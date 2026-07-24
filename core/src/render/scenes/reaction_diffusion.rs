@@ -310,7 +310,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     out_col = out_col * (1.0 - hatch_amt * 0.4);
     out_col = out_col + col * v * glow * 0.22;
 
-    return vec4<f32>(out_col, 1.0);
+    // Alpha carries scene presence (the V-field `structure` term) so V=0 voids are
+    // transparent and the `bg_*` backdrop shows through (ADR-0026). The present
+    // pipeline blends premultiplied-OVER: `out_col` is emitted as-is (added over the
+    // backdrop, so bright contours keep full brightness), and alpha only gates how
+    // much backdrop reveals. Over the default black backdrop this is byte-identical
+    // to the prior opaque present.
+    return vec4<f32>(out_col, structure);
 }
 "#;
 
@@ -786,7 +792,11 @@ fn surface_pipeline(
             compilation_options: Default::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format: surface_format,
-                blend: Some(wgpu::BlendState::REPLACE),
+                // Premultiplied-alpha OVER the backdrop (ADR-0026): the scene is
+                // emissive, so `out_col` adds over the atmosphere and the present's
+                // alpha (scene presence) reveals `bg_*` in the field's voids. Over
+                // the default black backdrop this equals the prior opaque REPLACE.
+                blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
                 write_mask: wgpu::ColorWrites::ALL,
             })],
         }),
