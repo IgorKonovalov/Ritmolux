@@ -44,6 +44,7 @@
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::PingPongField;
+use crate::render::palette::{self, Palette};
 
 /// Particle count. GPU-resident state is ~16 bytes each, so this is ~0.8 MB of
 /// storage (negligible); the real ceiling is additive-blend fill rate at high
@@ -161,6 +162,14 @@ const SPIN_RATE: f32 = 0.18;
 /// Parameter defaults — a calm idle look when nothing is bound.
 const DEFAULT_SIZE: f32 = 1.0;
 const DEFAULT_HUE: f32 = 0.0;
+// Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5). The per-particle
+// seed jitter occupies `hue_center + (seed - 0.5)*hue_spread`; the defaults
+// (`spread = 0.15`, `center = 0.075`) reduce to `seed*0.15` — the prior hardcoded
+// jitter — so an unbound attractor is unchanged (`saturation = 1`, `mix = 0`).
+const DEFAULT_HUE_SPREAD: f32 = 0.15;
+const DEFAULT_HUE_CENTER: f32 = 0.075;
+const DEFAULT_SATURATION: f32 = 1.0;
+const DEFAULT_PALETTE_MIX: f32 = 0.0;
 /// Trail persistence: the fraction of the accumulation retained per 1/60 s frame.
 /// ~0.94 gives glowing trails that fade over ~1 s; `fade = 0` clears each frame
 /// (trail-free). Applied frame-rate-independently (raised to the `dt`-relative
@@ -245,10 +254,17 @@ const DRAW_SHADER: &str = r#"
 struct Draw {
     // v: x aspect, y point half-size (world), z hue offset, w spin (radians)
     // w: x world scale, y dim (2 or 3), z z-center to subtract (3D), w unused
+    // u: x hue_spread, y hue_center, z palette_mix, w saturation
     v: vec4<f32>,
     w: vec4<f32>,
+    u: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> draw: Draw;
+// Shared gradient LUTs (ADR-0021): sampled per-particle in the vertex shader
+// (VERTEX visibility). A/B for the `palette_mix` crossfade, one repeat sampler.
+@group(0) @binding(1) var lut_a: texture_2d<f32>;
+@group(0) @binding(2) var lut_b: texture_2d<f32>;
+@group(0) @binding(3) var lut_samp: sampler;
 
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
@@ -256,14 +272,10 @@ struct VsOut {
     @location(1) color: vec3<f32>,
 }
 
-// iq-style cosine palette (RGB phase-shifted), matching the swarm/fragment look.
-fn palette(t: f32) -> vec3<f32> {
-    let tau = 6.28318530718;
-    return vec3<f32>(
-        0.5 + 0.5 * cos(tau * (t + 0.10)),
-        0.5 + 0.5 * cos(tau * (t + 0.42)),
-        0.5 + 0.5 * cos(tau * (t + 0.62)),
-    );
+// Shared `saturation` (mirrors core/src/render/palette.rs::desaturate verbatim).
+fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
+    let luma = dot(c, vec3<f32>(0.299, 0.587, 0.114));
+    return vec3<f32>(luma) + (c - vec3<f32>(luma)) * s;
 }
 
 @vertex
@@ -284,6 +296,10 @@ fn vs_main(
     let scl = draw.w.x;
     let dim = draw.w.y;
     let zc = draw.w.z;
+    let hue_spread = draw.u.x;
+    let hue_center = draw.u.y;
+    let palette_mix = draw.u.z;
+    let saturation = draw.u.w;
 
     let cs = cos(rot);
     let sn = sin(rot);
@@ -299,10 +315,19 @@ fn vs_main(
     }
     let world = screen * scl + corner * psize;
 
+    // Per-particle colour through the shared LUT: the seeded jitter occupies the
+    // band `hue_center + (seed - 0.5)*hue_spread` (was a hardcoded `seed*0.15`),
+    // plus the shared `hue`; both LUTs crossfade by `palette_mix` before
+    // `saturation`. `textureSampleLevel` (LOD 0) — vertex stage has no derivatives.
+    let coord = hue + hue_center + (seed - 0.5) * hue_spread;
+    let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
+    let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
+    let col = apply_saturation(mix(ca, cb, clamp(palette_mix, 0.0, 1.0)), saturation);
+
     var out: VsOut;
     out.pos = vec4<f32>(world.x / aspect, world.y, 0.0, 1.0);
     out.local = corner;
-    out.color = palette(hue + seed * 0.15);
+    out.color = col;
     return out;
 }
 
@@ -401,11 +426,13 @@ struct StepUniform {
 
 /// Draw uniform (per frame). `v`: x aspect, y point half-size, z hue offset, w
 /// spin. `w`: x world scale, y projection dim (2 or 3), z z-centre (3D), w unused.
+/// `u`: x hue_spread, y hue_center, z palette_mix, w saturation (ADR-0021).
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct DrawUniform {
     v: [f32; 4],
     w: [f32; 4],
+    u: [f32; 4],
 }
 
 /// Decay uniform (per frame): x is the per-frame trail retention factor.
@@ -429,6 +456,11 @@ struct Resources {
     decay_uniform: wgpu::Buffer,
     compute_bg: wgpu::BindGroup,
     draw_bg: wgpu::BindGroup,
+    /// The shared gradient LUT textures (A/B) the draw vertex shader samples +
+    /// crossfades (ADR-0021); uploaded from the scene's baked palette on the first
+    /// frame after a (re)build and on a preset switch.
+    lut_texture_a: wgpu::Texture,
+    lut_texture_b: wgpu::Texture,
     /// Decay/present bind groups reading texture A / texture B — selected by the
     /// field's read side each frame so nothing is rebuilt on the hot path.
     decay_bg_a: wgpu::BindGroup,
@@ -513,19 +545,62 @@ impl Resources {
             cache: None,
         });
 
+        // Shared gradient LUTs (ADR-0021): two 256×1 textures (A/B) + a repeat
+        // sampler, bound to the draw pass and sampled per-particle in the vertex
+        // shader (so VERTEX visibility).
+        let lut_texture_a = palette::lut_texture(device, "attractor-lut-a");
+        let lut_texture_b = palette::lut_texture(device, "attractor-lut-b");
+        let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
+        let lut_view_b = lut_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
+        let lut_sampler = palette::lut_sampler(device);
+
         // --- draw: the particle buffer as an instance vertex buffer, additively
         // into the trail field (float target so the accumulation has headroom) ---
+        let lut_vertex_texture = |binding: u32| wgpu::BindGroupLayoutEntry {
+            binding,
+            visibility: wgpu::ShaderStages::VERTEX,
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::D2,
+                multisampled: false,
+            },
+            count: None,
+        };
         let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("attractor-draw-layout"),
-            entries: &[uniform_entry(0, wgpu::ShaderStages::VERTEX)],
+            entries: &[
+                uniform_entry(0, wgpu::ShaderStages::VERTEX),
+                lut_vertex_texture(1),
+                lut_vertex_texture(2),
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
         });
         let draw_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("attractor-draw-bg"),
             layout: &draw_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: draw_uniform.as_entire_binding(),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: draw_uniform.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&lut_view_a),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&lut_view_b),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&lut_sampler),
+                },
+            ],
         });
         let draw_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("attractor-draw-pipeline-layout"),
@@ -660,6 +735,8 @@ impl Resources {
             decay_bg_b,
             present_bg_a,
             present_bg_b,
+            lut_texture_a,
+            lut_texture_b,
         }
     }
 
@@ -862,6 +939,16 @@ pub struct AttractorScene {
     size: f32,
     hue: f32,
     fade: f32,
+    /// Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5): the per-particle
+    /// seed jitter band + shared desaturation + A/B crossfade.
+    hue_spread: f32,
+    hue_center: f32,
+    saturation: f32,
+    palette_mix: f32,
+    /// The active baked palette pair; uploaded to the draw LUT textures when
+    /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
+    palette: Palette,
+    palette_dirty: bool,
     /// This frame's `reseed` level (bound to a beat/onset expression); its rising
     /// edge re-scatters the cloud.
     reseed: f32,
@@ -895,6 +982,12 @@ impl AttractorScene {
             size: DEFAULT_SIZE,
             hue: DEFAULT_HUE,
             fade: DEFAULT_FADE,
+            hue_spread: DEFAULT_HUE_SPREAD,
+            hue_center: DEFAULT_HUE_CENTER,
+            saturation: DEFAULT_SATURATION,
+            palette_mix: DEFAULT_PALETTE_MIX,
+            palette: Palette::default_spectrum(),
+            palette_dirty: true,
             reseed: 0.0,
             prev_reseed: 0.0,
         }
@@ -956,6 +1049,13 @@ impl Scene for AttractorScene {
         self.time = time;
     }
 
+    fn set_palette(&mut self, palette: &Palette) {
+        // Uploaded to the draw LUT textures in `render` (deferred — resources build
+        // lazily on first render). Cheap array copy, off the hot path.
+        self.palette = *palette;
+        self.palette_dirty = true;
+    }
+
     fn reset_params(&mut self) {
         // Defaults are the active family's canonical coefficients + the calm look,
         // so an unbound preset (or a param a preset leaves out) falls back here
@@ -968,6 +1068,10 @@ impl Scene for AttractorScene {
         self.size = DEFAULT_SIZE;
         self.hue = DEFAULT_HUE;
         self.fade = DEFAULT_FADE;
+        self.hue_spread = DEFAULT_HUE_SPREAD;
+        self.hue_center = DEFAULT_HUE_CENTER;
+        self.saturation = DEFAULT_SATURATION;
+        self.palette_mix = DEFAULT_PALETTE_MIX;
         self.reseed = 0.0;
     }
 
@@ -980,6 +1084,10 @@ impl Scene for AttractorScene {
             "size" => self.size = value,
             "hue" => self.hue = value,
             "fade" => self.fade = value,
+            "hue_spread" => self.hue_spread = value,
+            "hue_center" => self.hue_center = value,
+            "saturation" => self.saturation = value,
+            "palette_mix" => self.palette_mix = value,
             "reseed" => self.reseed = value,
             _ => {}
         }
@@ -1032,6 +1140,8 @@ impl Scene for AttractorScene {
     ) {
         if self.res.is_none() {
             self.res = Some(Resources::build(&self.device, self.surface_format));
+            // Fresh LUT textures are empty, so upload the palette below.
+            self.palette_dirty = true;
         }
         let Self {
             res,
@@ -1049,11 +1159,25 @@ impl Scene for AttractorScene {
             size,
             hue,
             fade,
+            hue_spread,
+            hue_center,
+            saturation,
+            palette_mix,
+            palette,
+            palette_dirty,
             ..
         } = self;
         let Some(res) = res.as_mut() else {
             return;
         };
+
+        // Upload the active palette LUTs (A + B) on a preset switch or a fresh
+        // build — off the hot path, once per change.
+        if *palette_dirty {
+            palette::write_lut(queue, &res.lut_texture_a, &palette.lut_a_bytes());
+            palette::write_lut(queue, &res.lut_texture_b, &palette.lut_b_bytes());
+            *palette_dirty = false;
+        }
 
         // Clear the trail field once after a (re)build so the first decay reads
         // black rather than garbage.
@@ -1091,6 +1215,7 @@ impl Scene for AttractorScene {
                     *time * SPIN_RATE,
                 ],
                 w: [scale, dim, z_center, 0.0],
+                u: [*hue_spread, *hue_center, *palette_mix, *saturation],
             }),
         );
         // Frame-rate-independent trail decay: retain `fade` per 1/60 s, raised to
