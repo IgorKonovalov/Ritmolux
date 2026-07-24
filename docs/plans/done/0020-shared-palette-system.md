@@ -1,7 +1,18 @@
 # 0020 — Shared palette system: gradient LUT, named + custom palettes, bindable color
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-07-23
+> **Closed:** 2026-07-24 — passed Mode 4 review (no blockers, no majors; two minor, two nits).
+> Six `dev` phase commits (`e64908c` shared palette module + fragment through the LUT, `b518130`
+> custom gradient stops, `81ede9e` swarm through the LUT, `53c944e` A/B `palette_mix` crossfade,
+> `9281c23` reaction-diffusion + attractor through the palette, `d00ce16` palette-surface docs).
+> All four shader-colored scenes (fragment, swarm, reaction-diffusion, attractor) color through the
+> shared `core/src/render/palette.rs` baked LUT; the default `spectrum` reproduces the prior cosine so
+> the shipped presets are visually unchanged (only the reaction-diffusion golden was re-blessed for the
+> user-approved unification onto `spectrum`). Verified: 51 lib tests + `preset` integration green,
+> `clippy -p lmv-core --all-targets` clean with the hot-path pragma on `palette.rs`; only
+> `core/tests/golden/reaction_diffusion.png` changed (fragment/swarm/attractor goldens byte-identical =
+> no-regression proof). **C ABI untouched, no new dependency.** Version **minor 0.9.0 -> 0.10.0** at close.
 > **Owner skill(s):** dev
 > **Related ADRs:** [0021](../adrs/0021-shared-palette-system.md) (supplements [0002](../adrs/0002-layered-preset-architecture.md))
 > **Scope note (2026-07-23):** extended to **all four** shader-colored scenes. The reaction-diffusion
