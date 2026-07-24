@@ -36,6 +36,7 @@
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::PingPongField;
+use crate::render::palette::{self, Palette};
 
 /// Fixed internal simulation grid (square). 256² resolves the Gray-Scott
 /// patterns well while staying cheap enough that the headless capture tests run
@@ -81,6 +82,14 @@ const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_CONTOUR: f32 = 6.0;
 const DEFAULT_HATCH: f32 = 5.0;
 const DEFAULT_GLOW: f32 = 1.0;
+// Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5). `color_span` = 0.85
+// (the old fixed field-to-gradient coefficient) + `color_center` = 0 +
+// `saturation` = 1 + `palette_mix` = 0 reproduce the prior present-look color math
+// (now sampling the shared LUT instead of the private cosine).
+const DEFAULT_COLOR_SPAN: f32 = 0.85;
+const DEFAULT_COLOR_CENTER: f32 = 0.0;
+const DEFAULT_SATURATION: f32 = 1.0;
+const DEFAULT_PALETTE_MIX: f32 = 0.0;
 
 /// Beat-stamped seed injection (Phase 3). A rising `inject` edge stamps a blob
 /// of V into the field at the next seeded position, so a beat spawns new growth.
@@ -220,18 +229,23 @@ fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
 struct Present {
     // x: hue, y: contour density, z: hatch frequency (texels), w: glow
     a: vec4<f32>,
+    // x: color_span, y: color_center, z: saturation, w: palette_mix
+    b: vec4<f32>,
 }
 @group(0) @binding(0) var present_field: texture_2d<f32>;
 @group(0) @binding(1) var present_samp: sampler;
 @group(0) @binding(2) var<uniform> pp: Present;
+// Shared gradient LUTs (ADR-0021): A/B for the `palette_mix` crossfade, one
+// repeat sampler. Kept in this present bind group (a unique 6-entry layout) so it
+// never matches another pipeline's layout on the DX12 WARP software adapter.
+@group(0) @binding(3) var lut_a: texture_2d<f32>;
+@group(0) @binding(4) var lut_b: texture_2d<f32>;
+@group(0) @binding(5) var lut_samp: sampler;
 
-// iq-style cosine palette: smooth, loops in hue.
-fn palette(t: f32) -> vec3<f32> {
-    let a = vec3<f32>(0.5, 0.5, 0.5);
-    let b = vec3<f32>(0.5, 0.5, 0.5);
-    let c = vec3<f32>(1.0, 1.0, 1.0);
-    let d = vec3<f32>(0.0, 0.33, 0.67);
-    return a + b * cos(6.28318 * (c * t + d));
+// Shared `saturation` (mirrors core/src/render/palette.rs::desaturate verbatim).
+fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
+    let luma = dot(c, vec3<f32>(0.299, 0.587, 0.114));
+    return vec3<f32>(luma) + (c - vec3<f32>(luma)) * s;
 }
 
 fn sample_v(uv: vec2<f32>) -> f32 {
@@ -256,6 +270,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let density = pp.a.y;
     let hatch_freq = pp.a.z;
     let glow = pp.a.w;
+    let color_span = pp.b.x;
+    let color_center = pp.b.y;
+    let saturation = pp.b.z;
+    let palette_mix = pp.b.w;
 
     // Slope mask: contours and hatch only appear where the field actually
     // slopes, so the flat V=0 background stays dark (V=0 is itself an iso-level,
@@ -268,8 +286,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let line_d = abs(fract(f - 0.5) - 0.5) / max(fwidth(f), 1e-4);
     let contour = (1.0 - clamp(line_d, 0.0, 1.0)) * slope;
 
-    // Palette by field level so the nested loops read as coloured bands.
-    let col = palette(v * 0.85 + hue);
+    // Palette by field level so the nested loops read as coloured bands. The
+    // field level `v` is the gradient coordinate: `color_span` (was a fixed 0.85)
+    // sets the spanned range, `color_center`/`hue` slide the window, and the A/B
+    // LUTs crossfade by `palette_mix` before the shared `saturation`.
+    let coord = v * color_span + color_center + hue;
+    let ca = textureSample(lut_a, lut_samp, vec2<f32>(coord, 0.5)).rgb;
+    let cb = textureSample(lut_b, lut_samp, vec2<f32>(coord, 0.5)).rgb;
+    let col = apply_saturation(mix(ca, cb, clamp(palette_mix, 0.0, 1.0)), saturation);
 
     // Hatch/comb: stripes along the contour tangent (perpendicular to grad),
     // gated to the slopes so flats stay clean.
@@ -311,6 +335,8 @@ struct SimParams {
 struct PresentParams {
     /// x: hue, y: contour density, z: hatch frequency (texels), w: glow.
     a: [f32; 4],
+    /// x: color_span, y: color_center, z: saturation, w: palette_mix.
+    b: [f32; 4],
 }
 
 /// The GPU-side state, built lazily on first render (see the module docs).
@@ -329,6 +355,11 @@ struct Resources {
     init_bg: wgpu::BindGroup,
     present_bg_a: wgpu::BindGroup,
     present_bg_b: wgpu::BindGroup,
+    /// The shared gradient LUT textures (A/B) the present pass samples + crossfades
+    /// (ADR-0021); uploaded from the scene's baked palette on the first frame after
+    /// a (re)build and on a preset switch.
+    lut_texture_a: wgpu::Texture,
+    lut_texture_b: wgpu::Texture,
 }
 
 impl Resources {
@@ -401,9 +432,23 @@ impl Resources {
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
+        // Shared gradient LUTs (ADR-0021): two 256×1 textures (A/B) + a repeat
+        // sampler, in the present bind group alongside the field.
+        let lut_texture_a = palette::lut_texture(device, "rd-lut-a");
+        let lut_texture_b = palette::lut_texture(device, "rd-lut-b");
+        let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
+        let lut_view_b = lut_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
+        let lut_sampler = palette::lut_sampler(device);
         let present_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("rd-present-layout"),
-            entries: &[texture_entry(0, true), sampler_entry(1), uniform_entry(2)],
+            entries: &[
+                texture_entry(0, true),
+                sampler_entry(1),
+                uniform_entry(2),
+                texture_entry(3, true),
+                texture_entry(4, true),
+                sampler_entry(5),
+            ],
         });
         let present_bg_a = present_bind_group(
             device,
@@ -411,6 +456,9 @@ impl Resources {
             field.view_a(),
             &sampler,
             &present_uniform,
+            &lut_view_a,
+            &lut_view_b,
+            &lut_sampler,
         );
         let present_bg_b = present_bind_group(
             device,
@@ -418,6 +466,9 @@ impl Resources {
             field.view_b(),
             &sampler,
             &present_uniform,
+            &lut_view_a,
+            &lut_view_b,
+            &lut_sampler,
         );
         let present_pipeline =
             surface_pipeline(device, &present_shader, &present_layout, surface_format);
@@ -435,6 +486,8 @@ impl Resources {
             init_bg,
             present_bg_a,
             present_bg_b,
+            lut_texture_a,
+            lut_texture_b,
         }
     }
 
@@ -503,6 +556,15 @@ pub struct ReactionDiffusionScene {
     contour: f32,
     hatch: f32,
     glow: f32,
+    /// Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5).
+    color_span: f32,
+    color_center: f32,
+    saturation: f32,
+    palette_mix: f32,
+    /// The active baked palette pair; uploaded to the present LUT textures when
+    /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
+    palette: Palette,
+    palette_dirty: bool,
 }
 
 impl ReactionDiffusionScene {
@@ -543,6 +605,12 @@ impl ReactionDiffusionScene {
             contour: DEFAULT_CONTOUR,
             hatch: DEFAULT_HATCH,
             glow: DEFAULT_GLOW,
+            color_span: DEFAULT_COLOR_SPAN,
+            color_center: DEFAULT_COLOR_CENTER,
+            saturation: DEFAULT_SATURATION,
+            palette_mix: DEFAULT_PALETTE_MIX,
+            palette: Palette::default_spectrum(),
+            palette_dirty: true,
         }
     }
 }
@@ -608,12 +676,16 @@ fn sim_bind_group(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn present_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     input: &wgpu::TextureView,
     sampler: &wgpu::Sampler,
     uniform: &wgpu::Buffer,
+    lut_a: &wgpu::TextureView,
+    lut_b: &wgpu::TextureView,
+    lut_sampler: &wgpu::Sampler,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("rd-present-bg"),
@@ -630,6 +702,18 @@ fn present_bind_group(
             wgpu::BindGroupEntry {
                 binding: 2,
                 resource: uniform.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::TextureView(lut_a),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: wgpu::BindingResource::TextureView(lut_b),
+            },
+            wgpu::BindGroupEntry {
+                binding: 5,
+                resource: wgpu::BindingResource::Sampler(lut_sampler),
             },
         ],
     })
@@ -738,6 +822,13 @@ impl Scene for ReactionDiffusionScene {
         self.time = time;
     }
 
+    fn set_palette(&mut self, palette: &Palette) {
+        // Uploaded to the present LUT textures in `render` (deferred — resources
+        // build lazily on first render). Cheap array copy, off the hot path.
+        self.palette = *palette;
+        self.palette_dirty = true;
+    }
+
     fn reset_params(&mut self) {
         self.feed = DEFAULT_FEED;
         self.kill = DEFAULT_KILL;
@@ -747,6 +838,10 @@ impl Scene for ReactionDiffusionScene {
         self.contour = DEFAULT_CONTOUR;
         self.hatch = DEFAULT_HATCH;
         self.glow = DEFAULT_GLOW;
+        self.color_span = DEFAULT_COLOR_SPAN;
+        self.color_center = DEFAULT_COLOR_CENTER;
+        self.saturation = DEFAULT_SATURATION;
+        self.palette_mix = DEFAULT_PALETTE_MIX;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -763,6 +858,10 @@ impl Scene for ReactionDiffusionScene {
             "contour" => self.contour = value,
             "hatch" => self.hatch = value,
             "glow" => self.glow = value,
+            "color_span" => self.color_span = value,
+            "color_center" => self.color_center = value,
+            "saturation" => self.saturation = value,
+            "palette_mix" => self.palette_mix = value,
             _ => {}
         }
     }
@@ -787,9 +886,11 @@ impl Scene for ReactionDiffusionScene {
         view: &wgpu::TextureView,
         _aspect: f32,
     ) {
-        // Build GPU resources on first use (module docs).
+        // Build GPU resources on first use (module docs). Fresh LUT textures are
+        // empty, so mark the palette dirty to upload it below.
         if self.res.is_none() {
             self.res = Some(Resources::build(&self.device, self.surface_format));
+            self.palette_dirty = true;
         }
         let Self {
             res,
@@ -804,17 +905,32 @@ impl Scene for ReactionDiffusionScene {
             contour,
             hatch,
             glow,
+            color_span,
+            color_center,
+            saturation,
+            palette_mix,
+            palette,
+            palette_dirty,
             ..
         } = self;
         let Some(res) = res.as_mut() else {
             return;
         };
 
+        // Upload the active palette LUTs (A + B) on a preset switch or a fresh
+        // build — off the hot path, once per change.
+        if *palette_dirty {
+            palette::write_lut(queue, &res.lut_texture_a, &palette.lut_a_bytes());
+            palette::write_lut(queue, &res.lut_texture_b, &palette.lut_b_bytes());
+            *palette_dirty = false;
+        }
+
         queue.write_buffer(
             &res.present_uniform,
             0,
             bytemuck::bytes_of(&PresentParams {
                 a: [*hue, *contour, *hatch, *glow],
+                b: [*color_span, *color_center, *saturation, *palette_mix],
             }),
         );
 

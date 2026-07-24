@@ -428,8 +428,14 @@ mod tests {
 
     /// The load-bearing no-regression guarantee (Plan 0020 Phase 1): the default
     /// `spectrum` palette baked into the LUT reproduces the prior analytic cosine
-    /// within a small tolerance at several sampled `t`. If this drifts, every
-    /// shipped preset's color shifts.
+    /// (`d = 0.10, 0.42, 0.62`) within a small tolerance at several sampled `t`.
+    /// That cosine is the one the **fragment field, swarm, and attractor** all
+    /// used before this module, so this single assertion is their shared default-
+    /// path no-regression proof (each also has a golden fixture within tolerance).
+    /// Reaction-diffusion used a *different* cosine and was deliberately unified
+    /// onto `spectrum` in Phase 5 (its golden baseline re-blessed), so it is the
+    /// one scene whose default look intentionally changed. If this drifts, every
+    /// shipped preset on those three scenes shifts color.
     #[test]
     fn spectrum_reproduces_the_prior_cosine() {
         let pal = Palette::default_spectrum();
