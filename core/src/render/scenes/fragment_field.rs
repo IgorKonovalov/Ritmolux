@@ -1,12 +1,19 @@
 //! Fragment-field scene: a fullscreen Shadertoy-style domain-warped field,
-//! colored by a cosine palette. The first "generative-art"-tier built-in and
-//! one of the two preset-driven systems (ADR-0002 layers 1-2).
+//! colored through the shared palette LUT (ADR-0021). The first "generative-art"-
+//! tier built-in and one of the two preset-driven systems (ADR-0002 layers 1-2).
 //!
 //! Its look is a set of named parameters — `warp`, `hue`, `zoom`, `glow`,
-//! `flash` — that a preset binds to expressions over the audio analysis (Plan
+//! `flash`, plus the shared color knobs `color_span`/`color_center`/`saturation`
+//! (Plan 0020) — that a preset binds to expressions over the audio analysis (Plan
 //! 0003 Phase 5). With no preset the parameter defaults render a gentle idle
 //! field. The scene reads no audio directly; all reactivity flows through the
 //! parameter values.
+//!
+//! Color: the field level indexes a 256-entry gradient LUT (the preset's
+//! `[palette]`, default `spectrum` = the exact prior cosine) instead of a
+//! hardcoded `palette()`. `color_span` sets how much of the gradient the field
+//! spans (replacing the old fixed `field*0.6`), `color_center`/`hue` slide the
+//! window, and `saturation` desaturates toward luma — all bindable.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). Runs every displayed frame.
@@ -20,6 +27,7 @@
 
 use super::Scene;
 use crate::dsp::AnalysisFrame;
+use crate::render::palette::{self, Palette};
 
 /// Parameter defaults — a calm idle field when nothing is bound.
 const DEFAULT_WARP: f32 = 0.4;
@@ -31,18 +39,31 @@ const DEFAULT_FLASH: f32 = 0.0;
 // field's existing `zoom` already scales the sample coordinates (its view-zoom in
 // field space), so Phase 2 completes the ViewTransform here by adding pan.
 const DEFAULT_PAN: f32 = 0.0;
+// Shared palette color knobs (ADR-0021). `color_span` = 0.6 + `color_center` = 0
+// + `saturation` = 1 reproduce the prior look exactly (the old `field*0.6` sample
+// with no desaturation).
+const DEFAULT_COLOR_SPAN: f32 = 0.6;
+const DEFAULT_COLOR_CENTER: f32 = 0.0;
+const DEFAULT_SATURATION: f32 = 1.0;
 
 const SHADER: &str = r#"
 struct Params {
     // x: time (s), y: aspect, z: warp, w: hue
     a: vec4<f32>,
-    // x: zoom, y: glow, z: flash, w: unused
+    // x: zoom, y: glow, z: flash, w: color_span
     b: vec4<f32>,
-    // xy: pan (field-space offset, ADR-0018), zw: unused
+    // xy: pan (field-space offset, ADR-0018), z: color_center, w: saturation
     c: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
+// The gradient LUT sits in its own bind group (group 1), so this pipeline's
+// layout stays distinct from the screen-space kaleidoscope's single 3-entry
+// [uniform, texture, sampler] group — two byte-identical layouts mis-render when
+// they coexist on the DX12 WARP software adapter (the same quirk the shared line
+// renderer and the lazy feedback scenes work around).
+@group(1) @binding(0) var lut: texture_2d<f32>;
+@group(1) @binding(1) var lut_samp: sampler;
 
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
@@ -61,13 +82,11 @@ fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
     return out;
 }
 
-// iq-style cosine palette: smooth, loops in hue.
-fn palette(t: f32) -> vec3<f32> {
-    let a = vec3<f32>(0.5, 0.5, 0.5);
-    let b = vec3<f32>(0.5, 0.5, 0.5);
-    let c = vec3<f32>(1.0, 1.0, 1.0);
-    let d = vec3<f32>(0.10, 0.42, 0.62);
-    return a + b * cos(6.28318 * (c * t + d));
+// Shared `saturation` (mirrors core/src/render/palette.rs::desaturate verbatim):
+// scale chroma around Rec. 601 luma. 1.0 unchanged, 0.0 grayscale.
+fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
+    let luma = dot(c, vec3<f32>(0.299, 0.587, 0.114));
+    return vec3<f32>(luma) + (c - vec3<f32>(luma)) * s;
 }
 
 @fragment
@@ -79,7 +98,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let zoom = params.b.x;
     let glow = params.b.y;
     let flash = params.b.z;
+    let color_span = params.b.w;
     let pan = params.c.xy;
+    let color_center = params.c.z;
+    let saturation = params.c.w;
 
     var uv = in.ndc;
     uv.x = uv.x * aspect;
@@ -97,7 +119,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
 
     let field = 0.5 + 0.5 * sin(p.x + p.y + t * 0.5);
-    var col = palette(field * 0.6 + hue);
+    // Field level indexes the gradient LUT: `color_span` sets the spanned range
+    // (was a fixed 0.6), `color_center`/`hue` slide the window. Linear-filtered,
+    // repeat-addressed (a hue rotation wraps like the cosine wheel).
+    let coord = field * color_span + color_center + hue;
+    var col = textureSample(lut, lut_samp, vec2<f32>(coord, 0.5)).rgb;
+    col = apply_saturation(col, saturation);
 
     let r = length(uv);
     col = col * (glow * (1.0 - 0.25 * r));
@@ -120,6 +147,15 @@ pub struct FragmentFieldScene {
     pipeline: wgpu::RenderPipeline,
     uniforms: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
+    /// The LUT texture + sampler bind group (group 1), kept distinct from the
+    /// uniform group so the pipeline layout does not match the kaleidoscope's.
+    lut_bind_group: wgpu::BindGroup,
+    /// The 256×1 gradient LUT texture the fragment samples for color (ADR-0021).
+    lut_texture: wgpu::Texture,
+    /// The active baked palette, re-uploaded to `lut_texture` when
+    /// `palette_dirty` (set by `set_palette` on a preset switch), off the hot path.
+    palette: Palette,
+    palette_dirty: bool,
     /// Shared scene clock (seconds), set by the renderer each frame.
     time: f32,
     warp: f32,
@@ -129,6 +165,9 @@ pub struct FragmentFieldScene {
     flash: f32,
     pan_x: f32,
     pan_y: f32,
+    color_span: f32,
+    color_center: f32,
+    saturation: f32,
 }
 
 impl FragmentFieldScene {
@@ -144,8 +183,11 @@ impl FragmentFieldScene {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("fragment-field-bind-layout"),
+        let lut_texture = palette::lut_texture(device, "fragment-field-lut");
+        let lut_view = lut_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let lut_sampler = palette::lut_sampler(device);
+        let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("fragment-field-uniform-layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::FRAGMENT,
@@ -157,17 +199,55 @@ impl FragmentFieldScene {
                 count: None,
             }],
         });
+        // The LUT texture + sampler live in their own group (group 1) — see the
+        // WGSL note: keeping this pipeline's layout distinct from the
+        // kaleidoscope's avoids the DX12 WARP identical-layout mis-render.
+        let lut_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("fragment-field-lut-layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("fragment-field-bind-group"),
-            layout: &bind_layout,
+            label: Some("fragment-field-uniform-bg"),
+            layout: &uniform_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
                 resource: uniforms.as_entire_binding(),
             }],
         });
+        let lut_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("fragment-field-lut-bg"),
+            layout: &lut_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&lut_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&lut_sampler),
+                },
+            ],
+        });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("fragment-field-pipeline-layout"),
-            bind_group_layouts: &[Some(&bind_layout)],
+            bind_group_layouts: &[Some(&uniform_layout), Some(&lut_layout)],
             immediate_size: 0,
         });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -200,6 +280,14 @@ impl FragmentFieldScene {
             pipeline,
             uniforms,
             bind_group,
+            lut_bind_group,
+            lut_texture,
+            // Seed with the default `spectrum` (the prior cosine); the renderer
+            // calls `set_palette` before the first frame with the active preset's
+            // palette, and `render` uploads it. Seeding here keeps the texture
+            // valid even if `set_palette` were never called.
+            palette: Palette::default_spectrum(),
+            palette_dirty: true,
             time: 0.0,
             warp: DEFAULT_WARP,
             hue: DEFAULT_HUE,
@@ -208,6 +296,9 @@ impl FragmentFieldScene {
             flash: DEFAULT_FLASH,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
+            color_span: DEFAULT_COLOR_SPAN,
+            color_center: DEFAULT_COLOR_CENTER,
+            saturation: DEFAULT_SATURATION,
         }
     }
 }
@@ -221,6 +312,13 @@ impl Scene for FragmentFieldScene {
         self.time = time;
     }
 
+    fn set_palette(&mut self, palette: &Palette) {
+        // Store the baked LUT; `render` uploads it (deferred so scenes with lazy
+        // GPU resources share this seam). Cheap array copy, off the hot path.
+        self.palette = *palette;
+        self.palette_dirty = true;
+    }
+
     fn reset_params(&mut self) {
         self.warp = DEFAULT_WARP;
         self.hue = DEFAULT_HUE;
@@ -229,6 +327,9 @@ impl Scene for FragmentFieldScene {
         self.flash = DEFAULT_FLASH;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
+        self.color_span = DEFAULT_COLOR_SPAN;
+        self.color_center = DEFAULT_COLOR_CENTER;
+        self.saturation = DEFAULT_SATURATION;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -240,6 +341,9 @@ impl Scene for FragmentFieldScene {
             "flash" => self.flash = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
+            "color_span" => self.color_span = value,
+            "color_center" => self.color_center = value,
+            "saturation" => self.saturation = value,
             _ => {}
         }
     }
@@ -256,10 +360,17 @@ impl Scene for FragmentFieldScene {
         view: &wgpu::TextureView,
         aspect: f32,
     ) {
+        // Upload the active palette LUT if a preset switch changed it (off the
+        // hot path — once per switch, not per frame).
+        if self.palette_dirty {
+            palette::write_lut(queue, &self.lut_texture, &self.palette);
+            self.palette_dirty = false;
+        }
+
         let params = Params {
             a: [self.time, aspect.max(0.1), self.warp, self.hue],
-            b: [self.zoom, self.glow, self.flash, 0.0],
-            c: [self.pan_x, self.pan_y, 0.0, 0.0],
+            b: [self.zoom, self.glow, self.flash, self.color_span],
+            c: [self.pan_x, self.pan_y, self.color_center, self.saturation],
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
 
@@ -283,6 +394,7 @@ impl Scene for FragmentFieldScene {
         });
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.bind_group, &[]);
+        pass.set_bind_group(1, &self.lut_bind_group, &[]);
         pass.draw(0..3, 0..1);
     }
 }
