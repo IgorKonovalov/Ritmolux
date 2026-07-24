@@ -20,6 +20,7 @@
 
 use super::{FALLBACK_DT, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
+use crate::render::palette::{self, Palette};
 
 /// Particle count. 10k is the target look (Plan 0003); it holds the primary
 /// dev box comfortably and is the number to validate against the 60 fps @
@@ -43,6 +44,13 @@ const DEFAULT_BURST: f32 = 0.0;
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_BRIGHTNESS: f32 = 0.8;
 const DEFAULT_SIZE: f32 = 1.0;
+// Shared palette color knobs (ADR-0021). Each particle's hue occupies the band
+// `hue_center + (particle_hue - 0.5) * hue_spread`; the defaults (`center = 0.5`,
+// `spread = 1`) reproduce the prior full-wheel look (`particle_hue`), and
+// `saturation = 1` leaves color untouched — so an unbound swarm is unchanged.
+const DEFAULT_HUE_SPREAD: f32 = 1.0;
+const DEFAULT_HUE_CENTER: f32 = 0.5;
+const DEFAULT_SATURATION: f32 = 1.0;
 // Shared view transform (ADR-0018): identity by default, so an unbound preset is
 // unchanged. `zoom` multiplies particle positions about the frame centre; `pan_*`
 // offset them — matching the line scenes' semantics (zoom > 1 = zoomed in).
@@ -144,6 +152,14 @@ pub struct SwarmScene {
     zoom: f32,
     pan_x: f32,
     pan_y: f32,
+    /// The active baked palette (ADR-0021), sampled per particle on the CPU. Set
+    /// by `set_palette` on a preset switch; default `spectrum` reproduces the
+    /// prior cosine.
+    palette: Palette,
+    /// Per-particle hue band + shared desaturation (ADR-0021).
+    hue_spread: f32,
+    hue_center: f32,
+    saturation: f32,
 }
 
 impl SwarmScene {
@@ -261,6 +277,10 @@ impl SwarmScene {
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
+            palette: Palette::default_spectrum(),
+            hue_spread: DEFAULT_HUE_SPREAD,
+            hue_center: DEFAULT_HUE_CENTER,
+            saturation: DEFAULT_SATURATION,
         }
     }
 
@@ -281,14 +301,12 @@ impl SwarmScene {
     }
 }
 
-/// iq-style cosine palette (RGB phase-shifted), matching the fragment field's.
-fn palette(t: f32) -> [f32; 3] {
-    let tau = std::f32::consts::TAU;
-    [
-        0.5 + 0.5 * (tau * (t + 0.10)).cos(),
-        0.5 + 0.5 * (tau * (t + 0.42)).cos(),
-        0.5 + 0.5 * (tau * (t + 0.62)).cos(),
-    ]
+/// The LUT sample coordinate for one particle (ADR-0021): its per-particle hue
+/// occupies the band `hue_center + (particle_hue - 0.5) * hue_spread`, plus the
+/// shared `hue` rotation. Defaults (`center = 0.5`, `spread = 1`, `hue = 0`)
+/// reduce to `particle_hue`, reproducing the prior full-wheel look.
+fn hue_coord(hue_center: f32, hue_spread: f32, particle_hue: f32, hue: f32) -> f32 {
+    hue_center + (particle_hue - 0.5) * hue_spread + hue
 }
 
 impl Scene for SwarmScene {
@@ -304,6 +322,12 @@ impl Scene for SwarmScene {
         self.time = time;
     }
 
+    fn set_palette(&mut self, palette: &Palette) {
+        // CPU-sampled per particle in `update`; a cheap array copy, off the hot
+        // path (once per preset switch).
+        self.palette = *palette;
+    }
+
     fn reset_params(&mut self) {
         self.force = DEFAULT_FORCE;
         self.spin = DEFAULT_SPIN;
@@ -314,6 +338,9 @@ impl Scene for SwarmScene {
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
+        self.hue_spread = DEFAULT_HUE_SPREAD;
+        self.hue_center = DEFAULT_HUE_CENTER;
+        self.saturation = DEFAULT_SATURATION;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -327,6 +354,9 @@ impl Scene for SwarmScene {
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
+            "hue_spread" => self.hue_spread = value,
+            "hue_center" => self.hue_center = value,
+            "saturation" => self.saturation = value,
             _ => {}
         }
     }
@@ -382,7 +412,11 @@ impl Scene for SwarmScene {
             }
 
             let speed = (p.vel[0] * p.vel[0] + p.vel[1] * p.vel[1]).sqrt();
-            let base = palette(p.hue + self.hue);
+            // Colour through the shared LUT (ADR-0021): the per-particle hue is
+            // mapped into the `hue_spread`/`hue_center` band, then desaturated by
+            // the shared `saturation`. Defaults reproduce the prior full-wheel look.
+            let coord = hue_coord(self.hue_center, self.hue_spread, p.hue, self.hue);
+            let base = palette::desaturate(self.palette.sample(coord), self.saturation);
             let bright = ((0.25 + speed * 0.7) * p.bright).min(1.6) * self.brightness;
 
             *inst = Instance {
@@ -436,5 +470,65 @@ impl Scene for SwarmScene {
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_vertex_buffer(0, self.instances.slice(..));
         pass.draw(0..6, 0..PARTICLES as u32);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // Test asserts index fixed-size arrays; allowed over the file's hot-path
+    // pragma — this is not the render path.
+    #![allow(clippy::indexing_slicing)]
+
+    use super::{DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, hue_coord};
+    use crate::render::palette::Palette;
+
+    /// The default hue band (`center = 0.5`, `spread = 1`, `hue = 0`) reduces to
+    /// `particle_hue`, so the swarm's colour is unchanged from before Plan 0020.
+    #[test]
+    fn default_hue_band_is_the_prior_full_wheel() {
+        for &ph in &[0.0, 0.2, 0.5, 0.73, 0.99] {
+            let coord = hue_coord(DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, ph, DEFAULT_HUE);
+            assert!(
+                (coord - ph).abs() < 1e-6,
+                "default band maps particle_hue to itself: {coord} vs {ph}"
+            );
+        }
+    }
+
+    /// A narrow `hue_spread` collapses the full particle-hue range into a tight
+    /// LUT band, so the sampled colours cluster (a coherent single-family swarm)
+    /// where `spread = 1` samples the whole wheel (rainbow confetti). Measured as
+    /// the spread of sampled RGB — the gap the plan closes.
+    #[test]
+    fn narrow_spread_makes_colour_coherent() {
+        let pal = Palette::default_spectrum();
+        // Total variance of the sampled colours across a fan of particle hues.
+        let colour_spread = |spread: f32| -> f32 {
+            let hues: Vec<f32> = (0..64).map(|i| i as f32 / 64.0).collect();
+            let cols: Vec<[f32; 3]> = hues
+                .iter()
+                .map(|&h| pal.sample(hue_coord(0.5, spread, h, 0.0)))
+                .collect();
+            let n = cols.len() as f32;
+            let mut mean = [0.0f32; 3];
+            for c in &cols {
+                for k in 0..3 {
+                    mean[k] += c[k] / n;
+                }
+            }
+            let mut var = 0.0f32;
+            for c in &cols {
+                for k in 0..3 {
+                    var += (c[k] - mean[k]).powi(2);
+                }
+            }
+            var / n
+        };
+        let narrow = colour_spread(0.1);
+        let full = colour_spread(1.0);
+        assert!(
+            narrow < full * 0.25,
+            "narrow band ({narrow:.4}) is far more coherent than the full wheel ({full:.4})"
+        );
     }
 }
