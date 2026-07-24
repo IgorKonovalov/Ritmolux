@@ -1,13 +1,22 @@
-# Aurora - cool cyan-green curtains that sway on their own like polar light. Medium
-# zoom for a moderate spread through the cool band (azure->green), anchored so it
-# stays out of the warm end; a slow sin sways the hue back and forth (not a monotonic
-# drift). Bass swells the fold; an independent slow sin keeps it alive when quiet.
+# Aurora - cool cyan-green curtains that sway like polar light. The shared "aurora"
+# palette (deep green -> teal -> violet, Plan 0020) held in a color_span that spans
+# green->teal and is anchored to stay OUT of the violet end, so the curtains keep their
+# polar-light hue instead of drifting the whole wheel (the old preset chased this with
+# a hue offset). A slow sin sways color_center; treble nudges it toward teal; bass
+# swells the fold, and an independent slow sin keeps it alive when quiet.
+#
+# Variables available to expressions: bass mid treb onset beat bar time.
 system = "fragment_field"
 name = "Aurora"
 
+[palette]
+name = "aurora"
+
 [params]
-warp  = "0.42 + sin(time * 0.11) * 0.1 + clamp(bass * 9, 0, 0.7)"
-hue   = "0.15 + sin(time * 0.07) * 0.05 + clamp(treb * 3, 0, 0.05)"
-zoom  = "0.85 + sin(time * 0.05) * 0.06 + bar * 0.1"
-glow  = "0.5 + clamp((bass + mid) * 7, 0, 0.95)"
-flash = "clamp(onset * 2.5, 0, 0.8)"
+warp         = "0.42 + sin(time * 0.11) * 0.1 + clamp(bass * 9, 0, 0.7)"
+zoom         = "0.85 + sin(time * 0.05) * 0.06 + bar * 0.1"
+glow         = "0.5 + clamp((bass + mid) * 7, 0, 0.95)"
+flash        = "clamp(onset * 2.5, 0, 0.8)"
+color_center = "0.22 + sin(time * 0.07) * 0.06 + clamp(treb * 3, 0, 0.08)"
+color_span   = "0.40"
+saturation   = "1.0"

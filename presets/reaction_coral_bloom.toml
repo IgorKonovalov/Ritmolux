@@ -1,24 +1,37 @@
 # Coral Bloom - a Gray-Scott reaction-diffusion field in the CORAL-GROWTH regime:
 # fingered fronds that reach and split at their tips, spawning fresh buds on the beat.
-# Warm-cored palette (orange fronds, cool ground) so it reads as living coral, a
-# growing sibling to Coral's churning teal spots.
+#
+# Colour (Plan 0020): a custom warm gradient - deep blue-teal ground -> hot orange
+# fronds -> pale-gold tips - so the fronds glow warm against a cool ground (the field
+# level is the gradient coordinate: ground low, frond spine high). A growing sibling
+# to Coral's churning teal spots; the old preset described this warmth but rendered
+# cyan under the spectrum default.
 #
 #   - bass drives the feed, growing the fronds faster and thicker; mid trims the kill,
 #     both staying inside the branching band so growth persists rather than dying back;
 #   - treble gently coarsens via flow; each beat stamps a fresh bud.
-# Mid iso-contours (5) and a loose hatch (6) keep the fronds legible; glow swells with
-# low/mid energy. Warm hue drifts slowly with time and treble.
+# Mid iso-contours (5) and a loose hatch (6) keep the fronds legible.
 #
 # Variables available to expressions: bass mid treb onset beat bar time.
 system = "reaction_diffusion"
 name = "Coral Bloom"
 
+[palette]
+stops = [
+  { at = 0.0,  color = "#06121c" },
+  { at = 0.42, color = "#134b5e" },
+  { at = 0.68, color = "#f0631a" },
+  { at = 0.86, color = "#ff8a2b" },
+  { at = 1.0,  color = "#ffd98a" },
+]
+
 [params]
-feed = "0.036 + clamp(bass * 4, 0, 1) * 0.005"
-kill = "0.057 + clamp(mid * 4, 0, 1) * 0.003"
-flow = "1.0 + clamp(treb * 4, 0, 1) * 0.25"
-inject = "beat"
-hue = "0.58 + time * 0.012 + clamp(treb * 3, 0, 1) * 0.06"
-contour = "5"
-hatch = "6"
-glow = "0.9 + clamp((bass + mid) * 3, 0, 1) * 0.6"
+feed         = "0.036 + clamp(bass * 4, 0, 1) * 0.005"
+kill         = "0.057 + clamp(mid * 4, 0, 1) * 0.003"
+flow         = "1.0 + clamp(treb * 4, 0, 1) * 0.25"
+inject       = "beat"
+contour      = "5"
+hatch        = "6"
+glow         = "0.9 + clamp((bass + mid) * 3, 0, 1) * 0.6"
+color_span   = "2.2"
+color_center = "sin(time * 0.025) * 0.02"

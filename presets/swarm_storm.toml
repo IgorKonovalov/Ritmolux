@@ -1,13 +1,28 @@
 # Storm - aggressive and churning: hard steering over a FAST-evolving field (high
 # spin) so the flow tears and reforms, with a big radial blast on every beat plus an
 # onset kick. Bright and busy - the loud end of the swarm set.
+#
+# Colour (Plan 0020): a custom hot gradient - deep crimson -> red -> orange ->
+# white-hot - with a WIDE hue_spread, so the churning mass reads as a chaotic firestorm
+# (hotter and broader than Burst's focused ember flare) instead of full-wheel confetti
+# (the old `hue` was a no-op). bass drags hue_center toward the white-hot end on hits.
 system = "swarm"
 name = "Storm"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#2a0206" },
+  { at = 0.35, color = "#b41414" },
+  { at = 0.7,  color = "#ff6a1a" },
+  { at = 1.0,  color = "#fff2c8" },
+]
 
 [params]
 force      = "2.0 + clamp(bass * 24, 0, 5)"
 spin       = "0.75 + clamp(mid * 9, 0, 1.6)"
 burst      = "beat * 11 + clamp(onset * 4, 0, 4)"
-hue        = "0.3 + time * 0.06"
 brightness = "0.8 + clamp((bass + treb) * 6, 0, 1.1)"
 size       = "1.7 + beat * 1.2"
+hue_spread = "0.7"
+hue_center = "0.5 + clamp(bass * 4, 0, 0.2) + beat * 0.1"
+saturation = "1.05"
