@@ -63,7 +63,7 @@ cargo build -p standalone --release --bin lmv
 
 Play any audio (loopback capture feeds the visuals). Then, in the window:
 
-- **`Space`** — cycle presets (step through all 10; each should render and react).
+- **`Space`** — cycle presets (step through the whole embedded set; each should render and react).
 - **`F3`** — toggle the diagnostics overlay (frame-time sparkline + GPU bar + fps/p99 readout).
 
 The 1 Hz log lands at:
