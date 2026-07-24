@@ -138,4 +138,8 @@ fn fullscreen_scenes_reveal_backdrop() {
         "feed = \"0.037\"\nkill = \"0.06\"\nflow = \"1.0\"\nglow = \"0.8\"\n",
         60,
     );
+
+    // Attractor (Plan 0025 Phase 3): the De Jong cloud fills a fractal shape with
+    // large empty space around it; that empty space must reveal the backdrop.
+    assert_backdrop_reveal(&mut r, "attractor", "size = \"1.0\"\n", 60);
 }
