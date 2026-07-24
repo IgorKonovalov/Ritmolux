@@ -1339,4 +1339,56 @@ mod tests {
             "trails accumulation resets on rebuild -> identical recaptures"
         );
     }
+
+    /// Plan 0028: the two new shape params (`radial_offset`, `phase`) are
+    /// preset-bindable and actually reach the sampler. A rose that binds both to
+    /// a `bass` expression, driven by a bass stimulus, must render differently
+    /// from an identical rose with both unbound (default `0.0`) — proof the
+    /// evaluated values thread through `set_param` into the geometry, not just
+    /// that the preset parses.
+    #[test]
+    fn shape_params_reach_the_parametric_scene() {
+        let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+            width: 96,
+            height: 96,
+            prefer_software: true,
+        }) else {
+            return;
+        };
+        let frame = AnalysisFrame {
+            bass: 1.0,
+            ..Default::default()
+        };
+
+        // Baseline: shape params unbound, so radial_offset = phase = 0.0 even
+        // under the bass stimulus — the plain rose.
+        let baseline = Preset::from_toml_str(
+            "system = \"parametric_curve\"\nname = \"ShapeBaseline\"\n\
+             [curve]\nfamily = \"maurer_rose\"\n\
+             [params]\nn = \"6\"\nd = \"71\"\nsamples = \"200\"\nscale = \"0.9\"\n",
+        )
+        .expect("valid baseline parametric preset");
+        renderer.set_presets(vec![baseline]);
+        let base = renderer
+            .capture_preset("ShapeBaseline", &frame, 4)
+            .expect("capture ShapeBaseline");
+
+        // Same rose, but radial_offset and phase are bound to the bass stimulus.
+        let bound = Preset::from_toml_str(
+            "system = \"parametric_curve\"\nname = \"ShapeBound\"\n\
+             [curve]\nfamily = \"maurer_rose\"\n\
+             [params]\nn = \"6\"\nd = \"71\"\nsamples = \"200\"\nscale = \"0.9\"\n\
+             radial_offset = \"bass * 0.6\"\nphase = \"bass * 2.0\"\n",
+        )
+        .expect("valid shape-bound parametric preset");
+        renderer.set_presets(vec![bound]);
+        let lit = renderer
+            .capture_preset("ShapeBound", &frame, 4)
+            .expect("capture ShapeBound");
+
+        assert_ne!(
+            base.rgba, lit.rgba,
+            "bound radial_offset/phase must change the rendered geometry"
+        );
+    }
 }
