@@ -397,7 +397,13 @@ fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let c = textureSampleLevel(field, samp, in.uv, 0.0).rgb;
-    return vec4<f32>(c, 1.0);
+    // Alpha from the accumulated luminance so empty space (no points, no trail) is
+    // transparent and reveals the bg_* backdrop (ADR-0026), while bright cloud cores
+    // (luma -> 1) occlude it. The present pipeline blends premultiplied-OVER: `c` is
+    // emitted as-is (added over the backdrop), so over the default black backdrop
+    // this is byte-identical to the prior opaque present.
+    let a = clamp(dot(c, vec3<f32>(0.299, 0.587, 0.114)), 0.0, 1.0);
+    return vec4<f32>(c, a);
 }
 "#;
 
@@ -688,6 +694,8 @@ impl Resources {
             &decay_shader,
             &decay_layout,
             PingPongField::FORMAT,
+            // The decay pass overwrites the trail field with the faded previous frame.
+            wgpu::BlendState::REPLACE,
             "attractor-decay",
         );
 
@@ -716,6 +724,11 @@ impl Resources {
             &present_shader,
             &present_layout,
             surface_format,
+            // Premultiplied-alpha OVER the backdrop (ADR-0026): the accumulation is
+            // emissive, so `c` adds over the atmosphere and the present's alpha
+            // (accumulated luminance) reveals bg_* in the cloud's empty space. Over
+            // the default black backdrop this equals the prior opaque present.
+            wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
             "attractor-present",
         );
 
@@ -855,12 +868,15 @@ fn blit_bind_group(
     })
 }
 
-/// A fullscreen-triangle pipeline (no vertex buffers) writing into `target`.
+/// A fullscreen-triangle pipeline (no vertex buffers) writing into `target` with
+/// the given `blend`. The decay pass overwrites its trail field (`REPLACE`); the
+/// present composites over the backdrop (`PREMULTIPLIED_ALPHA_BLENDING`, ADR-0026).
 fn fullscreen_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
     bind_layout: &wgpu::BindGroupLayout,
     target: wgpu::TextureFormat,
+    blend: wgpu::BlendState,
     label: &str,
 ) -> wgpu::RenderPipeline {
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -883,7 +899,7 @@ fn fullscreen_pipeline(
             compilation_options: Default::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format: target,
-                blend: Some(wgpu::BlendState::REPLACE),
+                blend: Some(blend),
                 write_mask: wgpu::ColorWrites::ALL,
             })],
         }),
