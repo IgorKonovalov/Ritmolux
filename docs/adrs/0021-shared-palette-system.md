@@ -1,6 +1,6 @@
 # ADR-0021 — Shared preset-controllable palette system: baked gradient LUT, named + custom stops, bindable modulation
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-07-23
 > **Related plan(s):** [0020](../plans/0020-shared-palette-system.md)
 > **Supplements:** [ADR-0002](0002-layered-preset-architecture.md) (adds a color axis to the layer-1/2 preset surface)

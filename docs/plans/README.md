@@ -11,7 +11,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 |------|-----------------------------------------|--------|---------|
 | [0015](0015-preset-dir-override-and-live-iteration.md) | Preset-directory override + live iteration (`LMV_PRESET_DIR`, shot flags) | approved | Edit one **version-controlled** `presets/*.toml` and see it live in **both** the running standalone app and the headless `shot` CLI, no rebuild. An `LMV_PRESET_DIR` env var (honored by both Rust frontends via a **single shared resolver** extracted into a `standalone` lib module) overrides the seeded `%APPDATA%` dir; the app hot-reloads it on a tightened ~150 ms poll (skipping seeding when overridden), and `shot` gets `--presets <dir>` / `--preset-file <path>` flags that beat the env var. Dependency-free (polling, **no** `notify` crate); framed as a power-user "custom preset folder" knob; consolidates Plan 0007's duplicated Rust resolver. Standalone + docs only, **C ABI untouched (v3)**; foobar plugin out of scope. [ADR-0014](../adrs/0014-preset-dir-override-for-dev-iteration.md); rejected app CLI args, symlink, `notify` watcher, duplicated resolver, core-side resolution. |
 | [0019](0019-preset-grammar-v2.md) | Preset expression grammar v2: branching, math functions, tempo, typo warnings | approved | Grow the preset expression language so authors stop hitting walls: add math functions (`cos sqrt pow smoothstep mod`) + constants (`pi tau`), branching (six comparison operators yielding `0/1` + a `select(cond,x,y)` conditional), and two new variables — `tempo` and experimental `novelty` (plumb the already-computed `AnalysisFrame.bpm`/`novelty`, no new DSP). Fix the silent-typo footgun — an unknown parameter name becomes a surfaced load **warning** (preset still loads its good bindings), backed by each system declaring its param vocabulary. Rewrite the stale `docs/presets.md` (claims 10 presets / 2 systems; code ships 17 / 5) last. Core-only, allocation-free/panic-free per frame, **C ABI untouched**; no new DSP, no boolean ops, no ternary, no Rhai. Pre-1.0 so no backward-compat obligation (additions are incidentally non-breaking). [ADR-0020](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md), supplements [ADR-0002](../adrs/0002-layered-preset-architecture.md); from `preset-author`-lane grammar feedback. |
-| [0020](0020-shared-palette-system.md) | Shared palette system: gradient LUT, named + custom palettes, bindable color (all four scenes) | approved | Give presets real color control. **All four** shader-colored scenes (fragment, swarm, reaction-diffusion, attractor) hardcode the **same** iq cosine palette, so a preset's only color lever is a scalar `hue` offset — fragment fields can't hold a cohesive mood, swarm/attractor color is unreachable (per-particle hue random/`0.15`-jittered, making `hue` a visual no-op), and RD is locked to a rainbow (the coral trio, commit 5b64ad2, could only rotate the fixed `v*0.85` sweep). Add one shared `core/src/render/palette.rs` that bakes a gradient (built-in **named** palette or **custom stops**) into a 256-entry LUT every scene colors through — delivered to the fragment/RD/attractor scenes as a 256x1 1D texture, sampled on CPU by the swarm — plus **fully bindable** color via layer-2 named params (`saturation`, `hue`, fragment/RD `color_span`/`color_center`, swarm/attractor `hue_spread`/`hue_center`) and an A/B `palette_mix` crossfade for bindable palette *selection*. Default `spectrum` palette = the exact current cosine, so the shipped presets are **visually unchanged** until re-authored. Adds one thin off-hot-path `Scene::set_palette` hook (second widening after ADR-0007's `configure`). **Scope expanded 2026-07-23** to fold RD + attractor into a new **Phase 5** (was a followup) at user direction, on `preset-author` coral-trio evidence; docs sweep now Phase 6. Core-only, **C ABI frozen**, no new dependency; from `preset-author`-lane color feedback (commits 76a2fb4, 5b64ad2). [ADR-0021](../adrs/0021-shared-palette-system.md), supplements [ADR-0002](../adrs/0002-layered-preset-architecture.md); rejected in-shader stop-array, cosine-coefficient params, minimal per-scene fix, bindable integer palette index, OKLab color management. **Independent of the `dt` coupling** (touches preset schema + scene shaders, not the render clock) — can land anytime. |
 | [0023](0023-cross-preset-transitions.md) | Cross-preset visual transitions: MilkDrop-style dissolves between presets | approved | Replace the instant preset **cut** with a MilkDrop-style **dissolve**. An engine `Transition` controller, driven by injected `dt`, blends the outgoing and incoming presets over ~1 s using a **small library** of blend kinds (crossfade, additive/burn, luma-dissolve, wipe/slide). The outgoing side is **snapshotted at transition start** (freeze path + safety net); the incoming renders live; **adaptive** logic re-renders the outgoing scene live too, but only when it is a *different* scene object and the frame budget is healthy, else it falls back to the snapshot (protects the 60 fps iGPU floor, NFR §1, and handles the same-slot case for free). Blends **fully-composited per-preset frames** via a two-input blend stage appended to Plan 0018's composite. Policy (kind/duration) is **engine-configured in code**; preset-declared `[transition]`, beat-quantized dissolves, and operator UI are explicit follow-ups. **Core-only, C ABI untouched, no new dependency.** **Sequenced after Plan 0018** (reuses its offscreen target + present + `Clear`->`Load` scenes; transitively after Plan 0014's `PingPongField` + injected `dt`). Realizes the cross-preset blending deferred by Plan 0003. [ADR-0024](../adrs/0024-cross-preset-transitions.md); rejected single-target alpha, always-dual-live, always-freeze, a `TransitionScene` wrapper, and preset-declared-now. |
 | [0027](0027-attractor-ink-and-crisp-trails.md) | Attractor ink-on-paper (engine-wide final tone-remap) + crisp trails | draft | Deliver the "ink on paper" look the `preset-author` lane couldn't reach: a WHITE background with BLACK moving lines, plus a sharper attractor. Root cause is the **additive** (lightening) compositing model — dark strokes add nothing, so black-on-white is the *inverse* of the model, not a color choice (Plan 0025 gives a white background via alpha-present, Plan 0020 gives arbitrary stroke colors, but neither adds a **darkening** step). Adds one **engine-wide final composite stage** (`render/ink.rs`) that duotone-remaps the finished frame to `mix(paper, ink, luminance)` between two preset-configurable colors — default white/black = a pure invert, so every scene (sparse and fullscreen) gets black-on-white / colored-duotone via bindable `ink_*` params routed exactly like `bg_*`; passthrough (byte-identical) when `ink_amount<=0`. Phase 2 replaces the attractor's fixed **640x360** trail field with a surface-tied (capped) internal resolution to kill the soft upscale. **Core-only, C ABI untouched, no `Scene`-trait change, no new dependency.** **Hard-sequenced after Plans 0020 + 0025** (shares the attractor present/draw path; ink rides on their LUT-colored, alpha-composited output). [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md) (proposed, extends [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md), coordinates with [ADR-0024](../adrs/0024-cross-preset-transitions.md)); rejected per-scene darkening blend, boolean-only invert, do-nothing-on-0025+0020. From `preset-author`-lane feedback (2026-07-24). |
 | [0028](0028-parametric-curve-shape-params.md) | Parametric-curve shape params: radial offset + phase (audio-morphable rose geometry) | approved | Add two named per-frame shape params to the `parametric_curve` scene — `radial_offset` (added to the curve radius) and `phase` (added inside the sine) — so the Maurer sampler becomes `r = sin(n*theta + phase) + radial_offset`. Unlocks the reference's spiral/rosette/annular family and phase-morph as **audio-bindable** levers (the shape itself morphs with `bass`/`bar`/`beat`, and `tempo` once 0019 lands), not just its color. Both **default 0.0**, so every shipped rose preset and the `parametric_curve` golden fixture are **byte-identical** (no re-bless). One `set_param`-path change across `curves.rs` + `parametric.rs`, allocation-free/panic-free; **no `Scene`-trait change, no C ABI change, no new dependency**. Independent of every active plan (touches only the Maurer sampler). [ADR-0029](../adrs/0029-parametric-curve-shape-params.md), supplements [ADR-0007](../adrs/0007-line-geometry-generators.md); rejected new `CurveFamily` variants (a family is a fixed load-time choice, can't morph with audio) and a general superformula (a sampler rewrite, more than the routed need). From `preset-author`-lane Maurer-rose feedback (2026-07-24). |
@@ -54,41 +53,37 @@ preset can express (real `cos`, easing, `tempo`, threshold `select`) and stops t
 so pairing them sharpens preset authoring end to end. Small, core-only, C ABI frozen. **Approved** —
 ready for `dev` (no ordering dependency; can land before or alongside the scene plans).
 
-**[0020] Shared palette system** is also **independent of the `dt` coupling** (it touches the preset
-schema + scene shaders + a new `render/palette.rs`, not the render clock or any feedback state), so it
-can land anytime. It completes the preset-color axis the way 0019 completes the expression axis — a
-natural companion to **[0015]** (fast edit loop) and **[0019]** (grammar), and to the `preset-author`
-lane whose color feedback (commits 76a2fb4, 5b64ad2) motivated it. **Scope now spans all four
-shader-colored scenes** — fragment + swarm (Phases 1–4) plus reaction-diffusion + attractor (Phase 5,
-folded in 2026-07-23 on coral-trio evidence); docs sweep is Phase 6 (six phases, still one `dev`
-session). Core-only, C ABI frozen, no new dependency. **Approved** — ready for `dev` (no ordering
-dependency; can land before or alongside the scene plans). [ADR-0021](../adrs/0021-shared-palette-system.md).
+(**[0020] Shared palette system has now landed and closed** — the shared `core/src/render/palette.rs`
+baked-LUT color surface (named + custom-stop palettes, bindable `saturation`/`hue`/`color_span`/
+`color_center`/`hue_spread`/`hue_center`, and the A/B `palette_mix` crossfade) reaches **all four**
+shader-colored scenes through the new off-hot-path `Scene::set_palette` hook; see Recently closed.
+Plans below that build on the RD/attractor present/draw path now ride on its LUT-colored output.)
 
 **[0025] Full composite coverage** finishes ADR-0018's engine-wide promise: it wires `bg_*` and
 `zoom`/`pan_*` into the two scenes (reaction-diffusion, attractor) that silently drop them. It **shares
-the RD/attractor present shaders with [0020]**, so those two should be sequenced deliberately — landing
-0020 (palette) first means 0025's alpha-present change rides on the LUT-colored output; otherwise 0025
-rebases onto 0020. No hard `dt` dependency (builds on the already-landed Plan 0018 composite). Core-only,
-C ABI untouched. **Approved** — ready for `dev` (sequence deliberately with 0020). [ADR-0026](../adrs/0026-full-composite-coverage-fullscreen-scenes.md).
+the RD/attractor present shaders with [0020], which has now landed** (see Recently closed), so 0025's
+alpha-present change rides on the LUT-colored output rather than rebasing onto it. No hard `dt`
+dependency (builds on the already-landed Plan 0018 composite). Core-only, C ABI untouched. **Approved** —
+ready for `dev`. [ADR-0026](../adrs/0026-full-composite-coverage-fullscreen-scenes.md).
 
 **[0027] Attractor ink-on-paper + crisp trails** is **hard-sequenced after both [0020] and [0025]** —
 all three touch the attractor present/draw path, and the new engine-wide ink remap is designed to sit
-*downstream* of the palette LUT (0020) and the alpha-present-over-backdrop (0025) so it composes with
-their output instead of rebasing across their shader edits. It also coordinates with **[0023]** (the
-ink remap is strictly after 0024's transition blend — whichever lands second wires the order). Adds a
-final skippable composite stage (`render/ink.rs`) delivering black-on-white / colored-duotone for every
-scene, plus a surface-tied attractor trail resolution. Core-only, C ABI untouched, no `Scene`-trait
-change. **Draft** — not yet ready for `dev` (blocked on 0020 + 0025 landing; ADR-0028 proposed, awaiting
-the user's go). [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md).
+*downstream* of the palette LUT (0020, **now landed**) and the alpha-present-over-backdrop (0025) so it
+composes with their output instead of rebasing across their shader edits. It also coordinates with
+**[0023]** (the ink remap is strictly after 0024's transition blend — whichever lands second wires the
+order). Adds a final skippable composite stage (`render/ink.rs`) delivering black-on-white /
+colored-duotone for every scene, plus a surface-tied attractor trail resolution. Core-only, C ABI
+untouched, no `Scene`-trait change. **Draft** — not yet ready for `dev` (0020 has landed; still blocked
+on 0025 landing; ADR-0028 proposed, awaiting the user's go). [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md).
 
 **[0028] Parametric-curve shape params** has **no hard dependency** on any active plan — it touches only
 the Maurer sampler (`curves.rs` + `parametric.rs`), no render clock, no compositing, no shared shader.
 Small and self-contained (two zero-defaulted `f32` shape params, one `set_param` path, no golden re-bless).
-By **user direction (2026-07-24) it is sequenced after [0020]** (shared palette) — a **priority** call, not
-a technical one: land the color axis first so `preset-author` gets both color and shape levers together
-when revising the rose drafts. It also **pairs naturally with [0019]** (the `tempo` variable those params
-can ride) but does not depend on it. **Approved** — ready for `dev` **once Plan 0020 lands** (ADR-0029
-proposed). [ADR-0029](../adrs/0029-parametric-curve-shape-params.md).
+By **user direction (2026-07-24) it is sequenced after [0020]** (shared palette, **now landed**) — a
+**priority** call, not a technical one: land the color axis first so `preset-author` gets both color and
+shape levers together when revising the rose drafts. It also **pairs naturally with [0019]** (the `tempo`
+variable those params can ride) but does not depend on it. **Approved** — ready for `dev` (Plan 0020 has
+landed; ADR-0029 proposed). [ADR-0029](../adrs/0029-parametric-curve-shape-params.md).
 
 ## Standing (not a plan)
 
@@ -100,6 +95,51 @@ proposed). [ADR-0029](../adrs/0029-parametric-curve-shape-params.md).
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0020 — Shared palette system: gradient LUT, named + custom palettes, bindable color (all four scenes)](done/0020-shared-palette-system.md) —
+  **done 2026-07-24**, passed Mode 4 review (no blockers, no majors; two minor, two nits). Six `dev`
+  phase commits (`e64908c` shared `core/src/render/palette.rs` + fragment through a 256-entry baked LUT,
+  `b518130` custom gradient `stops`, `81ede9e` swarm through the LUT, `53c944e` A/B `palette_mix`
+  crossfade, `9281c23` reaction-diffusion + attractor through the palette, `d00ce16` palette-surface
+  docs). Landed the shared color axis (ADR-0021, now **accepted**, supplements ADR-0002): a preset
+  declares an optional `[palette]` (built-in `name` — `spectrum`/`ember`/`ice`/`mono`/`aurora` — **or**
+  custom `stops`, validated at the load boundary) baked once into a 256-entry RGB LUT that **all four**
+  shader-colored scenes color through — a 256x1 1D texture for fragment/RD/attractor (attractor samples
+  it in the **vertex** shader), the identical CPU array for the swarm. Color is fully bindable via
+  layer-2 named params (`saturation`, `hue`, fragment/RD `color_span`/`color_center`, swarm/attractor
+  `hue_spread`/`hue_center`) plus an A/B `palette_mix` crossfade against an optional `[palette_b]`.
+  Delivered through one thin off-hot-path `Scene::set_palette` hook (the **second** trait widening after
+  ADR-0007's `configure`; ADR-0021 flags a third should prompt re-examining the seam). Default
+  `spectrum` = the exact prior cosine, so shipped presets are **visually unchanged**. **Scope expanded
+  2026-07-23** to fold reaction-diffusion + attractor into Phase 5 (was a followup) on `preset-author`
+  coral-trio evidence; docs became Phase 6. **User decision (Phase 5):** reaction-diffusion's present
+  used a *different* cosine than fragment/swarm; it was unified onto `spectrum` (its golden re-blessed),
+  so RD is the one scene whose default look intentionally shifted — re-authoring the four coral presets
+  is the documented `preset-author` followup. Verified: **51 lib tests + `preset` integration green** —
+  incl. `spectrum_reproduces_the_prior_cosine` (the no-regression proof: default LUT within 0.01 of the
+  analytic cosine at 8 sampled `t`), the Phase 2 malformed-stops/selector-clash load-error suite (never
+  a panic; loader keeps the prior preset), `narrow_spread_makes_colour_coherent` (variance-measured
+  swarm distinctness), and `palette_mix_crossfades_a_to_b`; `clippy -p lmv-core --all-targets` clean
+  with the hot-path panic pragma on `palette.rs`. Only `core/tests/golden/reaction_diffusion.png`
+  changed — fragment/swarm/attractor goldens byte-identical, the drift-guard no-regression proof. A DX12
+  WARP layout-aliasing fix kept each scene's LUT bind group structurally unique (fragment's LUT moved to
+  `group(1)`; RD/attractor LUTs in unique-arity present groups). Palette docs landed as a sibling
+  `docs/preset-palettes.md` (Plan 0019 owns the `presets.md` rewrite) + a `presets/README.md` colour
+  section, with a worked custom-stops example. **Core-only; C ABI untouched; no new dependency;**
+  determinism preserved (bake pure/off-hot-path, `sample` alloc-free). **Minor:** (1) a `[palette]`/
+  `[palette_b]` declared on a non-colored line scene (lsystem/star/parametric) bakes and is silently
+  ignored by the default `set_palette` no-op — no author feedback that colour config is inert there
+  (consistent with `set_param`'s silent unknown-name drop, but a `preset-author` footgun); (2)
+  `docs/presets.md` still describes `hue` as an "offset into the looping cosine palette" — now a LUT
+  sample coordinate — but that file's rewrite is explicitly owned by Plan 0019, so it was deferred, not
+  updated here. **Nits:** (3) the `Scene` trait is now two optional methods past its ADR-0002 shape
+  (`configure` + `set_palette`) — a third widening should trigger the seam re-examination ADR-0021 calls
+  for; (4) Phase 4's crossfade was demonstrated with a time ramp rather than the plan's `bar` driver
+  (the synthetic click track barely sweeps `bar`), a reasonable substitution since the crossfade math is
+  unit-tested. **`preset-author` followups (non-blocking):** re-author the field/flock + coral presets
+  to exploit named/custom palettes and `hue_spread`/`color_span`; refresh the skill's `systems.md`/
+  `grammar.md` colour snapshots; consider OKLab interpolation in the bake (ADR-0021 Alt E). Version
+  **minor 0.9.0 -> 0.10.0** at close.
 
 - [0026 — Calmer scene rotation: hold one scene by default, longer dwell, softened drop bias](done/0026-calmer-scene-rotation.md) —
   **done 2026-07-24**, passed Mode 4 review (no blockers, no majors; one minor, one nit). Three `dev`
