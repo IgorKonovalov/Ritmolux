@@ -440,6 +440,15 @@ impl Renderer {
         self.roster.name()
     }
 
+    /// Whether the active GPU adapter is a CPU/software rasterizer (WARP on DX12).
+    /// Visual-QA tests read this to skip differential checks the software
+    /// rasterizer can't render faithfully — notably the fullscreen-scene +
+    /// background-pipeline coexistence, which WARP mis-renders while real hardware
+    /// renders it correctly (Plan 0025 / ADR-0026).
+    pub fn adapter_is_software(&self) -> bool {
+        self.ctx.is_software()
+    }
+
     /// Name of the built-in system the active preset drives (e.g. the frontend
     /// shows it next to the preset name).
     pub fn active_system_name(&self) -> &'static str {
