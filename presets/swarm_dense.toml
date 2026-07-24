@@ -2,13 +2,23 @@
 # spin) so the whole mass sparkles and reforms. The shimmer comes from the churn
 # speed, not tiny dots (tiny particles just vanish on this scene). Treble lights the
 # sparkle, mids drive the churn, beats give a crisp shove. Reads as one glittering body.
+#
+# Colour (Plan 0020): the shared "ice" palette pushed toward the bright cyan->white
+# end, with treble both widening hue_spread (more sparkle scatter) and lifting
+# hue_center (whiter glints) - so the glitter reads as one cool shimmering body
+# instead of full-wheel confetti (the old `hue` was a no-op).
 system = "swarm"
 name = "Dense"
+
+[palette]
+name = "ice"
 
 [params]
 force      = "1.5 + clamp(mid * 12, 0, 3)"
 spin       = "0.9 + clamp(treb * 8, 0, 1.6)"
 burst      = "beat * 3"
-hue        = "0.6 + time * 0.03"
 brightness = "0.7 + clamp(treb * 7, 0, 0.95)"
 size       = "1.5 + beat * 0.3"
+hue_spread = "0.3 + clamp(treb * 3, 0, 0.3)"
+hue_center = "0.75 + clamp(treb * 2, 0, 0.15)"
+saturation = "1.0"

@@ -1,24 +1,37 @@
 # Reef - a Gray-Scott reaction-diffusion field in the LABYRINTH regime: dense,
-# interlocking channels like the folded ridges of brain coral. Warm-cored palette
-# (orange ridges, cool crevices) so it reads as a living reef, distinct from Coral's
-# cool teal maze; finer iso-contours put a bright spine down each channel.
+# interlocking channels like the folded ridges of brain coral.
+#
+# Colour (Plan 0020): a custom warm-reef gradient - deep teal crevice -> orange ridge
+# -> pale-gold spine - so the field level paints cool valleys and warm walls at once
+# (the field level is the gradient coordinate: low = crevice, the bright iso-contour
+# spine = high). This is the two-tone "warm-cored" look the old preset only described;
+# under the spectrum default it had gone cyan. Distinct from Coral's all-teal maze.
 #
 #   - bass thickens the ridges via feed, mid trims them via kill, both staying inside
 #     the maze band so the walls never dissolve;
 #   - treble gently coarsens via flow; each beat stamps fresh growth.
-# Fine iso-contours (9) and a tight hatch (3.5) give the ridges their inner spine;
-# glow swells with low/mid energy. Warm hue drifts slowly with time and treble.
+# Fine iso-contours (9) and a tight hatch (3.5) give the ridges their inner spine.
 #
 # Variables available to expressions: bass mid treb onset beat bar time.
 system = "reaction_diffusion"
 name = "Reef"
 
+[palette]
+stops = [
+  { at = 0.0,  color = "#041a1e" },
+  { at = 0.4,  color = "#0c6f6a" },
+  { at = 0.66, color = "#e2631c" },
+  { at = 0.85, color = "#ff9d3c" },
+  { at = 1.0,  color = "#ffe0a0" },
+]
+
 [params]
-feed = "0.024 + clamp(bass * 4, 0, 1) * 0.006"
-kill = "0.055 + clamp(mid * 4, 0, 1) * 0.003"
-flow = "1.0 + clamp(treb * 4, 0, 1) * 0.25"
-inject = "beat"
-hue = "0.58 + time * 0.010 + clamp(treb * 3, 0, 1) * 0.06"
-contour = "9"
-hatch = "3.5"
-glow = "0.8 + clamp((bass + mid) * 3, 0, 1) * 0.5"
+feed         = "0.024 + clamp(bass * 4, 0, 1) * 0.006"
+kill         = "0.055 + clamp(mid * 4, 0, 1) * 0.003"
+flow         = "1.0 + clamp(treb * 4, 0, 1) * 0.25"
+inject       = "beat"
+contour      = "9"
+hatch        = "3.5"
+glow         = "0.8 + clamp((bass + mid) * 3, 0, 1) * 0.5"
+color_span   = "2.2"
+color_center = "sin(time * 0.02) * 0.02"

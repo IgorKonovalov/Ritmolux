@@ -1,13 +1,21 @@
-# Glacier - cold, vast, cohesive: zoom held LOW so only a few field cycles fill
-# the screen, which narrows the visible color to a single cool blue/azure band
-# (low zoom is the cohesion lever - high zoom smears the whole rainbow). Almost no
-# warp, a long slow breath. Dim and still - the quiet end of the fragment set.
+# Glacier - cold, vast, cohesive: the shared "ice" palette (deep blue -> cyan ->
+# near-white, Plan 0020) held in a low color_span anchored at the deep-blue end, so
+# only the cool band shows - no more relying on a crushed zoom to hide the rainbow
+# (that lever is now colour_span, and zoom is free to open the field a little). Almost
+# no warp, a long slow breath; dim and still, the quiet end of the fragment set.
+#
+# Variables available to expressions: bass mid treb onset beat bar time.
 system = "fragment_field"
 name = "Glacier"
 
+[palette]
+name = "ice"
+
 [params]
-warp  = "0.14 + clamp(bass * 4, 0, 0.35)"
-hue   = "0.95 + sin(time * 0.02) * 0.03"
-zoom  = "0.58 + sin(time * 0.03) * 0.05 + bar * 0.14"
-glow  = "0.42 + clamp(mid * 4, 0, 0.55)"
-flash = "clamp(onset * 1.2, 0, 0.3)"
+warp         = "0.14 + clamp(bass * 4, 0, 0.35)"
+zoom         = "0.62 + sin(time * 0.03) * 0.05 + bar * 0.12"
+glow         = "0.42 + clamp(mid * 4, 0, 0.55)"
+flash        = "clamp(onset * 1.2, 0, 0.3)"
+color_center = "0.12 + sin(time * 0.04) * 0.03"
+color_span   = "0.38 + clamp(mid * 3, 0, 0.12)"
+saturation   = "0.95"

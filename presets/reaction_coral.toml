@@ -1,23 +1,35 @@
 # Coral - a Gray-Scott reaction-diffusion field (ADR-0012). The engine's first
-# stateful feedback scene: the pattern grows and reorganizes frame to frame in
-# the mitosis regime (spots that perpetually divide).
+# stateful feedback scene: the pattern grows and reorganizes frame to frame in the
+# mitosis regime (spots that perpetually divide).
+#
+# Colour (Plan 0020): a custom teal gradient - near-black crevice -> teal body ->
+# pale aqua spine - so the churning spots read as one cohesive cool teal instead of
+# the spectrum's cyan-with-magenta-fringe. The field level indexes the gradient
+# (crevice low, iso-contour spine high); colour_span spans nearly the whole ramp.
 #
 # The band energies steer the regime and beats spawn new growth:
-#   - bass pushes the feed rate, mid the kill rate (silent -> mitosis, loud ->
-#     coral), staying inside the pattern-forming band so the field never dies;
+#   - bass pushes the feed rate, mid the kill rate (silent -> mitosis, loud -> coral),
+#     staying inside the pattern-forming band so the field never dies;
 #   - treble scales the diffusion, coarsening the spatial texture;
 #   - each beat stamps a fresh seed of growth into the field.
-# The look (iso-contour loops + hatch + palette) drifts its hue slowly over time
-# and with treble, and its glow swells with the low/mid energy.
 #
 # Variables available to expressions: bass mid treb onset beat bar time.
 system = "reaction_diffusion"
 name = "Coral"
 
+[palette]
+stops = [
+  { at = 0.0,  color = "#02141a" },
+  { at = 0.5,  color = "#0e7d7a" },
+  { at = 0.82, color = "#3fd6c4" },
+  { at = 1.0,  color = "#d8fff4" },
+]
+
 [params]
-feed = "0.032 + clamp(bass * 4, 0, 1) * 0.018"
-kill = "0.060 + clamp(mid * 4, 0, 1) * 0.002"
-flow = "1.0 + clamp(treb * 4, 0, 1) * 0.4"
-inject = "beat"
-hue = "time * 0.015 + clamp(treb * 3, 0, 1) * 0.12"
-glow = "0.7 + clamp((bass + mid) * 3, 0, 1) * 0.6"
+feed         = "0.032 + clamp(bass * 4, 0, 1) * 0.018"
+kill         = "0.060 + clamp(mid * 4, 0, 1) * 0.002"
+flow         = "1.0 + clamp(treb * 4, 0, 1) * 0.4"
+inject       = "beat"
+glow         = "0.7 + clamp((bass + mid) * 3, 0, 1) * 0.6"
+color_span   = "0.9"
+color_center = "sin(time * 0.03) * 0.02"

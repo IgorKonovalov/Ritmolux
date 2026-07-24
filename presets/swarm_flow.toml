@@ -2,13 +2,23 @@
 # long, coherent streamlines, mid-sized and steady. Bass firms the steering, a slow
 # sin keeps it alive when quiet, beats give a small outward nudge. The gentle,
 # readable end of the swarm set.
+#
+# Colour (Plan 0020): the shared "ice" palette with a narrowed hue_spread, so the
+# particles hold one cool blue->cyan family instead of the old full-wheel confetti
+# (per-particle hue was random, so the old `hue` was a visual no-op). hue_center
+# breathes slowly through the cool band.
 system = "swarm"
 name = "Flow"
+
+[palette]
+name = "ice"
 
 [params]
 force      = "1.1 + sin(time * 0.1) * 0.2 + clamp(bass * 16, 0, 3)"
 spin       = "0.16 + clamp(mid * 4, 0, 0.6)"
 burst      = "beat * 4"
-hue        = "time * 0.03"
 brightness = "0.65 + clamp(bass * 6, 0, 0.8)"
 size       = "2.0 + beat * 0.5"
+hue_spread = "0.5"
+hue_center = "0.5 + sin(time * 0.05) * 0.08"
+saturation = "1.0"
