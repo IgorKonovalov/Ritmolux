@@ -90,10 +90,22 @@ the audio vocabulary (`bass mid treb onset beat bar time` …) — only the grad
 
 | Param | Default | What it does |
 |-------|---------|--------------|
-| `color_span`   | `0.6` (fragment) / `0.85` (RD) | How much of the gradient the field spans. **Low = a cohesive single-family mood**; high = a wide sweep. |
+| `color_span`   | `0.6` (fragment) / `0.85` (RD) | Multiplies the scene's field level to set how much of the gradient it spans. **Low = a cohesive single-family mood**; high = a wide sweep. |
 | `color_center` | `0.0` | Where that window sits in the gradient. Slide it (e.g. `0.1 + treb*0.2`) to move the tonal centre. |
 
 A warm, cohesive field: a warm palette + a low `color_span`.
+
+**Reaction-diffusion needs a much larger `color_span` than the fragment field.**
+`color_span` multiplies each scene's *native* field level, and those ranges differ:
+the fragment field runs the full `0..1`, but reaction-diffusion's field level (the
+Gray-Scott V concentration it colours by) only reaches roughly `0..0.4`. So at the RD
+default `0.85` the sampled coordinate never climbs past about `0.34` — the warm end of
+a custom gradient (any stop with `at` above ~`0.4`) is never reached, and a
+`teal -> orange -> gold` reef renders all-teal. To span a full custom gradient on RD,
+set `color_span` to roughly **`2.0`–`2.5`** (the shipped coral presets use ~`2.2`); the
+exact value shifts a little by regime, since a high-fill pattern drives the field level
+higher than a thin maze. On the fragment field, keep `color_span` in the usual
+`0.2`–`0.7` range.
 
 ### Swarm & attractor — the per-particle hue band
 
