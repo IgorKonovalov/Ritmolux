@@ -16,6 +16,7 @@
 //! a WARP device and can crash the software driver.
 
 use lmv_core::dsp::AnalysisFrame;
+use lmv_core::preset::Preset;
 use lmv_core::render::{
     CaptureImage, HeadlessOptions, RenderError, Renderer,
     metrics::{coverage, frame_diff, quadrant_spread},
@@ -26,6 +27,16 @@ const SIZE: u32 = 96;
 /// set — one of each idiom the scene supports.
 const DEJONG: &str = "De Jong";
 const LORENZ: &str = "Lorenz";
+
+/// A De Jong attractor preset with an extra `[params]` line — used to isolate the
+/// view transform (Phase 4): the compute/accumulation path is identical, so any
+/// render difference is the vertex-shader zoom/pan. The transform touches only the
+/// draw projection (no background pipeline), so it is faithful on WARP.
+fn attractor_view_preset(name: &str, extra: &str) -> Preset {
+    let toml =
+        format!("system = \"attractor\"\nname = \"{name}\"\n[params]\nsize = \"1.0\"\n{extra}");
+    Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name} preset parses: {e}"))
+}
 /// A pixel counts as lit if any RGB channel differs from the sampled background
 /// by more than this.
 const EPS: u8 = 10;
@@ -132,4 +143,42 @@ fn attractor_contract() {
     let lspread = quadrant_spread(&lorenz, lbg, EPS);
     assert!(lcov > 0.02, "Lorenz flow is blank: coverage {lcov:.4}");
     assert!(lspread >= 2, "Lorenz flow is a dot: {lspread} quadrant(s)");
+
+    // --- View transform (Plan 0025 Phase 4, ADR-0018): `zoom`/`pan_*` scale/offset
+    // the projected cloud, so binding them visibly moves the whole attractor. The
+    // compute + accumulation path is untouched (same seed, same steps), so any pixel
+    // difference is the view transform alone — and it stays a pure function of the
+    // params (deterministic). ---
+    renderer.set_presets(vec![
+        attractor_view_preset("at_identity", ""),
+        attractor_view_preset("at_zoom", "zoom = \"1.5\"\n"),
+        attractor_view_preset("at_pan", "pan_x = \"0.4\"\n"),
+    ]);
+    let identity = renderer
+        .capture_preset("at_identity", &lively, 60)
+        .expect("capture at_identity");
+    let zoomed = renderer
+        .capture_preset("at_zoom", &lively, 60)
+        .expect("capture at_zoom");
+    let panned = renderer
+        .capture_preset("at_pan", &lively, 60)
+        .expect("capture at_pan");
+    assert!(
+        frame_diff(&identity, &zoomed) > 0.02,
+        "zoom did not move the attractor: diff {:.4}",
+        frame_diff(&identity, &zoomed)
+    );
+    assert!(
+        frame_diff(&identity, &panned) > 0.02,
+        "pan did not move the attractor: diff {:.4}",
+        frame_diff(&identity, &panned)
+    );
+    // Determinism: the transform is a pure function of its params (no wall-clock).
+    let zoomed_again = renderer
+        .capture_preset("at_zoom", &lively, 60)
+        .expect("capture at_zoom again");
+    assert_eq!(
+        zoomed.rgba, zoomed_again.rgba,
+        "zoomed attractor capture is not reproducible"
+    );
 }

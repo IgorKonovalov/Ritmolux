@@ -170,6 +170,10 @@ const DEFAULT_HUE_SPREAD: f32 = 0.15;
 const DEFAULT_HUE_CENTER: f32 = 0.075;
 const DEFAULT_SATURATION: f32 = 1.0;
 const DEFAULT_PALETTE_MIX: f32 = 0.0;
+/// View transform defaults (ADR-0018): identity — `zoom` = 1 unscaled, `pan` = 0
+/// unshifted, so an unbound preset is byte-unchanged.
+const DEFAULT_ZOOM: f32 = 1.0;
+const DEFAULT_PAN: f32 = 0.0;
 /// Trail persistence: the fraction of the accumulation retained per 1/60 s frame.
 /// ~0.94 gives glowing trails that fade over ~1 s; `fade = 0` clears each frame
 /// (trail-free). Applied frame-rate-independently (raised to the `dt`-relative
@@ -255,9 +259,11 @@ struct Draw {
     // v: x aspect, y point half-size (world), z hue offset, w spin (radians)
     // w: x world scale, y dim (2 or 3), z z-center to subtract (3D), w unused
     // u: x hue_spread, y hue_center, z palette_mix, w saturation
+    // x: x zoom, yz pan (view transform, ADR-0018), w unused
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
+    x: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> draw: Draw;
 // Shared gradient LUTs (ADR-0021): sampled per-particle in the vertex shader
@@ -315,6 +321,14 @@ fn vs_main(
     }
     let world = screen * scl + corner * psize;
 
+    // View transform (ADR-0018): project to NDC, then scale about the screen centre
+    // by `zoom` and offset by `pan`. Default zoom = 1, pan = 0 is the identity, so an
+    // unbound preset is byte-unchanged. Applied post-projection so it moves the whole
+    // attractor (position and apparent point size) as one.
+    let zoom = draw.x.x;
+    let pan = draw.x.yz;
+    let ndc = vec2<f32>(world.x / aspect, world.y) * zoom + pan;
+
     // Per-particle colour through the shared LUT: the seeded jitter occupies the
     // band `hue_center + (seed - 0.5)*hue_spread` (was a hardcoded `seed*0.15`),
     // plus the shared `hue`; both LUTs crossfade by `palette_mix` before
@@ -325,7 +339,7 @@ fn vs_main(
     let col = apply_saturation(mix(ca, cb, clamp(palette_mix, 0.0, 1.0)), saturation);
 
     var out: VsOut;
-    out.pos = vec4<f32>(world.x / aspect, world.y, 0.0, 1.0);
+    out.pos = vec4<f32>(ndc, 0.0, 1.0);
     out.local = corner;
     out.color = col;
     return out;
@@ -433,12 +447,14 @@ struct StepUniform {
 /// Draw uniform (per frame). `v`: x aspect, y point half-size, z hue offset, w
 /// spin. `w`: x world scale, y projection dim (2 or 3), z z-centre (3D), w unused.
 /// `u`: x hue_spread, y hue_center, z palette_mix, w saturation (ADR-0021).
+/// `x`: x zoom, yz pan (view transform, ADR-0018), w unused.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct DrawUniform {
     v: [f32; 4],
     w: [f32; 4],
     u: [f32; 4],
+    x: [f32; 4],
 }
 
 /// Decay uniform (per frame): x is the per-frame trail retention factor.
@@ -961,6 +977,11 @@ pub struct AttractorScene {
     hue_center: f32,
     saturation: f32,
     palette_mix: f32,
+    /// Shared view transform (ADR-0018 / Plan 0025 Phase 4): `zoom` scales the
+    /// projected cloud about the screen centre, `pan_*` offsets it.
+    zoom: f32,
+    pan_x: f32,
+    pan_y: f32,
     /// The active baked palette pair; uploaded to the draw LUT textures when
     /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
     palette: Palette,
@@ -1002,6 +1023,9 @@ impl AttractorScene {
             hue_center: DEFAULT_HUE_CENTER,
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
+            zoom: DEFAULT_ZOOM,
+            pan_x: DEFAULT_PAN,
+            pan_y: DEFAULT_PAN,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
             reseed: 0.0,
@@ -1088,6 +1112,9 @@ impl Scene for AttractorScene {
         self.hue_center = DEFAULT_HUE_CENTER;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
+        self.zoom = DEFAULT_ZOOM;
+        self.pan_x = DEFAULT_PAN;
+        self.pan_y = DEFAULT_PAN;
         self.reseed = 0.0;
     }
 
@@ -1104,6 +1131,9 @@ impl Scene for AttractorScene {
             "hue_center" => self.hue_center = value,
             "saturation" => self.saturation = value,
             "palette_mix" => self.palette_mix = value,
+            "zoom" => self.zoom = value,
+            "pan_x" => self.pan_x = value,
+            "pan_y" => self.pan_y = value,
             "reseed" => self.reseed = value,
             _ => {}
         }
@@ -1179,6 +1209,9 @@ impl Scene for AttractorScene {
             hue_center,
             saturation,
             palette_mix,
+            zoom,
+            pan_x,
+            pan_y,
             palette,
             palette_dirty,
             ..
@@ -1232,6 +1265,7 @@ impl Scene for AttractorScene {
                 ],
                 w: [scale, dim, z_center, 0.0],
                 u: [*hue_spread, *hue_center, *palette_mix, *saturation],
+                x: [*zoom, *pan_x, *pan_y, 0.0],
             }),
         );
         // Frame-rate-independent trail decay: retain `fade` per 1/60 s, raised to
