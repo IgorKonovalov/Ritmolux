@@ -22,7 +22,7 @@ use lmv_core::render::{Renderer, TextRun};
 use overlay::{OverlayAction, OverlayKey, OverlayState};
 use soak::SoakLog;
 use winit::application::ApplicationHandler;
-use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::monitor::MonitorHandle;
@@ -48,6 +48,10 @@ const MAX_DT: f32 = 0.25;
 /// frame-count cadence keeps the shell clock-free for the title; the numbers
 /// themselves come from the core's diagnostics.
 const TITLE_UPDATE_FRAMES: u32 = 30;
+/// Max gap between two left-button presses for them to count as a double-click
+/// (the common OS default). winit has no native double-click event, so the
+/// shell times consecutive presses itself.
+const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 
 /// On-canvas active-preset-name label: top-left inset (device px), font size,
 /// and a light near-white color legible over most scenes.
@@ -105,6 +109,9 @@ struct AppState {
     /// Long-run soak sampler, present only with `--soak` (else the render loop
     /// is byte-unchanged).
     soak: Option<SoakLog>,
+    /// Wall-clock time of the previous left-button press, for detecting a
+    /// double-click (fullscreen toggle). `None` until the first click.
+    last_click: Option<Instant>,
 }
 
 /// Narrow alias so the non-Windows build (no capture until Phase 9) compiles
@@ -174,6 +181,7 @@ impl AppState {
             director: Director::from_config(&config.rotate),
             last_frame: start,
             soak: soak_path.map(SoakLog::new),
+            last_click: None,
             config,
             config_path,
             display_index,
@@ -491,6 +499,30 @@ impl AppState {
         }
     }
 
+    /// A left-button press: toggle fullscreen when it lands within
+    /// `DOUBLE_CLICK` of the previous one (same binding as the `F` hotkey).
+    /// Suppressed while the browse overlay is open so it doesn't fight modal
+    /// interaction. Wall-clock timing is a shell concern; core stays clock-free.
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "double-click timing is shell input handling; core analysis stays clock-free"
+    )]
+    fn handle_left_press(&mut self) {
+        if self.browse.is_open() {
+            return;
+        }
+        let now = Instant::now();
+        if self
+            .last_click
+            .is_some_and(|prev| now.duration_since(prev) <= DOUBLE_CLICK)
+        {
+            self.last_click = None;
+            self.toggle_fullscreen();
+        } else {
+            self.last_click = Some(now);
+        }
+    }
+
     /// The current roster names, owned — so a caller can borrow `&mut` the
     /// renderer afterward without holding a live borrow of the preset list.
     fn roster_names(&self) -> Vec<String> {
@@ -669,6 +701,11 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => state.redraw(),
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            } => state.handle_left_press(),
             WindowEvent::KeyboardInput { event, .. }
                 if event.state == ElementState::Pressed && !event.repeat =>
             {
