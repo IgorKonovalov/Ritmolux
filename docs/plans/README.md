@@ -13,7 +13,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0019](0019-preset-grammar-v2.md) | Preset expression grammar v2: branching, math functions, tempo, typo warnings | approved | Grow the preset expression language so authors stop hitting walls: add math functions (`cos sqrt pow smoothstep mod`) + constants (`pi tau`), branching (six comparison operators yielding `0/1` + a `select(cond,x,y)` conditional), and two new variables — `tempo` and experimental `novelty` (plumb the already-computed `AnalysisFrame.bpm`/`novelty`, no new DSP). Fix the silent-typo footgun — an unknown parameter name becomes a surfaced load **warning** (preset still loads its good bindings), backed by each system declaring its param vocabulary. Rewrite the stale `docs/presets.md` (claims 10 presets / 2 systems; code ships 17 / 5) last. Core-only, allocation-free/panic-free per frame, **C ABI untouched**; no new DSP, no boolean ops, no ternary, no Rhai. Pre-1.0 so no backward-compat obligation (additions are incidentally non-breaking). [ADR-0020](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md), supplements [ADR-0002](../adrs/0002-layered-preset-architecture.md); from `preset-author`-lane grammar feedback. |
 | [0023](0023-cross-preset-transitions.md) | Cross-preset visual transitions: MilkDrop-style dissolves between presets | approved | Replace the instant preset **cut** with a MilkDrop-style **dissolve**. An engine `Transition` controller, driven by injected `dt`, blends the outgoing and incoming presets over ~1 s using a **small library** of blend kinds (crossfade, additive/burn, luma-dissolve, wipe/slide). The outgoing side is **snapshotted at transition start** (freeze path + safety net); the incoming renders live; **adaptive** logic re-renders the outgoing scene live too, but only when it is a *different* scene object and the frame budget is healthy, else it falls back to the snapshot (protects the 60 fps iGPU floor, NFR §1, and handles the same-slot case for free). Blends **fully-composited per-preset frames** via a two-input blend stage appended to Plan 0018's composite. Policy (kind/duration) is **engine-configured in code**; preset-declared `[transition]`, beat-quantized dissolves, and operator UI are explicit follow-ups. **Core-only, C ABI untouched, no new dependency.** **Sequenced after Plan 0018** (reuses its offscreen target + present + `Clear`->`Load` scenes; transitively after Plan 0014's `PingPongField` + injected `dt`). Realizes the cross-preset blending deferred by Plan 0003. [ADR-0024](../adrs/0024-cross-preset-transitions.md); rejected single-target alpha, always-dual-live, always-freeze, a `TransitionScene` wrapper, and preset-declared-now. |
 | [0027](0027-attractor-ink-and-crisp-trails.md) | Attractor ink-on-paper (engine-wide final tone-remap) + crisp trails | approved | Deliver the "ink on paper" look the `preset-author` lane couldn't reach: a WHITE background with BLACK moving lines, plus a sharper attractor. Root cause is the **additive** (lightening) compositing model — dark strokes add nothing, so black-on-white is the *inverse* of the model, not a color choice (Plan 0025 gives a white background via alpha-present, Plan 0020 gives arbitrary stroke colors, but neither adds a **darkening** step). Adds one **engine-wide final composite stage** (`render/ink.rs`) that duotone-remaps the finished frame to `mix(paper, ink, luminance)` between two preset-configurable colors — default white/black = a pure invert, so every scene (sparse and fullscreen) gets black-on-white / colored-duotone via bindable `ink_*` params routed exactly like `bg_*`; passthrough (byte-identical) when `ink_amount<=0`. Phase 2 replaces the attractor's fixed **640x360** trail field with a surface-tied (capped) internal resolution to kill the soft upscale. **Core-only, C ABI untouched, no `Scene`-trait change, no new dependency.** **Hard-sequenced after Plans 0020 + 0025** (shares the attractor present/draw path; ink rides on their LUT-colored, alpha-composited output). [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md) (proposed, extends [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md), coordinates with [ADR-0024](../adrs/0024-cross-preset-transitions.md)); rejected per-scene darkening blend, boolean-only invert, do-nothing-on-0025+0020. From `preset-author`-lane feedback (2026-07-24). |
-| [0025](0025-full-composite-coverage.md) | Full composite coverage: background + view transform for reaction-diffusion and attractor | approved | Close the ADR-0018 coverage gap surfaced by the `preset-author` lane (design-backlog 0001): the **background** (`bg_*`) and **view transform** (`zoom`/`pan_*`) levers silently do nothing on the two fullscreen/accumulating scenes because both present **opaque** (overwriting the backdrop) and neither wired the view params. Switch both scenes' **final present** to an **alpha-blend over the backdrop** (scene structure/luminance drives alpha, so coral voids / attractor negative space reveal the `bg_*` gradient), and have both accept `zoom`/`pan_*` via `set_param` applied in their own space — exactly as `fragment_field` does. Full-audit scope (both scenes); default backdrop is dark so shipped presets stay ~unchanged (goldens deliberately re-blessed). **No `Scene`-trait change, C ABI untouched**; `mirror_*` stays line-only by design. Touches the same RD/attractor present shaders as Plan 0020 — coordinate order. [ADR-0026](../adrs/0026-full-composite-coverage-fullscreen-scenes.md), extends [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md); rejected self-contained per-scene backdrop, leave-opaque-and-document, a `Scene::set_view` hook. |
 
 ## Recommended execution sequence
 
@@ -58,23 +57,24 @@ baked-LUT color surface (named + custom-stop palettes, bindable `saturation`/`hu
 shader-colored scenes through the new off-hot-path `Scene::set_palette` hook; see Recently closed.
 Plans below that build on the RD/attractor present/draw path now ride on its LUT-colored output.)
 
-**[0025] Full composite coverage** finishes ADR-0018's engine-wide promise: it wires `bg_*` and
-`zoom`/`pan_*` into the two scenes (reaction-diffusion, attractor) that silently drop them. It **shares
-the RD/attractor present shaders with [0020], which has now landed** (see Recently closed), so 0025's
-alpha-present change rides on the LUT-colored output rather than rebasing onto it. No hard `dt`
-dependency (builds on the already-landed Plan 0018 composite). Core-only, C ABI untouched. **Approved** —
-ready for `dev`. [ADR-0026](../adrs/0026-full-composite-coverage-fullscreen-scenes.md).
+(**[0025] Full composite coverage has now landed and closed** — `bg_*` and `zoom`/`pan_*` reach the two
+fullscreen/accumulating scenes (reaction-diffusion, attractor) via an alpha-present-over-backdrop and
+named-param view transform; both present shaders now emit a premultiplied-alpha channel over the shared
+backdrop (byte-identical over the default black). See Recently closed. Plans below that build on the
+RD/attractor present path now ride on its alpha-composited output.)
 
-**[0027] Attractor ink-on-paper + crisp trails** is **hard-sequenced after both [0020] and [0025]** —
-all three touch the attractor present/draw path, and the new engine-wide ink remap is designed to sit
-*downstream* of the palette LUT (0020, **now landed**) and the alpha-present-over-backdrop (0025) so it
-composes with their output instead of rebasing across their shader edits. It also coordinates with
-**[0023]** (the ink remap is strictly after 0024's transition blend — whichever lands second wires the
-order). Adds a final skippable composite stage (`render/ink.rs`) delivering black-on-white /
-colored-duotone for every scene, plus a surface-tied attractor trail resolution. Core-only, C ABI
-untouched, no `Scene`-trait change. **Approved** — design signed off, but **not yet ready for `dev`
-until 0025 lands** (hard-sequenced after it; 0020 has already landed). ADR-0028 stays proposed until the
-plan's close ceremony. [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md).
+**[0027] Attractor ink-on-paper + crisp trails** is **hard-sequenced after both [0020] and [0025], which
+have now both landed** (see Recently closed) — all three touch the attractor present/draw path, and the
+new engine-wide ink remap is designed to sit *downstream* of the palette LUT (0020) and the
+alpha-present-over-backdrop (0025) so it composes with their output instead of rebasing across their
+shader edits. It also coordinates with **[0023]** (the ink remap is strictly after 0024's transition
+blend — whichever lands second wires the order). Adds a final skippable composite stage (`render/ink.rs`)
+delivering black-on-white / colored-duotone for every scene, plus a surface-tied attractor trail
+resolution. Core-only, C ABI untouched, no `Scene`-trait change. **Approved and now unblocked — ready for
+`dev`** (both hard-sequenced predecessors have landed). ADR-0028 stays proposed until the plan's close
+ceremony. A tidy-up candidate while in `render/scenes/reaction_diffusion.rs:1048`: correct the stale
+"fullscreen opaque pass" comment on the RD present (left from before 0025's alpha switch).
+[ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md).
 
 ## Standing (not a plan)
 
@@ -86,6 +86,31 @@ plan's close ceremony. [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md).
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0025 — Full composite coverage: background + view transform for reaction-diffusion and attractor](done/0025-full-composite-coverage.md) —
+  **done 2026-07-24**, passed Mode 4 review (no blockers, no majors; one minor, one nit). Five `dev`
+  phase commits (`06b4007` RD alpha-present, `ae17d57` RD zoom/pan, `265045b` attractor alpha-present,
+  `566fcf8` attractor zoom/pan, `6c570ec` docs) plus the pre-cleared `8d0e17a`
+  (`Renderer::adapter_is_software()`). Finishes ADR-0018's engine-wide promise: both fullscreen/
+  accumulating scenes switched their final present from opaque `REPLACE` to
+  `PREMULTIPLIED_ALPHA_BLENDING` over the `bg_*` backdrop (RD alpha = the V-field `structure` term;
+  attractor alpha = accumulated luminance), so coral voids / attractor negative space reveal the
+  tintable gradient — and both now accept `zoom`/`pan_*` via `set_param` (RD in its present-pass sample
+  UVs, the attractor in its world projection), exactly as `fragment_field` does. **Verified:** the
+  `reaction_diffusion.png` / `attractor.png` golden fixtures are **byte-identical** (neither binds
+  `bg_*`, so premultiplied-over-black equals the old opaque present) — the "re-bless" the plan
+  anticipated was a confirmed no-op, pinned by the unchanged golden suite. View transform isolated +
+  determinism-checked in the two scene tests (same field/seed, `zoom`/`pan` → `frame_diff > 0.02`,
+  reproducible captures); the backdrop reveal asserted on real hardware (dual-hue differential,
+  void-masked tint tracking) and skipped on the WARP software adapter in the new
+  `core/tests/background_composite.rs` (the one added test file + the `adapter_is_software` accessor,
+  both pre-cleared as outside the plan's file list). **No `Scene`-trait change; C ABI untouched;** no new
+  dependency; hot-path-safe. `fragment_field` correctly stays fullscreen-opaque (bg_* no-op there, now
+  documented); `mirror_*` stays line-only by design. **Minor:** stale "fullscreen opaque pass" comment
+  on the RD present (`reaction_diffusion.rs:1048`) — swept into Plan 0027's tidy-up list. **Nit:** the
+  plan's "goldens re-blessed" done-when wording diverges from the byte-identical reality (a
+  strictly-better outcome). Unblocks Plan 0027 (hard-sequenced after it). [ADR-0026](../adrs/0026-full-composite-coverage-fullscreen-scenes.md)
+  now **accepted**. Version **minor 0.11.0 -> 0.12.0** at close.
 
 - [0028 — Parametric-curve shape params: radial offset + phase (audio-morphable rose geometry)](done/0028-parametric-curve-shape-params.md) —
   **done 2026-07-24**, passed Mode 4 review (no blockers, no majors; one minor, one nit). Two `dev`
