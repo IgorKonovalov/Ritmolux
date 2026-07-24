@@ -477,10 +477,16 @@ impl Renderer {
         // `[palette]`) and hand it to the active scene (ADR-0021), off the hot
         // path. A shader-colored scene stores the LUT and uploads it next frame;
         // the line scenes ignore it. `spectrum` reproduces the prior cosine, so a
-        // palette-less preset is visually unchanged.
-        let baked = match preset.palette.as_ref() {
-            Some(cfg) => Palette::bake(cfg),
-            None => Palette::default_spectrum(),
+        // palette-less preset is visually unchanged. A `[palette_b]` bakes an A/B
+        // pair for the bindable `palette_mix` crossfade.
+        let baked = match (preset.palette.as_ref(), preset.palette_b.as_ref()) {
+            (Some(a), Some(b)) => Palette::bake_pair(a, b),
+            (Some(a), None) => Palette::bake(a),
+            (None, Some(b)) => Palette::bake_pair(
+                &crate::render::palette::PaletteConfig::default_spectrum(),
+                b,
+            ),
+            (None, None) => Palette::default_spectrum(),
         };
         scene.set_palette(&baked);
         // Structural config (ADR-0007), if any: capture segment-cap truncation so

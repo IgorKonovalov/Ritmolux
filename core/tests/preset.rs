@@ -261,14 +261,14 @@ fn palette_config_parses_names_stops_and_rejects_bad_tables() {
     }
     // Bake + sample: start ~black, middle ~red, end ~white — the gradient renders.
     let pal = Palette::bake(&cfg);
-    let start = pal.sample(0.002);
+    let start = pal.sample(0.002, 0.0);
     assert!(start.iter().all(|&c| c < 0.05), "start ~black: {start:?}");
-    let mid = pal.sample(0.5);
+    let mid = pal.sample(0.5, 0.0);
     assert!(
         mid[0] > 0.8 && mid[1] < 0.2 && mid[2] < 0.2,
         "middle ~red: {mid:?}"
     );
-    let end = pal.sample(0.998);
+    let end = pal.sample(0.998, 0.0);
     assert!(end.iter().all(|&c| c > 0.95), "end ~white: {end:?}");
 
     // Malformed stop lists and selector clashes are clean load errors, not panics

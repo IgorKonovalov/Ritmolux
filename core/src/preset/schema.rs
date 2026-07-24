@@ -108,6 +108,11 @@ pub struct Preset {
     /// renderer bakes it into a LUT and hands it to the active scene via
     /// `Scene::set_palette` on each preset switch.
     pub palette: Option<PaletteConfig>,
+    /// Optional **second** palette (ADR-0021 / Plan 0020 Phase 4), from a
+    /// `[palette_b]` table. When present, the renderer bakes an A/B pair and a
+    /// bindable `palette_mix` param crossfades between them per frame. `None`
+    /// means no crossfade (palette A only).
+    pub palette_b: Option<PaletteConfig>,
 }
 
 impl Preset {
@@ -147,8 +152,10 @@ impl Preset {
 
         // Palette selection (ADR-0021): validated at this boundary into a
         // baked-ready `PaletteConfig`; a bad name/stop list is a surfaced load
-        // error, never a panic. `None` -> the default `spectrum`.
+        // error, never a panic. `None` -> the default `spectrum`. `[palette_b]`
+        // (the crossfade target) validates the same way.
         let palette = raw.palette.map(RawPalette::into_config).transpose()?;
+        let palette_b = raw.palette_b.map(RawPalette::into_config).transpose()?;
 
         Ok(Preset {
             name,
@@ -157,6 +164,7 @@ impl Preset {
             config,
             smoothing: raw.smoothing,
             palette,
+            palette_b,
         })
     }
 }
@@ -227,10 +235,14 @@ struct RawPreset {
     /// constants in seconds. Absent means every param is applied instantly.
     #[serde(default)]
     smoothing: BTreeMap<String, f32>,
-    /// The optional `[palette]` color table (ADR-0021): a built-in `name` (or,
-    /// Phase 2, custom `stops`). Absent means the default `spectrum` cosine.
+    /// The optional `[palette]` color table (ADR-0021): a built-in `name` or
+    /// custom `stops`. Absent means the default `spectrum` cosine.
     #[serde(default)]
     palette: Option<RawPalette>,
+    /// The optional `[palette_b]` table (ADR-0021 / Phase 4): the crossfade
+    /// target for a bindable `palette_mix`. Same shape as `[palette]`.
+    #[serde(default)]
+    palette_b: Option<RawPalette>,
 }
 
 /// The raw `[palette]` table: **either** a built-in palette `name` **or** custom

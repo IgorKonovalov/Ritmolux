@@ -45,6 +45,9 @@ const DEFAULT_PAN: f32 = 0.0;
 const DEFAULT_COLOR_SPAN: f32 = 0.6;
 const DEFAULT_COLOR_CENTER: f32 = 0.0;
 const DEFAULT_SATURATION: f32 = 1.0;
+/// `palette_mix` default — 0 = palette A only (a no-op unless a preset declares
+/// `[palette_b]` and binds `palette_mix`).
+const DEFAULT_PALETTE_MIX: f32 = 0.0;
 
 const SHADER: &str = r#"
 struct Params {
@@ -54,16 +57,20 @@ struct Params {
     b: vec4<f32>,
     // xy: pan (field-space offset, ADR-0018), z: color_center, w: saturation
     c: vec4<f32>,
+    // x: palette_mix (A/B crossfade), yzw: unused
+    d: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
-// The gradient LUT sits in its own bind group (group 1), so this pipeline's
+// The gradient LUTs sit in their own bind group (group 1), so this pipeline's
 // layout stays distinct from the screen-space kaleidoscope's single 3-entry
 // [uniform, texture, sampler] group — two byte-identical layouts mis-render when
 // they coexist on the DX12 WARP software adapter (the same quirk the shared line
-// renderer and the lazy feedback scenes work around).
-@group(1) @binding(0) var lut: texture_2d<f32>;
-@group(1) @binding(1) var lut_samp: sampler;
+// renderer and the lazy feedback scenes work around). Two LUTs (A/B) for the
+// `palette_mix` crossfade; one shared sampler.
+@group(1) @binding(0) var lut_a: texture_2d<f32>;
+@group(1) @binding(1) var lut_b: texture_2d<f32>;
+@group(1) @binding(2) var lut_samp: sampler;
 
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
@@ -102,6 +109,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let pan = params.c.xy;
     let color_center = params.c.z;
     let saturation = params.c.w;
+    let palette_mix = params.d.x;
 
     var uv = in.ndc;
     uv.x = uv.x * aspect;
@@ -123,7 +131,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // (was a fixed 0.6), `color_center`/`hue` slide the window. Linear-filtered,
     // repeat-addressed (a hue rotation wraps like the cosine wheel).
     let coord = field * color_span + color_center + hue;
-    var col = textureSample(lut, lut_samp, vec2<f32>(coord, 0.5)).rgb;
+    // Sample both palettes and crossfade by `palette_mix` (0 = A, 1 = B). When a
+    // preset declares no [palette_b] the two LUTs are identical, so mix is a no-op.
+    let ca = textureSample(lut_a, lut_samp, vec2<f32>(coord, 0.5)).rgb;
+    let cb = textureSample(lut_b, lut_samp, vec2<f32>(coord, 0.5)).rgb;
+    var col = mix(ca, cb, clamp(palette_mix, 0.0, 1.0));
     col = apply_saturation(col, saturation);
 
     let r = length(uv);
@@ -140,6 +152,7 @@ struct Params {
     a: [f32; 4],
     b: [f32; 4],
     c: [f32; 4],
+    d: [f32; 4],
 }
 
 /// Fullscreen domain-warped fragment field, driven by named preset parameters.
@@ -147,12 +160,14 @@ pub struct FragmentFieldScene {
     pipeline: wgpu::RenderPipeline,
     uniforms: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    /// The LUT texture + sampler bind group (group 1), kept distinct from the
+    /// The LUT textures + sampler bind group (group 1), kept distinct from the
     /// uniform group so the pipeline layout does not match the kaleidoscope's.
     lut_bind_group: wgpu::BindGroup,
-    /// The 256×1 gradient LUT texture the fragment samples for color (ADR-0021).
-    lut_texture: wgpu::Texture,
-    /// The active baked palette, re-uploaded to `lut_texture` when
+    /// The 256×1 gradient LUT textures (A/B) the fragment samples + crossfades
+    /// for color (ADR-0021).
+    lut_texture_a: wgpu::Texture,
+    lut_texture_b: wgpu::Texture,
+    /// The active baked palette pair, re-uploaded to `lut_texture_a`/`_b` when
     /// `palette_dirty` (set by `set_palette` on a preset switch), off the hot path.
     palette: Palette,
     palette_dirty: bool,
@@ -168,6 +183,8 @@ pub struct FragmentFieldScene {
     color_span: f32,
     color_center: f32,
     saturation: f32,
+    /// A/B palette crossfade position (Plan 0020 Phase 4); 0 = palette A.
+    palette_mix: f32,
 }
 
 impl FragmentFieldScene {
@@ -183,8 +200,10 @@ impl FragmentFieldScene {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let lut_texture = palette::lut_texture(device, "fragment-field-lut");
-        let lut_view = lut_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let lut_texture_a = palette::lut_texture(device, "fragment-field-lut-a");
+        let lut_texture_b = palette::lut_texture(device, "fragment-field-lut-b");
+        let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
+        let lut_view_b = lut_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
         let lut_sampler = palette::lut_sampler(device);
         let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("fragment-field-uniform-layout"),
@@ -202,21 +221,23 @@ impl FragmentFieldScene {
         // The LUT texture + sampler live in their own group (group 1) — see the
         // WGSL note: keeping this pipeline's layout distinct from the
         // kaleidoscope's avoids the DX12 WARP identical-layout mis-render.
+        let lut_texture_entry = |binding: u32| wgpu::BindGroupLayoutEntry {
+            binding,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::D2,
+                multisampled: false,
+            },
+            count: None,
+        };
         let lut_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("fragment-field-lut-layout"),
             entries: &[
+                lut_texture_entry(0),
+                lut_texture_entry(1),
                 wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
+                    binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
@@ -237,10 +258,14 @@ impl FragmentFieldScene {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&lut_view),
+                    resource: wgpu::BindingResource::TextureView(&lut_view_a),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&lut_view_b),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
                     resource: wgpu::BindingResource::Sampler(&lut_sampler),
                 },
             ],
@@ -281,7 +306,8 @@ impl FragmentFieldScene {
             uniforms,
             bind_group,
             lut_bind_group,
-            lut_texture,
+            lut_texture_a,
+            lut_texture_b,
             // Seed with the default `spectrum` (the prior cosine); the renderer
             // calls `set_palette` before the first frame with the active preset's
             // palette, and `render` uploads it. Seeding here keeps the texture
@@ -299,6 +325,7 @@ impl FragmentFieldScene {
             color_span: DEFAULT_COLOR_SPAN,
             color_center: DEFAULT_COLOR_CENTER,
             saturation: DEFAULT_SATURATION,
+            palette_mix: DEFAULT_PALETTE_MIX,
         }
     }
 }
@@ -330,6 +357,7 @@ impl Scene for FragmentFieldScene {
         self.color_span = DEFAULT_COLOR_SPAN;
         self.color_center = DEFAULT_COLOR_CENTER;
         self.saturation = DEFAULT_SATURATION;
+        self.palette_mix = DEFAULT_PALETTE_MIX;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -344,6 +372,7 @@ impl Scene for FragmentFieldScene {
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
             "saturation" => self.saturation = value,
+            "palette_mix" => self.palette_mix = value,
             _ => {}
         }
     }
@@ -360,10 +389,11 @@ impl Scene for FragmentFieldScene {
         view: &wgpu::TextureView,
         aspect: f32,
     ) {
-        // Upload the active palette LUT if a preset switch changed it (off the
-        // hot path — once per switch, not per frame).
+        // Upload the active palette LUTs (A + B) if a preset switch changed them
+        // (off the hot path — once per switch, not per frame).
         if self.palette_dirty {
-            palette::write_lut(queue, &self.lut_texture, &self.palette);
+            palette::write_lut(queue, &self.lut_texture_a, &self.palette.lut_a_bytes());
+            palette::write_lut(queue, &self.lut_texture_b, &self.palette.lut_b_bytes());
             self.palette_dirty = false;
         }
 
@@ -371,6 +401,7 @@ impl Scene for FragmentFieldScene {
             a: [self.time, aspect.max(0.1), self.warp, self.hue],
             b: [self.zoom, self.glow, self.flash, self.color_span],
             c: [self.pan_x, self.pan_y, self.color_center, self.saturation],
+            d: [self.palette_mix, 0.0, 0.0, 0.0],
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
 
