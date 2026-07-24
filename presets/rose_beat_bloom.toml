@@ -1,0 +1,27 @@
+# Rose Beat Bloom - the SHAPE itself is audio-driven, not just color. `n` (petal
+# count) steps between integers with bass via floor(), and `[smoothing]` eases
+# each jump so the rose visibly MORPHS through the intermediate webs on every
+# beat instead of snapping. `d` breathes a little on the beat for extra life.
+system = "parametric_curve"
+name   = "Rose Beat Bloom"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+# 3..10 petals, quantized to integers, stepped by bass energy.
+n             = "floor(3 + clamp(bass * 22, 0, 7))"
+# Classic Maurer web step, nudged on the beat.
+d             = "71 + beat * 4"
+samples       = "1200"
+scale         = "0.92 + clamp(bass * 0.4, 0, 0.25)"
+spin          = "0.12"
+hue           = "0.58 + time * 0.01 + clamp(mid * 0.2, 0, 0.2)"
+thickness     = "1.1 + clamp(mid * 1.4, 0, 1.4)"
+brightness    = "0.85 + clamp(bass * 0.7, 0, 0.6)"
+draw_progress = "1"
+
+# Ease the integer petal jumps (~0.25s) so the shape morphs, not snaps.
+[smoothing]
+n     = 0.25
+scale = 0.12

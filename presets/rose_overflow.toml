@@ -1,0 +1,27 @@
+# Rose Overflow - the "out of bounds" blowout. A dense web whose `scale` is
+# pumped far past the frame by bass, so on loud hits the rose overflows the
+# screen and leaves the bright central void from the reference still. Petal count
+# also steps with bass, so the whole lattice re-forms as it blows up.
+system = "parametric_curve"
+name   = "Rose Overflow"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "floor(2 + clamp(bass * 20, 0, 6))"
+d             = "97"
+samples       = "3200"
+# Rests near the frame (~1.5), blows way past it on bass (~4.5) -> central void.
+scale         = "1.5 + clamp(bass * 3.5, 0, 3.0)"
+spin          = "0.03"
+hue           = "0.6 + clamp(mid * 0.15, 0, 0.15)"
+# Very thin strokes so thousands of chords read as a fine web, not a blob.
+thickness     = "0.7 + clamp(treb * 0.8, 0, 0.8)"
+brightness    = "0.7 + clamp(bass * 0.6, 0, 0.5)"
+draw_progress = "1"
+
+# Ease the blowout so it surges out and eases back like a real pump.
+[smoothing]
+scale = 0.14
+n     = 0.3
