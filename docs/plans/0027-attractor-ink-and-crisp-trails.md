@@ -1,6 +1,6 @@
 # 0027 — Attractor ink-on-paper + crisp trails (final-stage ink remap + trail resolution)
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-07-24
 > **Owner skill(s):** dev
 > **Related ADRs:** [0028](../adrs/0028-final-stage-ink-tone-remap.md) (new, proposed); extends
