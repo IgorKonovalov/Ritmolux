@@ -1,0 +1,25 @@
+# Rose Maurer Sweep - petals held constant, but the WEB restructures constantly.
+# `d` (the angular step) is the "fantastic shapes" lever from the reference: tiny
+# changes to it completely re-lattice the rose. Here it drifts slowly on `time`,
+# rides the mids, and kicks on every beat - so the web is never the same twice.
+system = "parametric_curve"
+name   = "Rose Maurer Sweep"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "6"
+# The lever: slow sine drift + mid energy + a per-beat kick.
+d             = "71 + sin(time * 0.06) * 12 + clamp(mid * 18, 0, 5) + beat * 3"
+samples       = "1600"
+scale         = "0.95"
+spin          = "0.05"
+hue           = "0.02 + time * 0.02 + clamp(treb * 0.3, 0, 0.3)"
+thickness     = "1.0 + clamp(treb * 1.6, 0, 1.6)"
+brightness    = "0.8 + clamp(mid * 0.8, 0, 0.6)"
+draw_progress = "1"
+
+# Gentle ease so the beat-kick on `d` reads as a surge, not a jitter.
+[smoothing]
+d = 0.08
