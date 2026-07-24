@@ -301,9 +301,11 @@ why "edit once, both frontends see it" works.
   reloads on any change. A malformed file is reported (to stderr / the load
   report) and the last good set is kept — a bad edit never crashes a running
   visual.
-- **Cycling.** Standalone: **Space** cycles to the next preset (title bar shows
-  the name). foobar2000: **Space**, or right-click the visualization → **Next
-  scene**.
+- **Cycling.** Standalone: the app **holds one scene by default** (ADR-0027) —
+  **Space** cycles to the next preset (title bar shows the name), and **`A`**
+  toggles auto-rotate on/off (auto is off out of the box; enable it per-run with
+  `A` or persistently via `auto = true` under `[rotate]` in `config.toml`).
+  foobar2000: **Space**, or right-click the visualization → **Next scene**.
 - **foobar loads on init.** The plugin calls the core's `lmv_load_presets` (C ABI
   v2, [ADR-0006](adrs/0006-c-abi-v2-preset-loading.md)) against the shared
   directory when it starts, so it seeds and renders the same library — no
