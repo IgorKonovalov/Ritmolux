@@ -13,6 +13,7 @@ use std::fmt;
 use serde::Deserialize;
 
 use super::expr::{self, Expr, ExprError};
+use crate::render::palette::{NamedPalette, PaletteConfig};
 use crate::render::scenes::lines::{CurveFamily, GeneratorConfig, MAX_LSYSTEM_DEPTH, hankin};
 use crate::render::scenes::particles::AttractorFamily;
 
@@ -100,6 +101,13 @@ pub struct Preset {
     /// injected `dt` before applying it, so band/beat motion eases instead of
     /// snapping. Keyed by param name; validated non-negative at load.
     pub smoothing: BTreeMap<String, f32>,
+    /// Optional color palette selection (ADR-0021 / Plan 0020), from a `[palette]`
+    /// table — a built-in `name` or custom `stops`, validated and baked-ready at
+    /// this boundary. `None` means the default `spectrum` (the exact current
+    /// cosine), so a preset without `[palette]` is visually unchanged. The
+    /// renderer bakes it into a LUT and hands it to the active scene via
+    /// `Scene::set_palette` on each preset switch.
+    pub palette: Option<PaletteConfig>,
 }
 
 impl Preset {
@@ -137,12 +145,18 @@ impl Preset {
             }
         }
 
+        // Palette selection (ADR-0021): validated at this boundary into a
+        // baked-ready `PaletteConfig`; a bad name/stop list is a surfaced load
+        // error, never a panic. `None` -> the default `spectrum`.
+        let palette = raw.palette.map(RawPalette::into_config).transpose()?;
+
         Ok(Preset {
             name,
             system,
             params,
             config,
             smoothing: raw.smoothing,
+            palette,
         })
     }
 }
@@ -213,6 +227,32 @@ struct RawPreset {
     /// constants in seconds. Absent means every param is applied instantly.
     #[serde(default)]
     smoothing: BTreeMap<String, f32>,
+    /// The optional `[palette]` color table (ADR-0021): a built-in `name` (or,
+    /// Phase 2, custom `stops`). Absent means the default `spectrum` cosine.
+    #[serde(default)]
+    palette: Option<RawPalette>,
+}
+
+/// The raw `[palette]` table: a built-in palette `name`. Custom `stops` land in
+/// Phase 2. Exactly one selector is expected; validated at load.
+#[derive(Deserialize)]
+struct RawPalette {
+    /// Built-in palette name (e.g. `"ember"`); validated at load.
+    #[serde(default)]
+    name: Option<String>,
+}
+
+impl RawPalette {
+    /// Validate the table into a [`PaletteConfig`], erroring (never panicking) on
+    /// an unknown name or a missing selector.
+    fn into_config(self) -> Result<PaletteConfig, PresetError> {
+        let name = self.name.ok_or_else(|| {
+            PresetError::Config("[palette] needs a `name` (a built-in palette)".into())
+        })?;
+        let named = NamedPalette::from_name(&name)
+            .ok_or_else(|| PresetError::Config(format!("unknown palette name '{name}'")))?;
+        Ok(PaletteConfig::Named(named))
+    }
 }
 
 /// The raw `[particles]` table: which strange-attractor family the

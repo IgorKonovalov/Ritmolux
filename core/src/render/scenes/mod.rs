@@ -22,6 +22,7 @@ pub mod reaction_diffusion;
 pub mod swarm;
 
 use crate::dsp::AnalysisFrame;
+use crate::render::palette::Palette;
 
 /// The `dt` (seconds) the C ABI's legacy `lmv_render` and the headless capture
 /// primitives inject when a caller has no real elapsed time to supply — the
@@ -77,6 +78,14 @@ pub(crate) trait Scene {
     fn configure(&mut self, _cfg: &lines::GeneratorConfig) -> Option<lines::CapOverflow> {
         None
     }
+
+    /// Consume a preset's baked color [`Palette`] (ADR-0021). Invoked **once at
+    /// preset load, off the hot path** — a shader-colored scene stores the baked
+    /// LUT and uploads it to its 256×1 texture (or samples it on the CPU) on the
+    /// next frame; a non-colored scene (the line scenes) ignores it. Default
+    /// no-op. The second and last thin off-hot-path widening of this trait after
+    /// ADR-0007's [`configure`](Scene::configure).
+    fn set_palette(&mut self, _palette: &Palette) {}
 
     /// The per-frame geometry-mirror cap overflow (Plan 0018 Phase 4), if this
     /// frame's N-fold replication exceeded the segment cap and truncated. Reuses

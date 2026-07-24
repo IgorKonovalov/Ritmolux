@@ -25,6 +25,7 @@ mod kaleidoscope;
 pub mod metrics;
 pub mod overlay;
 mod overlay_font;
+pub mod palette;
 pub mod scenes;
 #[cfg(feature = "text")]
 pub mod text;
@@ -39,6 +40,7 @@ pub use capture::CaptureImage;
 pub use context::{RenderContext, RenderError};
 use kaleidoscope::Kaleidoscope;
 use overlay::Overlay;
+use palette::Palette;
 use scenes::Scene;
 pub use scenes::lines::CapOverflow;
 #[cfg(feature = "text")]
@@ -468,12 +470,23 @@ impl Renderer {
         let Some(preset) = roster.active_preset() else {
             return;
         };
-        let Some(cfg) = preset.config.as_ref() else {
+        let Some(scene) = scenes.get_mut(system_slot(preset.system)) else {
             return;
         };
-        if let Some(scene) = scenes.get_mut(system_slot(preset.system)) {
-            // Capture any segment-cap truncation so the frontend can surface it
-            // (ADR-0007: never a silent cut). `None` for the fit/no-config case.
+        // Bake the preset's color palette (default `spectrum` if it declares no
+        // `[palette]`) and hand it to the active scene (ADR-0021), off the hot
+        // path. A shader-colored scene stores the LUT and uploads it next frame;
+        // the line scenes ignore it. `spectrum` reproduces the prior cosine, so a
+        // palette-less preset is visually unchanged.
+        let baked = match preset.palette.as_ref() {
+            Some(cfg) => Palette::bake(cfg),
+            None => Palette::default_spectrum(),
+        };
+        scene.set_palette(&baked);
+        // Structural config (ADR-0007), if any: capture segment-cap truncation so
+        // the frontend can surface it (never a silent cut). `None` for the
+        // fit/no-config case.
+        if let Some(cfg) = preset.config.as_ref() {
             *cap_overflow = scene.configure(cfg);
         }
     }
