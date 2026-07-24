@@ -32,6 +32,11 @@ const WIDTH_SCALE: f32 = 0.003;
 // Parameter defaults — a calm, whole, slowly turning rose when nothing is bound.
 const DEFAULT_N: f32 = 6.0;
 const DEFAULT_D: f32 = 71.0;
+// Shape params (ADR-0029): both no-ops by default, so an unbound rose is the
+// plain `sin(n*theta)` curve — `phase` adds inside the sine, `radial_offset`
+// adds to the radius.
+const DEFAULT_PHASE: f32 = 0.0;
+const DEFAULT_RADIAL_OFFSET: f32 = 0.0;
 const DEFAULT_SAMPLES: f32 = 361.0;
 const DEFAULT_THICKNESS: f32 = 2.0;
 const DEFAULT_HUE: f32 = 0.6;
@@ -69,6 +74,8 @@ pub struct ParametricCurveScene {
     time: f32,
     n: f32,
     d: f32,
+    phase: f32,
+    radial_offset: f32,
     samples: f32,
     thickness: f32,
     hue: f32,
@@ -96,6 +103,8 @@ impl ParametricCurveScene {
             time: 0.0,
             n: DEFAULT_N,
             d: DEFAULT_D,
+            phase: DEFAULT_PHASE,
+            radial_offset: DEFAULT_RADIAL_OFFSET,
             samples: DEFAULT_SAMPLES,
             thickness: DEFAULT_THICKNESS,
             hue: DEFAULT_HUE,
@@ -124,6 +133,8 @@ impl Scene for ParametricCurveScene {
     fn reset_params(&mut self) {
         self.n = DEFAULT_N;
         self.d = DEFAULT_D;
+        self.phase = DEFAULT_PHASE;
+        self.radial_offset = DEFAULT_RADIAL_OFFSET;
         self.samples = DEFAULT_SAMPLES;
         self.thickness = DEFAULT_THICKNESS;
         self.hue = DEFAULT_HUE;
@@ -142,6 +153,8 @@ impl Scene for ParametricCurveScene {
         match name {
             "n" => self.n = value,
             "d" => self.d = value,
+            "phase" => self.phase = value,
+            "radial_offset" => self.radial_offset = value,
             "samples" => self.samples = value,
             "thickness" => self.thickness = value,
             "hue" => self.hue = value,
@@ -202,8 +215,10 @@ impl Scene for ParametricCurveScene {
             CurveFamily::MaurerRose => curves::maurer_rose(
                 self.n,
                 self.d,
+                self.phase,
                 samples,
                 self.scale,
+                self.radial_offset,
                 rotation,
                 self.draw_progress,
                 color,
