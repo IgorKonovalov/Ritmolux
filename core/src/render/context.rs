@@ -77,6 +77,12 @@ pub struct RenderContext {
     pub(crate) device: wgpu::Device,
     pub(crate) queue: wgpu::Queue,
     pub(crate) config: wgpu::SurfaceConfiguration,
+    /// Whether the selected adapter is a CPU/software rasterizer (WARP on DX12,
+    /// llvmpipe on Vulkan). The headless capture path forces this for
+    /// reproducibility; visual-QA tests read it to skip checks the software
+    /// rasterizer can't render faithfully (e.g. fullscreen-scene + background
+    /// pipeline coexistence, a documented WARP quirk).
+    is_software: bool,
 }
 
 impl RenderContext {
@@ -139,11 +145,13 @@ impl RenderContext {
         config.desired_maximum_frame_latency = 2;
         surface.configure(&device, &config);
 
+        let is_software = adapter.get_info().device_type == wgpu::DeviceType::Cpu;
         Ok(Self {
             surface: Some(surface),
             device,
             queue,
             config,
+            is_software,
         })
     }
 
@@ -184,11 +192,13 @@ impl RenderContext {
             view_formats: vec![],
         };
 
+        let is_software = adapter.get_info().device_type == wgpu::DeviceType::Cpu;
         Ok(Self {
             surface: None,
             device,
             queue,
             config,
+            is_software,
         })
     }
 
@@ -207,6 +217,11 @@ impl RenderContext {
     /// The texture format the surface is configured with.
     pub fn surface_format(&self) -> wgpu::TextureFormat {
         self.config.format
+    }
+
+    /// Whether the active adapter is a CPU/software rasterizer (see the field).
+    pub(crate) fn is_software(&self) -> bool {
+        self.is_software
     }
 
     /// Re-apply the current configuration (after a Lost/Outdated surface).
