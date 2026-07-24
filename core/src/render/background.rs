@@ -18,10 +18,12 @@
 //! otherwise mis-render the coexisting scene pipelines (a documented quirk with no
 //! validation error; real hardware is unaffected).
 //!
-//! A fullscreen scene (fragment field, reaction-diffusion) draws opaquely over
-//! the backdrop, so its bg params have no visible effect; the pass earns its keep
-//! behind the *sparse* scenes (lines, swarm, attractor), where the empty space
-//! between strokes and points reveals the gradient.
+//! The **fragment field** is the one scene that still draws opaquely over the
+//! backdrop, so its bg params have no visible effect. Every other scene composites
+//! over it: the *sparse* scenes (lines, swarm, attractor) reveal the gradient in
+//! the space between strokes and points, and reaction-diffusion reveals it in the
+//! field's voids (Plan 0025 / ADR-0026 switched both fullscreen/accumulating scenes
+//! from an opaque present to an alpha-blend over the backdrop).
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to render/ by the
 // hygiene guard). Runs every displayed frame.

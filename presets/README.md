@@ -43,8 +43,8 @@ surfaced error — the engine keeps the last good preset, never crashes (NFR 10)
 | `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
-| `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `saturation` `color_span` `color_center` `palette_mix` |
-| `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` · `saturation` `hue_spread` `hue_center` `palette_mix` |
+| `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
+| `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. Unknown parameter names
 are ignored. The params after the first `·` are the shared **view transform** and
@@ -84,28 +84,30 @@ that binds none renders exactly as before.
 
 ### Shared view transform — `zoom`, `pan_x`, `pan_y`
 
-A camera zoom about the frame centre, then a pan. Applied by `fragment_field`,
-`swarm`, and the three line systems (`parametric_curve` / `lsystem` /
-`star_pattern`).
+A camera zoom about the frame centre, then a pan. Applied by **every** coloured
+scene: `fragment_field`, `swarm`, the three line systems (`parametric_curve` /
+`lsystem` / `star_pattern`), and — since Plan 0025 — `reaction_diffusion` and
+`attractor`.
 
-- On the **line** and **swarm** scenes, `zoom > 1` moves the camera *in* (geometry
-  bigger); `zoom = 1` is no zoom. `pan_*` shift in world units. Try
+- On the **line**, **swarm**, and **attractor** scenes, `zoom > 1` moves the camera
+  *in* (geometry bigger); `zoom = 1` is no zoom. `pan_*` shift in world units. Try
   `zoom = "1 + bass * 0.6"` for a kick-driven pump.
-- On the **fragment field**, `zoom` is the pre-existing field-density knob (it
-  scales the *sample* coordinates, so a *higher* `zoom` shows *more* field cycles —
-  the opposite sense to the line scenes, kept for the shipped fragment presets);
-  `pan_x` / `pan_y` slide the sampled field window.
-- `reaction_diffusion` and `attractor` are full-screen and ignore the view
-  transform.
+- On the **fragment field** and **reaction-diffusion**, `zoom` scales the *sample*
+  coordinates of the present pass, so a *higher* `zoom` shows *more* of the field
+  (the opposite sense to the geometry scenes, kept for the shipped fragment
+  presets); `pan_x` / `pan_y` slide the sampled window.
 
 ### Background pass — `bg_hue`, `bg_bright`, `bg_vignette`
 
 An audio-tintable gradient + vignette backdrop drawn *before* the scene, engine-
 wide. `bg_bright = 0` (the default) is a black backdrop; raise it to reveal the
 gradient. `bg_hue` offsets into the shared cosine palette; `bg_vignette` (0..1)
-darkens the corners. Visible behind the **sparse** scenes (lines, swarm,
-attractor) where the gaps show through; the full-screen scenes (fragment,
-reaction-diffusion) draw over it.
+darkens the corners. Visible wherever the scene leaves the frame unpainted: behind
+the **sparse** scenes (lines, swarm, attractor) where the gaps show through, and —
+since Plan 0025 — in the **reaction-diffusion** field's voids (both scenes now
+composite over the backdrop instead of presenting opaque). The **fragment field**
+is the one full-screen scene that still draws opaquely, so `bg_*` has no visible
+effect there.
 
 ### Geometry mirror (line systems) — `mirror_order`, `mirror_reflect`
 
