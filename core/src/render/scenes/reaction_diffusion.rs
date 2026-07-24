@@ -90,6 +90,10 @@ const DEFAULT_COLOR_SPAN: f32 = 0.85;
 const DEFAULT_COLOR_CENTER: f32 = 0.0;
 const DEFAULT_SATURATION: f32 = 1.0;
 const DEFAULT_PALETTE_MIX: f32 = 0.0;
+/// View transform defaults (ADR-0018): identity — `zoom` = 1 leaves the sampled
+/// window unscaled, `pan` = 0 unshifted, so an unbound preset is byte-unchanged.
+const DEFAULT_ZOOM: f32 = 1.0;
+const DEFAULT_PAN: f32 = 0.0;
 
 /// Beat-stamped seed injection (Phase 3). A rising `inject` edge stamps a blob
 /// of V into the field at the next seeded position, so a beat spawns new growth.
@@ -231,6 +235,8 @@ struct Present {
     a: vec4<f32>,
     // x: color_span, y: color_center, z: saturation, w: palette_mix
     b: vec4<f32>,
+    // x: zoom, yz: pan (field-space view transform, ADR-0018), w: unused
+    c: vec4<f32>,
 }
 @group(0) @binding(0) var present_field: texture_2d<f32>;
 @group(0) @binding(1) var present_samp: sampler;
@@ -256,7 +262,14 @@ fn sample_v(uv: vec2<f32>) -> f32 {
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let dims = vec2<f32>(textureDimensions(present_field));
     let texel = 1.0 / dims;
-    let uv = in.uv;
+
+    // View transform (ADR-0018): scale the sampled window about its centre by
+    // `zoom`, then offset by `pan`. Default zoom = 1, pan = 0 leaves `in.uv`
+    // untouched, so an unbound preset renders identically. Same shape fragment_field
+    // uses for its field-space zoom/pan.
+    let zoom = pp.c.x;
+    let pan = pp.c.yz;
+    let uv = (in.uv - vec2<f32>(0.5, 0.5)) * zoom + vec2<f32>(0.5, 0.5) + pan;
 
     let v = sample_v(uv);
 
@@ -343,6 +356,8 @@ struct PresentParams {
     a: [f32; 4],
     /// x: color_span, y: color_center, z: saturation, w: palette_mix.
     b: [f32; 4],
+    /// x: zoom, yz: pan (view transform, ADR-0018), w: unused.
+    c: [f32; 4],
 }
 
 /// The GPU-side state, built lazily on first render (see the module docs).
@@ -567,6 +582,11 @@ pub struct ReactionDiffusionScene {
     color_center: f32,
     saturation: f32,
     palette_mix: f32,
+    /// Shared view transform (ADR-0018 / Plan 0025 Phase 2): `zoom` scales the
+    /// present-pass sample window about its centre, `pan_*` offsets it.
+    zoom: f32,
+    pan_x: f32,
+    pan_y: f32,
     /// The active baked palette pair; uploaded to the present LUT textures when
     /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
     palette: Palette,
@@ -615,6 +635,9 @@ impl ReactionDiffusionScene {
             color_center: DEFAULT_COLOR_CENTER,
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
+            zoom: DEFAULT_ZOOM,
+            pan_x: DEFAULT_PAN,
+            pan_y: DEFAULT_PAN,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
         }
@@ -852,6 +875,9 @@ impl Scene for ReactionDiffusionScene {
         self.color_center = DEFAULT_COLOR_CENTER;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
+        self.zoom = DEFAULT_ZOOM;
+        self.pan_x = DEFAULT_PAN;
+        self.pan_y = DEFAULT_PAN;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -872,6 +898,9 @@ impl Scene for ReactionDiffusionScene {
             "color_center" => self.color_center = value,
             "saturation" => self.saturation = value,
             "palette_mix" => self.palette_mix = value,
+            "zoom" => self.zoom = value,
+            "pan_x" => self.pan_x = value,
+            "pan_y" => self.pan_y = value,
             _ => {}
         }
     }
@@ -919,6 +948,9 @@ impl Scene for ReactionDiffusionScene {
             color_center,
             saturation,
             palette_mix,
+            zoom,
+            pan_x,
+            pan_y,
             palette,
             palette_dirty,
             ..
@@ -941,6 +973,7 @@ impl Scene for ReactionDiffusionScene {
             bytemuck::bytes_of(&PresentParams {
                 a: [*hue, *contour, *hatch, *glow],
                 b: [*color_span, *color_center, *saturation, *palette_mix],
+                c: [*zoom, *pan_x, *pan_y, 0.0],
             }),
         );
 

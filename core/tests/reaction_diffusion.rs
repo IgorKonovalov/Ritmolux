@@ -15,6 +15,7 @@
 //! spin up a WARP device and can crash the software driver.
 
 use lmv_core::dsp::AnalysisFrame;
+use lmv_core::preset::Preset;
 use lmv_core::render::{
     CaptureImage, HeadlessOptions, RenderError, Renderer,
     metrics::{coverage, frame_diff, quadrant_spread},
@@ -26,6 +27,18 @@ const PRESET: &str = "Coral";
 /// A pixel counts as lit if any RGB channel differs from the sampled background
 /// by more than this.
 const EPS: u8 = 10;
+
+/// An RD preset with the same lively field params plus an extra `[params]` line —
+/// used to isolate the view transform (Phase 2): the field is identical, so any
+/// render difference is the present-pass zoom/pan. The view transform touches only
+/// the present sampling (no background pipeline), so it is faithful on WARP.
+fn rd_view_preset(name: &str, extra: &str) -> Preset {
+    let toml = format!(
+        "system = \"reaction_diffusion\"\nname = \"{name}\"\n[params]\n\
+         feed = \"0.037\"\nkill = \"0.06\"\nflow = \"1.0\"\nglow = \"0.8\"\n{extra}"
+    );
+    Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name} preset parses: {e}"))
+}
 
 /// Build a headless `Renderer`, or `None` (a logged skip) when the runner
 /// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
@@ -120,5 +133,42 @@ fn reaction_diffusion_contract() {
     assert_eq!(
         a.rgba, b.rgba,
         "reaction-diffusion capture is not reproducible for a fixed input"
+    );
+
+    // --- View transform (Plan 0025 Phase 2, ADR-0018): `zoom`/`pan_*` transform the
+    // present-pass sample window, so binding them visibly moves the field. The field
+    // sim is untouched (same params, same seed), so any pixel difference is the view
+    // transform alone — and it stays a pure function of the params (deterministic). ---
+    renderer.set_presets(vec![
+        rd_view_preset("rd_identity", ""),
+        rd_view_preset("rd_zoom", "zoom = \"1.6\"\n"),
+        rd_view_preset("rd_pan", "pan_x = \"0.3\"\n"),
+    ]);
+    let identity = renderer
+        .capture_preset("rd_identity", &lively, 60)
+        .expect("capture rd_identity");
+    let zoomed = renderer
+        .capture_preset("rd_zoom", &lively, 60)
+        .expect("capture rd_zoom");
+    let panned = renderer
+        .capture_preset("rd_pan", &lively, 60)
+        .expect("capture rd_pan");
+    assert!(
+        frame_diff(&identity, &zoomed) > 0.02,
+        "zoom did not move the field: diff {:.4}",
+        frame_diff(&identity, &zoomed)
+    );
+    assert!(
+        frame_diff(&identity, &panned) > 0.02,
+        "pan did not move the field: diff {:.4}",
+        frame_diff(&identity, &panned)
+    );
+    // Determinism: the transform is a pure function of its params (no wall-clock).
+    let zoomed_again = renderer
+        .capture_preset("rd_zoom", &lively, 60)
+        .expect("capture rd_zoom again");
+    assert_eq!(
+        zoomed.rgba, zoomed_again.rgba,
+        "zoomed reaction-diffusion capture is not reproducible"
     );
 }
