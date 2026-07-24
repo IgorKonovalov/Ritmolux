@@ -1,6 +1,6 @@
 # ADR-0026 — Full composite coverage: background + view transform for the fullscreen/accumulating scenes (reaction-diffusion, attractor)
 
-> **Status:** proposed
+> **Status:** accepted (2026-07-24, with Plan 0025 close)
 > **Date:** 2026-07-24
 > **Related plan(s):** [0025-full-composite-coverage](../plans/0025-full-composite-coverage.md); extends [0018-engine-wide-scene-compositing](0018-engine-wide-scene-compositing.md)
 

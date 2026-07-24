@@ -1,6 +1,27 @@
 # 0025 — Full composite coverage: background + view transform for reaction-diffusion and attractor
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-07-24, passed Mode 4 review (no blockers, no majors; one minor, one
+> nit). Five `dev` phase commits: `06b4007` (Phase 1, RD alpha-present over backdrop), `ae17d57`
+> (Phase 2, RD zoom/pan), `265045b` (Phase 3, attractor alpha-present), `566fcf8` (Phase 4, attractor
+> zoom/pan), `6c570ec` (Phase 5, `presets/README.md` note); plus `8d0e17a` (the pre-cleared
+> `Renderer::adapter_is_software()` accessor). Both fullscreen/accumulating presents switched from
+> opaque `REPLACE` to `PREMULTIPLIED_ALPHA_BLENDING` over the backdrop (RD alpha = the V-field
+> `structure` term; attractor alpha = accumulated luminance), and both now accept `zoom`/`pan_*` via
+> `set_param` — RD in its present-pass sample UVs, the attractor in its world projection. **Verified:**
+> the `reaction_diffusion.png` / `attractor.png` golden fixtures are **byte-identical** (neither binds
+> `bg_*`, so premultiplied-over-black equals the old opaque present) — the anticipated re-bless was a
+> confirmed no-op, pinned by the unchanged golden suite rather than re-blessed. The view transform is
+> isolated + determinism-checked in `reaction_diffusion.rs` / `attractor.rs` (same field/seed, `zoom`/
+> `pan` → `frame_diff > 0.02`, reproducible captures), and the backdrop reveal is asserted on real
+> hardware (dual-hue differential, void-masked tint tracking) and skipped on the WARP software adapter
+> in the new `core/tests/background_composite.rs`. **No `Scene`-trait change; C ABI untouched;** no new
+> dependency; hot-path-safe. **Minor:** the RD present-pass `LoadOp::Load` retains a stale "fullscreen
+> opaque pass" comment (`reaction_diffusion.rs:1048`) contradicting the alpha-present it now guards —
+> the attractor's equivalent was updated; sweep it when `dev` next edits that present (Plan 0027 is
+> sequenced onto it). **Nit:** the plan's "goldens re-blessed" done-when wording diverges from reality
+> (byte-identical, not re-blessed) — a strictly-better outcome. `fragment_field` correctly stays
+> fullscreen-opaque (bg_* no-op there, now documented); `mirror_*` stays line-only by design. Version
+> **minor 0.11.0 -> 0.12.0** at close.
 > **Created:** 2026-07-24
 > **Owner skill(s):** dev
 > **Related ADRs:** [0026-full-composite-coverage-fullscreen-scenes](../adrs/0026-full-composite-coverage-fullscreen-scenes.md); extends [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md) (engine composite) and touches the same present shaders as [ADR-0021](../adrs/0021-shared-palette-system.md) / Plan 0020
