@@ -51,6 +51,9 @@ const DEFAULT_SIZE: f32 = 1.0;
 const DEFAULT_HUE_SPREAD: f32 = 1.0;
 const DEFAULT_HUE_CENTER: f32 = 0.5;
 const DEFAULT_SATURATION: f32 = 1.0;
+/// `palette_mix` default — 0 = palette A only (the crossfade is a no-op unless a
+/// preset declares `[palette_b]` and binds `palette_mix`).
+const DEFAULT_PALETTE_MIX: f32 = 0.0;
 // Shared view transform (ADR-0018): identity by default, so an unbound preset is
 // unchanged. `zoom` multiplies particle positions about the frame centre; `pan_*`
 // offset them — matching the line scenes' semantics (zoom > 1 = zoomed in).
@@ -160,6 +163,8 @@ pub struct SwarmScene {
     hue_spread: f32,
     hue_center: f32,
     saturation: f32,
+    /// A/B palette crossfade position (Plan 0020 Phase 4); 0 = palette A.
+    palette_mix: f32,
 }
 
 impl SwarmScene {
@@ -281,6 +286,7 @@ impl SwarmScene {
             hue_spread: DEFAULT_HUE_SPREAD,
             hue_center: DEFAULT_HUE_CENTER,
             saturation: DEFAULT_SATURATION,
+            palette_mix: DEFAULT_PALETTE_MIX,
         }
     }
 
@@ -341,6 +347,7 @@ impl Scene for SwarmScene {
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.hue_center = DEFAULT_HUE_CENTER;
         self.saturation = DEFAULT_SATURATION;
+        self.palette_mix = DEFAULT_PALETTE_MIX;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -357,6 +364,7 @@ impl Scene for SwarmScene {
             "hue_spread" => self.hue_spread = value,
             "hue_center" => self.hue_center = value,
             "saturation" => self.saturation = value,
+            "palette_mix" => self.palette_mix = value,
             _ => {}
         }
     }
@@ -416,7 +424,10 @@ impl Scene for SwarmScene {
             // mapped into the `hue_spread`/`hue_center` band, then desaturated by
             // the shared `saturation`. Defaults reproduce the prior full-wheel look.
             let coord = hue_coord(self.hue_center, self.hue_spread, p.hue, self.hue);
-            let base = palette::desaturate(self.palette.sample(coord), self.saturation);
+            let base = palette::desaturate(
+                self.palette.sample(coord, self.palette_mix),
+                self.saturation,
+            );
             let bright = ((0.25 + speed * 0.7) * p.bright).min(1.6) * self.brightness;
 
             *inst = Instance {
@@ -507,7 +518,7 @@ mod tests {
             let hues: Vec<f32> = (0..64).map(|i| i as f32 / 64.0).collect();
             let cols: Vec<[f32; 3]> = hues
                 .iter()
-                .map(|&h| pal.sample(hue_coord(0.5, spread, h, 0.0)))
+                .map(|&h| pal.sample(hue_coord(0.5, spread, h, 0.0), 0.0))
                 .collect();
             let n = cols.len() as f32;
             let mut mean = [0.0f32; 3];

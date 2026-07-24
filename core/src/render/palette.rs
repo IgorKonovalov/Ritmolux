@@ -154,22 +154,37 @@ impl PaletteConfig {
     }
 }
 
-/// One gradient baked into a 256-entry RGB LUT. Sampled on the GPU (as a 256×1
-/// texture) and on the CPU (via [`sample`](Palette::sample)) from the same table.
-/// `Copy` (a 3 KB array) so a scene can hold its own copy for deferred upload.
+/// An **A/B palette pair** baked into two 256-entry RGB LUTs (Plan 0020 Phase 4).
+/// A preset declares palette A (`[palette]`) and, optionally, palette B
+/// (`[palette_b]`); a bindable `palette_mix` (`0..1`) crossfades between them per
+/// frame. With no `[palette_b]`, `lut_b == lut_a`, so `palette_mix` is a no-op and
+/// a single-palette preset is unchanged. Sampled on the GPU (two 256×1 textures,
+/// lerped in-shader) and on the CPU (via [`sample`](Palette::sample)) from the
+/// same tables. `Copy` (two 3 KB arrays) so a scene holds its own copy for
+/// deferred upload.
 #[derive(Clone, Copy)]
 pub struct Palette {
-    lut: [Rgb; LUT_SIZE],
+    lut_a: [Rgb; LUT_SIZE],
+    lut_b: [Rgb; LUT_SIZE],
 }
 
 impl Palette {
-    /// Bake `cfg` into the LUT. Pure; off the hot path (preset load only).
+    /// Bake a single palette (A) into both LUTs, so `palette_mix` is a no-op.
+    /// Pure; off the hot path (preset load only).
     pub fn bake(cfg: &PaletteConfig) -> Palette {
-        let lut = match cfg {
-            PaletteConfig::Named(named) => bake_gradient(&named.gradient()),
-            PaletteConfig::Custom(stops) => bake_gradient(&Gradient::Stops(stops)),
-        };
-        Palette { lut }
+        let lut = bake_config(cfg);
+        Palette {
+            lut_a: lut,
+            lut_b: lut,
+        }
+    }
+
+    /// Bake an A/B pair for a `palette_mix` crossfade. Pure; off the hot path.
+    pub fn bake_pair(a: &PaletteConfig, b: &PaletteConfig) -> Palette {
+        Palette {
+            lut_a: bake_config(a),
+            lut_b: bake_config(b),
+        }
     }
 
     /// The default palette (`spectrum`), used when a preset declares no
@@ -178,45 +193,78 @@ impl Palette {
         Palette::bake(&PaletteConfig::default_spectrum())
     }
 
-    /// Sample the LUT at `t`, linearly interpolated with the same texel-center
-    /// convention (and wrap) the GPU texture sampler uses, so the CPU (swarm) and
-    /// GPU scenes color consistently. Allocation-free — the swarm calls this per
-    /// particle per frame. `t` outside `[0, 1)` wraps (the gradient repeats, like
-    /// the cosine's periodic hue wheel).
-    pub fn sample(&self, t: f32) -> Rgb {
-        // Texel centers sit at (i + 0.5)/N (matching `bake_gradient` and hardware
-        // filtering), so map `t` to x = t*N - 0.5 and lerp the bracketing texels.
-        let tw = t - t.floor(); // wrap to [0, 1)
-        let x = tw * LUT_SIZE as f32 - 0.5;
-        let i0 = x.floor().rem_euclid(LUT_SIZE as f32) as usize;
-        let i1 = (i0 + 1) % LUT_SIZE;
-        let frac = x - x.floor();
-        let a = self.lut.get(i0).copied().unwrap_or([0.0; 3]);
-        let b = self.lut.get(i1).copied().unwrap_or([0.0; 3]);
+    /// Sample the crossfaded palette at `t` with A/B `mix` (`0` = A, `1` = B),
+    /// linearly interpolated with the same texel-center convention (and wrap) the
+    /// GPU texture sampler uses, so the CPU (swarm) and GPU scenes color
+    /// consistently. Allocation-free — the swarm calls this per particle per
+    /// frame. `mix <= 0` returns palette A exactly (matching the GPU `mix` at 0),
+    /// so `palette_mix = 0` is identical to palette A alone.
+    pub fn sample(&self, t: f32, mix: f32) -> Rgb {
+        let a = sample_lut(&self.lut_a, t);
+        if mix <= 0.0 {
+            return a;
+        }
+        let b = sample_lut(&self.lut_b, t);
+        let m = mix.min(1.0);
         let [ar, ag, ab] = a;
         let [br, bg, bb] = b;
-        [
-            ar + (br - ar) * frac,
-            ag + (bg - ag) * frac,
-            ab + (bb - ab) * frac,
-        ]
+        [ar + (br - ar) * m, ag + (bg - ag) * m, ab + (bb - ab) * m]
     }
 
-    /// The baked LUT as tight RGBA8 bytes for a 256×1 `Rgba8Unorm` texture upload
-    /// (the GPU scenes). Alpha is opaque; the display surface is 8-bit, so 8-bit
-    /// LUT storage adds no visible banding over the analytic cosine.
-    pub fn rgba8_bytes(&self) -> [u8; LUT_SIZE * 4] {
-        let mut out = [0u8; LUT_SIZE * 4];
-        for (px, rgb) in out.chunks_exact_mut(4).zip(self.lut.iter()) {
-            let [r, g, b] = *rgb;
-            if let [pr, pg, pb, pa] = px {
-                *pr = to_u8(r);
-                *pg = to_u8(g);
-                *pb = to_u8(b);
-                *pa = 255;
-            }
+    /// Palette A's LUT as tight RGBA8 bytes for a 256×1 `Rgba8Unorm` texture
+    /// upload. Alpha is opaque; the display surface is 8-bit, so 8-bit LUT storage
+    /// adds no visible banding over the analytic cosine.
+    pub fn lut_a_bytes(&self) -> [u8; LUT_SIZE * 4] {
+        lut_to_bytes(&self.lut_a)
+    }
+
+    /// Palette B's LUT as tight RGBA8 bytes (the crossfade target texture).
+    pub fn lut_b_bytes(&self) -> [u8; LUT_SIZE * 4] {
+        lut_to_bytes(&self.lut_b)
+    }
+}
+
+/// Sample one LUT at `t`, linearly interpolated with the texel-center convention
+/// (and wrap) the GPU sampler uses. Shared by [`Palette::sample`] for both sides.
+fn sample_lut(lut: &[Rgb; LUT_SIZE], t: f32) -> Rgb {
+    // Texel centers sit at (i + 0.5)/N (matching `bake_gradient` and hardware
+    // filtering), so map `t` to x = t*N - 0.5 and lerp the bracketing texels.
+    let tw = t - t.floor(); // wrap to [0, 1)
+    let x = tw * LUT_SIZE as f32 - 0.5;
+    let i0 = x.floor().rem_euclid(LUT_SIZE as f32) as usize;
+    let i1 = (i0 + 1) % LUT_SIZE;
+    let frac = x - x.floor();
+    let a = lut.get(i0).copied().unwrap_or([0.0; 3]);
+    let b = lut.get(i1).copied().unwrap_or([0.0; 3]);
+    let [ar, ag, ab] = a;
+    let [br, bg, bb] = b;
+    [
+        ar + (br - ar) * frac,
+        ag + (bg - ag) * frac,
+        ab + (bb - ab) * frac,
+    ]
+}
+
+/// One baked LUT as tight RGBA8 bytes (opaque alpha) for a 256×1 texture upload.
+fn lut_to_bytes(lut: &[Rgb; LUT_SIZE]) -> [u8; LUT_SIZE * 4] {
+    let mut out = [0u8; LUT_SIZE * 4];
+    for (px, rgb) in out.chunks_exact_mut(4).zip(lut.iter()) {
+        let [r, g, b] = *rgb;
+        if let [pr, pg, pb, pa] = px {
+            *pr = to_u8(r);
+            *pg = to_u8(g);
+            *pb = to_u8(b);
+            *pa = 255;
         }
-        out
+    }
+    out
+}
+
+/// Bake a [`PaletteConfig`] into a single LUT (the named or custom gradient).
+fn bake_config(cfg: &PaletteConfig) -> [Rgb; LUT_SIZE] {
+    match cfg {
+        PaletteConfig::Named(named) => bake_gradient(&named.gradient()),
+        PaletteConfig::Custom(stops) => bake_gradient(&Gradient::Stops(stops)),
     }
 }
 
@@ -262,11 +310,10 @@ pub fn lut_sampler(device: &wgpu::Device) -> wgpu::Sampler {
     })
 }
 
-/// Upload a baked palette's LUT into its 256×1 texture. Off the hot path — called
-/// from a scene's deferred `set_palette` upload (first frame after a preset
-/// switch).
-pub fn write_lut(queue: &wgpu::Queue, texture: &wgpu::Texture, palette: &Palette) {
-    let bytes = palette.rgba8_bytes();
+/// Upload one baked LUT (`palette.lut_a_bytes()` / `lut_b_bytes()`) into its 256×1
+/// texture. Off the hot path — called from a scene's deferred `set_palette`
+/// upload (first frame after a preset switch).
+pub fn write_lut(queue: &wgpu::Queue, texture: &wgpu::Texture, bytes: &[u8; LUT_SIZE * 4]) {
     queue.write_texture(
         wgpu::TexelCopyTextureInfo {
             texture,
@@ -274,7 +321,7 @@ pub fn write_lut(queue: &wgpu::Queue, texture: &wgpu::Texture, palette: &Palette
             origin: wgpu::Origin3d::ZERO,
             aspect: wgpu::TextureAspect::All,
         },
-        &bytes,
+        bytes,
         wgpu::TexelCopyBufferLayout {
             offset: 0,
             bytes_per_row: Some(LUT_SIZE as u32 * 4),
@@ -390,7 +437,7 @@ mod tests {
         // operating band (field*0.6 -> [0, 0.6]) and the wrap edges.
         let samples = [0.0, 0.1, 0.2, 0.3, 0.45, 0.6, 0.75, 0.95];
         for &t in &samples {
-            let got = pal.sample(t);
+            let got = pal.sample(t, 0.0);
             let want = cosine_reference(t);
             for k in 0..3 {
                 assert!(
@@ -411,17 +458,17 @@ mod tests {
     #[test]
     fn stops_interpolate_between_control_points() {
         let pal = Palette::bake(&PaletteConfig::Named(NamedPalette::Mono));
-        let lo = pal.sample(0.002);
+        let lo = pal.sample(0.002, 0.0);
         assert!(
             lo[0] < 0.05 && lo[1] < 0.05 && lo[2] < 0.05,
             "start ~black: {lo:?}"
         );
-        let hi = pal.sample(0.998);
+        let hi = pal.sample(0.998, 0.0);
         assert!(
             hi[0] > 0.95 && hi[1] > 0.95 && hi[2] > 0.95,
             "end ~white: {hi:?}"
         );
-        let mid = pal.sample(0.5);
+        let mid = pal.sample(0.5, 0.0);
         assert!(
             (mid[0] - 0.5).abs() < 0.05
                 && (mid[1] - 0.5).abs() < 0.05
@@ -447,5 +494,43 @@ mod tests {
             (gray[0] - gray[1]).abs() < 1e-6 && (gray[1] - gray[2]).abs() < 1e-6,
             "saturation 0 is gray: {gray:?}"
         );
+    }
+
+    /// The A/B crossfade (Plan 0020 Phase 4): `mix = 0` is exactly palette A,
+    /// `mix = 1` is palette B, and `mix = 0.5` lands between — the bindable
+    /// `palette_mix` behaviour, with the `mix = 0` = A-alone guarantee.
+    #[test]
+    fn palette_mix_crossfades_a_to_b() {
+        // A = mono (black->white), B = a solid mid-gray via two equal stops, so at
+        // a fixed `t` the two sides differ and the mix is easy to reason about.
+        let a = PaletteConfig::Named(NamedPalette::Mono);
+        let b = PaletteConfig::Named(NamedPalette::Ember);
+        let pair = Palette::bake_pair(&a, &b);
+        let a_only = Palette::bake(&a);
+
+        let t = 0.85;
+        // mix = 0 is exactly palette A alone (byte-for-byte with the single bake).
+        assert_eq!(
+            pair.sample(t, 0.0),
+            a_only.sample(t, 0.0),
+            "mix=0 is palette A alone"
+        );
+        // mix = 1 is palette B.
+        let b_only = Palette::bake(&b);
+        let at_one = pair.sample(t, 1.0);
+        let want_b = b_only.sample(t, 0.0);
+        for k in 0..3 {
+            assert!((at_one[k] - want_b[k]).abs() < 1e-6, "mix=1 is palette B");
+        }
+        // mix = 0.5 is the midpoint of A and B per channel.
+        let a_col = a_only.sample(t, 0.0);
+        let mid = pair.sample(t, 0.5);
+        for k in 0..3 {
+            let expected = a_col[k] + (want_b[k] - a_col[k]) * 0.5;
+            assert!(
+                (mid[k] - expected).abs() < 1e-6,
+                "mix=0.5 is the A/B midpoint"
+            );
+        }
     }
 }
