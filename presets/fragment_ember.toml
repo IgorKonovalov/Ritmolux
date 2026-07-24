@@ -1,9 +1,9 @@
-# Ember - warm and cohesive: the shared "ember" palette (deep red -> orange -> gold,
-# Plan 0020) held in a NARROW color_span so the whole field smoulders in one molten
-# band instead of smearing the rainbow (the old preset faked warmth with a crushed
-# zoom + a hue offset; now the palette carries the colour). color_center rides bass
-# toward the brighter orange on hits and breathes on a slow sin; big slow blobs, low
-# warp so it smoulders.
+# Ember - warm fiery layers that PUNCH gold on the beat. The field normally sweeps
+# near-black coals -> deep red -> orange, topping out at pale orange (gold hidden);
+# on each beat, color_center slides the palette window up so bright gold flares in,
+# then a short smoothing tau lets the flare swell and fall back instead of strobing.
+# color_span keeps distinct fiery layers across the field; a slow sin breathes it;
+# big slow blobs, low warp so it smoulders between hits.
 #
 # Variables available to expressions: bass mid treb onset beat bar time.
 system = "fragment_field"
@@ -17,6 +17,9 @@ warp         = "0.22 + clamp(bass * 6, 0, 0.5)"
 zoom         = "0.62 + clamp(mid * 2, 0, 0.15)"
 glow         = "0.55 + clamp((mid + bass) * 6, 0, 0.85)"
 flash        = "clamp(onset * 3, 0, 0.9)"
-color_center = "0.30 + clamp(bass * 3, 0, 0.12) + sin(time * 0.05) * 0.03"
-color_span   = "0.26 + clamp(mid * 2.5, 0, 0.10)"
+color_center = "0.03 + sin(time * 0.05) * 0.03 + beat * 0.20"
+color_span   = "0.82 + clamp(mid * 2, 0, 0.10)"
 saturation   = "1.05 + clamp(onset * 2, 0, 0.3)"
+
+[smoothing]
+color_center = 0.20
