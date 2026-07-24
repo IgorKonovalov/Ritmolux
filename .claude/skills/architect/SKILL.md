@@ -195,6 +195,14 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
 
 ### 3. Doc/diagram freshness & release bookkeeping
 - Are diagrams still accurate after new components/data flows? Update if not.
+- **Operator-doc freshness.** If the plan changed anything a user observes — controls/hotkeys,
+  a default, the preset/scene count, capture paths, CLI flags, config keys — grep the user-facing
+  docs for the thing that changed and update them in the close commit. The canonical set:
+  `README.md` (esp. the Controls table), `docs/presets.md`, `docs/on-device-validation.md`,
+  `docs/nfr.md`, `docs/capturing.md`. Prefer count-free phrasing ("the whole embedded set") over
+  hard numbers that re-drift. This is a required sweep, not a "if you notice" — behavior docs and
+  peripheral operator docs drift independently (Plan 0026 updated the README but left
+  `on-device-validation.md` saying "all 10" and `presets.md` silent on the `A` toggle).
 - Did the plan get `Status: done` and move to `docs/plans/done/`? Is `docs/plans/README.md`
   refreshed (roster → recently-closed, execution order, next-free-number)? Are paired ADRs
   flipped `proposed → accepted` with `docs/adrs/README.md` matching?
