@@ -160,6 +160,26 @@ additive points. Simulation runs in Rust; your parameters shape its behavior.
 | `brightness` | `0.8` | Global brightness multiplier over the per-particle brightness. |
 | `size`       | `1.0` | Particle size multiplier. |
 
+### `parametric_curve`
+
+A per-frame-sampled line curve (the Maurer rose). Its full named-parameter list
+lives in the actively-maintained [`presets/README.md`](../presets/README.md)
+table; documented here are the two **shape** params (Plan 0028 / ADR-0029) that
+morph the curve's geometry itself, so an audio binding reshapes the rose rather
+than only recoloring or spinning it. Both default to `0.0` (a no-op — the plain
+`sin(n·θ)` rose), so an unbound preset is unchanged.
+
+| Parameter | Default | What it does |
+|-----------|---------|--------------|
+| `phase` | `0.0` | Radians added **inside** the sine — `r = sin(n·θ + phase) + radial_offset`. Reshapes the petal structure as it advances. Distinct from `spin`, which rotates the *finished* figure in screen space; `phase` changes the figure. |
+| `radial_offset` | `0.0` | Added to the radius. A nonzero value opens the rose off the origin into spiral / annular / rosette forms. |
+
+With either param nonzero, `r` is no longer bounded to `[-1, 1]`: a large
+`radial_offset` (or `scale`) pushes geometry past the NDC frame. That is the
+**intended** "out of bounds" blowout — the renderer clips cleanly; it is a
+documented behavior, not a bug. Bind them to `bass`/`bar`/`beat` for a shape
+that morphs with the audio.
+
 > Legacy scenes (`spectrum`, `pulse`, `starfield`) exist in the renderer's cycle
 > but are **not** preset-driven — they take no parameters and cannot be targeted
 > by a preset file. Only `fragment_field` and `swarm` are addressable from a
