@@ -40,7 +40,7 @@ surfaced error — the engine keeps the last good preset, never crashes (NFR 10)
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `swarm`           | `force` `spin` `burst` `hue` `brightness` `size` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
-| `parametric_curve`| `n` `d` `samples` `thickness` `hue` `spin` `scale` `brightness` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
+| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `saturation` `color_span` `color_center` `palette_mix` |
@@ -62,7 +62,13 @@ Every system additionally accepts the engine-stage params `bg_*`, `trails`, and
   figure from the start (a line-draw-on; ride it on `bar` for a per-beat redraw).
 - `parametric_curve`: `n`/`d` are the rose parameters, `spin` is angular velocity
   (rotation = `spin * time`), `samples` the chord count (clamped to the segment
-  cap).
+  cap). Two **shape** params morph the curve itself (default `0.0`, a no-op):
+  `phase` (radians added *inside* the sine, `r = sin(n*theta + phase) + radial_offset`)
+  reshapes the petals as it advances — distinct from `spin`, which rotates the
+  finished figure; `radial_offset` adds to the radius, opening the rose off-origin
+  into spiral/annular/rosette forms. Both make `r` exceed `[-1, 1]` when nonzero —
+  large values push geometry past the frame (the intended blowout; the renderer
+  clips). Bind them to `bass`/`bar`/`beat` for an audio-driven shape morph.
 - `lsystem`: `visible_depth` picks which precomputed iteration is shown — drive
   it off a band/beat to *grow* the structure (e.g. `4 + floor(2 * bass)`);
   `rotation` is an angle in radians, so multiply by `time` yourself.
