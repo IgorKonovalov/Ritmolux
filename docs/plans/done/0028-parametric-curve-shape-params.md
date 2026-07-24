@@ -1,7 +1,25 @@
 # 0028 — Parametric-curve shape params: radial offset + phase (audio-morphable rose geometry)
 
-> **Status:** approved
+> **Status:** done
 > **Created:** 2026-07-24
+> **Closed:** 2026-07-24 — passed Mode 4 review (no blockers, no majors; one minor, one nit).
+> Two `dev` phase commits: `f37dde0` (Phase 1 — `radial_offset`/`phase` threaded through
+> `curves.rs` + `parametric.rs`, sampler now `r = sin(n*theta + phase) + radial_offset`, both
+> zero-defaulted; four tests: the zero-default no-op pin, radial-offset-shifts-by-a-constant,
+> phase-changes-geometry, and a `capture_preset` binding proof under a bass stimulus) and
+> `20cd7f7` (Phase 2 — docs). **Verified:** the 6 `curves` unit tests + the binding test green;
+> `golden` unchanged (**no re-bless**, confirming the zero-default no-op property); `hygiene`
+> confirms the `curves.rs`/`parametric.rs` panic pragmas intact; `clippy -p lmv-core
+> --all-targets -D warnings` clean. **Minor:** Phase 1 also edited `core/src/render/mod.rs`
+> (+52) for the required Done-when-#3 binding test — expected (the capture harness lives there),
+> just absent from the phase's "Files touched" list. **Nit:** Phase 2 documented both
+> `presets/README.md` (the live table) **and** `docs/presets.md` — the plan targeted only the
+> latter, which was stale (no `parametric_curve` section); per the user both were updated now
+> rather than deferring to Plan 0019's rewrite (which will carry them forward). Core-only; C ABI
+> untouched; `Scene` trait untouched; no new dependency. Version **minor 0.10.0 -> 0.11.0** at
+> close. Pre-existing unrelated `every_preset_animates_over_time` Aurora failure (a fragment_field
+> preset, motion 0.0078) and the untracked `rose_*` preset drafts in the working tree are not part
+> of this plan.
 > **Owner skill(s):** dev
 > **Related ADRs:** [0029-parametric-curve-shape-params](../adrs/0029-parametric-curve-shape-params.md), supplements [0007-line-geometry-generators](../adrs/0007-line-geometry-generators.md)
 > **Sequencing:** land **after Plan 0020** (shared palette). This is a **priority** sequencing, not a technical dependency — 0028 touches only the Maurer sampler (`curves.rs`/`parametric.rs`) and 0020 only color/shaders, so they never rebase across each other; the user's call (2026-07-24) is to land the color axis first so preset-author gets both color and shape levers together when revising the rose drafts.

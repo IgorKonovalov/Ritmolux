@@ -1,6 +1,6 @@
 # ADR-0029 — Enrich the Maurer curve family via named shape params (radial offset + phase), not new families or a superformula
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-07-24
 > **Related plan(s):** [0028-parametric-curve-shape-params](../plans/0028-parametric-curve-shape-params.md)
 
