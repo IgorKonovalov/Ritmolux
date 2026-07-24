@@ -38,17 +38,19 @@ surfaced error — the engine keeps the last good preset, never crashes (NFR 10)
 
 | System            | Named `[params]`                                                         |
 |-------------------|--------------------------------------------------------------------------|
-| `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y`                      |
-| `swarm`           | `force` `spin` `burst` `hue` `brightness` `size` · `zoom` `pan_x` `pan_y` |
+| `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
+| `swarm`           | `force` `spin` `burst` `hue` `brightness` `size` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `parametric_curve`| `n` `d` `samples` `thickness` `hue` `spin` `scale` `brightness` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
-| `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow`           |
-| `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed`                              |
+| `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `saturation` `color_span` `color_center` `palette_mix` |
+| `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. Unknown parameter names
-are ignored. The params after the `·` are the shared **view transform** and
-line-**mirror** controls (Plan 0018) — see [Engine-wide controls](#engine-wide-controls-plan-0018).
+are ignored. The params after the first `·` are the shared **view transform** and
+line-**mirror** controls (Plan 0018) — see [Engine-wide controls](#engine-wide-controls-plan-0018);
+the trailing group on the four shader-coloured scenes is the shared **palette**
+colour surface (Plan 0020) — see [Colour — the palette surface](#colour--the-palette-surface-plan-0020).
 Every system additionally accepts the engine-stage params `bg_*`, `trails`, and
 `kaleido_*` documented there.
 
@@ -122,6 +124,31 @@ Folds the finished frame into `kaleido_order` mirrored wedges before present.
 `kaleido_order < 2` (default) is a passthrough; `>= 2` folds (clamped to 48).
 `kaleido_angle` (radians) rotates the fold — ride it on `time` for a turning
 kaleidoscope. Works on any scene.
+
+## Colour — the palette surface (Plan 0020)
+
+The four **shader-coloured** scenes (`fragment_field`, `swarm`,
+`reaction_diffusion`, `attractor`) colour through a shared **palette** (ADR-0021):
+a gradient — a built-in `name` or custom `stops` — baked into a lookup table the
+scene samples. An optional top-level `[palette]` table picks it; a `[palette_b]` +
+bindable `palette_mix` crossfades between two. Colour modulation (`saturation`,
+`color_span`/`color_center`, `hue_spread`/`hue_center`, `palette_mix`) is normal
+audio-bindable `[params]`. All defaults reproduce each scene's prior look
+(`[palette]`-less = the classic `spectrum` cosine), so a preset that sets none is
+unchanged. The line scenes use their own cosine `hue` and ignore palettes.
+
+```toml
+[palette]
+name = "ember"                 # or: stops = [ {at=0.0, color="#0b0b2a"}, ... ]
+
+[params]
+color_span = "0.3"             # fragment/RD: low = a cohesive single-family mood
+hue_spread = "0.15"            # swarm/attractor: low = a coherent-colour cloud
+saturation = "0.8 + mid * 2"
+```
+
+Full reference — built-in names, custom-stops rules, the per-scene colour params,
+and the A/B crossfade — is in **[docs/preset-palettes.md](../docs/preset-palettes.md)**.
 
 ## Eased parameters — the `[smoothing]` table
 
