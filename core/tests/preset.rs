@@ -235,6 +235,69 @@ fn curve_config_parses_into_structural_config() {
 }
 
 #[test]
+fn palette_config_parses_names_stops_and_rejects_bad_tables() {
+    use lmv_core::render::palette::{NamedPalette, Palette, PaletteConfig};
+
+    // A built-in `name` parses to its config.
+    let named = Preset::from_toml_str("system = \"fragment_field\"\n[palette]\nname = \"ember\"\n")
+        .expect("named palette preset is valid");
+    match named.palette {
+        Some(PaletteConfig::Named(NamedPalette::Ember)) => {}
+        other => panic!("expected the ember named palette, got {other:?}"),
+    }
+
+    // Three custom stops (hex + rgb-array forms) parse and bake to the gradient.
+    let custom = Preset::from_toml_str(
+        "system = \"fragment_field\"\n[palette]\n\
+         stops = [ { at = 0.0, color = \"#000000\" }, \
+                   { at = 0.5, color = [1.0, 0.0, 0.0] }, \
+                   { at = 1.0, color = \"#ffffff\" } ]\n",
+    )
+    .expect("custom stops preset is valid");
+    let cfg = custom.palette.expect("custom palette present");
+    match &cfg {
+        PaletteConfig::Custom(stops) => assert_eq!(stops.len(), 3, "all three stops kept"),
+        other => panic!("expected custom stops, got {other:?}"),
+    }
+    // Bake + sample: start ~black, middle ~red, end ~white — the gradient renders.
+    let pal = Palette::bake(&cfg);
+    let start = pal.sample(0.002);
+    assert!(start.iter().all(|&c| c < 0.05), "start ~black: {start:?}");
+    let mid = pal.sample(0.5);
+    assert!(
+        mid[0] > 0.8 && mid[1] < 0.2 && mid[2] < 0.2,
+        "middle ~red: {mid:?}"
+    );
+    let end = pal.sample(0.998);
+    assert!(end.iter().all(|&c| c > 0.95), "end ~white: {end:?}");
+
+    // Malformed stop lists and selector clashes are clean load errors, not panics
+    // (the loader keeps the previous good preset — NFR 10).
+    let bad = [
+        // Unsorted `at`.
+        "system=\"swarm\"\n[palette]\nstops=[{at=0.0,color=\"#000000\"},{at=0.2,color=\"#111111\"},{at=0.1,color=\"#222222\"}]\n",
+        // `at` out of range.
+        "system=\"swarm\"\n[palette]\nstops=[{at=0.0,color=\"#000000\"},{at=1.5,color=\"#ffffff\"}]\n",
+        // Unparseable hex color.
+        "system=\"swarm\"\n[palette]\nstops=[{at=0.0,color=\"#zzzzzz\"},{at=1.0,color=\"#ffffff\"}]\n",
+        // Fewer than two stops.
+        "system=\"swarm\"\n[palette]\nstops=[{at=0.0,color=\"#000000\"}]\n",
+        // Both `name` and `stops` (mutually exclusive).
+        "system=\"swarm\"\n[palette]\nname=\"ember\"\nstops=[{at=0.0,color=\"#000000\"},{at=1.0,color=\"#ffffff\"}]\n",
+        // Unknown built-in name.
+        "system=\"swarm\"\n[palette]\nname=\"chartreuse_dream\"\n",
+        // Empty palette table (neither selector).
+        "system=\"swarm\"\n[palette]\n",
+    ];
+    for src in bad {
+        assert!(
+            Preset::from_toml_str(src).is_err(),
+            "malformed palette should be rejected: {src}"
+        );
+    }
+}
+
+#[test]
 fn embedded_default_presets_all_parse() {
     use lmv_core::preset::{EMBEDDED, Preset, default_presets};
 

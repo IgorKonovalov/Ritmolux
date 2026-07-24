@@ -135,12 +135,15 @@ impl NamedPalette {
 
 /// A validated, ready-to-bake palette selection from a preset's `[palette]`
 /// table — constructed at the load boundary (`schema.rs`), then trusted by
-/// [`Palette::bake`] (validate-at-the-boundary). Phase 2 adds a custom-stops
-/// variant here.
+/// [`Palette::bake`] (validate-at-the-boundary).
 #[derive(Debug, Clone)]
 pub enum PaletteConfig {
     /// A built-in named palette.
     Named(NamedPalette),
+    /// Custom gradient stops (`(at, color)`), pre-validated at the load boundary:
+    /// sorted `at` in `0..=1`, ≥2 entries, parseable colors. Baked through the
+    /// same stop path the named stop-list palettes use.
+    Custom(Vec<(f32, Rgb)>),
 }
 
 impl PaletteConfig {
@@ -164,6 +167,7 @@ impl Palette {
     pub fn bake(cfg: &PaletteConfig) -> Palette {
         let lut = match cfg {
             PaletteConfig::Named(named) => bake_gradient(&named.gradient()),
+            PaletteConfig::Custom(stops) => bake_gradient(&Gradient::Stops(stops)),
         };
         Palette { lut }
     }
