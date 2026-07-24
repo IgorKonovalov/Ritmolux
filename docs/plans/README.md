@@ -13,7 +13,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0019](0019-preset-grammar-v2.md) | Preset expression grammar v2: branching, math functions, tempo, typo warnings | approved | Grow the preset expression language so authors stop hitting walls: add math functions (`cos sqrt pow smoothstep mod`) + constants (`pi tau`), branching (six comparison operators yielding `0/1` + a `select(cond,x,y)` conditional), and two new variables — `tempo` and experimental `novelty` (plumb the already-computed `AnalysisFrame.bpm`/`novelty`, no new DSP). Fix the silent-typo footgun — an unknown parameter name becomes a surfaced load **warning** (preset still loads its good bindings), backed by each system declaring its param vocabulary. Rewrite the stale `docs/presets.md` (claims 10 presets / 2 systems; code ships 17 / 5) last. Core-only, allocation-free/panic-free per frame, **C ABI untouched**; no new DSP, no boolean ops, no ternary, no Rhai. Pre-1.0 so no backward-compat obligation (additions are incidentally non-breaking). [ADR-0020](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md), supplements [ADR-0002](../adrs/0002-layered-preset-architecture.md); from `preset-author`-lane grammar feedback. |
 | [0023](0023-cross-preset-transitions.md) | Cross-preset visual transitions: MilkDrop-style dissolves between presets | approved | Replace the instant preset **cut** with a MilkDrop-style **dissolve**. An engine `Transition` controller, driven by injected `dt`, blends the outgoing and incoming presets over ~1 s using a **small library** of blend kinds (crossfade, additive/burn, luma-dissolve, wipe/slide). The outgoing side is **snapshotted at transition start** (freeze path + safety net); the incoming renders live; **adaptive** logic re-renders the outgoing scene live too, but only when it is a *different* scene object and the frame budget is healthy, else it falls back to the snapshot (protects the 60 fps iGPU floor, NFR §1, and handles the same-slot case for free). Blends **fully-composited per-preset frames** via a two-input blend stage appended to Plan 0018's composite. Policy (kind/duration) is **engine-configured in code**; preset-declared `[transition]`, beat-quantized dissolves, and operator UI are explicit follow-ups. **Core-only, C ABI untouched, no new dependency.** **Sequenced after Plan 0018** (reuses its offscreen target + present + `Clear`->`Load` scenes; transitively after Plan 0014's `PingPongField` + injected `dt`). Realizes the cross-preset blending deferred by Plan 0003. [ADR-0024](../adrs/0024-cross-preset-transitions.md); rejected single-target alpha, always-dual-live, always-freeze, a `TransitionScene` wrapper, and preset-declared-now. |
 | [0027](0027-attractor-ink-and-crisp-trails.md) | Attractor ink-on-paper (engine-wide final tone-remap) + crisp trails | draft | Deliver the "ink on paper" look the `preset-author` lane couldn't reach: a WHITE background with BLACK moving lines, plus a sharper attractor. Root cause is the **additive** (lightening) compositing model — dark strokes add nothing, so black-on-white is the *inverse* of the model, not a color choice (Plan 0025 gives a white background via alpha-present, Plan 0020 gives arbitrary stroke colors, but neither adds a **darkening** step). Adds one **engine-wide final composite stage** (`render/ink.rs`) that duotone-remaps the finished frame to `mix(paper, ink, luminance)` between two preset-configurable colors — default white/black = a pure invert, so every scene (sparse and fullscreen) gets black-on-white / colored-duotone via bindable `ink_*` params routed exactly like `bg_*`; passthrough (byte-identical) when `ink_amount<=0`. Phase 2 replaces the attractor's fixed **640x360** trail field with a surface-tied (capped) internal resolution to kill the soft upscale. **Core-only, C ABI untouched, no `Scene`-trait change, no new dependency.** **Hard-sequenced after Plans 0020 + 0025** (shares the attractor present/draw path; ink rides on their LUT-colored, alpha-composited output). [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md) (proposed, extends [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md), coordinates with [ADR-0024](../adrs/0024-cross-preset-transitions.md)); rejected per-scene darkening blend, boolean-only invert, do-nothing-on-0025+0020. From `preset-author`-lane feedback (2026-07-24). |
-| [0028](0028-parametric-curve-shape-params.md) | Parametric-curve shape params: radial offset + phase (audio-morphable rose geometry) | approved | Add two named per-frame shape params to the `parametric_curve` scene — `radial_offset` (added to the curve radius) and `phase` (added inside the sine) — so the Maurer sampler becomes `r = sin(n*theta + phase) + radial_offset`. Unlocks the reference's spiral/rosette/annular family and phase-morph as **audio-bindable** levers (the shape itself morphs with `bass`/`bar`/`beat`, and `tempo` once 0019 lands), not just its color. Both **default 0.0**, so every shipped rose preset and the `parametric_curve` golden fixture are **byte-identical** (no re-bless). One `set_param`-path change across `curves.rs` + `parametric.rs`, allocation-free/panic-free; **no `Scene`-trait change, no C ABI change, no new dependency**. Independent of every active plan (touches only the Maurer sampler). [ADR-0029](../adrs/0029-parametric-curve-shape-params.md), supplements [ADR-0007](../adrs/0007-line-geometry-generators.md); rejected new `CurveFamily` variants (a family is a fixed load-time choice, can't morph with audio) and a general superformula (a sampler rewrite, more than the routed need). From `preset-author`-lane Maurer-rose feedback (2026-07-24). |
 | [0025](0025-full-composite-coverage.md) | Full composite coverage: background + view transform for reaction-diffusion and attractor | approved | Close the ADR-0018 coverage gap surfaced by the `preset-author` lane (design-backlog 0001): the **background** (`bg_*`) and **view transform** (`zoom`/`pan_*`) levers silently do nothing on the two fullscreen/accumulating scenes because both present **opaque** (overwriting the backdrop) and neither wired the view params. Switch both scenes' **final present** to an **alpha-blend over the backdrop** (scene structure/luminance drives alpha, so coral voids / attractor negative space reveal the `bg_*` gradient), and have both accept `zoom`/`pan_*` via `set_param` applied in their own space — exactly as `fragment_field` does. Full-audit scope (both scenes); default backdrop is dark so shipped presets stay ~unchanged (goldens deliberately re-blessed). **No `Scene`-trait change, C ABI untouched**; `mirror_*` stays line-only by design. Touches the same RD/attractor present shaders as Plan 0020 — coordinate order. [ADR-0026](../adrs/0026-full-composite-coverage-fullscreen-scenes.md), extends [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md); rejected self-contained per-scene backdrop, leave-opaque-and-document, a `Scene::set_view` hook. |
 
 ## Recommended execution sequence
@@ -76,15 +75,6 @@ colored-duotone for every scene, plus a surface-tied attractor trail resolution.
 untouched, no `Scene`-trait change. **Draft** — not yet ready for `dev` (0020 has landed; still blocked
 on 0025 landing; ADR-0028 proposed, awaiting the user's go). [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md).
 
-**[0028] Parametric-curve shape params** has **no hard dependency** on any active plan — it touches only
-the Maurer sampler (`curves.rs` + `parametric.rs`), no render clock, no compositing, no shared shader.
-Small and self-contained (two zero-defaulted `f32` shape params, one `set_param` path, no golden re-bless).
-By **user direction (2026-07-24) it is sequenced after [0020]** (shared palette, **now landed**) — a
-**priority** call, not a technical one: land the color axis first so `preset-author` gets both color and
-shape levers together when revising the rose drafts. It also **pairs naturally with [0019]** (the `tempo`
-variable those params can ride) but does not depend on it. **Approved** — ready for `dev` (Plan 0020 has
-landed; ADR-0029 proposed). [ADR-0029](../adrs/0029-parametric-curve-shape-params.md).
-
 ## Standing (not a plan)
 
 - **[On-device validation — low-end Windows iGPU smoke](../on-device-validation.md)** — a
@@ -95,6 +85,36 @@ landed; ADR-0029 proposed). [ADR-0029](../adrs/0029-parametric-curve-shape-param
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0028 — Parametric-curve shape params: radial offset + phase (audio-morphable rose geometry)](done/0028-parametric-curve-shape-params.md) —
+  **done 2026-07-24**, passed Mode 4 review (no blockers, no majors; one minor, one nit). Two `dev`
+  phase commits (`f37dde0` Phase 1 — core sampler + scene + tests; `20cd7f7` Phase 2 — docs). Added
+  two named zero-defaulted per-frame **shape** params to `parametric_curve` (ADR-0029, now
+  **accepted**, supplements ADR-0007): `phase` (radians inside the sine) and `radial_offset` (added
+  to the radius), so the Maurer sampler becomes `r = sin(n*theta + phase) + radial_offset`. Threaded
+  through the existing `reset_params`/`set_param`/`DEFAULT_*` machinery in `parametric.rs` into an
+  extended `maurer_rose(...)` in `curves.rs` (new args grouped by role: `phase` by the frequency
+  inputs, `radial_offset` by `scale`). Unlocks the reference's spiral/rosette/annular family and
+  phase-morph as **audio-bindable** levers (bind to `bass`/`bar`/`beat`, and `tempo` once 0019 lands),
+  not just color. Both **default 0.0** — a no-op reducing to the plain `sin(n*theta)` rose — so every
+  shipped rose preset and the `parametric_curve` golden fixture stay **byte-identical** (no re-bless,
+  the property a dedicated test pins). Verified: the 6 `curves` unit tests green — incl.
+  `zero_phase_and_offset_reduce_to_the_plain_sine_rose` (the no-op pin), `radial_offset_shifts_the_
+  radius_by_a_constant`, `phase_changes_the_geometry`, plus a `capture_preset` binding test in
+  `render/mod.rs` (`shape_params_reach_the_parametric_scene`) proving both evaluated values thread
+  into rendered geometry under a bass stimulus; `golden` **unchanged** (no re-bless, confirming the
+  no-op); `hygiene` confirms the `curves.rs`/`parametric.rs` panic pragmas intact; `clippy -p lmv-core
+  --all-targets -D warnings` clean. **Core-only; C ABI untouched; `Scene` trait untouched; no new
+  dependency;** hot-path-safe (two pure `f32` adds, no indexing/division/allocation). **Minor:** Phase
+  1 also edited `core/src/render/mod.rs` (+52) for the required Done-when-#3 binding test — expected
+  (the capture harness lives there), just absent from the phase's "Files touched" list. **Nit:** Phase
+  2 documented both `presets/README.md` (the live table) **and** `docs/presets.md` — the plan targeted
+  only the latter, which was stale (no `parametric_curve` section); per the user both were updated now
+  rather than deferring to Plan 0019's rewrite (which carries them forward). **`preset-author`
+  followup (non-blocking):** revise the `rose_maurer_sweep`/`rose_overflow`/`rose_beat_bloom` drafts
+  (untracked in the working tree) to use the new params and flag the strongest as a `dev` embed
+  candidate. Pre-existing unrelated `every_preset_animates_over_time` Aurora failure (fragment_field,
+  motion 0.0078) is not part of this plan. Version **minor 0.10.0 -> 0.11.0** at close.
 
 - [0020 — Shared palette system: gradient LUT, named + custom palettes, bindable color (all four scenes)](done/0020-shared-palette-system.md) —
   **done 2026-07-24**, passed Mode 4 review (no blockers, no majors; two minor, two nits). Six `dev`
