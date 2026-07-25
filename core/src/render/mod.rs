@@ -38,6 +38,7 @@ pub mod scenes;
 #[cfg(feature = "text")]
 pub mod text;
 pub(crate) mod trails;
+mod transition;
 
 use crate::audio::AudioFormat;
 use crate::diag::{Diag, Metrics};
@@ -56,6 +57,7 @@ pub use scenes::lines::CapOverflow;
 use text::TextLayer;
 #[cfg(feature = "text")]
 pub use text::TextRun;
+use transition::{Blend, DEFAULT_DURATION_SECS, Transition};
 
 /// Assumed bytes-per-pixel for the swapchain GPU-byte estimate (the common
 /// 8-bit RGBA/BGRA surface formats). An approximation, per ADR-0008.
@@ -118,11 +120,16 @@ impl Roster {
         }
     }
 
-    /// Advance to the next preset (wrapping); a no-op on an empty roster.
-    fn cycle(&mut self) {
-        if !self.presets.is_empty() {
-            self.active = (self.active + 1) % self.presets.len();
+    /// The index cycling would land on (wrapping), **without** moving there — the
+    /// dissolve controller needs the target before the roster flips, because the
+    /// dissolve's opening frame still composites the outgoing preset. Returns the
+    /// current index on an empty or single-preset roster, which the caller reads as
+    /// "nothing to dissolve to".
+    fn next_index(&self) -> usize {
+        if self.presets.is_empty() {
+            return self.active;
         }
+        (self.active + 1) % self.presets.len()
     }
 
     /// Set the active preset **iff** `index` is in range; an out-of-range index
@@ -234,6 +241,12 @@ pub struct Renderer {
     /// blend of two per-preset composites. Skipped entirely at `ink_amount <= 0`,
     /// which is every preset that does not opt in.
     ink: Ink,
+    /// The two-input cross-preset blend pass (Plan 0023 / ADR-0032), between the
+    /// chain and ink. Holds no GPU resources between dissolves.
+    blend: Blend,
+    /// The in-flight dissolve, if any. `None` is the ordinary frame path — chain
+    /// straight into ink's input (or the surface), no blend encoded at all.
+    transition: Option<Transition>,
     /// Loaded presets + the active index (pure selection state — see [`Roster`]).
     roster: Roster,
     /// Shared scene clock (seconds), advanced one fixed step per rendered frame.
@@ -269,6 +282,7 @@ impl Renderer {
         let background = Background::new(&ctx.device, ctx.surface_format());
         let chain = PostChain::new(&ctx.device, ctx.surface_format());
         let ink = Ink::new(&ctx.device, ctx.surface_format());
+        let blend = Blend::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
@@ -278,6 +292,8 @@ impl Renderer {
             background,
             chain,
             ink,
+            blend,
+            transition: None,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -303,6 +319,7 @@ impl Renderer {
         let background = Background::new(&ctx.device, ctx.surface_format());
         let chain = PostChain::new(&ctx.device, ctx.surface_format());
         let ink = Ink::new(&ctx.device, ctx.surface_format());
+        let blend = Blend::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
@@ -312,6 +329,8 @@ impl Renderer {
             background,
             chain,
             ink,
+            blend,
+            transition: None,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -352,6 +371,7 @@ impl Renderer {
         let background = Background::new(&ctx.device, ctx.surface_format());
         let chain = PostChain::new(&ctx.device, ctx.surface_format());
         let ink = Ink::new(&ctx.device, ctx.surface_format());
+        let blend = Blend::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
@@ -361,6 +381,8 @@ impl Renderer {
             background,
             chain,
             ink,
+            blend,
+            transition: None,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -385,16 +407,74 @@ impl Renderer {
     /// set is ignored so a preset directory that briefly reads empty — or whose
     /// files are all malformed — leaves the last good roster rendering (NFR 10).
     pub fn set_presets(&mut self, presets: Vec<Preset>) {
+        // A dissolve in flight is targeting an index in the *old* roster, which the
+        // replacement may not even have. Cancel it cleanly — the snapshot goes with
+        // it — and land on whatever `set_presets` resolves the active index to.
+        self.cancel_transition();
         self.roster.set_presets(presets);
         self.configure_active_scene();
     }
 
-    /// Switch to the next preset; returns its name. Instant — every system is
-    /// built at startup, so cycling never hitches a live show.
+    /// Switch to the next preset; returns its name. **Dissolves** rather than cuts
+    /// (Plan 0023): the outgoing preset's composite is captured on the next frame
+    /// and blended out over [`DEFAULT_DURATION_SECS`] while the incoming one
+    /// renders live. Every system is still built at startup, so the switch itself
+    /// never hitches a live show.
+    ///
+    /// The returned name is the **incoming** preset's, immediately — the frontend's
+    /// HUD should name where the show is going, not where it has been.
     pub fn cycle_preset(&mut self) -> &str {
-        self.roster.cycle();
+        let from = self.roster.active;
+        let to = self.roster.next_index();
+        self.begin_transition(from, to);
+        self.roster.presets.get(to).map_or("no presets", |p| {
+            // Borrowck: the roster is not flipped yet (the capture frame needs the
+            // outgoing preset active), so read the incoming name by index.
+            p.name.as_str()
+        })
+    }
+
+    /// Start a dissolve from `from` to `to`, or cut instantly when a dissolve
+    /// would be meaningless (an empty roster, an out-of-range target, or a switch
+    /// to the already-active preset).
+    ///
+    /// The roster is deliberately **not** flipped here: the dissolve's opening
+    /// frame composites the still-active outgoing preset into the snapshot, and
+    /// [`Transition::advance`] hands back the index to flip to once that frame has
+    /// been encoded.
+    fn begin_transition(&mut self, from: usize, to: usize) {
+        if to >= self.roster.presets.len() || to == from {
+            self.select_preset_instantly(to);
+            return;
+        }
+        // A switch arriving mid-dissolve snap-finishes the one in flight to its
+        // own target before starting the new one, so the roster is never left on
+        // an index nobody asked for (Plan 0023 Phase 5 re-entrancy rule).
+        if let Some(running) = self.transition.take() {
+            self.roster.select(running.to_index());
+        }
+        self.transition = Some(Transition::new(to, DEFAULT_DURATION_SECS));
+    }
+
+    /// Jump straight to `index` with no dissolve — the escape hatch for paths
+    /// where a blend would be wrong (a capture, which must stay a pure function of
+    /// its inputs) or meaningless (a switch to the already-active preset). Cancels
+    /// any dissolve in flight and releases its GPU targets.
+    fn select_preset_instantly(&mut self, index: usize) {
+        if index >= self.roster.presets.len() {
+            return; // out of range: a no-op, never a panic and never a wrap
+        }
+        self.cancel_transition();
+        self.roster.select(index);
         self.configure_active_scene();
-        self.preset_name()
+    }
+
+    /// Drop any dissolve in flight and release its full-frame GPU targets, leaving
+    /// the roster wherever it currently points. The caller decides the resolved
+    /// index; this only tears down the blend.
+    fn cancel_transition(&mut self) {
+        self.transition = None;
+        self.blend.release_targets();
     }
 
     /// The loaded preset names in roster order — the browse overlay's list
@@ -408,8 +488,7 @@ impl Renderer {
     /// out-of-range `index` is a no-op (never a panic, never a wrap), so a stale
     /// index from a shrunk hot-reloaded roster is harmless.
     pub fn select_preset(&mut self, index: usize) -> &str {
-        self.roster.select(index);
-        self.configure_active_scene();
+        self.select_preset_instantly(index);
         self.preset_name()
     }
 
@@ -620,6 +699,8 @@ impl Renderer {
             background,
             chain,
             ink,
+            blend,
+            transition,
             roster,
             time,
             diag,
@@ -678,22 +759,52 @@ impl Renderer {
         scene.update(frame);
 
         // Fixed-order composite (ADR-0018/0028/0032): background (owns the clear)
-        // -> scene -> the per-preset post chain -> ink -> present. Where the scene
-        // draws and which chain stage folds into which is the chain's business, not
-        // the renderer's — see `post.rs` for the order and the skip rule.
-        //
+        // -> scene -> the per-preset post chain -> [blend] -> ink -> present. Where
+        // the scene draws and which chain stage folds into which is the chain's
+        // business, not the renderer's — see `post.rs` for the order and the skip
+        // rule. The blend and ink are engine-wide passes the renderer drives.
+        let surface = (width, height);
+
+        // A dissolve's progress, read *before* it advances at frame end. `None` is
+        // the ordinary path: no blend is encoded and no full-frame target exists.
+        let progress = transition.as_ref().map(Transition::progress);
+
+        // Ink is one engine-wide pass over the *blended* frame (ADR-0028), but a
+        // dissolve has two presets each binding their own `ink_*`/`paper_*`. Lerp
+        // the params — not two remapped frames, which is non-linear — so `t = 0` is
+        // exactly the outgoing look and `t = 1` exactly the incoming one, with no
+        // snap at either end. On the capture frame the outgoing preset is still the
+        // active one, so its values are already correct and nothing is held yet.
+        if let (Some(t), Some(from)) = (
+            progress,
+            transition.as_ref().and_then(Transition::outgoing_ink),
+        ) {
+            ink.crossfade_from(from, t);
+        }
+
         // Ink is the terminal pass and lives outside the chain, so its input is
         // resolved *first*: everything upstream targets that view, and ink then
-        // folds it into the surface. With ink off, the chain targets the surface
-        // directly — the exact pixel path a three-stage chain took, which is why
-        // this relocation re-blesses no golden.
-        let surface = (width, height);
+        // folds it into the surface. With ink off, the chain (or the blend) targets
+        // the surface directly.
         let ink_input = if ink.active() {
             ink.begin(surface)
         } else {
             None
         };
-        let destination = ink_input.as_ref().unwrap_or(view);
+        let terminal = ink_input.as_ref().unwrap_or(view);
+
+        // Where the chain resolves. While a dissolve runs the blend sits between
+        // the chain and ink, so the chain feeds one of the blend's two inputs: the
+        // frozen snapshot on the opening frame (the roster is still on the outgoing
+        // preset, so this one ordinary composite *is* the outgoing frame), the live
+        // side on every frame after. If the blend cannot build its targets, fall
+        // through to the terminal view — a cut, never a blend of undefined pixels.
+        let blend_input = match transition.as_ref() {
+            Some(tr) if tr.needs_snapshot() => blend.snapshot_view(surface),
+            Some(_) => blend.live_view(surface),
+            None => None,
+        };
+        let destination = blend_input.as_ref().unwrap_or(terminal);
 
         let target = chain.begin(encoder, destination, surface);
         background.render(&ctx.queue, encoder, &target.view);
@@ -705,12 +816,23 @@ impl Renderer {
         scene.render(&ctx.queue, encoder, &target.view, target.aspect);
 
         // Background + scene, plus whatever passes the active chain stages encode
-        // on their way down, plus ink's remap when it runs, plus the optional text
-        // and overlay passes below.
+        // on their way down, plus the blend while a dissolve runs, plus ink's remap
+        // when it runs, plus the optional text and overlay passes below.
         let mut draw_calls = 2 + chain.resolve(&ctx.queue, encoder, destination, surface);
+        if let (Some(t), true) = (progress, blend_input.is_some()) {
+            // Mix the frozen outgoing side with the live incoming one into ink's
+            // input (or the surface). At t = 0 this is the snapshot exactly, which
+            // is what lets the opening frame present through the same pass before
+            // the live side has ever been rendered into.
+            draw_calls += blend.resolve(&ctx.queue, encoder, terminal, t);
+        }
         if ink_input.is_some() {
             draw_calls += ink.resolve(&ctx.queue, encoder, view);
         }
+
+        // Hold the outgoing preset's evaluated ink params off the capture frame,
+        // where the roster still points at it — the one frame they exist.
+        let captured_ink = ink.params();
 
         // On-canvas text (browse overlay / HUD): a second pass that loads the
         // scene and composites the queued runs on top, in the same frame
@@ -753,6 +875,24 @@ impl Renderer {
                 diag.stats().samples().map(|s| s * 1000.0),
             );
             draw_calls += 1;
+        }
+
+        // Advance the dissolve now that the frame at the current `t` is encoded.
+        // The capture frame hands back the index to flip the roster to, so the next
+        // frame composites the incoming preset live; a dissolve that has reached
+        // `t = 1` is dropped and its full-frame targets released. The borrows above
+        // all end here, so `self` is free again (NLL).
+        let flip_to = transition
+            .as_mut()
+            .map(|tr| (tr.advance(dt, captured_ink), tr.finished()));
+        if let Some((flip_to, finished)) = flip_to {
+            if let Some(index) = flip_to {
+                self.roster.select(index);
+                self.configure_active_scene();
+            }
+            if finished {
+                self.cancel_transition();
+            }
         }
 
         draw_calls
@@ -819,9 +959,11 @@ impl Renderer {
         // so the same (name, frame, frames) always yields identical pixels and
         // differential probes (Phase 3) isolate the stimulus, not history.
         self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
+        self.cancel_transition();
         self.background.reset_resources();
         self.chain.reset_resources();
         self.ink.reset_resources();
+        self.blend.reset_resources();
         self.time = 0.0;
         // The rebuilt scenes are fresh — re-apply the active preset's structural
         // config (ADR-0007) so a line scene captures with its geometry built.
@@ -890,9 +1032,11 @@ impl Renderer {
         let mut analyzer = crate::dsp::Analyzer::new(format).map_err(RenderError::AudioFormat)?;
 
         self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
+        self.cancel_transition();
         self.background.reset_resources();
         self.chain.reset_resources();
         self.ink.reset_resources();
+        self.blend.reset_resources();
         self.time = 0.0;
         self.configure_active_scene();
 
