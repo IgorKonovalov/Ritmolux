@@ -51,6 +51,12 @@ footprint so the vendor spread is on record.
       also satisfies the identical Plan 0003 Phase 3 iGPU-60-fps carry-forward — same measurement.)_
 - [ ] **Second GPU vendor — Intel iGPU, if a box is available**, 1080p. Same capture. The point is
       the footprint spread vs the AMD dev box — confirms whether the ~350 MB ceiling is AMD-specific.
+- [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
+      behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
+      Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was
+      **never measured** — the check needs a live window, so it could not run at that plan's close.
+      Run the standalone with the overlay on, let it settle, and report whether p99 moved.
+      _(Plan 0030's dynamic-dispatch risk bullet, extracted.)_
 
 ## How to run
 

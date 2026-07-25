@@ -1,13 +1,71 @@
 # 0030 — Composite chain + scene keying: a `PostStage` trait, an instantiable `PostChain`, and kind-keyed scenes
 
-> **Status:** approved
+> **Status:** done (2026-07-25)
 > **Created:** 2026-07-25
 > **Approved:** 2026-07-25
 > **Owner skill(s):** dev
 > **Related ADRs:** [0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md) (this plan
-> implements it); preserves [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md)'s fixed order
-> and [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md)'s ink-is-last rule; **unblocks**
+> implements it; accepted at this close); preserves
+> [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md)'s fixed order and
+> [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md)'s ink-is-last rule; **unblocks**
 > [Plan 0023](0023-cross-preset-transitions.md)
+
+## Close summary (Mode 4, 2026-07-25)
+
+Four `dev` phase commits — `023777d` (the `PostStage` trait, pure routing, and the `PostChain` that
+replaced the ladder), `55c7109` (two chains against one device proven independent), `9c02953`
+(kind-keyed scenes, `system_slot` deleted), `d711760` (docs describe the chain that now runs the
+composite). **No blockers.**
+
+The central claim holds: **every golden baseline is byte-identical, with no re-bless** — the diff
+across all four commits touches no file under `core/tests/golden/`. All 115 `lmv-core` tests pass,
+including `scenes_match_golden_baselines` over all seven systems and the two GPU-dependent new tests;
+`cargo clippy --workspace --all-targets` is clean; the Plan 0002 hygiene guard passes and picks up
+`post.rs` automatically (it scans `core/src/render/` recursively).
+
+Verified at review, by reading the assertion bodies rather than trusting a green run:
+
+- The six routing tests are real and non-tautological — no-stage, each single stage, all three,
+  the skipped-middle case, and two invariants (**last active stage always targets the surface**,
+  **ink when active is always last**) asserted over all eight flag combinations.
+- `two_chains_against_one_device_accumulate_independently` is **stronger than the phase asked for**:
+  it asserts chain B comes back black *and* that B driven through A's history yields byte-equal
+  pixels — distinguishing "independent" from "broken/empty". This is the Plan 0023 unblock, proven
+  rather than assumed.
+- `every_kind_builds_the_scene_it_drives` writes its expected mapping independently of the factory,
+  so the two can disagree — the assertion the old positional `system_slot` made impossible.
+- `system_slot` is gone; no scene is addressed by a numeric index anywhere in the tree.
+- Layering intact: `post.rs` is a **private** module exposing a `pub(crate)` seam, so no preset or
+  C-ABI caller can reach it. C ABI diff empty (still v4); the `Scene` trait is untouched; no new
+  dependency; nothing platform- or audio-source-specific entered `core/`.
+
+Four disclosed deviations from the plan's illustrative shapes, all accepted as improvements:
+`route` returns a fixed-size `Routing` (no per-frame heap allocation) instead of a `Vec`; `PostChain`
+holds a `[Box<dyn PostStage>; STAGE_COUNT]` array with `debug_assert`s pinning the ADR-0018/0028
+positions; `SystemKind::ALL` is typed from `VARIANT_COUNT` so roster drift is a compile error;
+`golden.rs`'s guard drops its now-tautological length assert and keeps what can still go wrong.
+
+Three minors, none blocking, all routed to [Plan 0031](0031-composite-cleanup-and-debt.md) or the
+on-device pass rather than fixed here:
+
+1. `PostChain::begin` and `::resolve` each recompute the routing independently
+   (`core/src/render/post.rs:284`, `:310`). Safe today, but a whole frame's correctness rests on no
+   stage's `active()` changing between them — and Plan 0023's blend stage is controller-driven.
+   Caching the `Routing` at `begin` makes "one routing decision per frame" structural.
+2. `cargo doc -p lmv-core` still emits 10 intra-doc-link warnings, so Phase 4's done-when is unmet.
+   Confirmed **pre-existing and outside every phase's file list** (`context.rs`, `overlay.rs`,
+   `lines/*`, `particles/mod.rs`, `reaction_diffusion.rs`); `dev` fixed the two in files this plan
+   owned and correctly stopped at the scope boundary rather than expanding silently.
+3. `core/src/preset/schema.rs:137` still narrates "the four compositing stages the renderer routes
+   to" — three of the four are the chain's now.
+
+The plan's hot-path risk bullet is **answered as unmeasured**: the debug overlay's p99 was not
+measured (it needs a live window, so it is a `human` task). The ~4 vtable calls and ~4 `TextureView`
+Arc bumps per frame are real but far below one render pass; folded into the next on-device
+validation pass rather than blocking the close.
+
+Version: **patch** (`0.15.0` → `0.15.1`) per the plan's own open question — production code ships,
+but no feature and no behavior change.
 
 ## TL;DR
 
