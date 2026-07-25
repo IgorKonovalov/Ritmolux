@@ -8,6 +8,8 @@
 //!
 //! Flags:
 //!   --preset <name>          single-shot the named preset
+//!   --presets <dir>          load the library from <dir> (e.g. the repo's presets/)
+//!   --preset-file <path>     load exactly one preset from <path>
 //!   --set k=v,...            constant stimulus (bass/mid/treb/onset/beat/bar)
 //!   --frames <N>             frames to advance before capture (default 120)
 //!   --size <WxH>             render size (default 1280x720)
@@ -19,6 +21,12 @@
 //!   --audio <clip.wav>       filmstrip from a 16-bit PCM WAV
 //!   --strip <N>              frames tiled along the audio (default 8)
 //!
+//! Which preset library is used, highest precedence first: `--preset-file`,
+//! `--presets`, the `LMV_PRESET_DIR` override, the per-user preset directory,
+//! the embedded defaults. The app resolves the last three through the very same
+//! `standalone` library function (ADR-0014), so `LMV_PRESET_DIR=./presets` points
+//! the running window and a headless capture at one editable folder.
+//!
 //! Exit code is non-zero with a message on any bad argument or failure.
 
 use std::path::{Path, PathBuf};
@@ -29,9 +37,7 @@ use lmv_core::preset::{Preset, SystemKind, default_presets, load_dir};
 use lmv_core::render::metrics::{coverage, frame_diff, quadrant_spread, struct_diff};
 use lmv_core::render::{CaptureImage, HeadlessOptions, Renderer};
 use lmv_core::signal::{bass_sine, chord, click_track, noise, treble_tone};
-
-/// Mirrors the standalone's per-user app dir (main.rs `APP_DIR_NAME`).
-const APP_DIR_NAME: &str = "light-music-visualizer";
+use standalone::{PRESET_DIR_ENV, resolve_preset_dir};
 
 fn main() {
     if let Err(msg) = run() {
@@ -53,6 +59,12 @@ enum Mode {
 struct Args {
     mode: Mode,
     preset: Option<String>,
+    /// `--presets <dir>`: load the library from here instead of the resolved
+    /// preset directory.
+    presets: Option<PathBuf>,
+    /// `--preset-file <path>`: a one-entry roster read from this file. Beats
+    /// `--presets`.
+    preset_file: Option<PathBuf>,
     stimulus: AnalysisFrame,
     frames: u32,
     width: u32,
@@ -70,6 +82,8 @@ impl Default for Args {
         Self {
             mode: Mode::Shot,
             preset: None,
+            presets: None,
+            preset_file: None,
             stimulus: AnalysisFrame::default(),
             frames: 120,
             width: 1280,
@@ -90,6 +104,10 @@ fn parse_args() -> Result<Args, String> {
     while let Some(arg) = it.next() {
         match arg.as_str() {
             "--preset" => args.preset = Some(next_value(&mut it, "--preset")?),
+            "--presets" => args.presets = Some(PathBuf::from(next_value(&mut it, "--presets")?)),
+            "--preset-file" => {
+                args.preset_file = Some(PathBuf::from(next_value(&mut it, "--preset-file")?));
+            }
             "--set" => apply_set(&mut args.stimulus, &next_value(&mut it, "--set")?)?,
             "--frames" => {
                 args.frames = next_value(&mut it, "--frames")?
@@ -181,6 +199,8 @@ fn print_usage() {
         "shot — headless capture / visual-QA (Plan 0013)\n\
          \n\
          --preset <name>            single-shot the named preset (needs --out)\n\
+         --presets <dir>            library directory (beats LMV_PRESET_DIR)\n\
+         --preset-file <path>       one preset from a file (beats --presets)\n\
          --set k=v,...              stimulus: bass,mid,treb,onset,bar,beat\n\
          --frames <N>               frames before capture (default 120)\n\
          --size <WxH>               render size (default 1280x720)\n\
@@ -199,56 +219,55 @@ fn print_usage() {
 // Preset library + renderer
 // ---------------------------------------------------------------------------
 
-/// Load the app's on-disk preset library if it resolves and has any valid
-/// presets; otherwise the embedded defaults. Returns the presets and a label
-/// describing the source.
-fn load_library() -> (Vec<Preset>, String) {
-    let dir = resolve_preset_dir();
-    if !dir.as_os_str().is_empty() {
-        let report = load_dir(&dir);
+/// Load the preset library, highest precedence first: `--preset-file` (a
+/// one-entry roster), `--presets <dir>`, the shared resolver (which honors
+/// `LMV_PRESET_DIR`, else the per-user directory), the embedded defaults.
+/// Returns the presets and a label naming which source won.
+///
+/// The two explicit flags are errors when they yield nothing — an agent that
+/// asked for a specific folder or file wants a non-zero exit, not a silent
+/// capture of some other library. The resolved directory keeps degrading to the
+/// embedded defaults, exactly as the app does (NFR 10).
+fn load_library(args: &Args) -> Result<(Vec<Preset>, String), String> {
+    if let Some(path) = &args.preset_file {
+        let src = std::fs::read_to_string(path)
+            .map_err(|e| format!("--preset-file {}: {e}", path.display()))?;
+        let preset = Preset::from_toml_str(&src)
+            .map_err(|e| format!("--preset-file {}: {e}", path.display()))?;
+        return Ok((vec![preset], format!("--preset-file {}", path.display())));
+    }
+
+    if let Some(dir) = &args.presets {
+        let report = load_dir(dir);
+        report_errors(&report);
+        if report.presets.is_empty() {
+            return Err(format!("--presets {}: no valid presets", dir.display()));
+        }
+        return Ok((report.presets, format!("--presets {}", dir.display())));
+    }
+
+    let resolved = resolve_preset_dir();
+    if let Some(dir) = resolved.path() {
+        let report = load_dir(dir);
+        report_errors(&report);
         if !report.presets.is_empty() {
-            return (report.presets, format!("on-disk {}", dir.display()));
+            let label = if resolved.is_override() {
+                format!("{PRESET_DIR_ENV} {}", dir.display())
+            } else {
+                format!("on-disk {}", dir.display())
+            };
+            return Ok((report.presets, label));
         }
     }
-    (default_presets(), "embedded defaults".to_string())
+    Ok((default_presets(), "embedded defaults".to_string()))
 }
 
-/// The per-user preset directory, resolved exactly as the app does (main.rs).
-/// Empty when the OS data root can't be found — the caller falls back to the
-/// embedded set.
-fn resolve_preset_dir() -> PathBuf {
-    match preset_data_root() {
-        Some(root) => root.join(APP_DIR_NAME).join("presets"),
-        None => PathBuf::new(),
+/// Surface malformed files on stderr — a preset being silently absent from a
+/// capture is the confusing failure this CLI exists to avoid.
+fn report_errors(report: &lmv_core::preset::LoadReport) {
+    for (path, err) in &report.errors {
+        eprintln!("shot: preset {}: {err}", path.display());
     }
-}
-
-#[cfg(windows)]
-fn preset_data_root() -> Option<PathBuf> {
-    std::env::var_os("APPDATA")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-}
-
-#[cfg(target_os = "macos")]
-fn preset_data_root() -> Option<PathBuf> {
-    std::env::var_os("HOME")
-        .filter(|v| !v.is_empty())
-        .map(|home| {
-            PathBuf::from(home)
-                .join("Library")
-                .join("Application Support")
-        })
-}
-
-#[cfg(not(any(windows, target_os = "macos")))]
-fn preset_data_root() -> Option<PathBuf> {
-    if let Some(xdg) = std::env::var_os("XDG_DATA_HOME").filter(|v| !v.is_empty()) {
-        return Some(PathBuf::from(xdg));
-    }
-    std::env::var_os("HOME")
-        .filter(|v| !v.is_empty())
-        .map(|home| PathBuf::from(home).join(".local").join("share"))
 }
 
 /// `(name, system)` pairs for the loaded library, in roster order.
@@ -275,7 +294,7 @@ fn renderer(width: u32, height: u32, presets: Vec<Preset>) -> Result<Renderer, S
 
 fn run() -> Result<(), String> {
     let args = parse_args()?;
-    let (presets, source) = load_library();
+    let (presets, source) = load_library(&args)?;
     // An audio source (synth signal or WAV) takes precedence — it drives a
     // filmstrip regardless of the shot/all/report mode default.
     if args.signal.is_some() || args.audio.is_some() {
@@ -289,10 +308,13 @@ fn run() -> Result<(), String> {
 }
 
 fn shot(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
-    let name = args
-        .preset
-        .clone()
-        .ok_or("--preset <name> is required for a single shot")?;
+    // A one-entry roster (`--preset-file`, or a folder holding a single preset)
+    // names itself, so `--preset` is only required when there is a choice.
+    let name = match (&args.preset, presets.as_slice()) {
+        (Some(name), _) => name.clone(),
+        (None, [only]) => only.name.clone(),
+        (None, _) => return Err("--preset <name> is required for a single shot".to_string()),
+    };
     let out = args.out.clone().ok_or("--out <path> is required")?;
     let mut r = renderer(args.width, args.height, presets)?;
     let img = r
