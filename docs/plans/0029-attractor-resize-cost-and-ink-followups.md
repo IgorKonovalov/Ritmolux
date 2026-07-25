@@ -1,6 +1,6 @@
 # 0029 — Attractor resize cost + ink-stage followups
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-07-25
 > **Owner skill(s):** dev
 > **Related ADRs:** [0030](../adrs/0030-scene-target-size-hot-path-hook.md) (the target-size hook this
