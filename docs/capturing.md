@@ -33,7 +33,9 @@ Flags:
 
 | flag | meaning |
 |------|---------|
-| `--preset <name>` | preset to render (by name, as shown in the report / library) |
+| `--preset <name>` | preset to render (by name, as shown in the report / library); optional when the library holds exactly one preset |
+| `--presets <dir>` | load the library from `<dir>` instead of the resolved preset directory |
+| `--preset-file <path>` | load exactly one preset from `<path>` (beats `--presets`) |
 | `--set k=v,...` | constant stimulus frame: `bass,mid,treb,onset,bar` (0..1) and `beat` (non-zero = true) |
 | `--frames <N>` | frames to advance before capture (default 120) |
 | `--size <WxH>` | render size (default 1280x720) |
@@ -45,8 +47,59 @@ Flags:
 | `--audio <clip.wav>` | filmstrip from a 16-bit PCM WAV |
 | `--strip <N>` | frames tiled along the audio (default 8) |
 
-Bad arguments and unknown presets exit non-zero with a message. It loads the
-app's on-disk preset library if present, else the embedded defaults.
+Bad arguments and unknown presets exit non-zero with a message.
+
+### Which preset library a shot uses
+
+Highest precedence first:
+
+1. `--preset-file <path>` — one preset, parsed from that file.
+2. `--presets <dir>` — every `*.toml` in that directory.
+3. **`LMV_PRESET_DIR`** — the environment override
+   ([ADR-0014](adrs/0014-preset-dir-override-for-dev-iteration.md)).
+4. The per-user preset directory (`%APPDATA%\light-music-visualizer\presets` on
+   Windows; see [`presets.md`](presets.md#where-preset-files-live)).
+5. The presets compiled into the binary.
+
+The `[source]` label printed after every capture names the winner, so a PNG's
+provenance is never a guess. The two flags are **errors** when they come up empty
+— a missing file, unparseable TOML, or a directory with no valid presets exits
+non-zero rather than quietly capturing some other library. Levels 3–5 degrade
+downward instead, exactly as the app does.
+
+`shot` resolves levels 3 and 4 through the **same** `standalone` library function
+the app calls, so the two can never disagree about which folder your edit landed
+in.
+
+### Editing presets live
+
+Point both surfaces at the repo's version-controlled `presets/` and edit a
+`.toml` — no rebuild, no relaunch:
+
+```bash
+# Windows (PowerShell): the app reloads the edited file within ~150 ms
+$env:LMV_PRESET_DIR = "./presets"; cargo run -p standalone --release
+
+# ...and every shot in that shell reads the same folder
+cargo run -p standalone --example shot -- --preset "Aurora" --out shot.png
+```
+
+For a one-off capture, the flags say it explicitly and need no environment:
+
+```bash
+# The whole repo library
+cargo run -p standalone --example shot -- --presets presets --preset "Aurora" --out a.png
+
+# A single file — --preset is unnecessary, the one-entry library names itself
+cargo run -p standalone --example shot -- --preset-file presets/fragment_aurora.toml --out a.png
+
+# Metrics for the repo library rather than the seeded per-user copy
+LMV_PRESET_DIR=./presets cargo run -p standalone --example shot -- --report
+```
+
+The app hot-reloads an override folder but **never seeds** into it (it is yours,
+not ours), and `diagnostics.log` / `config.toml` stay under the per-user app
+directory. The foobar2000 plugin does not read `LMV_PRESET_DIR`.
 
 ### Examples
 

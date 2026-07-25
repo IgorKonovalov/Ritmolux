@@ -9,6 +9,12 @@
 //!
 //! Nothing here prints or panics — callers decide how to report an unresolved
 //! root, so the headless `shot` stays quiet where the app logs.
+//!
+//! **This covers the Rust side only.** The foobar2000 plugin resolves the same
+//! `%APPDATA%` directory independently in C++ (`plugin-foobar/foo_lmv.cpp`,
+//! `resolve_preset_dir_utf8`) because it is compiled separately, and it does
+//! **not** honor [`PRESET_DIR_ENV`]. A change to [`APP_DIR_NAME`] or the layout
+//! below has to be mirrored there by hand.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
