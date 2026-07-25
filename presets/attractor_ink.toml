@@ -1,0 +1,60 @@
+# Ink on Paper - a De Jong attractor drawn as black lines on a white field, the
+# look that motivated the final-stage tone remap (ADR-0028, Plan 0027).
+#
+# The scenes draw additively, so this is NOT a colour choice: `ink_amount = 1`
+# turns on the last composite stage, which repaints the finished frame between
+# `paper_*` (where the frame was dark) and `ink_*` (where it was bright). The
+# glowing point cloud becomes wet ink; the black void becomes the page. Defaults
+# are white paper / black ink, so the amount is the only remap param set here.
+#
+# The whole preset is a balancing act around ONE trap: the remap keys on
+# luminance, so anything that pushes the accumulated field past white turns the
+# drawing into a solid blot. `fade` is the sensitive knob - it sets how many
+# frames of points pile up (roughly 1/(1-fade)), so 0.88 draws lines and 0.96
+# floods the page. `size` and `saturation` are held down for the same reason: a
+# fat, fully-saturated point blots where a fine one hatches. Read every param as
+# "more energy = more ink", but the ceilings are deliberate.
+#
+#   - bass and mid push coefficients a and b, redrawing the curve family;
+#   - treble pushes c, shifting the finer interior structure;
+#   - d breathes on a slow sine, so the drawing is never still;
+#   - bass and the beat swell the nib, so hits land as a stroke of wet ink;
+#   - a beat re-scatters the cloud, which floods and then dries back.
+#
+# Variables available to expressions: bass mid treb onset beat bar time.
+system = "attractor"
+name = "Ink on Paper"
+
+[params]
+a      = "1.641 + clamp(bass * 3, 0, 1) * 0.22"
+b      = "1.902 + clamp(mid * 3, 0, 1) * 0.22"
+c      = "0.316 + clamp(treb * 3, 0, 1) * 0.18"
+d      = "1.525 + sin(time * 0.06) * 0.14"
+
+# The nib. Fine on purpose - the trail grid is surface-sized now (Plan 0027
+# Phase 2), so a point that looked right on the old soft 640x360 field blots
+# here. The peak (bass + beat, ~0.95) is the heaviest stroke that still reads
+# as line art rather than a fill.
+size   = "0.55 + clamp(bass * 3, 0, 1) * 0.25 + beat * 0.15"
+
+# Trail length - the ink has to accumulate before it reads as a drawn line, but
+# this is the knob that blots. Ceiling 0.91.
+fade   = "0.88 + clamp(mid * 2, 0, 1) * 0.03"
+
+# Each beat re-scatters the cloud; it blooms through the standing trails and
+# dries back as the fade catches up.
+reseed = "beat"
+
+# Nearly neutral. The remap discards hue anyway, and a desaturated source keeps
+# the luminance ramp - and so the ink density - honest across the frame.
+saturation = "0.35"
+hue_spread = "0"
+
+# Full remap, held constant: a partial amount lets the near-black source frame
+# bleed through and greys the paper, which reads as a dirty page rather than a
+# faint drawing. Sparseness at low energy comes from the drawing, not the remap.
+ink_amount = "1"
+
+[smoothing]
+# The nib should swell, not flicker - a bare `beat` term on `size` would snap.
+size = 0.12
