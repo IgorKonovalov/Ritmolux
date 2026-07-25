@@ -638,6 +638,8 @@ impl Renderer {
             if frame.beat { 1.0 } else { 0.0 },
             frame.bar,
             *time,
+            frame.bpm,
+            frame.novelty,
         );
         scene.set_time(*time);
         scene.advance(dt);
