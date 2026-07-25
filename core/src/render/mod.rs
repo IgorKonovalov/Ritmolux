@@ -21,6 +21,7 @@ mod background;
 pub mod capture;
 pub mod context;
 pub mod feedback;
+mod ink;
 mod kaleidoscope;
 pub mod metrics;
 pub mod overlay;
@@ -38,6 +39,7 @@ use crate::preset::{Preset, SystemKind, Variables};
 use background::Background;
 pub use capture::CaptureImage;
 pub use context::{RenderContext, RenderError};
+use ink::Ink;
 use kaleidoscope::Kaleidoscope;
 use overlay::Overlay;
 use palette::Palette;
@@ -211,6 +213,11 @@ pub struct Renderer {
     /// composited frame into N mirrored wedges when a preset binds
     /// `kaleido_order >= 2`; a passthrough otherwise.
     kaleido: Kaleidoscope,
+    /// The final-stage duotone ink tone-remap (ADR-0028, Plan 0027): remaps the
+    /// composited frame to `mix(paper, ink, luminance)` when a preset binds
+    /// `ink_amount > 0` — the engine-wide black-on-white / colored-duotone mode;
+    /// a passthrough otherwise. Sits last in the composite, before the HUD.
+    ink: Ink,
     /// Loaded presets + the active index (pure selection state — see [`Roster`]).
     roster: Roster,
     /// Shared scene clock (seconds), advanced one fixed step per rendered frame.
@@ -246,6 +253,7 @@ impl Renderer {
         let background = Background::new(&ctx.device, ctx.surface_format());
         let trails = Trails::new(&ctx.device, ctx.surface_format());
         let kaleido = Kaleidoscope::new(&ctx.device, ctx.surface_format());
+        let ink = Ink::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
@@ -255,6 +263,7 @@ impl Renderer {
             background,
             trails,
             kaleido,
+            ink,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -280,6 +289,7 @@ impl Renderer {
         let background = Background::new(&ctx.device, ctx.surface_format());
         let trails = Trails::new(&ctx.device, ctx.surface_format());
         let kaleido = Kaleidoscope::new(&ctx.device, ctx.surface_format());
+        let ink = Ink::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
@@ -289,6 +299,7 @@ impl Renderer {
             background,
             trails,
             kaleido,
+            ink,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -329,6 +340,7 @@ impl Renderer {
         let background = Background::new(&ctx.device, ctx.surface_format());
         let trails = Trails::new(&ctx.device, ctx.surface_format());
         let kaleido = Kaleidoscope::new(&ctx.device, ctx.surface_format());
+        let ink = Ink::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
@@ -338,6 +350,7 @@ impl Renderer {
             background,
             trails,
             kaleido,
+            ink,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -597,6 +610,7 @@ impl Renderer {
             background,
             trails,
             kaleido,
+            ink,
             roster,
             time,
             diag,
@@ -630,6 +644,7 @@ impl Renderer {
         background.reset_params();
         trails.reset_params();
         kaleido.reset_params();
+        ink.reset_params();
         scene.reset_params();
         for (index, binding) in preset.params.iter().enumerate() {
             let raw = binding.expr.eval(&vars);
@@ -639,12 +654,14 @@ impl Renderer {
             // above stays pure and allocation-free.
             let tau = preset.smoothing.get(&binding.name).copied().unwrap_or(0.0);
             let value = param_smoother.smooth(index, raw, tau, dt);
-            // Route `bg_*` to the background, `trails` to the feedback stage, and
-            // `kaleido_*` to the fold; everything else to the scene. The namespaces
-            // are disjoint, so no param reaches more than one.
+            // Route `bg_*` to the background, `trails` to the feedback stage,
+            // `kaleido_*` to the fold, `ink_*`/`paper_*` to the final tone-remap;
+            // everything else to the scene. The namespaces are disjoint, so no
+            // param reaches more than one.
             if !background.set_param(&binding.name, value)
                 && !trails.set_param(&binding.name, value)
                 && !kaleido.set_param(&binding.name, value)
+                && !ink.set_param(&binding.name, value)
             {
                 scene.set_param(&binding.name, value);
             }
@@ -652,16 +669,21 @@ impl Renderer {
         scene.update(frame);
 
         // Fixed-order composite (ADR-0018): background (owns the clear) -> scene ->
-        // feedback trails -> screen-space kaleidoscope -> present. Each post-effect
-        // is skippable; the composite renders straight to the surface when neither
-        // is active (passthrough), else into an offscreen the chain folds down to
-        // the surface. Both post stages run at their fixed 16:9 internal resolution.
+        // feedback trails -> screen-space kaleidoscope -> ink tone-remap -> present.
+        // Each post-effect is skippable; the composite renders straight to the
+        // surface when none is active (passthrough), else into an offscreen the
+        // chain folds down to the surface. The trails/kaleidoscope stages run at a
+        // fixed 16:9 internal resolution; the ink remap runs surface-sized (it is a
+        // 1:1 per-pixel remap, so its input must match the surface). Ink is always
+        // last (ADR-0028), so every earlier stage resolves into its input.
         let surface_aspect = width as f32 / height.max(1) as f32;
         let trailing = trails.active();
         let kaleidoing = kaleido.active();
+        let inking = ink.active();
 
         // Where background + scene render: the first active post-stage's input, or
-        // the surface when no post-stage is active.
+        // the surface when no post-stage is active. The ink offscreen is
+        // surface-sized, so the scene renders into it at the surface aspect.
         let (scene_target, scene_aspect) = if trailing {
             match trails.begin(encoder) {
                 Some(v) => (v, Trails::aspect()),
@@ -672,31 +694,50 @@ impl Renderer {
                 Some(v) => (v, Kaleidoscope::aspect()),
                 None => (view, surface_aspect),
             }
+        } else if inking {
+            match ink.begin(encoder, width, height) {
+                Some(v) => (v, surface_aspect),
+                None => (view, surface_aspect),
+            }
         } else {
             (view, surface_aspect)
         };
         background.render(&ctx.queue, encoder, scene_target);
         scene.render(&ctx.queue, encoder, scene_target, scene_aspect);
 
-        // Trails folds its input into the kaleidoscope's input (if the fold is
-        // active) or the surface.
+        // Each post-stage resolves its input into the next active stage's input,
+        // or the surface when it is the last active stage. Order: trails ->
+        // kaleidoscope -> ink -> surface.
         if trailing {
             let trails_out = if kaleidoing {
                 kaleido.begin(encoder).unwrap_or(view)
+            } else if inking {
+                ink.begin(encoder, width, height).unwrap_or(view)
             } else {
                 view
             };
             trails.resolve(&ctx.queue, encoder, trails_out);
         }
-        // The kaleidoscope folds its input (the trails output, or bg+scene) into
-        // the surface.
         if kaleidoing {
-            kaleido.resolve(&ctx.queue, encoder, view);
+            let kaleido_out = if inking {
+                ink.begin(encoder, width, height).unwrap_or(view)
+            } else {
+                view
+            };
+            kaleido.resolve(&ctx.queue, encoder, kaleido_out);
+        }
+        // The ink remap is the final stage: it remaps its input (the last post
+        // stage's output, or bg+scene) into the surface.
+        if inking {
+            ink.resolve(&ctx.queue, encoder, view);
         }
 
-        // Background + scene, plus the trails (2) and kaleidoscope (1) post passes
-        // when active, plus the optional text and overlay passes below.
-        let mut draw_calls = 2 + if trailing { 2 } else { 0 } + if kaleidoing { 1 } else { 0 };
+        // Background + scene, plus the trails (2), kaleidoscope (1), and ink (1)
+        // post passes when active, plus the optional text and overlay passes below.
+        let mut draw_calls = 2
+            + if trailing { 2 } else { 0 }
+            + if kaleidoing { 1 } else { 0 }
+            + if inking { 1 } else { 0 };
 
         // On-canvas text (browse overlay / HUD): a second pass that loads the
         // scene and composites the queued runs on top, in the same frame
@@ -808,6 +849,7 @@ impl Renderer {
         self.background.reset_resources();
         self.trails.reset_resources();
         self.kaleido.reset_resources();
+        self.ink.reset_resources();
         self.time = 0.0;
         // The rebuilt scenes are fresh — re-apply the active preset's structural
         // config (ADR-0007) so a line scene captures with its geometry built.
@@ -878,6 +920,7 @@ impl Renderer {
         self.background.reset_resources();
         self.trails.reset_resources();
         self.kaleido.reset_resources();
+        self.ink.reset_resources();
         self.time = 0.0;
         self.configure_active_scene();
 
