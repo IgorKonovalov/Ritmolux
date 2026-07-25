@@ -51,9 +51,10 @@ unsafe impl GlobalAlloc for Counting {
 #[global_allocator]
 static GLOBAL: Counting = Counting;
 
-/// All-zero variables except where overridden per test.
+/// All-zero variables except where overridden per test. `tempo`/`novelty` are
+/// bound separately by the tests that exercise them.
 fn vars(bass: f32, mid: f32, treb: f32, onset: f32, beat: f32, bar: f32, time: f32) -> Variables {
-    Variables::new(bass, mid, treb, onset, beat, bar, time)
+    Variables::new(bass, mid, treb, onset, beat, bar, time, 0.0, 0.0)
 }
 
 #[test]
@@ -242,6 +243,35 @@ fn beat_coerces_as_a_zero_one_value() {
     let e = compile("1.0 + beat * 0.5").expect("compiles");
     assert_eq!(e.eval(&vars(0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0)), 1.5);
     assert_eq!(e.eval(&vars(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), 1.0);
+}
+
+/// Plan 0019 Phase 3: `tempo` and `novelty` read through to their slots, and
+/// appending them left the seven original variables on their own slots.
+#[test]
+fn tempo_and_novelty_read_through_without_shifting_the_other_slots() {
+    // A distinct value per slot, so a mis-wired slot reads a wrong number
+    // rather than coincidentally matching.
+    let v = Variables::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 128.0, 0.75);
+    for (name, expected) in [
+        ("bass", 1.0),
+        ("mid", 2.0),
+        ("treb", 3.0),
+        ("onset", 4.0),
+        ("beat", 5.0),
+        ("bar", 6.0),
+        ("time", 7.0),
+        ("tempo", 128.0),
+        ("novelty", 0.75),
+    ] {
+        let e = compile(name).unwrap_or_else(|err| panic!("{name} compiles: {err}"));
+        assert_eq!(e.eval(&v), expected, "{name} reads its own slot");
+    }
+
+    // The idiom the comparisons enable for tempo's unbounded 60-200 scale.
+    let gate = compile("select(tempo > 120, 1, 0)").expect("compiles");
+    assert_eq!(gate.eval(&v), 1.0);
+    let cold = Variables::default();
+    assert_eq!(gate.eval(&cold), 0.0, "tempo is 0 before the tracker warms");
 }
 
 #[test]

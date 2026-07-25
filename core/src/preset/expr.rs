@@ -16,7 +16,8 @@
 //! There are no boolean operators: with clean `0/1` results, `min` is and,
 //! `max` is or, and `1 - c` is not.
 //!
-//! Variables: `bass mid treb onset beat bar time`. Constants: `pi tau`.
+//! Variables: `bass mid treb onset beat bar time tempo novelty`. Constants:
+//! `pi tau`.
 //! Functions: `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep
 //! select`. Compilation is fallible (a malformed expression is
 //! rejected with a surfaced error, never a panic); evaluation of a compiled
@@ -37,7 +38,9 @@
 use std::fmt;
 
 /// The analysis variables an expression may reference, in slot order.
-pub const VAR_NAMES: [&str; 7] = ["bass", "mid", "treb", "onset", "beat", "bar", "time"];
+pub const VAR_NAMES: [&str; 9] = [
+    "bass", "mid", "treb", "onset", "beat", "bar", "time", "tempo", "novelty",
+];
 /// Number of expression variables.
 pub const VAR_COUNT: usize = VAR_NAMES.len();
 
@@ -49,11 +52,23 @@ pub struct Variables {
 }
 
 impl Variables {
-    /// Bind all seven variables (order matches [`VAR_NAMES`]).
+    /// Bind all nine variables (order matches [`VAR_NAMES`]). `tempo` is the
+    /// tracked BPM (`0` until the tracker warms, then ~60-200 — not a `0..1`
+    /// band); `novelty` is the experimental spectral track-change transient.
     #[allow(clippy::too_many_arguments)]
-    pub fn new(bass: f32, mid: f32, treb: f32, onset: f32, beat: f32, bar: f32, time: f32) -> Self {
+    pub fn new(
+        bass: f32,
+        mid: f32,
+        treb: f32,
+        onset: f32,
+        beat: f32,
+        bar: f32,
+        time: f32,
+        tempo: f32,
+        novelty: f32,
+    ) -> Self {
         Self {
-            values: [bass, mid, treb, onset, beat, bar, time],
+            values: [bass, mid, treb, onset, beat, bar, time, tempo, novelty],
         }
     }
 
