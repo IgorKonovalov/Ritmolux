@@ -1,7 +1,8 @@
 # ADR-0020 — Preset expression grammar v2: branching, math functions, a tempo variable, and soft typo warnings
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-07-23
+> **Accepted:** 2026-07-25 at the close of Plan 0019
 > **Related plan(s):** 0019-preset-grammar-v2
 > **Supplements:** [ADR-0002](0002-layered-preset-architecture.md) (does not supersede — the layered architecture stands; this refines layer-1's expression vocabulary)
 

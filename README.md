@@ -124,13 +124,16 @@ This is real-time audio + graphics, so a few rules are non-negotiable:
 
 Visuals are driven by **presets** — small TOML files that bind a built-in
 rendering system's parameters to short expressions over the live audio analysis
-(no Rust, no rebuild). Ten curated presets ship across two systems (a
-domain-warped fragment field and a ~10k-particle swarm), seeded into a per-user
-directory that both the standalone app and the foobar plugin share.
+(no Rust, no rebuild). The whole curated set ships across seven systems (fragment
+field, particle swarm, parametric curve, L-system, star pattern,
+reaction-diffusion, attractor), seeded into a per-user directory that both the
+standalone app and the foobar plugin share.
 
-See **[`docs/presets.md`](docs/presets.md)** for the full authoring guide and
-library reference: every shipped preset, the two systems and their parameters,
-the expression variables/functions, and where the files live on disk.
+See **[`docs/presets.md`](docs/presets.md)** for the authoring guide and the
+expression reference — grammar, variables, constants, functions, comparisons and
+`select()`, how a bad preset is reported, and where the files live on disk. The
+per-system parameter tables live in
+**[`presets/README.md`](presets/README.md)**, beside the preset files.
 
 Set **`LMV_PRESET_DIR`** to run against a custom preset folder instead of the
 per-user one — `LMV_PRESET_DIR=./presets cargo run -p standalone` points the app

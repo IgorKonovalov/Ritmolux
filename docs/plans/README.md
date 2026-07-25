@@ -9,7 +9,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title                                   | Status | Summary |
 |------|-----------------------------------------|--------|---------|
-| [0019](0019-preset-grammar-v2.md) | Preset expression grammar v2: branching, math functions, tempo, typo warnings | approved | Grow the preset expression language so authors stop hitting walls: add math functions (`cos sqrt pow smoothstep mod`) + constants (`pi tau`), branching (six comparison operators yielding `0/1` + a `select(cond,x,y)` conditional), and two new variables — `tempo` and experimental `novelty` (plumb the already-computed `AnalysisFrame.bpm`/`novelty`, no new DSP). Fix the silent-typo footgun — an unknown parameter name becomes a surfaced load **warning** (preset still loads its good bindings), backed by each system declaring its param vocabulary. Rewrite the stale `docs/presets.md` (claims 10 presets / 2 systems; code ships 17 / 5) last. Core-only, allocation-free/panic-free per frame, **C ABI untouched**; no new DSP, no boolean ops, no ternary, no Rhai. Pre-1.0 so no backward-compat obligation (additions are incidentally non-breaking). [ADR-0020](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md), supplements [ADR-0002](../adrs/0002-layered-preset-architecture.md); from `preset-author`-lane grammar feedback. |
 | [0030](0030-composite-chain-and-scene-keying.md) | Composite chain + scene keying: a `PostStage` trait, an instantiable `PostChain`, and kind-keyed scenes | draft | Structural, **behavior-preserving** (byte-identical goldens are the central done-when), and **sequenced before [0023](0023-cross-preset-transitions.md)**. Replaces `draw_frame`'s hand-written composite branch ladder (~70 lines over `trailing`/`kaleidoing`/`inking`, `ink.begin()` at three call sites, `draw_calls` summed by hand) with a `PostChain` — an owned value holding `Trails`/`Kaleidoscope`/`Ink` behind a declared `PostStage` trait in ADR-0018/0028's **fixed compile-time order** (not a graph, not a registration point). The routing adjacency is factored out as a **pure function**, so the composite contract gets its first GPU-free unit tests. Because the chain is a value rather than a set of `Renderer` fields, a **second independent instance is constructible** — which is exactly what 0023's approved dual-live path needs ("each side needs its own feedback field", its own risk bullet); Phase 2 proves it with a test rather than assuming it. Also deletes `system_slot`'s magic-index scene lookup: scenes become kind-keyed via an exhaustive `match` factory + a single `SystemKind::ALL` roster that `golden.rs`'s duplicate `SYSTEMS` list retires onto, so a new scene can no longer silently render in the wrong slot. Core-only; C ABI untouched; `Scene` trait untouched; no new dependency. [ADR-0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md); rejected extending the ladder, a render graph (again), post-stages-as-`Scene`s, and trait-only-keep-the-ladder. From the 2026-07-25 codebase-health review. |
 | [0031](0031-composite-cleanup-and-debt.md) | Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and the accumulated close-review debt | draft | The non-blocking half of the 2026-07-25 codebase-health review **plus the minors four earlier closes logged and nobody returned for**. Six independent phases: (1) `standalone/examples/shot.rs` is 1028 lines / 45 functions with **zero tests** in a target where `#[test]` does not run — its pure helpers (WAV parse, JSON emit, filmstrip indices, tiling, glyphs) move to the existing `[lib]` and get real assertions, closing a blind spot the `preset-author` lane depends on; (2) `Renderer`'s three constructors (~28 duplicated lines each) collapse onto `from_context`; (3) each binding's easing `tau` and destination resolve **once at load** instead of a per-frame `BTreeMap<String,_>` lookup + chained `set_param` string-match — mainly so adding a stage stops meaning another link in a chained `if` inside the hot loop; (4) three needless per-frame operations go — the cap-overflow `format!` (**Plan 0018 minor 1**, still open), the identity-mirror buffer copy, and the attractor's now-redundant reseed on grid change (**Plan 0029 minor 1**); (5) duplicated GPU boilerplate (two `fullscreen_pipeline`s, three copies of the bind-entry helpers, ~8 pasted fullscreen-triangle vertex stages, the twice-written fixed-step accumulator) shares one home, and the 228-line `AttractorScene::render` splits along its own comment paragraphs; (6) structural/doc debt — `GeneratorConfig` moves out of `lines/mod.rs` (**Plan 0016 minor 2**), the stale RD "fullscreen opaque pass" comment (**Plan 0025/0027**), *live* cap-overflow surfacing (**Plan 0018 minor 2**), `RoseParams` for 11 positional `f32`s, and `Palette` dropping `Copy` at 6 KB. **Sequenced after 0030** (Phase 3 names its chain stages). No new ADR; no preset-visible change; C ABI untouched. |
 | [0023](0023-cross-preset-transitions.md) | Cross-preset visual transitions: MilkDrop-style dissolves between presets | approved | Replace the instant preset **cut** with a MilkDrop-style **dissolve**. An engine `Transition` controller, driven by injected `dt`, blends the outgoing and incoming presets over ~1 s using a **small library** of blend kinds (crossfade, additive/burn, luma-dissolve, wipe/slide). The outgoing side is **snapshotted at transition start** (freeze path + safety net); the incoming renders live; **adaptive** logic re-renders the outgoing scene live too, but only when it is a *different* scene object and the frame budget is healthy, else it falls back to the snapshot (protects the 60 fps iGPU floor, NFR §1, and handles the same-slot case for free). Blends **fully-composited per-preset frames** via a two-input blend stage appended to Plan 0018's composite. Policy (kind/duration) is **engine-configured in code**; preset-declared `[transition]`, beat-quantized dissolves, and operator UI are explicit follow-ups. **Core-only, C ABI untouched, no new dependency.** **Sequenced after Plan 0018** (reuses its offscreen target + present + `Clear`->`Load` scenes; transitively after Plan 0014's `PingPongField` + injected `dt`). Realizes the cross-preset blending deferred by Plan 0003. [ADR-0024](../adrs/0024-cross-preset-transitions.md); rejected single-target alpha, always-dual-live, always-freeze, a `TransitionScene` wrapper, and preset-declared-now. |
@@ -72,16 +71,15 @@ editing a version-controlled `presets/*.toml` is live in the app (~150 ms) and i
 with no rebuild; see Recently closed. That is the edit loop the scene and grammar plans below tune
 their presets in.)
 
-**[0019] Preset grammar v2** is **independent of the `dt` coupling** (it touches `preset/expr.rs`
-+ `schema.rs` + the load path, not the render clock or any scene), so it can land anytime. It is the
-natural sequel to the now-closed **[0015]** for the `preset-author` lane: 0015 gave the fast edit
-loop, 0019 widens what a preset can express (real `cos`, easing, `tempo`, threshold `select`) and
-stops the silent-typo footgun — together they sharpen preset authoring end to end. Small, core-only,
-C ABI frozen. **Approved** — ready for `dev` (no ordering dependency; can land before or alongside
-the scene plans). **Carries one deferred chore from Plan 0015's close:** the `preset-author` skill
-docs still say `LMV_PRESET_DIR` is unlanded and still teach the manual `%APPDATA%` copy-over — both
-skill updates ride in one user-applied edit at 0019's close (the architect cannot edit
-`.claude/skills/**`).
+(**[0019] Preset grammar v2 has now landed and closed** — the expression language a preset binding is
+written in is v2: `cos sqrt pow mod smoothstep` + `select`, the constants `pi`/`tau`, six comparison
+operators, and the `tempo`/`novelty` variables; an unknown parameter name is a surfaced load-time
+**warning** instead of a silent no-op. See Recently closed. Plans and presets below can assume the v2
+vocabulary — notably **[0028]**'s `phase`/`radial_offset` rose morphing now has `tempo` and thresholds
+to drive it. **Still outstanding at that close, user-gated:** the `preset-author` skill docs
+(`SKILL.md`, `references/grammar.md`, `references/render-loop.md`) still describe the **v1** grammar
+and still teach the pre-`LMV_PRESET_DIR` `%APPDATA%` copy-over — the assistant cannot edit
+`.claude/skills/**`, so the lane runs on a stale reference until the user applies it.)
 
 (**[0020] Shared palette system has now landed and closed** — the shared `core/src/render/palette.rs`
 baked-LUT color surface (named + custom-stop palettes, bindable `saturation`/`hue`/`color_span`/
@@ -113,6 +111,56 @@ on the RD present, left from before 0025's alpha switch.)
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0019 — Preset expression grammar v2: branching, math functions, tempo, typo warnings](done/0019-preset-grammar-v2.md) —
+  **done 2026-07-25**, passed Mode 4 review (**no blockers**; one major, three minors, one nit). Five
+  `dev` phase commits (`c4f76fc` math functions + constants, `c33e996` comparisons + `select`,
+  `b36a3de` `tempo`/`novelty`, `462422b` warn-but-load unknown params, `66b1abb` the `docs/presets.md`
+  rewrite). The preset expression language roughly doubles, on the walls the `preset-author` lane
+  actually hit (ADR-0020, now **accepted**): `cos`, `sqrt`, `pow`, floored `mod` (`mod(-0.2, 1.0)` is
+  `0.8`, so a cyclic hue never jumps), `smoothstep`, the constants `pi`/`tau`, the six comparison
+  operators at a **new lowest-precedence tier** each yielding a clean `1.0`/`0.0`, and
+  `select(cond, x, y)` — which evaluates **only the taken branch**, so `select(x >= 0, sqrt(x), 0)` is
+  safe where a `lerp` blend of both sides would poison the parameter with `NaN`. No boolean operators
+  by design (`min` is and, `max` is or, `1 - c` is not). `VAR_NAMES` grows 7 → 9: `tempo` (the
+  already-computed `AnalysisFrame.bpm`, which `render/mod.rs` simply never passed) and experimental
+  `novelty` — **no new DSP**, both already pure functions of the input window, so determinism holds.
+  Phase 4 kills the silent-typo footgun: each system declares a `PARAMS` const beside its `set_param`
+  match, gathered by `SystemKind::param_names()`, and `is_known_param` unions in the four **global**
+  compositing vocabularies (`bg_*`, `trails`, `kaleido_*`, `ink_*`/`paper_*`) so a curated preset
+  setting a backdrop is not warned at. An unknown name is a **warning, not a rejection** (NFR 10) —
+  the preset loads, the binding is kept, and `Preset::warnings` / `LoadReport::warnings` carry it to
+  the standalone, which prints it on load and on every hot-reload. **Verified at review** rather than
+  taken on trust: `cargo test -p lmv-core` green with the `preset` suite **22/22** and every new
+  assertion body read — the math tests pin exact values (`smoothstep(0,1,0.25) == 0.15625`, the
+  floored-`mod` wrap) *and* totality on degenerate input (`sqrt(-1)` NaN, `mod(1,0)` NaN, `e0 == e1`
+  smoothstep stays bounded); the `select` test proves the untaken `sqrt(-1)` does not reach the
+  result; the variable test binds a **distinct value per slot** so a mis-wired slot cannot
+  coincidentally pass; `clippy --workspace --all-targets -D warnings` clean; the hot-path panic pragma
+  on `expr.rs` intact (no new `unwrap`/indexing — the new `Call` arms use slice patterns and the eval
+  falls back to `0.0`). The drift guard ADR-0020 asked for is real and **verified to fail on induced
+  drift**: `declared_params_match_set_param` reads each `set_param`'s arms back out of the source, so
+  it covers the GPU-backed scenes a headless test cannot instantiate, and a companion assert proves
+  **every shipped preset is warning-free** so the check cannot cry wolf on the curated library.
+  **Core-only; C ABI untouched (v4); no new dependency.** **Accepted deviation:** the plan's Phase 5
+  was written against a 17-preset / 5-system library and 8 variables; `dev` documented the **current**
+  35 presets / 7 systems and 9 variables, and restructured so the per-system parameter tables live
+  once in `presets/README.md` with `docs/presets.md` as the authoritative *expression* reference —
+  strictly better than the letter of the done-when. **Major (fixed in this close commit):** the
+  required operator-doc sweep missed `README.md`, which still advertised "Ten curated presets ship
+  across two systems" and pointed at `docs/presets.md` for "the two systems and their parameters" —
+  now count-free and pointing at both docs. **Minors:** (1) `standalone/examples/shot.rs:267`'s
+  `report_errors` prints `report.errors` but not `report.warnings`, so the headless CLI the
+  `preset-author` lane self-verifies through is the one surface that still swallows a typo; (2) the
+  drift guard hardcodes the four **global** stages' expected name lists inline instead of reading
+  their `PARAMS` consts (those are `pub(crate)`, unreachable from an integration test), so a
+  const-only edit to `background`/`trails`/`kaleidoscope`/`ink` can drift `is_known_param` away from
+  `set_param` without failing — the seven per-system lists go through `param_names()` and are fully
+  guarded; (3) [Plan 0031](0031-composite-cleanup-and-debt.md)'s Phase 3 note still tells its
+  implementer that an unknown param "must keep today's behavior exactly: silently ignored" and that
+  "making it a surfaced warning is Plan 0019's job" — true when drafted, stale now. **Nit:** the
+  `preset-author` skill's own grammar reference is now a version behind (see the sequence note above);
+  user-gated. Version **minor 0.14.0 -> 0.15.0** at close (a feature plan).
 
 - [0015 — Preset-directory override + live iteration](done/0015-preset-dir-override-and-live-iteration.md) —
   **done 2026-07-25**, passed Mode 4 review (**no blockers**; one major, three minors, two nits).
