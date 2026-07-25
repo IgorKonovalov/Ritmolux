@@ -57,7 +57,7 @@ pub use scenes::lines::CapOverflow;
 use text::TextLayer;
 #[cfg(feature = "text")]
 pub use text::TextRun;
-use transition::{Blend, DEFAULT_DURATION_SECS, Transition};
+use transition::{Blend, DEFAULT_DURATION_SECS, Transition, TransitionKind};
 
 /// Assumed bytes-per-pixel for the swapchain GPU-byte estimate (the common
 /// 8-bit RGBA/BGRA surface formats). An approximation, per ADR-0008.
@@ -67,6 +67,19 @@ const SWAPCHAIN_BYTES_PER_PIXEL: u64 = 4;
 /// `desired_maximum_frame_latency` (also 2); the figure is a trend indicator,
 /// not an exact footprint (ADR-0008).
 const SWAPCHAIN_IMAGE_COUNT: u64 = 2;
+
+/// **The engine's whole transition policy** (ADR-0024: policy lives in code, not
+/// in a preset's `[transition]` table and not in an operator UI — both are
+/// deliberate follow-ups). Two constants, in one place, so tuning the show is a
+/// one-line edit that changes *every* switch path at once.
+///
+/// `None` rotates deterministically over [`TransitionKind::LIBRARY`], so a live
+/// show sees the whole library; `Some(kind)` pins every dissolve to one. The
+/// rotation counter is engine state, never a clock or an RNG, so a captured
+/// sequence of switches reproduces exactly (NFR §6).
+const TRANSITION_KIND: Option<TransitionKind> = None;
+/// How long every dissolve runs, in seconds. See [`TRANSITION_KIND`].
+const TRANSITION_DURATION_SECS: f32 = DEFAULT_DURATION_SECS;
 
 /// The built scenes, each paired with the [`SystemKind`] it drives — the roster
 /// [`scenes::create_all`] returns. Addressed by kind, never by position, so a
@@ -247,6 +260,10 @@ pub struct Renderer {
     /// The in-flight dissolve, if any. `None` is the ordinary frame path — chain
     /// straight into ink's input (or the surface), no blend encoded at all.
     transition: Option<Transition>,
+    /// Dissolves started since the last explicit jump — the rotation position for
+    /// [`TRANSITION_KIND`]. A counter, not a clock or an RNG, so the sequence of
+    /// kinds a run produces is reproducible.
+    transitions_started: u32,
     /// Loaded presets + the active index (pure selection state — see [`Roster`]).
     roster: Roster,
     /// Shared scene clock (seconds), advanced one fixed step per rendered frame.
@@ -294,6 +311,7 @@ impl Renderer {
             ink,
             blend,
             transition: None,
+            transitions_started: 0,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -331,6 +349,7 @@ impl Renderer {
             ink,
             blend,
             transition: None,
+            transitions_started: 0,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -383,6 +402,7 @@ impl Renderer {
             ink,
             blend,
             transition: None,
+            transitions_started: 0,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -411,6 +431,7 @@ impl Renderer {
         // replacement may not even have. Cancel it cleanly — the snapshot goes with
         // it — and land on whatever `set_presets` resolves the active index to.
         self.cancel_transition();
+        self.reset_transition_rotation();
         self.roster.set_presets(presets);
         self.configure_active_scene();
     }
@@ -453,7 +474,10 @@ impl Renderer {
         if let Some(running) = self.transition.take() {
             self.roster.select(running.to_index());
         }
-        self.transition = Some(Transition::new(to, DEFAULT_DURATION_SECS));
+        let kind =
+            TRANSITION_KIND.unwrap_or_else(|| TransitionKind::rotating(self.transitions_started));
+        self.transitions_started = self.transitions_started.wrapping_add(1);
+        self.transition = Some(Transition::new(to, TRANSITION_DURATION_SECS, kind));
     }
 
     /// Jump straight to `index` with no dissolve — the escape hatch for paths
@@ -465,6 +489,7 @@ impl Renderer {
             return; // out of range: a no-op, never a panic and never a wrap
         }
         self.cancel_transition();
+        self.reset_transition_rotation();
         self.roster.select(index);
         self.configure_active_scene();
     }
@@ -475,6 +500,15 @@ impl Renderer {
     fn cancel_transition(&mut self) {
         self.transition = None;
         self.blend.release_targets();
+    }
+
+    /// Restart the kind rotation. An **explicit** jump — an operator picking a
+    /// preset by index or name, or a roster hot-reload — is the start of a new
+    /// stretch of show, so the next dissolve begins the library again rather than
+    /// resuming wherever the last auto-rotate left off. It also makes a scripted
+    /// sequence of switches reproduce the same kinds from a known starting point.
+    fn reset_transition_rotation(&mut self) {
+        self.transitions_started = 0;
     }
 
     /// The loaded preset names in roster order — the browse overlay's list
@@ -710,6 +744,8 @@ impl Renderer {
             // Set at preset load, surfaced by the frontend — not a per-frame concern.
             cap_overflow: _,
             param_smoother,
+            // Switch-site policy state (the kind rotation) — not a per-frame concern.
+            transitions_started: _,
         } = self;
 
         let Some(preset) = roster.active_preset() else {
@@ -819,12 +855,12 @@ impl Renderer {
         // on their way down, plus the blend while a dissolve runs, plus ink's remap
         // when it runs, plus the optional text and overlay passes below.
         let mut draw_calls = 2 + chain.resolve(&ctx.queue, encoder, destination, surface);
-        if let (Some(t), true) = (progress, blend_input.is_some()) {
+        if let (Some(tr), true) = (transition.as_ref(), blend_input.is_some()) {
             // Mix the frozen outgoing side with the live incoming one into ink's
             // input (or the surface). At t = 0 this is the snapshot exactly, which
             // is what lets the opening frame present through the same pass before
             // the live side has ever been rendered into.
-            draw_calls += blend.resolve(&ctx.queue, encoder, terminal, t);
+            draw_calls += blend.resolve(&ctx.queue, encoder, terminal, tr.progress(), tr.kind());
         }
         if ink_input.is_some() {
             draw_calls += ink.resolve(&ctx.queue, encoder, view);
