@@ -122,6 +122,23 @@ impl StarPatternScene {
     }
 }
 
+/// Parameter vocabulary — see [`fragment_field::PARAMS`](crate::render::scenes::fragment_field::PARAMS).
+/// **Keep in sync with `set_param` below.**
+pub const PARAMS: &[&str] = &[
+    "variant",
+    "rotation",
+    "hue",
+    "draw_progress",
+    "thickness",
+    "scale",
+    "brightness",
+    "zoom",
+    "pan_x",
+    "pan_y",
+    "mirror_order",
+    "mirror_reflect",
+];
+
 impl Scene for StarPatternScene {
     fn name(&self) -> &'static str {
         "star pattern"

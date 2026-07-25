@@ -17,12 +17,15 @@
     clippy::unreachable
 )]
 
-mod background;
+// The four compositing stages stay crate-private to the outside world, but are
+// `pub(crate)` so `preset::schema` can read their global `PARAMS` vocabularies
+// for the load-time typo check (ADR-0020).
+pub(crate) mod background;
 pub mod capture;
 pub mod context;
 pub mod feedback;
-mod ink;
-mod kaleidoscope;
+pub(crate) mod ink;
+pub(crate) mod kaleidoscope;
 pub mod metrics;
 pub mod overlay;
 mod overlay_font;
@@ -30,7 +33,7 @@ pub mod palette;
 pub mod scenes;
 #[cfg(feature = "text")]
 pub mod text;
-mod trails;
+pub(crate) mod trails;
 
 use crate::audio::AudioFormat;
 use crate::diag::{Diag, Metrics};

@@ -70,6 +70,44 @@ impl SystemKind {
             SystemKind::Attractor => "attractor",
         }
     }
+
+    /// The parameter names this system's scene consumes. Each list lives beside
+    /// that scene's `set_param` match (the two are guarded against drift by
+    /// `declared_params_match_set_param` in `core/tests/preset.rs`); this is the
+    /// one place they are gathered for the loader's typo check (ADR-0020).
+    ///
+    /// Does **not** include the global compositing params — a preset for any
+    /// system may bind those, so [`is_known_param`] unions them in.
+    pub fn param_names(self) -> &'static [&'static str] {
+        use crate::render::scenes;
+        match self {
+            SystemKind::FragmentField => scenes::fragment_field::PARAMS,
+            SystemKind::Swarm => scenes::swarm::PARAMS,
+            SystemKind::ParametricCurve => scenes::lines::parametric::PARAMS,
+            SystemKind::LSystem => scenes::lines::lsystem::PARAMS,
+            SystemKind::StarPattern => scenes::lines::star::PARAMS,
+            SystemKind::ReactionDiffusion => scenes::reaction_diffusion::PARAMS,
+            SystemKind::Attractor => scenes::particles::PARAMS,
+        }
+    }
+}
+
+/// The parameter names any preset may bind regardless of its system: the four
+/// compositing stages the renderer routes to before the scene (`bg_*`,
+/// `trails`, `kaleido_*`, `ink_*`/`paper_*`). Gathered from each stage's own
+/// declared vocabulary so there is no third copy to drift.
+pub const GLOBAL_PARAMS: [&[&str]; 4] = [
+    crate::render::background::PARAMS,
+    crate::render::trails::PARAMS,
+    crate::render::kaleidoscope::PARAMS,
+    crate::render::ink::PARAMS,
+];
+
+/// Whether `name` is a parameter `system` (or the global compositing layer)
+/// actually consumes. An unknown name is a load-time **warning**, not an error:
+/// the preset still loads and applies its good bindings (ADR-0020, NFR 10).
+pub fn is_known_param(system: SystemKind, name: &str) -> bool {
+    system.param_names().contains(&name) || GLOBAL_PARAMS.iter().any(|stage| stage.contains(&name))
 }
 
 /// A named parameter bound to a compiled expression.
@@ -113,6 +151,12 @@ pub struct Preset {
     /// bindable `palette_mix` param crossfades between them per frame. `None`
     /// means no crossfade (palette A only).
     pub palette_b: Option<PaletteConfig>,
+    /// Non-fatal problems found while loading — today, bindings naming a
+    /// parameter this system does not consume (ADR-0020). The preset loaded and
+    /// its good bindings apply; these are surfaced so a typo stops failing
+    /// silently. Empty for a clean preset. Load-time only — never read per
+    /// frame.
+    pub warnings: Vec<String>,
 }
 
 impl Preset {
@@ -126,11 +170,23 @@ impl Preset {
         // The raw params come from a BTreeMap, so bindings land name-sorted:
         // evaluation is order-independent, but determinism is cheap to keep.
         let mut params = Vec::with_capacity(raw.params.len());
+        let mut warnings = Vec::new();
         for (param, source) in raw.params {
             let expr = expr::compile(&source).map_err(|err| PresetError::Expr {
                 param: param.clone(),
                 err,
             })?;
+            // A name the system does not consume is a warning, not an error:
+            // one typo must not discard the rest of an otherwise-good preset
+            // (ADR-0020 / NFR 10). The binding is kept — an unconsumed param is
+            // harmless at apply time, and dropping it would turn a surfaced
+            // warning back into a silent loss.
+            if !is_known_param(system, &param) {
+                warnings.push(format!(
+                    "unknown parameter '{param}' for system '{}' (binding kept, but nothing reads it)",
+                    system.as_str()
+                ));
+            }
             params.push(Binding { name: param, expr });
         }
 
@@ -165,6 +221,7 @@ impl Preset {
             smoothing: raw.smoothing,
             palette,
             palette_b,
+            warnings,
         })
     }
 }

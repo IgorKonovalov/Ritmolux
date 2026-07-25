@@ -121,6 +121,27 @@ impl ParametricCurveScene {
     }
 }
 
+/// Parameter vocabulary — see [`fragment_field::PARAMS`](crate::render::scenes::fragment_field::PARAMS).
+/// **Keep in sync with `set_param` below.**
+pub const PARAMS: &[&str] = &[
+    "n",
+    "d",
+    "phase",
+    "radial_offset",
+    "samples",
+    "thickness",
+    "hue",
+    "spin",
+    "scale",
+    "brightness",
+    "draw_progress",
+    "zoom",
+    "pan_x",
+    "pan_y",
+    "mirror_order",
+    "mirror_reflect",
+];
+
 impl Scene for ParametricCurveScene {
     fn name(&self) -> &'static str {
         "parametric curve"
