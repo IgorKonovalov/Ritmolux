@@ -64,9 +64,13 @@ const DEFAULT_INK_BRIGHT: f32 = 0.0;
 
 const SHADER: &str = r#"
 struct Ink {
-    paper: vec4<f32>,  // x hue, y sat, z bright, w unused
-    ink: vec4<f32>,    // x hue, y sat, z bright, w unused
-    amount: vec4<f32>, // x amount, rest unused
+    // Two pole pairs and a crossfade between them: `from` is the outgoing
+    // preset's while a dissolve runs, and equals `to` otherwise (ADR-0032).
+    paper_from: vec4<f32>, // x hue, y sat, z bright, w unused
+    ink_from: vec4<f32>,
+    paper_to: vec4<f32>,
+    ink_to: vec4<f32>,
+    ctl: vec4<f32>,        // x amount, y dissolve progress, rest unused
 }
 
 @group(0) @binding(0) var<uniform> u: Ink;
@@ -110,14 +114,23 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // keys toward the ink pole, the dark base toward paper.
     let d = clamp(dot(src, vec3<f32>(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
 
-    let paper = hsv2rgb(u.paper.xyz);
-    let ink = hsv2rgb(u.ink.xyz);
+    // Crossfade the two presets' poles in **RGB**, after the HSV conversion.
+    // Interpolating hue/sat instead would sweep an unrelated arc of the wheel —
+    // white (sat 0) to blue passes through yellow-green, a tone neither preset
+    // configures. This is still a param crossfade feeding **one** remap of the
+    // blended frame: the non-linearity ADR-0032 rejects is remapping each side
+    // and mixing the *results*, which is a different thing.
+    // Outside a dissolve `from == to` and `t == 0`, so both mixes return the
+    // first operand exactly and the output is bit-identical to a single pole pair.
+    let t = clamp(u.ctl.y, 0.0, 1.0);
+    let paper = mix(hsv2rgb(u.paper_from.xyz), hsv2rgb(u.paper_to.xyz), t);
+    let ink = mix(hsv2rgb(u.ink_from.xyz), hsv2rgb(u.ink_to.xyz), t);
     let remapped = mix(paper, ink, d);
 
     // `amount` gates the remap against the untouched frame (0 = passthrough, 1 =
     // full remap), so a preset can breathe between glow and ink on the beat. The
     // stage is skipped entirely at amount <= 0, so this only blends for amount > 0.
-    let amount = clamp(u.amount.x, 0.0, 1.0);
+    let amount = clamp(u.ctl.x, 0.0, 1.0);
     return vec4<f32>(mix(src, remapped, amount), 1.0);
 }
 "#;
@@ -125,9 +138,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct InkUniform {
-    paper: [f32; 4],
-    ink: [f32; 4],
-    amount: [f32; 4],
+    paper_from: [f32; 4],
+    ink_from: [f32; 4],
+    paper_to: [f32; 4],
+    ink_to: [f32; 4],
+    ctl: [f32; 4],
 }
 
 struct Resources {
@@ -294,6 +309,68 @@ pub struct Ink {
     ink_hue: f32,
     ink_sat: f32,
     ink_bright: f32,
+    /// The **outgoing** preset's params while a dissolve runs, plus that
+    /// dissolve's progress — the crossfade state (ADR-0032). `None` on every
+    /// ordinary frame, where the shader sees one pole pair and `t = 0`.
+    crossfade: Option<(InkParams, f32)>,
+}
+
+/// One preset's evaluated remap params, held so a cross-preset dissolve can
+/// crossfade ink (ADR-0032).
+///
+/// Ink is a single **engine-wide** pass, but a dissolve has two presets each
+/// binding their own `ink_*`/`paper_*`. Holding the outgoing side's values at the
+/// dissolve's start and interpolating toward the incoming side's by the same `t`
+/// that drives the blend makes `t = 0` exactly the outgoing look and `t = 1`
+/// exactly the incoming one, with no snap at either endpoint.
+///
+/// This is a crossfade of the **poles feeding one remap**, not of two remapped
+/// frames: `mix(paper, ink, luminance)` is non-linear in the frame, so remapping
+/// each side and blending the results would show a tone neither preset configures
+/// (ADR-0032 Alternative B, rejected). The poles themselves interpolate in RGB, in
+/// the shader, after the HSV conversion — see the fragment stage for why.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct InkParams {
+    amount: f32,
+    paper_hue: f32,
+    paper_sat: f32,
+    paper_bright: f32,
+    ink_hue: f32,
+    ink_sat: f32,
+    ink_bright: f32,
+}
+
+impl InkParams {
+    /// This pair packed for the shader: `(paper hsv, ink hsv)`.
+    fn poles(&self) -> ([f32; 4], [f32; 4]) {
+        (
+            [self.paper_hue, self.paper_sat, self.paper_bright, 0.0],
+            [self.ink_hue, self.ink_sat, self.ink_bright, 0.0],
+        )
+    }
+}
+
+impl Default for InkParams {
+    /// The remap's own defaults — `amount = 0` (off), white paper, black ink. What
+    /// a preset that binds no `ink_*` hands to a dissolve, so fading *into* a
+    /// non-ink preset fades the remap out rather than cutting it.
+    fn default() -> Self {
+        Self {
+            amount: DEFAULT_AMOUNT,
+            paper_hue: DEFAULT_PAPER_HUE,
+            paper_sat: DEFAULT_PAPER_SAT,
+            paper_bright: DEFAULT_PAPER_BRIGHT,
+            ink_hue: DEFAULT_INK_HUE,
+            ink_sat: DEFAULT_INK_SAT,
+            ink_bright: DEFAULT_INK_BRIGHT,
+        }
+    }
+}
+
+/// Linear interpolation, with `t` clamped to `[0, 1]` so an out-of-range progress
+/// can never extrapolate a param past either preset's value.
+fn lerp(from: f32, to: f32, t: f32) -> f32 {
+    from + (to - from) * t.clamp(0.0, 1.0)
 }
 
 /// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
@@ -322,10 +399,13 @@ impl Ink {
             ink_hue: DEFAULT_INK_HUE,
             ink_sat: DEFAULT_INK_SAT,
             ink_bright: DEFAULT_INK_BRIGHT,
+            crossfade: None,
         }
     }
 
-    /// Reset the remap params to their defaults (each frame, before routing).
+    /// Reset the remap params to their defaults (each frame, before routing). The
+    /// crossfade state goes with them: the renderer re-declares it after routing,
+    /// for exactly the frames a dissolve is running.
     pub fn reset_params(&mut self) {
         self.amount = DEFAULT_AMOUNT;
         self.paper_hue = DEFAULT_PAPER_HUE;
@@ -334,6 +414,7 @@ impl Ink {
         self.ink_hue = DEFAULT_INK_HUE;
         self.ink_sat = DEFAULT_INK_SAT;
         self.ink_bright = DEFAULT_INK_BRIGHT;
+        self.crossfade = None;
     }
 
     /// Apply one named parameter, returning whether it was an `ink_*`/`paper_*`
@@ -358,6 +439,36 @@ impl Ink {
     /// it is the identity passthrough and the pass is skipped entirely).
     pub fn active(&self) -> bool {
         self.amount > 0.0 && self.amount.is_finite()
+    }
+
+    /// This frame's evaluated params — held for the **outgoing** preset at a
+    /// dissolve's start, to be handed back to [`crossfade_from`](Self::crossfade_from).
+    pub fn params(&self) -> InkParams {
+        InkParams {
+            amount: self.amount,
+            paper_hue: self.paper_hue,
+            paper_sat: self.paper_sat,
+            paper_bright: self.paper_bright,
+            ink_hue: self.ink_hue,
+            ink_sat: self.ink_sat,
+            ink_bright: self.ink_bright,
+        }
+    }
+
+    /// Declare that this frame is `t` of the way through a dissolve out of `from`
+    /// (the outgoing preset's params, held at the dissolve's start). This frame's
+    /// own params — the incoming preset's, already evaluated and routed — are the
+    /// other end.
+    ///
+    /// Call **after** routing and **before** [`active`](Self::active): `amount`
+    /// interpolates here, so a dissolve out of an ink-on preset into an ink-off one
+    /// keeps the pass running at a fading `ink_amount` rather than cutting it off
+    /// at the first frame. The **poles** are handed to the shader as two pairs and
+    /// interpolated there, in RGB — see the fragment stage.
+    pub fn crossfade_from(&mut self, from: &InkParams, t: f32) {
+        let t = t.clamp(0.0, 1.0);
+        self.amount = lerp(from.amount, self.amount, t);
+        self.crossfade = Some((*from, t));
     }
 
     /// Build the surface-sized resources if needed (or rebuild on a size change)
@@ -398,13 +509,21 @@ impl Ink {
         let Some(res) = self.res.as_ref() else {
             return 0;
         };
+        // Outside a dissolve both pole pairs are this frame's and `t` is 0, so the
+        // shader's `mix` returns the first operand exactly — bit-identical to a
+        // single-pair uniform, which is why no golden re-blesses.
+        let (paper_to, ink_to) = self.params().poles();
+        let (from, t) = self.crossfade.unwrap_or((self.params(), 0.0));
+        let (paper_from, ink_from) = from.poles();
         queue.write_buffer(
             &res.uniform,
             0,
             bytemuck::bytes_of(&InkUniform {
-                paper: [self.paper_hue, self.paper_sat, self.paper_bright, 0.0],
-                ink: [self.ink_hue, self.ink_sat, self.ink_bright, 0.0],
-                amount: [self.amount, 0.0, 0.0, 0.0],
+                paper_from,
+                ink_from,
+                paper_to,
+                ink_to,
+                ctl: [self.amount, t, 0.0, 0.0],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
