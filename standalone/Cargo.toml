@@ -9,6 +9,14 @@ repository.workspace = true
 # cargo-deny accept its path dependency on lmv-core under wildcards=deny.
 publish = false
 
+# Host-utility path resolution shared by the binary and the `shot` example, so
+# the app and the capture CLI can never drift on which preset directory they
+# read (ADR-0014). Library-only code; the shipped binary links the same source
+# it used to inline, so there is no size or dependency cost.
+[lib]
+name = "standalone"
+path = "src/lib.rs"
+
 [[bin]]
 name = "lmv"
 path = "src/main.rs"

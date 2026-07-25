@@ -21,6 +21,7 @@ use lmv_core::dsp::Analyzer;
 use lmv_core::render::{Renderer, TextRun};
 use overlay::{OverlayAction, OverlayKey, OverlayState};
 use soak::SoakLog;
+use standalone::{APP_DIR_NAME, PRESET_DIR_ENV, PresetDir, preset_data_root, resolve_preset_dir};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -36,11 +37,10 @@ const HIDDEN_TICK: Duration = Duration::from_millis(100);
 /// resolves at compile time to the single [workspace.package].version (ADR-0005).
 const APP_TITLE: &str = concat!("light-music-visualizer ", env!("CARGO_PKG_VERSION"));
 
-/// Per-user application directory name, used under the OS data root to build
-/// the shared preset directory (the foobar plugin resolves the same path).
-const APP_DIR_NAME: &str = "light-music-visualizer";
-/// How often to re-scan the preset directory for edits.
-const PRESET_POLL: Duration = Duration::from_millis(500);
+/// How often to re-scan the preset directory for edits. Tight enough that an
+/// edit to a `.toml` reads as immediate while authoring (ADR-0014); the scan
+/// itself is a `read_dir` + mtime pass, negligible beside a rendered frame.
+const PRESET_POLL: Duration = Duration::from_millis(150);
 /// Clamp the per-frame `dt` fed to the scene director. A long hidden/paused gap
 /// would otherwise dump a huge step into the dwell timer and rotate on return.
 const MAX_DT: f32 = 0.25;
@@ -140,12 +140,12 @@ impl AppState {
                 std::process::exit(1);
             });
 
-        // Resolve the per-user preset directory, seed the curated set into it
-        // on first run (write-if-absent), then load it over the renderer's
+        // Resolve the preset directory, seed the curated set into it on first
+        // run (write-if-absent — but never into an LMV_PRESET_DIR override,
+        // which is the user's own folder), then load it over the renderer's
         // embedded defaults and record the signature so later edits hot-reload.
         // Any failure degrades to the embedded defaults (NFR 10).
-        let preset_dir = resolve_preset_dir();
-        seed_preset_dir(&preset_dir);
+        let preset_dir = startup_preset_dir();
         reload_presets(&mut renderer, &preset_dir);
         let preset_sig = dir_signature(&preset_dir);
 
@@ -734,16 +734,26 @@ impl ApplicationHandler for App {
     }
 }
 
-/// Resolve the shared per-user preset directory, hand-rolled per-OS so we add
-/// no runtime dependency (NFR 4). Windows: `%APPDATA%\light-music-visualizer\
-/// presets`. macOS: `~/Library/Application Support/light-music-visualizer/
-/// presets`. Other: `$XDG_DATA_HOME` (or `~/.local/share`) plus the same
-/// suffix. Returns an empty path if the OS data root can't be resolved, so the
-/// caller keeps the renderer's embedded defaults (degrade, never crash — NFR 10).
-fn resolve_preset_dir() -> PathBuf {
-    match preset_data_root() {
-        Some(root) => root.join(APP_DIR_NAME).join("presets"),
-        None => {
+/// The preset directory to load and poll, seeding the curated set only when it
+/// is the per-user default — an `LMV_PRESET_DIR` override names a directory the
+/// user owns (typically the repo's version-controlled `presets/`), so writing
+/// our copies into it would be a surprise (ADR-0014). Returns an empty path if
+/// nothing resolves, so the caller keeps the renderer's embedded defaults
+/// (degrade, never crash — NFR 10).
+fn startup_preset_dir() -> PathBuf {
+    match resolve_preset_dir() {
+        PresetDir::Override(dir) => {
+            eprintln!(
+                "{PRESET_DIR_ENV} set: reading presets from {}",
+                dir.display()
+            );
+            dir
+        }
+        PresetDir::Default(dir) => {
+            seed_preset_dir(&dir);
+            dir
+        }
+        PresetDir::Unresolved => {
             eprintln!("could not resolve a per-user data directory; keeping embedded presets");
             PathBuf::new()
         }
@@ -817,34 +827,6 @@ fn resolve_monitor(
         return Some((output.display, monitor.clone()));
     }
     monitors.first().map(|monitor| (0, monitor.clone()))
-}
-
-#[cfg(windows)]
-fn preset_data_root() -> Option<PathBuf> {
-    std::env::var_os("APPDATA")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-}
-
-#[cfg(target_os = "macos")]
-fn preset_data_root() -> Option<PathBuf> {
-    std::env::var_os("HOME")
-        .filter(|v| !v.is_empty())
-        .map(|home| {
-            PathBuf::from(home)
-                .join("Library")
-                .join("Application Support")
-        })
-}
-
-#[cfg(not(any(windows, target_os = "macos")))]
-fn preset_data_root() -> Option<PathBuf> {
-    if let Some(xdg) = std::env::var_os("XDG_DATA_HOME").filter(|v| !v.is_empty()) {
-        return Some(PathBuf::from(xdg));
-    }
-    std::env::var_os("HOME")
-        .filter(|v| !v.is_empty())
-        .map(|home| PathBuf::from(home).join(".local").join("share"))
 }
 
 /// Seed the embedded curated set into `dir` on first run. An unresolved
