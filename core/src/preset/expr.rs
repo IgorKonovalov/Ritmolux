@@ -10,8 +10,9 @@
 //! primary:= number | ident | ident '(' expr (',' expr)* ')' | '(' expr ')'
 //! ```
 //!
-//! Variables: `bass mid treb onset beat bar time`. Functions: `sin abs floor
-//! min max clamp lerp`. Compilation is fallible (a malformed expression is
+//! Variables: `bass mid treb onset beat bar time`. Constants: `pi tau`.
+//! Functions: `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep`.
+//! Compilation is fallible (a malformed expression is
 //! rejected with a surfaced error, never a panic); evaluation of a compiled
 //! expression is total, panic-free, and allocation-free — it walks a prebuilt
 //! AST returning `f32`, so it is safe to call every frame (hot-path §5).
@@ -61,35 +62,55 @@ impl Variables {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Func {
     Sin,
+    Cos,
     Abs,
     Floor,
+    Sqrt,
     Min,
     Max,
+    Pow,
+    Mod,
     Clamp,
     Lerp,
+    Smoothstep,
 }
 
 impl Func {
     fn from_name(name: &str) -> Option<Self> {
         Some(match name {
             "sin" => Func::Sin,
+            "cos" => Func::Cos,
             "abs" => Func::Abs,
             "floor" => Func::Floor,
+            "sqrt" => Func::Sqrt,
             "min" => Func::Min,
             "max" => Func::Max,
+            "pow" => Func::Pow,
+            "mod" => Func::Mod,
             "clamp" => Func::Clamp,
             "lerp" => Func::Lerp,
+            "smoothstep" => Func::Smoothstep,
             _ => return None,
         })
     }
 
     fn arity(self) -> usize {
         match self {
-            Func::Sin | Func::Abs | Func::Floor => 1,
-            Func::Min | Func::Max => 2,
-            Func::Clamp | Func::Lerp => 3,
+            Func::Sin | Func::Cos | Func::Abs | Func::Floor | Func::Sqrt => 1,
+            Func::Min | Func::Max | Func::Pow | Func::Mod => 2,
+            Func::Clamp | Func::Lerp | Func::Smoothstep => 3,
         }
     }
+}
+
+/// Bare identifiers that resolve to a literal. Resolved before the variable
+/// lookup so they cannot be shadowed; an unknown bare name still errors.
+fn constant(name: &str) -> Option<f32> {
+    Some(match name {
+        "pi" => std::f32::consts::PI,
+        "tau" => std::f32::consts::TAU,
+        _ => return None,
+    })
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -133,10 +154,22 @@ impl Node {
             // indexing- and panic-free, with a safe default for completeness.
             Node::Call(func, args) => match (func, args.as_ref()) {
                 (Func::Sin, [x]) => x.eval(vars).sin(),
+                (Func::Cos, [x]) => x.eval(vars).cos(),
                 (Func::Abs, [x]) => x.eval(vars).abs(),
                 (Func::Floor, [x]) => x.eval(vars).floor(),
+                // Out-of-domain input yields NaN, not a panic.
+                (Func::Sqrt, [x]) => x.eval(vars).sqrt(),
                 (Func::Min, [a, b]) => a.eval(vars).min(b.eval(vars)),
                 (Func::Max, [a, b]) => a.eval(vars).max(b.eval(vars)),
+                (Func::Pow, [b, e]) => b.eval(vars).powf(e.eval(vars)),
+                // Floored (divisor-signed) modulo, so it wraps cleanly for
+                // cyclic hue/time: mod(-0.2, 1.0) is 0.8, not -0.2. A zero
+                // divisor yields NaN rather than panicking.
+                (Func::Mod, [a, b]) => {
+                    let a = a.eval(vars);
+                    let b = b.eval(vars);
+                    a - b * (a / b).floor()
+                }
                 // Manual clamp: std f32::clamp panics if lo > hi; max().min()
                 // is total.
                 (Func::Clamp, [x, lo, hi]) => x.eval(vars).max(lo.eval(vars)).min(hi.eval(vars)),
@@ -144,6 +177,18 @@ impl Node {
                     let a = a.eval(vars);
                     let b = b.eval(vars);
                     a + (b - a) * t.eval(vars)
+                }
+                (Func::Smoothstep, [e0, e1, x]) => {
+                    let e0 = e0.eval(vars);
+                    let e1 = e1.eval(vars);
+                    // Same total max().min() clamp as above, deliberately not
+                    // f32::clamp: a degenerate e0 == e1 divides by zero, and
+                    // max().min() folds the resulting +-inf/NaN into [0, 1]
+                    // (f32::max returns the non-NaN operand) where `clamp`
+                    // would propagate the NaN into the scene parameter.
+                    #[allow(clippy::manual_clamp)]
+                    let t = ((x.eval(vars) - e0) / (e1 - e0)).max(0.0).min(1.0);
+                    t * t * (3.0 - 2.0 * t)
                 }
                 _ => 0.0,
             },
@@ -389,6 +434,10 @@ impl Parser {
                 let name = name.clone();
                 if matches!(self.peek(), Some(Token::LParen)) {
                     self.parse_call(name)
+                } else if let Some(c) = constant(&name) {
+                    // Checked before the variable lookup, so a constant can
+                    // never be shadowed by a future variable of the same name.
+                    Ok(Node::Const(c))
                 } else if let Some(slot) = VAR_NAMES.iter().position(|&v| v == name) {
                     Ok(Node::Var(slot))
                 } else {

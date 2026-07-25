@@ -96,6 +96,72 @@ fn builtin_functions_behave() {
     assert_eq!(compile("floor(3.9)").expect("compiles").eval(&zero), 3.0);
 }
 
+/// Plan 0019 Phase 1: the v2 math functions each compute their mathematical
+/// result on a known input, and `mod` is floored (divisor-signed) so it wraps.
+#[test]
+fn v2_math_functions_compute_expected_values() {
+    let zero = Variables::default();
+    let eval = |src: &str| compile(src).expect("compiles").eval(&zero);
+
+    // cos(pi) = -1, and the constants resolve to the std literals.
+    assert!((eval("cos(pi)") + 1.0).abs() < 1e-6);
+    assert_eq!(eval("pi"), std::f32::consts::PI);
+    assert_eq!(eval("tau"), std::f32::consts::TAU);
+    assert!((eval("cos(tau)") - 1.0).abs() < 1e-6);
+
+    assert_eq!(eval("sqrt(4)"), 2.0);
+    assert_eq!(eval("pow(2, 3)"), 8.0);
+    assert_eq!(eval("pow(9, 0.5)"), 3.0);
+
+    // Floored modulo: a positive remainder for a positive divisor, so a
+    // wrapping hue/phase never goes negative.
+    assert_eq!(eval("mod(7, 3)"), 1.0);
+    assert!(
+        (eval("mod(0 - 0.2, 1.0)") - 0.8).abs() < 1e-6,
+        "mod is floored: mod(-0.2, 1.0) wraps to 0.8, not -0.2"
+    );
+
+    // smoothstep: 0 below edge0, 1 above edge1, 0.5 at the midpoint, and the
+    // eased (non-linear) value at a quarter.
+    assert_eq!(eval("smoothstep(0, 1, 0.5)"), 0.5);
+    assert_eq!(eval("smoothstep(0, 1, 0 - 3)"), 0.0);
+    assert_eq!(eval("smoothstep(0, 1, 9)"), 1.0);
+    assert_eq!(eval("smoothstep(0, 1, 0.25)"), 0.15625); // t*t*(3-2t)
+
+    // The plan's composite expression: -1 + 2 + 8 + 1 + 0.5 = 10.5.
+    let composite = "cos(pi) + sqrt(4) + pow(2,3) + mod(7,3) + smoothstep(0,1,0.5)";
+    assert!((eval(composite) - 10.5).abs() < 1e-6);
+}
+
+/// Degenerate inputs to the v2 functions yield `NaN`/`inf`/`0`, never a panic —
+/// `eval` must stay total on the per-frame hot path.
+#[test]
+fn v2_math_functions_are_total_on_degenerate_input() {
+    let zero = Variables::default();
+    let eval = |src: &str| compile(src).expect("compiles").eval(&zero);
+
+    assert!(eval("sqrt(0 - 1)").is_nan(), "sqrt of a negative is NaN");
+    assert!(eval("mod(1, 0)").is_nan(), "a zero divisor is NaN");
+    // edge0 == edge1 divides by zero; the clamp folds the result into [0, 1].
+    let degenerate = eval("smoothstep(1, 1, 2)");
+    assert!(
+        (0.0..=1.0).contains(&degenerate),
+        "degenerate smoothstep stays bounded, got {degenerate}"
+    );
+}
+
+/// A bare unknown identifier is still a compile error — the constants are
+/// checked before the variable lookup, not instead of it.
+#[test]
+fn constants_do_not_swallow_unknown_identifiers() {
+    assert!(matches!(
+        compile("foo"),
+        Err(lmv_core::preset::ExprError::UnknownIdent(name)) if name == "foo"
+    ));
+    // A constant used as a function is an unknown function, not a variable.
+    assert!(compile("pi(1)").is_err());
+}
+
 #[test]
 fn beat_coerces_as_a_zero_one_value() {
     let e = compile("1.0 + beat * 0.5").expect("compiles");
