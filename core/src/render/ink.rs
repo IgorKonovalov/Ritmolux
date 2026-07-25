@@ -344,12 +344,7 @@ impl Ink {
     /// and return the offscreen view the composite renders into this frame. `None`
     /// only if the resources are absent (never, after the build). Called when
     /// [`active`](Self::active).
-    pub fn begin(
-        &mut self,
-        _encoder: &mut wgpu::CommandEncoder,
-        width: u32,
-        height: u32,
-    ) -> Option<&wgpu::TextureView> {
+    pub fn begin(&mut self, width: u32, height: u32) -> Option<&wgpu::TextureView> {
         let stale = self
             .res
             .as_ref()
