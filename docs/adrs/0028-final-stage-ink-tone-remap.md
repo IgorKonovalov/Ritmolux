@@ -1,6 +1,6 @@
 # ADR-0028 — Final-stage duotone "ink" tone-remap (paper/ink), generalizing invert
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-07-24
 > **Related plan(s):** 0027-attractor-ink-and-crisp-trails
 

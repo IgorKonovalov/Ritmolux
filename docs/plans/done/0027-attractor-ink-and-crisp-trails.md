@@ -1,12 +1,40 @@
 # 0027 — Attractor ink-on-paper + crisp trails (final-stage ink remap + trail resolution)
 
-> **Status:** approved
+> **Status:** done — closed 2026-07-25
 > **Created:** 2026-07-24
 > **Owner skill(s):** dev
-> **Related ADRs:** [0028](../adrs/0028-final-stage-ink-tone-remap.md) (new, proposed); extends
+> **Related ADRs:** [0028](../adrs/0028-final-stage-ink-tone-remap.md) (accepted at close);
+> [0030](../adrs/0030-scene-target-size-hot-path-hook.md) (accepted at close — records the
+> `Scene` widening Phase 2 required, see the correction under *What this plan does NOT do*); extends
 > [0018](../adrs/0018-engine-wide-scene-compositing.md); coordinates with
 > [0024](../adrs/0024-cross-preset-transitions.md); sequenced after Plans
 > [0020](0020-shared-palette-system.md) and [0025](0025-full-composite-coverage.md).
+
+## Outcome (closed 2026-07-25)
+
+All three phases landed — `0e3b84a` (ink stage), `5f79dc6` (surface-sized trail field), `5daddfa`
+(curated preset + authoring docs). Mode 4 verdict: **no blockers, two majors, four minors**.
+Verified at review: `cargo nextest run -p lmv-core` 90/90 green including `golden`, `sanity`,
+`animation` and `reactivity` over the new `attractor_ink` preset; `clippy -p lmv-core --all-targets
+-D warnings` clean; the Phase 1 passthrough claim holds — `core/tests/golden/attractor.png` is the
+only baseline the plan touched, so the `fragment_field`/`swarm` restore after the over-broad
+`LMV_BLESS=1` run was correct.
+
+Two majors, both routed rather than reworked here:
+
+- **The `Scene`-trait widening Phase 2 needed was undocumented.** Ruled correct on the merits (no
+  other channel carries the target size), but it is the third widening and the first on the hot path,
+  after ADR-0007 bounded the trait at one optional method and ADR-0021 called `set_palette` "the
+  second and last". Recorded in [ADR-0030](../adrs/0030-scene-target-size-hot-path-hook.md), which
+  replaces the countdown with three conditions a future widening must meet.
+- **A size change rebuilds the attractor's entire GPU resource block inside `render`** — shaders and
+  pipelines included, once per frame of a live window drag, clearing the trail each time. Routed to
+  [Plan 0029](0029-attractor-resize-cost-and-ink-followups.md) along with the four minors (no
+  behavioral test for the ink stage; the per-axis cap that breaks aspect on ultrawide; docs
+  recommending a partial `ink_amount` that greys the paper; the hook's name and doc claiming it
+  receives the *surface* size when it receives the *target* size).
+
+Version bumped 0.12.0 -> 0.13.0 at close (feature plan, ADR-0005).
 
 ## TL;DR
 
@@ -157,7 +185,12 @@ struct InkUniform {
   possible follow-up.
 - **No engine-wide internal-resolution system** — Phase 2 sharpens the *attractor* only; the shared
   RD/trails/kaleidoscope fixed-resolution limitation is left as a separate future decision.
-- **No C ABI or `Scene`-trait change**, no new dependency, no new DSP.
+- **No C ABI change**, no new dependency, no new DSP. *(Corrected at close: this line originally
+  also claimed no `Scene`-trait change, which contradicted Phase 2's own ask for a resolution
+  "derived from the surface size" — scenes are `Box<dyn Scene>` and `Scene::render` receives only
+  `aspect`, so no existing channel carried the size. Phase 2 added a default-no-op per-frame
+  target-size hook with the user's approval; the decision and its budget are recorded in
+  [ADR-0030](../adrs/0030-scene-target-size-hot-path-hook.md). The C ABI is genuinely untouched.)*
 - **Does not re-open Plans 0020/0025** — it sequences after them and composes with their output.
 
 ## Followups (after this lands)
