@@ -38,10 +38,10 @@ pub enum SystemKind {
 }
 
 impl SystemKind {
-    /// How many variants [`SystemKind`] has. Kept honest by
-    /// [`variant_roster_reminder`]: a new variant fails the build there until this
-    /// is bumped, and the length of [`ALL`](SystemKind::ALL) is typed from it, so
-    /// bumping it without rostering the variant does not compile either.
+    /// How many variants [`SystemKind`] has. Kept honest by the private
+    /// `variant_roster_reminder` below: a new variant fails the build there until
+    /// this is bumped, and the length of [`ALL`](SystemKind::ALL) is typed from
+    /// it, so bumping it without rostering the variant does not compile either.
     pub const VARIANT_COUNT: usize = 7;
 
     /// **The** roster of built-in systems — every [`SystemKind`], in the order the

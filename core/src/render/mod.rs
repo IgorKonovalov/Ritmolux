@@ -19,7 +19,9 @@
 
 // The four compositing stages stay crate-private to the outside world, but are
 // `pub(crate)` so `preset::schema` can read their global `PARAMS` vocabularies
-// for the load-time typo check (ADR-0020).
+// for the load-time typo check (ADR-0020). `post` holds the three that run after
+// the scene, behind one trait and in one fixed-order chain (ADR-0031); the
+// background is a pre-pass and stays outside it.
 pub(crate) mod background;
 pub mod capture;
 pub mod context;
@@ -835,7 +837,8 @@ impl Renderer {
     /// intake boundary — the source-agnostic rule); each produced
     /// [`AnalysisFrame`] drives one rendered frame, so `at_frames` indexes the
     /// hop sequence (frame 0 is the first hop). Deterministic: scenes are rebuilt
-    /// to their seed and the clock resets to 0, exactly like [`capture_preset`].
+    /// to their seed and the clock resets to 0, exactly like
+    /// [`capture_preset`](Self::capture_preset).
     ///
     /// This is in-memory PCM only — no file, decoder, or OS audio-source code,
     /// just like a frontend pushing samples. Returned images are in `at_frames`
