@@ -17,6 +17,7 @@
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
+use lmv_core::render::scenes::particles::trail_grid_size;
 use lmv_core::render::{
     CaptureImage, HeadlessOptions, RenderError, Renderer,
     metrics::{coverage, frame_diff, quadrant_spread},
@@ -181,4 +182,97 @@ fn attractor_contract() {
         zoomed.rgba, zoomed_again.rgba,
         "zoomed attractor capture is not reproducible"
     );
+}
+
+// --- Trail grid sizing (Plan 0029 Phase 2) -------------------------------------
+//
+// `trail_grid_size` is pure, so these need no GPU and never skip. They mirror the
+// scene's private policy constants; a change there must change these deliberately.
+
+/// The per-axis cap (`TRAIL_MAX_W`/`TRAIL_MAX_H`) and quantization step
+/// (`TRAIL_GRID_STEP`) the scene applies.
+const CAP_W: u32 = 2560;
+const CAP_H: u32 = 1440;
+const STEP: u32 = 256;
+
+/// Above the cap the grid must keep the *target's* proportions. The previous
+/// per-axis clamp squashed a 3440x1440 ultrawide target to 2560x1440 — a 16:9
+/// grid that the aspect-ignoring present then stretched back to 21:9, so the
+/// attractor's shape changed discontinuously as the window crossed 2560 wide.
+#[test]
+fn trail_grid_preserves_aspect_above_the_cap() {
+    let (w, h) = trail_grid_size(3440, 1440);
+    assert_eq!(w, CAP_W, "the binding axis should sit at its cap");
+    assert!(
+        h < CAP_H,
+        "3440x1440 was squashed back to 16:9 ({w}x{h}) — the per-axis clamp is back"
+    );
+    // The aspect-exact height for this width, before quantization. Rounding each
+    // axis up to STEP is what collapses nearby sizes onto one grid, so the aspect
+    // it can hold is exact to within that step - but no worse.
+    let exact_h = w as f32 * 1440.0 / 3440.0;
+    assert!(
+        (h as f32 - exact_h).abs() < STEP as f32,
+        "grid {w}x{h} is more than one {STEP} px step off the aspect-exact height {exact_h:.1}"
+    );
+
+    // The same property on the other binding axis (a portrait/ultra-tall target).
+    let (tw, th) = trail_grid_size(1080, 3440);
+    assert_eq!(th, CAP_H, "the binding axis should sit at its cap");
+    let exact_w = th as f32 * 1080.0 / 3440.0;
+    assert!(
+        (tw as f32 - exact_w).abs() < STEP as f32,
+        "grid {tw}x{th} is more than one {STEP} px step off the aspect-exact width {exact_w:.1}"
+    );
+}
+
+/// Quantization: two nearby target sizes must request the *same* grid, so a live
+/// window drag re-allocates the field a handful of times instead of once a frame.
+#[test]
+fn trail_grid_quantizes_nearby_targets_to_one_grid() {
+    assert_eq!(
+        trail_grid_size(1920, 1080),
+        trail_grid_size(1900, 1070),
+        "a 20 px drag changed the grid — quantization is not in effect"
+    );
+    // ...and it is quantization, not a constant: a target a step away differs.
+    assert_ne!(
+        trail_grid_size(1920, 1080),
+        trail_grid_size(1280, 720),
+        "every target maps to the same grid — the size is not following the target"
+    );
+    // Both axes land on a step multiple below the cap.
+    let (w, h) = trail_grid_size(1920, 1080);
+    assert_eq!(
+        (w % STEP, h % STEP),
+        (0, 0),
+        "grid {w}x{h} is not quantized"
+    );
+}
+
+/// Cap and floor: no axis ever exceeds its cap, and none is ever 0 (a zero-extent
+/// texture is a wgpu validation error, and the window can report 0 while minimized).
+#[test]
+fn trail_grid_never_exceeds_the_cap_or_collapses() {
+    for (w, h) in [
+        (0, 0),
+        (1, 1),
+        (0, 1080),
+        (128, 128),
+        (1920, 1080),
+        (2560, 1440),
+        (3440, 1440),
+        (7680, 4320),
+        (u32::MAX, u32::MAX),
+    ] {
+        let (gw, gh) = trail_grid_size(w, h);
+        assert!(
+            gw >= 1 && gh >= 1,
+            "{w}x{h} produced an empty grid {gw}x{gh}"
+        );
+        assert!(
+            gw <= CAP_W && gh <= CAP_H,
+            "{w}x{h} produced {gw}x{gh}, past the {CAP_W}x{CAP_H} cap"
+        );
+    }
 }

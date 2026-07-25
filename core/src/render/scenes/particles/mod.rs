@@ -29,10 +29,13 @@
 //!
 //! The accumulation field is sized to the render target and capped (Plan 0027
 //! Phase 2, [`TRAIL_MAX_W`]/[`TRAIL_MAX_H`]) rather than fixed at 640x360, so the
-//! present is 1:1 up to the cap instead of a soft upscale on a 1080p+ display.
-//! It is still presented stretched (aspect ignored, as the reaction-diffusion
-//! present does), which is now a no-op below the cap because the field already
-//! carries the target's aspect.
+//! present is close to 1:1 up to the cap instead of a soft upscale on a 1080p+
+//! display. It is still presented stretched (aspect ignored, as the
+//! reaction-diffusion present does), which is why the cap scales both axes by one
+//! factor: [`trail_grid_size`] keeps the target's aspect at every size, so the
+//! stretch stays a near-no-op. That size is quantized to [`TRAIL_GRID_STEP`], so
+//! a live window drag re-allocates the field a handful of times rather than once
+//! per frame.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). Steps + draws every displayed frame.
@@ -64,26 +67,76 @@ const SEED: u64 = 0x4C4D_5641_5454_5231; // "LMVATTR1"
 /// The grid used to be a fixed 640x360 that was upscaled with linear filtering
 /// onto the surface, and that stretch — not the glow — is what read as soft on a
 /// 1080p+ display. It is now sized from the render target (see
-/// [`Scene::resize`](crate::render::scenes::Scene::resize)) and clamped per axis
-/// to this cap, so a 1080p window gets a 1:1 grid and a 4K/ultrawide one degrades
-/// to a mild, uniform upscale instead of an unbounded fill bill.
+/// [`Scene::resize`](crate::render::scenes::Scene::resize)) and scaled under this
+/// cap, so a 1080p window gets a ~1:1 grid and a 4K/ultrawide one degrades to a
+/// mild, uniform upscale instead of an unbounded fill bill.
 ///
 /// **The cap is the NFR §1 tradeoff.** Every frame pays a decay pass plus a
 /// 50k-instance additive draw over the grid, so fill scales with its area: 1440p
 /// is ~16x the old 640x360. 2560x1440 is the chosen ceiling — enough headroom for
 /// a high-DPI display while keeping the worst case bounded on the iGPU floor. The
-/// headless captures run well under it, so they size 1:1 and stay deterministic
-/// at a fixed `--size` (NFR §6).
+/// headless captures run well under it, so they size close to 1:1 and stay
+/// deterministic at a fixed `--size` (NFR §6).
 const TRAIL_MAX_W: u32 = 2560;
 const TRAIL_MAX_H: u32 = 1440;
 /// Grid size before the first [`Scene::resize`](crate::render::scenes::Scene::resize)
 /// — only reached if a scene renders without one, which the renderer never does.
 const TRAIL_FALLBACK_W: u32 = 1280;
 const TRAIL_FALLBACK_H: u32 = 720;
+/// Quantization step for each axis of the trail grid (Plan 0029 Phase 2).
+///
+/// A grid change costs a texture-pair reallocation, four bind groups, and a trail
+/// restart, and the standalone forwards **every** `WindowEvent::Resized` — so at
+/// pixel granularity a live drag pays that hundreds of times across a screen. At
+/// 256 px per axis a full-screen-width drag crosses a handful of grids and every
+/// other frame of it costs a compare. Coarser wastes fill (a 1920-wide window
+/// already takes a 2048-wide grid); finer defeats the point. Purely a constant —
+/// no wall clock, so a fixed-size headless capture stays byte-reproducible.
+const TRAIL_GRID_STEP: u32 = 256;
 
-/// Clamp a render-target size to the trail grid's cap, never below 1x1.
-fn trail_grid_size(width: u32, height: u32) -> (u32, u32) {
-    (width.clamp(1, TRAIL_MAX_W), height.clamp(1, TRAIL_MAX_H))
+/// The trail accumulation grid for a render target of `width` x `height`.
+///
+/// Pure, and the whole size policy in one place (Plan 0029 Phase 2): scale both
+/// axes by a **single** factor when either exceeds its cap, then round each up to
+/// [`TRAIL_GRID_STEP`]. The single factor is what keeps an ultrawide target's
+/// proportions — clamping each axis independently turned a 3440x1440 target into
+/// a 16:9 grid that the aspect-ignoring present then stretched back to 21:9, so
+/// the attractor's shape changed discontinuously as the window crossed 2560 wide.
+/// Never returns 0 on either axis, and never exceeds either cap.
+pub fn trail_grid_size(width: u32, height: u32) -> (u32, u32) {
+    let w = width.max(1);
+    let h = height.max(1);
+    // Integer ratio compare + derivation (u64 so the products can't overflow), so
+    // the grid is an exact function of the target size on every target (NFR §6).
+    let (fit_w, fit_h) = if w <= TRAIL_MAX_W && h <= TRAIL_MAX_H {
+        (w, h)
+    } else if u64::from(w) * u64::from(TRAIL_MAX_H) >= u64::from(h) * u64::from(TRAIL_MAX_W) {
+        // Width binds: pin it to the cap and derive the height from the target's
+        // aspect (<= TRAIL_MAX_H by the branch condition).
+        (
+            TRAIL_MAX_W,
+            (u64::from(h) * u64::from(TRAIL_MAX_W) / u64::from(w)) as u32,
+        )
+    } else {
+        (
+            (u64::from(w) * u64::from(TRAIL_MAX_H) / u64::from(h)) as u32,
+            TRAIL_MAX_H,
+        )
+    };
+    (
+        quantize_axis(fit_w, TRAIL_MAX_W),
+        quantize_axis(fit_h, TRAIL_MAX_H),
+    )
+}
+
+/// Round one axis up to the next [`TRAIL_GRID_STEP`] multiple, floored at one
+/// step (never 0) and clamped back under `cap` — the round-up can overshoot on an
+/// axis sitting at the cap.
+fn quantize_axis(px: u32, cap: u32) -> u32 {
+    px.div_ceil(TRAIL_GRID_STEP)
+        .max(1)
+        .saturating_mul(TRAIL_GRID_STEP)
+        .min(cap)
 }
 
 /// Wall-clock duration of one attractor iteration (Plan 0014 injected `dt`). The
