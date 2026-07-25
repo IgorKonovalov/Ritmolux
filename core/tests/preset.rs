@@ -162,6 +162,81 @@ fn constants_do_not_swallow_unknown_identifiers() {
     assert!(compile("pi(1)").is_err());
 }
 
+/// Plan 0019 Phase 2: comparisons yield a clean `1.0`/`0.0` at the lowest
+/// precedence tier, so they compose with arithmetic.
+#[test]
+fn comparisons_yield_one_or_zero_and_compose_with_arithmetic() {
+    let zero = Variables::default();
+    let eval = |src: &str| compile(src).expect("compiles").eval(&zero);
+
+    assert_eq!(eval("1 + (2 > 1)"), 2.0);
+    assert_eq!(eval("1 + (1 > 2)"), 1.0);
+
+    // Each operator on both sides of its boundary, plus the boundary itself.
+    assert_eq!(eval("2 > 2"), 0.0);
+    assert_eq!(eval("2 < 2"), 0.0);
+    assert_eq!(eval("2 >= 2"), 1.0);
+    assert_eq!(eval("2 <= 2"), 1.0);
+    assert_eq!(eval("3 >= 2"), 1.0);
+    assert_eq!(eval("1 >= 2"), 0.0);
+    assert_eq!(eval("1 <= 2"), 1.0);
+    assert_eq!(eval("3 <= 2"), 0.0);
+    assert_eq!(eval("2 == 2"), 1.0);
+    assert_eq!(eval("2 == 3"), 0.0);
+    assert_eq!(eval("2 != 3"), 1.0);
+    assert_eq!(eval("2 != 2"), 0.0);
+
+    // Lowest precedence: the sums on each side bind tighter than the compare.
+    assert_eq!(eval("1 + 1 > 3 - 2"), 1.0);
+    // The and/or/not idiom the grammar ships instead of boolean operators.
+    let v = vars(0.8, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0);
+    let both = compile("min(bass > 0.5, mid > 0.5)").expect("compiles");
+    let either = compile("max(bass > 0.5, mid > 0.5)").expect("compiles");
+    let not_bass = compile("1 - (bass > 0.5)").expect("compiles");
+    assert_eq!(both.eval(&v), 0.0);
+    assert_eq!(either.eval(&v), 1.0);
+    assert_eq!(not_bass.eval(&v), 0.0);
+}
+
+/// `select` returns the branch its condition picks — and evaluates **only**
+/// that branch, so an untaken `NaN` cannot poison the result.
+#[test]
+fn select_picks_a_branch_without_evaluating_the_other() {
+    let e = compile("select(bass > 0.5, 10, 20)").expect("compiles");
+    assert_eq!(e.eval(&vars(0.9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), 10.0);
+    assert_eq!(e.eval(&vars(0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), 20.0);
+    // Exactly at the threshold the condition is false (`>`, not `>=`).
+    assert_eq!(e.eval(&vars(0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), 20.0);
+
+    let zero = Variables::default();
+    let eval = |src: &str| compile(src).expect("compiles").eval(&zero);
+
+    // The lazy-branch guarantee: the untaken sqrt(-1) never runs, so the
+    // result is 5, not NaN. A lerp-based blend could not do this.
+    assert_eq!(eval("select(0, sqrt(0 - 1), 5)"), 5.0);
+    assert_eq!(eval("select(1, 5, sqrt(0 - 1))"), 5.0);
+
+    // Truthiness is `!= 0.0`, so any nonzero condition takes the first branch.
+    assert_eq!(eval("select(0 - 3, 1, 2)"), 1.0);
+    assert_eq!(eval("select(0, 1, 2)"), 2.0);
+}
+
+/// A bare `!` or `=` is an explicit tokenizer error — they are only valid as
+/// the two-char comparison forms.
+#[test]
+fn bare_bang_or_equals_is_a_compile_error() {
+    for bad in ["1 ! 2", "1 = 2", "!bass", "bass = 1"] {
+        assert!(
+            compile(bad).is_err(),
+            "expression {bad:?} should fail to compile"
+        );
+    }
+    // A trailing bare `>` tokenizes as Gt and then fails in the parser (an
+    // unexpected end), rather than panicking on the missing lookahead char.
+    assert!(compile("bass >").is_err());
+    assert!(compile("bass >=").is_err());
+}
+
 #[test]
 fn beat_coerces_as_a_zero_one_value() {
     let e = compile("1.0 + beat * 0.5").expect("compiles");

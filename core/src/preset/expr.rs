@@ -4,15 +4,21 @@
 //! Grammar (recursive descent, standard precedence):
 //!
 //! ```text
-//! expr   := term  (('+' | '-') term)*
+//! expr   := sum  (('>' | '<' | '>=' | '<=' | '==' | '!=') sum)*
+//! sum    := term  (('+' | '-') term)*
 //! term   := unary (('*' | '/') unary)*
 //! unary  := ('-' | '+')? primary
 //! primary:= number | ident | ident '(' expr (',' expr)* ')' | '(' expr ')'
 //! ```
 //!
+//! Comparisons sit at the lowest precedence and yield `1.0`/`0.0`, so they
+//! compose with arithmetic (`0.4 + (bass > 0.2) * 0.3`) and with `select`.
+//! There are no boolean operators: with clean `0/1` results, `min` is and,
+//! `max` is or, and `1 - c` is not.
+//!
 //! Variables: `bass mid treb onset beat bar time`. Constants: `pi tau`.
-//! Functions: `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep`.
-//! Compilation is fallible (a malformed expression is
+//! Functions: `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep
+//! select`. Compilation is fallible (a malformed expression is
 //! rejected with a surfaced error, never a panic); evaluation of a compiled
 //! expression is total, panic-free, and allocation-free — it walks a prebuilt
 //! AST returning `f32`, so it is safe to call every frame (hot-path §5).
@@ -73,6 +79,7 @@ enum Func {
     Clamp,
     Lerp,
     Smoothstep,
+    Select,
 }
 
 impl Func {
@@ -90,6 +97,7 @@ impl Func {
             "clamp" => Func::Clamp,
             "lerp" => Func::Lerp,
             "smoothstep" => Func::Smoothstep,
+            "select" => Func::Select,
             _ => return None,
         })
     }
@@ -98,7 +106,7 @@ impl Func {
         match self {
             Func::Sin | Func::Cos | Func::Abs | Func::Floor | Func::Sqrt => 1,
             Func::Min | Func::Max | Func::Pow | Func::Mod => 2,
-            Func::Clamp | Func::Lerp | Func::Smoothstep => 3,
+            Func::Clamp | Func::Lerp | Func::Smoothstep | Func::Select => 3,
         }
     }
 }
@@ -119,6 +127,12 @@ enum BinOp {
     Sub,
     Mul,
     Div,
+    Gt,
+    Lt,
+    Ge,
+    Le,
+    Eq,
+    Ne,
 }
 
 /// Compiled AST node. `Box`/`Box<[_]>` allocate once at compile; evaluation
@@ -148,6 +162,16 @@ impl Node {
                     // f32 division by zero yields inf/NaN, not a panic — fine
                     // for a display value; expressions never divide silently.
                     BinOp::Div => a / b,
+                    // Comparisons yield a clean 0.0/1.0 so they compose with
+                    // arithmetic. A NaN operand compares false everywhere, so
+                    // the result is 0.0 (except `!=`, where NaN != NaN is true
+                    // by IEEE rule) — total either way.
+                    BinOp::Gt => f32::from(a > b),
+                    BinOp::Lt => f32::from(a < b),
+                    BinOp::Ge => f32::from(a >= b),
+                    BinOp::Le => f32::from(a <= b),
+                    BinOp::Eq => f32::from(a == b),
+                    BinOp::Ne => f32::from(a != b),
                 }
             }
             // Arity is guaranteed by the parser; slice patterns keep this
@@ -189,6 +213,16 @@ impl Node {
                     #[allow(clippy::manual_clamp)]
                     let t = ((x.eval(vars) - e0) / (e1 - e0)).max(0.0).min(1.0);
                     t * t * (3.0 - 2.0 * t)
+                }
+                // Only the taken branch is evaluated, so the untaken one cannot
+                // poison the result: `select(x >= 0, sqrt(x), 0)` is safe in a
+                // way a `lerp` blend of both branches would not be.
+                (Func::Select, [cond, x, y]) => {
+                    if cond.eval(vars) != 0.0 {
+                        x.eval(vars)
+                    } else {
+                        y.eval(vars)
+                    }
                 }
                 _ => 0.0,
             },
@@ -277,6 +311,12 @@ enum Token {
     LParen,
     RParen,
     Comma,
+    Gt,
+    Lt,
+    Ge,
+    Le,
+    EqEq,
+    NotEq,
 }
 
 impl Token {
@@ -291,7 +331,25 @@ impl Token {
             Token::LParen => "(".into(),
             Token::RParen => ")".into(),
             Token::Comma => ",".into(),
+            Token::Gt => ">".into(),
+            Token::Lt => "<".into(),
+            Token::Ge => ">=".into(),
+            Token::Le => "<=".into(),
+            Token::EqEq => "==".into(),
+            Token::NotEq => "!=".into(),
         }
+    }
+}
+
+/// Consume a following `=` (the second half of `>=`/`<=`/`==`/`!=`), reporting
+/// whether one was there. At end of input `peek` yields `None`, so a trailing
+/// bare `>` tokenizes as `Gt` instead of reading past the end.
+fn eat_eq(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> bool {
+    if matches!(chars.peek(), Some('=')) {
+        chars.next();
+        true
+    } else {
+        false
     }
 }
 
@@ -330,6 +388,35 @@ fn tokenize(src: &str) -> Result<Vec<Token>, ExprError> {
             ',' => {
                 chars.next();
                 tokens.push(Token::Comma);
+            }
+            // Two-char comparison forms need one char of lookahead. A trailing
+            // bare `>`/`<` at end of input still tokenizes (peek yields None).
+            '>' => {
+                chars.next();
+                let tok = if eat_eq(&mut chars) {
+                    Token::Ge
+                } else {
+                    Token::Gt
+                };
+                tokens.push(tok);
+            }
+            '<' => {
+                chars.next();
+                let tok = if eat_eq(&mut chars) {
+                    Token::Le
+                } else {
+                    Token::Lt
+                };
+                tokens.push(tok);
+            }
+            // `=` and `!` are only valid as the two-char forms; a bare one is an
+            // explicit error rather than a silently-dropped character.
+            '=' | '!' => {
+                chars.next();
+                if !eat_eq(&mut chars) {
+                    return Err(ExprError::UnexpectedChar(c));
+                }
+                tokens.push(if c == '=' { Token::EqEq } else { Token::NotEq });
             }
             c if c.is_ascii_digit() || c == '.' => {
                 let mut num = String::new();
@@ -380,7 +467,28 @@ impl Parser {
         tok
     }
 
+    /// The lowest-precedence tier: comparisons over sums. Left-associative, so
+    /// a chained `a > b > c` parses as `(a > b) > c` — legal but rarely
+    /// intended (the docs discourage it).
     fn parse_expr(&mut self) -> Result<Node, ExprError> {
+        let mut left = self.parse_sum()?;
+        while let Some(op) = match self.peek() {
+            Some(Token::Gt) => Some(BinOp::Gt),
+            Some(Token::Lt) => Some(BinOp::Lt),
+            Some(Token::Ge) => Some(BinOp::Ge),
+            Some(Token::Le) => Some(BinOp::Le),
+            Some(Token::EqEq) => Some(BinOp::Eq),
+            Some(Token::NotEq) => Some(BinOp::Ne),
+            _ => None,
+        } {
+            self.pos += 1;
+            let right = self.parse_sum()?;
+            left = Node::Bin(op, Box::new(left), Box::new(right));
+        }
+        Ok(left)
+    }
+
+    fn parse_sum(&mut self) -> Result<Node, ExprError> {
         let mut left = self.parse_term()?;
         while let Some(op) = match self.peek() {
             Some(Token::Plus) => Some(BinOp::Add),
