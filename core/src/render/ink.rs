@@ -1,25 +1,36 @@
-//! Final-stage duotone "ink" tone-remap (ADR-0028, Plan 0027 Phase 1): the last
-//! stage of the ADR-0018 fixed composite. It reads the fully composited frame's
-//! per-pixel luminance as an *ink density* `d` and outputs `mix(paper, ink, d)`
-//! between two preset-configurable colors — so a bright additive stroke (density
-//! high) becomes ink and the dark base (density low) becomes paper. That is a
-//! *darkening* step the additive scene pipelines can't express, which is what
-//! "black on white" needs: it is the inverse of the compositing model, not a
-//! color choice reachable by any scene param.
+//! Final-stage duotone "ink" tone-remap (ADR-0028, Plan 0027 Phase 1): the
+//! **terminal engine post-pass** of the ADR-0018 fixed composite. It reads the
+//! fully composited frame's per-pixel luminance as an *ink density* `d` and
+//! outputs `mix(paper, ink, d)` between two preset-configurable colors — so a
+//! bright additive stroke (density high) becomes ink and the dark base (density
+//! low) becomes paper. That is a *darkening* step the additive scene pipelines
+//! can't express, which is what "black on white" needs: it is the inverse of the
+//! compositing model, not a color choice reachable by any scene param.
 //!
 //! Default `paper = white`, `ink = black`, so turning the stage on with the
 //! default colors is a pure black-on-white invert; colored poles (cream + indigo,
 //! sepia, ...) are the same operation with different `paper_*`/`ink_*`. The stage
-//! is driven by the `ink_*` named params, offered to it like every other stage's
-//! by the [`PostChain`](super::post::PostChain), so there is **no `Scene`-trait
-//! change and the C ABI is untouched**. It is the chain's **last** stage (after
-//! the scene, trails, kaleidoscope, and — when Plan 0023 lands, per ADR-0024 —
-//! the transition blend), before the text/overlay passes, so the HUD is never
-//! inverted.
+//! is driven by the `ink_*` named params, offered to it by the renderer after the
+//! background and the chain, so there is **no `Scene`-trait change and the C ABI
+//! is untouched**.
+//!
+//! # Why it is not a [`PostStage`](super::post::PostStage)
+//!
+//! Ink is **engine-wide**, not per-preset (ADR-0032): trails and kaleidoscope are
+//! a look a preset composes, and both sides of a cross-preset dissolve legitimately
+//! have their own — but there is exactly **one** finished frame to remap. So ink
+//! sits outside the [`PostChain`](super::post::PostChain), driven directly by the
+//! renderer, symmetric with [`Background`](super::background::Background) as the
+//! pre-pass. That placement is what lets Plan 0023's two-input transition blend run
+//! *before* it without widening the one-input `PostStage` trait, and it makes
+//! ADR-0028's "ink remaps the blended frame" ordering structural rather than a rule
+//! the chain has to honor. It still runs before the text/overlay passes, so the HUD
+//! is never inverted.
 //!
 //! **Passthrough and unbuilt when `ink_amount <= 0`** — every shipped preset until
-//! one opts in — so the chain skips this stage entirely: no offscreen, no
-//! pipeline, golden/determinism unchanged, the NFR §1 iGPU floor pays nothing,
+//! one opts in — so the renderer skips the pass entirely and the chain folds
+//! straight to the surface: no offscreen, no pipeline, golden/determinism
+//! unchanged, the NFR §1 iGPU floor pays nothing,
 //! and (like the background/trails/kaleidoscope passes) the DX12 WARP software
 //! adapter never sees a coexisting remap pipeline during the no-ink captures. When
 //! active the pipeline builds lazily and is dropped on the capture scene-rebuild.
@@ -38,8 +49,6 @@
     clippy::panic,
     clippy::unreachable
 )]
-
-use super::post::PostStage;
 
 /// `ink_amount` default — 0 = off (passthrough), so an unbound preset is
 /// unaffected and the stage is never built.
@@ -269,10 +278,11 @@ impl Resources {
     }
 }
 
-/// The engine final-stage duotone tone-remap — a [`PostStage`], not a
-/// [`Scene`](super::scenes::Scene): it consumes an already-rendered frame rather
-/// than an `AnalysisFrame`. Driven by the `ink_*` named params, it remaps the
-/// fully composited frame before present (ADR-0028).
+/// The engine terminal duotone tone-remap — neither a
+/// [`Scene`](super::scenes::Scene) nor a [`PostStage`](super::post::PostStage): it
+/// consumes an already-rendered frame rather than an `AnalysisFrame`, and it is
+/// engine-wide rather than per-preset (module docs, ADR-0032). Driven by the
+/// `ink_*` named params, it remaps the finished frame before present (ADR-0028).
 pub struct Ink {
     device: wgpu::Device,
     surface_format: wgpu::TextureFormat,
@@ -314,15 +324,9 @@ impl Ink {
             ink_bright: DEFAULT_INK_BRIGHT,
         }
     }
-}
-
-impl PostStage for Ink {
-    fn name(&self) -> &'static str {
-        "ink"
-    }
 
     /// Reset the remap params to their defaults (each frame, before routing).
-    fn reset_params(&mut self) {
+    pub fn reset_params(&mut self) {
         self.amount = DEFAULT_AMOUNT;
         self.paper_hue = DEFAULT_PAPER_HUE;
         self.paper_sat = DEFAULT_PAPER_SAT;
@@ -333,9 +337,10 @@ impl PostStage for Ink {
     }
 
     /// Apply one named parameter, returning whether it was an `ink_*`/`paper_*`
-    /// param. The chain falls through to the scene only when every stage returns
-    /// `false`, so the namespaces never collide.
-    fn set_param(&mut self, name: &str, value: f32) -> bool {
+    /// param. The renderer offers a name to the background, then the chain, then
+    /// here, and falls through to the scene only when all three return `false` —
+    /// the namespaces are disjoint, so no param reaches more than one owner.
+    pub fn set_param(&mut self, name: &str, value: f32) -> bool {
         match name {
             "ink_amount" => self.amount = value,
             "paper_hue" => self.paper_hue = value,
@@ -350,28 +355,20 @@ impl PostStage for Ink {
     }
 
     /// Whether the remap is active this frame (`ink_amount > 0`; at or below zero
-    /// it is the identity passthrough and the stage is skipped).
-    fn active(&self) -> bool {
+    /// it is the identity passthrough and the pass is skipped entirely).
+    pub fn active(&self) -> bool {
         self.amount > 0.0 && self.amount.is_finite()
     }
 
-    /// `None` — the remap is a 1:1 per-pixel operation, so its input is sized from
-    /// the surface rather than a fixed internal grid (module docs). This is what
-    /// removes ink's special case from the renderer: the chain reads the surface
-    /// size here like any other stage reads its own.
-    fn internal_size(&self) -> Option<(u32, u32)> {
-        None
-    }
-
     /// Build the surface-sized resources if needed (or rebuild on a size change)
-    /// and return the offscreen view the composite renders into this frame. `None`
-    /// only if the resources are absent (never, after the build). Called when
-    /// [`active`](PostStage::active).
-    fn begin(
-        &mut self,
-        _encoder: &mut wgpu::CommandEncoder,
-        surface: (u32, u32),
-    ) -> Option<wgpu::TextureView> {
+    /// and return the offscreen view **everything upstream renders into** this
+    /// frame — the chain's destination, or the transition blend's output while a
+    /// dissolve runs. The remap is a 1:1 per-pixel operation, so this input is
+    /// always sized from the surface rather than a fixed internal grid (module
+    /// docs). `None` only if the resources are absent (never, after the build);
+    /// the caller then falls back to the surface. Call when
+    /// [`active`](Self::active).
+    pub fn begin(&mut self, surface: (u32, u32)) -> Option<wgpu::TextureView> {
         let (width, height) = (surface.0.max(1), surface.1.max(1));
         let stale = self
             .res
@@ -388,11 +385,11 @@ impl PostStage for Ink {
         self.res.as_ref().map(|res| res.src_view.clone())
     }
 
-    /// Remap the input offscreen into `out`. Ink is always the last active stage
-    /// (ADR-0028), so `out` is the surface. Called after the composite has rendered
-    /// into the [`begin`](PostStage::begin) target, when
-    /// [`active`](PostStage::active).
-    fn resolve(
+    /// Remap the input offscreen into `out`. Ink is the terminal pass (ADR-0028 /
+    /// ADR-0032), so `out` is the surface. Called after everything upstream has
+    /// rendered into the [`begin`](Self::begin) target, when
+    /// [`active`](Self::active).
+    pub fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
@@ -436,7 +433,7 @@ impl PostStage for Ink {
     /// Drop the lazily-built resources — used on the capture scene-rebuild so a
     /// stale remap pipeline never lingers to mis-render the next capture's scene on
     /// the WARP adapter (module docs).
-    fn reset_resources(&mut self) {
+    pub fn reset_resources(&mut self) {
         self.res = None;
     }
 }

@@ -1,15 +1,14 @@
-//! The post-composite chain (ADR-0031): the stages that run *after* the scene has
-//! drawn, folded down to the surface in one fixed order.
+//! The post-composite chain (ADR-0031, membership revised by ADR-0032): the
+//! **per-preset look** stages that run *after* the scene has drawn, folded down to
+//! a caller-supplied destination in one fixed order.
 //!
 //! # The order, and the skip rule
 //!
-//! The chain is `trails -> kaleidoscope -> ink -> surface`, built as a
-//! compile-time constant array in [`PostChain::new`]. That order is ADR-0018's
-//! product decision (feedback before the screen-space fold) plus ADR-0028's
-//! ink-is-last rule (the tone remap reads the *fully* composited frame). This is
-//! **not** a render graph and **not** a registration point: nothing reorders the
-//! array at runtime, and the only way to add a stage is to add an array element
-//! and a [`PostStage`] impl.
+//! The chain is `trails -> kaleidoscope -> destination`, built as a compile-time
+//! constant array in [`PostChain::new`]. That order is ADR-0018's product decision
+//! (feedback before the screen-space fold). This is **not** a render graph and
+//! **not** a registration point: nothing reorders the array at runtime, and the
+//! only way to add a stage is to add an array element and a [`PostStage`] impl.
 //!
 //! Every stage is individually **skippable**: a stage whose amount param is off
 //! reports [`active`](PostStage::active) `false` and is dropped from the frame
@@ -17,14 +16,33 @@
 //! function of the active flags alone:
 //!
 //! - the background + scene render into the **first active** stage's input, or
-//!   straight into the surface when no stage is active;
+//!   straight into the destination when no stage is active;
 //! - each active stage folds into the **next active** stage's input;
-//! - the **last active** stage folds into the surface.
+//! - the **last active** stage folds into the destination.
 //!
-//! Skipped stages are simply not in that walk, so trails folds directly into ink
-//! when the kaleidoscope is off. That adjacency is [`route`] — a **pure function**
-//! over the flags, with no GPU and no `self`, so the contract is unit-testable
-//! (the tests at the bottom of this file are the composite's first real coverage).
+//! Skipped stages are simply not in that walk, so trails folds directly into the
+//! destination when the kaleidoscope is off. That adjacency is [`route`] — a
+//! **pure function** over the flags, with no GPU and no `self`, so the contract is
+//! unit-testable (the tests at the bottom of this file are the composite's first
+//! real coverage).
+//!
+//! # What is *not* in the chain
+//!
+//! ADR-0032's rule: **a pass a preset composes belongs in the chain; a pass that
+//! applies to the finished frame belongs outside it.** So the renderer drives three
+//! passes directly, around this chain:
+//!
+//! - [`Background`](super::background::Background) — the pre-pass that owns the
+//!   frame clear and never folds a rendered frame down;
+//! - the transition blend (Plan 0023) — two inputs, which a one-input
+//!   [`PostStage::begin`] cannot express, and live only while a dissolve runs;
+//! - [`Ink`](super::ink::Ink) — the engine-wide tone remap, which reads the one
+//!   finished frame (ADR-0028) and so must run *after* the blend of two per-preset
+//!   composites.
+//!
+//! That is why `begin`/`resolve` take their **destination** as an argument rather
+//! than assuming the surface: it is the blend's input while a transition runs,
+//! ink's input when ink is active, and the surface otherwise.
 //!
 //! # Why a value, not a set of fields
 //!
@@ -34,10 +52,6 @@
 //! lazily, on first use. That is what Plan 0023's dual-live transition path needs:
 //! two fully-composited frames in one frame, each side with its own feedback
 //! history.
-//!
-//! [`Background`](super::background::Background) is deliberately **not** a
-//! `PostStage`: it is a pre-pass that owns the frame clear and never folds a
-//! rendered frame down, so the renderer drives it directly, ahead of the chain.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). The chain routes and encodes every displayed frame.
@@ -49,20 +63,18 @@
     clippy::unreachable
 )]
 
-use super::ink::Ink;
 use super::kaleidoscope::Kaleidoscope;
 use super::trails::Trails;
 
 /// How many stages the chain holds. A compile-time constant, not a capacity:
 /// [`PostChain::new`] fills the array exactly, and [`Routing`] is sized from it so
 /// a frame's routing costs no allocation.
-pub(crate) const STAGE_COUNT: usize = 3;
+pub(crate) const STAGE_COUNT: usize = 2;
 
 /// Composite positions, in chain order. Named so the routing tests and the
-/// ADR-0018/0028 ordering claims read as assertions rather than magic indices.
+/// ADR-0018 ordering claim read as assertions rather than magic indices.
 pub(crate) const TRAILS: usize = 0;
 pub(crate) const KALEIDOSCOPE: usize = 1;
-pub(crate) const INK: usize = 2;
 
 /// One skippable post-composite stage (ADR-0031). Crate-internal on purpose: the
 /// composite order is fixed in [`PostChain::new`], not registered, and no preset
@@ -85,8 +97,8 @@ pub(crate) trait PostStage {
     fn active(&self) -> bool;
 
     /// This stage's fixed internal resolution, or `None` to size from the surface.
-    /// The trails and kaleidoscope stages run at a fixed 16:9 grid; the ink remap
-    /// is 1:1 per-pixel, so it must match the surface.
+    /// The trails and kaleidoscope stages both run at a fixed 16:9 grid; the
+    /// `None` arm is what a surface-sized stage would use.
     fn internal_size(&self) -> Option<(u32, u32)>;
 
     /// Lazily build this stage's resources and return the view its **input**
@@ -136,14 +148,15 @@ impl Routing {
         self.steps.get(..self.len).unwrap_or(&[])
     }
 
-    /// The stage the background + scene render into, or `None` for the surface
-    /// (no stage is active this frame).
+    /// The stage the background + scene render into, or `None` for the caller's
+    /// destination (no stage is active this frame).
     pub(crate) fn scene_stage(&self) -> Option<usize> {
         self.active_stages().first().copied()
     }
 
-    /// Each active stage paired with what it folds into: the next active stage,
-    /// or `None` for the surface. The last active stage always yields `None`.
+    /// Each active stage paired with what it folds into: the next active stage, or
+    /// `None` for the caller's destination. The last active stage always yields
+    /// `None`.
     pub(crate) fn edges(&self) -> impl Iterator<Item = (usize, Option<usize>)> + '_ {
         let steps = self.active_stages();
         steps
@@ -177,7 +190,7 @@ pub(crate) fn route(active: &[bool]) -> Routing {
 }
 
 /// Where the background + the scene render this frame — the first active stage's
-/// input, or the surface when the chain is entirely skipped.
+/// input, or the caller's destination when the chain is entirely skipped.
 pub(crate) struct SceneTarget {
     /// The view to draw into. Owned (an Arc bump) — see [`PostStage::begin`].
     pub view: wgpu::TextureView,
@@ -190,7 +203,7 @@ pub(crate) struct SceneTarget {
     pub size: (u32, u32),
 }
 
-/// The post-composite stages in ADR-0018/0028 order — see the module docs.
+/// The per-preset post-composite stages in ADR-0018 order — see the module docs.
 ///
 /// An owned value rather than a set of `Renderer` fields, so a second instance
 /// with fully independent GPU state is constructible (Plan 0023 dual-live).
@@ -206,17 +219,18 @@ impl PostChain {
     /// device share no resources.
     pub(crate) fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
         let chain = Self {
-            // ADR-0018's feedback-then-fold order, with ADR-0028's ink last.
+            // ADR-0018's feedback-then-fold order. Ink is deliberately absent:
+            // it is an engine-wide pass on the finished frame, so it runs after
+            // the chain (and after the transition blend) — ADR-0032.
             stages: [
                 Box::new(Trails::new(device, surface_format)),
                 Box::new(Kaleidoscope::new(device, surface_format)),
-                Box::new(Ink::new(device, surface_format)),
             ],
         };
         // The array above *is* the composite order, and the routing contract is
-        // written against the positions below (module docs, ADR-0018/0028). Assert
-        // they still hold, so reordering the literal trips here in a debug/test
-        // build instead of silently re-composing every preset.
+        // written against the positions below (module docs, ADR-0018). Assert they
+        // still hold, so reordering the literal trips here in a debug/test build
+        // instead of silently re-composing every preset.
         debug_assert_eq!(
             chain.stage_names().get(TRAILS).copied(),
             Some("trails"),
@@ -226,11 +240,6 @@ impl PostChain {
             chain.stage_names().get(KALEIDOSCOPE).copied(),
             Some("kaleidoscope"),
             "the screen-space fold runs after the feedback (ADR-0018)"
-        );
-        debug_assert_eq!(
-            chain.stage_names().get(INK).copied(),
-            Some("ink"),
-            "the tone remap reads the fully composited frame, so it is last (ADR-0028)"
         );
         chain
     }
@@ -273,12 +282,16 @@ impl PostChain {
     }
 
     /// The target the background + scene render into this frame. Builds the first
-    /// active stage's resources if needed; falls back to the surface when the
+    /// active stage's resources if needed; falls back to `destination` when the
     /// chain is skipped entirely.
+    ///
+    /// `destination` is **whatever runs next downstream**, not the surface
+    /// specifically (ADR-0032): the transition blend's input while a dissolve runs,
+    /// ink's input when ink is active, the surface otherwise.
     pub(crate) fn begin(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
-        surface_view: &wgpu::TextureView,
+        destination: &wgpu::TextureView,
         surface: (u32, u32),
     ) -> SceneTarget {
         let routing = self.routing();
@@ -288,7 +301,7 @@ impl PostChain {
             let view = stage.begin(encoder, surface)?;
             Some((view, size))
         });
-        let (view, size) = first.unwrap_or_else(|| (surface_view.clone(), surface));
+        let (view, size) = first.unwrap_or_else(|| (destination.clone(), surface));
         SceneTarget {
             view,
             aspect: size.0 as f32 / size.1.max(1) as f32,
@@ -296,25 +309,25 @@ impl PostChain {
         }
     }
 
-    /// Fold the chain down to the surface: each active stage resolves into the
-    /// next active stage's input, the last into `surface_view`. Returns the total
-    /// draw calls the stages encoded. Call once, after the scene has rendered into
-    /// [`begin`](Self::begin)'s target.
+    /// Fold the chain down: each active stage resolves into the next active
+    /// stage's input, the last into `destination` (the same caller-supplied view
+    /// [`begin`](Self::begin) took). Returns the total draw calls the stages
+    /// encoded. Call once, after the scene has rendered into `begin`'s target.
     pub(crate) fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        surface_view: &wgpu::TextureView,
+        destination: &wgpu::TextureView,
         surface: (u32, u32),
     ) -> u32 {
         let routing = self.routing();
         let mut draw_calls = 0;
-        for (stage, destination) in routing.edges() {
+        for (stage, next_stage) in routing.edges() {
             // The next active stage's input, built lazily right before anything
-            // renders into it; the surface when this is the last active stage.
-            let out = destination
+            // renders into it; `destination` when this is the last active stage.
+            let out = next_stage
                 .and_then(|next| self.stages.get_mut(next)?.begin(encoder, surface))
-                .unwrap_or_else(|| surface_view.clone());
+                .unwrap_or_else(|| destination.clone());
             if let Some(stage) = self.stages.get_mut(stage) {
                 draw_calls += stage.resolve(queue, encoder, &out);
             }
@@ -343,7 +356,7 @@ mod tests {
     // Test asserts index, expect and panic freely; this is not the render path.
     #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
-    use super::{INK, KALEIDOSCOPE, PostChain, Routing, STAGE_COUNT, TRAILS, route};
+    use super::{KALEIDOSCOPE, PostChain, Routing, STAGE_COUNT, TRAILS, route};
     use crate::render::background::Background;
     use crate::render::capture::{self, CaptureImage};
     use crate::render::context::{RenderContext, RenderError};
@@ -366,24 +379,25 @@ mod tests {
             .collect()
     }
 
-    /// No stage active: the scene renders straight to the surface and nothing
+    /// No stage active: the scene renders straight to the destination and nothing
     /// folds. The passthrough every shipped preset takes today.
     #[test]
     fn no_active_stage_renders_the_scene_to_the_surface() {
-        let routing = route(&[false, false, false]);
+        let routing = route(&[false, false]);
         assert_eq!(
             routing.scene_stage(),
             None,
-            "with no stage active the scene targets the surface"
+            "with no stage active the scene targets the destination"
         );
         assert!(edges(&routing).is_empty(), "nothing to fold down");
     }
 
-    /// One stage active: the scene renders into it and it resolves to the surface.
-    /// Asserted for each position, since the ladder had a separate branch per stage.
+    /// One stage active: the scene renders into it and it resolves to the
+    /// destination. Asserted for each position, since the ladder this replaced had
+    /// a separate branch per stage.
     #[test]
     fn a_single_active_stage_resolves_to_the_surface() {
-        for stage in [TRAILS, KALEIDOSCOPE, INK] {
+        for stage in [TRAILS, KALEIDOSCOPE] {
             let mut active = [false; STAGE_COUNT];
             active[stage] = true;
             let routing = route(&active);
@@ -395,39 +409,40 @@ mod tests {
             assert_eq!(
                 edges(&routing),
                 vec![(stage, None)],
-                "the only active stage folds into the surface"
+                "the only active stage folds into the destination"
             );
         }
     }
 
-    /// All three active: trails folds into the kaleidoscope's input, the
-    /// kaleidoscope into ink's, ink into the surface — ADR-0018's order with
-    /// ADR-0028's ink last.
+    /// Both active: trails folds into the kaleidoscope's input and the
+    /// kaleidoscope into the destination — ADR-0018's feedback-then-fold order.
     #[test]
-    fn all_three_active_fold_in_composite_order() {
-        let routing = route(&[true, true, true]);
+    fn all_active_stages_fold_in_composite_order() {
+        let routing = route(&[true, true]);
         assert_eq!(routing.scene_stage(), Some(TRAILS));
         assert_eq!(
             edges(&routing),
-            vec![
-                (TRAILS, Some(KALEIDOSCOPE)),
-                (KALEIDOSCOPE, Some(INK)),
-                (INK, None),
-            ]
+            vec![(TRAILS, Some(KALEIDOSCOPE)), (KALEIDOSCOPE, None)]
         );
     }
 
-    /// A skipped middle stage is not a gap: trails folds **directly** into ink's
-    /// input. This is the case the ladder answered with a nested `else if`.
+    /// A skipped stage leaves no hole in the walk: with trails off, the scene
+    /// renders **directly** into the kaleidoscope's input and the walk starts
+    /// there, rather than the array position surviving as an empty slot. This is
+    /// [`route`]'s compaction — the mechanism the old ladder answered with a nested
+    /// `else if`, and the one a third stage would exercise at more positions.
     #[test]
-    fn a_skipped_middle_stage_folds_straight_past_it() {
-        let routing = route(&[true, false, true]);
-        assert_eq!(routing.scene_stage(), Some(TRAILS));
-        assert_eq!(edges(&routing), vec![(TRAILS, Some(INK)), (INK, None)]);
+    fn a_skipped_stage_compacts_the_walk() {
+        let routing = route(&[false, true]);
+        assert_eq!(routing.scene_stage(), Some(KALEIDOSCOPE));
+        assert_eq!(routing.active_stages(), &[KALEIDOSCOPE]);
+        assert_eq!(edges(&routing), vec![(KALEIDOSCOPE, None)]);
     }
 
     /// The invariant, over every combination: whatever runs, the last active stage
-    /// targets the surface — the composite always terminates there exactly once.
+    /// targets the caller's destination — the composite always terminates there
+    /// exactly once. (The destination is the surface only when neither the
+    /// transition blend nor ink is downstream; ADR-0032 made it an argument.)
     #[test]
     fn the_last_active_stage_always_targets_the_surface() {
         for active in all_combinations() {
@@ -438,40 +453,32 @@ mod tests {
                 assert_eq!(
                     edges.last().map(|(_, dest)| *dest),
                     Some(None),
-                    "the last active stage folds into the surface for {active:?}"
+                    "the last active stage folds into the destination for {active:?}"
                 );
             }
             assert!(
                 to_surface <= 1,
-                "at most one stage may target the surface for {active:?}"
+                "at most one stage may target the destination for {active:?}"
             );
         }
     }
 
-    /// The invariant ADR-0028 names: ink, when active, is always the final stage —
-    /// it reads the *fully* composited frame, so nothing may fold after it.
+    /// ADR-0032: ink is **not** in the chain. The ordering the retired
+    /// `ink_when_active_is_always_last` asserted is structural now — ink is not in
+    /// the thing that composes, so no flag combination can schedule it before a
+    /// per-preset stage. This pins the membership itself instead.
     #[test]
-    fn ink_when_active_is_always_last() {
-        for active in all_combinations() {
-            let routing = route(&active);
-            if !active[INK] {
-                assert!(
-                    !routing.active_stages().contains(&INK),
-                    "an inactive ink stage never runs for {active:?}"
-                );
-                continue;
-            }
-            assert_eq!(
-                routing.active_stages().last().copied(),
-                Some(INK),
-                "ink is the last active stage for {active:?}"
-            );
-            assert_eq!(
-                edges(&routing).last().map(|(stage, dest)| (*stage, *dest)),
-                Some((INK, None)),
-                "ink folds into the surface for {active:?}"
-            );
-        }
+    fn the_chain_holds_only_the_per_preset_look_stages() {
+        let Some(ctx) = headless_context_or_skip() else {
+            return;
+        };
+        let chain = PostChain::new(&ctx.device, ctx.surface_format());
+        assert_eq!(
+            chain.stage_names(),
+            ["trails", "kaleidoscope"],
+            "the chain is exactly the per-preset look; the engine-wide passes \
+             (background, blend, ink) are driven outside it (ADR-0032)"
+        );
     }
 
     /// Offscreen size for the GPU independence test — small enough to read back

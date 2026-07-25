@@ -1,6 +1,6 @@
 # 0023 — Cross-preset visual transitions: MilkDrop-style dissolves between presets
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-07-23
 > **Revised:** 2026-07-25 (against the landed `PostChain`; see "Revision note" below)
 > **Owner skill(s):** dev
