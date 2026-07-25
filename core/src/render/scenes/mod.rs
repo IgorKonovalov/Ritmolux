@@ -21,7 +21,11 @@ pub mod particles;
 pub mod reaction_diffusion;
 pub mod swarm;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::dsp::AnalysisFrame;
+use crate::preset::SystemKind;
 use crate::render::palette::Palette;
 
 /// The `dt` (seconds) the C ABI's legacy `lmv_render` and the headless capture
@@ -120,38 +124,63 @@ pub(crate) trait Scene {
     }
 }
 
-/// The registry: every built-in scene, in cycling order. All scenes are
-/// created up front so switching mid-show is an index bump, never a hitch.
+/// The registry: every built-in scene, **keyed by the [`SystemKind`] it drives**,
+/// in [`SystemKind::ALL`] order. All scenes are created up front so switching
+/// mid-show is a lookup, never a hitch.
+///
+/// The keying is the point: the renderer addresses a scene by the kind its preset
+/// names, so a scene can no longer silently end up in the wrong slot. Nothing
+/// here is positional — reordering [`SystemKind::ALL`] reorders construction and
+/// nothing else.
 pub(crate) fn create_all(
     device: &wgpu::Device,
     surface_format: wgpu::TextureFormat,
-) -> Vec<Box<dyn Scene>> {
+) -> Vec<(SystemKind, Box<dyn Scene>)> {
     // One shared line renderer for every line scene (ADR-0007: "one line
     // renderer"). A single instanced-quad pipeline + segment buffer, borrowed by
     // whichever line scene is active — only one draws per frame. (Two separate
     // line pipelines with byte-identical vertex layouts also mis-render on the
     // DX12 WARP software adapter the capture tests use; one renderer avoids it.)
-    let line_renderer = std::rc::Rc::new(std::cell::RefCell::new(lines::LineRenderer::new(
+    let line_renderer = Rc::new(RefCell::new(lines::LineRenderer::new(
         device,
         surface_format,
         lines::MAX_SEGMENTS,
         "lines",
     )));
-    vec![
-        Box::new(fragment_field::FragmentFieldScene::new(
+    SystemKind::ALL
+        .iter()
+        .map(|&kind| (kind, create(kind, device, surface_format, &line_renderer)))
+        .collect()
+}
+
+/// Build the scene a [`SystemKind`] drives.
+///
+/// An **exhaustive** `match` with no wildcard arm — the same guard the golden
+/// drift fixtures use: adding a variant fails to compile here until its scene is
+/// constructed, so a new system cannot ship unbuilt or wired to the wrong scene.
+fn create(
+    kind: SystemKind,
+    device: &wgpu::Device,
+    surface_format: wgpu::TextureFormat,
+    line_renderer: &Rc<RefCell<lines::LineRenderer>>,
+) -> Box<dyn Scene> {
+    match kind {
+        SystemKind::FragmentField => Box::new(fragment_field::FragmentFieldScene::new(
             device,
             surface_format,
         )),
-        Box::new(swarm::SwarmScene::new(device, surface_format)),
-        Box::new(lines::ParametricCurveScene::new(line_renderer.clone())),
-        Box::new(lines::LSystemScene::new(line_renderer.clone())),
-        Box::new(lines::StarPatternScene::new(line_renderer.clone())),
-        Box::new(reaction_diffusion::ReactionDiffusionScene::new(
+        SystemKind::Swarm => Box::new(swarm::SwarmScene::new(device, surface_format)),
+        SystemKind::ParametricCurve => {
+            Box::new(lines::ParametricCurveScene::new(line_renderer.clone()))
+        }
+        SystemKind::LSystem => Box::new(lines::LSystemScene::new(line_renderer.clone())),
+        SystemKind::StarPattern => Box::new(lines::StarPatternScene::new(line_renderer.clone())),
+        SystemKind::ReactionDiffusion => Box::new(reaction_diffusion::ReactionDiffusionScene::new(
             device,
             surface_format,
         )),
-        Box::new(particles::AttractorScene::new(device, surface_format)),
-    ]
+        SystemKind::Attractor => Box::new(particles::AttractorScene::new(device, surface_format)),
+    }
 }
 
 /// Tiny deterministic RNG (splitmix64) so visual randomness is explicitly
@@ -179,5 +208,69 @@ impl SeededRng {
     /// Uniform in [lo, hi).
     pub(crate) fn range(&mut self, lo: f32, hi: f32) -> f32 {
         lo + (hi - lo) * self.next_f32()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! The scene-keying contract (Plan 0030 Phase 3). Test asserts panic freely;
+    //! this is not the render path.
+    #![allow(clippy::panic)]
+
+    use super::create_all;
+    use crate::preset::SystemKind;
+    use crate::render::context::{RenderContext, RenderError};
+
+    /// The scene each system is *supposed* to drive, written independently of the
+    /// factory so the two can disagree. This is the mapping the old magic-index
+    /// `system_slot` lookup could never assert: it named a position, and nothing
+    /// checked the position held the right scene.
+    fn expected_scene_name(system: SystemKind) -> &'static str {
+        match system {
+            SystemKind::FragmentField => "fragment field",
+            SystemKind::Swarm => "swarm",
+            SystemKind::ParametricCurve => "parametric curve",
+            SystemKind::LSystem => "l-system",
+            SystemKind::StarPattern => "star pattern",
+            SystemKind::ReactionDiffusion => "reaction diffusion",
+            SystemKind::Attractor => "attractor",
+        }
+    }
+
+    /// Every `SystemKind::ALL` entry builds the scene that kind is supposed to
+    /// drive, and the roster covers exactly the roster — so transposing two
+    /// factory arms, which used to silently point every preset of one system at
+    /// another's scene, now fails here.
+    ///
+    /// Needs a GPU adapter to build the scenes, so it skips on runners without
+    /// one (ADR-0016).
+    #[test]
+    fn every_kind_builds_the_scene_it_drives() {
+        let ctx = match RenderContext::new_headless(64, 64, true) {
+            Ok(ctx) => ctx,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+            Err(e) => panic!("headless context build failed: {e}"),
+        };
+
+        let scenes = create_all(&ctx.device, ctx.surface_format());
+
+        let kinds: Vec<SystemKind> = scenes.iter().map(|(kind, _)| *kind).collect();
+        assert_eq!(
+            kinds,
+            SystemKind::ALL.to_vec(),
+            "the roster is exactly SystemKind::ALL, in its order"
+        );
+
+        for (kind, scene) in &scenes {
+            assert_eq!(
+                scene.name(),
+                expected_scene_name(*kind),
+                "system {} must drive its own scene",
+                kind.as_str()
+            );
+        }
     }
 }

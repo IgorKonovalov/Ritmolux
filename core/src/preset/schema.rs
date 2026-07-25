@@ -38,6 +38,29 @@ pub enum SystemKind {
 }
 
 impl SystemKind {
+    /// How many variants [`SystemKind`] has. Kept honest by
+    /// [`variant_roster_reminder`]: a new variant fails the build there until this
+    /// is bumped, and the length of [`ALL`](SystemKind::ALL) is typed from it, so
+    /// bumping it without rostering the variant does not compile either.
+    pub const VARIANT_COUNT: usize = 7;
+
+    /// **The** roster of built-in systems — every [`SystemKind`], in the order the
+    /// engine builds their scenes. The single place the variant list lives: the
+    /// scene factory (`render::scenes::create_all`) and the golden drift guard
+    /// both iterate this rather than keeping lists of their own.
+    ///
+    /// Typed `[SystemKind; VARIANT_COUNT]`, so a roster that has drifted from the
+    /// variant count is a compile error, not a test failure.
+    pub const ALL: [SystemKind; Self::VARIANT_COUNT] = [
+        SystemKind::FragmentField,
+        SystemKind::Swarm,
+        SystemKind::ParametricCurve,
+        SystemKind::LSystem,
+        SystemKind::StarPattern,
+        SystemKind::ReactionDiffusion,
+        SystemKind::Attractor,
+    ];
+
     /// Parse a canonical system name (as written in a preset's `system = "..."`
     /// field) into its [`SystemKind`], or `None` if unknown. The inverse of
     /// [`SystemKind::as_str`]; together they are the single source for the
@@ -89,6 +112,24 @@ impl SystemKind {
             SystemKind::ReactionDiffusion => scenes::reaction_diffusion::PARAMS,
             SystemKind::Attractor => scenes::particles::PARAMS,
         }
+    }
+}
+
+/// Compile-time reminder (never called): adding a [`SystemKind`] variant makes
+/// this exhaustive match non-exhaustive and fails the build, prompting the dev to
+/// bump [`SystemKind::VARIANT_COUNT`] and add the variant to
+/// [`SystemKind::ALL`] — which in turn forces a scene into the exhaustive factory
+/// in `render::scenes` and a fixture into the golden drift guard.
+#[allow(dead_code)]
+fn variant_roster_reminder(system: SystemKind) {
+    match system {
+        SystemKind::FragmentField
+        | SystemKind::Swarm
+        | SystemKind::ParametricCurve
+        | SystemKind::LSystem
+        | SystemKind::StarPattern
+        | SystemKind::ReactionDiffusion
+        | SystemKind::Attractor => {}
     }
 }
 
