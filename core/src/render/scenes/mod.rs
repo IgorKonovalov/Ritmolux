@@ -50,6 +50,20 @@ pub(crate) trait Scene {
         aspect: f32,
     );
 
+    /// The surface size changed (or is being seen for the first time). A scene
+    /// that accumulates into an internal offscreen field sizes that field from
+    /// here so it is not upscaled from a fixed grid onto a larger surface; every
+    /// other scene ignores it. Called each frame before [`render`](Self::render)
+    /// with the current surface dimensions, so an implementor **must** compare
+    /// against what it already built and do nothing when unchanged — this is a
+    /// hot-path call, not a resize event.
+    ///
+    /// Default no-op, in the same spirit as [`advance`](Self::advance): the
+    /// renderer already holds width/height in `draw_frame`, and `Scene` is a
+    /// `dyn` trait, so this is the only channel that reaches a scene with the
+    /// surface size (Plan 0027 Phase 2).
+    fn resize(&mut self, _width: u32, _height: u32) {}
+
     /// Advance simulation state by `dt` real seconds (Plan 0014 Phase 2). The
     /// renderer injects the elapsed time each frame; a feedback scene steps its
     /// fixed-timestep accumulator here and a CPU-integrated scene (the swarm)

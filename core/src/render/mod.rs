@@ -684,25 +684,35 @@ impl Renderer {
         // Where background + scene render: the first active post-stage's input, or
         // the surface when no post-stage is active. The ink offscreen is
         // surface-sized, so the scene renders into it at the surface aspect.
-        let (scene_target, scene_aspect) = if trailing {
+        // `scene_size` is the pixel size of whatever the scene actually draws
+        // into — the first active post-stage's fixed internal grid, or the
+        // surface. A scene that sizes an internal field off it (the attractor,
+        // Plan 0027 Phase 2) then matches its target instead of supersampling
+        // into a smaller offscreen.
+        let (scene_target, scene_aspect, scene_size) = if trailing {
             match trails.begin(encoder) {
-                Some(v) => (v, Trails::aspect()),
-                None => (view, surface_aspect),
+                Some(v) => (v, Trails::aspect(), Trails::size()),
+                None => (view, surface_aspect, (width, height)),
             }
         } else if kaleidoing {
             match kaleido.begin(encoder) {
-                Some(v) => (v, Kaleidoscope::aspect()),
-                None => (view, surface_aspect),
+                Some(v) => (v, Kaleidoscope::aspect(), Kaleidoscope::size()),
+                None => (view, surface_aspect, (width, height)),
             }
         } else if inking {
             match ink.begin(encoder, width, height) {
-                Some(v) => (v, surface_aspect),
-                None => (view, surface_aspect),
+                Some(v) => (v, surface_aspect, (width, height)),
+                None => (view, surface_aspect, (width, height)),
             }
         } else {
-            (view, surface_aspect)
+            (view, surface_aspect, (width, height))
         };
         background.render(&ctx.queue, encoder, scene_target);
+        // Hand the scene its target size before it renders: a scene with an
+        // internal accumulation field (the attractor's trails) sizes that field
+        // from here rather than a fixed grid (Plan 0027 Phase 2). A no-op for
+        // every other scene, and a cheap unchanged-compare for the attractor.
+        scene.resize(scene_size.0, scene_size.1);
         scene.render(&ctx.queue, encoder, scene_target, scene_aspect);
 
         // Each post-stage resolves its input into the next active stage's input,

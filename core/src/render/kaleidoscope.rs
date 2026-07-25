@@ -294,6 +294,12 @@ impl Kaleidoscope {
         KALEIDO_W as f32 / KALEIDO_H as f32
     }
 
+    /// The fixed internal fold-input size — reported to a scene that sizes an
+    /// internal field, as [`Trails::size`](super::trails::Trails::size) is.
+    pub fn size() -> (u32, u32) {
+        (KALEIDO_W, KALEIDO_H)
+    }
+
     /// Build the resources if needed and return the offscreen view the composite
     /// (background + scene, or the trails output) renders into this frame. `None`
     /// only if the resources are absent (never, after the build) — the caller
