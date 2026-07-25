@@ -146,6 +146,39 @@ flowchart TB
   `presets/README.md` guidance on partial `ink_amount` agrees with the warning already in
   `presets/attractor_ink.toml`; `cargo nextest run -p lmv-core` green.
 
+### Phase 5 — Project at the target's aspect, not the grid's
+- **Owner skill:** dev
+- **What:** Phase 2 fixed the ultrawide squash and introduced a worse one everywhere else, found in
+  the Mode 4 review. The draw uniform's `aspect` is the *grid* ratio
+  (`particles/mod.rs:1477`), but the present pass stretches the field over the whole target with
+  aspect ignored, so a point at field NDC `x` lands at target NDC `x` — the field's own aspect
+  cancels out and the only value that produces correct proportions is the **target's**. That was
+  invisible while the grid equalled the target below the cap; quantization broke the equality, so a
+  1920x1080 window (the standalone's default, `standalone/src/main.rs:660`) takes a 2048x1280 grid
+  and draws the attractor **11% too wide**, a 512x384 window takes 512x512 and draws it 33% too
+  wide, and a 3 px change from 2880 to 2877 wide flips between 0% and 12%. The correct value is
+  already in hand and discarded: `render`'s signature is `_aspect: f32`
+  (`particles/mod.rs:1359`) and `draw_frame` computes `scene_aspect` from the same branch that
+  computes `scene_size` (`render/mod.rs:692-709`).
+
+  Use `aspect`. Point sprites follow for free — the quad half-extent is `psize` in world units
+  divided by the same `aspect`, so round-on-screen holds under the same condition. `trail_grid_size`
+  stays exactly as Phase 2 left it: its single-scale-factor cap stops being the aspect mechanism and
+  becomes what it should have been, a way to keep the field's sampling near-isotropic.
+- **Files touched:** `core/src/render/scenes/particles/mod.rs` (the draw uniform's `aspect` and the
+  comment at `1474-1476`, which currently reads as the justification for the defect; the module doc
+  at `29-38`, which claims the stretch "stays a near-no-op" because `trail_grid_size` keeps the
+  target's aspect — untrue under quantization, and the reason for the wrong call site),
+  `core/tests/attractor.rs` (the assertion below).
+- **Done when:** a headless test renders the same attractor preset at two **non-square** targets that
+  share a target aspect but land on different grid aspects — 1024x768 (grid 1024x768, already step
+  multiples, aspect-exact) and 512x384 (grid 512x512, aspect 1.0) — and asserts the normalized
+  bounding box of the lit region has the **same** width:height ratio in both, within ~10%. Today
+  those two ratios differ by ~33%, so the test fails before the fix and passes after. Skips cleanly
+  with no adapter per ADR-0016. The 128x128 golden baseline is **unchanged** — a square capture takes
+  a square grid, which is exactly why the whole suite was blind to this (every `core/tests/*.rs`
+  capture is 96x96 or 128x128).
+
 ## Data shapes
 
 ```rust
@@ -179,6 +212,11 @@ struct FieldResources {
 - **The golden luminance assertion needs a margin, not an exact value.** The ink-on frame's mean
   luminance depends on how much of the fixture is lit; assert a decisive gap (ink-on mean well above
   ink-off mean) rather than a tuned constant that re-drifts.
+- **Phase 5's bounding-box tolerance is a margin, not a constant.** Quantization changes how much the
+  field is up/downsampled, so the glow's outer falloff crosses the lit-pixel threshold at slightly
+  different radii between the two captures. ~10% is loose enough for that and tight enough to fail on
+  the ~33% shape error it is there to catch; if it proves flaky, widen the threshold on the lit mask
+  before widening the tolerance.
 - **No wall clock anywhere in this.** The rejected debounce would have needed one; quantization and
   the resource split are both pure, so determinism (NFR §6) is untouched and headless captures at a
   fixed `--size` stay byte-reproducible.
