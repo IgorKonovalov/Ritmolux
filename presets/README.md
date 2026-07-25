@@ -51,8 +51,18 @@ are ignored. The params after the first `·` are the shared **view transform** a
 line-**mirror** controls (Plan 0018) — see [Engine-wide controls](#engine-wide-controls-plan-0018);
 the trailing group on the four shader-coloured scenes is the shared **palette**
 colour surface (Plan 0020) — see [Colour — the palette surface](#colour--the-palette-surface-plan-0020).
-Every system additionally accepts the engine-stage params `bg_*`, `trails`, and
-`kaleido_*` documented there.
+Every system additionally accepts the engine-stage params `bg_*`, `trails`,
+`kaleido_*`, and the final `ink_*`/`paper_*` remap documented there.
+
+### Attractor detail sharpness (Plan 0027)
+
+The `attractor` accumulates its trails into an offscreen grid sized to what it is
+drawing into, up to 2560x1440 — so at 1080p the filaments are pixel-crisp rather
+than upscaled from the old fixed 640x360 grid. Nothing to bind: it follows the
+window. Two authoring consequences: `size` now reads *finer* at high resolution
+(a value tuned when the field was soft may look thin — nudge it up), and turning
+`trails` or `kaleido_*` on drops the accumulation to those stages' fixed 1280x720
+grid, so a preset that stacks them is softer than the attractor alone.
 
 ### Line-art parameter notes (Plan 0010)
 
@@ -132,6 +142,53 @@ Folds the finished frame into `kaleido_order` mirrored wedges before present.
 `kaleido_order < 2` (default) is a passthrough; `>= 2` folds (clamped to 48).
 `kaleido_angle` (radians) rotates the fold — ride it on `time` for a turning
 kaleidoscope. Works on any scene.
+
+### Ink on paper — `ink_amount`, `paper_*`, `ink_*` (Plan 0027)
+
+The **last** stage before present (ADR-0028). It reads each pixel's brightness as
+an *ink density* and repaints the frame between two colours: **paper** where the
+frame was dark, **ink** where it was bright. The defaults are white paper and
+black ink, so `ink_amount = "1"` alone gives **black marks on a white field** —
+the "ink on paper" look. Works on **any** scene, sparse or full-screen, because it
+operates on the finished frame rather than a scene's pipeline.
+
+This is the one control that reaches a *dark-on-light* look at all. The scenes draw
+**additively** (a lightening model), so a dark stroke colour adds nothing and a
+light `bg_bright` just washes the strokes out — no combination of `bg_*` and
+palette colours gets there. The remap inverts the tone at the end instead.
+
+| Param | Default | Meaning |
+|---|---|---|
+| `ink_amount` | `0` | `0` = off (passthrough). `1` = full remap. Bindable — try `"beat"` to snap into ink on each hit, or `"0.5"` to sit half-way between glow and ink. |
+| `paper_hue` | `0` | Paper (dark-input) hue, into the HSV wheel; wraps, so it can sweep freely. |
+| `paper_sat` | `0` | Paper saturation. `0` = neutral. |
+| `paper_bright` | `1` | Paper brightness. `1` = white. |
+| `ink_hue` | `0` | Ink (bright-input) hue. |
+| `ink_sat` | `0` | Ink saturation. `0` = neutral. |
+| `ink_bright` | `0` | Ink brightness. `0` = black. |
+
+```toml
+[params]
+ink_amount   = "1"          # black on white - nothing else needed
+
+# ...or a colored duotone: indigo ink on cream paper
+paper_hue    = "0.11"
+paper_sat    = "0.13"
+paper_bright = "0.97"
+ink_hue      = "0.68"
+ink_sat      = "0.85"
+ink_bright   = "0.30"
+```
+
+**In ink mode a scene's palette collapses to the duotone.** The remap keys on
+*luminance* only, so the hue a `[palette]` produced is discarded and every pixel
+lands somewhere on the paper→ink ramp. The palette still matters — it shapes which
+parts of the frame are bright, and therefore which parts become ink — but the two
+colours you actually see come from `paper_*`/`ink_*`. Reach for `saturation` and
+the palette to sculpt *contrast* in an ink preset, not colour.
+
+The HUD, the browse overlay, and the diagnostics overlay draw *after* this stage,
+so they are never inverted.
 
 ## Colour — the palette surface (Plan 0020)
 
