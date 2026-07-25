@@ -132,6 +132,10 @@ See **[`docs/presets.md`](docs/presets.md)** for the full authoring guide and
 library reference: every shipped preset, the two systems and their parameters,
 the expression variables/functions, and where the files live on disk.
 
+Set **`LMV_PRESET_DIR`** to run against a custom preset folder instead of the
+per-user one — `LMV_PRESET_DIR=./presets cargo run -p standalone` points the app
+at the repo's own presets and hot-reloads an edit within ~150 ms.
+
 ## Visual QA / headless capture
 
 Scenes can be rendered **with no window** — the core draws into an offscreen
@@ -145,6 +149,10 @@ The synthetic `--signal` path (e.g. `--signal click:120`) needs no audio file.
 For the `--audio` path, drop a **16-bit PCM WAV** into `assets/test/` — that
 folder is gitignored, so test audio is added manually and never committed (use
 your own or a royalty-free / CC0 clip).
+
+`shot` reads the same library the app does — including `LMV_PRESET_DIR` — and
+takes `--presets <dir>` / `--preset-file <path>` to capture a specific folder or
+file, so an edit can be shot without touching the seeded copy.
 
 See **[`docs/capturing.md`](docs/capturing.md)** for the runnable commands.
 

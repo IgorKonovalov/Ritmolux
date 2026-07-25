@@ -151,6 +151,13 @@ uint32_t g_debug_flags = LMV_DEBUG_OFF;
 // %APPDATA%\light-music-visualizer\presets - the exact path the standalone
 // seeds and watches, so both frontends share one library. Empty on failure
 // (the core then keeps its embedded defaults).
+//
+// This is the last independent copy of that path. The two Rust frontends (the
+// app and the shot CLI) now share one resolver in standalone/src/lib.rs, which
+// also honors the LMV_PRESET_DIR override (ADR-0014); this shim deliberately
+// does not - it resolves the same %APPDATA% directory on its own, and honoring
+// the override here is a documented followup. Keep the literals below in step
+// with APP_DIR_NAME in that module.
 std::string resolve_preset_dir_utf8() {
     const DWORD need = GetEnvironmentVariableW(L"APPDATA", nullptr, 0);
     if (need == 0) return {};

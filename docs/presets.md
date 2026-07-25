@@ -311,13 +311,43 @@ why "edit once, both frontends see it" works.
    | macOS | `~/Library/Application Support/light-music-visualizer/presets` |
    | Linux/other | `$XDG_DATA_HOME/light-music-visualizer/presets` (or `~/.local/share/light-music-visualizer/presets`) |
 
+### A custom preset folder: `LMV_PRESET_DIR`
+
+Set the **`LMV_PRESET_DIR`** environment variable to point the Rust frontends at
+any folder instead of the per-user directory above
+([ADR-0014](adrs/0014-preset-dir-override-for-dev-iteration.md)):
+
+```bash
+# Windows (PowerShell) — run the app against a folder you keep elsewhere
+$env:LMV_PRESET_DIR = "D:\my-presets"; cargo run -p standalone --release
+
+# macOS / Linux
+LMV_PRESET_DIR=~/my-presets cargo run -p standalone --release
+```
+
+- Both the **standalone app** and the headless **`shot` CLI** honor it, through
+  one shared resolver — they cannot disagree about which folder an edit lands in.
+- The override folder is **yours**: the app loads and hot-reloads it but **never
+  seeds** the curated set into it. An empty or missing folder simply falls back
+  to the presets compiled into the binary, exactly like an empty per-user
+  directory.
+- Only the presets move. `diagnostics.log` and `config.toml` stay under the
+  per-user app directory.
+- The **foobar2000 plugin does not read it** — the C++ side keeps resolving the
+  per-user directory (a followup, not a current behavior).
+
+Pointing it at the repo's own `presets/` is the preset-authoring loop: edit a
+version-controlled `.toml` and the running window follows within ~150 ms, with no
+rebuild. See [`capturing.md`](capturing.md#editing-presets-live) for that loop and
+for `shot`'s equivalent `--presets` / `--preset-file` flags.
+
 ### Loading, cycling, and hot-reload
 
 - **Seeding is write-if-absent.** Your edits to a seeded preset survive
   re-seeding. The flip side: a curated preset changed in a **new release** does
   **not** replace the copy already on your disk — delete that file and relaunch
   to get the updated version (there is no "refresh curated" button yet).
-- **Hot-reload (standalone).** The app polls the directory ~every 500 ms and
+- **Hot-reload (standalone).** The app polls the directory ~every 150 ms and
   reloads on any change. A malformed file is reported (to stderr / the load
   report) and the last good set is kept — a bad edit never crashes a running
   visual.
