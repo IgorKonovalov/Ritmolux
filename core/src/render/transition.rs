@@ -61,6 +61,61 @@ pub(crate) const DEFAULT_DURATION_SECS: f32 = 1.0;
 /// controller total on any policy value rather than pushing the check to callers.
 const MIN_DURATION_SECS: f32 = 1.0 / 1000.0;
 
+/// How one dissolve mixes its two sides. A **small fixed library** (ADR-0024),
+/// not an open registry: each is a variant of one shader, selected by the `kind`
+/// slot of the blend uniform.
+///
+/// Every kind is exactly the outgoing frame at `t = 0` and exactly the incoming
+/// one at `t = 1` — the property that lets a dissolve's opening frame present
+/// through the blend before the live side has ever been rendered into, and that
+/// keeps either endpoint from snapping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TransitionKind {
+    /// A straight linear mix. The calm default.
+    Crossfade,
+    /// An additive flare that peaks mid-dissolve and returns — the "burn" the
+    /// additive line/particle families read naturally, and the reason the blend
+    /// samples both textures rather than alpha-compositing one over the other.
+    AddBurn,
+    /// A brightness-ordered reveal: the outgoing frame's darkest pixels turn over
+    /// first, its highlights last, so the incoming preset seems to eat the old one
+    /// out of its own shadows.
+    LumaDissolve,
+    /// A soft-edged diagonal boundary sweeping across the frame.
+    Wipe,
+}
+
+impl TransitionKind {
+    /// The library, in rotation order. `Crossfade` is first so the pinned-default
+    /// policy and the rotation's first step agree.
+    pub(crate) const LIBRARY: [TransitionKind; 4] = [
+        TransitionKind::Crossfade,
+        TransitionKind::AddBurn,
+        TransitionKind::LumaDissolve,
+        TransitionKind::Wipe,
+    ];
+
+    /// The kind for the `n`-th dissolve of a run — a **deterministic** rotation
+    /// over [`LIBRARY`](Self::LIBRARY), never a random pick, so a captured show is
+    /// reproducible (NFR §6).
+    pub(crate) fn rotating(n: u32) -> Self {
+        let index = (n as usize) % Self::LIBRARY.len();
+        *Self::LIBRARY
+            .get(index)
+            .unwrap_or(&TransitionKind::Crossfade)
+    }
+
+    /// The `kind` slot the shader switches on.
+    fn code(self) -> f32 {
+        match self {
+            TransitionKind::Crossfade => 0.0,
+            TransitionKind::AddBurn => 1.0,
+            TransitionKind::LumaDissolve => 2.0,
+            TransitionKind::Wipe => 3.0,
+        }
+    }
+}
+
 /// Where a running dissolve is in its two-stage lifecycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Stage {
@@ -87,6 +142,8 @@ pub(crate) struct Transition {
     t: f32,
     /// Total duration in seconds. Always at least [`MIN_DURATION_SECS`].
     dur: f32,
+    /// How this dissolve mixes its two sides — chosen once, at the switch site.
+    kind: TransitionKind,
     stage: Stage,
     /// The outgoing preset's evaluated ink params, held at the capture frame so
     /// the one engine-wide ink pass can crossfade between the two sides
@@ -95,8 +152,8 @@ pub(crate) struct Transition {
 }
 
 impl Transition {
-    /// Start a dissolve landing on `to_index` over `dur` seconds.
-    pub(crate) fn new(to_index: usize, dur: f32) -> Self {
+    /// Start a dissolve landing on `to_index` over `dur` seconds, mixed by `kind`.
+    pub(crate) fn new(to_index: usize, dur: f32, kind: TransitionKind) -> Self {
         let dur = if dur.is_finite() {
             dur.max(MIN_DURATION_SECS)
         } else {
@@ -106,9 +163,15 @@ impl Transition {
             to_index,
             t: 0.0,
             dur,
+            kind,
             stage: Stage::Capture,
             outgoing_ink: None,
         }
+    }
+
+    /// How this dissolve mixes its two sides.
+    pub(crate) fn kind(&self) -> TransitionKind {
+        self.kind
     }
 
     /// Whether this frame is the opening one — the renderer must composite the
@@ -166,9 +229,17 @@ impl Transition {
 
 const SHADER: &str = r#"
 struct Blend {
-    // x = t in [0,1], rest reserved for the transition library (Plan 0023 Phase 3)
+    // x = t in [0,1], y = TransitionKind::code(), rest unused
     p: vec4<f32>,
 }
+
+// Soft edge width for the two boundary kinds: how much of the sweep key a pixel
+// takes to turn over. Wide enough to hide banding, narrow enough that the wipe
+// reads as a boundary rather than a fade.
+const LUMA_EDGE: f32 = 0.14;
+const WIPE_EDGE: f32 = 0.07;
+// Peak additive flare of the burn kind, at t = 0.5.
+const BURN_PEAK: f32 = 0.35;
 
 @group(0) @binding(0) var<uniform> u: Blend;
 @group(0) @binding(1) var t_out: texture_2d<f32>;
@@ -192,6 +263,19 @@ fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
     return out;
 }
 
+// A boundary sweep: `key` in [0,1] orders the pixels, and the cut travels from
+// just below 0 to just past 1 so the frame is *entirely* `a` at t = 0 and
+// *entirely* `b` at t = 1 — no snap at either endpoint, whatever the key.
+// Returns the per-pixel mix factor toward `b`.
+fn sweep(key: f32, t: f32, edge: f32) -> f32 {
+    let cut = mix(-edge, 1.0 + edge, t);
+    return 1.0 - smoothstep(cut - edge, cut + edge, key);
+}
+
+fn luma(c: vec3<f32>) -> f32 {
+    return clamp(dot(c, vec3<f32>(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // Both sides are *sampled*, never alpha-composited: the line and particle
@@ -200,6 +284,25 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let a = textureSample(t_out, samp, in.uv).rgb;
     let b = textureSample(t_in, samp, in.uv).rgb;
     let t = clamp(u.p.x, 0.0, 1.0);
+    let kind = u32(u.p.y + 0.5);
+
+    if (kind == 1u) {
+        // Add/burn: the linear mix plus an additive flare that rises and falls,
+        // zero at both endpoints so the ends stay exact. `4t(1-t)` peaks at 1.
+        let flare = BURN_PEAK * 4.0 * t * (1.0 - t);
+        return vec4<f32>(mix(a, b, t) + (a + b) * flare, 1.0);
+    }
+    if (kind == 2u) {
+        // Luma dissolve: the outgoing frame's own brightness orders the reveal,
+        // darkest first — the incoming preset eats the old one out of its shadows.
+        return vec4<f32>(mix(a, b, sweep(luma(a), t, LUMA_EDGE)), 1.0);
+    }
+    if (kind == 3u) {
+        // Wipe: a soft-edged diagonal boundary, top-left to bottom-right.
+        let key = clamp((in.uv.x + in.uv.y) * 0.5, 0.0, 1.0);
+        return vec4<f32>(mix(a, b, sweep(key, t, WIPE_EDGE)), 1.0);
+    }
+    // Crossfade (kind 0, and the fallback for any unknown code).
     return vec4<f32>(mix(a, b, t), 1.0);
 }
 "#;
@@ -304,15 +407,16 @@ impl Blend {
     /// the surface otherwise. Returns the draw calls encoded (1), or 0 if the
     /// resources are absent.
     ///
-    /// At `t = 0` the result is the snapshot **exactly**, which is what lets the
-    /// opening frame present through this same pass before the live side has ever
-    /// been rendered into.
+    /// At `t = 0` the result is the snapshot **exactly** — for every `kind`, which
+    /// is what lets the opening frame present through this same pass before the
+    /// live side has ever been rendered into.
     pub(crate) fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         out: &wgpu::TextureView,
         t: f32,
+        kind: TransitionKind,
     ) -> u32 {
         let (Some(pipeline), Some(targets)) = (self.pipeline.as_ref(), self.targets.as_ref())
         else {
@@ -322,7 +426,7 @@ impl Blend {
             &pipeline.uniform,
             0,
             bytemuck::bytes_of(&BlendUniform {
-                p: [t.clamp(0.0, 1.0), 0.0, 0.0, 0.0],
+                p: [t.clamp(0.0, 1.0), kind.code(), 0.0, 0.0],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -529,7 +633,7 @@ mod tests {
 
     #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
-    use super::{DEFAULT_DURATION_SECS, Transition};
+    use super::{DEFAULT_DURATION_SECS, Transition, TransitionKind};
     use crate::render::ink::InkParams;
 
     /// A stand-in for the outgoing preset's evaluated ink params: the default
@@ -542,7 +646,7 @@ mod tests {
     /// index the renderer must flip the roster to.
     #[test]
     fn the_opening_frame_captures_then_flips_to_the_target() {
-        let mut tr = Transition::new(5, DEFAULT_DURATION_SECS);
+        let mut tr = Transition::new(5, DEFAULT_DURATION_SECS, TransitionKind::Crossfade);
         assert!(
             tr.needs_snapshot(),
             "the opening frame is the capture frame"
@@ -566,7 +670,7 @@ mod tests {
     #[test]
     fn progress_is_a_pure_function_of_the_injected_dt() {
         let run = |dts: &[f32]| {
-            let mut tr = Transition::new(1, 1.0);
+            let mut tr = Transition::new(1, 1.0, TransitionKind::Crossfade);
             let mut seen = Vec::new();
             for &dt in dts {
                 seen.push(tr.progress());
@@ -579,8 +683,8 @@ mod tests {
 
         // Half a second of a 1 s dissolve is halfway, whatever the frame rate:
         // 30 steps of 1/60 and 15 of 1/30 must agree.
-        let mut fast = Transition::new(1, 1.0);
-        let mut slow = Transition::new(1, 1.0);
+        let mut fast = Transition::new(1, 1.0, TransitionKind::Crossfade);
+        let mut slow = Transition::new(1, 1.0, TransitionKind::Crossfade);
         for _ in 0..30 {
             fast.advance(1.0 / 60.0, default_ink());
         }
@@ -604,7 +708,7 @@ mod tests {
     /// index survives the whole run.
     #[test]
     fn a_dissolve_finishes_at_one_on_its_target() {
-        let mut tr = Transition::new(7, 0.25);
+        let mut tr = Transition::new(7, 0.25, TransitionKind::Crossfade);
         let mut frames = 0;
         while !tr.finished() {
             tr.advance(1.0 / 60.0, default_ink());
@@ -615,11 +719,50 @@ mod tests {
         assert_eq!(tr.to_index(), 7, "finalize lands on the requested index");
     }
 
+    /// The engine policy's rotation is a **deterministic** walk over the whole
+    /// library — never random, so a scripted sequence of switches reproduces the
+    /// same kinds (NFR §6) — and it covers every kind before repeating, so a live
+    /// show actually sees the library rather than one favourite.
+    ///
+    /// Pinning `TRANSITION_KIND` to `Some(kind)` in `render/mod.rs` bypasses this
+    /// entirely, which is the one-line edit that changes every transition.
+    #[test]
+    fn the_kind_rotation_covers_the_library_in_order() {
+        let library = TransitionKind::LIBRARY;
+        let walk: Vec<TransitionKind> = (0..library.len() as u32)
+            .map(TransitionKind::rotating)
+            .collect();
+        assert_eq!(
+            walk,
+            library.to_vec(),
+            "the rotation is the library, in order"
+        );
+
+        for (i, kind) in library.iter().enumerate() {
+            assert!(
+                !library[..i].contains(kind),
+                "the library must not repeat a kind: {kind:?} at {i}"
+            );
+        }
+
+        // Deterministic and wrapping: the same n always gives the same kind, and
+        // step n + len is step n.
+        for n in 0..32u32 {
+            assert_eq!(TransitionKind::rotating(n), TransitionKind::rotating(n));
+            assert_eq!(
+                TransitionKind::rotating(n),
+                TransitionKind::rotating(n + library.len() as u32)
+            );
+        }
+        // Even at the counter's wrap point, a kind comes back — never a panic.
+        let _ = TransitionKind::rotating(u32::MAX);
+    }
+
     /// A degenerate duration cannot divide by zero or stall the dissolve.
     #[test]
     fn a_degenerate_duration_still_terminates() {
         for dur in [0.0, -1.0, f32::NAN, f32::INFINITY] {
-            let mut tr = Transition::new(1, dur);
+            let mut tr = Transition::new(1, dur, TransitionKind::Crossfade);
             for _ in 0..200 {
                 tr.advance(1.0 / 60.0, default_ink());
             }
@@ -632,7 +775,7 @@ mod tests {
     /// backwards or to NaN — the frontend can inject either after a stall.
     #[test]
     fn a_degenerate_dt_holds_progress() {
-        let mut tr = Transition::new(1, 1.0);
+        let mut tr = Transition::new(1, 1.0, TransitionKind::Crossfade);
         tr.advance(0.5, default_ink()); // past the capture frame
         let held = tr.progress();
         for dt in [0.0, -0.5, f32::NAN] {
