@@ -340,10 +340,13 @@ mod tests {
     //! nothing tested — they were only ever exercised indirectly, through WARP
     //! captures of presets that happened to bind the right params.
 
-    // Test asserts index and panic freely; this is not the render path.
-    #![allow(clippy::indexing_slicing, clippy::panic)]
+    // Test asserts index, expect and panic freely; this is not the render path.
+    #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
-    use super::{INK, KALEIDOSCOPE, Routing, STAGE_COUNT, TRAILS, route};
+    use super::{INK, KALEIDOSCOPE, PostChain, Routing, STAGE_COUNT, TRAILS, route};
+    use crate::render::background::Background;
+    use crate::render::capture::{self, CaptureImage};
+    use crate::render::context::{RenderContext, RenderError};
 
     /// `(stage, destination)` pairs, for readable assertions.
     fn edges(routing: &Routing) -> Vec<(usize, Option<usize>)> {
@@ -469,6 +472,136 @@ mod tests {
                 "ink folds into the surface for {active:?}"
             );
         }
+    }
+
+    /// Offscreen size for the GPU independence test — small enough to read back
+    /// cheaply, large enough that a trail covers many pixels.
+    const CHAIN_TEST_SIZE: u32 = 64;
+
+    /// A headless device, or `None` (a logged skip) when the runner exposes no
+    /// GPU adapter — macOS has no software Metal fallback (ADR-0016). Any other
+    /// build error still panics loudly.
+    fn headless_context_or_skip() -> Option<RenderContext> {
+        match RenderContext::new_headless(CHAIN_TEST_SIZE, CHAIN_TEST_SIZE, true) {
+            Ok(ctx) => Some(ctx),
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                None
+            }
+            Err(e) => panic!("headless context build failed: {e}"),
+        }
+    }
+
+    /// Drive `chain` through one frame per entry in `lit` — a lit frame paints a
+    /// full-brightness backdrop, a dark one is a plain black clear — folding each
+    /// down into a **fresh offscreen of this call's own**, and read the last one
+    /// back. The chain keeps whatever cross-frame state it has built between
+    /// calls, so consecutive calls continue that chain's history.
+    fn drive(
+        ctx: &RenderContext,
+        chain: &mut PostChain,
+        background: &mut Background,
+        lit: &[bool],
+    ) -> CaptureImage {
+        let size = (CHAIN_TEST_SIZE, CHAIN_TEST_SIZE);
+        let (texture, view) =
+            capture::create_target(&ctx.device, ctx.surface_format(), size.0, size.1);
+
+        for &is_lit in lit {
+            background.reset_params();
+            if is_lit {
+                // A flat, full-brightness backdrop: bright everywhere, so the
+                // trail it leaves is unmistakable at 8-bit precision.
+                assert!(background.set_param("bg_bright", 1.0));
+                assert!(background.set_param("bg_vignette", 0.0));
+            } else {
+                assert!(background.set_param("bg_bright", 0.0));
+            }
+
+            let mut encoder = ctx
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("post-chain-independence"),
+                });
+            capture::record_clear(&mut encoder, &view);
+            let target = chain.begin(&mut encoder, &view, size);
+            background.render(&ctx.queue, &mut encoder, &target.view);
+            chain.resolve(&ctx.queue, &mut encoder, &view, size);
+            ctx.queue.submit(std::iter::once(encoder.finish()));
+        }
+
+        let (buffer, padded_bpr) = capture::create_readback(&ctx.device, size.0, size.1);
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("post-chain-readback"),
+            });
+        capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, size.0, size.1);
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+        capture::read_back(&ctx.device, &buffer, size.0, size.1, padded_bpr)
+            .expect("read back the folded chain output")
+    }
+
+    fn any_lit_pixel(image: &CaptureImage) -> bool {
+        image
+            .rgba
+            .chunks_exact(4)
+            .any(|px| px[0] > 0 || px[1] > 0 || px[2] > 0)
+    }
+
+    /// Plan 0030 Phase 2 — **the Plan 0023 unblock**: two `PostChain`s built
+    /// against one device hold fully independent GPU state, so a dual-live
+    /// transition can run two composites in one frame.
+    ///
+    /// Trails is the stage that matters: it is the one owning cross-frame state (a
+    /// [`PingPongField`](crate::render::feedback::PingPongField)), which is exactly
+    /// what Plan 0023's "in dual-live, each side needs its own feedback field" risk
+    /// bullet names. Both chains are driven past the point where their lazily-built
+    /// resources exist, then:
+    ///
+    /// - chain A accumulates a lit frame and fades it on a dark one — its own trail;
+    /// - chain B, driven only through a dark frame, comes back **black**: none of
+    ///   A's accumulation bled across;
+    /// - chain B driven through the same history as A yields the **same pixels**,
+    ///   so B's field is a real, working, separate one — not merely empty.
+    ///
+    /// Needs a GPU adapter, so it skips on runners without one (ADR-0016).
+    #[test]
+    fn two_chains_against_one_device_accumulate_independently() {
+        let Some(ctx) = headless_context_or_skip() else {
+            return;
+        };
+        let format = ctx.surface_format();
+        let mut background = Background::new(&ctx.device, format);
+
+        let mut chain_a = PostChain::new(&ctx.device, format);
+        let mut chain_b = PostChain::new(&ctx.device, format);
+        // A long trail on both, so a leaked accumulation would be glaring.
+        assert!(chain_a.set_param("trails", 0.9), "the chain owns `trails`");
+        assert!(chain_b.set_param("trails", 0.9), "the chain owns `trails`");
+
+        // A: lit, then dark — the dark frame shows A's own fading trail.
+        let a_lit_then_dark = drive(&ctx, &mut chain_a, &mut background, &[true, false]);
+        assert!(
+            any_lit_pixel(&a_lit_then_dark),
+            "chain A's own accumulation survives into its dark frame"
+        );
+
+        // B, never driven before: one dark frame. A shared field would show A's
+        // trail here; an independent one starts cleared.
+        let b_dark_only = drive(&ctx, &mut chain_b, &mut background, &[false]);
+        assert!(
+            !any_lit_pixel(&b_dark_only),
+            "chain B starts from its own cleared accumulation — none of A's \
+             history leaked across"
+        );
+
+        // B through A's history: its own field must now imply the same pixels.
+        let b_lit_then_dark = drive(&ctx, &mut chain_b, &mut background, &[true, false]);
+        assert_eq!(
+            b_lit_then_dark.rgba, a_lit_then_dark.rgba,
+            "each chain folds to the pixels its own history implies"
+        );
     }
 
     /// The active stages always come out in chain order, never reordered — the
