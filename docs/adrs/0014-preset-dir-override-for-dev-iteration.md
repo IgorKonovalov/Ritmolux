@@ -1,6 +1,6 @@
 # ADR-0014 — Preset-directory override (`LMV_PRESET_DIR`) with a shared resolver, polling over a watcher
 
-> **Status:** proposed
+> **Status:** accepted (2026-07-25, at Plan 0015's close)
 > **Date:** 2026-07-22
 > **Related plan(s):** [0015](../plans/0015-preset-dir-override-and-live-iteration.md)
 > **Related:** [ADR-0002](0002-layered-preset-architecture.md) (the preset layer being edited),

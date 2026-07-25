@@ -1,6 +1,6 @@
 # 0015 — Preset-directory override + live iteration (`LMV_PRESET_DIR`, shared resolver, shot flags)
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-07-25
 > **Created:** 2026-07-22
 > **Owner skill(s):** dev
 > **Related ADRs:** [0014](../adrs/0014-preset-dir-override-for-dev-iteration.md) (the override
@@ -184,12 +184,18 @@ pub fn resolve_preset_dir() -> PresetDir;
 - **No filesystem watcher / `notify` dependency** — polling only (ADR-0014 C).
 - **No app CLI argument parser** — the app takes the override via env var only (ADR-0014 A).
 - **No change to seeding of the default `%APPDATA%` dir**, the embedded-preset compile-time
-  embedding, or the C ABI (untouched, still v3).
+  embedding, or the C ABI (untouched, still v4).
 - **No preset *authoring* changes** — the TOML schema, systems, and expression language are
   ADR-0002 / Plan 0007 territory and unchanged here.
 
 ## Followups (after this lands)
 
+- **Refresh the `preset-author` skill to teach the override — deferred to Plan 0019's close** (user
+  call, 2026-07-25). `.claude/skills/preset-author/SKILL.md` and `references/render-loop.md` still
+  say this plan is unlanded and still walk the author through the manual `%APPDATA%` copy-over; the
+  Mode 4 review flagged it `major`. Plan 0019 widens the same lane's grammar, so both skill updates
+  ride in one edit. Architect cannot apply it (the auto-mode classifier denies `.claude/skills/**`)
+  — it is user-gated.
 - Honor `LMV_PRESET_DIR` in the foobar2000 plugin's C++ resolver for cross-frontend parity.
 - If a truly instant reload is ever wanted for a demo, revisit a watcher behind a dev-only feature
   flag (still keeping it out of the default shipped build).
