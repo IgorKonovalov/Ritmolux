@@ -1,7 +1,8 @@
 # 0031 — Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and the accumulated close-review debt
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-07-25
+> **Approved:** 2026-07-25
 > **Owner skill(s):** dev
 > **Related ADRs:** none new — this plan carries out existing decisions. Touches code governed by
 > [ADR-0007](../adrs/0007-line-geometry-generators.md) (segment cap is never a silent cut),

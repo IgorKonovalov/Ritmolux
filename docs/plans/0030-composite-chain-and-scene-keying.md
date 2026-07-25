@@ -1,7 +1,8 @@
 # 0030 — Composite chain + scene keying: a `PostStage` trait, an instantiable `PostChain`, and kind-keyed scenes
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-07-25
+> **Approved:** 2026-07-25
 > **Owner skill(s):** dev
 > **Related ADRs:** [0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md) (this plan
 > implements it); preserves [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md)'s fixed order
