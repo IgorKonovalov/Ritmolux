@@ -365,6 +365,10 @@ pub struct Trails {
     amount: f32,
 }
 
+/// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
+/// **Keep in sync with `set_param` below.**
+pub const PARAMS: &[&str] = &["trails"];
+
 impl Trails {
     /// Store the device/format for a lazy build; no GPU resources yet.
     pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {

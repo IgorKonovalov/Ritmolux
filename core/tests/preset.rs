@@ -295,6 +295,243 @@ fn malformed_expressions_fail_to_compile_without_panicking() {
     }
 }
 
+/// Plan 0019 Phase 4: an unknown parameter name is a **warning**, not a
+/// rejection — the preset loads and its good bindings survive.
+#[test]
+fn an_unknown_param_warns_but_still_loads_the_preset() {
+    let src = r#"
+system = "fragment_field"
+name = "Typo Field"
+
+[params]
+warp = "0.4"
+wrap = "0.4"
+"#;
+    let preset = Preset::from_toml_str(src).expect("a typo does not reject the preset");
+
+    // The good binding is present and applied.
+    assert!(
+        preset.params.iter().any(|b| b.name == "warp"),
+        "the real param survived the typo"
+    );
+
+    // Exactly one warning, naming the offending param and the system.
+    assert_eq!(preset.warnings.len(), 1, "one unknown param, one warning");
+    let warning = preset.warnings.first().expect("the warning");
+    assert!(
+        warning.contains("wrap"),
+        "the warning names the bad param: {warning}"
+    );
+    assert!(
+        warning.contains("fragment_field"),
+        "the warning names the system: {warning}"
+    );
+    assert!(
+        !warning.contains("'warp'"),
+        "the warning does not blame the good param: {warning}"
+    );
+}
+
+/// A preset binding only known names — including the **global** compositing
+/// params any system may bind — warns about nothing.
+#[test]
+fn known_params_including_global_ones_produce_no_warnings() {
+    let src = r#"
+system = "swarm"
+
+[params]
+force      = "1.2"
+hue        = "0.3"
+bg_hue     = "0.5"
+trails     = "0.4"
+kaleido_order = "6"
+ink_amount = "0.8"
+paper_hue  = "0.1"
+"#;
+    let preset = Preset::from_toml_str(src).expect("valid preset");
+    assert!(
+        preset.warnings.is_empty(),
+        "known params must not warn, got {:?}",
+        preset.warnings
+    );
+
+    // Every shipped preset is clean — the check must not cry wolf on the
+    // curated library.
+    for &(name, src) in lmv_core::preset::EMBEDDED {
+        let preset = Preset::from_toml_str(src)
+            .unwrap_or_else(|err| panic!("embedded preset {name} parses: {err}"));
+        assert!(
+            preset.warnings.is_empty(),
+            "embedded preset {name} warns: {:?}",
+            preset.warnings
+        );
+    }
+}
+
+/// `load_dir` aggregates each loaded preset's warnings with its path, so a
+/// frontend can point the author at the file.
+#[test]
+fn load_dir_reports_warnings_alongside_the_loaded_presets() {
+    let dir = std::env::temp_dir().join("lmv_warn_dir_test");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    std::fs::write(
+        dir.join("typo.toml"),
+        "system = \"fragment_field\"\n[params]\nwarp = \"0.4\"\nwrap = \"0.4\"\n",
+    )
+    .expect("write preset");
+    std::fs::write(
+        dir.join("clean.toml"),
+        "system = \"fragment_field\"\n[params]\nwarp = \"0.4\"\n",
+    )
+    .expect("write preset");
+
+    let report = lmv_core::preset::load_dir(&dir);
+    assert_eq!(report.presets.len(), 2, "both presets load");
+    assert!(report.errors.is_empty(), "a typo is not an error");
+    assert_eq!(report.warnings.len(), 1, "only the typo warns");
+    let (path, warning) = report.warnings.first().expect("the warning");
+    assert!(
+        path.ends_with("typo.toml"),
+        "the warning names the file: {}",
+        path.display()
+    );
+    assert!(warning.contains("wrap"), "the warning names the param");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Drift guard (ADR-0020's flagged risk): each declared `PARAMS` list must be
+/// exactly the set of names its `set_param` match handles. The two sit side by
+/// side in the source, so this compares them by scanning it — which covers the
+/// GPU-backed scenes a headless test cannot instantiate.
+#[test]
+fn declared_params_match_set_param() {
+    use lmv_core::preset::SystemKind;
+
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+
+    // (source file, the declared vocabulary it must match).
+    let scenes: Vec<(std::path::PathBuf, &[&str])> = vec![
+        (
+            src.join("render/scenes/fragment_field.rs"),
+            SystemKind::FragmentField.param_names(),
+        ),
+        (
+            src.join("render/scenes/swarm.rs"),
+            SystemKind::Swarm.param_names(),
+        ),
+        (
+            src.join("render/scenes/lines/parametric.rs"),
+            SystemKind::ParametricCurve.param_names(),
+        ),
+        (
+            src.join("render/scenes/lines/lsystem.rs"),
+            SystemKind::LSystem.param_names(),
+        ),
+        (
+            src.join("render/scenes/lines/star.rs"),
+            SystemKind::StarPattern.param_names(),
+        ),
+        (
+            src.join("render/scenes/reaction_diffusion.rs"),
+            SystemKind::ReactionDiffusion.param_names(),
+        ),
+        (
+            src.join("render/scenes/particles/mod.rs"),
+            SystemKind::Attractor.param_names(),
+        ),
+        // The global compositing stages, declared the same way.
+        (
+            src.join("render/background.rs"),
+            &["bg_hue", "bg_bright", "bg_vignette"],
+        ),
+        (src.join("render/trails.rs"), &["trails"]),
+        (
+            src.join("render/kaleidoscope.rs"),
+            &["kaleido_order", "kaleido_angle"],
+        ),
+        (
+            src.join("render/ink.rs"),
+            &[
+                "ink_amount",
+                "paper_hue",
+                "paper_sat",
+                "paper_bright",
+                "ink_hue",
+                "ink_sat",
+                "ink_bright",
+            ],
+        ),
+    ];
+
+    for (file, declared) in &scenes {
+        let text = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
+        let handled = set_param_arm_names(&text, file);
+
+        let mut declared_sorted: Vec<&str> = declared.to_vec();
+        declared_sorted.sort_unstable();
+        let mut handled_sorted: Vec<String> = handled.clone();
+        handled_sorted.sort();
+
+        assert_eq!(
+            declared_sorted,
+            handled_sorted
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}: the declared PARAMS list and the set_param match have drifted. \
+             Update whichever is wrong so the two stay in sync.",
+            file.display(),
+        );
+    }
+}
+
+/// The parameter names a file's `set_param` body matches on, read from the
+/// source: every `"name" =>` arm, plus the `if name == "…"` single-param form
+/// `trails` uses. Scanning the source is what lets this guard cover scenes that
+/// need a GPU device to instantiate.
+fn set_param_arm_names(text: &str, file: &std::path::Path) -> Vec<String> {
+    let start = text
+        .find("fn set_param")
+        .unwrap_or_else(|| panic!("{}: no set_param found", file.display()));
+    // The body ends at the first line that closes the fn at 4-space indent.
+    let rest = &text[start..];
+    let end = rest
+        .find("\n    }\n")
+        .unwrap_or_else(|| panic!("{}: set_param body is not 4-space indented", file.display()));
+    let body = &rest[..end];
+
+    let mut names = Vec::new();
+    for line in body.lines() {
+        let line = line.trim();
+        if line.starts_with("//") {
+            continue;
+        }
+        // `"name" => …` match arms.
+        if let Some(rest) = line.strip_prefix('"')
+            && let Some((name, tail)) = rest.split_once('"')
+            && tail.trim_start().starts_with("=>")
+        {
+            names.push(name.to_string());
+            continue;
+        }
+        // The `if name == "…"` single-param form.
+        if let Some(rest) = line.strip_prefix("if name == \"")
+            && let Some((name, _)) = rest.split_once('"')
+        {
+            names.push(name.to_string());
+        }
+    }
+    assert!(
+        !names.is_empty(),
+        "{}: parsed no set_param arms — the scan is broken, not the code",
+        file.display()
+    );
+    names
+}
+
 #[test]
 fn compiled_eval_performs_no_heap_allocation() {
     let e = compile("clamp(bass * 2 + sin(time), 0, 1) + lerp(mid, treb, bar)").expect("compiles");

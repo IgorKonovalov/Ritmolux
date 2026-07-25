@@ -1232,6 +1232,26 @@ impl AttractorScene {
     }
 }
 
+/// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
+/// **Keep in sync with `set_param` below.**
+pub const PARAMS: &[&str] = &[
+    "a",
+    "b",
+    "c",
+    "d",
+    "size",
+    "hue",
+    "fade",
+    "hue_spread",
+    "hue_center",
+    "saturation",
+    "palette_mix",
+    "zoom",
+    "pan_x",
+    "pan_y",
+    "reseed",
+];
+
 impl Scene for AttractorScene {
     fn name(&self) -> &'static str {
         "attractor"

@@ -190,6 +190,14 @@ pub struct Background {
     vignette: f32,
 }
 
+/// The parameter names this compositing stage consumes. Unlike a scene's
+/// vocabulary these are **global** — every preset may bind them whatever its
+/// system — so the loader's typo check unions them in (ADR-0020).
+/// **Keep in sync with `set_param` below**; the
+/// `declared_params_match_set_param` guard in `core/tests/preset.rs` fails if
+/// the two drift.
+pub const PARAMS: &[&str] = &["bg_hue", "bg_bright", "bg_vignette"];
+
 impl Background {
     /// Store the device/format for a lazy pipeline build; no GPU resources yet.
     pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {

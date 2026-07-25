@@ -282,6 +282,18 @@ pub struct Ink {
     ink_bright: f32,
 }
 
+/// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
+/// **Keep in sync with `set_param` below.**
+pub const PARAMS: &[&str] = &[
+    "ink_amount",
+    "paper_hue",
+    "paper_sat",
+    "paper_bright",
+    "ink_hue",
+    "ink_sat",
+    "ink_bright",
+];
+
 impl Ink {
     /// Store the device/format for a lazy build; no GPU resources yet.
     pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {

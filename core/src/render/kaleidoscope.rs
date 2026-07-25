@@ -247,6 +247,10 @@ pub struct Kaleidoscope {
     angle: f32,
 }
 
+/// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
+/// **Keep in sync with `set_param` below.**
+pub const PARAMS: &[&str] = &["kaleido_order", "kaleido_angle"];
+
 impl Kaleidoscope {
     /// Store the device/format for a lazy build; no GPU resources yet.
     pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {

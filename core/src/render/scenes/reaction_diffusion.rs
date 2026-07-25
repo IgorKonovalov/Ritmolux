@@ -831,6 +831,26 @@ fn surface_pipeline(
     })
 }
 
+/// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
+/// **Keep in sync with `set_param` below.**
+pub const PARAMS: &[&str] = &[
+    "feed",
+    "kill",
+    "flow",
+    "inject",
+    "hue",
+    "contour",
+    "hatch",
+    "glow",
+    "color_span",
+    "color_center",
+    "saturation",
+    "palette_mix",
+    "zoom",
+    "pan_x",
+    "pan_y",
+];
+
 impl Scene for ReactionDiffusionScene {
     fn name(&self) -> &'static str {
         "reaction diffusion"

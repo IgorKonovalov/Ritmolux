@@ -315,6 +315,24 @@ fn hue_coord(hue_center: f32, hue_spread: f32, particle_hue: f32, hue: f32) -> f
     hue_center + (particle_hue - 0.5) * hue_spread + hue
 }
 
+/// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
+/// **Keep in sync with `set_param` below.**
+pub const PARAMS: &[&str] = &[
+    "force",
+    "spin",
+    "burst",
+    "hue",
+    "brightness",
+    "size",
+    "zoom",
+    "pan_x",
+    "pan_y",
+    "hue_spread",
+    "hue_center",
+    "saturation",
+    "palette_mix",
+];
+
 impl Scene for SwarmScene {
     fn name(&self) -> &'static str {
         "swarm"

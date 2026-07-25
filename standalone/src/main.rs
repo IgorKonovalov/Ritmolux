@@ -866,10 +866,16 @@ fn dir_signature(dir: &Path) -> Option<(u128, usize)> {
 /// Load presets from `dir` and, if any compiled, install them on the renderer.
 /// Malformed files are reported to stderr; a directory with no valid presets
 /// leaves the renderer's current set (embedded defaults or last good) in place.
+/// Non-fatal warnings (an unknown parameter name — usually a typo) are printed
+/// too: the preset still loads and renders, but the mistake is no longer silent
+/// (ADR-0020).
 fn reload_presets(renderer: &mut Renderer, dir: &Path) {
     let report = lmv_core::preset::load_dir(dir);
     for (path, err) in &report.errors {
         eprintln!("preset {}: {err}", path.display());
+    }
+    for (path, warning) in &report.warnings {
+        eprintln!("preset {}: warning: {warning}", path.display());
     }
     if report.presets.is_empty() {
         if !report.errors.is_empty() {

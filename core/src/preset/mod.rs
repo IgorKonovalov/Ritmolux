@@ -16,7 +16,7 @@ pub mod schema;
 use std::path::{Path, PathBuf};
 
 pub use expr::{Expr, ExprError, Variables, compile};
-pub use schema::{Binding, Preset, PresetError, SystemKind};
+pub use schema::{Binding, Preset, PresetError, SystemKind, is_known_param};
 
 // The shipped example presets, embedded at compile time so the C-ABI/foobar
 // path always has visuals without a preset directory (ADR-0006). This list is
@@ -63,12 +63,18 @@ pub fn seed_dir(dir: &Path) -> std::io::Result<usize> {
 }
 
 /// The outcome of loading a preset directory: the presets that compiled, in
-/// filename order, plus the files that failed (so the caller can surface them).
+/// filename order, plus the files that failed and the non-fatal problems found
+/// in the ones that succeeded (so the caller can surface both).
 pub struct LoadReport {
     /// Successfully compiled presets, sorted by filename for a stable cycle.
     pub presets: Vec<Preset>,
     /// `(path, error)` for each `.toml` that failed to read or compile.
     pub errors: Vec<(PathBuf, PresetError)>,
+    /// `(path, warning)` for each non-fatal problem in a preset that **did**
+    /// load — today, a binding naming a parameter its system does not consume
+    /// (ADR-0020). Surfacing these is what stops a typo from failing silently;
+    /// the preset itself is in `presets` and renders normally.
+    pub warnings: Vec<(PathBuf, String)>,
 }
 
 /// Load every `*.toml` in `dir`, compiling each into a [`Preset`]. Missing or
@@ -77,27 +83,41 @@ pub struct LoadReport {
 pub fn load_dir(dir: &Path) -> LoadReport {
     let mut presets = Vec::new();
     let mut errors = Vec::new();
+    let mut warnings = Vec::new();
 
     let mut paths: Vec<PathBuf> = match std::fs::read_dir(dir) {
         Ok(entries) => entries
             .filter_map(|e| e.ok().map(|e| e.path()))
             .filter(|p| p.extension().is_some_and(|ext| ext == "toml"))
             .collect(),
-        Err(_) => return LoadReport { presets, errors },
+        Err(_) => {
+            return LoadReport {
+                presets,
+                errors,
+                warnings,
+            };
+        }
     };
     paths.sort();
 
     for path in paths {
         match std::fs::read_to_string(&path) {
             Ok(src) => match Preset::from_toml_str(&src) {
-                Ok(preset) => presets.push(preset),
+                Ok(preset) => {
+                    warnings.extend(preset.warnings.iter().map(|w| (path.clone(), w.clone())));
+                    presets.push(preset);
+                }
                 Err(err) => errors.push((path, err)),
             },
             Err(err) => errors.push((path, PresetError::Io(err.to_string()))),
         }
     }
 
-    LoadReport { presets, errors }
+    LoadReport {
+        presets,
+        errors,
+        warnings,
+    }
 }
 
 #[cfg(test)]
