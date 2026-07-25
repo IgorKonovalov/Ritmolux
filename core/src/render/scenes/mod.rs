@@ -50,19 +50,28 @@ pub(crate) trait Scene {
         aspect: f32,
     );
 
-    /// The surface size changed (or is being seen for the first time). A scene
-    /// that accumulates into an internal offscreen field sizes that field from
-    /// here so it is not upscaled from a fixed grid onto a larger surface; every
-    /// other scene ignores it. Called each frame before [`render`](Self::render)
-    /// with the current surface dimensions, so an implementor **must** compare
-    /// against what it already built and do nothing when unchanged — this is a
-    /// hot-path call, not a resize event.
+    /// The pixel size of the target **this scene renders into this frame**
+    /// (ADR-0030). That is *not* always the surface: the renderer routes the
+    /// scene into the trails or kaleidoscope stage's fixed internal grid when
+    /// either is active, and into the surface otherwise, so the only correct
+    /// value is the one `draw_frame` computes after choosing the composite chain.
+    /// A scene that accumulates into an internal offscreen field sizes that field
+    /// from here, so it matches its target instead of upscaling from a fixed grid
+    /// or supersampling into a smaller offscreen; every other scene ignores it.
+    ///
+    /// **Called unconditionally every frame**, immediately before
+    /// [`render`](Self::render) — it is named for what it carries, not for an
+    /// event, and there is no resize event behind it. So ADR-0030 condition 2
+    /// binds every implementor: **compare against what you already built and do
+    /// nothing when unchanged**, and never allocate or build GPU resources here.
+    /// The attractor records the requested grid and lets the next `render` notice
+    /// the difference.
     ///
     /// Default no-op, in the same spirit as [`advance`](Self::advance): the
-    /// renderer already holds width/height in `draw_frame`, and `Scene` is a
-    /// `dyn` trait, so this is the only channel that reaches a scene with the
-    /// surface size (Plan 0027 Phase 2).
-    fn resize(&mut self, _width: u32, _height: u32) {}
+    /// renderer already holds the size in `draw_frame`, and `Scene` is a `dyn`
+    /// trait, so this is the only channel that reaches a scene with it (Plan 0027
+    /// Phase 2, the third and first hot-path widening — ADR-0030).
+    fn set_target_size(&mut self, _width: u32, _height: u32) {}
 
     /// Advance simulation state by `dt` real seconds (Plan 0014 Phase 2). The
     /// renderer injects the elapsed time each frame; a feedback scene steps its

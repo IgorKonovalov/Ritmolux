@@ -159,7 +159,7 @@ palette colours gets there. The remap inverts the tone at the end instead.
 
 | Param | Default | Meaning |
 |---|---|---|
-| `ink_amount` | `0` | `0` = off (passthrough). `1` = full remap. Bindable — try `"beat"` to snap into ink on each hit, or `"0.5"` to sit half-way between glow and ink. |
+| `ink_amount` | `0` | `0` = off (passthrough). `1` = full remap. Bindable — try `"beat"` to snap into ink on each hit. Read the note below before resting it between the two. |
 | `paper_hue` | `0` | Paper (dark-input) hue, into the HSV wheel; wraps, so it can sweep freely. |
 | `paper_sat` | `0` | Paper saturation. `0` = neutral. |
 | `paper_bright` | `1` | Paper brightness. `1` = white. |
@@ -179,6 +179,16 @@ ink_hue      = "0.68"
 ink_sat      = "0.85"
 ink_bright   = "0.30"
 ```
+
+**A partial `ink_amount` is a transition, not a resting value.** The stage
+crossfades between the *remapped* frame and the untouched source, and the source
+is a near-black frame — so at `0.5` the paper is half black. That reads as a dirty
+page rather than a faint drawing, and the strokes lose contrast at the same time.
+Bind `ink_amount` when you want to *travel* between the glowing and the drawn look
+(`"beat"`, or an eased ramp via `[smoothing]`, both of which pass through the
+middle rather than sit in it); pick `0` or `1` when you want to stay somewhere. A
+sparse, faint drawing comes from the scene — a finer `size`, a shorter `fade` —
+not from a half-strength remap.
 
 **In ink mode a scene's palette collapses to the duotone.** The remap keys on
 *luminance* only, so the hue a `[palette]` produced is discarded and every pixel

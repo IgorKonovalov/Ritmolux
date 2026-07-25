@@ -67,9 +67,10 @@ const SEED: u64 = 0x4C4D_5641_5454_5231; // "LMVATTR1"
 /// The grid used to be a fixed 640x360 that was upscaled with linear filtering
 /// onto the surface, and that stretch — not the glow — is what read as soft on a
 /// 1080p+ display. It is now sized from the render target (see
-/// [`Scene::resize`](crate::render::scenes::Scene::resize)) and scaled under this
-/// cap, so a 1080p window gets a ~1:1 grid and a 4K/ultrawide one degrades to a
-/// mild, uniform upscale instead of an unbounded fill bill.
+/// [`Scene::set_target_size`](crate::render::scenes::Scene::set_target_size))
+/// and scaled under this cap, so a 1080p window gets a ~1:1 grid and a
+/// 4K/ultrawide one degrades to a mild, uniform upscale instead of an unbounded
+/// fill bill.
 ///
 /// **The cap is the NFR §1 tradeoff.** Every frame pays a decay pass plus a
 /// 50k-instance additive draw over the grid, so fill scales with its area: 1440p
@@ -79,8 +80,9 @@ const SEED: u64 = 0x4C4D_5641_5454_5231; // "LMVATTR1"
 /// deterministic at a fixed `--size` (NFR §6).
 const TRAIL_MAX_W: u32 = 2560;
 const TRAIL_MAX_H: u32 = 1440;
-/// Grid size before the first [`Scene::resize`](crate::render::scenes::Scene::resize)
-/// — only reached if a scene renders without one, which the renderer never does.
+/// Grid size before the first
+/// [`Scene::set_target_size`](crate::render::scenes::Scene::set_target_size) —
+/// only reached if a scene renders without one, which the renderer never does.
 const TRAIL_FALLBACK_W: u32 = 1280;
 const TRAIL_FALLBACK_H: u32 = 720;
 /// Quantization step for each axis of the trail grid (Plan 0029 Phase 2).
@@ -1091,10 +1093,11 @@ pub struct AttractorScene {
     surface_format: wgpu::TextureFormat,
     res: Option<Resources>,
     /// The accumulation grid the next build should use — the render target's size
-    /// clamped to [`TRAIL_MAX_W`]/[`TRAIL_MAX_H`], updated by
-    /// [`Scene::resize`](crate::render::scenes::Scene::resize). Held separately
-    /// from [`FieldResources::trail_w`]/`trail_h` so a size change is a compare
-    /// here and a field rebuild on the next render, not a rebuild inside `resize`.
+    /// through [`trail_grid_size`], updated by
+    /// [`Scene::set_target_size`](crate::render::scenes::Scene::set_target_size).
+    /// Held separately from [`FieldResources::trail_w`]/`trail_h` so a size change
+    /// is a compare here and a field re-allocation on the next render, never GPU
+    /// work inside the hook (ADR-0030 condition 2).
     trail_w: u32,
     trail_h: u32,
     /// The deterministic seeded scatter, uploaded on the first frame after a
@@ -1245,11 +1248,12 @@ impl Scene for AttractorScene {
         self.pending_steps = steps;
     }
 
-    /// Size the trail accumulation grid to the render target, capped (Plan 0027
-    /// Phase 2). Called every frame, so the unchanged case must stay free: this
-    /// only records the request, and `render` rebuilds when it differs from what
-    /// the live resources were built for.
-    fn resize(&mut self, width: u32, height: u32) {
+    /// Size the trail accumulation grid to the render target, capped and
+    /// quantized (Plan 0027 Phase 2, Plan 0029 Phase 2). Called every frame, so
+    /// the unchanged case must stay free (ADR-0030 condition 2): this only records
+    /// the request — no allocation, no GPU work — and `render` re-allocates the
+    /// field when it differs from what the live one was built for.
+    fn set_target_size(&mut self, width: u32, height: u32) {
         let (w, h) = trail_grid_size(width, height);
         self.trail_w = w;
         self.trail_h = h;

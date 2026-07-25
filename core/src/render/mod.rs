@@ -700,7 +700,7 @@ impl Renderer {
                 None => (view, surface_aspect, (width, height)),
             }
         } else if inking {
-            match ink.begin(encoder, width, height) {
+            match ink.begin(width, height) {
                 Some(v) => (v, surface_aspect, (width, height)),
                 None => (view, surface_aspect, (width, height)),
             }
@@ -712,7 +712,7 @@ impl Renderer {
         // internal accumulation field (the attractor's trails) sizes that field
         // from here rather than a fixed grid (Plan 0027 Phase 2). A no-op for
         // every other scene, and a cheap unchanged-compare for the attractor.
-        scene.resize(scene_size.0, scene_size.1);
+        scene.set_target_size(scene_size.0, scene_size.1);
         scene.render(&ctx.queue, encoder, scene_target, scene_aspect);
 
         // Each post-stage resolves its input into the next active stage's input,
@@ -722,7 +722,7 @@ impl Renderer {
             let trails_out = if kaleidoing {
                 kaleido.begin(encoder).unwrap_or(view)
             } else if inking {
-                ink.begin(encoder, width, height).unwrap_or(view)
+                ink.begin(width, height).unwrap_or(view)
             } else {
                 view
             };
@@ -730,7 +730,7 @@ impl Renderer {
         }
         if kaleidoing {
             let kaleido_out = if inking {
-                ink.begin(encoder, width, height).unwrap_or(view)
+                ink.begin(width, height).unwrap_or(view)
             } else {
                 view
             };
