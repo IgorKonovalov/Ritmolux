@@ -1,7 +1,17 @@
 # 0019 — Preset expression grammar v2: branching, math functions, tempo, and typo warnings
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-07-23
+> **Closed:** 2026-07-25 — passed the Mode 4 review (no blockers; one major, three
+> minors, one nit). Five `dev` phase commits: `c4f76fc` math functions + constants,
+> `c33e996` comparisons + `select`, `b36a3de` `tempo`/`novelty`, `462422b`
+> warn-but-load unknown params, `66b1abb` the `docs/presets.md` rewrite. Verified at
+> review rather than taken on trust: `cargo test -p lmv-core` green (the `preset`
+> suite 22/22, every new assertion body read and non-vacuous), `cargo clippy
+> --workspace --all-targets -D warnings` clean, the hot-path panic pragma on
+> `expr.rs` intact, and the C ABI untouched. The doc phase landed against the
+> **current** library (35 presets / 7 systems) rather than the plan's stale
+> 17-preset / 5-system wording.
 > **Owner skill(s):** dev
 > **Related ADRs:** [0020-preset-grammar-v2-branching-functions-tempo](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md), supplements [0002-layered-preset-architecture](../adrs/0002-layered-preset-architecture.md)
 
