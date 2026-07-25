@@ -36,44 +36,6 @@ const MEAN_TOL: f32 = 0.02;
 /// change a low mean would otherwise hide.
 const MAX_OUTLIER: u8 = 48;
 
-/// Every `SystemKind` the drift guard must cover. Iterating this list drives the
-/// test; the exhaustive `match` in [`fixture`] is what forces a new variant to
-/// add its fixture before the test compiles.
-const SYSTEMS: &[SystemKind] = &[
-    SystemKind::FragmentField,
-    SystemKind::Swarm,
-    SystemKind::ParametricCurve,
-    SystemKind::LSystem,
-    SystemKind::StarPattern,
-    SystemKind::ReactionDiffusion,
-    SystemKind::Attractor,
-];
-
-/// The number of `SystemKind` variants, asserted against `SYSTEMS.len()` by
-/// [`systems_rosters_every_variant`]. This closes the Plan 0022 half-enforced
-/// gap (folded into Plan 0016 Phase 5): the exhaustive [`fixture`] match forces a
-/// new variant to add a fixture *arm*, but nothing forced it into `SYSTEMS`, so a
-/// scene could compile green yet never be rendered/compared. Kept honest by
-/// [`variant_count_reminder`] below — a new variant fails the build there until
-/// this count is bumped and the variant is added to `SYSTEMS`.
-const VARIANT_COUNT: usize = 7;
-
-/// Compile-time reminder (never called): adding a `SystemKind` variant makes this
-/// exhaustive match non-exhaustive and fails the build, prompting the dev to bump
-/// [`VARIANT_COUNT`] and add the variant to [`SYSTEMS`] (and its [`fixture`]).
-#[allow(dead_code)]
-fn variant_count_reminder(system: SystemKind) {
-    match system {
-        SystemKind::FragmentField
-        | SystemKind::Swarm
-        | SystemKind::ParametricCurve
-        | SystemKind::LSystem
-        | SystemKind::StarPattern
-        | SystemKind::ReactionDiffusion
-        | SystemKind::Attractor => {}
-    }
-}
-
 /// The frozen fixture for a system: its baseline file stem (the system name) and
 /// the fixture TOML compiled into the test binary.
 ///
@@ -182,7 +144,7 @@ fn scenes_match_golden_baselines() {
     std::fs::create_dir_all(golden_dir()).expect("create tests/golden");
 
     let mut failures = Vec::new();
-    for &system in SYSTEMS {
+    for system in SystemKind::ALL {
         let (stem, toml) = fixture(system);
         let preset = Preset::from_toml_str(toml)
             .unwrap_or_else(|e| panic!("golden fixture {stem}.toml is invalid: {e}"));
@@ -224,34 +186,40 @@ fn scenes_match_golden_baselines() {
     );
 }
 
-/// Structural coverage guard (Plan 0016 Phase 5, closing the Plan 0022 followup):
-/// a variant added to the exhaustive [`fixture`] match but forgotten in
-/// [`SYSTEMS`] would render zero baselines and pass `scenes_match_golden_baselines`
-/// silently. Assert `SYSTEMS` holds exactly [`VARIANT_COUNT`] distinct systems,
-/// each with a valid, distinctly-named fixture — so removing a system from
-/// `SYSTEMS` (or adding a variant without rostering it) fails the suite. No GPU,
-/// so it runs everywhere (not skipped on an adapterless runner).
+/// Structural coverage guard (Plan 0016 Phase 5, closing the Plan 0022 followup;
+/// repointed onto [`SystemKind::ALL`] by Plan 0030 Phase 3, which retired this
+/// file's duplicate `SYSTEMS` list so the variant roster lives in exactly one
+/// place). A variant added to the exhaustive [`fixture`] match but forgotten in
+/// the roster would render zero baselines and pass
+/// `scenes_match_golden_baselines` silently.
+///
+/// Assert the roster holds distinct systems, each with a valid, distinctly-named
+/// fixture — so a variant reaching `fixture()` without being rostered, or two
+/// systems sharing a baseline file, fails the suite. (Its *length* is enforced at
+/// compile time now: `ALL` is typed `[SystemKind; VARIANT_COUNT]`.) No GPU, so it
+/// runs everywhere (not skipped on an adapterless runner).
 #[test]
 fn systems_rosters_every_variant() {
-    assert_eq!(
-        SYSTEMS.len(),
-        VARIANT_COUNT,
-        "SYSTEMS is missing a SystemKind (or VARIANT_COUNT is stale) — every \
-         variant must be in the drift roster, not just have a fixture() arm"
-    );
-
     let mut seen: Vec<SystemKind> = Vec::new();
     let mut stems: Vec<&str> = Vec::new();
-    for &system in SYSTEMS {
-        assert!(!seen.contains(&system), "duplicate entry in SYSTEMS");
+    for system in SystemKind::ALL {
+        assert!(
+            !seen.contains(&system),
+            "duplicate entry in SystemKind::ALL"
+        );
         seen.push(system);
         let (stem, toml) = fixture(system);
         assert!(
             !stems.contains(&stem),
-            "duplicate fixture stem {stem} in SYSTEMS"
+            "duplicate fixture stem {stem} in SystemKind::ALL"
         );
         stems.push(stem);
         Preset::from_toml_str(toml)
             .unwrap_or_else(|e| panic!("golden fixture {stem}.toml is invalid: {e}"));
     }
+    assert_eq!(
+        seen.len(),
+        SystemKind::VARIANT_COUNT,
+        "every SystemKind variant must carry a drift fixture"
+    );
 }

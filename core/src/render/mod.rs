@@ -62,18 +62,28 @@ const SWAPCHAIN_BYTES_PER_PIXEL: u64 = 4;
 /// not an exact footprint (ADR-0008).
 const SWAPCHAIN_IMAGE_COUNT: u64 = 2;
 
-/// A preset's system to its slot in the roster built by [`scenes::create_all`].
-/// The roster holds only preset-addressed systems, in this slot order.
-fn system_slot(system: SystemKind) -> usize {
-    match system {
-        SystemKind::FragmentField => 0,
-        SystemKind::Swarm => 1,
-        SystemKind::ParametricCurve => 2,
-        SystemKind::LSystem => 3,
-        SystemKind::StarPattern => 4,
-        SystemKind::ReactionDiffusion => 5,
-        SystemKind::Attractor => 6,
-    }
+/// The built scenes, each paired with the [`SystemKind`] it drives — the roster
+/// [`scenes::create_all`] returns. Addressed by kind, never by position, so a
+/// scene cannot silently render in another system's slot.
+type SceneRoster = Vec<(SystemKind, Box<dyn Scene>)>;
+
+/// The scene a preset's `system` drives, or `None` if the roster somehow lacks it
+/// (impossible: the roster is built from [`SystemKind::ALL`] by an exhaustive
+/// factory). A linear scan over seven `Copy`-enum keys, once per frame — the same
+/// cost as the `match` it replaces, so no map.
+fn scene_for(scenes: &SceneRoster, system: SystemKind) -> Option<&dyn Scene> {
+    scenes
+        .iter()
+        .find(|(kind, _)| *kind == system)
+        .map(|(_, scene)| scene.as_ref())
+}
+
+/// [`scene_for`], mutably.
+fn scene_for_mut(scenes: &mut SceneRoster, system: SystemKind) -> Option<&mut Box<dyn Scene>> {
+    scenes
+        .iter_mut()
+        .find(|(kind, _)| *kind == system)
+        .map(|(_, scene)| scene)
 }
 
 /// The loaded presets plus the active index — the pure, GPU-free part of
@@ -202,7 +212,8 @@ pub struct HeadlessOptions {
 /// one frame per call by evaluating the active preset into the active system.
 pub struct Renderer {
     ctx: RenderContext,
-    scenes: Vec<Box<dyn Scene>>,
+    /// Every built-in scene, keyed by the system it drives (see [`SceneRoster`]).
+    scenes: SceneRoster,
     /// The background pre-pass (ADR-0018): fills the frame with a gradient/vignette
     /// backdrop before the scene draws. Driven by `bg_*` named params the renderer
     /// routes to it; owns the frame clear now that scenes `Load` instead of `Clear`.
@@ -451,7 +462,7 @@ impl Renderer {
     pub fn active_system_name(&self) -> &'static str {
         self.roster
             .active_preset()
-            .and_then(|p| self.scenes.get(system_slot(p.system)))
+            .and_then(|p| scene_for(&self.scenes, p.system))
             .map(|scene| scene.name())
             .unwrap_or("")
     }
@@ -476,7 +487,7 @@ impl Renderer {
         let Some(preset) = roster.active_preset() else {
             return;
         };
-        let Some(scene) = scenes.get_mut(system_slot(preset.system)) else {
+        let Some(scene) = scene_for_mut(scenes, preset.system) else {
             return;
         };
         // Bake the preset's color palette (default `spectrum` if it declares no
@@ -518,7 +529,7 @@ impl Renderer {
         }
         self.roster
             .active_preset()
-            .and_then(|preset| self.scenes.get(system_slot(preset.system)))
+            .and_then(|preset| scene_for(&self.scenes, preset.system))
             .and_then(|scene| scene.mirror_overflow())
     }
 
@@ -607,7 +618,7 @@ impl Renderer {
         let Some(preset) = roster.active_preset() else {
             return 0; // no presets loaded — nothing to draw
         };
-        let Some(scene) = scenes.get_mut(system_slot(preset.system)) else {
+        let Some(scene) = scene_for_mut(scenes, preset.system) else {
             return 0;
         };
 
