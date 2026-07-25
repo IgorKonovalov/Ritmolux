@@ -2,8 +2,43 @@
 
 > **Status:** approved
 > **Created:** 2026-07-23
+> **Revised:** 2026-07-25 (against the landed `PostChain`; see "Revision note" below)
 > **Owner skill(s):** dev
-> **Related ADRs:** [0024-cross-preset-transitions](../adrs/0024-cross-preset-transitions.md); builds on [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md) (engine composite: offscreen target + present pass, scenes stop clearing) and Plan 0014 ([ADR-0012](../adrs/0012-stateful-feedback-render-system.md) `PingPongField` + [ADR-0013](../adrs/0013-c-abi-v4-render-dt.md) injected `dt`); realizes the "cross-preset blending" follow-up deferred by [Plan 0003](done/0003-generative-scenes-and-presets.md)
+> **Related ADRs:** [0024-cross-preset-transitions](../adrs/0024-cross-preset-transitions.md);
+> [ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md) (where the blend sits:
+> ink leaves the chain, the blend goes between chain and ink — **this plan implements it**); builds on
+> [ADR-0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md) (the `PostChain` this plan
+> instantiates twice), [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md) (engine composite:
+> offscreen target + present pass, scenes stop clearing), [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md)
+> (ink remaps the *blended* frame) and Plan 0014 ([ADR-0012](../adrs/0012-stateful-feedback-render-system.md)
+> `PingPongField` + [ADR-0013](../adrs/0013-c-abi-v4-render-dt.md) injected `dt`); realizes the
+> "cross-preset blending" follow-up deferred by [Plan 0003](done/0003-generative-scenes-and-presets.md)
+
+## Revision note (2026-07-25)
+
+Revised after [Plan 0030](done/0030-composite-chain-and-scene-keying.md) landed, which is what this
+plan was sequenced behind. Three things changed and one was newly settled:
+
+- **"Allocate the second target (or generalize the Plan 0018 target into a reusable pair)" is gone.**
+  The composite is an owned `PostChain` value; the outgoing side is `PostChain::new(...)` a second
+  time. Plan 0030 Phase 2 proved two chains against one device hold fully independent GPU state, with
+  a test — so the **trail-field-ownership risk below is answered by construction**, not by verification.
+- **"A kaleidoscope or trail stage that assumes it is last may need the blend to sit outside it" is
+  answered structurally.** No stage assumes it is last: `route` derives the fold order from the active
+  flags, and the last active stage always targets whatever destination the caller passed.
+- **Where the blend sits was a real open fork, and it is now decided** in
+  [ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md). ADR-0028 requires ink
+  to remap the *blended* frame, but ADR-0031's bound rules a two-input stage out of the one-input
+  `PostStage` trait — and ink was inside the chain, so the per-side chains could not each end in ink.
+  **Ink moves out of the chain** (a terminal engine post-pass, symmetric with `Background` as the
+  pre-pass); the chain keeps trails + kaleidoscope, the per-preset look; the blend sits between them
+  and ink, also outside the trait. That relocation is **Phase 1** below.
+- **Ink's params crossfade by `t` during a transition** — a decision this revision adds, since one ink
+  pass now serves two presets that each bind their own `ink_*`/`paper_*`.
+
+`PostChain::begin` / `::resolve` already take their final destination as a caller-supplied
+`&wgpu::TextureView`, so none of this changes their signatures — the destination is the blend's input
+while a transition runs, ink's input otherwise.
 
 ## TL;DR
 
@@ -36,14 +71,19 @@ The interview settled the shape (see [ADR-0024](../adrs/0024-cross-preset-transi
 
 ## Decision
 
-Append a **two-input blend stage** to the Plan 0018 composite and add a transition controller in the
-render loop. The outgoing input is a **snapshot** taken at `begin_transition`; the incoming preset
-renders live through the composite; a blend shader mixes them by `t` (advanced on injected `dt`) and a
-`TransitionKind`. **Adaptive dual-live** re-renders the outgoing scene live *only* when it is a
-different scene object than the incoming **and** the smoothed frame time (Plan 0011 `FrameStats`) is
-under budget; else the snapshot is used. Policy lives in engine code. Full rationale and the rejected
-alternatives (single-target alpha, always-dual-live, always-freeze, a `TransitionScene` wrapper,
-preset-declared-now) are in ADR-0024.
+Add a **two-input blend pass** between the composite chain and the ink post-pass, plus a transition
+controller in the render loop. The outgoing input is a **snapshot** taken at `begin_transition`; the
+incoming preset renders live through its `PostChain`; a blend shader mixes them by `t` (advanced on
+injected `dt`) and a `TransitionKind`; ink then remaps the blended result once, with its params
+crossfaded by the same `t`. **Adaptive dual-live** re-renders the outgoing scene live into a **second
+`PostChain`** *only* when it is a different scene object than the incoming **and** the smoothed frame
+time (Plan 0011 `FrameStats`) is under budget; else the snapshot is used. Policy lives in engine code.
+
+Full rationale and the rejected alternatives (single-target alpha, always-dual-live, always-freeze, a
+`TransitionScene` wrapper, preset-declared-now) are in ADR-0024. The blend's **placement** — outside
+the `PostStage` trait, with ink relocated out of the chain to sit after it — is
+[ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md), which rejects widening
+`PostStage` to two inputs, per-side inking, and a freeze-only path.
 
 ## Architecture diagram
 
@@ -55,46 +95,96 @@ flowchart LR
 
   subgraph ctrl["Transition controller (render loop)"]
     beg["begin_transition(to, dur, kind)<br/>snapshot outgoing composited frame"]
-    tick["t += dt / dur<br/>eligible? = diff slot AND budget ok"]
+    tick["t += dt / dur<br/>dual-live? = diff scene object AND budget ok"]
   end
 
-  subgraph comp["core/ composite (ADR-0018, after Plan 0018)"]
-    inc["incoming preset -> composite -> target A"]
-    out["outgoing input:<br/>snapshot tex (freeze)<br/>or live -> target B (dual-live)"]
-    blend["blend(out, A, t, kind)"]
-    present["present -> surface (then text / overlay)"]
+  subgraph comp["core/ composite (ADR-0018 order; ADR-0031 chain; ADR-0032 placement)"]
+    inc["incoming preset<br/>bg + scene -> PostChain B<br/>(trails, kaleidoscope)"]
+    out["outgoing input:<br/>snapshot tex (freeze)<br/>or bg + scene -> PostChain A (dual-live)"]
+    blend["blend(A, B, t, kind)<br/>OUTSIDE the chain — two inputs"]
+    ink["ink (engine-wide remap)<br/>OUTSIDE the chain, always last<br/>params crossfaded by t"]
+    present["surface (then text / overlay — never inked)"]
   end
 
   cyc --> beg --> tick
   tick --> inc --> blend
   tick --> out --> blend
-  blend --> present
+  blend --> ink --> present
 ```
+
+Without a transition running the blend is absent entirely and the chain resolves straight into ink's
+input (or the surface when ink is off) — the frame path Plan 0030 landed, unchanged.
 
 ## Implementation phases
 
-Each phase is one commit with a clear done-when. Phase 1 is a walking skeleton — an end-to-end visible
-dissolve on the simplest path — not plumbing.
+Each phase is one commit with a clear done-when. **Phase 2** is the walking skeleton — an end-to-end
+visible dissolve on the simplest path. Phase 1 precedes it because the skeleton's insertion point does
+not exist until ink moves; it is behavior-preserving and independently verifiable (byte-identical
+goldens), the same shape as Plan 0030's phases, so it is a prerequisite rather than open-ended plumbing.
 
-### Phase 1 — Walking skeleton: transition controller + frozen crossfade on the cycle path
+### Phase 1 — Ink leaves the chain (behavior-preserving)
+**Owner skill:** dev
+**Area:** core
+
+Per [ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md): remove `Ink` from
+`PostChain`'s array and make it a terminal post-pass the renderer drives directly, symmetric with
+`Background` as the pre-pass. `STAGE_COUNT` becomes 2 and the chain holds trails + kaleidoscope.
+
+**Files touched:** `core/src/render/post.rs`, `core/src/render/ink.rs`, `core/src/render/mod.rs`
+
+**Notes for the implementer:**
+- **`PostChain`'s signatures do not change.** `begin`/`resolve` already take the destination as a
+  caller-supplied `&wgpu::TextureView`. `draw_frame` computes the terminal target first — ink's input
+  when ink is active, else the surface view — and passes it as that argument. Rename the parameter
+  from `surface_view` to something honest (`destination`); it stops being the surface specifically.
+- `Ink` reverts from a `PostStage` impl to inherent methods. Keep its `PARAMS` const exactly as it is:
+  `preset::schema::GLOBAL_PARAMS` reads it for the load-time typo check (ADR-0020), so the preset-facing
+  vocabulary must not move.
+- The renderer offers a param to `background`, then `chain`, then `ink`, then the scene — same
+  first-owner-wins order the namespaces already guarantee. `reset_params` / `reset_resources` gain an
+  ink call back alongside the chain's.
+- The `INK` position const and the `ink_when_active_is_always_last` routing test retire with the
+  relocation — the ordering they asserted is structural now (ink is not in the thing that composes).
+  **Do not delete `the_last_active_stage_always_targets_the_surface`**; it still guards the chain.
+- `draw_calls` keeps summing: `chain.resolve()` plus ink's returned count (1 when it runs).
+
+**Done when:** `PostChain` holds two stages and no `PostStage` impl mentions ink; `draw_frame` drives
+ink after the chain; **every golden baseline is byte-identical with no re-bless** (the pixel path is
+unchanged: chain folds into ink's input, ink folds into the surface, exactly as the three-stage chain
+did); an ink-on preset still remaps correctly in a `shot` capture and the HUD is still never inked;
+`cargo nextest run -p lmv-core` green with the routing tests updated only for the retired stage, not
+weakened.
+
+### Phase 2 — Walking skeleton: transition controller + frozen crossfade on the cycle path
 **Owner skill:** dev
 **Area:** core
 
 Add a `Transition` state to the `Renderer` (`{ to_index, t, dur, kind, outgoing_tex }`). Route
 `cycle_preset` through a new `begin_transition(to_index, dur, Crossfade)` instead of the instant swap:
 on start, capture the current composited frame into `outgoing_tex` (reuse the Plan 0018 present/capture
-machinery); set `Roster.active` to the incoming preset so the composite renders it live into the engine
-target. Each frame while a transition is active, run a **crossfade** blend of `outgoing_tex` and the
-engine target by `t`, present the result, and advance `t += dt / dur`; when `t >= 1`, finalize (drop the
-snapshot, resume normal single-target present). Freeze-only, one kind, one switch path.
+machinery); set `Roster.active` to the incoming preset so the composite renders it live through the
+chain. Each frame while a transition is active, run a **crossfade** blend of `outgoing_tex` and the
+chain's output by `t` into ink's input (or the surface when ink is off), and advance `t += dt / dur`;
+when `t >= 1`, finalize (drop the snapshot, resume the normal no-blend path). Freeze-only, one kind,
+one switch path.
+
+**Notes for the implementer:**
+- **Snapshot the pre-ink frame**, not the presented one: the blend feeds ink, so both its inputs must
+  be in the same colour space or the remap applies twice on the outgoing side (ADR-0032).
+- Ink's params crossfade by the same `t` — `ink_amount`, `paper_*`, `ink_*` lerp from the outgoing
+  preset's evaluated values to the incoming's, so `t = 0` is exactly the outgoing look and `t = 1`
+  exactly the incoming one. Hold the outgoing side's values at `begin_transition`; they are already
+  evaluated for that frame.
 
 **Done when:** pressing Space (or `cycle_preset`) dissolves the current preset into the next over the
 configured duration instead of hard-cutting; a headless `shot --signal` filmstrip across the transition
 window shows intermediate **blended** frames (not a single-frame jump), and metrics confirm the mid-frame
 differs from both endpoints; `t` advances purely from injected `dt` (no wall-clock), so a capture is
-reproducible.
+reproducible; a dissolve **between two ink-on presets with different paper/ink colors** shows the poles
+moving continuously rather than snapping at either end; goldens still byte-identical with no transition
+running.
 
-### Phase 2 — The transition library (blend kinds)
+### Phase 3 — The transition library (blend kinds)
 **Owner skill:** dev
 **Area:** core
 
@@ -109,25 +199,43 @@ wipe = a moving boundary; luma-dissolve = brightness-ordered reveal; add/burn = 
 fragment-field <-> line-scene transition (additive family) shows no alpha/color corruption at mid-blend;
 switching the default kind in code changes every transition with no other edit.
 
-### Phase 3 — Adaptive dual-live upgrade + budget governor
+### Phase 4 — Adaptive dual-live upgrade + budget governor
 **Owner skill:** dev
 **Area:** core
 
 When the outgoing and incoming presets resolve to **different scene objects** *and* the smoothed frame
 time (Plan 0011 `FrameStats`/`Diag`) is under a budget threshold, re-render the **outgoing** scene live
-into a second target each transition frame and blend two **live** composited frames; otherwise use the
-frozen snapshot. Same-slot transitions (one shared scene object) always freeze. If the budget is blown
-mid-transition, latch to the snapshot for the remainder (no per-frame flicker between modes). Allocate
-the second target (or generalize the Plan 0018 target into a reusable pair).
+through a **second `PostChain`** each transition frame and blend two **live** composited frames;
+otherwise use the frozen snapshot. Same-scene transitions (one shared scene object) always freeze. If
+the budget is blown mid-transition, latch to the snapshot for the remainder (no per-frame flicker
+between modes).
 
-**Done when:** a light, different-slot transition (e.g. two fragment presets on different slots, or a
-line scene <-> fragment) shows **both** visuals live-animating through the dissolve; a forced-heavy case
-(attractor <-> reaction-diffusion) exercises the freeze fallback and holds the frame budget on the dev
-box (the low-end iGPU 60 fps confirmation is the standing on-device carry-forward,
-`docs/on-device-validation.md`); a same-slot transition is verifiably freeze (asserted via the mode the
-controller selects), never attempting a double live render of one object.
+**Notes for the implementer:**
+- The outgoing side is `PostChain::new(&device, format)` a second time — **not** a duplicated set of
+  fields, and **not** a generalized target pair. Plan 0030 Phase 2 proved two chains against one device
+  hold fully independent GPU state, including trails' `PingPongField`
+  (`post.rs::two_chains_against_one_device_accumulate_independently`); build on that rather than
+  re-verifying it.
+- Each chain resolves into **its own blend input view** — pass that view as the chain's destination
+  argument; that is the whole of the wiring.
+- Both chains need their own param routing per frame: the outgoing chain's params come from the
+  **outgoing** preset's bindings evaluated against the current `AnalysisFrame`, so the frozen side and
+  the live side differ in *what is evaluated*, not in how it is routed.
+- On finalize, the incoming chain becomes *the* chain and the outgoing one is dropped — no field is
+  shared or leaked, by construction.
+- **Scene keying matters here** (Plan 0030): two presets naming the same `SystemKind` resolve to the
+  *same* `Box<dyn Scene>`, which is exactly the same-scene case that must freeze. Detect it by kind
+  equality, not by preset index.
 
-### Phase 4 — All switch paths, re-entrancy, tests, and docs
+**Done when:** a light, different-scene transition (e.g. a line scene <-> fragment field) shows **both**
+visuals live-animating through the dissolve; a forced-heavy case (attractor <-> reaction-diffusion)
+exercises the freeze fallback and holds the frame budget on the dev box (the low-end iGPU 60 fps
+confirmation is the standing on-device carry-forward, `docs/on-device-validation.md`); a same-scene
+transition is verifiably freeze (asserted via the mode the controller selects), never attempting a
+double live render of one object; a dual-live transition **out of** a trails-on preset shows the
+outgoing side's trail continuing to accumulate rather than freezing or inheriting the incoming side's.
+
+### Phase 5 — All switch paths, re-entrancy, tests, and docs
 **Owner skill:** dev
 **Area:** core
 
@@ -142,33 +250,57 @@ docs.
 **Done when:** every switch path dissolves (not just cycle); a mid-transition switch lands on the final
 requested index with no stuck blend; hot-reload during a transition does not panic or leave a dangling
 snapshot; core tests cover the controller as a pure-ish unit — `t` progresses deterministically over a
-sequence of `dt`s, finalize lands **exactly** on the target index, same-slot forces freeze, and the
-budget governor selects freeze when fed an over-budget frame time; `docs/` (a short "Transitions" note,
-plus any composite-diagram touch-up) reflects the new stage. `cargo test -p lmv-core`, `clippy -D
-warnings`, and the `hygiene` panic-pragma guard (any new hot-path `render/` file included) are green.
+sequence of `dt`s, finalize lands **exactly** on the target index, a same-scene (same `SystemKind`)
+switch forces freeze, and the budget governor selects freeze when fed an over-budget frame time;
+`docs/` reflects the landed shape — a short "Transitions" note, the composite diagram (now
+`background -> scene -> PostChain -> blend -> ink`), and the **operator-facing** sweep: `README.md`'s
+Controls table (Space/preset-select now dissolve rather than cut) and `docs/presets.md` /
+`presets/README.md` wherever they describe the composite order or state that ink is the final stage.
+`cargo test -p lmv-core`, `clippy -D warnings`, and the `hygiene` panic-pragma guard (any new hot-path
+`render/` file included) are green.
 
 ## Risks & open questions
 
-- **Hard dependency on Plan 0018.** This plan assumes 0018 has landed its offscreen target, present
-  pass, and the `Clear`->`Load` scene migration. If 0018's landed target shape differs from its ADR
-  sketch, **trust the code over the plan** and adapt Phase 1's snapshot/target reuse to what exists.
-  Do not start this before 0018 closes.
-- **Blend granularity vs. the composite.** The blend should mix **fully-composited per-preset frames**
-  (each preset's own background/view/trails/kaleidoscope), so the exact insertion point is *after* each
-  composite and *before* present. Confirm this against 0018's landed pass order; a kaleidoscope or trail
-  stage that assumes it is last may need the blend to sit outside it.
+- **Plans 0018 and 0030 have both landed** (the hard dependencies, now satisfied). 0018 supplied the
+  offscreen target, present pass, and `Clear`->`Load` scenes; 0030 replaced its branch ladder with the
+  `PostChain`. The standing instruction survives: where this plan and the code disagree, **trust the
+  code**. In particular the composite is now `background -> scene -> PostChain -> [blend] -> ink ->
+  surface -> text/overlay`, and `post.rs`'s module docs state the order and the skip rule directly.
+- **Blend granularity is settled, but the colour-space trap is real.** The blend mixes each preset's
+  **own composited look** (its background, view, trails, kaleidoscope) *before* the engine-wide ink
+  remap — [ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md). The old worry
+  that "a kaleidoscope or trail stage may assume it is last" is answered structurally: no stage assumes
+  anything about position, `route` derives the fold order from the active flags, and the last active
+  stage targets whatever destination the caller passes. What replaces it is narrower and easier to get
+  wrong: **the snapshot must be the pre-ink frame.** Snapshotting the presented (already-inked) frame
+  and feeding it to a blend that then inks again double-applies the remap on the outgoing side, and
+  with default paper/ink it will look plausible rather than obviously broken.
+- **Ink's crossfade is the one new user-visible behavior in this revision.** One ink pass now serves
+  two presets that each bind their own `ink_*`/`paper_*`, so the params lerp by `t`. Two failure modes
+  to watch: a snap at `t = 0` (holding the incoming preset's params too early) and a mid-dissolve tone
+  neither preset configures (lerping in the wrong space — interpolate the *params*, not two remapped
+  frames; that latter is the non-linearity ADR-0032 rejected as Alternative B).
 - **Stateful incoming hitch.** A lazily-built stateful scene (reaction-diffusion, attractor) builds its
-  GPU resources on first render — now at the dissolve's opening frame. Consider pre-warming on
-  `begin_transition`; if deferred, note the one-time hitch as a known limitation.
-- **Trail-field ownership across a transition.** In dual-live, each side needs its own feedback field;
-  on finalize the incoming field must become *the* field. Verify no field is leaked or shared across the
-  two sides mid-blend.
+  GPU resources on first render — now at the dissolve's opening frame. The second `PostChain` adds its
+  own lazy build to the same frame (trails' `PingPongField`, the kaleidoscope's offscreen). Consider
+  pre-warming both on `begin_transition`; if deferred, note the one-time hitch as a known limitation.
+- **Trail-field ownership is answered by construction, not verification.** Each `PostChain` owns its
+  own `PingPongField` — proven by
+  `post.rs::two_chains_against_one_device_accumulate_independently` (Plan 0030 Phase 2), which asserts
+  a second chain starts from its own cleared accumulation and then reproduces the first chain's pixels
+  when driven through the same history. What is left to get right is **finalize**: the incoming chain
+  must become *the* chain and the outgoing one drop, with no frame where both or neither is live.
 - **Budget threshold tuning.** The dual-live/freeze cutover threshold is a magic number; keep it a named
   code constant for on-rig calibration (like the director dwell constants), and log the selected mode
   under the diagnostics overlay if cheap.
 - **Interaction with Plan 0016 (attractor).** The compute-particle attractor is the heaviest scene and
-  the primary freeze-fallback trigger; if 0016 has not landed, the heavy-case done-when uses
-  reaction-diffusion alone.
+  the primary freeze-fallback trigger. 0016 **has** landed, so the heavy case is the real
+  attractor <-> reaction-diffusion pair.
+- **The two-stage chain has less routing coverage than the three-stage one.** ADR-0032 shrinks
+  `STAGE_COUNT` to 2, so `post.rs`'s all-combinations sweeps go from eight cases to four. That is
+  correct — there is nothing else to enumerate — but it means the chain's contract is proportionally
+  less exercised than it was at Plan 0030's close. If a later stage joins the chain, the sweep grows
+  back; do not read the smaller sweep as a weakened guard.
 
 ## What this plan does NOT do
 
@@ -181,3 +313,9 @@ warnings`, and the `hygiene` panic-pragma guard (any new hot-path `render/` file
 - **No new dependency.** Blend shaders and the controller are hand-written; the snapshot reuses the
   Plan 0018 present/capture machinery.
 - **No MIDI/UI to pick transitions.** Selection is code policy; exposing it to the operator is later work.
+- **Does not change the `PostStage` trait or the chain's fixed-order rule.** ADR-0032 shrinks the
+  chain's *membership* only. The trait keeps its seven methods and its one-input `begin`; the blend is
+  not a `PostStage` and does not become one.
+- **Does not make ink per-preset.** Ink stays the engine-wide remap ADR-0028 describes — one pass on
+  the finished frame. The crossfade interpolates its params during a transition; it does not give each
+  side its own ink pass (ADR-0032 Alternative B, rejected).

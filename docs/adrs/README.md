@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0032**
+**Next free number: 0033**
 
 | ADR  | Title                                                      | Status   |
 |------|------------------------------------------------------------|----------|
@@ -41,4 +41,5 @@ you need a code comment.
 | [0028](0028-final-stage-ink-tone-remap.md) | Final-stage duotone "ink" tone-remap (paper/ink colors) generalizing invert; engine-wide black-on-white via a skippable last composite stage, `ink_*` named params (extends 0018, coordinates with 0024) | accepted |
 | [0029](0029-parametric-curve-shape-params.md) | Enrich the Maurer curve family via named shape params (radial offset + phase) so preset audio can morph the rose geometry; not new families or a superformula (supplements 0007) | accepted |
 | [0030](0030-scene-target-size-hot-path-hook.md) | Third `Scene` widening: a per-frame target-size hook; hot-path optional methods are now in scope under three conditions (retires the "off-hot-path only" bound from 0007/0021) | accepted |
-| [0031](0031-post-stage-trait-instantiable-composite-chain.md) | Post-composite stages behind a `PostStage` trait; the composite becomes an instantiable ordered `PostChain` (fixed order preserved, not a graph) — a third internal seam, unblocks 0024's dual-live | accepted |
+| [0031](0031-post-stage-trait-instantiable-composite-chain.md) | Post-composite stages behind a `PostStage` trait; the composite becomes an instantiable ordered `PostChain` (fixed order preserved, not a graph) — a third internal seam, unblocks 0024's dual-live | accepted (membership revised by 0032) |
+| [0032](0032-ink-leaves-the-chain-blend-between-chain-and-ink.md) | Ink leaves the `PostChain` and becomes a terminal engine post-pass; the two-input transition blend sits between chain and ink, outside the `PostStage` trait (revises 0031's membership, preserves 0028's ordering) | proposed |
