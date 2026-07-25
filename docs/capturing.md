@@ -11,8 +11,9 @@ built on that (Plan 0013):
   advisory distinctness report and golden-image regression.
 
 A headless render is a **pure function** of `(preset, input, frame-count)` —
-scenes are reseeded per capture, `SCENE_DT` is fixed, and the DSP is
-deterministic — so renders are reproducible and diff-able.
+scenes are reseeded per capture, every frame steps at the fixed
+`scenes::FALLBACK_DT` (the live app injects its real `dt` instead; Plan 0014),
+and the DSP is deterministic — so renders are reproducible and diff-able.
 
 Everything here is **dev/agent tooling**. The `image` crate is a *dev-dependency*
 only (ADR-0011), so the shipped `lmv.exe` is untouched; the CLI is a

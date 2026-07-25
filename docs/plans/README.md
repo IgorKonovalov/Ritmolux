@@ -9,7 +9,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title                                   | Status | Summary |
 |------|-----------------------------------------|--------|---------|
-| [0015](0015-preset-dir-override-and-live-iteration.md) | Preset-directory override + live iteration (`LMV_PRESET_DIR`, shot flags) | approved | Edit one **version-controlled** `presets/*.toml` and see it live in **both** the running standalone app and the headless `shot` CLI, no rebuild. An `LMV_PRESET_DIR` env var (honored by both Rust frontends via a **single shared resolver** extracted into a `standalone` lib module) overrides the seeded `%APPDATA%` dir; the app hot-reloads it on a tightened ~150 ms poll (skipping seeding when overridden), and `shot` gets `--presets <dir>` / `--preset-file <path>` flags that beat the env var. Dependency-free (polling, **no** `notify` crate); framed as a power-user "custom preset folder" knob; consolidates Plan 0007's duplicated Rust resolver. Standalone + docs only, **C ABI untouched (v3)**; foobar plugin out of scope. [ADR-0014](../adrs/0014-preset-dir-override-for-dev-iteration.md); rejected app CLI args, symlink, `notify` watcher, duplicated resolver, core-side resolution. |
 | [0019](0019-preset-grammar-v2.md) | Preset expression grammar v2: branching, math functions, tempo, typo warnings | approved | Grow the preset expression language so authors stop hitting walls: add math functions (`cos sqrt pow smoothstep mod`) + constants (`pi tau`), branching (six comparison operators yielding `0/1` + a `select(cond,x,y)` conditional), and two new variables — `tempo` and experimental `novelty` (plumb the already-computed `AnalysisFrame.bpm`/`novelty`, no new DSP). Fix the silent-typo footgun — an unknown parameter name becomes a surfaced load **warning** (preset still loads its good bindings), backed by each system declaring its param vocabulary. Rewrite the stale `docs/presets.md` (claims 10 presets / 2 systems; code ships 17 / 5) last. Core-only, allocation-free/panic-free per frame, **C ABI untouched**; no new DSP, no boolean ops, no ternary, no Rhai. Pre-1.0 so no backward-compat obligation (additions are incidentally non-breaking). [ADR-0020](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md), supplements [ADR-0002](../adrs/0002-layered-preset-architecture.md); from `preset-author`-lane grammar feedback. |
 | [0023](0023-cross-preset-transitions.md) | Cross-preset visual transitions: MilkDrop-style dissolves between presets | approved | Replace the instant preset **cut** with a MilkDrop-style **dissolve**. An engine `Transition` controller, driven by injected `dt`, blends the outgoing and incoming presets over ~1 s using a **small library** of blend kinds (crossfade, additive/burn, luma-dissolve, wipe/slide). The outgoing side is **snapshotted at transition start** (freeze path + safety net); the incoming renders live; **adaptive** logic re-renders the outgoing scene live too, but only when it is a *different* scene object and the frame budget is healthy, else it falls back to the snapshot (protects the 60 fps iGPU floor, NFR §1, and handles the same-slot case for free). Blends **fully-composited per-preset frames** via a two-input blend stage appended to Plan 0018's composite. Policy (kind/duration) is **engine-configured in code**; preset-declared `[transition]`, beat-quantized dissolves, and operator UI are explicit follow-ups. **Core-only, C ABI untouched, no new dependency.** **Sequenced after Plan 0018** (reuses its offscreen target + present + `Clear`->`Load` scenes; transitively after Plan 0014's `PingPongField` + injected `dt`). Realizes the cross-preset blending deferred by Plan 0003. [ADR-0024](../adrs/0024-cross-preset-transitions.md); rejected single-target alpha, always-dual-live, always-freeze, a `TransitionScene` wrapper, and preset-declared-now. |
 
@@ -44,18 +43,22 @@ see Recently closed.)
 (**[0010] Line-geometry scenes has now landed and closed** — the line-art category (roses,
 L-systems, Hankin stars) built on the shared `LineRenderer` is available; see Recently closed.)
 
-**[0015] Preset-dir override** is small, standalone + docs only, and **independent of the coupling
-above** (no `core` change, C ABI frozen) — it can land anytime. It's a strong companion to the
-scene plans (0010/0014): the shared-preset iteration loop it adds — edit `presets/*.toml`, see it
-live in the app and `shot` — is exactly how a developer/agent will tune the new curves and feedback
-presets those plans introduce, so doing it **before or alongside** 0010/0014 pays for itself.
+(**[0015] Preset-dir override has now landed and closed** — `LMV_PRESET_DIR` plus `shot`'s
+`--presets` / `--preset-file`, both resolved through the single `standalone/src/lib.rs` resolver, so
+editing a version-controlled `presets/*.toml` is live in the app (~150 ms) and in the next capture
+with no rebuild; see Recently closed. That is the edit loop the scene and grammar plans below tune
+their presets in.)
 
-**[0019] Preset grammar v2** is likewise **independent of the `dt` coupling** (it touches `preset/expr.rs`
-+ `schema.rs` + the load path, not the render clock or any scene), so it can land anytime. It's a natural
-companion to **[0015]** and the `preset-author` lane: 0015 gives the fast edit loop, 0019 widens what a
-preset can express (real `cos`, easing, `tempo`, threshold `select`) and stops the silent-typo footgun —
-so pairing them sharpens preset authoring end to end. Small, core-only, C ABI frozen. **Approved** —
-ready for `dev` (no ordering dependency; can land before or alongside the scene plans).
+**[0019] Preset grammar v2** is **independent of the `dt` coupling** (it touches `preset/expr.rs`
++ `schema.rs` + the load path, not the render clock or any scene), so it can land anytime. It is the
+natural sequel to the now-closed **[0015]** for the `preset-author` lane: 0015 gave the fast edit
+loop, 0019 widens what a preset can express (real `cos`, easing, `tempo`, threshold `select`) and
+stops the silent-typo footgun — together they sharpen preset authoring end to end. Small, core-only,
+C ABI frozen. **Approved** — ready for `dev` (no ordering dependency; can land before or alongside
+the scene plans). **Carries one deferred chore from Plan 0015's close:** the `preset-author` skill
+docs still say `LMV_PRESET_DIR` is unlanded and still teach the manual `%APPDATA%` copy-over — both
+skill updates ride in one user-applied edit at 0019's close (the architect cannot edit
+`.claude/skills/**`).
 
 (**[0020] Shared palette system has now landed and closed** — the shared `core/src/render/palette.rs`
 baked-LUT color surface (named + custom-stop palettes, bindable `saturation`/`hue`/`color_span`/
@@ -88,6 +91,56 @@ on the RD present, left from before 0025's alpha switch.)
 
 ## Recently closed
 
+- [0015 — Preset-directory override + live iteration](done/0015-preset-dir-override-and-live-iteration.md) —
+  **done 2026-07-25**, passed Mode 4 review (**no blockers**; one major, three minors, two nits).
+  Three `dev` phase commits (`82d33dc` shared resolver + `LMV_PRESET_DIR`, `9e59211` `shot
+  --presets` / `--preset-file`, `45bf613` docs). Editing a **version-controlled** `presets/*.toml`
+  is now live in the running app within ~150 ms and in the next headless capture, with no rebuild
+  and no relaunch. The per-OS resolver that was hand-copied into `main.rs` and `examples/shot.rs` is
+  now one module, `standalone/src/lib.rs` (a new `[lib]` target beside the `[[bin]]`, per ADR-0014):
+  `resolve_preset_dir() -> PresetDir::{Override, Default, Unresolved}` tells the caller **where the
+  directory came from**, which is what lets the app seed write-if-absent into the per-user default
+  and **never** into a user-owned override. `shot`'s precedence is `--preset-file` > `--presets` >
+  `LMV_PRESET_DIR` > per-user dir > embedded; the two explicit flags **error** when they come up
+  empty (an agent that named a folder wants exit 1, not a silent capture of some other library),
+  while levels 3-5 keep degrading downward as the app does (NFR 10). The `[source]` label printed on
+  every capture names the winner, so a PNG's provenance is never a guess. `main.rs` also stopped
+  keeping its own per-OS copy for `diagnostics.log` / `config.toml` / `soak.log` — they call the
+  lib's `preset_data_root` and, deliberately, do **not** move with the override. **Verified at
+  review** rather than taken on trust: `cargo test -p standalone --lib` **3/3** with the assertion
+  bodies read (they cover override-wins, override-survives-no-data-root, empty-is-unset, the per-OS
+  default, and `Unresolved` — a superset of the Phase 1 done-when), and all of Phase 2's done-whens
+  re-run live — `--presets presets --preset Aurora` exit 0 `[--presets presets]`, `--preset-file
+  presets/fragment_aurora.toml` with **no** `--preset` exit 0, a bad `--presets` and a bad
+  `--preset-file` both exit 1, and `--report` labelling `[LMV_PRESET_DIR ./presets]` set versus
+  `[on-disk C:\Users\...\Roaming\...]` unset, which is the direct proof that app and `shot` share one
+  resolver. Zero `core/` changes in the range; `plugin-foobar/foo_lmv.cpp` is **comment-only** (it
+  now says in writing that it is the last independent copy of the path and does not honor the env
+  var); **C ABI untouched (v4)**; no new dependency (polling, **no** `notify` — ADR-0014 C).
+  [ADR-0014](../adrs/0014-preset-dir-override-for-dev-iteration.md) accepted at this close.
+  **Accepted `dev` judgment calls:** the Edition-2024 `unsafe env::set_var` problem is handled by
+  factoring the rule into a pure `resolve_preset_dir_from(env, root)` with two env-free tests plus
+  **one** test holding both env halves (verified sound — the other tests never read env, and the
+  bin's `director`/`overlay`/`capture_mac` tests are a separate process); `--preset` became optional
+  for a one-entry roster (the plan's own done-when command needed it); malformed files in a loaded
+  directory are now reported on stderr, matching the app. **Major (deferred by user call, rides with
+  Plan 0019's close):** `.claude/skills/preset-author/SKILL.md` + `references/render-loop.md` still
+  state this plan is unlanded and still teach the manual `%APPDATA%` copy-over dance — the lane this
+  feature was built for. Architect cannot apply it (`.claude/skills/**` is denied); user-gated.
+  **Minors fixed in this close commit:** `docs/presets.md` still said the poll was ~500 ms in a
+  second place, `presets/README.md` still described the copy-into-`%APPDATA%` flow from inside the
+  very folder the override targets, and `docs/capturing.md` still named the retired `SCENE_DT`
+  (substance was right — headless steps at `scenes::FALLBACK_DT`). **Nits:** the lib's env-test
+  SAFETY comment claims no test in the crate reads the environment, three lines above its own
+  `preset_data_root()` read (reasoning holds, the sentence overstates); the plan and this index both
+  labelled the untouched C ABI "v3" when it has been v4 since Plan 0014 — corrected. **Observation,
+  unmeasured:** `poll_presets()` runs in the redraw path (`main.rs:311`) and does a synchronous
+  `read_dir` + one `metadata()` per `.toml`, now 6.7x/s instead of 2x/s. Sub-millisecond on a warm
+  local dir and pre-accepted by the plan; the uncovered case is a *slow* override folder (network
+  share, sync-backed) eating a 16.6 ms frame. If it ever shows in the soak log the fix is an
+  off-thread signature scan, **not** a looser interval — that would undo the feature. **Not covered
+  by tests, by design:** "the aurora recolors on screen within ~150 ms" is the plan's stated
+  on-device visual check. Version **minor 0.13.1 -> 0.14.0** at close (a feature plan).
 - [0029 — Attractor resize cost + ink-stage followups](done/0029-attractor-resize-cost-and-ink-followups.md) —
   **done 2026-07-25**, passed Mode 4 review (**no blockers, no majors**; two minors, two nits). Five
   `dev` phase commits (`773d437` resource split, `9b927ea` quantize + aspect-preserving cap,

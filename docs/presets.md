@@ -51,7 +51,7 @@ cross-preset blending, and the other built-in systems are deferred.
    size       = "1.0 + beat * 0.6"
    ```
 
-4. **Save and watch.** The standalone app polls the folder every ~500 ms and
+4. **Save and watch.** The standalone app polls the folder every ~150 ms and
    hot-reloads on any change (no restart). Press **Space** to cycle to your new
    preset; the window title shows the active preset name and system. If the file
    has a typo, the app reports it and keeps the last good set — it never crashes

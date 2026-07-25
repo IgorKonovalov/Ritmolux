@@ -6,8 +6,18 @@ analysis. Line-art systems (ADR-0007) additionally take a declarative
 **structural-config table** (`[curve]` / `[generator]`) that is *not* expressions.
 
 Files here are the curated set embedded into the binary and seeded into the
-per-user preset directory on first run (Plan 0007). Editing a file and dropping
-it in that directory hot-reloads it.
+per-user preset directory on first run (Plan 0007). Seeding is **write-if-absent**,
+so editing a file *here* is invisible to a frontend already reading its seeded
+copy. Point both frontends at this folder instead and edit in place — the app
+hot-reloads within ~150 ms, no rebuild:
+
+```sh
+$env:LMV_PRESET_DIR = "./presets"; cargo run -p standalone --release   # PowerShell
+cargo run -p standalone --example shot -- --preset-file presets/<name>.toml --out a.png
+```
+
+See [`../docs/presets.md`](../docs/presets.md#a-custom-preset-folder-lmv_preset_dir)
+and [`../docs/capturing.md`](../docs/capturing.md#editing-presets-live).
 
 ## Skeleton
 
