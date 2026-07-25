@@ -35,6 +35,7 @@
 )]
 
 use super::feedback::PingPongField;
+use super::post::PostStage;
 
 /// Fixed internal composite resolution (16:9), presented stretched to the surface
 /// (module docs). High enough that line trails stay crisp, cheap enough for the
@@ -379,15 +380,21 @@ impl Trails {
             amount: DEFAULT_TRAILS,
         }
     }
+}
+
+impl PostStage for Trails {
+    fn name(&self) -> &'static str {
+        "trails"
+    }
 
     /// Reset the `trails` amount to its default (each frame, before the active
     /// preset's bindings are routed).
-    pub fn reset_params(&mut self) {
+    fn reset_params(&mut self) {
         self.amount = DEFAULT_TRAILS;
     }
 
     /// Apply one named parameter, returning whether it was the `trails` param.
-    pub fn set_param(&mut self, name: &str, value: f32) -> bool {
+    fn set_param(&mut self, name: &str, value: f32) -> bool {
         if name == "trails" {
             self.amount = value;
             true
@@ -396,58 +403,51 @@ impl Trails {
         }
     }
 
-    /// Drop the lazily-built resources so the accumulation restarts cleared — used
-    /// on the capture scene-rebuild so a capture stays a pure function of its
-    /// inputs, and so a stale trails pipeline never lingers to mis-render the next
-    /// capture's scene on the WARP adapter (module docs).
-    pub fn reset_resources(&mut self) {
-        self.res = None;
-    }
-
     /// Whether trails are active this frame (a preset bound `trails > 0`).
-    pub fn active(&self) -> bool {
+    fn active(&self) -> bool {
         self.amount > 0.0 && self.amount.is_finite()
     }
 
-    /// The aspect the scene should render at into the composited target — the
-    /// fixed internal 16:9, presented stretched.
-    pub fn aspect() -> f32 {
-        TRAILS_W as f32 / TRAILS_H as f32
-    }
-
-    /// The fixed internal accumulation size. The renderer reports this — not the
-    /// surface — as the target size to a scene that sizes an internal field
-    /// ([`Scene::set_target_size`](super::scenes::Scene::set_target_size)), so the scene does not
-    /// supersample into an offscreen smaller than the window (Plan 0027 Phase 2).
-    pub fn size() -> (u32, u32) {
-        (TRAILS_W, TRAILS_H)
+    /// The fixed internal accumulation size (16:9), presented stretched. The chain
+    /// reports this — not the surface — as the target size to a scene that sizes an
+    /// internal field ([`Scene::set_target_size`](super::scenes::Scene::set_target_size)),
+    /// so the scene does not supersample into an offscreen smaller than the window
+    /// (Plan 0027 Phase 2), and derives the scene's aspect from it.
+    fn internal_size(&self) -> Option<(u32, u32)> {
+        Some((TRAILS_W, TRAILS_H))
     }
 
     /// Build the resources if needed (clearing the fresh accumulation) and return
     /// the offscreen view the background + scene render into this frame. Returns
     /// `None` only if the resources are absent (never, after the build above) —
     /// the caller falls back to the surface view. Called when
-    /// [`active`](Self::active).
-    pub fn begin(&mut self, encoder: &mut wgpu::CommandEncoder) -> Option<&wgpu::TextureView> {
+    /// [`active`](PostStage::active).
+    fn begin(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        _surface: (u32, u32),
+    ) -> Option<wgpu::TextureView> {
         if self.res.is_none() {
             let res = Resources::build(&self.device, self.surface_format);
             res.clear_accum(encoder);
             self.res = Some(res);
         }
-        self.res.as_ref().map(|res| &res.composited_view)
+        self.res.as_ref().map(|res| res.composited_view.clone())
     }
 
     /// Fold this frame's composited target into the accumulation (max-decay) and
-    /// present the result to `surface_view`. Called after the scene has rendered
-    /// into the [`begin`](Self::begin) target, when [`active`](Self::active).
-    pub fn resolve(
+    /// present the result to `out` — the next active stage's input, or the surface.
+    /// Called after the scene has rendered into the [`begin`](PostStage::begin)
+    /// target, when [`active`](PostStage::active). Returns the two passes it
+    /// encodes (feedback + present).
+    fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        surface_view: &wgpu::TextureView,
-    ) {
+        out: &wgpu::TextureView,
+    ) -> u32 {
         let Some(res) = self.res.as_mut() else {
-            return;
+            return 0;
         };
         let fade = self.amount.clamp(0.0, MAX_FADE);
         queue.write_buffer(
@@ -496,7 +496,7 @@ impl Trails {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("trails-present-pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: surface_view,
+                view: out,
                 depth_slice: None,
                 resolve_target: None,
                 ops: wgpu::Operations {
@@ -512,5 +512,15 @@ impl Trails {
         pass.set_pipeline(&res.present_pipeline);
         pass.set_bind_group(0, present_bg, &[]);
         pass.draw(0..3, 0..1);
+
+        2 // the feedback pass + the present pass
+    }
+
+    /// Drop the lazily-built resources so the accumulation restarts cleared — used
+    /// on the capture scene-rebuild so a capture stays a pure function of its
+    /// inputs, and so a stale trails pipeline never lingers to mis-render the next
+    /// capture's scene on the WARP adapter (module docs).
+    fn reset_resources(&mut self) {
+        self.res = None;
     }
 }

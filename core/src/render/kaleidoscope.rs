@@ -30,10 +30,14 @@
     clippy::unreachable
 )]
 
+use super::post::PostStage;
+
 /// Fixed internal resolution (16:9), presented stretched (module docs); the fold
 /// is aspect-corrected to this ratio so the wedges are symmetric on a 16:9 frame.
 const KALEIDO_W: u32 = 1280;
 const KALEIDO_H: u32 = 720;
+/// The fold's aspect correction — the ratio of the fixed internal grid above.
+const KALEIDO_ASPECT: f32 = KALEIDO_W as f32 / KALEIDO_H as f32;
 
 /// `kaleido_order` default — 1 = identity, so an unbound preset is unaffected.
 const DEFAULT_ORDER: f32 = 1.0;
@@ -262,15 +266,21 @@ impl Kaleidoscope {
             angle: DEFAULT_ANGLE,
         }
     }
+}
+
+impl PostStage for Kaleidoscope {
+    fn name(&self) -> &'static str {
+        "kaleidoscope"
+    }
 
     /// Reset the fold params to their defaults (each frame, before routing).
-    pub fn reset_params(&mut self) {
+    fn reset_params(&mut self) {
         self.order = DEFAULT_ORDER;
         self.angle = DEFAULT_ANGLE;
     }
 
     /// Apply one named parameter, returning whether it was a `kaleido_*` param.
-    pub fn set_param(&mut self, name: &str, value: f32) -> bool {
+    fn set_param(&mut self, name: &str, value: f32) -> bool {
         match name {
             "kaleido_order" => self.order = value,
             "kaleido_angle" => self.angle = value,
@@ -279,66 +289,58 @@ impl Kaleidoscope {
         true
     }
 
-    /// Drop the lazily-built resources — used on the capture scene-rebuild so a
-    /// stale fold pipeline never lingers to mis-render the next capture's scene on
-    /// the WARP adapter (module docs).
-    pub fn reset_resources(&mut self) {
-        self.res = None;
-    }
-
     /// Whether the fold is active this frame (order at least 2; below that it is
     /// the identity passthrough).
-    pub fn active(&self) -> bool {
+    fn active(&self) -> bool {
         self.order >= MIN_ACTIVE_ORDER && self.order.is_finite()
     }
 
-    /// The aspect the composite should render at into the fold's input — the fixed
-    /// internal 16:9, presented stretched.
-    pub fn aspect() -> f32 {
-        KALEIDO_W as f32 / KALEIDO_H as f32
-    }
-
-    /// The fixed internal fold-input size — reported to a scene that sizes an
-    /// internal field, as [`Trails::size`](super::trails::Trails::size) is.
-    pub fn size() -> (u32, u32) {
-        (KALEIDO_W, KALEIDO_H)
+    /// The fixed internal fold-input size (16:9), presented stretched — reported to
+    /// a scene that sizes an internal field, as the trails stage's is, and the
+    /// source of the aspect the composite renders at.
+    fn internal_size(&self) -> Option<(u32, u32)> {
+        Some((KALEIDO_W, KALEIDO_H))
     }
 
     /// Build the resources if needed and return the offscreen view the composite
     /// (background + scene, or the trails output) renders into this frame. `None`
     /// only if the resources are absent (never, after the build) — the caller
-    /// falls back to the surface. Called when [`active`](Self::active).
-    pub fn begin(&mut self, _encoder: &mut wgpu::CommandEncoder) -> Option<&wgpu::TextureView> {
+    /// falls back to the surface. Called when [`active`](PostStage::active).
+    fn begin(
+        &mut self,
+        _encoder: &mut wgpu::CommandEncoder,
+        _surface: (u32, u32),
+    ) -> Option<wgpu::TextureView> {
         if self.res.is_none() {
             self.res = Some(Resources::build(&self.device, self.surface_format));
         }
-        self.res.as_ref().map(|res| &res.src_view)
+        self.res.as_ref().map(|res| res.src_view.clone())
     }
 
-    /// Fold the input offscreen into `surface_view`. Called after the composite
-    /// has rendered into the [`begin`](Self::begin) target, when
-    /// [`active`](Self::active).
-    pub fn resolve(
+    /// Fold the input offscreen into `out` — the next active stage's input, or the
+    /// surface. Called after the composite has rendered into the
+    /// [`begin`](PostStage::begin) target, when [`active`](PostStage::active).
+    fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        surface_view: &wgpu::TextureView,
-    ) {
+        out: &wgpu::TextureView,
+    ) -> u32 {
         let Some(res) = self.res.as_ref() else {
-            return;
+            return 0;
         };
         let order = self.order.clamp(MIN_ACTIVE_ORDER, MAX_ORDER);
         queue.write_buffer(
             &res.uniform,
             0,
             bytemuck::bytes_of(&K {
-                v: [order, self.angle, Self::aspect(), 0.0],
+                v: [order, self.angle, KALEIDO_ASPECT, 0.0],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("kaleido-pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: surface_view,
+                view: out,
                 depth_slice: None,
                 resolve_target: None,
                 ops: wgpu::Operations {
@@ -354,5 +356,14 @@ impl Kaleidoscope {
         pass.set_pipeline(&res.pipeline);
         pass.set_bind_group(0, &res.bind_group, &[]);
         pass.draw(0..3, 0..1);
+
+        1 // the fold pass
+    }
+
+    /// Drop the lazily-built resources — used on the capture scene-rebuild so a
+    /// stale fold pipeline never lingers to mis-render the next capture's scene on
+    /// the WARP adapter (module docs).
+    fn reset_resources(&mut self) {
+        self.res = None;
     }
 }
