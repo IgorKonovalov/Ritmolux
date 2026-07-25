@@ -12,7 +12,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0015](0015-preset-dir-override-and-live-iteration.md) | Preset-directory override + live iteration (`LMV_PRESET_DIR`, shot flags) | approved | Edit one **version-controlled** `presets/*.toml` and see it live in **both** the running standalone app and the headless `shot` CLI, no rebuild. An `LMV_PRESET_DIR` env var (honored by both Rust frontends via a **single shared resolver** extracted into a `standalone` lib module) overrides the seeded `%APPDATA%` dir; the app hot-reloads it on a tightened ~150 ms poll (skipping seeding when overridden), and `shot` gets `--presets <dir>` / `--preset-file <path>` flags that beat the env var. Dependency-free (polling, **no** `notify` crate); framed as a power-user "custom preset folder" knob; consolidates Plan 0007's duplicated Rust resolver. Standalone + docs only, **C ABI untouched (v3)**; foobar plugin out of scope. [ADR-0014](../adrs/0014-preset-dir-override-for-dev-iteration.md); rejected app CLI args, symlink, `notify` watcher, duplicated resolver, core-side resolution. |
 | [0019](0019-preset-grammar-v2.md) | Preset expression grammar v2: branching, math functions, tempo, typo warnings | approved | Grow the preset expression language so authors stop hitting walls: add math functions (`cos sqrt pow smoothstep mod`) + constants (`pi tau`), branching (six comparison operators yielding `0/1` + a `select(cond,x,y)` conditional), and two new variables — `tempo` and experimental `novelty` (plumb the already-computed `AnalysisFrame.bpm`/`novelty`, no new DSP). Fix the silent-typo footgun — an unknown parameter name becomes a surfaced load **warning** (preset still loads its good bindings), backed by each system declaring its param vocabulary. Rewrite the stale `docs/presets.md` (claims 10 presets / 2 systems; code ships 17 / 5) last. Core-only, allocation-free/panic-free per frame, **C ABI untouched**; no new DSP, no boolean ops, no ternary, no Rhai. Pre-1.0 so no backward-compat obligation (additions are incidentally non-breaking). [ADR-0020](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md), supplements [ADR-0002](../adrs/0002-layered-preset-architecture.md); from `preset-author`-lane grammar feedback. |
 | [0023](0023-cross-preset-transitions.md) | Cross-preset visual transitions: MilkDrop-style dissolves between presets | approved | Replace the instant preset **cut** with a MilkDrop-style **dissolve**. An engine `Transition` controller, driven by injected `dt`, blends the outgoing and incoming presets over ~1 s using a **small library** of blend kinds (crossfade, additive/burn, luma-dissolve, wipe/slide). The outgoing side is **snapshotted at transition start** (freeze path + safety net); the incoming renders live; **adaptive** logic re-renders the outgoing scene live too, but only when it is a *different* scene object and the frame budget is healthy, else it falls back to the snapshot (protects the 60 fps iGPU floor, NFR §1, and handles the same-slot case for free). Blends **fully-composited per-preset frames** via a two-input blend stage appended to Plan 0018's composite. Policy (kind/duration) is **engine-configured in code**; preset-declared `[transition]`, beat-quantized dissolves, and operator UI are explicit follow-ups. **Core-only, C ABI untouched, no new dependency.** **Sequenced after Plan 0018** (reuses its offscreen target + present + `Clear`->`Load` scenes; transitively after Plan 0014's `PingPongField` + injected `dt`). Realizes the cross-preset blending deferred by Plan 0003. [ADR-0024](../adrs/0024-cross-preset-transitions.md); rejected single-target alpha, always-dual-live, always-freeze, a `TransitionScene` wrapper, and preset-declared-now. |
-| [0029](0029-attractor-resize-cost-and-ink-followups.md) | Attractor resize cost + ink-stage followups | in-progress | Clean up the Plan 0027 close-review findings. Plan 0027 tied the attractor's trail grid to its render target (correct, and it delivered the sharpness), but a size change rebuilds the scene's **entire** GPU resource block inside `render` — four shader modules, every pipeline, the 50k-particle buffer, both LUT textures — and clears the trail; `standalone` forwards every `WindowEvent::Resized`, so a live drag pays a shader-compilation stall per frame and never converges to a visible field, and the double-click fullscreen toggle pops the cloud back to its seed scatter. Splits `Resources` along the axis that actually varies (grid-dependent `PingPongField` + its four bind groups vs. grid-independent shaders/pipelines/particles/LUTs), quantizes the requested grid to a 256 px step so most resize deltas cost a compare, and makes the cap aspect-preserving (the per-axis clamp squashes ultrawide above 2560). Then the smaller items: the **first behavioral test for the ink stage** (ADR-0028 left the golden optional; nothing asserts `ink_amount = 1` inverts anything), renaming the ADR-0030 hook to `set_target_size` and correcting its doc (it receives the *target* size, which is the trails/kaleidoscope 1280x720 grid when those stages are active — not the surface), and replacing the `presets/README.md` recommendation of a partial `ink_amount` with the honest note that it blends toward the near-black source and greys the paper. Core-only, **no `Scene`-trait widening** (one rename), C ABI untouched, no new dependency, no wall clock (a debounce was rejected for exactly that reason). [ADR-0030](../adrs/0030-scene-target-size-hot-path-hook.md) / [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md). | Deliver the "ink on paper" look the `preset-author` lane couldn't reach: a WHITE background with BLACK moving lines, plus a sharper attractor. Root cause is the **additive** (lightening) compositing model — dark strokes add nothing, so black-on-white is the *inverse* of the model, not a color choice (Plan 0025 gives a white background via alpha-present, Plan 0020 gives arbitrary stroke colors, but neither adds a **darkening** step). Adds one **engine-wide final composite stage** (`render/ink.rs`) that duotone-remaps the finished frame to `mix(paper, ink, luminance)` between two preset-configurable colors — default white/black = a pure invert, so every scene (sparse and fullscreen) gets black-on-white / colored-duotone via bindable `ink_*` params routed exactly like `bg_*`; passthrough (byte-identical) when `ink_amount<=0`. Phase 2 replaces the attractor's fixed **640x360** trail field with a surface-tied (capped) internal resolution to kill the soft upscale. **Core-only, C ABI untouched, no `Scene`-trait change, no new dependency.** **Hard-sequenced after Plans 0020 + 0025** (shares the attractor present/draw path; ink rides on their LUT-colored, alpha-composited output). [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md) (proposed, extends [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md), coordinates with [ADR-0024](../adrs/0024-cross-preset-transitions.md)); rejected per-scene darkening blend, boolean-only invert, do-nothing-on-0025+0020. From `preset-author`-lane feedback (2026-07-24). |
 
 ## Recommended execution sequence
 
@@ -22,20 +21,14 @@ render clock (`Renderer::render(&frame, dt)`, `Scene::advance`, `SCENE_DT` retir
 C ABI **v4 `lmv_render_dt`**, and the `ReactionDiffusion` scene all exist for the plans below to build
 against; see Recently closed. Plan 0013's capture/visual-QA harness landed before it.)
 
-1. **[0029] Attractor resize cost + ink-stage followups** — no ordering dependency, and the
-   recommended next `dev` task: it closes the two majors from the 0027 review while that code is
-   still fresh, and its user-visible half (a window drag or fullscreen toggle stalls and blanks the
-   attractor) is a regression that shipped with 0027. Worth doing before the next feature plan rather
-   than after. Core-only, C ABI untouched
-   ([ADR-0030](../adrs/0030-scene-target-size-hot-path-hook.md)). **In progress** — Phases 1-4 landed
-   (`773d437`..`dd74d41`); the Mode 4 review added **Phase 5**, which is the only thing left. Phase 2
-   quantized the trail grid to a 256 px step and so broke the grid-equals-target identity the draw
-   uniform's `aspect` silently relied on: the attractor now draws 11% too wide at the default
-   1920x1080 window and 33% too wide at 512x384. Two-line fix — project at the `aspect` argument
-   `render` already receives and discards — plus the first non-square-target assertion in the suite
-   (every capture is square today, which is why nothing caught it).
+(**[0029] Attractor resize cost + ink-stage followups has now landed and closed** — the attractor's
+GPU resources are split along grid-dependence so a size change rebuilds only the accumulation field,
+the trail grid is quantized to a 256 px step with an aspect-preserving cap, the ink stage has its
+first behavioral test, and the projection uses the **target's** aspect rather than the grid's; see
+Recently closed. Its `PipelineResources`/`FieldResources` split is the pattern the deferred
+"target-sized internal grid for RD/trails/kaleidoscope" work would follow.)
 
-2. **[0023] Cross-preset transitions (MilkDrop-style dissolves)** — **hard-sequenced after 0018,
+1. **[0023] Cross-preset transitions (MilkDrop-style dissolves)** — **hard-sequenced after 0018,
    which has now landed** (see Recently closed): appends a two-input blend stage to 0018's engine
    composite (offscreen target + present + `Clear`->`Load` scenes, all now in place) and snapshots the
    outgoing composited frame. Adaptive dual-live/freeze protects the NFR §1 iGPU floor; the heaviest
@@ -94,6 +87,57 @@ on the RD present, left from before 0025's alpha switch.)
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0029 — Attractor resize cost + ink-stage followups](done/0029-attractor-resize-cost-and-ink-followups.md) —
+  **done 2026-07-25**, passed Mode 4 review (**no blockers, no majors**; two minors, two nits). Five
+  `dev` phase commits (`773d437` resource split, `9b927ea` quantize + aspect-preserving cap,
+  `59aa298` ink golden, `dd74d41` rename + doc corrections, `e375c2e` project at the target aspect).
+  Closes the two majors from the Plan 0027 review. `Resources` is split along the axis that actually
+  varies: `PipelineResources` (four shader modules, every pipeline, the 50k-particle buffer, both LUT
+  textures, the uniforms, the layouts and sampler) is built **once and survives every size change**,
+  and only `FieldResources` (the `PingPongField` plus the four bind groups referencing its views) is
+  rebuilt — so a live window drag costs a texture pair plus four bind groups instead of four WGSL
+  compilations per frame. `trail_grid_size` became the whole size policy in one pure function:
+  each axis rounds up to a **256 px step** (so most resize deltas cost two integer compares) and the
+  cap is a **single scale factor** applied to both axes (the old per-axis clamp squashed a 3440x1440
+  ultrawide target to 16:9, which the aspect-ignoring present stretched back — the shape changed
+  discontinuously as the window crossed 2560 wide). `core/tests/ink.rs` is the **first behavioral test
+  of the ink stage** (ADR-0028 had filed it optional): it asserts `ink_amount = 0` is byte-identical
+  to the unbound fixture, then bands the ink-off frame by luminance and requires the band means to
+  come back **strictly decreasing with the ends crossing** — the ADR-0028 property itself rather than
+  a tuned constant. `Scene::resize` is renamed **`set_target_size`** with a doc that states what it
+  actually carries (the trails/kaleidoscope internal grid when those stages are active, not the
+  surface) and restates the ADR-0030 compare-first obligation; `presets/README.md` replaces the
+  `"0.5"` recommendation with the honest note that a partial amount blends toward the near-black
+  source and greys the paper (now agreeing with the warning in `presets/attractor_ink.toml`).
+  **Phase 5 was added mid-plan by the Mode 4 review of Phases 1-4:** quantization broke the
+  grid-equals-target identity the draw uniform's `aspect` silently relied on, so the attractor drew
+  11% too wide at the default 1920x1080 window and 33% too wide at 512x384; the fix projects at the
+  `aspect` argument `render` already received and discarded. **Verified at review:** `cargo nextest
+  run -p lmv-core` **95/95 green**; `clippy -p lmv-core --all-targets -D warnings` + `cargo fmt
+  --check` clean; both new tests read and confirmed non-vacuous, and the Phase 5 assertion confirmed
+  to **fail before the fix** by temporarily restoring the grid-ratio projection (reported exactly the
+  predicted 1.329 skew, 1.00 after) — it is the suite's first non-square capture, which is why every
+  earlier square capture was blind to the defect. `core/tests/golden/attractor.png` is the **only**
+  baseline that changed (the 128x128 capture now takes a 256x256 field), correctly scoped and noted
+  in its commit. **Core-only; C ABI untouched (v4); no new dependency; no wall clock** (the debounce
+  alternative was rejected for exactly that reason), so fixed-size captures stay byte-reproducible.
+  The split is enforced by the types — `FieldResources::build` takes `&PipelineResources` and can
+  reach only the layouts, sampler and decay uniform, so a pipeline cannot drift back into the rebuilt
+  block. ADR-0028 and ADR-0030 were already **accepted** at Plan 0027's close. **Minors:** (1) the
+  particle **re-seed** on a grid change (`particles/mod.rs:1403`) is no longer necessary — the buffer
+  now survives the split — and is the surviving half of the "fullscreen toggle pops the cloud back to
+  its seed scatter" symptom the plan opened with; determinism does not need it (a headless capture
+  holds one target size, and a mid-capture stage flip stays a pure function of the frame index), so
+  moving `needs_upload = true` into the first-build arm finishes the job; (2) the 256 px quantization
+  **floors** at one full step, so every headless capture supersamples (a 128x128 target takes a
+  256x256 field — that is why the golden changed) and no test exercises the grid-equals-target path
+  any more. **Nits:** (3) `trail_grid_size` was made `pub`, widening `lmv-core`'s public API for a
+  test's benefit (consistent with `AttractorFamily` already being public there, so not new drift);
+  (4) this row's predecessor carried a stray fifth table column, fixed by this close. **Manual check
+  (non-blocking):** the plan's user-visible payoff — a smooth live window drag that keeps the cloud,
+  and a stall-free fullscreen toggle — needs a real window to confirm; the 256 px step is one
+  constant if it reads wrong on device. Version **patch 0.13.0 -> 0.13.1** at close (a fix-only plan).
 
 - [0027 — Attractor ink-on-paper (engine-wide final tone-remap) + crisp trails](done/0027-attractor-ink-and-crisp-trails.md) —
   **done 2026-07-25**, passed Mode 4 review (no blockers; two majors and four minors, all routed to

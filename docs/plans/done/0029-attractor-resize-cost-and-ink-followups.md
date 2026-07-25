@@ -1,12 +1,37 @@
 # 0029 — Attractor resize cost + ink-stage followups
 
-> **Status:** in-progress
+> **Status:** done (2026-07-25)
 > **Created:** 2026-07-25
 > **Owner skill(s):** dev
 > **Related ADRs:** [0030](../adrs/0030-scene-target-size-hot-path-hook.md) (the target-size hook this
 > plan makes cheap to respond to); [0028](../adrs/0028-final-stage-ink-tone-remap.md) (the ink stage
 > this plan tests and de-muddies). Cleans up findings from the Plan
 > [0027](done/0027-attractor-ink-and-crisp-trails.md) close review.
+
+## Close summary (Mode 4, 2026-07-25)
+
+Five `dev` phase commits — `773d437` (resource split), `9b927ea` (quantize + aspect-preserving cap),
+`59aa298` (ink golden), `dd74d41` (rename + doc corrections), `e375c2e` (project at the target
+aspect). Passed the close review with **no blockers and no majors**; two minors and two nits, all
+non-blocking and recorded in `docs/plans/README.md`.
+
+Verified at review: `cargo nextest run -p lmv-core` **95/95 green**; `clippy -p lmv-core
+--all-targets -D warnings` and `cargo fmt --check` clean. Both new behavioral tests were read and
+confirmed non-vacuous, and Phase 5's was confirmed to **fail before the fix** by temporarily
+restoring the grid-ratio projection — it reported exactly the predicted 1.329 skew, then 1.00 after.
+The resource split is enforced by the types, not a comment: `FieldResources::build` takes
+`&PipelineResources` and can reach only the layouts, sampler and decay uniform, so a pipeline cannot
+drift back into the rebuilt block. `core/tests/golden/attractor.png` is the only baseline that
+changed (the 128x128 capture now takes a 256x256 field), correctly scoped and noted in its commit.
+Core-only; **C ABI untouched (v4)**; no new dependency; no wall clock, so fixed-size captures stay
+byte-reproducible. ADR-0028 and ADR-0030 were already `accepted` at Plan 0027's close. Version
+**patch 0.13.0 -> 0.13.1** at close (a fix-only plan).
+
+Carried out of the review as followups, neither blocking: the particle **re-seed** on a grid change
+is now unnecessary (the buffer survives the split) and is the surviving half of the "pops back to its
+seed scatter" symptom this plan opened with — moving `needs_upload = true` into the first-build arm
+finishes it; and the 256 px quantization floor means every headless capture supersamples (a 128x128
+target takes a 256x256 field), so no test exercises the grid==target path any more.
 
 ## TL;DR
 
