@@ -232,8 +232,26 @@ flowchart TB
 - **Files touched:** `core/src/render/scenes/mod.rs`, `core/src/render/scenes/lines/mod.rs`,
   `core/src/render/scenes/lines/curves.rs`, `core/src/render/scenes/lines/parametric.rs`,
   `core/src/render/scenes/reaction_diffusion.rs`, `core/src/render/palette.rs`,
-  `core/src/preset/schema.rs`, `standalone/src/main.rs`
+  `core/src/preset/schema.rs`, `standalone/src/main.rs`, plus (added at Plan 0030's close)
+  `core/src/render/post.rs`, `core/src/render/context.rs`, `core/src/render/overlay.rs`,
+  `core/src/render/scenes/lines/renderer.rs`, `core/src/render/scenes/particles/mod.rs`
 - **Notes for the implementer:**
+  - **Cache the frame's `Routing` (Plan 0030 close-review minor 1):** `PostChain::begin`
+    (`post.rs:284`) and `PostChain::resolve` (`:310`) each call `self.routing()` independently. That
+    is safe today only because no stage's `active()` changes between them — a whole frame's
+    correctness rests on an incidental property, and Plan 0023's blend stage is controller-driven, so
+    it is exactly the case that could break it. Have `begin` store the `Routing` and `resolve` consume
+    it, so "one routing decision per frame" is structural. A stored `Routing` is `Copy` and
+    fixed-size, so this costs nothing.
+  - **`cargo doc -p lmv-core` warnings (Plan 0030 close-review minor 2):** ten intra-doc links resolve
+    to private items — `context.rs`, `overlay.rs`, `lines/renderer.rs`, `lines/mod.rs` (×2),
+    `particles/mod.rs` (×4), `reaction_diffusion.rs`. All pre-existing and all outside Plan 0030's
+    scope, which is why that plan's Phase 4 done-when went unmet rather than being force-fixed. These
+    are one-line fixes (drop the link, or point it at a public item); the phase is done when
+    `cargo doc -p lmv-core --no-deps` is **warning-free**.
+  - **Stale routing narration (Plan 0030 close-review nit):** `schema.rs:137` still says
+    `GLOBAL_PARAMS` are "the four compositing stages **the renderer** routes to before the scene".
+    Three of the four are now offered by the `PostChain`; the renderer only routes `bg_*` directly.
   - **`GeneratorConfig` relocation (closes Plan 0016's close-review minor 2):** the shared structural-
     config enum lives in `lines/mod.rs`, so the line module now reaches into
     `particles::AttractorFamily` for a variant that has nothing to do with lines. Move the enum (and
@@ -258,8 +276,10 @@ flowchart TB
   describes what the pass actually does; driving a preset's `mirror_order` past the cap live prints the
   overflow **once** on entry rather than per frame or never (verify by running with such a preset);
   `maurer_rose` takes a params struct and its tests construct it by field name; `Palette` is `Clone` and
-  not `Copy` with every call site adjusted; `cargo nextest run -p lmv-core` and
-  `cargo test -p standalone` green; goldens byte-identical.
+  not `Copy` with every call site adjusted; `PostChain::resolve` consumes the `Routing`
+  `PostChain::begin` decided rather than recomputing it, with the existing `post.rs` routing tests
+  still green and unedited; `cargo doc -p lmv-core --no-deps` emits **zero** warnings;
+  `cargo nextest run -p lmv-core` and `cargo test -p standalone` green; goldens byte-identical.
 
 ## Data shapes
 

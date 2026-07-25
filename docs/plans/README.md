@@ -9,7 +9,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title                                   | Status | Summary |
 |------|-----------------------------------------|--------|---------|
-| [0030](0030-composite-chain-and-scene-keying.md) | Composite chain + scene keying: a `PostStage` trait, an instantiable `PostChain`, and kind-keyed scenes | approved | Structural, **behavior-preserving** (byte-identical goldens are the central done-when), and **sequenced before [0023](0023-cross-preset-transitions.md)**. Replaces `draw_frame`'s hand-written composite branch ladder (~70 lines over `trailing`/`kaleidoing`/`inking`, `ink.begin()` at three call sites, `draw_calls` summed by hand) with a `PostChain` — an owned value holding `Trails`/`Kaleidoscope`/`Ink` behind a declared `PostStage` trait in ADR-0018/0028's **fixed compile-time order** (not a graph, not a registration point). The routing adjacency is factored out as a **pure function**, so the composite contract gets its first GPU-free unit tests. Because the chain is a value rather than a set of `Renderer` fields, a **second independent instance is constructible** — which is exactly what 0023's approved dual-live path needs ("each side needs its own feedback field", its own risk bullet); Phase 2 proves it with a test rather than assuming it. Also deletes `system_slot`'s magic-index scene lookup: scenes become kind-keyed via an exhaustive `match` factory + a single `SystemKind::ALL` roster that `golden.rs`'s duplicate `SYSTEMS` list retires onto, so a new scene can no longer silently render in the wrong slot. Core-only; C ABI untouched; `Scene` trait untouched; no new dependency. [ADR-0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md); rejected extending the ladder, a render graph (again), post-stages-as-`Scene`s, and trait-only-keep-the-ladder. From the 2026-07-25 codebase-health review. |
 | [0031](0031-composite-cleanup-and-debt.md) | Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and the accumulated close-review debt | approved | The non-blocking half of the 2026-07-25 codebase-health review **plus the minors four earlier closes logged and nobody returned for**. Six independent phases: (1) `standalone/examples/shot.rs` is 1028 lines / 45 functions with **zero tests** in a target where `#[test]` does not run — its pure helpers (WAV parse, JSON emit, filmstrip indices, tiling, glyphs) move to the existing `[lib]` and get real assertions, closing a blind spot the `preset-author` lane depends on; (2) `Renderer`'s three constructors (~28 duplicated lines each) collapse onto `from_context`; (3) each binding's easing `tau` and destination resolve **once at load** instead of a per-frame `BTreeMap<String,_>` lookup + chained `set_param` string-match — mainly so adding a stage stops meaning another link in a chained `if` inside the hot loop; (4) three needless per-frame operations go — the cap-overflow `format!` (**Plan 0018 minor 1**, still open), the identity-mirror buffer copy, and the attractor's now-redundant reseed on grid change (**Plan 0029 minor 1**); (5) duplicated GPU boilerplate (two `fullscreen_pipeline`s, three copies of the bind-entry helpers, ~8 pasted fullscreen-triangle vertex stages, the twice-written fixed-step accumulator) shares one home, and the 228-line `AttractorScene::render` splits along its own comment paragraphs; (6) structural/doc debt — `GeneratorConfig` moves out of `lines/mod.rs` (**Plan 0016 minor 2**), the stale RD "fullscreen opaque pass" comment (**Plan 0025/0027**), *live* cap-overflow surfacing (**Plan 0018 minor 2**), `RoseParams` for 11 positional `f32`s, and `Palette` dropping `Copy` at 6 KB. **Sequenced after 0030** (Phase 3 names its chain stages). No new ADR; no preset-visible change; C ABI untouched. |
 | [0023](0023-cross-preset-transitions.md) | Cross-preset visual transitions: MilkDrop-style dissolves between presets | approved | Replace the instant preset **cut** with a MilkDrop-style **dissolve**. An engine `Transition` controller, driven by injected `dt`, blends the outgoing and incoming presets over ~1 s using a **small library** of blend kinds (crossfade, additive/burn, luma-dissolve, wipe/slide). The outgoing side is **snapshotted at transition start** (freeze path + safety net); the incoming renders live; **adaptive** logic re-renders the outgoing scene live too, but only when it is a *different* scene object and the frame budget is healthy, else it falls back to the snapshot (protects the 60 fps iGPU floor, NFR §1, and handles the same-slot case for free). Blends **fully-composited per-preset frames** via a two-input blend stage appended to Plan 0018's composite. Policy (kind/duration) is **engine-configured in code**; preset-declared `[transition]`, beat-quantized dissolves, and operator UI are explicit follow-ups. **Core-only, C ABI untouched, no new dependency.** **Sequenced after Plan 0018** (reuses its offscreen target + present + `Clear`->`Load` scenes; transitively after Plan 0014's `PingPongField` + injected `dt`). Realizes the cross-preset blending deferred by Plan 0003. [ADR-0024](../adrs/0024-cross-preset-transitions.md); rejected single-target alpha, always-dual-live, always-freeze, a `TransitionScene` wrapper, and preset-declared-now. |
 
@@ -28,34 +27,36 @@ first behavioral test, and the projection uses the **target's** aspect rather th
 Recently closed. Its `PipelineResources`/`FieldResources` split is the pattern the deferred
 "target-sized internal grid for RD/trails/kaleidoscope" work would follow.)
 
-1. **[0030] Composite chain + scene keying** — **do this before 0023.** Structural and
-   behavior-preserving (byte-identical goldens are the acceptance criterion), but it is what makes
-   0023 tractable: 0023's Phase 3 renders **two fully-composited frames in one frame**, and today the
-   post stages are single-instance `Renderer` fields owning single offscreens and a single
-   `PingPongField` — its own risk bullet ("each side needs its own feedback field") is unsatisfiable
-   without duplicating every stage field *and* writing `draw_frame`'s branch ladder a second time.
-   0030 turns the composite into an owned `PostChain` behind a declared `PostStage` trait, so the
-   second chain is a construction rather than a re-architecture, and folds in the `system_slot`
-   magic-index deletion. Core-only, C ABI untouched
-   ([ADR-0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md)). **Approved
-   2026-07-25** — ready for `dev`, and the recommended next plan to implement.
+(**[0030] Composite chain + scene keying has now landed and closed** — the composite is an owned
+`PostChain` holding `Trails`/`Kaleidoscope`/`Ink` behind a declared `PostStage` trait in ADR-0018/0028
+order, its routing is a **pure, unit-tested** function over the active flags, and `system_slot`'s
+magic-index scene lookup is gone (scenes are keyed by `SystemKind` via an exhaustive factory over the
+single `SystemKind::ALL` roster). Every golden baseline is byte-identical. See Recently closed.
+**A second `PostChain` with fully independent GPU state is constructible and proven so by a test** —
+that is [0023]'s dual-live unblock, and its Phase 3 should now be revised to say "construct a second
+`PostChain`" rather than "allocate the second target".)
 
-2. **[0023] Cross-preset transitions (MilkDrop-style dissolves)** — **hard-sequenced after 0018,
-   which has now landed** (see Recently closed), and **now recommended after [0030]** (above):
+1. **[0023] Cross-preset transitions (MilkDrop-style dissolves)** — **hard-sequenced after 0018,
+   which has now landed** (see Recently closed), and **unblocked by [0030], which has now closed**:
    appends a two-input blend stage to 0018's engine composite (offscreen target + present +
    `Clear`->`Load` scenes, all now in place) and snapshots the outgoing composited frame. Adaptive
    dual-live/freeze protects the NFR §1 iGPU floor; the heaviest freeze-fallback trigger is 0016's
    attractor, so landing **after both 0016 and 0018** exercises the full matrix. Core-only, C ABI
    untouched ([ADR-0024](../adrs/0024-cross-preset-transitions.md)).
-   **Approved** — ready for `dev`. Note: **Phase 3 and two risk bullets want an architect edit once
-   0030 lands** ("allocate the second target / generalize the 0018 target into a reusable pair"
-   becomes "construct a second `PostChain`", and the "a kaleidoscope or trail stage that assumes it is
-   last" risk is answered structurally) — recorded as a followup on 0030.
+   **Approved** — ready for `dev`, **but wants an architect edit first**: 0030 has landed, so Phase 3
+   and two risk bullets are now stale ("allocate the second target / generalize the 0018 target into a
+   reusable pair" becomes "construct a second `PostChain`", and the "a kaleidoscope or trail stage
+   that assumes it is last" risk is answered structurally by the chain's routing). Carried over from
+   0030's followups — do the edit before handing this to `dev` so it does not re-solve it.
 
-3. **[0031] Cleanup pass (review findings + accumulated close-review debt)** — six independent phases,
-   no ordering pressure except its own Phase 3, which names 0030's chain stages. Safe to slot after
-   0023 if transitions are the priority; safe to run before it if a clean base is preferred, since
-   nothing in it is preset-visible. **Approved 2026-07-25** — ready for `dev` (after 0030).
+2. **[0031] Cleanup pass (review findings + accumulated close-review debt)** — six independent phases,
+   no ordering pressure except its own Phase 3, which names 0030's chain stages (**now landed**, so
+   that dependency is satisfied). Safe to slot after 0023 if transitions are the priority; safe to run
+   before it if a clean base is preferred, since nothing in it is preset-visible. **Approved
+   2026-07-25** — ready for `dev`. Phase 6 also carries three items from 0030's close review: cache
+   the `Routing` at `PostChain::begin` so one routing decision per frame is structural, the ten
+   pre-existing `cargo doc` intra-doc-link warnings, and the stale
+   `core/src/preset/schema.rs:137` "the renderer routes" narration.
 
 (**[0016] GPU compute-particle scenes has now landed and closed** — the engine's first compute
 pipeline + GPU-resident particle system (four strange-attractor families, data-driven `[particles]`
@@ -111,6 +112,32 @@ on the RD present, left from before 0025's alpha switch.)
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0030 — Composite chain + scene keying: a `PostStage` trait, an instantiable `PostChain`, and
+  kind-keyed scenes](done/0030-composite-chain-and-scene-keying.md) — **done 2026-07-25**, passed
+  Mode 4 review (**no blockers**; three minors, one nit). Four `dev` phase commits (`023777d` trait +
+  pure routing + chain, `55c7109` the two-chain independence proof, `9c02953` kind-keyed scenes,
+  `d711760` docs). `draw_frame`'s ~70-line composite branch ladder over `trailing`/`kaleidoing`/
+  `inking` is gone: the three post stages sit behind a crate-internal `PostStage` trait in a
+  `PostChain` array whose order is a **compile-time constant** (ADR-0018's feedback-then-fold plus
+  ADR-0028's ink-last, pinned by `debug_assert`s so reordering the literal trips in a debug build).
+  The routing adjacency is a **pure function** `route(&[bool]) -> Routing` with no GPU and no `self`,
+  giving the composite its first real coverage — eight tests including the two invariants asserted
+  over all eight flag combinations. `Routing` is fixed-size and `Copy`, so deciding a frame's routing
+  allocates nothing. **The Plan 0023 unblock is proven, not assumed**: two chains built against one
+  device accumulate independently (B comes back black after A's trail, then reproduces A's pixels
+  byte-for-byte through the same history). `system_slot`'s magic-index lookup is deleted — scenes are
+  keyed by `SystemKind` via an exhaustive `match` factory over a single `SystemKind::ALL` roster typed
+  `[SystemKind; VARIANT_COUNT]`, so roster drift is a **compile error**, and `golden.rs`'s duplicate
+  `SYSTEMS` list retired onto it. **Every golden baseline is byte-identical with no re-bless** — the
+  plan's central claim, verified. 115 core tests green, clippy clean, C ABI untouched (v4), `Scene`
+  trait untouched, no new dependency. ADR-0031 **accepted**. Version `0.15.0` → **`0.15.1`** (patch:
+  production code ships, no feature, no behavior change). Open minors routed to [0031]: cache the
+  `Routing` at `begin` so one routing decision per frame is structural; ten pre-existing `cargo doc`
+  intra-doc-link warnings (all outside this plan's file list — `dev` correctly stopped at the scope
+  boundary); the stale `schema.rs:137` routing narration. The debug overlay's p99 under the ~4 new
+  vtable calls per frame is **unmeasured** — it needs a live window, so it goes on the on-device pass,
+  not the close.
 
 - [0019 — Preset expression grammar v2: branching, math functions, tempo, typo warnings](done/0019-preset-grammar-v2.md) —
   **done 2026-07-25**, passed Mode 4 review (**no blockers**; one major, three minors, one nit). Five

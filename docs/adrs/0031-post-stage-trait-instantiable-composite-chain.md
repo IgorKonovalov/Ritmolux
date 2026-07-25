@@ -1,9 +1,9 @@
 # ADR-0031 — Post-composite stages behind a `PostStage` trait; the composite becomes an instantiable ordered chain
 
-> **Status:** proposed
+> **Status:** accepted (2026-07-25)
 > **Date:** 2026-07-25
-> **Related plan(s):** [0030](../plans/0030-composite-chain-and-scene-keying.md) (implements this);
-> unblocks [0023](../plans/0023-cross-preset-transitions.md)
+> **Related plan(s):** [0030](../plans/done/0030-composite-chain-and-scene-keying.md) (implemented
+> this; closed 2026-07-25); unblocks [0023](../plans/0023-cross-preset-transitions.md)
 
 ## Context
 
