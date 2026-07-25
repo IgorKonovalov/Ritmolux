@@ -1,4 +1,4 @@
-# Preset authoring guide & library reference
+# Preset authoring guide & expression reference
 
 A **preset** is a small text file that describes one visual: it names a built-in
 rendering **system** and binds each of that system's **parameters** to a short
@@ -6,17 +6,21 @@ rendering **system** and binds each of that system's **parameters** to a short
 rebuild, and no shader knowledge — you change a line, save, and the running app
 picks it up.
 
-This document is the human-readable reference for that format: what ships today,
-the exact vocabulary you can use, and where the files live on disk. It is the
-authoring counterpart to [ADR-0002](adrs/0002-layered-preset-architecture.md)
-(the layered preset architecture) and [Plan 0007](plans/done/0007-curated-preset-library.md)
-(the curated library + seeding). Only **layers 1-2** of ADR-0002 exist today —
-TOML data presets over a pure expression language. Layer 3 (Rhai scripting),
-cross-preset blending, and the other built-in systems are deferred.
+This document is the reference for the **expression language** — the vocabulary
+you write on the right-hand side of every binding — plus how presets load, where
+they live, and how a mistake is reported. It is the authoring counterpart to
+[ADR-0002](adrs/0002-layered-preset-architecture.md) (the layered preset
+architecture) and [ADR-0020](adrs/0020-preset-grammar-v2-branching-functions-tempo.md)
+(the v2 grammar). Only **layers 1-2** of ADR-0002 exist today — TOML data presets
+over a pure expression language. Layer 3 (Rhai scripting) and cross-preset
+blending are deferred.
 
-> **Accurate as of 2026-07-22**, against the 10-preset curated set. If you add,
-> rename, or retire a preset, see [Keeping this current](#keeping-this-current)
-> — this catalog is hand-maintained.
+**The per-system parameter tables live in [`presets/README.md`](../presets/README.md)**,
+next to the preset files themselves. That is the one place they are maintained;
+this document does not duplicate them.
+
+> **Accurate as of 2026-07-25**, against the 35-preset curated set across seven
+> systems and the v2 expression grammar (Plan 0019).
 
 ---
 
@@ -57,36 +61,7 @@ cross-preset blending, and the other built-in systems are deferred.
    has a typo, the app reports it and keeps the last good set — it never crashes
    on a bad preset.
 
-That is the whole loop: copy, edit an expression, save, cycle. The rest of this
-guide is the reference behind each of those choices.
-
----
-
-## The shipped library
-
-Ten curated presets ship today — five per built-in system, arranged as a
-loudness/energy spread from calm to aggressive within each system. The
-`File` column is the name under `presets/` (repo) and in your seeded directory.
-
-### Fragment field — fullscreen domain-warped light field
-
-| File | Name | Character |
-|------|------|-----------|
-| `fragment_glacier.toml` | Glacier | The quiet end. A wide, slow field with barely any warp, a long zoom breath on the beat phase, and a cold hue that drifts almost imperceptibly. |
-| `fragment_aurora.toml` | Aurora | Slow and flowing. Bass swells the warp, treble drifts the hue, the beat phase gently breathes the zoom. |
-| `fragment_ember.toml` | Ember | Warm and glow-forward. Mids build a steady bloom that bass swells; the hue sits low (reds/oranges) drifting slowly; warping stays gentle. Bright but unhurried. |
-| `fragment_pulse.toml` | Pulse Field | Tighter and beat-forward. Each beat kicks the warp and every onset flashes the field; mids push the hue around. |
-| `fragment_warp.toml` | Warp Drive | The loud end. Treble tears the field into fast domain-warp, each beat adds a shove, onset snaps the zoom, and the hue races. |
-
-### Swarm — ~10k-particle CPU flow-field swarm
-
-| File | Name | Character |
-|------|------|-----------|
-| `swarm_drift.toml` | Drift | The quiet end. Gentle force, slow spin, large soft particles easing around a slowly evolving field. Bass gives a slow breathing motion; beats only nudge, no hard bursts. |
-| `swarm_flow.toml` | Flow | A calm swarm. Bass steers harder, mids evolve the flow field, treble tints the palette, and each beat gives a small outward nudge. |
-| `swarm_dense.toml` | Dense | A tight, fast swarm: high spin churns the field, particles ride small and bright, treble tints them, beats give a crisp shove. Reads as a shimmering cloud rather than distinct dots. |
-| `swarm_burst.toml` | Burst | Beat-driven explosions over a faster-evolving field. Harder steering and a big radial shove on every beat. |
-| `swarm_storm.toml` | Storm | The aggressive end. Hard steering, fast spin, and a big radial blast on every beat over a bright, fast-shifting palette. Bass drives the force; treble the color. |
+That is the whole loop: copy, edit an expression, save, cycle.
 
 ---
 
@@ -108,82 +83,51 @@ flash = "clamp(onset * 3, 0, 1)"
 
 Rules:
 
-- **`system`** must be one of the known system names (`fragment_field` or
-  `swarm` today). An unknown system rejects the whole file.
+- **`system`** must be one of the seven known system names (below). An unknown
+  system rejects the whole file.
 - **`name`** is free text shown in the standalone title bar. If omitted, the
   system name is used.
 - **`[params]`** binds parameters by name to expression strings. Every value is
   a **string** (quote it), even a bare number: `warp = "0.4"`, not `warp = 0.4`.
-- **Unbound parameters** fall back to the system's default (listed below), so you
-  only need to write the parameters you want to drive. Order does not matter —
-  bindings are sorted by name at load for determinism.
-- **Unknown parameter names are silently ignored** (they do not error), so a typo
-  in a parameter name fails quietly by doing nothing — check spelling against the
-  tables below if a parameter seems to have no effect.
+- **Unbound parameters** fall back to the system's default, so you only need to
+  write the parameters you want to drive. Order does not matter — bindings are
+  sorted by name at load for determinism.
+- **An unknown parameter name is a load-time warning**, not an error — see
+  [When a preset is wrong](#when-a-preset-is-wrong).
 
-Every value is evaluated **once per frame** and applied to the system before it
-renders. There is no per-frame state you can accumulate in a preset — an
-expression is a pure function of the current analysis frame plus the clock.
+Beyond `[params]`, a preset may carry optional tables — `[curve]` / `[generator]`
+(structural config for the line systems), `[particles]` (attractor family),
+`[smoothing]` (per-parameter easing), and `[palette]` / `[palette_b]` (colour).
+All are documented in [`presets/README.md`](../presets/README.md) and
+[`docs/preset-palettes.md`](preset-palettes.md).
+
+Every `[params]` value is evaluated **once per frame** and applied to the system
+before it renders. There is no per-frame state you can accumulate in a preset —
+an expression is a pure function of the current analysis frame plus the clock.
 
 ---
 
-## Built-in systems and their parameters
+## The built-in systems
 
-Both systems expose a fixed set of named `f32` parameters. The **Default** column
-is the value used when a preset does not bind that parameter.
+Seven systems are addressable from a preset. Their **named parameters, defaults,
+and per-system notes are tabulated in [`presets/README.md`](../presets/README.md#systems-and-their-named-parameters)** —
+that table is maintained alongside the presets and is the authoritative list.
 
-### `fragment_field`
+| `system = ` | What it draws | Curated presets |
+|-------------|---------------|-----------------|
+| `fragment_field` | A fullscreen domain-warped light field (fragment shader). | 7 |
+| `swarm` | ~10k CPU-simulated particles on an evolving flow field. | 5 |
+| `parametric_curve` | A sampled line curve — the Maurer rose (ADR-0007). | 11 |
+| `lsystem` | An L-system turtle figure, precomputed per depth (ADR-0007). | 2 |
+| `star_pattern` | A Hankin star pattern over a regular tiling (ADR-0007). | 1 |
+| `reaction_diffusion` | A Gray-Scott reaction-diffusion field (ADR-0012). | 4 |
+| `attractor` | GPU compute particles iterating a strange attractor (ADR-0015). | 5 |
 
-A fullscreen, Shadertoy-style domain-warped field with an iq-style cosine
-palette. Purely parameter-driven — the audio reaches it only through your
-expressions.
-
-| Parameter | Default | What it does |
-|-----------|---------|--------------|
-| `warp`  | `0.4` | Domain-warp fold amount. Higher = more distorted, kinetic field. Curated presets range ~`0.25`–`2.6`. |
-| `hue`   | `0.0` | Palette rotation (offset into the looping cosine palette). Drift it slowly with `time * k` for a wandering color. |
-| `zoom`  | `1.0` | Field scale. `> 1` zooms in (larger features); a slow `bar`-driven ramp reads as "breathing". |
-| `glow`  | `0.7` | Overall brightness / bloom multiplier. |
-| `flash` | `0.0` | Additive white flash on top of the field, ~`0`–`1`. Drive from `onset` for a transient accent. |
-
-### `swarm`
-
-~10,000 CPU-simulated particles steered by an evolving flow field, drawn as
-additive points. Simulation runs in Rust; your parameters shape its behavior.
-
-| Parameter | Default | What it does |
-|-----------|---------|--------------|
-| `force`      | `1.4` | Steering strength toward the flow field — how hard particles are pulled along it. |
-| `spin`       | `0.3` | How fast the flow field itself evolves over time. Higher = a more churning, restless field. |
-| `burst`      | `0.0` | Radial outward kick from center. Drive from `beat` (e.g. `beat * 9`) for an explosion on each beat. |
-| `hue`        | `0.0` | Palette offset added to every particle's base color. |
-| `brightness` | `0.8` | Global brightness multiplier over the per-particle brightness. |
-| `size`       | `1.0` | Particle size multiplier. |
-
-### `parametric_curve`
-
-A per-frame-sampled line curve (the Maurer rose). Its full named-parameter list
-lives in the actively-maintained [`presets/README.md`](../presets/README.md)
-table; documented here are the two **shape** params (Plan 0028 / ADR-0029) that
-morph the curve's geometry itself, so an audio binding reshapes the rose rather
-than only recoloring or spinning it. Both default to `0.0` (a no-op — the plain
-`sin(n·θ)` rose), so an unbound preset is unchanged.
-
-| Parameter | Default | What it does |
-|-----------|---------|--------------|
-| `phase` | `0.0` | Radians added **inside** the sine — `r = sin(n·θ + phase) + radial_offset`. Reshapes the petal structure as it advances. Distinct from `spin`, which rotates the *finished* figure in screen space; `phase` changes the figure. |
-| `radial_offset` | `0.0` | Added to the radius. A nonzero value opens the rose off the origin into spiral / annular / rosette forms. |
-
-With either param nonzero, `r` is no longer bounded to `[-1, 1]`: a large
-`radial_offset` (or `scale`) pushes geometry past the NDC frame. That is the
-**intended** "out of bounds" blowout — the renderer clips cleanly; it is a
-documented behavior, not a bug. Bind them to `bass`/`bar`/`beat` for a shape
-that morphs with the audio.
-
-> Legacy scenes (`spectrum`, `pulse`, `starfield`) exist in the renderer's cycle
-> but are **not** preset-driven — they take no parameters and cannot be targeted
-> by a preset file. Only `fragment_field` and `swarm` are addressable from a
-> preset today.
+Beyond a system's own parameters, **every** preset may also bind the engine-wide
+compositing controls — the shared view transform (`zoom`, `pan_x`, `pan_y`), the
+background pass (`bg_*`), feedback `trails`, the screen-space kaleidoscope
+(`kaleido_*`), and the final ink-on-paper remap (`ink_*` / `paper_*`). Those are
+documented under [Engine-wide controls](../presets/README.md#engine-wide-controls-plan-0018).
 
 ---
 
@@ -191,25 +135,32 @@ that morphs with the audio.
 
 Each parameter value is a tiny arithmetic expression, compiled once when the
 preset loads and evaluated every frame. It is deliberately small: pure,
-allocation-free, and total (evaluation never panics), so it is safe to run per
-parameter per frame during a live show.
+allocation-free, and **total** (evaluation never panics), so it is safe to run
+per parameter per frame during a live show.
 
 ### Grammar
 
-Standard arithmetic with the usual precedence:
+```text
+expr   := sum  (('>' | '<' | '>=' | '<=' | '==' | '!=') sum)*
+sum    := term  (('+' | '-') term)*
+term   := unary (('*' | '/') unary)*
+unary  := ('-' | '+')? primary
+primary:= number | ident | ident '(' expr (',' expr)* ')' | '(' expr ')'
+```
 
-- **Operators:** `+`  `-`  `*`  `/`, unary `-` / `+`, and parentheses `( )`.
+- **Arithmetic:** `+` `-` `*` `/`, unary `-` / `+`, and parentheses `( )`, with
+  the usual precedence.
+- **Comparisons** sit at the **lowest** precedence, below `+`/`-`, so
+  `1 + 1 > 3 - 2` reads as `(1 + 1) > (3 - 2)`.
 - **Numbers:** decimal `f32` literals (`0.3`, `14`, `1.8`).
-- **No comparisons, conditionals, or constants** (no `if`, `>`, `pi`, etc.).
-  Shape reactivity with `clamp`, `min`, `max`, and `lerp` instead.
 
-There is no `time`-independent randomness and no way to read wall-clock time —
-the only clock is `time`, the renderer's shared scene clock, so a preset is
-reproducible given the same audio.
+There is no randomness and no way to read wall-clock time — the only clock is
+`time`, the renderer's shared scene clock, so a preset is reproducible given the
+same audio.
 
 ### Variables
 
-Seven read-only variables carry the live audio analysis into your expressions:
+Nine read-only variables carry the live audio analysis into your expressions:
 
 | Variable | Meaning | Notes |
 |----------|---------|-------|
@@ -220,29 +171,100 @@ Seven read-only variables carry the live audio analysis into your expressions:
 | `beat` | `1.0` on a hop where a beat fired, else `0.0`. | A gate: `beat * k` adds `k` only on beat frames. |
 | `bar` | Beat phase in `[0, 1)`: `0` on each beat, ramping to the next. | A sawtooth that "breathes" between beats. |
 | `time` | The scene clock in seconds (monotonic). | Use `time * k` for slow drift; `k` sets the speed. |
+| `tempo` | Tracked tempo in **BPM**. | **Not a `0–1` band** — see the warning below. |
+| `novelty` | Spectral-change transient: ~`0` within a steady segment, spiking at a track/section boundary. | **Experimental** — see below. |
 
 The band values (`bass`/`mid`/`treb`) are raw mean magnitudes normalized so a
 full-scale sine reads near `1.0`, but real program material reads far lower — so
 curated presets consistently apply their own gain and then clamp to a bounded
 range. That is the central idiom (below).
 
+> **`tempo` is the one variable that is not roughly `0–1`.** It is `0` until the
+> tempo tracker warms up (the first several seconds of audio), then jumps to a
+> real BPM in the ~`60–200` range. Using it raw will blow out any parameter.
+> Either **scale** it (`tempo / 180`) or — better — **compare** it:
+> ```
+> select(tempo > 128, 2.5, 0.8)     # a fast look above 128 BPM, a calm one below
+> ```
+
+> **`novelty` is experimental.** It is a transient that spikes when the spectrum
+> changes character — useful for gating an accent on a track or section change
+> (`beat * (novelty > 0.5)`). Its DSP shape may change in a later release, or it
+> may be withdrawn; do not build a preset that only works with today's exact
+> values.
+
+### Constants
+
+| Constant | Value |
+|----------|-------|
+| `pi` | 3.14159265… |
+| `tau` | 2π — a full turn, the natural unit for a cyclic `hue` or `rotation`. |
+
+Constants resolve before the variable lookup, so they cannot be shadowed. A bare
+identifier that is neither a constant nor a variable is a compile error.
+
 ### Functions
 
 | Function | Args | Result |
 |----------|------|--------|
 | `sin(x)` | 1 | Sine of `x` (radians). |
+| `cos(x)` | 1 | Cosine of `x` (radians). |
 | `abs(x)` | 1 | Absolute value. |
 | `floor(x)` | 1 | Largest integer ≤ `x`. |
+| `sqrt(x)` | 1 | Square root. `sqrt` of a negative is `NaN` — guard it with `select` or `max(x, 0)`. |
 | `min(a, b)` | 2 | Smaller of `a`, `b`. |
 | `max(a, b)` | 2 | Larger of `a`, `b`. |
-| `clamp(x, lo, hi)` | 3 | `x` bounded to `[lo, hi]`. Total even if `lo > hi` (implemented as `max` then `min`). |
+| `pow(base, exp)` | 2 | `base` raised to `exp`. Shape a response curve: `pow(bass * 8, 2)` is punchier, `pow(x, 0.5)` gentler. |
+| `mod(a, b)` | 2 | **Floored** modulo, `a - b * floor(a / b)`. Divisor-signed, so `mod(-0.2, 1.0)` is `0.8` — it wraps cleanly for a cyclic hue or phase. |
+| `clamp(x, lo, hi)` | 3 | `x` bounded to `[lo, hi]`. Total even if `lo > hi`. |
 | `lerp(a, b, t)` | 3 | Linear blend `a + (b - a) * t`. |
+| `smoothstep(e0, e1, x)` | 3 | Eased `0 → 1` ramp as `x` crosses `e0 → e1` (`0` below, `1` above). The easing primitive — smoother than `clamp` for a threshold. |
+| `select(cond, x, y)` | 3 | `x` if `cond != 0.0`, else `y`. **Only the taken branch is evaluated.** |
 
 Calling a function with the wrong number of arguments, or referencing an unknown
 name, is a **compile error** — the preset is rejected at load and the app keeps
 the previous good set (it does not crash). Division by zero yields `inf`/`NaN`
 rather than panicking, but you should avoid it — a `NaN` parameter produces
 undefined-looking visuals.
+
+### Comparisons and branching
+
+The six comparison operators — `>` `<` `>=` `<=` `==` `!=` — each yield exactly
+`1.0` (true) or `0.0` (false), so they compose with arithmetic:
+
+```
+0.4 + (bass > 0.2) * 0.3        # 0.4 normally, 0.7 once the bass crosses 0.2
+```
+
+`select(cond, x, y)` picks between two whole expressions. Because it evaluates
+**only** the branch it takes, it is also the way to guard a partial function:
+
+```
+select(bass > 0.5, 3.0, 0.8)          # a threshold switch
+select(x >= 0, sqrt(x), 0)            # safe — the untaken sqrt never runs
+```
+
+That last property is why `select` exists rather than a `lerp`-based blend: a
+blend evaluates both sides, so an out-of-domain `sqrt` would poison the result
+with `NaN` even on the branch you did not want.
+
+**There are no boolean operators** (`&&`, `||`, `!`) — with clean `0`/`1`
+comparison results they add nothing:
+
+| You want | Write |
+|----------|-------|
+| `a AND b` | `min(a, b)` |
+| `a OR b` | `max(a, b)` |
+| `NOT c` | `1 - c` |
+
+```
+min(bass > 0.3, tempo > 120)          # loud AND fast
+max(beat, onset > 0.6)                # on a beat OR a strong transient
+```
+
+**Chained comparisons are legal but rarely what you mean.** `a > b > c` parses
+left-associatively as `(a > b) > c`, comparing a `0`/`1` against `c`. Write
+`min(a > b, b > c)` instead.
 
 ### Idioms (patterns from the curated set)
 
@@ -277,6 +299,55 @@ undefined-looking visuals.
   ```
   `bar` sweeps `0 → 1` between beats, so `zoom` eases up and resets each beat.
 
+- **Soft threshold** — `smoothstep` where `clamp` would snap:
+  ```
+  smoothstep(0.15, 0.45, bass)
+  ```
+  A `0 → 1` ramp that eases in and out instead of cornering.
+
+- **Cyclic wrap** — keep a rotating value in one turn:
+  ```
+  mod(time * 0.2, 1.0)
+  ```
+  Floored `mod` never returns a negative, so a hue driven this way never jumps.
+
+- **Two-mode preset** — one file that behaves differently by energy or tempo:
+  ```
+  select(tempo > 130, 1 + bass * 3, 1 + bass * 0.6)
+  ```
+
+---
+
+## When a preset is wrong
+
+The engine distinguishes mistakes that make a preset meaningless from mistakes
+that merely waste a line. Neither ever crashes a running visual (NFR 10).
+
+**Hard errors — the file is rejected, the last good set is kept:**
+
+- Malformed TOML.
+- An unknown `system` name.
+- An expression that fails to compile — an unknown identifier, a bad number, a
+  wrong argument count, an unbalanced parenthesis, a stray character.
+- An invalid structural table (`[curve]`, `[generator]`, `[particles]`,
+  `[palette]`, `[smoothing]`).
+
+**Warnings — the preset still loads and renders:**
+
+- **An unknown parameter name.** A binding whose name no system or engine stage
+  consumes is reported at load, naming the parameter and the system, and the rest
+  of the preset applies normally (ADR-0020):
+
+  ```
+  preset ...\my_first.toml: warning: unknown parameter 'wrap' for system 'fragment_field' (binding kept, but nothing reads it)
+  ```
+
+  This is why a typo no longer fails silently. It is a warning rather than a
+  rejection on purpose: one mistyped character should not blank a scene
+  mid-show, so the good bindings keep working while the mistake is surfaced.
+  The standalone prints both errors and warnings to stderr on every load and
+  hot-reload.
+
 ---
 
 ## Where preset files live
@@ -285,19 +356,21 @@ There are three copies of the curated set, and understanding the flow explains
 why "edit once, both frontends see it" works.
 
 ```
-  presets/*.toml                 core/src/preset/mod.rs                per-user preset dir
-  (repo, source of truth)  ──>   EMBEDDED = include_str!(...)   ──>    seeded on first run,
-                                 (compiled into the binary)            then loaded + watched
+  presets/*.toml                 core/build.rs -> EMBEDDED             per-user preset dir
+  (repo, source of truth)  ──>   (globbed + include_str!'d      ──>    seeded on first run,
+                                  into the binary)                     then loaded + watched
 ```
 
-1. **`presets/` at the repo root — the source of truth.** These ten `.toml`
-   files are what a contributor edits. Nothing reads them at runtime directly.
+1. **`presets/` at the repo root — the source of truth.** These `.toml` files are
+   what a contributor edits. Nothing reads them at runtime directly.
 
-2. **`core/src/preset/mod.rs` — `EMBEDDED`.** The core `include_str!`s each
-   `presets/*.toml` at build time into the `EMBEDDED` array, so the compiled
-   binary always carries the curated set. `default_presets()` parses these as the
-   fallback the C-ABI / foobar path renders even with no preset directory
-   present.
+2. **`EMBEDDED` — generated at build time.** `core/build.rs` globs `presets/*.toml`
+   and emits an `EMBEDDED` slice of `(filename, contents)` tuples, each
+   `include_str!`'d, so the compiled binary always carries the curated set
+   ([ADR-0022](adrs/0022-build-time-preset-embedding.md)). `default_presets()`
+   parses these as the fallback the C-ABI / foobar path renders even with no
+   preset directory present. **Adding a preset is dropping a file** — there is no
+   list to edit and no count to bump.
 
 3. **The per-user directory — what actually gets loaded.** On first run each
    frontend **seeds** this directory (writes every embedded preset that isn't
@@ -348,9 +421,8 @@ for `shot`'s equivalent `--presets` / `--preset-file` flags.
   **not** replace the copy already on your disk — delete that file and relaunch
   to get the updated version (there is no "refresh curated" button yet).
 - **Hot-reload (standalone).** The app polls the directory ~every 150 ms and
-  reloads on any change. A malformed file is reported (to stderr / the load
-  report) and the last good set is kept — a bad edit never crashes a running
-  visual.
+  reloads on any change. Errors and warnings are printed and the last good set is
+  kept — a bad edit never crashes a running visual.
 - **Cycling.** Standalone: the app **holds one scene by default** (ADR-0027) —
   **Space** cycles to the next preset (title bar shows the name), and **`A`**
   toggles auto-rotate on/off (auto is off out of the box; enable it per-run with
@@ -365,26 +437,29 @@ for `shot`'s equivalent `--presets` / `--preset-file` flags.
 
 ## Keeping this current
 
-This catalog is **hand-maintained** — nothing regenerates it. Adding, renaming,
-or retiring a preset touches **four** places; update all of them in the same
-change so the repo, the binary, the tests, and this doc never drift:
+**Adding, renaming, or retiring a preset touches two places:**
 
-1. **`presets/<name>.toml`** — the preset file itself.
-2. **`core/src/preset/mod.rs`** — add (or remove) the matching `EMBEDDED` entry
-   **and** update the array length in its type (`[(&str, &str); 10]`).
-3. **`core/tests/preset.rs`** — the count in `embedded_default_presets_all_parse`
-   (currently asserts `10`) guards that every shipped preset compiles; keep it in
-   step with the library size.
-4. **`docs/presets.md`** (this file) — add/adjust the row in
-   [The shipped library](#the-shipped-library), and bump the "accurate as of"
-   date near the top.
+1. **`presets/<name>.toml`** — the preset file itself. That is all the *shipping*
+   takes: `core/build.rs` globs the directory, so the embedded list and the
+   preset-count test follow automatically (ADR-0022). There is no array to extend
+   and no count to bump.
+2. **[`presets/README.md`](../presets/README.md)** — if the preset showcases a
+   control worth pointing an author at.
 
-If you add a **new built-in system** or a **new parameter** to an existing one,
-also extend [Built-in systems and their parameters](#built-in-systems-and-their-parameters);
-if you add an **expression variable or function**, extend
-[The expression language](#the-expression-language). A new system or a change to
-the expression grammar is ADR-territory (ADR-0002 fixed the current model) — flag
-it rather than quietly widening the vocabulary here.
+**Adding a parameter to a system** touches the scene's `set_param` match, the
+`PARAMS` const beside it (the two are guarded against drift by
+`declared_params_match_set_param` in `core/tests/preset.rs`), and the table in
+[`presets/README.md`](../presets/README.md).
+
+**Adding an expression variable, function, or operator** touches
+`core/src/preset/expr.rs` and [The expression language](#the-expression-language)
+in this file. A change to the grammar is **ADR territory** (ADR-0002 fixed the
+model; ADR-0020 grew it to v2) — flag it rather than quietly widening the
+vocabulary here.
+
+> **Format stability:** the app is pre-1.0 and in active development, so the
+> preset format may still change between releases. Preset-format stability begins
+> at 1.0.0.
 
 ---
 
@@ -392,11 +467,13 @@ it rather than quietly widening the vocabulary here.
 
 - [ADR-0002 — Layered preset architecture](adrs/0002-layered-preset-architecture.md):
   the data/expression/script model and why it is layered.
+- [ADR-0020 — Preset expression grammar v2](adrs/0020-preset-grammar-v2-branching-functions-tempo.md):
+  the math functions, branching, `tempo`/`novelty`, and warn-but-load typo handling.
+- [`presets/README.md`](../presets/README.md): the per-system parameter tables,
+  engine-wide controls, structural config, and `[smoothing]`.
+- [`docs/preset-palettes.md`](preset-palettes.md): the palette surface — built-in
+  names, custom stops, and the A/B crossfade.
 - [ADR-0006 — C ABI v2 preset loading](adrs/0006-c-abi-v2-preset-loading.md):
   how the foobar plugin reaches the shared library.
-- [Plan 0007 — Curated preset library](plans/done/0007-curated-preset-library.md):
-  the seeding, per-user directory, and curated set of ten.
-- [Plan 0008 — Preset browse overlay](plans/0008-preset-browse-overlay.md):
-  in-app browse/select UX (follow-up to the loading foundation above).
-</content>
-</invoke>
+- [`docs/capturing.md`](capturing.md): the headless `shot` CLI for rendering a
+  preset to a PNG without launching the app.

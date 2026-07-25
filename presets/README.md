@@ -40,9 +40,16 @@ Each `[params]` value is a pure expression evaluated every frame. A malformed
 expression (or structural config) makes the whole preset fail to load with a
 surfaced error — the engine keeps the last good preset, never crashes (NFR 10).
 
-- **Variables:** `bass mid treb onset beat bar time`
-  (`beat` is 0/1; `bar` is the 0..1 beat phase; `time` is seconds).
-- **Functions:** `sin abs floor min max clamp lerp`.
+- **Variables:** `bass mid treb onset beat bar time tempo novelty`
+  (`beat` is 0/1; `bar` is the 0..1 beat phase; `time` is seconds; `tempo` is
+  **BPM**, not a 0..1 band; `novelty` is an experimental track-change transient).
+- **Functions:** `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep select`.
+- **Constants:** `pi`, `tau`.
+- **Comparisons:** `> < >= <= == !=`, each yielding `1`/`0`, plus
+  `select(cond, x, y)`. No boolean operators — `min` is and, `max` is or,
+  `1 - c` is not.
+
+Full grammar reference: [`../docs/presets.md`](../docs/presets.md#the-expression-language).
 
 ## Systems and their named parameters
 
@@ -56,8 +63,10 @@ surfaced error — the engine keeps the last good preset, never crashes (NFR 10)
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 
-Unbound parameters fall back to each system's defaults. Unknown parameter names
-are ignored. The params after the first `·` are the shared **view transform** and
+Unbound parameters fall back to each system's defaults. An **unknown** parameter
+name is reported as a load-time warning naming the param and the system — the
+preset still loads and its other bindings apply (ADR-0020). The params after the
+first `·` are the shared **view transform** and
 line-**mirror** controls (Plan 0018) — see [Engine-wide controls](#engine-wide-controls-plan-0018);
 the trailing group on the four shader-coloured scenes is the shared **palette**
 colour surface (Plan 0020) — see [Colour — the palette surface](#colour--the-palette-surface-plan-0020).
