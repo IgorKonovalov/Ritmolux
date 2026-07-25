@@ -30,12 +30,16 @@
 //! The accumulation field is sized to the render target and capped (Plan 0027
 //! Phase 2, [`TRAIL_MAX_W`]/[`TRAIL_MAX_H`]) rather than fixed at 640x360, so the
 //! present is close to 1:1 up to the cap instead of a soft upscale on a 1080p+
-//! display. It is still presented stretched (aspect ignored, as the
-//! reaction-diffusion present does), which is why the cap scales both axes by one
-//! factor: [`trail_grid_size`] keeps the target's aspect at every size, so the
-//! stretch stays a near-no-op. That size is quantized to [`TRAIL_GRID_STEP`], so
-//! a live window drag re-allocates the field a handful of times rather than once
-//! per frame.
+//! display. That size is quantized to [`TRAIL_GRID_STEP`], so a live window drag
+//! re-allocates the field a handful of times rather than once per frame.
+//!
+//! **The field's own aspect is not the projection's** (Plan 0029 Phase 5). The
+//! present is a plain stretch (aspect ignored, as the reaction-diffusion present
+//! does), so a point at field NDC `x` lands at target NDC `x` — the field's aspect
+//! cancels out and the projection must use the **target's**. Quantization makes
+//! the two genuinely differ (a 1920x1080 target takes a 2048x1280 grid), so
+//! [`trail_grid_size`] scaling both axes by one factor at the cap is about keeping
+//! the field's *sampling* near-isotropic, not about the shape on screen.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). Steps + draws every displayed frame.
@@ -1356,7 +1360,7 @@ impl Scene for AttractorScene {
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
-        _aspect: f32,
+        aspect: f32,
     ) {
         // Build on the first frame, and re-allocate the accumulation field when
         // `set_target_size` asked for a different grid than the live one (Plan
@@ -1471,10 +1475,15 @@ impl Scene for AttractorScene {
             0,
             bytemuck::bytes_of(&DrawUniform {
                 v: [
-                    // The live grid's aspect — the points are projected into the
-                    // accumulation field, not the surface, so this follows the
-                    // field's size (Plan 0027 Phase 2).
-                    grid.trail_w as f32 / grid.trail_h.max(1) as f32,
+                    // The **target's** aspect, not the accumulation field's (Plan
+                    // 0029 Phase 5). The points are projected into the field, but
+                    // the present stretches the field over the whole target with
+                    // aspect ignored, so field NDC `x` becomes target NDC `x` and
+                    // the field's own aspect cancels out. Using the grid ratio was
+                    // harmless only while quantization was absent and the grid
+                    // equalled the target; with a 256 px step a 1920x1080 target
+                    // takes a 2048x1280 grid and drew the cloud 11% too wide.
+                    aspect,
                     POINT_BASE * *size,
                     *hue,
                     *time * SPIN_RATE,

@@ -276,3 +276,134 @@ fn trail_grid_never_exceeds_the_cap_or_collapses() {
         );
     }
 }
+
+// --- Projection aspect (Plan 0029 Phase 5) -------------------------------------
+
+/// Targets sharing one aspect but landing on different grids, so the *only* thing
+/// that differs between the two captures is the grid the scene chose. The first is
+/// aspect-exact (both axes are already `STEP` multiples, so the grid equals the
+/// target); the second quantizes up on both axes to a square grid under a 4:3
+/// target. Point size is in world units, so the cloud's extent as a *fraction* of
+/// the frame is resolution-independent and the two are directly comparable.
+const EXACT_TARGET: (u32, u32) = (1024, 768);
+const QUANTIZED_TARGET: (u32, u32) = (512, 384);
+/// Enough frames for the trail field to saturate (`fade = 0.94` fades over ~1 s),
+/// so the cloud's outline is at its full extent in both captures.
+const ASPECT_FRAMES: u32 = 90;
+
+/// Capture one preset at an explicit target size, building and dropping a renderer
+/// so only one WARP device is ever live (the file docs' constraint). `None` is the
+/// no-adapter skip (ADR-0016).
+fn capture_at(size: (u32, u32), preset: &str, frame: &AnalysisFrame) -> Option<CaptureImage> {
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: size.0,
+        height: size.1,
+        prefer_software: true,
+    }) {
+        Ok(r) => r,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+        Err(e) => panic!("headless renderer build failed at {size:?}: {e}"),
+    };
+    let img = renderer
+        .capture_preset(preset, frame, ASPECT_FRAMES)
+        .unwrap_or_else(|e| panic!("capture {preset} at {size:?}: {e}"));
+    Some(img)
+}
+
+/// The width:height ratio of the lit region's bounding box, in units of the
+/// **frame** — i.e. normalized by the capture's own size, so it is the aspect the
+/// cloud occupies on screen and is directly comparable across capture sizes.
+fn lit_bbox_ratio(img: &CaptureImage) -> f32 {
+    let bg = background(img);
+    let (mut x0, mut y0, mut x1, mut y1) = (u32::MAX, u32::MAX, 0u32, 0u32);
+    for (i, px) in img.rgba.chunks_exact(4).enumerate() {
+        let lit = px
+            .iter()
+            .zip(bg.iter())
+            .take(3)
+            .any(|(&c, &b)| c.abs_diff(b) > EPS);
+        if !lit {
+            continue;
+        }
+        let (x, y) = (i as u32 % img.width, i as u32 / img.width);
+        x0 = x0.min(x);
+        y0 = y0.min(y);
+        x1 = x1.max(x);
+        y1 = y1.max(y);
+    }
+    assert!(
+        x0 <= x1 && y0 <= y1,
+        "no lit pixels to measure a bounding box"
+    );
+    let bw = (x1 - x0 + 1) as f32 / img.width as f32;
+    let bh = (y1 - y0 + 1) as f32 / img.height as f32;
+    bw / bh
+}
+
+/// The cloud's proportions must follow the **render target's** aspect, not the
+/// accumulation grid's (Plan 0029 Phase 5). The present stretches the field over
+/// the whole target with aspect ignored, so field NDC `x` becomes target NDC `x`
+/// and the field's own aspect cancels out — the projection has to use the target's
+/// or the shape is scaled by `target_aspect / grid_aspect`.
+///
+/// Both targets below are 4:3. One is aspect-exact (grid 1024x768); the other
+/// quantizes to a 512x512 grid, aspect 1.0. Projecting at the grid ratio therefore
+/// drew the second **33% too wide** — the size-dependent shape error Phase 2's
+/// quantization introduced, and the reason this is the first non-square assertion
+/// in the suite: every other capture here is square, so grid aspect always equalled
+/// target aspect and nothing could see it.
+#[test]
+fn attractor_projects_at_the_target_aspect() {
+    // Verify the premise before spending two captures on it: these two targets
+    // must genuinely disagree about the grid, or the test proves nothing.
+    let exact_grid = trail_grid_size(EXACT_TARGET.0, EXACT_TARGET.1);
+    let quantized_grid = trail_grid_size(QUANTIZED_TARGET.0, QUANTIZED_TARGET.1);
+    assert_eq!(
+        exact_grid, EXACT_TARGET,
+        "{EXACT_TARGET:?} is no longer aspect-exact — pick a target whose axes are STEP multiples"
+    );
+    assert_ne!(
+        quantized_grid, QUANTIZED_TARGET,
+        "{QUANTIZED_TARGET:?} is no longer quantized up — the premise is gone"
+    );
+    let grid_ratio_gap = (quantized_grid.0 as f32 / quantized_grid.1 as f32)
+        / (QUANTIZED_TARGET.0 as f32 / QUANTIZED_TARGET.1 as f32);
+    assert!(
+        (grid_ratio_gap - 1.0).abs() > 0.2,
+        "the two targets' grid aspects are within 20% ({grid_ratio_gap:.3}) — too close to \
+         distinguish projecting at the grid from projecting at the target"
+    );
+
+    let lively = AnalysisFrame {
+        bass: 0.5,
+        mid: 0.4,
+        treb: 0.5,
+        ..Default::default()
+    };
+    let Some(exact) = capture_at(EXACT_TARGET, DEJONG, &lively) else {
+        return;
+    };
+    let Some(quantized) = capture_at(QUANTIZED_TARGET, DEJONG, &lively) else {
+        return;
+    };
+
+    let exact_ratio = lit_bbox_ratio(&exact);
+    let quantized_ratio = lit_bbox_ratio(&quantized);
+    let skew = quantized_ratio / exact_ratio;
+    println!(
+        "lit bbox ratio: {EXACT_TARGET:?} grid {exact_grid:?} -> {exact_ratio:.3}, \
+         {QUANTIZED_TARGET:?} grid {quantized_grid:?} -> {quantized_ratio:.3} (skew {skew:.3})"
+    );
+    // A margin, not a constant: quantization changes how far the glow's falloff is
+    // resampled, so the outline crosses `EPS` at slightly different radii. 10% is
+    // loose enough for that and tight enough to fail on the ~33% shape error.
+    assert!(
+        (skew - 1.0).abs() < 0.10,
+        "the cloud's proportions follow the accumulation grid, not the target: the \
+         {QUANTIZED_TARGET:?} capture (grid {quantized_grid:?}) is {skew:.3}x the aspect of the \
+         aspect-exact {EXACT_TARGET:?} one — the projection is using the grid ratio"
+    );
+}
