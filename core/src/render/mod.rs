@@ -19,9 +19,10 @@
 
 // The four compositing stages stay crate-private to the outside world, but are
 // `pub(crate)` so `preset::schema` can read their global `PARAMS` vocabularies
-// for the load-time typo check (ADR-0020). `post` holds the three that run after
-// the scene, behind one trait and in one fixed-order chain (ADR-0031); the
-// background is a pre-pass and stays outside it.
+// for the load-time typo check (ADR-0020). `post` holds the two **per-preset**
+// stages that run after the scene, behind one trait in one fixed-order chain
+// (ADR-0031); the engine-wide passes stay outside it (ADR-0032) — `background`
+// is the pre-pass that owns the clear, `ink` the terminal tone remap.
 pub(crate) mod background;
 pub mod capture;
 pub mod context;
@@ -45,6 +46,7 @@ use crate::preset::{Preset, SystemKind, Variables};
 use background::Background;
 pub use capture::CaptureImage;
 pub use context::{RenderContext, RenderError};
+use ink::Ink;
 use overlay::Overlay;
 use palette::Palette;
 use post::PostChain;
@@ -220,13 +222,18 @@ pub struct Renderer {
     /// backdrop before the scene draws. Driven by `bg_*` named params the renderer
     /// routes to it; owns the frame clear now that scenes `Load` instead of `Clear`.
     background: Background,
-    /// The post-composite stages the scene folds down through — feedback trails,
-    /// the screen-space kaleidoscope, and the final ink tone-remap — in ADR-0018 /
-    /// ADR-0028 order behind one [`PostStage`](post::PostStage) seam (ADR-0031).
-    /// Each is individually skippable, so an unbound preset renders straight to the
-    /// surface. One owned value, not three fields: a second chain with independent
-    /// GPU state is constructible from it (Plan 0023 dual-live).
+    /// The **per-preset** post-composite stages the scene folds down through —
+    /// feedback trails then the screen-space kaleidoscope — in ADR-0018 order
+    /// behind one [`PostStage`](post::PostStage) seam (ADR-0031). Each is
+    /// individually skippable, so an unbound preset renders straight to the chain's
+    /// destination. One owned value, not two fields: a second chain with
+    /// independent GPU state is constructible from it (Plan 0023 dual-live).
     chain: PostChain,
+    /// The terminal engine tone-remap (ADR-0028), outside the chain per ADR-0032:
+    /// it remaps the **one** finished frame, so it must run after the transition
+    /// blend of two per-preset composites. Skipped entirely at `ink_amount <= 0`,
+    /// which is every preset that does not opt in.
+    ink: Ink,
     /// Loaded presets + the active index (pure selection state — see [`Roster`]).
     roster: Roster,
     /// Shared scene clock (seconds), advanced one fixed step per rendered frame.
@@ -261,6 +268,7 @@ impl Renderer {
         let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
         let background = Background::new(&ctx.device, ctx.surface_format());
         let chain = PostChain::new(&ctx.device, ctx.surface_format());
+        let ink = Ink::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
@@ -269,6 +277,7 @@ impl Renderer {
             scenes,
             background,
             chain,
+            ink,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -293,6 +302,7 @@ impl Renderer {
         let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
         let background = Background::new(&ctx.device, ctx.surface_format());
         let chain = PostChain::new(&ctx.device, ctx.surface_format());
+        let ink = Ink::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
@@ -301,6 +311,7 @@ impl Renderer {
             scenes,
             background,
             chain,
+            ink,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -340,6 +351,7 @@ impl Renderer {
         let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
         let background = Background::new(&ctx.device, ctx.surface_format());
         let chain = PostChain::new(&ctx.device, ctx.surface_format());
+        let ink = Ink::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
@@ -348,6 +360,7 @@ impl Renderer {
             scenes,
             background,
             chain,
+            ink,
             roster: Roster::new(crate::preset::default_presets()),
             time: 0.0,
             diag: Diag::new(),
@@ -606,6 +619,7 @@ impl Renderer {
             scenes,
             background,
             chain,
+            ink,
             roster,
             time,
             diag,
@@ -640,6 +654,7 @@ impl Renderer {
         scene.advance(dt);
         background.reset_params();
         chain.reset_params();
+        ink.reset_params();
         scene.reset_params();
         for (index, binding) in preset.params.iter().enumerate() {
             let raw = binding.expr.eval(&vars);
@@ -649,23 +664,38 @@ impl Renderer {
             // above stays pure and allocation-free.
             let tau = preset.smoothing.get(&binding.name).copied().unwrap_or(0.0);
             let value = param_smoother.smooth(index, raw, tau, dt);
-            // Route `bg_*` to the background pre-pass, then offer the name to the
-            // post chain (`trails`, `kaleido_*`, `ink_*`/`paper_*`, first owner
-            // wins); everything else goes to the scene. The namespaces are
-            // disjoint, so no param reaches more than one.
-            if !background.set_param(&binding.name, value) && !chain.set_param(&binding.name, value)
+            // First owner wins, in composite order: `bg_*` to the background
+            // pre-pass, then the post chain (`trails`, `kaleido_*`), then the
+            // terminal ink pass (`ink_*`/`paper_*`); everything else goes to the
+            // scene. The namespaces are disjoint, so no param reaches more than one.
+            if !background.set_param(&binding.name, value)
+                && !chain.set_param(&binding.name, value)
+                && !ink.set_param(&binding.name, value)
             {
                 scene.set_param(&binding.name, value);
             }
         }
         scene.update(frame);
 
-        // Fixed-order composite (ADR-0018/0028): background (owns the clear) ->
-        // scene -> the post chain -> present. Where the scene draws and which
-        // stage folds into which is the chain's business, not the renderer's —
-        // see `post.rs` for the order and the skip rule.
+        // Fixed-order composite (ADR-0018/0028/0032): background (owns the clear)
+        // -> scene -> the per-preset post chain -> ink -> present. Where the scene
+        // draws and which chain stage folds into which is the chain's business, not
+        // the renderer's — see `post.rs` for the order and the skip rule.
+        //
+        // Ink is the terminal pass and lives outside the chain, so its input is
+        // resolved *first*: everything upstream targets that view, and ink then
+        // folds it into the surface. With ink off, the chain targets the surface
+        // directly — the exact pixel path a three-stage chain took, which is why
+        // this relocation re-blesses no golden.
         let surface = (width, height);
-        let target = chain.begin(encoder, view, surface);
+        let ink_input = if ink.active() {
+            ink.begin(surface)
+        } else {
+            None
+        };
+        let destination = ink_input.as_ref().unwrap_or(view);
+
+        let target = chain.begin(encoder, destination, surface);
         background.render(&ctx.queue, encoder, &target.view);
         // Hand the scene its target size before it renders: a scene with an
         // internal accumulation field (the attractor's trails) sizes that field
@@ -674,10 +704,13 @@ impl Renderer {
         scene.set_target_size(target.size.0, target.size.1);
         scene.render(&ctx.queue, encoder, &target.view, target.aspect);
 
-        // Background + scene, plus whatever passes the active stages encode on
-        // their way down to the surface, plus the optional text and overlay
-        // passes below.
-        let mut draw_calls = 2 + chain.resolve(&ctx.queue, encoder, view, surface);
+        // Background + scene, plus whatever passes the active chain stages encode
+        // on their way down, plus ink's remap when it runs, plus the optional text
+        // and overlay passes below.
+        let mut draw_calls = 2 + chain.resolve(&ctx.queue, encoder, destination, surface);
+        if ink_input.is_some() {
+            draw_calls += ink.resolve(&ctx.queue, encoder, view);
+        }
 
         // On-canvas text (browse overlay / HUD): a second pass that loads the
         // scene and composites the queued runs on top, in the same frame
@@ -788,6 +821,7 @@ impl Renderer {
         self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
         self.background.reset_resources();
         self.chain.reset_resources();
+        self.ink.reset_resources();
         self.time = 0.0;
         // The rebuilt scenes are fresh — re-apply the active preset's structural
         // config (ADR-0007) so a line scene captures with its geometry built.
@@ -858,6 +892,7 @@ impl Renderer {
         self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
         self.background.reset_resources();
         self.chain.reset_resources();
+        self.ink.reset_resources();
         self.time = 0.0;
         self.configure_active_scene();
 
