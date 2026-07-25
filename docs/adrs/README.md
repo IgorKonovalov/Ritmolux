@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0033**
+**Next free number: 0034**
 
 | ADR  | Title                                                      | Status   |
 |------|------------------------------------------------------------|----------|
@@ -43,3 +43,4 @@ you need a code comment.
 | [0030](0030-scene-target-size-hot-path-hook.md) | Third `Scene` widening: a per-frame target-size hook; hot-path optional methods are now in scope under three conditions (retires the "off-hot-path only" bound from 0007/0021) | accepted |
 | [0031](0031-post-stage-trait-instantiable-composite-chain.md) | Post-composite stages behind a `PostStage` trait; the composite becomes an instantiable ordered `PostChain` (fixed order preserved, not a graph) — a third internal seam, unblocks 0024's dual-live | accepted (membership revised by 0032) |
 | [0032](0032-ink-leaves-the-chain-blend-between-chain-and-ink.md) | Ink leaves the `PostChain` and becomes a terminal engine post-pass; the two-input transition blend sits between chain and ink, outside the `PostStage` trait (revises 0031's membership, preserves 0028's ordering) | proposed |
+| [0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) | Testing strategy: five named tiers, an end-to-end tier (ring->analyzer->renderer, plus `shot` as a subprocess), a line-coverage **ratchet on `lmv-core` only**, and an opt-in `.githooks/pre-push` fast gate; rejected workspace-wide coverage, a fixed 80% target, an inventory guard, promoting `shot` to a `[[bin]]`, and full-CI-parity in the hook | proposed |
