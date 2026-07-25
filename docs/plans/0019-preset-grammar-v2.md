@@ -1,6 +1,6 @@
 # 0019 — Preset expression grammar v2: branching, math functions, tempo, and typo warnings
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-07-23
 > **Owner skill(s):** dev
 > **Related ADRs:** [0020-preset-grammar-v2-branching-functions-tempo](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md), supplements [0002-layered-preset-architecture](../adrs/0002-layered-preset-architecture.md)
