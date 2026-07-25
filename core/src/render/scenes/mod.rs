@@ -55,10 +55,11 @@ pub(crate) trait Scene {
     );
 
     /// The pixel size of the target **this scene renders into this frame**
-    /// (ADR-0030). That is *not* always the surface: the renderer routes the
-    /// scene into the trails or kaleidoscope stage's fixed internal grid when
-    /// either is active, and into the surface otherwise, so the only correct
-    /// value is the one `draw_frame` computes after choosing the composite chain.
+    /// (ADR-0030). That is *not* always the surface: the composite chain routes
+    /// the scene into the first active post stage's input, which is a fixed
+    /// internal grid for the trails and kaleidoscope stages and the surface
+    /// otherwise, so the only correct value is the one the chain reports back
+    /// (`PostChain::begin`).
     /// A scene that accumulates into an internal offscreen field sizes that field
     /// from here, so it matches its target instead of upscaling from a fixed grid
     /// or supersampling into a smaller offscreen; every other scene ignores it.

@@ -176,10 +176,13 @@ impl Resources {
     }
 }
 
-/// The engine-owned background pass. Not a [`Scene`](super::scenes::Scene): it is
-/// driven by `bg_*` named params the renderer routes to it, and it runs before
-/// the active scene in the fixed composite (ADR-0018). Its GPU pipeline is built
-/// lazily on the first frame that paints a visible backdrop.
+/// The engine-owned background pass. Not a [`Scene`](super::scenes::Scene), and
+/// deliberately **not** a [`PostStage`](super::post::PostStage) either: it is a
+/// *pre*-pass that owns the frame clear and never folds a rendered frame down, so
+/// the renderer drives it directly — routing `bg_*` params to it and painting it
+/// into whatever target the chain chose — ahead of the scene and the chain
+/// (ADR-0018, ADR-0031). Its GPU pipeline is built lazily on the first frame that
+/// paints a visible backdrop.
 pub struct Background {
     device: wgpu::Device,
     surface_format: wgpu::TextureFormat,
@@ -229,8 +232,9 @@ impl Background {
     }
 
     /// Apply one named parameter, returning whether it was a background param
-    /// (`bg_*`). The renderer routes to the scene only when this returns `false`,
-    /// so scene and background param namespaces never collide.
+    /// (`bg_*`). Offered first, ahead of the post chain; the renderer falls
+    /// through to the scene only when neither claims the name, so the background,
+    /// post-stage and scene namespaces never collide.
     pub fn set_param(&mut self, name: &str, value: f32) -> bool {
         match name {
             "bg_hue" => self.hue = value,

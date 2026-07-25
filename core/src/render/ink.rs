@@ -10,14 +10,15 @@
 //! Default `paper = white`, `ink = black`, so turning the stage on with the
 //! default colors is a pure black-on-white invert; colored poles (cream + indigo,
 //! sepia, ...) are the same operation with different `paper_*`/`ink_*`. The stage
-//! is driven by the `ink_*` named params the renderer routes here exactly as it
-//! routes `bg_*`/`kaleido_*`, so there is **no `Scene`-trait change and the C ABI
-//! is untouched**. It sits last (after the scene, trails, kaleidoscope, and — when
-//! Plan 0024 lands — the transition blend), before the text/overlay passes, so the
-//! HUD is never inverted.
+//! is driven by the `ink_*` named params, offered to it like every other stage's
+//! by the [`PostChain`](super::post::PostChain), so there is **no `Scene`-trait
+//! change and the C ABI is untouched**. It is the chain's **last** stage (after
+//! the scene, trails, kaleidoscope, and — when Plan 0023 lands, per ADR-0024 —
+//! the transition blend), before the text/overlay passes, so the HUD is never
+//! inverted.
 //!
 //! **Passthrough and unbuilt when `ink_amount <= 0`** — every shipped preset until
-//! one opts in — so the renderer skips this stage entirely: no offscreen, no
+//! one opts in — so the chain skips this stage entirely: no offscreen, no
 //! pipeline, golden/determinism unchanged, the NFR §1 iGPU floor pays nothing,
 //! and (like the background/trails/kaleidoscope passes) the DX12 WARP software
 //! adapter never sees a coexisting remap pipeline during the no-ink captures. When
@@ -268,9 +269,10 @@ impl Resources {
     }
 }
 
-/// The engine final-stage duotone tone-remap. Not a [`Scene`](super::scenes::Scene):
-/// it is driven by the `ink_*` named params the renderer routes to it, and it
-/// remaps the composited frame before present (ADR-0028).
+/// The engine final-stage duotone tone-remap — a [`PostStage`], not a
+/// [`Scene`](super::scenes::Scene): it consumes an already-rendered frame rather
+/// than an `AnalysisFrame`. Driven by the `ink_*` named params, it remaps the
+/// fully composited frame before present (ADR-0028).
 pub struct Ink {
     device: wgpu::Device,
     surface_format: wgpu::TextureFormat,

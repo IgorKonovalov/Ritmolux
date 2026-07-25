@@ -11,7 +11,8 @@
 //! comes from the `trails` named param (0 = off).
 //!
 //! **Off by default (passthrough).** When `trails <= 0` — every shipped preset
-//! until one opts in — the renderer skips this stage entirely: no offscreen
+//! until one opts in — the [`PostChain`](super::post::PostChain) skips this stage
+//! entirely: no offscreen
 //! target, no pipelines, so golden/determinism are unchanged, the NFR §1 iGPU
 //! floor pays nothing, and (like the background pass) the DX12 WARP software
 //! adapter never sees a coexisting feedback pipeline during the no-trails
@@ -356,9 +357,12 @@ fn fullscreen_pipeline(
     })
 }
 
-/// The engine feedback-trails stage. Not a [`Scene`](super::scenes::Scene): it is
-/// driven by the `trails` named param the renderer routes to it, and it wraps the
-/// composite (background + scene) in a fade-and-accumulate feedback (ADR-0018).
+/// The engine feedback-trails stage — a [`PostStage`], not a
+/// [`Scene`](super::scenes::Scene): it consumes an already-rendered frame rather
+/// than an `AnalysisFrame`. Driven by the `trails` named param, it wraps what the
+/// chain hands it (background + scene) in a fade-and-accumulate feedback
+/// (ADR-0018). First in the chain, so it folds into whichever stage is active
+/// after it — or straight into the surface when none is.
 pub struct Trails {
     device: wgpu::Device,
     surface_format: wgpu::TextureFormat,

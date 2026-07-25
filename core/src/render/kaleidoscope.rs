@@ -10,7 +10,8 @@
 //! params.
 //!
 //! **Identity passthrough when `kaleido_order < 2`** — every shipped preset until
-//! one opts in — so the renderer skips this stage entirely: no offscreen, no
+//! one opts in — so the [`PostChain`](super::post::PostChain) skips this stage
+//! entirely: no offscreen, no
 //! pipeline, golden/determinism unchanged, the NFR §1 iGPU floor pays nothing,
 //! and (like the background/trails passes) the DX12 WARP software adapter never
 //! sees a coexisting fold pipeline during the no-kaleidoscope captures. When
@@ -240,9 +241,11 @@ impl Resources {
     }
 }
 
-/// The engine screen-space kaleidoscope stage. Not a [`Scene`](super::scenes::Scene):
-/// it is driven by the `kaleido_*` named params the renderer routes to it, and it
-/// folds the composited frame before present (ADR-0018).
+/// The engine screen-space kaleidoscope stage — a [`PostStage`], not a
+/// [`Scene`](super::scenes::Scene): it consumes an already-rendered frame rather
+/// than an `AnalysisFrame`. Driven by the `kaleido_*` named params, it folds
+/// whatever the chain hands it — the trails output when that stage is active,
+/// otherwise background + scene — before the next stage or present (ADR-0018).
 pub struct Kaleidoscope {
     device: wgpu::Device,
     surface_format: wgpu::TextureFormat,
