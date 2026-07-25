@@ -38,6 +38,8 @@
     clippy::unreachable
 )]
 
+use super::post::PostStage;
+
 /// `ink_amount` default — 0 = off (passthrough), so an unbound preset is
 /// unaffected and the stage is never built.
 const DEFAULT_AMOUNT: f32 = 0.0;
@@ -310,9 +312,15 @@ impl Ink {
             ink_bright: DEFAULT_INK_BRIGHT,
         }
     }
+}
+
+impl PostStage for Ink {
+    fn name(&self) -> &'static str {
+        "ink"
+    }
 
     /// Reset the remap params to their defaults (each frame, before routing).
-    pub fn reset_params(&mut self) {
+    fn reset_params(&mut self) {
         self.amount = DEFAULT_AMOUNT;
         self.paper_hue = DEFAULT_PAPER_HUE;
         self.paper_sat = DEFAULT_PAPER_SAT;
@@ -323,9 +331,9 @@ impl Ink {
     }
 
     /// Apply one named parameter, returning whether it was an `ink_*`/`paper_*`
-    /// param. The renderer routes to the scene only when this returns `false`, so
-    /// the namespaces never collide.
-    pub fn set_param(&mut self, name: &str, value: f32) -> bool {
+    /// param. The chain falls through to the scene only when every stage returns
+    /// `false`, so the namespaces never collide.
+    fn set_param(&mut self, name: &str, value: f32) -> bool {
         match name {
             "ink_amount" => self.amount = value,
             "paper_hue" => self.paper_hue = value,
@@ -339,28 +347,34 @@ impl Ink {
         true
     }
 
-    /// Drop the lazily-built resources — used on the capture scene-rebuild so a
-    /// stale remap pipeline never lingers to mis-render the next capture's scene on
-    /// the WARP adapter (module docs).
-    pub fn reset_resources(&mut self) {
-        self.res = None;
-    }
-
     /// Whether the remap is active this frame (`ink_amount > 0`; at or below zero
     /// it is the identity passthrough and the stage is skipped).
-    pub fn active(&self) -> bool {
+    fn active(&self) -> bool {
         self.amount > 0.0 && self.amount.is_finite()
+    }
+
+    /// `None` — the remap is a 1:1 per-pixel operation, so its input is sized from
+    /// the surface rather than a fixed internal grid (module docs). This is what
+    /// removes ink's special case from the renderer: the chain reads the surface
+    /// size here like any other stage reads its own.
+    fn internal_size(&self) -> Option<(u32, u32)> {
+        None
     }
 
     /// Build the surface-sized resources if needed (or rebuild on a size change)
     /// and return the offscreen view the composite renders into this frame. `None`
     /// only if the resources are absent (never, after the build). Called when
-    /// [`active`](Self::active).
-    pub fn begin(&mut self, width: u32, height: u32) -> Option<&wgpu::TextureView> {
+    /// [`active`](PostStage::active).
+    fn begin(
+        &mut self,
+        _encoder: &mut wgpu::CommandEncoder,
+        surface: (u32, u32),
+    ) -> Option<wgpu::TextureView> {
+        let (width, height) = (surface.0.max(1), surface.1.max(1));
         let stale = self
             .res
             .as_ref()
-            .is_none_or(|res| res.width != width.max(1) || res.height != height.max(1));
+            .is_none_or(|res| res.width != width || res.height != height);
         if stale {
             self.res = Some(Resources::build(
                 &self.device,
@@ -369,20 +383,21 @@ impl Ink {
                 height,
             ));
         }
-        self.res.as_ref().map(|res| &res.src_view)
+        self.res.as_ref().map(|res| res.src_view.clone())
     }
 
-    /// Remap the input offscreen into `surface_view`. Called after the composite
-    /// has rendered into the [`begin`](Self::begin) target, when
-    /// [`active`](Self::active).
-    pub fn resolve(
+    /// Remap the input offscreen into `out`. Ink is always the last active stage
+    /// (ADR-0028), so `out` is the surface. Called after the composite has rendered
+    /// into the [`begin`](PostStage::begin) target, when
+    /// [`active`](PostStage::active).
+    fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        surface_view: &wgpu::TextureView,
-    ) {
+        out: &wgpu::TextureView,
+    ) -> u32 {
         let Some(res) = self.res.as_ref() else {
-            return;
+            return 0;
         };
         queue.write_buffer(
             &res.uniform,
@@ -396,7 +411,7 @@ impl Ink {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("ink-pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: surface_view,
+                view: out,
                 depth_slice: None,
                 resolve_target: None,
                 ops: wgpu::Operations {
@@ -412,5 +427,14 @@ impl Ink {
         pass.set_pipeline(&res.pipeline);
         pass.set_bind_group(0, &res.bind_group, &[]);
         pass.draw(0..3, 0..1);
+
+        1 // the remap pass
+    }
+
+    /// Drop the lazily-built resources — used on the capture scene-rebuild so a
+    /// stale remap pipeline never lingers to mis-render the next capture's scene on
+    /// the WARP adapter (module docs).
+    fn reset_resources(&mut self) {
+        self.res = None;
     }
 }
