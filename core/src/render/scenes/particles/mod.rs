@@ -27,9 +27,12 @@
 //! activates it never builds them (keeping the other scenes' WARP captures
 //! unperturbed).
 //!
-//! The accumulation field is a fixed 16:9 offscreen, presented stretched to the
-//! surface (aspect ignored, as the reaction-diffusion present does): correct on a
-//! 16:9 display, uniformly stretched otherwise.
+//! The accumulation field is sized to the render target and capped (Plan 0027
+//! Phase 2, [`TRAIL_MAX_W`]/[`TRAIL_MAX_H`]) rather than fixed at 640x360, so the
+//! present is 1:1 up to the cap instead of a soft upscale on a 1080p+ display.
+//! It is still presented stretched (aspect ignored, as the reaction-diffusion
+//! present does), which is now a no-op below the cap because the field already
+//! carries the target's aspect.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). Steps + draws every displayed frame.
@@ -56,12 +59,32 @@ const PARTICLE_COUNT: u32 = 50_000;
 const WORKGROUP: u32 = 64;
 const SEED: u64 = 0x4C4D_5641_5454_5231; // "LMVATTR1"
 
-/// Fixed 16:9 accumulation grid the trails live on, decoupled from the surface
-/// size (the reaction-diffusion resolution-independence discipline). Modest so
-/// the extra decay+present fill the software capture pays stays cheap; the glow
-/// is soft, so upscaling to 1080p reads fine.
-const TRAIL_W: u32 = 640;
-const TRAIL_H: u32 = 360;
+/// Upper bound on each axis of the trail accumulation grid (Plan 0027 Phase 2).
+///
+/// The grid used to be a fixed 640x360 that was upscaled with linear filtering
+/// onto the surface, and that stretch — not the glow — is what read as soft on a
+/// 1080p+ display. It is now sized from the render target (see
+/// [`Scene::resize`](crate::render::scenes::Scene::resize)) and clamped per axis
+/// to this cap, so a 1080p window gets a 1:1 grid and a 4K/ultrawide one degrades
+/// to a mild, uniform upscale instead of an unbounded fill bill.
+///
+/// **The cap is the NFR §1 tradeoff.** Every frame pays a decay pass plus a
+/// 50k-instance additive draw over the grid, so fill scales with its area: 1440p
+/// is ~16x the old 640x360. 2560x1440 is the chosen ceiling — enough headroom for
+/// a high-DPI display while keeping the worst case bounded on the iGPU floor. The
+/// headless captures run well under it, so they size 1:1 and stay deterministic
+/// at a fixed `--size` (NFR §6).
+const TRAIL_MAX_W: u32 = 2560;
+const TRAIL_MAX_H: u32 = 1440;
+/// Grid size before the first [`Scene::resize`](crate::render::scenes::Scene::resize)
+/// — only reached if a scene renders without one, which the renderer never does.
+const TRAIL_FALLBACK_W: u32 = 1280;
+const TRAIL_FALLBACK_H: u32 = 720;
+
+/// Clamp a render-target size to the trail grid's cap, never below 1x1.
+fn trail_grid_size(width: u32, height: u32) -> (u32, u32) {
+    (width.clamp(1, TRAIL_MAX_W), height.clamp(1, TRAIL_MAX_H))
+}
 
 /// Wall-clock duration of one attractor iteration (Plan 0014 injected `dt`). The
 /// fixed-timestep accumulator runs one compute step per `FIXED_STEP` of injected
@@ -489,10 +512,20 @@ struct Resources {
     decay_bg_b: wgpu::BindGroup,
     present_bg_a: wgpu::BindGroup,
     present_bg_b: wgpu::BindGroup,
+    /// The accumulation grid these resources were built for. The decay/present
+    /// bind groups are bound to the field's views, so a size change rebuilds the
+    /// whole block rather than swapping the textures under them.
+    trail_w: u32,
+    trail_h: u32,
 }
 
 impl Resources {
-    fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    fn build(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        trail_w: u32,
+        trail_h: u32,
+    ) -> Self {
         let step_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("attractor-step-shader"),
             source: wgpu::ShaderSource::Wgsl(STEP_SHADER.into()),
@@ -510,7 +543,7 @@ impl Resources {
             source: wgpu::ShaderSource::Wgsl(PRESENT_SHADER.into()),
         });
 
-        let field = PingPongField::new(device, TRAIL_W, TRAIL_H);
+        let field = PingPongField::new(device, trail_w, trail_h);
 
         // Particle storage buffer: written by the compute step (STORAGE), read by
         // the draw pass as an instance vertex buffer (VERTEX), seeded once from
@@ -766,6 +799,8 @@ impl Resources {
             present_bg_b,
             lut_texture_a,
             lut_texture_b,
+            trail_w,
+            trail_h,
         }
     }
 
@@ -939,6 +974,13 @@ pub struct AttractorScene {
     device: wgpu::Device,
     surface_format: wgpu::TextureFormat,
     res: Option<Resources>,
+    /// The accumulation grid the next build should use — the render target's size
+    /// clamped to [`TRAIL_MAX_W`]/[`TRAIL_MAX_H`], updated by
+    /// [`Scene::resize`](crate::render::scenes::Scene::resize). Held separately
+    /// from [`Resources::trail_w`]/`trail_h` so a size change is a compare here
+    /// and a rebuild on the next render, not a rebuild inside `resize`.
+    trail_w: u32,
+    trail_h: u32,
     /// The deterministic seeded scatter, uploaded on the first frame after a
     /// (re)build so a rebuilt scene restarts identically (capture determinism).
     seed_particles: Vec<Particle>,
@@ -1004,6 +1046,8 @@ impl AttractorScene {
             device: device.clone(),
             surface_format,
             res: None,
+            trail_w: TRAIL_FALLBACK_W,
+            trail_h: TRAIL_FALLBACK_H,
             seed_particles,
             needs_upload: true,
             needs_clear: true,
@@ -1083,6 +1127,16 @@ impl Scene for AttractorScene {
         }
         self.accumulator = self.accumulator.min(FIXED_STEP);
         self.pending_steps = steps;
+    }
+
+    /// Size the trail accumulation grid to the render target, capped (Plan 0027
+    /// Phase 2). Called every frame, so the unchanged case must stay free: this
+    /// only records the request, and `render` rebuilds when it differs from what
+    /// the live resources were built for.
+    fn resize(&mut self, width: u32, height: u32) {
+        let (w, h) = trail_grid_size(width, height);
+        self.trail_w = w;
+        self.trail_h = h;
     }
 
     fn set_time(&mut self, time: f32) {
@@ -1184,9 +1238,24 @@ impl Scene for AttractorScene {
         view: &wgpu::TextureView,
         _aspect: f32,
     ) {
-        if self.res.is_none() {
-            self.res = Some(Resources::build(&self.device, self.surface_format));
-            // Fresh LUT textures are empty, so upload the palette below.
+        // (Re)build when there are no resources, or when `resize` asked for a
+        // different accumulation grid than the live one (Plan 0027 Phase 2). The
+        // rebuilt field is undefined and its LUTs empty, so re-flag the clear,
+        // the seed upload, and the palette — a resize therefore restarts the
+        // trail rather than carrying a differently-sized one across.
+        let stale = self
+            .res
+            .as_ref()
+            .is_none_or(|res| res.trail_w != self.trail_w || res.trail_h != self.trail_h);
+        if stale {
+            self.res = Some(Resources::build(
+                &self.device,
+                self.surface_format,
+                self.trail_w,
+                self.trail_h,
+            ));
+            self.needs_clear = true;
+            self.needs_upload = true;
             self.palette_dirty = true;
         }
         let Self {
@@ -1258,7 +1327,10 @@ impl Scene for AttractorScene {
             0,
             bytemuck::bytes_of(&DrawUniform {
                 v: [
-                    TRAIL_W as f32 / TRAIL_H as f32,
+                    // The live grid's aspect — the points are projected into the
+                    // accumulation field, not the surface, so this follows the
+                    // field's size (Plan 0027 Phase 2).
+                    res.trail_w as f32 / res.trail_h.max(1) as f32,
                     POINT_BASE * *size,
                     *hue,
                     *time * SPIN_RATE,

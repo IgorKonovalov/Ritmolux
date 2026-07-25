@@ -411,6 +411,14 @@ impl Trails {
         TRAILS_W as f32 / TRAILS_H as f32
     }
 
+    /// The fixed internal accumulation size. The renderer reports this — not the
+    /// surface — as the target size to a scene that sizes an internal field
+    /// ([`Scene::resize`](super::scenes::Scene::resize)), so the scene does not
+    /// supersample into an offscreen smaller than the window (Plan 0027 Phase 2).
+    pub fn size() -> (u32, u32) {
+        (TRAILS_W, TRAILS_H)
+    }
+
     /// Build the resources if needed (clearing the fresh accumulation) and return
     /// the offscreen view the background + scene render into this frame. Returns
     /// `None` only if the resources are absent (never, after the build above) —
