@@ -1,13 +1,13 @@
 # ADR-0032 — Ink leaves the `PostChain`: a terminal engine post-pass, with the transition blend between chain and ink
 
-> **Status:** proposed
+> **Status:** accepted (implemented by Plan 0023 Phase 1, closed 2026-07-26)
 > **Date:** 2026-07-25
 > **Related ADRs:** revises [0031](0031-post-stage-trait-instantiable-composite-chain.md)'s chain
 > membership (does **not** revise its trait, its fixed-order rule, or its instantiability claim);
 > preserves [0028](0028-final-stage-ink-tone-remap.md)'s ink-after-blend ordering and
 > [0018](0018-engine-wide-scene-compositing.md)'s fixed composite; enables
 > [0024](0024-cross-preset-transitions.md)
-> **Related plan(s):** [0023](../plans/0023-cross-preset-transitions.md) (implements this)
+> **Related plan(s):** [0023](../plans/done/0023-cross-preset-transitions.md) (implements this)
 
 ## Context
 

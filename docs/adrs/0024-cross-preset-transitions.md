@@ -1,8 +1,8 @@
 # ADR-0024 — Cross-preset transitions: a two-input blend stage over the engine composite, adaptive dual-live/freeze, engine-default policy
 
-> **Status:** proposed
+> **Status:** accepted (implemented by Plan 0023, closed 2026-07-26)
 > **Date:** 2026-07-23
-> **Related plan(s):** [0023-cross-preset-transitions](../plans/0023-cross-preset-transitions.md); builds on [0018](0018-engine-wide-scene-compositing.md) (the engine composite's offscreen target + present pass) and [0012](0012-stateful-feedback-render-system.md)/[0013](0013-c-abi-v4-render-dt.md) (Plan 0014's `PingPongField` + injected `dt`); realizes the "cross-preset blending" follow-up deferred by [Plan 0003](../plans/done/0003-generative-scenes-and-presets.md)
+> **Related plan(s):** [0023-cross-preset-transitions](../plans/done/0023-cross-preset-transitions.md); builds on [0018](0018-engine-wide-scene-compositing.md) (the engine composite's offscreen target + present pass) and [0012](0012-stateful-feedback-render-system.md)/[0013](0013-c-abi-v4-render-dt.md) (Plan 0014's `PingPongField` + injected `dt`); realizes the "cross-preset blending" follow-up deferred by [Plan 0003](../plans/done/0003-generative-scenes-and-presets.md)
 
 ## Context
 

@@ -3,7 +3,7 @@
 > **Status:** accepted (2026-07-25)
 > **Date:** 2026-07-25
 > **Related plan(s):** [0030](../plans/done/0030-composite-chain-and-scene-keying.md) (implemented
-> this; closed 2026-07-25); unblocks [0023](../plans/0023-cross-preset-transitions.md)
+> this; closed 2026-07-25); unblocks [0023](../plans/done/0023-cross-preset-transitions.md)
 
 ## Context
 
@@ -24,7 +24,7 @@ the frame's `draw_calls` total assembled by hand arithmetic. The ladder enumerat
 than deriving them, so each new stage roughly doubles it. None of that routing has a unit test — it
 is exercised only indirectly, through WARP captures of presets that happen to bind the right params.
 
-Two forces make this a decision rather than a tidy-up. First, [Plan 0023](../plans/0023-cross-preset-transitions.md)
+Two forces make this a decision rather than a tidy-up. First, [Plan 0023](../plans/done/0023-cross-preset-transitions.md)
 (status `approved`) appends a **fourth** stage, and it is two-input — it samples the outgoing and
 incoming frames. Second, that plan's Phase 3 renders **two fully-composited frames in one frame**, and
 its own risk list records the consequence: "in dual-live, each side needs its own feedback field". The
