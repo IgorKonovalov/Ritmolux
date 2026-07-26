@@ -148,17 +148,47 @@ pub enum GeneratorConfig {
     },
 }
 
-/// Reported by [`Scene::configure`](super::super::Scene::configure) when
-/// building a line scene's geometry hit the fixed [`MAX_SEGMENTS`] cap and
-/// truncated. The cap must never be a silent cut (ADR-0007 Risks): `configure`
-/// returns this so the frontend surfaces it at load. Produced off the hot path
-/// (preset load only); `None` is the normal case where geometry fit.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Which construction hit the [`MAX_SEGMENTS`] cap, for the surfaced message.
+///
+/// An enum rather than a `String` because one of the two producers is **per
+/// frame**: an audio-driven `mirror_order` sitting over the cap used to build a
+/// fresh `format!("mirror x{order}")` on every single frame for as long as it
+/// stayed there — a heap allocation on the hot path (Plan 0031 Phase 4). The
+/// formatting now happens only in [`Display`](std::fmt::Display), i.e. only when
+/// something actually prints it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OverflowContext {
+    /// An N-fold geometry mirror replicated past the cap — per frame, from the
+    /// `mirror_order` param (Plan 0018 Phase 4).
+    Mirror(u32),
+    /// An L-system depth expanded past the cap — once, at preset load.
+    Depth(u32),
+}
+
+impl std::fmt::Display for OverflowContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // These two renderings are the user-visible text ADR-0007 requires stay
+        // informative; the shell prints them verbatim. Do not reword them
+        // without meaning to change what an operator sees.
+        match self {
+            OverflowContext::Mirror(order) => write!(f, "mirror x{order}"),
+            OverflowContext::Depth(depth) => write!(f, "depth {depth}"),
+        }
+    }
+}
+
+/// Reported when building a line scene's geometry hit the fixed [`MAX_SEGMENTS`]
+/// cap and truncated. The cap must never be a silent cut (ADR-0007 Risks), so it
+/// travels to the frontend two ways: out of
+/// [`Scene::configure`](super::super::Scene::configure) at preset load, and off
+/// [`Scene::mirror_overflow`](super::super::Scene::mirror_overflow) for the
+/// per-frame mirror. `None` is the normal case where geometry fit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CapOverflow {
     /// How many draw segments were dropped at the cap.
     pub dropped: usize,
-    /// Where the drop happened, for the surfaced message (e.g. `"depth 6"`).
-    pub context: String,
+    /// Where the drop happened, for the surfaced message.
+    pub context: OverflowContext,
 }
 
 impl std::fmt::Display for CapOverflow {
@@ -248,6 +278,13 @@ impl MirrorSpec {
     /// How many copies of the base a full replication emits.
     fn copies(self) -> usize {
         self.order.max(1) as usize * if self.reflect { 2 } else { 1 }
+    }
+
+    /// Whether replication would be a no-op — one sector, no reflection, so the
+    /// output is the input. The common case (no shipped preset binds
+    /// `mirror_order`), and the one the scenes skip the copy for.
+    pub(crate) fn is_identity(self) -> bool {
+        self.order <= 1 && !self.reflect
     }
 }
 
@@ -356,16 +393,97 @@ mod tests {
         }
     }
 
-    /// The identity spec (`from_params(1, 0)`) copies the base through unchanged.
+    /// The identity spec (`from_params(1, 0)`) copies the base through unchanged —
+    /// which is *why* the scenes skip the call entirely at that spec (Plan 0031
+    /// Phase 4). This test is the equivalence that licenses the skip: replication
+    /// at an identity spec yields exactly the input, no drop and no transform, so
+    /// swapping the buffers instead produces the same frame.
     #[test]
     fn identity_spec_copies_the_base_unchanged() {
-        let single = vec![seg([0.2, 0.3], [0.5, 0.1])];
+        let single = vec![
+            seg([0.2, 0.3], [0.5, 0.1]),
+            seg([-0.4, 0.05], [0.15, -0.35]),
+        ];
+        let spec = MirrorSpec::from_params(1.0, 0.0);
+        assert!(spec.is_identity(), "the spec the scenes skip on");
         let mut out = Vec::new();
-        let dropped =
-            replicate_mirror(&single, MirrorSpec::from_params(1.0, 0.0), 10_000, &mut out);
-        assert_eq!(dropped, 0);
-        assert_eq!(out.len(), 1);
-        assert!(close(out[0].a, single[0].a) && close(out[0].b, single[0].b));
+        let dropped = replicate_mirror(&single, spec, 10_000, &mut out);
+        assert_eq!(dropped, 0, "identity never truncates");
+        assert_eq!(out.len(), single.len(), "no copies added or lost");
+        for (produced, source) in out.iter().zip(&single) {
+            assert!(
+                close(produced.a, source.a) && close(produced.b, source.b),
+                "identity applies no transform"
+            );
+            assert_eq!(produced.color, source.color);
+            assert_eq!(produced.width, source.width);
+        }
+    }
+
+    /// Exactly which specs the scenes may skip replication for. A spec that is
+    /// *not* the identity must not be treated as one — that would silently drop a
+    /// preset's mirror.
+    #[test]
+    fn is_identity_covers_exactly_the_no_op_specs() {
+        assert!(
+            MirrorSpec {
+                order: 1,
+                reflect: false
+            }
+            .is_identity()
+        );
+        // A non-finite or sub-1 order clamps to 1, which is the identity.
+        assert!(MirrorSpec::from_params(0.0, 0.0).is_identity());
+        assert!(MirrorSpec::from_params(f32::NAN, 0.0).is_identity());
+        assert!(
+            MirrorSpec::from_params(1.4, 0.0).is_identity(),
+            "rounds to 1"
+        );
+        // Reflection at order 1 still doubles the geometry — not an identity.
+        assert!(
+            !MirrorSpec {
+                order: 1,
+                reflect: true
+            }
+            .is_identity()
+        );
+        assert!(!MirrorSpec::from_params(1.0, 1.0).is_identity());
+        assert!(!MirrorSpec::from_params(2.0, 0.0).is_identity());
+        assert!(
+            !MirrorSpec::from_params(1.6, 0.0).is_identity(),
+            "rounds to 2"
+        );
+    }
+
+    /// The message an operator actually reads. Plan 0031 Phase 4 replaced the
+    /// per-frame `format!` with an enum that formats only in `Display`; ADR-0007
+    /// requires the text stay informative, so both renderings are pinned here.
+    #[test]
+    fn the_overflow_message_is_unchanged() {
+        assert_eq!(OverflowContext::Mirror(6).to_string(), "mirror x6");
+        assert_eq!(OverflowContext::Depth(6).to_string(), "depth 6");
+        assert_eq!(
+            CapOverflow {
+                dropped: 350,
+                context: OverflowContext::Mirror(6),
+            }
+            .to_string(),
+            format!(
+                "geometry exceeded the {MAX_SEGMENTS}-segment cap at mirror x6 \
+                 (dropped 350 segment(s)); reduce the structure or its depth"
+            )
+        );
+        assert_eq!(
+            CapOverflow {
+                dropped: 1,
+                context: OverflowContext::Depth(7),
+            }
+            .to_string(),
+            format!(
+                "geometry exceeded the {MAX_SEGMENTS}-segment cap at depth 7 \
+                 (dropped 1 segment(s)); reduce the structure or its depth"
+            )
+        );
     }
 
     /// Reflection doubles the copy count and stays rotationally symmetric.
