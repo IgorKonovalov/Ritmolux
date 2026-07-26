@@ -31,11 +31,25 @@ the behavior to avoid.
   never reviews its own work. You hand plans to `dev`; `dev` hands finished plans back to you
   for the close-ceremony review.
 - **`preset-author`** — the content lane (added per [ADR-0017](../../../docs/adrs/0017-preset-author-skill-lane.md)).
-  Composes existing engine capability into visual looks — `.toml` presets, expression bindings,
-  `[curve]`/`[generator]` config — and never writes engine Rust. It hands **you** two things: a
-  *feedback note* when a look needs something the preset grammar can't express (a new scene, param,
-  function, easing, compositing — you decide if it's ADR-worthy), and a *curation candidate* when a
-  preset is strong enough to ship (embedding is a `dev` change). It never authors plans or ADRs.
+  Composes existing engine capability into visual looks — `.toml` presets, expression bindings, and
+  the structural (`[curve]`/`[generator]`/`[particles]`), colour (`[palette]`) and easing
+  (`[smoothing]`) tables — and never writes engine Rust. It hands **you** two things: a *feedback
+  note* when a look needs something the preset surface can't express (a new scene, param, function,
+  curve family, shader — you decide if it's ADR-worthy), and a *curation candidate* when a preset is
+  strong enough to ship. It never authors plans or ADRs.
+
+  **Where feedback notes land: [`docs/design-backlog.md`](../../../docs/design-backlog.md).** That
+  file is your inbox from this lane — captured friction that isn't yet an ADR or a plan. Read it
+  when you're deciding what to design next; when an entry graduates, strike it through with a
+  pointer to the ADR/plan it became.
+
+  **The curation boundary is an open question.** ADR-0017 put it at "`dev` embeds a curated preset"
+  because embedding meant editing Rust in two coupled spots. [ADR-0022](../../../docs/adrs/0022-build-time-preset-embedding.md)
+  removed that premise — `core/build.rs` globs `presets/*.toml`, so shipping a preset is now just
+  committing a `.toml`. Either the boundary moves (the content lane lands curated presets directly,
+  gated on the `sanity`/`reactivity`/`animation` behavioral tests) or it gets re-justified on other
+  grounds. That's an ADR-0017 supplement someone owes; until it's written, `preset-author` names
+  candidates and hands off rather than deciding unilaterally.
 
 That's the whole ecosystem: you design, `dev` builds, `preset-author` composes content. The handoffs
 are `architect → dev` (the user's "go"), `dev → architect` (the close ceremony), and
@@ -198,11 +212,27 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
 - **Operator-doc freshness.** If the plan changed anything a user observes — controls/hotkeys,
   a default, the preset/scene count, capture paths, CLI flags, config keys — grep the user-facing
   docs for the thing that changed and update them in the close commit. The canonical set:
-  `README.md` (esp. the Controls table), `docs/presets.md`, `docs/on-device-validation.md`,
-  `docs/nfr.md`, `docs/capturing.md`. Prefer count-free phrasing ("the whole embedded set") over
-  hard numbers that re-drift. This is a required sweep, not a "if you notice" — behavior docs and
-  peripheral operator docs drift independently (Plan 0026 updated the README but left
-  `on-device-validation.md` saying "all 10" and `presets.md` silent on the `A` toggle).
+
+  | Doc | Sweep it when the plan touched |
+  |-----|-------------------------------|
+  | `README.md` (esp. the Controls table) | hotkeys, controls, top-level behavior |
+  | **`presets/README.md`** | **any scene param added/renamed/re-defaulted, any engine-stage param, the structural/palette/smoothing tables** |
+  | **`docs/presets.md`** | **the expression grammar — a variable, constant, function, operator, or the error surface** |
+  | **`docs/preset-palettes.md`** | **palette names, custom-stop rules, per-scene colour params, A/B crossfade** |
+  | `docs/capturing.md` | `shot` CLI flags, the visual-QA harness |
+  | `docs/on-device-validation.md` | anything the on-device checklist asserts |
+  | `docs/nfr.md` | a quantified budget moved |
+
+  **The three bolded rows are load-bearing for the `preset-author` lane.** That skill deliberately
+  keeps *no* catalogue of its own — it points at these docs — precisely because its private copies
+  rotted while these stayed current (rewritten 2026-07-26, commit `1412a9b`). So when a plan adds a
+  scene param or a grammar function and these don't get swept, the content lane authors against a
+  surface that doesn't exist and has no way to notice. Sweeping them *is* how that skill stays true.
+
+  Prefer count-free phrasing ("the whole embedded set") over hard numbers that re-drift. This is a
+  required sweep, not a "if you notice" — behavior docs and peripheral operator docs drift
+  independently (Plan 0026 updated the README but left `on-device-validation.md` saying "all 10"
+  and `presets.md` silent on the `A` toggle).
 - Did the plan get `Status: done` and move to `docs/plans/done/`? Is `docs/plans/README.md`
   refreshed (roster → recently-closed, execution order, next-free-number)? Are paired ADRs
   flipped `proposed → accepted` with `docs/adrs/README.md` matching?
@@ -320,8 +350,12 @@ Bash tool mangles here-strings. Never rewrite history (no amend/rebase/reset). N
 
 Read on demand, not upfront:
 
-- `references/project-context.md` — full project state: crate layout, canonical `cargo`
-  commands, the source-agnostic-core rule, open ADRs/plans. The source of truth, not your memory.
+- `references/project-context.md` — crate layout, canonical `cargo` commands, the
+  source-agnostic-core rule, platform realities. It deliberately does **not** enumerate ADRs or
+  plans — `docs/adrs/README.md` and `docs/plans/README.md` are the live indexes, and a second copy
+  here would only rot.
+- `docs/design-backlog.md` (in the repo, not this skill) — the `preset-author → architect` inbox:
+  captured friction not yet promoted to an ADR or plan. Read it when deciding what to design next.
 - `references/best-practices.md` — the correctness rules you check in Mode 4 (real-time audio
   safety, determinism, source-agnostic core, C ABI discipline, boundary validation).
 - `references/templates/plan.md`, `references/templates/adr.md`,

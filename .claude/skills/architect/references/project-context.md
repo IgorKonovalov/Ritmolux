@@ -22,22 +22,25 @@ Cargo workspace. This is the intended shape for orientation, not an inventory �
 `Glob`/`git` for what actually exists today (the tree has grown well past the founding scaffold).
 
 ```
-core/            # Rust library crate — DSP + render engine + scenes + C ABI.
+core/            # Rust library crate — DSP + render engine + scenes + preset engine + C ABI.
                  #   crate-type = ["rlib", "cdylib", "staticlib"]
-  src/audio.rs   #   ring buffer + source-agnostic sample intake (validated at boundary)
-  src/dsp/       #   fft.rs, onset.rs — pure, deterministic, unit-tested
-  src/render/    #   wgpu device/surface/context
-  src/scenes/    #   Scene trait + spectrum/beat scenes
+  build.rs       #   globs presets/*.toml into the embedded set (ADR-0022)
+  src/audio.rs   #   source-agnostic sample intake (validated at boundary)
+  src/dsp/       #   bands/fft/onset/beat — pure, deterministic, unit-tested
+  src/preset/    #   the .toml schema + the pure expression evaluator (expr.rs, schema.rs)
+  src/render/    #   wgpu device/surface/context, the composite stages, and scenes/
   src/ffi.rs     #   extern "C" surface for the plugin
-  include/       #   generated/hand-written C header
-standalone/      # Rust binary — winit + wgpu surface + loopback capture (capture_win.rs / capture_mac.rs)
+lmv-ring/        # the lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI
+standalone/      # Rust binary + lib — winit + wgpu surface + loopback capture + the `shot` example
 plugin-foobar/   # C++ shim — foobar2000 SDK glue, links core's C ABI (Windows-first)
+presets/         # the curated preset library (*.toml) + README.md (the param roster)
 docs/
 ├── adrs/        # ADR-NNNN + README index
 ├── plans/       # plan NNNN + README index + done/
-└── diagrams/    # standalone mermaid
+├── specs/       # NNNN-<subsystem>.md — living behavioral contracts (C ABI, ring/DSP)
+└── diagrams/    # standalone mermaid (created on first use)
 .claude/
-├── skills/      # architect + dev
+├── skills/      # architect + dev + preset-author
 ├── hooks/       # block-broad-git-add.js
 └── settings.json
 ```
@@ -55,8 +58,11 @@ Rust (run from repo root):
   `cbindgen` if configured)
 
 foobar plugin (Windows, C++): built with its own project/toolchain under `plugin-foobar/` linking
-the core's staticlib + generated header. The exact build invocation is pinned when Plan 0001
-phase 6 lands — check that plan / the plugin's README.
+the core's staticlib + generated header. Check the plugin's own README for the current invocation.
+
+Headless visual QA: `cargo run -p standalone --example shot -- <flags>` (see `docs/capturing.md`).
+That is how the `preset-author` lane self-verifies, and how you can eyeball a render change during
+a Mode 4 review without launching the app.
 
 ## Non-functional requirements
 
@@ -85,10 +91,14 @@ here; the index is one glob away and this file would only go stale.
 
 Three skills. `architect` (this skill) owns `docs/` — plans, ADRs, diagrams, reviews. `dev` owns
 all code: `core/`, `standalone/`, `plugin-foobar/`. `preset-author` owns preset **content** —
-`.toml` presets, expression bindings, `[curve]`/`[generator]` config — and never engine Rust
-(ADR-0017). Phase owner tags use the vocabulary `dev` (all code) and `human` (a task only the user
-can do — a product call, a cert, installing a system audio driver); preset-authoring is its own
-lane, not a phase owner. There are no sibling *implementer* skills — `dev` owns all code.
+`.toml` presets, expression bindings, and the structural/palette/smoothing tables — and never
+engine Rust (ADR-0017). Phase owner tags use the vocabulary `dev` (all code) and `human` (a task
+only the user can do — a product call, a cert, installing a system audio driver); preset-authoring
+is its own lane, not a phase owner. There are no sibling *implementer* skills — `dev` owns all code.
+
+`preset-author` feeds you through **`docs/design-backlog.md`** — captured friction not yet promoted
+to an ADR or plan. It is the one inbound channel that isn't a conversation, so check it when
+deciding what to design next.
 
 ## Platform realities
 
