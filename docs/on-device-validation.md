@@ -51,6 +51,18 @@ footprint so the vendor spread is on record.
       also satisfies the identical Plan 0003 Phase 3 iGPU-60-fps carry-forward — same measurement.)_
 - [ ] **Second GPU vendor — Intel iGPU, if a box is available**, 1080p. Same capture. The point is
       the footprint spread vs the AMD dev box — confirms whether the ~350 MB ceiling is AMD-specific.
+- [ ] **The dual-live dissolve budget, on the low-end box.** Plan 0023 made every preset switch a
+      ~1 s dissolve, and its governor re-renders the *outgoing* preset live as well whenever the two
+      presets hold independent GPU state **and** the smoothed frame time is under
+      `DUAL_LIVE_BUDGET_MS` (`core/src/render/mod.rs`, currently **18.0** — the code calls it "the
+      number to calibrate on a low-end rig", and no capture can speak to it because a headless run
+      collects no frame times and so never upgrades). Two things to report, both with the overlay on
+      (`F3`) so the p99 is visible: **(a)** press `Space` repeatedly between light presets — does the
+      frame time hold ≥ 60 fps *through* the dissolves, or does the governor's threshold need to come
+      down; **(b)** the **heavy pair** — dissolve an attractor preset into a reaction-diffusion one
+      and back. That pair is the freeze fallback's reason for existing; on this box it should either
+      stay frozen (fine) or, if it upgrades, still hold the floor. _(Plan 0023 Phase 4's done-when
+      and its budget-tuning risk, extracted at that plan's close.)_
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
       behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
       Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was
@@ -70,6 +82,8 @@ cargo build -p standalone --release --bin lmv
 Play any audio (loopback capture feeds the visuals). Then, in the window:
 
 - **`Space`** — cycle presets (step through the whole embedded set; each should render and react).
+  Each switch **dissolves** over ~1 s rather than cutting, so the frame time during the dissolve is
+  its own measurement — see the dual-live budget item above.
 - **`F3`** — toggle the diagnostics overlay (frame-time sparkline + GPU bar + fps/p99 readout).
 
 The 1 Hz log lands at:
