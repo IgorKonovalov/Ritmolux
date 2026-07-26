@@ -3,15 +3,34 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0033**
+**Next free number: 0034**
 
 ## Active roster
 
-**Empty** — nothing is in flight. [0031] closed on 2026-07-26 and was the last open plan; the
-`preset-author` inbox at [`docs/design-backlog.md`](../design-backlog.md) plus the minors logged in
-the closes below are where the next plan comes from.
+| Plan | Title | Status | Owner skill(s) |
+|------|-------|--------|----------------|
+| [0033](0033-internal-resolution-and-preset-surface.md) | Internal resolution follows the target, plus the preset-surface and harness gaps behind it | draft | dev, human |
 
 ## Recommended execution sequence
+
+**[0033] is the only plan in flight** and is ready for `dev`. It takes four of the eight entries in
+the [design backlog](../design-backlog.md) — the 2026-07-26 `preset-author` feedback batch — in one
+pass: the composite's two post stages stop rendering the whole frame through a fixed 1280x720
+([ADR-0034](../adrs/0034-internal-resolution-follows-the-target.md)), reaction-diffusion's blockiness
+is attacked at the reconstruction seam before the expensive grid step, RD's present sampler starts
+wrapping a field that was **already toroidal** (which is what makes `zoom`/`pan_*` usable on that
+scene at all), `[smoothing]` gains an `{ attack, release }` pair
+([ADR-0035](../adrs/0035-asymmetric-attack-release-easing.md)), and the `shot` harness stops being
+unable to drive `tempo`/`novelty` or to say what real audio levels look like. Phase 8 is `human` —
+the aesthetic re-tune on the user's 2048x1152 display, which engine-green cannot substitute for.
+
+**Deliberately sequenced after it:** backlog 0005 (a bloom/glow post stage), so it is built against
+target-sized stages rather than inheriting the 720p problem it exists to answer. **Not yet designed:**
+backlog 0002 (per-bin spectrum + a scene that draws N elements — the largest item in the batch, and
+the one the user asked for twice) and backlog 0007 (`star_pattern`, which the user chose to invest in
+rather than cut).
+
+### Prior sequencing notes
 
 A tactical ordering of the **active roster** (strategic themes live in the Roadmap below).
 (**Plan 0014 has now landed and closed** — the `render::feedback::PingPongField` seam, the injected-`dt`

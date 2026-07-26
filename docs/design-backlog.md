@@ -110,6 +110,10 @@ window.
 - **Verified against code:** yes — `const GRID: u32 = 256` (`render/scenes/reaction_diffusion.rs:48`),
   `TRAILS_W/H = 1280/720` (`render/trails.rs:45`), `KALEIDO_W/H = 1280/720`
   (`render/kaleidoscope.rs:40`). All three report through `PostStage::internal_size`.
+- **PROMOTED 2026-07-26 → [ADR-0034](adrs/0034-internal-resolution-follows-the-target.md) +
+  [Plan 0033](plans/0033-internal-resolution-and-preset-surface.md)** (Phases 3-4 the RD side,
+  Phase 6 the post stages, Phase 7 the mirror-vs-kaleidoscope docs action). Notes retained below as
+  the origin record.
 - **Not chemistry:** the lane swept `flow` across 0.45 / 0.70 / 1.00 and the blockiness is identical
   in all three. No preset value removes it.
 
@@ -157,6 +161,9 @@ have saved the lane the trades above.
   grid; any real `pan_*` at `zoom = 1.0` walks off the field the same way. All four RD presets are
   now pinned at `zoom = 0.99` with a whisper of pan, which costs the family its whole view-transform
   lever.
+- **PROMOTED 2026-07-26 → [ADR-0034](adrs/0034-internal-resolution-follows-the-target.md) +
+  [Plan 0033](plans/0033-internal-resolution-and-preset-surface.md) Phase 5.** Notes retained below
+  as the origin record.
 - **Verified against code — and the diagnosis is more specific than the report.** The present pass
   computes `uv = (in.uv - 0.5) * zoom + 0.5 + pan` (`reaction_diffusion.rs:226`), so `zoom > 1`
   samples outside `[0,1]`. The present sampler is **`AddressMode::ClampToEdge`** (`:418-420`) — so
@@ -215,6 +222,9 @@ level. `docs/nfr.md` §7 is the budget it must answer to.
 
 - **Raised:** 2026-07-26, from `preset-author`. The user: "pulse field reaction are way too fast and
   jarring, we should smoothen it up a lot - use some qubic bezziere function or something."
+- **PROMOTED 2026-07-26 → [ADR-0035](adrs/0035-asymmetric-attack-release-easing.md) +
+  [Plan 0033](plans/0033-internal-resolution-and-preset-surface.md) Phase 2.** Notes retained below
+  as the origin record.
 - **Verified against code:** yes. `[smoothing]` is one time constant per param, folded onto
   `Binding::tau` at load (`preset/schema.rs:270`), applied by `Smoother::smooth`
   (`render/mod.rs:310-326`) as `alpha = 1 - exp(-dt/tau)`. One state slot per binding. No ease shape,
@@ -264,11 +274,23 @@ generator-level change to `star_pattern`'s config surface (ADR-0007 territory).
 **Lowest-confidence entry in the batch**, and the only one where "cut the scene" is a legitimate
 answer. Do not promote without asking the user which way they lean.
 
+**Decided 2026-07-26: invest, do not cut.** The user chose to make the scene earn its slot rather
+than retire it. Still needs its own ADR and plan — both asks (a richer interior, and a real geometry
+lerp between `variant`s) are generator-level changes to `star_pattern`'s config surface, which is
+ADR-0007 territory. Not folded into [Plan 0033](plans/0033-internal-resolution-and-preset-surface.md),
+which is a resolution/preset-surface plan and shares no files with this.
+
 ---
 
 ## 0008 — `shot` harness gaps that cost the content lane real iterations
 
 - **Raised:** 2026-07-26, from `preset-author`. All three verified.
+- **PROMOTED 2026-07-26 → [Plan 0033](plans/0033-internal-resolution-and-preset-surface.md) Phase 1**
+  (no ADR — no rejected alternative worth remembering). **One item was answered rather than built:**
+  the pulsing `--set` form is *not* being added. `apply_set` is a pure per-frame function with no
+  frame index, and `shot --audio <clip.wav>` plus `--signal click:120` already produce transient
+  beats and realistic levels — so Phase 1 documents the trap and names those paths instead of
+  duplicating them. Notes retained below as the origin record.
 
 1. **`--set` cannot drive `tempo` or `novelty`.** `apply_set` (`standalone/src/shot/args.rs:35-43`)
    accepts exactly `bass mid treb onset bar beat`. The two variables Plan 0019 added are unreachable
