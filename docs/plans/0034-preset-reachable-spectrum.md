@@ -1,6 +1,6 @@
 # 0034 — Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human

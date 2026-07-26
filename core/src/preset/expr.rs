@@ -19,10 +19,16 @@
 //! Variables: `bass mid treb onset beat bar time tempo novelty`. Constants:
 //! `pi tau`.
 //! Functions: `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep
-//! select`. Compilation is fallible (a malformed expression is
+//! select bin`. Compilation is fallible (a malformed expression is
 //! rejected with a surfaced error, never a panic); evaluation of a compiled
 //! expression is total, panic-free, and allocation-free — it walks a prebuilt
 //! AST returning `f32`, so it is safe to call every frame (hot-path §5).
+//!
+//! `bin(x)` is the one function that reads something other than its arguments:
+//! it samples the analysis frame's log-spaced spectrum, which [`Variables`]
+//! carries **by borrow** (ADR-0036). The language stays scalar-only — there is
+//! no array type and no indexing syntax; the band array is reachable only
+//! through this call, at a normalized position, interpolated.
 
 // Hot-path panic-denial pragma: `eval` runs per parameter per frame. This file
 // is a named target in the hygiene guard's scan (tests/hygiene.rs), so the
@@ -46,15 +52,27 @@ pub const VAR_COUNT: usize = VAR_NAMES.len();
 
 /// A bound set of variable values for one evaluation. Field order matches
 /// [`VAR_NAMES`]; `beat` is the caller's bool coerced to 0.0/1.0.
+///
+/// The spectrum is held **by borrow**, not by value (ADR-0036): the analysis
+/// frame's 64 bands are 256 bytes, and this bundle is built once per frame but
+/// read once per *binding*. A by-value payload would put that memcpy on the
+/// per-binding path; a slice reference keeps the whole struct at nine floats
+/// plus a fat pointer, so it stays cheaply `Copy`.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct Variables {
+pub struct Variables<'a> {
     values: [f32; VAR_COUNT],
+    /// The log-spaced band array `bin(x)` samples, borrowed from the analysis
+    /// frame. Empty when no caller supplied one, which makes `bin` read `0`.
+    spectrum: &'a [f32],
 }
 
-impl Variables {
+impl<'a> Variables<'a> {
     /// Bind all nine variables (order matches [`VAR_NAMES`]). `tempo` is the
     /// tracked BPM (`0` until the tracker warms, then ~60-200 — not a `0..1`
     /// band); `novelty` is the experimental spectral track-change transient.
+    ///
+    /// The spectrum starts empty; attach one with
+    /// [`with_spectrum`](Self::with_spectrum).
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         bass: f32,
@@ -69,13 +87,50 @@ impl Variables {
     ) -> Self {
         Self {
             values: [bass, mid, treb, onset, beat, bar, time, tempo, novelty],
+            spectrum: &[],
         }
+    }
+
+    /// Attach the frame's log-spaced band array, which `bin(x)` samples. A
+    /// borrow rather than a copy — see the type docs. Kept a separate builder so
+    /// the nine-scalar constructor stays the shape every existing caller (and
+    /// every test) already uses.
+    pub fn with_spectrum(self, spectrum: &'a [f32]) -> Self {
+        Self { spectrum, ..self }
     }
 
     /// Value in `slot` (0.0 for an out-of-range slot — never panics; compiled
     /// expressions only ever produce valid slots).
     fn get(&self, slot: usize) -> f32 {
         self.values.get(slot).copied().unwrap_or(0.0)
+    }
+
+    /// The spectrum at normalized position `x`, linearly interpolated between
+    /// the two adjacent bands — so a preset addresses a frequency *region*
+    /// without ever naming the engine's band count (`SPECTRUM_BINS`).
+    ///
+    /// **Total by construction**, because this runs per binding per frame:
+    /// `x <= 0` reads the first band, `x >= 1` the last, `NaN` clamps to the
+    /// first, and an absent spectrum reads `0`. No indexing, no panic path.
+    fn bin(&self, x: f32) -> f32 {
+        let last = match self.spectrum.len().checked_sub(1) {
+            Some(last) => last,
+            // No spectrum bound at all — a `bin()` in an expression evaluated
+            // outside the render loop reads a flat zero rather than erroring.
+            None => return 0.0,
+        };
+        // Same total `max().min()` as `clamp`/`smoothstep` below and for the
+        // same reason: `f32::max` returns the non-NaN operand, so a NaN input
+        // folds to 0.0 instead of propagating into a scene parameter.
+        #[allow(clippy::manual_clamp)]
+        let pos = x.max(0.0).min(1.0) * last as f32;
+        let floor = pos.floor();
+        let index = floor as usize;
+        let a = self.spectrum.get(index).copied().unwrap_or(0.0);
+        // At the top end there is no next band; `unwrap_or(a)` makes the
+        // interpolation degenerate to `a` rather than reaching past the array.
+        let b = self.spectrum.get(index + 1).copied().unwrap_or(a);
+        a + (b - a) * (pos - floor)
     }
 }
 
@@ -95,6 +150,10 @@ enum Func {
     Lerp,
     Smoothstep,
     Select,
+    /// `bin(x)` — the log-spaced spectrum at normalized position `x`
+    /// (ADR-0036). The only function whose result depends on [`Variables`]
+    /// rather than on its arguments alone.
+    Bin,
 }
 
 impl Func {
@@ -113,13 +172,14 @@ impl Func {
             "lerp" => Func::Lerp,
             "smoothstep" => Func::Smoothstep,
             "select" => Func::Select,
+            "bin" => Func::Bin,
             _ => return None,
         })
     }
 
     fn arity(self) -> usize {
         match self {
-            Func::Sin | Func::Cos | Func::Abs | Func::Floor | Func::Sqrt => 1,
+            Func::Sin | Func::Cos | Func::Abs | Func::Floor | Func::Sqrt | Func::Bin => 1,
             Func::Min | Func::Max | Func::Pow | Func::Mod => 2,
             Func::Clamp | Func::Lerp | Func::Smoothstep | Func::Select => 3,
         }
@@ -162,7 +222,7 @@ enum Node {
 }
 
 impl Node {
-    fn eval(&self, vars: &Variables) -> f32 {
+    fn eval(&self, vars: &Variables<'_>) -> f32 {
         match self {
             Node::Const(c) => *c,
             Node::Var(slot) => vars.get(*slot),
@@ -239,6 +299,9 @@ impl Node {
                         y.eval(vars)
                     }
                 }
+                // The one call that reads the variable bundle's non-scalar
+                // payload. Total for every input (see `Variables::bin`).
+                (Func::Bin, [x]) => vars.bin(x.eval(vars)),
                 _ => 0.0,
             },
         }
@@ -253,7 +316,7 @@ pub struct Expr {
 
 impl Expr {
     /// Evaluate against a variable binding. Total and allocation-free.
-    pub fn eval(&self, vars: &Variables) -> f32 {
+    pub fn eval(&self, vars: &Variables<'_>) -> f32 {
         self.root.eval(vars)
     }
 }
