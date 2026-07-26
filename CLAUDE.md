@@ -68,6 +68,9 @@ docs/
 ├── skills/          # architect (designs docs/) + dev (all code) + preset-author (preset content)
 ├── settings.json    # Registers the block-broad-git-add PreToolUse hook
 └── hooks/           # block-broad-git-add.js — enforces explicit-path staging
+.githooks/           # Checked-in git hooks. pre-push runs the fast subset (fmt + clippy +
+                     #   a narrowed nextest, ~28 s). OPT-IN PER CLONE — nothing runs until
+                     #   `git config core.hooksPath .githooks`. See README + ADR-0033.
 ```
 
 ## How we work (canonical workflow)
