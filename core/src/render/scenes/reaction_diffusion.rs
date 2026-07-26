@@ -208,8 +208,64 @@ fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
     return vec3<f32>(luma) + (c - vec3<f32>(luma)) * s;
 }
 
-fn sample_v(uv: vec2<f32>) -> f32 {
+fn tap_v(uv: vec2<f32>) -> f32 {
     return textureSampleLevel(present_field, present_samp, uv, 0.0).y;
+}
+
+// C1 reconstruction of the finite field (Plan 0033 Phase 3, ADR-0034).
+//
+// Hardware bilinear is C0: the value is continuous, its gradient is not. This
+// pass runs analytic iso-contours and a central-difference gradient over exactly
+// that field, and `line_d` divides by `fwidth`, so a slope discontinuity far
+// below the 8-bit output quantum is amplified into a visible tangent kink —
+// which is why an 8x upscale of a smooth field read as angular facets.
+//
+// Catmull-Rom, not a smoothed texel coordinate. Warping the fractional
+// coordinate by a quintic is the cheap trick and it is *wrong here*: a
+// smoothstep-family warp has zero derivative at both ends, so it pins the
+// reconstruction's gradient to zero at every texel centre. That is C1, but the
+// derivative then oscillates once per cell, and a pass with this much gradient
+// gain renders it as one scalloped step per texel — measurably worse than the
+// faceting it replaces. Only a genuine higher-order filter has a smooth,
+// non-degenerate derivative.
+//
+// Nine taps rather than sixteen: each pair of neighbouring weights is folded
+// into one hardware-bilinear fetch at the weighted midpoint (`offset12`), which
+// is exact for a separable cubic. `w1 + w2 >= 1` over the whole cell, so the
+// division is safe.
+//
+// **Every** read of the field goes through here — value, gradient, contour and
+// hatch — because fixing only the value tap fixes nothing: the gradient is where
+// the discontinuity becomes visible.
+fn sample_v(uv: vec2<f32>) -> f32 {
+    let dims = vec2<f32>(textureDimensions(present_field));
+    let sample_pos = uv * dims;
+    let pos1 = floor(sample_pos - 0.5) + 0.5;
+    let f = sample_pos - pos1;
+
+    let w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+    let w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+    let w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+    let w3 = f * f * (-0.5 + 0.5 * f);
+    let w12 = w1 + w2;
+
+    let p0 = (pos1 - 1.0) / dims;
+    let p3 = (pos1 + 2.0) / dims;
+    let p12 = (pos1 + w2 / w12) / dims;
+
+    var acc = 0.0;
+    acc = acc + tap_v(vec2<f32>(p0.x, p0.y)) * w0.x * w0.y;
+    acc = acc + tap_v(vec2<f32>(p12.x, p0.y)) * w12.x * w0.y;
+    acc = acc + tap_v(vec2<f32>(p3.x, p0.y)) * w3.x * w0.y;
+
+    acc = acc + tap_v(vec2<f32>(p0.x, p12.y)) * w0.x * w12.y;
+    acc = acc + tap_v(vec2<f32>(p12.x, p12.y)) * w12.x * w12.y;
+    acc = acc + tap_v(vec2<f32>(p3.x, p12.y)) * w3.x * w12.y;
+
+    acc = acc + tap_v(vec2<f32>(p0.x, p3.y)) * w0.x * w3.y;
+    acc = acc + tap_v(vec2<f32>(p12.x, p3.y)) * w12.x * w3.y;
+    acc = acc + tap_v(vec2<f32>(p3.x, p3.y)) * w3.x * w3.y;
+    return acc;
 }
 
 @fragment
