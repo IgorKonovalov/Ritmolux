@@ -37,7 +37,15 @@ contact_angle_deg = 20
 # What IS available is making the cut RARE and hiding it: the cycle here is
 # ~50 s, and `draw_progress` below re-draws the figure continuously so the swap
 # tends to land mid-redraw rather than as a visible snap of a static shape.
-variant = "floor(mod(time * 0.06 + clamp(bass * 3.0, 0, 1.0), 3))"
+# SLOWED, and the audio term deliberately declawed. Two separate changes:
+#   - the clock went 0.06 -> 0.021, so a variant holds for ~48 s instead of ~17.
+#   - the bass term was `clamp(bass * 3.0, 0, 1.0)` - a full 1.0, i.e. enough to
+#     push the index a WHOLE variant forward and let it fall back as the level
+#     moved. That is not a morph, it is a flicker between two geometries driven
+#     by the low end, and it is most of what read as restless. Capped at 0.35 it
+#     can nudge the phase of the cycle without ever crossing a boundary alone.
+# The cut itself still cannot be made smooth from here - see the note above.
+variant = "floor(mod(time * 0.021 + clamp(bass * 0.9, 0, 0.35), 3))"
 
 # MOTION - a brisk, steady, AUDIO-INDEPENDENT turn in radians. `rotation` is an
 # angle, so a band term on it is a positional jump rather than a speed change,
@@ -52,14 +60,17 @@ rotation = "0.80 * time + sin(time * 0.031) * 0.26"
 # only on `bar`: this figure is a rotationally symmetric ring, so turning it
 # barely moves a pixel. Radial and draw-order change is the only motion that
 # actually reads, in silence or otherwise.
-draw_progress = "clamp(0.52 + sin(time * 0.62) * 0.42 + bar * 0.20 + clamp(onset * 0.8, 0, 0.20), 0, 1)"
+draw_progress = "clamp(0.52 + sin(time * 0.20) * 0.42 + bar * 0.20 + clamp(onset * 0.8, 0, 0.20), 0, 1)"
 
 # STROKE - moderate. Thin strokes looked elegant at 2048 but the figure is a
 # thin ring, so at small render sizes it nearly vanishes; this weight holds up
 # across both.
 thickness  = "1.70 + clamp(bass * 9.0, 0, 2.6) + beat * 0.40"
 brightness = "0.66 + clamp(mid * 1.8, 0, 0.45)"
-scale      = "0.58 + sin(time * 0.85) * 0.13 + bar * 0.05 + clamp(bass * 4.0, 0, 0.40)"
+# The 0.85 rad/s scale pulse was a ~7 s throb reading as a second, faster morph
+# on top of the variant cycle - slowed to 0.14 (~45 s) so it breathes with the
+# variant clock rather than against it, and eased properly below (was 0.06 s).
+scale      = "0.58 + sin(time * 0.14) * 0.13 + bar * 0.05 + clamp(bass * 4.0, 0, 0.40)"
 hue        = "0.50 + time * 0.023 + clamp(treb * 2.6, 0, 0.45)"
 
 # GEOMETRY MIRROR - kept low, because on THIS scene it barely does anything and
@@ -94,7 +105,7 @@ mirror_order  = 2.5
 # would just spend time on the in-between integers rather than blending shapes.
 rotation      = 0.18
 thickness     = { attack = 0.02, release = 0.34 }
-scale         = 0.06
+scale         = 0.55
 hue           = 0.42
 zoom          = 0.18
 bg_bright     = 0.40
