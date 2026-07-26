@@ -1,6 +1,10 @@
 # 0033 — Internal resolution follows the target, plus the preset-surface and harness gaps behind it
 
-> **Status:** in-progress
+> **Status:** done — 2026-07-26. Phases 1-3 and 5-7 landed in `978405a`, `cf65c4a`, `8c0ff2b`,
+> `08714c7`, `3f3b652`, `621fa7b`; **Phase 4 skipped** per ADR-0034's if-and-only-if (the
+> reconstruction fix resolved the artifact, so the RD grid stays 256 and no coral preset takes a look
+> change). Phase 8 is `human` and remains open. Passed Mode 4 review: **no blockers, three majors,
+> four minors** — see the Close section below.
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
@@ -339,6 +343,66 @@ fn internal_size(&self, surface: (u32, u32)) -> (u32, u32);  // was: Option<(u32
 - **No `Scene` trait change, no C ABI change (stays v4), no new dependency.** `PostStage` is
   crate-internal (ADR-0031); nothing here is reachable from a preset or an FFI caller.
 
+## Close (Mode 4 review, 2026-07-26)
+
+Verified cold rather than taken on trust: `cargo fmt --check` and `clippy --workspace --all-targets
+-D warnings` clean; `nextest -p lmv-core --lib` 97/97; `golden` + `reaction_diffusion` 3/3;
+`sanity` + `reactivity` + `animation` 3/3 (the floors that actually render through the changed
+stages, since `rose_trails` binds `trails` and two presets bind `kaleido_*`); `-p standalone` 58/58.
+`git diff --stat` over the range confirms `core/tests/golden/reaction_diffusion.png` is the **only**
+baseline touched, so both re-bless scope claims hold in fact.
+
+**Deviations accepted at close** — in each case the plan text was wrong and the commit said so:
+
+1. **Phase 2 done-when 1's "90 % within two 60 Hz frames" is unreachable for its own constant.**
+   At `attack = 0.02`, `alpha = 1 - exp(-(1/60)/0.02) = 0.5654`, so two frames reach 81.1 % and
+   three reach 91.8 %. The shipped test pins the arithmetic (>= 80 at two, >= 90 at three). The
+   release side holds exactly as written.
+2. **Phase 6 done-when 4's "reports 2048x1152" contradicts the same plan's 1920x1080 cap**, which
+   ADR-0034 acknowledges when it calls the cap a 1.07x downscale at that display. The test asserts
+   the capped grid with the aspect preserved, plus the done-when's actual point: not 1280x720.
+3. **Phase 3 done-when 3 is unmet and is not satisfiable as specified.** It asks a pixel-domain
+   scanline second-difference statistic to detect a geometric property of a 1-D contour curve; five
+   measured attempts are in `8c0ff2b`'s body. The premise fails at 8 bits — a C0 reconstruction's
+   slope discontinuity over a smooth Gray-Scott field at 8x upscale is below one output quantum, so
+   every luminance aggregate mixes it back into the field's own content. **No followup metric is
+   owed:** the RD golden is a real pixel-regression guard for exactly this shader, it moved, and it
+   passes. The done-when should have read "the golden moves and the artifact is gone at 2048x1152".
+4. **Phase 3 shipped Catmull-Rom, not the plan's named cheap form.** A quintic-smoothed fractional
+   texel coordinate has zero derivative at both ends, pinning the reconstruction gradient to zero at
+   every texel centre; under `line_d`'s `fwidth` gain that scallops once per texel. Built and
+   measured worse. ADR-0034's Outcome section records this.
+
+**Majors (none reworked here; all routed):**
+
+1. **The composite stretches the frame when the quantized grid's aspect differs from the target's.**
+   `post.rs:445` derives `SceneTarget::aspect` from the internal grid while both stages present with
+   a plain normalized blit, so the scene draws correct-for-the-grid and the present stretches it.
+   Reproduced with `shot` on a trails-bound copy of `rose_web`: at 1280x800 the figure comes back
+   **1.278x wider** (predicted 1.280); at 1280x720, **1.069x wider** (predicted 1.067) where the old
+   fixed 1280x720 grid was aspect-exact. 1920x1080 / 2048x1152 / 2560x1440 / 3840x2160 are
+   unaffected, which is why the plan's own display never showed it. This is the Plan 0029 Phase 5
+   defect on the composite path, and because the attractor reads this same `aspect` it also undoes
+   that fix whenever a post stage is active. Fix: the composite's aspect is the **surface's**;
+   `Scene::set_target_size` keeps the grid.
+2. **`docs/on-device-validation.md` states that no shipped preset binds `trails`.**
+   `presets/rose_trails.toml:48` does. The item guarding this plan's stated main risk sends the
+   tester to build a workaround they do not need.
+3. **The two rewired stages have no golden coverage at all.** No fixture in `core/tests/fixtures/`
+   binds `trails` or `kaleido_*`, so done-when 5's baselines never existed and the headline change
+   ships without a pixel guard — which is how major 1 got through. Not a blind fixture add: a
+   feedback pipeline built mid-run resolves differently on the WARP adapter, so it needs a
+   deliberate call.
+
+**Minors:** (1) fourteen shipped presets plus `attractor_ink.toml:22` still carry the retired "both
+stages render at a fixed 1280x720" note — preset content, so it rides with Phase 8; (2)
+`post.rs::internal_grid_size` is a line-for-line copy of `particles/mod.rs::trail_grid_size`, which
+is the opposite of ADR-0034's "one shared function" consequence and a divergence risk the moment
+major 1 is fixed on one of them; (3) the RD reconstruction's real cost is **unmeasured** — the +16 %
+WARP figure was retracted in `3f3b652` as run-to-run noise, the 45 fetches/fragment is real, and the
+on-device checklist gained trails items but no RD item; (4) `presets/README.md`'s "an ultrawide keeps
+its proportions" overclaims under the 256 px round-up (3440x1440 comes back 1.88 against 2.39).
+
 ## Followups (after this lands)
 
 - Backlog 0002 (per-bin spectrum + an N-element scene) — the next design interview.
@@ -347,3 +411,8 @@ fn internal_size(&self, surface: (u32, u32)) -> (u32, u32);  // was: Option<(u32
 - Whether the attractor's 2560x1440 cap should converge on the post stages' 1920x1080, or whether
   the two genuinely want different numbers. Deliberately left alone here — the attractor's grid is
   single-instance and not doubled by a dissolve, so it is not obviously the same decision.
+- **The three majors above**, as a small fix plan: the surface-aspect correction (majors 1 + minor 2
+  together, since the two policy copies want unifying at the same time), the checklist correction
+  (major 2, a sentence), and a decided posture on golden coverage for the composite stages
+  (major 3). Sequence it before backlog 0005's bloom stage, which will inherit whichever answer the
+  aspect question gets.
