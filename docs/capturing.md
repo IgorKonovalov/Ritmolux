@@ -37,7 +37,7 @@ Flags:
 | `--preset <name>` | preset to render (by name, as shown in the report / library); optional when the library holds exactly one preset |
 | `--presets <dir>` | load the library from `<dir>` instead of the resolved preset directory |
 | `--preset-file <path>` | load exactly one preset from `<path>` (beats `--presets`) |
-| `--set k=v,...` | constant stimulus frame: `bass,mid,treb,onset,bar` (0..1) and `beat` (non-zero = true) |
+| `--set k=v,...` | constant stimulus frame: `bass,mid,treb,onset,bar,novelty` (0..1), `tempo` (BPM), `beat` (non-zero = true). Keys are the **grammar's** names, so `tempo` is what a binding writes — see [the calibration traps](#the-two-calibration-traps) before trusting a value |
 | `--frames <N>` | frames to advance before capture (default 120) |
 | `--size <WxH>` | render size (default 1280x720) |
 | `--out <path>` | output PNG (single shot) or dir/file (`--all`) |
@@ -49,6 +49,51 @@ Flags:
 | `--strip <N>` | frames tiled along the audio (default 8) |
 
 Bad arguments and unknown presets exit non-zero with a message.
+
+### The two calibration traps
+
+`--set` is a **held** stimulus: it writes the analysis frame directly and that
+same frame drives every captured frame. That makes it perfect for isolating one
+binding and wrong for two things people reach for it anyway.
+
+**Trap 1 — `--set beat=1` holds the beat gate high for the whole capture.** Real
+beats are transient: `beat` fires on one hop and is false on the next. Held high,
+every `beat`-driven accent in the preset is at full deflection in the still you
+are looking at — a `+ beat * 0.155` thickness term that should flash for a frame
+instead reads as the preset's baseline. The result is that a *working* preset
+looks broken in a still (permanently blown-out, or so busy the geometry is
+unreadable), and the natural response — turning the accent down — breaks it for
+real on live audio. If you want a beat, capture one:
+
+```bash
+# Transient beats through the real onset detector, no asset needed
+cargo run -p standalone --example shot -- --preset "Pulse Field" \
+  --signal click:120 --strip 8 --out click.png
+```
+
+**Trap 2 — `--set` band magnitudes are not real levels.** `--set bass=0.8` writes
+`0.8` onto the frame, but a band that arrives through the analyzer is normalized,
+and it does not get anywhere near there. Measured through this very harness: a
+**full-scale 60 Hz sine** (`--signal bass:60`) reads `bass ≈ 0.19`, and a **120
+BPM click track** peaks at `bass ≈ 0.011`. A gain tuned to look right at
+`bass=0.8` is roughly four times too weak on the loudest pure tone the harness
+can synthesize, and the preset barely moves on real music.
+
+So every `--signal` / `--audio` filmstrip now **prints the levels it measured**,
+and those are the numbers to calibrate a gain against:
+
+```
+audio levels over 367 analysis hops (past warm-up) — calibrate gains against these, not against --set magnitudes:
+  band       min     mean      max
+  bass     0.187    0.187    0.187
+  mid      0.000    0.000    0.000
+  treb     0.000    0.000    0.000
+```
+
+`--audio <clip.wav>` on real material is the one that answers "what does my music
+actually produce"; `--signal` answers it for a known synthetic tone. Use `--set`
+to ask "does this binding do anything at all", not to decide how much of it to
+apply.
 
 ### Which preset library a shot uses
 
@@ -108,6 +153,12 @@ directory. The foobar2000 plugin does not read `LMV_PRESET_DIR`.
 # Shot a preset under a loud beat, at a custom size
 cargo run -p standalone --example shot -- --preset "Pulse Field" \
   --set bass=1,onset=1,beat=1 --size 960x540 --out pulse.png
+
+# Both sides of a tempo gate, e.g. `select(tempo > 130, ..., ...)`
+cargo run -p standalone --example shot -- --preset-file presets/rose_zoom.toml \
+  --set tempo=90 --out slow.png
+cargo run -p standalone --example shot -- --preset-file presets/rose_zoom.toml \
+  --set tempo=160 --out fast.png
 
 # Labeled contact sheet of the whole library
 cargo run -p standalone --example shot -- --all --out gallery/
