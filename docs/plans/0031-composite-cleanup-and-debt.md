@@ -1,6 +1,6 @@
 # 0031 — Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and the accumulated close-review debt
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-07-25
 > **Approved:** 2026-07-25
 > **Owner skill(s):** dev
