@@ -36,6 +36,7 @@
 )]
 
 use super::feedback::PingPongField;
+use super::gpu;
 use super::post::PostStage;
 
 /// Fixed internal composite resolution (16:9), presented stretched to the surface
@@ -51,6 +52,9 @@ const DEFAULT_TRAILS: f32 = 0.0;
 /// smear), so keep it strictly below.
 const MAX_FADE: f32 = 0.98;
 
+/// Fade-and-accumulate body. `VsOut`/`vs_main` come from
+/// [`gpu::FULLSCREEN_VS_UV_FLIPPED`] — this pass samples what another pass
+/// rendered, so it needs the Y flip.
 const TRAILS_SHADER: &str = r#"
 struct Fade { v: vec4<f32> } // x: fade factor
 
@@ -58,24 +62,6 @@ struct Fade { v: vec4<f32> } // x: fade factor
 @group(0) @binding(1) var t_composited: texture_2d<f32>;
 @group(0) @binding(2) var t_accum: texture_2d<f32>;
 @group(0) @binding(3) var samp: sampler;
-
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    // Fullscreen triangle; map clip space to [0,1] uv (y flipped for texture space).
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    let p = pts[vi];
-    var out: VsOut;
-    out.pos = vec4<f32>(p, 0.0, 1.0);
-    out.uv = vec2<f32>(0.5 * p.x + 0.5, 0.5 - 0.5 * p.y);
-    return out;
-}
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
@@ -86,26 +72,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 "#;
 
+/// Present body; same Y-flipped prelude as [`TRAILS_SHADER`].
 const PRESENT_SHADER: &str = r#"
 @group(0) @binding(0) var t_accum: texture_2d<f32>;
 @group(0) @binding(1) var samp: sampler;
-
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    let p = pts[vi];
-    var out: VsOut;
-    out.pos = vec4<f32>(p, 0.0, 1.0);
-    out.uv = vec2<f32>(0.5 * p.x + 0.5, 0.5 - 0.5 * p.y);
-    return out;
-}
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
@@ -168,26 +138,19 @@ impl Resources {
             mapped_at_creation: false,
         });
 
-        let trails_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("trails-shader"),
-            source: wgpu::ShaderSource::Wgsl(TRAILS_SHADER.into()),
-        });
+        let trails_shader = gpu::fullscreen_shader(
+            device,
+            "trails-shader",
+            gpu::FULLSCREEN_VS_UV_FLIPPED,
+            TRAILS_SHADER,
+        );
         let trails_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("trails-bind-layout"),
             entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                tex_entry(1),
-                tex_entry(2),
-                samp_entry(3),
+                gpu::uniform(0, wgpu::ShaderStages::FRAGMENT),
+                gpu::texture(1, true),
+                gpu::texture(2, true),
+                gpu::sampler(3),
             ],
         });
         let make_trails_bg = |accum_view: &wgpu::TextureView, label: &str| {
@@ -216,21 +179,24 @@ impl Resources {
         };
         let trails_bg_a = make_trails_bg(accum.view_a(), "trails-bg-a");
         let trails_bg_b = make_trails_bg(accum.view_b(), "trails-bg-b");
-        let trails_pipeline = fullscreen_pipeline(
+        let trails_pipeline = gpu::fullscreen_pipeline(
             device,
             &trails_shader,
-            &trails_layout,
+            &[&trails_layout],
             PingPongField::FORMAT,
+            wgpu::BlendState::REPLACE,
             "trails",
         );
 
-        let present_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("trails-present-shader"),
-            source: wgpu::ShaderSource::Wgsl(PRESENT_SHADER.into()),
-        });
+        let present_shader = gpu::fullscreen_shader(
+            device,
+            "trails-present-shader",
+            gpu::FULLSCREEN_VS_UV_FLIPPED,
+            PRESENT_SHADER,
+        );
         let present_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("trails-present-bind-layout"),
-            entries: &[tex_entry(0), samp_entry(1)],
+            entries: &[gpu::texture(0, true), gpu::sampler(1)],
         });
         let make_present_bg = |accum_view: &wgpu::TextureView, label: &str| {
             device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -250,11 +216,12 @@ impl Resources {
         };
         let present_bg_a = make_present_bg(accum.view_a(), "trails-present-bg-a");
         let present_bg_b = make_present_bg(accum.view_b(), "trails-present-bg-b");
-        let present_pipeline = fullscreen_pipeline(
+        let present_pipeline = gpu::fullscreen_pipeline(
             device,
             &present_shader,
-            &present_layout,
+            &[&present_layout],
             surface_format,
+            wgpu::BlendState::REPLACE,
             "trails-present",
         );
 
@@ -294,67 +261,6 @@ impl Resources {
             });
         }
     }
-}
-
-fn tex_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Texture {
-            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-            view_dimension: wgpu::TextureViewDimension::D2,
-            multisampled: false,
-        },
-        count: None,
-    }
-}
-
-fn samp_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-        count: None,
-    }
-}
-
-fn fullscreen_pipeline(
-    device: &wgpu::Device,
-    shader: &wgpu::ShaderModule,
-    bind_layout: &wgpu::BindGroupLayout,
-    target_format: wgpu::TextureFormat,
-    label: &str,
-) -> wgpu::RenderPipeline {
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some(&format!("{label}-pipeline-layout")),
-        bind_group_layouts: &[Some(bind_layout)],
-        immediate_size: 0,
-    });
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(&format!("{label}-pipeline")),
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
-            compilation_options: Default::default(),
-            buffers: &[],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some("fs_main"),
-            compilation_options: Default::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: target_format,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
 }
 
 /// The engine feedback-trails stage — a [`PostStage`], not a

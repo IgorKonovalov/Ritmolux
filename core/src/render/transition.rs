@@ -48,6 +48,8 @@
     clippy::unreachable
 )]
 
+use crate::render::gpu;
+
 use super::ink::InkParams;
 
 /// The engine's default dissolve duration, in seconds (ADR-0024: policy is
@@ -341,23 +343,6 @@ const BURN_PEAK: f32 = 0.35;
 @group(0) @binding(2) var t_in: texture_2d<f32>;
 @group(0) @binding(3) var samp: sampler;
 
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    let p = pts[vi];
-    var out: VsOut;
-    out.pos = vec4<f32>(p, 0.0, 1.0);
-    out.uv = vec2<f32>(0.5 * p.x + 0.5, 0.5 - 0.5 * p.y);
-    return out;
-}
-
 // A boundary sweep: `key` in [0,1] orders the pixels, and the cut travels from
 // just below 0 to just past 1 so the frame is *entirely* `a` at t = 0 and
 // *entirely* `b` at t = 1 — no snap at either endpoint, whatever the key.
@@ -587,73 +572,29 @@ impl Pipeline {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("blend-shader"),
-            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
-        });
-        let texture_entry = |binding: u32| wgpu::BindGroupLayoutEntry {
-            binding,
-            visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                view_dimension: wgpu::TextureViewDimension::D2,
-                multisampled: false,
-            },
-            count: None,
-        };
+        let shader = gpu::fullscreen_shader(
+            device,
+            "blend-shader",
+            gpu::FULLSCREEN_VS_UV_FLIPPED,
+            SHADER,
+        );
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("blend-bind-layout"),
             entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                texture_entry(1),
-                texture_entry(2),
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
+                gpu::uniform(0, wgpu::ShaderStages::FRAGMENT),
+                gpu::texture(1, true),
+                gpu::texture(2, true),
+                gpu::sampler(3),
             ],
         });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("blend-pipeline-layout"),
-            bind_group_layouts: &[Some(&bind_layout)],
-            immediate_size: 0,
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("blend-pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        let pipeline = gpu::fullscreen_pipeline(
+            device,
+            &shader,
+            &[&bind_layout],
+            surface_format,
+            wgpu::BlendState::REPLACE,
+            "blend",
+        );
 
         Self {
             uniform,

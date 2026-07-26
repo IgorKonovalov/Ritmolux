@@ -33,6 +33,8 @@
     clippy::unreachable
 )]
 
+use crate::render::gpu;
+
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::PingPongField;
@@ -106,22 +108,6 @@ const INJECT_THRESHOLD: f32 = 0.5;
 
 /// Seed pass: U = 1 everywhere, V = 1 inside the scattered blobs.
 const INIT_SHADER: &str = r#"
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    let p = pts[vi];
-    var out: VsOut;
-    out.pos = vec4<f32>(p, 0.0, 1.0);
-    out.uv = p * 0.5 + vec2<f32>(0.5, 0.5);
-    return out;
-}
-
 struct Init {
     blobs: array<vec4<f32>, 32>, // xy: center (uv), z: radius, w: unused
     count: vec4<u32>,            // x: active blob count
@@ -144,22 +130,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
 /// Sim pass: one Gray-Scott step, reading the previous field, writing the next.
 const SIM_SHADER: &str = r#"
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    let p = pts[vi];
-    var out: VsOut;
-    out.pos = vec4<f32>(p, 0.0, 1.0);
-    out.uv = p * 0.5 + vec2<f32>(0.5, 0.5);
-    return out;
-}
-
 struct Sim {
     p: vec4<f32>,   // x: feed, y: kill, z: diffuse_u, w: diffuse_v
     inj: vec4<f32>, // xy: stamp center (uv), z: radius, w: amount (0 = no stamp)
@@ -214,22 +184,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// the V field with `fwidth` anti-aliasing, a cosine palette coloring the nested
 /// loops, gradient-aligned hatch/comb ticks, and a soft glow.
 const PRESENT_SHADER: &str = r#"
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    let p = pts[vi];
-    var out: VsOut;
-    out.pos = vec4<f32>(p, 0.0, 1.0);
-    out.uv = p * 0.5 + vec2<f32>(0.5, 0.5);
-    return out;
-}
-
 struct Present {
     // x: hue, y: contour density, z: hatch frequency (texels), w: glow
     a: vec4<f32>,
@@ -386,18 +340,16 @@ struct Resources {
 impl Resources {
     /// Create every pipeline, buffer, bind group, and the ping-pong field.
     fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
-        let init_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("rd-init-shader"),
-            source: wgpu::ShaderSource::Wgsl(INIT_SHADER.into()),
-        });
-        let sim_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("rd-sim-shader"),
-            source: wgpu::ShaderSource::Wgsl(SIM_SHADER.into()),
-        });
-        let present_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("rd-present-shader"),
-            source: wgpu::ShaderSource::Wgsl(PRESENT_SHADER.into()),
-        });
+        let init_shader =
+            gpu::fullscreen_shader(device, "rd-init-shader", gpu::FULLSCREEN_VS_UV, INIT_SHADER);
+        let sim_shader =
+            gpu::fullscreen_shader(device, "rd-sim-shader", gpu::FULLSCREEN_VS_UV, SIM_SHADER);
+        let present_shader = gpu::fullscreen_shader(
+            device,
+            "rd-present-shader",
+            gpu::FULLSCREEN_VS_UV,
+            PRESENT_SHADER,
+        );
 
         let field = PingPongField::new(device, GRID, GRID);
 
@@ -422,7 +374,7 @@ impl Resources {
         // --- init pipeline: one uniform, writes the seed field ---
         let init_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("rd-init-layout"),
-            entries: &[uniform_entry(0)],
+            entries: &[gpu::uniform(0, wgpu::ShaderStages::FRAGMENT)],
         });
         let init_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("rd-init-bg"),
@@ -432,16 +384,33 @@ impl Resources {
                 resource: init_uniform.as_entire_binding(),
             }],
         });
-        let init_pipeline = field_pipeline(device, &init_shader, &init_layout, "rd-init");
+        let init_pipeline = gpu::fullscreen_pipeline(
+            device,
+            &init_shader,
+            &[&init_layout],
+            PingPongField::FORMAT,
+            wgpu::BlendState::REPLACE,
+            "rd-init",
+        );
 
         // --- sim pipeline: uniform + input texture (textureLoad, no sampler) ---
         let sim_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("rd-sim-layout"),
-            entries: &[uniform_entry(0), texture_entry(1, false)],
+            entries: &[
+                gpu::uniform(0, wgpu::ShaderStages::FRAGMENT),
+                gpu::texture(1, false),
+            ],
         });
         let sim_bg_a = sim_bind_group(device, &sim_layout, &sim_uniform, field.view_a());
         let sim_bg_b = sim_bind_group(device, &sim_layout, &sim_uniform, field.view_b());
-        let sim_pipeline = field_pipeline(device, &sim_shader, &sim_layout, "rd-sim");
+        let sim_pipeline = gpu::fullscreen_pipeline(
+            device,
+            &sim_shader,
+            &[&sim_layout],
+            PingPongField::FORMAT,
+            wgpu::BlendState::REPLACE,
+            "rd-sim",
+        );
 
         // --- present pipeline: input texture + filtering sampler, to surface ---
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -463,12 +432,12 @@ impl Resources {
         let present_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("rd-present-layout"),
             entries: &[
-                texture_entry(0, true),
-                sampler_entry(1),
-                uniform_entry(2),
-                texture_entry(3, true),
-                texture_entry(4, true),
-                sampler_entry(5),
+                gpu::texture(0, true),
+                gpu::sampler(1),
+                gpu::uniform(2, wgpu::ShaderStages::FRAGMENT),
+                gpu::texture(3, true),
+                gpu::texture(4, true),
+                gpu::sampler(5),
             ],
         });
         let present_bg_a = present_bind_group(
@@ -491,8 +460,18 @@ impl Resources {
             &lut_view_b,
             &lut_sampler,
         );
-        let present_pipeline =
-            surface_pipeline(device, &present_shader, &present_layout, surface_format);
+        let present_pipeline = gpu::fullscreen_pipeline(
+            device,
+            &present_shader,
+            &[&present_layout],
+            surface_format,
+            // Premultiplied-alpha OVER the backdrop (ADR-0026): the scene is
+            // emissive, so `out_col` adds over the atmosphere and the present's
+            // alpha (scene presence) reveals `bg_*` in the field's voids. Over
+            // the default black backdrop this equals the prior opaque REPLACE.
+            wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
+            "rd-present",
+        );
 
         Self {
             field,
@@ -552,7 +531,7 @@ pub struct ReactionDiffusionScene {
     needs_seed: bool,
     /// Fixed-timestep accumulator: unspent injected `dt`, drained one
     /// [`FIXED_STEP`] at a time in [`advance`](Scene::advance).
-    accumulator: f32,
+    fixed_step: gpu::FixedStep,
     /// Sub-steps `advance` scheduled for the next `render` to encode.
     pending_substeps: u32,
     /// Seeded RNG for injection stamp positions (NFR 6); advanced only when a
@@ -617,7 +596,7 @@ impl ReactionDiffusionScene {
             res: None,
             init_params,
             needs_seed: true,
-            accumulator: 0.0,
+            fixed_step: gpu::FixedStep::new(FIXED_STEP, MAX_SUBSTEPS),
             pending_substeps: 0,
             stamp_rng: SeededRng::new(INJECT_SEED),
             pending_stamp: None,
@@ -641,45 +620,6 @@ impl ReactionDiffusionScene {
             palette: Palette::default_spectrum(),
             palette_dirty: true,
         }
-    }
-}
-
-/// A fragment-visible uniform-buffer bind group layout entry.
-fn uniform_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Uniform,
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        },
-        count: None,
-    }
-}
-
-/// A fragment-visible sampled-texture layout entry. `filterable` must match how
-/// the shader uses it: the sim reads via `textureLoad` (unfiltered), the present
-/// pass via a filtering sampler.
-fn texture_entry(binding: u32, filterable: bool) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Texture {
-            sample_type: wgpu::TextureSampleType::Float { filterable },
-            view_dimension: wgpu::TextureViewDimension::D2,
-            multisampled: false,
-        },
-        count: None,
-    }
-}
-
-fn sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-        count: None,
     }
 }
 
@@ -748,89 +688,6 @@ fn present_bind_group(
     })
 }
 
-/// A fullscreen-triangle pipeline writing into the [`PingPongField::FORMAT`]
-/// grid (the init and sim passes).
-fn field_pipeline(
-    device: &wgpu::Device,
-    shader: &wgpu::ShaderModule,
-    bind_layout: &wgpu::BindGroupLayout,
-    label: &str,
-) -> wgpu::RenderPipeline {
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some(label),
-        bind_group_layouts: &[Some(bind_layout)],
-        immediate_size: 0,
-    });
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(label),
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
-            compilation_options: Default::default(),
-            buffers: &[],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some("fs_main"),
-            compilation_options: Default::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: PingPongField::FORMAT,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
-}
-
-/// The present pipeline: fullscreen triangle to the surface format.
-fn surface_pipeline(
-    device: &wgpu::Device,
-    shader: &wgpu::ShaderModule,
-    bind_layout: &wgpu::BindGroupLayout,
-    surface_format: wgpu::TextureFormat,
-) -> wgpu::RenderPipeline {
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("rd-present"),
-        bind_group_layouts: &[Some(bind_layout)],
-        immediate_size: 0,
-    });
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("rd-present-pipeline"),
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
-            compilation_options: Default::default(),
-            buffers: &[],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some("fs_main"),
-            compilation_options: Default::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: surface_format,
-                // Premultiplied-alpha OVER the backdrop (ADR-0026): the scene is
-                // emissive, so `out_col` adds over the atmosphere and the present's
-                // alpha (scene presence) reveals `bg_*` in the field's voids. Over
-                // the default black backdrop this equals the prior opaque REPLACE.
-                blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
-}
-
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
 pub const PARAMS: &[&str] = &[
@@ -860,15 +717,9 @@ impl Scene for ReactionDiffusionScene {
         // Drain the accumulator one fixed sub-step at a time, clamped so a long
         // stall can't queue unbounded work (ADR-0012). The sub-`FIXED_STEP`
         // remainder carries to the next frame; a clamp drops the excess backlog
-        // so the sim slows rather than races to catch up.
-        self.accumulator += dt;
-        let mut steps = 0u32;
-        while self.accumulator >= FIXED_STEP && steps < MAX_SUBSTEPS {
-            self.accumulator -= FIXED_STEP;
-            steps += 1;
-        }
-        self.accumulator = self.accumulator.min(FIXED_STEP);
-        self.pending_substeps = steps;
+        // so the sim slows rather than races to catch up. Shared with the
+        // attractor scene, which drains an identical accumulator.
+        self.pending_substeps = self.fixed_step.advance(dt);
     }
 
     fn set_time(&mut self, time: f32) {

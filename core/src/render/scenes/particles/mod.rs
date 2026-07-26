@@ -51,6 +51,8 @@
     clippy::unreachable
 )]
 
+use crate::render::gpu;
+
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::PingPongField;
@@ -440,22 +442,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// by the per-frame retention factor `k`, laying down the faded trail before the
 /// new points are added on top.
 const DECAY_SHADER: &str = r#"
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    let p = pts[vi];
-    var out: VsOut;
-    out.pos = vec4<f32>(p, 0.0, 1.0);
-    out.uv = p * 0.5 + vec2<f32>(0.5, 0.5);
-    return out;
-}
-
 struct Decay { k: vec4<f32> } // x: per-frame retention factor
 @group(0) @binding(0) var prev: texture_2d<f32>;
 @group(0) @binding(1) var samp: sampler;
@@ -471,22 +457,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// Present pass: composite the accumulation field to the surface (linear sample,
 /// stretched to fill; aspect ignored as in the reaction-diffusion present).
 const PRESENT_SHADER: &str = r#"
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    let p = pts[vi];
-    var out: VsOut;
-    out.pos = vec4<f32>(p, 0.0, 1.0);
-    out.uv = p * 0.5 + vec2<f32>(0.5, 0.5);
-    return out;
-}
-
 @group(0) @binding(0) var field: texture_2d<f32>;
 @group(0) @binding(1) var samp: sampler;
 
@@ -635,14 +605,18 @@ impl PipelineResources {
             label: Some("attractor-draw-shader"),
             source: wgpu::ShaderSource::Wgsl(DRAW_SHADER.into()),
         });
-        let decay_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("attractor-decay-shader"),
-            source: wgpu::ShaderSource::Wgsl(DECAY_SHADER.into()),
-        });
-        let present_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("attractor-present-shader"),
-            source: wgpu::ShaderSource::Wgsl(PRESENT_SHADER.into()),
-        });
+        let decay_shader = gpu::fullscreen_shader(
+            device,
+            "attractor-decay-shader",
+            gpu::FULLSCREEN_VS_UV,
+            DECAY_SHADER,
+        );
+        let present_shader = gpu::fullscreen_shader(
+            device,
+            "attractor-present-shader",
+            gpu::FULLSCREEN_VS_UV,
+            PRESENT_SHADER,
+        );
 
         // Particle storage buffer: written by the compute step (STORAGE), read by
         // the draw pass as an instance vertex buffer (VERTEX), seeded once from
@@ -667,7 +641,7 @@ impl PipelineResources {
             label: Some("attractor-compute-layout"),
             entries: &[
                 storage_entry(0),
-                uniform_entry(1, wgpu::ShaderStages::COMPUTE),
+                gpu::uniform(1, wgpu::ShaderStages::COMPUTE),
             ],
         });
         let compute_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -723,7 +697,7 @@ impl PipelineResources {
         let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("attractor-draw-layout"),
             entries: &[
-                uniform_entry(0, wgpu::ShaderStages::VERTEX),
+                gpu::uniform(0, wgpu::ShaderStages::VERTEX),
                 lut_vertex_texture(1),
                 lut_vertex_texture(2),
                 wgpu::BindGroupLayoutEntry {
@@ -819,15 +793,15 @@ impl PipelineResources {
         let decay_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("attractor-decay-layout"),
             entries: &[
-                texture_entry(0),
-                sampler_entry(1),
-                uniform_entry(2, wgpu::ShaderStages::FRAGMENT),
+                gpu::texture(0, true),
+                gpu::sampler(1),
+                gpu::uniform(2, wgpu::ShaderStages::FRAGMENT),
             ],
         });
-        let decay_pipeline = fullscreen_pipeline(
+        let decay_pipeline = gpu::fullscreen_pipeline(
             device,
             &decay_shader,
-            &decay_layout,
+            &[&decay_layout],
             PingPongField::FORMAT,
             // The decay pass overwrites the trail field with the faded previous frame.
             wgpu::BlendState::REPLACE,
@@ -836,12 +810,12 @@ impl PipelineResources {
 
         let present_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("attractor-present-layout"),
-            entries: &[texture_entry(0), sampler_entry(1)],
+            entries: &[gpu::texture(0, true), gpu::sampler(1)],
         });
-        let present_pipeline = fullscreen_pipeline(
+        let present_pipeline = gpu::fullscreen_pipeline(
             device,
             &present_shader,
-            &present_layout,
+            &[&present_layout],
             surface_format,
             // Premultiplied-alpha OVER the backdrop (ADR-0026): the accumulation is
             // emissive, so `c` adds over the atmosphere and the present's alpha
@@ -972,41 +946,6 @@ fn storage_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-fn uniform_entry(binding: u32, visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility,
-        ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Uniform,
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        },
-        count: None,
-    }
-}
-
-fn texture_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Texture {
-            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-            view_dimension: wgpu::TextureViewDimension::D2,
-            multisampled: false,
-        },
-        count: None,
-    }
-}
-
-fn sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-        count: None,
-    }
-}
-
 /// A texture(+sampler)[+uniform] bind group for the decay/present fullscreen
 /// passes. `uniform` is `Some` for decay (the retention factor) and `None` for
 /// present (no scaling).
@@ -1038,49 +977,6 @@ fn blit_bind_group(
         label: Some(label),
         layout,
         entries: &entries,
-    })
-}
-
-/// A fullscreen-triangle pipeline (no vertex buffers) writing into `target` with
-/// the given `blend`. The decay pass overwrites its trail field (`REPLACE`); the
-/// present composites over the backdrop (`PREMULTIPLIED_ALPHA_BLENDING`, ADR-0026).
-fn fullscreen_pipeline(
-    device: &wgpu::Device,
-    shader: &wgpu::ShaderModule,
-    bind_layout: &wgpu::BindGroupLayout,
-    target: wgpu::TextureFormat,
-    blend: wgpu::BlendState,
-    label: &str,
-) -> wgpu::RenderPipeline {
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some(label),
-        bind_group_layouts: &[Some(bind_layout)],
-        immediate_size: 0,
-    });
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(label),
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
-            compilation_options: Default::default(),
-            buffers: &[],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some("fs_main"),
-            compilation_options: Default::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: target,
-                blend: Some(blend),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
     })
 }
 
@@ -1116,7 +1012,7 @@ pub struct AttractorScene {
     needs_clear: bool,
     /// Fixed-timestep accumulator: unspent injected `dt`, drained one
     /// [`FIXED_STEP`] at a time into compute steps.
-    accumulator: f32,
+    fixed_step: gpu::FixedStep,
     /// Steps `advance` scheduled for the next `render` to encode.
     pending_steps: u32,
     /// Real elapsed seconds for this frame, injected via `advance`, used to make
@@ -1174,7 +1070,7 @@ impl AttractorScene {
             seed_particles,
             needs_upload: true,
             needs_clear: true,
-            accumulator: 0.0,
+            fixed_step: gpu::FixedStep::new(FIXED_STEP, MAX_SUBSTEPS),
             pending_steps: 0,
             dt: FIXED_STEP,
             time: 0.0,
@@ -1211,6 +1107,58 @@ impl AttractorScene {
         clippy::indexing_slicing,
         reason = "spread/centre/pos index fixed [f32; 3] at constant offsets, always in-bounds"
     )]
+    /// Build the GPU resources on the first frame, and re-allocate the
+    /// grid-dependent half when `set_target_size` asked for a different grid than
+    /// the live one (Plan 0027 Phase 2). In the steady state — every frame of a
+    /// static window — this is the two integer compares below and nothing else
+    /// (ADR-0030 condition 2).
+    ///
+    /// A grid change rebuilds **only** `FieldResources` (Plan 0029 Phase 1): the
+    /// shaders, pipelines, particle buffer and LUT textures do not depend on the
+    /// grid and survive, so a resize costs a texture pair plus four bind groups
+    /// instead of four shader compilations. The rebuilt field is undefined, so the
+    /// **clear** is re-flagged — a resize restarts the trail rather than carrying a
+    /// differently-sized accumulation across. The palette is not re-flagged: the
+    /// LUT textures survive.
+    ///
+    /// Neither is the particle buffer (Plan 0031 Phase 4, closing Plan 0029's
+    /// close-review minor 1). It survives the split, so re-uploading the seed
+    /// scatter on a grid change is no longer *necessary* — and it was the surviving
+    /// half of "a fullscreen toggle pops the cloud back to its seed scatter": the
+    /// points kept iterating across a resize, then jumped back. Determinism does
+    /// not need it either, since a headless capture holds one target size for its
+    /// whole run.
+    fn rebuild_if_stale(&mut self) {
+        let grid_stale = self
+            .res
+            .as_ref()
+            .is_none_or(|res| res.grid.trail_w != self.trail_w || res.grid.trail_h != self.trail_h);
+        if !grid_stale {
+            return;
+        }
+        let res = match self.res.take() {
+            Some(mut res) => {
+                res.rebuild_grid(&self.device, self.trail_w, self.trail_h);
+                res
+            }
+            None => {
+                // First build: the LUT textures are fresh, so the palette needs its
+                // one upload, and the particle buffer has never been written — this
+                // is the arm the seed upload belongs to.
+                self.palette_dirty = true;
+                self.needs_upload = true;
+                Resources::build(
+                    &self.device,
+                    self.surface_format,
+                    self.trail_w,
+                    self.trail_h,
+                )
+            }
+        };
+        self.res = Some(res);
+        self.needs_clear = true;
+    }
+
     fn seed(family: AttractorFamily) -> Vec<Particle> {
         let (spread, center) = family.seed_box();
         let mut rng = SeededRng::new(SEED);
@@ -1260,16 +1208,10 @@ impl Scene for AttractorScene {
     fn advance(&mut self, dt: f32) {
         self.dt = dt;
         // Drain the accumulator one fixed step at a time, clamped so a long stall
-        // can't queue unbounded compute work (the reaction-diffusion discipline).
-        // The sub-`FIXED_STEP` remainder carries to the next frame.
-        self.accumulator += dt;
-        let mut steps = 0u32;
-        while self.accumulator >= FIXED_STEP && steps < MAX_SUBSTEPS {
-            self.accumulator -= FIXED_STEP;
-            steps += 1;
-        }
-        self.accumulator = self.accumulator.min(FIXED_STEP);
-        self.pending_steps = steps;
+        // can't queue unbounded compute work (the reaction-diffusion discipline,
+        // and now literally the same code). The sub-`FIXED_STEP` remainder
+        // carries to the next frame.
+        self.pending_steps = self.fixed_step.advance(dt);
     }
 
     /// Size the trail accumulation grid to the render target, capped and
@@ -1375,6 +1317,14 @@ impl Scene for AttractorScene {
         None
     }
 
+    /// The frame, in the order the GPU must see it: rebuild if the grid moved,
+    /// flush the deferred one-shot uploads, write this frame's uniforms, dispatch
+    /// the compute steps, lay the trail, swap, present.
+    ///
+    /// **The order and the `swap()` placement are load-bearing** — the decay reads
+    /// the field's current read side and the present reads the freshly-written one,
+    /// so the swap sits exactly between those two passes. The steps are separate
+    /// functions for readability only; nothing here may be reordered or merged.
     fn render(
         &mut self,
         queue: &wgpu::Queue,
@@ -1382,54 +1332,7 @@ impl Scene for AttractorScene {
         view: &wgpu::TextureView,
         aspect: f32,
     ) {
-        // Build on the first frame, and re-allocate the accumulation field when
-        // `set_target_size` asked for a different grid than the live one (Plan
-        // 0027 Phase 2). In the steady state — every frame of a static window —
-        // this is the two integer compares below and nothing else (ADR-0030
-        // condition 2).
-        //
-        // A grid change rebuilds **only** `FieldResources` (Plan 0029 Phase 1):
-        // the shaders, pipelines, particle buffer and LUT textures do not depend
-        // on the grid and survive, so a resize costs a texture pair plus four
-        // bind groups instead of four shader compilations. The rebuilt field is
-        // undefined, so the **clear** is re-flagged — a resize restarts the trail
-        // rather than carrying a differently-sized accumulation across. The
-        // palette is not re-flagged: the LUT textures survive.
-        //
-        // Neither is the particle buffer (Plan 0031 Phase 4, closing Plan 0029's
-        // close-review minor 1). It survives the split, so re-uploading the seed
-        // scatter on a grid change is no longer *necessary* — and it was the
-        // surviving half of "a fullscreen toggle pops the cloud back to its seed
-        // scatter": the points kept iterating across a resize, then jumped back.
-        // Determinism does not need it either, since a headless capture holds one
-        // target size for its whole run.
-        let grid_stale = self
-            .res
-            .as_ref()
-            .is_none_or(|res| res.grid.trail_w != self.trail_w || res.grid.trail_h != self.trail_h);
-        if grid_stale {
-            let res = match self.res.take() {
-                Some(mut res) => {
-                    res.rebuild_grid(&self.device, self.trail_w, self.trail_h);
-                    res
-                }
-                None => {
-                    // First build: the LUT textures are fresh, so the palette
-                    // needs its one upload, and the particle buffer has never been
-                    // written — this is the arm the seed upload belongs to.
-                    self.palette_dirty = true;
-                    self.needs_upload = true;
-                    Resources::build(
-                        &self.device,
-                        self.surface_format,
-                        self.trail_w,
-                        self.trail_h,
-                    )
-                }
-            };
-            self.res = Some(res);
-            self.needs_clear = true;
-        }
+        self.rebuild_if_stale();
         let Self {
             res,
             seed_particles,
@@ -1461,154 +1364,268 @@ impl Scene for AttractorScene {
             return;
         };
 
-        // Upload the active palette LUTs (A + B) on a preset switch or a fresh
-        // build — off the hot path, once per change.
-        if *palette_dirty {
-            palette::write_lut(queue, &pipelines.lut_texture_a, &palette.lut_a_bytes());
-            palette::write_lut(queue, &pipelines.lut_texture_b, &palette.lut_b_bytes());
-            *palette_dirty = false;
-        }
-
-        // Clear the trail field once after a (re)build so the first decay reads
-        // black rather than garbage.
-        if *needs_clear {
-            grid.clear_field(encoder);
-            *needs_clear = false;
-        }
-        // (Re)upload the seeded scatter — on first build, and each time a `reseed`
-        // rising edge re-scatters the cloud (the trail field is kept).
-        if *needs_upload {
-            queue.write_buffer(
-                &pipelines.particles,
-                0,
-                bytemuck::cast_slice(seed_particles),
-            );
-            *needs_upload = false;
-        }
-
-        queue.write_buffer(
-            &pipelines.step_uniform,
-            0,
-            bytemuck::bytes_of(&StepUniform {
+        flush_deferred_uploads(
+            queue,
+            encoder,
+            pipelines,
+            grid,
+            seed_particles,
+            palette,
+            palette_dirty,
+            needs_clear,
+            needs_upload,
+        );
+        upload_uniforms(
+            queue,
+            pipelines,
+            &UniformInputs {
+                aspect,
                 coeffs: [*a, *b, *c, *d],
-                dt: FIXED_STEP,
-                family: family.shader_id(),
-                count: PARTICLE_COUNT,
-                pad: 0,
-            }),
+                family: *family,
+                time: *time,
+                dt: *dt,
+                size: *size,
+                hue: *hue,
+                fade: *fade,
+                hue_spread: *hue_spread,
+                hue_center: *hue_center,
+                saturation: *saturation,
+                palette_mix: *palette_mix,
+                zoom: *zoom,
+                pan: [*pan_x, *pan_y],
+            },
         );
-        let (scale, dim, z_center) = family.projection();
-        queue.write_buffer(
-            &pipelines.draw_uniform,
-            0,
-            bytemuck::bytes_of(&DrawUniform {
-                v: [
-                    // The **target's** aspect, not the accumulation field's (Plan
-                    // 0029 Phase 5). The points are projected into the field, but
-                    // the present stretches the field over the whole target with
-                    // aspect ignored, so field NDC `x` becomes target NDC `x` and
-                    // the field's own aspect cancels out. Using the grid ratio was
-                    // harmless only while quantization was absent and the grid
-                    // equalled the target; with a 256 px step a 1920x1080 target
-                    // takes a 2048x1280 grid and drew the cloud 11% too wide.
-                    aspect,
-                    POINT_BASE * *size,
-                    *hue,
-                    *time * SPIN_RATE,
-                ],
-                w: [scale, dim, z_center, 0.0],
-                u: [*hue_spread, *hue_center, *palette_mix, *saturation],
-                x: [*zoom, *pan_x, *pan_y, 0.0],
-            }),
-        );
-        // Frame-rate-independent trail decay: retain `fade` per 1/60 s, raised to
-        // the `dt`-relative power so the trail length is the same wall-clock
-        // duration on any refresh. `fade = 0` -> factor 0 -> trail-free.
-        let decay = fade.clamp(0.0, 1.0).powf((*dt * 60.0).max(0.0));
-        queue.write_buffer(
-            &pipelines.decay_uniform,
-            0,
-            bytemuck::bytes_of(&DecayUniform {
-                k: [decay, 0.0, 0.0, 0.0],
-            }),
-        );
-
-        // Step the particles: one compute dispatch per scheduled sub-step. wgpu
-        // inserts the storage->vertex barrier before the draw pass below.
-        let groups = PARTICLE_COUNT.div_ceil(WORKGROUP);
-        for _ in 0..*pending_steps {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("attractor-step-pass"),
-                timestamp_writes: None,
-            });
-            pass.set_pipeline(&pipelines.compute_pipeline);
-            pass.set_bind_group(0, &pipelines.compute_bg, &[]);
-            pass.dispatch_workgroups(groups, 1, 1);
-        }
-
-        // Trail pass: draw the faded previous accumulation into the fresh target,
-        // then add this frame's points on top. One pass, so the decay lays the
-        // bed and the additive points bloom over it. The decay reads the current
-        // read side; the present below reads the freshly-written side after swap.
-        let decay_bg = if grid.field.reading_a() {
-            &grid.decay_bg_a
-        } else {
-            &grid.decay_bg_b
-        };
-        {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("attractor-trail-pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: grid.field.write_view(),
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
-            pass.set_pipeline(&pipelines.decay_pipeline);
-            pass.set_bind_group(0, decay_bg, &[]);
-            pass.draw(0..3, 0..1);
-
-            pass.set_pipeline(&pipelines.draw_pipeline);
-            pass.set_bind_group(0, &pipelines.draw_bg, &[]);
-            pass.set_vertex_buffer(0, pipelines.particles.slice(..));
-            pass.draw(0..6, 0..PARTICLE_COUNT);
-        }
+        encode_steps(encoder, pipelines, *pending_steps);
+        encode_trail_pass(encoder, pipelines, grid);
+        // Between the trail pass and the present, and nowhere else: the trail wrote
+        // the write side, so the present must read it.
         grid.field.swap();
-
-        // Present the freshly-written accumulation to the surface.
-        let present_bg = if grid.field.reading_a() {
-            &grid.present_bg_a
-        } else {
-            &grid.present_bg_b
-        };
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("attractor-present-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    // Load over the engine backdrop (ADR-0018): the additive
-                    // point cloud blooms over whatever the background pass painted.
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
-        pass.set_pipeline(&pipelines.present_pipeline);
-        pass.set_bind_group(0, present_bg, &[]);
-        pass.draw(0..3, 0..1);
+        encode_present(encoder, pipelines, grid, view);
     }
+}
+
+// ---------------------------------------------------------------------------
+// The frame, step by step (Plan 0031 Phase 5)
+// ---------------------------------------------------------------------------
+//
+// `AttractorScene::render` was 228 lines. These are the paragraphs its own
+// comments already marked, lifted out verbatim: same calls, same order, same
+// `swap()` placement. Free functions rather than methods because `render`
+// destructures `self` to borrow the resources and the params at once.
+
+/// One frame's uniform inputs, gathered so [`upload_uniforms`] takes one argument
+/// rather than fourteen. Plain values read off the scene's params.
+struct UniformInputs {
+    /// The **render target's** aspect, not the accumulation grid's — see the note
+    /// in [`upload_uniforms`].
+    aspect: f32,
+    coeffs: [f32; 4],
+    family: AttractorFamily,
+    time: f32,
+    dt: f32,
+    size: f32,
+    hue: f32,
+    fade: f32,
+    hue_spread: f32,
+    hue_center: f32,
+    saturation: f32,
+    palette_mix: f32,
+    zoom: f32,
+    pan: [f32; 2],
+}
+
+/// The deferred one-shot uploads: the palette LUTs on a preset switch or fresh
+/// build, the field clear after a (re)build, and the seeded particle scatter on
+/// first build or a `reseed` rising edge. Each clears its own flag, so none
+/// repeats per frame.
+#[allow(clippy::too_many_arguments)]
+fn flush_deferred_uploads(
+    queue: &wgpu::Queue,
+    encoder: &mut wgpu::CommandEncoder,
+    pipelines: &PipelineResources,
+    grid: &FieldResources,
+    seed_particles: &[Particle],
+    palette: &Palette,
+    palette_dirty: &mut bool,
+    needs_clear: &mut bool,
+    needs_upload: &mut bool,
+) {
+    // Upload the active palette LUTs (A + B) on a preset switch or a fresh
+    // build — off the hot path, once per change.
+    if *palette_dirty {
+        palette::write_lut(queue, &pipelines.lut_texture_a, &palette.lut_a_bytes());
+        palette::write_lut(queue, &pipelines.lut_texture_b, &palette.lut_b_bytes());
+        *palette_dirty = false;
+    }
+
+    // Clear the trail field once after a (re)build so the first decay reads
+    // black rather than garbage.
+    if *needs_clear {
+        grid.clear_field(encoder);
+        *needs_clear = false;
+    }
+    // (Re)upload the seeded scatter — on first build, and each time a `reseed`
+    // rising edge re-scatters the cloud (the trail field is kept).
+    if *needs_upload {
+        queue.write_buffer(
+            &pipelines.particles,
+            0,
+            bytemuck::cast_slice(seed_particles),
+        );
+        *needs_upload = false;
+    }
+}
+
+/// This frame's three uniform buffers: the compute step's coefficients, the
+/// point draw's projection and colour, and the trail decay factor.
+fn upload_uniforms(queue: &wgpu::Queue, pipelines: &PipelineResources, inputs: &UniformInputs) {
+    queue.write_buffer(
+        &pipelines.step_uniform,
+        0,
+        bytemuck::bytes_of(&StepUniform {
+            coeffs: inputs.coeffs,
+            dt: FIXED_STEP,
+            family: inputs.family.shader_id(),
+            count: PARTICLE_COUNT,
+            pad: 0,
+        }),
+    );
+    let (scale, dim, z_center) = inputs.family.projection();
+    queue.write_buffer(
+        &pipelines.draw_uniform,
+        0,
+        bytemuck::bytes_of(&DrawUniform {
+            v: [
+                // The **target's** aspect, not the accumulation field's (Plan
+                // 0029 Phase 5). The points are projected into the field, but
+                // the present stretches the field over the whole target with
+                // aspect ignored, so field NDC `x` becomes target NDC `x` and
+                // the field's own aspect cancels out. Using the grid ratio was
+                // harmless only while quantization was absent and the grid
+                // equalled the target; with a 256 px step a 1920x1080 target
+                // takes a 2048x1280 grid and drew the cloud 11% too wide.
+                inputs.aspect,
+                POINT_BASE * inputs.size,
+                inputs.hue,
+                inputs.time * SPIN_RATE,
+            ],
+            w: [scale, dim, z_center, 0.0],
+            u: [
+                inputs.hue_spread,
+                inputs.hue_center,
+                inputs.palette_mix,
+                inputs.saturation,
+            ],
+            x: [inputs.zoom, inputs.pan[0], inputs.pan[1], 0.0],
+        }),
+    );
+    // Frame-rate-independent trail decay: retain `fade` per 1/60 s, raised to
+    // the `dt`-relative power so the trail length is the same wall-clock
+    // duration on any refresh. `fade = 0` -> factor 0 -> trail-free.
+    let decay = inputs
+        .fade
+        .clamp(0.0, 1.0)
+        .powf((inputs.dt * 60.0).max(0.0));
+    queue.write_buffer(
+        &pipelines.decay_uniform,
+        0,
+        bytemuck::bytes_of(&DecayUniform {
+            k: [decay, 0.0, 0.0, 0.0],
+        }),
+    );
+}
+
+/// Step the particles: one compute dispatch per scheduled sub-step. wgpu inserts
+/// the storage-to-vertex barrier before the draw pass that follows.
+fn encode_steps(
+    encoder: &mut wgpu::CommandEncoder,
+    pipelines: &PipelineResources,
+    pending_steps: u32,
+) {
+    let groups = PARTICLE_COUNT.div_ceil(WORKGROUP);
+    for _ in 0..pending_steps {
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("attractor-step-pass"),
+            timestamp_writes: None,
+        });
+        pass.set_pipeline(&pipelines.compute_pipeline);
+        pass.set_bind_group(0, &pipelines.compute_bg, &[]);
+        pass.dispatch_workgroups(groups, 1, 1);
+    }
+}
+
+/// Trail pass: draw the faded previous accumulation into the fresh target, then
+/// add this frame's points on top. **One** pass, so the decay lays the bed and the
+/// additive points bloom over it — splitting it in two would clear the bed away.
+/// Reads the field's current read side; the caller swaps afterwards.
+fn encode_trail_pass(
+    encoder: &mut wgpu::CommandEncoder,
+    pipelines: &PipelineResources,
+    grid: &FieldResources,
+) {
+    let decay_bg = if grid.field.reading_a() {
+        &grid.decay_bg_a
+    } else {
+        &grid.decay_bg_b
+    };
+    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("attractor-trail-pass"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view: grid.field.write_view(),
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                store: wgpu::StoreOp::Store,
+            },
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    });
+    pass.set_pipeline(&pipelines.decay_pipeline);
+    pass.set_bind_group(0, decay_bg, &[]);
+    pass.draw(0..3, 0..1);
+
+    pass.set_pipeline(&pipelines.draw_pipeline);
+    pass.set_bind_group(0, &pipelines.draw_bg, &[]);
+    pass.set_vertex_buffer(0, pipelines.particles.slice(..));
+    pass.draw(0..6, 0..PARTICLE_COUNT);
+}
+
+/// Present the freshly-written accumulation to the target, loading over whatever
+/// the engine backdrop painted (ADR-0018). Call **after** the swap.
+fn encode_present(
+    encoder: &mut wgpu::CommandEncoder,
+    pipelines: &PipelineResources,
+    grid: &FieldResources,
+    view: &wgpu::TextureView,
+) {
+    let present_bg = if grid.field.reading_a() {
+        &grid.present_bg_a
+    } else {
+        &grid.present_bg_b
+    };
+    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("attractor-present-pass"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view,
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                // Load over the engine backdrop (ADR-0018): the additive
+                // point cloud blooms over whatever the background pass painted.
+                load: wgpu::LoadOp::Load,
+                store: wgpu::StoreOp::Store,
+            },
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    });
+    pass.set_pipeline(&pipelines.present_pipeline);
+    pass.set_bind_group(0, present_bg, &[]);
+    pass.draw(0..3, 0..1);
 }

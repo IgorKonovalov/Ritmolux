@@ -25,6 +25,8 @@
     clippy::unreachable
 )]
 
+use crate::render::gpu;
+
 use super::Scene;
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
@@ -71,23 +73,6 @@ struct Params {
 @group(1) @binding(0) var lut_a: texture_2d<f32>;
 @group(1) @binding(1) var lut_b: texture_2d<f32>;
 @group(1) @binding(2) var lut_samp: sampler;
-
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) ndc: vec2<f32>,
-}
-
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    // Single oversized triangle covers the viewport (no vertex buffer).
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    var out: VsOut;
-    out.pos = vec4<f32>(pts[vi], 0.0, 1.0);
-    out.ndc = pts[vi];
-    return out;
-}
 
 // Shared `saturation` (mirrors core/src/render/palette.rs::desaturate verbatim):
 // scale chroma around Rec. 601 luma. 1.0 unchanged, 0.0 grayscale.
@@ -190,10 +175,12 @@ pub struct FragmentFieldScene {
 impl FragmentFieldScene {
     /// Build the scene's pipeline and uniform buffer on `device`.
     pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("fragment-field-shader"),
-            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
-        });
+        let shader = gpu::fullscreen_shader(
+            device,
+            "fragment-field-shader",
+            gpu::FULLSCREEN_VS_NDC,
+            SHADER,
+        );
         let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("fragment-field-params"),
             size: std::mem::size_of::<Params>() as u64,
@@ -207,41 +194,17 @@ impl FragmentFieldScene {
         let lut_sampler = palette::lut_sampler(device);
         let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("fragment-field-uniform-layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
+            entries: &[gpu::uniform(0, wgpu::ShaderStages::FRAGMENT)],
         });
         // The LUT texture + sampler live in their own group (group 1) — see the
         // WGSL note: keeping this pipeline's layout distinct from the
         // kaleidoscope's avoids the DX12 WARP identical-layout mis-render.
-        let lut_texture_entry = |binding: u32| wgpu::BindGroupLayoutEntry {
-            binding,
-            visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                view_dimension: wgpu::TextureViewDimension::D2,
-                multisampled: false,
-            },
-            count: None,
-        };
         let lut_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("fragment-field-lut-layout"),
             entries: &[
-                lut_texture_entry(0),
-                lut_texture_entry(1),
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
+                gpu::texture(0, true),
+                gpu::texture(1, true),
+                gpu::sampler(2),
             ],
         });
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -270,36 +233,14 @@ impl FragmentFieldScene {
                 },
             ],
         });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("fragment-field-pipeline-layout"),
-            bind_group_layouts: &[Some(&uniform_layout), Some(&lut_layout)],
-            immediate_size: 0,
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("fragment-field-pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        let pipeline = gpu::fullscreen_pipeline(
+            device,
+            &shader,
+            &[&uniform_layout, &lut_layout],
+            surface_format,
+            wgpu::BlendState::REPLACE,
+            "fragment-field",
+        );
 
         Self {
             pipeline,
