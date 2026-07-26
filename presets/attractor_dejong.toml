@@ -1,26 +1,82 @@
-# De Jong - the engine's first GPU compute-particle scene (ADR-0015, Plan 0016).
-# A storage buffer of 50k particles is stepped through the De Jong strange-
-# attractor map by a compute shader each frame and drawn as additive glowing
-# points with fading trails, so a dense, slowly-turning point cloud boils along
-# the attractor's fractal curves.
+# De Jong - the flagship compute-particle attractor, rebuilt around one rule:
+# PEAK BUYS STRUCTURE, NOT BRIGHTNESS. The old version raised `fade` and `size`
+# on bass, so a loud passage saturated the (now surface-sized, Plan 0027)
+# accumulation grid into a white blot. Here energy runs the other way - `fade`
+# and `size` FALL as the track hits, so a drop sharpens the filigree into a fine
+# wire mesh instead of blooming it out.
 #
-# The bands steer the attractor's shape and a beat re-scatters the cloud:
-#   - bass pushes coefficient a and swells the points and the beat glow;
-#   - mid pushes coefficient b and lengthens the trails;
-#   - treble pushes coefficient c and drifts the hue;
-#   - coefficient d breathes slowly with time so the cloud never freezes;
-#   - each beat re-scatters the cloud, blooming through the trails.
-#
-# Variables available to expressions: bass mid treb onset beat bar time.
+# Shape: the four De Jong coefficients drift on four incommensurate slow sines
+# (periods ~170/217/275/331 s, so the figure never repeats) with a small band
+# term on top - the map bends with the music rather than cutting between poses.
+# Colour: a deep indigo -> violet -> magenta -> gold gradient crossfading to
+# `ice` on treble, so the shimmer cools as the top end opens up.
+# Composite: a tinted vignette backdrop underneath, and the screen-space
+# kaleidoscope folds in only when the mix is genuinely loud (a comparison gate).
 system = "attractor"
 name = "De Jong"
 
+[particles]
+family = "de_jong"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#07021c" },
+  { at = 0.28, color = "#3b1178" },
+  { at = 0.55, color = "#a81fa0" },
+  { at = 0.80, color = "#ff5c3a" },
+  { at = 1.00, color = "#ffe9a8" },
+]
+
+[palette_b]
+name = "ice"
+
 [params]
-a      = "1.641 + clamp(bass * 3, 0, 1) * 0.25"
-b      = "1.902 + clamp(mid * 3, 0, 1) * 0.25"
-c      = "0.316 + clamp(treb * 3, 0, 1) * 0.20"
-d      = "1.525 + sin(time * 0.07) * 0.15"
-size   = "1.0 + clamp(bass * 3, 0, 1) * 0.6 + beat * 0.5"
-hue    = "time * 0.05 + clamp(treb * 2, 0, 1) * 0.12"
-fade   = "0.90 + clamp(mid * 2, 0, 1) * 0.06"
-reseed = "beat"
+# SHAPE - slow incommensurate drift plus a gentle band bend. Chaotic maps punish
+# big jumps, so every band term is small and clamped.
+a = "1.641 + sin(time * 0.0370) * 0.070 + clamp(bass * 0.40, 0, 0.085)"
+b = "1.902 - sin(time * 0.0289) * 0.055 - clamp(mid * 0.35, 0, 0.070)"
+c = "0.316 + sin(time * 0.0228) * 0.090 + clamp(treb * 0.30, 0, 0.055)"
+d = "1.525 + cos(time * 0.0190) * 0.075 - clamp(bass * 0.25, 0, 0.050)"
+
+# DENSITY - the inversion fix. Loud = shorter trails and finer points. The base
+# values are deliberately low: at the Plan 0027 surface-sized grid, `fade` much
+# above ~0.92 with `size` near 1 saturates the accumulation into a white blot.
+fade   = "0.905 - clamp(bass * 0.16, 0, 0.055) - beat * 0.020"
+size   = "0.58 - clamp((bass + mid) * 0.15, 0, 0.17) + beat * 0.08"
+reseed = "onset > 0.42"
+
+# COLOUR - a narrow window that slides, not a rainbow. palette_mix finally earns
+# its keep: the gradient cools toward `ice` as treble opens.
+hue_spread  = "0.20 + clamp(mid * 1.2, 0, 0.30)"
+hue_center  = "0.34 + sin(time * 0.043) * 0.12 + clamp(bass * 1.1, 0, 0.26)"
+saturation  = "1.05 + clamp(treb * 1.5, 0, 0.35)"
+palette_mix = "0.14 + sin(time * 0.021) * 0.14 + clamp(mid * 0.7, 0, 0.18)"
+
+# VIEW - a slow breathing push-in with a lazy drift, so the cloud never sits still.
+zoom  = "1.06 + bar * 0.10 + clamp(bass * 0.5, 0, 0.22)"
+pan_x = "sin(time * 0.051) * 0.06"
+pan_y = "cos(time * 0.037) * 0.05"
+
+# COMPOSITE - an atmosphere under the sparse cloud, and symmetry that arrives
+# only on the loud sections rather than sitting on all the time. NOTE: `bg_hue`
+# indexes the shared COSINE palette, not the [palette] table above - ~0.25 is
+# the deep indigo that sits under this gradient; 0.6 would read green.
+bg_hue        = "0.25 + sin(time * 0.017) * 0.05"
+bg_bright     = "0.06 + clamp(mid * 0.5, 0, 0.07)"
+bg_vignette   = "0.80"
+kaleido_order = "select(bass + mid > 0.34, 5, 1)"
+kaleido_angle = "time * 0.07"
+
+[smoothing]
+# Ease everything that would otherwise snap; leave `reseed` and the beat sharp.
+a             = 0.6
+b             = 0.6
+c             = 0.6
+d             = 0.6
+fade          = 0.18
+size          = 0.10
+zoom          = 0.14
+hue_center    = 0.35
+palette_mix   = 0.5
+kaleido_order = 0.8
+bg_bright     = 0.4

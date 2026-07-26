@@ -1,24 +1,68 @@
-# Dense - a shimmering cloud: medium bright particles churned by a FAST field (high
-# spin) so the whole mass sparkles and reforms. The shimmer comes from the churn
-# speed, not tiny dots (tiny particles just vanish on this scene). Treble lights the
-# sparkle, mids drive the churn, beats give a crisp shove. Reads as one glittering body.
+# Dense - a tight, shimmering shoal: a fast-churning field with a NARROW hue
+# window, so the whole mass reads as one glittering body that turns together
+# rather than as a scatter of coloured dots. Folded through the screen-space
+# kaleidoscope, which turns the shoal into a slowly-rotating mandala of itself.
 #
-# Colour (Plan 0020): the shared "ice" palette pushed toward the bright cyan->white
-# end, with treble both widening hue_spread (more sparkle scatter) and lifting
-# hue_center (whiter glints) - so the glitter reads as one cool shimmering body
-# instead of full-wheel confetti (the old `hue` was a no-op).
+# The shimmer comes from CHURN SPEED (`spin`), not from small particles - tiny
+# points simply vanish on this scene. See `swarm_flow.toml` for the force
+# ceiling that governs the family.
 system = "swarm"
 name = "Dense"
 
 [palette]
 name = "ice"
 
+[palette_b]
+name = "spectrum"
+
 [params]
-force      = "1.5 + clamp(mid * 12, 0, 3)"
-spin       = "0.9 + clamp(treb * 8, 0, 1.6)"
-burst      = "beat * 3"
-brightness = "0.7 + clamp(treb * 7, 0, 0.95)"
-size       = "1.5 + beat * 0.3"
-hue_spread = "0.3 + clamp(treb * 3, 0, 0.3)"
-hue_center = "0.75 + clamp(treb * 2, 0, 0.15)"
-saturation = "1.0"
+# MOTION - the fastest churn in the set, but the steering still sits inside the
+# ceiling. Treble runs the shimmer; mid runs the body.
+force = "1.35 + clamp(mid * 1.5, 0, 0.60) + sin(time * 0.061) * 0.12"
+spin  = "0.85 + clamp(treb * 2.6, 0, 1.05) + clamp(mid * 0.9, 0, 0.35)"
+burst = "clamp(beat * 1.4 + onset * 1.0, 0, 2.2)"
+
+# APPEARANCE - flat brightness, and size FALLS slightly under treble: a loud
+# top end should read as finer, faster glitter, not as a brighter smear.
+brightness = "0.78 + clamp(bass * 0.8, 0, 0.20)"
+size       = "1.9 - clamp(treb * 0.7, 0, 0.35) + beat * 0.30"
+
+# COLOUR - the tightest hue window in the set. This is the cohesion knob: low
+# spread is what separates "one shimmering body" from "novelty confetti".
+hue_spread  = "0.11 + clamp(treb * 0.9, 0, 0.15)"
+hue_center  = "0.70 + sin(time * 0.037) * 0.08 + clamp(treb * 0.8, 0, 0.13)"
+saturation  = "1.05 + clamp(mid * 1.2, 0, 0.28)"
+palette_mix = "clamp((bass + treb) * 0.9, 0, 0.35)"
+
+# VIEW - pushed in so the shoal fills its wedge before the fold repeats it.
+zoom  = "1.22 + bar * 0.10 + clamp(bass * 0.5, 0, 0.22)"
+pan_x = "sin(time * 0.033) * 0.07"
+pan_y = "cos(time * 0.025) * 0.05"
+
+# COMPOSITE - a short exposure to bind the glitter into strokes, then a
+# six-fold screen fold that turns slowly.
+#
+# The fold order is FIXED and modest on purpose. A high-order fold (this preset
+# ran 8->10) leaves visible wedge seams and mirrored debris in the frame
+# CORNERS: the fold maps corner pixels from source coordinates outside the
+# wedge it is replicating, and the further the order is pushed the more corner
+# area comes from out-of-range samples. Six is the highest that stays clean at
+# 16:9.
+trails        = "0.42 + clamp(mid * 0.35, 0, 0.16)"
+kaleido_order = "6"
+kaleido_angle = "time * 0.055"
+bg_hue        = "0.40 + sin(time * 0.013) * 0.05"
+bg_bright     = "0.011 + clamp(mid * 0.09, 0, 0.011)"
+bg_vignette   = "0.74"
+
+[smoothing]
+force         = 0.30
+spin          = 0.22
+brightness    = 0.18
+size          = 0.14
+trails        = 0.40
+zoom          = 0.15
+hue_center    = 0.35
+palette_mix   = 0.7
+kaleido_order = 1.0
+bg_bright     = 0.4

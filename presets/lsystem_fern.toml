@@ -1,8 +1,21 @@
-# Fern Grow - a branching plant L-system that grows an iteration deeper as the
-# bass swells (visible_depth), turns slowly on the clock, and draws itself on
-# across each beat. The signature growth scene.
+# Fern Grow - a branching plant L-system that literally GROWS an iteration
+# deeper as the music opens up: `visible_depth` picks which precomputed
+# iteration is drawn, so stepping it on the low end adds a whole generation of
+# branches at once. Around that, the geometry mirror turns a single plant into a
+# radial thicket, which is what fills a frame the lone fern left 88% empty.
+#
+# Two engine facts worth knowing here:
+#   - `max_depth` is clamped to 1..=7 (ADR-0007). This grammar's expansion is
+#     steep, so depth 6 is already ~10k segments before mirroring - that is why
+#     `mirror_order` is only 5, and why raising either needs the other lowered.
+#   - `rotation` is an ANGLE IN RADIANS, not a rate. Multiply by `time` yourself
+#     to make it turn; the old presets all did `0.3 * time`.
+#
+# The old version also ran `brightness = 0.5 + 0.5 * sin(time * 4)` - a ~0.64 Hz
+# full-depth luminance strobe with no relationship to the audio at all. It is
+# gone; brightness is near flat and the life comes from growth and colour.
 system = "lsystem"
-name   = "Fern Grow"
+name = "Fern Grow"
 
 [generator]
 axiom     = "X"
@@ -11,11 +24,52 @@ angle_deg = 25
 max_depth = 6
 seed      = 1
 
+# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
+# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
+# softens line art (it reads as "upsized from something smaller"). The geometry
+# mirror below costs nothing in resolution because it replicates real geometry
+# before rasterisation - so on the line scenes, prefer `mirror_*` over the
+# screen-space fold whenever both would do.
+
 [params]
-visible_depth = "5 + floor(1 * bass)"
-rotation      = "0.3 * time"
-hue           = "0.3 + time * 0.03 + treb * 0.3"
-draw_progress = "clamp(0.6 + bar * 0.6, 0, 1)"
-thickness     = "2.5 + bass * 1.5"
-scale         = "0.82 + mid * 0.12 + bass * 0.18"
-brightness    = "0.5 + 0.5 * sin(time * 4) + clamp(bass * 0.4, 0, 0.4)"
+# THE GROWTH - three generations on two comparison gates. Eased below, so a
+# section change reads as the thicket sprouting rather than as a jump cut.
+visible_depth = "select(bass + mid > 0.42, 6, select(bass + mid > 0.18, 5, 4))"
+
+# MOTION - a steady turn plus a slow sway, both in radians and both
+# audio-independent. `rotation` is an ANGLE, so a band term on it is a
+# positional jump, not a speed change - the most jarring option of all.
+rotation = "0.26 * time + sin(time * 0.037) * 0.30"
+
+# THE REVEAL - the plant draws itself on across each beat, never fully erasing.
+draw_progress = "clamp(0.55 + bar * 0.60 + clamp(onset * 0.7, 0, 0.20), 0, 1)"
+
+# STROKE - thin, because the mirror overlaps five copies near the origin.
+thickness  = "1.15 + clamp(bass * 0.9, 0, 0.80)"
+brightness = "0.56 + clamp(bass * 0.30, 0, 0.15)"
+scale      = "0.68 + clamp(mid * 0.30, 0, 0.14) + clamp(bass * 0.35, 0, 0.16)"
+hue        = "0.30 + time * 0.023 + clamp(treb * 0.8, 0, 0.28) + bar * 0.04"
+
+# GEOMETRY MIRROR - the thicket. Five-fold, no reflection: a reflected fern
+# reads as a mirrored plant rather than a grown one.
+mirror_order   = "5"
+mirror_reflect = "0"
+
+# VIEW + COMPOSITE - an off-centre camera so the growth has somewhere to go,
+# over a deep forest backdrop.
+zoom        = "1.10 + bar * 0.06 + clamp(bass * 0.35, 0, 0.15)"
+pan_x       = "sin(time * 0.0170) * 0.05"
+pan_y       = "cos(time * 0.0130) * 0.04"
+bg_hue      = "0.52 + sin(time * 0.0091) * 0.05"
+bg_bright   = "0.085 + clamp((bass + mid) * 0.55, 0, 0.13)"
+bg_vignette = "0.55"
+
+[smoothing]
+# A long constant on the depth so a generation appears as a swell, not a pop.
+visible_depth = 1.2
+rotation      = 0.20
+thickness     = 0.15
+scale         = 0.20
+hue           = 0.42
+zoom          = 0.20
+bg_bright     = 0.40

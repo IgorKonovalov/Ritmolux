@@ -1,13 +1,63 @@
-# Warp Drive - hot and kinetic: highest zoom AND highest fold, so the whole rainbow
-# churns as fast fine cells - the deliberate full-spread counterpart to Glacier/Ember.
-# Treble tears the field, a fast sin wobbles the zoom, onset snaps it, the hue races.
-# The loud, high-energy end of the fragment set.
+# Warp Drive - the fastest, densest fragment field in the set: a deep domain
+# warp churning at high spatial frequency, folded through the screen-space
+# kaleidoscope on the loud sections.
+#
+# THE GLOW CEILING governs this whole family. The old fragment presets ran
+# `glow = 0.55 + clamp(treb * 8, 0, 1.1)` and `flash = clamp(onset * 5, 0, 1.3)`
+# - at a loud frame that is glow 1.65 and a full-strength strobe on top, which
+# blows the field to flat pastel and erases every filament the warp just drew.
+# Here `glow` stays near 0.8 and `flash` is capped low; peak energy goes into
+# `warp` and `zoom` instead. Note that `zoom` is INVERTED on this scene (Plan
+# 0018): a HIGHER zoom shows MORE of the field, so raising it on bass is what
+# makes a drop read as finer, busier cells rather than a brighter blur.
 system = "fragment_field"
 name = "Warp Drive"
 
+[palette]
+name = "spectrum"
+
+[palette_b]
+stops = [
+  { at = 0.00, color = "#04001a" },
+  { at = 0.22, color = "#2b0f8f" },
+  { at = 0.48, color = "#00b7c7" },
+  { at = 0.72, color = "#c6ff4a" },
+  { at = 0.88, color = "#ff3d8b" },
+  { at = 1.00, color = "#fff0ff" },
+]
+
 [params]
-warp  = "0.7 + clamp(treb * 16, 0, 2.4) + beat * 0.4"
-hue   = "0.7 + time * 0.05 + clamp(mid * 5, 0, 0.3)"
-zoom  = "1.5 + sin(time * 0.5) * 0.12 + clamp(onset * 2, 0, 0.5)"
-glow  = "0.55 + clamp(treb * 8, 0, 1.1)"
-flash = "clamp(onset * 5, 0, 1.3)"
+# STRUCTURE - the warp is the star, and it is what rises with energy.
+warp  = "1.05 + sin(time * 0.071) * 0.18 + clamp(treb * 2.2, 0, 1.10) + beat * 0.22"
+zoom  = "1.85 + sin(time * 0.113) * 0.14 + clamp(bass * 1.2, 0, 0.65) + clamp(onset * 0.7, 0, 0.22)"
+pan_x = "sin(time * 0.037) * 0.30 + time * 0.010"
+pan_y = "cos(time * 0.029) * 0.24"
+
+# LUMINANCE - held near flat, deliberately. See the ceiling note above.
+glow  = "0.78 + clamp(mid * 0.55, 0, 0.16)"
+flash = "clamp(onset * 0.9, 0, 0.30)"
+
+# COLOUR - the widest window in the set (this is the deliberate full-spread
+# preset), racing on time, crossfading into a harder neon gradient on treble.
+hue          = "0.70 + time * 0.043 + clamp(mid * 0.9, 0, 0.22)"
+color_span   = "0.92 + clamp(treb * 0.8, 0, 0.30)"
+color_center = "sin(time * 0.053) * 0.16 + clamp(bass * 0.5, 0, 0.12)"
+saturation   = "1.10 + clamp(treb * 0.9, 0, 0.25)"
+palette_mix  = "clamp(treb * 1.7, 0, 0.65)"
+
+# COMPOSITE - a fold that steps through three orders with the energy, turning
+# on the clock. No `bg_*`: the fragment field draws fullscreen-opaque, so the
+# backdrop pass is a no-op behind it.
+kaleido_order = "select(bass + treb > 0.55, 12, select(bass + treb > 0.30, 6, 1))"
+kaleido_angle = "time * 0.17"
+trails        = "clamp(onset * 0.8, 0, 0.34)"
+
+[smoothing]
+warp          = 0.10
+zoom          = 0.14
+glow          = 0.20
+color_span    = 0.30
+color_center  = 0.35
+palette_mix   = 0.55
+kaleido_order = 0.7
+trails        = 0.30

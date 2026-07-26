@@ -1,21 +1,68 @@
-# Thomas - a cyclically-symmetric 3D flow on the GPU compute-particle scene
-# (ADR-0015, Plan 0016). Particles integrate the Thomas equations, tracing a
-# soft, rounded lattice that turns slowly in depth - gentler than Lorenz's
-# butterfly. A continuous flow, so it moves on its own even in silence.
+# Thomas - the cyclically-symmetric 3D flow, rebuilt as the set's COLOURED
+# DUOTONE. `attractor_ink` uses the final tone remap for black-on-white line
+# art; this one uses the same stage (ADR-0028) with both poles moved off
+# neutral - deep indigo ink on a pale sea-green page - which is a visual
+# register nothing else in the library occupies.
 #
-# The dissipation coefficient stays at its canonical value; the bands drive the
-# look: bass swells the points, mid lengthens the trails, treble drifts the hue,
-# and each beat re-blooms the cloud.
+# Two consequences of the remap worth knowing before tuning this file:
+#   - it keys on LUMINANCE only, so the [palette] below does not set the colour
+#     you see; it sets which parts of the frame are bright, and therefore which
+#     parts become ink. Saturation is held low so that ramp stays honest.
+#   - `ink_amount` rests at a pole, never between. A partial amount blends
+#     toward the near-black source and greys the page. An earlier draft here
+#     dipped the amount on a hard onset to "punch through" to the glowing
+#     source; at onset 0.8 that landed on 0.25 and turned the page a dirty
+#     grey - the exact trap this comment warns about. It rests at 1.
 #
-# Variables available to expressions: bass mid treb onset beat bar time.
+# The blot trap governs everything else: `fade` sets how many frames pile up
+# (~1/(1-fade)), so it stays low and falls further under bass.
 system = "attractor"
 name = "Thomas"
 
 [particles]
 family = "thomas"
 
+[palette]
+name = "mono"
+
 [params]
-size   = "1.0 + clamp(bass * 3, 0, 1) * 0.6 + beat * 0.4"
-hue    = "0.15 + time * 0.03 + clamp(treb * 2, 0, 1) * 0.22 + clamp(bass * 2, 0, 1) * 0.10"
-fade   = "0.92 + clamp(mid * 2, 0, 1) * 0.05"
-reseed = "beat"
+# SHAPE - Thomas uses `a` alone (canonical 0.19). Small numbers matter here: the
+# lattice opens out below ~0.17 and knots up above ~0.21.
+a = "0.190 + sin(time * 0.0233) * 0.014 - clamp(bass * 0.10, 0, 0.020)"
+
+# DENSITY - the duotone needs MORE source density than the black-on-white
+# drawing does. The remap keys on luminance, so a too-faint source never reaches
+# the ink pole at all and the whole frame collapses onto the paper colour - the
+# failure mode this preset hit first. Denser than `attractor_ink`, still well
+# under the blot ceiling.
+fade   = "0.912 - clamp(bass * 0.14, 0, 0.045) - beat * 0.015"
+size   = "0.78 - clamp((bass + mid) * 0.14, 0, 0.16) + beat * 0.08"
+reseed = "onset > 0.50"
+
+# COLOUR - near-neutral by design; the remap discards hue and a desaturated
+# source keeps the luminance ramp (and so the ink density) even.
+saturation = "0.30 + clamp(treb * 0.6, 0, 0.15)"
+hue_spread = "0.08"
+hue_center = "0.50"
+
+# VIEW - a slow turn so the lattice reads in depth; the page stays still.
+zoom  = "1.14 + bar * 0.08 + clamp(bass * 0.35, 0, 0.16)"
+pan_x = "sin(time * 0.027) * 0.05"
+pan_y = "cos(time * 0.021) * 0.04"
+
+# THE DUOTONE - pale sea-green page, deep indigo ink. `ink_amount` rests at the
+# pole and dips only on a hard transient, flashing the glowing source through.
+ink_amount   = "1"
+paper_hue    = "0.44"
+paper_sat    = "0.10"
+paper_bright = "0.99"
+ink_hue      = "0.66"
+ink_sat      = "0.92"
+ink_bright   = "0.13"
+
+[smoothing]
+a          = 1.0
+fade       = 0.22
+size       = 0.14
+zoom       = 0.18
+saturation = 0.30

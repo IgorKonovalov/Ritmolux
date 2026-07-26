@@ -1,27 +1,68 @@
-# Rose Overflow - the "out of bounds" blowout. A dense web whose `scale` is
-# pumped far past the frame by bass, so on loud hits the rose overflows the
-# screen and leaves the bright central void from the reference still. Petal count
-# also steps with bass, so the whole lattice re-forms as it blows up.
+# Rose Overflow - the deliberate blowout: a dense web whose `scale` is pumped
+# far past the frame on the low end, so a loud hit sends the rose off every edge
+# and leaves the bright central void the Maurer reference figures are known for.
+# The renderer clips, which is the intended effect, not an accident.
+#
+# `radial_offset` (Plan 0028) is what makes this version work where the original
+# only had `scale`: pushing the radius off-origin opens the figure into an
+# annulus, so the "void" is a real structural hole in the curve rather than just
+# the middle of a figure that got too big. The two levers pump together.
+#
+# SEGMENT BUDGET: 3200 chords with NO geometry mirror. This is the one preset in
+# the set that spends its whole budget on chord count, which is why the mirror
+# is off - 3200 x 2 folds would still fit, but the overflow reads better as one
+# continuous web than as a replicated one.
 system = "parametric_curve"
 name   = "Rose Overflow"
 
 [curve]
 family = "maurer_rose"
 
+# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
+# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
+# softens line art (it reads as "upsized from something smaller"). The geometry
+# mirror below costs nothing in resolution because it replicates real geometry
+# before rasterisation - so on the line scenes, prefer `mirror_*` over the
+# screen-space fold whenever both would do.
+
 [params]
-n             = "floor(2 + clamp(bass * 20, 0, 6))"
+# SHAPE - the petal count steps with the low end, so the lattice re-forms as it
+# blows up. Eased below so it morphs through the intermediate webs.
+n             = "floor(2 + clamp(bass * 7, 0, 3.72))"
 d             = "97"
 samples       = "3200"
-# Rests near the frame (~1.5), blows way past it on bass (~4.5) -> central void.
-scale         = "1.5 + clamp(bass * 3.5, 0, 3.0)"
-spin          = "0.03"
-hue           = "0.6 + clamp(mid * 0.15, 0, 0.15)"
-# Very thin strokes so thousands of chords read as a fine web, not a blob.
-thickness     = "0.7 + clamp(treb * 0.8, 0, 0.8)"
-brightness    = "0.7 + clamp(bass * 0.6, 0, 0.5)"
+phase         = "sin(time * 0.0175) * 0.30"
+
+# THE BLOWOUT - the two levers that pump together.
+radial_offset = "0.10 + clamp(bass * 1.4, 0, 0.53) + beat * 0.074"
+scale         = "1.35 + clamp(bass * 2.2, 0, 1.49)"
+
+spin          = "0.06 + sin(time * 0.011) * 0.02"
 draw_progress = "1"
 
-# Ease the blowout so it surges out and eases back like a real pump.
+# STROKE - very thin. Thousands of chords at any real weight is a solid blob.
+thickness  = "0.62 + clamp(treb * 0.7, 0, 0.37)"
+brightness = "0.52 + clamp(bass * 0.26, 0, 0.13)"
+hue        = "0.60 + time * 0.017 + clamp(mid * 0.5, 0, 0.18)"
+
+mirror_order   = "1"
+mirror_reflect = "0"
+
+# VIEW + COMPOSITE - the camera pulls back slightly as the figure blows up, so
+# some structure survives at peak instead of everything leaving frame at once.
+zoom        = "1.00 - clamp(bass * 0.35, 0, 0.18) + bar * 0.05"
+pan_x       = "sin(time * 0.017) * 0.05"
+bg_hue      = "0.28 + sin(time * 0.009) * 0.05"
+bg_bright   = "0.016 + clamp(mid * 0.09, 0, 0.012)"
+bg_vignette = "0.84"
+
 [smoothing]
-scale = 0.14
-n     = 0.3
+# The blowout surges out and eases back like a real pump.
+scale         = 0.36
+radial_offset = 0.42
+n             = 0.91
+phase         = 1.17
+thickness     = 0.39
+hue           = 1.04
+zoom          = 0.36
+bg_bright     = 1.04

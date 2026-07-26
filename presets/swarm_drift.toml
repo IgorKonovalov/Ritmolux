@@ -1,24 +1,65 @@
-# Drift - ambient and weightless: a nearly FROZEN field with LARGE, bright, soft
-# particles and almost no burst, so the swarm stays gathered and readable instead of
-# blown to the edges. Bass gives a slow breathing motion. The quiet, spacious end -
-# and the densest-reading swarm, since big low-burst particles fill the frame.
+# Drift - ambient and weightless: a nearly frozen field with large, soft, sparse
+# particles, so the swarm hangs as a slow nebula instead of streaming anywhere.
+# The quietest, most spacious preset in the set, and the one that best rewards a
+# long ambient passage - it evolves almost entirely on `time`, so it keeps
+# changing when the audio gives it nothing.
 #
-# Colour (Plan 0020): the shared "aurora" palette with a narrowed hue_spread anchored
-# in the teal->violet high end, so the soft cloud holds one weightless teal-violet
-# family instead of full-wheel confetti (the old `hue` was a no-op). hue_center
-# drifts slowly for a living, aurora-like shift.
+# See `swarm_flow.toml` for the force-ceiling note that governs the whole family.
+# This preset sits at the very bottom of that range: even a loud frame barely
+# moves the steering, because the point of it is that nothing is in a hurry.
 system = "swarm"
 name = "Drift"
 
 [palette]
 name = "aurora"
 
+[palette_b]
+stops = [
+  { at = 0.00, color = "#0a0320" },
+  { at = 0.35, color = "#4a1d7a" },
+  { at = 0.65, color = "#c2439b" },
+  { at = 1.00, color = "#ffd9a3" },
+]
+
 [params]
-force      = "0.8 + sin(time * 0.06) * 0.15 + clamp(bass * 8, 0, 1.2)"
-spin       = "0.09 + clamp(mid * 2, 0, 0.22)"
-burst      = "beat * 0.8"
-brightness = "0.8 + clamp(bass * 5, 0, 0.8)"
-size       = "3.2 + beat * 0.6"
-hue_spread = "0.45"
-hue_center = "0.7 + sin(time * 0.03) * 0.08"
-saturation = "0.95"
+# MOTION - three incommensurate sines so the cloud never settles into a loop,
+# with only a whisper of band input on top.
+force = "1.00 + sin(time * 0.037) * 0.16 + cos(time * 0.023) * 0.10 + clamp(bass * 0.8, 0, 0.30)"
+spin  = "0.07 + sin(time * 0.019) * 0.03 + clamp(mid * 0.7, 0, 0.15)"
+burst = "clamp(beat * 0.5 + onset * 0.4, 0, 0.9)"
+
+# APPEARANCE - big soft particles are what make this read as a nebula rather
+# than a starfield. Brightness is nearly flat; size does the breathing.
+brightness = "0.76 + clamp(bass * 0.7, 0, 0.20)"
+size       = "2.6 + sin(time * 0.031) * 0.4 + clamp(bass * 1.2, 0, 0.7) + beat * 0.3"
+
+# COLOUR - the slowest hue journey in the set: a full slow wander through the
+# aurora band, crossfading into a violet-to-amber gradient over minutes.
+hue_spread  = "0.34 + sin(time * 0.017) * 0.10 + clamp(treb * 0.9, 0, 0.16)"
+hue_center  = "0.62 + sin(time * 0.0130) * 0.16 + clamp(mid * 0.6, 0, 0.10)"
+saturation  = "0.94 + clamp(treb * 1.1, 0, 0.22)"
+palette_mix = "0.5 + sin(time * 0.0091) * 0.45"
+
+# VIEW - a very slow parallax wander around the frame.
+zoom  = "1.05 + sin(time * 0.021) * 0.06 + bar * 0.04 + clamp(bass * 0.3, 0, 0.12)"
+pan_x = "sin(time * 0.0170) * 0.16"
+pan_y = "cos(time * 0.0113) * 0.11"
+
+# COMPOSITE - a long, soft exposure over a deep violet field. The nebula is
+# mostly made of its own afterimage.
+trails      = "0.40 + clamp(mid * 0.22, 0, 0.10)"
+bg_hue      = "0.17 + sin(time * 0.0083) * 0.06"
+bg_bright   = "0.012 + clamp(mid * 0.08, 0, 0.010)"
+bg_vignette = "0.68"
+
+[smoothing]
+force       = 0.8
+spin        = 0.8
+brightness  = 0.5
+size        = 0.45
+trails      = 0.7
+zoom        = 0.5
+hue_center  = 0.9
+hue_spread  = 0.9
+palette_mix = 1.2
+bg_bright   = 0.6

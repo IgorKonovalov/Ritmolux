@@ -1,37 +1,73 @@
-# Coral Head - a Gray-Scott reaction-diffusion field in a high-fill regime: fat,
-# rounded lobes with interior holes, like the massive folded surface of a brain-coral
-# head.
+# Coral Head - the SOLITON regime: fat rounded lobes with interior holes,
+# drifting like the massive folded surface of a brain-coral head. The lowest
+# feed rate of the four RD presets, which is what gives it big soft masses where
+# Coral gets dividing spots and Coral Bloom gets thin reaching fronds.
 #
-# Colour (Plan 0020): a custom warm gradient - deep green-teal crevice -> orange lobe
-# -> pale-gold crown - so the massive lobes read warm over green-cyan valleys (the
-# field level is the gradient coordinate: crevice low, lobe crown high). Versus Coral's
-# cool teal thin maze; the old preset described this and had gone cyan under spectrum.
-#
-#   - bass swells the fill via feed, mid trims it via kill, both staying inside the
-#     filled band so the lobes stay massive rather than dissolving to spots;
-#   - treble gently coarsens via flow; each beat stamps fresh growth.
-# Broad iso-contours (4) and a loose hatch keep the lobes soft and filled.
-#
-# Variables available to expressions: bass mid treb onset beat bar time.
+# See `reaction_coral.toml` for the reactivity note that governs this family.
+# This one is the slowest and most massive of the four, so it leans hardest on
+# the view transform for its motion - the field itself barely hurries, and a
+# camera that travels across it is what keeps the preset alive through a long
+# passage.
 system = "reaction_diffusion"
 name = "Coral Head"
 
 [palette]
 stops = [
-  { at = 0.0,  color = "#0a1a14" },
+  { at = 0.00, color = "#0a1a14" },
   { at = 0.18, color = "#14524a" },
-  { at = 0.4,  color = "#d6591a" },
-  { at = 0.7,  color = "#ff9836" },
-  { at = 1.0,  color = "#ffe6b0" },
+  { at = 0.40, color = "#d6591a" },
+  { at = 0.70, color = "#ff9836" },
+  { at = 1.00, color = "#ffe6b0" },
 ]
 
+[palette_b]
+name = "aurora"
+
 [params]
-feed         = "0.022 + clamp(bass * 4, 0, 1) * 0.006"
-kill         = "0.051 + clamp(mid * 4, 0, 1) * 0.002"
-flow         = "1.0 + clamp(treb * 4, 0, 1) * 0.25"
-inject       = "beat"
-contour      = "4"
-hatch        = "6"
-glow         = "0.9 + clamp((bass + mid) * 3, 0, 1) * 0.5"
-color_span   = "2.0"
-color_center = "sin(time * 0.02) * 0.02"
+# CHEMISTRY - solitons. The lowest feed in the family; the lobes stay massive
+# rather than dissolving into spots.
+feed   = "0.0222 + sin(time * 0.033) * 0.0026 + clamp(bass * 1.6, 0, 1) * 0.0055"
+kill   = "0.0512 + cos(time * 0.024) * 0.0010 + clamp(mid * 1.6, 0, 1) * 0.0028"
+flow   = "1.00 + clamp(treb * 1.0, 0, 1) * 0.22"
+inject = "beat"
+
+# THE FAST LEVERS - broad contours and a loose hatch keep the lobes soft.
+contour = "4.0 + clamp(treb * 4.0, 0, 3.2) + beat * 1.4"
+hatch   = "6.0 + clamp(mid * 2.5, 0, 2.2)"
+glow    = "0.85 + clamp((bass + mid) * 0.45, 0, 0.25)"
+
+# VIEW - PINNED NEAR NATIVE, and this is a hard constraint, not a taste call.
+# The Gray-Scott field is a fixed 256x256 grid, already upscaled ~7x at 1080p.
+# `zoom` is INVERTED here (higher shows more of the field) and it is unusable in
+# BOTH directions: above 1.0 it samples outside the simulated field and renders
+# vertical bars and rectangular blocks; below 1.0 it magnifies the 256px grid
+# until the pattern reads as angular pixel blobs instead of organic growth. Any
+# real pan at zoom 1.0 walks off the field for the same reason. So this family
+# sits at ~0.99 with a whisper of drift, and takes its motion from the chemistry,
+# the contour/hatch rendering and the colour instead.
+zoom  = "0.99"
+pan_x = "sin(time * 0.0130) * 0.008"
+pan_y = "cos(time * 0.0091) * 0.006"
+
+# COLOUR - warm lobes over green-teal valleys, drifting toward aurora greens.
+color_span   = "2.00 + clamp(mid * 0.7, 0, 0.35)"
+color_center = "sin(time * 0.0170) * 0.06"
+saturation   = "1.05 + clamp(treb * 0.7, 0, 0.20)"
+palette_mix  = "0.30 + sin(time * 0.0063) * 0.28"
+
+# COMPOSITE - a long feedback so the drifting mass smears, plus the backdrop
+# showing through the interior holes.
+trails      = "0.50 + clamp(mid * 0.25, 0, 0.12)"
+bg_hue      = "0.56 + sin(time * 0.0083) * 0.05"
+bg_bright   = "0.024 + clamp(mid * 0.11, 0, 0.015)"
+bg_vignette = "0.70"
+
+[smoothing]
+contour     = 0.18
+hatch       = 0.28
+glow        = 0.32
+zoom        = 0.25
+color_span  = 0.45
+palette_mix = 1.2
+trails      = 0.50
+bg_bright   = 0.45

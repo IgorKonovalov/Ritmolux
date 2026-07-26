@@ -1,19 +1,72 @@
-# Rose Draw - a 7-petal rose (n=7/d=131) that redraws itself across each beat
-# (draw_progress rides the beat phase) and swells on the beat. Motion lives in
-# the reveal as much as the spin.
+# Rose Draw - the line-draw-on: `draw_progress` rides the beat phase, so the
+# figure redraws itself from nothing across every beat instead of simply sitting
+# there and pulsing. The motion is in the REVEAL, which is a different kind of
+# rhythm reading from anything else in the set.
+#
+# `bar` ramps 0 -> 1 between beats, so `draw_progress = bar` is a complete
+# redraw per beat. The version here keeps a floor (it never fully erases) and
+# multiplies the ramp, so most of the figure is always present and the leading
+# edge sweeps round it - a chasing light rather than a blink.
+#
+# SEGMENT BUDGET: 1200 x 7 = 8400 (no reflection on this one; the sweep reads
+# more clearly on a purely rotational fold).
 system = "parametric_curve"
 name   = "Rose Draw"
 
 [curve]
 family = "maurer_rose"
 
+# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
+# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
+# softens line art (it reads as "upsized from something smaller"). The geometry
+# mirror below costs nothing in resolution because it replicates real geometry
+# before rasterisation - so on the line scenes, prefer `mirror_*` over the
+# screen-space fold whenever both would do.
+
 [params]
+# SHAPE - a seven-petal curve, morphing slowly under the sweep.
 n             = "7"
 d             = "131"
 samples       = "420"
-scale         = "0.8 + beat * 0.25 + bass * 0.2"
-spin          = "0.22 + mid * 0.3"
-hue           = "0.35 + time * 0.02 + treb * 0.3"
-thickness     = "1.6 + bass * 2"
-brightness    = "0.9 + clamp(bass * 0.5, 0, 0.5)"
-draw_progress = "clamp(0.4 + bar * 0.8, 0, 1)"
+phase         = "sin(time * 0.0215) * 0.26 + clamp(bass * 0.4, 0, 0.11)"
+radial_offset = "sin(time * 0.0123) * 0.11"
+
+# THE REVEAL - the point of the preset. A floor of 0.35 keeps the figure
+# present; the bar ramp sweeps the leading edge round it once per beat, and a
+# hard onset briefly completes it.
+draw_progress = "clamp(0.35 + bar * 0.80 + clamp(onset * 0.8, 0, 0.25), 0, 1)"
+
+# MOTION - a slow turn under the sweep, so the two rates beat against each other.
+spin  = "0.24 + sin(time * 0.019) * 0.03"
+scale = "0.70 + beat * 0.043 + clamp(bass * 0.4, 0, 0.11)"
+
+# STROKE - flat brightness; the reveal supplies the dynamics.
+thickness  = "0.72 + clamp(bass * 0.48, 0, 0.25) + beat * 0.074"
+brightness = "0.46 + clamp(bass * 0.20, 0, 0.10)"
+
+# COLOUR - a slow green-to-cyan journey, swept by treble.
+hue = "0.35 + time * 0.023 + clamp(treb * 0.8, 0, 0.26) + bar * 0.05"
+
+# GEOMETRY MIRROR - seven-fold to match the petal count, purely rotational.
+mirror_order   = "7"
+mirror_reflect = "0"
+
+# VIEW + COMPOSITE - a long feedback, which is what makes the sweep legible:
+# the drawn part persists as the leading edge moves on.
+zoom        = "1.06 + bar * 0.06 + clamp(bass * 0.35, 0, 0.14)"
+pan_x       = "sin(time * 0.021) * 0.045"
+pan_y       = "cos(time * 0.029) * 0.035"
+bg_hue      = "0.44 + sin(time * 0.011) * 0.05"
+bg_bright   = "0.018 + clamp(mid * 0.09, 0, 0.012)"
+bg_vignette = "0.82"
+
+[smoothing]
+# `draw_progress` is NOT smoothed - easing it would blur the leading edge into
+# the body and lose the sweep entirely.
+phase         = 1.04
+radial_offset = 1.17
+scale         = 0.36
+thickness     = 0.31
+hue           = 1.04
+zoom          = 0.47
+bg_bright     = 1.04

@@ -1,25 +1,60 @@
-# Ember - warm fiery layers that PUNCH gold on the beat. The field normally sweeps
-# near-black coals -> deep red -> orange, topping out at pale orange (gold hidden);
-# on each beat, color_center slides the palette window up so bright gold flares in,
-# then a short smoothing tau lets the flare swell and fall back instead of strobing.
-# color_span keeps distinct fiery layers across the field; a slow sin breathes it;
-# big slow blobs, low warp so it smoulders between hits.
+# Ember - molten rock seen close up: slow, heavy, layered convection cells that
+# crack open gold on the beat and cool back to near-black coals between hits.
 #
-# Variables available to expressions: bass mid treb onset beat bar time.
+# The old version ran `zoom = 0.62`, which on this scene (where zoom is
+# INVERTED - lower shows LESS of the field) meant almost no cells were visible
+# at all and the preset rendered as a soft two-colour gradient. The zoom here is
+# roughly three times that, which is what turns it back into layered rock.
+#
+# The beat mechanism is the one worth reading: `color_center` slides the palette
+# window UP on a hit, so bright gold flares into a field that is normally
+# sitting in the coals, and a short smoothing constant lets that flare swell and
+# fall rather than strobe. It is a colour accent, not a brightness accent - see
+# the glow ceiling note in `fragment_warp.toml`.
 system = "fragment_field"
 name = "Ember"
 
 [palette]
 name = "ember"
 
+[palette_b]
+stops = [
+  { at = 0.00, color = "#0d0000" },
+  { at = 0.26, color = "#5c0a00" },
+  { at = 0.52, color = "#c93a06" },
+  { at = 0.74, color = "#ff9b1f" },
+  { at = 0.90, color = "#ffe27a" },
+  { at = 1.00, color = "#fffbe8" },
+]
+
 [params]
-warp         = "0.22 + clamp(bass * 6, 0, 0.5)"
-zoom         = "0.62 + clamp(mid * 2, 0, 0.15)"
-glow         = "0.55 + clamp((mid + bass) * 6, 0, 0.85)"
-flash        = "clamp(onset * 3, 0, 0.9)"
-color_center = "0.03 + sin(time * 0.05) * 0.03 + beat * 0.20"
-color_span   = "0.82 + clamp(mid * 2, 0, 0.10)"
-saturation   = "1.05 + clamp(onset * 2, 0, 0.3)"
+# STRUCTURE - big slow cells. Low warp keeps them smouldering and coherent;
+# the zoom is what supplies the layering.
+warp  = "0.34 + sin(time * 0.0330) * 0.09 + clamp(bass * 1.1, 0, 0.45) + beat * 0.14"
+zoom  = "2.70 + sin(time * 0.0190) * 0.22 + clamp(bass * 1.2, 0, 0.50)"
+pan_x = "sin(time * 0.0117) * 0.20 + time * 0.005"
+pan_y = "cos(time * 0.0163) * 0.16"
+
+# LUMINANCE - low and flat. Coals are dark; the gold comes from the palette.
+glow  = "0.60 + clamp((mid + bass) * 0.45, 0, 0.18)"
+flash = "clamp(onset * 0.8, 0, 0.24)"
+
+# COLOUR - the beat slides the window up into the gold. This is the accent.
+color_center = "0.02 + sin(time * 0.0410) * 0.04 + beat * 0.26 + clamp(onset * 0.9, 0, 0.12)"
+color_span   = "0.80 + clamp(mid * 0.6, 0, 0.16)"
+saturation   = "1.08 + clamp(onset * 0.9, 0, 0.26)"
+palette_mix  = "clamp(bass * 1.2, 0, 0.50)"
+
+# COMPOSITE - a long feedback so the molten flow smears like slow lava.
+trails = "0.58 + clamp(mid * 0.30, 0, 0.14)"
 
 [smoothing]
-color_center = 0.20
+# The gold flare swells and falls; everything structural drifts.
+color_center = 0.22
+warp         = 0.30
+zoom         = 0.35
+glow         = 0.35
+color_span   = 0.40
+palette_mix  = 0.70
+trails       = 0.45
+saturation   = 0.25

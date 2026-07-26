@@ -1,21 +1,76 @@
-# Clifford - a second 2D strange attractor on the GPU compute-particle scene
-# (ADR-0015, Plan 0016). Same engine as De Jong, a different map: the Clifford
-# recurrence traces broad ribbony loops that read quite unlike De Jong's mesh.
-# The family is selected data-driven via the [particles] table - no engine edit.
+# Clifford - the broad ribbony sibling of De Jong, rebuilt as a light-painting.
+# Where De Jong slams into kaleidoscope symmetry at peak, this one runs the
+# ENGINE-WIDE FEEDBACK TRAILS stage: the composited frame is fed back with a
+# decay, so the slowly-turning ribbons smear into long luminous strokes and the
+# whole frame reads as a long exposure rather than a point cloud.
 #
-# The coefficients stay at the family default (a canonical Clifford); the bands
-# drive the look: bass swells the points and the beat glow, mid lengthens the
-# trails, treble drifts the hue, and each beat re-scatters the cloud.
+# Same inversion rule as the rest of the family - PEAK BUYS STRUCTURE. `fade`
+# and `size` fall as the track hits, and it is `trails` that rises instead, so a
+# drop stretches the exposure rather than blowing the accumulation to white.
 #
-# Variables available to expressions: bass mid treb onset beat bar time.
+# Shape: the Clifford coefficients drift on four slow incommensurate sines with
+# a small clamped band term - a chaotic map cuts rather than morphs if you shove
+# it, so every term here is deliberately tiny.
+# Colour: a crimson -> ember -> white-hot custom gradient crossfading toward the
+# built-in `mono` on sustained mids, so busy sections desaturate into smoke.
 system = "attractor"
 name = "Clifford"
 
 [particles]
 family = "clifford"
 
+[palette]
+stops = [
+  { at = 0.00, color = "#12000a" },
+  { at = 0.30, color = "#7a0b2e" },
+  { at = 0.60, color = "#e03a12" },
+  { at = 0.85, color = "#ffab33" },
+  { at = 1.00, color = "#fff4d6" },
+]
+
+[palette_b]
+name = "mono"
+
 [params]
-size   = "1.0 + clamp(bass * 3, 0, 1) * 0.7 + beat * 0.4"
-hue    = "0.35 + time * 0.04 + clamp(treb * 2, 0, 1) * 0.18"
-fade   = "0.90 + clamp(mid * 2, 0, 1) * 0.06"
-reseed = "beat"
+# SHAPE - canonical Clifford (-1.4, 1.6, 1.0, 0.7) plus small slow drift.
+a = "-1.40 + sin(time * 0.0331) * 0.085 - clamp(bass * 0.30, 0, 0.070)"
+b = "1.60 + cos(time * 0.0257) * 0.080 + clamp(mid * 0.28, 0, 0.060)"
+c = "1.00 + sin(time * 0.0194) * 0.095 + clamp(treb * 0.25, 0, 0.050)"
+d = "0.70 + cos(time * 0.0151) * 0.090 - clamp(bass * 0.20, 0, 0.045)"
+
+# DENSITY - low base, falling further at peak. The exposure comes from `trails`
+# below, not from letting the accumulation grid saturate.
+fade   = "0.885 - clamp(bass * 0.18, 0, 0.060) - beat * 0.020"
+size   = "0.62 - clamp((bass + treb) * 0.16, 0, 0.18) + beat * 0.10"
+reseed = "onset > 0.55"
+
+# COLOUR - a hot but narrow window; treble slides the centre toward white-hot.
+hue_spread  = "0.16 + clamp(treb * 1.0, 0, 0.22)"
+hue_center  = "0.42 + sin(time * 0.037) * 0.10 + clamp(bass * 1.2, 0, 0.28)"
+saturation  = "1.10 + clamp(bass * 1.2, 0, 0.30)"
+palette_mix = "clamp(mid * 1.4, 0, 0.40)"
+
+# VIEW - a slow counter-rotating drift so the smear never runs in one direction.
+zoom  = "1.10 + bar * 0.12 + clamp(bass * 0.45, 0, 0.20)"
+pan_x = "cos(time * 0.043) * 0.09"
+pan_y = "sin(time * 0.061) * 0.07"
+
+# COMPOSITE - the long exposure, over a warm vignetted backdrop. `trails` is the
+# one thing here that RISES with energy: loud stretches the stroke.
+trails      = "0.62 + clamp((bass + mid) * 0.35, 0, 0.28)"
+bg_hue      = "0.02 + sin(time * 0.013) * 0.04"
+bg_bright   = "0.07 + clamp(mid * 0.5, 0, 0.06)"
+bg_vignette = "0.85"
+
+[smoothing]
+a           = 0.7
+b           = 0.7
+c           = 0.7
+d           = 0.7
+fade        = 0.20
+size        = 0.12
+trails      = 0.45
+zoom        = 0.16
+hue_center  = 0.40
+palette_mix = 0.6
+bg_bright   = 0.4

@@ -1,19 +1,63 @@
-# Smooth Pulse - a fragment field whose beat-driven flash and glow EASE rather
-# than snap, and whose bass warp is low-passed so the fold breathes instead of
-# jittering (Plan 0018 Phase 5 / ADR-0019). The [smoothing] table gives each
-# param its own time constant in seconds: a punchy-but-soft flash, a slower glow
-# swell, and a gentle warp drift.
+# Smooth Pulse - the worked example of the `[smoothing]` table (ADR-0019): the
+# SAME beat-and-band drivers as a hard-edged preset, but every one of them
+# low-passed with its own time constant, so the field breathes and swells where
+# an unsmoothed version would jitter and strobe.
+#
+# Read the `[smoothing]` block at the bottom as the actual content of this
+# preset. The constants are in SECONDS and they are chosen per param by how that
+# param should feel, which is the whole idea:
+#
+#   flash 0.30  - a punch that still has a soft edge and a visible decay
+#   warp  0.22  - the fold swells into a hit rather than snapping to it
+#   glow  0.40  - a slow luminance swell trailing behind the beat
+#   zoom  0.55  - a long push-in that lags the music, so it reads as drift
+#   colour 0.7+ - hue motion that is always gradual, never a cut
+#
+# Because the smoothing runs on real elapsed time it is identical at any refresh
+# rate, and it resets on a preset switch - so the first frame after a dissolve
+# snaps to this preset's own values rather than easing out of the last one's.
 system = "fragment_field"
-name   = "Smooth Pulse"
+name = "Smooth Pulse"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#06021a" },
+  { at = 0.28, color = "#26186e" },
+  { at = 0.54, color = "#3f7fc4" },
+  { at = 0.76, color = "#63dbc0" },
+  { at = 1.00, color = "#fff5d8" },
+]
+
+[palette_b]
+name = "aurora"
 
 [params]
-warp  = "0.4 + bass * 0.6"
-hue   = "0.55 + time * 0.02 + treb * 0.2"
-zoom  = "0.9"
-glow  = "0.6 + beat * 0.6"
-flash = "beat"
+# Every driver here is deliberately BLUNT - a bare beat, a raw band. All the
+# finesse lives in the smoothing table, not in the arithmetic.
+warp  = "0.55 + bass * 0.85 + beat * 0.35"
+zoom  = "2.25 + bass * 0.80 + bar * 0.18"
+pan_x = "sin(time * 0.027) * 0.20"
+pan_y = "cos(time * 0.019) * 0.15"
+
+glow  = "0.68 + beat * 0.22 + mid * 0.30"
+flash = "beat * 0.32 + clamp(onset * 0.7, 0, 0.18)"
+
+hue          = "0.55 + time * 0.023 + treb * 0.30"
+color_span   = "0.66 + treb * 0.45"
+color_center = "sin(time * 0.037) * 0.12 + beat * 0.10"
+saturation   = "1.05 + mid * 0.40"
+palette_mix  = "clamp(treb * 1.5, 0, 0.55)"
+
+trails = "0.44 + bass * 0.35"
 
 [smoothing]
-warp  = 0.18
-glow  = 0.28
-flash = 0.35
+flash        = 0.30
+warp         = 0.22
+glow         = 0.40
+zoom         = 0.55
+trails       = 0.50
+hue          = 0.70
+color_span   = 0.65
+color_center = 0.70
+saturation   = 0.45
+palette_mix  = 0.90

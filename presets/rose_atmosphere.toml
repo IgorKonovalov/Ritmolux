@@ -1,25 +1,69 @@
-# Rose Atmosphere - a slow, cool rose floating over a tinted gradient backdrop:
-# the Phase 3 demo of the engine background pass (ADR-0018). The sparse strokes
-# let the vignetted blue-violet gradient show through behind them, and the bass
-# lifts the backdrop brightness so the whole frame breathes on the low end.
+# Rose Atmosphere - the background pass as the subject: a slow, cool rose
+# floating in a tinted, vignetted deep that breathes with the low end. The
+# sparse strokes are deliberately thin so the gradient reads THROUGH the figure
+# rather than being hidden by it.
+#
+# THE BACKDROP IS STRONGER THAN IT LOOKS in a parameter list. The old version
+# ran `bg_bright = 0.22 + clamp(bass * 0.5, 0, 0.28)`, which at a loud frame is
+# 0.5 - a wash that swallowed the rose entirely. Anything above ~0.05 dominates
+# a sparse line scene, and it compounds with `trails`, because the feedback
+# re-adds the backdrop every frame. The values here are ~0.03 and they are still
+# clearly visible.
+#
+# `bg_hue` indexes the shared COSINE palette, not a `[palette]` table (the line
+# scenes ignore palettes entirely): ~0.25 is deep indigo, ~0.0 is warm red,
+# ~0.6 is green.
 system = "parametric_curve"
 name   = "Rose Atmosphere"
 
 [curve]
 family = "maurer_rose"
 
+# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
+# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
+# softens line art (it reads as "upsized from something smaller"). The geometry
+# mirror below costs nothing in resolution because it replicates real geometry
+# before rasterisation - so on the line scenes, prefer `mirror_*` over the
+# screen-space fold whenever both would do.
+
 [params]
+# SHAPE - an open four-petal curve; the radial offset opens it into a rosette
+# so there is more negative space for the atmosphere to occupy.
 n             = "4"
 d             = "133"
-samples       = "361"
-scale         = "0.78"
-spin          = "0.08 + mid * 0.2"
-hue           = "0.62 + treb * 0.2"
-thickness     = "1.4 + bass * 1.6"
-brightness    = "0.9 + clamp(bass * 0.5, 0, 0.5)"
+samples       = "460"
+phase         = "sin(time * 0.0137) * 0.28"
+radial_offset = "0.15 + sin(time * 0.0084) * 0.16 + clamp(bass * 0.35, 0, 0.074)"
+
+spin          = "0.10 + sin(time * 0.017) * 0.02"
+scale         = "0.70 + bar * 0.04 + clamp(bass * 0.32, 0, 0.093)"
 draw_progress = "1"
-# Engine background pass (ADR-0018): a vignetted blue-violet gradient that lifts
-# with the bass and drifts its hue slowly.
-bg_hue        = "0.66 + time * 0.01"
-bg_bright     = "0.22 + clamp(bass * 0.5, 0, 0.28)"
-bg_vignette   = "0.65"
+
+thickness  = "0.85 + clamp(bass * 0.7, 0, 0.37)"
+brightness = "0.58 + clamp(bass * 0.28, 0, 0.13)"
+hue        = "0.62 + time * 0.015 + clamp(treb * 0.6, 0, 0.20)"
+
+mirror_order   = "4"
+mirror_reflect = "0"
+
+# THE ATMOSPHERE - the subject. A deep indigo-to-violet field, drifting its hue
+# on a very slow cycle and lifting gently with the low end.
+bg_hue      = "0.23 + sin(time * 0.0077) * 0.07 + clamp(bass * 0.20, 0, 0.04)"
+bg_bright   = "0.03 + clamp(bass * 0.14, 0, 0.022)"
+bg_vignette = "0.62"
+
+# VIEW + COMPOSITE - slow drift, and a long feedback that reads as haze depth.
+zoom   = "1.03 + bar * 0.04 + clamp(bass * 0.25, 0, 0.10)"
+pan_x  = "sin(time * 0.011) * 0.07"
+pan_y  = "cos(time * 0.0083) * 0.05"
+trails = "0.56 + clamp(mid * 0.25, 0, 0.12)"
+
+[smoothing]
+bg_bright     = 1.43
+bg_hue        = 2.08
+phase         = 1.17
+radial_offset = 1.3
+scale         = 0.52
+thickness     = 0.42
+hue           = 1.17
+zoom          = 0.57

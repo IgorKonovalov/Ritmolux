@@ -1,7 +1,14 @@
-# Rose Trails - a briskly spinning Maurer rose routed through the engine feedback
-# trails (Plan 0018 Phase 6 / ADR-0018): each rotated position leaves a fading
-# light trail via the max-decay accumulation, so the flower smears into a glowing
-# spiral. The bass lengthens the trail. Reuses Plan 0014's PingPongField.
+# Rose Trails - light-painting: a briskly spinning rose routed through the
+# engine feedback stage, so each rotated position leaves a fading trace and the
+# flower smears into a continuous glowing spiral. The figure you see is almost
+# entirely AFTERIMAGE - only a thin leading edge is the current frame.
+#
+# The old version ran `trails = 0.82 + bass` at `brightness = 1.0`, which
+# saturated the feedback buffer to a solid white ball within a second (its
+# measured frame coverage was 0.026 - a dot). The two numbers are coupled: a
+# max-decay feedback at 0.85 holds roughly seven times the energy of a single
+# frame, so the source has to be DIM for the accumulation to land at a sensible
+# exposure. Brightness here is 0.42 and the trail sits near 0.80.
 system = "parametric_curve"
 name   = "Rose Trails"
 
@@ -9,13 +16,47 @@ name   = "Rose Trails"
 family = "maurer_rose"
 
 [params]
+# SHAPE - deliberately simple. The spiral is made by the motion, not the curve,
+# and a busy figure smears into mush.
 n             = "3"
 d             = "80"
-samples       = "200"
-scale         = "0.6"
-spin          = "0.9 + mid * 0.4"
-hue           = "0.48 + time * 0.03 + treb * 0.2"
-thickness     = "1.6 + bass * 1.6"
-brightness    = "1.0"
+samples       = "260"
+phase         = "sin(time * 0.028) * 0.38 + clamp(bass * 0.6, 0, 0.16)"
+radial_offset = "0.20 + sin(time * 0.015) * 0.22"
+
+# MOTION - the fastest spin in the set, and a STEADY one. This IS the
+# light-painting brush, and a brush whose speed jerks with the music paints a
+# lurching stroke rather than a spiral.
+spin          = "1.25 + sin(time * 0.029) * 0.08"
+scale         = "0.52 + bar * 0.10 + clamp(bass * 0.45, 0, 0.124)"
 draw_progress = "1"
-trails        = "0.82 + clamp(bass * 0.4, 0, 0.15)"
+
+# STROKE - dim on purpose. See the coupling note above.
+thickness  = "1.10 + clamp(bass * 0.9, 0, 0.47)"
+brightness = "0.42 + clamp(bass * 0.20, 0, 0.10)"
+hue        = "0.48 + time * 0.033 + clamp(treb * 0.8, 0, 0.26)"
+
+mirror_order   = "3"
+mirror_reflect = "beat"
+
+# VIEW - the pan is what turns a spiral into a ribbon travelling across frame.
+zoom  = "1.05 + bar * 0.09 + clamp(bass * 0.5, 0, 0.22)"
+pan_x = "sin(time * 0.037) * 0.16"
+pan_y = "cos(time * 0.029) * 0.12"
+
+# COMPOSITE - the subject. Long, and lengthening with the low end.
+trails      = "0.78 + clamp(bass * 0.25, 0, 0.13)"
+bg_hue      = "0.50 + sin(time * 0.011) * 0.06"
+bg_bright   = "0.012 + clamp(mid * 0.08, 0, 0.01)"
+bg_vignette = "0.86"
+
+[smoothing]
+spin          = 0.65
+phase         = 1.04
+radial_offset = 1.17
+scale         = 0.42
+thickness     = 0.36
+hue           = 1.04
+zoom          = 0.42
+trails        = 1.3
+bg_bright     = 1.04

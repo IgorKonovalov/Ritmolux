@@ -1,21 +1,94 @@
-# Lorenz - the classic butterfly, as a 3D GPU compute-particle flow (ADR-0015,
-# Plan 0016). Particles Euler-integrate the Lorenz convection equations each
-# frame and the whole 3D cloud slowly turns, so the two lobes read in depth. A
-# continuous flow, so it drifts on its own even in silence.
+# Lorenz - the classic butterfly, rebuilt as the set's TWO-PERSONALITY preset.
+# This is the first shipped preset to use grammar v2's `tempo` variable and the
+# comparison operators (Plan 0019): `select(tempo > 124, ..., ...)` gives one
+# file a slow, wide, drifting reading for downtempo material and a tight,
+# fast-turning, hard-cut reading above ~124 BPM. Everything gated that way is
+# written so the UNWARMED case is the calm one - `tempo` is 0 until the tracker
+# locks, so a cold start reads as the slow personality and eases into the fast
+# one rather than snapping.
 #
-# The sigma/rho/beta coefficients stay at the canonical values; the bands drive
-# the look: bass swells the points, mid lengthens the trails, treble drifts the
-# hue, and each beat re-blooms the cloud.
-#
-# Variables available to expressions: bass mid treb onset beat bar time.
+# Shape: sigma/rho/beta drift slowly around the canonical 10 / 28 / 2.667. Rho
+# is the lever that matters - it sets how violently the two lobes trade - so it
+# gets the biggest (still small) band term.
+# Colour: a night-blue -> teal -> solar-white gradient, crossfading to `ember`
+# on the fast personality, so the butterfly literally heats up with the tempo.
 system = "attractor"
 name = "Lorenz"
 
 [particles]
 family = "lorenz"
 
+[palette]
+stops = [
+  { at = 0.00, color = "#00060f" },
+  { at = 0.25, color = "#062b4a" },
+  { at = 0.55, color = "#12a3a8" },
+  { at = 0.80, color = "#8fe6c2" },
+  { at = 1.00, color = "#fbffe8" },
+]
+
+[palette_b]
+name = "ember"
+
 [params]
-size   = "0.9 + clamp(bass * 3, 0, 1) * 0.6 + beat * 0.4"
-hue    = "0.55 + time * 0.03 + clamp(treb * 2, 0, 1) * 0.22 + clamp(bass * 2, 0, 1) * 0.12"
-fade   = "0.93 + clamp(mid * 2, 0, 1) * 0.05"
-reseed = "beat"
+# SHAPE - canonical Lorenz; `d` is unused by this family.
+a = "10.0 + sin(time * 0.0290) * 0.55 + clamp(mid * 1.6, 0, 0.85)"
+b = "28.0 + cos(time * 0.0217) * 1.30 + clamp(bass * 5.0, 0, 2.60)"
+c = "2.667 + sin(time * 0.0173) * 0.075 - clamp(treb * 0.30, 0, 0.060)"
+
+# DENSITY - the family rule, plus a tempo split: the fast personality runs a
+# shorter exposure and a finer point, so quick material reads as a hard strobe
+# of structure instead of a smear.
+# Lorenz concentrates its density into the lobe cores far harder than the 2D
+# maps do, so the nib runs much finer here than elsewhere in the family and the
+# exposure runs longer - that is what resolves the filaments instead of a blob.
+# Lorenz runs a MUCH shorter exposure than the 2D maps in this family. Its
+# particles collapse onto a thin sheet, so ~17 accumulated frames (fade 0.94)
+# saturate the lobe cores to flat white no matter how fine the nib is; ~4
+# frames is what keeps the sheet reading as filaments.
+fade   = "select(tempo > 124, 0.680, 0.760) - clamp(bass * 0.10, 0, 0.045) - beat * 0.015"
+size   = "select(tempo > 124, 0.30, 0.40) - clamp(bass * 0.08, 0, 0.09) + beat * 0.05"
+reseed = "onset > 0.48"
+
+# COLOUR - the fast personality heats toward `ember` and widens; the slow one
+# stays a cool, cohesive single family.
+# The centre sits LOW in the gradient on purpose. Lorenz's sheet overlaps
+# additively, so the dense cores climb to white on their own - keeping the base
+# down in the night-blue is what leaves anywhere for them to climb to.
+hue_spread  = "select(tempo > 124, 0.30, 0.14) + clamp(treb * 0.7, 0, 0.14)"
+hue_center  = "0.20 + sin(time * 0.031) * 0.07 + clamp(bass * 0.8, 0, 0.16)"
+saturation  = "1.15 + clamp(mid * 1.4, 0, 0.32)"
+palette_mix = "select(tempo > 124, 0.55, 0.05) + clamp(bass * 0.6, 0, 0.15)"
+
+# VIEW - the fast personality pushes in hard and pumps per beat; the slow one
+# sits back and breathes on the bar.
+# The zoom runs far higher than elsewhere in the family, and that is the real
+# density control: Lorenz collapses onto a thin sheet, so spreading it across
+# more pixels is what resolves filaments where a smaller nib just makes a
+# dimmer blob.
+zoom  = "select(tempo > 124, 1.85, 1.55) + bar * 0.16 + clamp(bass * 0.8, 0, 0.34)"
+pan_x = "-0.16 + sin(time * 0.039) * 0.08"
+pan_y = "cos(time * 0.028) * 0.06"
+
+# COMPOSITE - a cold backdrop that warms with the mix, and a two-fold screen
+# fold that only engages on the fast personality WITH real energy behind it.
+bg_hue        = "0.30 + clamp(bass * 0.5, 0, 0.10)"
+bg_bright     = "0.04 + clamp(mid * 0.35, 0, 0.045)"
+bg_vignette   = "0.88"
+kaleido_order = "select(min(tempo > 124, bass + treb > 0.38), 4, 1)"
+kaleido_angle = "time * 0.11"
+
+[smoothing]
+# The tempo-gated params are the important ones to ease: a BPM estimate that
+# wobbles across the threshold would otherwise hard-cut the whole look.
+a             = 0.8
+b             = 0.8
+c             = 0.8
+fade          = 0.9
+size          = 0.9
+hue_spread    = 1.2
+palette_mix   = 1.5
+zoom          = 1.0
+kaleido_order = 1.5
+hue_center    = 0.40
+bg_bright     = 0.4

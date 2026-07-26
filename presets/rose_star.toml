@@ -1,18 +1,67 @@
-# Rose Star - a 5-fold star-like rose (n=5/d=97) that flares on onsets and beats.
-# Sparser and sharper than the web; the transient-reactive rose.
+# Rose Star - the transient reader of the line family: a five-fold star rose
+# that flares on every onset. Sparser and sharper than the web, and the one
+# rose whose accents are deliberately left UNSMOOTHED so hits actually snap.
+#
+# The accent stack is layered so a hit reads three ways at once - the stroke
+# thickens, the shape's phase kicks (Plan 0028, so the geometry itself moves,
+# not just its size), and the dihedral reflection latches in for a denser
+# instant. That is what makes a transient read as an event rather than a blink.
+#
+# SEGMENT BUDGET: 900 x 5 = 4500, doubling to 9000 with the reflection.
 system = "parametric_curve"
 name   = "Rose Star"
 
 [curve]
 family = "maurer_rose"
 
+# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
+# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
+# softens line art (it reads as "upsized from something smaller"). The geometry
+# mirror below costs nothing in resolution because it replicates real geometry
+# before rasterisation - so on the line scenes, prefer `mirror_*` over the
+# screen-space fold whenever both would do.
+
 [params]
+# SHAPE - 5/97 gives the sharp star points; onset kicks the phase so a hit
+# visibly re-forms the figure.
 n             = "5"
 d             = "97"
-samples       = "361"
-scale         = "0.75 + bass * 0.35"
-spin          = "0.28 + onset * 0.6"
-hue           = "0.72 + time * 0.02 + treb * 0.25"
-thickness     = "1.5 + onset * 3 + beat * 1.5"
-brightness    = "0.85 + clamp(onset * 0.9, 0, 0.7)"
+samples       = "900"
+phase         = "sin(time * 0.019) * 0.20 + clamp(onset * 1.1, 0, 0.34)"
+radial_offset = "sin(time * 0.011) * 0.07 + beat * 0.037"
+
+# MOTION - a STEADY turn. The spin rate is deliberately audio-independent:
+# `spin` is angular velocity, so a band term on it changes the rate of
+# rotation, which reads as the figure lurching rather than as reactivity. All
+# the transient energy in this preset goes into shape, stroke and colour.
+spin          = "0.34 + sin(time * 0.025) * 0.04"
+scale         = "0.68 + clamp(bass * 0.45, 0, 0.136) + beat * 0.037"
 draw_progress = "1"
+
+# STROKE - the accent. Thickness carries the hit hard; brightness stays flat.
+thickness  = "1.3 + clamp(onset * 2.4, 0, 1.36) + beat * 0.5"
+brightness = "0.80 + clamp(onset * 0.7, 0, 0.24)"
+
+# COLOUR - a violet-to-gold sweep, kicked toward the warm end on a hit.
+hue = "0.72 + time * 0.019 + clamp(treb * 0.7, 0, 0.24) + clamp(onset * 0.5, 0, 0.14)"
+
+# GEOMETRY MIRROR - five-fold to match the star, reflection latching on hits.
+mirror_order   = "5"
+mirror_reflect = "onset > 0.35"
+
+# VIEW + COMPOSITE - a hard onset punch-in, and a short feedback so each flare
+# leaves a visible ghost of the previous star.
+zoom        = "1.02 + clamp(onset * 0.6, 0, 0.20) + bar * 0.05"
+pan_x       = "sin(time * 0.023) * 0.04"
+pan_y       = "cos(time * 0.031) * 0.03"
+bg_hue      = "0.14 + clamp(onset * 0.2, 0, 0.05)"
+bg_bright   = "0.014 + clamp(onset * 0.14, 0, 0.02)"
+bg_vignette = "0.86"
+
+[smoothing]
+# `thickness`, `phase`, `spin` and `zoom` are deliberately UNSMOOTHED - they are
+# the transient. Only the slow supports get a constant.
+scale     = 0.36
+hue       = 0.91
+trails    = 0.57
+bg_bright = 0.47

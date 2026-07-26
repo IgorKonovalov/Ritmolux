@@ -1,24 +1,69 @@
-# Flow - laminar and calm: a SLOW-evolving flow field (low spin) so particles trace
-# long, coherent streamlines, mid-sized and steady. Bass firms the steering, a slow
-# sin keeps it alive when quiet, beats give a small outward nudge. The gentle,
-# readable end of the swarm set.
+# Flow - laminar and calm: a slow-evolving field so the ~10k particles trace
+# long coherent streamlines, seen through the engine-wide FEEDBACK TRAILS stage
+# so those streamlines actually draw themselves as ribbons rather than being
+# implied by a cloud of dots.
 #
-# Colour (Plan 0020): the shared "ice" palette with a narrowed hue_spread, so the
-# particles hold one cool blue->cyan family instead of the old full-wheel confetti
-# (per-particle hue was random, so the old `hue` was a visual no-op). hue_center
-# breathes slowly through the cool band.
+# THE FORCE CEILING is the thing to understand before editing this file. The
+# previous version of the swarm set ran `force = 1.1 + clamp(bass * 16, 0, 3)`,
+# which at a loud frame is ~4 against a scene default of 1.4 - hard enough that
+# every particle is flung to the frame edge and the middle of the picture goes
+# black. Loud is supposed to look like MORE, and it looked like nothing. Every
+# swarm preset in this set now holds `force` inside roughly 0.7 - 2.4 and spends
+# peak energy on churn, size, colour and the composite instead.
 system = "swarm"
 name = "Flow"
 
 [palette]
 name = "ice"
 
+[palette_b]
+stops = [
+  { at = 0.00, color = "#03102a" },
+  { at = 0.40, color = "#1f5fa8" },
+  { at = 0.70, color = "#4fd0c4" },
+  { at = 1.00, color = "#f2fff4" },
+]
+
 [params]
-force      = "1.1 + sin(time * 0.1) * 0.2 + clamp(bass * 16, 0, 3)"
-spin       = "0.16 + clamp(mid * 4, 0, 0.6)"
-burst      = "beat * 4"
-brightness = "0.65 + clamp(bass * 6, 0, 0.8)"
-size       = "2.0 + beat * 0.5"
-hue_spread = "0.5"
-hue_center = "0.5 + sin(time * 0.05) * 0.08"
-saturation = "1.0"
+# MOTION - steering stays inside the ceiling; a slow sine keeps it alive in
+# silence and the bar gives it a gentle per-beat lean.
+force = "1.05 + sin(time * 0.083) * 0.16 + clamp(bass * 1.4, 0, 0.55) + bar * 0.10"
+spin  = "0.14 + clamp(mid * 1.6, 0, 0.42) + sin(time * 0.047) * 0.05"
+burst = "clamp(beat * 1.1 + onset * 0.9, 0, 1.8)"
+
+# APPEARANCE - brightness held near flat on purpose. The particles draw
+# additively into a feedback buffer, so pushing brightness at peak clips the
+# ribbons to white and destroys exactly the streamline detail this preset is
+# about. Peak buys length and size, not luminance.
+brightness = "0.72 + clamp(bass * 0.9, 0, 0.24)"
+size       = "2.1 + clamp(mid * 1.2, 0, 0.7) + beat * 0.35"
+
+# COLOUR - one cool family, sliding. palette_mix crossfades `ice` toward a
+# custom deep-blue-to-foam gradient as the top end opens.
+hue_spread  = "0.28 + clamp(treb * 1.4, 0, 0.26)"
+hue_center  = "0.46 + sin(time * 0.041) * 0.10 + clamp(bass * 0.7, 0, 0.14)"
+saturation  = "1.00 + clamp(mid * 1.0, 0, 0.25)"
+palette_mix = "clamp(treb * 1.8, 0, 0.6)"
+
+# VIEW - a slow lateral drift, so the river appears to run rather than sit.
+zoom  = "1.02 + bar * 0.07 + clamp(bass * 0.4, 0, 0.16)"
+pan_x = "sin(time * 0.029) * 0.12"
+pan_y = "cos(time * 0.019) * 0.06"
+
+# COMPOSITE - the ribbons, over a cold vignetted deep. `trails` is what turns a
+# point cloud into streamlines, so it is the one thing that rises with energy.
+trails      = "0.58 + clamp((bass + mid) * 0.30, 0, 0.26)"
+bg_hue      = "0.33 + sin(time * 0.011) * 0.04"
+bg_bright   = "0.010 + clamp(mid * 0.08, 0, 0.010)"
+bg_vignette = "0.80"
+
+[smoothing]
+force       = 0.35
+spin        = 0.30
+brightness  = 0.18
+size        = 0.15
+trails      = 0.45
+zoom        = 0.16
+hue_center  = 0.40
+palette_mix = 0.6
+bg_bright   = 0.4

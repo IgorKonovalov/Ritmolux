@@ -1,25 +1,69 @@
-# Rose Maurer Sweep - petals held constant, but the WEB restructures constantly.
-# `d` (the angular step) is the "fantastic shapes" lever from the reference: tiny
-# changes to it completely re-lattice the rose. Here it drifts slowly on `time`,
-# rides the mids, and kicks on every beat - so the web is never the same twice.
+# Rose Maurer Sweep - petal count held constant, but the WEB restructures
+# continuously. `d`, the angular step between chords, is the "fantastic shapes"
+# lever: tiny changes to it completely re-lattice the figure, so driving it is
+# the single most transformative thing a rose preset can do.
+#
+# Here `d` moves on three time-scales at once, which is the whole design:
+#   - a slow sine over ~100 s, so the lattice family drifts across a track
+#   - a mid-band term, so busy passages restructure faster
+#   - a per-beat kick, eased just enough to read as a surge rather than a jitter
+#
+# `n` also steps between three petal counts on comparison gates, so the preset
+# has three distinct structural personalities layered under the `d` sweep -
+# something the single-`d` original could not do.
 system = "parametric_curve"
 name   = "Rose Maurer Sweep"
 
 [curve]
 family = "maurer_rose"
 
+# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
+# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
+# softens line art (it reads as "upsized from something smaller"). The geometry
+# mirror below costs nothing in resolution because it replicates real geometry
+# before rasterisation - so on the line scenes, prefer `mirror_*` over the
+# screen-space fold whenever both would do.
+
 [params]
-n             = "6"
-# The lever: slow sine drift + mid energy + a per-beat kick.
-d             = "71 + sin(time * 0.06) * 12 + clamp(mid * 18, 0, 5) + beat * 3"
-samples       = "1600"
-scale         = "0.95"
-spin          = "0.05"
-hue           = "0.02 + time * 0.02 + clamp(treb * 0.3, 0, 0.3)"
-thickness     = "1.0 + clamp(treb * 1.6, 0, 1.6)"
-brightness    = "0.8 + clamp(mid * 0.8, 0, 0.6)"
+# THE LEVER - three time-scales on the angular step.
+d = "71 + sin(time * 0.041) * 14 + clamp(mid * 5.5, 0, 3.72) + beat * 2.17"
+
+# Three petal personalities on the energy. Eased hard below, so the change
+# reads as the figure re-forming rather than as a cut.
+n = "select(bass + mid > 0.55, 8, select(bass + mid > 0.28, 6, 4))"
+
+samples       = "1500"
+phase         = "sin(time * 0.015) * 0.36 + clamp(bass * 0.5, 0, 0.124)"
+radial_offset = "sin(time * 0.011) * 0.13"
+
+spin          = "0.09 + sin(time * 0.013) * 0.02"
+scale         = "0.80 + bar * 0.05 + clamp(bass * 0.30, 0, 0.08)"
 draw_progress = "1"
 
-# Gentle ease so the beat-kick on `d` reads as a surge, not a jitter.
+# STROKE - thin: 1500 chords through a low fold is already a dense lattice.
+thickness  = "0.85 + clamp(treb * 0.9, 0, 0.47)"
+brightness = "0.58 + clamp(mid * 0.35, 0, 0.16)"
+hue        = "0.02 + time * 0.019 + clamp(treb * 0.6, 0, 0.24)"
+
+# GEOMETRY MIRROR - low, because `samples` is already carrying the density.
+# 1500 x 2 = 3000 segments, well under MAX_SEGMENTS.
+mirror_order   = "2"
+mirror_reflect = "0"
+
+zoom        = "1.05 + bar * 0.05 + clamp(bass * 0.30, 0, 0.13)"
+pan_x       = "sin(time * 0.013) * 0.05"
+bg_hue      = "0.00 + sin(time * 0.009) * 0.05"
+bg_bright   = "0.016 + clamp(mid * 0.09, 0, 0.012)"
+bg_vignette = "0.84"
+
 [smoothing]
-d = 0.08
+# `d` gets a short constant so the beat-kick surges; `n` gets a long one so a
+# petal-count change is a morph rather than a jump cut.
+d             = 0.3
+n             = 3.38
+phase         = 1.17
+radial_offset = 1.3
+scale         = 0.47
+thickness     = 0.39
+hue           = 1.09
+bg_bright     = 1.04
