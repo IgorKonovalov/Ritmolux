@@ -475,6 +475,13 @@ impl Blend {
             .as_ref()
             .is_none_or(|t| t.width != width || t.height != height);
         if stale {
+            // A size change mid-dissolve **discards the held snapshot** — the new
+            // textures start cleared, so the rest of that dissolve mixes against
+            // black and reads as a fade-up. That is deliberate, not a leak: the
+            // snapshot is a surface-sized image of a frame that no longer exists at
+            // this size, and the alternative (rescaling a frozen frame) would blur
+            // one side of a 1:1 mix. It lasts at most one dissolve, and only for a
+            // resize that lands inside one.
             self.targets = Some(Targets::build(
                 &self.device,
                 self.surface_format,
