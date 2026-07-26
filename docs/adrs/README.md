@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0038**
+**Next free number: 0039**
 
 | ADR  | Title                                                      | Status   |
 |------|------------------------------------------------------------|----------|
@@ -48,3 +48,4 @@ you need a code comment.
 | [0035](0035-asymmetric-attack-release-easing.md) | Asymmetric easing: `[smoothing]` accepts an `{ attack, release }` pair beside today's scalar, selected by direction in the existing render-layer smoother; rejected a parametric bezier ease, a second `[release]` table, and a stateful `slew()` in the grammar (supplements 0019) | accepted |
 | [0037](0037-internal-grid-is-a-resolution-not-a-shape.md) | An internal grid is a **resolution, not a shape**: any pass computing screen-destined geometry takes its aspect from the render target, never from the grid it rasterizes into — the grid's aspect must cancel out of the picture; rejected matching the grid's aspect to the target (defeats the quantization step), letterboxing the present, and a mismatch threshold (corrects 0034, generalizes Plan 0029 Phase 5) | proposed |
 | [0036](0036-preset-reachable-spectrum.md) | Preset-reachable spectrum in three separable steps: a scalar `bin(x)` over the **already-computed** 64-band log spectrum, an N-element `spectrum` line system on the existing `LineRenderer`, and per-element evaluation last; rejected `spectrum[i]` indexing, N flat `band*` variables, and a GPU spectrum texture (deferred, not refused) | proposed |
+| [0038](0038-tag-driven-release-unsigned-universal-mac-app.md) | Distribution: a **tag-driven** GitHub Release (separate `release.yml`, never a job in the `ci.yml` gate) carrying an unsigned, **ad-hoc-signed universal** macOS `.app` plus the Windows exe — standalone only; rejected cross-compiling from Windows, a bare binary (TCC names Terminal, not us), a notarized DMG, arch-specific Mac builds, extending `ci.yml`, and run-artifacts-only (a public Release asset needs no account); the `.fb2k-component` is excluded because the SDK is not in the repository | proposed |
