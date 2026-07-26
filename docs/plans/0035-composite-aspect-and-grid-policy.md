@@ -2,6 +2,7 @@
 
 > **Status:** draft
 > **Created:** 2026-07-26
+> **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev
 > **Related ADRs:** [0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the invariant);
 > corrects the aspect consequence of [0034](../adrs/0034-internal-resolution-follows-the-target.md);
