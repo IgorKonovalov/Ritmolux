@@ -3,12 +3,13 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0036**
+**Next free number: 0037**
 
 ## Active roster
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
+| [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **draft 2026-07-26** | dev, human |
 | [0035](0035-composite-aspect-and-grid-policy.md) | The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages | **approved 2026-07-26** — ready for `dev` | dev |
 | [0034](0034-preset-reachable-spectrum.md) | Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation | **approved 2026-07-26** — ready for `dev` | dev, human |
 
@@ -38,6 +39,15 @@ commented "Log-frequency bands exposed to scenes"), **every scene already receiv
 no new render idiom, and no `Scene`-trait or C-ABI change in the first three phases. `bin(x)` alone
 answers the attractor-morphing half; per-element evaluation is sequenced last on purpose
 ([ADR-0036](../adrs/0036-preset-reachable-spectrum.md)).
+
+**[0036] is orthogonal to all of the above** — it touches no `core/`, `standalone/` or shader code
+at all (two new `packaging/` scripts, one new workflow, a docs sweep), so it neither blocks nor is
+blocked by the render work and can be taken whenever the user wants artifacts. It exists because
+nothing in this repo can currently be handed to another person, and it delivers the **standalone
+half of roadmap item 5**; its Phase 4 (`human`) is gated on a friend with a Mac, which is also the
+long-deferred Plan 0001 Phase 10 on-device validation finally being exercised. Note the practical
+prerequisite: pushing anything under `.github/workflows/` needs the `workflow` OAuth scope on the
+git credential.
 
 **Deliberately sequenced after [0033]:** backlog 0005 (a bloom/glow post stage) — it now builds against
 target-sized stages rather than inheriting the 720p problem it exists to answer, and it should follow
