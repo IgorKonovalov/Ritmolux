@@ -36,18 +36,16 @@ contour = "4.0 + clamp(treb * 4.0, 0, 3.2) + beat * 1.4"
 hatch   = "6.0 + clamp(mid * 2.5, 0, 2.2)"
 glow    = "0.85 + clamp((bass + mid) * 0.45, 0, 0.25)"
 
-# VIEW - PINNED NEAR NATIVE, and this is a hard constraint, not a taste call.
-# The Gray-Scott field is a fixed 256x256 grid, already upscaled ~7x at 1080p.
-# `zoom` is INVERTED here (higher shows more of the field) and it is unusable in
-# BOTH directions: above 1.0 it samples outside the simulated field and renders
-# vertical bars and rectangular blocks; below 1.0 it magnifies the 256px grid
-# until the pattern reads as angular pixel blobs instead of organic growth. Any
-# real pan at zoom 1.0 walks off the field for the same reason. So this family
-# sits at ~0.99 with a whisper of drift, and takes its motion from the chemistry,
-# the contour/hatch rendering and the colour instead.
-zoom  = "0.99"
-pan_x = "sin(time * 0.0130) * 0.008"
-pan_y = "cos(time * 0.0091) * 0.006"
+# VIEW - UNPINNED (Plan 0033), and this is the lever the family used to lack.
+# The Gray-Scott field is finite but TOROIDAL, and the present sampler now
+# WRAPS, so `pan_*` is a seamless infinite scroll rather than a walk off the
+# edge. `zoom` is usable in both directions too: below 1.0 magnifies (the
+# Catmull-Rom reconstruction landed in the same plan, so it no longer reads as
+# angular pixel blobs), above 1.0 tiles. Keep zoom under ~1.3 - past that the
+# repeat becomes legible as wallpaper rather than as more field.
+zoom  = "0.70 + sin(time * 0.013) * 0.06 + clamp(bass * 0.7, 0, 0.14)"
+pan_x = "sin(time * 0.009) * 0.07"
+pan_y = "time * 0.009 + cos(time * 0.007) * 0.05"
 
 # COLOUR - warm lobes over green-teal valleys, drifting toward aurora greens.
 color_span   = "2.00 + clamp(mid * 0.7, 0, 0.35)"
@@ -63,7 +61,7 @@ bg_bright   = "0.024 + clamp(mid * 0.11, 0, 0.015)"
 bg_vignette = "0.70"
 
 [smoothing]
-contour     = 0.18
+contour     = { attack = 0.03, release = 0.38 }
 hatch       = 0.28
 glow        = 0.32
 zoom        = 0.25

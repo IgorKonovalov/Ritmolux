@@ -62,5 +62,5 @@ force       = 0.35
 spin        = 0.30
 hue_center  = 0.10
 palette_mix = 0.6
-trails      = 0.25
+trails      = { attack = 0.03, release = 0.50 }
 bg_bright   = 0.20

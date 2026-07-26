@@ -24,12 +24,11 @@ angle_deg = 25
 max_depth = 6
 seed      = 1
 
-# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
-# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
-# softens line art (it reads as "upsized from something smaller"). The geometry
-# mirror below costs nothing in resolution because it replicates real geometry
-# before rasterisation - so on the line scenes, prefer `mirror_*` over the
-# screen-space fold whenever both would do.
+# The geometry mirror below costs nothing in resolution because it replicates
+# real geometry BEFORE rasterisation, while `kaleido_*` folds finished pixels -
+# so on the line scenes, prefer `mirror_*` when both would do. Since Plan 0033
+# the feedback and kaleidoscope stages follow the RENDER TARGET rather than a
+# fixed 1280x720, so `trails` no longer costs this preset its sharpness.
 
 [params]
 # THE GROWTH - three generations on two comparison gates. Eased below, so a
@@ -64,6 +63,9 @@ bg_hue      = "0.52 + sin(time * 0.0091) * 0.05"
 bg_bright   = "0.085 + clamp((bass + mid) * 0.55, 0, 0.13)"
 bg_vignette = "0.55"
 
+# FEEDBACK - restored (Plan 0033) - this is the preset whose afterglow the old 720p grid cost. The draw_progress reveal now leaves a wake.
+trails = "0.62 + clamp(bass * 0.25, 0, 0.12)"
+
 [smoothing]
 # A long constant on the depth so a generation appears as a swell, not a pop.
 visible_depth = 1.2
@@ -73,3 +75,4 @@ scale         = 0.20
 hue           = 0.42
 zoom          = 0.20
 bg_bright     = 0.40
+trails       = 0.50

@@ -56,7 +56,7 @@ trails        = "0.34 + clamp(bass * 0.5, 0, 0.22)"
 # The order ladder gets the longest constant in the file - this is what turns
 # a discrete jump between fold counts into a rosette that grows petals.
 kaleido_order = 1.1
-warp          = 0.14
+warp          = { attack = 0.02, release = 0.28 }
 zoom          = 0.18
 glow          = 0.22
 color_span    = 0.35

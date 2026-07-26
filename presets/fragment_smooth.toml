@@ -51,8 +51,8 @@ palette_mix  = "clamp(treb * 1.5, 0, 0.55)"
 trails = "0.44 + bass * 0.35"
 
 [smoothing]
-flash        = 0.30
-warp         = 0.22
+flash        = { attack = 0.02, release = 0.60 }
+warp         = { attack = 0.03, release = 0.42 }
 glow         = 0.40
 zoom         = 0.55
 trails       = 0.50

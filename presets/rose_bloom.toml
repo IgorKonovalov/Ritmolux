@@ -18,12 +18,11 @@ name   = "Rose Bloom"
 [curve]
 family = "maurer_rose"
 
-# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
-# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
-# softens line art (it reads as "upsized from something smaller"). The geometry
-# mirror below costs nothing in resolution because it replicates real geometry
-# before rasterisation - so on the line scenes, prefer `mirror_*` over the
-# screen-space fold whenever both would do.
+# The geometry mirror below costs nothing in resolution because it replicates
+# real geometry BEFORE rasterisation, while `kaleido_*` folds finished pixels -
+# so on the line scenes, prefer `mirror_*` when both would do. Since Plan 0033
+# the feedback and kaleidoscope stages follow the RENDER TARGET rather than a
+# fixed 1280x720, so `trails` no longer costs this preset its sharpness.
 
 [params]
 # SHAPE - the classic 6/71 rose, with the Plan 0028 shape params giving it a
@@ -63,12 +62,16 @@ bg_hue      = "0.05 + sin(time * 0.013) * 0.05"
 bg_bright   = "0.02 + clamp(mid * 0.10, 0, 0.014)"
 bg_vignette = "0.80"
 
+# FEEDBACK - restored at native resolution (Plan 0033). Six-fold mirror, so the tail is generous but not maximal.
+trails = "0.66 + clamp(bass * 0.25, 0, 0.12)"
+
 [smoothing]
 phase         = 0.91
 radial_offset = 1.04
 scale         = 0.36
-thickness     = 0.31
+thickness     = { attack = 0.03, release = 0.60 }
 hue           = 1.04
 mirror_order  = 2.34
 zoom          = 0.42
 bg_bright     = 1.04
+trails       = 0.50

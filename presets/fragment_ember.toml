@@ -51,7 +51,7 @@ trails = "0.58 + clamp(mid * 0.30, 0, 0.14)"
 [smoothing]
 # The gold flare swells and falls; everything structural drifts.
 color_center = 0.22
-warp         = 0.30
+warp         = { attack = 0.03, release = 0.58 }
 zoom         = 0.35
 glow         = 0.35
 color_span   = 0.40

@@ -63,6 +63,6 @@ ink_bright   = "0.13"
 [smoothing]
 a          = 1.0
 fade       = 0.22
-size       = 0.14
+size       = { attack = 0.03, release = 0.30 }
 zoom       = 0.18
 saturation = 0.30
