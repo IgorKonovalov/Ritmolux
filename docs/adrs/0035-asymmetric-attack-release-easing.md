@@ -1,6 +1,6 @@
 # ADR-0035 — Asymmetric easing: `[smoothing]` accepts an `{ attack, release }` pair (supplements ADR-0019)
 
-> **Status:** proposed
+> **Status:** accepted (2026-07-26, at Plan 0033's close)
 > **Date:** 2026-07-26
 > **Related plan(s):** [0033](../plans/0033-internal-resolution-and-preset-surface.md)
 > **Supplements:** [ADR-0019](0019-eased-parameters.md)

@@ -1,6 +1,7 @@
 # ADR-0034 — Internal render resolutions follow the target (quantized and capped); the reaction-diffusion **simulation** grid does not
 
-> **Status:** proposed
+> **Status:** accepted (2026-07-26, at Plan 0033's close — see **Outcome** below, which corrects two
+> claims this ADR made before the work was done)
 > **Date:** 2026-07-26
 > **Related plan(s):** [0033](../plans/0033-internal-resolution-and-preset-surface.md)
 > **Supplements:** [ADR-0012](0012-stateful-feedback-render-system.md) (the fixed internal grid),
@@ -154,6 +155,40 @@ The narrow fix for the edge-smear symptom, and what the report implies. Rejected
 is already toroidal: clamping would remove a lever the simulation has always been able to support,
 to work around a sampler address mode that is one line. It would also leave `pan_*` broken, since
 panning walks off the field at any zoom.
+
+## Outcome (2026-07-26, at Plan 0033's close)
+
+Recorded here rather than in a superseding ADR because the **decision held in full** — the post
+stages follow the target, the RD simulation grid stayed a constant at 256, reconstruction was tried
+first and resolved the artifact (so the Phase 4 grid step was **skipped** under the if-and-only-if
+above), and the sampler wraps. What did not survive contact is two supporting claims, both of which
+this ADR asserted before anything was built:
+
+1. **"The RD reconstruction fix, if the hypothesis holds, costs approximately nothing"** (Positive
+   consequences) is **false**. The shipped reconstruction is Catmull-Rom, called five times per
+   fragment (value plus four gradient taps) at nine bilinear fetches each — roughly **45 texture
+   fetches per fragment** on the RD present pass. The hypothesis itself was confirmed: the artifact
+   is bilinear faceting, not pixel-stepping, with facet corners on the 256-texel lattice.
+   The cost is **unmeasured on real hardware**: the +16 % WARP-suite figure first reported was
+   retracted in the same plan's next commit once run-to-run variance on that machine turned out to
+   dominate it (193.6 s / 224.2 s / 105.2 s across runs of the same suite, the fastest *after* the
+   work landed). Treat the tap count as the real number and the wall time as unknown.
+2. **"A quintic-smoothed fractional texel coordinate is the cheap form"** (Decision) is **wrong for
+   this pass**. It was built and measured worse than the faceting it replaces: a smoothstep-family
+   warp has zero derivative at both ends, so it pins the reconstruction's gradient to zero at every
+   texel centre and the derivative then oscillates once per cell. Against a pass whose `line_d`
+   divides by `fwidth`, that renders as one scalloped step per texel. The whole coordinate-warp
+   class is unusable here — only a genuine higher-order filter has a smooth, non-degenerate
+   derivative.
+
+One consequence this ADR did not anticipate, found at the close review and routed to a followup
+plan: the 256 px round-up makes the internal grid's **aspect** differ from the target's at most
+sizes, and because the composite derives the scene's aspect from the grid while both stages present
+with a plain normalized blit, the whole frame is geometrically stretched whenever a stage is active
+(measured 1.28x wide at 1280x800, 1.07x at 1280x720; exact at 1920x1080 and 2048x1152). The single
+scale factor preserves proportions only *before* quantization. The fix is to take the composite's
+aspect from the surface rather than the grid — `Scene::set_target_size` keeps the grid, which is a
+resolution and not a shape.
 
 ## Notes
 

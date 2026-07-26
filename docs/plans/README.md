@@ -9,26 +9,29 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
-| [0033](0033-internal-resolution-and-preset-surface.md) | Internal resolution follows the target, plus the preset-surface and harness gaps behind it | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0034](0034-preset-reachable-spectrum.md) | Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
 
-**Both [0033] and [0034] are approved and ready for `dev`, and they are independent** — they share no
-files, so either can go first and neither blocks the other. **Take [0033] first** unless there is a
-reason not to: it fixes reported breakage in already-shipped content ("coral is broken", "roses feel
-upscaled"), and its Phase 1 harness fixes plus Phase 2 easing make [0034]'s new scene easier to author
-and verify. Each is a separate `dev` session — one plan per session, and the close review is a third.
+**[0034] is the only approved plan on the roster** — [0033] closed 2026-07-26 (see Recently closed).
+Two pieces of work are queued ahead of or beside it:
 
-**[0033]** takes four of the eight entries in the [design backlog](../design-backlog.md) — the
-2026-07-26 `preset-author` feedback batch — in one pass: the composite's two post stages stop rendering the whole frame through a fixed 1280x720
-([ADR-0034](../adrs/0034-internal-resolution-follows-the-target.md)), reaction-diffusion's blockiness
-is attacked at the reconstruction seam before the expensive grid step, RD's present sampler starts
-wrapping a field that was **already toroidal** (which is what makes `zoom`/`pan_*` usable on that
-scene at all), `[smoothing]` gains an `{ attack, release }` pair
-([ADR-0035](../adrs/0035-asymmetric-attack-release-easing.md)), and the `shot` harness stops being
-unable to drive `tempo`/`novelty` or to say what real audio levels look like. Phase 8 is `human` —
-the aesthetic re-tune on the user's 2048x1152 display, which engine-green cannot substitute for.
+1. **[0033]'s Phase 8 (`human`) is still open** — the aesthetic re-tune on the user's 2048x1152
+   display: run the `preset-author` lane over the four `reaction_*` presets (now free of the
+   `zoom = 0.99` pin) and the 13 line presets, **restoring `trails` where it was removed purely for
+   sharpness**. That is the payoff the whole plan exists for, and engine-green cannot substitute for
+   it. The stale "both stages render at a fixed 1280x720" note in fourteen preset headers is preset
+   content and rides with this pass.
+2. **The three majors from [0033]'s close want a small fix plan** (undesigned, no number yet): the
+   composite must take its aspect from the **surface** rather than the quantized internal grid — with
+   `trails` or `kaleido_*` active the frame is stretched 1.28x wide at 1280x800 and 1.07x at
+   1280x720, reproduced, and it also undoes [0029] Phase 5's attractor fix on that path; the two
+   copies of the grid policy (`post.rs::internal_grid_size` vs
+   `particles/mod.rs::trail_grid_size`) want unifying at the same time; `docs/on-device-validation.md`
+   wrongly tells the tester no shipped preset binds `trails` (`rose_trails.toml:48` does); and the
+   two rewired stages have **no golden coverage at all**, which is how the aspect defect got through.
+   Sequence it before backlog 0005's bloom stage, which inherits whichever answer the aspect question
+   gets.
 
 **[0034]** closes backlog 0002, the capability the user asked for twice. Three verifications shrank
 it well below the feedback
@@ -39,8 +42,9 @@ no new render idiom, and no `Scene`-trait or C-ABI change in the first three pha
 answers the attractor-morphing half; per-element evaluation is sequenced last on purpose
 ([ADR-0036](../adrs/0036-preset-reachable-spectrum.md)).
 
-**Deliberately sequenced after [0033]:** backlog 0005 (a bloom/glow post stage), so it is built against
-target-sized stages rather than inheriting the 720p problem it exists to answer. **Still undesigned:**
+**Deliberately sequenced after [0033]:** backlog 0005 (a bloom/glow post stage) — it now builds against
+target-sized stages rather than inheriting the 720p problem it exists to answer, and it should follow
+the aspect fix above so it does not inherit *that* instead. **Still undesigned:**
 backlog 0007 (`star_pattern`, which the user chose to invest in rather than cut) and the waterfall
 spectrogram, which [0034] leaves as a followup on the same spectrum surface.
 
@@ -151,6 +155,81 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0033 — Internal resolution follows the target, plus the preset-surface and harness gaps behind
+  it](done/0033-internal-resolution-and-preset-surface.md) — **done 2026-07-26**, passed Mode 4
+  review (**no blockers**; three majors, four minors). Six `dev` phase commits (`978405a` `shot`
+  reaches `tempo`/`novelty` + band levels, `cf65c4a` `{ attack, release }` smoothing, `8c0ff2b`
+  Catmull-Rom reconstruction, `08714c7` the wrapped RD sampler, `3f3b652` target-sized post stages,
+  `621fa7b` the operator sweep). **Phase 4 skipped** under ADR-0034's if-and-only-if — the
+  reconstruction fix resolved the coral artifact, so the Gray-Scott grid stays 256, no coral preset
+  takes a look change, and the ~4x sub-step cost is not spent. Takes four of the eight
+  [design-backlog](../design-backlog.md) entries from the 2026-07-26 `preset-author` batch.
+  `TRAILS_W/H` and `KALEIDO_W/H` are gone: one `internal_grid_size(surface)` policy (256 px step,
+  single-scale-factor cap at **1920x1080** — not the attractor's 2560x1440, because the trails
+  `Rgba16Float` field pair is charged twice during a dual-live dissolve) sizes both stages,
+  `PostStage::internal_size` takes the surface, and `KALEIDO_ASPECT` moved into the uniform so the
+  fold corrects by the live ratio. `lsystem_fern` with `trails = 0.75` at 2048x1152 now renders its
+  finest fronds crisp with the feedback active — the combination the fixed 720p grid made impossible.
+  RD's present pass reconstructs with **Catmull-Rom** (nine bilinear taps, every field read routed
+  through `sample_v` — value, gradient, contour, hatch — because the gradient is where a C0
+  discontinuity shows), and its sampler is `Repeat`, so `pan_*` is a seamless scroll over a torus the
+  simulation has always been and `zoom > 1` tiles instead of smearing the edge row into bars.
+  `[smoothing]` takes an `{ attack, release }` pair, hand-deserialized rather than `serde(untagged)`
+  so a mistyped table is not harder to diagnose than a mistyped float. `shot --set` reaches
+  `tempo`/`novelty` and every filmstrip now prints the min/mean/max the analyzer measured — a
+  full-scale 60 Hz sine reads `bass 0.187` and a 120 BPM click peaks at `bass 0.011`, against the
+  `--set bass=0.8` the lane had been calibrating against. **Verified at review** rather than taken
+  on trust: `fmt --check` + `clippy --workspace --all-targets -D warnings` clean; `nextest -p
+  lmv-core --lib` **97/97**; `golden` + `reaction_diffusion` **3/3**; `sanity` + `reactivity` +
+  `animation` **3/3** (the floors that actually render through the changed stages, since
+  `rose_trails` binds `trails` and two presets bind `kaleido_*`); `-p standalone` **58/58**; and
+  `git diff --stat` over the range confirms `core/tests/golden/reaction_diffusion.png` is the **only**
+  baseline touched, so both re-bless scope claims hold in fact (`LMV_BLESS` twice rewrote
+  `fragment_field.png` / `swarm.png` on WARP variance and both were restored). **Three deviations
+  accepted, each because the plan was wrong and the commit said so:** Phase 2's "90 % within two
+  60 Hz frames" is unreachable for its own `attack = 0.02` (`alpha = 0.5654`, so two frames reach
+  81.1 % and three reach 91.8 % — the test pins the arithmetic); Phase 6's "reports 2048x1152"
+  contradicts the same plan's 1920x1080 cap, which ADR-0034 acknowledges as a 1.07x downscale; and
+  Phase 3 shipped Catmull-Rom rather than the plan's named cheap quintic coordinate warp, which was
+  built and measured **worse** (zero derivative at both ends pins the reconstruction gradient to zero
+  at every texel centre, and `line_d`'s `fwidth` gain renders that as one scalloped step per texel).
+  **Phase 3's done-when 3 is unmet and is not satisfiable as specified** — it asks a pixel-domain
+  scanline second-difference statistic to detect a geometric property of a 1-D contour curve, and at
+  8 bits the slope discontinuity over a smooth field is below one output quantum (five measured
+  attempts in `8c0ff2b`). Accepted with cause; **no followup metric is owed**, since the RD golden is
+  a real pixel guard for exactly this shader, it moved, and it passes. **Majors, all routed to a
+  followup fix plan rather than reworked here:** (1) the 256 px round-up makes the grid's aspect
+  differ from the target's, and because `post.rs:445` derives the scene's aspect from the **grid**
+  while both stages present with a plain normalized blit, the whole frame is stretched whenever a
+  stage is active — reproduced with `shot` on a trails-bound `rose_web`, **1.278x wider at 1280x800**
+  (predicted 1.280) and **1.069x at 1280x720** (predicted 1.067, where the old fixed grid was
+  aspect-exact); 1920x1080 / 2048x1152 / 2560x1440 / 3840x2160 are unaffected, which is why the
+  plan's own display never showed it, and because the attractor reads this same `aspect` it also
+  undoes [0029] Phase 5's fix on that path — the correction is one line, take the aspect from the
+  surface and leave `Scene::set_target_size` on the grid; (2) `docs/on-device-validation.md`'s new
+  trails item tells the tester no shipped preset binds `trails`, but `presets/rose_trails.toml:48`
+  does, so the item guarding this plan's stated main risk sends them to build a needless workaround;
+  (3) **no fixture in `core/tests/fixtures/` binds `trails` or `kaleido_*`**, so Phase 6's "goldens
+  re-blessed" done-when referred to baselines that never existed and the headline change ships with
+  zero pixel guard on the stages it rewired — which is how major 1 got through (not a blind fixture
+  add: a feedback pipeline built mid-run resolves differently on WARP). **Minors:** fourteen preset
+  headers plus `attractor_ink.toml:22` still teach the retired fixed-1280x720 rule (preset content —
+  rides with Phase 8); `post.rs::internal_grid_size` is a line-for-line copy of
+  `particles/mod.rs::trail_grid_size`, the opposite of ADR-0034's "one shared function" consequence;
+  the RD reconstruction's real cost is **unmeasured** (the +16 % WARP figure was retracted in
+  `3f3b652` as run-to-run noise — 193.6 / 224.2 / 105.2 s on the same suite — leaving 45 fetches per
+  fragment as the only real number, and the on-device checklist gained trails items but no RD item);
+  `presets/README.md`'s "an ultrawide keeps its proportions" overclaims under the round-up
+  (3440x1440 comes back 1.88 against 2.39). **⚠ On-device carry-forward:** full-resolution trails
+  against NFR §1's 60 fps @ 1080p floor, the working-set delta including mid-dissolve, and now the
+  RD tap count — none reachable from WARP; the mitigation in all three cases is the one cap constant.
+  **Core + standalone only; C ABI untouched (v4); `Scene` trait untouched; no new dependency; no
+  preset re-tune** (Phase 8's job). [ADR-0034](../adrs/0034-internal-resolution-follows-the-target.md)
+  **accepted with an Outcome section** correcting two claims implementation falsified, and
+  [ADR-0035](../adrs/0035-asymmetric-attack-release-easing.md) **accepted**. **Phase 8 (`human`)
+  remains open** — the aesthetic re-tune on the 2048x1152 display, restoring `trails` to the line
+  presets. Version **minor 0.16.1 -> 0.17.0** at close (a feature plan).
 
 - [0031 — Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and
   the accumulated close-review debt](done/0031-composite-cleanup-and-debt.md) — **done 2026-07-26**,
