@@ -1,0 +1,32 @@
+# COMPOSITE FIXTURE - do not tune; editing this invalidates the drift baseline.
+# Plan 0035 Phase 2. Not a per-SystemKind golden fixture: this one exists to put
+# a POST STAGE on the captured path at all. No fixture bound `trails` or
+# `kaleido_*` before, which is why a whole-frame geometric defect (ADR-0037)
+# shipped green.
+#
+# A rose is the figure on purpose - radially symmetric line art, so an aspect
+# error reads as a visibly out-of-round bloom rather than as a plausible
+# alternative pattern. `spin` is a rate, so the figure turns and the max-decay
+# accumulation actually has history to hold: a static figure would make trails
+# indistinguishable from a passthrough. Determinism is unaffected - the capture
+# steps a fixed dt (NFR 6).
+system = "parametric_curve"
+name   = "fixture_composite_trails"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "5"
+d             = "43"
+samples       = "301"
+scale         = "0.72"
+spin          = "0.4"
+hue           = "0.55"
+thickness     = "2.0"
+brightness    = "0.9"
+draw_progress = "1"
+
+# The stage under test. High enough that the tail spans many frames, below the
+# MAX_FADE ceiling.
+trails        = "0.9"

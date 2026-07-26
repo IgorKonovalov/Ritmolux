@@ -229,6 +229,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `beat` | HARD | a 120 BPM click track through the **real** DSP makes a beat-accent preset render differently on-beat vs off-beat; a zeroed beat binding does not |
 | `distinctness` | ADVISORY | prints per-family pixel + shape pairwise matrices and flags near-duplicate geometry; never asserts |
 | `golden` | HARD (tolerance) | one **frozen fixture per system** matches its committed baseline PNG within a mean + max-outlier tolerance ([ADR-0023](adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)) |
+| `composite` | HARD (tolerance) | the **post stages** — one fixture composes `trails`, one composes `kaleido_*` — match their baselines. Captured at **160x100**, a size whose internal grid is *not* the target's shape, so an aspect error is visible ([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) |
 | `reaction_diffusion` | HARD | the first stateful-feedback scene: seed reproducibility, regime response ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
 | `attractor` | HARD | the first compute-particle scene: seed reproducibility + beat perturbation ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
 | `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
@@ -256,7 +257,12 @@ change:
 
 ```bash
 LMV_BLESS=1 cargo test -p lmv-core --test golden
+LMV_BLESS=1 cargo test -p lmv-core --test composite   # the two post-stage baselines
 ```
+
+The `composite_*.png` pair belongs to the `composite` test, not to `golden` —
+bless it by naming that binary, which is also what keeps the two scopes from
+rewriting each other.
 
 **Eyeball the regenerated PNGs before committing** — the first baseline is easy
 to enshrine wrong. The compare tolerates minor cross-GPU rasterization drift; a
