@@ -140,6 +140,21 @@ Everything up to and including the post chain is **per preset** — during a dis
 each side composites its own, independently. The blend and the ink remap are
 **engine-wide**: one pass each, over the frame both presets produced.
 
+**The post chain renders at the render target's own resolution.** `trails` and
+`kaleido_*` used to run through a fixed 1280x720 grid, so composing either one
+upscaled the whole frame on any display above 720p — sharp geometry went in and soft
+pixels came out. They follow the target now (quantized and capped), so a look no
+longer costs sharpness. Two things still follow from a stage being a *resample*:
+
+- On a **line** scene, `mirror_order` / `mirror_reflect` replicate real geometry
+  *before* rasterization, so they cost nothing in resolution, while `kaleido_*` folds
+  finished pixels. Prefer the mirror when either would do — see
+  [Mirror or kaleidoscope?](../presets/README.md#mirror-or-kaleidoscope-they-are-not-the-same-cost).
+- **Reaction-diffusion is a special case in the other direction.** Its simulation grid
+  is deliberately fixed and independent of the window (ADR-0012), but the field is
+  **toroidal**, so `pan_*` is a seamless infinite scroll and `zoom > 1` tiles rather
+  than running out of field.
+
 ### Transitions between presets
 
 A preset switch dissolves rather than cuts (ADR-0024 / ADR-0032). Nothing about it

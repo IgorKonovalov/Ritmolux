@@ -10,10 +10,17 @@ built on that (Plan 0013):
   preset for reactivity, animation, shape sanity, and beat response, with an
   advisory distinctness report and golden-image regression.
 
-A headless render is a **pure function** of `(preset, input, frame-count)` —
+A headless render is a **pure function** of `(preset, input, frame-count, size)` —
 scenes are reseeded per capture, every frame steps at the fixed
 `scenes::FALLBACK_DT` (the live app injects its real `dt` instead; Plan 0014),
 and the DSP is deterministic — so renders are reproducible and diff-able.
+
+> `--size` is part of that tuple, and since Plan 0033 it does more than crop: the
+> `trails` and `kaleido_*` stages size their internal grid from the render target
+> (ADR-0034), so a preset composing either one genuinely renders *differently* at
+> 640x360 than at 1080p rather than merely smaller. A given size is still exactly
+> reproducible; two sizes are no longer scaled versions of one picture. Capture at
+> the size you are judging.
 
 Everything here is **dev/agent tooling**. The `image` crate is a *dev-dependency*
 only (ADR-0011), so the shipped `lmv.exe` is untouched; the CLI is a
