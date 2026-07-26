@@ -17,9 +17,16 @@
 //! sees a coexisting fold pipeline during the no-kaleidoscope captures. When
 //! active the pipeline builds lazily and is dropped on the capture scene-rebuild.
 //!
-//! Runs at a fixed 16:9 internal resolution, presented stretched to the surface —
-//! the same resolution-independent approach the other post/present passes take
-//! (correct on a 16:9 display; distorted otherwise — a documented v1 limitation).
+//! Runs at an internal resolution that **follows the render target** (ADR-0034),
+//! quantized and capped by
+//! [`internal_grid_size`](super::post::internal_grid_size). It used to be a fixed
+//! 1280x720 with the fold's aspect correction baked to match; both are live now,
+//! so the wedges stay radially symmetric on a non-16:9 window instead of skewing.
+//!
+//! On a line scene, prefer the **geometry** mirror (`mirror_order` /
+//! `mirror_reflect`) over this fold when either would do: that one replicates real
+//! segments *before* rasterization, so it costs nothing in resolution, while this
+//! one folds finished pixels at the stage's internal grid.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). The fold pass encodes every displayed frame it is active.
@@ -33,14 +40,7 @@
 
 use crate::render::gpu;
 
-use super::post::PostStage;
-
-/// Fixed internal resolution (16:9), presented stretched (module docs); the fold
-/// is aspect-corrected to this ratio so the wedges are symmetric on a 16:9 frame.
-const KALEIDO_W: u32 = 1280;
-const KALEIDO_H: u32 = 720;
-/// The fold's aspect correction — the ratio of the fixed internal grid above.
-const KALEIDO_ASPECT: f32 = KALEIDO_W as f32 / KALEIDO_H as f32;
+use super::post::{PostStage, internal_grid_size};
 
 /// `kaleido_order` default — 1 = identity, so an unbound preset is unaffected.
 const DEFAULT_ORDER: f32 = 1.0;
@@ -92,6 +92,8 @@ struct K {
 
 struct Resources {
     // The offscreen the composite (background + scene [+ trails]) renders into.
+    /// The grid these were built for, so `begin` can compare before rebuilding.
+    size: (u32, u32),
     // Kept alive so `src_view` stays valid; not read after construction.
     _src: wgpu::Texture,
     src_view: wgpu::TextureView,
@@ -101,12 +103,12 @@ struct Resources {
 }
 
 impl Resources {
-    fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat, size: (u32, u32)) -> Self {
         let src = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("kaleido-src"),
             size: wgpu::Extent3d {
-                width: KALEIDO_W,
-                height: KALEIDO_H,
+                width: size.0,
+                height: size.1,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -174,6 +176,7 @@ impl Resources {
         );
 
         Self {
+            size,
             _src: src,
             src_view,
             uniform,
@@ -194,6 +197,9 @@ pub struct Kaleidoscope {
     res: Option<Resources>,
     order: f32,
     angle: f32,
+    /// How many times [`Resources::build`] has run — see
+    /// [`Trails::builds`](super::trails::Trails).
+    builds: u32,
 }
 
 /// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
@@ -209,7 +215,14 @@ impl Kaleidoscope {
             res: None,
             order: DEFAULT_ORDER,
             angle: DEFAULT_ANGLE,
+            builds: 0,
         }
+    }
+
+    /// How many times this stage has built its GPU resources.
+    #[cfg(test)]
+    pub(crate) fn build_count(&self) -> u32 {
+        self.builds
     }
 }
 
@@ -244,11 +257,11 @@ impl PostStage for Kaleidoscope {
         self.order >= MIN_ACTIVE_ORDER && self.order.is_finite()
     }
 
-    /// The fixed internal fold-input size (16:9), presented stretched — reported to
-    /// a scene that sizes an internal field, as the trails stage's is, and the
-    /// source of the aspect the composite renders at.
-    fn internal_size(&self) -> Option<(u32, u32)> {
-        Some((KALEIDO_W, KALEIDO_H))
+    /// The fold-input size, following the render target under the shared policy
+    /// (ADR-0034) — reported to a scene that sizes an internal field, as the trails
+    /// stage's is, and the source of the aspect the composite renders at.
+    fn internal_size(&self, surface: (u32, u32)) -> (u32, u32) {
+        internal_grid_size(surface)
     }
 
     /// Build the resources if needed and return the offscreen view the composite
@@ -258,10 +271,13 @@ impl PostStage for Kaleidoscope {
     fn begin(
         &mut self,
         _encoder: &mut wgpu::CommandEncoder,
-        _surface: (u32, u32),
+        surface: (u32, u32),
     ) -> Option<wgpu::TextureView> {
-        if self.res.is_none() {
-            self.res = Some(Resources::build(&self.device, self.surface_format));
+        // Compare-first (ADR-0030): build once, then only when the grid changes.
+        let wanted = self.internal_size(surface);
+        if self.res.as_ref().is_none_or(|res| res.size != wanted) {
+            self.res = Some(Resources::build(&self.device, self.surface_format, wanted));
+            self.builds += 1;
         }
         self.res.as_ref().map(|res| res.src_view.clone())
     }
@@ -279,11 +295,16 @@ impl PostStage for Kaleidoscope {
             return 0;
         };
         let order = self.order.clamp(MIN_ACTIVE_ORDER, MAX_ORDER);
+        let aspect = res.size.0 as f32 / res.size.1.max(1) as f32;
         queue.write_buffer(
             &res.uniform,
             0,
             bytemuck::bytes_of(&K {
-                v: [order, self.angle, KALEIDO_ASPECT, 0.0],
+                // The fold's aspect correction is the *live* grid's ratio, not a
+                // compile-time 16:9 (ADR-0034): the internal grid follows the
+                // render target now, so on an ultrawide or a portrait window a
+                // baked 16:9 would skew every wedge.
+                v: [order, self.angle, aspect, 0.0],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
