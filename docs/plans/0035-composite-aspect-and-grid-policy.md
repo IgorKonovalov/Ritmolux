@@ -1,6 +1,6 @@
 # 0035 — The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev

@@ -20,8 +20,13 @@
 //! Runs at an internal resolution that **follows the render target** (ADR-0034),
 //! quantized and capped by
 //! [`internal_grid_size`](super::post::internal_grid_size). It used to be a fixed
-//! 1280x720 with the fold's aspect correction baked to match; both are live now,
-//! so the wedges stay radially symmetric on a non-16:9 window instead of skewing.
+//! 1280x720 with the fold's aspect correction baked to match.
+//!
+//! **The fold's aspect is the render target's, never that grid's** (ADR-0037). The
+//! grid is quantized to a 256 px step, so its ratio is only approximately the
+//! window's, and folding about the grid's axis skewed every wedge whenever the two
+//! disagreed — which is most window sizes, but not the 16:9 ones this was
+//! developed at.
 //!
 //! On a line scene, prefer the **geometry** mirror (`mirror_order` /
 //! `mirror_reflect`) over this fold when either would do: that one replicates real
@@ -259,7 +264,9 @@ impl PostStage for Kaleidoscope {
 
     /// The fold-input size, following the render target under the shared policy
     /// (ADR-0034) — reported to a scene that sizes an internal field, as the trails
-    /// stage's is, and the source of the aspect the composite renders at.
+    /// stage's is. A **texel count only**: the aspect the composite renders at, and
+    /// the one [`resolve`](PostStage::resolve) folds about, is the render target's
+    /// (ADR-0037).
     fn internal_size(&self, surface: (u32, u32)) -> (u32, u32) {
         internal_grid_size(surface)
     }
@@ -290,20 +297,24 @@ impl PostStage for Kaleidoscope {
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         out: &wgpu::TextureView,
+        surface: (u32, u32),
     ) -> u32 {
         let Some(res) = self.res.as_ref() else {
             return 0;
         };
         let order = self.order.clamp(MIN_ACTIVE_ORDER, MAX_ORDER);
-        let aspect = res.size.0 as f32 / res.size.1.max(1) as f32;
+        // The **render target's** ratio, not this stage's input grid's (ADR-0037).
+        // The fold happens in the destination's space and the frame it samples was
+        // drawn pre-squashed at this same aspect, so both the output geometry and
+        // the reconstructed sample coordinate want the shape the frame is finally
+        // seen at. The grid's own aspect is a resolution artefact — quantized to a
+        // 256 px step — and correcting by it skewed every wedge on any window the
+        // step did not divide evenly.
+        let aspect = surface.0 as f32 / surface.1.max(1) as f32;
         queue.write_buffer(
             &res.uniform,
             0,
             bytemuck::bytes_of(&K {
-                // The fold's aspect correction is the *live* grid's ratio, not a
-                // compile-time 16:9 (ADR-0034): the internal grid follows the
-                // render target now, so on an ultrawide or a portrait window a
-                // baked 16:9 would skew every wedge.
                 v: [order, self.angle, aspect, 0.0],
             }),
         );

@@ -232,11 +232,24 @@ pub(crate) trait PostStage {
 
     /// Fold this stage's input into `out`, returning the draw calls encoded — so
     /// the frame's total is a sum of what the stages report, not hand arithmetic.
+    ///
+    /// `surface` is the **render target's** pixel size — the same value
+    /// [`begin`](Self::begin) took, and the shape the finished frame is seen at.
+    /// A stage computing screen-destined geometry (the kaleidoscope's fold) takes
+    /// its aspect from here and **never** from the grid it happens to be
+    /// rasterizing into, nor from `out`'s own size: every present down the chain
+    /// is a plain normalized stretch, so an intermediate stage's grid is a
+    /// resolution too and its aspect cancels out (ADR-0037). The chain's
+    /// destination is surface-sized in every case (the blend's input, ink's input,
+    /// or the surface), so this *is* the destination's aspect today — passing
+    /// `surface` rather than `out`'s size is what keeps that true if a stage is
+    /// ever added after the fold.
     fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         out: &wgpu::TextureView,
+        surface: (u32, u32),
     ) -> u32;
 
     /// Drop the lazily-built resources, so the next active frame starts from a
@@ -308,7 +321,24 @@ pub(crate) fn route(active: &[bool]) -> Routing {
 pub(crate) struct SceneTarget {
     /// The view to draw into. Owned (an Arc bump) — see [`PostStage::begin`].
     pub view: wgpu::TextureView,
-    /// The aspect that target implies, derived from [`size`](Self::size).
+    /// The aspect the scene projects at — the **render target's**, never
+    /// [`size`](Self::size)'s (ADR-0037).
+    ///
+    /// An internal grid is a *resolution, not a shape*: it is quantized to a
+    /// 256 px step and capped, so its aspect is only approximately the target's,
+    /// and every stage presents with a plain normalized blit that ignores aspect
+    /// entirely. The two stretches therefore **cancel**. A scene told the target's
+    /// aspect draws itself pre-squashed into a grid of a different shape, and the
+    /// present's stretch is exactly the inverse: a unit circle at aspect 1.6
+    /// rendered into a 1280x1024 grid occupies 400x512 texels, and the blit down
+    /// to a 1280x800 surface returns it to 400x400 — round.
+    ///
+    /// Deriving this from the grid instead is what made turning `trails` or
+    /// `kaleido_*` on change the **shape** of the picture — 1.28x too wide at
+    /// 1280x800, 1.07x at 1280x720 — and re-broke Plan 0029's attractor fix
+    /// whenever a stage was active, since the attractor reads this value. It was
+    /// invisible at 1920x1080 and 2048x1152, which the policy returns exactly
+    /// 16:9. Any `aspect` computed from a grid size is a bug.
     pub aspect: f32,
     /// The pixel size a scene sees through
     /// [`Scene::set_target_size`](super::scenes::Scene::set_target_size) (ADR-0030),
@@ -442,7 +472,9 @@ impl PostChain {
         let (view, size) = first.unwrap_or_else(|| (destination.clone(), surface));
         SceneTarget {
             view,
-            aspect: size.0 as f32 / size.1.max(1) as f32,
+            // `surface`, not `size` — see the field's docs and ADR-0037. The grid
+            // is a texel count; the shape is the render target's.
+            aspect: surface.0 as f32 / surface.1.max(1) as f32,
             size,
             routing,
         }
@@ -471,7 +503,7 @@ impl PostChain {
                 .and_then(|next| self.stages.get_mut(next)?.begin(encoder, surface))
                 .unwrap_or_else(|| destination.clone());
             if let Some(stage) = self.stages.get_mut(stage) {
-                draw_calls += stage.resolve(queue, encoder, &out);
+                draw_calls += stage.resolve(queue, encoder, &out, surface);
             }
         }
         draw_calls
@@ -505,6 +537,7 @@ mod tests {
     use crate::render::background::Background;
     use crate::render::capture::{self, CaptureImage};
     use crate::render::context::{RenderContext, RenderError};
+    use crate::render::gpu;
 
     // -----------------------------------------------------------------------
     // The internal-grid policy (ADR-0034) — GPU-free
@@ -887,7 +920,7 @@ mod tests {
                 label: Some("post-resize"),
             });
         stage.begin(&mut encoder, surface);
-        stage.resolve(&ctx.queue, &mut encoder, &view);
+        stage.resolve(&ctx.queue, &mut encoder, &view, surface);
         ctx.queue.submit(std::iter::once(encoder.finish()));
     }
 
@@ -1020,31 +1053,16 @@ mod tests {
         );
     }
 
-    /// The kaleidoscope's aspect correction is the **live grid's**, not a
-    /// compile-time 16:9 (ADR-0034). With the grid now following the target, a
-    /// baked ratio would skew every wedge on any non-16:9 window.
-    ///
-    /// Asserted as the fold's own symmetry: an order-N dihedral fold makes the
-    /// output identical in each of its N wedges *in aspect-corrected space*, so
-    /// sampling those wedges with the true grid aspect must give matching means. If
-    /// the shader folded about a 16:9 axis on a 2:1 grid, the wedges would land
-    /// somewhere else and the means would diverge. Restricted to an inscribed disc
-    /// so the rectangular frame's corners do not give some wedges more area.
-    #[test]
-    fn the_fold_stays_symmetric_on_a_non_16_9_target() {
-        let Some(ctx) = headless_context_or_skip() else {
-            return;
-        };
+    /// Fold order used by the symmetry probes.
+    const FOLD_ORDER: usize = 6;
+
+    /// Fold a vignetted backdrop at `surface` and report
+    /// [`fold_mirror_error`] over the result.
+    fn fold_error_at(ctx: &RenderContext, surface: (u32, u32)) -> f32 {
         let format = ctx.surface_format();
         let mut background = Background::new(&ctx.device, format);
         let mut kaleido = crate::render::kaleidoscope::Kaleidoscope::new(&ctx.device, format);
-        const ORDER: usize = 6;
-        assert!(kaleido.set_param("kaleido_order", ORDER as f32));
-
-        // 2:1 — as far from 16:9 as an ordinary window gets, and both axes land on
-        // the quantization step so the grid is exactly 2:1 too.
-        let surface = (512, 256);
-        assert_eq!(internal_grid_size(surface), (512, 256), "a 2:1 grid");
+        assert!(kaleido.set_param("kaleido_order", FOLD_ORDER as f32));
 
         let (texture, view) = capture::create_target(&ctx.device, format, surface.0, surface.1);
         let mut encoder = ctx
@@ -1059,7 +1077,7 @@ mod tests {
             .begin(&mut encoder, surface)
             .expect("the fold builds its input");
         background.render(&ctx.queue, &mut encoder, &src);
-        kaleido.resolve(&ctx.queue, &mut encoder, &view);
+        kaleido.resolve(&ctx.queue, &mut encoder, &view, surface);
         let (buffer, padded_bpr) = capture::create_readback(&ctx.device, surface.0, surface.1);
         capture::record_copy(
             &mut encoder,
@@ -1072,16 +1090,65 @@ mod tests {
         ctx.queue.submit(std::iter::once(encoder.finish()));
         let img = capture::read_back(&ctx.device, &buffer, surface.0, surface.1, padded_bpr)
             .expect("read back the folded frame");
+        fold_mirror_error(&img, FOLD_ORDER)
+    }
 
-        // Measured: 0.0099 with the live grid aspect, 0.1860 with a baked 1280x720
+    /// The kaleidoscope's aspect correction is the **render target's**, not a
+    /// compile-time 16:9 (ADR-0034) and not its own internal grid's (ADR-0037).
+    ///
+    /// Asserted as the fold's own symmetry: an order-N dihedral fold makes the
+    /// output identical in each of its N wedges *in aspect-corrected space*, so
+    /// sampling those wedges with the **target's** aspect must give matching means.
+    /// If the shader folded about a different axis, the wedges would land somewhere
+    /// else and the means would diverge. Restricted to an inscribed disc so the
+    /// rectangular frame's corners do not give some wedges more area.
+    ///
+    /// Two probes, and the second is the one that matters:
+    ///
+    /// - **(512, 256)** — 2:1, which `internal_grid_size` returns unchanged. This
+    ///   was the whole test through Plan 0033, and it *cannot* distinguish grid
+    ///   aspect from surface aspect, which is why it passed for the entire life of
+    ///   the defect.
+    /// - **(320, 256)** — grid (512, 256). The target is 1.25:1 and the grid is
+    ///   2:1, so folding about the grid is a 1.6x wrong axis and only the target's
+    ///   aspect scores clean.
+    #[test]
+    fn the_fold_stays_symmetric_on_a_non_16_9_target() {
+        let Some(ctx) = headless_context_or_skip() else {
+            return;
+        };
+
+        // The grid-agnostic probe (retained): grid and surface agree here.
+        let agreeing = (512, 256);
+        assert_eq!(internal_grid_size(agreeing), (512, 256), "a 2:1 grid");
+        // Measured: 0.0099 with the target's aspect, 0.1860 with a baked 1280x720
         // — a 19x separation, and the threshold sits between them. Verified
         // non-vacuous by re-baking the old constant and watching this fail.
-        let error = fold_mirror_error(&img, ORDER);
-        eprintln!("fold mirror error on a 2:1 grid: {error:.4}");
+        let error = fold_error_at(&ctx, agreeing);
+        eprintln!("fold mirror error at {agreeing:?} (grid == surface): {error:.4}");
         assert!(
             error < 0.05,
             "the fold's wedge mirror is broken by {error:.4} of the frame's contrast on a \
-             2:1 target — it is being aspect-corrected to something other than the live grid"
+             2:1 target — it is being aspect-corrected to something other than the target"
+        );
+
+        // The discriminating probe: the grid's shape is not the target's here, so
+        // only one of the two can be the axis the fold uses.
+        let disagreeing = (320, 256);
+        let grid = internal_grid_size(disagreeing);
+        assert_eq!(grid, (512, 256), "the probe's grid must not be its surface");
+        assert!(
+            (grid.0 as f32 / grid.1 as f32 - disagreeing.0 as f32 / disagreeing.1 as f32).abs()
+                > 0.5,
+            "grid {grid:?} and surface {disagreeing:?} must disagree enough to separate them"
+        );
+        let error = fold_error_at(&ctx, disagreeing);
+        eprintln!("fold mirror error at {disagreeing:?} (grid {grid:?}): {error:.4}");
+        assert!(
+            error < 0.05,
+            "the fold's wedge mirror is broken by {error:.4} of the frame's contrast on a \
+             target whose grid has a different shape — it is folding about the grid's axis \
+             rather than the target's (ADR-0037)"
         );
     }
 
@@ -1141,6 +1208,213 @@ mod tests {
         let contrast =
             values.iter().map(|v| (v - mean).abs()).sum::<f32>() / values.len().max(1) as f32;
         (diff / pairs.max(1) as f32) / contrast.max(1e-6)
+    }
+
+    // -----------------------------------------------------------------------
+    // ADR-0037: composing a stage must not change the picture's *shape*
+    // -----------------------------------------------------------------------
+
+    /// A test-only stand-in for a scene: a hard-edged disc drawn at whatever
+    /// `aspect` the composite hands it.
+    ///
+    /// `world.x = ndc.x * aspect` is the exact inverse of the `ndc = world.x /
+    /// aspect` projection every real scene applies (`particles/mod.rs:414`,
+    /// `lines/renderer.rs:76`), so this models the seam under test — a scene's only
+    /// shape input is that one float — without dragging a whole scene's params,
+    /// palette and audio bindings into a geometry assertion.
+    const DISC_SHADER: &str = r#"
+struct D { v: vec4<f32> } // x: aspect
+
+@group(0) @binding(0) var<uniform> u: D;
+
+@fragment
+fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    let aspect = max(u.v.x, 0.001);
+    let p = vec2<f32>(in.ndc.x * aspect, in.ndc.y);
+    let lit = select(0.0, 1.0, length(p) < 0.5);
+    return vec4<f32>(lit, lit, lit, 1.0);
+}
+"#;
+
+    /// Encode the disc into `target`, projected at `aspect`.
+    fn draw_disc(
+        ctx: &RenderContext,
+        encoder: &mut wgpu::CommandEncoder,
+        target: &wgpu::TextureView,
+        aspect: f32,
+    ) {
+        let format = ctx.surface_format();
+        let uniform = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("disc-uniform"),
+            size: 16,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        ctx.queue
+            .write_buffer(&uniform, 0, bytemuck::bytes_of(&[aspect, 0.0, 0.0, 0.0]));
+        let layout = ctx
+            .device
+            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("disc-bind-layout"),
+                entries: &[gpu::uniform(0, wgpu::ShaderStages::FRAGMENT)],
+            });
+        let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("disc-bind-group"),
+            layout: &layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform.as_entire_binding(),
+            }],
+        });
+        let shader = gpu::fullscreen_shader(
+            &ctx.device,
+            "disc-shader",
+            gpu::FULLSCREEN_VS_NDC,
+            DISC_SHADER,
+        );
+        let pipeline = gpu::fullscreen_pipeline(
+            &ctx.device,
+            &shader,
+            &[&layout],
+            format,
+            wgpu::BlendState::REPLACE,
+            "disc",
+        );
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("disc-pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(&pipeline);
+        pass.set_bind_group(0, &bind_group, &[]);
+        pass.draw(0..3, 0..1);
+    }
+
+    /// Width/height of the lit region's bounding box, in destination pixels.
+    /// `1.0` is a round disc; the defect made it the grid's aspect over the
+    /// target's.
+    fn lit_extent_ratio(img: &CaptureImage) -> f32 {
+        let (w, h) = (img.width as usize, img.height as usize);
+        let (mut x0, mut y0, mut x1, mut y1) = (usize::MAX, usize::MAX, 0usize, 0usize);
+        for y in 0..h {
+            for x in 0..w {
+                let i = (y * w + x) * 4;
+                if img.rgba[i] > 128 {
+                    x0 = x0.min(x);
+                    y0 = y0.min(y);
+                    x1 = x1.max(x);
+                    y1 = y1.max(y);
+                }
+            }
+        }
+        assert!(x0 != usize::MAX, "the disc drew nothing to measure");
+        (x1 - x0 + 1) as f32 / (y1 - y0 + 1) as f32
+    }
+
+    /// Draw the disc through the composite at `surface` — with the trails stage
+    /// active or with the chain entirely skipped — and report the shape it lands
+    /// on the destination as.
+    ///
+    /// Trails is the right stage for this: it computes no geometry of its own, and
+    /// on its first frame the max-decay against a cleared accumulation is the
+    /// identity, so anything that moves is the aspect and nothing else.
+    fn disc_extent_ratio(ctx: &RenderContext, surface: (u32, u32), through_a_stage: bool) -> f32 {
+        let format = ctx.surface_format();
+        let mut chain = PostChain::new(&ctx.device, format);
+        if through_a_stage {
+            assert!(chain.set_stage_param(TRAILS, "trails", 0.5));
+        }
+        let (texture, view) = capture::create_target(&ctx.device, format, surface.0, surface.1);
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("composite-aspect"),
+            });
+        capture::record_clear(&mut encoder, &view);
+        let target = chain.begin(&mut encoder, &view, surface);
+        draw_disc(ctx, &mut encoder, &target.view, target.aspect);
+        chain.resolve(&ctx.queue, &mut encoder, target.routing, &view, surface);
+
+        let (buffer, padded_bpr) = capture::create_readback(&ctx.device, surface.0, surface.1);
+        capture::record_copy(
+            &mut encoder,
+            &texture,
+            &buffer,
+            padded_bpr,
+            surface.0,
+            surface.1,
+        );
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+        let img = capture::read_back(&ctx.device, &buffer, surface.0, surface.1, padded_bpr)
+            .expect("read back the composited frame");
+        lit_extent_ratio(&img)
+    }
+
+    /// **The defect this plan exists for**: turning a post stage on must change the
+    /// picture's softness, never its **shape** (ADR-0037).
+    ///
+    /// A radially symmetric figure is composited twice at the same target size —
+    /// once with the chain skipped, once through an active `trails` — and the two
+    /// must agree. Before the fix `SceneTarget::aspect` came from the quantized
+    /// internal grid, so the scene drew correct-for-the-grid and the stage's
+    /// aspect-ignoring present stretched it by grid-aspect-over-target-aspect.
+    ///
+    /// The sizes are chosen, not incidental. **1280x800** takes a 1280x1024 grid:
+    /// 1.25 against the target's 1.6, a 1.28x stretch and the worst ordinary case.
+    /// **1920x1080** is the control the policy returns unchanged — it is what the
+    /// project develops at, it is why this shipped, and it must move under neither
+    /// the defect nor the fix.
+    #[test]
+    fn composing_a_stage_does_not_change_the_pictures_shape() {
+        let Some(ctx) = headless_context_or_skip() else {
+            return;
+        };
+
+        let skewing = (1280, 800);
+        assert_eq!(
+            internal_grid_size(skewing),
+            (1280, 1024),
+            "the probe size must be one where the grid's shape is not the target's"
+        );
+        let control = (1920, 1080);
+        assert_eq!(
+            internal_grid_size(control),
+            control,
+            "the control must be a size the policy returns exactly — that is what hid this"
+        );
+
+        for surface in [skewing, control] {
+            let plain = disc_extent_ratio(&ctx, surface, false);
+            let staged = disc_extent_ratio(&ctx, surface, true);
+            eprintln!(
+                "{surface:?}: disc x/y = {plain:.4} with the chain skipped, \
+                 {staged:.4} through trails (grid {:?})",
+                internal_grid_size(surface)
+            );
+            assert!(
+                (plain - 1.0).abs() < 0.03,
+                "{surface:?}: the reference disc is not round ({plain:.4}) — the \
+                 comparison below would be meaningless"
+            );
+            assert!(
+                (staged / plain - 1.0).abs() < 0.03,
+                "{surface:?}: composing `trails` restretched the picture by \
+                 {:.3}x ({plain:.4} -> {staged:.4}) — the scene is being handed the \
+                 internal grid's aspect instead of the target's (ADR-0037)",
+                staged / plain
+            );
+        }
     }
 
     /// The active stages always come out in chain order, never reordered — the
