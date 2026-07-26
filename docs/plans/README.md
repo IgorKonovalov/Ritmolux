@@ -3,35 +3,32 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0035**
+**Next free number: 0036**
 
 ## Active roster
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
+| [0035](0035-composite-aspect-and-grid-policy.md) | The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages | **draft 2026-07-26** — awaiting approval | dev |
 | [0034](0034-preset-reachable-spectrum.md) | Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
 
-**[0034] is the only approved plan on the roster** — [0033] closed 2026-07-26 (see Recently closed).
-Two pieces of work are queued ahead of or beside it:
+**Take [0035] first.** It is small (four phases, one of them docs) and it fixes a shipped correctness
+defect: with `trails` or `kaleido_*` active the composite derives every scene's aspect from the
+quantized internal grid, so the whole frame is **stretched** — measured 1.28x wide at 1280x800 and
+1.07x at 1280x720, and it re-breaks [0029] Phase 5's attractor fix on that path. The rule it
+establishes ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) — an internal grid
+is a resolution, not a shape) is one every later stage inherits, which is why it goes before both
+[0034]'s new scene and backlog 0005's bloom stage. It also gives the two post stages their first
+capture-level coverage; the absence of any is what let a whole-frame geometric defect ship green.
 
-1. **[0033]'s Phase 8 (`human`) is still open** — the aesthetic re-tune on the user's 2048x1152
-   display: run the `preset-author` lane over the four `reaction_*` presets (now free of the
-   `zoom = 0.99` pin) and the 13 line presets, **restoring `trails` where it was removed purely for
-   sharpness**. That is the payoff the whole plan exists for, and engine-green cannot substitute for
-   it. The stale "both stages render at a fixed 1280x720" note in fourteen preset headers is preset
-   content and rides with this pass.
-2. **The three majors from [0033]'s close want a small fix plan** (undesigned, no number yet): the
-   composite must take its aspect from the **surface** rather than the quantized internal grid — with
-   `trails` or `kaleido_*` active the frame is stretched 1.28x wide at 1280x800 and 1.07x at
-   1280x720, reproduced, and it also undoes [0029] Phase 5's attractor fix on that path; the two
-   copies of the grid policy (`post.rs::internal_grid_size` vs
-   `particles/mod.rs::trail_grid_size`) want unifying at the same time; `docs/on-device-validation.md`
-   wrongly tells the tester no shipped preset binds `trails` (`rose_trails.toml:48` does); and the
-   two rewired stages have **no golden coverage at all**, which is how the aspect defect got through.
-   Sequence it before backlog 0005's bloom stage, which inherits whichever answer the aspect question
-   gets.
+**[0033]'s Phase 8 (`human`) is open and independent** — the aesthetic re-tune on the user's
+2048x1152 display: run the `preset-author` lane over the four `reaction_*` presets (now free of the
+`zoom = 0.99` pin) and the 13 line presets, **restoring `trails` where it was removed purely for
+sharpness**. That display is aspect-exact under the policy, so [0035] does not block it; the stale
+"both stages render at a fixed 1280x720" note in fourteen preset headers is preset content and rides
+with this pass.
 
 **[0034]** closes backlog 0002, the capability the user asked for twice. Three verifications shrank
 it well below the feedback

@@ -173,6 +173,14 @@ audio + graphics**, where the usual "just allocate and log it" habits cause glit
   whole design rests on.
 - **Don't allocate or block in the audio callback.** See the non-negotiables — this is the
   #1 source of real-time audio bugs.
+- **Don't take an aspect ratio from an internal grid.** An internal render grid (a trail
+  accumulation, a post stage's offscreen, a simulation field) is a **resolution, not a shape**:
+  it is quantized and capped, so its aspect is *not* the target's, and every present is a plain
+  normalized stretch. Any pass computing screen-destined geometry — a projection, a fold, a
+  distance — takes its aspect from the **render target**, so the grid's own aspect cancels out.
+  A `f32` aspect derived from a grid size is the bug. This has shipped twice ([Plan 0029] Phase 5
+  on the attractor, [Plan 0033] Phase 6 on the composite), both times invisible at 1920x1080 and
+  glaring at 1280x800 — see [ADR-0037](docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md).
 - **Don't skip the ADR for cross-cutting decisions.** New dependency, C ABI change, a second
   GPU backend, a new capture mechanism → ADR, even if the edit feels small.
 - **Don't implement without a plan for non-trivial work**, and don't review your own work in

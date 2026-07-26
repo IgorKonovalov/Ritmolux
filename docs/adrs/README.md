@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0037**
+**Next free number: 0038**
 
 | ADR  | Title                                                      | Status   |
 |------|------------------------------------------------------------|----------|
@@ -46,4 +46,5 @@ you need a code comment.
 | [0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) | Testing strategy: five named tiers, an end-to-end tier (ring->analyzer->renderer, plus `shot` as a subprocess), a line-coverage **ratchet on `lmv-core` only**, and an opt-in `.githooks/pre-push` fast gate; rejected workspace-wide coverage, a fixed 80% target, an inventory guard, promoting `shot` to a `[[bin]]`, and full-CI-parity in the hook | accepted |
 | [0034](0034-internal-resolution-follows-the-target.md) | Internal render resolutions follow the target (256 px quantize, single-scale-factor cap at 1920x1080); the reaction-diffusion **simulation** grid deliberately does not — reconstruction first, one fixed step second — and RD's present sampler wraps a field that was already toroidal (supplements 0012/0018/0031) | accepted (Plan 0033; carries an **Outcome** section — "costs approximately nothing" and the named cheap reconstruction form were both falsified in implementation) |
 | [0035](0035-asymmetric-attack-release-easing.md) | Asymmetric easing: `[smoothing]` accepts an `{ attack, release }` pair beside today's scalar, selected by direction in the existing render-layer smoother; rejected a parametric bezier ease, a second `[release]` table, and a stateful `slew()` in the grammar (supplements 0019) | accepted |
+| [0037](0037-internal-grid-is-a-resolution-not-a-shape.md) | An internal grid is a **resolution, not a shape**: any pass computing screen-destined geometry takes its aspect from the render target, never from the grid it rasterizes into — the grid's aspect must cancel out of the picture; rejected matching the grid's aspect to the target (defeats the quantization step), letterboxing the present, and a mismatch threshold (corrects 0034, generalizes Plan 0029 Phase 5) | proposed |
 | [0036](0036-preset-reachable-spectrum.md) | Preset-reachable spectrum in three separable steps: a scalar `bin(x)` over the **already-computed** 64-band log spectrum, an N-element `spectrum` line system on the existing `LineRenderer`, and per-element evaluation last; rejected `spectrum[i]` indexing, N flat `band*` variables, and a GPU spectrum texture (deferred, not refused) | proposed |
