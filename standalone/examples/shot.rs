@@ -16,7 +16,8 @@
 //!   --preset <name>          single-shot the named preset
 //!   --presets <dir>          load the library from <dir> (e.g. the repo's presets/)
 //!   --preset-file <path>     load exactly one preset from <path>
-//!   --set k=v,...            constant stimulus (bass/mid/treb/onset/beat/bar)
+//!   --set k=v,...            constant stimulus (bass/mid/treb/onset/beat/bar/
+//!                            tempo/novelty) — a *held* value, not a transient
 //!   --frames <N>             frames to advance before capture (default 120)
 //!   --size <WxH>             render size (default 1280x720)
 //!   --out <path>             output PNG (single shot) or dir/file (--all)
@@ -42,7 +43,7 @@ use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::{Preset, SystemKind, default_presets, load_dir};
 use lmv_core::render::metrics::{coverage, frame_diff, quadrant_spread, struct_diff};
 use lmv_core::render::{CaptureImage, HeadlessOptions, Renderer};
-use standalone::shot::args::{apply_set, parse_size, synth_signal};
+use standalone::shot::args::{BandLevels, apply_set, band_levels, parse_size, synth_signal};
 use standalone::shot::film::{StripLayout, filmstrip_indices, filmstrip_layout};
 use standalone::shot::glyph::{GLYPH_ADVANCE, GLYPH_COLS, glyph_for};
 use standalone::shot::json::{json_matrix, json_string, num};
@@ -176,7 +177,8 @@ fn print_usage() {
          --preset <name>            single-shot the named preset (needs --out)\n\
          --presets <dir>            library directory (beats LMV_PRESET_DIR)\n\
          --preset-file <path>       one preset from a file (beats --presets)\n\
-         --set k=v,...              stimulus: bass,mid,treb,onset,bar,beat\n\
+         --set k=v,...              bass,mid,treb,onset,bar,beat,tempo,novelty\n\
+         (each HELD for every captured frame - see docs/capturing.md)\n\
          --frames <N>               frames before capture (default 120)\n\
          --size <WxH>               render size (default 1280x720)\n\
          --out <path>               PNG path (shot) or dir/file (--all)\n\
@@ -443,12 +445,37 @@ fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), Strin
 
     let strip = tile_filmstrip(&frames)?;
     save_image(&strip, &out)?;
+    // Printed unconditionally rather than behind a flag: an author who does not
+    // already know that `--set` magnitudes are unlike real levels is exactly the
+    // one who will never pass the flag.
+    print_band_levels(&band_levels(&pcm, format)?);
     println!(
         "wrote {} ({} frames, preset {name}, {label}) [{source}]",
         out.display(),
         frames.len(),
     );
     Ok(())
+}
+
+/// Report what the analyzer derived from this clip, so "what does real material
+/// actually produce" is answered with numbers instead of a guess.
+fn print_band_levels(levels: &BandLevels) {
+    println!(
+        "audio levels over {} analysis hops (past warm-up) — calibrate gains against these, \
+         not against --set magnitudes:",
+        levels.hops
+    );
+    println!("  {:<5} {:>8} {:>8} {:>8}", "band", "min", "mean", "max");
+    for (name, band) in [
+        ("bass", levels.bass),
+        ("mid", levels.mid),
+        ("treb", levels.treb),
+    ] {
+        println!(
+            "  {name:<5} {:>8.3} {:>8.3} {:>8.3}",
+            band.min, band.mean, band.max
+        );
+    }
 }
 
 /// Read a 16-bit-PCM WAV off disk. The parse itself is

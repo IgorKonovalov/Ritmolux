@@ -1,6 +1,6 @@
 # 0033 — Internal resolution follows the target, plus the preset-surface and harness gaps behind it
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human

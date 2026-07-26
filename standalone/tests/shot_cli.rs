@@ -31,6 +31,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use lmv_core::render::CaptureImage;
+use lmv_core::render::metrics::frame_diff;
+
 /// Substring of the error `shot` prints when no GPU adapter can be acquired
 /// (`RenderError::RequestAdapter` -> "no suitable GPU adapter: ..."). Matching the
 /// adapter failure specifically means an unrelated non-zero exit is never mistaken
@@ -41,6 +44,14 @@ const NO_ADAPTER: &str = "no suitable GPU adapter";
 /// these tests fail with a message saying so rather than something cryptic.
 const SHIPPED_PRESET_FILE: &str = "presets/fragment_aurora.toml";
 const SHIPPED_PRESET_NAME: &str = "Aurora";
+
+/// A shipped preset whose `zoom` is gated on `tempo` — the evidence that
+/// `--set tempo=` reaches the grammar rather than merely being accepted.
+const TEMPO_GATED_PRESET_FILE: &str = "presets/rose_zoom.toml";
+
+/// `core/tests/reactivity.rs`'s floor: below this, a difference is rasterization
+/// noise rather than a preset responding.
+const REACTIVITY_FLOOR: f32 = 0.02;
 
 /// The repo root — `shot` is invoked from here so `presets` resolves and the
 /// provenance label reads exactly `[--presets presets]`.
@@ -266,6 +277,126 @@ fn the_presets_flag_is_reported_as_the_source() {
         "stdout does not carry the --presets provenance label:\n{}",
         stdout(&out)
     );
+}
+
+/// `--set tempo=` must reach the expression grammar, not just be accepted by the
+/// parser. `rose_zoom` gates its `zoom` on `select(tempo > 130, 1.45, 1.10)`, so
+/// a slow and a fast setting are two different camera depths — and the frames
+/// have to differ by more than `core/tests/reactivity.rs`'s floor, or the flag is
+/// decorative. This is the gap that kept `tempo` out of nearly every preset: an
+/// author could not see it move.
+#[test]
+fn set_tempo_reaches_the_grammar_and_changes_the_render() {
+    let dir = scratch("tempo");
+    let slow = dir.join("slow.png");
+    let fast = dir.join("fast.png");
+
+    // 60 frames at the fixed 1/60 s capture step is a full second — several time
+    // constants of `rose_zoom`'s 0.31 s `zoom` smoothing, so both captures have
+    // settled on their gated value rather than still travelling toward it.
+    let shot_at = |tempo: &str, out: &Path| {
+        run(&[
+            "--preset-file",
+            TEMPO_GATED_PRESET_FILE,
+            "--set",
+            &format!("tempo={tempo}"),
+            "--size",
+            "128x96",
+            "--frames",
+            "60",
+            "--out",
+            &out.to_string_lossy(),
+        ])
+    };
+
+    let out = shot_at("90", &slow);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "--set tempo=90 failed (is `{TEMPO_GATED_PRESET_FILE}` still tempo-gated?)\n\
+         stdout: {}\nstderr: {}",
+        stdout(&out),
+        stderr(&out)
+    );
+    let out = shot_at("160", &fast);
+    assert!(
+        out.status.success(),
+        "--set tempo=160 failed: {}",
+        stderr(&out)
+    );
+
+    let diff = frame_diff(&load_capture(&slow), &load_capture(&fast));
+    eprintln!("tempo 90 vs 160: frame diff {diff:.4} (floor {REACTIVITY_FLOOR})");
+    assert!(
+        diff > REACTIVITY_FLOOR,
+        "tempo=90 and tempo=160 rendered near-identically (frame diff {diff:.4} <= \
+         {REACTIVITY_FLOOR}); --set tempo is not reaching the grammar"
+    );
+}
+
+/// A filmstrip reports the levels it measured. The `preset-author` lane
+/// calibrated a whole sweep against `--set bass=0.8` — far above anything real
+/// material produces — because nothing ever showed it the real numbers.
+#[test]
+fn a_filmstrip_reports_the_band_levels_it_measured() {
+    let dir = scratch("levels");
+    let strip = dir.join("strip.png");
+
+    let out = run(&[
+        "--preset-file",
+        SHIPPED_PRESET_FILE,
+        "--signal",
+        "bass:60",
+        "--strip",
+        "2",
+        "--size",
+        "64x48",
+        "--out",
+        &strip.to_string_lossy(),
+    ]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "filmstrip failed\nstdout: {}\nstderr: {}",
+        stdout(&out),
+        stderr(&out)
+    );
+
+    let text = stdout(&out);
+    assert!(
+        text.contains("audio levels"),
+        "the filmstrip did not report its band levels:\n{text}"
+    );
+    for band in ["bass", "mid", "treb"] {
+        assert!(
+            text.lines().any(|l| l.trim_start().starts_with(band)),
+            "no `{band}` row in the levels report:\n{text}"
+        );
+    }
+    // The numbers have to be numbers — a row of `NaN` would be worse than no
+    // report, since an author would calibrate against it.
+    assert!(
+        !text.contains("NaN") && !text.contains("inf"),
+        "the levels report carries a non-finite value:\n{text}"
+    );
+}
+
+/// Decode a PNG `shot` wrote back into the shape `lmv_core`'s metrics take, so a
+/// CLI-level difference is measured with the same function the in-core harness
+/// uses rather than a second, subtly different one.
+fn load_capture(path: &Path) -> CaptureImage {
+    let img = image::open(path)
+        .unwrap_or_else(|e| panic!("decode {}: {e}", path.display()))
+        .to_rgba8();
+    CaptureImage {
+        width: img.width(),
+        height: img.height(),
+        rgba: img.into_raw(),
+    }
 }
 
 /// `--report --json` emits parseable JSON with the documented top-level shape. The
