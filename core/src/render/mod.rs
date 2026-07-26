@@ -585,15 +585,20 @@ impl Renderer {
     /// Switch to the next preset; returns its name. **Dissolves** rather than cuts
     /// (Plan 0023): the outgoing preset's composite is captured on the next frame
     /// and blended out over [`DEFAULT_DURATION_SECS`] while the incoming one
-    /// renders live. Every system is still built at startup, so the switch itself
-    /// never hitches a live show.
+    /// renders live. Every system is built at startup, so no *scene* is
+    /// constructed here; the dissolve's opening frames do allocate its own
+    /// resources lazily — see [`begin_transition`](Self::begin_transition).
     ///
     /// The returned name is the **incoming** preset's, immediately — the frontend's
     /// HUD should name where the show is going, not where it has been.
     pub fn cycle_preset(&mut self) -> &str {
-        let from = self.roster.active;
+        // Settle any dissolve in flight *before* reading the roster: "next" must be
+        // one past where the show is actually going, not one past where it started.
+        // Two switches arriving between two rendered frames therefore advance two
+        // presets, as two switches either side of a frame already did.
+        self.snap_finish_transition();
         let to = self.roster.next_index();
-        self.begin_transition(from, to);
+        self.begin_transition(to);
         self.roster.presets.get(to).map_or("no presets", |p| {
             // Borrowck: the roster is not flipped yet (the capture frame needs the
             // outgoing preset active), so read the incoming name by index.
@@ -601,27 +606,41 @@ impl Renderer {
         })
     }
 
-    /// Start a dissolve from `from` to `to`, or cut instantly when a dissolve
-    /// would be meaningless (an empty roster, an out-of-range target, or a switch
-    /// to the already-active preset).
+    /// Start a dissolve to `to`, or cut instantly when a dissolve would be
+    /// meaningless (a switch to the already-active preset). An out-of-range `to` is
+    /// a no-op that does not disturb a dissolve already running.
+    ///
+    /// The outgoing index is read from the roster **after** settling any dissolve in
+    /// flight, never passed in: a caller that resolved it earlier would name a
+    /// preset the snapshot is no longer going to hold.
     ///
     /// The roster is deliberately **not** flipped here: the dissolve's opening
     /// frame composites the still-active outgoing preset into the snapshot, and
     /// [`Transition::advance`] hands back the index to flip to once that frame has
     /// been encoded.
-    fn begin_transition(&mut self, from: usize, to: usize) {
-        if to >= self.roster.presets.len() || to == from {
-            self.select_preset_instantly(to);
+    ///
+    /// **This is where a dissolve's GPU cost lands.** Every scene is built at
+    /// startup, but the blend's two surface-sized targets (~16 MB at 1080p) and the
+    /// incoming side's chain stages build lazily on the frames that first need them
+    /// — the dissolve's opening frames. A one-time hitch there is a known
+    /// limitation, not a bug; pre-warming here was considered and declined, since
+    /// the chain's stages cannot know which of them a preset will even activate
+    /// until its params are evaluated.
+    fn begin_transition(&mut self, to: usize) {
+        if to >= self.roster.presets.len() {
+            // Out of range (a stale index from a shrunk hot-reloaded roster): a
+            // no-op. Deliberately checked before settling, so an invalid request
+            // cannot cut short a dissolve that is running correctly.
             return;
         }
-        // A switch arriving mid-dissolve snap-finishes the one in flight to its
-        // own target before starting the new one, so the roster is never left on
-        // an index nobody asked for (Plan 0023 Phase 5 re-entrancy rule). Its
-        // incoming side is promoted first: that preset became the active one, so
-        // its composite is the one the new dissolve's outgoing side must use.
-        if let Some(running) = self.transition.take() {
-            self.roster.select(running.incoming_index());
-            self.promote_incoming_side();
+        // A switch arriving mid-dissolve snap-finishes the one in flight to its own
+        // target before starting the new one, so the roster is never left on an
+        // index nobody asked for (Plan 0023 Phase 5 re-entrancy rule).
+        self.snap_finish_transition();
+        let from = self.roster.active;
+        if to == from {
+            self.select_preset_instantly(to);
+            return;
         }
         let kind =
             TRANSITION_KIND.unwrap_or_else(|| TransitionKind::rotating(self.transitions_started));
@@ -677,10 +696,37 @@ impl Renderer {
     /// is otherwise unreachable from a headless test. No frontend calls this.
     #[cfg(test)]
     fn begin_transition_forced(&mut self, to: usize, mode: Mode) {
-        let from = self.roster.active;
-        self.begin_transition(from, to);
+        self.begin_transition(to);
         if let Some(tr) = self.transition.as_mut() {
             tr.set_mode(mode);
+        }
+    }
+
+    /// Land any dissolve in flight on its own target immediately, as if it had run
+    /// to `t = 1`, leaving nothing running. The re-entrancy rule's first half: a
+    /// switch arriving mid-dissolve finishes the current one before starting the
+    /// new one, so the roster is never left on an index nobody asked for.
+    ///
+    /// Idempotent, and a no-op when nothing is running — callers invoke it to
+    /// *settle* the roster before reading it, not only before replacing a dissolve.
+    fn snap_finish_transition(&mut self) {
+        let Some(running) = self.transition.take() else {
+            return;
+        };
+        let target = running.incoming_index();
+        // The roster is already on the target unless the dissolve was interrupted
+        // before its capture frame ran — that frame is what flips it. Only then has
+        // the incoming preset never been configured, and only then may the eased
+        // params be reset; doing it unconditionally would snap a smoothed preset on
+        // every mid-dissolve switch.
+        let settled_early = self.roster.active != target;
+        self.roster.select(target);
+        // Its incoming side is promoted whether or not the roster moved: that preset
+        // is the active one now, so its composite is the one the next dissolve's
+        // outgoing side must use.
+        self.promote_incoming_side();
+        if settled_early {
+            self.configure_active_scene();
         }
     }
 
@@ -749,12 +795,12 @@ impl Renderer {
     /// Use [`select_preset_now`](Self::select_preset_now) where a blend would be
     /// wrong rather than merely unwanted.
     pub fn select_preset(&mut self, index: usize) -> &str {
-        let from = self.roster.active;
-        self.begin_transition(from, index);
+        self.begin_transition(index);
         // A dissolve has not flipped the roster yet — the opening frame still
         // composites the outgoing preset — so name the incoming one by index, as
         // `cycle_preset` does. `begin_transition` cuts instantly when the index is
-        // out of range or already active, and then the roster *is* the answer.
+        // already active, and no-ops when it is out of range; either way the roster
+        // *is* the answer then.
         match self.transition.as_ref().map(Transition::incoming_index) {
             Some(to) => self
                 .roster
@@ -1884,6 +1930,74 @@ mod tests {
         assert_ne!(
             base.rgba, lit.rgba,
             "bound radial_offset/phase must change the rendered geometry"
+        );
+    }
+
+    /// **The governor's wiring**, not its arithmetic (Plan 0023 close review, minor
+    /// 4). `dual_live_eligible` and `shares_resources` are each covered where they
+    /// live; what nothing exercised is `dissolve_mode` composing them — including
+    /// the arm that decides what an *unresolvable* preset index means.
+    ///
+    /// GPU-free: `Roster` and the preset list are enough, so this runs everywhere.
+    #[test]
+    fn dissolve_mode_freezes_a_shared_scene_pair_and_an_unresolvable_one() {
+        let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+            width: 64,
+            height: 64,
+            prefer_software: true,
+        }) else {
+            return;
+        };
+        let of = |name: &str, body: &str| {
+            Preset::from_toml_str(&format!("name = \"{name}\"\n{body}"))
+                .expect("hand-written test preset is valid")
+        };
+        // 0 and 1 are the same system (one scene object); 2 is a different line
+        // system (a *different* scene that still shares the one `LineRenderer`); 3
+        // holds genuinely independent GPU state.
+        renderer.set_presets(vec![
+            of("SameA", "system = \"parametric_curve\"\n"),
+            of("SameB", "system = \"parametric_curve\"\n"),
+            of(
+                "OtherLine",
+                "system = \"star_pattern\"\n[generator]\ntiling = \"8\"\n",
+            ),
+            of("Field", "system = \"fragment_field\"\n"),
+        ]);
+
+        assert_eq!(
+            renderer.dissolve_mode(0, 1),
+            Mode::Freeze,
+            "two presets on one `SystemKind` are one mutable scene object"
+        );
+        assert_eq!(
+            renderer.dissolve_mode(0, 2),
+            Mode::Freeze,
+            "two line systems share one `LineRenderer`, so neither may render twice"
+        );
+        // An index the roster cannot resolve must read as *shared*, not as
+        // independent: the safe answer to "can we render both?" is no.
+        assert_eq!(
+            renderer.dissolve_mode(0, 99),
+            Mode::Freeze,
+            "an unresolvable preset index must not be read as an independent pair"
+        );
+        assert_eq!(
+            renderer.dissolve_mode(99, 0),
+            Mode::Freeze,
+            "...from either side"
+        );
+
+        // The independent pair is the only one that *could* upgrade — and it still
+        // freezes here, because a headless renderer collects no frame times and the
+        // governor upgrades only on positive evidence of headroom. Asserting that
+        // pins the second half of the composition: passing the veto is necessary,
+        // not sufficient.
+        assert_eq!(
+            renderer.dissolve_mode(2, 3),
+            Mode::Freeze,
+            "independent scenes still need frame-time evidence, which a headless \
+             capture never has"
         );
     }
 

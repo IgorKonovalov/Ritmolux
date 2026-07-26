@@ -781,6 +781,105 @@ fn a_switch_mid_dissolve_lands_on_the_last_requested_preset() {
     );
 }
 
+/// **Two switches between two rendered frames advance two presets** (Plan 0023
+/// close review, minor 1).
+///
+/// A dissolve does not flip the roster until its *capture* frame has rendered, so
+/// a second switch arriving before that frame used to read a roster still pointing
+/// at the outgoing preset — `cycle_preset` would compute "next" from where the show
+/// started rather than where it was already going, and silently absorb the press.
+/// Settling the dissolve in flight before reading the roster is what makes a
+/// double-tap of Space behave like two taps either side of a frame.
+///
+/// The reference is preset 2 reached by an instant select: same destination, no
+/// dissolve, so a mismatch is the switch being lost rather than a blend artifact.
+#[test]
+fn two_switches_between_frames_advance_two_presets() {
+    let Some(mut renderer) = headless_or_skip() else {
+        return;
+    };
+    let frame = AnalysisFrame::default();
+
+    renderer.set_presets(static_trio());
+    renderer.select_preset_now(2);
+    let reference = capture_run(&mut renderer, &frame, 8);
+
+    renderer.set_presets(static_trio());
+    renderer.select_preset_now(0);
+    capture_run(&mut renderer, &frame, 5);
+
+    // Both switches land with **no capture between them** — the window where the
+    // roster has not yet flipped.
+    assert_eq!(
+        renderer.cycle_preset(),
+        "TransB",
+        "the first switch heads for the next preset"
+    );
+    assert_eq!(
+        renderer.cycle_preset(),
+        "TransC",
+        "the second must step past it, not re-target the same index"
+    );
+
+    capture_run(&mut renderer, &frame, DISSOLVE_FRAMES + 2);
+    let after = capture_run(&mut renderer, &frame, 8);
+
+    assert_eq!(
+        renderer.preset_name(),
+        "TransC",
+        "two switches advance two presets, even between two frames"
+    );
+    let drift = frame_diff(
+        after.last().expect("settled frame"),
+        reference.last().expect("reference frame"),
+    );
+    assert!(
+        drift < 0.02,
+        "the doubled switch must settle on preset 2 like an instant select: {drift}"
+    );
+}
+
+/// **An out-of-range select does not disturb a dissolve in flight** (Plan 0023
+/// close review, minor 1). A stale index from a shrunk hot-reloaded roster is
+/// documented as a no-op; settling the running dissolve early on its way to
+/// rejecting one would make that no-op visible as a cut.
+#[test]
+fn an_out_of_range_select_leaves_a_running_dissolve_alone() {
+    let Some(mut renderer) = headless_or_skip() else {
+        return;
+    };
+    let frame = AnalysisFrame::default();
+    renderer.set_presets(static_pair());
+    renderer.select_preset_now(0);
+    capture_run(&mut renderer, &frame, 5);
+
+    renderer.cycle_preset(); // 0 -> 1, in flight
+    let before = capture_run(&mut renderer, &frame, DISSOLVE_FRAMES / 3);
+    renderer.select_preset(999); // rejected — must change nothing
+    let after = capture_run(&mut renderer, &frame, 1);
+
+    // Still mid-dissolve: the frame after the rejected select continues the ramp
+    // rather than jumping to either endpoint.
+    let last_before = before.last().expect("a frame before the rejected select");
+    let step = frame_diff(last_before, after.first().expect("the frame after"));
+    let ramp = frame_diff(
+        before.first().expect("the dissolve's opening frame"),
+        last_before,
+    );
+    assert!(
+        step < ramp,
+        "a rejected select must not cut the dissolve short \
+         (step {step} against the ramp so far {ramp})"
+    );
+
+    capture_run(&mut renderer, &frame, DISSOLVE_FRAMES);
+    assert_eq!(
+        renderer.preset_name(),
+        "TransB",
+        "the dissolve still lands on its own target"
+    );
+}
+
 /// **A roster hot-reload during a dissolve settles cleanly** (Plan 0023 Phase 5):
 /// the in-flight target may not even exist in the replacement set, so the
 /// transition is cancelled to whatever `set_presets` resolves the active index to
