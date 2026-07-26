@@ -433,6 +433,44 @@ pub struct Renderer {
 }
 
 impl Renderer {
+    /// Everything a renderer is beyond its [`RenderContext`]: the scene roster,
+    /// the composite side, the engine-wide post passes, the overlay, and the
+    /// embedded default presets. **The one construction path** — the three public
+    /// constructors differ only in how they obtain the context, so a new field is
+    /// a one-place edit here rather than three.
+    fn from_context(ctx: RenderContext) -> Self {
+        let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
+        let side = CompositeSide::new(&ctx.device, ctx.surface_format());
+        let ink = Ink::new(&ctx.device, ctx.surface_format());
+        let blend = Blend::new(&ctx.device, ctx.surface_format());
+        let overlay = Overlay::new(&ctx.device, ctx.surface_format());
+        #[cfg(feature = "text")]
+        let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
+        let mut renderer = Self {
+            ctx,
+            scenes,
+            side,
+            incoming_side: None,
+            ink,
+            blend,
+            transition: None,
+            transitions_started: 0,
+            roster: Roster::new(crate::preset::default_presets()),
+            time: 0.0,
+            diag: Diag::new(),
+            overlay,
+            #[cfg(feature = "text")]
+            text_layer,
+            cap_overflow: None,
+            param_smoother: ParamSmoother::default(),
+            outgoing_smoother: ParamSmoother::default(),
+        };
+        // Apply the initial preset's structural config (ADR-0007) so a line
+        // scene at roster index 0 renders with its geometry built.
+        renderer.configure_active_scene();
+        renderer
+    }
+
     /// Build a renderer drawing into `target` (a safe window handle — the
     /// standalone path). Starts with the embedded default presets.
     pub fn new(
@@ -440,37 +478,9 @@ impl Renderer {
         width: u32,
         height: u32,
     ) -> Result<Self, RenderError> {
-        let ctx = RenderContext::new(target, width, height)?;
-        let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
-        let side = CompositeSide::new(&ctx.device, ctx.surface_format());
-        let ink = Ink::new(&ctx.device, ctx.surface_format());
-        let blend = Blend::new(&ctx.device, ctx.surface_format());
-        let overlay = Overlay::new(&ctx.device, ctx.surface_format());
-        #[cfg(feature = "text")]
-        let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
-        let mut renderer = Self {
-            ctx,
-            scenes,
-            side,
-            incoming_side: None,
-            ink,
-            blend,
-            transition: None,
-            transitions_started: 0,
-            roster: Roster::new(crate::preset::default_presets()),
-            time: 0.0,
-            diag: Diag::new(),
-            overlay,
-            #[cfg(feature = "text")]
-            text_layer,
-            cap_overflow: None,
-            param_smoother: ParamSmoother::default(),
-            outgoing_smoother: ParamSmoother::default(),
-        };
-        // Apply the initial preset's structural config (ADR-0007) so a line
-        // scene at roster index 0 renders with its geometry built.
-        renderer.configure_active_scene();
-        Ok(renderer)
+        Ok(Self::from_context(RenderContext::new(
+            target, width, height,
+        )?))
     }
 
     /// Build a **headless** renderer that draws into offscreen textures instead
@@ -478,37 +488,11 @@ impl Renderer {
     /// per-frame evaluation as the on-surface path — only the target differs.
     /// Starts with the embedded default presets.
     pub fn new_headless(opts: HeadlessOptions) -> Result<Self, RenderError> {
-        let ctx = RenderContext::new_headless(opts.width, opts.height, opts.prefer_software)?;
-        let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
-        let side = CompositeSide::new(&ctx.device, ctx.surface_format());
-        let ink = Ink::new(&ctx.device, ctx.surface_format());
-        let blend = Blend::new(&ctx.device, ctx.surface_format());
-        let overlay = Overlay::new(&ctx.device, ctx.surface_format());
-        #[cfg(feature = "text")]
-        let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
-        let mut renderer = Self {
-            ctx,
-            scenes,
-            side,
-            incoming_side: None,
-            ink,
-            blend,
-            transition: None,
-            transitions_started: 0,
-            roster: Roster::new(crate::preset::default_presets()),
-            time: 0.0,
-            diag: Diag::new(),
-            overlay,
-            #[cfg(feature = "text")]
-            text_layer,
-            cap_overflow: None,
-            param_smoother: ParamSmoother::default(),
-            outgoing_smoother: ParamSmoother::default(),
-        };
-        // Apply the initial preset's structural config (ADR-0007) so a line
-        // scene at roster index 0 renders with its geometry built.
-        renderer.configure_active_scene();
-        Ok(renderer)
+        Ok(Self::from_context(RenderContext::new_headless(
+            opts.width,
+            opts.height,
+            opts.prefer_software,
+        )?))
     }
 
     /// Renderer targeting a native Win32 window the host owns — the C ABI
@@ -531,37 +515,11 @@ impl Renderer {
                 wgpu::rwh::Win32WindowHandle::new(hwnd),
             ),
         };
+        // The `unsafe` is exactly the surface-from-raw-handle call: the caller's
+        // promise about `hwnd`'s validity and lifetime. Construction past that
+        // point is the same safe code the other two paths run.
         let ctx = unsafe { RenderContext::new_unsafe(target, width, height) }?;
-        let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
-        let side = CompositeSide::new(&ctx.device, ctx.surface_format());
-        let ink = Ink::new(&ctx.device, ctx.surface_format());
-        let blend = Blend::new(&ctx.device, ctx.surface_format());
-        let overlay = Overlay::new(&ctx.device, ctx.surface_format());
-        #[cfg(feature = "text")]
-        let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
-        let mut renderer = Self {
-            ctx,
-            scenes,
-            side,
-            incoming_side: None,
-            ink,
-            blend,
-            transition: None,
-            transitions_started: 0,
-            roster: Roster::new(crate::preset::default_presets()),
-            time: 0.0,
-            diag: Diag::new(),
-            overlay,
-            #[cfg(feature = "text")]
-            text_layer,
-            cap_overflow: None,
-            param_smoother: ParamSmoother::default(),
-            outgoing_smoother: ParamSmoother::default(),
-        };
-        // Apply the initial preset's structural config (ADR-0007) so a line
-        // scene at roster index 0 renders with its geometry built.
-        renderer.configure_active_scene();
-        Ok(renderer)
+        Ok(Self::from_context(ctx))
     }
 
     /// Reconfigure the surface for a new window size.
