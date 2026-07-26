@@ -75,19 +75,86 @@ The app **never seeds** into an override folder — it is yours.
 
 | Flag | Effect |
 |------|--------|
-| `--all --out sheet.png` | **contact sheet** — every preset in the loaded library as a labeled thumbnail grid. The fastest way to compare a draft against the shipped set and to offer the user side-by-side directions. |
-| `--report` / `--report --json` | a **metrics table** (reactivity / animation / coverage / near-duplicate), no image. `family=<system>` filters it to one system. Use it to check a preset actually reacts and isn't a near-dup. |
+| `--all --out sheet.png` | **contact sheet** — every preset in the loaded library as a labeled thumbnail grid. The fastest way to compare a draft against the shipped set and to offer the user side-by-side directions. **Honours `--set`** — see the audit pair below. |
+| `--report` / `--report --json` | a **metrics table** (reactivity / animation / coverage / near-duplicate), no image. `family=<system>` filters it to one system. See "Reading the report" below. |
 | `--frames <N>` | frames advanced before capture (default 120). More frames = later in any `time`-driven animation. |
 | `--size <WxH>` | render size (default 1280x720). Render near 1080p when judging the real look — the attractor's detail in particular follows the target size. |
 | `--strip <N>` | frames tiled along the audio (default 8). |
 | `--out <path>` | output PNG (parent dirs auto-created). For `--all`, a `.png` path is used verbatim; any other path is treated as a dir and the sheet lands at `<out>/contact-sheet.png`. |
 
+## Reading the report
+
+`--report` renders the loaded library at fixed stimuli and prints one row per preset, grouped by
+family. It builds its own frames (a silent base, one per band, a late frame, a loud frame), so it
+ignores `--set` — but it does honour library selection, which matters:
+
+```sh
+# The repo working tree, not whichever library wins precedence
+cargo run -p standalone --example shot -- --presets presets --report
+cargo run -p standalone --example shot -- --presets presets --report family=swarm
+cargo run -p standalone --example shot -- --presets presets --report --json > report.json
+```
+
+```
+=== swarm (5 presets) ===
+  preset            bass     mid    treb   onset    anim   cover
+  Flow             0.150   0.019   0.000   0.120   0.092   0.944
+  NEAR-DUP: Burst ~ Storm
+```
+
+| Column | What it is | What a bad value means |
+|--------|-----------|------------------------|
+| `bass` `mid` `treb` `onset` | how much the frame changes when that input alone is lit | `0.000` — nothing you bound to it reaches the picture: a typo'd param, a gain too small, or a term the clamp swallows. One live column is enough for CI; a *designed* preset usually wants two or three. |
+| `anim` | change between an early and a late silent frame | near zero — frozen at rest. It needs a `time` drift somewhere. |
+| `cover` | fraction of the loud frame differing from its own corner pixel | near zero — the peak has **no structure against its own background**: dead, flung out of frame, or so blown out that the corner is lit too. Which one it is, only the still will tell you (`craft.md`, the additive ceiling). |
+| `NEAR-DUP` | pairwise shape distance under `0.08` | it is not a new look. Change the geometry, not the colour. |
+
+The report is a **suspect finder**, not a verdict: it costs one command for a whole library and it
+points you at the two or three files worth rendering. Run it before you start editing, not just
+before you ship.
+
+## The audit pair — one library, two excitations
+
+`--all` honours `--set`, so the same library rendered loud and quiet gives two sheets you can flip
+between. This is the highest-yield move in the lane when the task is "tune the set" rather than "make
+one look":
+
+```sh
+cargo run -p standalone --example shot -- --presets presets --all \
+  --set bass=1,mid=1,treb=1,onset=1,beat=1,bar=0.5 --out audit/loud.png
+cargo run -p standalone --example shot -- --presets presets --all \
+  --set bass=0.1,mid=0.1,treb=0.05 --out audit/quiet.png
+```
+
+What the pair exposes that neither sheet alone does:
+
+- **Inversions** — any thumbnail with *less* legible structure loud than quiet is over the additive
+  ceiling (blown white) or has thrown its geometry out of frame. Loud must read as more.
+- **Dead presets** — identical loud and quiet thumbnails means nothing is reaching the picture.
+- **Family sameness** — a grid makes near-duplicates and one-note families obvious in a way a
+  sequence of single stills never does, and it confirms what `--report` flagged as `NEAR-DUP`.
+- **Neighbour clashes** — the sheet is laid out in the same filename order the engine's rotation
+  walks, so adjacent cells are the presets that will dissolve into each other.
+
+Pair it with `--report`: the table gives the numbers, the sheets say which failure produced them.
+
 ## The loop in practice
+
+**Fixing or tuning an existing set** — diagnose before you edit:
+
+1. `--report` over the working tree → which presets are dead, blown, frozen or duplicated?
+2. The audit pair of contact sheets → which of those failures each one actually is, and does anything
+   invert from quiet to loud?
+3. Only now open the two or three files that the numbers and the sheets agree about.
+
+**Authoring one new look** — render every step:
 
 1. Write the draft (repo `presets/` or your own folder).
 2. `--set` loud still → composition right? colour cohesive? reacting at all?
 3. `--set` quiet still → does it still look intentional at rest, or collapse to nothing?
-4. `--signal click:120` filmstrip → does it move musically, or strobe?
-5. Tune, re-render, repeat.
-6. To offer directions: render 2–3 variants (or `--all`) and show the stills side by side — this
+4. Loud vs quiet → more structure at peak, not less (the inversion check).
+5. `--signal click:120` filmstrip → does it move musically, or strobe?
+6. Tune, re-render, repeat.
+7. `--report` before you'd ship it → bands live, `anim` alive, `cover` sane, no `NEAR-DUP`.
+8. To offer directions: render 2–3 variants (or `--all`) and show the stills side by side — this
    project decides by looking, not by prose. Save the stills somewhere the user can flip through.
