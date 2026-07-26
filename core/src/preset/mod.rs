@@ -16,7 +16,7 @@ pub mod schema;
 use std::path::{Path, PathBuf};
 
 pub use expr::{Expr, ExprError, Variables, compile};
-pub use schema::{Binding, Preset, PresetError, SystemKind, is_known_param};
+pub use schema::{Binding, Easing, Preset, PresetError, SystemKind, is_known_param};
 
 // The shipped example presets, embedded at compile time so the C-ABI/foobar
 // path always has visuals without a preset directory (ADR-0006). This list is

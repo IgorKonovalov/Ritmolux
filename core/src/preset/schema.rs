@@ -157,6 +157,48 @@ pub fn is_known_param(system: SystemKind, name: &str) -> bool {
     system.param_names().contains(&name) || GLOBAL_PARAMS.iter().any(|stage| stage.contains(&name))
 }
 
+/// A binding's easing time constants in **seconds** (ADR-0019, widened to a pair
+/// by ADR-0035).
+///
+/// `attack` applies while the incoming value is **above** the held one and
+/// `release` while it is at or below — so a percussive parameter can reach its
+/// target in a frame or two and then glide back over most of a second, which no
+/// single constant expresses at any value.
+///
+/// The scalar `[smoothing]` form builds [`Easing::symmetric`], which is the
+/// low-pass ADR-0019 shipped: with both constants equal the direction test picks
+/// the same number either way, so the arithmetic is bit-for-bit unchanged.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Easing {
+    /// Constant used while the raw value is **above** the held value (rising).
+    pub attack: f32,
+    /// Constant used while the raw value is at or **below** the held value.
+    pub release: f32,
+}
+
+impl Easing {
+    /// No smoothing on either side: the value is applied instantly. The default
+    /// for a parameter absent from `[smoothing]`.
+    pub const INSTANT: Self = Self {
+        attack: 0.0,
+        release: 0.0,
+    };
+
+    /// One constant in both directions — the scalar `[smoothing]` form.
+    pub const fn symmetric(tau: f32) -> Self {
+        Self {
+            attack: tau,
+            release: tau,
+        }
+    }
+}
+
+impl Default for Easing {
+    fn default() -> Self {
+        Self::INSTANT
+    }
+}
+
 /// A named parameter bound to a compiled expression.
 #[derive(Debug)]
 pub struct Binding {
@@ -164,13 +206,13 @@ pub struct Binding {
     pub name: String,
     /// The compiled expression producing its per-frame value.
     pub expr: Expr,
-    /// This binding's easing time constant in **seconds** (ADR-0019), read out of
-    /// the preset's `[smoothing]` table **once, here at load**. `0.0` — the
-    /// default for an unlisted param — means no smoothing, i.e. the value is
-    /// applied instantly. Resolved at parse time rather than looked up per
-    /// binding per frame (Plan 0031 Phase 3); it is a fact about the preset, and
-    /// the preset does not change while it renders.
-    pub tau: f32,
+    /// This binding's easing constants (ADR-0019 / ADR-0035), read out of the
+    /// preset's `[smoothing]` table **once, here at load**.
+    /// [`Easing::INSTANT`] — the default for an unlisted param — means no
+    /// smoothing. Resolved at parse time rather than looked up per binding per
+    /// frame (Plan 0031 Phase 3); it is a fact about the preset, and the preset
+    /// does not change while it renders.
+    pub tau: Easing,
 }
 
 /// A loaded, ready-to-evaluate preset.
@@ -244,7 +286,7 @@ impl Preset {
             params.push(Binding {
                 name: param,
                 expr,
-                tau: 0.0,
+                tau: Easing::INSTANT,
             });
         }
 
@@ -253,21 +295,27 @@ impl Preset {
         // scene. Built per system so each reads the right table.
         let config = build_config(system, raw.curve, raw.generator, raw.particles)?;
 
-        // Easing time constants (ADR-0019): validated non-negative + finite at the
-        // load boundary, then trusted by the render-layer smoother. A bad value is
-        // a surfaced load error, never a panic.
-        for (param, seconds) in &raw.smoothing {
-            if !seconds.is_finite() || *seconds < 0.0 {
-                return Err(PresetError::Config(format!(
-                    "smoothing '{param}' must be a non-negative number of seconds, got {seconds}"
-                )));
+        // Easing time constants (ADR-0019, ADR-0035): validated non-negative +
+        // finite at the load boundary, then trusted by the render-layer smoother.
+        // A bad value is a surfaced load error, never a panic. Both sides of an
+        // `{ attack, release }` pair are checked, and the error names which one.
+        for (param, entry) in &raw.smoothing {
+            match *entry {
+                RawSmoothing::Symmetric(seconds) => check_tau(param, None, seconds)?,
+                RawSmoothing::Asymmetric { attack, release } => {
+                    check_tau(param, Some("attack"), attack)?;
+                    check_tau(param, Some("release"), release)?;
+                }
             }
         }
-        // Fold the validated table into the bindings, so the frame loop reads a
-        // plain `f32` off the binding instead of hashing its name into a
+        // Fold the validated table into the bindings, so the frame loop reads the
+        // constants off the binding instead of hashing its name into a
         // `BTreeMap` once per binding per frame (Plan 0031 Phase 3).
         for binding in &mut params {
-            binding.tau = raw.smoothing.get(&binding.name).copied().unwrap_or(0.0);
+            binding.tau = raw
+                .smoothing
+                .get(&binding.name)
+                .map_or(Easing::INSTANT, |entry| entry.to_easing());
         }
 
         // Palette selection (ADR-0021): validated at this boundary into a
@@ -351,10 +399,11 @@ struct RawPreset {
     /// the attractor family for the compute-particle scene.
     #[serde(default)]
     particles: Option<RawParticles>,
-    /// The optional `[smoothing]` table (ADR-0019): per-parameter easing time
-    /// constants in seconds. Absent means every param is applied instantly.
+    /// The optional `[smoothing]` table (ADR-0019, ADR-0035): per-parameter
+    /// easing time constants in seconds, each a scalar or an
+    /// `{ attack, release }` pair. Absent means every param is applied instantly.
     #[serde(default)]
-    smoothing: BTreeMap<String, f32>,
+    smoothing: BTreeMap<String, RawSmoothing>,
     /// The optional `[palette]` color table (ADR-0021): a built-in `name` or
     /// custom `stops`. Absent means the default `spectrum` cosine.
     #[serde(default)]
@@ -363,6 +412,103 @@ struct RawPreset {
     /// target for a bindable `palette_mix`. Same shape as `[palette]`.
     #[serde(default)]
     palette_b: Option<RawPalette>,
+}
+
+/// One `[smoothing]` entry, before validation: today's scalar, or ADR-0035's
+/// inline `{ attack = <seconds>, release = <seconds> }` pair.
+///
+/// Hand-deserialized rather than `#[serde(untagged)]` because an untagged enum
+/// reports every failure as "data did not match any variant", which would make a
+/// mistyped table strictly harder to diagnose than a mistyped float — the exact
+/// regression ADR-0035 says not to ship.
+#[derive(Debug, Clone, Copy)]
+enum RawSmoothing {
+    /// `hue = 0.4` — one constant in both directions.
+    Symmetric(f32),
+    /// `burst = { attack = 0.02, release = 0.7 }`.
+    Asymmetric { attack: f32, release: f32 },
+}
+
+impl RawSmoothing {
+    /// The validated pair this entry denotes. A scalar means both sides.
+    fn to_easing(self) -> Easing {
+        match self {
+            Self::Symmetric(tau) => Easing::symmetric(tau),
+            Self::Asymmetric { attack, release } => Easing { attack, release },
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RawSmoothing {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        de.deserialize_any(RawSmoothingVisitor)
+    }
+}
+
+struct RawSmoothingVisitor;
+
+impl<'de> serde::de::Visitor<'de> for RawSmoothingVisitor {
+    type Value = RawSmoothing;
+
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("a number of seconds, or a table { attack = <seconds>, release = <seconds> }")
+    }
+
+    fn visit_f64<E: serde::de::Error>(self, v: f64) -> Result<Self::Value, E> {
+        Ok(RawSmoothing::Symmetric(v as f32))
+    }
+
+    // TOML distinguishes `0.4` from `0`, and an author writing an instant
+    // constant reaches for the integer.
+    fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Self::Value, E> {
+        Ok(RawSmoothing::Symmetric(v as f32))
+    }
+
+    fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Self::Value, E> {
+        Ok(RawSmoothing::Symmetric(v as f32))
+    }
+
+    fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+        use serde::de::Error;
+        let mut attack = None;
+        let mut release = None;
+        while let Some(key) = map.next_key::<String>()? {
+            match key.as_str() {
+                "attack" if attack.is_some() => return Err(A::Error::duplicate_field("attack")),
+                "release" if release.is_some() => return Err(A::Error::duplicate_field("release")),
+                "attack" => attack = Some(map.next_value::<f32>()?),
+                "release" => release = Some(map.next_value::<f32>()?),
+                // Naming both expected keys is the whole point: `atack = 0.02`
+                // must not silently become an entry with a default attack.
+                other => return Err(A::Error::unknown_field(other, &["attack", "release"])),
+            }
+        }
+        match (attack, release) {
+            (Some(attack), Some(release)) => Ok(RawSmoothing::Asymmetric { attack, release }),
+            // Half a pair is a mistake, not a shorthand: silently defaulting the
+            // missing side to instant would give the opposite of the requested
+            // envelope on that direction.
+            (None, _) => Err(A::Error::missing_field("attack")),
+            (_, None) => Err(A::Error::missing_field("release")),
+        }
+    }
+}
+
+/// One easing constant, validated at the load boundary. `side` names which half
+/// of an `{ attack, release }` pair failed; `None` is the scalar form, whose
+/// message is unchanged from ADR-0019.
+fn check_tau(param: &str, side: Option<&str>, seconds: f32) -> Result<(), PresetError> {
+    if seconds.is_finite() && seconds >= 0.0 {
+        return Ok(());
+    }
+    Err(PresetError::Config(match side {
+        Some(side) => format!(
+            "smoothing '{param}' {side} must be a non-negative number of seconds, got {seconds}"
+        ),
+        None => {
+            format!("smoothing '{param}' must be a non-negative number of seconds, got {seconds}")
+        }
+    }))
 }
 
 /// The raw `[palette]` table: **either** a built-in palette `name` **or** custom

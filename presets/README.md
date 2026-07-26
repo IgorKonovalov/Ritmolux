@@ -268,6 +268,33 @@ smoothing. The smoothing runs on real elapsed time, so it is identical at any
 refresh rate, and it resets on a preset switch (a switch snaps to the new preset's
 first value). Validated non-negative and finite at load.
 
+### Snap up, glide down — the `{ attack, release }` form
+
+One constant slows the rise exactly as much as it slows the fall, so a longer
+`tau` trades a jarring attack for a mushy one. An entry may instead name **two**
+constants, and the smoother picks by direction (ADR-0035):
+
+```toml
+[smoothing]
+hue   = 0.4                              # unchanged: symmetric, one constant
+burst = { attack = 0.02, release = 0.7 } # snap up in ~2 frames, glide down over ~0.7 s
+```
+
+`attack` applies while the incoming value is **above** the held one, `release`
+while it is at or below. Both are validated the same way, and `0` on either side
+still means instant on that side — `{ attack = 0, release = 0.5 }` is an
+instant hit with a slow decay. A scalar entry is exactly
+`{ attack = t, release = t }`, so nothing about the existing form changed.
+
+> **The price: a two-constant entry is no longer a low-pass, it is a rectifier.**
+> A direction-dependent time constant does not treat a rise and a fall alike, so
+> under sustained material the output acquires a DC offset and **rides above its
+> input's mean**. That is the envelope-follower behaviour you are asking for on a
+> percussive accent, and a surprise on anything continuous — a fast-attack `hue`
+> will drift upward rather than tracking. Reach for the pair on things that
+> should *hit* (`burst`, `mirror_reflect`, `thickness` on a beat); leave
+> continuous params symmetric.
+
 ## Structural config (line systems and the attractor)
 
 Declarative data the generator/sampler consumes once at load — **not**
