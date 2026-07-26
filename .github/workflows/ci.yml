@@ -8,6 +8,14 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # ADR-0033 ratchet: line coverage of lmv-core only, measured on Windows where
+  # the DX12 WARP software adapter makes the render paths genuinely executable.
+  # Set from a real measurement (90.13% at Plan 0032's close) minus a 2-point
+  # margin so an unrelated change does not trip on rounding.
+  #
+  # Raise it at a close ceremony when a plan improves coverage. Never lower it
+  # without a one-line note here naming the plan that lowered it and why.
+  COVERAGE_FLOOR: "88"
 
 jobs:
   check:
@@ -38,6 +46,41 @@ jobs:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@cargo-deny
       - run: cargo deny check
+
+  # Coverage ratchet (Plan 0032 Phase 4, ADR-0033). Gates `lmv-core` only:
+  # `standalone/` is a winit event loop plus two platform capture backends that
+  # no runner can execute, so a workspace-wide number would mostly measure how
+  # much of the app is structurally untestable (ADR-0033 Alternative A).
+  #
+  # windows-latest ONLY, and not for convenience: WARP makes the GPU tests real
+  # there, while on macOS every one of them skips and would report that code as
+  # dead. Do not "fix" a slow run by moving this to another runner.
+  #
+  # Line coverage gates; region coverage is emitted in the report for
+  # information only (ADR-0033 Alternative C). Separate job, so it stays off the
+  # critical path even though instrumented binaries make the WARP suites slower.
+  coverage:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Measure lmv-core line coverage and enforce the floor
+        run: cargo llvm-cov nextest -p lmv-core --summary-only --fail-under-lines ${{ env.COVERAGE_FLOOR }}
+      # Re-report from the profile data already collected (no second test run)
+      # so the per-file breakdown lands where a reviewer will actually read it.
+      - name: Per-file breakdown in the job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## lmv-core coverage (floor: ${COVERAGE_FLOOR}% lines)"
+            echo ""
+            echo '```'
+            cargo llvm-cov report --summary-only
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # UB gate (Plan 0005, unblocking Plan 0002's deferred Phase 5). Miri checks
   # the SPSC ring's `unsafe` - the only pure-Rust unsafe in the tree. It runs
