@@ -1,6 +1,6 @@
 # 0032 — Testing strategy: full-chain e2e, `shot` CLI coverage, a core coverage ratchet, and a pre-push gate
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-07-25
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
