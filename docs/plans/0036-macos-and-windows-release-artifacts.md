@@ -2,6 +2,7 @@
 
 > **Status:** draft
 > **Created:** 2026-07-26
+> **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md) (this plan's decision), [0025](../adrs/0025-foobar-component-version-single-sourced.md) (version single-sourcing precedent), [0022](../adrs/0022-build-time-preset-embedding.md) (presets are embedded, not loaded from the zip)
 
