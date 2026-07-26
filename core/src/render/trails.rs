@@ -341,7 +341,11 @@ impl PostStage for Trails {
     /// a scene that sizes an internal field
     /// ([`Scene::set_target_size`](super::scenes::Scene::set_target_size)), so the
     /// scene does not supersample into an offscreen smaller than the window (Plan
-    /// 0027 Phase 2), and derives the scene's aspect from it.
+    /// 0027 Phase 2).
+    ///
+    /// A **texel count only** — the scene's aspect comes from the render target
+    /// (ADR-0037), because the present below is a plain normalized stretch that
+    /// undoes whatever shape this grid happens to have.
     fn internal_size(&self, surface: (u32, u32)) -> (u32, u32) {
         internal_grid_size(surface)
     }
@@ -379,11 +383,17 @@ impl PostStage for Trails {
     /// Called after the scene has rendered into the [`begin`](PostStage::begin)
     /// target, when [`active`](PostStage::active). Returns the two passes it
     /// encodes (feedback + present).
+    ///
+    /// `surface` is unused: neither pass computes geometry, so this stage has no
+    /// aspect to get wrong (ADR-0037). Both are normalized fullscreen blits, and
+    /// the present's stretch back to the target is precisely what cancels the
+    /// grid's shape out of the picture.
     fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         out: &wgpu::TextureView,
+        _surface: (u32, u32),
     ) -> u32 {
         let Some(res) = self.res.as_mut() else {
             return 0;
