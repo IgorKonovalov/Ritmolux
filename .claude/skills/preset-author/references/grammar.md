@@ -1,159 +1,94 @@
-# Preset grammar — complete reference
+# Grammar notes for authoring
 
-> **Snapshot: 2026-07-23.** The expression language and schema are engine code and **change as the
-> app develops**. Before relying on any list here, confirm it against the source of truth:
-> - variables → `VAR_NAMES` in `core/src/preset/expr.rs`
-> - functions + arity → `Func::from_name` / `Func::arity` in `core/src/preset/expr.rs`
-> - top-level schema → `RawPreset` in `core/src/preset/schema.rs`
-> - structural config → `into_config` / `into_lsystem` / `into_star` in `core/src/preset/schema.rs`
->
-> If code and this file disagree, the code is right and this file is stale — fix it, and if the delta
-> is a capability you wanted, log it as API feedback (`api-feedback.md`).
+> **The complete expression reference is `docs/presets.md`** (variables, constants, functions,
+> comparisons, idioms) and **the table reference is `presets/README.md`**. Both are maintained at
+> plan close. This file is the authoring layer on top: what to reach for when, what bites, and
+> what the error surface actually does to you mid-session. Source of truth stays the code —
+> `VAR_NAMES` / `Func::from_name` in `core/src/preset/expr.rs`, `RawPreset` in
+> `core/src/preset/schema.rs`.
 
-## Top-level file schema
+## File shape
 
-Deserialized by `RawPreset` (`core/src/preset/schema.rs`):
+```toml
+system = "attractor"        # required — one of the seven; unknown rejects the file
+name   = "Lorenz Drift"     # optional — display name, and what `--preset` matches
 
-| Key | TOML type | Required | Notes |
-|-----|-----------|----------|-------|
-| `system` | string | **yes** | Must match `SystemKind::from_name`. Missing/unknown ⇒ load error. |
-| `name` | string | no | Defaults to the `system` string. This is what `--preset` matches. |
-| `[params]` | table string→string | no | Each key = a scene param name; each value = an **expression string**. |
-| `[curve]` | table | no | Only for `parametric_curve`. |
-| `[generator]` | table | no | **Required** for `lsystem` and `star_pattern`. |
+[particles]                 # structural config: [curve] | [generator] | [particles]
+family = "lorenz"
 
-There is **no** `[meta]`, `[palette]`, `[color]`, `[easing]`, or `[smoothing]` table today. Color is
-driven only through the `hue` param into a shared cosine palette. `[smoothing]` is proposed
-(ADR-0019) but **not implemented** — a preset that includes it has those keys silently ignored, so do
-not author it as if it works.
+[palette]                   # colour: a built-in `name` OR custom `stops`, never both
+name = "ice"
 
-**Every `[params]` value must be a quoted string.** `warp = 0.4` is a TOML type error; write
-`warp = "0.4"`. Bindings are applied name-sorted (a `BTreeMap`), so file order is irrelevant.
+[palette_b]                 # optional crossfade target for a bindable `palette_mix`
+name = "ember"
 
-## Expression grammar
+[smoothing]                 # per-param easing: SECONDS, a bare number, NOT an expression
+zoom = 0.12
 
-Standard-precedence recursive descent; compiled once at load, evaluated per-param per-frame; total,
-panic-free, allocation-free.
-
-```
-expr   := term  (('+' | '-') term)*
-term   := unary (('*' | '/') unary)*
-unary  := ('-' | '+')? primary
-primary:= number | ident | ident '(' expr (',' expr)* ')' | '(' expr ')'
+[params]                    # every value is a quoted STRING, even a bare number
+zoom        = "1 + clamp(bass * 3, 0, 0.6)"
+palette_mix = "bar"
 ```
 
-### Variables — exactly 7
+`[params]` values are strings — `warp = 0.4` is a TOML type error, `warp = "0.4"` is right.
+`[smoothing]` values are the opposite: bare numbers, and an expression there is an error.
+Bindings apply name-sorted, so file order is irrelevant (group them for a human reader anyway).
 
-`bass mid treb onset beat bar time`
+## Reaching for the right tool
 
-| Var | Meaning | Range / shape |
-|-----|---------|---------------|
-| `bass` | bass-band magnitude (~20–250 Hz) | raw, **small**; full-scale sine ≈ 1.0, real material far lower |
-| `mid` | mid-band magnitude (~250–4000 Hz) | same small scale |
-| `treb` | treble-band magnitude (~4–18 kHz) | same; reads smallest of the three |
-| `onset` | spectral-flux attack strength | a transient spike, not a level |
-| `beat` | beat gate | `0.0` or `1.0` (a `bool` coerced) |
-| `bar` | beat phase | sawtooth `[0, 1)` — 0 on each beat, ramps to the next |
-| `time` | scene clock | seconds, monotonic, unbounded |
+| You want | Write |
+|----------|-------|
+| a small band to move a param usefully | `clamp(band * gain, lo, hi)` — gain-then-bound, over a baseline |
+| a threshold that doesn't snap | `smoothstep(0.15, 0.45, bass)` — the easing primitive |
+| a hard either/or | `select(cond, a, b)` — **only the taken branch evaluates**, so it also guards partial functions: `select(x >= 0, sqrt(x), 0)` |
+| a punchier or gentler response curve | `pow(bass * 8, 2)` / `pow(x, 0.5)` |
+| a value that wraps cleanly | `mod(time * 0.2, 1.0)` — floored, so it never returns negative |
+| "loud AND fast" / "beat OR strong hit" | `min(bass > 0.3, tempo > 120)` / `max(beat, onset > 0.6)` — no booleans exist; comparisons give clean `1`/`0` |
+| behaviour that changes with tempo | `select(tempo > 128, fast, calm)` — never use `tempo` raw, it's BPM |
+| a driver that stops jittering | move it to `[smoothing]`, don't fake it with arithmetic |
+| a value held until the next beat | **not expressible** — the evaluator is pure and stateless. API feedback. |
 
-Spelled exactly this way — `mid` not `mids`, `treb` not `treble`. **There is no `tempo`, no `bpm`, no
-`mid_high`, no per-bin access.** Wanting any of those is API feedback.
+Chained comparisons (`a > b > c`) parse left-associatively and compare a `0`/`1` against `c` —
+write `min(a > b, b > c)`.
 
-### Operators
+## What the engine does with your mistake
 
-Binary `+ - * /`; unary prefix `-` (negate) and `+` (no-op); parentheses for grouping; `,` separates
-function arguments. **Nothing else** — no `< > == != && || !`, no ternary/`if`, no `%`, no `^`.
-Division by zero yields `inf`/`NaN` (not a panic), which becomes broken geometry downstream — avoid
-denominators that can reach zero.
+**Hard error — the whole file is rejected and the app keeps its last good set (never crashes):**
+malformed TOML; unknown `system`; an expression that fails to compile (unknown identifier, wrong
+arity, unbalanced parens, stray character, `1 2` trailing tokens); an invalid `[curve]` /
+`[generator]` / `[particles]` / `[palette]` / `[smoothing]` value.
 
-### Functions — exactly 7
+**Warning — the preset loads and everything else applies:** a binding whose param name no system or
+engine stage consumes. The message names the param and the system.
 
-| Call | Arity | Semantics |
-|------|-------|-----------|
-| `sin(x)` | 1 | `x.sin()`, radians |
-| `abs(x)` | 1 | `x.abs()` |
-| `floor(x)` | 1 | `x.floor()` — the tool for discrete selection (`variant`, `visible_depth`) |
-| `min(a, b)` | 2 | lesser |
-| `max(a, b)` | 2 | greater |
-| `clamp(x, lo, hi)` | 3 | `x.max(lo).min(hi)` — total even if `lo > hi` |
-| `lerp(a, b, t)` | 3 | `a + (b - a) * t` — **`t` is not clamped** |
+> **The warning is where this lane gets bitten.** The standalone prints warnings on load and on
+> every hot-reload; **`shot` prints errors only**. So a typo'd param is invisible in the tool you
+> verify through, and the render looks "fine, just not doing what I asked". Check names against
+> `presets/README.md`, or run the app against the folder when a binding seems inert.
 
-That is the entire set. **No `cos`** → use `sin(x + 1.5708)`. No `sqrt pow exp log mod smoothstep
-noise mix step fract sign round ceil`. **No constants** — no `pi`/`tau`/`e`; write `3.14159`,
-`6.28318` literally. Each missing function you reach for is worth noting as feedback.
+**Not validated at all:** the numeric *range* an expression produces. Output is written straight
+into the scene param — no clamping, no NaN check. `NaN`/`inf` (a zero denominator, `sqrt` of a
+negative outside a `select`) becomes broken geometry, not an error. You clamp; the engine won't.
 
-### Output range
+## Structural tables — the parts with rules
 
-An expression returns a raw `f32` with **no evaluator-side clamping** — it is written straight into
-the scene param. Each scene decides its own sane range; **you clamp yourself.** The universal idiom:
+- **`[curve]`** — `parametric_curve` only. `family = "maurer_rose"` is the **only** value; absent
+  means the family default. A second family is engine work.
+- **`[generator]` as L-system** — required for `lsystem`. Non-empty `axiom`; ≥1 `rules` entry with a
+  **single-character** key; `angle_deg` finite (default 25); `max_depth` in `1..=7` (default 4).
+  Turtle vocabulary: `F`/`G` draw, `f` moves without drawing, `+`/`-` turn, `[`/`]` push/pop, any
+  other char is an inert variable.
+- **`[generator]` as star** — required for `star_pattern`. `tiling` ∈
+  `square|4|4.4.4.4`, `hexagon|6|6.6.6`, `octagon|8|4.8.8`, `dodecagon|12|3.12.12`;
+  `contact_angle_deg` finite (default 30).
+- **`[particles]`** — `attractor` only. `family` ∈ `de_jong|clifford|thomas|lorenz` (default
+  `de_jong`).
+- **`[palette]` / `[palette_b]`** — a built-in `name` (`spectrum|ember|ice|mono|aurora`) **or**
+  custom `stops` (≥2, each `at` in `0..=1` and ascending, colour `#rrggbb` or `[r,g,b]` floats).
+  Setting both, or neither, is a load error. **Silently inert on the three line scenes.**
+- **`[smoothing]`** — `param = seconds`, non-negative and finite; `0` means instant. Runs on real
+  elapsed time (identical at any refresh rate) and resets on a preset switch.
 
-```
-gain-then-bound:  clamp(bass * 14, 0, 1.8)
-```
-
-Raw bands read small, so a bare `bass` barely moves the look and an un-gained `bass * 40` blows out.
-Gain to taste, then `clamp` to the param's sane window (see `systems.md` for each param's window).
-
-## `[curve]` / `[generator]` structural config
-
-Static data the generator consumes **once at load** (not expressions, not per-frame). Validated at
-load; a bad value fails the whole preset with a surfaced error.
-
-### `[curve]` — for `parametric_curve`
-
-| Key | Type | Required | Allowed |
-|-----|------|----------|---------|
-| `family` | string | yes (if table present) | **`"maurer_rose"`** only — anything else is rejected |
-
-Absent `[curve]` ⇒ family default. Only one curve family exists today; a second one is engine work.
-
-### `[generator]` as L-system — for `lsystem` (required)
-
-| Key | Type | Required | Default | Rule |
-|-----|------|----------|---------|------|
-| `axiom` | string | **yes** | — | non-empty |
-| `rules` | table char→string | **yes, ≥1** | — | each key is a **single character** |
-| `angle_deg` | float | no | `25.0` | finite; turn angle for `+`/`-` |
-| `max_depth` | integer | no | `4` | `1..=7` (`MAX_LSYSTEM_DEPTH`) |
-| `seed` | integer | no | `0` | reserved; deterministic today |
-
-Turtle vocabulary in the expanded string: `F`/`G` draw forward, `f` moves without drawing, `+`/`-`
-turn by `angle_deg`, `[`/`]` push/pop branch state, any other char is an inert grammar variable.
-Example: `rules = { X = "F+[[X]-X]-F[-FX]+X", F = "FF" }`.
-
-### `[generator]` as star pattern — for `star_pattern` (required)
-
-| Key | Type | Required | Default | Allowed |
-|-----|------|----------|---------|---------|
-| `tiling` | string | **yes** | — | `square`/`4`/`4.4.4.4`→4, `hexagon`/`6`/`6.6.6`→6, `octagon`/`8`/`4.8.8`→8, `dodecagon`/`12`/`3.12.12`→12 |
-| `contact_angle_deg` | float | no | `30.0` | finite; the Hankin contact angle |
-
-Only these four tilings exist; a fifth order is engine work.
-
-**Geometry cap:** all line scenes share `MAX_SEGMENTS = 20_000`. Overruns are truncated and surfaced
-via `CapOverflow` at load (never silently cut) — if you hit it, the preset is too dense (lower
-`samples`, `max_depth`, or `visible_depth`).
-
-## Validation & error surface
-
-All load failures are recoverable `PresetError`s — the engine keeps the last good preset and never
-crashes (NFR §10). Knowing the surface tells you what you must get right:
-
-| Error | Trigger |
-|-------|---------|
-| `Toml(..)` | malformed TOML, wrong value type (e.g. bare number for a param), missing `system` |
-| `UnknownSystem(s)` | `system` not in `SystemKind::from_name` |
-| `Expr { param, err }` | a param expression fails to compile (see below) |
-| `Config(msg)` | bad `[curve]`/`[generator]` — unknown family/tiling, empty axiom, multi-char rule key, no rules, out-of-range `max_depth`, non-finite angle, missing required table |
-| `Io(msg)` | file unreadable (directory-load path only) |
-
-Expression compile errors (`ExprError`): `UnexpectedChar` (illegal char like `@`), `BadNumber`,
-`UnknownIdent` ("unknown variable or function '…'" — this is what a typo'd function or a nonexistent
-variable produces), `WrongArity`, `UnexpectedToken`, `UnexpectedEnd`, `TrailingTokens` (leftover
-tokens, e.g. `1 2`).
-
-**What is NOT validated — the footgun:** an **unknown param name is silently ignored**. Every scene's
-`set_param` ends in `_ => {}`, so a misspelled param (`thicknes`, `col`) compiles clean and does
-nothing. The grammar can't catch this — *you* catch it by verifying param names against the scene's
-`set_param` before you author (SKILL.md step 2). There is also no range/NaN checking on expression
-output.
+**Geometry cap:** the line scenes share `MAX_SEGMENTS = 20_000`. A too-dense figure (high `samples`,
+`max_depth`, or `mirror_order`) is truncated and the drop is surfaced — lower the density rather
+than living with a clipped figure.
