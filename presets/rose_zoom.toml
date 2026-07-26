@@ -1,23 +1,63 @@
-# Rose Zoom - a 5-petal Maurer rose that pumps the shared view zoom with the bass
-# and drifts on a slow pan, the Phase 1 walking-skeleton demo of the ViewTransform
-# (ADR-0018). Zoom multiplies endpoint positions about the frame centre, so the
-# whole flower breathes toward and away from the camera on every kick.
+# Rose Zoom - the shared view transform as the whole subject: a five-petal rose
+# that rides the camera hard. `zoom` multiplies endpoint positions about the
+# frame centre, so a kick throws the flower toward the lens and it falls back
+# between hits. Layered on top: a per-bar breath, a slow orbital pan, and a
+# tempo-gated push-in depth so fast material sits closer to the camera.
+#
+# This is the preset to read for how the three view params interact. Note the
+# sense: on the LINE, swarm and attractor scenes `zoom > 1` moves the camera IN
+# (geometry bigger). On `fragment_field` and `reaction_diffusion` it is the
+# opposite - a higher zoom shows MORE of the field. Check which family you are
+# in before copying a zoom expression between presets.
 system = "parametric_curve"
 name   = "Rose Zoom"
 
 [curve]
 family = "maurer_rose"
 
+# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
+# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
+# softens line art (it reads as "upsized from something smaller"). The geometry
+# mirror below costs nothing in resolution because it replicates real geometry
+# before rasterisation - so on the line scenes, prefer `mirror_*` over the
+# screen-space fold whenever both would do.
+
 [params]
+# SHAPE
 n             = "5"
 d             = "97"
-samples       = "361"
-scale         = "0.8"
-spin          = "0.15 + mid * 0.3"
-hue           = "0.72 + time * 0.02 + treb * 0.25"
-thickness     = "1.6 + bass * 2.0"
-brightness    = "0.9 + clamp(bass * 0.6, 0, 0.6)"
+samples       = "420"
+phase         = "sin(time * 0.02) * 0.24 + clamp(bass * 0.4, 0, 0.11)"
+radial_offset = "sin(time * 0.0123) * 0.10"
+
+spin          = "0.19 + sin(time * 0.017) * 0.03"
+scale         = "0.72 + clamp(bass * 0.30, 0, 0.087)"
 draw_progress = "1"
-zoom          = "1 + bass * 0.6"
-pan_x         = "sin(time * 0.3) * 0.05"
-pan_y         = "sin(time * 0.23 + 1.57) * 0.05"
+
+thickness  = "0.95 + clamp(bass * 0.9, 0, 0.47) + beat * 0.155"
+brightness = "0.62 + clamp(bass * 0.30, 0, 0.14)"
+hue        = "0.72 + time * 0.021 + clamp(treb * 0.7, 0, 0.26)"
+
+mirror_order   = "4"
+mirror_reflect = "0"
+
+# THE CAMERA - the subject of the preset. A tempo-gated base depth, a bass kick,
+# a bar breath and a slow orbit, all on the one transform.
+zoom  = "select(tempo > 130, 1.45, 1.10) + clamp(bass * 1.1, 0, 0.55) + bar * 0.12"
+pan_x = "sin(time * 0.083) * 0.14"
+pan_y = "cos(time * 0.06) * 0.11"
+
+# COMPOSITE - a feedback long enough that the pump leaves a visible tunnel.
+bg_hue      = "0.18 + sin(time * 0.013) * 0.05"
+bg_bright   = "0.018 + clamp(mid * 0.10, 0, 0.013)"
+bg_vignette = "0.80"
+
+[smoothing]
+# A punchy pump that still eases - the canonical use of a short constant.
+zoom          = 0.31
+phase         = 0.91
+radial_offset = 1.04
+scale         = 0.42
+thickness     = 0.31
+hue           = 1.04
+bg_bright     = 1.04

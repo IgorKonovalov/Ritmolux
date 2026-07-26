@@ -1,18 +1,98 @@
-# Star Rosette - a 12-fold Hankin star that turns slowly, breathes on the clock,
-# and snaps between a pointy and a blunt variant on the beat. Bass thickens the
-# strokes; treble sweeps the hue.
+# Star Rosette - a twelve-fold Hankin star: the most rigidly geometric figure
+# in the set, and the one that most rewards being stacked with both symmetry
+# engines. The star is already twelve-fold; folding it again at a DIFFERENT,
+# non-dividing order produces a quasi-periodic interference pattern that neither
+# tool reaches alone.
+#
+# `variant` selects between the precomputed contact-angle variants (0..2,
+# clamped), which is a genuine STRUCTURAL swap rather than a transform - the
+# star's interior lacing changes shape. The old preset drove it with
+# `floor(2.99 * beat)`, which only ever produced 0 or 2 because `beat` is a
+# 0/1 gate; here it cycles all three off the bar phase and the low end, so every
+# variant actually gets shown.
+#
+# The old `brightness = 0.5 + 0.5 * sin(time * 4)` strobe is gone.
 system = "star_pattern"
-name   = "Star Rosette"
+name = "Star Rosette"
 
 [generator]
 tiling            = "12"
-contact_angle_deg = 35
+contact_angle_deg = 20
+
+# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
+# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
+# softens line art (it reads as "upsized from something smaller"). The geometry
+# mirror below costs nothing in resolution because it replicates real geometry
+# before rasterisation - so on the line scenes, prefer `mirror_*` over the
+# screen-space fold whenever both would do.
 
 [params]
-variant       = "floor(2.99 * beat)"
-rotation      = "0.3 * time"
-hue           = "0.5 + time * 0.03 + treb * 0.3"
-draw_progress = "clamp(0.6 + bar * 0.6, 0, 1)"
-thickness     = "4 + bass * 2"
-scale         = "0.92 + bass * 0.14"
-brightness    = "0.5 + 0.5 * sin(time * 4) + clamp(mid * 0.4, 0, 0.4)"
+# THE STRUCTURAL SWAP - cycles 0 -> 1 -> 2 on a slow ~50 s clock.
+#
+# THIS SWAP CANNOT BE MADE SMOOTH from a preset, and it is worth knowing why:
+# `variant` selects one of three PRECOMPUTED contact-angle geometries by index,
+# so there is nothing to interpolate between - putting it in the smoothing table
+# only spends time on fractional indices that `floor` collapses back to the same
+# three shapes, which reads as a stutter rather than a morph. Blending two star
+# variants would be engine work (a real geometry lerp), not preset content.
+# What IS available is making the cut RARE and hiding it: the cycle here is
+# ~50 s, and `draw_progress` below re-draws the figure continuously so the swap
+# tends to land mid-redraw rather than as a visible snap of a static shape.
+variant = "floor(mod(time * 0.06 + clamp(bass * 3.0, 0, 1.0), 3))"
+
+# MOTION - a brisk, steady, AUDIO-INDEPENDENT turn in radians. `rotation` is an
+# angle, so a band term on it is a positional jump rather than a speed change,
+# which reads as the figure lurching. The rate is brisk because a twelve-fold
+# rosette is near-symmetric under small rotations, so a slow turn moves almost
+# no pixels and reads as frozen. (The old preset faked liveness with a
+# `sin(time * 4)` brightness strobe; this is motion that is actually the figure
+# moving.)
+rotation = "0.80 * time + sin(time * 0.031) * 0.26"
+
+# THE SWEEP - the preset's main motion, and the reason it is on `time` and not
+# only on `bar`: this figure is a rotationally symmetric ring, so turning it
+# barely moves a pixel. Radial and draw-order change is the only motion that
+# actually reads, in silence or otherwise.
+draw_progress = "clamp(0.52 + sin(time * 0.62) * 0.42 + bar * 0.20 + clamp(onset * 0.8, 0, 0.20), 0, 1)"
+
+# STROKE - moderate. Thin strokes looked elegant at 2048 but the figure is a
+# thin ring, so at small render sizes it nearly vanishes; this weight holds up
+# across both.
+thickness  = "1.70 + clamp(bass * 9.0, 0, 2.6) + beat * 0.40"
+brightness = "0.66 + clamp(mid * 1.8, 0, 0.45)"
+scale      = "0.58 + sin(time * 0.85) * 0.13 + bar * 0.05 + clamp(bass * 4.0, 0, 0.40)"
+hue        = "0.50 + time * 0.023 + clamp(treb * 2.6, 0, 0.45)"
+
+# GEOMETRY MIRROR - kept low, because on THIS scene it barely does anything and
+# it is worth recording why. The mirror replicates the segment set by rotating
+# it about the frame centre; a Hankin rosette is already rotationally symmetric
+# about that same centre, so the copies land almost exactly on the original. On
+# the parametric-curve presets the mirror is transformative (their figures are
+# not centred rosettes); here it is close to a no-op. Combined with the fact
+# that the star's segments all sit near the rim at every contact angle, this
+# preset is intrinsically a ring - the sparse, minimal member of the set rather
+# than a dense one. Making it dense would need engine work (more tilings, or an
+# off-centre mirror), not a preset change.
+mirror_order   = "select(mid > 0.18, 7, 5)"
+mirror_reflect = "0"
+
+# SCREEN FOLD at SEVEN, turning against the star's own rotation. Seven does not
+# divide twelve, and that mismatch is the point: a matching or dividing order
+# would collapse back onto the star's own symmetry and show nothing.
+
+zoom        = "1.06 + bar * 0.06 + clamp(bass * 0.35, 0, 0.15)"
+pan_x       = "sin(time * 0.0170) * 0.05"
+bg_hue      = "0.10 + sin(time * 0.0091) * 0.06"
+bg_bright   = "0.018 + clamp(mid * 0.10, 0, 0.013)"
+bg_vignette = "0.82"
+
+[smoothing]
+mirror_order  = 2.5
+# `variant` is NOT smoothed - it indexes a precomputed geometry, so easing it
+# would just spend time on the in-between integers rather than blending shapes.
+rotation      = 0.18
+thickness     = 0.14
+scale         = 0.06
+hue           = 0.42
+zoom          = 0.18
+bg_bright     = 0.40

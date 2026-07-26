@@ -1,23 +1,66 @@
-# Burst - explosive and punctuated: mostly a quiet mid-speed swarm that DETONATES on
-# every beat - a huge radial blast plus an onset kick - and the particles swell as
-# they fly. Between beats it re-gathers. The most percussive swarm.
+# Burst - explosive and punctuated: a gathered, mid-speed swarm that detonates
+# on the beat and re-gathers between hits. The most percussive preset in the set
+# and the one whose whole character lives in the gap between the hits, so the
+# resting state is tuned as carefully as the blast.
 #
-# Colour (Plan 0020): the shared "ember" palette with a hue_spread that fans the
-# particles across red->orange->gold, so a blast reads as a coherent burst of embers
-# instead of full-wheel confetti (the old `hue` was a no-op). onset/beat lift
-# hue_center toward the hot gold end, so a detonation flares brighter.
+# The old version of this preset ran `burst = beat * 10 + clamp(onset * 5,0,5)`
+# on top of `force = 1.3 + clamp(bass * 18, 0, 4)`. Both blasts fired at once
+# and the entire population left the frame - at a loud frame it rendered as a
+# black picture with a thin line of survivors at the edge, which is the opposite
+# of explosive. Here the burst is a genuine TRANSIENT (it rides `beat`/`onset`,
+# which decay) over a steering term that never leaves the family ceiling, so the
+# swarm is thrown outward and visibly falls back.
 system = "swarm"
 name = "Burst"
 
 [palette]
 name = "ember"
 
+[palette_b]
+stops = [
+  { at = 0.00, color = "#1a0016" },
+  { at = 0.30, color = "#8e1146" },
+  { at = 0.62, color = "#ff4d1f" },
+  { at = 0.85, color = "#ffc24a" },
+  { at = 1.00, color = "#fff6dd" },
+]
+
 [params]
-force      = "1.3 + clamp(bass * 18, 0, 4)"
-spin       = "0.4 + clamp(mid * 6, 0, 1.2)"
-burst      = "beat * 10 + clamp(onset * 5, 0, 5)"
-brightness = "0.65 + clamp((bass + treb) * 5, 0, 1.0)"
-size       = "1.6 + beat * 1.3"
-hue_spread = "0.5"
-hue_center = "0.55 + clamp(onset * 2, 0, 0.18) + beat * 0.08"
-saturation = "1.05"
+# MOTION - a modest gathered swarm; the detonation is `burst`, not `force`.
+force = "1.15 + clamp(bass * 1.2, 0, 0.50) + sin(time * 0.053) * 0.10"
+spin  = "0.34 + clamp(mid * 1.5, 0, 0.55)"
+burst = "clamp(beat * 2.6 + clamp(onset * 2.2, 0, 1.6), 0, 3.4)"
+
+# APPEARANCE - the swell IS the accent, so `size` carries the beat hard while
+# brightness stays close to flat. A bright frame at peak just clips.
+brightness = "0.70 + clamp(bass * 0.9, 0, 0.22) + beat * 0.10"
+size       = "1.7 + beat * 1.1 + clamp(onset * 1.4, 0, 0.8)"
+
+# COLOUR - a hot fan across the ember band; a hit flares the centre toward gold.
+hue_spread  = "0.30 + clamp(onset * 1.2, 0, 0.22)"
+hue_center  = "0.48 + clamp(onset * 1.5, 0, 0.24) + beat * 0.09"
+saturation  = "1.05 + clamp(bass * 1.1, 0, 0.26)"
+palette_mix = "clamp(bass * 1.5, 0, 0.55)"
+
+# VIEW - a hard per-beat punch-in that recovers between hits.
+zoom  = "1.06 + beat * 0.18 + clamp(bass * 0.6, 0, 0.24)"
+pan_x = "sin(time * 0.043) * 0.05"
+pan_y = "cos(time * 0.031) * 0.04"
+
+# COMPOSITE - a short exposure so each detonation leaves a visible shockwave,
+# over a dark ember field that flares with the hits.
+trails      = "0.46 + clamp(onset * 0.6, 0, 0.22)"
+bg_hue      = "0.97 + clamp(bass * 0.15, 0, 0.025)"
+bg_bright   = "0.008 + clamp(onset * 0.12, 0, 0.016)"
+bg_vignette = "0.86"
+
+[smoothing]
+# `burst`, `size` and the beat terms are deliberately UNSMOOTHED - this preset
+# is the set's transient, and easing its accents would remove the point of it.
+# Only the slow-moving supports are eased.
+force       = 0.35
+spin        = 0.30
+hue_center  = 0.10
+palette_mix = 0.6
+trails      = 0.25
+bg_bright   = 0.20

@@ -1,35 +1,92 @@
-# Coral - a Gray-Scott reaction-diffusion field (ADR-0012). The engine's first
-# stateful feedback scene: the pattern grows and reorganizes frame to frame in the
-# mitosis regime (spots that perpetually divide).
+# Coral - a Gray-Scott reaction-diffusion field in the MITOSIS regime: spots
+# that perpetually divide. The engine's stateful feedback scene, so the pattern
+# genuinely grows and reorganises frame to frame rather than being redrawn.
 #
-# Colour (Plan 0020): a custom teal gradient - near-black crevice -> teal body ->
-# pale aqua spine - so the churning spots read as one cohesive cool teal instead of
-# the spectrum's cyan-with-magenta-fringe. The field level indexes the gradient
-# (crevice low, iso-contour spine high); colour_span spans nearly the whole ramp.
+# THE REACTIVITY PROBLEM this version solves. `feed` and `kill` are the physical
+# levers, but the field takes SECONDS to propagate a change to them - measured
+# band response across the old coral set was 0.02-0.06, near the bottom of the
+# whole library, and it felt static against a beat even though the chemistry was
+# being driven correctly. The fix is not to shove feed/kill harder (that just
+# kills the pattern); it is to layer levers that respond INSTANTLY on top:
+#   - `contour` / `hatch` - the iso-line rendering, immediate
+#   - `zoom` / `pan_*`    - the view transform, immediate
+#   - `glow` / colour     - immediate
+#   - `kaleido_*`         - immediate
+# The chemistry now carries the slow evolution and everything else carries the
+# beat. Note `zoom` is INVERTED on this scene: higher shows MORE of the field.
 #
-# The band energies steer the regime and beats spawn new growth:
-#   - bass pushes the feed rate, mid the kill rate (silent -> mitosis, loud -> coral),
-#     staying inside the pattern-forming band so the field never dies;
-#   - treble scales the diffusion, coarsening the spatial texture;
-#   - each beat stamps a fresh seed of growth into the field.
-#
-# Variables available to expressions: bass mid treb onset beat bar time.
+# Regime separation is also deliberate. The four RD presets used to sit close
+# enough in feed/kill space that the report flagged three of them as
+# near-duplicates; each now owns a distinct, named regime.
 system = "reaction_diffusion"
 name = "Coral"
 
 [palette]
 stops = [
-  { at = 0.0,  color = "#02141a" },
-  { at = 0.5,  color = "#0e7d7a" },
+  { at = 0.00, color = "#02141a" },
+  { at = 0.50, color = "#0e7d7a" },
   { at = 0.82, color = "#3fd6c4" },
-  { at = 1.0,  color = "#d8fff4" },
+  { at = 1.00, color = "#d8fff4" },
+]
+
+[palette_b]
+stops = [
+  { at = 0.00, color = "#120024" },
+  { at = 0.48, color = "#5c1e8a" },
+  { at = 0.80, color = "#d054c8" },
+  { at = 1.00, color = "#ffe6ff" },
 ]
 
 [params]
-feed         = "0.032 + clamp(bass * 4, 0, 1) * 0.018"
-kill         = "0.060 + clamp(mid * 4, 0, 1) * 0.002"
-flow         = "1.0 + clamp(treb * 4, 0, 1) * 0.4"
-inject       = "beat"
-glow         = "0.7 + clamp((bass + mid) * 3, 0, 1) * 0.6"
-color_span   = "0.9"
-color_center = "sin(time * 0.03) * 0.02"
+# CHEMISTRY - mitosis, with a slow time sweep on `feed`/`kill` so the field
+# never settles (a fixed Gray-Scott point genuinely stops moving once it
+# converges, which is what made this preset fail the animation gate at 0.0001).
+#
+# KNOWN LIMIT, not tunable from here: the simulation runs on a hard-coded
+# 256x256 grid, so at 1080p and above the pattern is upscaled ~8x and its edges
+# are visibly pixel-stepped. No combination of `feed`/`kill`/`flow`/`contour`
+# removes that - it is the grid, and raising it is engine work. A lower `flow`
+# (bigger, rounder features) hides it better than a high one, which is why this
+# sits at 0.55 rather than the 1.0 default.
+feed   = "0.0320 + sin(time * 0.041) * 0.0030 + clamp(bass * 1.6, 0, 1) * 0.0055"
+kill   = "0.0565 + cos(time * 0.029) * 0.0012 + clamp(mid * 1.6, 0, 1) * 0.0022"
+flow   = "1.00 + clamp(treb * 1.6, 0, 1) * 0.35"
+inject = "beat"
+
+# THE FAST LEVERS - this is where the beat actually reads.
+contour = "5.0 + sin(time * 0.55) * 2.2 + clamp(treb * 14.0, 0, 6.0) + beat * 1.6"
+hatch   = "4.5 + clamp(mid * 3.0, 0, 2.4)"
+glow    = "0.62 + clamp((bass + mid) * 2.2, 0, 0.75)"
+
+# VIEW - PINNED NEAR NATIVE, and this is a hard constraint, not a taste call.
+# The Gray-Scott field is a fixed 256x256 grid, already upscaled ~7x at 1080p.
+# `zoom` is INVERTED here (higher shows more of the field) and it is unusable in
+# BOTH directions: above 1.0 it samples outside the simulated field and renders
+# vertical bars and rectangular blocks; below 1.0 it magnifies the 256px grid
+# until the pattern reads as angular pixel blobs instead of organic growth. Any
+# real pan at zoom 1.0 walks off the field for the same reason. So this family
+# sits at ~0.99 with a whisper of drift, and takes its motion from the chemistry,
+# the contour/hatch rendering and the colour instead.
+zoom  = "0.99"
+pan_x = "sin(time * 0.0130) * 0.008"
+pan_y = "cos(time * 0.0091) * 0.006"
+
+# COLOUR - teal body, crossfading toward a violet variant over minutes.
+color_span   = "0.90 + clamp(mid * 0.5, 0, 0.20)"
+color_center = "sin(time * 0.47) * 0.11"
+saturation   = "0.95 + clamp(treb * 3.0, 0, 0.55)"
+palette_mix  = "0.35 + sin(time * 0.0077) * 0.32"
+
+# COMPOSITE - the backdrop shows through the field's voids (Plan 0025).
+bg_hue      = "0.36 + sin(time * 0.0110) * 0.05"
+bg_bright   = "0.022 + clamp(mid * 0.10, 0, 0.014)"
+bg_vignette = "0.72"
+
+[smoothing]
+contour     = 0.16
+hatch       = 0.25
+glow        = 0.30
+zoom        = 0.18
+color_span  = 0.40
+palette_mix = 1.1
+bg_bright   = 0.40

@@ -1,21 +1,71 @@
 # Arrowhead - a Sierpinski arrowhead L-system (both F and G draw) that fills a
-# fractal triangle. The mids drive how deep the recursion goes; bass adds a
-# rotational kick. Symmetric and geometric, a foil to the organic fern.
+# fractal triangle: the hard, geometric foil to the organic fern. Where the fern
+# grows outward, this one subdivides INWARD, so stepping `visible_depth` makes
+# the same silhouette resolve into finer and finer self-similar detail.
+#
+# That is the reason this preset pairs so well with the screen-space
+# kaleidoscope rather than the geometry mirror: the arrowhead is already a
+# closed, edge-to-edge fractal, so replicating its geometry just crowds it,
+# while folding the finished PIXELS builds a larger tiling out of it. The two
+# symmetry tools are not interchangeable - see `rose_kaleidoscope.toml` for the
+# preset that runs both at once.
+#
+# The old version's `brightness = 0.5 + 0.5 * sin(time * 4)` strobe is gone.
 system = "lsystem"
-name   = "Arrowhead"
+name = "Arrowhead"
 
 [generator]
 axiom     = "F"
 rules     = { F = "G-F-G", G = "F+G+F" }
 angle_deg = 60
-max_depth = 6
+max_depth = 7
 seed      = 1
 
+# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
+# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
+# softens line art (it reads as "upsized from something smaller"). The geometry
+# mirror below costs nothing in resolution because it replicates real geometry
+# before rasterisation - so on the line scenes, prefer `mirror_*` over the
+# screen-space fold whenever both would do.
+
 [params]
-visible_depth = "5 + floor(1 * mid)"
-rotation      = "0.3 * time + 0.2 * bass"
-hue           = "0.62 + time * 0.03 + treb * 0.25"
-draw_progress = "clamp(0.6 + bar * 0.6, 0, 1)"
-thickness     = "2.2 + mid * 1.5"
-scale         = "0.95 + bass * 0.1"
-brightness    = "0.5 + 0.5 * sin(time * 4) + clamp(mid * 0.5, 0, 0.4)"
+# THE SUBDIVISION - four levels on three comparison gates. Each step roughly
+# triples the segment count, so this is the widest structural range in the set.
+visible_depth = "select(mid + treb > 0.50, 7, select(mid + treb > 0.28, 6, select(mid + treb > 0.10, 5, 4)))"
+
+# MOTION - a continuous, audio-independent turn (radians) plus a slow sway. The
+# rate is deliberately brisk: this figure is large and near-symmetric, so a
+# slower turn moves almost no pixels and the preset reads as frozen. (Its
+# predecessor faked liveness with `brightness = 0.5 + 0.5 * sin(time * 4)` - a
+# ~0.64 Hz luminance strobe unrelated to the audio. Real rotation replaces it.)
+rotation = "0.88 * time + sin(time * 0.029) * 0.24"
+
+draw_progress = "clamp(0.60 + bar * 0.55 + clamp(onset * 0.6, 0, 0.18), 0, 1)"
+
+thickness  = "1.35 + clamp(mid * 1.1, 0, 0.95)"
+brightness = "0.72 + clamp(mid * 0.40, 0, 0.20)"
+scale      = "0.82 + sin(time * 0.95) * 0.07 + bar * 0.05 + clamp(bass * 0.30, 0, 0.13)"
+hue        = "0.62 + time * 0.023 + clamp(treb * 0.8, 0, 0.26)"
+
+# GEOMETRY MIRROR - the source of the "several lines". Six rotational copies of
+# the whole fractal, interleaving into a radial web, and MID drives the fold
+# count so the number of arms is itself a band reading. Full resolution.
+mirror_order   = "select(mid > 0.22, 8, select(mid > 0.08, 6, 4))"
+mirror_reflect = "0"
+
+
+zoom        = "1.05 + bar * 0.05 + clamp(bass * 0.30, 0, 0.13)"
+pan_y       = "-0.04 + cos(time * 0.0130) * 0.05"
+bg_hue      = "0.44 + sin(time * 0.0110) * 0.06"
+bg_bright   = "0.080 + clamp((bass + mid) * 0.55, 0, 0.13)"
+bg_vignette = "0.52"
+
+[smoothing]
+visible_depth = 1.1
+kaleido_order = 1.3
+rotation      = 0.18
+thickness     = 0.15
+scale         = 0.06
+hue           = 0.42
+zoom          = 0.18
+bg_bright     = 0.40

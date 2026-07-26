@@ -1,21 +1,60 @@
-# Glacier - cold, vast, cohesive: the shared "ice" palette (deep blue -> cyan ->
-# near-white, Plan 0020) held in a low color_span anchored at the deep-blue end, so
-# only the cool band shows - no more relying on a crushed zoom to hide the rainbow
-# (that lever is now colour_span, and zoom is free to open the field a little). Almost
-# no warp, a long slow breath; dim and still, the quiet end of the fragment set.
+# Glacier - cold, vast and cohesive: deep blue through cyan to near-white, held
+# in a NARROW colour window so only that band shows. Low warp keeps the field in
+# broad sheets rather than churn, and a gentle six-fold screen fold turns those
+# sheets into crystal facets.
 #
-# Variables available to expressions: bass mid treb onset beat bar time.
+# `color_span` is the cohesion lever here (Plan 0020) - low span is what makes
+# this read as one designed cold palette instead of a rainbow, and it is why
+# this preset no longer needs a crushed `zoom` to hide the wheel. That freed the
+# zoom to open the field back up: the old version sat at 0.62, which on this
+# INVERTED-zoom scene showed almost no field at all and rendered as a flat blue
+# gradient. Structure and cohesion are now controlled by separate knobs, which
+# is the whole point of the palette surface.
 system = "fragment_field"
 name = "Glacier"
 
 [palette]
 name = "ice"
 
+[palette_b]
+stops = [
+  { at = 0.00, color = "#01060f" },
+  { at = 0.32, color = "#0a2f5e" },
+  { at = 0.60, color = "#2f86b8" },
+  { at = 0.82, color = "#9fd8ea" },
+  { at = 1.00, color = "#f4fdff" },
+]
+
 [params]
-warp         = "0.14 + clamp(bass * 4, 0, 0.35)"
-zoom         = "0.62 + sin(time * 0.03) * 0.05 + bar * 0.12"
-glow         = "0.42 + clamp(mid * 4, 0, 0.55)"
-flash        = "clamp(onset * 1.2, 0, 0.3)"
-color_center = "0.12 + sin(time * 0.04) * 0.03"
-color_span   = "0.38 + clamp(mid * 3, 0, 0.12)"
-saturation   = "0.95"
+# STRUCTURE - broad slow sheets, opened up so the facets have something to fold.
+warp  = "0.46 + sin(time * 0.0210) * 0.11 + clamp(bass * 1.2, 0, 0.48)"
+zoom  = "2.80 + sin(time * 0.0143) * 0.24 + bar * 0.14 + clamp(bass * 1.0, 0, 0.40)"
+pan_x = "sin(time * 0.0091) * 0.24"
+pan_y = "cos(time * 0.0127) * 0.18 + time * 0.003"
+
+# LUMINANCE - the dimmest in the set. Glaciers are not bright; they are pale.
+glow  = "0.52 + clamp(mid * 0.5, 0, 0.16)"
+flash = "clamp(onset * 0.5, 0, 0.16)"
+
+# COLOUR - the tightest window in the fragment family. Do not widen it without
+# also reconsidering the palette; the cohesion IS the preset.
+color_center = "0.10 + sin(time * 0.0230) * 0.05 + clamp(treb * 0.5, 0, 0.07)"
+color_span   = "0.34 + clamp(mid * 0.6, 0, 0.14)"
+saturation   = "0.94 + clamp(treb * 0.7, 0, 0.18)"
+palette_mix  = "0.35 + sin(time * 0.0071) * 0.30"
+
+# COMPOSITE - a low fold for facets, stepping up once on genuinely loud
+# material, and a long feedback that reads as ice depth.
+kaleido_order = "select(bass + mid > 0.42, 6, 3)"
+kaleido_angle = "time * 0.031"
+trails        = "0.62 + clamp(mid * 0.25, 0, 0.12)"
+
+[smoothing]
+warp          = 0.50
+zoom          = 0.50
+glow          = 0.45
+color_center  = 0.55
+color_span    = 0.50
+palette_mix   = 1.3
+kaleido_order = 1.4
+trails        = 0.55

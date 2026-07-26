@@ -1,13 +1,61 @@
-# Pulse Field - violet/magenta and hard on the beat: higher zoom gives a busier,
-# more multi-hued field (energetic looks earn the spread), every beat kicks the fold
-# and nudges the color, every onset throws a bright strobe. Bass drives the zoom in.
-# It reads the rhythm, not the drift.
+# Pulse Field - the rhythm reader: a violet/magenta field that answers the beat
+# structurally rather than with brightness. Every beat drives the warp deeper
+# and the zoom wider (finer cells), every onset snaps a short strobe, and the
+# bar ramp gives a continuous breath between hits so it never sits still.
+#
+# See `fragment_warp.toml` for the glow ceiling this family observes. This
+# preset is the clearest demonstration of why it matters: a beat that raises
+# `glow` reads as a camera flash and washes the picture out; a beat that raises
+# `warp` reads as the field itself being struck.
 system = "fragment_field"
 name = "Pulse Field"
 
+[palette]
+stops = [
+  { at = 0.00, color = "#0a0018" },
+  { at = 0.30, color = "#4a0d7a" },
+  { at = 0.58, color = "#c11e86" },
+  { at = 0.80, color = "#ff6ea8" },
+  { at = 1.00, color = "#ffe4f4" },
+]
+
+[palette_b]
+name = "ice"
+
 [params]
-warp  = "0.5 + beat * 0.7 + clamp(bass * 9, 0, 1.0)"
-hue   = "0.12 + beat * 0.06 + clamp(mid * 3, 0, 0.05)"
-zoom  = "1.3 + clamp(bass * 5, 0, 0.4) + beat * 0.15"
-glow  = "0.5 + clamp(mid * 9, 0, 1.0)"
-flash = "clamp(onset * 5, 0, 1.2)"
+# STRUCTURE - the beat lands here, not on the glow.
+warp  = "0.72 + beat * 0.22 + clamp(bass * 2.2, 0, 0.55) + bar * 0.10"
+zoom  = "2.30 + beat * 0.14 + clamp(bass * 2.0, 0, 0.45)"
+pan_x = "sin(time * 0.047) * 0.22"
+pan_y = "cos(time * 0.033) * 0.18 + time * 0.006"
+
+# LUMINANCE - near flat, with only a short onset strobe.
+glow  = "0.74 + clamp(mid * 0.6, 0, 0.18)"
+flash = "clamp(onset * 0.8, 0, 0.20)"
+
+# COLOUR - a tight violet family that shifts toward cold on the top end.
+hue          = "0.12 + time * 0.017 + beat * 0.02 + clamp(mid * 1.6, 0, 0.14)"
+color_span   = "0.52 + clamp(treb * 1.0, 0, 0.26)"
+color_center = "0.08 + sin(time * 0.061) * 0.10 + beat * 0.03"
+saturation   = "1.12 + clamp(bass * 0.8, 0, 0.22)"
+palette_mix  = "clamp(treb * 1.4, 0, 0.45)"
+
+# COMPOSITE - a short feedback that gives each hit a visible wake.
+trails = "0.42 + clamp(bass * 0.9, 0, 0.20)"
+
+[smoothing]
+# Heavily eased on purpose. NOTE: this table is a one-pole exponential
+# low-pass, not an S-curve - there is no cubic-bezier / ease-in-out shaping in
+# the grammar, and `smoothstep` shapes a VALUE, not a trajectory over time
+# (expressions are stateless). So the only lever for "less jarring" is a longer
+# time constant, and these are long.
+warp         = 0.55
+flash        = 0.30
+zoom         = 0.60
+glow         = 0.50
+hue          = 0.80
+color_span   = 0.70
+color_center = 0.65
+palette_mix  = 0.90
+trails       = 0.55
+saturation   = 0.50
