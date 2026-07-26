@@ -34,7 +34,7 @@ pub mod turtle;
 pub use lsystem::LSystemScene;
 pub use parametric::ParametricCurveScene;
 pub use renderer::{LineRenderer, SegmentInstance};
-pub use spectrum::SpectrumScene;
+pub use spectrum::{SpectrumLayout, SpectrumScene};
 pub use star::StarPatternScene;
 
 /// The shared structural-config and cap-overflow types now live one level up, in

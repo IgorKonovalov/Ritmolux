@@ -14,6 +14,23 @@
 system = "spectrum"
 name   = "Spectrum Comb"
 
+[spectrum]
+# 26 elements: enough that the shape of the music is legible, few enough that
+# each one is a stroke rather than a hair. Below ~16 the readout stops being a
+# spectrum and starts being a bar chart; above ~40 at this frame width the
+# elements merge into a solid block.
+elements = 26
+layout   = "bars"
+
+# PER-ELEMENT EASING, and the reason it is asymmetric. The bands are the rawest
+# signal in the engine - they are what `onset` is computed FROM - so an unsmoothed
+# comb strobes on every hop. A fast attack keeps a transient's shape (a kick
+# still snaps the low elements up in a frame or two) while a slow release lets
+# them fall like a real meter instead of flickering back down. One constant
+# cannot express that at any value; this is the same { attack, release } pair the
+# [smoothing] table uses.
+smoothing = { attack = 0.025, release = 0.22 }
+
 [params]
 # THE RESTING COMB, and the preset's main motion. `base` is the length every
 # element has before any audio is added, and it is deliberately not zero: at zero

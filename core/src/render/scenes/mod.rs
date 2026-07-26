@@ -81,6 +81,23 @@ pub enum GeneratorConfig {
         /// The attractor family (De Jong, Clifford, Thomas, Lorenz).
         family: particles::AttractorFamily,
     },
+    /// The spectrum readout's `[spectrum]` table (Plan 0034 / ADR-0036): how many
+    /// elements the frequency axis is divided into, how they are laid out, and how
+    /// fast each one follows its band. All three are structure rather than
+    /// expression — they are fixed for as long as the preset is loaded — so they
+    /// ride the existing `configure` hook like every other declarative config.
+    Spectrum {
+        /// Element count, validated at load into
+        /// `2..=`[`SPECTRUM_BINS`](crate::dsp::SPECTRUM_BINS).
+        elements: usize,
+        /// Which figure the elements form.
+        layout: lines::SpectrumLayout,
+        /// Per-element temporal easing in **seconds**, applied on the injected
+        /// real `dt` — the same [`Easing`](crate::preset::Easing) the `[smoothing]`
+        /// table uses, deliberately reused rather than a second vocabulary
+        /// (ADR-0035).
+        easing: crate::preset::Easing,
+    },
 }
 
 /// Which construction hit the [`lines::MAX_SEGMENTS`] cap, for the surfaced message.

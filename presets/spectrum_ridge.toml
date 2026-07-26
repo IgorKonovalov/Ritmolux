@@ -1,0 +1,76 @@
+# Spectrum Ridge - the same data as Spectrum Comb, drawn as a CONTOUR instead of
+# a comb. One continuous line through one point per element, mirrored about the
+# centre so the frequency axis reads as a landscape and its own reflection.
+#
+# WHY THE LAYOUT IS THE WHOLE POINT. A comb shows each band as an independent
+# quantity; a polyline shows the SHAPE of the spectrum - where the slope is, how
+# broad a peak is, whether the top end is a shelf or a cliff. That is a different
+# thing to look at even though nothing about the analysis changed, which is why
+# `layout` is structure rather than a param.
+system = "spectrum"
+name   = "Spectrum Ridge"
+
+[spectrum]
+# More elements than the comb: a contour can carry finer detail without turning
+# into mush, because the eye reads the line rather than counting the parts.
+elements = 40
+layout   = "polyline"
+# Longer release than the comb. A contour that jitters looks like noise in the
+# measurement rather than movement in the music; a comb can get away with more
+# because each element is read separately.
+smoothing = { attack = 0.04, release = 0.34 }
+
+[palette]
+name = "aurora"
+
+[params]
+# THE RESTING CONTOUR. Same reasoning as the comb: at zero the line collapses
+# onto the baseline and the preset reads as broken during a silence. This
+# breathes, and the amplitude is large because a single stroke covers far fewer
+# pixels than 26 bars do - the motion has to be geometric to be visible at all.
+base  = "0.55 + sin(time * 1.3) * 0.20"
+scale = "2.2"
+
+# THE FOLD. Order 2 puts a second copy of the contour through a half turn, so the
+# figure closes into a symmetric band across the frame instead of hanging as one
+# line near the bottom. On a polyline the mirror is genuinely transformative -
+# unlike on the radial ring, where the figure is already rotationally symmetric
+# and the copies land nearly on top of the original.
+mirror_order   = "2"
+mirror_reflect = "0"
+
+# A SLOW TILT - the contour turning a few degrees either way. This is the motion
+# that carries the preset through a silence, and it works here precisely because
+# the figure is off-centre: rotating it sweeps the line across its own width.
+rotation = "sin(time * 0.4) * 0.30 + clamp(bass * 0.5, 0, 0.10)"
+
+# COLOUR ALONG THE AXIS. `hue_spread` walks the palette from the lowest element
+# to the highest, so the low end and the top end are different colours and you
+# can see WHERE in the spectrum a peak is without counting positions. This is the
+# lever the comb deliberately leaves at zero.
+hue        = "mod(0.10 + time * 0.02, 1)"
+hue_spread = "0.75"
+saturation = "0.95"
+
+thickness  = "5.0 + clamp(mid * 8.0, 0, 3.0)"
+brightness = "0.80 + clamp(bass * 1.2, 0, 0.30)"
+
+zoom  = "1.00 + sin(time * 0.23) * 0.05"
+pan_y = "0.02"
+
+bg_hue      = "0.44 + sin(time * 0.008) * 0.05"
+bg_bright   = "0.020 + clamp(treb * 0.12, 0, 0.014)"
+bg_vignette = "0.80"
+
+# A short tail. The contour is a thin stroke, so a little persistence gives it
+# body without smearing the shape it exists to show.
+trails = "0.30 + clamp(mid * 0.12, 0, 0.06)"
+
+[smoothing]
+rotation   = 0.20
+thickness  = { attack = 0.03, release = 0.30 }
+brightness = { attack = 0.04, release = 0.26 }
+hue        = 0.40
+zoom       = 0.25
+bg_bright  = 0.40
+trails     = 0.50

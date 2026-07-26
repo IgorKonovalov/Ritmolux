@@ -321,20 +321,10 @@ impl ParamSmoother {
         let Some(slot) = self.last.get_mut(index) else {
             return raw; // unreachable after the resize; never panics on the hot path
         };
-        // The direction test is against the **held** value, not the raw signal's
-        // own derivative (ADR-0035): a parameter already above its new target
-        // releases toward it even while the raw input is still rising. That is
-        // the envelope-follower convention, and it is what keeps the behavior
-        // stable under a noisy input.
-        let tau = if raw > *slot { tau.attack } else { tau.release };
-        if tau <= 0.0 || !tau.is_finite() || dt <= 0.0 {
-            *slot = raw;
-            return raw;
-        }
-        // alpha = 1 - exp(-dt/tau): the fraction of the gap closed this frame,
-        // frame-rate-independent because `dt` is real elapsed time (ADR-0019).
-        let alpha = 1.0 - (-dt / tau).exp();
-        *slot += alpha * (raw - *slot);
+        // The arithmetic itself lives on `Easing` (Plan 0034 Phase 3), so the
+        // spectrum scene's per-element smoother eases by the same rule rather
+        // than growing a second easing vocabulary beside this one.
+        *slot = tau.step(*slot, raw, dt);
         *slot
     }
 }
@@ -994,7 +984,8 @@ impl Renderer {
         // Bake the preset's color palette (default `spectrum` if it declares no
         // `[palette]`) and hand it to the active scene (ADR-0021), off the hot
         // path. A shader-colored scene stores the LUT and uploads it next frame;
-        // the line scenes ignore it. `spectrum` reproduces the prior cosine, so a
+        // the spectrum readout samples it on the CPU per element (Plan 0034); the
+        // other line scenes ignore it. `spectrum` reproduces the prior cosine, so a
         // palette-less preset is visually unchanged. A `[palette_b]` bakes an A/B
         // pair for the bindable `palette_mix` crossfade.
         let baked = match (preset.palette.as_ref(), preset.palette_b.as_ref()) {

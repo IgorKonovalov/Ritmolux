@@ -62,6 +62,7 @@ Full grammar reference: [`../docs/presets.md`](../docs/presets.md#the-expression
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
+| `spectrum`        | `base` `scale` `radius` `rotation` `thickness` `hue` `brightness` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -106,6 +107,44 @@ so a very large window resolves the attractor alone slightly finer.
 - `star_pattern`: `variant` selects one of the precomputed contact-angle variants
   (0..2, clamped) — swap it on a beat for a structural accent
   (e.g. `floor(2.99 * beat)`); `rotation` is an angle in radians.
+
+### `spectrum` — the frequency-axis readout (Plan 0034)
+
+A line system like the three above, but its figure is not a generator's geometry:
+it is the engine's log-spaced band array, divided into elements by the
+[`[spectrum]`](#spectrum--for-spectrum) table. Element 0 is the bottom of the
+spectrum and the last is the top, so **nothing in `[params]` maps audio to
+position** — that mapping is the scene. What the params say is how the elements
+look and how far they reach.
+
+- `base` — the length every element has *before* any audio, in world units
+  (the frame is 2 units tall). Deliberately not zero by default: at zero the
+  readout vanishes completely in a silence, which reads as a broken preset. Bind
+  it to `time` for a resting breath.
+- `scale` — multiplier on the element's own band level. The bands read **small**
+  on real music, the same caveat as `bass`/`mid`/`treb`, so useful values are
+  well above 1.
+- `radius` — **`radial_ring` only**: the inner circle the spokes stand on. It has
+  no effect on `bars` or `polyline`, and that is the one layout-specific
+  parameter on this system.
+- `rotation` — turns the whole figure about the frame centre, in radians, on
+  every layout. On the ring it is the natural motion; on bars and the polyline it
+  tilts the readout, which is what makes those two worth folding with `mirror_*`.
+- `hue_spread` — walks the palette across the elements: `0` (the default) colours
+  the whole figure one hue, `1` spans the full palette from the lowest element to
+  the highest, so you can see *where* a peak is without counting positions. On
+  `radial_ring` a spread of exactly `1` makes the wrap continuous in colour as
+  well as in position.
+
+**What this system honors**, since a silent no-op would be worse than an absence:
+the shared view transform, the geometry mirror, the palette surface
+(`[palette]`/`[palette_b]`/`palette_mix`/`saturation`, sampled per element — this
+is the **only line system that reads `[palette]`**; the other three still colour
+from the built-in cosine), and all the engine stages (`bg_*`, `trails`,
+`kaleido_*`, `ink_*`). On `radial_ring` the geometry mirror is close to a no-op
+for the same reason it is on `star_pattern` — the figure is already rotationally
+symmetric about the frame centre, so the copies land on the original. On `bars`
+and `polyline` it is genuinely transformative.
 
 ## Engine-wide controls (Plan 0018)
 
@@ -417,6 +456,45 @@ The family sets the map **and** the meaning of the four bindable coefficients
 alone at `0.19`; Lorenz `sigma/rho/beta` = `10 28 2.667`, `d` unused). Bind them
 to bands for a morphing cloud, but move them **slowly and by a little** — these
 are chaotic maps, and a large jump reads as a hard cut rather than a morph.
+
+### `[spectrum]` — for `spectrum`
+
+| Key         | Values                                | Notes                                                                                      |
+|-------------|---------------------------------------|--------------------------------------------------------------------------------------------|
+| `elements`  | integer `2..=64`                      | How many elements the frequency axis is divided into. Default 24. Optional.                  |
+| `layout`    | `bars`, `polyline`, `radial_ring`     | Which figure the elements form. Default `bars`. Optional.                                    |
+| `smoothing` | seconds, or `{ attack, release }`     | Per-element temporal easing, in the same vocabulary as [`[smoothing]`](#eased-parameters--the-smoothing-table). Default: none (instant). Optional. |
+
+```toml
+system = "spectrum"
+
+[spectrum]
+elements  = 26
+layout    = "bars"
+smoothing = { attack = 0.025, release = 0.22 }
+```
+
+The whole table is optional — `system = "spectrum"` alone renders the default
+readout. An out-of-range `elements` or an unknown `layout` is a surfaced load
+error naming what it expected, never a silent fallback.
+
+**Why 64 is the ceiling.** The engine analyses 64 log-spaced bands, and the scene
+reduces them to `elements` by averaging each element's own contiguous slice — a
+real partition, so no band is dropped or counted twice. Above 64 that stops being
+possible, and a readout finer than its own data is a lie rather than a feature.
+Note the axis is **logarithmic**: at 24 elements the bottom few cover a couple of
+bass notes each while the top one covers most of the presence region — the same
+caveat `bin(x)` carries in [docs/presets.md](../docs/presets.md).
+
+**`smoothing` here is per element, not per binding.** It is the one piece of
+easing an expression cannot reach: the element levels are scene state, computed
+from the band array rather than evaluated from a binding, so `[smoothing]` has no
+name to attach to. Asymmetric values earn their keep more here than almost
+anywhere else — the bands are the rawest signal in the engine, so a fast `attack`
+keeps a transient's shape while a slow `release` lets the elements fall like a
+meter instead of strobing on every analysis hop. Like all easing in this engine it
+is expressed in seconds against the real frame time, so it looks the same at 60
+and 144 Hz.
 
 Two attractor params behave unlike anything else in the set:
 

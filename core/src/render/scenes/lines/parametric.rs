@@ -198,10 +198,12 @@ impl Scene for ParametricCurveScene {
         // match gains ignore-arms for them when they land.
         match cfg {
             GeneratorConfig::Curve { family } => self.family = *family,
-            // Other scenes' configs (L-system, star, particle attractor).
+            // Other scenes' configs (L-system, star, particle attractor,
+            // spectrum readout).
             GeneratorConfig::LSystem { .. }
             | GeneratorConfig::Star { .. }
-            | GeneratorConfig::Particles { .. } => {}
+            | GeneratorConfig::Particles { .. }
+            | GeneratorConfig::Spectrum { .. } => {}
         }
         // No load-time truncation: the parametric sampler builds nothing here.
         // Its only cap is a per-frame `samples` clamp in `update` (see there).

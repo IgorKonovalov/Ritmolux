@@ -1,0 +1,89 @@
+# Spectrum Corona - the frequency axis wrapped around a circle: one spoke per
+# element, radiating outward from a ring, with the low end at three o'clock and
+# the rest running counter-clockwise.
+#
+# WHY THIS LAYOUT IS DIFFERENT IN KIND. Bars and the contour both have a left and
+# a right, so they read as a chart. Wrapped, the axis has no ends - the readout
+# becomes an object with a centre, which is the difference between a meter and a
+# figure. The trade is real and worth stating: a ring makes it much harder to
+# tell WHERE in the spectrum a peak is, so this is the least legible of the three
+# layouts and the most watchable.
+system = "spectrum"
+name   = "Spectrum Corona"
+
+[spectrum]
+# One spoke per band would be a solid disc at this radius; 32 keeps them
+# separate all the way round.
+elements = 32
+layout   = "radial_ring"
+# Slower than the comb on both sides. A spoke sweeping past the eye already
+# carries the transient through the rotation, so the envelope does not have to
+# be fast as well - and a ring of jittering spokes reads as static.
+smoothing = { attack = 0.05, release = 0.40 }
+
+[palette]
+name = "ember"
+
+[palette_b]
+name = "ice"
+
+[params]
+# ROTATION - the preset's spine. A steady turn, which on a ring is the one motion
+# that is always visible: every spoke crosses the position its neighbour just
+# left. The audio term is a small nudge to the PHASE rather than a speed change,
+# because a band term on an angle reads as the figure lurching.
+rotation = "time * 0.42 + sin(time * 0.05) * 0.30 + clamp(bass * 0.7, 0, 0.18)"
+
+# THE RING. `radius` is the one layout-specific parameter on this system - it is
+# the inner circle the spokes stand on, and it does nothing at all on bars or the
+# polyline. Bound here to a slow breath plus the low end, so the whole corona
+# expands on a heavy bar.
+radius = "0.34 + sin(time * 0.27) * 0.05 + clamp(bass * 1.1, 0, 0.14)"
+
+# SPOKE LENGTH. The resting length is generous because the ring is the figure:
+# at a short base the spokes read as tick marks on a circle rather than as a
+# corona, and the whole thing collapses to a plain annulus in a silence.
+base  = "0.20 + sin(time * 1.1) * 0.07"
+scale = "2.4"
+
+# COLOUR AROUND THE RING. A full `hue_spread` walks the palette once round the
+# circle, so the wrap is continuous - the last spoke lands next to the first in
+# colour as well as in position, which is the whole reason to spend the spread on
+# this layout rather than on the comb.
+hue         = "mod(time * 0.03, 1)"
+hue_spread  = "1.0"
+saturation  = "1.0"
+# The A/B crossfade, driven slowly: ember through ice and back on a ~35 s cycle.
+palette_mix = "0.5 + sin(time * 0.18) * 0.5"
+
+thickness  = "4.5 + clamp(treb * 10.0, 0, 3.5)"
+brightness = "0.78 + clamp(mid * 1.6, 0, 0.32)"
+
+# NO GEOMETRY MIRROR, and it is worth recording why rather than leaving it as an
+# omission. The mirror replicates the segment set by rotating it about the frame
+# centre - which is exactly where this figure already sits, and it is already
+# rotationally symmetric to 32 folds. Every copy would land on top of the
+# original. This is the same near-no-op the Hankin star has, for the same reason.
+# The screen fold below is a different mechanism and does show.
+
+zoom  = "1.05 + bar * 0.05"
+pan_y = "0.0"
+
+bg_hue      = "0.06 + sin(time * 0.009) * 0.05"
+bg_bright   = "0.024 + clamp(bass * 0.10, 0, 0.014)"
+bg_vignette = "0.86"
+
+# A long tail: the spokes sweep, so persistence draws the sweep itself as a
+# glowing annulus behind them.
+trails = "0.52 + clamp(mid * 0.14, 0, 0.08)"
+
+[smoothing]
+rotation    = 0.15
+radius      = 0.35
+thickness   = { attack = 0.02, release = 0.32 }
+brightness  = { attack = 0.04, release = 0.28 }
+hue         = 0.40
+palette_mix = 0.60
+zoom        = 0.25
+bg_bright   = 0.40
+trails      = 0.55
