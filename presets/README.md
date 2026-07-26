@@ -80,8 +80,10 @@ drawing into, up to 2560x1440 — so at 1080p the filaments are pixel-crisp rath
 than upscaled from the old fixed 640x360 grid. Nothing to bind: it follows the
 window. Two authoring consequences: `size` now reads *finer* at high resolution
 (a value tuned when the field was soft may look thin — nudge it up), and turning
-`trails` or `kaleido_*` on drops the accumulation to those stages' fixed 1280x720
-grid, so a preset that stacks them is softer than the attractor alone.
+`trails` or `kaleido_*` on routes it through those stages' grid instead. Since Plan
+0033 that grid follows the render target too, so stacking them no longer softens the
+attractor the way it did against the old fixed 1280x720 — the two caps still differ,
+so a very large window resolves the attractor alone slightly finer.
 
 ### Line-art parameter notes (Plan 0010)
 
@@ -180,6 +182,46 @@ Folds the finished frame into `kaleido_order` mirrored wedges before present.
 `kaleido_order < 2` (default) is a passthrough; `>= 2` folds (clamped to 48).
 `kaleido_angle` (radians) rotates the fold — ride it on `time` for a turning
 kaleidoscope. Works on any scene.
+
+### Mirror or kaleidoscope? They are not the same cost
+
+`mirror_*` and `kaleido_*` both give you N-fold symmetry, and on a line scene they
+can look nearly alike — but they work at opposite ends of the pipeline:
+
+| | `mirror_order` / `mirror_reflect` | `kaleido_order` / `kaleido_angle` |
+|---|---|---|
+| what it folds | the **geometry**, before rasterization | the finished **pixels** |
+| when | while the scene builds its segments | a post stage, after the scene has drawn |
+| resolution cost | **none** — every replicated segment is drawn at full target resolution | resamples through the stage's internal grid |
+| works on | line systems only (`parametric_curve`, `lsystem`, `star_pattern`) | any scene |
+
+**On a line scene, prefer the mirror whenever either would do.** Replicated
+geometry is rasterized at the target's own resolution, so a 24-fold mirror is
+exactly as crisp as no mirror at all; the screen-space fold has to resample.
+
+Since Plan 0033 the post stages **follow the render target** rather than sitting at
+a fixed 1280x720 (see below), so the fold's cost is far smaller than it was — but
+it is still a resample, and the mirror is still free.
+
+### The composite stages render at the target
+
+`trails` and `kaleido_*` used to run at a fixed 1280x720 internal grid and present
+stretched, which on any display above 720p upscaled the **whole frame** — including
+line art that had just been rasterized at full resolution. That is why a preset
+could look sharp with the stages off and "upsized from something smaller" with them
+on, and why the shipped line presets were written without `trails`.
+
+Both stages now size their grid from the render target (quantized to a 256 px step,
+capped), so composing a look no longer costs sharpness and the line presets can take
+their feedback back. Nothing to bind — it follows the window.
+
+Two consequences worth knowing:
+
+- **A resize clears the trail.** Crossing a quantization step reallocates the
+  accumulation, so the afterglow restarts. Rare rather than continuous, but a slow
+  window drag will blink it.
+- **The cap is a real ceiling.** Above it the grid stops growing and both axes scale
+  by one factor, so an ultrawide keeps its proportions instead of being squashed.
 
 ### Ink on paper — `ink_amount`, `paper_*`, `ink_*` (Plan 0027)
 

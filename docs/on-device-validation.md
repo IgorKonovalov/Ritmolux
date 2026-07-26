@@ -63,6 +63,25 @@ footprint so the vendor spread is on record.
       and back. That pair is the freeze fallback's reason for existing; on this box it should either
       stay frozen (fine) or, if it upgrades, still hold the floor. _(Plan 0023 Phase 4's done-when
       and its budget-tuning risk, extracted at that plan's close.)_
+- [ ] **Trails at native resolution, on the low-end box, 1080p.** Plan 0033 made the two post
+      stages size their internal grid from the render target instead of a fixed 1280x720
+      (ADR-0034). With `trails` active that is now a **full-resolution `Rgba16Float` ping-pong
+      read *and* write every frame** where it used to be a 720p one — roughly 2.25x the feedback
+      bandwidth at 1080p. NFR §1's ≥ 60 fps @ 1080p floor is exactly the claim at risk, and no
+      headless capture can speak to it: WARP timings say nothing about an iGPU's memory bandwidth.
+      Load a line preset with `trails` bound (the shipped ones do not bind it yet — add
+      `trails = "0.75"` to a copy, or wait for the Phase 8 re-tune), let it settle with the overlay
+      on (`F3`), and report **(a)** whether fps holds ≥ 60 and **(b)** the p99 against the same
+      preset with `trails = 0`. _(Plan 0033's stated main exposure. If it fails, lower the cap
+      constant in `core/src/render/post.rs` — do **not** re-fix the grids.)_
+- [ ] **Working-set delta from the target-sized post stages, including mid-dissolve.** The same
+      change grows the composite's GPU memory from ~22 MB per chain to ~50 MB at the cap, and a
+      dual-live dissolve holds **two** chains, so the transient peak is ~100 MB against NFR §12's
+      ~350 MB soft ceiling — which is mostly driver floor already. **Those figures are arithmetic
+      from the texture descriptors, not a measurement.** On the low-end box, report the steady-state
+      working set with a `trails` preset active, and again *while holding down* preset switches so a
+      dissolve is live, against the same numbers with `trails = 0`. _(Plan 0033 Risks: "memory is a
+      projection, not a measurement". Same mitigation as above — the cap is one constant.)_
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
       behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
       Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was
