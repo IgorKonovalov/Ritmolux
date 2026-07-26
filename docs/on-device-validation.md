@@ -69,10 +69,10 @@ footprint so the vendor spread is on record.
       read *and* write every frame** where it used to be a 720p one — roughly 2.25x the feedback
       bandwidth at 1080p. NFR §1's ≥ 60 fps @ 1080p floor is exactly the claim at risk, and no
       headless capture can speak to it: WARP timings say nothing about an iGPU's memory bandwidth.
-      Load a line preset with `trails` bound (the shipped ones do not bind it yet — add
-      `trails = "0.75"` to a copy, or wait for the Phase 8 re-tune), let it settle with the overlay
-      on (`F3`), and report **(a)** whether fps holds ≥ 60 and **(b)** the p99 against the same
-      preset with `trails = 0`. _(Plan 0033's stated main exposure. If it fails, lower the cap
+      Load **`rose_trails`** — it binds `trails` around 0.78 and is the shipped preset that exercises
+      this path (`rose_kaleidoscope` and `fragment_kaleido` cover the fold). Let it settle with the
+      overlay on (`F3`), and report **(a)** whether fps holds ≥ 60 and **(b)** the p99 against the
+      same preset with `trails = 0`. _(Plan 0033's stated main exposure. If it fails, lower the cap
       constant in `core/src/render/post.rs` — do **not** re-fix the grids.)_
 - [ ] **Working-set delta from the target-sized post stages, including mid-dissolve.** The same
       change grows the composite's GPU memory from ~22 MB per chain to ~50 MB at the cap, and a
