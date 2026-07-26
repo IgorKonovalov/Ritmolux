@@ -102,49 +102,27 @@ const TRAIL_FALLBACK_H: u32 = 720;
 /// no wall clock, so a fixed-size headless capture stays byte-reproducible.
 const TRAIL_GRID_STEP: u32 = 256;
 
-/// The trail accumulation grid for a render target of `width` x `height`.
+/// The trail accumulation grid for a render target of `width` x `height` — this
+/// scene's **cap and step** over the one shared policy
+/// ([`grid::grid_size`](crate::render::grid::grid_size)).
 ///
-/// Pure, and the whole size policy in one place (Plan 0029 Phase 2): scale both
-/// axes by a **single** factor when either exceeds its cap, then round each up to
-/// `TRAIL_GRID_STEP`. The single factor is what keeps an ultrawide target's
-/// proportions — clamping each axis independently turned a 3440x1440 target into
-/// a 16:9 grid that the aspect-ignoring present then stretched back to 21:9, so
-/// the attractor's shape changed discontinuously as the window crossed 2560 wide.
-/// Never returns 0 on either axis, and never exceeds either cap.
+/// A thin wrapper on purpose (Plan 0035 Phase 3). The arithmetic used to live
+/// here, and `post.rs` held a line-for-line copy of it; that duplication is how
+/// the aspect lesson this scene already paid for failed to reach the post stages
+/// and shipped as a defect a second time (ADR-0037). The **numbers** stay here,
+/// because they are genuinely this call site's — see `TRAIL_MAX_*` for why the
+/// attractor may take a larger grid than a post stage.
+///
+/// **Still `pub`, deliberately.** Plan 0029's close logged this as a nit (public
+/// API widened for a test's benefit), and Plan 0035 re-examined it while touching
+/// the function: `core/tests/attractor.rs` is an integration test and can only
+/// reach a `pub` item, so narrowing to `pub(crate)` means moving that test set
+/// into the crate — a change to a file outside this plan's scope, for no
+/// behavioral gain. `core/` is not a published API surface; the cost of the
+/// widening is a doc-comment's worth of noise, and the cost of the churn is a
+/// silent scope expansion. Kept.
 pub fn trail_grid_size(width: u32, height: u32) -> (u32, u32) {
-    let w = width.max(1);
-    let h = height.max(1);
-    // Integer ratio compare + derivation (u64 so the products can't overflow), so
-    // the grid is an exact function of the target size on every target (NFR §6).
-    let (fit_w, fit_h) = if w <= TRAIL_MAX_W && h <= TRAIL_MAX_H {
-        (w, h)
-    } else if u64::from(w) * u64::from(TRAIL_MAX_H) >= u64::from(h) * u64::from(TRAIL_MAX_W) {
-        // Width binds: pin it to the cap and derive the height from the target's
-        // aspect (<= TRAIL_MAX_H by the branch condition).
-        (
-            TRAIL_MAX_W,
-            (u64::from(h) * u64::from(TRAIL_MAX_W) / u64::from(w)) as u32,
-        )
-    } else {
-        (
-            (u64::from(w) * u64::from(TRAIL_MAX_H) / u64::from(h)) as u32,
-            TRAIL_MAX_H,
-        )
-    };
-    (
-        quantize_axis(fit_w, TRAIL_MAX_W),
-        quantize_axis(fit_h, TRAIL_MAX_H),
-    )
-}
-
-/// Round one axis up to the next `TRAIL_GRID_STEP` multiple, floored at one
-/// step (never 0) and clamped back under `cap` — the round-up can overshoot on an
-/// axis sitting at the cap.
-fn quantize_axis(px: u32, cap: u32) -> u32 {
-    px.div_ceil(TRAIL_GRID_STEP)
-        .max(1)
-        .saturating_mul(TRAIL_GRID_STEP)
-        .min(cap)
+    crate::render::grid::grid_size((width, height), (TRAIL_MAX_W, TRAIL_MAX_H), TRAIL_GRID_STEP)
 }
 
 /// Wall-clock duration of one attractor iteration (Plan 0014 injected `dt`). The

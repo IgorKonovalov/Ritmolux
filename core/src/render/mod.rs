@@ -28,6 +28,7 @@ pub mod capture;
 pub mod context;
 pub mod feedback;
 pub(crate) mod gpu;
+pub(crate) mod grid;
 pub(crate) mod ink;
 pub(crate) mod kaleidoscope;
 pub mod metrics;

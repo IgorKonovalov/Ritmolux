@@ -99,52 +99,17 @@ const POST_MAX_H: u32 = 1080;
 /// byte-reproducible (NFR §6).
 const POST_GRID_STEP: u32 = 256;
 
-/// **The** internal-grid policy both post stages share (ADR-0034): the grid a
-/// stage should run at for a given render target.
+/// The grid both post stages run at for a given render target (ADR-0034) — this
+/// call site's **cap and step** over the one shared policy
+/// ([`grid::grid_size`](super::grid::grid_size)).
 ///
-/// Pure, GPU-free, and the whole policy in one place. Round each axis up to
-/// [`POST_GRID_STEP`]; when either axis exceeds its cap, scale **both** by a
-/// single factor first so the aspect survives. That single factor is the lesson
-/// Plan 0029 already paid for on the attractor: clamping each axis independently
-/// squashed a 3440x1440 ultrawide into a 16:9 grid, which the aspect-ignoring
-/// present then stretched back, so the picture changed shape discontinuously as
-/// the window crossed the cap.
-///
-/// Never returns 0 on either axis, and never exceeds either cap.
+/// A thin wrapper on purpose. The arithmetic used to live here as a line-for-line
+/// copy of the attractor's, which is how the two ended up with different aspect
+/// behavior and how ADR-0037's defect shipped a second time; the numbers are
+/// what is genuinely this call site's, and they stay here with their reasoning
+/// (Plan 0035 Phase 3).
 pub(crate) fn internal_grid_size(surface: (u32, u32)) -> (u32, u32) {
-    let w = surface.0.max(1);
-    let h = surface.1.max(1);
-    // Integer ratio compare and derivation (u64 so the products cannot overflow),
-    // so the grid is an exact function of the target size on every target.
-    let (fit_w, fit_h) = if w <= POST_MAX_W && h <= POST_MAX_H {
-        (w, h)
-    } else if u64::from(w) * u64::from(POST_MAX_H) >= u64::from(h) * u64::from(POST_MAX_W) {
-        // Width binds: pin it to the cap and derive the height from the target's
-        // own aspect (<= POST_MAX_H by the branch condition).
-        (
-            POST_MAX_W,
-            (u64::from(h) * u64::from(POST_MAX_W) / u64::from(w)) as u32,
-        )
-    } else {
-        (
-            (u64::from(w) * u64::from(POST_MAX_H) / u64::from(h)) as u32,
-            POST_MAX_H,
-        )
-    };
-    (
-        quantize_axis(fit_w, POST_MAX_W),
-        quantize_axis(fit_h, POST_MAX_H),
-    )
-}
-
-/// Round one axis up to the next [`POST_GRID_STEP`] multiple, floored at one step
-/// (never 0) and clamped back under `cap` — the round-up overshoots on an axis
-/// already sitting at the cap.
-fn quantize_axis(px: u32, cap: u32) -> u32 {
-    px.div_ceil(POST_GRID_STEP)
-        .max(1)
-        .saturating_mul(POST_GRID_STEP)
-        .min(cap)
+    super::grid::grid_size(surface, (POST_MAX_W, POST_MAX_H), POST_GRID_STEP)
 }
 
 /// Composite positions, in chain order. Named so the routing tests and the
