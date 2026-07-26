@@ -54,9 +54,30 @@ contradicts this file is a plan bug — surface it, don't guess.
 ## 7. CI
 
 - GitHub Actions from the start (right after the workspace scaffold): Windows + macOS
-  runners running `cargo build`, `cargo test`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo fmt --all --check` on every push.
-- GPU rendering and live audio cannot run in CI — those checks stay manual on real hardware.
+  runners running `cargo build`, `cargo nextest run`, `cargo test --doc`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo fmt --all --check` on every push.
+- Plus three single-runner gates: `cargo deny check` (supply chain), Miri over `lmv-ring`'s
+  `unsafe` (UB), and the coverage ratchet below.
+- **Live audio** cannot run in CI. **GPU rendering partly can**: on Windows the DX12 **WARP**
+  software adapter makes headless rendering deterministic, which is what the golden suite and
+  the tier-4 chain test ride on. macOS has no software Metal fallback ([ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)),
+  so the GPU suites skip there with a printed reason. Real-GPU-vendor and live-loopback checks
+  stay manual — see [`on-device-validation.md`](on-device-validation.md).
+- **Coverage ratchet** ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)):
+  a Windows-only job runs `cargo llvm-cov nextest -p lmv-core --fail-under-lines $COVERAGE_FLOOR`.
+  It gates **`lmv-core` only** — `standalone/` is a `winit` event loop plus two platform capture
+  backends no runner can execute. The floor lives in exactly one place, the `COVERAGE_FLOOR`
+  `env:` key in `ci.yml`, and is a **ratchet, not a target**: set from measurement, raised at a
+  close ceremony when a plan improves coverage, lowered only with a note naming the plan and the
+  reason. Measured **90.13 %** at Plan 0032's close; floor set to **88** (a 2-point margin so an
+  unrelated change does not trip on rounding). A line-coverage floor is gameable by design — it
+  is a backstop against silent erosion, not a quality measure. The Mode 4 review's
+  "read the assertion body" step remains the actual quality gate.
+- **Local pre-push gate** (opt-in, per clone): `.githooks/pre-push`, enabled with
+  `git config core.hooksPath .githooks`. Runs the fast subset — `fmt`, `clippy`, and a narrowed
+  `nextest` — in **~28 s** warm, and prints the GPU-heavy suites it skipped. `cargo deny`,
+  doctests, Miri, and coverage stay in CI. An uninstalled clone silently has no gate; see the
+  README's developer section.
 
 ## 8. Distribution (v1)
 
