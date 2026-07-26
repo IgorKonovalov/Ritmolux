@@ -1392,10 +1392,17 @@ impl Scene for AttractorScene {
         // the shaders, pipelines, particle buffer and LUT textures do not depend
         // on the grid and survive, so a resize costs a texture pair plus four
         // bind groups instead of four shader compilations. The rebuilt field is
-        // undefined, so the clear and the seed upload are re-flagged — a resize
-        // restarts the trail from the seeded scatter rather than carrying a
-        // differently-sized accumulation across. The palette is not re-flagged:
-        // the LUT textures survive.
+        // undefined, so the **clear** is re-flagged — a resize restarts the trail
+        // rather than carrying a differently-sized accumulation across. The
+        // palette is not re-flagged: the LUT textures survive.
+        //
+        // Neither is the particle buffer (Plan 0031 Phase 4, closing Plan 0029's
+        // close-review minor 1). It survives the split, so re-uploading the seed
+        // scatter on a grid change is no longer *necessary* — and it was the
+        // surviving half of "a fullscreen toggle pops the cloud back to its seed
+        // scatter": the points kept iterating across a resize, then jumped back.
+        // Determinism does not need it either, since a headless capture holds one
+        // target size for its whole run.
         let grid_stale = self
             .res
             .as_ref()
@@ -1408,8 +1415,10 @@ impl Scene for AttractorScene {
                 }
                 None => {
                     // First build: the LUT textures are fresh, so the palette
-                    // needs its one upload.
+                    // needs its one upload, and the particle buffer has never been
+                    // written — this is the arm the seed upload belongs to.
                     self.palette_dirty = true;
+                    self.needs_upload = true;
                     Resources::build(
                         &self.device,
                         self.surface_format,
@@ -1420,7 +1429,6 @@ impl Scene for AttractorScene {
             };
             self.res = Some(res);
             self.needs_clear = true;
-            self.needs_upload = true;
         }
         let Self {
             res,

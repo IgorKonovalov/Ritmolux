@@ -22,8 +22,8 @@ use std::rc::Rc;
 use super::super::Scene;
 use super::renderer::{LineRenderer, SegmentInstance};
 use super::{
-    CapOverflow, GeneratorConfig, MAX_SEGMENTS, MirrorSpec, ViewTransform, hankin, palette,
-    replicate_mirror, transform_cached, turtle,
+    CapOverflow, GeneratorConfig, MAX_SEGMENTS, MirrorSpec, OverflowContext, ViewTransform, hankin,
+    palette, replicate_mirror, transform_cached, turtle,
 };
 use crate::dsp::AnalysisFrame;
 
@@ -231,12 +231,25 @@ impl Scene for StarPatternScene {
             &mut self.single_buf,
         );
         // Replicate the single transformed variant under the geometry mirror
-        // (Phase 4); the default identity spec is a 1:1 copy.
+        // (Phase 4). At the default identity spec, skip it: replication would copy
+        // the whole segment set into a second buffer to produce exactly what it
+        // was given, so swap instead — O(1), and both buffers were preallocated to
+        // `MAX_SEGMENTS`, so neither can grow later. `transform_cached` clears
+        // before it fills, so whatever lands back in `single_buf` is overwritten.
         let mirror = MirrorSpec::from_params(self.mirror_order, self.mirror_reflect);
+        if mirror.is_identity() {
+            debug_assert!(
+                self.single_buf.len() <= MAX_SEGMENTS,
+                "the cached variant is capped at load, so identity cannot truncate"
+            );
+            std::mem::swap(&mut self.single_buf, &mut self.draw_buf);
+            self.mirror_overflow = None;
+            return;
+        }
         let dropped = replicate_mirror(&self.single_buf, mirror, MAX_SEGMENTS, &mut self.draw_buf);
-        self.mirror_overflow = (dropped > 0).then(|| CapOverflow {
+        self.mirror_overflow = (dropped > 0).then_some(CapOverflow {
             dropped,
-            context: format!("mirror x{}", mirror.order),
+            context: OverflowContext::Mirror(mirror.order),
         });
     }
 

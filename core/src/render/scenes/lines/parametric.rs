@@ -20,8 +20,8 @@ use std::rc::Rc;
 use super::super::Scene;
 use super::renderer::{LineRenderer, SegmentInstance};
 use super::{
-    CapOverflow, CurveFamily, GeneratorConfig, MAX_SEGMENTS, MirrorSpec, ViewTransform, curves,
-    palette, replicate_mirror,
+    CapOverflow, CurveFamily, GeneratorConfig, MAX_SEGMENTS, MirrorSpec, OverflowContext,
+    ViewTransform, curves, palette, replicate_mirror,
 };
 use crate::dsp::AnalysisFrame;
 
@@ -248,10 +248,24 @@ impl Scene for ParametricCurveScene {
             ),
         }
         let mirror = MirrorSpec::from_params(self.mirror_order, self.mirror_reflect);
+        if mirror.is_identity() {
+            // Identity spec: replication would copy the whole segment set into a
+            // second buffer to produce exactly what it was given. Swap instead —
+            // O(1), and both buffers were preallocated to `MAX_SEGMENTS`, so
+            // neither can grow later. `maurer_rose` clears before it fills, so
+            // whatever lands back in `single_buf` is overwritten next frame.
+            debug_assert!(
+                self.single_buf.len() <= MAX_SEGMENTS,
+                "the sampler already clamps to the cap, so identity cannot truncate"
+            );
+            std::mem::swap(&mut self.single_buf, &mut self.segments);
+            self.mirror_overflow = None;
+            return;
+        }
         let dropped = replicate_mirror(&self.single_buf, mirror, MAX_SEGMENTS, &mut self.segments);
-        self.mirror_overflow = (dropped > 0).then(|| CapOverflow {
+        self.mirror_overflow = (dropped > 0).then_some(CapOverflow {
             dropped,
-            context: format!("mirror x{}", mirror.order),
+            context: OverflowContext::Mirror(mirror.order),
         });
     }
 
