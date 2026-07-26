@@ -1,126 +1,144 @@
-# Scene & parameter catalogue
+# Scene & parameter catalogue — authoring guidance
 
-> **Snapshot: 2026-07-23. Five scenes exist.** Scenes are engine code and **change as the app
-> develops** — new scenes land, params get added, defaults get tuned. Confirm the current set against:
-> - valid `system` names → `SystemKind::from_name` in `core/src/preset/schema.rs`
-> - a scene's params + defaults → that scene's `set_param` match + `DEFAULT_*` consts in
->   `core/src/render/scenes/**`
->
-> `docs/presets.md` is stale (wrong counts) — do not use it. The "typical range" columns below are
-> authoring guidance distilled from the shipped presets, not hard engine limits.
+> **The authoritative param roster is `presets/README.md`; defaults are the `DEFAULT_*` consts
+> beside each scene's `set_param`.** This file adds what those don't: what each scene is *for*,
+> the typical working range of each param (distilled from the shipped set, not an engine limit),
+> and which audio input it naturally rides. Where the two disagree, the code wins.
 
-**Naming:** a preset's `system = "…"` uses the underscore name (left column). That differs from the
-scene's display `name()` (e.g. `system = "lsystem"` renders the scene whose display name is
-`"l-system"`). Use the underscore names.
+**Naming:** `system = "…"` is the underscore name; it differs from the scene's display name
+(`system = "lsystem"` → display "l-system").
 
-**Param lifecycle:** each frame the renderer calls `reset_params()` (every param → its default) then
-applies the preset's bindings. So **any param you don't bind keeps its default** — you only write the
-ones you want to drive. All scenes share one iq-style cosine palette; `hue` is a phase offset `0..1`
-into that single looping palette, so color language is consistent across every scene (`+ time * k`
-gives a slow hue drift).
+**Param lifecycle:** each frame the renderer resets every param to its default, then applies the
+preset's bindings. **Any param you don't bind keeps its default** — you only write what you drive.
+
+**Colour split:** `fragment_field`, `swarm`, `reaction_diffusion` and `attractor` colour through
+the shared **palette LUT** (`[palette]`, `saturation`, and either `color_span`/`color_center` or
+`hue_spread`/`hue_center`). The three **line** scenes colour through their own cosine `hue` and
+**ignore `[palette]` silently** — see `docs/preset-palettes.md`.
+
+**Every scene also takes** the shared view transform (`zoom`, `pan_x`, `pan_y`) and the engine
+stages `bg_hue`/`bg_bright`/`bg_vignette`, `trails`, `kaleido_order`/`kaleido_angle`,
+`ink_amount`/`paper_*`/`ink_*`. Line scenes additionally take `mirror_order`/`mirror_reflect`.
 
 ---
 
 ## `fragment_field` — full-screen domain-warp field
+*Ambient, nebula, aurora.* All colour in the pixel shader; reads no audio itself, so every bit of
+life comes through the bindings. Draws **opaquely**, so `bg_*` has no visible effect here.
 
-A single full-screen shader; all color in the pixel shader (iterated sine-fold warp + cosine palette).
-Reads no audio itself — **all** reactivity flows through the expression-bound params. Clears to black.
-The right pick for flowing, ambient, nebula/aurora looks.
+| Param | Default | Typical | Controls / natural driver |
+|-------|---------|---------|---------------------------|
+| `warp` | `0.4` | `0.25 – 2.6` | fold amount — the structure. Gained bass. |
+| `hue` | `0.0` | `0 – 1` (+drift) | palette rotation. `time * 0.02..0.06` + a little treble. |
+| `zoom` | `1.0` | `0.8 – 2.0` | **inverted sense**: higher shows *more* field. Breathe on `bar`. |
+| `glow` | `0.7` | `0.3 – 1.2` | brightness/bloom. Band energy over a floor. |
+| `flash` | `0.0` | `0 – 1` | additive white flash. `clamp(onset * 3, 0, 1)`. |
+| `color_span` | `0.6` | `0.2 – 0.7` | how much of the gradient the field spans. **Low = cohesive mood.** |
+| `color_center` | `0.0` | `0 – 1` | where that window sits. Slide on treble. |
+| `saturation` | `1.0` | `0.6 – 1.4` | chroma. |
 
-| Param | Default | Typical range | Controls |
-|-------|---------|---------------|----------|
-| `warp` | `0.4` | `0.25 – 2.6` | domain-warp fold amount; higher = more distorted, kinetic field |
-| `hue` | `0.0` | `0 – 1` (+drift) | palette rotation offset |
-| `zoom` | `1.0` | `0.8 – 2.0` | field scale; `>1` zooms in (larger features) |
-| `glow` | `0.7` | `0.3 – 1.2` | overall brightness / bloom |
-| `flash` | `0.0` | `0 – 1` | additive white flash on top (ride `onset` for transient pops) |
+## `swarm` — ~10k-particle CPU flow swarm
+*Kinetic, dancey, physical.* Additive sprites, so density reads as glow.
 
-Idiomatic: `warp` on gained bass, `hue` on `time` drift + a little `treb`, `zoom` breathing on `bar`,
-`glow` on band energy, `flash` on `onset`. (See `presets/fragment_aurora.toml`.)
-
-## `swarm` — ~10k-particle flow swarm
-
-~10,000 CPU-simulated particles steered by an evolving flow field, drawn as **additive** sprites over
-near-black. Energetic, organic, physical. The right pick for kinetic, dancey, particle looks.
-
-| Param | Default | Typical range | Controls |
-|-------|---------|---------------|----------|
-| `force` | `1.4` | `1.4 – 7` | steering strength toward the flow field (drive from bass) |
-| `spin` | `0.3` | `0.3 – 2.3` | how fast the flow field evolves (`field_t = time * spin`) |
-| `burst` | `0.0` | `0 – 12` | radial outward kick from center (drive from `beat` for a pulse) |
-| `hue` | `0.0` | `0 – 1` (+drift) | palette offset |
-| `brightness` | `0.8` | `0.8 – 1.8` | global brightness multiplier |
-| `size` | `1.0` | `1.0 – 2.5` | particle size |
-
-Idiomatic: `force`←bass, `spin`←mid, `burst = beat * 11`, `hue` drift + `treb`, `size` bumped on
-`beat`. (See `presets/swarm_storm.toml`.) Additive blending means more particles/size = brighter
-bloom — watch the perf floor on dense, large settings.
+| Param | Default | Typical | Controls / natural driver |
+|-------|---------|---------|---------------------------|
+| `force` | `1.4` | `1.4 – 7` | steering toward the flow field. Bass. |
+| `spin` | `0.3` | `0.3 – 2.3` | how fast the field evolves. Mid. |
+| `burst` | `0.0` | `0 – 12` | radial kick from centre. `beat * 9..11`. |
+| `brightness` | `0.8` | `0.8 – 1.8` | global multiplier. |
+| `size` | `1.0` | `1.0 – 2.5` | particle size — watch overdraw on the iGPU floor. |
+| `hue` | `0.0` | `0 – 1` | gradient offset. |
+| `hue_spread` | `1.0` | `0.1 – 1.0` | width of the per-particle hue band. **`1.0` is full rainbow; drop it for a coherent cloud.** |
+| `hue_center` | `0.5` | `0 – 1` | centre of that band — two presets differing only here read as different colours. |
 
 ## `parametric_curve` — Maurer-rose line curve
+*Precise, geometric, hypnotic.* `[curve] family = "maurer_rose"` (the only family; optional).
 
-A Maurer rose (`sin(n·theta)` walked at a fixed angular step), resampled every frame into the shared
-line renderer. Precise, geometric, hypnotic. Requires `[curve] family = "maurer_rose"`.
-
-| Param | Default | Typical range | Controls |
-|-------|---------|---------------|----------|
-| `n` | `6.0` | `2 – 12` | rose petal frequency (petal count / symmetry) |
-| `d` | `71.0` | `2 – 360` | angular step in degrees — the Maurer "web" density |
-| `samples` | `361.0` | `120 – 720` | chord count (clamped to `MAX_SEGMENTS`) |
-| `thickness` | `2.0` | `1 – 5` | stroke weight |
-| `hue` | `0.6` | `0 – 1` (+drift) | palette offset |
-| `spin` | `0.1` | `0 – 1` | rotation rate (`rotation = spin · time`) |
-| `scale` | `0.9` | `0.6 – 1.0` | overall size in the frame |
-| `brightness` | `1.0` | `0.8 – 1.6` | color multiplier |
-| `draw_progress` | `1.0` | `0 – 1` | line-draw-on reveal (prefix of chords); ride `bar` for a per-beat redraw |
-
-`n`/`d` are the shape; small changes redraw the whole figure. Keep `n` and `samples` integer-ish
-(use `floor` if driving them). (See `presets/rose_star.toml`.)
+| Param | Default | Typical | Controls / natural driver |
+|-------|---------|---------|---------------------------|
+| `n` | `6.0` | `2 – 12` | petal frequency. Keep integer-ish (`floor`). |
+| `d` | `71.0` | `2 – 360` | angular step — the "web" density. |
+| `phase` | `0.0` | `0 – tau` | radians **inside** the sine: reshapes petals as it advances (distinct from `spin`, which rotates the finished figure). Morph on `bar`/`bass`. |
+| `radial_offset` | `0.0` | `-1 – 1` | added to the radius — opens the rose into spiral/annular/rosette forms. Nonzero pushes `r` past `[-1,1]`; large values blow past the frame (intended, the renderer clips). |
+| `samples` | `361.0` | `120 – 720` | chord count; capped by `MAX_SEGMENTS`. |
+| `thickness` | `2.0` | `1 – 5` | stroke weight. |
+| `hue` | `0.6` | `0 – 1` (+drift) | cosine palette offset. |
+| `spin` | `0.1` | `0 – 1` | angular velocity (`rotation = spin * time`). |
+| `scale` | `0.9` | `0.6 – 1.0` | size in frame. |
+| `brightness` | `1.0` | `0.8 – 1.6` | multiplier. |
+| `draw_progress` | `1.0` | `0 – 1` | line-draw-on reveal; ride `bar` for a per-beat redraw. |
 
 ## `lsystem` — branching L-system growth
+*Organic, botanical, growing.* `[generator]` **required** (axiom / rules / `angle_deg` /
+`max_depth ≤ 7` / seed).
 
-A grammar expanded and turtle-walked into a cached segment buffer **per depth** at load; per frame
-just a rotate/scale/color/draw-on transform. Organic, botanical, "growing." Requires a `[generator]`
-table (axiom/rules/angle_deg/max_depth/seed — see `grammar.md`).
+| Param | Default | Typical | Controls / natural driver |
+|-------|---------|---------|---------------------------|
+| `visible_depth` | `1.0` | `1 – max_depth` | which cached iteration draws — the signature move: `4 + floor(2 * bass)` grows the plant on a swell. |
+| `rotation` | `0.0` | radians | **absolute angle**, not a rate — multiply by `time` yourself. |
+| `draw_progress` | `1.0` | `0 – 1` | draw-on reveal. |
+| `hue` | `0.3` | `0 – 1` (+drift) | cosine offset. |
+| `thickness` | `1.8` | `1 – 4` | stroke weight. |
+| `scale` | `1.0` | `0.7 – 1.0` | size. |
+| `brightness` | `1.0` | `0.8 – 1.6` | multiplier. |
 
-| Param | Default | Typical range | Controls |
-|-------|---------|---------------|----------|
-| `visible_depth` | `1.0` | `1 – max_depth` | which cached iteration is drawn — drive with `floor` off a band to **grow** the structure |
-| `rotation` | `0.0` | radians | absolute angle (not a rate — multiply by `time` yourself for spin) |
-| `hue` | `0.3` | `0 – 1` (+drift) | palette offset |
-| `draw_progress` | `1.0` | `0 – 1` | draw-on reveal; ride `bar` for a per-beat redraw |
-| `thickness` | `1.8` | `1 – 4` | stroke weight |
-| `scale` | `1.0` | `0.7 – 1.0` | overall size |
-| `brightness` | `1.0` | `0.8 – 1.6` | color multiplier |
-
-Signature move: `visible_depth = "5 + floor(1 * bass)"` grows a level on a swell. Only depths up to
-`max_depth` are built, so `visible_depth` is clamped to what exists. (See `presets/lsystem_fern.toml`.)
+Only depths up to `max_depth` are built, so `visible_depth` is clamped to what exists.
 
 ## `star_pattern` — Hankin star rosette
+*Symmetric, architectural, mandala.* `[generator]` **required** (`tiling` 4/6/8/12,
+`contact_angle_deg`).
 
-A Hankin contact-angle star rosette (`2·n` segments), one cached rosette per contact-angle **variant**
-at load. Symmetric, mandala-like, architectural. Requires a `[generator]` table
-(tiling/contact_angle_deg — see `grammar.md`).
+| Param | Default | Typical | Controls / natural driver |
+|-------|---------|---------|---------------------------|
+| `variant` | `1.0` | `0 – 2` | precomputed contact-angle variant (pointy↔blunt). `floor(2.99 * beat)` snaps it on the beat. |
+| `rotation` | `0.0` | radians | absolute angle. |
+| `draw_progress` | `1.0` | `0 – 1` | draw-on reveal. |
+| `hue` | `0.5` | `0 – 1` (+drift) | cosine offset. |
+| `thickness` | `2.0` | `2 – 6` | stroke weight. |
+| `scale` | `1.0` | `0.8 – 1.0` | size. |
+| `brightness` | `1.0` | `0.8 – 1.6` | multiplier. |
 
-| Param | Default | Typical range | Controls |
-|-------|---------|---------------|----------|
-| `variant` | `1.0` | `0 – 2` | selects a precomputed contact-angle variant (pointy↔blunt); snap on `beat` with `floor` |
-| `rotation` | `0.0` | radians | absolute angle (multiply by `time` for spin) |
-| `hue` | `0.5` | `0 – 1` (+drift) | palette offset |
-| `draw_progress` | `1.0` | `0 – 1` | draw-on reveal |
-| `thickness` | `2.0` | `2 – 6` | stroke weight |
-| `scale` | `1.0` | `0.8 – 1.0` | overall size |
-| `brightness` | `1.0` | `0.8 – 1.6` | color multiplier |
+## `reaction_diffusion` — Gray-Scott field
+*Coral, maze, mitosis — slow, organic, alive.* A running simulation: parameters steer a **regime**,
+they don't redraw a figure, so changes take a second or two to read. Composites over `bg_*`.
 
-Three variants exist (contact-angle offsets `[-24°, 0°, +24°]` around the base). Signature move:
-`variant = "floor(2.99 * beat)"` snaps between pointy and blunt on the beat. (See
-`presets/star_rosette.toml`.)
+| Param | Default | Typical | Controls / natural driver |
+|-------|---------|---------|---------------------------|
+| `feed` | `0.0367` | `0.02 – 0.06` | Gray-Scott F. **Tiny moves change the whole pattern family** — nudge, don't sweep. |
+| `kill` | `0.0649` | `0.055 – 0.07` | Gray-Scott K. Same caution; the F/K pair is the regime. |
+| `flow` | `1.0` | `0.5 – 2` | simulation rate — the safest audio-driven knob. |
+| `inject` | `0.0` | gate | **edge-triggered** like the attractor's `reseed`: a rising edge stamps one seeded blob at a deterministic pseudo-random spot. `"beat"` blooms a new growth per beat. |
+| `contour` | `6.0` | `3 – 12` | contour banding of the field. |
+| `hatch` | `5.0` | `0 – 12` | hatching texture. |
+| `glow` | `1.0` | `0.6 – 1.6` | brightness. |
+| `color_span` | `0.85` | **`2.0 – 2.5`** for a full custom gradient | RD's field level only reaches ~`0..0.4`, so the default never reaches a warm end — see `docs/preset-palettes.md`. |
+| `color_center` | `0.0` | `0 – 1` | tonal centre. |
+
+## `attractor` — GPU compute particles on a strange attractor
+*Filamentary, chaotic, luminous.* `[particles] family = de_jong | clifford | thomas | lorenz`
+(optional; defaults `de_jong`). The family sets the map **and** the meaning of `a`/`b`/`c`/`d`,
+each defaulting to that family's canonical value.
+
+| Param | Default | Typical | Controls / natural driver |
+|-------|---------|---------|---------------------------|
+| `a` `b` `c` `d` | family canon | ±0.05 around canon | the map's coefficients — **chaotic**: move them slowly and by a little, or it reads as a cut, not a morph. |
+| `size` | `1.0` | `0.6 – 2.0` | point size. Reads *finer* at high resolution — a value tuned on a small capture may look thin at 1080p. |
+| `fade` | `0.94` | `0 – 0.98` | trail persistence per 1/60 s. `0` = no trails; near `1` smears toward permanence (the "blot" trap with `ink_amount`). |
+| `reseed` | `0.0` | gate | **edge-triggered**: re-scatters once when the expression rises past `0.5`. `"beat"` re-scatters per beat. |
+| `hue_spread` | `0.15` | `0.05 – 0.4` | per-particle hue band width. |
+| `hue_center` | `0.075` | `0 – 1` | centre of that band. |
 
 ---
 
-## What no scene can do today (→ API feedback)
+## Engine-wide stages (any system)
 
-There is no ping-pong/feedback scene (reaction-diffusion, Lenia — designed, Plan 0014/ADR-0012, not
-built), no GPU-compute particle scene (attractors/flames — Plan 0016/ADR-0015, not built), no 3D
-scene, no boids/walkers as distinct scenes. There is no view zoom/pan, background, trails, mirror, or
-kaleidoscope yet (ADR-0018, not landed) and no per-param easing (ADR-0019, not landed). If a look
-wants any of these, it is engine work — capture it per `api-feedback.md`.
+| Param | Default | Note |
+|-------|---------|------|
+| `zoom` / `pan_x` / `pan_y` | `1` / `0` / `0` | camera **in** on line/swarm/attractor; **out** (shows more) on fragment/RD. |
+| `bg_hue` / `bg_bright` / `bg_vignette` | `0` / `0` / `0` | backdrop is black until `bg_bright > 0`. Visible behind sparse scenes and RD voids; **invisible behind `fragment_field`**. |
+| `trails` | `0` | per-frame decay; `0` off, higher = longer. Needs real motion to read. |
+| `kaleido_order` / `kaleido_angle` | `1` / `0` | `< 2` is passthrough; ride the angle on `time` for a turning fold. |
+| `mirror_order` / `mirror_reflect` | `1` / `0` | **line scenes only**; folds geometry (before the segment cap), not pixels. |
+| `ink_amount` | `0` | `1` = black-on-white; `paper_*`/`ink_*` make it any duotone. Collapses the palette to two colours. |
+
+Details and the exact semantics: `presets/README.md`.
