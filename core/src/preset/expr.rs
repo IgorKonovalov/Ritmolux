@@ -16,8 +16,8 @@
 //! There are no boolean operators: with clean `0/1` results, `min` is and,
 //! `max` is or, and `1 - c` is not.
 //!
-//! Variables: `bass mid treb onset beat bar time tempo novelty`. Constants:
-//! `pi tau`.
+//! Variables: `bass mid treb onset beat bar time tempo novelty index`.
+//! Constants: `pi tau`.
 //! Functions: `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep
 //! select bin`. Compilation is fallible (a malformed expression is
 //! rejected with a surfaced error, never a panic); evaluation of a compiled
@@ -44,11 +44,19 @@
 use std::fmt;
 
 /// The analysis variables an expression may reference, in slot order.
-pub const VAR_NAMES: [&str; 9] = [
-    "bass", "mid", "treb", "onset", "beat", "bar", "time", "tempo", "novelty",
+///
+/// The first nine are the analysis frame. `index` is different in kind: it is
+/// **not** audio but the *element's own position* during a per-element
+/// evaluation (Plan 0034 Phase 4), and it reads `0` anywhere else.
+pub const VAR_NAMES: [&str; 10] = [
+    "bass", "mid", "treb", "onset", "beat", "bar", "time", "tempo", "novelty", "index",
 ];
 /// Number of expression variables.
 pub const VAR_COUNT: usize = VAR_NAMES.len();
+
+/// Slot of the implicit per-element `index` variable — the last one, appended
+/// after the nine analysis variables so no existing slot moved.
+const INDEX_SLOT: usize = VAR_COUNT - 1;
 
 /// A bound set of variable values for one evaluation. Field order matches
 /// [`VAR_NAMES`]; `beat` is the caller's bool coerced to 0.0/1.0.
@@ -86,9 +94,25 @@ impl<'a> Variables<'a> {
         novelty: f32,
     ) -> Self {
         Self {
-            values: [bass, mid, treb, onset, beat, bar, time, tempo, novelty],
+            // `index` starts at 0: an expression naming it outside a per-element
+            // evaluation reads zero rather than something undefined.
+            values: [bass, mid, treb, onset, beat, bar, time, tempo, novelty, 0.0],
             spectrum: &[],
         }
+    }
+
+    /// Rebind the per-element `index` to `t` (the element's normalized `0..1`
+    /// position), returning a fresh binding — the caller evaluates once per
+    /// element against these (Plan 0034 Phase 4).
+    ///
+    /// By value and `Copy`, so a per-element loop rebinds one float without
+    /// touching the borrowed spectrum or allocating.
+    pub fn with_index(self, t: f32) -> Self {
+        let mut next = self;
+        if let Some(slot) = next.values.get_mut(INDEX_SLOT) {
+            *slot = t;
+        }
+        next
     }
 
     /// Attach the frame's log-spaced band array, which `bin(x)` samples. A
@@ -222,6 +246,18 @@ enum Node {
 }
 
 impl Node {
+    /// Whether this subtree reads variable `slot`. Walked **once at compile**,
+    /// never per frame.
+    fn references(&self, slot: usize) -> bool {
+        match self {
+            Node::Const(_) => false,
+            Node::Var(s) => *s == slot,
+            Node::Neg(inner) => inner.references(slot),
+            Node::Bin(_, l, r) => l.references(slot) || r.references(slot),
+            Node::Call(_, args) => args.iter().any(|arg| arg.references(slot)),
+        }
+    }
+
     fn eval(&self, vars: &Variables<'_>) -> f32 {
         match self {
             Node::Const(c) => *c,
@@ -312,12 +348,24 @@ impl Node {
 #[derive(Debug)]
 pub struct Expr {
     root: Node,
+    /// Whether the expression names `index` anywhere — decided **once at
+    /// compile**, because it is a property of the source text and cannot change
+    /// while the preset is loaded. This is what lets the frame loop ask "is this
+    /// binding per-element?" for the price of reading a `bool`.
+    uses_index: bool,
 }
 
 impl Expr {
     /// Evaluate against a variable binding. Total and allocation-free.
     pub fn eval(&self, vars: &Variables<'_>) -> f32 {
         self.root.eval(vars)
+    }
+
+    /// Whether this expression references the per-element `index`, i.e. whether
+    /// it wants to be evaluated **once per element** rather than once per frame
+    /// (Plan 0034 Phase 4). Free to call — the answer was computed at compile.
+    pub fn uses_index(&self) -> bool {
+        self.uses_index
     }
 }
 
@@ -375,7 +423,8 @@ pub fn compile(src: &str) -> Result<Expr, ExprError> {
     if parser.pos != parser.tokens.len() {
         return Err(ExprError::TrailingTokens);
     }
-    Ok(Expr { root })
+    let uses_index = root.references(INDEX_SLOT);
+    Ok(Expr { root, uses_index })
 }
 
 #[derive(Debug, Clone, PartialEq)]

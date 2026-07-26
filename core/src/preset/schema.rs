@@ -365,6 +365,20 @@ impl Preset {
                 .smoothing
                 .get(&binding.name)
                 .map_or(Easing::INSTANT, |entry| entry.to_easing());
+            // A per-element binding (one naming `index`, Plan 0034 Phase 4) is
+            // evaluated N times and delivered as a series; the smoother holds one
+            // scalar and has no single value to ease. Rather than let the entry be
+            // a silent no-op, say so — an author reaching for easing here wants
+            // `[spectrum] smoothing`, which eases the element levels themselves.
+            if binding.expr.uses_index() && raw.smoothing.contains_key(&binding.name) {
+                warnings.push(format!(
+                    "[smoothing] entry '{}' is ignored: the binding names `index`, so it is \
+                     evaluated per element and cannot be eased as one value \
+                     (use [spectrum] smoothing for the element levels)",
+                    binding.name
+                ));
+                binding.tau = Easing::INSTANT;
+            }
         }
 
         // Palette selection (ADR-0021): validated at this boundary into a
