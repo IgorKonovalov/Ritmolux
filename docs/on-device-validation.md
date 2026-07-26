@@ -88,6 +88,19 @@ footprint so the vendor spread is on record.
       textures sit in VRAM and never enter the working set. That is exactly why this item needs the
       iGPU, where GPU memory *is* system memory. _(Plan 0033 Risks: "memory is a projection, not a
       measurement". Same mitigation as above — the cap is one constant.)_
+- [ ] **The reaction-diffusion present's reconstruction cost, on the low-end box, 1080p.** Plan 0033
+      replaced the RD present's field sampling with a Catmull-Rom reconstruction to get the coral
+      look. The present pass now calls `sample_v` **five** times per fragment, each at **nine**
+      bilinear taps — roughly **45 texture fetches per fragment**, over the whole screen, every
+      frame. It shipped **unmeasured on hardware**: the WARP figure first reported was retracted as
+      run-to-run noise (the same suite timed 193.6 / 224.2 / 105.2 s across three runs), and a
+      software rasterizer says nothing about an iGPU's texture-unit throughput anyway. Load
+      **`reaction_reef`** (or any `reaction_*` preset), let it settle with the overlay on (`F3`), and
+      report **(a)** whether fps holds ≥ 60 @ 1080p and **(b)** the p99. **If it fails, that is a
+      user call, not an automatic revert.** The reconstruction is one function in the RD present
+      shader and reverting it is cheap, but it costs the coral look outright — so route a failure to
+      `architect` with the number, and let the look/perf tradeoff be decided rather than assumed.
+      _(Plan 0033 shipped this and never measured it; extracted at Plan 0035's Phase 4.)_
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
       behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
       Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was

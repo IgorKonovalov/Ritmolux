@@ -221,7 +221,19 @@ Two consequences worth knowing:
   accumulation, so the afterglow restarts. Rare rather than continuous, but a slow
   window drag will blink it.
 - **The cap is a real ceiling.** Above it the grid stops growing and both axes scale
-  by one factor, so an ultrawide keeps its proportions instead of being squashed.
+  by one factor, so a very large or very wide window resolves the stages slightly
+  softer than native rather than unboundedly expensively.
+
+**Composing a stage never changes the picture's proportions**, at any window size.
+The grid's own shape is not the picture's: it is quantized, so it is only roughly
+your window's ratio, and the scene is drawn at the **window's** aspect and then
+stretched back by exactly the inverse when the stage presents. The two cancel, so a
+circle is a circle with `trails` on and with it off (ADR-0037).
+
+That was not true until Plan 0035 — the scene took its aspect from the grid, so
+turning a stage on stretched the whole frame by up to 28 % on common window sizes
+(1280x800 and 1366x768 among them). If you are reading a preset comment written
+before then that talks about a stage changing the shape of a figure, it is stale.
 
 ### Ink on paper — `ink_amount`, `paper_*`, `ink_*` (Plan 0027)
 
