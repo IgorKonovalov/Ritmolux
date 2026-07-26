@@ -9,7 +9,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
-| [0035](0035-composite-aspect-and-grid-policy.md) | The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages | **draft 2026-07-26** — awaiting approval | dev |
+| [0035](0035-composite-aspect-and-grid-policy.md) | The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages | **approved 2026-07-26** — ready for `dev` | dev |
 | [0034](0034-preset-reachable-spectrum.md) | Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
