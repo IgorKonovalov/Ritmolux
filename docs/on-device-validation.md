@@ -80,8 +80,14 @@ footprint so the vendor spread is on record.
       ~350 MB soft ceiling — which is mostly driver floor already. **Those figures are arithmetic
       from the texture descriptors, not a measurement.** On the low-end box, report the steady-state
       working set with a `trails` preset active, and again *while holding down* preset switches so a
-      dissolve is live, against the same numbers with `trails = 0`. _(Plan 0033 Risks: "memory is a
-      projection, not a measurement". Same mitigation as above — the cap is one constant.)_
+      dissolve is live, against the same numbers with `trails = 0`. **Read `rss_bytes`, not
+      `gpu_bytes`** — the latter is a swapchain-only approximation (ADR-0008) that does not count the
+      post stages' offscreens, so it reads identically either way. Measured on the dev box after this
+      landed: `gpu_bytes` unchanged at 16,588,800 (= 1920x1080 x 4 B x 2 — the swapchain exactly),
+      and `rss_bytes` up only ~3 MB, because that box renders on a **discrete** GPU where the
+      textures sit in VRAM and never enter the working set. That is exactly why this item needs the
+      iGPU, where GPU memory *is* system memory. _(Plan 0033 Risks: "memory is a projection, not a
+      measurement". Same mitigation as above — the cap is one constant.)_
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
       behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
       Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was
