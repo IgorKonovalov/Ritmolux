@@ -35,6 +35,10 @@ pub enum SystemKind {
     ReactionDiffusion,
     /// The GPU compute-particle strange-attractor scene — ADR-0015.
     Attractor,
+    /// The N-element spectrum readout — ADR-0036. A line scene like the three
+    /// above (it draws through the same shared renderer), driven by the analysis
+    /// frame's log-spaced band array rather than by a generator.
+    Spectrum,
 }
 
 impl SystemKind {
@@ -42,7 +46,7 @@ impl SystemKind {
     /// `variant_roster_reminder` below: a new variant fails the build there until
     /// this is bumped, and the length of [`ALL`](SystemKind::ALL) is typed from
     /// it, so bumping it without rostering the variant does not compile either.
-    pub const VARIANT_COUNT: usize = 7;
+    pub const VARIANT_COUNT: usize = 8;
 
     /// **The** roster of built-in systems — every [`SystemKind`], in the order the
     /// engine builds their scenes. The single place the variant list lives: the
@@ -59,6 +63,7 @@ impl SystemKind {
         SystemKind::StarPattern,
         SystemKind::ReactionDiffusion,
         SystemKind::Attractor,
+        SystemKind::Spectrum,
     ];
 
     /// Parse a canonical system name (as written in a preset's `system = "..."`
@@ -75,6 +80,7 @@ impl SystemKind {
             "star_pattern" => SystemKind::StarPattern,
             "reaction_diffusion" => SystemKind::ReactionDiffusion,
             "attractor" => SystemKind::Attractor,
+            "spectrum" => SystemKind::Spectrum,
             _ => return None,
         })
     }
@@ -91,6 +97,7 @@ impl SystemKind {
             SystemKind::StarPattern => "star_pattern",
             SystemKind::ReactionDiffusion => "reaction_diffusion",
             SystemKind::Attractor => "attractor",
+            SystemKind::Spectrum => "spectrum",
         }
     }
 
@@ -111,6 +118,7 @@ impl SystemKind {
             SystemKind::StarPattern => scenes::lines::star::PARAMS,
             SystemKind::ReactionDiffusion => scenes::reaction_diffusion::PARAMS,
             SystemKind::Attractor => scenes::particles::PARAMS,
+            SystemKind::Spectrum => scenes::lines::spectrum::PARAMS,
         }
     }
 }
@@ -129,7 +137,8 @@ fn variant_roster_reminder(system: SystemKind) {
         | SystemKind::LSystem
         | SystemKind::StarPattern
         | SystemKind::ReactionDiffusion
-        | SystemKind::Attractor => {}
+        | SystemKind::Attractor
+        | SystemKind::Spectrum => {}
     }
 }
 
@@ -374,8 +383,13 @@ fn build_config(
             Ok(Some(GeneratorConfig::Particles { family }))
         }
         // Reaction-diffusion drives its regime through named params (feed/kill/
-        // flow), not a declarative structural table.
-        SystemKind::FragmentField | SystemKind::Swarm | SystemKind::ReactionDiffusion => Ok(None),
+        // flow), not a declarative structural table. The spectrum readout gains
+        // its own `[spectrum]` table in Plan 0034 Phase 3; until then its
+        // element count and layout are fixed.
+        SystemKind::FragmentField
+        | SystemKind::Swarm
+        | SystemKind::ReactionDiffusion
+        | SystemKind::Spectrum => Ok(None),
     }
 }
 

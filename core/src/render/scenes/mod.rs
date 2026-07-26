@@ -279,7 +279,10 @@ pub(crate) fn shares_resources(a: SystemKind, b: SystemKind) -> bool {
 /// until someone says which side of the sharing it is on.
 fn draws_through_shared_line_renderer(kind: SystemKind) -> bool {
     match kind {
-        SystemKind::ParametricCurve | SystemKind::LSystem | SystemKind::StarPattern => true,
+        SystemKind::ParametricCurve
+        | SystemKind::LSystem
+        | SystemKind::StarPattern
+        | SystemKind::Spectrum => true,
         SystemKind::FragmentField
         | SystemKind::Swarm
         | SystemKind::ReactionDiffusion
@@ -314,6 +317,7 @@ fn create(
             surface_format,
         )),
         SystemKind::Attractor => Box::new(particles::AttractorScene::new(device, surface_format)),
+        SystemKind::Spectrum => Box::new(lines::SpectrumScene::new(line_renderer.clone())),
     }
 }
 
@@ -368,6 +372,7 @@ mod tests {
             SystemKind::StarPattern => "star pattern",
             SystemKind::ReactionDiffusion => "reaction diffusion",
             SystemKind::Attractor => "attractor",
+            SystemKind::Spectrum => "spectrum",
         }
     }
 
@@ -433,6 +438,7 @@ mod tests {
             SystemKind::ParametricCurve,
             SystemKind::LSystem,
             SystemKind::StarPattern,
+            SystemKind::Spectrum,
         ];
         for a in lines {
             for b in lines {

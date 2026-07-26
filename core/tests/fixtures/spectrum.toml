@@ -1,0 +1,13 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+# Minimal spectrum readout: every param a constant, so the only thing that moves
+# the pixels is the band array the harness frame supplies and the geometry the
+# scene builds from it. No `time` term anywhere, so the frame is canonical.
+system = "spectrum"
+name   = "fixture_spectrum"
+
+[params]
+base       = "0.05"
+scale      = "1.1"
+thickness  = "6"
+hue        = "0.55"
+brightness = "0.9"

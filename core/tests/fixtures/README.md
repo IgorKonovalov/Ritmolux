@@ -27,14 +27,22 @@ fixture here — the fixture roster is an **exhaustive `match SystemKind`** with
 wildcard arm. To add one:
 
 1. Author `<system_name>.toml` here (mirror the header comment of the others).
-2. Add the variant's arm to `fixture()` in `golden.rs`, and the variant to the
-   `SYSTEMS` list.
+2. Add the variant's arm to `fixture()` in `golden.rs`. (There is no second list
+   to update: the roster iterated here is `SystemKind::ALL` itself, since Plan
+   0030 Phase 3 retired this file's duplicate `SYSTEMS` list.)
 3. Bless the baseline on Windows WARP:
    `LMV_BLESS=1 cargo test -p lmv-core --test golden`, then eyeball the new PNG
    under `core/tests/golden/` to confirm the scene actually drew.
 
 Baselines are WARP-only (macOS skips per ADR-0016) and must be blessed on WARP or
-they will drift.
+they will drift. **`LMV_BLESS=1` rewrites every baseline, not just the one you
+are adding** — check `git status` afterwards and restore any file you did not
+mean to move, or you will silently re-baseline an unrelated scene's drift.
+
+Note that `golden.rs`'s harness frame carries a **populated `spectrum` array**
+(Plan 0034): a frame claiming `bass = 0.6` with 64 silent log-bands is not a
+frame any audio could produce, and the spectrum fixture would pin a baseline of
+nothing under it.
 
 ## The `composite_*` fixtures are a different guard
 

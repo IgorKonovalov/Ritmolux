@@ -542,6 +542,10 @@ fn declared_params_match_set_param() {
             src.join("render/scenes/particles/mod.rs"),
             SystemKind::Attractor.param_names(),
         ),
+        (
+            src.join("render/scenes/lines/spectrum.rs"),
+            SystemKind::Spectrum.param_names(),
+        ),
         // The global compositing stages, declared the same way.
         (
             src.join("render/background.rs"),
