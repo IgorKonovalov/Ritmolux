@@ -172,6 +172,43 @@ file, so an edit can be shot without touching the seeded copy.
 
 See **[`docs/capturing.md`](docs/capturing.md)** for the runnable commands.
 
+## Developer setup: the pre-push gate
+
+A checked-in `.githooks/pre-push` runs the fast subset of CI before a push, so a
+broken push costs seconds locally instead of minutes in CI. It is **opt-in per
+clone** — enable it with:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+> **An uninstalled clone has no gate.** Git will not run a hook from a tracked
+> directory without that config, so until you set it nothing below happens. There
+> is deliberately no auto-install ([ADR-0033](docs/adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
+> Alternative H).
+
+What it runs, stopping at the first failure and naming the step that failed:
+
+| Step | Command |
+|------|---------|
+| Format | `cargo fmt --all --check` |
+| Lint | `cargo clippy --all-targets -- -D warnings` |
+| Tests | `cargo nextest run` (narrowed — see below) |
+
+**Measured warm wall time: ~28 s** (fmt ~0.5 s, clippy ~0.7 s, tests ~26 s;
+166 of 180 tests). The full suite would be ~98 s, so the hook excludes the nine
+GPU-heavy suites that iterate every shipped preset or scene through a real
+adapter — `golden`, `attractor`, `reaction_diffusion`, `background_composite`,
+`ink`, `reactivity`, `animation`, `sanity`, `distinctness`. It **prints which
+suites it skipped** on every run, so the narrowing is never silent, and **CI runs
+all of them regardless**.
+
+`cargo deny`, doctests, Miri, and the coverage job are deliberately *not* in the
+hook — they push it into minutes, and a gate that hurts gets disabled (ADR-0033
+Alternative F). They are also the checks least likely to break from a local edit.
+
+Bypass once with `git push --no-verify`.
+
 ## Architecture decisions
 
 Key decisions are recorded as ADRs in [`docs/adrs/`](docs/adrs/). Start with
