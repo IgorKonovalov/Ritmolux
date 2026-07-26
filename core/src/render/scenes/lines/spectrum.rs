@@ -66,6 +66,12 @@ use crate::render::palette::{Palette, desaturate};
 /// scenes use, so a `thickness` that reads well on the rose reads the same here.
 const WIDTH_SCALE: f32 = 0.003;
 
+/// Largest element count a `[spectrum]` table may ask for — the band count
+/// itself, because above it the 64 → N reduction stops being a partition of the
+/// array. The loader validates against this, and the render layer sizes its
+/// per-element scratch to it (Plan 0034 Phase 4), so the two cannot disagree.
+pub const MAX_ELEMENTS: usize = crate::dsp::SPECTRUM_BINS;
+
 /// World-space half-width the readout spans. The renderer divides x by the
 /// target aspect, so this is a **world** extent, not a screen one — the scene
 /// never sees an aspect and so cannot take one from the wrong place (ADR-0037).
@@ -147,21 +153,31 @@ impl SpectrumLayout {
     }
 }
 
-/// The per-frame geometry scalars the layout builders need, gathered so each
-/// builder is a pure function of `(levels, colors, style)`.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct Style {
-    /// Minimum element length in world units (the `base` param).
-    pub base: f32,
-    /// Multiplier on the element's band level (the `scale` param).
-    pub scale: f32,
+/// Where the figure sits — the two scalars that belong to the **whole** readout
+/// rather than to an element, so they stay off the per-element arrays.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct Placement {
     /// Inner radius — [`SpectrumLayout::RadialRing`] only.
     pub radius: f32,
     /// Whole-figure rotation in radians, about the world origin.
     pub rotation: f32,
-    /// Half-width in NDC-y units.
-    pub width: f32,
 }
+
+/// The parameters this scene accepts as a **per-element series** (Plan 0034
+/// Phase 4) — the ones whose effect is genuinely per element. Everything else in
+/// [`PARAMS`] describes the whole figure (`radius`, `rotation`, the view
+/// transform, the mirror, `hue_spread`, `palette_mix`, `saturation`), so a
+/// series aimed at one of those degrades to its `index = 0` value, which is what
+/// the trait default does.
+///
+/// **Index order matches the `SERIES_*` constants below** — the two are read
+/// together by `set_param_series` and `update`.
+const SERIES_PARAMS: [&str; 5] = ["base", "scale", "thickness", "brightness", "hue"];
+const SERIES_BASE: usize = 0;
+const SERIES_SCALE: usize = 1;
+const SERIES_THICKNESS: usize = 2;
+const SERIES_BRIGHTNESS: usize = 3;
+const SERIES_HUE: usize = 4;
 
 /// Reduce the engine's band array to `levels.len()` elements by **averaging each
 /// element's own contiguous slice of bands**.
@@ -193,45 +209,49 @@ pub(crate) fn downsample(spectrum: &[f32], levels: &mut [f32]) {
     }
 }
 
-/// The world-space length element `i` reaches, `base + scale * level`, floored at
+/// The world-space length an element reaches, `base + scale * level`, floored at
 /// zero so a degenerate level can never invert the element.
-fn element_length(level: f32, style: Style) -> f32 {
-    (style.base + style.scale * level).max(0.0)
+pub(crate) fn element_length(level: f32, base: f32, scale: f32) -> f32 {
+    (base + scale * level).max(0.0)
 }
 
 /// Build the segment list for `layout` into `out` (cleared first).
 /// Allocation-free into a preallocated buffer; the per-frame half of the scene.
 ///
-/// `colors` is read positionally alongside `levels`; a short list falls back to
-/// white rather than panicking, which cannot happen (both are sized together at
-/// load) but keeps the hot path total.
+/// `lengths`, `widths` and `colors` are read **positionally, per element**, which
+/// is what lets a per-element binding vary any of them across the figure (Plan
+/// 0034 Phase 4). A short list falls back to a sane constant rather than
+/// panicking — which cannot happen, since all three are sized together at load,
+/// but keeps the hot path total.
 pub(crate) fn build(
     layout: SpectrumLayout,
-    levels: &[f32],
+    lengths: &[f32],
+    widths: &[f32],
     colors: &[[f32; 3]],
-    style: Style,
+    place: Placement,
     out: &mut Vec<SegmentInstance>,
 ) {
     out.clear();
-    if levels.is_empty() {
+    if lengths.is_empty() {
         return;
     }
-    let (sin, cos) = style.rotation.sin_cos();
+    let (sin, cos) = place.rotation.sin_cos();
     // The whole-figure rotation is applied here, at the point where world-space
     // endpoints are emitted, so it composes with every layout identically.
     let turn = |p: [f32; 2]| -> [f32; 2] { [p[0] * cos - p[1] * sin, p[0] * sin + p[1] * cos] };
     let color_of = |i: usize| colors.get(i).copied().unwrap_or([1.0, 1.0, 1.0]);
+    let width_of = |i: usize| widths.get(i).copied().unwrap_or(0.01);
 
     match layout {
         SpectrumLayout::Bars => {
-            let step = 2.0 * SPAN_X / levels.len() as f32;
-            for (i, &level) in levels.iter().enumerate() {
+            let step = 2.0 * SPAN_X / lengths.len() as f32;
+            for (i, &length) in lengths.iter().enumerate() {
                 let x = -SPAN_X + step * (i as f32 + 0.5);
                 out.push(SegmentInstance {
                     a: turn([x, BASELINE_Y]),
-                    b: turn([x, BASELINE_Y + element_length(level, style)]),
+                    b: turn([x, BASELINE_Y + length]),
                     color: color_of(i),
-                    width: style.width,
+                    width: width_of(i),
                 });
             }
         }
@@ -239,25 +259,22 @@ pub(crate) fn build(
             // One point per element, spanning edge to edge, joined by n-1
             // segments. A single element has no segment to draw, which is why
             // the loader's minimum count is 2.
-            let span = levels.len().saturating_sub(1);
+            let span = lengths.len().saturating_sub(1);
             if span == 0 {
                 return;
             }
             let step = 2.0 * SPAN_X / span as f32;
-            let point = |i: usize, level: f32| -> [f32; 2] {
-                turn([
-                    -SPAN_X + step * i as f32,
-                    BASELINE_Y + element_length(level, style),
-                ])
+            let point = |i: usize, length: f32| -> [f32; 2] {
+                turn([-SPAN_X + step * i as f32, BASELINE_Y + length])
             };
-            let mut prev = point(0, levels.first().copied().unwrap_or(0.0));
-            for (i, &level) in levels.iter().enumerate().skip(1) {
-                let next = point(i, level);
+            let mut prev = point(0, lengths.first().copied().unwrap_or(0.0));
+            for (i, &length) in lengths.iter().enumerate().skip(1) {
+                let next = point(i, length);
                 out.push(SegmentInstance {
                     a: prev,
                     b: next,
                     color: color_of(i),
-                    width: style.width,
+                    width: width_of(i),
                 });
                 prev = next;
             }
@@ -266,17 +283,17 @@ pub(crate) fn build(
             // The frequency axis wrapped around the circle: element 0 points
             // along +x and the rest follow counter-clockwise, each spoke running
             // outward from the ring.
-            let n = levels.len() as f32;
-            for (i, &level) in levels.iter().enumerate() {
-                let angle = style.rotation + std::f32::consts::TAU * i as f32 / n;
+            let n = lengths.len() as f32;
+            let inner = place.radius.max(0.0);
+            for (i, &length) in lengths.iter().enumerate() {
+                let angle = place.rotation + std::f32::consts::TAU * i as f32 / n;
                 let (s, c) = angle.sin_cos();
-                let inner = style.radius.max(0.0);
-                let outer = inner + element_length(level, style);
+                let outer = inner + length;
                 out.push(SegmentInstance {
                     a: [c * inner, s * inner],
                     b: [c * outer, s * outer],
                     color: color_of(i),
-                    width: style.width,
+                    width: width_of(i),
                 });
             }
         }
@@ -303,6 +320,17 @@ pub struct SpectrumScene {
     levels: Vec<f32>,
     /// Per-element stroke colour, rebuilt each frame into a buffer sized at load.
     colors: Vec<[f32; 3]>,
+    /// Per-element world-space length, rebuilt each frame. Sized at load.
+    lengths: Vec<f32>,
+    /// Per-element stroke half-width, rebuilt each frame. Sized at load.
+    widths: Vec<f32>,
+    /// Per-element binding overrides (Plan 0034 Phase 4), one row per
+    /// [`SERIES_PARAMS`] entry, each sized at load.
+    series: [Vec<f32>; SERIES_PARAMS.len()],
+    /// Which rows this frame's bindings actually wrote. Cleared in
+    /// `reset_params` alongside the scalars, so a series never outlives the frame
+    /// that produced it — the same lifetime rule every other param follows.
+    series_active: [bool; SERIES_PARAMS.len()],
     /// The figure, from `[spectrum] layout`.
     layout: SpectrumLayout,
     /// Per-element easing, from `[spectrum] smoothing`.
@@ -343,6 +371,10 @@ impl SpectrumScene {
             raw_levels: Vec::new(),
             levels: Vec::new(),
             colors: Vec::new(),
+            lengths: Vec::new(),
+            widths: Vec::new(),
+            series: Default::default(),
+            series_active: [false; SERIES_PARAMS.len()],
             layout: SpectrumLayout::default(),
             easing: Easing::INSTANT,
             dt: 0.0,
@@ -379,6 +411,29 @@ impl SpectrumScene {
         self.levels.resize(elements, 0.0);
         self.colors.clear();
         self.colors.resize(elements, [0.0; 3]);
+        self.lengths.clear();
+        self.lengths.resize(elements, 0.0);
+        self.widths.clear();
+        self.widths.resize(elements, 0.0);
+        for row in &mut self.series {
+            row.clear();
+            row.resize(elements, 0.0);
+        }
+        self.series_active = [false; SERIES_PARAMS.len()];
+    }
+
+    /// Element `i`'s value for series row `row`, or `fallback` when no binding
+    /// drove that row this frame. Total — an out-of-range row or element reads
+    /// the fallback rather than panicking on the hot path.
+    fn series_value(&self, row: usize, i: usize, fallback: f32) -> f32 {
+        if !self.series_active.get(row).copied().unwrap_or(false) {
+            return fallback;
+        }
+        self.series
+            .get(row)
+            .and_then(|values| values.get(i))
+            .copied()
+            .unwrap_or(fallback)
     }
 }
 
@@ -407,6 +462,10 @@ impl Scene for SpectrumScene {
         self.pan_y = DEFAULT_PAN;
         self.mirror_order = DEFAULT_MIRROR_ORDER;
         self.mirror_reflect = DEFAULT_MIRROR_REFLECT;
+        // A per-element series lives exactly one frame, like every scalar above:
+        // the rows keep their storage (sized at load) but stop being read until
+        // a binding writes them again.
+        self.series_active = [false; SERIES_PARAMS.len()];
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -428,6 +487,33 @@ impl Scene for SpectrumScene {
             "mirror_reflect" => self.mirror_reflect = value,
             _ => {}
         }
+    }
+
+    fn set_param_series(&mut self, name: &str, values: &[f32]) {
+        let Some(row) = SERIES_PARAMS.iter().position(|&p| p == name) else {
+            // Not a per-element parameter on this scene (the whole-figure ones:
+            // radius, rotation, the view transform, the mirror, hue_spread,
+            // palette_mix, saturation). Fall back to the trait's rule — the
+            // element-0 value — rather than dropping the binding.
+            if let Some(&first) = values.first() {
+                self.set_param(name, first);
+            }
+            return;
+        };
+        let (Some(dst), Some(active)) = (self.series.get_mut(row), self.series_active.get_mut(row))
+        else {
+            return; // unreachable: `position` returned an in-range row
+        };
+        // Copy rather than borrow: the caller's slice is the renderer's scratch,
+        // reused by the next binding. `n` is the overlap, so a scratch sized for
+        // a different element count can neither overrun nor leave stale values
+        // beyond it (the rest of the row keeps whatever it held; only the first
+        // `n` are read, because `update` walks `lengths`, which is `n` long).
+        let n = dst.len().min(values.len());
+        if let (Some(dst), Some(src)) = (dst.get_mut(..n), values.get(..n)) {
+            dst.copy_from_slice(src);
+        }
+        *active = n > 0;
     }
 
     fn set_palette(&mut self, palette: &Palette) {
@@ -472,32 +558,51 @@ impl Scene for SpectrumScene {
             *held = self.easing.step(*held, raw, self.dt);
         }
 
-        // Colour each element from the preset's palette, offset along the axis by
-        // `hue_spread` — at the default `0` the whole figure is one hue, and at
-        // `1` the readout spans the full palette from lowest band to highest.
-        let n = self.colors.len().max(1) as f32;
-        for (i, color) in self.colors.iter_mut().enumerate() {
-            let t = self.hue + self.hue_spread * (i as f32 / n);
-            let rgb = desaturate(self.palette.sample(t, self.palette_mix), self.saturation);
-            *color = [
-                rgb[0] * self.brightness,
-                rgb[1] * self.brightness,
-                rgb[2] * self.brightness,
-            ];
+        // Per-element geometry and colour. Each scalar below reads its own series
+        // row when a binding drove one this frame (Plan 0034 Phase 4) and the
+        // whole-figure param otherwise — so `thickness = "0.01 + bin(index) * 5"`
+        // varies the stroke across the figure while `thickness = "2"` does not,
+        // with no branch in the preset and no second code path here.
+        let count = self.levels.len();
+        let span = count.max(1) as f32;
+        for i in 0..count {
+            let level = self.levels.get(i).copied().unwrap_or(0.0);
+            let base = self.series_value(SERIES_BASE, i, self.base);
+            let scale = self.series_value(SERIES_SCALE, i, self.scale);
+            let thickness = self.series_value(SERIES_THICKNESS, i, self.thickness);
+            let brightness = self.series_value(SERIES_BRIGHTNESS, i, self.brightness);
+            // `hue_spread` walks the palette along the axis on top of whatever
+            // `hue` is — at the default spread of 0 the figure is one hue, at 1
+            // it spans the palette from the lowest element to the highest.
+            let hue =
+                self.series_value(SERIES_HUE, i, self.hue) + self.hue_spread * (i as f32 / span);
+            let rgb = desaturate(self.palette.sample(hue, self.palette_mix), self.saturation);
+
+            if let Some(slot) = self.lengths.get_mut(i) {
+                *slot = element_length(level, base, scale);
+            }
+            if let Some(slot) = self.widths.get_mut(i) {
+                *slot = (thickness * WIDTH_SCALE).max(0.0005);
+            }
+            if let Some(slot) = self.colors.get_mut(i) {
+                *slot = [
+                    rgb[0] * brightness,
+                    rgb[1] * brightness,
+                    rgb[2] * brightness,
+                ];
+            }
         }
 
-        let style = Style {
-            base: self.base,
-            scale: self.scale,
+        let place = Placement {
             radius: self.radius,
             rotation: self.rotation,
-            width: (self.thickness * WIDTH_SCALE).max(0.0005),
         };
         build(
             self.layout,
-            &self.levels,
+            &self.lengths,
+            &self.widths,
             &self.colors,
-            style,
+            place,
             &mut self.single_buf,
         );
 
@@ -544,33 +649,41 @@ mod tests {
     use super::*;
     use crate::dsp::SPECTRUM_BINS;
 
-    fn style() -> Style {
-        Style {
-            base: 0.0,
-            scale: 1.0,
-            radius: 0.0,
-            rotation: 0.0,
-            width: 0.01,
-        }
-    }
-
     fn white(n: usize) -> Vec<[f32; 3]> {
         vec![[1.0, 1.0, 1.0]; n]
     }
 
-    /// The element lengths a stimulus produces, low index first.
+    fn even_widths(n: usize) -> Vec<f32> {
+        vec![0.01; n]
+    }
+
+    /// Build one figure from raw per-element lengths, at the origin, unturned.
+    fn figure(layout: SpectrumLayout, lengths: &[f32]) -> Vec<SegmentInstance> {
+        let mut out = Vec::new();
+        build(
+            layout,
+            lengths,
+            &even_widths(lengths.len()),
+            &white(lengths.len()),
+            Placement::default(),
+            &mut out,
+        );
+        out
+    }
+
+    /// The element lengths a stimulus produces, low index first — the whole
+    /// chain from band array to drawn geometry, at `base = 0`, `scale = 1`.
     fn bar_lengths(spectrum: &[f32; SPECTRUM_BINS], elements: usize) -> Vec<f32> {
         let mut levels = vec![0.0; elements];
         downsample(spectrum, &mut levels);
-        let mut out = Vec::new();
-        build(
-            SpectrumLayout::Bars,
-            &levels,
-            &white(elements),
-            style(),
-            &mut out,
-        );
-        out.iter().map(|s| s.b[1] - s.a[1]).collect()
+        let lengths: Vec<f32> = levels
+            .iter()
+            .map(|&level| element_length(level, 0.0, 1.0))
+            .collect();
+        figure(SpectrumLayout::Bars, &lengths)
+            .iter()
+            .map(|s| s.b[1] - s.a[1])
+            .collect()
     }
 
     /// A band array with energy `1.0` in `lit` bands starting at `from`.
@@ -667,14 +780,11 @@ mod tests {
     #[test]
     fn bars_are_evenly_spaced_upright_segments_on_one_baseline() {
         let levels = [0.0f32, 0.5, 1.0, 0.25];
-        let mut out = Vec::new();
-        build(
-            SpectrumLayout::Bars,
-            &levels,
-            &white(levels.len()),
-            style(),
-            &mut out,
-        );
+        let plain: Vec<f32> = levels
+            .iter()
+            .map(|&level| element_length(level, 0.0, 1.0))
+            .collect();
+        let out = figure(SpectrumLayout::Bars, &plain);
         assert_eq!(out.len(), levels.len(), "one segment per element");
 
         let spacing = out[1].a[0] - out[0].a[0];
@@ -702,21 +812,18 @@ mod tests {
             "a full element is full"
         );
 
-        let mut lifted = Vec::new();
-        build(
-            SpectrumLayout::Bars,
-            &levels,
-            &white(levels.len()),
-            Style {
-                base: 0.1,
-                ..style()
-            },
-            &mut lifted,
-        );
+        let lifted_lengths: Vec<f32> = levels
+            .iter()
+            .map(|&level| element_length(level, 0.1, 1.0))
+            .collect();
+        let lifted = figure(SpectrumLayout::Bars, &lifted_lengths);
         assert!(
             (length(&lifted[0]) - 0.1).abs() < 1e-6,
             "base is the resting length, so silence still draws a comb"
         );
+        // And a level can never pull an element below its baseline, whatever a
+        // degenerate `scale` does.
+        assert_eq!(element_length(1.0, 0.0, -5.0), 0.0, "length floors at zero");
     }
 
     /// Plan 0034 Phase 3 done-when 1: each layout draws the *same data* as a
@@ -724,18 +831,10 @@ mod tests {
     #[test]
     fn each_layout_draws_the_same_levels_as_its_own_figure() {
         let levels = [0.1f32, 0.4, 0.9, 0.3, 0.6];
-        let colors = white(levels.len());
-        let mut out = Vec::new();
 
         // Polyline: a connected chain, so consecutive segments share an endpoint
         // and there is one fewer segment than elements.
-        build(
-            SpectrumLayout::Polyline,
-            &levels,
-            &colors,
-            style(),
-            &mut out,
-        );
+        let out = figure(SpectrumLayout::Polyline, &levels);
         assert_eq!(out.len(), levels.len() - 1, "n-1 segments join n points");
         for i in 1..out.len() {
             assert_eq!(
@@ -756,11 +855,18 @@ mod tests {
 
         // Radial ring: one spoke per element, each pointing away from the origin
         // and starting on a circle of the configured inner radius.
-        let ring = Style {
-            radius: 0.4,
-            ..style()
-        };
-        build(SpectrumLayout::RadialRing, &levels, &colors, ring, &mut out);
+        let mut out = Vec::new();
+        build(
+            SpectrumLayout::RadialRing,
+            &levels,
+            &even_widths(levels.len()),
+            &white(levels.len()),
+            Placement {
+                radius: 0.4,
+                rotation: 0.0,
+            },
+            &mut out,
+        );
         assert_eq!(out.len(), levels.len(), "one spoke per element");
         for (i, seg) in out.iter().enumerate() {
             let inner = (seg.a[0] * seg.a[0] + seg.a[1] * seg.a[1]).sqrt();
@@ -792,7 +898,6 @@ mod tests {
     #[test]
     fn rotation_turns_every_layout_by_the_same_angle() {
         let levels = [0.2f32, 0.7, 0.4, 0.5];
-        let colors = white(levels.len());
         let quarter = std::f32::consts::FRAC_PI_2;
 
         for layout in [
@@ -800,15 +905,16 @@ mod tests {
             SpectrumLayout::Polyline,
             SpectrumLayout::RadialRing,
         ] {
-            let (mut plain, mut turned) = (Vec::new(), Vec::new());
-            build(layout, &levels, &colors, style(), &mut plain);
+            let plain = figure(layout, &levels);
+            let mut turned = Vec::new();
             build(
                 layout,
                 &levels,
-                &colors,
-                Style {
+                &even_widths(levels.len()),
+                &white(levels.len()),
+                Placement {
+                    radius: 0.0,
                     rotation: quarter,
-                    ..style()
                 },
                 &mut turned,
             );
@@ -875,19 +981,29 @@ mod tests {
                 color: [1.0, 1.0, 1.0],
                 width: 1.0,
             }];
-            build(layout, &none, &[], style(), &mut out);
+            build(layout, &none, &[], &[], Placement::default(), &mut out);
             assert!(out.is_empty(), "{layout:?}: no elements, no segments");
+
+            // Short width/colour lists fall back rather than panicking — the hot
+            // path must stay total even if the buffers ever disagree.
+            build(
+                layout,
+                &[0.3, 0.4],
+                &[],
+                &[],
+                Placement::default(),
+                &mut out,
+            );
+            assert!(
+                out.iter().all(|s| s.width > 0.0),
+                "{layout:?}: a missing width falls back to a drawable one"
+            );
         }
         // A single element has no polyline to draw and must not underflow.
-        let mut out = Vec::new();
-        build(
-            SpectrumLayout::Polyline,
-            &[0.5],
-            &white(1),
-            style(),
-            &mut out,
+        assert!(
+            figure(SpectrumLayout::Polyline, &[0.5]).is_empty(),
+            "one point is not a line"
         );
-        assert!(out.is_empty(), "one point is not a line");
 
         // An empty spectrum leaves every element at zero rather than reading
         // stale values.

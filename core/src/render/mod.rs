@@ -45,7 +45,7 @@ mod transition;
 use crate::audio::AudioFormat;
 use crate::diag::{Diag, Metrics};
 use crate::dsp::AnalysisFrame;
-use crate::preset::{Easing, Preset, SystemKind, Variables};
+use crate::preset::{Easing, Expr, Preset, SystemKind, Variables};
 use background::Background;
 pub use capture::CaptureImage;
 pub use context::{RenderContext, RenderError};
@@ -329,6 +329,41 @@ impl ParamSmoother {
     }
 }
 
+/// How much of the per-element scratch `preset` uses this frame: its
+/// `[spectrum] elements`, or `0` for a system with no per-element surface
+/// (Plan 0034 Phase 4). Bounded by `capacity` so a config can never index past
+/// the scratch, whatever the loader admitted.
+fn element_prefix(preset: &Preset, capacity: usize) -> usize {
+    preset
+        .config
+        .as_ref()
+        .map_or(0, scenes::GeneratorConfig::element_count)
+        .min(capacity)
+}
+
+/// Evaluate `expr` once **per element**, binding each element's normalized
+/// `0..1` position to `index`, into `out` (Plan 0034 Phase 4).
+///
+/// Normalized rather than an integer count so an expression composes without
+/// knowing how many elements there are: `bin(index)` reads the whole spectrum
+/// across the figure at any count. The first element is `0` and the last `1`; a
+/// single element is `0` (there is no span to normalize over).
+///
+/// Pure and allocation-free — `out` is the renderer's scratch, sized at preset
+/// load. Split out of [`evaluate_preset`] so the per-element contract is
+/// testable without a GPU.
+fn evaluate_series(expr: &Expr, vars: &Variables<'_>, out: &mut [f32]) {
+    let last = out.len().saturating_sub(1);
+    for (i, slot) in out.iter_mut().enumerate() {
+        let t = if last == 0 {
+            0.0
+        } else {
+            i as f32 / last as f32
+        };
+        *slot = expr.eval(&vars.with_index(t));
+    }
+}
+
 /// Evaluate one preset's bindings into a composite side, an optional ink pass,
 /// and its scene. **Routing only** — nothing is encoded here, because the frame's
 /// destination is not known until ink's activity is (ADR-0032).
@@ -354,6 +389,7 @@ fn evaluate_preset(
     frame: &AnalysisFrame,
     time: f32,
     dt: f32,
+    series: &mut [f32],
 ) {
     scene.set_time(time);
     scene.advance(dt);
@@ -382,7 +418,24 @@ fn evaluate_preset(
                 }
             }
             ParamRoute::Scene => {
-                scene.set_param(&binding.name, value);
+                // A binding that names `index` is asking to be evaluated once
+                // per element (Plan 0034 Phase 4). The test is a `bool` read
+                // decided at compile, and `series` is empty for every system
+                // without a per-element surface — so for the other seven
+                // systems this branch is never taken and the path below is the
+                // one that ran before this existed.
+                if !series.is_empty() && binding.expr.uses_index() {
+                    // Deliberately the *raw* expression, not `value`: the
+                    // per-binding smoother holds one scalar, and a series has
+                    // no single value for it to hold. The scene eases the
+                    // element levels itself through `[spectrum] smoothing`, and
+                    // a `[smoothing]` entry naming a per-element binding is a
+                    // surfaced load warning rather than a silent no-op.
+                    evaluate_series(&binding.expr, vars, series);
+                    scene.set_param_series(&binding.name, series);
+                } else {
+                    scene.set_param(&binding.name, value);
+                }
             }
             // Nothing consumes it. Surfaced at load, silent here (ADR-0020).
             ParamRoute::Unclaimed => {}
@@ -526,6 +579,12 @@ pub struct Renderer {
     cap_overflow: Option<CapOverflow>,
     /// Per-parameter easing state (ADR-0019 / Phase 5), reset on every
     /// active-preset change and capture rebuild.
+    /// Scratch for per-element binding evaluation (Plan 0034 Phase 4). Sized
+    /// **once, here at construction**, to the largest element count the loader
+    /// admits — so the per-frame path slices it and never allocates. A frame uses
+    /// the prefix its preset's `[spectrum] elements` asks for; every other system
+    /// uses an empty prefix, which is what makes their path unchanged.
+    series_scratch: Vec<f32>,
     param_smoother: ParamSmoother,
     /// The **outgoing** preset's easing state during a dual-live dissolve. Moved
     /// out of [`param_smoother`](Self::param_smoother) when the roster flips, so a
@@ -564,6 +623,7 @@ impl Renderer {
             #[cfg(feature = "text")]
             text_layer,
             cap_overflow: None,
+            series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
             param_smoother: ParamSmoother::default(),
             outgoing_smoother: ParamSmoother::default(),
         };
@@ -1107,6 +1167,7 @@ impl Renderer {
             text_layer,
             // Set at preset load, surfaced by the frontend — not a per-frame concern.
             cap_overflow: _,
+            series_scratch,
             param_smoother,
             outgoing_smoother,
             // Switch-site policy state (the kind rotation) — not a per-frame concern.
@@ -1166,6 +1227,7 @@ impl Renderer {
             {
                 // No ink: the outgoing side's `ink_*` were held at the capture
                 // frame and are crossfaded by the single engine-wide pass below.
+                let out_elements = element_prefix(outgoing, series_scratch.len());
                 evaluate_preset(
                     outgoing,
                     out_routes,
@@ -1177,6 +1239,7 @@ impl Renderer {
                     frame,
                     *time,
                     dt,
+                    series_scratch.get_mut(..out_elements).unwrap_or(&mut []),
                 );
                 draw_calls += composite_into(ctx, out_scene, side, encoder, &out_view, surface);
             }
@@ -1198,6 +1261,7 @@ impl Renderer {
             return draw_calls;
         };
         ink.reset_params();
+        let elements = element_prefix(preset, series_scratch.len());
         evaluate_preset(
             preset,
             routes,
@@ -1209,6 +1273,7 @@ impl Renderer {
             frame,
             *time,
             dt,
+            series_scratch.get_mut(..elements).unwrap_or(&mut []),
         );
 
         // Ink is one engine-wide pass over the *blended* frame (ADR-0028), but a
@@ -1597,10 +1662,10 @@ mod tests {
 
     use super::{
         CaptureImage, HeadlessOptions, Mode, ParamRoute, ParamSmoother, RenderError, Renderer,
-        Roster, resolve_route,
+        Roster, element_prefix, evaluate_series, resolve_route,
     };
     use crate::dsp::AnalysisFrame;
-    use crate::preset::{Easing, Preset, SystemKind};
+    use crate::preset::{Easing, Preset, SystemKind, Variables, compile};
     use crate::render::metrics::frame_diff;
     use crate::render::post::{KALEIDOSCOPE, TRAILS};
 
@@ -2036,6 +2101,97 @@ mod tests {
 
     /// Phase 5 (ADR-0019): a step change eases toward the target over several
     /// frames instead of snapping, and converges. The one-pole is the whole point.
+    /// Plan 0034 Phase 4 done-when 1 and 4. A binding that names `index` really
+    /// does vary **per element** — a monotonic ramp, not N copies of one value —
+    /// and the positions it is evaluated at are normalized `0..1` rather than
+    /// element counts, so an expression composes without knowing how many there
+    /// are. A binding that does **not** name `index` yields one constant across
+    /// the whole series, which is what makes the per-element path opt-in.
+    #[test]
+    fn a_per_element_binding_varies_and_a_plain_one_does_not() {
+        let vars = Variables::default();
+        let mut out = [0.0f32; 6];
+
+        // `index` itself: the first element is 0, the last is 1, and the steps
+        // in between are even — the normalization the whole feature rests on.
+        let ramp = compile("index").expect("compiles");
+        assert!(
+            ramp.uses_index(),
+            "naming index marks the binding per-element"
+        );
+        evaluate_series(&ramp, &vars, &mut out);
+        assert_eq!(out.first().copied(), Some(0.0), "the first element is 0");
+        assert_eq!(out.last().copied(), Some(1.0), "the last element is 1");
+        for i in 1..out.len() {
+            assert!(
+                out[i] > out[i - 1],
+                "the series must be monotonically varying, got {out:?}"
+            );
+            let step = out[i] - out[i - 1];
+            assert!(
+                (step - 0.2).abs() < 1e-6,
+                "steps are even at 1/(n-1), got {step}"
+            );
+        }
+
+        // A composed expression varies with it rather than being clamped flat.
+        let shaped = compile("0.01 + index * 0.05").expect("compiles");
+        evaluate_series(&shaped, &vars, &mut out);
+        assert!((out[0] - 0.01).abs() < 1e-6 && (out[5] - 0.06).abs() < 1e-6);
+
+        // No `index`: one constant across every element, and the flag says so.
+        let flat = compile("0.4 + 0.1").expect("compiles");
+        assert!(
+            !flat.uses_index(),
+            "a binding without index is not per-element"
+        );
+        evaluate_series(&flat, &vars, &mut out);
+        assert!(
+            out.iter().all(|&v| (v - 0.5).abs() < 1e-6),
+            "a binding not using index is constant across elements, got {out:?}"
+        );
+
+        // A single element has no span to normalize over, so it reads 0 — the
+        // same value `index` takes outside a per-element evaluation.
+        let mut one = [9.0f32; 1];
+        evaluate_series(&ramp, &vars, &mut one);
+        assert_eq!(one[0], 0.0);
+        // And an empty series is simply not evaluated.
+        evaluate_series(&ramp, &vars, &mut []);
+    }
+
+    /// The element count a preset asks the render layer to evaluate for: its
+    /// `[spectrum] elements`, zero for every other system — which is what makes
+    /// the per-element branch unreachable for them — and always bounded by the
+    /// scratch, so a config can never index past it.
+    #[test]
+    fn only_a_spectrum_preset_claims_a_per_element_prefix() {
+        let spectrum = Preset::from_toml_str(
+            "system = \"spectrum\"\n[spectrum]\nelements = 30\n[params]\nbase = \"0.2\"\n",
+        )
+        .expect("valid spectrum preset");
+        assert_eq!(element_prefix(&spectrum, 64), 30);
+        assert_eq!(
+            element_prefix(&spectrum, 8),
+            8,
+            "the scratch bounds the prefix"
+        );
+
+        for src in [
+            "system = \"swarm\"\n[params]\nforce = \"1.0\"\n",
+            "system = \"parametric_curve\"\n[params]\nn = \"6\"\n",
+            "system = \"attractor\"\n[params]\nsize = \"1.0\"\n",
+        ] {
+            let preset = Preset::from_toml_str(src).expect("valid preset");
+            assert_eq!(
+                element_prefix(&preset, 64),
+                0,
+                "{} has no per-element surface",
+                preset.system.as_str()
+            );
+        }
+    }
+
     #[test]
     fn smoothing_eases_a_step_instead_of_snapping() {
         let mut s = ParamSmoother::default();

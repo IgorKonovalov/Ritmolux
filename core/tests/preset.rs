@@ -375,6 +375,121 @@ fn bin_is_a_known_function_with_arity_one() {
     ));
 }
 
+/// Plan 0034 Phase 4 done-when 1: `index` is an ordinary variable that reads
+/// **`0`** outside a per-element evaluation, and appending it left the nine
+/// analysis slots exactly where they were.
+#[test]
+fn index_reads_zero_outside_a_per_element_evaluation() {
+    let e = compile("index").expect("compiles");
+    assert_eq!(
+        e.eval(&Variables::default()),
+        0.0,
+        "outside a per-element evaluation `index` is 0, not undefined"
+    );
+    // Every analysis variable still reads its own value, so the new slot did not
+    // shift any of them.
+    let v = Variables::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 128.0, 0.75);
+    assert_eq!(e.eval(&v), 0.0, "`index` is not fed by the analysis frame");
+    for (name, expected) in [("bass", 1.0), ("novelty", 0.75), ("tempo", 128.0)] {
+        let read = compile(name).unwrap_or_else(|err| panic!("{name} compiles: {err}"));
+        assert_eq!(read.eval(&v), expected, "{name} kept its slot");
+    }
+
+    // `with_index` rebinds only that slot.
+    let at_half = v.with_index(0.5);
+    assert_eq!(e.eval(&at_half), 0.5);
+    assert_eq!(
+        compile("bass").expect("compiles").eval(&at_half),
+        1.0,
+        "rebinding index leaves the analysis variables alone"
+    );
+
+    // The per-element flag is a property of the source text, decided at compile.
+    for (src, per_element) in [
+        ("index", true),
+        ("0.01 + bin(index) * 0.05", true),
+        ("select(index > 0.5, 1, 0)", true),
+        ("bass * 2", false),
+        ("bin(0.4)", false),
+    ] {
+        assert_eq!(
+            compile(src).expect("compiles").uses_index(),
+            per_element,
+            "{src:?} per-element flag"
+        );
+    }
+}
+
+/// Per-element evaluation multiplies the per-frame work by the element count, so
+/// the thing it must never do is allocate. `with_index` rebinds one float on a
+/// `Copy` bundle that borrows (not owns) the spectrum.
+#[test]
+fn per_element_evaluation_performs_no_heap_allocation() {
+    let spectrum = [0.4f32; 64];
+    let e = compile("0.01 + bin(index) * 0.05 + bass").expect("compiles");
+    let v = vars(0.5, 0.2, 0.1, 0.0, 1.0, 0.3, 1.23).with_spectrum(&spectrum);
+
+    // Warm up (touch any lazy statics before measuring).
+    let _ = e.eval(&v.with_index(0.0));
+
+    let before = alloc_count();
+    let mut acc = 0.0f32;
+    // 240 frames at 24 elements — a minute of a default readout.
+    for _ in 0..240 {
+        for i in 0..24 {
+            acc += e.eval(&v.with_index(i as f32 / 23.0));
+        }
+    }
+    let after = alloc_count();
+
+    assert!(acc.is_finite(), "sanity: evaluation produced a real number");
+    assert_eq!(
+        before,
+        after,
+        "per-element evaluation must not allocate; saw {} allocation(s)",
+        after - before
+    );
+}
+
+/// A `[smoothing]` entry naming a per-element binding cannot work — the smoother
+/// holds one scalar and a series has no single value — so it is a **surfaced
+/// warning** rather than a silent no-op, and it points at the table that does.
+#[test]
+fn smoothing_a_per_element_binding_warns_instead_of_doing_nothing() {
+    let preset = Preset::from_toml_str(
+        "system = \"spectrum\"\n[spectrum]\nelements = 8\n\
+         [params]\nthickness = \"2 + bin(index) * 8\"\nbrightness = \"0.5 + bass\"\n\
+         [smoothing]\nthickness = 0.3\nbrightness = 0.3\n",
+    )
+    .expect("valid preset");
+
+    assert_eq!(preset.warnings.len(), 1, "only the per-element one warns");
+    let warning = preset.warnings.first().expect("the warning");
+    assert!(
+        warning.contains("thickness") && warning.contains("index"),
+        "the warning names the binding and why: {warning}"
+    );
+    assert!(
+        warning.contains("[spectrum] smoothing"),
+        "the warning points at the table that does work: {warning}"
+    );
+
+    // The scalar binding's easing is untouched, and the ignored one is instant.
+    let tau_of = |name: &str| {
+        preset
+            .params
+            .iter()
+            .find(|b| b.name == name)
+            .map(|b| b.tau)
+            .unwrap_or_else(|| panic!("{name} is bound"))
+    };
+    assert_eq!(
+        tau_of("brightness"),
+        lmv_core::preset::Easing::symmetric(0.3)
+    );
+    assert_eq!(tau_of("thickness"), lmv_core::preset::Easing::INSTANT);
+}
+
 #[test]
 fn malformed_expressions_fail_to_compile_without_panicking() {
     for bad in [

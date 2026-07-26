@@ -100,6 +100,25 @@ pub enum GeneratorConfig {
     },
 }
 
+impl GeneratorConfig {
+    /// How many elements a per-element binding should be evaluated for under this
+    /// config, or `0` when the system has no per-element surface (Plan 0034 Phase
+    /// 4). Read once at preset load to size the render layer's scratch.
+    ///
+    /// The count lives here rather than on `Scene` because it is **preset data**:
+    /// it comes off the `[spectrum]` table, not out of the scene's state, and the
+    /// renderer already holds the preset.
+    pub fn element_count(&self) -> usize {
+        match self {
+            GeneratorConfig::Spectrum { elements, .. } => *elements,
+            GeneratorConfig::Curve { .. }
+            | GeneratorConfig::LSystem { .. }
+            | GeneratorConfig::Star { .. }
+            | GeneratorConfig::Particles { .. } => 0,
+        }
+    }
+}
+
 /// Which construction hit the [`lines::MAX_SEGMENTS`] cap, for the surfaced message.
 ///
 /// An enum rather than a `String` because one of the two producers is **per
@@ -213,6 +232,30 @@ pub(crate) trait Scene {
     fn reset_params(&mut self) {}
     /// Apply one named parameter; unknown names are ignored.
     fn set_param(&mut self, _name: &str, _value: f32) {}
+
+    /// Apply one named parameter as a **per-element series** (Plan 0034 Phase 4,
+    /// ADR-0036): `values` holds one evaluation of the binding per element, in
+    /// element order. Reached only for a binding whose expression names `index`.
+    ///
+    /// **This is the whole channel, and it is deliberately this narrow.** It
+    /// carries `(name, &[f32])` in one direction and returns nothing. A scene
+    /// cannot ask the preset layer for anything, cannot see the expression, and
+    /// cannot learn which preset is loaded — so this is `set_param` with a slice,
+    /// not an inversion in which scenes read presets. The slice borrows the
+    /// renderer's scratch, which is sized at preset load, so nothing here
+    /// allocates.
+    ///
+    /// The default takes the **first** value and routes it through
+    /// [`set_param`](Self::set_param) — exactly the `index = 0` reading a binding
+    /// gets outside a per-element evaluation. So a scene with no per-element
+    /// surface degrades a series to a scalar instead of dropping it, and a scene
+    /// that never opts in behaves byte-for-byte as before. Only the spectrum
+    /// readout overrides this.
+    fn set_param_series(&mut self, name: &str, values: &[f32]) {
+        if let Some(&first) = values.first() {
+            self.set_param(name, first);
+        }
+    }
 
     /// Consume a preset's declarative structural config (ADR-0007). Invoked
     /// **once at preset load, off the hot path** — a generator builds and caches

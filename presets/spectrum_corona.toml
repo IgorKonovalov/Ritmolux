@@ -40,10 +40,24 @@ rotation = "time * 0.42 + sin(time * 0.05) * 0.30 + clamp(bass * 0.7, 0, 0.18)"
 # expands on a heavy bar.
 radius = "0.34 + sin(time * 0.27) * 0.05 + clamp(bass * 1.1, 0, 0.14)"
 
-# SPOKE LENGTH. The resting length is generous because the ring is the figure:
-# at a short base the spokes read as tick marks on a circle rather than as a
-# corona, and the whole thing collapses to a plain annulus in a silence.
-base  = "0.20 + sin(time * 1.1) * 0.07"
+# SPOKE LENGTH, and the one PER-ELEMENT binding in the shipped set. `index` is
+# the element's own position along the frequency axis, normalized 0..1, and a
+# binding that names it is evaluated once PER SPOKE instead of once per frame -
+# so this is a different resting length at every point around the ring, which no
+# single number can express.
+#
+# It is here for a reason rather than as a demonstration. Music has far less
+# energy at the top of the spectrum than at the bottom, so on a plain readout the
+# high spokes sit stubbed while the low ones swing; lengthening them at rest tilts
+# the figure back toward a circle and lets the top end actually read. The
+# resting length is generous overall because the ring IS the figure: at a short
+# base the spokes are tick marks on a circle rather than a corona.
+#
+# Note there is deliberately no `base` entry in [smoothing] below - a per-element
+# binding is delivered as a series and cannot be eased as one value. The engine
+# says so at load rather than ignoring the entry, and the easing that DOES apply
+# to a spectrum readout is [spectrum] smoothing above.
+base  = "0.16 + index * 0.12 + sin(time * 1.1) * 0.07"
 scale = "2.4"
 
 # COLOUR AROUND THE RING. A full `hue_spread` walks the palette once round the
