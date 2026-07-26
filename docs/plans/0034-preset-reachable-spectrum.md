@@ -2,6 +2,7 @@
 
 > **Status:** draft
 > **Created:** 2026-07-26
+> **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0036](../adrs/0036-preset-reachable-spectrum.md); supplements
 > [0002](../adrs/0002-layered-preset-architecture.md),
