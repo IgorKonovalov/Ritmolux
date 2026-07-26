@@ -116,6 +116,55 @@ impl TransitionKind {
     }
 }
 
+/// The fidelity a dissolve runs its **outgoing** side at (ADR-0024).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Mode {
+    /// The outgoing side is the frame captured at the dissolve's opening, held
+    /// still. Always correct, always affordable — the floor-safe default, the
+    /// same-scene answer, and the fallback the governor latches to.
+    Freeze,
+    /// The outgoing side keeps rendering live through its own composite, so both
+    /// presets animate through the dissolve. The opportunistic upgrade.
+    DualLive,
+}
+
+/// Whether a dissolve may take the dual-live upgrade — **pure** over the two
+/// facts that decide it, so the governor is unit-testable with no GPU and no
+/// clock.
+///
+/// Both must hold (ADR-0024):
+///
+/// - the two presets' scenes must not **share GPU state**, or one frame would
+///   have to render one mutable object twice
+///   ([`scenes::shares_resources`](super::scenes::shares_resources));
+/// - the smoothed frame time must show **positive evidence of headroom**. A zero
+///   `smoothed_frame_ms` means no samples — diagnostics collection is off, as it
+///   is on every headless capture — and absence of evidence is not headroom, so
+///   it declines. That is also what keeps a captured dissolve deterministic: with
+///   no clock there is no clock-dependent mode.
+pub(crate) fn dual_live_eligible(
+    shares_resources: bool,
+    smoothed_frame_ms: f32,
+    budget_ms: f32,
+) -> bool {
+    if shares_resources {
+        return false;
+    }
+    smoothed_frame_ms > 0.0 && smoothed_frame_ms <= budget_ms
+}
+
+/// Whether a **running** dual-live dissolve must give up and latch to the frozen
+/// side — **pure**, the demotion counterpart of [`dual_live_eligible`].
+///
+/// Deliberately not the negation of eligibility: upgrading needs evidence of
+/// headroom, demoting needs evidence of *overload*. A zero reading (no samples)
+/// is neither, so it neither starts a dual-live dissolve nor kills one already
+/// running. Once demoted a dissolve never upgrades again, so the mode cannot
+/// flicker frame to frame.
+pub(crate) fn budget_blown(smoothed_frame_ms: f32, budget_ms: f32) -> bool {
+    smoothed_frame_ms > budget_ms
+}
+
 /// Where a running dissolve is in its two-stage lifecycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Stage {
@@ -134,6 +183,9 @@ enum Stage {
 /// switch-mid-switch rule are unit-testable without a surface. The GPU half is
 /// [`Blend`].
 pub(crate) struct Transition {
+    /// Roster index the dissolve started from — the preset the snapshot holds, and
+    /// the one a dual-live dissolve keeps compositing live.
+    from_index: usize,
     /// Roster index the dissolve lands on. Finalizing must leave the roster here
     /// exactly, whatever happened in between.
     to_index: usize,
@@ -144,6 +196,9 @@ pub(crate) struct Transition {
     dur: f32,
     /// How this dissolve mixes its two sides — chosen once, at the switch site.
     kind: TransitionKind,
+    /// The fidelity of the outgoing side. Chosen at the switch site and only ever
+    /// **downgraded** from there ([`latch_freeze`](Self::latch_freeze)).
+    mode: Mode,
     stage: Stage,
     /// The outgoing preset's evaluated ink params, held at the capture frame so
     /// the one engine-wide ink pass can crossfade between the two sides
@@ -152,18 +207,27 @@ pub(crate) struct Transition {
 }
 
 impl Transition {
-    /// Start a dissolve landing on `to_index` over `dur` seconds, mixed by `kind`.
-    pub(crate) fn new(to_index: usize, dur: f32, kind: TransitionKind) -> Self {
+    /// Start a dissolve from `from_index` to `to_index` over `dur` seconds, mixed
+    /// by `kind` at `mode` fidelity.
+    pub(crate) fn new(
+        from_index: usize,
+        to_index: usize,
+        dur: f32,
+        kind: TransitionKind,
+        mode: Mode,
+    ) -> Self {
         let dur = if dur.is_finite() {
             dur.max(MIN_DURATION_SECS)
         } else {
             DEFAULT_DURATION_SECS
         };
         Self {
+            from_index,
             to_index,
             t: 0.0,
             dur,
             kind,
+            mode,
             stage: Stage::Capture,
             outgoing_ink: None,
         }
@@ -172,6 +236,36 @@ impl Transition {
     /// How this dissolve mixes its two sides.
     pub(crate) fn kind(&self) -> TransitionKind {
         self.kind
+    }
+
+    /// The roster index the dissolve started from — the side the snapshot holds,
+    /// and the one a dual-live dissolve keeps compositing live.
+    pub(crate) fn outgoing_index(&self) -> usize {
+        self.from_index
+    }
+
+    /// Whether the outgoing side re-renders live this frame. Never true on the
+    /// opening frame: that one *is* the outgoing preset's own composite.
+    pub(crate) fn is_dual_live(&self) -> bool {
+        self.mode == Mode::DualLive && self.stage == Stage::Dissolve
+    }
+
+    /// Override the fidelity the governor chose. **Test-only**: a headless capture
+    /// has no meaningful frame-time clock — diagnostics are off and the readback
+    /// blocks — so [`dual_live_eligible`] always answers `Freeze` there and the
+    /// dual-live *render* path would otherwise be unreachable from a test.
+    #[cfg(test)]
+    pub(crate) fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+    }
+
+    /// Give up on the live outgoing side for the **rest** of this dissolve. The
+    /// frozen image is whatever the last live frame left in the outgoing target —
+    /// so the fallback holds the picture still rather than jumping back to the
+    /// frame the dissolve opened on. One-way: a demoted dissolve never upgrades,
+    /// so the mode cannot flicker.
+    pub(crate) fn latch_freeze(&mut self) {
+        self.mode = Mode::Freeze;
     }
 
     /// Whether this frame is the opening one — the renderer must composite the
@@ -185,8 +279,9 @@ impl Transition {
         self.t
     }
 
-    /// The roster index this dissolve lands on.
-    pub(crate) fn to_index(&self) -> usize {
+    /// The roster index this dissolve lands on — where finalize must leave the
+    /// roster, whatever arrived in between.
+    pub(crate) fn incoming_index(&self) -> usize {
         self.to_index
     }
 
@@ -633,7 +728,9 @@ mod tests {
 
     #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
-    use super::{DEFAULT_DURATION_SECS, Transition, TransitionKind};
+    use super::{
+        DEFAULT_DURATION_SECS, Mode, Transition, TransitionKind, budget_blown, dual_live_eligible,
+    };
     use crate::render::ink::InkParams;
 
     /// A stand-in for the outgoing preset's evaluated ink params: the default
@@ -646,7 +743,13 @@ mod tests {
     /// index the renderer must flip the roster to.
     #[test]
     fn the_opening_frame_captures_then_flips_to_the_target() {
-        let mut tr = Transition::new(5, DEFAULT_DURATION_SECS, TransitionKind::Crossfade);
+        let mut tr = Transition::new(
+            2,
+            5,
+            DEFAULT_DURATION_SECS,
+            TransitionKind::Crossfade,
+            Mode::Freeze,
+        );
         assert!(
             tr.needs_snapshot(),
             "the opening frame is the capture frame"
@@ -670,7 +773,7 @@ mod tests {
     #[test]
     fn progress_is_a_pure_function_of_the_injected_dt() {
         let run = |dts: &[f32]| {
-            let mut tr = Transition::new(1, 1.0, TransitionKind::Crossfade);
+            let mut tr = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
             let mut seen = Vec::new();
             for &dt in dts {
                 seen.push(tr.progress());
@@ -683,8 +786,8 @@ mod tests {
 
         // Half a second of a 1 s dissolve is halfway, whatever the frame rate:
         // 30 steps of 1/60 and 15 of 1/30 must agree.
-        let mut fast = Transition::new(1, 1.0, TransitionKind::Crossfade);
-        let mut slow = Transition::new(1, 1.0, TransitionKind::Crossfade);
+        let mut fast = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
+        let mut slow = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
         for _ in 0..30 {
             fast.advance(1.0 / 60.0, default_ink());
         }
@@ -708,7 +811,7 @@ mod tests {
     /// index survives the whole run.
     #[test]
     fn a_dissolve_finishes_at_one_on_its_target() {
-        let mut tr = Transition::new(7, 0.25, TransitionKind::Crossfade);
+        let mut tr = Transition::new(3, 7, 0.25, TransitionKind::Crossfade, Mode::Freeze);
         let mut frames = 0;
         while !tr.finished() {
             tr.advance(1.0 / 60.0, default_ink());
@@ -716,7 +819,11 @@ mod tests {
             assert!(frames < 1000, "a 0.25 s dissolve must terminate");
         }
         assert_eq!(tr.progress(), 1.0, "t lands exactly on 1, never past it");
-        assert_eq!(tr.to_index(), 7, "finalize lands on the requested index");
+        assert_eq!(
+            tr.incoming_index(),
+            7,
+            "finalize lands on the requested index"
+        );
     }
 
     /// The engine policy's rotation is a **deterministic** walk over the whole
@@ -758,11 +865,86 @@ mod tests {
         let _ = TransitionKind::rotating(u32::MAX);
     }
 
+    /// The budget governor, over every case that decides a dissolve's fidelity
+    /// (Plan 0023 Phase 4). This is where "a same-scene transition is verifiably
+    /// freeze" is asserted: **shared scene resources veto dual-live outright**, no
+    /// matter how much frame-time headroom there is.
+    #[test]
+    fn the_governor_only_upgrades_on_evidence_of_headroom() {
+        const BUDGET: f32 = 18.0;
+
+        // Shared resources: never dual-live. One mutable scene object cannot be
+        // rendered twice in a frame, and the three line scenes share one renderer.
+        for ms in [1.0, 8.0, BUDGET, 100.0] {
+            assert!(
+                !dual_live_eligible(true, ms, BUDGET),
+                "a shared-resource pair must freeze even at {ms} ms"
+            );
+        }
+
+        // Independent resources plus real headroom: upgrade.
+        assert!(dual_live_eligible(false, 8.0, BUDGET));
+        assert!(
+            dual_live_eligible(false, BUDGET, BUDGET),
+            "the budget is inclusive"
+        );
+
+        // Over budget: decline.
+        assert!(!dual_live_eligible(false, BUDGET + 0.1, BUDGET));
+
+        // No samples at all (diagnostics off — every headless capture) is not
+        // evidence of headroom, so it declines. This is what keeps a captured
+        // dissolve free of any clock-dependent choice.
+        assert!(
+            !dual_live_eligible(false, 0.0, BUDGET),
+            "absence of frame-time evidence must not be read as headroom"
+        );
+    }
+
+    /// Demotion is **not** the negation of eligibility: a zero reading neither
+    /// starts a dual-live dissolve nor kills one already running, so a run with
+    /// diagnostics off stays in whatever mode it began.
+    #[test]
+    fn the_governor_only_demotes_on_evidence_of_overload() {
+        const BUDGET: f32 = 18.0;
+        assert!(budget_blown(BUDGET + 0.1, BUDGET), "over budget demotes");
+        assert!(!budget_blown(BUDGET, BUDGET), "exactly at budget holds");
+        assert!(!budget_blown(1.0, BUDGET), "plenty of headroom holds");
+        assert!(
+            !budget_blown(0.0, BUDGET),
+            "no samples is not evidence of overload"
+        );
+    }
+
+    /// A dissolve's fidelity only ever goes **down**, and never on the opening
+    /// frame — that frame is the outgoing preset's own composite, so there is
+    /// nothing to re-render beside it.
+    #[test]
+    fn fidelity_latches_down_and_never_back_up() {
+        let mut tr = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::DualLive);
+        assert!(
+            !tr.is_dual_live(),
+            "the opening frame is the outgoing composite itself, never a second one"
+        );
+        tr.advance(1.0 / 60.0, InkParams::default());
+        assert!(tr.is_dual_live(), "the frames after it run both sides live");
+
+        tr.latch_freeze();
+        assert!(
+            !tr.is_dual_live(),
+            "a demoted dissolve stops rendering the outgoing side"
+        );
+        for _ in 0..30 {
+            tr.advance(1.0 / 60.0, InkParams::default());
+            assert!(!tr.is_dual_live(), "and never upgrades again");
+        }
+    }
+
     /// A degenerate duration cannot divide by zero or stall the dissolve.
     #[test]
     fn a_degenerate_duration_still_terminates() {
         for dur in [0.0, -1.0, f32::NAN, f32::INFINITY] {
-            let mut tr = Transition::new(1, dur, TransitionKind::Crossfade);
+            let mut tr = Transition::new(0, 1, dur, TransitionKind::Crossfade, Mode::Freeze);
             for _ in 0..200 {
                 tr.advance(1.0 / 60.0, default_ink());
             }
@@ -775,7 +957,7 @@ mod tests {
     /// backwards or to NaN — the frontend can inject either after a stall.
     #[test]
     fn a_degenerate_dt_holds_progress() {
-        let mut tr = Transition::new(1, 1.0, TransitionKind::Crossfade);
+        let mut tr = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
         tr.advance(0.5, default_ink()); // past the capture frame
         let held = tr.progress();
         for dt in [0.0, -0.5, f32::NAN] {

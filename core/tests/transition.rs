@@ -596,3 +596,72 @@ fn a_finished_dissolve_leaves_no_trace_on_later_frames() {
         "a finished dissolve must leave the ordinary frame path untouched: {drift}"
     );
 }
+
+/// **The heavy pair, on the freeze fallback** (Plan 0023 Phase 4): the two most
+/// expensive stateful scenes — the compute-particle attractor (Plan 0016) and
+/// reaction-diffusion — dissolve into one another correctly on the frozen path.
+///
+/// This *is* the fallback, not a simulation of it: the adaptive governor upgrades
+/// to dual-live only on positive evidence of frame-time headroom, and a headless
+/// capture collects no frame times, so it resolves to `Freeze` here by the same
+/// rule that protects a struggling rig. What must hold is that the freeze path
+/// renders these two the same way it renders the light pair — a ramp between two
+/// real looks, not a cut and not a degenerate frame.
+///
+/// The frame-budget half of the claim (that the heavy pair holds 60 fps on a
+/// low-end iGPU) is the standing on-device carry-forward in
+/// `docs/on-device-validation.md`; a WARP capture cannot speak to it.
+#[test]
+fn the_heavy_pair_dissolves_on_the_freeze_fallback() {
+    let Some(mut renderer) = headless_or_skip() else {
+        return;
+    };
+    let frame = AnalysisFrame::default();
+    let attractor = Preset::from_toml_str(
+        "system = \"attractor\"\nname = \"HeavyA\"\n\
+         [params]\nhue = \"0.1\"\nbrightness = \"1\"\n",
+    )
+    .expect("valid attractor preset");
+    let reaction = Preset::from_toml_str(
+        "system = \"reaction_diffusion\"\nname = \"HeavyB\"\n\
+         [params]\nhue = \"0.6\"\nbrightness = \"1\"\n",
+    )
+    .expect("valid reaction-diffusion preset");
+    renderer.set_presets(vec![attractor, reaction]);
+
+    // Let both the attractor's particles and the diffusion field build and settle
+    // before the switch — these are the scenes whose GPU resources are lazy.
+    capture_run(&mut renderer, &frame, 20);
+
+    renderer.cycle_preset();
+    let window = capture_run(&mut renderer, &frame, DISSOLVE_FRAMES);
+    maybe_write_strip(&window, 6, "heavy-pair");
+
+    let first = window.first().expect("a non-empty dissolve window");
+    let last = window.last().expect("a non-empty dissolve window");
+    let mid = &window[DISSOLVE_FRAMES / 2];
+
+    let span = frame_diff(first, last);
+    assert!(
+        span > 0.05,
+        "the heavy pair must actually look different across the dissolve: {span}"
+    );
+    assert!(
+        frame_diff(mid, first) > 0.2 * span && frame_diff(mid, last) > 0.2 * span,
+        "the heavy pair's mid-dissolve frame must be a blend of both, not either end"
+    );
+    // Neither side may go black: a stateful scene that lost its resources to the
+    // dissolve's allocations would show up exactly here.
+    for (i, img) in [(0usize, first), (DISSOLVE_FRAMES / 2, mid), (59, last)] {
+        assert!(
+            mean_luma(img) > 1.0,
+            "frame {i} of the heavy dissolve is degenerate (mean luma {})",
+            mean_luma(img)
+        );
+    }
+    assert_eq!(
+        renderer.preset_name(),
+        "HeavyB",
+        "the heavy dissolve still finalizes on its target"
+    );
+}

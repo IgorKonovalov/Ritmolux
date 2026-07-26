@@ -154,6 +154,36 @@ pub(crate) fn create_all(
         .collect()
 }
 
+/// Whether two systems' scenes share mutable GPU state, so **one frame must not
+/// render both**.
+///
+/// Two facts make this true, and only one of them is obvious. The roster is keyed
+/// by kind, so the same kind is literally the same `Box<dyn Scene>`. Less
+/// obviously, the three **line** scenes deliberately share one `LineRenderer` —
+/// "borrowed by whichever line scene is active, only one draws per frame" (see
+/// [`create_all`]) — so two *different* line kinds are just as unrenderable in one
+/// frame as one kind twice.
+///
+/// Plan 0023's dual-live dissolve is the first caller: it composites two presets
+/// in a single frame, which is exactly what this forbids. A pair that shares
+/// resources falls back to the frozen snapshot.
+pub(crate) fn shares_resources(a: SystemKind, b: SystemKind) -> bool {
+    a == b || (draws_through_shared_line_renderer(a) && draws_through_shared_line_renderer(b))
+}
+
+/// Whether a system draws through the shared `LineRenderer`. **Exhaustive** with
+/// no wildcard arm, like [`create`] itself: a new scene fails to compile here
+/// until someone says which side of the sharing it is on.
+fn draws_through_shared_line_renderer(kind: SystemKind) -> bool {
+    match kind {
+        SystemKind::ParametricCurve | SystemKind::LSystem | SystemKind::StarPattern => true,
+        SystemKind::FragmentField
+        | SystemKind::Swarm
+        | SystemKind::ReactionDiffusion
+        | SystemKind::Attractor => false,
+    }
+}
+
 /// Build the scene a [`SystemKind`] drives.
 ///
 /// An **exhaustive** `match` with no wildcard arm — the same guard the golden
@@ -272,6 +302,63 @@ mod tests {
                 "system {} must drive its own scene",
                 kind.as_str()
             );
+        }
+    }
+
+    /// The **freeze veto** a dual-live dissolve rests on (Plan 0023 Phase 4): a
+    /// pair of systems that would have to render one mutable object twice in a
+    /// frame must report shared resources, so the governor never upgrades it.
+    ///
+    /// GPU-free — this is the mapping, not the rendering. It closes the half the
+    /// governor's own test has to assume: `dual_live_eligible` is asserted to
+    /// refuse a shared pair, and here is what makes a pair shared.
+    #[test]
+    fn a_pair_that_cannot_render_twice_reports_shared_resources() {
+        // Same kind is the same `Box<dyn Scene>` — the same-scene case that must
+        // always freeze, whatever the frame budget says.
+        for kind in SystemKind::ALL {
+            assert!(
+                super::shares_resources(kind, kind),
+                "{} against itself is one scene object",
+                kind.as_str()
+            );
+        }
+
+        // Two *different* line systems are just as unrenderable together: they
+        // borrow one shared `LineRenderer` (see `create_all`).
+        let lines = [
+            SystemKind::ParametricCurve,
+            SystemKind::LSystem,
+            SystemKind::StarPattern,
+        ];
+        for a in lines {
+            for b in lines {
+                assert!(
+                    super::shares_resources(a, b),
+                    "{} and {} share the line renderer",
+                    a.as_str(),
+                    b.as_str()
+                );
+            }
+        }
+
+        // Everything else holds independent state, so a dissolve between them may
+        // run both sides live.
+        let independent = [
+            SystemKind::FragmentField,
+            SystemKind::Swarm,
+            SystemKind::ReactionDiffusion,
+            SystemKind::Attractor,
+        ];
+        for (i, a) in independent.iter().enumerate() {
+            for b in independent.iter().skip(i + 1).chain(lines.iter()) {
+                assert!(
+                    !super::shares_resources(*a, *b),
+                    "{} and {} hold independent GPU state",
+                    a.as_str(),
+                    b.as_str()
+                );
+            }
         }
     }
 }
