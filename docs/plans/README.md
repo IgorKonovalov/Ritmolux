@@ -10,7 +10,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title                                   | Status | Summary |
 |------|-----------------------------------------|--------|---------|
 | [0031](0031-composite-cleanup-and-debt.md) | Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and the accumulated close-review debt | approved | The non-blocking half of the 2026-07-25 codebase-health review **plus the minors four earlier closes logged and nobody returned for**. Six independent phases: (1) `standalone/examples/shot.rs` is 1028 lines / 45 functions with **zero tests** in a target where `#[test]` does not run — its pure helpers (WAV parse, JSON emit, filmstrip indices, tiling, glyphs) move to the existing `[lib]` and get real assertions, closing a blind spot the `preset-author` lane depends on; (2) `Renderer`'s three constructors (~28 duplicated lines each) collapse onto `from_context`; (3) each binding's easing `tau` and destination resolve **once at load** instead of a per-frame `BTreeMap<String,_>` lookup + chained `set_param` string-match — mainly so adding a stage stops meaning another link in a chained `if` inside the hot loop; (4) three needless per-frame operations go — the cap-overflow `format!` (**Plan 0018 minor 1**, still open), the identity-mirror buffer copy, and the attractor's now-redundant reseed on grid change (**Plan 0029 minor 1**); (5) duplicated GPU boilerplate (two `fullscreen_pipeline`s, three copies of the bind-entry helpers, ~8 pasted fullscreen-triangle vertex stages, the twice-written fixed-step accumulator) shares one home, and the 228-line `AttractorScene::render` splits along its own comment paragraphs; (6) structural/doc debt — `GeneratorConfig` moves out of `lines/mod.rs` (**Plan 0016 minor 2**), the stale RD "fullscreen opaque pass" comment (**Plan 0025/0027**), *live* cap-overflow surfacing (**Plan 0018 minor 2**), `RoseParams` for 11 positional `f32`s, and `Palette` dropping `Copy` at 6 KB. **Sequenced after 0030** (Phase 3 names its chain stages). No new ADR; no preset-visible change; C ABI untouched. |
-| [0032](0032-testing-strategy-e2e-coverage-and-pre-push.md) | Testing strategy: full-chain e2e, `shot` CLI coverage, a core coverage ratchet, and a pre-push gate | draft | Answers "do we have a coverage threshold, e2e tests, happy paths covered, a pre-push hook" — currently no, no, *unknown*, no. Four `dev` phases + one `human` install step, per [ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md). **Phase 1** adds the missing **end-to-end tier**: `core/tests/chain.rs` drives synthetic PCM through the real `audio::intake` SPSC ring, the real drain policy, the real `Analyzer`, and the real `Renderer` to pixels — the seam the architecture rests on and that *nothing* currently crosses (`capture_audio` starts at the `Analyzer`; the drain loop at `main.rs:275` is untested). Asserts band routing survives the seam, determinism across it, lossy-not-fatal overflow, and boundary rejection without panic. **Phase 2** runs the built `shot` binary as a **subprocess** (`standalone/tests/shot_cli.rs`) — exit codes, PNG output, `--report --json`, the `[--presets ...]` provenance label — closing the fact that the CLI the `preset-author` lane and the Plan 0013 harness depend on has **zero tests of any kind** (`#[test]` does not run in an `examples/` target). It deliberately does **not** promote `shot` to a `[[bin]]` (that would drag the `image` dev-dependency into `lmv.exe` and rename every documented invocation, incl. ones in the un-editable `.claude/skills/**`). **Phase 3** adds an opt-in `.githooks/pre-push` running the fast subset (`fmt` + `clippy` + `nextest`, **not** deny/doctests/Miri/coverage), with the warm wall time **measured, not estimated**, and a stated narrowing rule if it exceeds ~90 s. **Phase 4** measures `lmv-core` line coverage, then sets a **ratchet floor** (`cargo llvm-cov nextest -p lmv-core --fail-under-lines`, Windows-only so WARP makes render paths real) at `measured - 2`, in one `env:` key, raised at closes and lowered only with a note — and proves the gate bites by watching it fail. **Phase 5 is `human`**: `core.hooksPath` is per-clone config, so nothing lands until the user sets it. Core+standalone tests and CI only; **no production-code change, no C ABI change, no new Cargo dependency**. Sequencing: Phase 2 is worth landing **before [0031]** (it is the behavioral net that refactor should be done under); Phase 4 reads best **after [0023] closes** (a large, new, thinly-tested render subsystem mid-flight either sets the floor artificially low or trips it). |
 
 ## Recommended execution sequence
 
@@ -47,18 +46,15 @@ capture entry points use, so captures stay a pure function of their inputs. See 
 A later plan touching the render loop should pick up the five minors logged there — the switch-site
 `from`/`to` ordering and the standalone's stale post-switch reads are the two with user-visible edges.)
 
-1. **[0032] Testing strategy (e2e tier + coverage ratchet + pre-push gate)** — **draft, needs the
-   user's go**. Phases 1 and 3 are independent of every active plan and can land at any time; Phase
-   1 is the walking skeleton and carries the value on its own (the ring-to-pixels claim gets a test).
-   One soft ordering preference remains, a judgment call rather than a hard dependency: **Phase 2
-   before [0031]**, since [0031] Phase 1 refactors the 1028-line zero-test `standalone/examples/shot.rs`
-   and a subprocess suite is the behavioral net that work should sit on. Its other preference —
-   **Phase 4 after [0023] closes** — **is now satisfied** (0023 closed 2026-07-26), so the coverage
-   floor can be measured against a settled render subsystem rather than an in-flight one. Adds no
-   production code, no C ABI change, and no Cargo dependency — `cargo-llvm-cov` is a CI-installed
-   tool. [ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md).
+(**[0032] Testing strategy has now landed and closed** — the suite gained a **tier 4** it did not
+have: `core/tests/chain.rs` crosses the ring→analyzer→renderer seam for the first time, and
+`standalone/tests/shot_cli.rs` runs the built `shot` binary as a subprocess. That second one is the
+behavioral net [0031] Phase 1's `shot.rs` refactor should now be done under — its soft
+"land Phase 2 before [0031]" preference **is satisfied**. Also live: an opt-in `.githooks/pre-push`
+fast gate (~28 s) and a `COVERAGE_FLOOR` ratchet on `lmv-core` at **88** against a measured
+**90.13 %** — [0031] deletes code, so watch that number at its close. See Recently closed.)
 
-2. **[0031] Cleanup pass (review findings + accumulated close-review debt)** — six independent phases,
+1. **[0031] Cleanup pass (review findings + accumulated close-review debt)** — six independent phases,
    no ordering pressure except its own Phase 3, which names 0030's chain stages (**now landed**, so
    that dependency is satisfied). 0023 has since closed too, so nothing is in flight ahead of it and
    nothing in it is preset-visible — it can start whenever. **Approved
@@ -124,6 +120,65 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0032 — Testing strategy: full-chain e2e, `shot` CLI coverage, a core coverage ratchet, and a
+  pre-push gate](done/0032-testing-strategy-e2e-coverage-and-pre-push.md) — **done 2026-07-26**,
+  passed Mode 4 review (**no blockers, no majors**; four minors, two nits). Four `dev` phase commits
+  (`332720f` the e2e chain suite, `108e21a` `shot` as a subprocess, `ee89905` the pre-push gate,
+  `a4b7045` the coverage ratchet). Answers the three questions that opened it — coverage threshold,
+  e2e tests, happy paths covered — with a number instead of an opinion. **`core/tests/chain.rs` is
+  the first test that crosses the seam CLAUDE.md opens with**: synthetic PCM into a real
+  `audio::intake` SPSC pair in 20 ms capture-callback-sized bursts, drained through `pop_samples`
+  into a fixed scratch with the shell's own `pump_audio` policy, into a real `Analyzer`, into a real
+  `Renderer`, to real pixels. Four claims: band routing survives the ring, determinism holds
+  **byte-identically** across it, an oversized push is lossy-not-fatal (fills the ring exactly,
+  never splits a frame, never blocks), and `intake` rejects 4 kHz / 0 ch / 9 ch with the exact
+  `FormatError` and no panic. **`standalone/tests/shot_cli.rs` runs the built binary as a user
+  does** — closing the fact that the CLI the `preset-author` lane self-verifies through had **no
+  tests of any kind** (`#[test]` does not run in an `examples/` target). `shot` stayed an example
+  rather than a `[[bin]]` (ADR-0033 Alternative E — a `[[bin]]` gets no dev-dependencies, so the
+  `image` PNG codec would land in the shipped `lmv.exe`), located by walking `current_exe()`'s
+  ancestors for the `examples/` sibling. Four GPU-free cases run everywhere; three rendering cases
+  skip on an **adapter-error match rather than an OS check**, so an adapterless Windows runner is
+  handled too. `.githooks/pre-push` runs `fmt` + `clippy` + a narrowed `nextest` in **~28 s**,
+  opt-in per clone (`git config core.hooksPath .githooks`), printing the nine GPU-heavy suites it
+  skipped. A `windows-latest` `coverage` job gates `lmv-core` line coverage behind
+  **`COVERAGE_FLOOR: 88`** against a measured **90.13 %**, in one `env:` key with the ratchet rule
+  in a comment. **Verified at review** rather than taken on trust: 166/166 green in the hook's
+  narrowed set in 22 s wall and `nextest list` reporting 180 total (the README's "166 of 180" is
+  exact); the coverage gate re-run locally at **exit 0 / 90.13 %**; `clippy --all-targets -D
+  warnings` and `fmt --check` clean; **manifests untouched**, so "no new Cargo dependency" is true
+  in fact (hand-rolled escape-aware JSON helpers bought it, and they carry their own negative-case
+  unit test); the hook is mode **100755** in the index so it executes on a POSIX clone. **The
+  band-routing test is non-vacuous, and more strongly than its own doc claims**: neutralizing the
+  *treble* bindings drops the difference to 0.0243 and **fails** the 0.05 floor, while neutralizing
+  the *bass* bindings still passes — so the treble half is load-bearing and the test cannot be
+  satisfied by bass alone. **Core+standalone tests and CI only; no production code, no C ABI change
+  (v4), no `Scene` change.** **Phase 3 deviated with the user's approval:** the plan's guessed
+  narrowing list (`golden`, `attractor`, `reaction_diffusion`, `background_composite`, `ink`) is
+  worth ~8 s of the ~98 s full gate and misses the real bottlenecks (`reactivity` 89 s, `animation`
+  73 s, `sanity` 46 s, `distinctness` 41 s); the hook excludes the **measured** nine, and the plan
+  text now says so. **Minors, three fixed in the close commit:** (1) the coverage job's summary step
+  ran `cargo llvm-cov report` unscoped, which re-reports every object in the profile data —
+  including `lmv-ring` — so the table under the "floor: 88 %" heading was not the number the gate
+  enforces (confirmed locally; now `-p lmv-core`); (2) `ci.yml`'s own header comment still said
+  "build, test, clippy, fmt" and "GPU rendering ... out of CI scope", the exact sentence this plan
+  corrected in `docs/nfr.md` §7; (3) `CLAUDE.md`'s layout tree did not know `.githooks/` exists;
+  (4) plan-text drift — Phase 1's done-when named `-E 'test(chain)'`, a *name* filter that matches
+  three unrelated `render::post` tests and silently skips two of the four chain claims
+  (`binary(chain)` is the suite selector) — corrected in the plan. **Nits:** `scratch()` never
+  cleans up its `target/shot-cli-tests/<pid>-*` directories; the overflow claim asserts analyzer
+  frames rather than *rendered* frames (which is what keeps it GPU-free — a net gain).
+  **First-push discoveries:** the `coverage` job and the three GPU `shot_cli` tests have never run
+  in CI, so whether `windows-latest` satisfies `shot`'s hardware-adapter request and how far
+  instrumentation stretches the job are open (the suite degrades to a printed skip either way).
+  **Phase 5 (`human`) is half done** — `core.hooksPath` is set in the user's clone; the refused-push
+  half is observable on their next push. **Baseline for the followup coverage plan:**
+  `render/overlay_font.rs` 0.00 %, `render/overlay.rs` 30.69 %, `render/context.rs` 34.71 %,
+  `ffi.rs` 56.60 %, `diag/mod.rs` 65.75 %. [ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
+  **accepted**. **Version: no bump, deliberately** — every commit in the range is chore-class
+  (`test`/`test`/`build`/`ci`), no production code shipped, so `docs/releasing.md`'s docs/chore-only
+  rule applies; stays **0.16.0**.
 
 - [0023 — Cross-preset visual transitions: MilkDrop-style dissolves between presets](done/0023-cross-preset-transitions.md) —
   **done 2026-07-26**, passed Mode 4 review (**no blockers, no majors**; five minors, one nit). Five

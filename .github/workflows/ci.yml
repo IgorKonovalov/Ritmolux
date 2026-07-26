@@ -1,5 +1,12 @@
-# NFR section 7: build, test, clippy, fmt on Windows + macOS for every push.
-# GPU rendering and live audio are out of CI scope - those checks stay manual.
+# NFR section 7: build, test, doctests, clippy, fmt on Windows + macOS for every
+# push, plus three single-runner gates - cargo-deny (supply chain), the lmv-core
+# coverage ratchet (ADR-0033), and Miri over lmv-ring's unsafe.
+#
+# Live audio is out of CI scope. GPU rendering partly is not: on Windows the DX12
+# WARP software adapter makes headless rendering deterministic, which the golden
+# suite and the tier-4 chain test ride on. macOS has no software Metal fallback
+# (ADR-0016), so the GPU suites skip there. Real-vendor GPU and live-loopback
+# checks stay manual - see docs/on-device-validation.md.
 name: CI
 
 on:
@@ -70,6 +77,9 @@ jobs:
         run: cargo llvm-cov nextest -p lmv-core --summary-only --fail-under-lines ${{ env.COVERAGE_FLOOR }}
       # Re-report from the profile data already collected (no second test run)
       # so the per-file breakdown lands where a reviewer will actually read it.
+      # `-p lmv-core` is load-bearing: without it `report` re-reports every
+      # object in the profile data, which includes lmv-ring, and the summary
+      # under the floor heading would not be the number the step above gates.
       - name: Per-file breakdown in the job summary
         if: always()
         shell: bash
@@ -78,7 +88,7 @@ jobs:
             echo "## lmv-core coverage (floor: ${COVERAGE_FLOOR}% lines)"
             echo ""
             echo '```'
-            cargo llvm-cov report --summary-only
+            cargo llvm-cov report -p lmv-core --summary-only
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

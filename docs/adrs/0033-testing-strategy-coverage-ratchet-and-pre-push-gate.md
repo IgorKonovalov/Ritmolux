@@ -1,6 +1,6 @@
 # ADR-0033 — Testing strategy: named tiers, a core-only coverage ratchet, and a local pre-push gate
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-07-25
 > **Related plan(s):** [0032](../plans/0032-testing-strategy-e2e-coverage-and-pre-push.md)
 
