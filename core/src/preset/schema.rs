@@ -158,6 +158,13 @@ pub struct Binding {
     pub name: String,
     /// The compiled expression producing its per-frame value.
     pub expr: Expr,
+    /// This binding's easing time constant in **seconds** (ADR-0019), read out of
+    /// the preset's `[smoothing]` table **once, here at load**. `0.0` — the
+    /// default for an unlisted param — means no smoothing, i.e. the value is
+    /// applied instantly. Resolved at parse time rather than looked up per
+    /// binding per frame (Plan 0031 Phase 3); it is a fact about the preset, and
+    /// the preset does not change while it renders.
+    pub tau: f32,
 }
 
 /// A loaded, ready-to-evaluate preset.
@@ -173,13 +180,10 @@ pub struct Preset {
     /// at preset load via `Scene::configure`. `None` for the fragment/swarm
     /// systems and for curve presets that accept the family default.
     pub config: Option<GeneratorConfig>,
-    /// Optional per-parameter easing time constants in **seconds** (ADR-0019 /
-    /// Plan 0018 Phase 5), from a `[smoothing]` table. A param not listed (the
-    /// default) is applied instantly, exactly as before; a `tau` of `0` also
-    /// means no smoothing. The renderer low-passes each evaluated value on the
-    /// injected `dt` before applying it, so band/beat motion eases instead of
-    /// snapping. Keyed by param name; validated non-negative at load.
-    pub smoothing: BTreeMap<String, f32>,
+    // The `[smoothing]` table itself is deliberately **not** kept: it is validated
+    // at load and folded into each binding's `tau` there (Plan 0031 Phase 3), so
+    // there is nothing left for a frame to look up. An entry naming a param this
+    // preset does not bind was inert before and is inert now.
     /// Optional color palette selection (ADR-0021 / Plan 0020), from a `[palette]`
     /// table — a built-in `name` or custom `stops`, validated and baked-ready at
     /// this boundary. `None` means the default `spectrum` (the exact current
@@ -228,7 +232,14 @@ impl Preset {
                     system.as_str()
                 ));
             }
-            params.push(Binding { name: param, expr });
+            // `tau` is filled below, once the `[smoothing]` table has been
+            // validated — keeping the validation where it is preserves which error
+            // a preset with several problems reports first.
+            params.push(Binding {
+                name: param,
+                expr,
+                tau: 0.0,
+            });
         }
 
         // Structural config: validated once here (a bad family/grammar -> load
@@ -246,6 +257,12 @@ impl Preset {
                 )));
             }
         }
+        // Fold the validated table into the bindings, so the frame loop reads a
+        // plain `f32` off the binding instead of hashing its name into a
+        // `BTreeMap` once per binding per frame (Plan 0031 Phase 3).
+        for binding in &mut params {
+            binding.tau = raw.smoothing.get(&binding.name).copied().unwrap_or(0.0);
+        }
 
         // Palette selection (ADR-0021): validated at this boundary into a
         // baked-ready `PaletteConfig`; a bad name/stop list is a surfaced load
@@ -259,7 +276,6 @@ impl Preset {
             system,
             params,
             config,
-            smoothing: raw.smoothing,
             palette,
             palette_b,
             warnings,

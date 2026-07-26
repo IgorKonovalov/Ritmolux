@@ -292,6 +292,10 @@ impl PostStage for Kaleidoscope {
         true
     }
 
+    fn params(&self) -> &'static [&'static str] {
+        PARAMS
+    }
+
     /// Whether the fold is active this frame (order at least 2; below that it is
     /// the identity passthrough).
     fn active(&self) -> bool {

@@ -407,6 +407,10 @@ impl PostStage for Trails {
         }
     }
 
+    fn params(&self) -> &'static [&'static str] {
+        PARAMS
+    }
+
     /// Whether trails are active this frame (a preset bound `trails > 0`).
     fn active(&self) -> bool {
         self.amount > 0.0 && self.amount.is_finite()
