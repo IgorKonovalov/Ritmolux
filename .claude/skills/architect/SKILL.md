@@ -135,6 +135,17 @@ plugin); `human` marks a task only the user can do (obtain a signing cert, insta
 make a product call). No missing tags, no inline-prose ownership — the tag is machine-readable
 and `dev` branches on it. A plan missing an owner tag on any phase fails Mode 4 as a blocker.
 
+**Do the arithmetic on every numeric done-when before the plan ships.** A done-when is the contract
+`dev` is held to, so an unchecked number costs either a mid-phase stop to litigate it or — worse — an
+implementation tuned until the wrong number is satisfied. Plan 0033 shipped three in one plan: "90 %
+of the target within two 60 Hz frames" against its own `tau = 0.02`, where the one-pole arithmetic
+reaches 81 %; "reports 2048x1152" alongside the same plan's own 1920x1080 cap; and a
+scanline-statistic test for what is actually a property of a curve's geometry. All three were caught
+by `dev`, and all three cost a round trip. When you cannot do the arithmetic — or the property is
+real but measuring it is its own design problem — **state the property instead of a threshold you
+have not earned**: "the rise is dramatically faster than the fall, and one constant provably would
+not have done" is checkable, honest, and invents nothing.
+
 If the decision has a revisitable tradeoff (a dependency choice, a second GPU backend, an ABI
 shape), **also write an ADR** (Mode 2). A plan says *what we're building*; an ADR says *why this
 way over alternatives*.
@@ -241,7 +252,7 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   most-forgotten close step — flag it here during the review so it can't slip when you do the
   bookkeeping.
 
-### 4. Correctness & determinism (audio/DSP-specific)
+### 4. Correctness & determinism (audio/DSP, and geometry that varies with the target)
 - **Boundary validation.** Sample-rate / channel-count / buffer-size checked once where audio
   enters the core; the hot path downstream trusts them.
 - **Determinism in DSP.** FFT bins / onset envelope / beat estimate are pure functions of the
@@ -251,6 +262,21 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   latent crash; flag them. (Plan 0002 arms this as a `#![deny(clippy::unwrap_used, ...)]` pragma on
   hot-path modules; here you verify the pragma is present on every module that *should* be hot-path,
   since the guard test only checks the files it already knows about.)
+- **An internal grid is a resolution, not a shape.** Trail fields, post-stage offscreens and
+  simulation domains are quantized and capped, so their aspect is *not* the render target's, and
+  every present is a plain normalized stretch (ADR-0037). Anything computing screen-destined
+  geometry — a projection, a fold, a distance — takes its aspect from the **target**, so the grid's
+  own aspect cancels out of the picture. Grep the diff for `aspect`: one derived from a grid size is
+  the bug.
+- **Ask what the development configuration cannot see.** The rule above shipped twice (Plan 0029 on
+  the attractor, Plan 0033 on the composite) because 1920x1080 and the 2048x1152 display this
+  project is built on both come back from the quantizer *exactly* 16:9 — grid and target coincide
+  there, so every test written at those sizes passed a 28 % stretch without noticing. Generalize
+  the habit: whenever a value could be sourced from two places that happen to **agree** on the one
+  configuration we develop and test at — one display, one sample rate, one channel count, one GPU
+  adapter — no test at that configuration can tell you which source the code actually used. Find the
+  configuration where the two disagree and ask whether anything probes it. If nothing does, that is
+  the finding, whether or not you can also name the bug.
 
 ### 5. Design integrity — classic principles
 The rules above are mostly mechanical (Plan 0002's gates catch many). This lens is the part no
