@@ -144,7 +144,17 @@ each side composites its own, independently. The blend and the ink remap are
 `kaleido_*` used to run through a fixed 1280x720 grid, so composing either one
 upscaled the whole frame on any display above 720p — sharp geometry went in and soft
 pixels came out. They follow the target now (quantized and capped), so a look no
-longer costs sharpness. Two things still follow from a stage being a *resample*:
+longer costs sharpness.
+
+**A stage changes softness, never shape.** The internal grid is a resolution, not a
+proportion: your scene is drawn at the *window's* aspect and the stage's present
+stretches it back by exactly the inverse, so the grid's own ratio cancels out and a
+circle stays a circle whether `trails` is on or off (ADR-0037). Plan 0035 made that
+true; before it, composing a stage stretched the whole frame by up to 28 % on common
+window sizes, which is worth knowing if you are reading a preset comment written
+earlier that blames a stage for a figure's shape.
+
+Two things still follow from a stage being a *resample*:
 
 - On a **line** scene, `mirror_order` / `mirror_reflect` replicate real geometry
   *before* rasterization, so they cost nothing in resolution, while `kaleido_*` folds
