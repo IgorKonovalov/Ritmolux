@@ -466,20 +466,39 @@ out-of-range region asymmetric and probably worse, so 0010 should be decided fir
   library, and is healthy — it is the family's ink-on-paper variant (`ink_amount = 1`,
   `paper_bright = 0.965`), a pale botanical print.
 
-`cover` measures structure against the frame's own background. A look whose subject is *darker* than
-its ground is penalised by construction, so an ink preset reads as dead every run. The lane chased it
-as a bug and spent a rendered glow sweep proving it was not one.
+**PREMISE CORRECTED 2026-07-26, at promotion time — this is not a metric bug.** The entry as filed
+claimed `cover` "measures brightness above the background", so an inverted-polarity look is
+"penalised by construction". The code says otherwise: `coverage`
+(`core/src/render/metrics.rs:69`) counts pixels where `is_lit` is true, and `is_lit` (`:109`) is
+`c.abs_diff(b) > eps` — a **symmetric** difference from the corner-sampled background, on any
+channel. Dark-on-light and light-on-dark are measured identically.
 
-**Impact:** modest and self-inflicted — the metric's job is to name suspects for a human, and a
-permanent false positive costs trust in the whole table. Cheapest fix is polarity-aware coverage
-(measure deviation from the modal background rather than brightness above it), or excluding
-`ink_amount >= 0.5` presets from the `cover` column with a note. No ADR — a measurement change.
+So Coral Bloom's 0.128 is a **truthful** reading: only 12.8 % of its pixels differ from its paper.
+The chaotic-branching regime genuinely is a sparse print. The number is right; what is missing is any
+way for a reader to tell "sparse on purpose" from "dead", which is an **interpretation** gap, not a
+measurement one.
+
+**Impact:** downgraded from a measurement change to a documentation sentence — `docs/capturing.md`
+should say that a low `cover` is expected and correct for a deliberately sparse or ink-remapped look,
+and that the column names suspects rather than convicting them. Folded into
+[Plan 0037](plans/0037-verifying-easing-transient-probe-and-dynamic-signal.md)'s doc phase alongside
+0014. No code change, no ADR.
+
+*(Second entry in this batch whose diagnosis inverted under verification — see 0010. Both were filed
+in good faith from real symptoms; both attributed the symptom to the wrong mechanism. The lane's
+symptom reports are reliable; its causal claims want checking against code before they become work.)*
 
 ---
 
 ## 0013 — no synthetic signal has transients, so a `[smoothing]` change cannot be verified at all
 
 - **Raised:** 2026-07-26, from `preset-author`, after adopting `{ attack, release }` on 20 presets.
+- **PROMOTED 2026-07-26 → [ADR-0039](adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md) +
+  [Plan 0037](plans/0037-verifying-easing-transient-probe-and-dynamic-signal.md)** — a deterministic
+  transient probe (the primary answer) plus one synthesized generator with musical dynamics; a
+  committed reference clip was rejected, and 0008's item 3 calibration question is closed by a
+  `human` phase that measures the user's own audio and records the numbers. **0012 and 0014 ride
+  along as documentation** in that plan's Phase 5. Notes retained below as the origin record.
 - **This is the unresolved half of 0008.** That entry's item 3 asked for a `--signal` matching real
   music levels; Plan 0033 Phase 1 shipped the *measurement* (the band-level report) and *documented*
   the trap, but added no such signal. The trap is now visible and still unavoidable.
@@ -518,3 +537,6 @@ implies. Picking a colour costs a render round-trip every time.
 
 **Impact:** small, recurring, purely documentation — a swatch table in `docs/preset-palettes.md` (or
 a generated strip committed as an image) closes it. Bundle with any other doc sweep.
+
+- **PROMOTED 2026-07-26 → [Plan 0037](plans/0037-verifying-easing-transient-probe-and-dynamic-signal.md)
+  Phase 5**, which carries the measured swatch points to seed the table.
