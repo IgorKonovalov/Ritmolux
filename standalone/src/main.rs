@@ -112,6 +112,15 @@ struct AppState {
     /// Wall-clock time of the previous left-button press, for detecting a
     /// double-click (fullscreen toggle). `None` until the first click.
     last_click: Option<Instant>,
+    /// Set at a preset switch, consumed after the next rendered frame: a switch
+    /// now **dissolves** (Plan 0023), so the roster does not reach the incoming
+    /// preset until that frame's capture step has run. Everything that describes
+    /// the active preset therefore still answers with the *outgoing* one at the
+    /// switch site — the window title, and (the one that does not self-correct)
+    /// its segment-cap truncation, which does not even exist until the incoming
+    /// preset's structural config is applied at the flip. ADR-0007 says the cap is
+    /// never a silent cut, so the check waits for the frame that makes it real.
+    pending_switch_settle: bool,
 }
 
 /// Narrow alias so the non-Windows build (no capture until Phase 9) compiles
@@ -182,6 +191,7 @@ impl AppState {
             last_frame: start,
             soak: soak_path.map(SoakLog::new),
             last_click: None,
+            pending_switch_settle: false,
             config,
             config_path,
             display_index,
@@ -314,9 +324,7 @@ impl AppState {
         // Hands-off scene rotation: the director decides from dt + this frame's
         // energy whether to advance the preset (manual Space/A override it).
         if self.director.advance(dt, &frame).is_some() {
-            self.renderer.cycle_preset();
-            warn_cap_overflow(&self.renderer);
-            self.update_title();
+            self.on_preset_switched();
         }
 
         // Queue the on-canvas text for this frame (active name + browse list).
@@ -324,6 +332,14 @@ impl AppState {
 
         if let Err(err) = self.renderer.render(&frame, dt) {
             eprintln!("render error: {err}");
+        }
+        // A dissolve's capture frame has now flipped the roster to the incoming
+        // preset and applied its structural config, so this is the first moment the
+        // renderer describes it rather than the one it is leaving (see
+        // `pending_switch_settle`).
+        if std::mem::take(&mut self.pending_switch_settle) {
+            warn_cap_overflow(&self.renderer);
+            self.update_title();
         }
         self.title_tick += 1;
         if self.title_tick >= TITLE_UPDATE_FRAMES {
@@ -340,6 +356,19 @@ impl AppState {
         if let Some(soak) = self.soak.as_mut() {
             soak.maybe_sample(&metrics, rss::current_rss_bytes);
         }
+        self.window.request_redraw();
+    }
+
+    /// Bookkeeping common to every preset switch — Space, a browse-overlay pick,
+    /// and the director's auto-rotate.
+    ///
+    /// It defers rather than reports: a switch **dissolves** now (Plan 0023), and
+    /// the roster does not reach the incoming preset until the dissolve's capture
+    /// frame has rendered. Reading the title or the cap overflow here would describe
+    /// the preset being left, so both wait one frame — see
+    /// [`pending_switch_settle`](AppState::pending_switch_settle).
+    fn on_preset_switched(&mut self) {
+        self.pending_switch_settle = true;
         self.window.request_redraw();
     }
 
@@ -443,8 +472,7 @@ impl AppState {
                 OverlayAction::Redraw | OverlayAction::Close => {}
                 OverlayAction::Select(index) => {
                     self.renderer.select_preset(index);
-                    warn_cap_overflow(&self.renderer);
-                    self.update_title();
+                    self.on_preset_switched();
                 }
             }
             self.window.request_redraw();
@@ -478,9 +506,7 @@ impl AppState {
                 // timer restarts from this moment.
                 self.director.force_next();
                 self.renderer.cycle_preset();
-                warn_cap_overflow(&self.renderer);
-                self.update_title();
-                self.window.request_redraw();
+                self.on_preset_switched();
             }
             KeyCode::KeyA => {
                 let on = self.director.toggle_auto();
