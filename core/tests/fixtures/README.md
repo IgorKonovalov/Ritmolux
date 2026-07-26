@@ -1,7 +1,8 @@
 # Golden drift fixtures
 
 These TOML files are **test-only frozen fixtures** for the golden drift guard
-(`core/tests/golden.rs`), one per `SystemKind`. They exist to catch **unintended
+(`core/tests/golden.rs`), one per `SystemKind` — plus the two `composite_*`
+fixtures described at the bottom, which belong to a different guard. They exist to catch **unintended
 engine rendering drift** — a shader or scene-math change that silently perturbs
 output — by pinning each scene's pixels to a committed baseline PNG under
 `core/tests/golden/`.
@@ -34,3 +35,26 @@ wildcard arm. To add one:
 
 Baselines are WARP-only (macOS skips per ADR-0016) and must be blessed on WARP or
 they will drift.
+
+## The `composite_*` fixtures are a different guard
+
+`composite_trails.toml` and `composite_kaleido.toml` are **not** part of the
+per-`SystemKind` roster and `golden.rs` never reads them. They belong to
+`core/tests/composite.rs` (Plan 0035 Phase 2), and they exist because **no
+fixture bound `trails` or `kaleido_*`** — so the entire post-composite path was
+covered by no capture in the suite, which is how a defect that stretched the
+whole frame shipped green (ADR-0037).
+
+Two things about them differ from the rest of this directory, both deliberate:
+
+- **They are captured at 160x100, not at `golden.rs`'s square 128.** The post
+  stages round each grid axis up to a 256 px step, so 160x100 takes a 256x256
+  grid — aspect 1.0 against the target's 1.6. A square or 16:9 size is returned
+  aspect-exact by the policy and would make the guard blind, which is exactly why
+  the defect survived at 1920x1080. **Do not "tidy" that size.**
+- **`composite_kaleido.png` pins a known defect on purpose** (design-backlog
+  0010, a Plan 0018 Phase 7 clamp artifact). Its header says what will and will
+  not be visible and why. Fixing 0010 moves that baseline; re-bless it then.
+
+They are otherwise governed by everything above: do not tune, bless on WARP,
+eyeball before committing.
