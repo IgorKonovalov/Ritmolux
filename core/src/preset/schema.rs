@@ -14,7 +14,9 @@ use serde::Deserialize;
 
 use super::expr::{self, Expr, ExprError};
 use crate::render::palette::{NamedPalette, PaletteConfig};
-use crate::render::scenes::lines::{CurveFamily, GeneratorConfig, MAX_LSYSTEM_DEPTH, hankin};
+use crate::render::scenes::lines::{
+    CurveFamily, GeneratorConfig, MAX_LSYSTEM_DEPTH, SpectrumLayout, hankin,
+};
 use crate::render::scenes::particles::AttractorFamily;
 
 /// The built-in system a preset drives. Extend as Plan 0003 (and later plans)
@@ -200,6 +202,38 @@ impl Easing {
             release: tau,
         }
     }
+
+    /// One frame of the one-pole envelope: ease `held` toward `raw` over `dt`
+    /// real seconds, using whichever constant the direction of travel selects.
+    ///
+    /// **The single implementation of this vocabulary.** The render layer's
+    /// per-binding smoother and the spectrum scene's per-element smoother both
+    /// call it, so "smoothing in seconds, frame-rate independent, asymmetric by
+    /// direction" means exactly one thing everywhere (ADR-0019 / ADR-0035, Plan
+    /// 0034 Phase 3).
+    ///
+    /// The direction test is against the **held** value, not the raw signal's own
+    /// derivative: a value already above its new target releases toward it even
+    /// while the input is still rising. That is the envelope-follower convention,
+    /// and it is what keeps the behavior stable under a noisy input.
+    ///
+    /// A selected constant of `<= 0` (the default) or non-finite, or a
+    /// non-positive `dt`, passes `raw` through unchanged. Total and
+    /// allocation-free — it runs per element per frame.
+    pub fn step(self, held: f32, raw: f32, dt: f32) -> f32 {
+        let tau = if raw > held {
+            self.attack
+        } else {
+            self.release
+        };
+        if tau <= 0.0 || !tau.is_finite() || dt <= 0.0 {
+            return raw;
+        }
+        // alpha = 1 - exp(-dt/tau): the fraction of the gap closed this frame,
+        // frame-rate-independent because `dt` is real elapsed time (ADR-0019).
+        let alpha = 1.0 - (-dt / tau).exp();
+        held + alpha * (raw - held)
+    }
 }
 
 impl Default for Easing {
@@ -302,7 +336,13 @@ impl Preset {
         // Structural config: validated once here (a bad family/grammar -> load
         // error, the caller keeps the last good preset), then trusted by the
         // scene. Built per system so each reads the right table.
-        let config = build_config(system, raw.curve, raw.generator, raw.particles)?;
+        let config = build_config(
+            system,
+            raw.curve,
+            raw.generator,
+            raw.particles,
+            raw.spectrum,
+        )?;
 
         // Easing time constants (ADR-0019, ADR-0035): validated non-negative +
         // finite at the load boundary, then trusted by the render-layer smoother.
@@ -353,6 +393,7 @@ fn build_config(
     curve: Option<RawCurve>,
     generator: Option<RawGenerator>,
     particles: Option<RawParticles>,
+    spectrum: Option<RawSpectrum>,
 ) -> Result<Option<GeneratorConfig>, PresetError> {
     match system {
         // A curve preset without a `[curve]` table accepts the family default.
@@ -382,14 +423,17 @@ fn build_config(
             };
             Ok(Some(GeneratorConfig::Particles { family }))
         }
+        // The spectrum readout selects its element count, layout and per-element
+        // easing through an optional `[spectrum]` table; absent, it takes the
+        // defaults. Config is always `Some` so `configure` runs on every preset
+        // switch (resizing the element buffer — never stale).
+        SystemKind::Spectrum => Ok(Some(match spectrum {
+            Some(s) => s.into_config()?,
+            None => RawSpectrum::default().into_config()?,
+        })),
         // Reaction-diffusion drives its regime through named params (feed/kill/
-        // flow), not a declarative structural table. The spectrum readout gains
-        // its own `[spectrum]` table in Plan 0034 Phase 3; until then its
-        // element count and layout are fixed.
-        SystemKind::FragmentField
-        | SystemKind::Swarm
-        | SystemKind::ReactionDiffusion
-        | SystemKind::Spectrum => Ok(None),
+        // flow), not a declarative structural table.
+        SystemKind::FragmentField | SystemKind::Swarm | SystemKind::ReactionDiffusion => Ok(None),
     }
 }
 
@@ -413,6 +457,10 @@ struct RawPreset {
     /// the attractor family for the compute-particle scene.
     #[serde(default)]
     particles: Option<RawParticles>,
+    /// The optional `[spectrum]` structural-config table (Plan 0034): the element
+    /// count, layout and per-element easing of the spectrum readout.
+    #[serde(default)]
+    spectrum: Option<RawSpectrum>,
     /// The optional `[smoothing]` table (ADR-0019, ADR-0035): per-parameter
     /// easing time constants in seconds, each a scalar or an
     /// `{ attack, release }` pair. Absent means every param is applied instantly.
@@ -655,6 +703,75 @@ fn validate_stops(stops: Vec<RawStop>) -> Result<Vec<(f32, [f32; 3])>, PresetErr
 struct RawParticles {
     /// Attractor family name (e.g. `"lorenz"`); validated at load.
     family: String,
+}
+
+/// The raw `[spectrum]` table: how the readout divides the frequency axis, what
+/// figure the elements form, and how fast each element follows its band.
+///
+/// Every field is optional; an absent table is the same as an empty one, so
+/// `system = "spectrum"` alone renders the default readout.
+#[derive(Deserialize, Default)]
+struct RawSpectrum {
+    /// Element count; validated into `2..=SPECTRUM_BINS`.
+    #[serde(default)]
+    elements: Option<usize>,
+    /// Layout name (`bars` / `polyline` / `radial_ring`); validated at load.
+    #[serde(default)]
+    layout: Option<String>,
+    /// Per-element easing in seconds — a scalar or an `{ attack, release }`
+    /// pair, exactly the `[smoothing]` vocabulary (ADR-0035).
+    #[serde(default)]
+    smoothing: Option<RawSmoothing>,
+}
+
+/// Default element count when a preset does not choose one — inside the "20-30
+/// points" range the capability was asked for.
+const DEFAULT_SPECTRUM_ELEMENTS: usize = 24;
+
+impl RawSpectrum {
+    /// Validate the table into a [`GeneratorConfig::Spectrum`], erroring (never
+    /// panicking) on an out-of-range count, an unknown layout name, or a bad
+    /// easing constant — the same load-boundary discipline every other
+    /// declarative config follows (ADR-0007).
+    fn into_config(self) -> Result<GeneratorConfig, PresetError> {
+        let elements = self.elements.unwrap_or(DEFAULT_SPECTRUM_ELEMENTS);
+        // The upper bound is the band count itself: above it the 64 -> N
+        // reduction stops being a partition of the array (two elements would
+        // have to share a band), and a readout finer than its own data is a lie
+        // rather than a feature.
+        if !(2..=crate::dsp::SPECTRUM_BINS).contains(&elements) {
+            return Err(PresetError::Config(format!(
+                "[spectrum] elements must be 2..={}, got {elements}",
+                crate::dsp::SPECTRUM_BINS
+            )));
+        }
+        let layout = match self.layout {
+            Some(name) => SpectrumLayout::from_name(&name).ok_or_else(|| {
+                PresetError::Config(format!(
+                    "unknown [spectrum] layout '{name}' (expected one of: {})",
+                    SpectrumLayout::NAMES.join(", ")
+                ))
+            })?,
+            None => SpectrumLayout::default(),
+        };
+        let easing = match self.smoothing {
+            Some(RawSmoothing::Symmetric(seconds)) => {
+                check_tau("[spectrum] smoothing", None, seconds)?;
+                Easing::symmetric(seconds)
+            }
+            Some(RawSmoothing::Asymmetric { attack, release }) => {
+                check_tau("[spectrum] smoothing", Some("attack"), attack)?;
+                check_tau("[spectrum] smoothing", Some("release"), release)?;
+                Easing { attack, release }
+            }
+            None => Easing::INSTANT,
+        };
+        Ok(GeneratorConfig::Spectrum {
+            elements,
+            layout,
+            easing,
+        })
+    }
 }
 
 /// The raw `[curve]` table: declarative structure for a parametric-curve scene.

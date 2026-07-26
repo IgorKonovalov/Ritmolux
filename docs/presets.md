@@ -97,8 +97,10 @@ Rules:
 
 Beyond `[params]`, a preset may carry optional tables — `[curve]` / `[generator]`
 (structural config for the line systems), `[particles]` (attractor family),
-`[smoothing]` (per-parameter easing), and `[palette]` / `[palette_b]` (colour).
-All are documented in [`presets/README.md`](../presets/README.md) and
+`[spectrum]` (the readout's element count, layout and per-element easing —
+summarised [below](#the-spectrum-table)), `[smoothing]` (per-parameter easing),
+and `[palette]` / `[palette_b]` (colour). All are documented in
+[`presets/README.md`](../presets/README.md) and
 [`docs/preset-palettes.md`](preset-palettes.md).
 
 Every `[params]` value is evaluated **once per frame** and applied to the system
@@ -109,7 +111,7 @@ an expression is a pure function of the current analysis frame plus the clock.
 
 ## The built-in systems
 
-Seven systems are addressable from a preset. Their **named parameters, defaults,
+Eight systems are addressable from a preset. Their **named parameters, defaults,
 and per-system notes are tabulated in [`presets/README.md`](../presets/README.md#systems-and-their-named-parameters)** —
 that table is maintained alongside the presets and is the authoritative list.
 
@@ -122,6 +124,7 @@ that table is maintained alongside the presets and is the authoritative list.
 | `star_pattern` | A Hankin star pattern over a regular tiling (ADR-0007). | 1 |
 | `reaction_diffusion` | A Gray-Scott reaction-diffusion field (ADR-0012). | 4 |
 | `attractor` | GPU compute particles iterating a strange attractor (ADR-0015). | 5 |
+| `spectrum` | The log-spaced band array as N elements — bars, a contour, or a ring (ADR-0036). | 3 |
 
 Beyond a system's own parameters, **every** preset may also bind the engine-wide
 compositing controls — the shared view transform (`zoom`, `pan_x`, `pan_y`), the
@@ -164,6 +167,54 @@ Two things still follow from a stage being a *resample*:
   is deliberately fixed and independent of the window (ADR-0012), but the field is
   **toroidal**, so `pan_*` is a seamless infinite scroll and `zoom > 1` tiles rather
   than running out of field.
+
+### The `[spectrum]` table
+
+The `spectrum` system is the one whose *figure* is the analysis rather than a
+generator's geometry, so what it draws is chosen structurally rather than through
+`[params]`:
+
+```toml
+system = "spectrum"
+
+[spectrum]
+elements  = 26                                  # 2..=64, default 24
+layout    = "bars"                              # bars | polyline | radial_ring
+smoothing = { attack = 0.025, release = 0.22 }  # seconds; default: instant
+```
+
+| Key | Values | Notes |
+|-----|--------|-------|
+| `elements` | integer `2..=64` | How many elements the frequency axis is divided into. Default 24. |
+| `layout` | `bars`, `polyline`, `radial_ring` | Default `bars`. |
+| `smoothing` | seconds, or `{ attack, release }` | Per-element easing, in the same vocabulary as `[smoothing]`. |
+
+Every key is optional and so is the table itself. An out-of-range `elements` or
+an unknown `layout` is a **surfaced load error** naming what it expected, like
+every other structural table — never a silent fallback.
+
+Element 0 is the bottom of the spectrum and the last is the top, so no expression
+maps audio to position; that mapping is the scene. Three things follow that are
+worth knowing before you tune one:
+
+- **64 is the ceiling because 64 is the data.** The engine analyses 64 log-spaced
+  bands and the scene averages each element's own contiguous slice of them — a
+  real partition, nothing dropped or double-counted. A readout finer than its own
+  data would be a lie rather than a feature.
+- **The axis is logarithmic**, so the elements are not equal musical intervals.
+  At 24 elements the lowest few cover a couple of bass notes each while the
+  topmost covers most of the presence region — the same caveat
+  [`bin(x)`](#binx--reaching-the-spectrum) carries.
+- **`smoothing` here is the one easing an expression cannot reach.** The element
+  levels are scene state computed from the band array, not a binding, so
+  `[smoothing]` has no name to attach to them. Asymmetric values earn their keep:
+  the bands are the rawest signal in the engine, so a fast `attack` keeps a
+  transient's shape while a slow `release` lets the elements fall like a meter
+  instead of strobing on every analysis hop.
+
+Full parameter notes — including which composite controls this system honors, and
+the one layout-specific parameter (`radius`) — are in
+[`presets/README.md`](../presets/README.md#spectrum--the-frequency-axis-readout-plan-0034).
 
 ### Transitions between presets
 
@@ -452,7 +503,7 @@ that merely waste a line. Neither ever crashes a running visual (NFR 10).
 - An expression that fails to compile — an unknown identifier, a bad number, a
   wrong argument count, an unbalanced parenthesis, a stray character.
 - An invalid structural table (`[curve]`, `[generator]`, `[particles]`,
-  `[palette]`, `[smoothing]`).
+  `[spectrum]`, `[palette]`, `[smoothing]`).
 
 **Warnings — the preset still loads and renders:**
 

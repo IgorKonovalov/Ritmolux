@@ -502,6 +502,76 @@ fn load_dir_reports_warnings_alongside_the_loaded_presets() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Plan 0034 Phase 3 done-when 1: `[spectrum]` is validated at the load
+/// boundary. A bad element count or an unknown layout name is a **surfaced
+/// error** naming what was expected — never a panic and never a silent fallback,
+/// matching every other declarative config (ADR-0007).
+#[test]
+fn a_bad_spectrum_table_is_a_surfaced_load_error() {
+    let with = |table: &str| {
+        Preset::from_toml_str(&format!(
+            "system = \"spectrum\"\n[params]\nbase = \"0.2\"\n[spectrum]\n{table}\n"
+        ))
+    };
+
+    // An unknown layout names the offender and lists what it accepts, so the
+    // author can fix it without reading the source.
+    let Err(err) = with("layout = \"waterfall\"") else {
+        panic!("an unknown layout is rejected");
+    };
+    let message = err.to_string();
+    for expected in ["waterfall", "bars", "polyline", "radial_ring"] {
+        assert!(
+            message.contains(expected),
+            "the error must mention {expected}: {message}"
+        );
+    }
+
+    // The count is bounded on both sides: one element has no figure to draw, and
+    // above the band count the 64 -> N reduction stops being a partition.
+    for bad in [
+        "elements = 0",
+        "elements = 1",
+        "elements = 65",
+        "elements = 4096",
+    ] {
+        let err = with(bad)
+            .err()
+            .unwrap_or_else(|| panic!("{bad} is rejected"));
+        assert!(
+            err.to_string().contains("2..=64"),
+            "{bad} must name the accepted range: {err}"
+        );
+    }
+
+    // A negative easing constant is caught by the same check the `[smoothing]`
+    // table uses, and the message says which table it came from.
+    let Err(err) = with("smoothing = -0.5") else {
+        panic!("a negative easing constant is rejected");
+    };
+    assert!(
+        err.to_string().contains("[spectrum]"),
+        "the error must name the table it came from: {err}"
+    );
+
+    // The whole table is optional, and every key within it is.
+    for good in [
+        "",
+        "elements = 2",
+        "layout = \"radial_ring\"",
+        "smoothing = 0.2",
+    ] {
+        assert!(
+            with(good).is_ok(),
+            "a spectrum preset with `{good}` must load"
+        );
+    }
+    assert!(
+        Preset::from_toml_str("system = \"spectrum\"\n").is_ok(),
+        "the [spectrum] table is optional"
+    );
+}
+
 /// Drift guard (ADR-0020's flagged risk): each declared `PARAMS` list must be
 /// exactly the set of names its `set_param` match handles. The two sit side by
 /// side in the source, so this compares them by scanning it — which covers the
