@@ -42,16 +42,22 @@ Smallest meaningful scope. Omit if a commit truly spans many (usually a sign to 
 | Scope        | Area |
 |--------------|------|
 | `core`       | `core/` generally |
-| `audio`      | `core/src/audio.rs` — ring buffer, sample intake |
-| `dsp`        | `core/src/dsp/` — FFT, onset, beat |
-| `render`     | `core/src/render/` — wgpu layer |
-| `scenes`     | `core/src/scenes/` |
+| `audio`      | `core/src/audio.rs` — sample intake |
+| `ring`       | `lmv-ring/` — the extracted SPSC ring |
+| `dsp`        | `core/src/dsp/` — FFT, onset, beat, bands |
+| `render`     | `core/src/render/` — wgpu layer, composite stages |
+| `scenes`     | `core/src/render/scenes/` |
+| `preset`     | `core/src/preset/` — schema + expression evaluator |
 | `ffi`        | `core/src/ffi.rs`, `core/include/` — the C ABI |
-| `standalone` | `standalone/` — winit, capture, input |
+| `standalone` | `standalone/` — winit, capture, input, the `shot` example |
 | `plugin`     | `plugin-foobar/` — C++ shim |
 | `tooling`    | `Cargo.toml`, lockfile, rust-toolchain, `.gitignore` |
 | `ci`         | `.github/workflows/` |
 | `docs`       | anything under `docs/` |
+
+For `docs` commits the log uses a finer scope naming the *audience* rather than the path —
+`docs(architect)`, `docs(plans)`, `docs(presets)`, `docs(preset-author)`. Match what's already
+there; `git log --format=%s -40` shows the live vocabulary faster than this table can track it.
 
 ## Examples
 
@@ -101,5 +107,11 @@ Bad: a single opaque `feat: implement phase 2`.
 
 - Secrets, signing/notarization credentials — not in the diff, message, or body.
 - `--no-verify` shortcuts, or `#[allow(...)]` added only to dodge a real clippy warning.
-- Co-author trailers, unless the user explicitly asks.
 - Broad staging (`git add -A` / `.`). Name files explicitly; you own what enters the index.
+
+## Co-authorship
+
+Agent-written commits **do** carry the `Co-Authored-By:` trailer for the model that wrote them — it
+is standard harness behavior and the repo's history is full of it. An earlier version of this file
+said to omit it unless asked; that was wrong on both the convention and the practice. Put it last in
+the footer, after any other trailers.
