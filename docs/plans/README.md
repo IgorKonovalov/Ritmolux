@@ -11,7 +11,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 |------|-----------------------------------------|--------|---------|
 | [0031](0031-composite-cleanup-and-debt.md) | Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and the accumulated close-review debt | approved | The non-blocking half of the 2026-07-25 codebase-health review **plus the minors four earlier closes logged and nobody returned for**. Six independent phases: (1) `standalone/examples/shot.rs` is 1028 lines / 45 functions with **zero tests** in a target where `#[test]` does not run — its pure helpers (WAV parse, JSON emit, filmstrip indices, tiling, glyphs) move to the existing `[lib]` and get real assertions, closing a blind spot the `preset-author` lane depends on; (2) `Renderer`'s three constructors (~28 duplicated lines each) collapse onto `from_context`; (3) each binding's easing `tau` and destination resolve **once at load** instead of a per-frame `BTreeMap<String,_>` lookup + chained `set_param` string-match — mainly so adding a stage stops meaning another link in a chained `if` inside the hot loop; (4) three needless per-frame operations go — the cap-overflow `format!` (**Plan 0018 minor 1**, still open), the identity-mirror buffer copy, and the attractor's now-redundant reseed on grid change (**Plan 0029 minor 1**); (5) duplicated GPU boilerplate (two `fullscreen_pipeline`s, three copies of the bind-entry helpers, ~8 pasted fullscreen-triangle vertex stages, the twice-written fixed-step accumulator) shares one home, and the 228-line `AttractorScene::render` splits along its own comment paragraphs; (6) structural/doc debt — `GeneratorConfig` moves out of `lines/mod.rs` (**Plan 0016 minor 2**), the stale RD "fullscreen opaque pass" comment (**Plan 0025/0027**), *live* cap-overflow surfacing (**Plan 0018 minor 2**), `RoseParams` for 11 positional `f32`s, and `Palette` dropping `Copy` at 6 KB. **Sequenced after 0030** (Phase 3 names its chain stages). No new ADR; no preset-visible change; C ABI untouched. |
 | [0032](0032-testing-strategy-e2e-coverage-and-pre-push.md) | Testing strategy: full-chain e2e, `shot` CLI coverage, a core coverage ratchet, and a pre-push gate | draft | Answers "do we have a coverage threshold, e2e tests, happy paths covered, a pre-push hook" — currently no, no, *unknown*, no. Four `dev` phases + one `human` install step, per [ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md). **Phase 1** adds the missing **end-to-end tier**: `core/tests/chain.rs` drives synthetic PCM through the real `audio::intake` SPSC ring, the real drain policy, the real `Analyzer`, and the real `Renderer` to pixels — the seam the architecture rests on and that *nothing* currently crosses (`capture_audio` starts at the `Analyzer`; the drain loop at `main.rs:275` is untested). Asserts band routing survives the seam, determinism across it, lossy-not-fatal overflow, and boundary rejection without panic. **Phase 2** runs the built `shot` binary as a **subprocess** (`standalone/tests/shot_cli.rs`) — exit codes, PNG output, `--report --json`, the `[--presets ...]` provenance label — closing the fact that the CLI the `preset-author` lane and the Plan 0013 harness depend on has **zero tests of any kind** (`#[test]` does not run in an `examples/` target). It deliberately does **not** promote `shot` to a `[[bin]]` (that would drag the `image` dev-dependency into `lmv.exe` and rename every documented invocation, incl. ones in the un-editable `.claude/skills/**`). **Phase 3** adds an opt-in `.githooks/pre-push` running the fast subset (`fmt` + `clippy` + `nextest`, **not** deny/doctests/Miri/coverage), with the warm wall time **measured, not estimated**, and a stated narrowing rule if it exceeds ~90 s. **Phase 4** measures `lmv-core` line coverage, then sets a **ratchet floor** (`cargo llvm-cov nextest -p lmv-core --fail-under-lines`, Windows-only so WARP makes render paths real) at `measured - 2`, in one `env:` key, raised at closes and lowered only with a note — and proves the gate bites by watching it fail. **Phase 5 is `human`**: `core.hooksPath` is per-clone config, so nothing lands until the user sets it. Core+standalone tests and CI only; **no production-code change, no C ABI change, no new Cargo dependency**. Sequencing: Phase 2 is worth landing **before [0031]** (it is the behavioral net that refactor should be done under); Phase 4 reads best **after [0023] closes** (a large, new, thinly-tested render subsystem mid-flight either sets the floor artificially low or trips it). |
-| [0023](0023-cross-preset-transitions.md) | Cross-preset visual transitions: MilkDrop-style dissolves between presets | approved (revised 2026-07-25) | **Revised against the landed `PostChain`:** five phases now, not four. New **Phase 1** relocates ink out of the chain to a terminal engine post-pass ([ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md)) so the two-input blend can sit between chain and ink without widening the one-input `PostStage` trait — that placement was a real fork (ADR-0028 needs ink to remap the *blended* frame; ADR-0031's bound keeps a two-input stage out of the trait) and it is now decided, not deferred to `dev`. Dual-live is "construct a second `PostChain`" and the trail-field risk is answered by Plan 0030's independence test rather than re-verified. Ink's params crossfade by `t` during a dissolve. Original scope below. Replace the instant preset **cut** with a MilkDrop-style **dissolve**. An engine `Transition` controller, driven by injected `dt`, blends the outgoing and incoming presets over ~1 s using a **small library** of blend kinds (crossfade, additive/burn, luma-dissolve, wipe/slide). The outgoing side is **snapshotted at transition start** (freeze path + safety net); the incoming renders live; **adaptive** logic re-renders the outgoing scene live too, but only when it is a *different* scene object and the frame budget is healthy, else it falls back to the snapshot (protects the 60 fps iGPU floor, NFR §1, and handles the same-slot case for free). Blends **fully-composited per-preset frames** via a two-input blend stage appended to Plan 0018's composite. Policy (kind/duration) is **engine-configured in code**; preset-declared `[transition]`, beat-quantized dissolves, and operator UI are explicit follow-ups. **Core-only, C ABI untouched, no new dependency.** **Sequenced after Plan 0018** (reuses its offscreen target + present + `Clear`->`Load` scenes; transitively after Plan 0014's `PingPongField` + injected `dt`). Realizes the cross-preset blending deferred by Plan 0003. [ADR-0024](../adrs/0024-cross-preset-transitions.md); rejected single-target alpha, always-dual-live, always-freeze, a `TransitionScene` wrapper, and preset-declared-now. |
 
 ## Recommended execution sequence
 
@@ -38,41 +37,31 @@ that is [0023]'s dual-live unblock. [0023] **has been revised against this** (20
 now says "construct a second `PostChain`", and the revision surfaced and settled where the blend sits
 ([ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md) — ink leaves the chain).)
 
-1. **[0023] Cross-preset transitions (MilkDrop-style dissolves)** — **hard-sequenced after 0018,
-   which has now landed** (see Recently closed), and **unblocked by [0030], which has now closed**:
-   appends a two-input blend stage to 0018's engine composite (offscreen target + present +
-   `Clear`->`Load` scenes, all now in place) and snapshots the outgoing composited frame. Adaptive
-   dual-live/freeze protects the NFR §1 iGPU floor; the heaviest freeze-fallback trigger is 0016's
-   attractor, so landing **after both 0016 and 0018** exercises the full matrix. Core-only, C ABI
-   untouched ([ADR-0024](../adrs/0024-cross-preset-transitions.md)).
-   **Approved and revised 2026-07-25 against the landed chain** — ready for `dev`. The revision
-   replaced "allocate the second target" with "construct a second `PostChain`" (0030 Phase 2 already
-   proved two chains are independent, so the trail-field risk is answered by construction), retired the
-   "a stage that assumes it is last" risk as structurally answered, and **settled where the blend
-   sits** — a fork the old wording only gestured at. ADR-0028 needs ink to remap the *blended* frame
-   while ADR-0031's bound keeps a two-input stage out of the one-input `PostStage` trait, and ink was
-   inside the chain: [ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md)
-   resolves it by moving **ink out of the chain** (a terminal engine post-pass, symmetric with
-   `Background` as the pre-pass), leaving the chain as the per-preset look and the blend between them.
-   That relocation is the plan's **new Phase 1** (behavior-preserving, byte-identical goldens), so the
-   plan is now five phases and the walking skeleton is Phase 2. Ink's params crossfade by `t` during a
-   dissolve — the one new user-visible behavior the revision adds.
+(**[0023] Cross-preset transitions has now landed and closed** — **every** preset switch dissolves
+instead of cutting: `Space`, a browse-overlay pick, the director auto-rotate, and the C ABI
+`lmv_cycle_scene`, over ~1 s, through a deterministic rotation of four blend kinds. The composite is
+now `background -> scene -> PostChain (trails -> kaleidoscope) -> [blend] -> ink -> present`: ink left
+the chain to become a terminal engine post-pass (ADR-0032) and the two-input blend sits between them,
+outside the one-input `PostStage` trait. `Renderer::select_preset_now` is the instant-cut escape the
+capture entry points use, so captures stay a pure function of their inputs. See Recently closed.
+A later plan touching the render loop should pick up the five minors logged there — the switch-site
+`from`/`to` ordering and the standalone's stale post-switch reads are the two with user-visible edges.)
 
-2. **[0032] Testing strategy (e2e tier + coverage ratchet + pre-push gate)** — **draft, needs the
+1. **[0032] Testing strategy (e2e tier + coverage ratchet + pre-push gate)** — **draft, needs the
    user's go**. Phases 1 and 3 are independent of every active plan and can land at any time; Phase
    1 is the walking skeleton and carries the value on its own (the ring-to-pixels claim gets a test).
-   Two soft ordering preferences, both judgment calls rather than hard dependencies: **Phase 2
+   One soft ordering preference remains, a judgment call rather than a hard dependency: **Phase 2
    before [0031]**, since [0031] Phase 1 refactors the 1028-line zero-test `standalone/examples/shot.rs`
-   and a subprocess suite is the behavioral net that work should sit on; and **Phase 4 after [0023]
-   closes**, since setting a coverage floor while a large new render subsystem is uncommitted either
-   pins the floor artificially low or trips it on arrival (if the floor is wanted sooner, widen the
-   margin instead). Adds no production code, no C ABI change, and no Cargo dependency —
-   `cargo-llvm-cov` is a CI-installed tool. [ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md).
+   and a subprocess suite is the behavioral net that work should sit on. Its other preference —
+   **Phase 4 after [0023] closes** — **is now satisfied** (0023 closed 2026-07-26), so the coverage
+   floor can be measured against a settled render subsystem rather than an in-flight one. Adds no
+   production code, no C ABI change, and no Cargo dependency — `cargo-llvm-cov` is a CI-installed
+   tool. [ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md).
 
-3. **[0031] Cleanup pass (review findings + accumulated close-review debt)** — six independent phases,
+2. **[0031] Cleanup pass (review findings + accumulated close-review debt)** — six independent phases,
    no ordering pressure except its own Phase 3, which names 0030's chain stages (**now landed**, so
-   that dependency is satisfied). Safe to slot after 0023 if transitions are the priority; safe to run
-   before it if a clean base is preferred, since nothing in it is preset-visible. **Approved
+   that dependency is satisfied). 0023 has since closed too, so nothing is in flight ahead of it and
+   nothing in it is preset-visible — it can start whenever. **Approved
    2026-07-25** — ready for `dev`. Phase 6 also carries three items from 0030's close review: cache
    the `Routing` at `PostChain::begin` so one routing decision per frame is structural, the ten
    pre-existing `cargo doc` intra-doc-link warnings, and the stale
@@ -118,10 +107,10 @@ RD/attractor present path now ride on its alpha-composited output.)
 composite stage `render/ink.rs` gives *every* scene a black-on-white / colored-duotone mode via the
 bindable `ink_*`/`paper_*` params, and the attractor's trail grid follows its render target instead of
 a fixed 640x360. See Recently closed. The ordering wiring it left **[0023]** — ink must remap the
-*blended* frame, so the transition blend goes before it — is now **designed** in
-[ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md) and is 0023's Phase 1
-(ink leaves the chain and becomes a terminal post-pass, so the blend can sit ahead of it without
-widening the `PostStage` trait); the wiring itself still lands with 0023. A tidy-up candidate still
+*blended* frame, so the transition blend goes before it — was designed in
+[ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md) and **has now landed**
+as 0023's Phase 1: ink left the chain to become a terminal post-pass, byte-identical goldens, so the
+blend sits ahead of it without widening the `PostStage` trait. A tidy-up candidate still
 open in `render/scenes/reaction_diffusion.rs:1048`: correct the stale "fullscreen opaque pass" comment
 on the RD present, left from before 0025's alpha switch — **carried by [0031] Phase 6**.)
 
@@ -135,6 +124,61 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0023 — Cross-preset visual transitions: MilkDrop-style dissolves between presets](done/0023-cross-preset-transitions.md) —
+  **done 2026-07-26**, passed Mode 4 review (**no blockers, no majors**; five minors, one nit). Five
+  `dev` phase commits (`2a40f83` ink leaves the chain, `4fefce3` the walking-skeleton controller +
+  frozen crossfade, `918ae89` the blend library, `5ab441a` adaptive dual-live + the budget governor,
+  `9c0d468` every switch path + re-entrancy + docs). A preset switch is no longer an index bump: an
+  engine `Transition` drives it as a **dissolve** over ~1 s on the injected `dt` (no wall clock, so a
+  captured show reproduces frame-for-frame), through a **deterministic rotation** over four blend
+  kinds — crossfade, additive burn, luma-dissolve, wipe — each a variant of one two-input shader that
+  **samples both sides** rather than alpha-compositing, which is what lets the additive line/particle
+  families blend without colour corruption. Every switch path goes through it: `Space`, the browse
+  overlay's pick, the director auto-rotate, and the C ABI `lmv_cycle_scene`. Policy is two code
+  constants (`TRANSITION_KIND`, `TRANSITION_DURATION_SECS`); preset-declared `[transition]`,
+  beat-quantized dissolves, and operator UI stay deliberate follow-ups.
+  **The composite is now `background -> scene -> PostChain (trails -> kaleidoscope) -> [blend] -> ink
+  -> present`** ([ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md), now
+  **accepted**): ink left the chain to become a terminal engine post-pass symmetric with `Background`
+  as the pre-pass, so the two-input blend can sit before it without widening ADR-0031's one-input
+  `PostStage` trait. `STAGE_COUNT` is 2 and the chain is exactly the **per-preset** look; the blend and
+  ink are the **engine-wide** passes the renderer drives. Ink's `ink_*`/`paper_*` crossfade by the same
+  `t` — the poles interpolate in RGB inside the shader, feeding **one** remap of the blended frame
+  rather than mixing two remapped frames (the non-linearity ADR-0032 rejects). **Adaptive fidelity**
+  ([ADR-0024](../adrs/0024-cross-preset-transitions.md), now **accepted**): the outgoing side re-renders
+  live through its own `CompositeSide` (background + a second `PostChain`) only when the two presets
+  hold independent GPU state — `scenes::shares_resources`, which vetoes both the same `SystemKind` and
+  any two of the three line scenes sharing one `LineRenderer` — **and** the smoothed frame time shows
+  positive evidence of headroom under `DUAL_LIVE_BUDGET_MS = 18.0`; otherwise the frozen opening
+  snapshot carries it. Demotion latches for the rest of the dissolve, so the mode cannot flicker. A
+  zero frame-time reading (diagnostics off — every headless capture) is read as neither headroom nor
+  overload, which is what keeps a capture free of any clock-dependent choice.
+  `Renderer::select_preset_now` is the **instant-cut escape** (a path, not the code constant the plan
+  suggested), used by the capture entry points so captures stay a pure function of their inputs
+  (NFR §6). Re-entrancy: a switch mid-dissolve snap-finishes the one in flight and starts the new one;
+  a hot-reload cancels cleanly to whatever `set_presets` resolves the active index to.
+  **Core-only; C ABI untouched** (`lmv_cycle_scene` gains dissolves through its unchanged signature);
+  **no new dependency**; `Scene` untouched. Verified cold at review: 137/137 `nextest -p lmv-core`,
+  `clippy --workspace --all-targets -D warnings` clean, and **every golden baseline byte-identical with
+  no re-bless** — Phase 1's behavior-preserving claim held in fact. The dual-live trail check
+  **requests the default adapter and skips on software**: building the blend's pipeline + targets
+  mid-run deterministically changes what the trails stage resolves to on WARP (the ADR-0016 posture
+  `background_composite` already takes), and it was verified red against an induced restart bug.
+  **Minors** (all carried, none blocking; full text in the plan's Close section): (1) `begin_transition`
+  captures `from`/`to` **before** the snap-finish, so a second switch arriving inside one frame
+  interval desynchronizes `from_index`, the snapshot and the roster, and `cycle_preset` absorbs the
+  press; (2) the standalone's post-switch `warn_cap_overflow` reads the **outgoing** preset, so an
+  oversized incoming L-system's truncation is announced one switch late (ADR-0007's "never a silent
+  cut" slipping — the title's equivalent staleness self-corrects); (3) the stateful-incoming hitch was
+  neither pre-warmed nor documented and `render/mod.rs:589` now claims the opposite; (4) `dissolve_mode`
+  is untested (both its pure inputs are covered, the composition is not); (5)
+  `docs/on-device-validation.md` gained no item for `DUAL_LIVE_BUDGET_MS`, which the code itself calls
+  "the number to calibrate on a low-end rig". **Nit:** a resize mid-dissolve rebuilds the blend targets
+  and discards the frozen snapshot, so that dissolve fades up from black. **⚠ On-device carry-forward:**
+  the heavy attractor <-> reaction-diffusion pair holding 60 fps @ 1080p on a low-end iGPU, and the
+  `DUAL_LIVE_BUDGET_MS` calibration — a WARP capture cannot speak to either. Version **minor
+  0.15.1 -> 0.16.0** at close.
 
 - [0030 — Composite chain + scene keying: a `PostStage` trait, an instantiable `PostChain`, and
   kind-keyed scenes](done/0030-composite-chain-and-scene-keying.md) — **done 2026-07-25**, passed

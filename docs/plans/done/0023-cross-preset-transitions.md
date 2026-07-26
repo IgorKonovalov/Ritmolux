@@ -1,9 +1,65 @@
 # 0023 — Cross-preset visual transitions: MilkDrop-style dissolves between presets
 
-> **Status:** in-progress
+> **Status:** done (2026-07-26)
 > **Created:** 2026-07-23
 > **Revised:** 2026-07-25 (against the landed `PostChain`; see "Revision note" below)
 > **Owner skill(s):** dev
+
+## Close (2026-07-26)
+
+Landed in five `dev` commits — `2a40f83` (Phase 1: ink leaves the `PostChain` as a terminal engine
+post-pass), `4fefce3` (Phase 2: the walking skeleton — `Transition` controller + frozen crossfade on
+the cycle path, plus ink's param crossfade), `918ae89` (Phase 3: the blend library — crossfade,
+add/burn, luma-dissolve, wipe, behind one shader and a deterministic kind rotation), `5ab441a`
+(Phase 4: adaptive dual-live + the budget governor, `CompositeSide`, `scenes::shares_resources`),
+`9c0d468` (Phase 5: every switch path dissolves, re-entrancy, `select_preset_now`, the doc sweep).
+
+**Mode 4 review: no blockers, no majors, five minors and one nit.** Verified cold: 137/137
+`cargo nextest run -p lmv-core` green (including the hardware-only dual-live trail check, which ran
+rather than skipped on the review box), `clippy --workspace --all-targets -D warnings` clean, and
+**every golden baseline byte-identical with no re-bless** — Phase 1's behavior-preserving claim holds
+in fact, not just in intent. The two hardest things in the plan are right: the snapshot is the
+**pre-ink** frame (the chain targets a blend input; ink is downstream of the blend), and ink's
+crossfade interpolates *params* feeding one remap rather than mixing two remapped frames
+(in RGB, after the HSV conversion). Layering intact — no platform types in `core/`, `Scene` untouched,
+the C ABI a doc-comment change only, the blend deliberately not a `PostStage`, and `transition.rs`
+carries the panic pragma under `render/`'s recursive hygiene scan.
+
+Two implementer judgment calls, both accepted at review: the "outgoing trail survives the dissolve"
+check **requests the default adapter and skips on software** (building the blend's pipeline + targets
+mid-run deterministically changes what the trails stage resolves to on WARP; on hardware the
+dissolve's opening frame is byte-identical to the ordinary frame it replaces) — the same posture
+`tests/background_composite.rs` already takes under ADR-0016, and it was verified red against an
+induced restart bug. And the instant-cut escape is a **path**, public `select_preset_now`, rather than
+the code constant this plan suggested; a constant would have forced one global answer to a
+per-call-site question. It touches neither extension seam, so it is not ADR-worthy.
+
+**Minors, carried to a later `dev` pass** (recorded in `docs/plans/README.md`):
+
+1. `begin_transition` captures `from`/`to` **before** the snap-finish (`render/mod.rs:593-644`), so a
+   switch arriving before the in-flight dissolve's capture frame has rendered leaves `from_index`, the
+   snapshot and the roster describing different presets — and `cycle_preset`'s `to`, computed from the
+   stale roster, absorbs the second press. One-frame window. Fix: snap-finish first, then derive
+   `from` from `self.roster.active`.
+2. The standalone's post-switch reads name the **outgoing** preset (`standalone/src/main.rs:317`,
+   `445`, `480`). The title self-corrects on the periodic refresh; `warn_cap_overflow` does not, so an
+   oversized incoming L-system's truncation is announced one switch late — ADR-0007's "never a silent
+   cut" quietly slipping.
+3. The stateful-incoming hitch was neither pre-warmed nor written down, and `render/mod.rs:589` now
+   claims the opposite ("the switch itself never hitches a live show") while a dissolve's opening
+   frames build the blend's two surface-sized targets (~16 MB at 1080p) plus the incoming chain's lazy
+   offscreens. `CompositeSide::new` itself is free — every stage constructor is lazy — so this is a
+   doc fix, not a design one.
+4. `dissolve_mode` (`render/mod.rs:654-673`) is the one untested link: both of its inputs
+   (`dual_live_eligible`, `shares_resources`) are covered thoroughly, but nothing exercises the
+   composition, including its `_ => true` unresolvable-preset arm.
+5. `docs/on-device-validation.md` gained no item for `DUAL_LIVE_BUDGET_MS`, which the code itself
+   calls "the number to calibrate on a low-end rig".
+
+**Nit:** a surface resize mid-dissolve rebuilds `Blend::Targets` and so discards the frozen snapshot —
+the rest of that dissolve fades up from black. Acceptable; worth a comment at the rebuild.
+
+Version **minor 0.15.1 -> 0.16.0** at close.
 > **Related ADRs:** [0024-cross-preset-transitions](../adrs/0024-cross-preset-transitions.md);
 > [ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md) (where the blend sits:
 > ink leaves the chain, the blend goes between chain and ink — **this plan implements it**); builds on
