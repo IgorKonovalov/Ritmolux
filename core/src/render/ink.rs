@@ -50,6 +50,8 @@
     clippy::unreachable
 )]
 
+use crate::render::gpu;
+
 /// `ink_amount` default — 0 = off (passthrough), so an unbound preset is
 /// unaffected and the stage is never built.
 const DEFAULT_AMOUNT: f32 = 0.0;
@@ -76,23 +78,6 @@ struct Ink {
 @group(0) @binding(0) var<uniform> u: Ink;
 @group(0) @binding(1) var t_src: texture_2d<f32>;
 @group(0) @binding(2) var samp: sampler;
-
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    let p = pts[vi];
-    var out: VsOut;
-    out.pos = vec4<f32>(p, 0.0, 1.0);
-    out.uv = vec2<f32>(0.5 * p.x + 0.5, 0.5 - 0.5 * p.y);
-    return out;
-}
 
 // Standard HSV->RGB (iq form). `fract` normalizes an arbitrary hue into [0,1),
 // so a bound `ink_hue` can sweep freely. No CPU color math per frame (ADR-0028).
@@ -197,39 +182,14 @@ impl Resources {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("ink-shader"),
-            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
-        });
+        let shader =
+            gpu::fullscreen_shader(device, "ink-shader", gpu::FULLSCREEN_VS_UV_FLIPPED, SHADER);
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("ink-bind-layout"),
             entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
+                gpu::uniform(0, wgpu::ShaderStages::FRAGMENT),
+                gpu::texture(1, true),
+                gpu::sampler(2),
             ],
         });
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -250,36 +210,14 @@ impl Resources {
                 },
             ],
         });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("ink-pipeline-layout"),
-            bind_group_layouts: &[Some(&bind_layout)],
-            immediate_size: 0,
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("ink-pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        let pipeline = gpu::fullscreen_pipeline(
+            device,
+            &shader,
+            &[&bind_layout],
+            surface_format,
+            wgpu::BlendState::REPLACE,
+            "ink",
+        );
 
         Self {
             _src: src,

@@ -35,6 +35,8 @@
     clippy::unreachable
 )]
 
+use crate::render::gpu;
+
 /// Parameter defaults — a black backdrop when nothing is bound, so the composite
 /// is byte-neutral against the pre-Phase-3 per-scene clears.
 const DEFAULT_HUE: f32 = 0.0;
@@ -48,23 +50,6 @@ struct Bg {
 }
 
 @group(0) @binding(0) var<uniform> u: Bg;
-
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) ndc: vec2<f32>,
-}
-
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    // Single oversized triangle covers the viewport (no vertex buffer).
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    var out: VsOut;
-    out.pos = vec4<f32>(pts[vi], 0.0, 1.0);
-    out.ndc = pts[vi];
-    return out;
-}
 
 // iq-style cosine palette, matching the scenes' colour language.
 fn palette(t: f32) -> vec3<f32> {
@@ -105,10 +90,8 @@ struct Resources {
 
 impl Resources {
     fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("background-shader"),
-            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
-        });
+        let shader =
+            gpu::fullscreen_shader(device, "background-shader", gpu::FULLSCREEN_VS_NDC, SHADER);
         let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("background-params"),
             size: std::mem::size_of::<Bg>() as u64,
@@ -117,16 +100,7 @@ impl Resources {
         });
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("background-bind-layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
+            entries: &[gpu::uniform(0, wgpu::ShaderStages::FRAGMENT)],
         });
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("background-bind-group"),
@@ -136,37 +110,15 @@ impl Resources {
                 resource: uniforms.as_entire_binding(),
             }],
         });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("background-pipeline-layout"),
-            bind_group_layouts: &[Some(&bind_layout)],
-            immediate_size: 0,
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("background-pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    // Opaque: the backdrop establishes the frame the scene loads over.
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        // Opaque: the backdrop establishes the frame the scene loads over.
+        let pipeline = gpu::fullscreen_pipeline(
+            device,
+            &shader,
+            &[&bind_layout],
+            surface_format,
+            wgpu::BlendState::REPLACE,
+            "background",
+        );
 
         Self {
             pipeline,
