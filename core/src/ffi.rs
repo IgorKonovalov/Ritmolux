@@ -342,7 +342,9 @@ pub unsafe extern "C" fn lmv_resize(handle: *mut LmvHandle, width: u32, height: 
 }
 
 /// Switch to the next scene (same roster as the standalone — parity by
-/// construction).
+/// construction), **dissolving** rather than cutting: the plugin gets Plan 0023's
+/// cross-preset transitions through this unchanged signature, since the blend runs
+/// inside the render loop off `lmv_render_dt`.
 ///
 /// # Safety
 /// `handle` valid per `lmv_create`; render-thread role only.

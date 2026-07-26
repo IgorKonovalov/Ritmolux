@@ -155,8 +155,11 @@ cargo test -p lmv-core            # also fine, except where noted below
 > counts allocations through a process-global allocator hook, so it is only
 > reliable under nextest's per-test process isolation — under stock `cargo test`
 > a concurrently-running test's allocations bleed into the count. Tests that need
-> a real GPU (`background_composite`) **skip themselves** when only a software
-> rasterizer is present, per [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md).
+> a real GPU (`background_composite`, and the in-crate dual-live dissolve check in
+> `render/mod.rs`) **skip themselves** when only a software rasterizer is present,
+> per [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md). WARP mis-renders both:
+> the fullscreen-scene + background pipeline set, and — once a dissolve allocates
+> its blend targets mid-run — what the feedback `trails` stage resolves to.
 
 Individual tests (add `-- --nocapture` to see the printed diagnostics):
 
@@ -172,7 +175,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `attractor` | HARD | the first compute-particle scene: seed reproducibility + beat perturbation ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
 | `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
 | `background_composite` | HARD (**hardware only**) | RD / attractor presents alpha-blend over the `bg_*` backdrop; **skipped** on a software adapter, which mis-renders that pipeline set |
-| `transition` | HARD | a preset switch renders intermediate blended frames as a ramp, reproducibly from the injected `dt` (set `LMV_TRANSITION_STRIP=<dir>` to also dump filmstrips) |
+| `transition` | HARD | every switch path (cycle **and** select) renders intermediate blended frames as a ramp, reproducibly from the injected `dt`; each blend kind shows its own signature; a switch arriving mid-dissolve lands on the last index requested; a hot-reload mid-dissolve cancels cleanly; the heavy attractor ↔ reaction-diffusion pair dissolves on the freeze fallback (set `LMV_TRANSITION_STRIP=<dir>` to also dump filmstrips) |
 | `preset` | HARD | the expression evaluator and TOML schema: exact values, rejection without panic, **zero allocation** per eval, and the `PARAMS` ↔ `set_param` drift guard |
 | `dsp` / `ffi` / `hygiene` | HARD | known-signal analysis fixtures; the C ABI across the boundary; the hot-path panic pragma + exact dependency pinning |
 

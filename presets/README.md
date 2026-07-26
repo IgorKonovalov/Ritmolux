@@ -164,9 +164,13 @@ kaleidoscope. Works on any scene.
 
 ### Ink on paper — `ink_amount`, `paper_*`, `ink_*` (Plan 0027)
 
-The **last** stage before present (ADR-0028). It reads each pixel's brightness as
-an *ink density* and repaints the frame between two colours: **paper** where the
-frame was dark, **ink** where it was bright. The defaults are white paper and
+The **last** stage before present (ADR-0028), and the only engine-wide one that is
+not per-preset: it remaps the one finished frame, which during a cross-preset
+dissolve is the *blended* frame of both presets (ADR-0032). Your `ink_*`/`paper_*`
+values therefore crossfade with the dissolve rather than snapping — a switch from a
+white-paper preset into a black-ink one travels between the two poles. It reads each
+pixel's brightness as an *ink density* and repaints the frame between two colours:
+**paper** where the frame was dark, **ink** where it was bright. The defaults are white paper and
 black ink, so `ink_amount = "1"` alone gives **black marks on a white field** —
 the "ink on paper" look. Works on **any** scene, sparse or full-screen, because it
 operates on the finished frame rather than a scene's pipeline.

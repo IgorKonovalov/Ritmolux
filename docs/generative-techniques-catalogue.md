@@ -28,10 +28,12 @@ unlocks its whole family, so the idiom — not the individual technique — is t
 | **D. Full-screen fragment** | one quad, all colour in the pixel shader | **Exists** — `render/scenes/fragment_field.rs` |
 
 Since this catalogue was written the engine also grew a **composite layer** the idioms all
-ride: a background pre-pass, a shared view transform, feedback trails and a screen-space
-kaleidoscope behind a `PostStage` chain, and a terminal ink tone-remap (ADR-0018 / 0028 /
-0031 / 0032), plus a shared palette LUT (ADR-0021). A new technique inherits all of that for
-free — budget it as a *scene*, not as a whole look.
+ride — `background -> scene -> post chain (trails -> kaleidoscope) -> [transition blend] ->
+ink -> present`: a background pre-pass, a shared view transform, feedback trails and a
+screen-space kaleidoscope behind a `PostStage` chain, a two-input cross-preset dissolve, and
+a terminal ink tone-remap (ADR-0018 / 0024 / 0028 / 0031 / 0032), plus a shared palette LUT
+(ADR-0021). A new technique inherits all of that for free — including dissolving into and
+out of every other preset — so budget it as a *scene*, not as a whole look.
 
 Two facts that shape everything:
 
