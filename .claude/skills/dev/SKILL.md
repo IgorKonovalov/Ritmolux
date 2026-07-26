@@ -25,18 +25,26 @@ Then wait. The reads below are task-grounded, not startup routines.
 - **`architect`** — writes plans, ADRs, diagrams, and the post-implementation review. You hand a
   plan back to it once you've finished the **last phase**.
 - **`preset-author`** — the content lane (added per [ADR-0017](../../docs/adrs/0017-preset-author-skill-lane.md)).
-  Composes engine capability into visual looks (`.toml` presets, expression bindings,
-  `[curve]`/`[generator]` config); never writes engine Rust. It touches **you** in two ways: it
+  Composes engine capability into visual looks (`.toml` presets, expression bindings, and the
+  structural/palette/smoothing tables); never writes engine Rust. It touches **you** in two ways: it
   routes engine gaps back through `architect` (a look that needs a new scene/param/function is a
-  plan for you, not a preset), and it flags a **curation candidate** — a strong preset to embed into
-  the shipped set. Embedding is *your* change (it touches the `EMBEDDED` array + its length type in
-  `core/src/preset/mod.rs` and the count assert in `core/tests/preset.rs`); the author proposes, you
-  embed.
+  plan for you, not a preset), and it flags a **curation candidate** — a strong preset worth
+  shipping.
+
+  **Embedding is no longer a code change.** Per
+  [ADR-0022](../../docs/adrs/0022-build-time-preset-embedding.md), `core/build.rs` globs
+  `presets/*.toml` and emits the `EMBEDDED` table via `include_str!`. Dropping a `.toml` into
+  `presets/` ships it — there is **no array to hand-edit, no length type, and no count assert to
+  bump**. If you go looking for a literal array in `core/src/preset/mod.rs` you'll find a generated
+  `include!`; don't write the array back in. The embedded set is covered by a *structural* test
+  (every embedded preset parses) plus the `sanity`/`reactivity`/`animation` gates, which iterate the
+  whole set — so a weak preset fails CI for everyone, and that's the real gate on curation.
 
 You own all code (Rust core, standalone, C++ plugin) — there is no sibling *implementer* skill.
 The handoffs are `architect → you` (the user's "go" at Step 2), `you → architect` (the
-close-ceremony prompt at Step 4), and `preset-author → you` (embedding a curated preset). All are
-manual and their value is the fresh-context boundary — don't try to collapse them into one session.
+close-ceremony prompt at Step 4), and `preset-author → architect` (engine-gap feedback, which
+reaches you as a plan). All are manual and their value is the fresh-context boundary — don't try to
+collapse them into one session.
 
 ## How plans ship
 
@@ -195,7 +203,7 @@ The plan and relevant ADRs win on specifics. Defaults when the plan is silent:
 Read on demand:
 
 - `references/project-context.md` — where files live, the canonical `cargo` / plugin-build
-  commands, and the two-skill ownership map.
+  commands, and the three-lane ownership map.
 - `references/commit-conventions.md` — conventional-commit types/scopes for this repo, when to
   split commits.
 - `references/close-ceremony-prompt.md` — the exact message you send at the end of the last phase.
