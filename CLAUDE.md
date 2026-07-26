@@ -46,11 +46,19 @@ C ABI, C++ foobar shim. **Read it before questioning the language/GPU/FFI split.
 core/                # Rust library crate — the shared brain. DSP + render engine + scenes.
                      #   Exposes both a native Rust API (for the standalone) and a C ABI
                      #   (cdylib/staticlib) for the foobar plugin. NO audio-source code here.
-standalone/          # Rust binary crate — winit window + wgpu surface + OS loopback capture.
+lmv-ring/            # The lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI.
+standalone/          # Rust binary + lib — winit window, wgpu surface, loopback capture, `shot`.
 plugin-foobar/       # C++ shim: foobar2000 SDK integration, links core's C ABI. Windows-first.
+presets/             # The curated preset library (*.toml) — build.rs globs and embeds it.
+    └── README.md    #   THE per-system parameter roster + structural/palette/smoothing tables.
 docs/
 ├── nfr.md           # Quantified v1 non-functional requirements — the numbers behind every
 │                    #   "lightweight" / "real-time" / "stable frame rate" in the plans.
+├── presets.md       # Preset authoring guide: THE expression-language reference.
+├── preset-palettes.md  # The colour surface: palettes, custom stops, A/B crossfade.
+├── capturing.md     # Headless `shot` CLI + the core/tests/ visual-QA harness.
+├── releasing.md     # How the version moves (one bump per plan close).
+├── specs/           # NNNN-<subsystem>.md — living behavioral contracts (C ABI, ring/DSP).
 ├── adrs/            # NNNN-<slug>.md — architecture decisions + rejected alternatives. Append-only.
 │   └── README.md    #   ADR index
 └── plans/           # NNNN-<slug>.md — phased implementation plans (what's in flight)

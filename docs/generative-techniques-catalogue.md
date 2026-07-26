@@ -16,12 +16,22 @@ which idiom it needs, see whether that idiom exists yet, then interview + plan.
 Almost every technique below collapses onto one of four GPU idioms. Building an idiom once
 unlocks its whole family, so the idiom — not the individual technique — is the unit of work.
 
+> **Status column refreshed 2026-07-25.** All four idioms now exist — the unit of work has
+> shifted from "build the idiom" to "add a technique on an existing one", which is mostly
+> content plus a shader or a sampler.
+
 | Idiom | What the engine needs | Repo status |
 |-------|-----------------------|-------------|
-| **A. Line / point strips** | vertex buffer of evaluated points (`LineRenderer`) | **Exists / in progress** — `render/scenes/lines/`, Plan 0010 |
-| **B. GPU particles** | storage buffer + compute step + additive/instanced draw | **In progress via [Plan 0016](plans/0016-gpu-compute-particle-scenes.md)** — the first compute pipeline ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
-| **C. Texture-feedback ping-pong** | two offscreen textures, read one / write other, fade | **Designed** — Plan 0014 + [ADR-0012](adrs/0012-stateful-feedback-render-system.md) (`PingPongField`) |
+| **A. Line / point strips** | vertex buffer of evaluated points (`LineRenderer`) | **Exists** — `render/scenes/lines/` (Plan 0010, closed): parametric curve, L-system, Hankin star |
+| **B. GPU particles** | storage buffer + compute step + additive/instanced draw | **Exists** — `render/scenes/particles/` (Plan 0016, closed): four strange-attractor families on the engine's first compute pipeline ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
+| **C. Texture-feedback ping-pong** | two offscreen textures, read one / write other, fade | **Exists** — `render/feedback.rs` `PingPongField` (Plan 0014, closed) + `render/scenes/reaction_diffusion.rs`; also reused by the `trails` composite stage ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
 | **D. Full-screen fragment** | one quad, all colour in the pixel shader | **Exists** — `render/scenes/fragment_field.rs` |
+
+Since this catalogue was written the engine also grew a **composite layer** the idioms all
+ride: a background pre-pass, a shared view transform, feedback trails and a screen-space
+kaleidoscope behind a `PostStage` chain, and a terminal ink tone-remap (ADR-0018 / 0028 /
+0031 / 0032), plus a shared palette LUT (ADR-0021). A new technique inherits all of that for
+free — budget it as a *scene*, not as a whole look.
 
 Two facts that shape everything:
 
@@ -35,7 +45,7 @@ Two facts that shape everything:
 
 ---
 
-## Idiom A — line / point strips (have it: `lines/`, Plan 0010)
+## Idiom A — line / point strips (have it: `lines/`, Plan 0010 closed)
 
 Cheap, plotter-clean, rides the existing `LineRenderer`. New entries here are mostly **content**
 (a new curve family + presets), not new infrastructure.
@@ -51,7 +61,7 @@ Research note: superformula/harmonograph/epicycloid did **not** get a verified s
 main pass, but they are textbook math and near-trivial extensions of the existing curve system —
 absence of a citation reflects the verified-claim set, not any doubt about feasibility.
 
-## Idiom B — GPU particles (building now: Plan 0016)
+## Idiom B — GPU particles (have it: `particles/`, Plan 0016 closed)
 
 The genuine new capability. Compute shader steps particle state in a storage buffer; additive
 point-sprite draw; trails via a fade pass. Verified: state stays GPU-resident (no CPU round-trip);
@@ -66,7 +76,7 @@ a per-particle RK4 integrator.
 | **Boids / flocking** | Reynolds steering: separation + alignment + cohesion over neighbours | High — neighbour radius → centroid, speed → amplitude | Moderate (needs spatial-hash grid to stay O(n)) |
 | **Particle systems** (emitter/lifespan) | beat → emission burst, amplitude → rate/velocity, band → colour | **Very high** (the archetypal visualizer scene) | Moderate (GPU particle buffer + additive) |
 
-## Idiom C — texture-feedback ping-pong (designed: Plan 0014 `PingPongField`)
+## Idiom C — texture-feedback ping-pong (have it: `PingPongField`, Plan 0014 closed)
 
 Read one texture, write the next, fade each step. Ideal iGPU fit — no per-cell branching cost.
 
@@ -120,8 +130,9 @@ chapters, priority order:
 5. **Ch. 5 Autonomous Agents** — flocking/boids (needs a spatial-hash grid).
 
 Deprioritise / offline: Ch. 6 Physics (heavy solver); **Ch. 9 Evolutionary** (great *offline* — evolve
-preset parameters toward an aesthetic fitness; ties into the deferred preset-author skill); Ch. 10/11
-Neural (audio-analysis helper at most, not a renderer).
+preset parameters toward an aesthetic fitness; ties into the `preset-author` lane, which now exists
+per [ADR-0017](adrs/0017-preset-author-skill-lane.md)); Ch. 10/11 Neural (audio-analysis helper at
+most, not a renderer).
 
 ## What real music visualizers actually use (verified)
 
@@ -136,13 +147,19 @@ Neural (audio-analysis helper at most, not a renderer).
 
 ## Suggested pick order (payoff ÷ engine work)
 
-1. **Superformula / harmonograph / epicycloid** — extend the *current* line renderer (Plan 0010),
-   near-zero new infra. Immediate wins.
-2. **Idiom B GPU particles → strange attractors first** — cheapest high-impact new idiom; unlocks
-   curl-noise + fractal flames later. **This is [Plan 0016](plans/0016-gpu-compute-particle-scenes.md).**
-3. **Idiom D → Chladni, then SDF** — new shaders on the existing fragment field; Chladni is nearly free
-   and thematically on-point for a music visualizer.
-4. **Idiom C → Gray-Scott (Plan 0014), then Lenia.**
+Refreshed 2026-07-25 — the first entries of the original order (attractors, Gray-Scott) have
+shipped, so what remains is ranked against the idioms as they now stand:
+
+1. **Superformula / harmonograph / epicycloid** — a second/third `CurveFamily` on the *existing*
+   `parametric_curve` scene, near-zero new infra. Still the cheapest win on the board, and
+   `maurer_rose` is **still the only family** (`CurveFamily::from_name`).
+2. **Idiom D → Chladni, then SDF** — new shaders on the existing fragment-field pattern; Chladni is
+   nearly free and thematically on-point for a music visualizer.
+3. **Idiom B → curl-noise flow fields, then fractal flames** — the compute path, particle buffer and
+   trail accumulation from Plan 0016 are all reusable; flames additionally need a log-density
+   histogram + tonemap pass.
+4. **Idiom C → Lenia** — the `PingPongField` and fixed-timestep accumulator exist; cost is dominated
+   by kernel radius.
 
 Walkers ride idiom A or C, so they slot in cheaply alongside.
 
