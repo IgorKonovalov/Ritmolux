@@ -1,8 +1,13 @@
 # 0031 — Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and the accumulated close-review debt
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-07-25
 > **Approved:** 2026-07-25
+> **Closed:** 2026-07-26 — six `dev` phase commits (`5244fd2` `shot`'s helpers into the lib,
+> `83706a3` `from_context`, `6755014` load-time routes + tau, `64e7145` three per-frame stops,
+> `fb024fc` `render/gpu.rs` + the attractor split, `609b9c9` the accumulated debt). Passed Mode 4
+> review: **no blockers, no majors**; five minors, three nits. Version **patch 0.16.0 -> 0.16.1**.
+> See "Close" at the foot of this file.
 > **Owner skill(s):** dev
 > **Related ADRs:** none new — this plan carries out existing decisions. Touches code governed by
 > [ADR-0007](../adrs/0007-line-geometry-generators.md) (segment cap is never a silent cut),
@@ -400,3 +405,89 @@ pub struct RoseParams {
 - Consider whether `shot`'s hand-rolled WAV reader should stay hand-rolled now that it is tested, or
   whether the tests make a small dependency unnecessary (they probably do — keep it hand-rolled;
   "lightweight is a feature").
+
+## Close (2026-07-26)
+
+Passed Mode 4 review: **no blockers, no majors**; five minors, three nits. Six phase commits, one per
+phase, every `**Owner skill:**` tag present and in-vocabulary.
+
+### Verified at review, not taken on trust
+
+- **211/211** `cargo nextest run --workspace` green, all nine GPU suites included.
+- **`core/tests/` is byte-untouched across the whole range** (`git diff --stat ee2811c..HEAD --
+  core/tests/` is empty), so "every golden baseline byte-identical, no re-bless" — this plan's central
+  acceptance criterion, and the one Phase 5 could have silently broken — is true in fact, not by
+  assertion.
+- `clippy --workspace --all-targets -D warnings` and `fmt --check` clean; **`cargo doc -p lmv-core
+  --no-deps` warning-free** (Phase 6's done-when).
+- **`lmv-core` line coverage measured at 90.51 %**, up from the 90.13 % Plan 0032 set its
+  `COVERAGE_FLOOR: 88` ratchet against — the deletions did not cost coverage.
+- Phase 5's grep proof re-run independently: one `fullscreen_pipeline` definition, zero
+  `field_pipeline`/`surface_pipeline`, zero local bind-entry helper definitions; the six surviving
+  `vs_main` outside `gpu.rs` are genuine instanced/vertex-buffer stages and the six surviving
+  `BindGroupLayoutEntry` literals are exactly the disclosed set. Zero `particles::` references under
+  `scenes/lines/`.
+- **Independent non-vacuity check on Phase 3.** Inducing `ParamRoute::Stage(_) -> Unclaimed` fails
+  three tests: the two new routing unit tests *and* `a_dual_live_dissolve_carries_the_outgoing_trail`,
+  a pixel-level end-to-end through `evaluate_preset`. The chain route is behaviorally covered, not
+  merely unit-asserted.
+- The guard that makes `resolve_route`'s dependence on `SystemKind::param_names()` safe is real:
+  Plan 0019's `declared_params_match_set_param` is a **strict two-way equality** between each scene's
+  `PARAMS` const and its `set_param` arms, so a scene handling an undeclared name — which routing by
+  declared vocabulary would now silently drop — cannot exist.
+- `smoothed_preset_capture_is_deterministic` untouched; `[smoothing]` non-negative validation still
+  runs before the tau fold, so a preset with several problems reports the same error first.
+
+### Accepted deviations
+
+- **Phase 3 routes live on the render-layer `Roster`, keyed by preset index** — not on `Binding`, not
+  resolved in `configure_active_scene`. Better than the plan's sketch: a dissolve composites two
+  presets in one frame and both sides need routes, and indexing by preset makes a side's routes
+  structurally undriftable from the preset it shows. Chain positions stay out of `preset/` as the plan
+  required. `Preset::smoothing` was deleted outright once `tau` moved onto `Binding`.
+- **Phase 3's plan note was stale and correctly not followed.** It told the implementer that a surfaced
+  warning for an unknown param is Plan 0019's job; 0019 has landed and the load-time warning exists.
+  Runtime dispatch stays a silent no-op (unchanged), and `ParamRoute::Unclaimed` documents itself as
+  where a render-time diagnostic would hang. This was already logged as Plan 0019's close-review minor 3.
+- **Phase 5 needed three vertex preludes, not one** — the nine pasted stages used raw NDC, Y-flipped UV
+  and un-flipped UV. Three named constants, per the plan's own "provide two constants rather than one
+  with a flag".
+- **Two approved scope expansions:** `render/transition.rs` in Phase 5 (it postdates the plan's file
+  list and carried its own copy of the Y-flipped prelude and texture-entry closure) and two `cargo doc`
+  warnings in `render/mod.rs` in Phase 6 (added by Plan 0023). Both were required for their done-whens
+  to hold literally.
+- **Phase 1 shipped `filmstrip_layout`, not the plan's `tile_filmstrip`** — the arithmetic split out and
+  tested, the `image` blit left in the example so the PNG codec stays out of `lmv.exe` (ADR-0011,
+  ADR-0033 Alt E). Better than the letter of the done-when; `tile_filmstrip` itself stays untested.
+
+### Minors (carried, none blocking)
+
+1. `presets/README.md` still described the segment-cap drop as surfaced "at load-time-style" after
+   Phase 6 made the *live* mirror overflow report itself — **fixed in this close commit**.
+2. `core/src/render/mod.rs:1007` — `cap_overflow()`'s doc still says "Refreshed on every active-preset
+   change …; the standalone surfaces it at load". The second clause is now false; the shell polls it
+   every frame. (The body comment three lines down is correct.)
+3. `poll_cap_overflow` edge-triggers on the *presence* of `cap_overflow()`, which gives the
+   configure-time L-system overflow precedence — so a preset that loads with a depth overflow *and*
+   later drives its mirror past the cap never announces the second. Defensible, undocumented.
+4. `tile_filmstrip` has no test (see the deviation above).
+5. `standalone/src/shot/json.rs` — `num(v)` renders `NaN`/`inf` verbatim, which is invalid JSON. Moved
+   unchanged, so pre-existing, but Phase 1's stated purpose is exactly that a silent bug in this
+   harness corrupts the `preset-author` feedback loop.
+
+### Nits
+
+- `gpu::texture`/`gpu::sampler` hardcode `ShaderStages::FRAGMENT` while `gpu::uniform` takes
+  visibility, which is why the attractor's vertex-visible LUT entries stayed inline. A visibility
+  parameter on all three would have absorbed those two copies too.
+- `render/mod.rs:56` still re-exports `CapOverflow` through `scenes::lines` after Phase 6 moved the
+  type to `scenes/`.
+- The lsystem early-return paths don't reset `mirror_overflow`; pre-existing, unrelated to the swap.
+
+### On-device carry-forward
+
+- **Phase 2's `#[cfg(windows)]` HWND constructor is build-checked only** — no automated coverage on
+  this machine, since the plugin is not compiled here. The other two paths were verified live (1592
+  frames at 165 fps through `Renderer::new`) and by the headless capture tests.
+- **Phase 4's attractor claim** — that resizing no longer restarts the point cloud from its seed
+  scatter — needs a real window; the plan states it as a manual check.

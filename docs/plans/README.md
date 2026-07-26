@@ -7,9 +7,9 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 ## Active roster
 
-| Plan | Title                                   | Status | Summary |
-|------|-----------------------------------------|--------|---------|
-| [0031](0031-composite-cleanup-and-debt.md) | Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and the accumulated close-review debt | approved | The non-blocking half of the 2026-07-25 codebase-health review **plus the minors four earlier closes logged and nobody returned for**. Six independent phases: (1) `standalone/examples/shot.rs` is 1028 lines / 45 functions with **zero tests** in a target where `#[test]` does not run — its pure helpers (WAV parse, JSON emit, filmstrip indices, tiling, glyphs) move to the existing `[lib]` and get real assertions, closing a blind spot the `preset-author` lane depends on; (2) `Renderer`'s three constructors (~28 duplicated lines each) collapse onto `from_context`; (3) each binding's easing `tau` and destination resolve **once at load** instead of a per-frame `BTreeMap<String,_>` lookup + chained `set_param` string-match — mainly so adding a stage stops meaning another link in a chained `if` inside the hot loop; (4) three needless per-frame operations go — the cap-overflow `format!` (**Plan 0018 minor 1**, still open), the identity-mirror buffer copy, and the attractor's now-redundant reseed on grid change (**Plan 0029 minor 1**); (5) duplicated GPU boilerplate (two `fullscreen_pipeline`s, three copies of the bind-entry helpers, ~8 pasted fullscreen-triangle vertex stages, the twice-written fixed-step accumulator) shares one home, and the 228-line `AttractorScene::render` splits along its own comment paragraphs; (6) structural/doc debt — `GeneratorConfig` moves out of `lines/mod.rs` (**Plan 0016 minor 2**), the stale RD "fullscreen opaque pass" comment (**Plan 0025/0027**), *live* cap-overflow surfacing (**Plan 0018 minor 2**), `RoseParams` for 11 positional `f32`s, and `Palette` dropping `Copy` at 6 KB. **Sequenced after 0030** (Phase 3 names its chain stages). No new ADR; no preset-visible change; C ABI untouched. |
+**Empty** — nothing is in flight. [0031] closed on 2026-07-26 and was the last open plan; the
+`preset-author` inbox at [`docs/design-backlog.md`](../design-backlog.md) plus the minors logged in
+the closes below are where the next plan comes from.
 
 ## Recommended execution sequence
 
@@ -54,14 +54,12 @@ behavioral net [0031] Phase 1's `shot.rs` refactor should now be done under — 
 fast gate (~28 s) and a `COVERAGE_FLOOR` ratchet on `lmv-core` at **88** against a measured
 **90.13 %** — [0031] deletes code, so watch that number at its close. See Recently closed.)
 
-1. **[0031] Cleanup pass (review findings + accumulated close-review debt)** — six independent phases,
-   no ordering pressure except its own Phase 3, which names 0030's chain stages (**now landed**, so
-   that dependency is satisfied). 0023 has since closed too, so nothing is in flight ahead of it and
-   nothing in it is preset-visible — it can start whenever. **Approved
-   2026-07-25** — ready for `dev`. Phase 6 also carries three items from 0030's close review: cache
-   the `Routing` at `PostChain::begin` so one routing decision per frame is structural, the ten
-   pre-existing `cargo doc` intra-doc-link warnings, and the stale
-   `core/src/preset/schema.rs:137` "the renderer routes" narration.
+(**[0031] Cleanup pass has now landed and closed** — `standalone/src/shot/` holds the CLI's pure
+helpers under real tests, `Renderer::from_context` is the one construction path, each binding's
+easing `tau` and destination resolve **once at load** onto a render-layer route table, three pieces
+of per-frame work are gone, `core/src/render/gpu.rs` is the single home for the repeated wgpu
+boilerplate, and eight items of accumulated close-review debt are closed. Every golden baseline is
+byte-identical. See Recently closed.)
 
 (**[0016] GPU compute-particle scenes has now landed and closed** — the engine's first compute
 pipeline + GPU-resident particle system (four strange-attractor families, data-driven `[particles]`
@@ -120,6 +118,73 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0031 — Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and
+  the accumulated close-review debt](done/0031-composite-cleanup-and-debt.md) — **done 2026-07-26**,
+  passed Mode 4 review (**no blockers, no majors**; five minors, three nits). Six `dev` phase commits
+  (`5244fd2` `shot`'s helpers into the lib, `83706a3` `from_context`, `6755014` load-time routes +
+  `tau`, `64e7145` three per-frame stops, `fb024fc` `render/gpu.rs` + the attractor split, `609b9c9`
+  the accumulated debt). Clears the non-blocking half of the 2026-07-25 codebase-health review **plus
+  the minors four earlier closes logged and nobody returned for**. `standalone/examples/shot.rs` went
+  1028 -> 803 lines: its pure helpers (the 16-bit WAV parse, `filmstrip_indices` + the strip layout,
+  the arg helpers, the JSON emitter, the glyph table) live in `standalone/src/shot/` where `cargo
+  test` actually reaches them — an `examples/` target's `#[test]` does not run — and `image` stays a
+  dev-dependency because the *layout* arithmetic moved and the pixel blit did not (ADR-0011,
+  ADR-0033 Alt E). `Renderer`'s three ~28-line constructors collapse onto `from_context`, with the
+  `unsafe` boundary still wrapping exactly `RenderContext::new_unsafe`. **The per-frame binding loop
+  no longer re-derives two load-time facts**: `tau` is folded out of the validated `[smoothing]`
+  table onto each `Binding` at parse time (`Preset::smoothing` is gone), and a
+  `ParamRoute { Background, Stage(usize), Ink, Scene, Unclaimed }` resolved by a pure
+  `resolve_route(name, system)` replaces the chained `set_param(&str, ..)` fallthrough — so adding a
+  composite stage costs an enum arm, not another link inside the hot loop. Three per-frame
+  operations stop: the cap-overflow `format!` (an `OverflowContext` enum that formats only in
+  `Display`, which is also what lets `CapOverflow` become `Copy`), the identity-mirror buffer copy
+  (an O(1) `mem::swap` at `MirrorSpec::is_identity`), and the attractor's reseed on grid change.
+  `core/src/render/gpu.rs` is one home for the bind-entry helpers, the single parameterized
+  `fullscreen_pipeline`, **three** fullscreen-triangle vertex preludes (raw NDC / Y-flipped UV /
+  un-flipped UV — the pasted stages genuinely disagreed, and a wrong flip is a vertically-mirrored
+  effect) and a unit-tested `FixedStep`; `AttractorScene::render` went 228 -> 77 lines with no GPU
+  call reordered. Phase 6 closed eight debt items: the frame's `Routing` is decided once in
+  `PostChain::begin` and *consumed* by `resolve`, `GeneratorConfig`/`CapOverflow` moved up to
+  `scenes/mod.rs` so **no module under `scenes/lines/` names `particles::`**, `cargo doc -p lmv-core
+  --no-deps` is **warning-free**, `RoseParams` replaces eleven positional `f32`s, `Palette` drops
+  `Copy` at 6 KB, and a **live** segment-cap overflow finally reports itself — edge-triggered on
+  entry and once on recovery, because an unthrottled `eprintln!` at 130 fps is I/O on the render
+  thread. **Verified at review** rather than taken on trust: **211/211** workspace tests green;
+  **`core/tests/` byte-untouched across the whole range**, so "every golden baseline byte-identical,
+  no re-bless" — the plan's central claim and the thing Phase 5 could have silently broken — is true
+  in fact; `clippy --workspace --all-targets -D warnings` + `fmt --check` clean; `cargo doc`
+  warning-free; Phase 5's grep proof re-run independently (one `fullscreen_pipeline`, zero local
+  bind-entry helpers, the six surviving `BindGroupLayoutEntry` literals exactly the disclosed set);
+  and **an independent non-vacuity check on Phase 3** — inducing `Stage(_) -> Unclaimed` fails three
+  tests including `a_dual_live_dissolve_carries_the_outgoing_trail`, a *pixel-level* end-to-end, so
+  the chain route is behaviorally covered and not merely unit-asserted. **`lmv-core` line coverage
+  measured at 90.51 %**, up from Plan 0032's 90.13 %, so the `COVERAGE_FLOOR: 88` ratchet is safe
+  despite the deletions. **Core + standalone only; C ABI untouched (v4); `Scene` trait untouched; no
+  new dependency; no preset-visible change.** **Accepted deviations:** Phase 3's routes live on the
+  render-layer `Roster` keyed by preset index rather than on `Binding` — a dissolve composites two
+  presets in one frame and both need routes, and indexing by preset makes a side's routes
+  structurally undriftable; Phase 3's plan note (unknown param "must keep today's behavior exactly:
+  silently ignored… Plan 0019's job") was stale and correctly not followed, since 0019 landed and the
+  load-time warning exists; Phase 1 shipped `filmstrip_layout` rather than the plan's
+  `tile_filmstrip`, keeping the PNG codec out of `lmv.exe`; two approved scope expansions
+  (`render/transition.rs` in Phase 5 and two `render/mod.rs` doc links in Phase 6, both postdating the
+  plan's file lists and both required for the done-whens to hold literally). **Minors:** (1)
+  `presets/README.md` still described the cap drop as surfaced "at load-time-style" — **fixed in this
+  close commit**; (2) `render/mod.rs:1007`'s `cap_overflow()` doc still says the standalone surfaces
+  it "at load", now false; (3) `poll_cap_overflow` edge-triggers on *presence*, and the configure-time
+  overflow takes precedence, so a depth overflow masks a later mirror overflow; (4) `tile_filmstrip`
+  itself stays untested; (5) `shot/json.rs`'s `num()` renders `NaN`/`inf` verbatim, which is invalid
+  JSON (pre-existing, moved unchanged). **Nits:** `gpu::texture`/`gpu::sampler` hardcode
+  `FRAGMENT` visibility while `gpu::uniform` takes it, which is why the attractor's vertex-visible LUT
+  entries stayed inline; `render/mod.rs:56` still re-exports `CapOverflow` through `scenes::lines`;
+  the lsystem early returns don't reset `mirror_overflow`. **⚠ On-device carry-forward:** Phase 2's
+  `#[cfg(windows)]` HWND constructor is **build-checked only** (the plugin is not compiled here — the
+  other two paths were verified live at 1592 frames / 165 fps and by the headless capture tests), and
+  Phase 4's "resizing no longer restarts the point cloud" needs a real window. **No new ADR** — the
+  plan carries out existing decisions. Version **patch 0.16.0 -> 0.16.1** at close (a fix/cleanup
+  plan; its one behavior addition completes ADR-0007's never-a-silent-cut contract rather than adding
+  a feature).
 
 - [0032 — Testing strategy: full-chain e2e, `shot` CLI coverage, a core coverage ratchet, and a
   pre-push gate](done/0032-testing-strategy-e2e-coverage-and-pre-push.md) — **done 2026-07-26**,

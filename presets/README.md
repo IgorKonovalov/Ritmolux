@@ -145,8 +145,10 @@ true geometric fractal. `mirror_order` is the fold count (rounds, clamped to
 `1..=24`; `1` = no mirror). `mirror_reflect >= 0.5` adds a reflected copy per
 sector (dihedral). Distinct from the screen-space `kaleido_*` below: this folds
 the *geometry*, that folds the finished *pixels*. High order on a dense curve is
-capped at the segment limit and the drop is surfaced at load-time-style — never a
-silent cut.
+capped at the segment limit and the drop is always surfaced — never a silent cut.
+A structural overflow (an L-system depth) is reported when the preset loads; a
+*live* one, where a bound expression drives `mirror_order` past the cap while the
+scene runs, is reported on stderr once when it starts and once when it clears.
 
 ### Feedback trails — `trails`
 
