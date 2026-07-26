@@ -262,7 +262,7 @@ smoothing. The smoothing runs on real elapsed time, so it is identical at any
 refresh rate, and it resets on a preset switch (a switch snaps to the new preset's
 first value). Validated non-negative and finite at load.
 
-## Structural config (line systems only)
+## Structural config (line systems and the attractor)
 
 Declarative data the generator/sampler consumes once at load — **not**
 expressions. Validated at load; a bad value is a surfaced error.
@@ -294,19 +294,55 @@ character is an inert grammar variable.
 | `tiling`            | `square`/`4`/`4.4.4.4`, `hexagon`/`6`/`6.6.6`, `octagon`/`8`/`4.8.8`, `dodecagon`/`12`/`3.12.12` | Star order `n`. Required. |
 | `contact_angle_deg` | number                                                | Hankin contact angle. Default 30. |
 
-## Curated line-art presets in this set
+### `[particles]` — for `attractor`
 
-- Roses (`parametric_curve`): `rose_bloom`, `rose_web`, `rose_star`, `rose_draw`.
-- L-systems (`lsystem`): `lsystem_fern`, `lsystem_arrowhead`.
-- Star (`star_pattern`): `star_rosette`.
+| Key      | Values                                       | Notes                                             |
+|----------|----------------------------------------------|---------------------------------------------------|
+| `family` | `de_jong`, `clifford`, `thomas`, `lorenz`    | Which strange attractor the compute step iterates. Optional — absent means `de_jong`. |
 
-## Plan 0018 showcase presets
+```toml
+system = "attractor"
 
-One preset per new engine-wide control, a starting point for authoring your own:
+[particles]
+family = "lorenz"
+```
 
-- `rose_zoom` — a rose whose view **zoom** pumps on the bass with a slow sine pan.
-- `rose_atmosphere` — a rose over a vignetted **background** gradient.
-- `rose_kaleidoscope` — a six-fold **geometry mirror**, reflection toggled on the beat.
-- `rose_trails` — a spinning rose smeared into a glowing spiral by the **trails** feedback.
-- `fragment_kaleido` — a fragment field folded into an eight-fold screen-space **kaleidoscope**.
-- `fragment_smooth` — beat-driven flash/glow **eased** via a `[smoothing]` table.
+The family sets the map **and** the meaning of the four bindable coefficients
+`a`/`b`/`c`/`d`, each of which defaults to that family's canonical value
+(De Jong `1.641 1.902 0.316 1.525`; Clifford `-1.4 1.6 1.0 0.7`; Thomas uses `a`
+alone at `0.19`; Lorenz `sigma/rho/beta` = `10 28 2.667`, `d` unused). Bind them
+to bands for a morphing cloud, but move them **slowly and by a little** — these
+are chaotic maps, and a large jump reads as a hard cut rather than a morph.
+
+Two attractor params behave unlike anything else in the set:
+
+- `fade` (default `0.94`) is the fraction of the trail accumulation kept per
+  1/60 s, applied frame-rate-independently. `0` clears every frame (no trails);
+  values near `1` smear toward permanence — high `fade` plus `ink_amount` is the
+  documented "blot" trap (the page fills in solid).
+- `reseed` is **edge-triggered**, not a level: the cloud re-scatters once when the
+  bound expression rises past `0.5`, so `reseed = "beat"` re-scatters on each beat
+  instead of every frame the flag is held.
+
+## Finding a starting point in this folder
+
+Filenames are `<system>_<look>.toml`, so `ls` is the roster — there is no list here to
+drift (adding a preset is dropping a file; `core/build.rs` globs the directory,
+ADR-0022). To browse them rendered instead, shoot a contact sheet:
+
+```sh
+cargo run -p standalone --example shot -- --presets presets --all --out sheet.png
+```
+
+Presets worth reading as **worked examples** of one control each:
+
+| Preset | Shows |
+|--------|-------|
+| `rose_zoom` | the shared view **zoom** pumping on bass, with a slow sine pan |
+| `rose_atmosphere` | a scene over a vignetted **background** gradient (`bg_*`) |
+| `rose_kaleidoscope` | the six-fold **geometry mirror**, reflection toggled on the beat |
+| `rose_trails` | **feedback trails** smearing a spinning curve into a spiral |
+| `fragment_kaleido` | the screen-space **kaleidoscope** over a fragment field |
+| `fragment_smooth` | beat-driven flash/glow **eased** through a `[smoothing]` table |
+| `attractor_ink` | the terminal **ink-on-paper** remap (`ink_*` / `paper_*`) |
+| `rose_maurer_sweep`, `rose_overflow`, `rose_beat_bloom` | the audio-morphable curve **shape** params (`phase`, `radial_offset`) |

@@ -42,7 +42,7 @@ Flags:
 | `--size <WxH>` | render size (default 1280x720) |
 | `--out <path>` | output PNG (single shot) or dir/file (`--all`) |
 | `--all` | contact sheet of every preset, labeled (needs `--out`) |
-| `--report [family=<sys>]` | per-family metrics table (`fragment_field` \| `swarm`) |
+| `--report [family=<sys>]` | per-family metrics table; `family=` takes any `system` name (`fragment_field`, `swarm`, `parametric_curve`, `lsystem`, `star_pattern`, `reaction_diffusion`, `attractor`) |
 | `--json` | emit the report as JSON instead of a text table |
 | `--signal <kind:param>` | synth-audio filmstrip (see below) |
 | `--audio <clip.wav>` | filmstrip from a 16-bit PCM WAV |
@@ -143,12 +143,20 @@ family/preset: per-band `reactivity`, `animation`, `coverage`, the pairwise
 
 ## The `core/tests/` harness
 
-All differential tests render on the **software adapter** (`prefer_software`) so
-they hold on any GPU. Run the whole suite:
+Most differential tests render on the **software adapter** (`prefer_software`) so
+they hold on any GPU; the exceptions say so below. Run the whole suite:
 
 ```bash
-cargo test -p lmv-core
+cargo nextest run -p lmv-core     # what CI runs (per-test process isolation)
+cargo test -p lmv-core            # also fine, except where noted below
 ```
+
+> **Use `nextest` for the whole suite.** `preset`'s zero-allocation assertion
+> counts allocations through a process-global allocator hook, so it is only
+> reliable under nextest's per-test process isolation — under stock `cargo test`
+> a concurrently-running test's allocations bleed into the count. Tests that need
+> a real GPU (`background_composite`) **skip themselves** when only a software
+> rasterizer is present, per [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md).
 
 Individual tests (add `-- --nocapture` to see the printed diagnostics):
 
@@ -156,10 +164,24 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 |------|------|---------|
 | `reactivity` | HARD | every preset moves for at least one band (bass/mid/treb/onset); prints the per-band vector so a dead single binding — e.g. treble — is visible |
 | `animation` | HARD | every preset changes between frame N and N+k at fixed audio (not frozen) |
-| `sanity` | HARD | every preset lights a minimum coverage and spans ≥2 quadrants against its own background (not blank, not a dot) |
+| `sanity` | HARD | every preset lights a minimum coverage and spans ≥2 quadrants **against its own background** (not blank, not a dot) |
 | `beat` | HARD | a 120 BPM click track through the **real** DSP makes a beat-accent preset render differently on-beat vs off-beat; a zeroed beat binding does not |
 | `distinctness` | ADVISORY | prints per-family pixel + shape pairwise matrices and flags near-duplicate geometry; never asserts |
-| `golden` | HARD (tolerance) | a small matrix matches committed baseline PNGs within a mean + max-outlier tolerance |
+| `golden` | HARD (tolerance) | one **frozen fixture per system** matches its committed baseline PNG within a mean + max-outlier tolerance ([ADR-0023](adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)) |
+| `reaction_diffusion` | HARD | the first stateful-feedback scene: seed reproducibility, regime response ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
+| `attractor` | HARD | the first compute-particle scene: seed reproducibility + beat perturbation ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
+| `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
+| `background_composite` | HARD (**hardware only**) | RD / attractor presents alpha-blend over the `bg_*` backdrop; **skipped** on a software adapter, which mis-renders that pipeline set |
+| `transition` | HARD | a preset switch renders intermediate blended frames as a ramp, reproducibly from the injected `dt` (set `LMV_TRANSITION_STRIP=<dir>` to also dump filmstrips) |
+| `preset` | HARD | the expression evaluator and TOML schema: exact values, rejection without panic, **zero allocation** per eval, and the `PARAMS` ↔ `set_param` drift guard |
+| `dsp` / `ffi` / `hygiene` | HARD | known-signal analysis fixtures; the C ABI across the boundary; the hot-path panic pragma + exact dependency pinning |
+
+**Golden baselines pin frozen fixtures, not shipped presets.** `core/tests/fixtures/*.toml`
+is a deliberately minimal preset per `SystemKind`, committed alongside
+`core/tests/golden/*.png`; the shipped presets in `presets/` are guarded
+*behaviorally* (`sanity` / `reactivity` / `animation`) so the `preset-author` lane can
+tune them freely without re-blessing pixels. A new `SystemKind` variant fails
+`golden.rs` to **compile** until its fixture exists (exhaustive match, no wildcard arm).
 
 `core::signal` (pure, zero-dep) synthesizes the test audio; `core::render::metrics`
 (pure) provides `frame_diff`, `struct_diff`, `coverage`, and `quadrant_spread`,
@@ -179,6 +201,12 @@ LMV_BLESS=1 cargo test -p lmv-core --test golden
 to enshrine wrong. The compare tolerates minor cross-GPU rasterization drift; a
 genuine change exceeds it.
 
+> **`LMV_BLESS=1` is not scoped to the scene you changed** — it rewrites **every**
+> baseline the run touches. `git status` after blessing and `git checkout` the
+> baselines your change had no business moving; committing an incidental re-bless
+> silently retires the drift guard for that scene. (Learned the hard way in Plan
+> 0027, where an over-broad bless moved `fragment_field` and `swarm`.)
+
 ## The habit for a new scene
 
 When you add a new scene or preset:
@@ -190,5 +218,8 @@ When you add a new scene or preset:
    `sanity`. If it's beat-driven, extend `beat`.
 3. **Check distinctness** — run `--report` (or the `distinctness` test) to see if
    the new preset is a near-duplicate of an existing one (advisory).
-4. **Bless a golden only after eyeballing** — add a case to `golden.rs` and run
-   `LMV_BLESS=1` once the PNG looks right.
+4. **A new *system* needs a golden fixture; a new *preset* does not.** Adding a
+   `SystemKind` variant fails `golden.rs` to compile until you author
+   `core/tests/fixtures/<system_name>.toml` and add its arm — then bless that one
+   baseline after eyeballing it. Shipped presets are never pixel-pinned
+   ([ADR-0023](adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)).

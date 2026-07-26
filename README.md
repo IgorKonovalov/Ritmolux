@@ -12,8 +12,10 @@ The core is **source-agnostic**: it takes interleaved/mono PCM frames and does n
 they came from loopback capture or foobar. That single abstraction is what lets one visual
 codebase serve both frontends.
 
-> **Status: early / pre-alpha.** The architecture and plans are in place; the code crates are
-> being scaffolded. See [`docs/plans/`](docs/plans/) for what's in flight.
+> **Status: pre-1.0, in active development.** Both frontends run: the standalone app renders
+> live WASAPI loopback on Windows, and the foobar2000 component links the core's C ABI. The
+> preset format and the C ABI may still change between releases — stability begins at 1.0.0.
+> See [`docs/plans/`](docs/plans/) for what's in flight.
 
 ## Architecture
 
@@ -53,18 +55,23 @@ device's cadence, frames render at the display's, and neither loop drives the ot
 ```
 core/                # Rust library crate — the shared brain: DSP + render engine + scenes.
                      #   Native Rust API (standalone) + C ABI (foobar plugin). No audio-source code.
-standalone/          # Rust binary crate — winit window + wgpu surface + OS loopback capture.
+lmv-ring/            # The lock-free SPSC ring, split out zero-dependency so Miri can check it in CI.
+standalone/          # Rust binary + lib — winit window, wgpu surface, loopback capture, the shot example.
 plugin-foobar/       # C++ shim: foobar2000 SDK integration, links the core's C ABI. Windows-first.
+presets/             # The curated preset library (*.toml) — embedded at build time, seeded on first run.
 docs/
 ├── nfr.md           # Quantified v1 non-functional requirements (the numbers behind "lightweight").
-├── presets.md       # Preset authoring guide + shipped-library reference (systems, params, expressions).
+├── presets.md       # Preset authoring guide: the expression language, loading, and where files live.
+├── preset-palettes.md  # The colour surface: built-in palettes, custom stops, the A/B crossfade.
 ├── capturing.md     # Headless capture + visual-QA harness: the shot CLI and the core/tests/ checks.
+├── releasing.md     # The version-bump / release procedure (one bump per plan close).
 ├── adrs/            # Architecture Decision Records + rejected alternatives. Append-only.
+├── specs/           # Living behavioral contracts per core subsystem (C ABI, ring/DSP determinism).
 └── plans/           # Phased implementation plans (what's in flight); done/ holds completed plans.
 ```
 
-(The `core/`, `standalone/`, and `plugin-foobar/` crates are being scaffolded — the paths above
-are the target layout.)
+The per-system parameter tables live in [`presets/README.md`](presets/README.md), beside the
+preset files they document.
 
 ## Running the standalone app
 

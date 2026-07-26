@@ -19,12 +19,16 @@ summary.
 ## Commands
 
 ```sh
-# Preview (does nothing):
-cargo release <patch|minor> --no-push --dry-run
+# Preview — cargo-release is dry-run by default, so this changes nothing:
+cargo release <patch|minor> --no-push
 
 # Do it (bumps the workspace version, commits, tags vX.Y.Z, no push):
-cargo release <patch|minor> --no-push
+cargo release <patch|minor> --no-push --no-publish --no-confirm --execute
 ```
+
+`--execute` is what makes it real; without it cargo-release only reports what it
+would do. `push = false` / `publish = false` are already pinned in `release.toml`
+— the explicit flags on the command line are belt-and-braces.
 
 While in the `0.x` band: a feature-plan is a **minor** bump (`0.1.0 -> 0.2.0`), a fix-only
 plan is a **patch** bump (`0.1.0 -> 0.1.1`), and a docs/chore-only plan legitimately gets
@@ -37,8 +41,13 @@ a deliberate future act (freezing the C ABI and standalone behavior), never back
   (ADR-0003). It moves only when the `extern "C"` surface changes shape — never on an app
   bump, and an ABI bump never implies an app bump.
 - **Dependency versions** (exact `=` pins, cargo-deny) are unrelated.
-- **The foobar plugin** ships as a `.fb2k-component` with its own independent version;
-  `cargo-release` does not drive it (ADR-0005).
+- **The foobar plugin's build.** `cargo-release` does not run it — but since
+  [ADR-0025](adrs/0025-foobar-component-version-single-sourced.md) the component version is
+  no longer independent: `plugin-foobar/build.ps1` reads `[workspace.package].version` out of
+  root `Cargo.toml` and generates `build/foo_lmv_version.h`, which `DECLARE_COMPONENT_VERSION`
+  consumes. So a bump here reaches foobar's Components list **on the plugin's next build**,
+  with no second string to edit. (This revises ADR-0005's original "independent plugin
+  version" note.)
 
 ## Where the version surfaces
 

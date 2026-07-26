@@ -1,8 +1,8 @@
 # Spec — Ring seam + DSP determinism
 
 > **Subsystem:** The lock-free SPSC ring buffer that decouples audio from render, and the pure-function DSP that consumes it (FFT/spectrum, onset, tempo/beat).
-> **Source:** `core/src/audio.rs` (ring), `core/src/dsp/` (analysis); ring extraction to `lmv-ring` is Plan 0005.
-> **Reconciled-through:** Plan 0003 (DSP enriched with bass/mid/treb + deterministic tempo; ring unchanged since Plan 0001)
+> **Source:** `lmv-ring/` (the SPSC ring itself, a zero-dependency workspace member), `core/src/audio.rs` (format validation + the re-exported producer/consumer handles), `core/src/dsp/` (analysis).
+> **Reconciled-through:** Plan 0005 (ring extracted to `lmv-ring`, Miri gate live in CI); DSP unchanged since Plan 0003 (bass/mid/treb + deterministic tempo). Reconciled 2026-07-25.
 > **Governing ADRs:** [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) (core owns DSP + the audio/render split); CLAUDE.md non-negotiables; Plan 0005 (Miri UB gate).
 
 ## Invariants
@@ -14,8 +14,9 @@
   producer (the audio thread) and one consumer (the render thread). Neither loop is driven
   directly off the other; the ring absorbs the cadence mismatch. (CLAUDE.md)
 - The ring MUST be **data-race-free** under concurrent single-producer/single-consumer access.
-  This is the invariant Plan 0002 Phase 5 (deferred) / Plan 0005 exists to prove under Miri.
-  (Plan 0005)
+  It lives in `lmv-ring` — a workspace member with **no dependencies**, so Miri can interpret its
+  `unsafe` without compiling the wgpu/naga graph — and the CI `miri` job proves it on every push.
+  (Plan 0005, `.github/workflows/ci.yml`)
 - DSP analysis (FFT bins, onset envelope, tempo/BPM estimate, bass/mid/treb bands) MUST be a
   **pure function of its input window**: no wall-clock reads, no unseeded randomness. The same
   input window MUST produce the same analysis frame. (CLAUDE.md "determinism where it's
@@ -38,15 +39,17 @@
   behavioral claim the DSP tests defend).
 - WHEN the same audio window is analyzed twice THEN the onset envelope, tempo/BPM estimate, and
   band energies are bit-for-bit identical (no wall-clock, no unseeded RNG in the path).
-- WHEN `cargo +nightly miri test -p lmv-ring` runs (Plan 0005) THEN the SPSC ring's cross-thread
-  test reports no undefined behavior.
+- WHEN `cargo +nightly miri test -p lmv-ring` runs (the CI `miri` job, Plan 0005) THEN the SPSC
+  ring's cross-thread test reports no undefined behavior.
 
 ## Known gaps / honest nulls
 
-- The ring is verified UB-clean **locally** today (`cargo +nightly miri test -p lmv-core --lib`,
-  including the cross-thread SPSC case); the **CI automation** of that check is outstanding and
-  is exactly what Plan 0005 wires (by extracting the ring into a wgpu-free `lmv-ring` crate so
-  Miri need not compile the wgpu/naga graph).
+- **Nothing crosses the whole seam in a test.** Miri proves the ring's `unsafe`, and the DSP
+  tests prove determinism, but no test drives PCM through `audio::intake` → the real drain policy
+  → `Analyzer` → `Renderer`. The standalone's drain loop is therefore uncovered. That end-to-end
+  tier is [Plan 0032](../plans/0032-testing-strategy-e2e-coverage-and-pre-push.md) Phase 1
+  ([ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)) — until it
+  lands, the ring-to-pixels claim above is architecture, not assertion.
 - This spec does not contract the *tempo estimator's accuracy* (how close BPM is to ground
   truth) — only its **determinism**. Better tempo tracking is a named later roadmap item.
 - The overflow/underrun policy is stated behaviorally here; the exact capacity (~100 ms at
