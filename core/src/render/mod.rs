@@ -117,6 +117,57 @@ fn scene_for_mut(scenes: &mut SceneRoster, system: SystemKind) -> Option<&mut Bo
         .map(|(_, scene)| scene)
 }
 
+/// What one binding's evaluated value drives, resolved **once when the roster is
+/// loaded** (Plan 0031 Phase 3) so the frame loop dispatches on an enum instead of
+/// walking a chain of `set_param(&str, ..)` string matches to discover the owner.
+///
+/// The answer is fixed the moment a preset is parsed: it depends only on the
+/// param's name, the preset's system, and which composite stages exist. Adding a
+/// stage now costs a `ParamRoute` arm here, not another link in a chained `if`
+/// inside the hot loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParamRoute {
+    /// The backdrop pre-pass (`bg_*`), which sits outside the chain (ADR-0031).
+    Background,
+    /// A post-composite stage, by its fixed index in the chain (ADR-0031).
+    Stage(usize),
+    /// The terminal engine-wide ink pass (`ink_*` / `paper_*`), outside the chain
+    /// (ADR-0032).
+    Ink,
+    /// The active scene's named-parameter surface.
+    Scene,
+    /// No owner claimed the name — silently dropped at apply time, exactly as
+    /// the old fallthrough dropped it on reaching a scene that ignores it. The
+    /// author already heard about it: an unknown name is a **load-time warning**
+    /// carried on [`Preset::warnings`] (ADR-0020, Plan 0019). This is where a
+    /// future *render-time* diagnostic for the same case would hang.
+    Unclaimed,
+}
+
+/// Resolve one binding's destination. **Pure** — a lookup over the static stage
+/// vocabularies plus the system's own, so it is decidable at load and testable
+/// without a GPU.
+///
+/// The order is the composite order (ADR-0032) and matches the first-owner-wins
+/// fallthrough it replaces: the backdrop pre-pass, then the post chain, then the
+/// terminal ink pass, then the scene. The four namespaces are disjoint, so the
+/// order is a formality rather than a tie-break — but it is the documented one.
+fn resolve_route(name: &str, system: SystemKind) -> ParamRoute {
+    if background::PARAMS.contains(&name) {
+        return ParamRoute::Background;
+    }
+    if let Some(stage) = post::stage_for(name) {
+        return ParamRoute::Stage(stage);
+    }
+    if ink::PARAMS.contains(&name) {
+        return ParamRoute::Ink;
+    }
+    if system.param_names().contains(&name) {
+        return ParamRoute::Scene;
+    }
+    ParamRoute::Unclaimed
+}
+
 /// The loaded presets plus the active index — the pure, GPU-free part of
 /// selection. Split out of [`Renderer`] so the addressing contract (names in
 /// roster order, in-range select, out-of-range no-op) is unit-testable without a
@@ -124,12 +175,26 @@ fn scene_for_mut(scenes: &mut SceneRoster, system: SystemKind) -> Option<&mut Bo
 /// [`Renderer`]. [`Renderer`]'s preset methods delegate here 1:1.
 struct Roster {
     presets: Vec<Preset>,
+    /// Resolved [`ParamRoute`]s, one inner `Vec` per preset and one entry per that
+    /// preset's bindings, in `Preset::params` order.
+    ///
+    /// Kept here rather than on the active preset alone because a dissolve
+    /// composites **two** presets in one frame (Plan 0023) and both sides want
+    /// their routes; indexing by preset means a side's routes cannot drift out of
+    /// step with the preset it is showing. Resolution is a render-layer concern
+    /// (it names chain positions), which is why it lives on this render-layer type
+    /// and not in `preset/`.
+    routes: Vec<Vec<ParamRoute>>,
     active: usize,
 }
 
 impl Roster {
     fn new(presets: Vec<Preset>) -> Self {
-        Self { presets, active: 0 }
+        Self {
+            routes: resolve_routes(&presets),
+            presets,
+            active: 0,
+        }
     }
 
     /// Replace the roster; reset `active` to the start if it now points past the
@@ -139,10 +204,23 @@ impl Roster {
         if presets.is_empty() {
             return;
         }
+        self.routes = resolve_routes(&presets);
         self.presets = presets;
         if self.active >= self.presets.len() {
             self.active = 0;
         }
+    }
+
+    /// The resolved routes for the preset at `index`, positionally matching its
+    /// `params`. Empty for an out-of-range index, which pairs with
+    /// `presets.get(index)` returning `None`.
+    fn routes_for(&self, index: usize) -> &[ParamRoute] {
+        self.routes.get(index).map_or(&[], Vec::as_slice)
+    }
+
+    /// The active preset's resolved routes.
+    fn active_routes(&self) -> &[ParamRoute] {
+        self.routes_for(self.active)
     }
 
     /// The index cycling would land on (wrapping), **without** moving there — the
@@ -181,6 +259,21 @@ impl Roster {
     fn names(&self) -> impl Iterator<Item = &str> {
         self.presets.iter().map(|p| p.name.as_str())
     }
+}
+
+/// Resolve every preset's bindings to their destinations, off the hot path — once
+/// per roster load, not once per binding per frame.
+fn resolve_routes(presets: &[Preset]) -> Vec<Vec<ParamRoute>> {
+    presets
+        .iter()
+        .map(|preset| {
+            preset
+                .params
+                .iter()
+                .map(|binding| resolve_route(&binding.name, preset.system))
+                .collect()
+        })
+        .collect()
 }
 
 /// Render-layer one-pole low-pass over evaluated parameter values (ADR-0019 /
@@ -238,11 +331,17 @@ impl ParamSmoother {
 ///
 /// `ink` is `None` for a dual-live dissolve's outgoing side: there is one
 /// engine-wide ink pass and it belongs to the active preset, whose crossfade the
-/// caller applies afterwards. `ink_*` names then fall through to the scene, which
-/// ignores unknown params — the same silent drop every unknown name already gets.
+/// caller applies afterwards. An `ink_*` binding on that side is therefore
+/// dropped — the same no-op it was when it fell through to a scene that ignores
+/// unknown params.
+///
+/// `routes` carries each binding's destination, resolved once at roster load
+/// ([`ParamRoute`]); it is positionally paired with `preset.params`, so a binding
+/// with no route entry is skipped rather than mis-routed.
 #[allow(clippy::too_many_arguments)]
 fn evaluate_preset(
     preset: &Preset,
+    routes: &[ParamRoute],
     scene: &mut Box<dyn Scene>,
     side: &mut CompositeSide,
     ink: Option<&mut Ink>,
@@ -257,28 +356,33 @@ fn evaluate_preset(
     side.reset_params();
     scene.reset_params();
     let mut ink = ink;
-    for (index, binding) in preset.params.iter().enumerate() {
+    for (index, (binding, route)) in preset.params.iter().zip(routes).enumerate() {
         let raw = binding.expr.eval(vars);
         // Ease the evaluated value on the injected real `dt` before applying it
-        // (ADR-0019). An unlisted param has `tau = 0` = no smoothing, so it passes
-        // through instantly; the expression layer above stays pure and
-        // allocation-free.
-        let tau = preset.smoothing.get(&binding.name).copied().unwrap_or(0.0);
-        let value = smoother.smooth(index, raw, tau, dt);
-        // First owner wins, in composite order: `bg_*` to the background pre-pass,
-        // then the post chain (`trails`, `kaleido_*`), then the terminal ink pass
-        // (`ink_*`/`paper_*`); everything else goes to the scene. The namespaces
-        // are disjoint, so no param reaches more than one.
-        if side.set_param(&binding.name, value) {
-            continue;
+        // (ADR-0019). `tau` came off the preset's `[smoothing]` table at load;
+        // `0` (the default for an unlisted param) passes through instantly. The
+        // expression layer above stays pure and allocation-free.
+        let value = smoother.smooth(index, raw, binding.tau, dt);
+        // Dispatch on the resolved destination — no map lookup, no walk over the
+        // stages, no chained fallthrough. The owner was decided at load.
+        match *route {
+            ParamRoute::Background => {
+                side.background.set_param(&binding.name, value);
+            }
+            ParamRoute::Stage(stage) => {
+                side.chain.set_stage_param(stage, &binding.name, value);
+            }
+            ParamRoute::Ink => {
+                if let Some(ink) = ink.as_mut() {
+                    ink.set_param(&binding.name, value);
+                }
+            }
+            ParamRoute::Scene => {
+                scene.set_param(&binding.name, value);
+            }
+            // Nothing consumes it. Surfaced at load, silent here (ADR-0020).
+            ParamRoute::Unclaimed => {}
         }
-        if ink
-            .as_mut()
-            .is_some_and(|ink| ink.set_param(&binding.name, value))
-        {
-            continue;
-        }
-        scene.set_param(&binding.name, value);
     }
     scene.update(frame);
 }
@@ -341,12 +445,6 @@ impl CompositeSide {
     fn reset_params(&mut self) {
         self.background.reset_params();
         self.chain.reset_params();
-    }
-
-    /// Offer one named param to the backdrop, then the chain. **First owner
-    /// wins**; `false` means neither owns the name and the caller falls through.
-    fn set_param(&mut self, name: &str, value: f32) -> bool {
-        self.background.set_param(name, value) || self.chain.set_param(name, value)
     }
 
     /// Drop the lazily-built GPU resources (capture rebuild — keeps a headless
@@ -1013,6 +1111,7 @@ impl Renderer {
         let Some(preset) = roster.active_preset() else {
             return 0; // no presets loaded — nothing to draw
         };
+        let routes = roster.active_routes();
 
         // Evaluate against the shared clock and this frame's analysis. Both sides
         // of a dissolve read the same variables — they differ in what they *bind*.
@@ -1046,16 +1145,20 @@ impl Renderer {
         // to the one the dissolve opened on.
         let dual_live = transition.as_ref().is_some_and(Transition::is_dual_live);
         if dual_live {
-            let outgoing = transition
-                .as_ref()
-                .and_then(|tr| roster.presets.get(tr.outgoing_index()));
-            if let (Some(outgoing), Some(out_view)) = (outgoing, blend.snapshot_view(surface))
+            let outgoing_index = transition.as_ref().map(Transition::outgoing_index);
+            // The outgoing preset and the routes resolved for it come from the same
+            // index, so the two cannot drift apart.
+            let outgoing = outgoing_index
+                .and_then(|index| Some((roster.presets.get(index)?, roster.routes_for(index))));
+            if let (Some((outgoing, out_routes)), Some(out_view)) =
+                (outgoing, blend.snapshot_view(surface))
                 && let Some(out_scene) = scene_for_mut(scenes, outgoing.system)
             {
                 // No ink: the outgoing side's `ink_*` were held at the capture
                 // frame and are crossfaded by the single engine-wide pass below.
                 evaluate_preset(
                     outgoing,
+                    out_routes,
                     out_scene,
                     side,
                     None,
@@ -1087,6 +1190,7 @@ impl Renderer {
         ink.reset_params();
         evaluate_preset(
             preset,
+            routes,
             scene,
             live_side,
             Some(ink),
@@ -1482,11 +1586,13 @@ mod tests {
     #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
     use super::{
-        CaptureImage, HeadlessOptions, Mode, ParamSmoother, RenderError, Renderer, Roster,
+        CaptureImage, HeadlessOptions, Mode, ParamRoute, ParamSmoother, RenderError, Renderer,
+        Roster, resolve_route,
     };
     use crate::dsp::AnalysisFrame;
-    use crate::preset::Preset;
+    use crate::preset::{Preset, SystemKind};
     use crate::render::metrics::frame_diff;
+    use crate::render::post::{KALEIDOSCOPE, TRAILS};
 
     /// A minimal valid preset: a known system + explicit name, no params.
     fn preset(name: &str) -> Preset {
@@ -1496,6 +1602,135 @@ mod tests {
 
     fn roster(names: &[&str]) -> Roster {
         Roster::new(names.iter().map(|n| preset(n)).collect())
+    }
+
+    /// Plan 0031 Phase 3 — the routing contract, GPU-free: every global namespace
+    /// resolves to its owner, the system's own names to the scene, and anything
+    /// else to `Unclaimed` (dropped at apply time, already warned about at load).
+    ///
+    /// This is the answer the per-frame `set_param` fallthrough chain used to
+    /// re-derive on every bound param of every frame.
+    #[test]
+    fn each_namespace_resolves_to_its_owner() {
+        let swarm = SystemKind::Swarm;
+        // The backdrop pre-pass, outside the chain (ADR-0031).
+        for name in crate::render::background::PARAMS {
+            assert_eq!(
+                resolve_route(name, swarm),
+                ParamRoute::Background,
+                "`{name}` belongs to the backdrop"
+            );
+        }
+        // The two chain stages, each to its own fixed position — not merely "some
+        // stage", so a swapped `STAGE_PARAMS` order would fail here.
+        for name in crate::render::trails::PARAMS {
+            assert_eq!(resolve_route(name, swarm), ParamRoute::Stage(TRAILS));
+        }
+        for name in crate::render::kaleidoscope::PARAMS {
+            assert_eq!(resolve_route(name, swarm), ParamRoute::Stage(KALEIDOSCOPE));
+        }
+        // The terminal engine-wide ink pass (ADR-0032) — `ink_*` and `paper_*`.
+        for name in crate::render::ink::PARAMS {
+            assert_eq!(
+                resolve_route(name, swarm),
+                ParamRoute::Ink,
+                "`{name}` belongs to the ink pass"
+            );
+        }
+        assert!(
+            crate::render::ink::PARAMS.contains(&"ink_amount")
+                && crate::render::ink::PARAMS
+                    .iter()
+                    .any(|n| n.starts_with("paper_")),
+            "the ink vocabulary covers both the ink_* and paper_* halves"
+        );
+
+        // Everything a system declares goes to its scene — checked for **every**
+        // system, so a family whose names happened to collide with a global
+        // namespace could not slip through.
+        for system in SystemKind::ALL {
+            for name in system.param_names() {
+                assert_eq!(
+                    resolve_route(name, system),
+                    ParamRoute::Scene,
+                    "`{name}` is {}'s own param",
+                    system.as_str()
+                );
+            }
+        }
+
+        // An unknown name is ignored, not an error and not mis-routed. Includes a
+        // near-miss typo, which is the case the load-time warning names.
+        for name in ["nope", "trail", "bg_", "kaleido", "ink", "warp_"] {
+            assert_eq!(
+                resolve_route(name, swarm),
+                ParamRoute::Unclaimed,
+                "`{name}` is claimed by nobody"
+            );
+        }
+        // A param real on one system is not silently accepted on another: `warp`
+        // is fragment-only, so on the swarm it is unclaimed.
+        assert_eq!(
+            resolve_route("warp", SystemKind::FragmentField),
+            ParamRoute::Scene
+        );
+        assert_eq!(resolve_route("warp", swarm), ParamRoute::Unclaimed);
+    }
+
+    /// The routes a roster hands the frame loop line up positionally with the
+    /// preset's bindings — the property `evaluate_preset`'s `zip` rests on.
+    #[test]
+    fn roster_routes_pair_with_each_presets_bindings() {
+        let mixed = Preset::from_toml_str(
+            "system = \"swarm\"\nname = \"Mixed\"\n[params]\n\
+             bg_bright = \"0.5\"\ntrails = \"0.4\"\nkaleido_order = \"6\"\n\
+             ink_amount = \"1\"\nforce = \"bass\"\nnot_a_param = \"1\"\n",
+        )
+        .expect("valid preset with one binding per route");
+        let roster = Roster::new(vec![mixed]);
+        let preset = roster.active_preset().expect("one preset");
+        let routes = roster.active_routes();
+        assert_eq!(routes.len(), preset.params.len(), "one route per binding");
+
+        // Bindings are name-sorted at load, so read the pairing by name rather
+        // than by position.
+        let by_name: Vec<(&str, ParamRoute)> = preset
+            .params
+            .iter()
+            .zip(routes)
+            .map(|(binding, route)| (binding.name.as_str(), *route))
+            .collect();
+        assert!(by_name.contains(&("bg_bright", ParamRoute::Background)));
+        assert!(by_name.contains(&("trails", ParamRoute::Stage(TRAILS))));
+        assert!(by_name.contains(&("kaleido_order", ParamRoute::Stage(KALEIDOSCOPE))));
+        assert!(by_name.contains(&("ink_amount", ParamRoute::Ink)));
+        assert!(by_name.contains(&("force", ParamRoute::Scene)));
+        assert!(by_name.contains(&("not_a_param", ParamRoute::Unclaimed)));
+        // The unknown name loaded with a warning rather than failing (ADR-0020).
+        assert_eq!(preset.warnings.len(), 1, "{:?}", preset.warnings);
+
+        // Out of range is empty, pairing with `presets.get` returning `None`.
+        assert!(roster.routes_for(9).is_empty());
+    }
+
+    /// `tau` is read off the `[smoothing]` table once at load, so the frame loop
+    /// does no map lookup. An unlisted param is `0.0` = instant (ADR-0019).
+    #[test]
+    fn smoothing_taus_are_resolved_onto_the_bindings() {
+        let p = Preset::from_toml_str(
+            "system = \"swarm\"\n[params]\nforce = \"bass\"\nhue = \"time\"\n\
+             [smoothing]\nforce = 0.25\n",
+        )
+        .expect("valid preset with a [smoothing] entry");
+        let tau_of = |name: &str| {
+            p.params
+                .iter()
+                .find(|b| b.name == name)
+                .map(|b| b.tau)
+                .expect("bound param")
+        };
+        assert_eq!(tau_of("force"), 0.25, "listed in [smoothing]");
+        assert_eq!(tau_of("hue"), 0.0, "unlisted means instant");
     }
 
     /// Build a headless `Renderer`, or return `None` (a logged skip) when the

@@ -76,6 +76,31 @@ pub(crate) const STAGE_COUNT: usize = 2;
 pub(crate) const TRAILS: usize = 0;
 pub(crate) const KALEIDOSCOPE: usize = 1;
 
+/// Each stage's declared parameter vocabulary, **in chain order** — the same
+/// consts the stages themselves match on, so there is no second copy to drift.
+/// Pinned to the live array by a `debug_assert` in [`PostChain::new`].
+///
+/// This exists so a binding's owning stage can be resolved **once, at load**
+/// ([`stage_for`]) instead of by walking the stages per binding per frame: the
+/// answer is fixed the moment a preset is parsed, and a chained
+/// `set_param(&str, ..)` fallthrough inside the hot loop is a link every new
+/// stage would lengthen (Plan 0031 Phase 3).
+pub(crate) const STAGE_PARAMS: [&[&str]; STAGE_COUNT] =
+    [super::trails::PARAMS, super::kaleidoscope::PARAMS];
+
+/// The chain position that owns `name`, or `None` when no stage does. **Pure** —
+/// a lookup over the static vocabularies above, with no GPU and no chain
+/// instance, so it is callable from load-time resolution and testable directly.
+///
+/// The stage namespaces are disjoint (`trails` vs `kaleido_*`), so the first
+/// match is the only match — the same first-owner-wins rule the per-frame walk
+/// this replaced applied.
+pub(crate) fn stage_for(name: &str) -> Option<usize> {
+    STAGE_PARAMS
+        .iter()
+        .position(|params| params.contains(&name))
+}
+
 /// One skippable post-composite stage (ADR-0031). Crate-internal on purpose: the
 /// composite order is fixed in [`PostChain::new`], not registered, and no preset
 /// or C-ABI caller can reach this seam.
@@ -89,8 +114,15 @@ pub(crate) trait PostStage {
     fn reset_params(&mut self);
 
     /// Apply one named param, returning whether this stage owns the name. The
-    /// chain stops at the first owner, so the stage namespaces must stay disjoint.
+    /// caller routes by resolved index (see [`stage_for`]), so a `false` here
+    /// means the resolution and this match disagree — which
+    /// [`STAGE_PARAMS`]'s `debug_assert` in [`PostChain::new`] exists to catch.
     fn set_param(&mut self, name: &str, value: f32) -> bool;
+
+    /// This stage's declared parameter vocabulary — the names its
+    /// [`set_param`](Self::set_param) claims. Read only to pin [`STAGE_PARAMS`]
+    /// to the live array at construction; never on the hot path.
+    fn params(&self) -> &'static [&'static str];
 
     /// Whether this stage runs this frame. `false` skips it entirely — the
     /// passthrough that keeps an unbound preset paying nothing.
@@ -241,6 +273,17 @@ impl PostChain {
             Some("kaleidoscope"),
             "the screen-space fold runs after the feedback (ADR-0018)"
         );
+        // `STAGE_PARAMS` is what load-time route resolution reads, so its order
+        // has to be this array's order — otherwise a resolved `Stage(i)` would
+        // hand `kaleido_*` to trails. Swapping the literal above trips here.
+        for (index, stage) in chain.stages.iter().enumerate() {
+            debug_assert_eq!(
+                STAGE_PARAMS.get(index).copied(),
+                Some(stage.params()),
+                "STAGE_PARAMS[{index}] must be `{}`'s own vocabulary",
+                stage.name()
+            );
+        }
         chain
     }
 
@@ -252,16 +295,18 @@ impl PostChain {
         }
     }
 
-    /// Offer one named param to the chain, returning whether a stage owned it.
-    /// **First owner wins**, in chain order; the renderer falls through to the
-    /// scene when this returns `false`.
-    pub(crate) fn set_param(&mut self, name: &str, value: f32) -> bool {
-        for stage in self.stages.iter_mut() {
-            if stage.set_param(name, value) {
-                return true;
-            }
-        }
-        false
+    /// Apply one named param to the stage at `index` — the position load-time
+    /// resolution already decided ([`stage_for`]). Returns whether that stage
+    /// owned the name, so a resolution/`set_param` disagreement is visible rather
+    /// than silent.
+    ///
+    /// Indexed rather than searched on purpose: the by-name walk this replaced ran
+    /// once per bound param per frame and grew a link with every stage added
+    /// (Plan 0031 Phase 3).
+    pub(crate) fn set_stage_param(&mut self, index: usize, name: &str, value: f32) -> bool {
+        self.stages
+            .get_mut(index)
+            .is_some_and(|stage| stage.set_param(name, value))
     }
 
     /// Drop every stage's lazily-built resources (capture rebuild — keeps a
@@ -584,8 +629,14 @@ mod tests {
         let mut chain_a = PostChain::new(&ctx.device, format);
         let mut chain_b = PostChain::new(&ctx.device, format);
         // A long trail on both, so a leaked accumulation would be glaring.
-        assert!(chain_a.set_param("trails", 0.9), "the chain owns `trails`");
-        assert!(chain_b.set_param("trails", 0.9), "the chain owns `trails`");
+        assert!(
+            chain_a.set_stage_param(TRAILS, "trails", 0.9),
+            "the TRAILS position owns `trails`"
+        );
+        assert!(
+            chain_b.set_stage_param(TRAILS, "trails", 0.9),
+            "the TRAILS position owns `trails`"
+        );
 
         // A: lit, then dark — the dark frame shows A's own fading trail.
         let a_lit_then_dark = drive(&ctx, &mut chain_a, &mut background, &[true, false]);
