@@ -433,10 +433,21 @@ not exist.
 - **Fold as a disc and treat the corners deliberately** — sample at `min(r, r_max)` with a radial
   falloff, accepting the corners as a designed vignette rather than folded content.
 
-**Connects to close-review major 3** ([Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md)):
-no golden fixture binds `trails` or `kaleido_*`. A fixture at a fold order above 2 would have pinned
-this artifact the moment anyone looked at the baseline. Fixing 0010 and closing major 3 belong in the
-same plan.
+**Connected to close-review major 3** ([Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md)):
+no golden fixture bound `trails` or `kaleido_*`. **Major 3 is now closed and this is still open** —
+[Plan 0035](plans/done/0035-composite-aspect-and-grid-policy.md) Phase 2 added
+`core/tests/fixtures/composite_kaleido.toml` at order 6, which **pins this artifact on purpose** so a
+fix does not read as a regression. Read that fixture's header before touching the fold.
+
+**Re-bless `composite_kaleido.png` by hand when you fix this — the guard will not tell you to.**
+Measured at Plan 0035's close review: the first candidate above (clamp the fold radius to the
+inscribed disc, `min(r, 0.5)` in the shader) leaves the capture guard **green** at mean 0.0189 against
+its 0.02 tolerance and outlier 22 against 48. It passes while consuming 94 % of the drift budget, so
+the *next* unrelated fold change trips the guard with a message blaming the wrong thing. The fixture
+header's claim that "a fix must not pass silently" is therefore false as written — a real guard for
+this artifact needs a **border-filling** scene (`swarm`/`fragment`) where the clamp smears
+high-frequency content, or a direct assertion on the clamped-pixel statistic. Whichever this fix
+takes, do it in the same plan.
 
 ---
 

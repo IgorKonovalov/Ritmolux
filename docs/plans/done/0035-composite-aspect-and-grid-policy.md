@@ -1,6 +1,8 @@
 # 0035 — The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages
 
-> **Status:** in-progress
+> **Status:** done — 2026-07-26 (four `dev` phase commits `d4f98f8` / `687621b` / `bc11b23` /
+> `f9f9e79`; passed Mode 4 review with **no blockers and no majors** — four minors, one nit. See
+> **Close** at the bottom.)
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev
@@ -259,3 +261,97 @@ fn grid_size(surface: (u32, u32), cap: (u32, u32), step: u32) -> (u32, u32);
   rule rather than the defect, exactly as it was sequenced after Plan 0033 to inherit target sizing.
 - Whether the attractor's 2560x1440 cap and the post stages' 1920x1080 should converge. Still open
   from Plan 0033, and cheaper to answer once the policy is one function (Phase 3).
+
+## Close (2026-07-26)
+
+Passed Mode 4 review: **no blockers, no majors**; four minors, one nit. Four `dev` phase commits —
+`d4f98f8` the aspect fix, `687621b` the two post-stage baselines, `bc11b23` one grid policy,
+`f9f9e79` the docs. Turning `trails` or `kaleido_*` on now changes the picture's **softness and
+nothing else**: `SceneTarget::aspect` comes from `surface`, the kaleidoscope folds about the render
+target's ratio, and `Scene::set_target_size` keeps the grid because that one genuinely is a texel
+count. Plan 0029 Phase 5's attractor fix stops being conditional on no stage being active, and
+ADR-0037's invariant is now checkable by inspection — **no `aspect` anywhere in `core/src` is derived
+from a grid size**.
+
+**Verified at review rather than taken on trust.** `fmt --check` and `clippy --workspace
+--all-targets -D warnings` clean; `nextest -p lmv-core` **171/171**; `git diff --stat` over the whole
+range confirms `core/tests/golden/` gained exactly the two new PNGs and no existing baseline moved,
+so the re-bless-scope claim holds in fact. **The non-vacuity was reproduced independently**, not read
+from the commit body: restoring the grid-derived aspect fails all three new guards, with the disc at
+1280x800 reading `1.0000` skipped against `1.2800` through trails (predicted 1.280; the plan's `shot`
+measurement was 1.278), the 1920x1080 control unmoved under both, and the capture guard failing at
+`composite_trails` mean 0.0958 / outlier 255 and `composite_kaleido` 0.0356 / 135. The kaleido
+fixture's **5.9 % clamped-pixel figure was recomputed from the shader's arithmetic and is exact**
+(0.0590 at 160x100, order 6). `ffi.rs` and `scenes/mod.rs` are untouched, both manifests are
+untouched, and both `PostStage` implementors were updated — **C ABI stays v4, `Scene` unchanged, no
+new dependency, no preset change**.
+
+**Accepted deviation, and it is an improvement on the plan.** The plan's illustrative data-shape
+sketch gave `resolve` an `out_size`; the implementation passes `surface`. That is the stronger choice
+and the commit says why: every present down the chain is a plain normalized stretch, so an
+intermediate stage's grid is a resolution too, and deriving the fold's aspect from the destination
+would re-plant ADR-0037's trap for any stage added *after* the kaleidoscope. Identical in today's
+chain, where the destination is surface-sized in every case. Verified against the shader: the fold's
+input and output are both full-frame normalized, so one aspect correctly serves both the output
+geometry and the sample reconstruction.
+
+**Phase 2's fixture choices, reviewed and accepted.** The capture size (160x100, grid 256x256, a
+1.6x stretch under the defect) is load-bearing and documented as such in three places. The
+`composite_kaleido` baseline pins design-backlog 0010 deliberately at order 6 — there is no clean
+order (at order 2 a corner radius still overruns the rectangle along x, and below 2 the stage is
+skipped entirely), and the header is candid that the baseline *looks* clean because a centred figure
+leaves the source border a smooth gradient. WARP was settled by measurement (byte-identical SHA-256
+across three consecutive runs) and takes the ordinary blessed posture rather than
+`background_composite.rs`'s skip-on-software, deliberately, so the guard runs in CI and not only on
+developer machines — the right trade for a defect whose failure mode was that nobody looked.
+
+**Minors, all carried to a followup rather than reworked here:**
+
+1. **The kaleido fixture promises a guard it does not deliver.** Its header says every candidate 0010
+   fix "MOVES THIS BASELINE… a fix must not pass silently". Measured at review: applying backlog
+   0010's **first** named candidate — clamp the fold radius to the inscribed disc, `min(r, 0.5)` in
+   `kaleidoscope.rs:85` — leaves the guard **green** at mean **0.0189** against the 0.02 tolerance
+   and outlier 22 against 48. Worse than a false claim: that fix consumes 94 % of the mean drift
+   budget while passing, so the next unrelated fold change trips the guard with a message blaming the
+   wrong thing. Either weaken the sentence to what is true (the clamped pixels are non-black, so a
+   fix perturbs them) or make it a real guard the way `dev` already identified — a border-filling
+   scene (`swarm`/`fragment`), or a direct assertion on the clamped-pixel statistic.
+2. **The in-code rationale for the single-factor cap is the retired one.** `render/grid.rs:22-26`
+   justifies the single scale factor by *shape* ("the picture's shape changed discontinuously as the
+   window crossed the cap") ten lines above stating ADR-0037's opposite conclusion ("`step` and `cap`
+   are pure cost/quality knobs with no geometric side effect"); same at `post.rs:566-575` and in its
+   assert message ("the per-axis clamp regression is back"). After Phase 1 the surviving reason is
+   **sampling density** — a 21:9 target squashed into a 16:9 grid loses horizontal resolution — not
+   shape. Phase 4 corrected this exact sentence in `presets/README.md` and left the two in-code
+   copies.
+3. **`post.rs:1014-1018` is now a tautology.** `assert!((target.aspect - 2048.0/1152.0).abs() <
+   1e-3, "the capped grid must keep the target's aspect")` cannot fail for any grid now that
+   `target.aspect` *is* `surface.0/surface.1`, and its message describes a property it no longer
+   reads. Restate it as "the aspect is the surface's whatever the grid came back as", or drop it.
+4. **`README.md:199`'s gate arithmetic went stale** — fixed in this close commit. The new `composite`
+   binary is not in `.githooks/pre-push`'s `SKIPPED_SUITES`, so the fast gate runs it; that is cheap
+   (measured **2.9 s**, so the "~28 s" figure survives) but "166 of 180 tests" is no longer the
+   suite. Phase 4's done-when forbade *introducing* a count and a neighbouring one rotted.
+
+**Nit (fixed in this close commit):** design-backlog 0010 said "Fixing 0010 and closing major 3
+belong in the same plan" — major 3 is closed here and 0010 is still open — and it predated minor 1's
+measurement. Both corrected in place so whoever fixes 0010 knows the baseline must be re-blessed by
+hand.
+
+**Out of scope, correctly:** `trail_grid_size` keeps its `pub` (narrowing means moving
+`core/tests/attractor.rs` into the crate, a file outside this plan); `presets/swarm_dense.toml:45-50`
+still claims "Six is the highest that stays clean at 16:9", which is `preset-author` content already
+recorded in backlog 0010; and `cargo test -p lmv-core --lib render::post` crashing with
+`STATUS_ACCESS_VIOLATION` under in-process parallel GPU tests **predates this plan** (verified by
+`dev` against a stashed tree at `a1e3e26`) — `nextest` and `--test-threads=1` are both clean, so
+nothing is masked.
+
+**⚠ On-device carry-forward, unchanged and now one item longer:** after Phase 1 the composite
+genuinely rasterizes more texels on one axis than it shows (bounded by one 256 px step), on top of
+the full-resolution ping-pong Plan 0033's item already watches; and Phase 4 added the
+reaction-diffusion reconstruction's ~45 texture fetches per fragment to
+`docs/on-device-validation.md`, with a failure routed to `architect` rather than to an automatic
+revert because reverting costs the coral look outright.
+
+[ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) **accepted** at this close.
+Version **patch 0.17.0 -> 0.17.1** — a fix/coverage/refactor/docs plan, no feature.
