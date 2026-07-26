@@ -9,7 +9,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
-| [0033](0033-internal-resolution-and-preset-surface.md) | Internal resolution follows the target, plus the preset-surface and harness gaps behind it | draft | dev, human |
+| [0033](0033-internal-resolution-and-preset-surface.md) | Internal resolution follows the target, plus the preset-surface and harness gaps behind it | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
 

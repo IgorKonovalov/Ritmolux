@@ -2,6 +2,7 @@
 
 > **Status:** draft
 > **Created:** 2026-07-26
+> **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0034](../adrs/0034-internal-resolution-follows-the-target.md) (internal
 > resolution), [0035](../adrs/0035-asymmetric-attack-release-easing.md) (attack/release easing);
