@@ -57,7 +57,7 @@ pub use scenes::lines::CapOverflow;
 use text::TextLayer;
 #[cfg(feature = "text")]
 pub use text::TextRun;
-use transition::{Blend, DEFAULT_DURATION_SECS, Transition, TransitionKind};
+use transition::{Blend, DEFAULT_DURATION_SECS, Mode, Transition, TransitionKind};
 
 /// Assumed bytes-per-pixel for the swapchain GPU-byte estimate (the common
 /// 8-bit RGBA/BGRA surface formats). An approximation, per ADR-0008.
@@ -80,6 +80,18 @@ const SWAPCHAIN_IMAGE_COUNT: u64 = 2;
 const TRANSITION_KIND: Option<TransitionKind> = None;
 /// How long every dissolve runs, in seconds. See [`TRANSITION_KIND`].
 const TRANSITION_DURATION_SECS: f32 = DEFAULT_DURATION_SECS;
+/// Smoothed frame-time ceiling, in milliseconds, under which a dissolve may run
+/// its outgoing side **live** as well (ADR-0024's adaptive governor). A named
+/// constant on purpose — this is the number to calibrate on a low-end rig.
+///
+/// Sized against 60 fps @ 1080p (NFR §1 = 16.7 ms) with slack, not under it: with
+/// vsync on, a machine keeping up reports the refresh interval no matter how much
+/// GPU headroom it has, so a stricter threshold would simply never upgrade on a
+/// 60 Hz display. ~55 fps is the "we are already struggling, do not double the
+/// composite" line. The real protection against *starting* an unaffordable
+/// dissolve is the latch: dual-live begins, the frame time rises past this within
+/// a few frames, and the rest of the dissolve falls back to the frozen side.
+const DUAL_LIVE_BUDGET_MS: f32 = 18.0;
 
 /// The built scenes, each paired with the [`SystemKind`] it drives — the roster
 /// [`scenes::create_all`] returns. Addressed by kind, never by position, so a
@@ -220,6 +232,131 @@ impl ParamSmoother {
     }
 }
 
+/// Evaluate one preset's bindings into a composite side, an optional ink pass,
+/// and its scene. **Routing only** — nothing is encoded here, because the frame's
+/// destination is not known until ink's activity is (ADR-0032).
+///
+/// `ink` is `None` for a dual-live dissolve's outgoing side: there is one
+/// engine-wide ink pass and it belongs to the active preset, whose crossfade the
+/// caller applies afterwards. `ink_*` names then fall through to the scene, which
+/// ignores unknown params — the same silent drop every unknown name already gets.
+#[allow(clippy::too_many_arguments)]
+fn evaluate_preset(
+    preset: &Preset,
+    scene: &mut Box<dyn Scene>,
+    side: &mut CompositeSide,
+    ink: Option<&mut Ink>,
+    smoother: &mut ParamSmoother,
+    vars: &Variables,
+    frame: &AnalysisFrame,
+    time: f32,
+    dt: f32,
+) {
+    scene.set_time(time);
+    scene.advance(dt);
+    side.reset_params();
+    scene.reset_params();
+    let mut ink = ink;
+    for (index, binding) in preset.params.iter().enumerate() {
+        let raw = binding.expr.eval(vars);
+        // Ease the evaluated value on the injected real `dt` before applying it
+        // (ADR-0019). An unlisted param has `tau = 0` = no smoothing, so it passes
+        // through instantly; the expression layer above stays pure and
+        // allocation-free.
+        let tau = preset.smoothing.get(&binding.name).copied().unwrap_or(0.0);
+        let value = smoother.smooth(index, raw, tau, dt);
+        // First owner wins, in composite order: `bg_*` to the background pre-pass,
+        // then the post chain (`trails`, `kaleido_*`), then the terminal ink pass
+        // (`ink_*`/`paper_*`); everything else goes to the scene. The namespaces
+        // are disjoint, so no param reaches more than one.
+        if side.set_param(&binding.name, value) {
+            continue;
+        }
+        if ink
+            .as_mut()
+            .is_some_and(|ink| ink.set_param(&binding.name, value))
+        {
+            continue;
+        }
+        scene.set_param(&binding.name, value);
+    }
+    scene.update(frame);
+}
+
+/// Encode one preset's composite into `destination`: the backdrop pre-pass (which
+/// owns the clear), then the scene, then the chain folded down. Returns the draw
+/// calls. Call after [`evaluate_preset`] has routed this side's params.
+fn composite_into(
+    ctx: &RenderContext,
+    scene: &mut Box<dyn Scene>,
+    side: &mut CompositeSide,
+    encoder: &mut wgpu::CommandEncoder,
+    destination: &wgpu::TextureView,
+    surface: (u32, u32),
+) -> u32 {
+    let target = side.chain.begin(encoder, destination, surface);
+    side.background.render(&ctx.queue, encoder, &target.view);
+    // Hand the scene its target size before it renders: a scene with an internal
+    // accumulation field (the attractor's trails) sizes that field from here rather
+    // than a fixed grid (Plan 0027 Phase 2). A no-op for every other scene, and a
+    // cheap unchanged-compare for the attractor.
+    scene.set_target_size(target.size.0, target.size.1);
+    scene.render(&ctx.queue, encoder, &target.view, target.aspect);
+    // The backdrop and the scene, plus whatever the active chain stages encode on
+    // their way down.
+    2 + side
+        .chain
+        .resolve(&ctx.queue, encoder, destination, surface)
+}
+
+/// One preset's private composite: the background pre-pass it owns plus the post
+/// chain its look folds through.
+///
+/// Bundled because a dual-live dissolve needs **two**, with fully independent GPU
+/// state. That independence is not a nicety: `Queue::write_buffer` writes are
+/// applied before the submission's commands run, so two passes in one frame
+/// sharing one uniform buffer would *both* read the second write — the first
+/// side's backdrop would silently take the second side's `bg_*`. Two sides, two
+/// buffers, no ordering hazard. (Plan 0030 already proved the chain half of this
+/// with `post.rs::two_chains_against_one_device_accumulate_independently`.)
+///
+/// `Background` stays outside the [`PostChain`](post::PostChain) per ADR-0031 —
+/// it is a pre-pass that owns the frame clear — so the pairing lives here rather
+/// than in the chain.
+struct CompositeSide {
+    background: Background,
+    chain: PostChain,
+}
+
+impl CompositeSide {
+    fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+        Self {
+            background: Background::new(device, format),
+            chain: PostChain::new(device, format),
+        }
+    }
+
+    /// Reset every stage's params to their defaults (once per frame, before this
+    /// side's preset bindings are routed).
+    fn reset_params(&mut self) {
+        self.background.reset_params();
+        self.chain.reset_params();
+    }
+
+    /// Offer one named param to the backdrop, then the chain. **First owner
+    /// wins**; `false` means neither owns the name and the caller falls through.
+    fn set_param(&mut self, name: &str, value: f32) -> bool {
+        self.background.set_param(name, value) || self.chain.set_param(name, value)
+    }
+
+    /// Drop the lazily-built GPU resources (capture rebuild — keeps a headless
+    /// capture a pure function of its inputs, NFR §6).
+    fn reset_resources(&mut self) {
+        self.background.reset_resources();
+        self.chain.reset_resources();
+    }
+}
+
 /// How to build a headless [`Renderer`] for capture (Plan 0013).
 #[derive(Debug, Clone, Copy)]
 pub struct HeadlessOptions {
@@ -238,17 +375,21 @@ pub struct Renderer {
     ctx: RenderContext,
     /// Every built-in scene, keyed by the system it drives (see [`SceneRoster`]).
     scenes: SceneRoster,
-    /// The background pre-pass (ADR-0018): fills the frame with a gradient/vignette
-    /// backdrop before the scene draws. Driven by `bg_*` named params the renderer
-    /// routes to it; owns the frame clear now that scenes `Load` instead of `Clear`.
-    background: Background,
-    /// The **per-preset** post-composite stages the scene folds down through —
-    /// feedback trails then the screen-space kaleidoscope — in ADR-0018 order
-    /// behind one [`PostStage`](post::PostStage) seam (ADR-0031). Each is
-    /// individually skippable, so an unbound preset renders straight to the chain's
-    /// destination. One owned value, not two fields: a second chain with
-    /// independent GPU state is constructible from it (Plan 0023 dual-live).
-    chain: PostChain,
+    /// The active preset's composite — its `bg_*` backdrop pre-pass (ADR-0018,
+    /// which owns the frame clear now that scenes `Load` instead of `Clear`) and
+    /// the per-preset [`PostChain`] its trails and kaleidoscope fold through
+    /// (ADR-0018 order, ADR-0031 seam). Each stage is individually skippable, so an
+    /// unbound preset renders straight to the chain's destination.
+    ///
+    /// While a dissolve runs this side stays on the **outgoing** preset — which is
+    /// what keeps its trail accumulating across the dissolve instead of restarting
+    /// — and [`incoming_side`](Self::incoming_side) carries the new one.
+    side: CompositeSide,
+    /// The incoming preset's composite while a dissolve runs, `None` otherwise.
+    /// Created at the switch site and promoted to [`side`](Self::side) at finalize,
+    /// so there is no frame where both or neither is the live one, and no GPU state
+    /// is ever shared between the two presets.
+    incoming_side: Option<CompositeSide>,
     /// The terminal engine tone-remap (ADR-0028), outside the chain per ADR-0032:
     /// it remaps the **one** finished frame, so it must run after the transition
     /// blend of two per-preset composites. Skipped entirely at `ink_amount <= 0`,
@@ -284,6 +425,11 @@ pub struct Renderer {
     /// Per-parameter easing state (ADR-0019 / Phase 5), reset on every
     /// active-preset change and capture rebuild.
     param_smoother: ParamSmoother,
+    /// The **outgoing** preset's easing state during a dual-live dissolve. Moved
+    /// out of [`param_smoother`](Self::param_smoother) when the roster flips, so a
+    /// heavily-smoothed preset keeps easing through the dissolve instead of
+    /// snapping to raw values the moment it stops being active.
+    outgoing_smoother: ParamSmoother,
 }
 
 impl Renderer {
@@ -296,8 +442,7 @@ impl Renderer {
     ) -> Result<Self, RenderError> {
         let ctx = RenderContext::new(target, width, height)?;
         let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
-        let background = Background::new(&ctx.device, ctx.surface_format());
-        let chain = PostChain::new(&ctx.device, ctx.surface_format());
+        let side = CompositeSide::new(&ctx.device, ctx.surface_format());
         let ink = Ink::new(&ctx.device, ctx.surface_format());
         let blend = Blend::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
@@ -306,8 +451,8 @@ impl Renderer {
         let mut renderer = Self {
             ctx,
             scenes,
-            background,
-            chain,
+            side,
+            incoming_side: None,
             ink,
             blend,
             transition: None,
@@ -320,6 +465,7 @@ impl Renderer {
             text_layer,
             cap_overflow: None,
             param_smoother: ParamSmoother::default(),
+            outgoing_smoother: ParamSmoother::default(),
         };
         // Apply the initial preset's structural config (ADR-0007) so a line
         // scene at roster index 0 renders with its geometry built.
@@ -334,8 +480,7 @@ impl Renderer {
     pub fn new_headless(opts: HeadlessOptions) -> Result<Self, RenderError> {
         let ctx = RenderContext::new_headless(opts.width, opts.height, opts.prefer_software)?;
         let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
-        let background = Background::new(&ctx.device, ctx.surface_format());
-        let chain = PostChain::new(&ctx.device, ctx.surface_format());
+        let side = CompositeSide::new(&ctx.device, ctx.surface_format());
         let ink = Ink::new(&ctx.device, ctx.surface_format());
         let blend = Blend::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
@@ -344,8 +489,8 @@ impl Renderer {
         let mut renderer = Self {
             ctx,
             scenes,
-            background,
-            chain,
+            side,
+            incoming_side: None,
             ink,
             blend,
             transition: None,
@@ -358,6 +503,7 @@ impl Renderer {
             text_layer,
             cap_overflow: None,
             param_smoother: ParamSmoother::default(),
+            outgoing_smoother: ParamSmoother::default(),
         };
         // Apply the initial preset's structural config (ADR-0007) so a line
         // scene at roster index 0 renders with its geometry built.
@@ -387,8 +533,7 @@ impl Renderer {
         };
         let ctx = unsafe { RenderContext::new_unsafe(target, width, height) }?;
         let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
-        let background = Background::new(&ctx.device, ctx.surface_format());
-        let chain = PostChain::new(&ctx.device, ctx.surface_format());
+        let side = CompositeSide::new(&ctx.device, ctx.surface_format());
         let ink = Ink::new(&ctx.device, ctx.surface_format());
         let blend = Blend::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
@@ -397,8 +542,8 @@ impl Renderer {
         let mut renderer = Self {
             ctx,
             scenes,
-            background,
-            chain,
+            side,
+            incoming_side: None,
             ink,
             blend,
             transition: None,
@@ -411,6 +556,7 @@ impl Renderer {
             text_layer,
             cap_overflow: None,
             param_smoother: ParamSmoother::default(),
+            outgoing_smoother: ParamSmoother::default(),
         };
         // Apply the initial preset's structural config (ADR-0007) so a line
         // scene at roster index 0 renders with its geometry built.
@@ -470,14 +616,81 @@ impl Renderer {
         }
         // A switch arriving mid-dissolve snap-finishes the one in flight to its
         // own target before starting the new one, so the roster is never left on
-        // an index nobody asked for (Plan 0023 Phase 5 re-entrancy rule).
+        // an index nobody asked for (Plan 0023 Phase 5 re-entrancy rule). Its
+        // incoming side is promoted first: that preset became the active one, so
+        // its composite is the one the new dissolve's outgoing side must use.
         if let Some(running) = self.transition.take() {
-            self.roster.select(running.to_index());
+            self.roster.select(running.incoming_index());
+            self.promote_incoming_side();
         }
         let kind =
             TRANSITION_KIND.unwrap_or_else(|| TransitionKind::rotating(self.transitions_started));
         self.transitions_started = self.transitions_started.wrapping_add(1);
-        self.transition = Some(Transition::new(to, TRANSITION_DURATION_SECS, kind));
+        self.transition = Some(Transition::new(
+            from,
+            to,
+            TRANSITION_DURATION_SECS,
+            kind,
+            self.dissolve_mode(from, to),
+        ));
+        // The incoming preset gets its own backdrop + chain for the dissolve, so
+        // neither side can see the other's uniforms or feedback history. It is
+        // promoted to *the* side at finalize; until then `side` stays on the
+        // outgoing preset (see the field docs).
+        self.incoming_side = Some(CompositeSide::new(
+            &self.ctx.device,
+            self.ctx.surface_format(),
+        ));
+    }
+
+    /// The fidelity a dissolve from `from` to `to` may run at — ADR-0024's
+    /// adaptive governor, resolved once at the switch site.
+    ///
+    /// Dual-live needs both halves: two presets whose scenes hold **independent**
+    /// GPU state (not the same `SystemKind`, and not two of the three line scenes,
+    /// which share one renderer), and measured frame-time headroom. The decision
+    /// itself is the pure [`transition::dual_live_eligible`]; this only gathers its
+    /// two inputs.
+    fn dissolve_mode(&self, from: usize, to: usize) -> Mode {
+        let systems = (
+            self.roster.presets.get(from).map(|p| p.system),
+            self.roster.presets.get(to).map(|p| p.system),
+        );
+        let shares = match systems {
+            (Some(a), Some(b)) => scenes::shares_resources(a, b),
+            // A preset we cannot even resolve is not a pair we will render twice.
+            _ => true,
+        };
+        if transition::dual_live_eligible(
+            shares,
+            self.diag.stats().frame_ms_avg(),
+            DUAL_LIVE_BUDGET_MS,
+        ) {
+            Mode::DualLive
+        } else {
+            Mode::Freeze
+        }
+    }
+
+    /// Start a dissolve to `to` at a forced fidelity, bypassing the governor.
+    /// **Test-only** — see [`Transition::set_mode`] for why the GPU dual-live path
+    /// is otherwise unreachable from a headless test. No frontend calls this.
+    #[cfg(test)]
+    fn begin_transition_forced(&mut self, to: usize, mode: Mode) {
+        let from = self.roster.active;
+        self.begin_transition(from, to);
+        if let Some(tr) = self.transition.as_mut() {
+            tr.set_mode(mode);
+        }
+    }
+
+    /// Make the dissolve's incoming composite *the* composite, dropping the
+    /// outgoing one. Called at finalize (and when a switch snap-finishes another),
+    /// so there is never a frame with both live or neither.
+    fn promote_incoming_side(&mut self) {
+        if let Some(incoming) = self.incoming_side.take() {
+            self.side = incoming;
+        }
     }
 
     /// Jump straight to `index` with no dissolve — the escape hatch for paths
@@ -498,6 +711,10 @@ impl Renderer {
     /// the roster wherever it currently points. The caller decides the resolved
     /// index; this only tears down the blend.
     fn cancel_transition(&mut self) {
+        // The incoming side has been rendering the preset the roster now points at,
+        // so it is the one to keep — dropping it instead would restart that
+        // preset's feedback history mid-show.
+        self.promote_incoming_side();
         self.transition = None;
         self.blend.release_targets();
     }
@@ -730,8 +947,8 @@ impl Renderer {
         let Self {
             ctx,
             scenes,
-            background,
-            chain,
+            side,
+            incoming_side,
             ink,
             blend,
             transition,
@@ -744,6 +961,7 @@ impl Renderer {
             // Set at preset load, surfaced by the frontend — not a per-frame concern.
             cap_overflow: _,
             param_smoother,
+            outgoing_smoother,
             // Switch-site policy state (the kind rotation) — not a per-frame concern.
             transitions_started: _,
         } = self;
@@ -751,11 +969,9 @@ impl Renderer {
         let Some(preset) = roster.active_preset() else {
             return 0; // no presets loaded — nothing to draw
         };
-        let Some(scene) = scene_for_mut(scenes, preset.system) else {
-            return 0;
-        };
 
-        // Evaluate the preset's bindings into the system's named parameters.
+        // Evaluate against the shared clock and this frame's analysis. Both sides
+        // of a dissolve read the same variables — they differ in what they *bind*.
         let vars = Variables::new(
             frame.bass,
             frame.mid,
@@ -767,32 +983,6 @@ impl Renderer {
             frame.bpm,
             frame.novelty,
         );
-        scene.set_time(*time);
-        scene.advance(dt);
-        background.reset_params();
-        chain.reset_params();
-        ink.reset_params();
-        scene.reset_params();
-        for (index, binding) in preset.params.iter().enumerate() {
-            let raw = binding.expr.eval(&vars);
-            // Ease the evaluated value on the injected real `dt` before applying
-            // it (ADR-0019). An unlisted param has `tau = 0` = no smoothing, so it
-            // passes through instantly (today's behaviour); the expression layer
-            // above stays pure and allocation-free.
-            let tau = preset.smoothing.get(&binding.name).copied().unwrap_or(0.0);
-            let value = param_smoother.smooth(index, raw, tau, dt);
-            // First owner wins, in composite order: `bg_*` to the background
-            // pre-pass, then the post chain (`trails`, `kaleido_*`), then the
-            // terminal ink pass (`ink_*`/`paper_*`); everything else goes to the
-            // scene. The namespaces are disjoint, so no param reaches more than one.
-            if !background.set_param(&binding.name, value)
-                && !chain.set_param(&binding.name, value)
-                && !ink.set_param(&binding.name, value)
-            {
-                scene.set_param(&binding.name, value);
-            }
-        }
-        scene.update(frame);
 
         // Fixed-order composite (ADR-0018/0028/0032): background (owns the clear)
         // -> scene -> the per-preset post chain -> [blend] -> ink -> present. Where
@@ -800,10 +990,68 @@ impl Renderer {
         // business, not the renderer's — see `post.rs` for the order and the skip
         // rule. The blend and ink are engine-wide passes the renderer drives.
         let surface = (width, height);
+        let mut draw_calls = 0;
 
-        // A dissolve's progress, read *before* it advances at frame end. `None` is
-        // the ordinary path: no blend is encoded and no full-frame target exists.
-        let progress = transition.as_ref().map(Transition::progress);
+        // --- the outgoing side, while it is still animating (dual-live only) ---
+        //
+        // Encoded first because it feeds the blend, and driven through `side` —
+        // which has followed the outgoing preset since before the switch, so its
+        // trail keeps accumulating rather than restarting. Its target is the same
+        // texture the snapshot lives in: dual-live simply overwrites it each frame,
+        // so a latch to freeze holds the last live picture instead of jumping back
+        // to the one the dissolve opened on.
+        let dual_live = transition.as_ref().is_some_and(Transition::is_dual_live);
+        if dual_live {
+            let outgoing = transition
+                .as_ref()
+                .and_then(|tr| roster.presets.get(tr.outgoing_index()));
+            if let (Some(outgoing), Some(out_view)) = (outgoing, blend.snapshot_view(surface))
+                && let Some(out_scene) = scene_for_mut(scenes, outgoing.system)
+            {
+                // No ink: the outgoing side's `ink_*` were held at the capture
+                // frame and are crossfaded by the single engine-wide pass below.
+                evaluate_preset(
+                    outgoing,
+                    out_scene,
+                    side,
+                    None,
+                    outgoing_smoother,
+                    &vars,
+                    frame,
+                    *time,
+                    dt,
+                );
+                draw_calls += composite_into(ctx, out_scene, side, encoder, &out_view, surface);
+            }
+        }
+
+        // --- the active preset: the incoming side during a dissolve, the only
+        // side otherwise ---
+        //
+        // The opening frame is the exception that makes the whole scheme cheap: the
+        // roster still points at the *outgoing* preset there, so this one ordinary
+        // composite is the snapshot, and `side` is the right chain for it.
+        let live_side = match incoming_side.as_mut() {
+            Some(incoming) if !transition.as_ref().is_some_and(Transition::needs_snapshot) => {
+                incoming
+            }
+            _ => side,
+        };
+        let Some(scene) = scene_for_mut(scenes, preset.system) else {
+            return draw_calls;
+        };
+        ink.reset_params();
+        evaluate_preset(
+            preset,
+            scene,
+            live_side,
+            Some(ink),
+            param_smoother,
+            &vars,
+            frame,
+            *time,
+            dt,
+        );
 
         // Ink is one engine-wide pass over the *blended* frame (ADR-0028), but a
         // dissolve has two presets each binding their own `ink_*`/`paper_*`. Lerp
@@ -811,10 +1059,10 @@ impl Renderer {
         // exactly the outgoing look and `t = 1` exactly the incoming one, with no
         // snap at either end. On the capture frame the outgoing preset is still the
         // active one, so its values are already correct and nothing is held yet.
-        if let (Some(t), Some(from)) = (
-            progress,
-            transition.as_ref().and_then(Transition::outgoing_ink),
-        ) {
+        if let Some((from, t)) = transition
+            .as_ref()
+            .and_then(|tr| Some((tr.outgoing_ink()?, tr.progress())))
+        {
             ink.crossfade_from(from, t);
         }
 
@@ -829,12 +1077,11 @@ impl Renderer {
         };
         let terminal = ink_input.as_ref().unwrap_or(view);
 
-        // Where the chain resolves. While a dissolve runs the blend sits between
-        // the chain and ink, so the chain feeds one of the blend's two inputs: the
-        // frozen snapshot on the opening frame (the roster is still on the outgoing
-        // preset, so this one ordinary composite *is* the outgoing frame), the live
-        // side on every frame after. If the blend cannot build its targets, fall
-        // through to the terminal view — a cut, never a blend of undefined pixels.
+        // Where the active side resolves. While a dissolve runs the blend sits
+        // between the chain and ink, so it feeds one of the blend's two inputs: the
+        // outgoing target on the opening frame, the live target on every frame
+        // after. If the blend cannot build its targets, fall through to the terminal
+        // view — a cut, never a blend of undefined pixels.
         let blend_input = match transition.as_ref() {
             Some(tr) if tr.needs_snapshot() => blend.snapshot_view(surface),
             Some(_) => blend.live_view(surface),
@@ -842,24 +1089,12 @@ impl Renderer {
         };
         let destination = blend_input.as_ref().unwrap_or(terminal);
 
-        let target = chain.begin(encoder, destination, surface);
-        background.render(&ctx.queue, encoder, &target.view);
-        // Hand the scene its target size before it renders: a scene with an
-        // internal accumulation field (the attractor's trails) sizes that field
-        // from here rather than a fixed grid (Plan 0027 Phase 2). A no-op for
-        // every other scene, and a cheap unchanged-compare for the attractor.
-        scene.set_target_size(target.size.0, target.size.1);
-        scene.render(&ctx.queue, encoder, &target.view, target.aspect);
-
-        // Background + scene, plus whatever passes the active chain stages encode
-        // on their way down, plus the blend while a dissolve runs, plus ink's remap
-        // when it runs, plus the optional text and overlay passes below.
-        let mut draw_calls = 2 + chain.resolve(&ctx.queue, encoder, destination, surface);
+        draw_calls += composite_into(ctx, scene, live_side, encoder, destination, surface);
         if let (Some(tr), true) = (transition.as_ref(), blend_input.is_some()) {
-            // Mix the frozen outgoing side with the live incoming one into ink's
-            // input (or the surface). At t = 0 this is the snapshot exactly, which
-            // is what lets the opening frame present through the same pass before
-            // the live side has ever been rendered into.
+            // Mix the outgoing side with the live incoming one into ink's input (or
+            // the surface). At t = 0 this is the outgoing frame exactly, which is
+            // what lets the opening frame present through the same pass before the
+            // live side has ever been rendered into.
             draw_calls += blend.resolve(&ctx.queue, encoder, terminal, tr.progress(), tr.kind());
         }
         if ink_input.is_some() {
@@ -913,16 +1148,31 @@ impl Renderer {
             draw_calls += 1;
         }
 
+        // The budget governor, re-checked every frame a dual-live dissolve runs: on
+        // evidence of overload it latches to the frozen side for the remainder, so
+        // the mode can never flicker frame to frame (ADR-0024).
+        if let Some(tr) = transition.as_mut()
+            && dual_live
+            && transition::budget_blown(diag.stats().frame_ms_avg(), DUAL_LIVE_BUDGET_MS)
+        {
+            tr.latch_freeze();
+        }
+
         // Advance the dissolve now that the frame at the current `t` is encoded.
         // The capture frame hands back the index to flip the roster to, so the next
-        // frame composites the incoming preset live; a dissolve that has reached
-        // `t = 1` is dropped and its full-frame targets released. The borrows above
-        // all end here, so `self` is free again (NLL).
-        let flip_to = transition
+        // frame composites the incoming preset through its own side; a dissolve that
+        // has reached `t = 1` promotes that side and releases the blend's targets.
+        // The borrows above all end here, so `self` is free again (NLL).
+        let advanced = transition
             .as_mut()
             .map(|tr| (tr.advance(dt, captured_ink), tr.finished()));
-        if let Some((flip_to, finished)) = flip_to {
+        if let Some((flip_to, finished)) = advanced {
             if let Some(index) = flip_to {
+                // Hand the outgoing preset's easing state to the outgoing side
+                // before `configure_active_scene` resets the active one, so a
+                // heavily-smoothed preset keeps easing through a dual-live dissolve
+                // instead of snapping to raw values the frame it stops being active.
+                self.outgoing_smoother = std::mem::take(&mut self.param_smoother);
                 self.roster.select(index);
                 self.configure_active_scene();
             }
@@ -996,8 +1246,7 @@ impl Renderer {
         // differential probes (Phase 3) isolate the stimulus, not history.
         self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
         self.cancel_transition();
-        self.background.reset_resources();
-        self.chain.reset_resources();
+        self.side.reset_resources();
         self.ink.reset_resources();
         self.blend.reset_resources();
         self.time = 0.0;
@@ -1069,8 +1318,7 @@ impl Renderer {
 
         self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
         self.cancel_transition();
-        self.background.reset_resources();
-        self.chain.reset_resources();
+        self.side.reset_resources();
         self.ink.reset_resources();
         self.blend.reset_resources();
         self.time = 0.0;
@@ -1189,9 +1437,12 @@ mod tests {
     // path (`headless_or_skip` panics on an unexpected build error).
     #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
-    use super::{HeadlessOptions, ParamSmoother, RenderError, Renderer, Roster};
+    use super::{
+        CaptureImage, HeadlessOptions, Mode, ParamSmoother, RenderError, Renderer, Roster,
+    };
     use crate::dsp::AnalysisFrame;
     use crate::preset::Preset;
+    use crate::render::metrics::frame_diff;
 
     /// A minimal valid preset: a known system + explicit name, no params.
     fn preset(name: &str) -> Preset {
@@ -1593,6 +1844,200 @@ mod tests {
         assert_ne!(
             base.rgba, lit.rgba,
             "bound radial_offset/phase must change the rendered geometry"
+        );
+    }
+
+    // --- Plan 0023 Phase 4: the adaptive dual-live upgrade -------------------
+    //
+    // These live inside the crate rather than in `tests/transition.rs` because a
+    // headless capture cannot reach the dual-live path from outside: diagnostics
+    // are off, so the governor has no frame-time evidence and correctly answers
+    // `Freeze` every time. `begin_transition_forced` is the crate-private,
+    // `#[cfg(test)]` way in — the shipped API grows nothing.
+    //
+    // Both tests are **differential**: they run the *same* dissolve twice, with
+    // only the mode changed, so any difference is the live outgoing side and
+    // nothing else. That is stronger than a threshold on one run, which could pass
+    // on scene animation alone.
+
+    /// The outgoing preset — a rose that both **spins** and leaves a long trail, so
+    /// it has motion to show and cross-frame state to preserve.
+    ///
+    /// Spun **fast** and faded **slowly** on purpose: the accumulated smear has to
+    /// cover a lot more of the frame than one stroke does, or "the trail survived"
+    /// and "the trail restarted" differ by too little to assert. At this rate the
+    /// warm-up sweeps the rose through its whole symmetry period.
+    fn spinning_trailed_rose() -> Preset {
+        Preset::from_toml_str(
+            "system = \"parametric_curve\"\nname = \"DualA\"\n\
+             [curve]\nfamily = \"maurer_rose\"\n\
+             [params]\nn = \"3\"\nd = \"71\"\nsamples = \"300\"\nscale = \"0.85\"\n\
+             spin = \"6.0\"\ntrails = \"0.98\"\n",
+        )
+        .expect("valid spinning trailed rose")
+    }
+
+    /// The incoming preset — a fragment field, so the pair resolves to **different
+    /// scene objects** with independent GPU state (not two of the three line scenes
+    /// sharing one renderer), which is what dual-live requires.
+    fn moving_field() -> Preset {
+        Preset::from_toml_str(
+            "system = \"fragment_field\"\nname = \"DualB\"\n\
+             [params]\nwarp = \"0.5\"\nhue = \"0.2\"\nglow = \"0.9\"\n",
+        )
+        .expect("valid fragment field preset")
+    }
+
+    /// How many frames the outgoing preset renders before the switch — the length
+    /// of trail history the dissolve inherits. [`WARMED`] is well past the point
+    /// where the accumulation dominates the picture; [`COLD`] is the counterfactual
+    /// a restarted chain would look like.
+    const WARMED: usize = 60;
+    const COLD: usize = 1;
+
+    /// Capture one dissolve at a forced fidelity, after `warmup` frames of the
+    /// outgoing preset. Returns the dissolve window, opening frame first.
+    ///
+    /// `software` picks the adapter. **A trail's survival across the switch can
+    /// only be seen on real hardware**: on the DX12 WARP rasterizer, allocating the
+    /// dissolve's GPU resources mid-run (the blend's targets, the incoming side's
+    /// chain) resets what the trails feedback resolves to, so the outgoing side
+    /// comes back at a single stroke's brightness whether it has one frame of
+    /// history or thirty. That is the same coexisting-pipeline quirk
+    /// `trails.rs` documents and `tests/background_composite.rs` skips for; on
+    /// hardware the dissolve's opening frame is byte-identical to the ordinary
+    /// frame it replaces. Checks that only compare two dissolves against each other
+    /// stay on WARP, where they run in CI.
+    fn dissolve_at(
+        mode: Mode,
+        frames: usize,
+        warmup: usize,
+        software: bool,
+    ) -> Option<Vec<CaptureImage>> {
+        let mut renderer = headless_or_skip(HeadlessOptions {
+            width: 96,
+            height: 96,
+            prefer_software: software,
+        })?;
+        if !software && renderer.adapter_is_software() {
+            eprintln!(
+                "skipped: only a software rasterizer is available (WARP drops the \
+                 trails accumulation when the dissolve allocates; see dissolve_at)"
+            );
+            return None;
+        }
+        let stimulus = AnalysisFrame::default();
+        renderer.set_presets(vec![spinning_trailed_rose(), moving_field()]);
+        for _ in 0..warmup.max(1) {
+            renderer.capture_frame(&stimulus).expect("warm-up frame");
+        }
+        renderer.begin_transition_forced(1, mode);
+        Some(
+            (0..frames)
+                .map(|i| {
+                    renderer
+                        .capture_frame(&stimulus)
+                        .unwrap_or_else(|e| panic!("dissolve frame {i}: {e}"))
+                })
+                .collect(),
+        )
+    }
+
+    /// **Both visuals animate through a dual-live dissolve.** Same presets, same
+    /// `dt` sequence, same blend kind — only the fidelity differs, so any pixel
+    /// difference is the outgoing side still rendering.
+    ///
+    /// The opening frame must be *identical* in both modes: it is the outgoing
+    /// preset's own composite either way, before dual-live has anything extra to
+    /// do. That pins the assertion to the dissolve rather than to a warm-up drift.
+    #[test]
+    fn dual_live_keeps_the_outgoing_side_animating() {
+        const FRAMES: usize = 40;
+        let (Some(frozen), Some(live)) = (
+            dissolve_at(Mode::Freeze, FRAMES, WARMED, true),
+            dissolve_at(Mode::DualLive, FRAMES, WARMED, true),
+        ) else {
+            return; // no GPU adapter (ADR-0016)
+        };
+
+        assert_eq!(
+            frozen[0].rgba, live[0].rgba,
+            "the opening frame is the outgoing composite in either mode"
+        );
+
+        let mid = frame_diff(&frozen[FRAMES / 2], &live[FRAMES / 2]);
+        assert!(
+            mid > 0.01,
+            "mid-dissolve the outgoing side must still be moving, not held \
+             (freeze vs dual-live differ by only {mid})"
+        );
+    }
+
+    /// Mean Rec. 709 luminance in bytes — how much light a frame carries, which is
+    /// what a feedback trail adds and a restarted one would not.
+    fn mean_luma(img: &CaptureImage) -> f32 {
+        let sum: f32 = img
+            .rgba
+            .chunks_exact(4)
+            .map(|px| 0.2126 * px[0] as f32 + 0.7152 * px[1] as f32 + 0.0722 * px[2] as f32)
+            .sum();
+        sum / (img.rgba.len() / 4) as f32
+    }
+
+    /// **A dual-live dissolve out of a trails-on preset keeps that trail.** The
+    /// outgoing side re-renders through the composite it has been using all along,
+    /// so its accumulation carries into the dissolve instead of restarting.
+    ///
+    /// Measured as **brightness against the same dissolve run cold** — the
+    /// counterfactual of the bug. A restarted chain would enter the dissolve with a
+    /// single stroke's worth of light, which is exactly what the cold run has, so
+    /// the two would read alike; carrying thirty frames of decay-0.9 history makes
+    /// the warmed run several times brighter.
+    ///
+    /// The reference cannot be the frozen run at the same warm-up: freeze and
+    /// dual-live take the same opening frame through the same composite, so a bug
+    /// that restarted the chain at the switch would move both together and the
+    /// comparison would still pass. The cold run moves only with the trail history,
+    /// which is the claim.
+    ///
+    /// **Real hardware only** — WARP cannot show a trail surviving the dissolve's
+    /// allocations at all (see [`dissolve_at`]).
+    #[test]
+    fn a_dual_live_dissolve_carries_the_outgoing_trail() {
+        const FRAMES: usize = 4;
+        // Halfway between the two outcomes rather than close to either: a restarted
+        // chain reads 1.0x the cold run by construction, and the carried trail
+        // measures ~1.9x it on the dev box. The floor cannot go lower — the cold run
+        // still draws the same stroke this one does; only the swept history differs.
+        const CARRIES: f32 = 1.5;
+        let (Some(warmed), Some(cold), Some(frozen)) = (
+            dissolve_at(Mode::DualLive, FRAMES, WARMED, false),
+            dissolve_at(Mode::DualLive, FRAMES, COLD, false),
+            dissolve_at(Mode::Freeze, FRAMES, WARMED, false),
+        ) else {
+            return; // no adapter, or only a software one
+        };
+
+        let carries = |warm: &CaptureImage, restarted: &CaptureImage, what: &str| {
+            let (got, floor) = (mean_luma(warm), mean_luma(restarted));
+            assert!(
+                floor > 0.0 && got > CARRIES * floor,
+                "{what} must carry the outgoing preset's accumulated trail, not \
+                 restart from a fresh accumulation ({got} against {floor} for the \
+                 same dissolve run cold)"
+            );
+        };
+        // The opening frame is the outgoing preset's own composite...
+        carries(&warmed[0], &cold[0], "the dissolve's opening frame");
+        // ...and the first dual-live re-render — the frame the outgoing side is
+        // drawn a second time, at ~98% outgoing weight — must still carry it.
+        carries(&warmed[1], &cold[1], "the first dual-live frame");
+
+        // And it is genuinely re-rendering rather than reusing the held texture:
+        // the spin has moved the geometry even though the light is preserved.
+        assert!(
+            frame_diff(&frozen[1], &warmed[1]) > 0.0,
+            "the outgoing side re-renders; it does not reuse the snapshot"
         );
     }
 }
