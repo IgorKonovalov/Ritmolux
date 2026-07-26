@@ -160,9 +160,13 @@ impl PaletteConfig {
 /// frame. With no `[palette_b]`, `lut_b == lut_a`, so `palette_mix` is a no-op and
 /// a single-palette preset is unchanged. Sampled on the GPU (two 256×1 textures,
 /// lerped in-shader) and on the CPU (via [`sample`](Palette::sample)) from the
-/// same tables. `Copy` (two 3 KB arrays) so a scene holds its own copy for
-/// deferred upload.
-#[derive(Clone, Copy)]
+/// same tables.
+///
+/// **`Clone`, deliberately not `Copy`** (Plan 0031 Phase 6): the struct is 6144
+/// bytes (`[Rgb; 256]` twice), so `Copy` made any accidental by-value use a silent
+/// 6 KB memcpy. A scene still holds its own baked copy for deferred upload — it
+/// just has to say `.clone()` to get one.
+#[derive(Clone)]
 pub struct Palette {
     lut_a: [Rgb; LUT_SIZE],
     lut_b: [Rgb; LUT_SIZE],

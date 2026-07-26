@@ -233,6 +233,17 @@ pub(crate) struct SceneTarget {
     /// so a scene with an internal accumulation field matches its actual target
     /// instead of a fixed grid.
     pub size: (u32, u32),
+    /// **This frame's routing decision**, made once in [`PostChain::begin`] and
+    /// handed back so [`PostChain::resolve`] consumes it rather than recomputing
+    /// it (Plan 0031 Phase 6, closing Plan 0030's close-review minor 1).
+    ///
+    /// The two used to call `routing()` independently. That was correct only
+    /// because no stage's [`active`](PostStage::active) changes between them —
+    /// a whole frame's correctness resting on an incidental property. Threading
+    /// the value through makes "one routing decision per frame" structural: there
+    /// is no way to call `resolve` without the `Routing` `begin` produced.
+    /// `Routing` is `Copy` and fixed-size, so this costs nothing.
+    pub routing: Routing,
 }
 
 /// The per-preset post-composite stages in ADR-0018 order — see the module docs.
@@ -351,6 +362,7 @@ impl PostChain {
             view,
             aspect: size.0 as f32 / size.1.max(1) as f32,
             size,
+            routing,
         }
     }
 
@@ -358,14 +370,17 @@ impl PostChain {
     /// stage's input, the last into `destination` (the same caller-supplied view
     /// [`begin`](Self::begin) took). Returns the total draw calls the stages
     /// encoded. Call once, after the scene has rendered into `begin`'s target.
+    ///
+    /// `routing` is the [`SceneTarget::routing`] `begin` produced — passed in, not
+    /// recomputed, so the frame folds down exactly the stages it opened.
     pub(crate) fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
+        routing: Routing,
         destination: &wgpu::TextureView,
         surface: (u32, u32),
     ) -> u32 {
-        let routing = self.routing();
         let mut draw_calls = 0;
         for (stage, next_stage) in routing.edges() {
             // The next active stage's input, built lazily right before anything
@@ -578,7 +593,7 @@ mod tests {
             capture::record_clear(&mut encoder, &view);
             let target = chain.begin(&mut encoder, &view, size);
             background.render(&ctx.queue, &mut encoder, &target.view);
-            chain.resolve(&ctx.queue, &mut encoder, &view, size);
+            chain.resolve(&ctx.queue, &mut encoder, target.routing, &view, size);
             ctx.queue.submit(std::iter::once(encoder.finish()));
         }
 

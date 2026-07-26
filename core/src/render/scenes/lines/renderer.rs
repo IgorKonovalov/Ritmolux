@@ -240,7 +240,7 @@ impl LineRenderer {
     /// Draw `segments` as thick glowing quads at the given `aspect` and `glow`
     /// multiplier, under the shared `xform` camera transform (zoom/pan, ADR-0018),
     /// **loading** over the engine backdrop rather than clearing (Plan 0018 Phase
-    /// 3 — the background pass owns the clear). Segments beyond [`capacity`] are
+    /// 3 — the background pass owns the clear). Segments beyond `capacity` are
     /// dropped defensively (the scene is responsible for capping at load).
     #[allow(
         clippy::too_many_arguments,

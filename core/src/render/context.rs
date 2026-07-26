@@ -161,7 +161,7 @@ impl RenderContext {
     /// adapter (WARP on DX12) so tests rasterize identically on any machine.
     ///
     /// The synthesized [`wgpu::SurfaceConfiguration`] carries only the render
-    /// size and the offscreen format ([`HEADLESS_FORMAT`]); its present-related
+    /// size and the offscreen format (`HEADLESS_FORMAT`); its present-related
     /// fields are inert with no surface to configure.
     pub fn new_headless(
         width: u32,

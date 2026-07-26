@@ -234,16 +234,18 @@ impl Scene for ParametricCurveScene {
         // un-mirrored preset is unchanged.
         match self.family {
             CurveFamily::MaurerRose => curves::maurer_rose(
-                self.n,
-                self.d,
-                self.phase,
-                samples,
-                self.scale,
-                self.radial_offset,
-                rotation,
-                self.draw_progress,
-                color,
-                width,
+                curves::RoseParams {
+                    n: self.n,
+                    d: self.d,
+                    phase: self.phase,
+                    radial_offset: self.radial_offset,
+                    samples,
+                    scale: self.scale,
+                    rotation,
+                    draw_progress: self.draw_progress,
+                    color,
+                    width,
+                },
                 &mut self.single_buf,
             ),
         }

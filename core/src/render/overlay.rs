@@ -5,7 +5,7 @@
 //! Everything is drawn as solid-color quads through one instanced pipeline —
 //! the same instanced-quad pattern the scenes use — so there is no new
 //! dependency and no texture: even the digits are quads, one per lit font pixel
-//! (see [`super::overlay_font`]). The pass loads (does not clear) the scene, so
+//! (see `overlay_font`). The pass loads (does not clear) the scene, so
 //! it truly composites on top; when the overlay flag is off the renderer skips
 //! this pass entirely (no transparent draw), so a live show pays nothing.
 

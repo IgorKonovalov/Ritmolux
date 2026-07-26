@@ -35,6 +35,14 @@ pub use parametric::ParametricCurveScene;
 pub use renderer::{LineRenderer, SegmentInstance};
 pub use star::StarPatternScene;
 
+/// The shared structural-config and cap-overflow types now live one level up, in
+/// [`scenes`](super) — every scene family can see them there without the line
+/// module having to reach sideways into `particles` for an attractor variant
+/// (Plan 0031 Phase 6, closing Plan 0016's close-review minor 2). Re-exported
+/// here because the sibling line scenes and the preset schema name them through
+/// this path.
+pub use super::{CapOverflow, GeneratorConfig, OverflowContext};
+
 /// Fixed segment-buffer capacity for every line scene, tuned to the iGPU floor
 /// (ADR-0007 Risks: ~20k). A curve's `samples` and a generator's structure are
 /// both clamped to this, and any drop is surfaced at load — never a silent cut.
@@ -99,106 +107,6 @@ impl CurveFamily {
             "maurer_rose" => CurveFamily::MaurerRose,
             _ => return None,
         })
-    }
-}
-
-/// Declarative structural config a scene consumes once at preset load
-/// (ADR-0007): **not** expressions — the family / grammar / tiling the sampler
-/// or generator builds from. Delivered through the optional
-/// [`Scene::configure`](super::Scene::configure) hook, off the hot path. This is
-/// the shared structural-config enum for every scene that has one: the line
-/// scenes' curve/L-system/star variants, plus the compute-particle attractor
-/// family (Plan 0016) — it is not line-specific despite living here.
-#[derive(Debug, Clone)]
-pub enum GeneratorConfig {
-    /// A parametric curve: which family to sample.
-    Curve {
-        /// The curve family (Maurer rose, ...).
-        family: CurveFamily,
-    },
-    /// An L-system: a grammar the generator expands and turtle-walks at load,
-    /// caching one segment buffer per depth.
-    LSystem {
-        /// The starting string.
-        axiom: String,
-        /// Production rules `(predecessor, successor)`.
-        rules: Vec<(char, String)>,
-        /// Turn angle in degrees for `+`/`-`.
-        angle_deg: f32,
-        /// Iterations to precompute (`1..=max_depth`), clamped to
-        /// [`MAX_LSYSTEM_DEPTH`] at load.
-        max_depth: u32,
-        /// Reserved seed for future stochastic rules; deterministic today.
-        seed: u64,
-    },
-    /// A Hankin star pattern: an `n`-fold star rosette built at load, with a few
-    /// contact-angle variants a beat can switch between.
-    Star {
-        /// Star order `n` (from the tiling), e.g. 6 or 12.
-        order: u32,
-        /// Contact angle in degrees; variants are precomputed around it.
-        contact_angle_deg: f32,
-    },
-    /// A GPU compute-particle attractor (Plan 0016): which strange-attractor map
-    /// the compute step iterates. Not a line scene — reuses this shared enum so
-    /// the family rides the existing `configure` hook (no new trait method).
-    Particles {
-        /// The attractor family (De Jong, Clifford, Thomas, Lorenz).
-        family: super::particles::AttractorFamily,
-    },
-}
-
-/// Which construction hit the [`MAX_SEGMENTS`] cap, for the surfaced message.
-///
-/// An enum rather than a `String` because one of the two producers is **per
-/// frame**: an audio-driven `mirror_order` sitting over the cap used to build a
-/// fresh `format!("mirror x{order}")` on every single frame for as long as it
-/// stayed there — a heap allocation on the hot path (Plan 0031 Phase 4). The
-/// formatting now happens only in [`Display`](std::fmt::Display), i.e. only when
-/// something actually prints it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OverflowContext {
-    /// An N-fold geometry mirror replicated past the cap — per frame, from the
-    /// `mirror_order` param (Plan 0018 Phase 4).
-    Mirror(u32),
-    /// An L-system depth expanded past the cap — once, at preset load.
-    Depth(u32),
-}
-
-impl std::fmt::Display for OverflowContext {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // These two renderings are the user-visible text ADR-0007 requires stay
-        // informative; the shell prints them verbatim. Do not reword them
-        // without meaning to change what an operator sees.
-        match self {
-            OverflowContext::Mirror(order) => write!(f, "mirror x{order}"),
-            OverflowContext::Depth(depth) => write!(f, "depth {depth}"),
-        }
-    }
-}
-
-/// Reported when building a line scene's geometry hit the fixed [`MAX_SEGMENTS`]
-/// cap and truncated. The cap must never be a silent cut (ADR-0007 Risks), so it
-/// travels to the frontend two ways: out of
-/// [`Scene::configure`](super::super::Scene::configure) at preset load, and off
-/// [`Scene::mirror_overflow`](super::super::Scene::mirror_overflow) for the
-/// per-frame mirror. `None` is the normal case where geometry fit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CapOverflow {
-    /// How many draw segments were dropped at the cap.
-    pub dropped: usize,
-    /// Where the drop happened, for the surfaced message.
-    pub context: OverflowContext,
-}
-
-impl std::fmt::Display for CapOverflow {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "geometry exceeded the {}-segment cap at {} (dropped {} segment(s)); \
-             reduce the structure or its depth",
-            MAX_SEGMENTS, self.context, self.dropped
-        )
     }
 }
 

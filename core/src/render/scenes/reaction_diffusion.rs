@@ -13,7 +13,7 @@
 //!
 //! **GPU resources are built lazily, on first render.** The scene stores a
 //! device handle and constructs its pipelines/textures only when it is first
-//! drawn (see [`Resources`]). This keeps the resources off the device until the
+//! drawn (see `Resources`). This keeps the resources off the device until the
 //! scene is actually shown, and — importantly — lets the headless capture tests
 //! build the full roster on the DX12 WARP software adapter: WARP mis-renders the
 //! pre-existing fragment-field pipeline once this scene's *full* set of feedback
@@ -729,7 +729,7 @@ impl Scene for ReactionDiffusionScene {
     fn set_palette(&mut self, palette: &Palette) {
         // Uploaded to the present LUT textures in `render` (deferred — resources
         // build lazily on first render). Cheap array copy, off the hot path.
-        self.palette = *palette;
+        self.palette = palette.clone();
         self.palette_dirty = true;
     }
 
@@ -916,8 +916,12 @@ impl Scene for ReactionDiffusionScene {
                 depth_slice: None,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    // Load over the engine backdrop (ADR-0018); this present is a
-                    // fullscreen opaque pass, so it covers the backdrop as before.
+                    // Load over the engine backdrop (ADR-0018). The present is
+                    // **not** opaque: since Plan 0025 it writes premultiplied
+                    // alpha, with the V-field's `structure` term as coverage, so
+                    // the coral's voids reveal the `bg_*` gradient underneath.
+                    // Over the default black backdrop that equals the old opaque
+                    // REPLACE, which is why the golden did not move.
                     load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,
                 },

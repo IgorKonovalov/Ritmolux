@@ -28,9 +28,9 @@
 //! unperturbed).
 //!
 //! The accumulation field is sized to the render target and capped (Plan 0027
-//! Phase 2, [`TRAIL_MAX_W`]/[`TRAIL_MAX_H`]) rather than fixed at 640x360, so the
+//! Phase 2, `TRAIL_MAX_W`/`TRAIL_MAX_H`) rather than fixed at 640x360, so the
 //! present is close to 1:1 up to the cap instead of a soft upscale on a 1080p+
-//! display. That size is quantized to [`TRAIL_GRID_STEP`], so a live window drag
+//! display. That size is quantized to `TRAIL_GRID_STEP`, so a live window drag
 //! re-allocates the field a handful of times rather than once per frame.
 //!
 //! **The field's own aspect is not the projection's** (Plan 0029 Phase 5). The
@@ -106,7 +106,7 @@ const TRAIL_GRID_STEP: u32 = 256;
 ///
 /// Pure, and the whole size policy in one place (Plan 0029 Phase 2): scale both
 /// axes by a **single** factor when either exceeds its cap, then round each up to
-/// [`TRAIL_GRID_STEP`]. The single factor is what keeps an ultrawide target's
+/// `TRAIL_GRID_STEP`. The single factor is what keeps an ultrawide target's
 /// proportions — clamping each axis independently turned a 3440x1440 target into
 /// a 16:9 grid that the aspect-ignoring present then stretched back to 21:9, so
 /// the attractor's shape changed discontinuously as the window crossed 2560 wide.
@@ -137,7 +137,7 @@ pub fn trail_grid_size(width: u32, height: u32) -> (u32, u32) {
     )
 }
 
-/// Round one axis up to the next [`TRAIL_GRID_STEP`] multiple, floored at one
+/// Round one axis up to the next `TRAIL_GRID_STEP` multiple, floored at one
 /// step (never 0) and clamped back under `cap` — the round-up can overshoot on an
 /// axis sitting at the cap.
 fn quantize_axis(px: u32, cap: u32) -> u32 {
@@ -1232,7 +1232,7 @@ impl Scene for AttractorScene {
     fn set_palette(&mut self, palette: &Palette) {
         // Uploaded to the draw LUT textures in `render` (deferred — resources build
         // lazily on first render). Cheap array copy, off the hot path.
-        self.palette = *palette;
+        self.palette = palette.clone();
         self.palette_dirty = true;
     }
 

@@ -18,7 +18,7 @@ use diaglog::DiagLog;
 use director::Director;
 use lmv_core::audio::{AudioFormat, SampleConsumer};
 use lmv_core::dsp::Analyzer;
-use lmv_core::render::{Renderer, TextRun};
+use lmv_core::render::{CapOverflow, Renderer, TextRun};
 use overlay::{OverlayAction, OverlayKey, OverlayState};
 use soak::SoakLog;
 use standalone::{APP_DIR_NAME, PRESET_DIR_ENV, PresetDir, preset_data_root, resolve_preset_dir};
@@ -121,6 +121,16 @@ struct AppState {
     /// preset's structural config is applied at the flip. ADR-0007 says the cap is
     /// never a silent cut, so the check waits for the frame that makes it real.
     pending_switch_settle: bool,
+    /// The segment-cap truncation already announced on stderr, so
+    /// [`poll_cap_overflow`](AppState::poll_cap_overflow) reports the **transition**
+    /// rather than the state (Plan 0031 Phase 6).
+    ///
+    /// The load-time half of the cap (an oversized L-system depth) is announced by
+    /// [`warn_cap_overflow`] when the preset changes. The **per-frame** half — a
+    /// geometry mirror an audio expression drives over the cap — was tracked by the
+    /// core and never reported, because the only reader ran on a preset change.
+    /// This field is what lets the frame loop report it without shouting.
+    reported_overflow: Option<CapOverflow>,
 }
 
 /// Narrow alias so the non-Windows build (no capture until Phase 9) compiles
@@ -172,6 +182,7 @@ impl AppState {
             reason = "preset-poll start; wall-clock pacing lives in the shell, not core analysis"
         )]
         let start = Instant::now();
+        let renderer_overflow = renderer.cap_overflow().copied();
         Self {
             window,
             renderer,
@@ -192,6 +203,9 @@ impl AppState {
             soak: soak_path.map(SoakLog::new),
             last_click: None,
             pending_switch_settle: false,
+            // Seeded from what `reload_presets` already printed above, so the
+            // frame loop does not re-announce the startup preset's truncation.
+            reported_overflow: renderer_overflow,
             config,
             config_path,
             display_index,
@@ -254,6 +268,39 @@ impl AppState {
         self.window.request_redraw();
     }
 
+    /// Report a **live** segment-cap truncation on entry, and its clearing once —
+    /// never per frame.
+    ///
+    /// `Renderer::cap_overflow` covers both producers: the load-time L-system
+    /// depth, which [`warn_cap_overflow`] already announces on a preset change,
+    /// and the per-frame geometry mirror, which an audio-driven `mirror_order` can
+    /// push over the cap at any moment. That second half was tracked by the core
+    /// and never surfaced, because nothing read it between preset changes — the
+    /// silent cut ADR-0007 forbids.
+    ///
+    /// **Edge-triggered on purpose.** `eprintln!` is file I/O on the render
+    /// thread; doing it every frame for as long as a bound expression sits over
+    /// the cap would be a worse bug than the gap it closes. The comparison is on
+    /// *presence*, not on the dropped count, so a mirror order sweeping over the
+    /// cap prints once rather than on every change of magnitude.
+    fn poll_cap_overflow(&mut self) {
+        let current = self.renderer.cap_overflow().copied();
+        match (&self.reported_overflow, &current) {
+            (None, Some(overflow)) => {
+                eprintln!("preset '{}': {overflow}", self.renderer.preset_name());
+            }
+            (Some(_), None) => {
+                eprintln!(
+                    "preset '{}': geometry is back within the segment cap",
+                    self.renderer.preset_name()
+                );
+            }
+            // Still over (whatever the count now is), or still fine: say nothing.
+            _ => {}
+        }
+        self.reported_overflow = current;
+    }
+
     /// Re-scan the preset directory if the poll interval has elapsed and its
     /// signature changed, hot-reloading on any edit. Keeps the current set if
     /// the reload yields nothing valid (degrade, never crash — NFR 10).
@@ -272,6 +319,9 @@ impl AppState {
         }
         self.preset_sig = sig;
         reload_presets(&mut self.renderer, &self.preset_dir);
+        // `reload_presets` announced any truncation itself; re-baseline so the
+        // frame loop reports only what changes from here.
+        self.reported_overflow = self.renderer.cap_overflow().copied();
         // Keep the browse overlay's highlight valid if the roster just changed
         // shape under it (re-clamp; the open state and filter are preserved).
         let names = self.roster_names();
@@ -339,8 +389,12 @@ impl AppState {
         // `pending_switch_settle`).
         if std::mem::take(&mut self.pending_switch_settle) {
             warn_cap_overflow(&self.renderer);
+            self.reported_overflow = self.renderer.cap_overflow().copied();
             self.update_title();
         }
+        // The *live* half: a per-frame geometry-mirror overflow, which no
+        // preset-change hook can see (ADR-0007 -- never a silent cut).
+        self.poll_cap_overflow();
         self.title_tick += 1;
         if self.title_tick >= TITLE_UPDATE_FRAMES {
             self.title_tick = 0;
