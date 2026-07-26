@@ -129,6 +129,33 @@ background pass (`bg_*`), feedback `trails`, the screen-space kaleidoscope
 (`kaleido_*`), and the final ink-on-paper remap (`ink_*` / `paper_*`). Those are
 documented under [Engine-wide controls](../presets/README.md#engine-wide-controls-plan-0018).
 
+They run in a fixed order, which is worth knowing when a look does not compose the
+way you expect:
+
+```
+background -> scene -> post chain (trails -> kaleidoscope) -> [transition blend] -> ink -> present
+```
+
+Everything up to and including the post chain is **per preset** — during a dissolve
+each side composites its own, independently. The blend and the ink remap are
+**engine-wide**: one pass each, over the frame both presets produced.
+
+### Transitions between presets
+
+A preset switch dissolves rather than cuts (ADR-0024 / ADR-0032). Nothing about it
+is preset-authored today — duration and blend kind are engine policy in code — but
+two consequences reach your file:
+
+- **Your preset renders live from the dissolve's second frame.** It is composited
+  through its own background + post chain the whole way, so a `trails` accumulation
+  starts from empty at the switch, not from the outgoing preset's history.
+- **`ink_*` / `paper_*` crossfade.** There is one ink pass for the blended frame, so
+  its params travel from the outgoing preset's values to yours across the dissolve.
+  A preset whose look *depends* on ink reaches it about a second after the switch.
+
+Per-preset `[transition]` declarations are a deliberate follow-up, not a gap you can
+work around from the TOML.
+
 ---
 
 ## The expression language

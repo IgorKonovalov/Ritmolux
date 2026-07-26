@@ -719,11 +719,15 @@ impl Renderer {
         self.blend.release_targets();
     }
 
-    /// Restart the kind rotation. An **explicit** jump — an operator picking a
-    /// preset by index or name, or a roster hot-reload — is the start of a new
-    /// stretch of show, so the next dissolve begins the library again rather than
-    /// resuming wherever the last auto-rotate left off. It also makes a scripted
-    /// sequence of switches reproduce the same kinds from a known starting point.
+    /// Restart the kind rotation. A **cut** — a roster hot-reload, a capture, or
+    /// the [`select_preset_now`](Self::select_preset_now) escape — is the start of
+    /// a new stretch of show, so the next dissolve begins the library again rather
+    /// than resuming wherever the last one left off, and a scripted sequence of
+    /// switches reproduces the same kinds from a known starting point.
+    ///
+    /// A *dissolving* switch does not reset it: the rotation is what gives a live
+    /// show its variety, and restarting it on every browse-select would pin every
+    /// hand-picked switch to the library's first kind.
     fn reset_transition_rotation(&mut self) {
         self.transitions_started = 0;
     }
@@ -734,25 +738,61 @@ impl Renderer {
         self.roster.names()
     }
 
-    /// Jump to the preset at `index` (its absolute position in
-    /// [`preset_names`](Self::preset_names)); returns the now-active name. An
-    /// out-of-range `index` is a no-op (never a panic, never a wrap), so a stale
-    /// index from a shrunk hot-reloaded roster is harmless.
+    /// Switch to the preset at `index` (its absolute position in
+    /// [`preset_names`](Self::preset_names)); returns the incoming name. Like
+    /// [`cycle_preset`](Self::cycle_preset) this **dissolves** rather than cuts
+    /// (Plan 0023 Phase 5) — the browse overlay's select is a switch the operator
+    /// watches, so it gets the same treatment as Space. An out-of-range `index` is
+    /// a no-op (never a panic, never a wrap), so a stale index from a shrunk
+    /// hot-reloaded roster is harmless.
+    ///
+    /// Use [`select_preset_now`](Self::select_preset_now) where a blend would be
+    /// wrong rather than merely unwanted.
     pub fn select_preset(&mut self, index: usize) -> &str {
+        let from = self.roster.active;
+        self.begin_transition(from, index);
+        // A dissolve has not flipped the roster yet — the opening frame still
+        // composites the outgoing preset — so name the incoming one by index, as
+        // `cycle_preset` does. `begin_transition` cuts instantly when the index is
+        // out of range or already active, and then the roster *is* the answer.
+        match self.transition.as_ref().map(Transition::incoming_index) {
+            Some(to) => self
+                .roster
+                .presets
+                .get(to)
+                .map_or("no presets", |p| &p.name),
+            None => self.preset_name(),
+        }
+    }
+
+    /// Jump to the preset at `index` with **no dissolve** — the instant-cut escape
+    /// for paths where a blend is wrong rather than unwanted: a capture, which must
+    /// stay a pure function of its inputs (NFR §6), or a test placing the roster on
+    /// a known preset before measuring. Returns the now-active name; an
+    /// out-of-range `index` is a no-op.
+    pub fn select_preset_now(&mut self, index: usize) -> &str {
         self.select_preset_instantly(index);
         self.preset_name()
     }
 
-    /// Make the preset named `name` active, returning whether it was found. A
-    /// by-name lookup layered over [`preset_names`](Self::preset_names) +
-    /// index-based [`select_preset`](Self::select_preset) (Plan 0013 capture
-    /// tooling — distinct from 0008's by-index selection). An unknown name
-    /// leaves the active preset unchanged.
+    /// Make the preset named `name` active, returning whether it was found — the
+    /// by-name form of [`select_preset`](Self::select_preset), and like it a
+    /// **dissolve**. An unknown name leaves the active preset unchanged.
     pub fn select_preset_by_name(&mut self, name: &str) -> bool {
         let Some(index) = self.preset_names().position(|n| n == name) else {
             return false;
         };
         self.select_preset(index);
+        true
+    }
+
+    /// The instant-cut form of [`select_preset_by_name`](Self::select_preset_by_name),
+    /// used by the capture entry points below.
+    fn select_preset_by_name_now(&mut self, name: &str) -> bool {
+        let Some(index) = self.preset_names().position(|n| n == name) else {
+            return false;
+        };
+        self.select_preset_instantly(index);
         true
     }
 
@@ -1238,7 +1278,7 @@ impl Renderer {
         frame: &AnalysisFrame,
         frames: u32,
     ) -> Result<CaptureImage, RenderError> {
-        if !self.select_preset_by_name(name) {
+        if !self.select_preset_by_name_now(name) {
             return Err(RenderError::UnknownPreset(name.to_string()));
         }
         // Reset simulation state to the deterministic seed and the clock to 0,
@@ -1311,7 +1351,7 @@ impl Renderer {
         format: AudioFormat,
         at_frames: &[u32],
     ) -> Result<Vec<CaptureImage>, RenderError> {
-        if !self.select_preset_by_name(name) {
+        if !self.select_preset_by_name_now(name) {
             return Err(RenderError::UnknownPreset(name.to_string()));
         }
         let mut analyzer = crate::dsp::Analyzer::new(format).map_err(RenderError::AudioFormat)?;

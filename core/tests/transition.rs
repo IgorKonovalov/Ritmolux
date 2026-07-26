@@ -226,7 +226,7 @@ fn region_progress(
 /// **The whole transition library, one kind per dissolve** (Plan 0023 Phase 3).
 ///
 /// The engine policy rotates deterministically over `TransitionKind::LIBRARY`,
-/// and an explicit `select_preset` restarts that rotation — so four consecutive
+/// and an explicit `select_preset_now` restarts that rotation — so four consecutive
 /// cycles from a fresh selection are exactly crossfade, add/burn, luma-dissolve,
 /// wipe, in that order. Each is asserted on the property that **distinguishes**
 /// it, not merely on "something changed":
@@ -247,7 +247,7 @@ fn each_kind_renders_its_own_dissolve() {
     };
     let frame = AnalysisFrame::default();
     renderer.set_presets(static_pair());
-    renderer.select_preset(0); // restarts the kind rotation at the library's head
+    renderer.select_preset_now(0); // restarts the kind rotation at the library's head
     capture_run(&mut renderer, &frame, 5);
 
     let windows: Vec<Window> = (0..4)
@@ -349,7 +349,7 @@ fn an_additive_family_dissolve_stays_clean() {
     let mut roster = static_pair();
     roster.insert(0, field);
     renderer.set_presets(roster);
-    renderer.select_preset(0);
+    renderer.select_preset_now(0);
     capture_run(&mut renderer, &frame, 5);
 
     let window = dissolve_once(&mut renderer, &frame);
@@ -458,7 +458,7 @@ fn a_dissolve_is_reproducible_from_the_injected_dt() {
 
     let mut run = || {
         renderer.set_presets(static_pair());
-        renderer.select_preset(0);
+        renderer.select_preset_now(0);
         capture_run(&mut renderer, &frame, 5);
         renderer.cycle_preset();
         capture_run(&mut renderer, &frame, 20)
@@ -569,14 +569,14 @@ fn a_finished_dissolve_leaves_no_trace_on_later_frames() {
 
     // Reference: preset 1, reached by an instant select, settled.
     renderer.set_presets(static_pair());
-    renderer.select_preset(1);
+    renderer.select_preset_now(1);
     let reference = capture_run(&mut renderer, &frame, 8);
 
     // Same preset, same clock steps — but reached through a full dissolve that
     // has since finished. `capture_preset` resets the clock and scene state, so
     // both runs start from the same seed.
     renderer.set_presets(static_pair());
-    renderer.select_preset(0);
+    renderer.select_preset_now(0);
     renderer.cycle_preset();
     // Run past the end of the dissolve, then settle for the same 8 steps.
     capture_run(&mut renderer, &frame, DISSOLVE_FRAMES + 2);
@@ -663,5 +663,171 @@ fn the_heavy_pair_dissolves_on_the_freeze_fallback() {
         renderer.preset_name(),
         "HeavyB",
         "the heavy dissolve still finalizes on its target"
+    );
+}
+
+/// A third static preset, so a switch can arrive *during* a dissolve and land
+/// somewhere neither of its two sides was heading. Static means static: no `time`
+/// in any binding **and** no scene that animates on its own clock, or two runs
+/// reaching the same preset by different routes would not be comparable.
+fn static_trio() -> Vec<Preset> {
+    let mut roster = static_pair();
+    roster.push(
+        Preset::from_toml_str(
+            "system = \"star_pattern\"\nname = \"TransC\"\n\
+             [generator]\ntiling = \"8\"\ncontact_angle_deg = 55\n\
+             [params]\nvariant = \"0\"\nrotation = \"0\"\nhue = \"0.15\"\n\
+             draw_progress = \"1\"\nthickness = \"3\"\nscale = \"0.6\"\nbrightness = \"1\"\n",
+        )
+        .expect("valid static third preset"),
+    );
+    roster
+}
+
+/// **Selecting a preset dissolves too** (Plan 0023 Phase 5), so the browse
+/// overlay's pick reads like Space rather than like a cut. Asserted on the shape
+/// of the sequence — a ramp away from the outgoing look — which is exactly what a
+/// hard cut cannot produce.
+///
+/// `select_preset_now` is the escape that still cuts; the last assertion pins
+/// that the two really are different paths.
+#[test]
+fn selecting_a_preset_dissolves_like_a_cycle() {
+    let Some(mut renderer) = headless_or_skip() else {
+        return;
+    };
+    let frame = AnalysisFrame::default();
+    renderer.set_presets(static_pair());
+    renderer.select_preset_now(0);
+    capture_run(&mut renderer, &frame, 5);
+
+    assert_eq!(
+        renderer.select_preset(1),
+        "TransB",
+        "the returned name is where the show is going, not where it has been"
+    );
+    let window = capture_run(&mut renderer, &frame, DISSOLVE_FRAMES);
+    maybe_write_strip(&window, 6, "select-dissolve");
+
+    let first = window.first().expect("a non-empty dissolve window");
+    let last = window.last().expect("a non-empty dissolve window");
+    let span = frame_diff(first, last);
+    assert!(span > 0.05, "the two presets must differ: {span}");
+    let ramp: Vec<f32> = [0, 20, 40, DISSOLVE_FRAMES - 1]
+        .iter()
+        .map(|&k| frame_diff(&window[k], first))
+        .collect();
+    for pair in ramp.windows(2) {
+        assert!(
+            pair[1] > pair[0],
+            "a selected switch must ramp away from the outgoing look, not jump: {ramp:?}"
+        );
+    }
+
+    // ...and the escape hatch still cuts: one frame after it, the frame is the
+    // new preset outright, not a blend of the two.
+    renderer.select_preset_now(0);
+    let cut = capture_run(&mut renderer, &frame, 1);
+    let settled = capture_run(&mut renderer, &frame, 4);
+    let drift = frame_diff(
+        cut.first().expect("the cut frame"),
+        settled.last().expect("the settled frame"),
+    );
+    assert!(
+        drift < 0.02,
+        "select_preset_now must land on the new preset immediately: {drift}"
+    );
+}
+
+/// **A switch arriving mid-dissolve lands on the last one requested**, with no
+/// blend left running (Plan 0023 Phase 5 re-entrancy). The rule is snap-finish:
+/// the dissolve in flight completes to its own target, then the new one starts —
+/// so the roster is never left on an index nobody asked for.
+#[test]
+fn a_switch_mid_dissolve_lands_on_the_last_requested_preset() {
+    let Some(mut renderer) = headless_or_skip() else {
+        return;
+    };
+    let frame = AnalysisFrame::default();
+
+    // Reference: preset 2 alone, reached by an instant select and settled.
+    renderer.set_presets(static_trio());
+    renderer.select_preset_now(2);
+    let reference = capture_run(&mut renderer, &frame, 8);
+
+    // The same destination, reached by interrupting a dissolve a third of the way
+    // through with a switch to somewhere else.
+    renderer.set_presets(static_trio());
+    renderer.select_preset_now(0);
+    capture_run(&mut renderer, &frame, 5);
+    renderer.cycle_preset(); // 0 -> 1
+    capture_run(&mut renderer, &frame, DISSOLVE_FRAMES / 3);
+    renderer.select_preset(2); // interrupts, mid-blend
+    capture_run(&mut renderer, &frame, DISSOLVE_FRAMES + 2);
+    let after = capture_run(&mut renderer, &frame, 8);
+
+    assert_eq!(
+        renderer.preset_name(),
+        "TransC",
+        "the roster must land on the last requested index, not the interrupted one"
+    );
+    let drift = frame_diff(
+        after.last().expect("settled frame"),
+        reference.last().expect("reference frame"),
+    );
+    assert!(
+        drift < 0.02,
+        "an interrupted dissolve must leave no blend running: {drift}"
+    );
+}
+
+/// **A roster hot-reload during a dissolve settles cleanly** (Plan 0023 Phase 5):
+/// the in-flight target may not even exist in the replacement set, so the
+/// transition is cancelled to whatever `set_presets` resolves the active index to
+/// — no panic, no dangling snapshot, no half-blended frame that never finishes.
+#[test]
+fn a_hot_reload_mid_dissolve_settles_cleanly() {
+    let Some(mut renderer) = headless_or_skip() else {
+        return;
+    };
+    let frame = AnalysisFrame::default();
+    // The roster the reload replaces everything with: one preset, so the in-flight
+    // target index does not even exist afterwards.
+    let survivor = || {
+        vec![
+            static_trio()
+                .into_iter()
+                .next_back()
+                .expect("a non-empty trio"),
+        ]
+    };
+
+    // Reference: that preset alone, never having seen a dissolve.
+    renderer.set_presets(survivor());
+    let reference = capture_run(&mut renderer, &frame, 8);
+
+    renderer.set_presets(static_trio());
+    renderer.select_preset_now(0);
+    capture_run(&mut renderer, &frame, 5);
+    renderer.cycle_preset(); // 0 -> 1, now in flight
+    capture_run(&mut renderer, &frame, DISSOLVE_FRAMES / 3);
+    renderer.set_presets(survivor()); // the reload, mid-blend
+    let after = capture_run(&mut renderer, &frame, 8);
+
+    assert_eq!(
+        renderer.preset_name(),
+        "TransC",
+        "the roster resolves to the surviving preset"
+    );
+    // Settled on that preset and nothing else — a dangling snapshot or a blend
+    // still being encoded would show up as a difference from the reference.
+    let drift = frame_diff(
+        after.last().expect("settled frame"),
+        reference.last().expect("reference frame"),
+    );
+    assert!(
+        drift < 0.02,
+        "a hot-reload must cancel the dissolve cleanly, leaving the ordinary frame \
+         path: {drift}"
     );
 }

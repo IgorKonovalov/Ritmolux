@@ -92,11 +92,17 @@ By default the app **holds one scene** — pick a look and it stays. Press `A` t
 opt into auto-rotate (or set `auto = true` under `[rotate]` in `config.toml`);
 when it's on, a scene holds ~20–90 s and an energy drop can nudge a change early.
 
+Every preset change — `Space`, a pick from the browser, or an auto-rotate — **dissolves**
+over about a second rather than cutting, so the show reads as continuous. The engine
+rotates through a small library of dissolves (crossfade, additive burn, luma dissolve,
+wipe), and a switch arriving mid-dissolve finishes the one in flight and starts the new
+one, so you always land where you asked.
+
 | Key       | Action                                                      |
 |-----------|-------------------------------------------------------------|
-| `Space`   | Next preset (and restart the auto-rotate timer)             |
+| `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
-| `Tab`     | Open/close the preset browser (`↑`/`↓` navigate, `Enter` select, `Esc` close) |
+| `Tab`     | Open/close the preset browser (`↑`/`↓` navigate, `Enter` select — also dissolves, `Esc` close) |
 | `F`       | Toggle fullscreen                                           |
 | `D`       | Cycle to the next display/monitor                           |
 | `F3`      | Toggle the diagnostics overlay                              |
