@@ -126,6 +126,23 @@ scene: `fragment_field`, `swarm`, the three line systems (`parametric_curve` /
   (the opposite sense to the geometry scenes, kept for the shipped fragment
   presets); `pan_x` / `pan_y` slide the sampled window.
 
+**Reaction-diffusion's field is finite but toroidal**, and that is what makes the
+view transform usable on it. The simulation runs on a fixed grid whose edges wrap
+— growth leaving the right edge re-enters on the left — so the field is seamless
+even though it is not infinite. Since Plan 0033 the present pass samples it that
+way too:
+
+- `pan_x` / `pan_y` are a **seamless infinite scroll**. Pan as far as you like in
+  either axis; the field repeats, and there is no edge to fall off.
+- `zoom > 1` **tiles** the field rather than running out of it. At `zoom = 1.4`
+  you see the whole field plus a wrapped border on each side, joined seamlessly.
+
+Before that change the present sampler clamped, so anything past the field edge
+was the boundary row smeared outward — `zoom > 1` produced vertical bars and
+rectangular blocks, and any real `pan_*` walked off into them. That is why the
+shipped `reaction_*` presets are pinned near `zoom = 0.99` with a whisper of pan,
+and why those pins are now unnecessary.
+
 ### Background pass — `bg_hue`, `bg_bright`, `bg_vignette`
 
 An audio-tintable gradient + vignette backdrop drawn *before* the scene, engine-
