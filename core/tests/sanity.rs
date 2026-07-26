@@ -38,13 +38,14 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // Reaction-diffusion paints a real pattern across the frame, but the
         // present maps only the sparse V species, so the lit fraction is modest.
         SystemKind::ReactionDiffusion => 0.03,
-        // Sparse line art / point swarm / attractor cloud: a small but real
-        // footprint.
+        // Sparse line art / point swarm / attractor cloud / spectrum comb: a
+        // small but real footprint.
         SystemKind::Swarm
         | SystemKind::ParametricCurve
         | SystemKind::LSystem
         | SystemKind::StarPattern
-        | SystemKind::Attractor => 0.01,
+        | SystemKind::Attractor
+        | SystemKind::Spectrum => 0.01,
     }
 }
 
@@ -57,6 +58,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::StarPattern => "star_pattern",
         SystemKind::ReactionDiffusion => "reaction_diffusion",
         SystemKind::Attractor => "attractor",
+        SystemKind::Spectrum => "spectrum",
     }
 }
 
@@ -80,6 +82,13 @@ fn headless() -> Option<Renderer> {
 
 /// A sustained "loud" frame: every band up and a beat, so any audio-gated
 /// brightness reaches its lit state.
+///
+/// "Every band up" now includes the `spectrum` array itself (Plan 0034 Phase 2).
+/// A frame with `bass = mid = treb = 1.0` and 64 silent log-bands is not a frame
+/// any audio could produce, and under it a spectrum readout would correctly draw
+/// almost nothing — the floor would be measuring the fixture, not the scene. No
+/// pre-0034 scene reads `spectrum`, so every other preset's capture is
+/// unchanged.
 fn loud() -> AnalysisFrame {
     AnalysisFrame {
         bass: 1.0,
@@ -88,6 +97,7 @@ fn loud() -> AnalysisFrame {
         onset: 1.0,
         beat: true,
         bar: 0.5,
+        spectrum: [1.0; lmv_core::dsp::SPECTRUM_BINS],
         ..Default::default()
     }
 }

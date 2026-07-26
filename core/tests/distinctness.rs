@@ -39,16 +39,24 @@ fn headless() -> Option<Renderer> {
 }
 
 /// One representative non-silent frame, shared by every capture so the only
-/// variable across a family is the preset.
+/// variable across a family is the preset. Carries a falling band profile as
+/// well as the three scalars (Plan 0034 Phase 2), so a spectrum preset draws
+/// something to compare.
 fn fixed_frame() -> AnalysisFrame {
-    AnalysisFrame {
+    let mut frame = AnalysisFrame {
         bass: 0.6,
         mid: 0.5,
         treb: 0.6,
         onset: 0.4,
         bar: 0.25,
         ..Default::default()
+    };
+    let bands = frame.spectrum.len() as f32;
+    for (i, band) in frame.spectrum.iter_mut().enumerate() {
+        let t = i as f32 / bands;
+        *band = (0.9 - 0.7 * t) * (0.75 + 0.25 * (t * 17.0).sin());
     }
+    frame
 }
 
 fn print_matrix(
@@ -84,6 +92,7 @@ fn report_family_distinctness() {
         (SystemKind::ParametricCurve, "parametric_curve"),
         (SystemKind::LSystem, "lsystem"),
         (SystemKind::StarPattern, "star_pattern"),
+        (SystemKind::Spectrum, "spectrum"),
     ] {
         let names: Vec<String> = default_presets()
             .into_iter()

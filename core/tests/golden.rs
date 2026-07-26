@@ -60,6 +60,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
             include_str!("fixtures/reaction_diffusion.toml"),
         ),
         SystemKind::Attractor => ("attractor", include_str!("fixtures/attractor.toml")),
+        SystemKind::Spectrum => ("spectrum", include_str!("fixtures/spectrum.toml")),
     }
 }
 
@@ -89,15 +90,29 @@ fn headless() -> Option<Renderer> {
 
 /// The fixed frame every baseline is rendered under — a representative
 /// mid-energy frame with all bands lit, so a band-reactive fixture still draws.
+///
+/// The `spectrum` array carries a plausible falling profile rather than the
+/// zeros a bare `Default` would give (Plan 0034 Phase 2). A frame claiming
+/// `bass = 0.6` with 64 silent bands is not a frame any audio could produce, and
+/// under it a spectrum fixture would pin a baseline of nothing. No pre-0034
+/// scene reads `spectrum`, so filling it leaves every other baseline unchanged.
 fn fixed_frame() -> AnalysisFrame {
-    AnalysisFrame {
+    let mut frame = AnalysisFrame {
         bass: 0.6,
         mid: 0.5,
         treb: 0.6,
         onset: 0.4,
         bar: 0.25,
         ..Default::default()
+    };
+    let bands = frame.spectrum.len() as f32;
+    for (i, band) in frame.spectrum.iter_mut().enumerate() {
+        // Loud at the bottom, quiet at the top, with a slow ripple so adjacent
+        // elements differ — a flat ramp would let a transposed mapping pass.
+        let t = i as f32 / bands;
+        *band = (0.9 - 0.7 * t) * (0.75 + 0.25 * (t * 17.0).sin());
     }
+    frame
 }
 
 fn decode(path: &Path) -> CaptureImage {

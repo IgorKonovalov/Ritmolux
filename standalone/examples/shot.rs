@@ -164,9 +164,10 @@ fn parse_system(name: &str) -> Result<SystemKind, String> {
     // The name↔kind mapping is single-sourced on SystemKind in core; keep only
     // shot's friendly error text here.
     SystemKind::from_name(name).ok_or_else(|| {
-        format!(
-            "unknown family `{name}` (fragment_field | swarm | parametric_curve | lsystem | star_pattern | reaction_diffusion | attractor)"
-        )
+        // The list of legal names comes off the roster too, so a new system
+        // cannot ship missing from the error text (it used to be hand-written).
+        let known: Vec<&str> = SystemKind::ALL.iter().map(|k| k.as_str()).collect();
+        format!("unknown family `{name}` ({})", known.join(" | "))
     })
 }
 
@@ -555,17 +556,10 @@ fn report(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> 
     let meta = preset_meta(&presets);
     let mut r = renderer(REPORT_SIZE, REPORT_SIZE, presets)?;
 
-    let families = [
-        SystemKind::FragmentField,
-        SystemKind::Swarm,
-        SystemKind::ParametricCurve,
-        SystemKind::LSystem,
-        SystemKind::StarPattern,
-        SystemKind::ReactionDiffusion,
-        SystemKind::Attractor,
-    ];
+    // The roster, not a copy of it: a hand-maintained list here silently omitted
+    // a new system from the report instead of failing to build.
     let mut reports = Vec::new();
-    for system in families {
+    for system in SystemKind::ALL {
         if args.family.is_some_and(|f| f != system) {
             continue;
         }

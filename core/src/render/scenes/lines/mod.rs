@@ -27,12 +27,14 @@ pub mod hankin;
 pub mod lsystem;
 pub mod parametric;
 pub mod renderer;
+pub mod spectrum;
 pub mod star;
 pub mod turtle;
 
 pub use lsystem::LSystemScene;
 pub use parametric::ParametricCurveScene;
 pub use renderer::{LineRenderer, SegmentInstance};
+pub use spectrum::SpectrumScene;
 pub use star::StarPatternScene;
 
 /// The shared structural-config and cap-overflow types now live one level up, in
