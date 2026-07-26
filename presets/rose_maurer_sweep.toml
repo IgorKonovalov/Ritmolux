@@ -24,16 +24,21 @@ family = "maurer_rose"
 # fixed 1280x720, so `trails` no longer costs this preset its sharpness.
 
 [params]
-# THE LEVER - three time-scales on the angular step.
-d = "71 + sin(time * 0.041) * 14 + clamp(mid * 5.5, 0, 3.72) + beat * 2.17"
+# THE LEVER - three time-scales on the angular step, all of them SLOWED HARD.
+# The drift sine went 0.041 -> 0.0068, roughly a 150 s cycle against the old
+# ~25 s, so the lattice family now drifts across a whole track rather than
+# re-forming every few bars. The mid term and the beat kick are both cut to a
+# third: `d` re-lattices the entire web, so a large fast term on it is the most
+# restless thing this preset can do, and it was doing all three at once.
+d = "71 + sin(time * 0.0068) * 13 + clamp(mid * 1.8, 0, 1.25) + beat * 0.70"
 
 # Three petal personalities on the energy. Eased hard below, so the change
 # reads as the figure re-forming rather than as a cut.
 n = "select(bass + mid > 0.55, 8, select(bass + mid > 0.28, 6, 4))"
 
 samples       = "1500"
-phase         = "sin(time * 0.015) * 0.36 + clamp(bass * 0.5, 0, 0.124)"
-radial_offset = "sin(time * 0.011) * 0.13"
+phase         = "sin(time * 0.0042) * 0.36 + clamp(bass * 0.30, 0, 0.075)"
+radial_offset = "sin(time * 0.0034) * 0.13"
 
 spin          = "0.09 + sin(time * 0.013) * 0.02"
 scale         = "0.80 + bar * 0.05 + clamp(bass * 0.30, 0, 0.08)"
@@ -49,8 +54,12 @@ hue        = "0.02 + time * 0.019 + clamp(treb * 0.6, 0, 0.24)"
 mirror_order   = "2"
 mirror_reflect = "0"
 
-zoom        = "1.05 + bar * 0.05 + clamp(bass * 0.30, 0, 0.13)"
-pan_x       = "sin(time * 0.013) * 0.05"
+# VIEW - the camera work is deliberately gentle here. The bass term and the bar
+# breath are both roughly halved and the constant below is long: this is the
+# preset whose subject is the WEB restructuring, so a pumping camera competes
+# with the thing you are meant to be watching.
+zoom        = "1.04 + bar * 0.025 + clamp(bass * 0.14, 0, 0.06)"
+pan_x       = "sin(time * 0.009) * 0.04"
 bg_hue      = "0.00 + sin(time * 0.009) * 0.05"
 bg_bright   = "0.016 + clamp(mid * 0.09, 0, 0.012)"
 bg_vignette = "0.84"
@@ -59,14 +68,17 @@ bg_vignette = "0.84"
 trails = "0.50 + clamp(mid * 0.18, 0, 0.09)"
 
 [smoothing]
-# `d` gets a short constant so the beat-kick surges; `n` gets a long one so a
-# petal-count change is a morph rather than a jump cut.
-d             = 0.3
-n             = 3.38
-phase         = 1.17
-radial_offset = 1.3
-scale         = 0.47
-thickness     = 0.39
+# `d` now gets a LONG constant, not a short one. The old 0.3 s existed to let
+# the beat-kick surge; with the kick cut to 0.70 there is nothing to surge, and
+# a long constant is what turns the remaining drift into something continuous.
+# `n` is longer still, so a petal-count change is a slow re-forming.
+d             = 1.60
+n             = 5.20
+phase         = 2.00
+radial_offset = 2.20
+scale         = 0.62
+thickness     = 0.50
 hue           = 1.09
+zoom          = 1.00
 bg_bright     = 1.04
-trails       = 0.55
+trails        = 0.55

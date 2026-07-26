@@ -25,17 +25,22 @@ family = "maurer_rose"
 # fixed 1280x720, so `trails` no longer costs this preset its sharpness.
 
 [params]
-# SHAPE - the classic 6/71 rose, with the Plan 0028 shape params giving it a
-# slow living morph the old version did not have.
+# SHAPE - the classic 6-petal rose, now EVOLVING rather than merely turning.
+# The trade this preset makes: the spin came down and the shape work went up, so
+# the figure reads as re-forming in place instead of rotating past. `d` is the
+# strongest lever for that (see `rose_maurer_sweep.toml` - tiny changes to the
+# angular step completely re-lattice the web), so it stops being a constant here
+# and takes a mid-band sweep plus a slow drift.
 n             = "6"
-d             = "71"
+d             = "71 + sin(time * 0.058) * 9 + clamp(mid * 4.0, 0, 3.0)"
 samples       = "300"
-phase         = "sin(time * 0.024) * 0.30 + clamp(bass * 0.5, 0, 0.136)"
-radial_offset = "sin(time * 0.0137) * 0.09"
+phase         = "sin(time * 0.075) * 0.55 + clamp(bass * 0.6, 0, 0.18)"
+radial_offset = "sin(time * 0.043) * 0.22"
 
-# MOTION - a STEADY turn (audio-independent rate), a per-bar breath, and a
-# bass swell on the scale.
-spin          = "0.28 + sin(time * 0.023) * 0.04"
+# MOTION - a SLOW steady turn. Deliberately a third of what it was: with the
+# shape now morphing continuously, a brisk spin fought the evolution for the
+# eye's attention and the figure read as spinning rather than as blooming.
+spin          = "0.09 + sin(time * 0.023) * 0.02"
 scale         = "0.78 + bar * 0.06 + clamp(bass * 0.45, 0, 0.124)"
 draw_progress = "1"
 
@@ -66,8 +71,12 @@ bg_vignette = "0.80"
 trails = "0.66 + clamp(bass * 0.25, 0, 0.12)"
 
 [smoothing]
-phase         = 0.91
-radial_offset = 1.04
+# The shape constants are SHORT on purpose - this is the "evolve faster" half.
+# A 0.9-1.0 s constant on `phase`/`radial_offset` low-passed the faster drivers
+# above back into the slow morph they replaced, so the two have to move together.
+phase         = 0.38
+radial_offset = 0.50
+d             = 0.55
 scale         = 0.36
 thickness     = { attack = 0.03, release = 0.60 }
 hue           = 1.04

@@ -40,9 +40,13 @@ hue        = "0.72 + time * 0.021 + clamp(treb * 0.7, 0, 0.26)"
 mirror_order   = "4"
 mirror_reflect = "0"
 
-# THE CAMERA - the subject of the preset. A tempo-gated base depth, a bass kick,
-# a bar breath and a slow orbit, all on the one transform.
-zoom  = "select(tempo > 130, 1.45, 1.10) + clamp(bass * 1.1, 0, 0.55) + bar * 0.12"
+# THE CAMERA - the subject of the preset, and now pushed MUCH further in. The
+# base roughly doubles (1.10/1.45 -> 2.15/2.75) and the kick grows with it, so
+# the rose no longer sits whole in frame: the figure runs off every edge and the
+# picture becomes a moving detail of it, which is the point of a zoom preset.
+# The four-fold mirror is what keeps it legible that close - the replicated
+# chords keep filling frame as the original geometry leaves it.
+zoom  = "select(tempo > 130, 2.75, 2.15) + clamp(bass * 1.6, 0, 0.85) + bar * 0.18"
 pan_x = "sin(time * 0.083) * 0.14"
 pan_y = "cos(time * 0.06) * 0.11"
 

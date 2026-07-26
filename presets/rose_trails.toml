@@ -28,12 +28,26 @@ radial_offset = "0.20 + sin(time * 0.015) * 0.22"
 # light-painting brush, and a brush whose speed jerks with the music paints a
 # lurching stroke rather than a spiral.
 spin          = "1.25 + sin(time * 0.029) * 0.08"
-scale         = "0.52 + bar * 0.10 + clamp(bass * 0.45, 0, 0.124)"
+# BIGGER - the ribbon now sweeps most of the frame rather than a third of it.
+scale         = "0.80 + bar * 0.10 + clamp(bass * 0.45, 0, 0.124)"
 draw_progress = "1"
 
-# STROKE - dim on purpose. See the coupling note above.
-thickness  = "1.10 + clamp(bass * 0.9, 0, 0.47)"
-brightness = "0.42 + clamp(bass * 0.20, 0, 0.10)"
+# STROKE - MORE GLOW, bought mostly with thickness rather than brightness,
+# because the coupling note above still governs. `thickness` is the halo: the
+# line quad has a quadratic falloff from a bright core, so widening it adds glow
+# around the stroke. `brightness` moves only a little (0.42 -> 0.50) - it is the
+# term that saturated the buffer to a white ball in the old version. Push
+# thickness first if you want more; brightness is the dangerous one.
+#
+# HELD DELIBERATELY MODEST, and here is why the usual verification does not
+# apply: this preset cannot be judged from a `--set` still at all. The spin is
+# 1.25 and the feedback is max-decay, so a held excitation accumulates a full
+# rotation's sweep into a saturated blob NO MATTER what these values are - a
+# five-way sweep from 1.10 to 2.30 rendered indistinguishably, including the
+# untouched original. Only the running app, with real material, separates them.
+# So this sits mid-range rather than at the top of what a still would allow.
+thickness  = "1.70 + clamp(bass * 1.0, 0, 0.55)"
+brightness = "0.50 + clamp(bass * 0.22, 0, 0.11)"
 hue        = "0.48 + time * 0.033 + clamp(treb * 0.8, 0, 0.26)"
 
 mirror_order   = "3"
