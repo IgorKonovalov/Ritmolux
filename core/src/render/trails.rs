@@ -20,10 +20,13 @@
 //! **reset on the capture scene-rebuild**, so a headless capture stays a pure
 //! function of its inputs (NFR §6).
 //!
-//! The composite runs at a fixed 16:9 internal resolution, presented stretched to
-//! the surface — the same resolution-independent approach the reaction-diffusion
-//! and attractor presents already take (correct on a 16:9 display; distorted
-//! otherwise — a documented v1 limitation).
+//! The composite runs at an internal resolution that **follows the render target**
+//! (ADR-0034), quantized to a 256 px step and capped — see
+//! [`internal_grid_size`](super::post::internal_grid_size). It used to be a fixed
+//! 1280x720, which on anything above 720p upscaled the whole frame: line geometry
+//! rasterized at full resolution was thrown away and came back soft, and the
+//! preset lane's only recourse was to drop `trails` from every line preset to get
+//! its sharpness back. Following the target is what lets those presets keep both.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). The trails stage encodes its passes every displayed frame.
@@ -37,13 +40,7 @@
 
 use super::feedback::PingPongField;
 use super::gpu;
-use super::post::PostStage;
-
-/// Fixed internal composite resolution (16:9), presented stretched to the surface
-/// (module docs). High enough that line trails stay crisp, cheap enough for the
-/// iGPU floor when a trails preset is active.
-const TRAILS_W: u32 = 1280;
-const TRAILS_H: u32 = 720;
+use super::post::{PostStage, internal_grid_size};
 
 /// `trails` param default — off, so an unbound preset pays nothing.
 const DEFAULT_TRAILS: f32 = 0.0;
@@ -89,8 +86,12 @@ struct Fade {
     v: [f32; 4],
 }
 
-/// The trails GPU resources, built lazily on the first active frame.
+/// The trails GPU resources, built lazily on the first active frame and rebuilt
+/// only when the internal grid changes size (ADR-0030's compare-first rule).
 struct Resources {
+    /// The grid these were built for, so [`Trails::begin`] can compare before
+    /// rebuilding rather than reallocating every frame.
+    size: (u32, u32),
     // The offscreen the composite (background + scene) renders into each frame.
     // Kept alive so `composited_view` stays valid; not read after construction.
     _composited: wgpu::Texture,
@@ -107,12 +108,12 @@ struct Resources {
 }
 
 impl Resources {
-    fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat, size: (u32, u32)) -> Self {
         let composited = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("trails-composited"),
             size: wgpu::Extent3d {
-                width: TRAILS_W,
-                height: TRAILS_H,
+                width: size.0,
+                height: size.1,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -123,7 +124,7 @@ impl Resources {
             view_formats: &[],
         });
         let composited_view = composited.create_view(&wgpu::TextureViewDescriptor::default());
-        let accum = PingPongField::new(device, TRAILS_W, TRAILS_H);
+        let accum = PingPongField::new(device, size.0, size.1);
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("trails-sampler"),
@@ -226,6 +227,7 @@ impl Resources {
         );
 
         Self {
+            size,
             _composited: composited,
             composited_view,
             accum,
@@ -274,6 +276,11 @@ pub struct Trails {
     surface_format: wgpu::TextureFormat,
     res: Option<Resources>,
     amount: f32,
+    /// How many times [`Resources::build`] has run on this stage. Diagnostic, and
+    /// what pins ADR-0030's compare-first obligation in a test: rebuilding every
+    /// frame would be correct-looking and would also clear the trail history every
+    /// frame, which no pixel assertion would obviously catch.
+    builds: u32,
 }
 
 /// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
@@ -288,7 +295,14 @@ impl Trails {
             surface_format,
             res: None,
             amount: DEFAULT_TRAILS,
+            builds: 0,
         }
+    }
+
+    /// How many times this stage has built its GPU resources. See [`Self::builds`].
+    #[cfg(test)]
+    pub(crate) fn build_count(&self) -> u32 {
+        self.builds
     }
 }
 
@@ -322,13 +336,14 @@ impl PostStage for Trails {
         self.amount > 0.0 && self.amount.is_finite()
     }
 
-    /// The fixed internal accumulation size (16:9), presented stretched. The chain
-    /// reports this — not the surface — as the target size to a scene that sizes an
-    /// internal field ([`Scene::set_target_size`](super::scenes::Scene::set_target_size)),
-    /// so the scene does not supersample into an offscreen smaller than the window
-    /// (Plan 0027 Phase 2), and derives the scene's aspect from it.
-    fn internal_size(&self) -> Option<(u32, u32)> {
-        Some((TRAILS_W, TRAILS_H))
+    /// The accumulation size, following the render target under the shared policy
+    /// (ADR-0034). The chain reports this — not the surface — as the target size to
+    /// a scene that sizes an internal field
+    /// ([`Scene::set_target_size`](super::scenes::Scene::set_target_size)), so the
+    /// scene does not supersample into an offscreen smaller than the window (Plan
+    /// 0027 Phase 2), and derives the scene's aspect from it.
+    fn internal_size(&self, surface: (u32, u32)) -> (u32, u32) {
+        internal_grid_size(surface)
     }
 
     /// Build the resources if needed (clearing the fresh accumulation) and return
@@ -339,12 +354,22 @@ impl PostStage for Trails {
     fn begin(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
-        _surface: (u32, u32),
+        surface: (u32, u32),
     ) -> Option<wgpu::TextureView> {
-        if self.res.is_none() {
-            let res = Resources::build(&self.device, self.surface_format);
+        // Compare-first (ADR-0030): build on the first active frame, and again only
+        // when the grid actually changes size. Rebuilding unconditionally would
+        // reallocate a `Rgba16Float` texture pair every frame *and* clear the trail
+        // history every frame, which reads as "trails stopped working" rather than
+        // as a performance bug.
+        //
+        // The flip side, accepted: a resize that crosses a 256 px step does blink
+        // the accumulated trail away, because the field it lived in is gone.
+        let wanted = self.internal_size(surface);
+        if self.res.as_ref().is_none_or(|res| res.size != wanted) {
+            let res = Resources::build(&self.device, self.surface_format, wanted);
             res.clear_accum(encoder);
             self.res = Some(res);
+            self.builds += 1;
         }
         self.res.as_ref().map(|res| res.composited_view.clone())
     }

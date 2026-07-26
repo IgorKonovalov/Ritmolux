@@ -71,6 +71,82 @@ use super::trails::Trails;
 /// a frame's routing costs no allocation.
 pub(crate) const STAGE_COUNT: usize = 2;
 
+/// Cap on a post stage's internal grid (ADR-0034).
+///
+/// **Not** the attractor's 2560x1440, and the difference is deliberate: the trails
+/// accumulation is a [`PingPongField`](super::feedback::PingPongField) of
+/// `Rgba16Float` (8 bytes/texel, **two** textures), and Plan 0023's dual-live
+/// dissolve holds two whole `PostChain`s at once, so the field pair is charged
+/// twice at the peak. At this cap that is ~50 MB per chain and ~100 MB dual-live,
+/// against NFR §12's ~350 MB soft ceiling that is mostly driver floor already; at
+/// 2560x1440 it would be ~88 MB and ~177 MB. 1920x1080 is also a 1.07x downscale
+/// on the 2048x1152 display this was built for — indistinguishable from native for
+/// less than half the memory.
+///
+/// It is one constant on purpose. If the iGPU frame budget (NFR §1) fails on
+/// device, lower this rather than re-fixing the grids.
+const POST_MAX_W: u32 = 1920;
+const POST_MAX_H: u32 = 1080;
+
+/// Quantization step for each axis of a post stage's internal grid.
+///
+/// Same 256 px as the attractor's trail grid, for the same reason: a grid change
+/// costs texture reallocation, bind-group rebuilds and — for trails — a cleared
+/// accumulation, and the standalone forwards **every** `WindowEvent::Resized`. At
+/// pixel granularity a live window drag would pay that hundreds of times and blink
+/// the afterglow away continuously; at 256 px it crosses a handful of grids.
+/// Purely a constant — no wall clock, so a fixed-size headless capture stays
+/// byte-reproducible (NFR §6).
+const POST_GRID_STEP: u32 = 256;
+
+/// **The** internal-grid policy both post stages share (ADR-0034): the grid a
+/// stage should run at for a given render target.
+///
+/// Pure, GPU-free, and the whole policy in one place. Round each axis up to
+/// [`POST_GRID_STEP`]; when either axis exceeds its cap, scale **both** by a
+/// single factor first so the aspect survives. That single factor is the lesson
+/// Plan 0029 already paid for on the attractor: clamping each axis independently
+/// squashed a 3440x1440 ultrawide into a 16:9 grid, which the aspect-ignoring
+/// present then stretched back, so the picture changed shape discontinuously as
+/// the window crossed the cap.
+///
+/// Never returns 0 on either axis, and never exceeds either cap.
+pub(crate) fn internal_grid_size(surface: (u32, u32)) -> (u32, u32) {
+    let w = surface.0.max(1);
+    let h = surface.1.max(1);
+    // Integer ratio compare and derivation (u64 so the products cannot overflow),
+    // so the grid is an exact function of the target size on every target.
+    let (fit_w, fit_h) = if w <= POST_MAX_W && h <= POST_MAX_H {
+        (w, h)
+    } else if u64::from(w) * u64::from(POST_MAX_H) >= u64::from(h) * u64::from(POST_MAX_W) {
+        // Width binds: pin it to the cap and derive the height from the target's
+        // own aspect (<= POST_MAX_H by the branch condition).
+        (
+            POST_MAX_W,
+            (u64::from(h) * u64::from(POST_MAX_W) / u64::from(w)) as u32,
+        )
+    } else {
+        (
+            (u64::from(w) * u64::from(POST_MAX_H) / u64::from(h)) as u32,
+            POST_MAX_H,
+        )
+    };
+    (
+        quantize_axis(fit_w, POST_MAX_W),
+        quantize_axis(fit_h, POST_MAX_H),
+    )
+}
+
+/// Round one axis up to the next [`POST_GRID_STEP`] multiple, floored at one step
+/// (never 0) and clamped back under `cap` — the round-up overshoots on an axis
+/// already sitting at the cap.
+fn quantize_axis(px: u32, cap: u32) -> u32 {
+    px.div_ceil(POST_GRID_STEP)
+        .max(1)
+        .saturating_mul(POST_GRID_STEP)
+        .min(cap)
+}
+
 /// Composite positions, in chain order. Named so the routing tests and the
 /// ADR-0018 ordering claim read as assertions rather than magic indices.
 pub(crate) const TRAILS: usize = 0;
@@ -128,10 +204,16 @@ pub(crate) trait PostStage {
     /// passthrough that keeps an unbound preset paying nothing.
     fn active(&self) -> bool;
 
-    /// This stage's fixed internal resolution, or `None` to size from the surface.
-    /// The trails and kaleidoscope stages both run at a fixed 16:9 grid; the
-    /// `None` arm is what a surface-sized stage would use.
-    fn internal_size(&self) -> Option<(u32, u32)>;
+    /// The internal resolution this stage runs at for the given render target
+    /// (ADR-0034). Both shipped stages follow the target through
+    /// [`internal_grid_size`], so line geometry composited through them is sharp at
+    /// the display's own resolution rather than being rasterized full-size and then
+    /// thrown away through a fixed 720p grid.
+    ///
+    /// A stage is free to answer with something else — a constant, or a fraction of
+    /// the target — but it must be a **pure function of `surface`**, because the
+    /// chain compares this against the built size to decide whether to rebuild.
+    fn internal_size(&self, surface: (u32, u32)) -> (u32, u32);
 
     /// Lazily build this stage's resources and return the view its **input**
     /// renders into. `surface` is the current surface size, for a surface-sized
@@ -353,7 +435,7 @@ impl PostChain {
         let routing = self.routing();
         let first = routing.scene_stage().and_then(|index| {
             let stage = self.stages.get_mut(index)?;
-            let size = stage.internal_size().unwrap_or(surface);
+            let size = stage.internal_size(surface);
             let view = stage.begin(encoder, surface)?;
             Some((view, size))
         });
@@ -416,10 +498,121 @@ mod tests {
     // Test asserts index, expect and panic freely; this is not the render path.
     #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
-    use super::{KALEIDOSCOPE, PostChain, Routing, STAGE_COUNT, TRAILS, route};
+    use super::{
+        KALEIDOSCOPE, POST_GRID_STEP, POST_MAX_H, POST_MAX_W, PostChain, PostStage, Routing,
+        STAGE_COUNT, TRAILS, internal_grid_size, route,
+    };
     use crate::render::background::Background;
     use crate::render::capture::{self, CaptureImage};
     use crate::render::context::{RenderContext, RenderError};
+
+    // -----------------------------------------------------------------------
+    // The internal-grid policy (ADR-0034) — GPU-free
+    // -----------------------------------------------------------------------
+
+    /// The headline property: a stage's grid **follows the render target** instead
+    /// of being pinned to a fixed 1280x720. This is the whole point of Plan 0033 —
+    /// line geometry composited through trails or the fold was rasterized at full
+    /// resolution and then thrown away through a 720p grid, which on the 2048x1152
+    /// display the preset lane worked at was a 1.6x upscale of the entire frame.
+    #[test]
+    fn the_internal_grid_follows_the_target_instead_of_a_fixed_720p() {
+        // Common desktop sizes, all under the cap: the grid is the target rounded
+        // up to the step, never the old constant.
+        for target in [(1280, 720), (1600, 900), (1920, 1080)] {
+            let grid = internal_grid_size(target);
+            assert!(
+                grid.0 >= target.0 && grid.1 >= target.1,
+                "{target:?} must not be downsampled below the target: got {grid:?}"
+            );
+            assert!(grid.0 <= POST_MAX_W && grid.1 <= POST_MAX_H, "{grid:?}");
+        }
+        // The display this plan exists for. 2048x1152 is 16:9 and above the width
+        // cap, so it comes back capped *with its aspect exactly preserved* — a
+        // 1.07x downscale, and emphatically not 1280x720 (ADR-0034).
+        assert_eq!(internal_grid_size((2048, 1152)), (1920, 1080));
+        assert_ne!(internal_grid_size((2048, 1152)), (1280, 720));
+    }
+
+    /// Every axis lands on the quantization step (or the cap), never on 0.
+    ///
+    /// The step is what keeps a live window drag from reallocating a
+    /// `Rgba16Float` texture pair — and, for trails, clearing the accumulated
+    /// history — on every one of the hundreds of `Resized` events a drag emits.
+    #[test]
+    fn every_grid_axis_is_quantized_and_non_degenerate() {
+        for target in [
+            (1, 1),
+            (17, 3),
+            (640, 480),
+            (1281, 721),
+            (1920, 1080),
+            (3840, 2160),
+            (100, 4000),
+        ] {
+            let (w, h) = internal_grid_size(target);
+            assert!(w > 0 && h > 0, "{target:?} produced a degenerate grid");
+            assert!(
+                w <= POST_MAX_W && h <= POST_MAX_H,
+                "{target:?} -> ({w}, {h})"
+            );
+            for (axis, cap) in [(w, POST_MAX_W), (h, POST_MAX_H)] {
+                assert!(
+                    axis % POST_GRID_STEP == 0 || axis == cap,
+                    "{target:?}: axis {axis} is neither a {POST_GRID_STEP} multiple nor the cap"
+                );
+            }
+        }
+    }
+
+    /// Plan 0029's lesson, re-paid here: when the cap binds, **one** scale factor
+    /// applies to both axes. Clamping each axis independently turned a 3440x1440
+    /// ultrawide into a 16:9 grid, which the aspect-ignoring present then stretched
+    /// back — so the picture changed shape as the window crossed the cap.
+    ///
+    /// Note what "aspect intact" can and cannot mean under a 256 px step: the
+    /// derived axis is rounded up to the step, so an ultrawide's grid aspect is
+    /// coarser than its target's (3440x1440 is 2.39; the grid is 1920x1024 = 1.88).
+    /// What the single factor buys is that it is **not** squashed to the cap's own
+    /// 16:9, which is the regression.
+    #[test]
+    fn a_capped_target_keeps_its_proportions_rather_than_the_caps() {
+        let ultrawide = internal_grid_size((3440, 1440));
+        let squashed_to_the_cap = (POST_MAX_W, POST_MAX_H);
+        assert_ne!(
+            ultrawide, squashed_to_the_cap,
+            "a 3440x1440 ultrawide must not come back as the cap's own 16:9"
+        );
+        let target_aspect = 3440.0 / 1440.0;
+        let grid_aspect = ultrawide.0 as f32 / ultrawide.1 as f32;
+        let cap_aspect = POST_MAX_W as f32 / POST_MAX_H as f32;
+        assert!(
+            grid_aspect > cap_aspect,
+            "the ultrawide grid ({grid_aspect:.3}) is no wider than 16:9 ({cap_aspect:.3}) \
+             — the per-axis clamp regression is back"
+        );
+        assert!(
+            (grid_aspect - target_aspect).abs() < target_aspect * 0.25,
+            "grid aspect {grid_aspect:.3} is far from the target's {target_aspect:.3}"
+        );
+
+        // The same in portrait, where the height binds instead.
+        let portrait = internal_grid_size((1440, 3440));
+        assert!(
+            (portrait.1 as f32 / portrait.0 as f32) > cap_aspect,
+            "a portrait target must keep its proportions too: {portrait:?}"
+        );
+    }
+
+    /// The policy is a **pure function** — the same target always yields the same
+    /// grid, with no wall clock anywhere in it, so a fixed-size headless capture
+    /// stays byte-reproducible (NFR §6).
+    #[test]
+    fn the_grid_policy_is_a_pure_function_of_the_target() {
+        for target in [(800, 600), (2048, 1152), (3440, 1440)] {
+            assert_eq!(internal_grid_size(target), internal_grid_size(target));
+        }
+    }
 
     /// `(stage, destination)` pairs, for readable assertions.
     fn edges(routing: &Routing) -> Vec<(usize, Option<usize>)> {
@@ -675,6 +868,279 @@ mod tests {
             b_lit_then_dark.rgba, a_lit_then_dark.rgba,
             "each chain folds to the pixels its own history implies"
         );
+    }
+
+    /// A chain's stages, addressed concretely so their build counters are readable.
+    struct Stages {
+        trails: crate::render::trails::Trails,
+        kaleido: crate::render::kaleidoscope::Kaleidoscope,
+    }
+
+    /// Drive one `begin`/`resolve` frame through `stage` at `surface`, discarding
+    /// the pixels — this is about what the stage *allocates*, not what it draws.
+    fn pump(ctx: &RenderContext, stage: &mut dyn PostStage, surface: (u32, u32)) {
+        let (_texture, view) =
+            capture::create_target(&ctx.device, ctx.surface_format(), surface.0, surface.1);
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("post-resize"),
+            });
+        stage.begin(&mut encoder, surface);
+        stage.resolve(&ctx.queue, &mut encoder, &view);
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    /// **ADR-0030's compare-first obligation, counted rather than assumed**: a
+    /// stage rebuilds its resources on a size change and *only* on a size change.
+    ///
+    /// This is worth a counter rather than a pixel assertion because rebuilding
+    /// every frame would look almost right: the picture would be correct, but the
+    /// trails accumulation would be cleared every frame (so trails would silently
+    /// stop working) and a `Rgba16Float` texture pair would be reallocated at frame
+    /// rate. Neither is visible in a single captured frame.
+    #[test]
+    fn stages_rebuild_on_a_size_change_and_only_on_a_size_change() {
+        let Some(ctx) = headless_context_or_skip() else {
+            return;
+        };
+        let format = ctx.surface_format();
+        let mut stages = Stages {
+            trails: crate::render::trails::Trails::new(&ctx.device, format),
+            kaleido: crate::render::kaleidoscope::Kaleidoscope::new(&ctx.device, format),
+        };
+        // Both stages have to be active or `begin` is never reached.
+        assert!(stages.trails.set_param("trails", 0.9));
+        assert!(stages.kaleido.set_param("kaleido_order", 6.0));
+
+        // Two sizes that the policy maps to *different* grids, so the compare has
+        // something to see. (Sizes inside one 256 px step deliberately do not
+        // rebuild — that is the point of quantizing.)
+        let small = (512, 512);
+        let large = (1024, 768);
+        assert_ne!(
+            internal_grid_size(small),
+            internal_grid_size(large),
+            "the two probe sizes must land on different grids for this test to mean anything"
+        );
+
+        for _ in 0..5 {
+            pump(&ctx, &mut stages.trails, small);
+            pump(&ctx, &mut stages.kaleido, small);
+        }
+        assert_eq!(stages.trails.build_count(), 1, "five frames, one build");
+        assert_eq!(stages.kaleido.build_count(), 1, "five frames, one build");
+
+        for _ in 0..3 {
+            pump(&ctx, &mut stages.trails, large);
+            pump(&ctx, &mut stages.kaleido, large);
+        }
+        assert_eq!(
+            stages.trails.build_count(),
+            2,
+            "a size change builds once more"
+        );
+        assert_eq!(
+            stages.kaleido.build_count(),
+            2,
+            "a size change builds once more"
+        );
+
+        // Back to the first size: it must build *again* rather than resurrect the
+        // stale grid — the resources for `small` were dropped when `large` replaced
+        // them, so reusing them is not merely wasteful, it is impossible.
+        for _ in 0..3 {
+            pump(&ctx, &mut stages.trails, small);
+            pump(&ctx, &mut stages.kaleido, small);
+        }
+        assert_eq!(
+            stages.trails.build_count(),
+            3,
+            "returning to a size rebuilds"
+        );
+        assert_eq!(
+            stages.kaleido.build_count(),
+            3,
+            "returning to a size rebuilds"
+        );
+
+        // A size within the same 256 px step is free — the quantization is what
+        // makes a live window drag survivable. (512 sits exactly *on* a step, so
+        // 513 is already the next grid up; the probe has to be inside the step.)
+        let same_grid = (400, 400);
+        assert_eq!(internal_grid_size(small), internal_grid_size(same_grid));
+        pump(&ctx, &mut stages.trails, same_grid);
+        assert_eq!(
+            stages.trails.build_count(),
+            3,
+            "a resize inside one quantization step must not reallocate"
+        );
+    }
+
+    /// The chain reports the **target's** grid, not a fixed 720p — checked through
+    /// the real `begin`, so it covers the wiring and not just the policy function.
+    ///
+    /// Plan 0033's done-when for this reads "a `PostChain` driven at 2048x1152
+    /// reports an internal size of 2048x1152". That is not reachable alongside the
+    /// same plan's 1920x1080 cap, which 2048x1152 exceeds on width; ADR-0034 says
+    /// as much when it calls the cap "a 1.07x downscale at the display in
+    /// question". So the assertion is the capped grid — with the aspect exactly
+    /// preserved, 2048x1152 and 1920x1080 both being 16:9 — and, per the done-when's
+    /// actual point, emphatically not 1280x720.
+    #[test]
+    fn the_chain_reports_the_targets_grid_not_a_fixed_720p() {
+        let Some(ctx) = headless_context_or_skip() else {
+            return;
+        };
+        let format = ctx.surface_format();
+        let mut chain = PostChain::new(&ctx.device, format);
+        assert!(chain.set_stage_param(TRAILS, "trails", 0.9));
+
+        let surface = (2048, 1152);
+        let (_texture, view) =
+            capture::create_target(&ctx.device, format, CHAIN_TEST_SIZE, CHAIN_TEST_SIZE);
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("post-target-size"),
+            });
+        let target = chain.begin(&mut encoder, &view, surface);
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+
+        assert_eq!(
+            target.size,
+            (1920, 1080),
+            "the composite must follow the render target under the cap, not sit at 1280x720"
+        );
+        assert_ne!(target.size, (1280, 720), "the fixed 720p grid is retired");
+        assert!(
+            (target.aspect - 2048.0 / 1152.0).abs() < 1e-3,
+            "the capped grid must keep the target's aspect, got {}",
+            target.aspect
+        );
+    }
+
+    /// The kaleidoscope's aspect correction is the **live grid's**, not a
+    /// compile-time 16:9 (ADR-0034). With the grid now following the target, a
+    /// baked ratio would skew every wedge on any non-16:9 window.
+    ///
+    /// Asserted as the fold's own symmetry: an order-N dihedral fold makes the
+    /// output identical in each of its N wedges *in aspect-corrected space*, so
+    /// sampling those wedges with the true grid aspect must give matching means. If
+    /// the shader folded about a 16:9 axis on a 2:1 grid, the wedges would land
+    /// somewhere else and the means would diverge. Restricted to an inscribed disc
+    /// so the rectangular frame's corners do not give some wedges more area.
+    #[test]
+    fn the_fold_stays_symmetric_on_a_non_16_9_target() {
+        let Some(ctx) = headless_context_or_skip() else {
+            return;
+        };
+        let format = ctx.surface_format();
+        let mut background = Background::new(&ctx.device, format);
+        let mut kaleido = crate::render::kaleidoscope::Kaleidoscope::new(&ctx.device, format);
+        const ORDER: usize = 6;
+        assert!(kaleido.set_param("kaleido_order", ORDER as f32));
+
+        // 2:1 — as far from 16:9 as an ordinary window gets, and both axes land on
+        // the quantization step so the grid is exactly 2:1 too.
+        let surface = (512, 256);
+        assert_eq!(internal_grid_size(surface), (512, 256), "a 2:1 grid");
+
+        let (texture, view) = capture::create_target(&ctx.device, format, surface.0, surface.1);
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("kaleido-aspect"),
+            });
+        background.reset_params();
+        assert!(background.set_param("bg_bright", 1.0));
+        assert!(background.set_param("bg_vignette", 0.6));
+        let src = kaleido
+            .begin(&mut encoder, surface)
+            .expect("the fold builds its input");
+        background.render(&ctx.queue, &mut encoder, &src);
+        kaleido.resolve(&ctx.queue, &mut encoder, &view);
+        let (buffer, padded_bpr) = capture::create_readback(&ctx.device, surface.0, surface.1);
+        capture::record_copy(
+            &mut encoder,
+            &texture,
+            &buffer,
+            padded_bpr,
+            surface.0,
+            surface.1,
+        );
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+        let img = capture::read_back(&ctx.device, &buffer, surface.0, surface.1, padded_bpr)
+            .expect("read back the folded frame");
+
+        // Measured: 0.0099 with the live grid aspect, 0.1860 with a baked 1280x720
+        // — a 19x separation, and the threshold sits between them. Verified
+        // non-vacuous by re-baking the old constant and watching this fail.
+        let error = fold_mirror_error(&img, ORDER);
+        eprintln!("fold mirror error on a 2:1 grid: {error:.4}");
+        assert!(
+            error < 0.05,
+            "the fold's wedge mirror is broken by {error:.4} of the frame's contrast on a \
+             2:1 target — it is being aspect-corrected to something other than the live grid"
+        );
+    }
+
+    /// How badly the fold's own mirror symmetry is broken, measured in the frame's
+    /// **true** aspect-corrected space and normalized by the frame's contrast.
+    ///
+    /// A dihedral fold mirrors within each wedge, so the output must satisfy
+    /// `L(r, θ) == L(r, 2c - θ)` where `c` is that wedge's centre line. The
+    /// **screen** direction of those centre lines depends on the aspect the shader
+    /// corrected by: a line at angle `θ` in aspect-`A` space is a different set of
+    /// pixels than the same angle in aspect-`T` space. So measuring the symmetry
+    /// with the true grid aspect detects a shader folding about the wrong one —
+    /// which comparing whole-wedge *means* cannot, because the fold is periodic and
+    /// a periodic function's mean over any full period is the same wherever the
+    /// period starts.
+    fn fold_mirror_error(img: &CaptureImage, order: usize) -> f32 {
+        let (w, h) = (img.width as usize, img.height as usize);
+        let aspect = img.width as f32 / img.height.max(1) as f32;
+        let seg = std::f32::consts::TAU / order as f32;
+        let luma_at = |r: f32, theta: f32| -> Option<f32> {
+            // Back to pixels: undo the aspect correction on x only.
+            let x = ((r * theta.cos()) / aspect + 0.5) * w as f32 - 0.5;
+            let y = (r * theta.sin() + 0.5) * h as f32 - 0.5;
+            let (xi, yi) = (x.round() as i32, y.round() as i32);
+            if xi < 0 || yi < 0 || xi >= w as i32 || yi >= h as i32 {
+                return None;
+            }
+            let i = (yi as usize * w + xi as usize) * 4;
+            Some(
+                (0.299 * img.rgba[i] as f32
+                    + 0.587 * img.rgba[i + 1] as f32
+                    + 0.114 * img.rgba[i + 2] as f32)
+                    / 255.0,
+            )
+        };
+
+        let mut diff = 0.0f32;
+        let mut pairs = 0usize;
+        let mut values: Vec<f32> = Vec::new();
+        for ri in 1..=24 {
+            // Inside the inscribed disc, so no sample leaves the frame.
+            let r = 0.45 * ri as f32 / 24.0;
+            for ti in 0..(order * 12) {
+                let theta = std::f32::consts::TAU * ti as f32 / (order * 12) as f32;
+                let centre = seg * (theta / seg).floor() + seg * 0.5;
+                let mirrored = 2.0 * centre - theta;
+                if let (Some(a), Some(b)) = (luma_at(r, theta), luma_at(r, mirrored)) {
+                    diff += (a - b).abs();
+                    pairs += 1;
+                    values.push(a);
+                }
+            }
+        }
+        // Normalize by the frame's own contrast, so the number is scale-free and a
+        // flat frame cannot score a deceptively good zero.
+        let mean = values.iter().sum::<f32>() / values.len().max(1) as f32;
+        let contrast =
+            values.iter().map(|v| (v - mean).abs()).sum::<f32>() / values.len().max(1) as f32;
+        (diff / pairs.max(1) as f32) / contrast.max(1e-6)
     }
 
     /// The active stages always come out in chain order, never reordered — the
