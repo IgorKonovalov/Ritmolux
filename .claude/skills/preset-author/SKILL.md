@@ -104,10 +104,19 @@ screen-space kaleidoscope (`kaleido_*`), and the terminal ink-on-paper remap
 not an expression) so band/beat motion eases instead of snapping; `[palette]` / `[palette_b]` +
 bindable `palette_mix` set colour on the four shader-coloured scenes.
 
-**The one idiom to internalise:** bands read small, so almost every binding is **gain-then-bound** —
-`clamp(bass * 14, 0, 1.8)` — over a **baseline**: `0.4 + clamp(...)`, never bare reactive.
+**The two things to internalise:** bands read small, so almost every binding is **gain-then-bound**
+— `clamp(bass * 14, 0, 1.8)` — over a **baseline**: `0.4 + clamp(...)`, never bare reactive. And the
+bound matters most on **luminance**: the scenes draw additively, so a big reactive term on
+`brightness`/`glow`/`flash`/`thickness` clips the peak to white and erases the look. Peak energy
+belongs on structure — see the additive ceiling in the footguns.
 
 ## The workflow
+
+Steps 1–7 describe authoring a **new** look. If the task is instead *diagnosing or tuning presets
+that already exist* ("why does the library look like this", "fix the swarm set", "these all feel the
+same"), start with the measurement tools in step 4 — `--report` and the loud/quiet contact-sheet pair
+— and let them choose which files you open. Opening `.toml` files first, one at a time, is how a set
+gets tuned by anecdote.
 
 ### 1 — Understand the look
 What mood, energy, tempo feel? Which system fits? If the user is vague, don't over-interview — offer
@@ -124,22 +133,63 @@ Lead with a `#` comment describing the scene and what drives what (house convent
 deliberately: a slow `time` drift for evolution, `bar` for per-beat breathing, `beat`/`onset` for
 accents, `[smoothing]` where a driver would otherwise snap. Craft: `references/craft.md`.
 
-### 4 — Render and verify (this is what makes the lane trustworthy)
+### 4 — Render, verify, measure (this is what makes the lane trustworthy)
 A preset you haven't rendered is a guess — and **a bare still is a dead still** (default stimulus is
 silence). Point `shot` straight at the file; there is no copy-into-`%APPDATA%` dance any more:
 
 ```sh
-# One file, loud frame — judge composition and colour
+# Loud frame — judge composition and colour at peak
 cargo run -p standalone --example shot -- --preset-file presets/my_draft.toml \
-  --set bass=1,mid=1,treb=1,onset=1,beat=1,bar=0.5 --out draft.png
+  --set bass=1,mid=1,treb=1,onset=1,beat=1,bar=0.5 --out loud.png
 
-# The same file over synthesized audio through the real DSP — judge motion and beat response
+# Quiet frame — the same file at rest. Collapsing to nothing here means it isn't finished
+cargo run -p standalone --example shot -- --preset-file presets/my_draft.toml \
+  --set bass=0.1,mid=0.1,treb=0.05 --out quiet.png
+
+# Synthesized audio through the real DSP — judge motion and beat response
 cargo run -p standalone --example shot -- --preset-file presets/my_draft.toml \
   --signal click:120 --strip 8 --out strip.png
 ```
 
-Also look at a **quiet** frame (`--set bass=0.1,mid=0.1,treb=0.05`) — a preset that collapses to
-nothing at rest is not finished. Full flag reference: `references/render-loop.md`.
+Compare the loud and quiet frames rather than judging each alone: if the loud one has **less**
+legible structure than the quiet one, the preset is *inverted* — over the additive ceiling (footguns
+below, and `references/craft.md`). Loud is supposed to look like more.
+
+**Then read the numbers — `--report`.** It renders the whole loaded library and prints per-band
+reactivity, `anim`, `cover` and near-duplicate flags. No image, no per-preset loop: it diagnoses a
+library in one command, which makes it the cheapest first move in this lane, not a closing formality.
+
+```sh
+cargo run -p standalone --example shot -- --presets presets --report
+cargo run -p standalone --example shot -- --presets presets --report family=swarm
+```
+
+Pass `--presets presets` (or `--preset-file`) deliberately — bare `--report` resolves to whichever
+library wins precedence, usually the seeded per-user copy rather than your working tree. Reading it:
+a `0.000` band column means that band drives nothing visible; `anim` near zero means the look is
+frozen in silence; `cover` near zero means the loud frame has no structure *against its own
+background* — dead, flung out of view, or uniformly blown out; `NEAR-DUP` means it isn't a new look.
+The numbers name the suspects; the stills tell you which failure it is.
+
+**Auditing a set — the loud/quiet contact-sheet pair.** `--all` tiles every preset in the loaded
+library as a labeled grid, and it honours `--set`, so the same library at two excitations gives two
+sheets you flip between:
+
+```sh
+cargo run -p standalone --example shot -- --presets presets --all \
+  --set bass=1,mid=1,treb=1,onset=1,beat=1,bar=0.5 --out audit/loud.png
+cargo run -p standalone --example shot -- --presets presets --all \
+  --set bass=0.1,mid=0.1,treb=0.05 --out audit/quiet.png
+```
+
+Read them as a pair, exactly as you read the single-preset frames: every preset that goes *flatter*
+from quiet to loud is broken, and family-wide sameness is obvious in a grid in a way it never is one
+still at a time. This is the right opening move whenever the task is "fix/tune the set" or "why does
+the library look like this" rather than "make one new look" — it costs one build and a couple of
+minutes. `--report` + the sheet pair together will usually have found the problem before you open a
+single `.toml`.
+
+Full flag reference: `references/render-loop.md`.
 
 ### 5 — Iterate with the user on stills
 Show rendered variants, not descriptions. Tune from what they pick. Repeat until the look lands.
@@ -158,6 +208,27 @@ off, and note that an embedded preset must survive the behavioral gates (`sanity
 
 ## The footguns that ruin presets
 
+- **The additive ceiling is the single biggest one.** Every scene draws *additively* and the frame
+  clips per channel, so luminance terms stack (`brightness` + `glow`/`flash` + `thickness` + what
+  `trails` has accumulated + `bg_bright`) and a hard peak renders **flat white** with the structure
+  and the palette both gone. The mirror failure is over-driven motion (`force`, `burst`, `scale`)
+  flinging the picture out of frame so loud reads as *nothing*. Hold luminance nearly flat and spend
+  peak energy on structure — the full principle, with the numbers that worked, is the first section
+  of `references/craft.md`. This one binding habit is worth more than every other footgun here.
+- **Presets now dissolve into each other (Plan 0023 / ADR-0024) — a preset is no longer judged
+  alone.** Every switch is a ~1 s blend whose kind rotates deterministically through crossfade,
+  **add/burn**, luma-dissolve and wipe, and rotation walks the `presets/` **filename sort**, so your
+  file's neighbours are its alphabetical ones. Three consequences reach your `.toml`:
+  - the add/burn kind *sums* two frames, so a preset already sitting at its brightness ceiling has no
+    headroom left mid-dissolve — one more reason peak energy belongs on structure;
+  - `ink_*`/`paper_*` **crossfade across the switch** (one engine-wide ink pass over the blended
+    frame), so an ink preset following a glowing one passes through the greyed partial-ink state.
+    That's a transition, not a bug — but don't park two clashing ink duotones next to each other;
+  - `trails` restarts from empty at the switch, so a look that *is* its accumulation arrives a beat
+    late. Judge it a few beats in.
+
+  Nothing about the dissolve is preset-authored today — a per-preset `[transition]` is a deliberate
+  follow-up, not a gap to work around.
 - **A misspelled param name still loads.** Since ADR-0020 the loader *warns* — but the binding is
   kept and nothing reads it. Worse for this lane: **`shot` prints load errors and swallows
   warnings**, so a typo is invisible in exactly the tool you verify through (a known open minor).
@@ -201,10 +272,11 @@ parser rejects — use the `Write` tool, and check the diff.
 
 Read on demand, not upfront.
 
-- `references/craft.md` — what makes a preset *beautiful*: layering motion across time-scales, colour
-  cohesion through the palette surface, easing, per-system aesthetics.
-- `references/render-loop.md` — the `shot` CLI: every flag, the loud/quiet stills, contact sheets,
-  filmstrips, and the metrics report.
+- `references/craft.md` — what makes a preset *beautiful*: **the additive ceiling first** (the failure
+  mode behind most broken presets), then layering motion across time-scales, colour cohesion through
+  the palette surface, easing, per-system aesthetics.
+- `references/render-loop.md` — the `shot` CLI: every flag, the loud/quiet stills, how to read
+  `--report` column by column, the loud/quiet **audit pair** of contact sheets, and filmstrips.
 - `references/api-feedback.md` — the second duty: the gaps that are *still* real, how to write a
   feedback note, and the curation handoff.
 - `references/grammar.md` — authoring-specific notes on the grammar and the non-`[params]` tables
