@@ -53,13 +53,33 @@ kaleido_angle = "time * 0.13"
 trails        = "0.34 + clamp(bass * 0.5, 0, 0.22)"
 
 [smoothing]
-# The order ladder gets the longest constant in the file - this is what turns
-# a discrete jump between fold counts into a rosette that grows petals.
-kaleido_order = 1.1
-warp          = { attack = 0.02, release = 0.28 }
-zoom          = 0.18
-glow          = 0.22
-color_span    = 0.35
-color_center  = 0.40
-palette_mix   = 0.60
-trails        = 0.30
+# Smoothed hard, everywhere. This preset folds the frame, and the fold
+# REPLICATES motion as well as luminance: a twitch in the wedge becomes the same
+# twitch times `kaleido_order`, so anything that reads as lively on an unfolded
+# field reads as jarring here. Every constant below is longer than it would be
+# on the same param in `fragment_warp`, and that is deliberate.
+#
+# The order ladder gets the longest constant in the file - this is what turns a
+# discrete jump between fold counts into a rosette that grows petals. It is also
+# the anti-chatter lever: the three gates read a sum of all three bands, which
+# hovers near a boundary for whole passages, and a short constant would let the
+# fold count flicker between two figures. Long enough that a boundary crossing
+# has to be sustained before the picture commits to it.
+kaleido_order = 2.1
+
+# `warp` is CONTINUOUS structure here, not a percussive accent - so it stays
+# symmetric and long. An { attack, release } pair belongs on things that should
+# hit; giving it a fast attack made the per-beat term snap, which through the
+# fold is exactly the jarring the preset must not have.
+warp          = 0.62
+
+# `flash` was the one unsmoothed param in the file - an instant onset strobe,
+# multiplied by up to 24 wedges. Now it eases in and decays out.
+flash         = { attack = 0.09, release = 0.70 }
+
+zoom          = 0.45
+glow          = 0.42
+color_span    = 0.55
+color_center  = 0.62
+palette_mix   = 0.95
+trails        = 0.48

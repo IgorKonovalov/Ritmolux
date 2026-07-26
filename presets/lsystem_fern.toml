@@ -43,34 +43,67 @@ rotation = "0.26 * time + sin(time * 0.037) * 0.30"
 # THE REVEAL - the plant draws itself on across each beat, never fully erasing.
 draw_progress = "clamp(0.55 + bar * 0.60 + clamp(onset * 0.7, 0, 0.20), 0, 1)"
 
-# STROKE - thin, because the mirror overlaps five copies near the origin.
-thickness  = "1.15 + clamp(bass * 0.9, 0, 0.80)"
-brightness = "0.56 + clamp(bass * 0.30, 0, 0.15)"
+# STROKE - THE GLOW. There is no `glow` param on a line scene (only
+# fragment_field and reaction_diffusion have one) and no bloom stage in the
+# engine yet, so a glowing line is built from the two levers that do exist:
+#
+#   - `thickness` is the halo. The line primitive draws each segment as a quad
+#     with a QUADRATIC falloff from a bright core to the quad edge, so a wider
+#     stroke is not just a fatter line - it is a bigger soft halo around the
+#     same core. This is the lever that actually reads as glow.
+#   - `brightness` is the shader's glow multiplier, straight onto that falloff.
+#
+# Both run far above the rest of the line set here, and the additive blend plus
+# the five-fold mirror lets the dense interior stack into a white-hot core -
+# which is what sells it as light rather than as paint.
+# THE FOCUS/GLOW TRADE, learned the hard way: a very wide stroke does NOT read
+# as a brighter glow, it reads as OUT OF FOCUS. The falloff is quadratic across
+# the whole quad, so widening it spreads the core out rather than adding halo
+# around a core. Glow wants a THIN, very bright core - brightness carries the
+# intensity, thickness only sets how far the halo reaches past it. 1.9 with a
+# 1.55 multiplier is sharp and hot; 4.0 was a blur.
+thickness  = "1.90 + clamp(bass * 1.3, 0, 0.90)"
+brightness = "1.55 + clamp(bass * 0.70, 0, 0.35)"
 scale      = "0.68 + clamp(mid * 0.30, 0, 0.14) + clamp(bass * 0.35, 0, 0.16)"
-hue        = "0.30 + time * 0.023 + clamp(treb * 0.8, 0, 0.28) + bar * 0.04"
+# THE GLOW COLOUR. On a line scene there is no separate glow tint - the stroke
+# colour IS the glow colour, so this one param sets both. 0.46 lands near-white
+# with a faint green cast, which is the hottest-reading point on the cosine
+# ramp: a filament rather than a coloured line. Note the ramp is NOT a standard
+# hue wheel - 0.30 is cyan, 0.62 is gold, 0.82 is rose. Sweep it, do not assume.
+hue        = "0.46 + time * 0.023 + clamp(treb * 0.8, 0, 0.28) + bar * 0.04"
 
 # GEOMETRY MIRROR - the thicket. Five-fold, no reflection: a reflected fern
 # reads as a mirrored plant rather than a grown one.
 mirror_order   = "5"
 mirror_reflect = "0"
 
-# VIEW + COMPOSITE - an off-centre camera so the growth has somewhere to go,
-# over a deep forest backdrop.
+# VIEW + COMPOSITE - an off-centre camera so the growth has somewhere to go.
 zoom        = "1.10 + bar * 0.06 + clamp(bass * 0.35, 0, 0.15)"
 pan_x       = "sin(time * 0.0170) * 0.05"
 pan_y       = "cos(time * 0.0130) * 0.04"
-bg_hue      = "0.52 + sin(time * 0.0091) * 0.05"
-bg_bright   = "0.085 + clamp((bass + mid) * 0.55, 0, 0.13)"
-bg_vignette = "0.55"
 
-# FEEDBACK - restored (Plan 0033) - this is the preset whose afterglow the old 720p grid cost. The draw_progress reveal now leaves a wake.
-trails = "0.62 + clamp(bass * 0.25, 0, 0.12)"
+# THE BACKDROP IS PART OF THE GLOW, and this is the non-obvious half. The old
+# values (bg_bright 0.085 rising to 0.215, vignette 0.55) lifted the whole frame
+# to a mid teal, and an additive halo falling off into a lifted floor reads as
+# flat paint - raising `thickness` against it only made the fern FATTER, never
+# brighter. Dropping the floor and deepening the vignette is what gives the
+# halo somewhere to fall off into; the stroke values above only work over this.
+bg_hue      = "0.55 + sin(time * 0.0091) * 0.05"
+bg_bright   = "0.012 + clamp((bass + mid) * 0.08, 0, 0.016)"
+bg_vignette = "0.88"
+
+# FEEDBACK - restored (Plan 0033); the preset whose afterglow the old 720p grid
+# cost. Long, because a glow that persists between the draw_progress reveals is
+# most of what makes the thicket read as lit rather than as stroked.
+trails = "0.72 + clamp(bass * 0.20, 0, 0.10)"
 
 [smoothing]
 # A long constant on the depth so a generation appears as a swell, not a pop.
 visible_depth = 1.2
 rotation      = 0.20
-thickness     = 0.15
+# The stroke now carries the glow, so it eases longer than it did as a thin
+# line - a fast constant on a 4.0-wide halo pumps the whole frame's luminance.
+thickness     = { attack = 0.06, release = 0.55 }
 scale         = 0.20
 hue           = 0.42
 zoom          = 0.20

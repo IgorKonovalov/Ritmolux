@@ -38,9 +38,13 @@ thickness  = "0.70 + clamp(mid * 0.55, 0, 0.31) + beat * 0.087"
 brightness = "0.46 + clamp(bass * 0.22, 0, 0.11)"
 hue        = "0.58 + time * 0.017 + clamp(mid * 0.5, 0, 0.20) + bar * 0.04"
 
-# 560 x 3 folds = 1680 segments, doubling to 3360 on the beat reflection.
+# 560 x 3 folds = 1680 segments, doubling to 3360 when the reflection latches.
+# Latched on a HARD ONSET rather than on `beat`: a reflection that toggles on
+# every single beat doubles and halves the figure twice a second, which was the
+# largest single source of this preset reading as aggressive. On onset it lands
+# on real transients and the figure holds its shape between them.
 mirror_order   = "3"
-mirror_reflect = "beat"
+mirror_reflect = "onset > 0.60"
 
 zoom        = "1.05 + bar * 0.07 + clamp(bass * 0.35, 0, 0.15)"
 pan_x       = "sin(time * 0.021) * 0.05"
