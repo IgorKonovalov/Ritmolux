@@ -3,13 +3,14 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0034**
+**Next free number: 0035**
 
 ## Active roster
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0033](0033-internal-resolution-and-preset-surface.md) | Internal resolution follows the target, plus the preset-surface and harness gaps behind it | **approved 2026-07-26** — ready for `dev` | dev, human |
+| [0034](0034-preset-reachable-spectrum.md) | Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation | draft | dev, human |
 
 ## Recommended execution sequence
 
@@ -24,11 +25,19 @@ scene at all), `[smoothing]` gains an `{ attack, release }` pair
 unable to drive `tempo`/`novelty` or to say what real audio levels look like. Phase 8 is `human` —
 the aesthetic re-tune on the user's 2048x1152 display, which engine-green cannot substitute for.
 
-**Deliberately sequenced after it:** backlog 0005 (a bloom/glow post stage), so it is built against
-target-sized stages rather than inheriting the 720p problem it exists to answer. **Not yet designed:**
-backlog 0002 (per-bin spectrum + a scene that draws N elements — the largest item in the batch, and
-the one the user asked for twice) and backlog 0007 (`star_pattern`, which the user chose to invest in
-rather than cut).
+**[0034] is independent of [0033]** — they share no files, so either order works. It closes backlog
+0002, the capability the user asked for twice. Three verifications shrank it well below the feedback
+note's estimate: the 64-band log-spaced spectrum **already exists** on `AnalysisFrame` (`dsp/mod.rs:32`,
+commented "Log-frequency bands exposed to scenes"), **every scene already receives it** through
+`Scene::update`, and `LineRenderer` **already draws arbitrary segment lists** — so there is no new DSP,
+no new render idiom, and no `Scene`-trait or C-ABI change in the first three phases. `bin(x)` alone
+answers the attractor-morphing half; per-element evaluation is sequenced last on purpose
+([ADR-0036](../adrs/0036-preset-reachable-spectrum.md)).
+
+**Deliberately sequenced after [0033]:** backlog 0005 (a bloom/glow post stage), so it is built against
+target-sized stages rather than inheriting the 720p problem it exists to answer. **Still undesigned:**
+backlog 0007 (`star_pattern`, which the user chose to invest in rather than cut) and the waterfall
+spectrogram, which [0034] leaves as a followup on the same spectrum surface.
 
 ### Prior sequencing notes
 

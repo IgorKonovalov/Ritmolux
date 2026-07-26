@@ -75,6 +75,17 @@ recorded per entry. Ordered by how hard each blocked real authoring work, not by
 - **Verified against code:** yes. `VAR_NAMES` (`core/src/preset/expr.rs:41`) is exactly nine scalars —
   `bass mid treb onset beat bar time tempo novelty`. The FFT exists in the analyzer; **none of it is
   reachable from a preset.**
+- **PROMOTED 2026-07-26 → [ADR-0036](adrs/0036-preset-reachable-spectrum.md) +
+  [Plan 0034](plans/0034-preset-reachable-spectrum.md).** **Three verifications shrank this well below
+  the estimate below**, and they are why the plan is three separable steps rather than one big one:
+  (1) the spectrum already exists as a **normalized, log-spaced 64-band array** on `AnalysisFrame`
+  (`dsp/mod.rs:32`, commented "Log-frequency bands exposed to scenes"), already consumed by
+  `novelty.rs` — **no new DSP**; (2) `Scene::update(&mut self, frame: &AnalysisFrame)` **already hands
+  every scene all 64 bands every frame**, so a scene drawing the spectrum needs no new channel; (3)
+  `LineRenderer::draw(&[SegmentInstance])` already draws arbitrary segment lists, so an N-element
+  scene is a **fourth consumer of an existing idiom**, not a new render idiom. The attractor-morphing
+  half is met by `bin(x)` driving its four shape scalars — no per-particle mechanism needed. Notes
+  retained below as the origin record.
 
 Three bands is not a spectrum. The lane's workaround was to map the three bands onto three
 *separable structural* levers (Arrowhead: treble to subdivision depth, mid to mirror fold count,
