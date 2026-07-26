@@ -44,7 +44,7 @@ mod transition;
 use crate::audio::AudioFormat;
 use crate::diag::{Diag, Metrics};
 use crate::dsp::AnalysisFrame;
-use crate::preset::{Preset, SystemKind, Variables};
+use crate::preset::{Easing, Preset, SystemKind, Variables};
 use background::Background;
 pub use capture::CaptureImage;
 pub use context::{RenderContext, RenderError};
@@ -277,12 +277,17 @@ fn resolve_routes(presets: &[Preset]) -> Vec<Vec<ParamRoute>> {
         .collect()
 }
 
-/// Render-layer one-pole low-pass over evaluated parameter values (ADR-0019 /
-/// Plan 0018 Phase 5). Each active-preset binding gets optional exponential
-/// smoothing with a per-param time constant `tau` (seconds), applied on the
-/// injected real `dt` **between** `expr.eval` and `set_param`, so band- and
-/// beat-driven motion eases instead of snapping. The expression layer stays pure
-/// and allocation-free — the smoothing state lives only here.
+/// Render-layer one-pole envelope over evaluated parameter values (ADR-0019 /
+/// Plan 0018 Phase 5, widened by ADR-0035). Each active-preset binding gets
+/// optional exponential smoothing with a per-param [`Easing`] (seconds), applied
+/// on the injected real `dt` **between** `expr.eval` and `set_param`, so band-
+/// and beat-driven motion eases instead of snapping. The expression layer stays
+/// pure and allocation-free — the smoothing state lives only here.
+///
+/// With `attack != release` this is deliberately **not** a linear filter: a
+/// direction-dependent time constant rectifies, so a fast-attack parameter rides
+/// above its input's mean under sustained material. That is the envelope-follower
+/// behavior ADR-0035 exists to provide, not a defect.
 ///
 /// State is keyed by binding **index** (the active preset's `params` are a stable
 /// name-sorted `Vec`) and is **reset on every active-preset change** (a switch
@@ -303,17 +308,24 @@ impl ParamSmoother {
         self.last.clear();
     }
 
-    /// Smooth `raw` for binding `index` toward its previous value with time
-    /// constant `tau` seconds over `dt` seconds. `tau <= 0` (the default), a
-    /// non-finite `tau`, or a non-positive `dt` passes `raw` through unchanged.
-    /// The first frame after a reset seeds the state with `raw` (a snap).
-    fn smooth(&mut self, index: usize, raw: f32, tau: f32, dt: f32) -> f32 {
+    /// Smooth `raw` for binding `index` toward its previous value over `dt`
+    /// seconds, using whichever of `tau`'s two constants the direction of travel
+    /// selects (ADR-0035). A selected constant of `<= 0` (the default) or
+    /// non-finite, or a non-positive `dt`, passes `raw` through unchanged. The
+    /// first frame after a reset seeds the state with `raw` (a snap).
+    fn smooth(&mut self, index: usize, raw: f32, tau: Easing, dt: f32) -> f32 {
         if self.last.len() <= index {
             self.last.resize(index + 1, raw);
         }
         let Some(slot) = self.last.get_mut(index) else {
             return raw; // unreachable after the resize; never panics on the hot path
         };
+        // The direction test is against the **held** value, not the raw signal's
+        // own derivative (ADR-0035): a parameter already above its new target
+        // releases toward it even while the raw input is still rising. That is
+        // the envelope-follower convention, and it is what keeps the behavior
+        // stable under a noisy input.
+        let tau = if raw > *slot { tau.attack } else { tau.release };
         if tau <= 0.0 || !tau.is_finite() || dt <= 0.0 {
             *slot = raw;
             return raw;
@@ -1591,7 +1603,7 @@ mod tests {
         Roster, resolve_route,
     };
     use crate::dsp::AnalysisFrame;
-    use crate::preset::{Preset, SystemKind};
+    use crate::preset::{Easing, Preset, SystemKind};
     use crate::render::metrics::frame_diff;
     use crate::render::post::{KALEIDOSCOPE, TRAILS};
 
@@ -1715,14 +1727,16 @@ mod tests {
     }
 
     /// `tau` is read off the `[smoothing]` table once at load, so the frame loop
-    /// does no map lookup. An unlisted param is `0.0` = instant (ADR-0019).
+    /// does no map lookup. An unlisted param is instant (ADR-0019), and a scalar
+    /// entry means the same constant in both directions (ADR-0035).
     #[test]
     fn smoothing_taus_are_resolved_onto_the_bindings() {
         let p = Preset::from_toml_str(
             "system = \"swarm\"\n[params]\nforce = \"bass\"\nhue = \"time\"\n\
-             [smoothing]\nforce = 0.25\n",
+             size = \"treb\"\n\
+             [smoothing]\nforce = 0.25\nsize = { attack = 0.02, release = 0.7 }\n",
         )
-        .expect("valid preset with a [smoothing] entry");
+        .expect("valid preset with both [smoothing] forms");
         let tau_of = |name: &str| {
             p.params
                 .iter()
@@ -1730,8 +1744,78 @@ mod tests {
                 .map(|b| b.tau)
                 .expect("bound param")
         };
-        assert_eq!(tau_of("force"), 0.25, "listed in [smoothing]");
-        assert_eq!(tau_of("hue"), 0.0, "unlisted means instant");
+        assert_eq!(
+            tau_of("force"),
+            Easing::symmetric(0.25),
+            "a scalar is both directions"
+        );
+        assert_eq!(tau_of("hue"), Easing::INSTANT, "unlisted means instant");
+        assert_eq!(
+            tau_of("size"),
+            Easing {
+                attack: 0.02,
+                release: 0.7
+            },
+            "the pair form resolves at the same boundary"
+        );
+    }
+
+    /// Both constants are validated at the load boundary, and the error names the
+    /// parameter — and, for a pair, which side of it. A bad value is a surfaced
+    /// load error the caller degrades on, never a panic (ADR-0002 / NFR 10).
+    #[test]
+    fn a_bad_smoothing_constant_is_a_load_error_naming_the_parameter() {
+        let load = |table: &str| {
+            Preset::from_toml_str(&format!(
+                "system = \"swarm\"\n[params]\nforce = \"bass\"\n[smoothing]\n{table}\n"
+            ))
+        };
+        let err = load("force = -1.0")
+            .expect_err("negative scalar")
+            .to_string();
+        assert!(
+            err.contains("force") && err.contains("non-negative"),
+            "{err}"
+        );
+        assert!(load("force = nan").is_err(), "non-finite scalar");
+        assert!(load("force = inf").is_err(), "non-finite scalar");
+
+        // Each side of a pair is checked, and the message says which one.
+        let err = load("force = { attack = -1.0, release = 0.7 }")
+            .expect_err("negative attack")
+            .to_string();
+        assert!(
+            err.contains("force") && err.contains("attack"),
+            "the error must name the failing side: {err}"
+        );
+        let err = load("force = { attack = 0.02, release = nan }")
+            .expect_err("non-finite release")
+            .to_string();
+        assert!(err.contains("release"), "{err}");
+
+        // A malformed table is as clear as a malformed float: both expected keys
+        // are named, half a pair is rejected rather than silently defaulted, and
+        // a wrong type says what was wanted.
+        let err = load("force = { atack = 0.02, release = 0.7 }")
+            .expect_err("misspelled key")
+            .to_string();
+        assert!(
+            err.contains("attack") && err.contains("release"),
+            "an unknown key must name the expected ones: {err}"
+        );
+        assert!(
+            load("force = { attack = 0.02 }").is_err(),
+            "half a pair is a mistake, not a shorthand"
+        );
+        assert!(
+            load("force = { release = 0.7 }").is_err(),
+            "half a pair is a mistake, not a shorthand"
+        );
+        let err = load("force = \"fast\"").expect_err("a string").to_string();
+        assert!(
+            err.contains("attack") && err.contains("release"),
+            "a wrong type must state both accepted forms: {err}"
+        );
     }
 
     /// Build a headless `Renderer`, or return `None` (a logged skip) when the
@@ -1959,7 +2043,7 @@ mod tests {
     fn smoothing_eases_a_step_instead_of_snapping() {
         let mut s = ParamSmoother::default();
         let dt = 1.0 / 60.0;
-        let tau = 0.1;
+        let tau = Easing::symmetric(0.1);
         // The first value after a reset snaps (it seeds the state).
         assert_eq!(s.smooth(0, 0.0, tau, dt), 0.0);
         // A step to 1.0 closes only a fraction of the gap — eased, not snapped.
@@ -1977,13 +2061,134 @@ mod tests {
         );
     }
 
-    /// `tau = 0` (the default for an unlisted param) is today's instant behaviour.
+    /// ADR-0035: the same step, up and then down, under
+    /// `{ attack = 0.02, release = 0.7 }`. The property is the **asymmetry** —
+    /// a snap up and a glide down — which no single `tau` reaches at any value.
+    ///
+    /// The absolute figures are what this filter actually does at 60 Hz:
+    /// `alpha = 1 - exp(-dt/tau)` closes 56.5 % of the gap per frame at
+    /// `tau = 0.02`, so two frames reach 81 % and three reach 92 %. (Plan 0033's
+    /// done-when says "90 % within two frames"; that is one frame optimistic for
+    /// this constant — the assertion below pins the arithmetic, not the prose.)
+    #[test]
+    fn asymmetric_easing_snaps_up_and_glides_down() {
+        let mut s = ParamSmoother::default();
+        let dt = 1.0 / 60.0;
+        let e = Easing {
+            attack: 0.02,
+            release: 0.7,
+        };
+
+        // Seed at 0, then step to 1.0 and watch the rise.
+        assert_eq!(s.smooth(0, 0.0, e, dt), 0.0);
+        let after_two = {
+            s.smooth(0, 1.0, e, dt);
+            s.smooth(0, 1.0, e, dt)
+        };
+        assert!(
+            after_two >= 0.80,
+            "attack = 0.02 must cover most of the step in two 60 Hz frames, got {after_two}"
+        );
+        let after_three = s.smooth(0, 1.0, e, dt);
+        assert!(
+            after_three >= 0.90,
+            "three frames reach 90 % of the target, got {after_three}"
+        );
+
+        // Settle, then step back to 0 and watch the fall over 0.4 s.
+        for _ in 0..300 {
+            s.smooth(0, 1.0, e, dt);
+        }
+        let mut falling = 0.0;
+        for _ in 0..(0.4 / dt) as usize {
+            falling = s.smooth(0, 0.0, e, dt);
+        }
+        assert!(
+            falling > 0.50,
+            "release = 0.7 must still be above half a second's worth of glide after \
+             0.4 s, got {falling}"
+        );
+
+        // The asymmetry itself, stated as a comparison rather than two constants:
+        // the rise covers far more of its gap in two frames than the fall does.
+        let mut sym = ParamSmoother::default();
+        let slow = Easing::symmetric(0.7);
+        sym.smooth(0, 0.0, slow, dt);
+        sym.smooth(0, 1.0, slow, dt);
+        let symmetric_two = sym.smooth(0, 1.0, slow, dt);
+        assert!(
+            after_two > symmetric_two * 10.0,
+            "a 0.02 s attack must be dramatically faster than the 0.7 s release used \
+             symmetrically ({after_two} vs {symmetric_two}) — otherwise one constant \
+             would have done"
+        );
+    }
+
+    /// ADR-0035's compatibility claim, checked rather than asserted in prose: a
+    /// scalar `[smoothing]` entry and an explicit `{ attack = t, release = t }`
+    /// table are **bit-identical** through the whole load-and-smooth path. This is
+    /// why no shipped preset moved and no golden was re-blessed.
+    #[test]
+    fn a_scalar_smoothing_entry_is_bit_identical_to_an_equal_pair() {
+        let load = |table: &str| {
+            Preset::from_toml_str(&format!(
+                "system = \"swarm\"\n[params]\nforce = \"bass\"\n[smoothing]\nforce = {table}\n"
+            ))
+            .expect("valid preset")
+            .params
+            .first()
+            .expect("one binding")
+            .tau
+        };
+        let scalar = load("0.31");
+        let pair = load("{ attack = 0.31, release = 0.31 }");
+        assert_eq!(scalar, pair, "the two forms resolve to the same constants");
+
+        // Drive both through the smoother with a signal that rises *and* falls, so
+        // the direction branch is exercised in both directions, and compare raw
+        // bits — an epsilon compare would hide exactly the drift this rules out.
+        let dt = 1.0 / 60.0;
+        let (mut a, mut b) = (ParamSmoother::default(), ParamSmoother::default());
+        for i in 0..240 {
+            let raw = ((i as f32) * 0.11).sin() * 0.5 + 0.5;
+            let va = a.smooth(0, raw, scalar, dt);
+            let vb = b.smooth(0, raw, pair, dt);
+            assert_eq!(
+                va.to_bits(),
+                vb.to_bits(),
+                "frame {i}: scalar {va} != pair {vb}"
+            );
+        }
+    }
+
+    /// `tau = 0` (the default for an unlisted param) is today's instant behaviour,
+    /// and ADR-0035 keeps `0` meaning instant **per side**.
     #[test]
     fn zero_tau_passes_through_instantly() {
         let mut s = ParamSmoother::default();
         let dt = 1.0 / 60.0;
-        assert_eq!(s.smooth(0, 0.5, 0.0, dt), 0.5);
-        assert_eq!(s.smooth(0, 0.9, 0.0, dt), 0.9, "tau=0 snaps every frame");
+        assert_eq!(s.smooth(0, 0.5, Easing::INSTANT, dt), 0.5);
+        assert_eq!(
+            s.smooth(0, 0.9, Easing::INSTANT, dt),
+            0.9,
+            "tau=0 snaps every frame"
+        );
+
+        // A zero on one side only: that direction snaps while the other still
+        // eases. `{ attack = 0, release = 0.5 }` is the "instant hit, slow decay"
+        // an author reaches for on a percussive accent.
+        let half = Easing {
+            attack: 0.0,
+            release: 0.5,
+        };
+        let mut s = ParamSmoother::default();
+        assert_eq!(s.smooth(1, 0.0, half, dt), 0.0, "seeds");
+        assert_eq!(s.smooth(1, 1.0, half, dt), 1.0, "attack = 0 snaps up");
+        let falling = s.smooth(1, 0.0, half, dt);
+        assert!(
+            falling > 0.0 && falling < 1.0,
+            "release = 0.5 still eases down: {falling}"
+        );
     }
 
     /// A reset makes the next frame snap to the incoming value — the mechanism
@@ -1992,7 +2197,7 @@ mod tests {
     fn reset_snaps_to_the_next_value() {
         let mut s = ParamSmoother::default();
         let dt = 1.0 / 60.0;
-        let tau = 0.2;
+        let tau = Easing::symmetric(0.2);
         s.smooth(0, 0.0, tau, dt);
         for _ in 0..10 {
             s.smooth(0, 1.0, tau, dt); // partway toward 1.0

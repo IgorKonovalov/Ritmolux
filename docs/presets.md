@@ -343,6 +343,35 @@ left-associatively as `(a > b) > c`, comparing a `0`/`1` against `c`. Write
   select(tempo > 130, 1 + bass * 3, 1 + bass * 0.6)
   ```
 
+### What an expression cannot do: shape a value *over time*
+
+`smoothstep` eases a **value** as its input crosses a threshold. It cannot ease a
+**trajectory**, because expressions are pure and stateless by hard invariant —
+there is no previous frame to ease away from. Anything time-shaped therefore
+lives in `[smoothing]`, not in the expression:
+
+```toml
+[params]
+thickness = "0.9 + beat * 0.6"           # the target: snaps on every beat
+
+[smoothing]
+thickness = { attack = 0.02, release = 0.7 }   # the trajectory: hit, then glide
+```
+
+`attack` is the time constant while the value is **rising**, `release` while it is
+falling or level; a plain `thickness = 0.3` means the same constant both ways.
+That is what makes a percussive accent land in a frame or two and then decay over
+most of a second — a single constant slows the rise exactly as much as the fall,
+so there is no value that gives both.
+
+> **A two-constant entry stops being a low-pass and becomes a rectifier.**
+> Because rise and fall are treated differently, a symmetric input comes out with
+> a DC offset: the parameter **rides above its input's mean** under sustained
+> material. On a percussive accent that is the point. On a continuous parameter
+> it is a surprise — a fast-attack `hue` drifts upward instead of tracking. Use
+> the pair where you want a hit; leave anything continuous symmetric. Full table
+> reference: [`presets/README.md`](../presets/README.md).
+
 ---
 
 ## When a preset is wrong
