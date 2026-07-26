@@ -272,12 +272,53 @@ identifier that is neither a constant nor a variable is a compile error.
 | `lerp(a, b, t)` | 3 | Linear blend `a + (b - a) * t`. |
 | `smoothstep(e0, e1, x)` | 3 | Eased `0 → 1` ramp as `x` crosses `e0 → e1` (`0` below, `1` above). The easing primitive — smoother than `clamp` for a threshold. |
 | `select(cond, x, y)` | 3 | `x` if `cond != 0.0`, else `y`. **Only the taken branch is evaluated.** |
+| `bin(x)` | 1 | The **spectrum** at normalized position `x` (`0` = lowest frequency, `1` = highest), interpolated between adjacent bands. See below. |
 
 Calling a function with the wrong number of arguments, or referencing an unknown
 name, is a **compile error** — the preset is rejected at load and the app keeps
 the previous good set (it does not crash). Division by zero yields `inf`/`NaN`
 rather than panicking, but you should avoid it — a `NaN` parameter produces
 undefined-looking visuals.
+
+### `bin(x)` — reaching the spectrum
+
+`bass`/`mid`/`treb` are three numbers for the whole audible range. `bin(x)` reads
+the *same* analysis at whatever resolution you point it at: the engine's
+log-spaced band array, sampled at a normalized position and interpolated between
+the two adjacent bands. A preset never names the band count, so nothing here
+breaks if the engine ever re-bands.
+
+```toml
+[params]
+# Morph an attractor's shape from the low-mids rather than from a whole band.
+a = "1.4 + bin(0.15) * 0.4"
+# A treble-region shimmer, independent of what the bass is doing.
+brightness = "0.6 + bin(0.85) * 0.8"
+```
+
+It is **total**: `bin(0)` is the lowest band, `bin(1)` the highest, anything
+outside `0..1` clamps, and a `NaN` argument reads the lowest band. It never
+errors and never rejects a preset at load.
+
+> [!WARNING]
+> **The bands are log-spaced, so `x` is not linear in Hz.** The array covers
+> ~20 Hz to Nyquist across 64 bands, which means the bottom of the range is
+> finely resolved and the top octave is one or two bands. Two consequences:
+>
+> - **`bin(0.02)` is not reliably "the kick".** Down there a single band is a
+>   narrow musical interval, and it will often be sub-bass rumble rather than
+>   the beater. Sweep the value while listening rather than computing it.
+> - **One call near the top covers a wide interval.** `bin(0.95)` answers for
+>   most of the presence/air region at once, so it reads smoother and less
+>   selective than a call near the bottom.
+>
+> Point sampling is deliberate — there is no range-integrating companion
+> (`bin_range(lo, hi)`) yet. If you want a region rather than a point, average a
+> few calls: `(bin(0.1) + bin(0.13) + bin(0.16)) / 3`.
+
+Values come off the same normalization as the bands: a full-scale sine reads near
+`1.0` in its band, and ordinary music reads **small**, so multiply up and clamp
+exactly as you would with `bass`.
 
 ### Comparisons and branching
 

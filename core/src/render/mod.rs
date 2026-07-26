@@ -360,7 +360,7 @@ fn evaluate_preset(
     side: &mut CompositeSide,
     ink: Option<&mut Ink>,
     smoother: &mut ParamSmoother,
-    vars: &Variables,
+    vars: &Variables<'_>,
     frame: &AnalysisFrame,
     time: f32,
     dt: f32,
@@ -1129,6 +1129,10 @@ impl Renderer {
 
         // Evaluate against the shared clock and this frame's analysis. Both sides
         // of a dissolve read the same variables — they differ in what they *bind*.
+        //
+        // The band array rides along **by borrow** (ADR-0036): this bundle is
+        // built once per frame here but read once per binding below, so a
+        // by-value spectrum would put a 256-byte copy on the per-binding path.
         let vars = Variables::new(
             frame.bass,
             frame.mid,
@@ -1139,7 +1143,8 @@ impl Renderer {
             *time,
             frame.bpm,
             frame.novelty,
-        );
+        )
+        .with_spectrum(&frame.spectrum);
 
         // Fixed-order composite (ADR-0018/0028/0032): background (owns the clear)
         // -> scene -> the per-preset post chain -> [blend] -> ink -> present. Where

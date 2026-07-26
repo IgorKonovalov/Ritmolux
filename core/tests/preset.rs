@@ -53,7 +53,15 @@ static GLOBAL: Counting = Counting;
 
 /// All-zero variables except where overridden per test. `tempo`/`novelty` are
 /// bound separately by the tests that exercise them.
-fn vars(bass: f32, mid: f32, treb: f32, onset: f32, beat: f32, bar: f32, time: f32) -> Variables {
+fn vars(
+    bass: f32,
+    mid: f32,
+    treb: f32,
+    onset: f32,
+    beat: f32,
+    bar: f32,
+    time: f32,
+) -> Variables<'static> {
     Variables::new(bass, mid, treb, onset, beat, bar, time, 0.0, 0.0)
 }
 
@@ -272,6 +280,99 @@ fn tempo_and_novelty_read_through_without_shifting_the_other_slots() {
     assert_eq!(gate.eval(&v), 1.0);
     let cold = Variables::default();
     assert_eq!(gate.eval(&cold), 0.0, "tempo is 0 before the tracker warms");
+}
+
+/// Plan 0034 Phase 1: `bin(x)` samples the log-spaced band array at a
+/// **normalized** position, interpolating between adjacent bands — so a preset
+/// addresses a frequency region without ever naming `SPECTRUM_BINS`.
+#[test]
+fn bin_samples_the_spectrum_at_a_normalized_interpolated_position() {
+    // Three deliberately non-monotonic bands, so hitting the right one is a
+    // real claim rather than something a wrong index could match by luck.
+    let spectrum = [0.2f32, 0.9, 0.4];
+    let v = Variables::default().with_spectrum(&spectrum);
+    let eval = |src: &str| compile(src).expect("compiles").eval(&v);
+
+    // The endpoints are the first and last band exactly, not one short.
+    assert_eq!(eval("bin(0)"), 0.2, "bin(0) is the first band");
+    assert_eq!(eval("bin(1)"), 0.4, "bin(1) is the last band");
+    // An interior position that lands exactly on a band reads it exactly.
+    assert_eq!(
+        eval("bin(0.5)"),
+        0.9,
+        "bin(0.5) is the middle band of three"
+    );
+
+    // Halfway between two bands is their linear interpolation, both on a
+    // rising pair (0.2 -> 0.9) and a falling one (0.9 -> 0.4).
+    assert!(
+        (eval("bin(0.25)") - 0.55).abs() < 1e-6,
+        "bin(0.25) interpolates 0.2 and 0.9, got {}",
+        eval("bin(0.25)")
+    );
+    assert!(
+        (eval("bin(0.75)") - 0.65).abs() < 1e-6,
+        "bin(0.75) interpolates 0.9 and 0.4, got {}",
+        eval("bin(0.75)")
+    );
+
+    // The argument is an expression like any other, so a computed position
+    // works — this is what Phase 4's `bin(index)` rests on.
+    assert_eq!(eval("bin(0.25 + 0.25)"), 0.9);
+}
+
+/// `bin` runs per binding per frame, so it must be **total**: out-of-range
+/// clamps, `NaN` yields a finite value, an absent spectrum reads zero, and no
+/// input path panics.
+#[test]
+fn bin_is_total_for_every_input() {
+    let spectrum = [0.2f32, 0.9, 0.4];
+    let v = Variables::default().with_spectrum(&spectrum);
+    let eval = |src: &str| compile(src).expect("compiles").eval(&v);
+
+    // Out of range clamps to the ends rather than erroring or reading past.
+    assert_eq!(
+        eval("bin(0 - 5)"),
+        0.2,
+        "below zero clamps to the first band"
+    );
+    assert_eq!(eval("bin(17)"), 0.4, "above one clamps to the last band");
+
+    // NaN and infinities fold to a finite value (`f32::max` returns the
+    // non-NaN operand, so a NaN position clamps to the first band).
+    for degenerate in ["bin(sqrt(0 - 1))", "bin(1 / 0)", "bin(0 - 1 / 0)"] {
+        let got = compile(degenerate).expect("compiles").eval(&v);
+        assert!(got.is_finite(), "{degenerate} must stay finite, got {got}");
+    }
+
+    // No spectrum bound at all — an expression evaluated outside the render
+    // loop reads a flat zero instead of misbehaving.
+    let bare = Variables::default();
+    assert_eq!(compile("bin(0.5)").expect("compiles").eval(&bare), 0.0);
+
+    // A single-band spectrum is degenerate (there is no "next" band to
+    // interpolate toward) and still answers everywhere.
+    let one = [0.7f32];
+    let single = Variables::default().with_spectrum(&one);
+    for src in ["bin(0)", "bin(0.5)", "bin(1)"] {
+        assert_eq!(compile(src).expect("compiles").eval(&single), 0.7);
+    }
+}
+
+/// `bin` is a registered function, so an arity mistake is the same surfaced
+/// load error as any other call — not a silently-different meaning.
+#[test]
+fn bin_is_a_known_function_with_arity_one() {
+    assert!(matches!(
+        compile("bin(0.1, 0.2)"),
+        Err(lmv_core::preset::ExprError::WrongArity { func, expected: 1, got: 2 }) if func == "bin"
+    ));
+    assert!(compile("bin()").is_err(), "zero arguments is an error");
+    // Bare `bin` is not a variable — the spectrum is reachable only by call.
+    assert!(matches!(
+        compile("bin"),
+        Err(lmv_core::preset::ExprError::UnknownIdent(name)) if name == "bin"
+    ));
 }
 
 #[test]
