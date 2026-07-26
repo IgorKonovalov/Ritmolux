@@ -1,0 +1,63 @@
+#!/bin/sh
+# Pre-push gate (Plan 0032 Phase 3, ADR-0033).
+#
+# Runs the fast subset of what CI runs, so a broken push costs seconds here
+# instead of minutes there. Stops at the first failure and names the step.
+#
+# NOT run here, by design (ADR-0033 Alternative F): `cargo deny`, doctests,
+# Miri, and the coverage job. Those push the gate from tens of seconds into
+# minutes, and a gate that hurts gets disabled — at which point it is worth less
+# than the fast subset it replaced. They are also the checks least likely to
+# break from a local edit. CI runs all of them.
+#
+# Install (per clone — git will not run a hook from a tracked directory
+# without this, so an uninstalled clone silently has no gate):
+#
+#     git config core.hooksPath .githooks
+#
+# Bypass once:  git push --no-verify
+#
+# POSIX sh: runs under Git-for-Windows' bundled shell and macOS sh alike.
+
+set -u
+
+# Suites excluded from the hook's test step, chosen by measurement rather than
+# by guess. Warm wall times on the development machine: reactivity 89 s,
+# animation 73 s, sanity 46 s, distinctness 41 s, reaction_diffusion 54 s,
+# attractor 49 s, golden 25 s. They iterate every shipped preset or scene
+# through a real GPU, which is what makes them slow and what makes them CI's
+# job. Excluding them takes the gate from ~98 s to ~27 s warm.
+#
+# CI runs the full suite on every push regardless — this only changes what you
+# wait for locally.
+SKIPPED_SUITES="golden attractor reaction_diffusion background_composite ink reactivity animation sanity distinctness"
+
+NEXTEST_FILTER='not (binary(golden) + binary(attractor) + binary(reaction_diffusion) + binary(background_composite) + binary(ink) + binary(reactivity) + binary(animation) + binary(sanity) + binary(distinctness))'
+
+fail() {
+    echo ""
+    echo "pre-push: FAILED at: $1"
+    echo "pre-push: fix it, or bypass this gate with: git push --no-verify"
+    exit 1
+}
+
+run_step() {
+    label="$1"
+    shift
+    echo "pre-push: $label"
+    "$@" || fail "$label"
+}
+
+echo "pre-push: running the fast subset (fmt, clippy, tests)"
+
+run_step "cargo fmt --all --check" cargo fmt --all --check
+run_step "cargo clippy --all-targets -- -D warnings" cargo clippy --all-targets -- -D warnings
+
+echo "pre-push: skipping GPU-heavy suites (CI runs them):"
+for suite in $SKIPPED_SUITES; do
+    echo "pre-push:   - $suite"
+done
+run_step "cargo nextest run (narrowed)" cargo nextest run -E "$NEXTEST_FILTER"
+
+echo ""
+echo "pre-push: OK"
