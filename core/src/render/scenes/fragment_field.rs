@@ -302,7 +302,7 @@ impl Scene for FragmentFieldScene {
     fn set_palette(&mut self, palette: &Palette) {
         // Store the baked LUT; `render` uploads it (deferred so scenes with lazy
         // GPU resources share this seam). Cheap array copy, off the hot path.
-        self.palette = *palette;
+        self.palette = palette.clone();
         self.palette_dirty = true;
     }
 

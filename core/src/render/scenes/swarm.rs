@@ -349,7 +349,7 @@ impl Scene for SwarmScene {
     fn set_palette(&mut self, palette: &Palette) {
         // CPU-sampled per particle in `update`; a cheap array copy, off the hot
         // path (once per preset switch).
-        self.palette = *palette;
+        self.palette = palette.clone();
     }
 
     fn reset_params(&mut self) {

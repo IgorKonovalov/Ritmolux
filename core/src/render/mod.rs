@@ -411,7 +411,7 @@ fn composite_into(
     // their way down.
     2 + side
         .chain
-        .resolve(&ctx.queue, encoder, destination, surface)
+        .resolve(&ctx.queue, encoder, target.routing, destination, surface)
 }
 
 /// One preset's private composite: the background pre-pass it owns plus the post
@@ -641,10 +641,10 @@ impl Renderer {
 
     /// Switch to the next preset; returns its name. **Dissolves** rather than cuts
     /// (Plan 0023): the outgoing preset's composite is captured on the next frame
-    /// and blended out over [`DEFAULT_DURATION_SECS`] while the incoming one
+    /// and blended out over `DEFAULT_DURATION_SECS` while the incoming one
     /// renders live. Every system is built at startup, so no *scene* is
     /// constructed here; the dissolve's opening frames do allocate its own
-    /// resources lazily — see [`begin_transition`](Self::begin_transition).
+    /// resources lazily — see `begin_transition`.
     ///
     /// The returned name is the **incoming** preset's, immediately — the frontend's
     /// HUD should name where the show is going, not where it has been.
