@@ -1,4 +1,9 @@
-//! Host-side path resolution shared by the `lmv` binary and the `shot` example.
+//! Host-side helpers shared by the `lmv` binary and the `shot` example: the
+//! per-OS path resolution below, plus [`shot`]'s pure CLI helpers (which live
+//! here so `cargo test` actually runs their tests — an `examples/` target's
+//! `#[test]` does not).
+//!
+//! ## Preset-directory resolution
 //!
 //! The per-OS preset directory used to be hand-copied into `src/main.rs` and
 //! `examples/shot.rs`; the two copies could drift, which silently breaks the
@@ -18,6 +23,8 @@
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+
+pub mod shot;
 
 /// Per-user application directory name, used under the OS data root for the
 /// shared preset directory, the diagnostics log, and `config.toml`.

@@ -4,6 +4,12 @@
 //! `lmv-core` the app does; `image` (a dev-dependency, ADR-0011) only encodes
 //! and tiles, so the shipped `lmv.exe` is untouched.
 //!
+//! What is left here is what an `examples/` target has to own: argument parsing,
+//! GPU capture, and file I/O. Every **pure** helper lives in
+//! [`standalone::shot`] instead, because `#[test]` in an example does not run
+//! under `cargo test` (Plan 0031 Phase 1) — so the WAV parse, the JSON escaping,
+//! the filmstrip index/layout math and the glyph table are unit-tested there.
+//!
 //! Run: `cargo run -p standalone --example shot -- --preset Aurora --out shot.png`
 //!
 //! Flags:
@@ -32,11 +38,15 @@
 use std::path::{Path, PathBuf};
 
 use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{AnalysisFrame, HOP_SIZE};
+use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::{Preset, SystemKind, default_presets, load_dir};
 use lmv_core::render::metrics::{coverage, frame_diff, quadrant_spread, struct_diff};
 use lmv_core::render::{CaptureImage, HeadlessOptions, Renderer};
-use lmv_core::signal::{bass_sine, chord, click_track, noise, treble_tone};
+use standalone::shot::args::{apply_set, parse_size, synth_signal};
+use standalone::shot::film::{StripLayout, filmstrip_indices, filmstrip_layout};
+use standalone::shot::glyph::{GLYPH_ADVANCE, GLYPH_COLS, glyph_for};
+use standalone::shot::json::{json_matrix, json_string, num};
+use standalone::shot::wav::parse_wav_16bit;
 use standalone::{PRESET_DIR_ENV, resolve_preset_dir};
 
 fn main() {
@@ -147,41 +157,6 @@ fn parse_args() -> Result<Args, String> {
 
 fn next_value(it: &mut impl Iterator<Item = String>, flag: &str) -> Result<String, String> {
     it.next().ok_or_else(|| format!("{flag} needs a value"))
-}
-
-fn parse_size(spec: &str) -> Result<(u32, u32), String> {
-    let (w, h) = spec
-        .split_once(['x', 'X'])
-        .ok_or_else(|| format!("--size expects WxH, got `{spec}`"))?;
-    let w = w.parse().map_err(|_| format!("bad width in `{spec}`"))?;
-    let h = h.parse().map_err(|_| format!("bad height in `{spec}`"))?;
-    if w == 0 || h == 0 {
-        return Err("--size dimensions must be non-zero".to_string());
-    }
-    Ok((w, h))
-}
-
-/// Apply a comma-separated `k=v` list onto the stimulus frame. Keys are the
-/// scalar analysis bands; `beat` is truthy for any non-zero value.
-fn apply_set(frame: &mut AnalysisFrame, spec: &str) -> Result<(), String> {
-    for pair in spec.split(',').filter(|s| !s.is_empty()) {
-        let (key, value) = pair
-            .split_once('=')
-            .ok_or_else(|| format!("--set expects k=v, got `{pair}`"))?;
-        let v: f32 = value
-            .parse()
-            .map_err(|_| format!("--set `{key}` value `{value}` is not a number"))?;
-        match key {
-            "bass" => frame.bass = v,
-            "mid" => frame.mid = v,
-            "treb" => frame.treb = v,
-            "onset" => frame.onset = v,
-            "bar" => frame.bar = v,
-            "beat" => frame.beat = v != 0.0,
-            other => return Err(format!("--set: unknown key `{other}`")),
-        }
-    }
-    Ok(())
 }
 
 fn parse_system(name: &str) -> Result<SystemKind, String> {
@@ -435,11 +410,6 @@ fn contact_sheet_path(out: &Path) -> PathBuf {
 // Audio filmstrips (--signal / --audio)
 // ---------------------------------------------------------------------------
 
-/// Duration synthesized for a `--signal` (enough for several 120 BPM beats).
-const SIGNAL_SECS: f32 = 4.0;
-/// Hops skipped at the start so the strip samples past the analyzer's warm-up.
-const FILMSTRIP_WARMUP: usize = 8;
-
 fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
     let out = args
         .out
@@ -481,146 +451,38 @@ fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), Strin
     Ok(())
 }
 
-/// `--strip` frame indices, evenly spaced from just past warm-up to the last
-/// analysis frame the PCM produces.
-fn filmstrip_indices(pcm_len: usize, format: AudioFormat, strip: u32) -> Result<Vec<u32>, String> {
-    let hop_samples = HOP_SIZE * format.channels as usize;
-    let total = pcm_len / hop_samples.max(1);
-    if total <= FILMSTRIP_WARMUP + 1 {
-        return Err("audio too short for a filmstrip".to_string());
-    }
-    let start = FILMSTRIP_WARMUP;
-    let end = total - 1;
-    let n = strip.max(1);
-    if n == 1 {
-        return Ok(vec![start as u32]);
-    }
-    let span = (end - start) as f32;
-    Ok((0..n)
-        .map(|i| (start as f32 + span * i as f32 / (n - 1) as f32).round() as u32)
-        .collect())
-}
-
-/// Parse `<kind:param>` into synthesized PCM. Zero committed asset — this is the
-/// self-contained validation of the whole audio path.
-fn synth_signal(spec: &str) -> Result<(Vec<f32>, AudioFormat), String> {
-    let format = AudioFormat {
-        sample_rate: 48_000,
-        channels: 2,
-    };
-    let (kind, param) = spec.split_once(':').unwrap_or((spec, ""));
-    let pcm = match kind {
-        "click" => click_track(parse_param(param, "click BPM")?, SIGNAL_SECS, format),
-        "bass" => bass_sine(parse_param(param, "bass Hz")?, SIGNAL_SECS, format),
-        "treble" | "treb" => treble_tone(parse_param(param, "treble Hz")?, SIGNAL_SECS, format),
-        "noise" => {
-            let seed = param.parse::<u64>().unwrap_or(1);
-            noise(seed, SIGNAL_SECS, 0.8, format)
-        }
-        "chord" => chord(&[220.0, 277.0, 330.0], SIGNAL_SECS, format),
-        other => {
-            return Err(format!(
-                "--signal: unknown kind `{other}` (click|bass|treble|noise|chord)"
-            ));
-        }
-    };
-    Ok((pcm, format))
-}
-
-fn parse_param(param: &str, what: &str) -> Result<f32, String> {
-    param
-        .parse::<f32>()
-        .map_err(|_| format!("--signal: expected a {what} value, got `{param}`"))
-}
-
-/// A minimal hand-rolled 16-bit-PCM WAV reader (no decoder dependency). Supports
-/// uncompressed PCM (format 1), 16-bit, any channel count / sample rate. Other
-/// encodings are a documented followup.
+/// Read a 16-bit-PCM WAV off disk. The parse itself is
+/// [`standalone::shot::wav`]; only the file read (and its path-labelled error)
+/// belongs to the CLI.
 fn read_wav_16bit(path: &Path) -> Result<(Vec<f32>, AudioFormat), String> {
     let bytes = std::fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
-    if bytes.get(0..4) != Some(b"RIFF") || bytes.get(8..12) != Some(b"WAVE") {
-        return Err(format!("{} is not a RIFF/WAVE file", path.display()));
-    }
-
-    let mut channels = 0u16;
-    let mut sample_rate = 0u32;
-    let mut data: Option<&[u8]> = None;
-    let mut pos = 12usize;
-    while pos + 8 <= bytes.len() {
-        let id = bytes.get(pos..pos + 4).unwrap_or(&[]);
-        let size = le_u32(&bytes, pos + 4).unwrap_or(0) as usize;
-        let body = pos + 8;
-        let end = body.saturating_add(size).min(bytes.len());
-        match id {
-            b"fmt " => {
-                let audio_format = le_u16(&bytes, body).unwrap_or(0);
-                let bits = le_u16(&bytes, body + 14).unwrap_or(0);
-                if audio_format != 1 {
-                    return Err("only uncompressed PCM (format 1) WAV is supported".to_string());
-                }
-                if bits != 16 {
-                    return Err(format!(
-                        "only 16-bit PCM WAV is supported (found {bits}-bit)"
-                    ));
-                }
-                channels = le_u16(&bytes, body + 2).unwrap_or(0);
-                sample_rate = le_u32(&bytes, body + 4).unwrap_or(0);
-            }
-            b"data" => data = bytes.get(body..end),
-            _ => {}
-        }
-        pos = body + size + (size & 1); // chunks are word-aligned
-    }
-
-    let data = data.ok_or("WAV has no data chunk")?;
-    let samples: Vec<f32> = data
-        .chunks_exact(2)
-        .map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0)
-        .collect();
-    let format = AudioFormat {
-        sample_rate,
-        channels,
-    }
-    .validate()
-    .map_err(|e| format!("unusable WAV format: {e}"))?;
-    Ok((samples, format))
-}
-
-fn le_u16(b: &[u8], at: usize) -> Option<u16> {
-    Some(u16::from_le_bytes([*b.get(at)?, *b.get(at + 1)?]))
-}
-
-fn le_u32(b: &[u8], at: usize) -> Option<u32> {
-    Some(u32::from_le_bytes([
-        *b.get(at)?,
-        *b.get(at + 1)?,
-        *b.get(at + 2)?,
-        *b.get(at + 3)?,
-    ]))
+    parse_wav_16bit(&bytes, &path.display().to_string())
 }
 
 /// Tile the captured frames left-to-right into one filmstrip, each scaled to a
-/// fixed height.
+/// fixed height. The arithmetic is [`filmstrip_layout`]; this is the blit.
 fn tile_filmstrip(frames: &[CaptureImage]) -> Result<image::RgbaImage, String> {
-    const STRIP_H: u32 = 200;
-    const PAD: u32 = 4;
-    let first = frames.first().ok_or("no frames captured")?;
-    let thumb_w = (first.width * STRIP_H / first.height.max(1)).max(1);
-    let n = frames.len() as u32;
-    let canvas_w = n * thumb_w + (n + 1) * PAD;
-    let canvas_h = STRIP_H + 2 * PAD;
-    let mut canvas =
-        image::RgbaImage::from_pixel(canvas_w, canvas_h, image::Rgba([18, 18, 22, 255]));
+    let (frame_w, frame_h) = frames.first().map_or((1, 1), |f| (f.width, f.height));
+    let layout: StripLayout = filmstrip_layout(frame_w, frame_h, frames.len())?;
+    let mut canvas = image::RgbaImage::from_pixel(
+        layout.canvas_w,
+        layout.canvas_h,
+        image::Rgba([18, 18, 22, 255]),
+    );
     for (i, frame) in frames.iter().enumerate() {
         let full = to_rgba(frame)?;
         let thumb = image::imageops::resize(
             &full,
-            thumb_w,
-            STRIP_H,
+            layout.thumb_w,
+            layout.thumb_h,
             image::imageops::FilterType::Triangle,
         );
-        let x = PAD + i as u32 * (thumb_w + PAD);
-        image::imageops::overlay(&mut canvas, &thumb, x as i64, PAD as i64);
+        image::imageops::overlay(
+            &mut canvas,
+            &thumb,
+            layout.x_of(i) as i64,
+            layout.pad as i64,
+        );
     }
     Ok(canvas)
 }
@@ -902,56 +764,14 @@ fn render_json(source: &str, reports: &[FamilyReport]) -> String {
     out
 }
 
-fn json_matrix(rows: &[Vec<f32>]) -> String {
-    let mut s = String::from("[");
-    for (i, row) in rows.iter().enumerate() {
-        if i > 0 {
-            s.push(',');
-        }
-        s.push('[');
-        for (j, v) in row.iter().enumerate() {
-            if j > 0 {
-                s.push(',');
-            }
-            s.push_str(&num(*v));
-        }
-        s.push(']');
-    }
-    s.push(']');
-    s
-}
-
-/// Fixed 4-decimal number, so the schema is stable and parseable.
-fn num(v: f32) -> String {
-    format!("{v:.4}")
-}
-
-/// Minimal JSON string escaping (quotes, backslash, control chars).
-fn json_string(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    out.push('"');
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
-
 // ---------------------------------------------------------------------------
-// Minimal 5x7 bitmap font for contact-sheet labels (A-Z 0-9 space - .)
+// Label rasterizer over the shared 5x7 bitmap font
 // ---------------------------------------------------------------------------
 
 /// Draw `text` (uppercased) at `(x, y)` on `canvas`, each glyph scaled by
 /// `scale`. Unknown characters render blank. Pixels outside the canvas are
-/// clipped.
+/// clipped. The glyph table is [`standalone::shot::glyph`]; only the blit is
+/// here, because it needs the dev-only `image` canvas.
 fn draw_label(
     canvas: &mut image::RgbaImage,
     x: u32,
@@ -964,8 +784,8 @@ fn draw_label(
     for ch in text.chars() {
         let glyph = glyph_for(ch.to_ascii_uppercase());
         for (row, bits) in glyph.iter().enumerate() {
-            for col in 0..5u32 {
-                if bits & (1 << (4 - col)) != 0 {
+            for col in 0..GLYPH_COLS {
+                if bits & (1 << (GLYPH_COLS - 1 - col)) != 0 {
                     for dy in 0..scale {
                         for dx in 0..scale {
                             let px = cx + col * scale + dx;
@@ -978,51 +798,6 @@ fn draw_label(
                 }
             }
         }
-        cx += 6 * scale;
-    }
-}
-
-/// 7 rows (top→bottom); each byte's low 5 bits are the columns (bit4 = left).
-fn glyph_for(ch: char) -> [u8; 7] {
-    match ch {
-        'A' => [0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11],
-        'B' => [0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E],
-        'C' => [0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E],
-        'D' => [0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E],
-        'E' => [0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F],
-        'F' => [0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10],
-        'G' => [0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0F],
-        'H' => [0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11],
-        'I' => [0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E],
-        'J' => [0x07, 0x02, 0x02, 0x02, 0x02, 0x12, 0x0C],
-        'K' => [0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11],
-        'L' => [0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F],
-        'M' => [0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11],
-        'N' => [0x11, 0x11, 0x19, 0x15, 0x13, 0x11, 0x11],
-        'O' => [0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E],
-        'P' => [0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10],
-        'Q' => [0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D],
-        'R' => [0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11],
-        'S' => [0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E],
-        'T' => [0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04],
-        'U' => [0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E],
-        'V' => [0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04],
-        'W' => [0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0A],
-        'X' => [0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11],
-        'Y' => [0x11, 0x11, 0x0A, 0x04, 0x04, 0x04, 0x04],
-        'Z' => [0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F],
-        '0' => [0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E],
-        '1' => [0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E],
-        '2' => [0x0E, 0x11, 0x01, 0x06, 0x08, 0x10, 0x1F],
-        '3' => [0x1F, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0E],
-        '4' => [0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02],
-        '5' => [0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E],
-        '6' => [0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E],
-        '7' => [0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08],
-        '8' => [0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E],
-        '9' => [0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x0C],
-        '-' => [0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00],
-        '.' => [0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x06],
-        _ => [0x00; 7], // space + anything unmapped
+        cx += GLYPH_ADVANCE * scale;
     }
 }
