@@ -1,8 +1,10 @@
 # ADR-0037 — An internal grid is a **resolution**, not a **shape**: aspect comes from the render target
 
-> **Status:** proposed
+> **Status:** accepted (2026-07-26, at Plan 0035's close — the decision landed in full; the two
+> stretches cancel as predicted, reproduced at review with the disc reading 1.0000 skipped against
+> 1.2800 through trails at 1280x800 once the grid-derived aspect is restored)
 > **Date:** 2026-07-26
-> **Related plan(s):** [0035](../plans/0035-composite-aspect-and-grid-policy.md)
+> **Related plan(s):** [0035](../plans/done/0035-composite-aspect-and-grid-policy.md)
 > **Corrects:** [ADR-0034](0034-internal-resolution-follows-the-target.md) (whose "an ultrawide keeps
 > its proportions" claim survives quantization only approximately)
 > **Supplements:** [ADR-0030](0030-scene-target-size-hot-path-hook.md) (the target-size hook),
