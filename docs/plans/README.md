@@ -10,13 +10,18 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0033](0033-internal-resolution-and-preset-surface.md) | Internal resolution follows the target, plus the preset-surface and harness gaps behind it | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0034](0034-preset-reachable-spectrum.md) | Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation | draft | dev, human |
+| [0034](0034-preset-reachable-spectrum.md) | Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
 
-**[0033] is the only plan in flight** and is ready for `dev`. It takes four of the eight entries in
-the [design backlog](../design-backlog.md) — the 2026-07-26 `preset-author` feedback batch — in one
-pass: the composite's two post stages stop rendering the whole frame through a fixed 1280x720
+**Both [0033] and [0034] are approved and ready for `dev`, and they are independent** — they share no
+files, so either can go first and neither blocks the other. **Take [0033] first** unless there is a
+reason not to: it fixes reported breakage in already-shipped content ("coral is broken", "roses feel
+upscaled"), and its Phase 1 harness fixes plus Phase 2 easing make [0034]'s new scene easier to author
+and verify. Each is a separate `dev` session — one plan per session, and the close review is a third.
+
+**[0033]** takes four of the eight entries in the [design backlog](../design-backlog.md) — the
+2026-07-26 `preset-author` feedback batch — in one pass: the composite's two post stages stop rendering the whole frame through a fixed 1280x720
 ([ADR-0034](../adrs/0034-internal-resolution-follows-the-target.md)), reaction-diffusion's blockiness
 is attacked at the reconstruction seam before the expensive grid step, RD's present sampler starts
 wrapping a field that was **already toroidal** (which is what makes `zoom`/`pan_*` usable on that
@@ -25,8 +30,8 @@ scene at all), `[smoothing]` gains an `{ attack, release }` pair
 unable to drive `tempo`/`novelty` or to say what real audio levels look like. Phase 8 is `human` —
 the aesthetic re-tune on the user's 2048x1152 display, which engine-green cannot substitute for.
 
-**[0034] is independent of [0033]** — they share no files, so either order works. It closes backlog
-0002, the capability the user asked for twice. Three verifications shrank it well below the feedback
+**[0034]** closes backlog 0002, the capability the user asked for twice. Three verifications shrank
+it well below the feedback
 note's estimate: the 64-band log-spaced spectrum **already exists** on `AnalysisFrame` (`dsp/mod.rs:32`,
 commented "Log-frequency bands exposed to scenes"), **every scene already receives it** through
 `Scene::update`, and `LineRenderer` **already draws arbitrary segment lists** — so there is no new DSP,
