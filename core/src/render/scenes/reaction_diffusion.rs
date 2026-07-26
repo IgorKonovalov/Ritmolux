@@ -469,11 +469,25 @@ impl Resources {
         );
 
         // --- present pipeline: input texture + filtering sampler, to surface ---
+        //
+        // `Repeat`, not `ClampToEdge` (Plan 0033 Phase 5, ADR-0034). The
+        // simulation has always been **toroidal** — `ld()` in the sim shader wraps
+        // with `((c % size) + size) % size`, so the field is seamless — and only
+        // the present sampler refused to wrap. Clamping smeared the edge row
+        // outward into vertical bars and rectangular blocks the moment `zoom`
+        // went above 1, and any real `pan_*` walked off the field, which is why
+        // all four RD presets were pinned at `zoom = 0.99` and lost the whole
+        // view lever. One address mode restores it: `pan_*` becomes a seamless
+        // infinite scroll and `zoom > 1` tiles.
+        //
+        // It also makes the Catmull-Rom taps correct at the boundary: the p0/p3
+        // taps reach one texel outside the cell, and wrapping is what the
+        // toroidal field actually means there.
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("rd-present-sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()

@@ -171,4 +171,105 @@ fn reaction_diffusion_contract() {
         zoomed.rgba, zoomed_again.rgba,
         "zoomed reaction-diffusion capture is not reproducible"
     );
+
+    // --- Toroidal presentation (Plan 0033 Phase 5, ADR-0034): the simulation has
+    // always wrapped (`ld()` in the sim shader), but the present sampler clamped,
+    // so `zoom > 1` smeared the edge row outward into vertical bars and any real
+    // `pan_*` walked off the field. With `AddressMode::Repeat` the view transform
+    // sees a seamless torus.
+    //
+    // Asserted as structure, not by eye. At `zoom = 1.4` the sampled window
+    // overshoots the field by 1/2 - 1/2.8 of the frame on each side, so the outer
+    // ~14% of columns are off-field. Clamping fills them by repeating the boundary
+    // texel along x, which makes them *horizontally* flat — the give-away is
+    // vanishing horizontal detail out there, not vanishing variance down the
+    // column (clamping u leaves each column's vertical structure intact, which is
+    // why the obvious detector misses this entirely). Wrapping fills them with
+    // real field, so the edge band carries the same detail as the centre. ---
+    renderer.set_presets(vec![
+        rd_view_preset("rd_wrap_1", "zoom = \"1.0\"\n"),
+        rd_view_preset("rd_wrap_14", "zoom = \"1.4\"\n"),
+        rd_view_preset("rd_wrap_pan", "pan_x = \"0.5\"\n"),
+    ]);
+    let at_1 = renderer
+        .capture_preset("rd_wrap_1", &lively, 60)
+        .expect("capture rd_wrap_1");
+    let at_14 = renderer
+        .capture_preset("rd_wrap_14", &lively, 60)
+        .expect("capture rd_wrap_14");
+    let ratio = edge_band_detail(&at_14);
+    let control = edge_band_detail(&at_1);
+    eprintln!(
+        "toroidal present: edge-band detail ratio at zoom 1.4 = {ratio:.3} \
+         (zoom 1.0 control {control:.3})"
+    );
+    assert!(
+        ratio > 0.5,
+        "at zoom = 1.4 the outer columns carry only {ratio:.3} of the centre's \
+         horizontal detail: the present sampler is smearing the edge texel outward \
+         instead of wrapping the toroidal field"
+    );
+    // The control proves the metric is measuring the overshoot and not some
+    // property of the scene: at zoom = 1.0 nothing is off-field, so both filters
+    // score near 1 here.
+    assert!(
+        control > 0.5,
+        "the edge-band metric is broken: even at zoom = 1.0, with no overshoot at \
+         all, the outer columns look flat ({control:.3})"
+    );
+
+    // A half-field pan at zoom = 1.0 is a seamless scroll: it must MOVE the field
+    // (not a no-op) while keeping every column populated (not a clamp streak).
+    let panned_half = renderer
+        .capture_preset("rd_wrap_pan", &lively, 60)
+        .expect("capture rd_wrap_pan");
+    assert!(
+        frame_diff(&at_1, &panned_half) > 0.02,
+        "pan_x = 0.5 did not move the field"
+    );
+    let panned_detail = edge_band_detail(&panned_half);
+    assert!(
+        panned_detail > 0.5,
+        "pan_x = 0.5 left the outer columns flat ({panned_detail:.3} of the centre's \
+         horizontal detail): it is walking off the field rather than scrolling around it"
+    );
+}
+
+/// Horizontal detail in the outer 10% of columns, relative to the middle 20%.
+///
+/// This is the clamp detector. `AddressMode::ClampToEdge` fills everything past
+/// the field's right/left edge by repeating the boundary texel *along x*, so out
+/// there `L(x+1, y) == L(x, y)` and the horizontal gradient vanishes. Note it is
+/// specifically the horizontal gradient: clamping `u` leaves each column's
+/// vertical structure completely intact, so a variance-down-the-column detector
+/// sees nothing. Wrapping fills the same band with real field, so it carries the
+/// centre's detail and the ratio sits near 1.
+fn edge_band_detail(img: &CaptureImage) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    let luma = |x: usize, y: usize| -> f32 {
+        let i = (y * w + x) * 4;
+        let r = img.rgba.get(i).copied().unwrap_or(0) as f32;
+        let g = img.rgba.get(i + 1).copied().unwrap_or(0) as f32;
+        let b = img.rgba.get(i + 2).copied().unwrap_or(0) as f32;
+        (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+    };
+    let gradient = |xs: std::ops::Range<usize>| -> f32 {
+        let mut sum = 0.0f32;
+        let mut n = 0usize;
+        for y in 0..h {
+            for x in xs.clone() {
+                if x + 1 < w {
+                    sum += (luma(x + 1, y) - luma(x, y)).abs();
+                    n += 1;
+                }
+            }
+        }
+        sum / n.max(1) as f32
+    };
+    // Outer tenth on each side — comfortably inside the ~14% that a zoom of 1.4
+    // pushes off the field — against the middle fifth, which is always on-field.
+    let band = w / 10;
+    let edges = (gradient(0..band) + gradient(w - band..w)) / 2.0;
+    let centre = gradient(w * 2 / 5..w * 3 / 5);
+    edges / centre.max(1e-9)
 }
