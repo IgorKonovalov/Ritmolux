@@ -53,11 +53,11 @@ kaleido_angle = "time * 0.17"
 trails        = "clamp(onset * 0.8, 0, 0.34)"
 
 [smoothing]
-warp          = 0.10
-zoom          = 0.14
+warp          = { attack = 0.02, release = 0.22 }
+zoom          = { attack = 0.02, release = 0.30 }
 glow          = 0.20
 color_span    = 0.30
 color_center  = 0.35
 palette_mix   = 0.55
 kaleido_order = 0.7
-trails        = 0.30
+trails        = { attack = 0.03, release = 0.55 }

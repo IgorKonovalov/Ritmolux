@@ -18,8 +18,11 @@
 #
 # Deliberately NO `bg_*` and NO `kaleido_*` here. A lit backdrop raises the
 # frame's floor luminance, which the remap reads as ink and greys the whole
-# page; the kaleidoscope drops the attractor's accumulation to that stage's
-# fixed 1280x720 grid, and a softer source blots where a crisp one hatches.
+# page; the kaleidoscope re-samples the attractor's accumulation, and a softer
+# source blots where a crisp one hatches. Since Plan 0033 that stage follows the
+# render target rather than a fixed 1280x720, so the cost is far smaller than it
+# was - but the two caps still differ (2560x1440 for the attractor's own grid,
+# 1920x1080 for the post stages), so the fold still costs this preset some bite.
 system = "attractor"
 name = "Ink on Paper"
 
@@ -77,7 +80,7 @@ ink_bright   = "0.055"
 
 [smoothing]
 # The nib should swell, not flicker - a bare `beat` term on `size` would snap.
-size = 0.12
+size = { attack = 0.02, release = 0.26 }
 fade = 0.25
 zoom = 0.18
 a    = 0.8

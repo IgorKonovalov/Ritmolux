@@ -17,12 +17,11 @@ name   = "Rose Maurer Sweep"
 [curve]
 family = "maurer_rose"
 
-# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
-# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
-# softens line art (it reads as "upsized from something smaller"). The geometry
-# mirror below costs nothing in resolution because it replicates real geometry
-# before rasterisation - so on the line scenes, prefer `mirror_*` over the
-# screen-space fold whenever both would do.
+# The geometry mirror below costs nothing in resolution because it replicates
+# real geometry BEFORE rasterisation, while `kaleido_*` folds finished pixels -
+# so on the line scenes, prefer `mirror_*` when both would do. Since Plan 0033
+# the feedback and kaleidoscope stages follow the RENDER TARGET rather than a
+# fixed 1280x720, so `trails` no longer costs this preset its sharpness.
 
 [params]
 # THE LEVER - three time-scales on the angular step.
@@ -56,6 +55,9 @@ bg_hue      = "0.00 + sin(time * 0.009) * 0.05"
 bg_bright   = "0.016 + clamp(mid * 0.09, 0, 0.012)"
 bg_vignette = "0.84"
 
+# FEEDBACK - restored (Plan 0033). Short: 1500 chords already fill, so a long tail only smears.
+trails = "0.50 + clamp(mid * 0.18, 0, 0.09)"
+
 [smoothing]
 # `d` gets a short constant so the beat-kick surges; `n` gets a long one so a
 # petal-count change is a morph rather than a jump cut.
@@ -67,3 +69,4 @@ scale         = 0.47
 thickness     = 0.39
 hue           = 1.09
 bg_bright     = 1.04
+trails       = 0.55

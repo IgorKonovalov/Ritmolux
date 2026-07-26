@@ -19,12 +19,11 @@ name = "Star Rosette"
 tiling            = "12"
 contact_angle_deg = 20
 
-# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
-# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
-# softens line art (it reads as "upsized from something smaller"). The geometry
-# mirror below costs nothing in resolution because it replicates real geometry
-# before rasterisation - so on the line scenes, prefer `mirror_*` over the
-# screen-space fold whenever both would do.
+# The geometry mirror below costs nothing in resolution because it replicates
+# real geometry BEFORE rasterisation, while `kaleido_*` folds finished pixels -
+# so on the line scenes, prefer `mirror_*` when both would do. Since Plan 0033
+# the feedback and kaleidoscope stages follow the RENDER TARGET rather than a
+# fixed 1280x720, so `trails` no longer costs this preset its sharpness.
 
 [params]
 # THE STRUCTURAL SWAP - cycles 0 -> 1 -> 2 on a slow ~50 s clock.
@@ -86,13 +85,17 @@ bg_hue      = "0.10 + sin(time * 0.0091) * 0.06"
 bg_bright   = "0.018 + clamp(mid * 0.10, 0, 0.013)"
 bg_vignette = "0.82"
 
+# FEEDBACK - restored (Plan 0033), short. The stroke is already the thickest in the set, so a long tail closes the rosette into a solid annulus.
+trails = "0.34 + clamp(mid * 0.15, 0, 0.07)"
+
 [smoothing]
 mirror_order  = 2.5
 # `variant` is NOT smoothed - it indexes a precomputed geometry, so easing it
 # would just spend time on the in-between integers rather than blending shapes.
 rotation      = 0.18
-thickness     = 0.14
+thickness     = { attack = 0.02, release = 0.34 }
 scale         = 0.06
 hue           = 0.42
 zoom          = 0.18
 bg_bright     = 0.40
+trails       = 0.55

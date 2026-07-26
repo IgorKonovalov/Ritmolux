@@ -18,12 +18,11 @@ name   = "Rose Kaleidoscope"
 [curve]
 family = "maurer_rose"
 
-# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
-# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
-# softens line art (it reads as "upsized from something smaller"). The geometry
-# mirror below costs nothing in resolution because it replicates real geometry
-# before rasterisation - so on the line scenes, prefer `mirror_*` over the
-# screen-space fold whenever both would do.
+# The geometry mirror below costs nothing in resolution because it replicates
+# real geometry BEFORE rasterisation, while `kaleido_*` folds finished pixels -
+# so on the line scenes, prefer `mirror_*` when both would do. Since Plan 0033
+# the feedback and kaleidoscope stages follow the RENDER TARGET rather than a
+# fixed 1280x720, so `trails` no longer costs this preset its sharpness.
 
 [params]
 # SHAPE - a low-order curve, because the mirrors supply the complexity.
@@ -59,6 +58,9 @@ bg_hue      = "0.20 + sin(time * 0.011) * 0.06"
 bg_bright   = "0.016 + clamp(mid * 0.09, 0, 0.012)"
 bg_vignette = "0.82"
 
+# FEEDBACK - restored (Plan 0033). Moderate - the mirror order climbs to 9 on the loud end.
+trails = "0.56 + clamp(bass * 0.20, 0, 0.10)"
+
 [smoothing]
 phase         = 1.04
 radial_offset = 1.17
@@ -68,3 +70,4 @@ hue           = 1.04
 mirror_order  = 2.6
 zoom          = 0.47
 bg_bright     = 1.04
+trails       = 0.50

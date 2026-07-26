@@ -74,7 +74,7 @@ b             = 0.6
 c             = 0.6
 d             = 0.6
 fade          = 0.18
-size          = 0.10
+size          = { attack = 0.02, release = 0.22 }
 zoom          = 0.14
 hue_center    = 0.35
 palette_mix   = 0.5

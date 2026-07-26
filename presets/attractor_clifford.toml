@@ -68,7 +68,7 @@ b           = 0.7
 c           = 0.7
 d           = 0.7
 fade        = 0.20
-size        = 0.12
+size        = { attack = 0.02, release = 0.26 }
 trails      = 0.45
 zoom        = 0.16
 hue_center  = 0.40

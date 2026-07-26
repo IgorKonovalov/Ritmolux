@@ -15,12 +15,11 @@ name   = "Rose Zoom"
 [curve]
 family = "maurer_rose"
 
-# NOTE - no `trails` here. The feedback and kaleidoscope stages both render at a
-# fixed 1280x720 and upscale to the surface, which on anything above 720p visibly
-# softens line art (it reads as "upsized from something smaller"). The geometry
-# mirror below costs nothing in resolution because it replicates real geometry
-# before rasterisation - so on the line scenes, prefer `mirror_*` over the
-# screen-space fold whenever both would do.
+# The geometry mirror below costs nothing in resolution because it replicates
+# real geometry BEFORE rasterisation, while `kaleido_*` folds finished pixels -
+# so on the line scenes, prefer `mirror_*` when both would do. Since Plan 0033
+# the feedback and kaleidoscope stages follow the RENDER TARGET rather than a
+# fixed 1280x720, so `trails` no longer costs this preset its sharpness.
 
 [params]
 # SHAPE
@@ -52,12 +51,16 @@ bg_hue      = "0.18 + sin(time * 0.013) * 0.05"
 bg_bright   = "0.018 + clamp(mid * 0.10, 0, 0.013)"
 bg_vignette = "0.80"
 
+# FEEDBACK - restored at native resolution (Plan 0033).
+trails = "0.62 + clamp(bass * 0.22, 0, 0.10)"
+
 [smoothing]
 # A punchy pump that still eases - the canonical use of a short constant.
 zoom          = 0.31
 phase         = 0.91
 radial_offset = 1.04
 scale         = 0.42
-thickness     = 0.31
+thickness     = { attack = 0.03, release = 0.60 }
 hue           = 1.04
 bg_bright     = 1.04
+trails       = 0.50

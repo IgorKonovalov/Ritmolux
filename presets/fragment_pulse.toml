@@ -44,14 +44,19 @@ palette_mix  = "clamp(treb * 1.4, 0, 0.45)"
 trails = "0.42 + clamp(bass * 0.9, 0, 0.20)"
 
 [smoothing]
-# Heavily eased on purpose. NOTE: this table is a one-pole exponential
-# low-pass, not an S-curve - there is no cubic-bezier / ease-in-out shaping in
-# the grammar, and `smoothstep` shapes a VALUE, not a trajectory over time
-# (expressions are stateless). So the only lever for "less jarring" is a longer
-# time constant, and these are long.
-warp         = 0.55
-flash        = 0.30
-zoom         = 0.60
+# Heavily eased on purpose. This table is a one-pole exponential low-pass, not
+# an S-curve - there is no cubic-bezier shaping in the grammar, and `smoothstep`
+# shapes a VALUE, not a trajectory over time (expressions are stateless).
+#
+# The three percussive params take the { attack, release } pair (Plan 0033 /
+# ADR-0035). A single constant had to trade the strike for the recovery: long
+# enough to stop the pumping made the beat mushy. Now the hit lands in ~3 frames
+# and glides out over most of a second, which is what "smoother" actually meant.
+# The colour params stay SYMMETRIC on purpose - an asymmetric constant is a
+# rectifier, and a fast-attack `hue` drifts upward instead of tracking.
+warp         = { attack = 0.05, release = 0.95 }
+flash        = { attack = 0.02, release = 0.62 }
+zoom         = { attack = 0.06, release = 1.05 }
 glow         = 0.50
 hue          = 0.80
 color_span   = 0.70

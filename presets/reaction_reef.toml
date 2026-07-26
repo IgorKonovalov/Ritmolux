@@ -35,18 +35,14 @@ contour = "9.0 + clamp(treb * 6.0, 0, 5.0) + beat * 2.0"
 hatch   = "3.5 + clamp(mid * 2.5, 0, 2.0)"
 glow    = "0.80 + clamp((bass + mid) * 0.45, 0, 0.26)"
 
-# VIEW - PINNED NEAR NATIVE, and this is a hard constraint, not a taste call.
-# The Gray-Scott field is a fixed 256x256 grid, already upscaled ~7x at 1080p.
-# `zoom` is INVERTED here (higher shows more of the field) and it is unusable in
-# BOTH directions: above 1.0 it samples outside the simulated field and renders
-# vertical bars and rectangular blocks; below 1.0 it magnifies the 256px grid
-# until the pattern reads as angular pixel blobs instead of organic growth. Any
-# real pan at zoom 1.0 walks off the field for the same reason. So this family
-# sits at ~0.99 with a whisper of drift, and takes its motion from the chemistry,
-# the contour/hatch rendering and the colour instead.
-zoom  = "0.99"
-pan_x = "sin(time * 0.0130) * 0.008"
-pan_y = "cos(time * 0.0091) * 0.006"
+# VIEW - deliberately NOT scrolled, even though Plan 0033 freed `pan_*` over the
+# now-wrapping toroidal field. This preset folds through `kaleido_*`, whose fold
+# axis is SCREEN-CENTRED: translating the source slides the rosette off centre
+# and costs the composition its symmetry. So the view breathes on `zoom` only
+# and the pan stays a small oscillation, never a drift.
+zoom  = "1.14 + sin(time * 0.019) * 0.09 + clamp(bass * 0.8, 0, 0.16)"
+pan_x = "sin(time * 0.012) * 0.030"
+pan_y = "cos(time * 0.0085) * 0.024"
 
 # COLOUR - the warm-cored gradient, cooling toward `ice` on the top end.
 color_span   = "2.20 + clamp(mid * 0.8, 0, 0.40)"
@@ -62,7 +58,7 @@ bg_bright     = "0.020 + clamp(mid * 0.10, 0, 0.013)"
 bg_vignette   = "0.76"
 
 [smoothing]
-contour       = 0.18
+contour       = { attack = 0.03, release = 0.38 }
 hatch         = 0.25
 glow          = 0.30
 zoom          = 0.20
