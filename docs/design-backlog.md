@@ -227,6 +227,28 @@ array element and a `STAGE_COUNT` bump, not surgery. Two things to decide:
 Cost on the iGPU floor is the live risk — a separable blur is two extra full-frame passes per blur
 level. `docs/nfr.md` §7 is the budget it must answer to.
 
+**RE-RAISED 2026-07-26 (second batch), with a new concrete finding.** The user asked for "much much
+more glow" on Fern Grow, and getting it took four rendered variants to discover that glow on a line
+scene is a **three-way** interaction whose decisive term is not a stroke param at all:
+
+- `thickness` is the halo — the line primitive's quad has a *quadratic* falloff
+  (`core/src/render/scenes/lines/renderer.rs:109`), so a wider stroke is a wider halo.
+- `brightness` is the shader's glow multiplier onto that falloff.
+- **`bg_bright` / `bg_vignette` decide whether either reads at all.** Fern's backdrop floor (0.085
+  rising to 0.215, vignette 0.55) meant raising `thickness` made the fern *fatter but never
+  brighter* — an additive halo falling off into a lifted floor is flat paint. Only after dropping the
+  floor to 0.012 and deepening the vignette to 0.88 did the stroke params do anything.
+- **And widening too far reads as OUT OF FOCUS rather than as glow** — user-reported at
+  `thickness = 4.0`, because the quadratic falloff spans the whole quad, so widening spreads the core
+  instead of adding halo around it. The working shape is a thin bright core (1.9) with `brightness`
+  (1.55) carrying intensity.
+
+That is four coupled hand-tuned params standing in for one missing capability, and the coupling is
+undiscoverable — it cost a full sweep to find. Strengthens the case for the stage rather than
+changing its shape. **Sequencing note:** 0033 is closed, so the "size it to the target" concern above
+is satisfied; but a bloom stage inherits the same `PostStage` plumbing as [0010](#0010--the-kaleidoscope-fold-samples-outside-its-source-rectangle-and-clamps-leaving-edge-debris),
+so decide 0010 first and let bloom be built against the settled answer.
+
 ---
 
 ## 0006 — `[smoothing]` is a one-pole low-pass: no attack/release split, no S-curve
@@ -288,8 +310,18 @@ answer. Do not promote without asking the user which way they lean.
 **Decided 2026-07-26: invest, do not cut.** The user chose to make the scene earn its slot rather
 than retire it. Still needs its own ADR and plan — both asks (a richer interior, and a real geometry
 lerp between `variant`s) are generator-level changes to `star_pattern`'s config surface, which is
-ADR-0007 territory. Not folded into [Plan 0033](plans/0033-internal-resolution-and-preset-surface.md),
+ADR-0007 territory. Not folded into [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md),
 which is a resolution/preset-surface plan and shares no files with this.
+
+**RE-RAISED 2026-07-26 (second batch) — the user asked for the blocked capability directly.** Live
+against the running app, unprompted: *"star rosette - very nice, but can we make morphing between
+shapes easier, slower?"* That is exactly the second ask above, and it is unreachable from a preset —
+`variant` indexes three precomputed contact-angle geometries, so smoothing it only stutters across
+`floor` boundaries (`presets/star_rosette.toml:31-39` documents why). Note also the shift in the
+verdict on the scene: the original entry recorded "idea is interesting but looks poor", and the same
+user now opens with "very nice" — the preset-side mitigations (radial `draw_progress` motion, a rare
+and hidden cut) did move it. What remains is the geometry lerp, which is engine work. This raises
+confidence in the *invest* decision and narrows the ask to the second half.
 
 ---
 
@@ -338,3 +370,151 @@ Both are real preset-authoring constraints imposed by the **test resolution** ra
 look. The failure mode is non-obvious and cost several iterations to diagnose. **Captured so the next
 author does not re-diagnose it** — the cheap resolution is a sentence in the authoring docs, not a
 change to the gate.
+
+---
+
+## Entries 0010-0014 — the 2026-07-26 `preset-author` API-feedback batch (second, post-Plan-0033)
+
+Raised from the lane's Phase 8 preset pass (`a070f5a`) and the live-tuning session that followed
+(`8b5b2e0`), on the user's 2048x1152 display. Two of these were filed by the lane as Plan 0033
+regressions; **one of those was verified here and is not one** — see 0010.
+
+---
+
+## 0010 — the kaleidoscope fold samples outside its source rectangle and clamps, leaving edge debris
+
+- **Raised:** 2026-07-26, from `preset-author`, user-reported from the running app on `swarm_dense`
+  ("dense still has artifacts on corners", with a screenshot).
+- **Verified against code AND against the pre-Plan-0033 engine.** This entry's diagnosis is
+  **corrected** from the one the lane filed.
+
+**The symptom.** Hard-edged geometric streaks in the frame corners at `kaleido_order = 6`, chevron
+debris on the left/right edges at `kaleido_order = 4`, clean only with the fold off (`order < 2`).
+Lowering the order relocates the debris rather than removing it. Reproduced headlessly at 2048x1152.
+
+**The cause, from the shader** (`core/src/render/kaleidoscope.rs:63-84`). The fold is a polar
+operation on a **rectangular** source: each output pixel keeps its radius `r` and takes a folded
+angle `a`, then samples `q = vec2(cos(a), sin(a)) * r`. In aspect-corrected space the source spans
+`x` in +/-0.5*aspect and `y` in +/-0.5, so at 16:9 the corner radius is ~1.02 while the source only
+reaches 0.889 along the `x` axis. Any output pixel whose radius exceeds the source's extent **in the
+folded direction** produces `s_uv` outside `[0,1]`, and the sampler is `ClampToEdge` (`:125`), which
+smears the border texel radially. Corners have the largest radius, so they are worst; a higher order
+rotates more of that out-of-range region into view.
+
+**It is NOT a Plan 0033 regression — this was tested, not assumed.** A worktree at `3f3b652~1` (the
+commit before "the post stages follow the render target"), rendering the *same unmodified*
+`swarm_dense.toml` at the same size, produces **the same corner debris**. The arithmetic says why:
+the fold's aspect was a baked 1280/720 = 1.7778 before and is a live 1920/1080 = 1.7778 now, and the
+shader works in normalized uv, so the fold geometry is the same decision at any 16:9 target. The bug
+dates from Plan 0018 Phase 7, when the stage was written.
+
+**What Plan 0033 changed is visibility.** The stage used to render at a fixed 1280x720 and upscale
+1.6x to a 2048x1152 surface, which blurred the clamped streaks into something easy to miss; it now
+renders at 1920x1080 and presents nearly 1:1, so the same debris is sharp and legible. Plan 0033
+**revealed** this, it did not cause it. That distinction decides where `dev` looks: the fix is in the
+fold shader, not in `internal_grid_size` or the grid policy.
+
+**Also wrong, and worth correcting in place:** `presets/swarm_dense.toml:45-50` asserts "Six is the
+highest that stays clean at 16:9". It is not clean at six, and was not before either. That comment
+should go when this is fixed — it currently sends the next author hunting for a safe order that does
+not exist.
+
+**Impact:** nine shipped presets bind `kaleido_*` (`fragment_kaleido`, `fragment_glacier`,
+`fragment_warp`, `attractor_dejong`, `attractor_lorenz`, `rose_kaleidoscope`, `reaction_reef`,
+`swarm_dense`, `swarm_storm`). There is no preset-level workaround short of disabling the fold.
+
+**ADR-worthy — a real choice with a real cost on each side:**
+
+- **Clamp the fold radius** to the largest disc the source contains (0.5 in the short axis), so
+  out-of-range pixels get a defined result. Cheapest; either letterboxes the fold to a disc or
+  leaves the corners flat.
+- **Wrap or mirror the address mode** instead of clamping. One line, but it tiles unrelated content
+  into the corners — plausible on a field scene, wrong on a centred figure.
+- **Fold as a disc and treat the corners deliberately** — sample at `min(r, r_max)` with a radial
+  falloff, accepting the corners as a designed vignette rather than folded content.
+
+**Connects to close-review major 3** ([Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md)):
+no golden fixture binds `trails` or `kaleido_*`. A fixture at a fold order above 2 would have pinned
+this artifact the moment anyone looked at the baseline. Fixing 0010 and closing major 3 belong in the
+same plan.
+
+---
+
+## 0011 — the kaleidoscope fold axis is screen-centred, so `pan_*` and `kaleido_*` are mutually exclusive
+
+- **Raised:** 2026-07-26, from `preset-author`, while unpinning the reaction-diffusion view after
+  Plan 0033 Phase 5 made `pan_*` genuinely usable there.
+- **Verified against code:** yes. `kaleidoscope.rs:69` centres the fold on `in.uv - vec2(0.5, 0.5)`,
+  a hard screen centre. The stage is a `PostStage` and never sees the `ViewTransform`.
+
+A translating `pan_x`/`pan_y` slides the folded rosette off centre and costs the composition its
+symmetry, because the source moves under a fold axis that does not. The lane shipped `reaction_reef`
+deliberately un-scrolled for this reason and documented it in the file; the three RD presets without
+a fold took the scroll happily. An oscillating pan is the only workaround, since it returns to centre.
+
+**Impact:** narrow but sharp — it bites exactly where Plan 0033 just added value. Fix shape is either
+a `kaleido_center_x` / `kaleido_center_y` pair, or having the fold axis follow the view transform.
+**Note the interaction with 0010:** moving the fold centre away from screen centre makes the
+out-of-range region asymmetric and probably worse, so 0010 should be decided first.
+
+---
+
+## 0012 — `--report`'s `cover` metric structurally penalises inverted-polarity (ink) presets
+
+- **Raised:** 2026-07-26, from `preset-author`.
+- **Verified by measurement:** `reaction_coral_bloom` reports `cover = 0.128`, the lowest in the
+  library, and is healthy — it is the family's ink-on-paper variant (`ink_amount = 1`,
+  `paper_bright = 0.965`), a pale botanical print.
+
+`cover` measures structure against the frame's own background. A look whose subject is *darker* than
+its ground is penalised by construction, so an ink preset reads as dead every run. The lane chased it
+as a bug and spent a rendered glow sweep proving it was not one.
+
+**Impact:** modest and self-inflicted — the metric's job is to name suspects for a human, and a
+permanent false positive costs trust in the whole table. Cheapest fix is polarity-aware coverage
+(measure deviation from the modal background rather than brightness above it), or excluding
+`ink_amount >= 0.5` presets from the `cover` column with a note. No ADR — a measurement change.
+
+---
+
+## 0013 — no synthetic signal has transients, so a `[smoothing]` change cannot be verified at all
+
+- **Raised:** 2026-07-26, from `preset-author`, after adopting `{ attack, release }` on 20 presets.
+- **This is the unresolved half of 0008.** That entry's item 3 asked for a `--signal` matching real
+  music levels; Plan 0033 Phase 1 shipped the *measurement* (the band-level report) and *documented*
+  the trap, but added no such signal. The trap is now visible and still unavoidable.
+
+Two independent blockers, both measured:
+
+- **`--report` measures settled response**, so it is identical before and after any easing edit by
+  construction. Kaleido Field: bass 0.228 / mid 0.153 / treb 0.131 before AND after a full smoothing
+  rework.
+- **Every `--signal` kind is effectively steady-state**, per the Phase 1 band report: `bass:60` gives
+  0.187 / 0.187 / 0.187 (zero variance), `chord` 0.058 / 0.059 / 0.060, `noise:7`
+  0.012 / 0.022 / 0.039. `click:120` is the only transient kind and peaks at **0.011** — roughly 50x
+  below the levels the library is gained for.
+
+**Impact: the widest blast radius in the batch.** ADR-0035's asymmetric easing is a capability whose
+entire value lives in the transient, and the harness cannot see a transient. Every easing edit in
+`a070f5a` and `8b5b2e0` rests solely on the user watching the running app, and the same hole will
+make the next easing feature unverifiable too.
+
+Cheapest credible fix is one short committed reference clip (`--audio` already exists and reads
+16-bit PCM WAV) plus a transient-response measure — rise/fall time to a step. Harness work, but not
+merely documentation this time.
+
+---
+
+## 0014 — the line scenes' cosine `hue` ramp is not a hue wheel, and nothing documents it
+
+- **Raised:** 2026-07-26, from `preset-author`, choosing a glow colour for Fern Grow.
+- **Verified by a rendered six-way sweep.** Predicted 0.06 = amber, 0.17 = gold-green, 0.62 = violet.
+  Measured: **0.06 lavender, 0.17 turquoise, 0.30 cyan, 0.46 near-white/green, 0.62 gold, 0.82 rose.**
+  Every prediction was wrong.
+
+The three line scenes ignore `[palette]` entirely and colour through their own cosine ramp, so `hue`
+is their *only* colour control — and its mapping is undocumented and not the hue wheel the name
+implies. Picking a colour costs a render round-trip every time.
+
+**Impact:** small, recurring, purely documentation — a swatch table in `docs/preset-palettes.md` (or
+a generated strip committed as an image) closes it. Bundle with any other doc sweep.
