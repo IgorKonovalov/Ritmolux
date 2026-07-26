@@ -3,17 +3,28 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0037**
+**Next free number: 0038**
 
 ## Active roster
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
+| [0037](0037-verifying-easing-transient-probe-and-dynamic-signal.md) | Verifying easing: a transient probe, a signal with dynamics, and the levels authors calibrate against | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0035](0035-composite-aspect-and-grid-policy.md) | The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages | **approved 2026-07-26** — ready for `dev` | dev |
+| [0035](0035-composite-aspect-and-grid-policy.md) | The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages | **all four phases landed 2026-07-26** (`d4f98f8`, `687621b`, `bc11b23`, `f9f9e79`) — **awaiting Mode 4 close review** | dev |
 | [0034](0034-preset-reachable-spectrum.md) | Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
+
+**[0035] is done and awaiting its close review** — all four phases landed 2026-07-26. The next
+session's first job is the Mode 4 review in a **fresh** session, then the close bookkeeping
+(status → `done`, `git mv` to `done/`, accept [ADR-0037], bump the version). Original rationale
+retained below.
+
+**Then [0034], then [0037].** [0037] is sequenced *after* [0034] at the user's explicit choice
+(2026-07-26), with the consequence stated and accepted: [0034]'s new spectrum scene will land
+**unverifiable in the same way** the easing capability did, because the transient probe that would
+check it arrives afterwards. The alternative — probe first — was offered and declined.
 
 **Take [0035] first.** It is small (four phases, one of them docs) and it fixes a shipped correctness
 defect: with `trails` or `kaleido_*` active the composite derives every scene's aspect from the
