@@ -1,0 +1,51 @@
+# EASING PROBE FIXTURE - do not tune; this is a baseline, not a look.
+# Plan 0037 Phase 1. Its twin is easing_scalar.toml: the two carry the SAME
+# `[curve]` family and the SAME `[params]` bindings, differing only in their
+# `name` and their `[smoothing]` table. core/tests/easing.rs asserts that, because
+# the probe's whole claim is that the table is the only thing that differs.
+#
+# WHY IT LOOKS LIKE THIS. The probe measures the FRAME, not the parameter
+# (ADR-0039), so it can only see easing through whatever curve the scene puts
+# between a param and its pixels. Everything here is chosen to make that curve as
+# close to a straight line as the engine allows:
+#
+#   - `brightness` is the bound param, and the line renderer multiplies the
+#     stroke colour by it directly - the most nearly linear lever in the engine.
+#   - `spin = 0` and `draw_progress = 1` make the figure STATIC, so the only
+#     thing moving between two captured frames is the eased parameter. A scene
+#     with its own time term (the fragment field's fold, any feedback trail)
+#     would add a floor of change the probe cannot tell from the response.
+#   - the amplitude stays well under 1 so overlapping strokes, which the line
+#     renderer sums additively, do not clamp at the top of the ramp. Saturation
+#     there is exactly the `rose_trails` failure the plan is about.
+#   - nothing binds `trails`, `kaleido_*`, `bg_*` or `ink_*`: every one of those
+#     is a nonlinearity between the parameter and the pixels.
+#
+# Raising the brightness amplitude, adding a spin, or giving it a composite stage
+# will not make the probe fail loudly - it will make it quietly measure the scene
+# instead of the easing. That is why this says do not tune.
+system = "parametric_curve"
+name   = "fixture_easing_asymmetric"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "6"
+d             = "71"
+samples       = "361"
+scale         = "0.8"
+spin          = "0"
+hue           = "0.55"
+thickness     = "1.6"
+brightness    = "0.55 * bass"
+draw_progress = "1"
+
+# THE ONLY LINE THAT DIFFERS FROM THE TWIN. An { attack, release } pair
+# (ADR-0035) selects its constant by the direction of travel, so this snaps up in
+# about 3 frames (2.303 * 0.02 = 0.046 s) and glides back down over about 69
+# (2.303 * 0.5 = 1.15 s) - a PARAMETER-domain ratio of 25. The probe's measured
+# pixel-domain ratio is smaller, because 90% of a parameter's travel is not 90%
+# of a frame's; only its distance from 1.0 is the claim.
+[smoothing]
+brightness = { attack = 0.02, release = 0.5 }
