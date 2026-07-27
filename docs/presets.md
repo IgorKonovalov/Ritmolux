@@ -107,6 +107,10 @@ Every `[params]` value is evaluated **once per frame** and applied to the system
 before it renders. There is no per-frame state you can accumulate in a preset —
 an expression is a pure function of the current analysis frame plus the clock.
 
+The one exception is a binding that names [`index`](#index--one-binding-evaluated-once-per-element),
+which the `spectrum` system evaluates once *per element*. Nothing else changes:
+it is still the same pure expression over the same frame.
+
 ---
 
 ## The built-in systems
@@ -212,6 +216,11 @@ worth knowing before you tune one:
   transient's shape while a slow `release` lets the elements fall like a meter
   instead of strobing on every analysis hop.
 
+This is also the one system that reads **per-element bindings**: a `[params]`
+expression naming [`index`](#index--one-binding-evaluated-once-per-element) is
+evaluated once for each element, so the relationship between a frequency region
+and what is drawn there is preset content rather than scene code.
+
 Full parameter notes — including which composite controls this system honors, and
 the one layout-specific parameter (`radius`) — are in
 [`presets/README.md`](../presets/README.md#spectrum--the-frequency-axis-readout-plan-0034).
@@ -263,7 +272,8 @@ same audio.
 
 ### Variables
 
-Nine read-only variables carry the live audio analysis into your expressions:
+Nine read-only variables carry the live audio analysis into your expressions,
+plus one — `index` — that carries position rather than sound:
 
 | Variable | Meaning | Notes |
 |----------|---------|-------|
@@ -276,6 +286,7 @@ Nine read-only variables carry the live audio analysis into your expressions:
 | `time` | The scene clock in seconds (monotonic). | Use `time * k` for slow drift; `k` sets the speed. |
 | `tempo` | Tracked tempo in **BPM**. | **Not a `0–1` band** — see the warning below. |
 | `novelty` | Spectral-change transient: ~`0` within a steady segment, spiking at a track/section boundary. | **Experimental** — see below. |
+| `index` | The element's own position in `[0, 1]` during a **per-element** evaluation. | Not audio. `0` everywhere else — see [below](#index--one-binding-evaluated-once-per-element). |
 
 The band values (`bass`/`mid`/`treb`) are raw mean magnitudes normalized so a
 full-scale sine reads near `1.0`, but real program material reads far lower — so
@@ -370,6 +381,52 @@ errors and never rejects a preset at load.
 Values come off the same normalization as the bands: a full-scale sine reads near
 `1.0` in its band, and ordinary music reads **small**, so multiply up and clamp
 exactly as you would with `bass`.
+
+### `index` — one binding, evaluated once per element
+
+`bin(x)` lets an expression read *a* frequency region. `index` lets one
+expression read *every* region — it is the only variable that is not audio. On a
+system that draws N elements (today that is [`spectrum`](#the-spectrum-table)),
+a binding whose text mentions `index` is evaluated **once per element**, with
+`index` bound to that element's normalized position: `0` at the first element,
+`1` at the last, evenly spaced between.
+
+```toml
+system = "spectrum"
+
+[params]
+# The stroke thickens where that element's own band is loud.
+thickness = "0.01 + bin(index) * 0.05"
+# A resting length that grows toward the top of the axis, where music has less
+# energy, so the high elements read instead of sitting stubbed.
+base      = "0.16 + index * 0.12"
+# No `index` -> one evaluation, one value, every element the same.
+brightness= "0.9 + bass * 3"
+```
+
+`index` is normalized rather than an element count on purpose: `bin(index)` maps
+the axis onto itself, so the same preset is correct whether it draws 8 elements
+or 64, and you never write the count into an expression.
+
+Things worth knowing before you reach for it:
+
+- **Outside a per-element evaluation, `index` reads `0`.** Naming it on any other
+  system is not an error and not a warning — the binding simply evaluates once
+  with `index = 0`, which is the value the first element would have seen.
+- **Not every parameter is per-element.** On `spectrum`, `base`, `scale`,
+  `thickness`, `brightness` and `hue` genuinely vary per element. The
+  whole-figure ones — `radius`, `rotation`, `hue_spread`, `palette_mix`,
+  `saturation`, and the view transform / mirror — take the `index = 0` value of
+  the series instead of silently dropping the binding.
+- **`[smoothing]` cannot ease a per-element binding**, because the smoother holds
+  one scalar and a series has no single value. Listing one is a surfaced load
+  **warning**, not a silent no-op; the easing you want is
+  [`[spectrum] smoothing`](#the-spectrum-table), which eases the element levels
+  themselves.
+- **Cost is bounded and small**: N × (per-element bindings) evaluations per frame,
+  allocation-free — at the default 24 elements it is a low-microsecond fraction of
+  a 60 Hz frame. A preset that names `index` nowhere costs exactly what it did
+  before this existed.
 
 ### Comparisons and branching
 

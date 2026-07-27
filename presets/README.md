@@ -69,8 +69,9 @@ name is reported as a load-time warning naming the param and the system — the
 preset still loads and its other bindings apply (ADR-0020). The params after the
 first `·` are the shared **view transform** and
 line-**mirror** controls (Plan 0018) — see [Engine-wide controls](#engine-wide-controls-plan-0018);
-the trailing group on the four shader-coloured scenes is the shared **palette**
-colour surface (Plan 0020) — see [Colour — the palette surface](#colour--the-palette-surface-plan-0020).
+the trailing group on the palette-coloured scenes (the four shader ones, plus
+`spectrum` since Plan 0034) is the shared **palette** colour surface (Plan 0020) —
+see [Colour — the palette surface](#colour--the-palette-surface-plan-0020).
 Every system additionally accepts the engine-stage params `bg_*`, `trails`,
 `kaleido_*`, and the final `ink_*`/`paper_*` remap documented there.
 
@@ -136,6 +137,27 @@ look and how far they reach.
   `radial_ring` a spread of exactly `1` makes the wrap continuous in colour as
   well as in position.
 
+**Per-element bindings (Plan 0034 Phase 4).** This is the one system where a
+single `[params]` expression can say something *different about each element*. A
+binding whose text names `index` — the element's normalized `0..1` position along
+the frequency axis — is evaluated once per element instead of once per frame:
+
+```toml
+[params]
+thickness = "0.01 + bin(index) * 0.05"   # thick where that element's band is loud
+base      = "0.16 + index * 0.12"        # a longer rest toward the quiet top end
+hue       = "index * 0.3 + time * 0.02"  # colour walked by hand instead of hue_spread
+```
+
+Five params genuinely vary per element — `base`, `scale`, `thickness`,
+`brightness`, `hue`. The rest describe the whole figure (`radius`, `rotation`,
+`hue_spread`, `palette_mix`, `saturation`, the view transform, the mirror), so a
+series aimed at one of those takes its `index = 0` value rather than being
+dropped. `index` reads `0` on every other system, and a `[smoothing]` entry naming
+a per-element binding is a surfaced **warning** — ease the levels with
+[`[spectrum] smoothing`](#spectrum--for-spectrum) instead. Full semantics in
+[docs/presets.md](../docs/presets.md#index--one-binding-evaluated-once-per-element).
+
 **What this system honors**, since a silent no-op would be worse than an absence:
 the shared view transform, the geometry mirror, the palette surface
 (`[palette]`/`[palette_b]`/`palette_mix`/`saturation`, sampled per element — this
@@ -155,9 +177,9 @@ that binds none renders exactly as before.
 ### Shared view transform — `zoom`, `pan_x`, `pan_y`
 
 A camera zoom about the frame centre, then a pan. Applied by **every** coloured
-scene: `fragment_field`, `swarm`, the three line systems (`parametric_curve` /
-`lsystem` / `star_pattern`), and — since Plan 0025 — `reaction_diffusion` and
-`attractor`.
+scene: `fragment_field`, `swarm`, the line systems (`parametric_curve` /
+`lsystem` / `star_pattern`, and `spectrum` since Plan 0034), and — since Plan
+0025 — `reaction_diffusion` and `attractor`.
 
 - On the **line**, **swarm**, and **attractor** scenes, `zoom > 1` moves the camera
   *in* (geometry bigger); `zoom = 1` is no zoom. `pan_*` shift in world units. Try
@@ -338,14 +360,16 @@ so they are never inverted.
 ## Colour — the palette surface (Plan 0020)
 
 The four **shader-coloured** scenes (`fragment_field`, `swarm`,
-`reaction_diffusion`, `attractor`) colour through a shared **palette** (ADR-0021):
-a gradient — a built-in `name` or custom `stops` — baked into a lookup table the
-scene samples. An optional top-level `[palette]` table picks it; a `[palette_b]` +
-bindable `palette_mix` crossfades between two. Colour modulation (`saturation`,
-`color_span`/`color_center`, `hue_spread`/`hue_center`, `palette_mix`) is normal
-audio-bindable `[params]`. All defaults reproduce each scene's prior look
-(`[palette]`-less = the classic `spectrum` cosine), so a preset that sets none is
-unchanged. The line scenes use their own cosine `hue` and ignore palettes.
+`reaction_diffusion`, `attractor`) — and, since Plan 0034, `spectrum`, which
+samples the same LUT on the CPU, one colour per element — colour through a shared
+**palette** (ADR-0021): a gradient — a built-in `name` or custom `stops` — baked
+into a lookup table the scene samples. An optional top-level `[palette]` table
+picks it; a `[palette_b]` + bindable `palette_mix` crossfades between two. Colour
+modulation (`saturation`, `color_span`/`color_center`, `hue_spread`/`hue_center`,
+`palette_mix`) is normal audio-bindable `[params]`. All defaults reproduce each
+scene's prior look (`[palette]`-less = the classic `spectrum` cosine), so a preset
+that sets none is unchanged. The **other three** line scenes (`parametric_curve`,
+`lsystem`, `star_pattern`) use their own cosine `hue` and ignore palettes.
 
 ```toml
 [palette]

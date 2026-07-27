@@ -9,8 +9,13 @@ palette is a gradient baked once at load into a lookup table that the four
 - `reaction_diffusion`
 - `attractor`
 
-The line scenes (`parametric_curve` / `lsystem` / `star_pattern`) colour through
-their own cosine `hue` offset and do **not** use this palette surface.
+`spectrum` samples the same LUT too, but **on the CPU, once per element** rather
+than per pixel or per particle — see
+[Spectrum — colour along the frequency axis](#spectrum--colour-along-the-frequency-axis).
+
+The other three line scenes (`parametric_curve` / `lsystem` / `star_pattern`)
+colour through their own cosine `hue` offset and do **not** use this palette
+surface.
 
 A preset that declares no `[palette]` gets the default **`spectrum`** palette —
 the exact iq cosine the scenes used before this system existed — so every shipped
@@ -78,7 +83,7 @@ Everything that *modulates* the gradient is a normal `[params]` expression over
 the audio vocabulary (`bass mid treb onset beat bar time` …) — only the gradient
 *shape* above is static config. Defaults reproduce each scene's prior look.
 
-### Shared (all four scenes)
+### Shared (every palette-coloured scene)
 
 | Param | Default | What it does |
 |-------|---------|--------------|
@@ -115,6 +120,35 @@ higher than a thin maze. On the fragment field, keep `color_span` in the usual
 | `hue_center` | `0.5` (swarm) / `0.075` (attractor) | Centre of that band in the gradient. Two presets that differ only here render as different colours. |
 
 Particle hues occupy `hue_center + (particle_seed - 0.5) * hue_spread`.
+
+### Spectrum — colour along the frequency axis
+
+`spectrum` is the one **line** system on this surface, and it uses the palette for
+something the shader scenes cannot: it colours by *position in frequency*, so the
+gradient becomes a legend. Element `i` of `n` samples the LUT at
+
+```
+hue + hue_spread * (i / n)
+```
+
+then crossfades by `palette_mix`, desaturates by `saturation`, and scales by
+`brightness` — one CPU sample per element per frame, not per pixel.
+
+| Param | Default | What it does |
+|-------|---------|--------------|
+| `hue_spread` | `0.0` | How far the palette is walked from the lowest element to the highest. `0` = the whole figure is one hue; `1` = the full gradient spans the axis, so you can see *where* a peak is without counting positions. |
+| `hue` | `0.0` | The offset the walk starts from — rotate the whole readout through the gradient, or drive it off the audio. |
+
+Two notes specific to this scene:
+
+- **On `radial_ring`, `hue_spread = 1` closes the loop.** The gradient repeats past
+  its ends, so the last element's colour meets the first's — continuous in colour
+  as well as in position. Any other spread leaves a visible seam at the wrap, which
+  is sometimes what you want (it marks where the axis starts).
+- **`hue` may be per element.** It is one of the five `spectrum` params that accept
+  a [per-element binding](presets.md#index--one-binding-evaluated-once-per-element),
+  so `hue = "bin(index) * 0.4"` colours by *loudness* rather than by position —
+  a different reading of the same figure. `hue_spread` itself is whole-figure.
 
 ---
 
