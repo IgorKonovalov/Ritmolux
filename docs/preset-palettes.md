@@ -15,7 +15,9 @@ than per pixel or per particle — see
 
 The other three line scenes (`parametric_curve` / `lsystem` / `star_pattern`)
 colour through their own cosine `hue` offset and do **not** use this palette
-surface.
+surface — a `[palette]` table in one of those presets is inert, and `hue` is the
+only colour control they have. See
+[the line scenes' cosine ramp](#the-line-scenes-cosine-ramp--what-hue-actually-looks-like).
 
 A preset that declares no `[palette]` gets the default **`spectrum`** palette —
 the exact iq cosine the scenes used before this system existed — so every shipped
@@ -175,6 +177,62 @@ Three notes specific to this scene:
   therefore lands the last element on the same colour as the first — a duplicated
   colour rather than a closed loop. Use `hue_spread` for a ring, and `index` when
   you want the ends to be the ends.
+
+---
+
+## The line scenes' cosine ramp — what `hue` actually looks like
+
+`parametric_curve`, `lsystem` and `star_pattern` ignore `[palette]` entirely.
+They colour through a fixed cosine ramp (`core/src/render/scenes/lines/mod.rs`),
+so `hue` is their **only** colour control — and it is **not a hue wheel**. The
+three channels are cosines at the same frequency with different phases, which
+means the ramp walks a fixed loop through colour space rather than rotating
+through hues at an even rate. Guessing a value costs a render round-trip; this
+table is so you do not have to.
+
+Swatches are the ramp at `brightness = 1`, sRGB, computed from the shader's own
+arithmetic and confirmed against rendered strokes:
+
+| `hue` | swatch | reads as |
+|-------|--------|----------|
+| `0.00` | `#F44667` | coral rose |
+| `0.05` | `#E6188B` | cerise |
+| `0.10` | `#D30DAB` | magenta |
+| `0.15` | `#BC3EC6` | orchid |
+| `0.20` | `#9F67DC` | lavender-violet |
+| `0.25` | `#7D8BEC` | periwinkle |
+| `0.30` | `#57ABF8` | cornflower blue |
+| `0.35` | `#2BC6FE` | sky |
+| `0.40` | `#00DCFF` | cyan |
+| `0.45` | `#2BECFA` | aqua |
+| `0.50` | `#57F8EF` | turquoise |
+| `0.55` | `#7DFEDF` | pale aquamarine |
+| `0.60` | `#9FFFCA` | mint |
+| `0.65` | `#BCFAB1` | pale green |
+| `0.70` | `#D3EF92` | lime cream |
+| `0.75` | `#E6DF6F` | pale yellow |
+| `0.80` | `#F4CA46` | gold |
+| `0.85` | `#FCB118` | amber |
+| `0.90` | `#FF920D` | orange |
+| `0.95` | `#FC6F3E` | vermilion |
+
+Reading it:
+
+- **It is cyclic**, unlike `ember` / `ice` / `mono` / `aurora`: `hue = 1.0` is
+  `hue = 0.0`, so a binding that sweeps `hue` continuously never hits a seam.
+- **The ends of the loop are the warm half.** Red through orange lives at the
+  wrap (`0.90`–`0.05`); there is no deep-red-to-black end, because the ramp never
+  leaves full saturation. If you want a dark look here, that is `brightness`, not
+  `hue`.
+- **The cool half is over-represented.** Roughly `0.30`–`0.65` is blue through
+  green, a third of the range for what a hue wheel gives a quarter of. Fine
+  distinctions between two blues need smaller steps than between two ambers.
+- **`brightness` scales the ramp; overlap does not preserve it.** The line
+  renderer blends **additively**, so where strokes cross, channels sum and the
+  crossing reads paler than the swatch — approaching white where three or more
+  overlap. A dense figure at high `brightness` therefore looks less saturated
+  than its `hue` says. Lower `brightness` (or `thickness`) rather than chasing the
+  colour with `hue`.
 
 ---
 

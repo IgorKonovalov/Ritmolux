@@ -90,7 +90,11 @@ so a very large window resolves the attractor alone slightly finer.
 ### Line-art parameter notes (Plan 0010)
 
 - `thickness` — stroke weight (roughly 1–5); scaled to a projector-friendly glow.
-- `hue` — offset into the shared cosine palette (add `time * k` for a slow drift).
+- `hue` — offset into the line scenes' own cosine ramp (add `time * k` for a slow
+  drift). **It is not a hue wheel**, and on these three scenes it is the *only*
+  colour control — `[palette]` is inert here. The measured swatch table is in
+  [`docs/preset-palettes.md`](../docs/preset-palettes.md#the-line-scenes-cosine-ramp--what-hue-actually-looks-like);
+  read it rather than guessing, because a guess costs a render round-trip.
 - `scale` — overall size in the frame; `draw_progress` in `0..1` reveals the
   figure from the start (a line-draw-on; ride it on `bar` for a per-beat redraw).
 - `parametric_curve`: `n`/`d` are the rose parameters, `spin` is angular velocity
@@ -380,7 +384,9 @@ modulation (`saturation`, `color_span`/`color_center`, `hue_spread`/`hue_center`
 `palette_mix`) is normal audio-bindable `[params]`. All defaults reproduce each
 scene's prior look (`[palette]`-less = the classic `spectrum` cosine), so a preset
 that sets none is unchanged. The **other three** line scenes (`parametric_curve`,
-`lsystem`, `star_pattern`) use their own cosine `hue` and ignore palettes.
+`lsystem`, `star_pattern`) use their own cosine `hue` and ignore palettes — see
+[the swatch table](../docs/preset-palettes.md#the-line-scenes-cosine-ramp--what-hue-actually-looks-like)
+for what its values actually look like.
 
 ```toml
 [palette]

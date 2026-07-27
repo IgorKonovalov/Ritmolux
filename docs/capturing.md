@@ -138,8 +138,8 @@ it summarises), so the report's numbers are real for a spectrum preset.
 |---|---|
 | `bass` `mid` `treb` `onset` | how far the frame moves when that stimulus alone comes up, against silence — "does this preset respond to bass at all" |
 | `anim` | how far the frame moves between two capture depths **under silence** — does it have a life of its own |
-| `cover` | fraction of the frame that is lit, against the corner background |
-| `rise` `fall` | the **transient probe** (below) — frames to settle after a step up, and after the matching step down |
+| `cover` | fraction of the frame that differs from the corner background — [a low value is often correct](#a-low-cover-is-not-a-defect) |
+| `rise` `fall` | the **transient probe** (below) — frames to settle after a step up, and after the matching step down; [read them as evidence, not a verdict](#what-the-transient-columns-cannot-see) |
 
 Every one of those but the last two is a **settled** measurement: the capture
 holds one stimulus for every frame it renders, so each smoother has converged
@@ -169,12 +169,64 @@ Reading them:
   columns: this usually means the preset does not respond to the stimulus, not
   that its easing is instant.
 
-Two limits worth knowing before you act on a number. The probe's window is
-**48 frames (0.8 s) each way**, so a release constant longer than about 0.35 s
-does not fully settle inside it and reads *clamped* rather than measured — the
-asymmetry still shows, the magnitude understates. And more fundamentally, the
-probe measures the **frame**, not the parameter; a preset whose visual response
-saturates reads flat no matter what its easing says.
+#### What the transient columns cannot see
+
+**The probe measures the frame, not the parameter.** It reads pixels, so it can
+only see easing through whatever curve the scene puts between a bound value and
+its output — and for most scenes that curve is neither linear nor even monotone.
+Two consequences, both real and neither fixable by measuring harder:
+
+- **A saturating response reads flat.** `rose_trails` is the worked example: its
+  1.25 spin against a max-decay feedback drives the frame to the same place
+  whatever `thickness` says, which is why the content lane once rendered five
+  values from 1.10 to 2.30 — *including the untouched original* — and could not
+  tell them apart. A preset like that will report a transient that has nothing to
+  do with its `[smoothing]` table, and no column here will warn you.
+- **The scene's own motion is measured too.** A fragment field's fold, a feedback
+  trail and a particle cloud all keep changing while the parameter settles, and
+  the probe cannot separate that from the response. Over the shipped library this
+  shows up as presets reporting `fall` *below* `rise`, which is backwards for any
+  easing.
+
+Measured over the shipped set on 2026-07-27 — a snapshot of what the probe sees,
+not a figure anyone maintains — presets carrying at least one
+`{ attack, release }` entry had a median `fall / rise` of **1.02**, with
+`fall > rise` in about half of them; presets with only scalar entries sat at
+**0.60**, with barely any. So the columns separate the two populations
+*directionally* and lose the magnitude almost entirely:
+`Smooth Pulse`, the worked asymmetric example with a 0.60 s release,
+reads `26 / 31` where a purpose-built near-linear fixture at a 0.5 s release reads
+`3 / 61`.
+
+**Read the columns as evidence, not as a verdict.** A wide `fall / rise` gap is
+good evidence the easing is working. A narrow one is not evidence it is broken.
+The place easing is proven is `core/tests/easing.rs`, against fixtures built to
+have a near-linear response precisely so the measurement is of the easing and not
+of a scene; everything else is a preset-shaped approximation of that.
+
+One smaller limit: the probe's window is **48 frames (0.8 s) each way**, so a
+release constant longer than about 0.35 s does not fully settle inside it and
+reads *clamped*. Widening it does not help — measured at 96 frames the separation
+got **worse** (scalar-only median 0.60 → 0.92), for double the wall clock. The
+window is not what is hiding the magnitude.
+
+#### A low `cover` is not a defect
+
+`cover` counts pixels differing from the corner-sampled background by more than a
+threshold, on any channel — a **symmetric** difference, so dark-on-light and
+light-on-dark are measured identically. An ink-remapped look is not penalised by
+construction, and a low reading is not evidence of one.
+
+What a low `cover` means is that the frame is sparse, and sparse is often the
+intent. `reaction_coral_bloom` reports **0.128**, about as low as the shipped set
+goes, and is healthy — it is the family's ink-on-paper variant, a pale print whose
+chaotic-branching regime genuinely covers an eighth of the frame. The number is
+truthful; what it cannot tell you is "sparse on purpose" from "dead".
+
+So the column **names suspects rather than convicting them**. A low `cover`
+alongside a dead `anim` and flat reactivity columns is worth investigating; a low
+`cover` on a preset that is deliberately a thin figure on a wide ground is the
+report working.
 
 ### Which preset library a shot uses
 
