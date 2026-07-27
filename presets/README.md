@@ -128,6 +128,17 @@ look and how far they reach.
 - `radius` — **`radial_ring` only**: the inner circle the spokes stand on. It has
   no effect on `bars` or `polyline`, and that is the one layout-specific
   parameter on this system.
+
+**How wide the readout is, since there is no parameter for it.** The figure is
+2 world units across, and the line renderer divides world x by the target's
+aspect — the same rule every line scene follows, and the reason a `radial_ring`
+comes out a circle rather than an ellipse. The consequence for the two flat
+layouts is worth stating plainly: `bars` and `polyline` span the frame's
+**height** in pixels, which is about **56 % of its width at 16:9** and less on an
+ultrawide. There is no `span`/`width` param, and `zoom` is not a substitute — it
+scales y as well, so widening the comb also lifts its baseline off the bottom of
+the frame. Design for a centred figure with room either side rather than for an
+edge-to-edge meter.
 - `rotation` — turns the whole figure about the frame centre, in radians, on
   every layout. On the ring it is the natural motion; on bars and the polyline it
   tilts the readout, which is what makes those two worth folding with `mirror_*`.

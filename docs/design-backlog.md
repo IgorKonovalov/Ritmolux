@@ -542,9 +542,11 @@ merely documentation this time.
   Measured: **0.06 lavender, 0.17 turquoise, 0.30 cyan, 0.46 near-white/green, 0.62 gold, 0.82 rose.**
   Every prediction was wrong.
 
-The three line scenes ignore `[palette]` entirely and colour through their own cosine ramp, so `hue`
-is their *only* colour control — and its mapping is undocumented and not the hue wheel the name
-implies. Picking a colour costs a render round-trip every time.
+Three of the four line scenes (`parametric_curve`, `lsystem`, `star_pattern`) ignore `[palette]`
+entirely and colour through their own cosine ramp, so `hue` is their *only* colour control — and its
+mapping is undocumented and not the hue wheel the name implies. Picking a colour costs a render
+round-trip every time. (`spectrum`, added by Plan 0034, does read `[palette]`, so it is not affected;
+the swatch table below is still owed for the other three.)
 
 **Impact:** small, recurring, purely documentation — a swatch table in `docs/preset-palettes.md` (or
 a generated strip committed as an image) closes it. Bundle with any other doc sweep.

@@ -72,8 +72,20 @@ every colour parseable. Any violation is a surfaced error and the engine keeps t
 last good preset (it never crashes). Values `0..1` are used directly (no gamma /
 perceptual management — that is a future addition).
 
-The gradient **repeats** past its ends (a colour coordinate that wraps past `1`
-comes back around at `0`), matching the `spectrum` cosine's periodic hue wheel.
+The gradient **repeats** past its ends: a colour coordinate that wraps past `1`
+comes back around at `0`.
+
+> [!IMPORTANT]
+> **Repeating is not the same as continuous.** The wrap is seamless only if the
+> gradient's **last stop is the same colour as its first**. The `spectrum` cosine
+> is genuinely periodic, so it wraps invisibly; **all four stop-list palettes
+> (`ember`, `ice`, `mono`, `aurora`) run from a dark end to a light one**, so the
+> wrap is the sharpest transition in the gradient, not the softest. That does not
+> matter when the coordinate stays inside `0..1` — which is the usual case — but
+> it matters a great deal anywhere the whole gradient is walked around a closed
+> figure (see [Spectrum](#spectrum--colour-along-the-frequency-axis)). If you need
+> a cyclic gradient, write custom `stops` that return to the starting colour at
+> `at = 1.0`.
 
 ---
 
@@ -139,16 +151,30 @@ then crossfades by `palette_mix`, desaturates by `saturation`, and scales by
 | `hue_spread` | `0.0` | How far the palette is walked from the lowest element to the highest. `0` = the whole figure is one hue; `1` = the full gradient spans the axis, so you can see *where* a peak is without counting positions. |
 | `hue` | `0.0` | The offset the walk starts from — rotate the whole readout through the gradient, or drive it off the audio. |
 
-Two notes specific to this scene:
+Three notes specific to this scene:
 
-- **On `radial_ring`, `hue_spread = 1` closes the loop.** The gradient repeats past
-  its ends, so the last element's colour meets the first's — continuous in colour
-  as well as in position. Any other spread leaves a visible seam at the wrap, which
-  is sometimes what you want (it marks where the axis starts).
+- **On `radial_ring`, `hue_spread = 1` walks the gradient exactly once around the
+  circle** — the sample coordinate steps evenly from `0` to `(n-1)/n`, so the last
+  spoke sits one step short of the first and the ring is covered without a repeat.
+  Whether that *reads* as continuous is a property of the **gradient**, not of the
+  layout: only a cyclic gradient meets itself at the wrap. `spectrum` (the cosine)
+  is cyclic; **`ember`, `ice`, `mono` and `aurora` are not** — each runs dark to
+  light, so at `hue_spread = 1` the ring carries a hard dark/light seam wherever
+  `hue` currently puts the wrap. Either pick `spectrum`, write custom `stops` that
+  return to their starting colour at `at = 1.0`, or keep the seam deliberately (it
+  marks where the frequency axis begins).
 - **`hue` may be per element.** It is one of the five `spectrum` params that accept
   a [per-element binding](presets.md#index--one-binding-evaluated-once-per-element),
   so `hue = "bin(index) * 0.4"` colours by *loudness* rather than by position —
   a different reading of the same figure. `hue_spread` itself is whole-figure.
+- **`hue = "index"` is not the same walk as `hue_spread = 1`,** and the difference
+  shows on a ring. `index` normalizes over the *span* (`i/(n-1)`, so the last
+  element is exactly `1.0`), which is what makes `bin(index)` cover the whole
+  spectrum; `hue_spread` normalizes over the *count* (`i/n`), which is what makes
+  the steps around a closed figure even. Walking `hue` from `0` to `1` by hand
+  therefore lands the last element on the same colour as the first — a duplicated
+  colour rather than a closed loop. Use `hue_spread` for a ring, and `index` when
+  you want the ends to be the ends.
 
 ---
 
