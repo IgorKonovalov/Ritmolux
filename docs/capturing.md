@@ -252,15 +252,49 @@ cargo run -p standalone --example shot -- --report --json > report.json
 cargo run -p standalone --example shot -- --preset "Pulse Field" \
   --signal click:120 --strip 8 --out click.png
 
+# ...or from the one synthesized kind with dynamics
+cargo run -p standalone --example shot -- --preset "Pulse Field" \
+  --signal dynamic:110 --strip 8 --out groove.png
+
 # Filmstrip from a real clip (16-bit PCM WAV)
 cargo run -p standalone --example shot -- --preset "Burst" \
   --audio assets/test/clip.wav --strip 8 --out clip.png
 ```
 
 `--signal` kinds: `click:<bpm>`, `bass:<hz>`, `treble:<hz>`, `noise:<seed>`,
-`chord`. The synth path needs no committed asset. `--audio` reads uncompressed
-16-bit PCM WAV only (a hand-rolled reader — no decoder dependency); other
-encodings are a followup.
+`chord`, `dynamic:<bpm>`. The synth path needs no committed asset. `--audio`
+reads uncompressed 16-bit PCM WAV only (a hand-rolled reader — no decoder
+dependency); other encodings are a followup.
+
+#### `dynamic:<bpm>` — the one kind that rises and falls
+
+Every other kind is a **steady** tone or steady noise, and the band report says
+so: `bass:60` reads min/mean/max `0.187 / 0.187 / 0.187` — zero variance — and
+`chord` `0.058 / 0.059 / 0.060`. A filmstrip of those exercises the DSP with
+material that never changes, which is not what any preset is authored against.
+`click:<bpm>` has real transients but peaks at `bass ≈ 0.011`, far below anything
+a shipped preset is gained for.
+
+`dynamic:<bpm>` is three layers on a beat grid — a pitch-dropping kick every
+beat (bass), eighth-note hats (treble), a harmonic pad that swells across each
+beat (mid) — under an **8-beat phrase** that builds for six beats and rests for
+two. Measured at 110 BPM through the real analyzer:
+
+| band | min | mean | max | `max / mean` |
+|---|---|---|---|---|
+| bass | 0.0035 | 0.0399 | 0.1063 | **2.67** |
+| mid | 0.0005 | 0.0062 | 0.0189 | **3.07** |
+| treb | 0.0000 | 0.0059 | 0.0320 | **5.45** |
+
+against `noise:<seed>`'s 1.78 / 1.15 / 1.07 — and it was the liveliest kind there
+was. Like every generator here it is a pure function of its arguments, so a
+filmstrip of it is reproducible.
+
+> **It exercises dynamics. It is not evidence about real loopback levels.** A
+> preset that looks right under `dynamic:110` is a preset that survives material
+> which rises and falls — that is all this says. Nothing synthesized can tell you
+> whether your gains match what your music actually produces; only `--audio` on
+> real material does. Do not read a lively filmstrip as a calibration check.
 
 > **Test audio is added manually and never committed.** Drop a 16-bit PCM WAV
 > into [`assets/test/`](../assets/test/) — that folder is gitignored (only its
