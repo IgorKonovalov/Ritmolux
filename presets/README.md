@@ -517,9 +517,13 @@ error naming what it expected, never a silent fallback.
 reduces them to `elements` by averaging each element's own contiguous slice — a
 real partition, so no band is dropped or counted twice. Above 64 that stops being
 possible, and a readout finer than its own data is a lie rather than a feature.
-Note the axis is **logarithmic**: at 24 elements the bottom few cover a couple of
-bass notes each while the top one covers most of the presence region — the same
-caveat `bin(x)` carries in [docs/presets.md](../docs/presets.md).
+**The axis is only half logarithmic, and the low end is the coarse end.** Band
+edges follow a log curve, but each band is floored at one FFT bin (23.4 Hz at
+48 kHz), which binds up to ~750 Hz — so the bottom **31 of the 64 bands are
+linear**, and band 0 alone spans 23–47 Hz, a full octave. At 24 elements the
+lowest element therefore covers *more* musical range than any other, not less.
+The measured mapping is tabulated with
+[`bin(x)`](../docs/presets.md#binx--reaching-the-spectrum).
 
 **`smoothing` here is per element, not per binding.** It is the one piece of
 easing an expression cannot reach: the element levels are scene state, computed

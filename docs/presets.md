@@ -205,10 +205,14 @@ worth knowing before you tune one:
   bands and the scene averages each element's own contiguous slice of them — a
   real partition, nothing dropped or double-counted. A readout finer than its own
   data would be a lie rather than a feature.
-- **The axis is logarithmic**, so the elements are not equal musical intervals.
-  At 24 elements the lowest few cover a couple of bass notes each while the
-  topmost covers most of the presence region — the same caveat
-  [`bin(x)`](#binx--reaching-the-spectrum) carries.
+- **The axis is only half logarithmic, and the low end is the coarse end.** Band
+  edges follow a log curve, but each band is floored at one FFT bin (23.4 Hz at
+  48 kHz), which binds all the way up to ~750 Hz — so the bottom **31 of the 64
+  bands are linear**. Element 0 therefore covers about an octave while an element
+  near the middle of the figure covers a semitone or two. This is the opposite of
+  what a log axis suggests, and it is the same caveat
+  [`bin(x)`](#binx--reaching-the-spectrum) carries — the measured mapping is
+  tabulated there.
 - **`smoothing` here is the one easing an expression cannot reach.** The element
   levels are scene state computed from the band array, not a binding, so
   `[smoothing]` has no name to attach to them. Asymmetric values earn their keep:
@@ -363,20 +367,48 @@ outside `0..1` clamps, and a `NaN` argument reads the lowest band. It never
 errors and never rejects a preset at load.
 
 > [!WARNING]
-> **The bands are log-spaced, so `x` is not linear in Hz.** The array covers
-> ~20 Hz to Nyquist across 64 bands, which means the bottom of the range is
-> finely resolved and the top octave is one or two bands. Two consequences:
+> **`bin(x)` is a narrow probe, not a region average, and `x` is nowhere near
+> linear in Hz. Do not compute a position from a formula — read it off this
+> table.** The band edges are laid out on a log curve from 35 Hz to 18 kHz
+> (`core/src/dsp/fft.rs`), but every band is then forced to be at least one FFT
+> bin wide, and at a 2048-point window that floor is **23.4 Hz** — coarser than
+> the log curve asks for all the way up to ~750 Hz. So the array has **two
+> regimes**, and half of it is not log-spaced at all.
 >
-> - **`bin(0.02)` is not reliably "the kick".** Down there a single band is a
->   narrow musical interval, and it will often be sub-bass rumble rather than
->   the beater. Sweep the value while listening rather than computing it.
-> - **One call near the top covers a wide interval.** `bin(0.95)` answers for
->   most of the presence/air region at once, so it reads smoother and less
->   selective than a call near the bottom.
+> Measured at 48 kHz:
 >
-> Point sampling is deliberate — there is no range-integrating companion
-> (`bin_range(lo, hi)`) yet. If you want a region rather than a point, average a
-> few calls: `(bin(0.1) + bin(0.13) + bin(0.16)) / 3`.
+> | `x` | lands on | band width there |
+> |-----|----------|------------------|
+> | `0.00` | ~35 Hz | 23 Hz — **a full octave** |
+> | `0.10` | ~176 Hz | 23 Hz (~2.3 semitones) |
+> | `0.25` | ~410 Hz | 23 Hz (~1.0 semitone) |
+> | `0.50` | ~832 Hz | ~30 Hz — the finest point on the axis |
+> | `0.75` | ~3.6 kHz | ~250 Hz (~1.7 semitones) |
+> | `0.90` | ~9.6 kHz | ~900 Hz (~1.7 semitones) |
+> | `1.00` | ~17 kHz | ~1.7 kHz (~1.7 semitones) |
+>
+> - **Below `x ≈ 0.48` (~750 Hz) the axis is *linear*, not logarithmic** — 31 of
+>   the 64 bands are one FFT bin each. A curve fitted to the log edges
+>   (`35 × 514.3^x`) is accurate above the crossover and **up to 2.9× wrong
+>   below it**: it puts `bin(0.14)` at 84 Hz when the real answer is ~246 Hz.
+> - **The bottom is musically the *coarsest* part of the array, not the finest.**
+>   Band 0 spans 23–47 Hz — an entire octave in one number. Resolution is best
+>   around 500–800 Hz and settles at ~1.7 semitones above 1 kHz.
+> - **`bin(0.02)` is not "the kick".** It is a ~23 Hz sliver of sub. Sweep the
+>   value while listening rather than computing it.
+> - **This mapping moves with the sample rate** below the crossover, since the
+>   FFT bin width is `sample_rate / 2048`. The log half is stable; the linear
+>   half is not.
+>
+> **Averaging a few calls does not integrate a region — it spot-samples one.**
+> Measured against a 6.5 kHz tone: `bin(0.84)` reads `0.094` while `bin(0.82)`
+> and `bin(0.88)` both read **exactly zero**. Samples a few hundredths apart in
+> `x` step *over* bands rather than across them, so a narrow peak between two
+> probes is invisible to all of them. There is no range-integrating companion
+> (`bin_range(lo, hi)`) yet — until there is, use `bin()` when you want
+> **selectivity** and `bass`/`mid`/`treb` when you want a **region**. Combining
+> both is usually right: a band scalar for the body, a `bin()` term for the
+> detail, so the parameter never goes still on material that misses the probe.
 
 Values come off the same normalization as the bands: a full-scale sine reads near
 `1.0` in its band, and ordinary music reads **small**, so multiply up and clamp
