@@ -556,12 +556,20 @@ a generated strip committed as an image) closes it. Bundle with any other doc sw
 
 ---
 
-## Entries 0015-0016 — the 2026-07-27 batch (third, post-Plan-0034)
+## Entries 0015-0019 — the 2026-07-27 batch (third, post-Plan-0034)
 
 Surfaced by the Plan 0034 **close review** and by the lane's first adoption pass (`037825d`), which
-put `bin()` into five curated presets. Most of that batch was fixed in the close itself (`ca99cb1`
-the `shot` report stimuli and the palette wrap seam, `4d41884` the band-axis documentation). These
-two are what survived as open design questions.
+put `bin()` into five curated presets, then extended the same day by a second `preset-author` pass
+over the `spectrum` scene itself. Most of the review batch was fixed in the close (`ca99cb1` the
+`shot` report stimuli and the palette wrap seam, `4d41884` the band-axis documentation); these five
+are what survived as open design questions.
+
+**0016, 0017, 0018 and 0019 are one theme: the levers exist in the engine but not in the preset
+surface.** Three are world-space constants that should be params (`SPAN_X`, `BASELINE_Y`, the level
+curve) and one is a renderer argument already plumbed and hardcoded (`glow`). They want designing
+**together as one plan** rather than four drive-by fixes — 0016 and 0018 both move scene geometry
+and would otherwise be tuned twice, and 0017 carries the batch's only genuine ADR question. 0015 is
+separate: it is DSP, not the preset surface.
 
 ---
 
@@ -605,18 +613,103 @@ the alternatives above are the ones to weigh.
 
 ---
 
-## 0016 — the `spectrum` readout has no width control
+## 0016 — the `spectrum` readout has no width control, and density makes it worse
 
-- **Raised:** 2026-07-27, from the Plan 0034 close review (minor 1).
-- **Verified against code:** `core/src/render/scenes/lines/spectrum.rs` — `SPAN_X = 1.0` is a
+- **Raised:** 2026-07-27, Plan 0034 close review minor 1; **re-raised and sharpened the same day**
+  by the `preset-author` lane with the fix's binding constraint.
+- **Verified against code:** `core/src/render/scenes/lines/spectrum.rs:78` — `SPAN_X = 1.0` is a
   **constant**, and the figure spans 2 world units, which the line renderer maps to the frame
-  **height**. At 16:9 that is about **56 % of the width**, with the rest empty on both sides.
+  **height**. At 16:9 that is about **56 % of the width**, less on an ultrawide.
 
 `zoom` is no substitute: it scales the whole figure about the frame centre, so widening the readout
 also lifts its baseline off the bottom and grows the element lengths. There is no `span`/`width`
-param in [`PARAMS`](../core/src/render/scenes/lines/spectrum.rs), so a full-width bar readout — the
-single most conventional form this scene has — is not authorable.
+param in that scene's `PARAMS`, so a full-width bar readout — the single most conventional form this
+scene has — is not authorable.
 
-**Impact:** small and contained. One named param on one scene, no new idiom, no ABI or trait change;
-it would ride any plan that touches the scene. Noted at the close rather than fixed there because the
-close was already carrying two majors. Not ADR-worthy — there is no alternative worth recording.
+**It compounds with element count.** `MAX_ELEMENTS = SPECTRUM_BINS` (`spectrum.rs:73`) is the right
+ceiling — a readout finer than its own data would be a lie — but **64 bars crammed into 56 % of the
+width are hairs**. The width limit is what makes the top of the legal range unusable, so the two are
+one problem, not two.
+
+> **Binding constraint on any fix: the width must stay a WORLD quantity.** A scene that reads its
+> render target's aspect to size itself is precisely the
+> [ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) trap, which has already shipped
+> twice in this codebase. The param sets a world span; the renderer's existing aspect handling maps
+> it. Do not "fix" this by having the scene ask how wide the window is.
+
+**Impact:** small and contained — one named param on one scene, no new idiom, no ABI or trait change.
+Not ADR-worthy on its own, but see **0018**: it and this are the two halves of "the readout's shape
+is pinned by constants", and they should be designed together.
+
+---
+
+## 0017 — `[spectrum]` has no level curve, and the grammar has no `log`, so a dB readout is impossible
+
+- **Raised:** 2026-07-27, from `preset-author`.
+- **Verified against code:** yes, on all three legs.
+
+`element_length` (`spectrum.rs:214`) is **`base + scale * level`** — strictly linear, with no shaping
+lever. Audio levels are perceptually logarithmic, so a linear readout spends most of its range on the
+loudest element and leaves everything else stubbed; a dB-like curve is the conventional answer and it
+is **not reachable from a preset**:
+
+- The grammar has `sqrt` and `pow` but **no `log`** (`Func::from_name`, `core/src/preset/expr.rs`) —
+  confirmed absent, not overlooked.
+- **The one reachable workaround silently breaks easing.** Driving `base` from `bin(index)` with
+  `scale = 0` does shape the length — but `[spectrum] smoothing` eases the internal `levels`, which
+  that formulation **discards**. So the author trades the scene's only temporal easing for the curve,
+  and nothing warns. Since the bands are the rawest signal in the engine, that easing is exactly what
+  keeps the readout from strobing.
+
+**This must be engine work** — no preset-level composition reaches it. A `[spectrum] curve` key is
+the obvious shape, and **the real design question is whether the curve applies before or after the
+per-element easing**, which changes the behaviour materially: easing a curved value smooths what the
+eye sees, while curving an eased value keeps the smoother operating in the linear domain the
+`{ attack, release }` constants were reasoned about in. That is a genuine either/or with a
+consequence worth recording — **ADR-worthy**.
+
+Adding `log` to the expression grammar is the *other* candidate and is broader (it would serve every
+system, not just this one), but it does not fix the easing-bypass leg on its own. Weigh both.
+
+---
+
+## 0018 — `BASELINE_Y` is a constant, so `mirror_reflect` throws the copy to the top of the frame
+
+- **Raised:** 2026-07-27, from `preset-author`. **Rendered and confirmed**, not inferred.
+- **Verified against code:** `spectrum.rs:81` — `BASELINE_Y = -0.85` is a **constant**. The geometry
+  mirror reflects across the **x-axis** (`lines/mod.rs:227`: `let y = if reflected { -p[1] } else
+  { p[1] }`).
+
+Bars stand *upward* from `y = -0.85`, so a reflected copy stands *downward* from `y = +0.85` — it
+lands against the **top edge of the frame** rather than mirroring about a shared centre line, which
+is what `mirror_reflect` means on every other line scene. The symmetric "landscape and its
+reflection" figure the ridge/polyline layouts want is therefore not authorable.
+
+**`pan_y` cannot correct it**, and the reason is structural rather than a tuning miss: the mirror
+runs in `update()` on **world** coordinates, while the view transform is applied later **in the
+shader**. Panning moves the mirrored pair together; it cannot move the reflection axis relative to
+the figure.
+
+**Impact:** contained, and naturally paired with **0016** — both are "a world-space constant in this
+scene should be a param", both are one named param, and a fix touching `BASELINE_Y` wants to think
+about `SPAN_X` at the same time. Same ADR-0037 constraint applies: world quantities only.
+
+---
+
+## 0019 — `glow` is unreachable from a preset on all four line scenes
+
+- **Raised:** 2026-07-27, from `preset-author`.
+- **Verified against code:** `LineRenderer::draw(queue, encoder, view, aspect, glow, xform,
+  segments)` already takes a `glow` argument, and **every one of the four call sites passes a
+  hardcoded `1.0`** — `parametric.rs:291`, `lsystem.rs:288`, `star.rs:271`, `spectrum.rs:639`.
+
+The plumbing exists end to end; only the binding is missing. This is the **cheapest item in the
+batch by a wide margin**, and unlike the rest it is not spectrum-specific — it lands on the rose,
+the L-system and the star as well, which is most of the line library.
+
+**It is the renderer's per-segment falloff, not a post-process bloom.** Backlog **0005** (above) is
+still the separate, larger stage. Worth deciding
+deliberately whether this ships *ahead* of 0005 — it is nearly free and immediately useful — or
+waits so the two are designed as one coherent luminance story. **Recommendation: ship ahead.** A
+per-segment falloff param and a screen-space bloom are different tools an author would reach for
+differently, and holding a one-line win behind an undesigned stage has no payoff.
