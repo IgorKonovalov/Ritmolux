@@ -3,13 +3,14 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0038**
+**Next free number: 0039**
 
 ## Active roster
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0037](0037-verifying-easing-transient-probe-and-dynamic-signal.md) | Verifying easing: a transient probe, a signal with dynamics, and the levels authors calibrate against | **approved 2026-07-26** — ready for `dev` | dev, human |
+| [0038](0038-line-family-unreachable-levers.md) | The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log` | **draft 2026-07-27** — awaiting the user's go | dev, human |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
@@ -30,6 +31,16 @@ The consequence accepted when [0037] was sequenced *after* [0034] (the user's ex
 the surface the content lane self-verifies through scored a spectrum preset on its scalar bindings
 alone while `cargo test` passed it. Fixed in `ca99cb1`. That is the second time in three plans a
 capability shipped without the content lane being able to see it, which is exactly [0037]'s subject.
+
+**[0038] is drafted and sequenced before [0037] at the user's explicit choice (2026-07-27)** —
+design first, then implement. It closes the whole 0016–0019 backlog batch: four levers that already
+exist in the engine and are simply not reachable from a `.toml`. It is safe to take ahead of [0037]
+because **every new parameter defaults to today's constant**, so Phases 1–5 are behaviour-preserving
+and assert byte-identical goldens; the one claim [0037]'s probe would measure directly
+([ADR-0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md)'s curve-before-easing
+ordering) is deliberately recorded as a *property* rather than a tuned number, so the probe can
+confirm or refute it later without this plan having invented a threshold. [0038] Phase 6 is a
+`preset-author` pass and is the only phase that changes how anything looks.
 
 **[0033]'s Phase 8 (`human`) is open and independent** — the aesthetic re-tune on the user's
 2048x1152 display: run the `preset-author` lane over the four `reaction_*` presets (now free of the
