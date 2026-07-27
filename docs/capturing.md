@@ -346,7 +346,52 @@ filmstrip of it is reproducible.
 > preset that looks right under `dynamic:110` is a preset that survives material
 > which rises and falls — that is all this says. Nothing synthesized can tell you
 > whether your gains match what your music actually produces; only `--audio` on
-> real material does. Do not read a lively filmstrip as a calibration check.
+> real material does — see [the reference range](#what-real-material-actually-produces)
+> below. Do not read a lively filmstrip as a calibration check.
+
+#### What real material actually produces
+
+Measured 2026-07-27 through `--audio` on three local clips, none committed (see
+the note above about `assets/test/`). **These are the numbers to calibrate a gain
+against.** All three were peak-normalized to −1 dBFS first, because two of them
+arrived 20–26 dB under-levelled and every band read zero — a level problem in the
+file, not a fact about the music.
+
+| material | RMS | bass min / mean / max | mid | treb |
+|---|---|---|---|---|
+| electric-guitar loop, ~101 BPM, no drums | −17.7 dBFS | 0.000 / 0.000 / 0.004 | 0.000 / 0.002 / 0.013 | 0.000 / 0.000 / 0.000 |
+| hi-hat percussion loop, ~102 BPM | −21.1 dBFS | 0.000 / 0.000 / 0.001 | 0.000 / 0.000 / 0.002 | 0.000 / 0.002 / 0.011 |
+| trap with 808 sub, ~140 BPM | −19.9 dBFS | 0.000 / 0.007 / 0.190 | 0.000 / 0.001 / 0.026 | 0.000 / 0.001 / 0.006 |
+
+**The shape of it matters more than any single number.** The 808's bass *peak*
+(`0.190`) sits right on a full-scale 60 Hz sine (`0.187`) — the analyzer is not
+quietly attenuating anything. Its *mean* is `0.007`, about 25× lower, because
+real material is transient and spectrally sparse in a way no steady generator is.
+Everything else here reads lower still: a guitar loop with no drums puts
+essentially nothing in bass or treble, which is correct and is what most material
+does in most bands most of the time.
+
+So, in descending order of how far a stimulus is from real music:
+
+| stimulus | bass it produces | vs. a real mean |
+|---|---|---|
+| `--set bass=0.8` | `0.800` | **~100×** too hot |
+| `--signal bass:60` (full-scale sine) | `0.187` | ~25× too hot |
+| `--signal dynamic:110` | mean `0.040`, max `0.106` | ~6× too hot, right order for peaks |
+| real music (above) | mean `0.000`–`0.007`, max up to `0.190` | — |
+
+Two practical consequences:
+
+- **Calibrate against a mean, not a peak, for anything continuous** — a size, a
+  zoom, a hue drift. Those spend their life near the mean, so a gain tuned to look
+  right at `0.19` barely moves.
+- **Calibrate against a peak for anything percussive** — a flash, a burst, a
+  beat-latched accent. Those exist to fire on the hit, and the hit really does
+  reach a full-scale tone's level.
+
+The shipped library predates this measurement and is gained against the older
+figures; whether it needs a re-gain pass is
+[design-backlog 0020](design-backlog.md), not something to fix preset-by-preset.
 
 > **Test audio is added manually and never committed.** Drop a 16-bit PCM WAV
 > into [`assets/test/`](../assets/test/) — that folder is gitignored (only its
