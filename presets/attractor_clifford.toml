@@ -9,10 +9,26 @@
 # drop stretches the exposure rather than blowing the accumulation to white.
 #
 # Shape: the Clifford coefficients drift on four slow incommensurate sines with
-# a small clamped band term - a chaotic map cuts rather than morphs if you shove
-# it, so every term here is deliberately tiny.
+# a small clamped SPECTRUM term - a chaotic map cuts rather than morphs if you
+# shove it, so every term here is deliberately tiny. As on De Jong, each
+# coefficient adds its own narrow log-spectrum probe through `bin()` on top of a
+# reduced band term, so the four axes de-correlate instead of two of them
+# sharing `bass`:
+#   a ~ 51 Hz    d ~ 200 Hz    b ~ 1.15 kHz    c ~ 5.2 kHz
+# (The log axis runs 35 Hz to 18 kHz over 64 bands: position `x` is
+# 35 * 514.3^x Hz.)
+# See attractor_dejong.toml for why the band term stays underneath rather than
+# being replaced outright.
+#
 # Colour: a crimson -> ember -> white-hot custom gradient crossfading toward the
 # built-in `mono` on sustained mids, so busy sections desaturate into smoke.
+# The hue centre rides the CONTRAST between two narrow probes - `bin(0.84)`
+# (~6.6 kHz air) minus `bin(0.14)` (~84 Hz sub). That is a TIMBRE signal, not a
+# loudness one: it goes positive when the mix is bright and negative when it is
+# dark, and it stays put through a crescendo that raises both ends together. It
+# is signed, so the clamp is signed too. `bin()` is a NARROW probe (~2 of the 64
+# bands), not a region average - fragment_aurora.toml carries the measurement
+# and the rule that follows from it.
 system = "attractor"
 name = "Clifford"
 
@@ -32,11 +48,12 @@ stops = [
 name = "mono"
 
 [params]
-# SHAPE - canonical Clifford (-1.4, 1.6, 1.0, 0.7) plus small slow drift.
-a = "-1.40 + sin(time * 0.0331) * 0.085 - clamp(bass * 0.30, 0, 0.070)"
-b = "1.60 + cos(time * 0.0257) * 0.080 + clamp(mid * 0.28, 0, 0.060)"
-c = "1.00 + sin(time * 0.0194) * 0.095 + clamp(treb * 0.25, 0, 0.050)"
-d = "0.70 + cos(time * 0.0151) * 0.090 - clamp(bass * 0.20, 0, 0.045)"
+# SHAPE - canonical Clifford (-1.4, 1.6, 1.0, 0.7) plus small slow drift, each
+# coefficient bent by its own frequency region rather than by a shared band.
+a = "-1.40 + sin(time * 0.0331) * 0.085 - clamp(bass * 0.12 + bin(0.06) * 0.21, 0, 0.070)"
+b = "1.60 + cos(time * 0.0257) * 0.080 + clamp(mid * 0.11 + bin(0.56) * 0.20, 0, 0.060)"
+c = "1.00 + sin(time * 0.0194) * 0.095 + clamp(treb * 0.10 + bin(0.80) * 0.18, 0, 0.050)"
+d = "0.70 + cos(time * 0.0151) * 0.090 - clamp(bass * 0.08 + bin(0.28) * 0.14, 0, 0.045)"
 
 # DENSITY - low base, falling further at peak. The exposure comes from `trails`
 # below, not from letting the accumulation grid saturate.
@@ -46,7 +63,7 @@ reseed = "onset > 0.55"
 
 # COLOUR - a hot but narrow window; treble slides the centre toward white-hot.
 hue_spread  = "0.16 + clamp(treb * 1.0, 0, 0.22)"
-hue_center  = "0.42 + sin(time * 0.037) * 0.10 + clamp(bass * 1.2, 0, 0.28)"
+hue_center  = "0.42 + sin(time * 0.037) * 0.10 + clamp(bass * 1.2, 0, 0.28) + clamp((bin(0.84) - bin(0.14)) * 1.6, -0.12, 0.12)"
 saturation  = "1.10 + clamp(bass * 1.2, 0, 0.30)"
 palette_mix = "clamp(mid * 1.4, 0, 0.40)"
 

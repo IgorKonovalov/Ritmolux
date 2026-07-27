@@ -3,10 +3,19 @@
 # lever: tiny changes to it completely re-lattice the figure, so driving it is
 # the single most transformative thing a rose preset can do.
 #
-# Here `d` moves on three time-scales at once, which is the whole design:
+# Here `d` moves on four time-scales at once, which is the whole design:
 #   - a slow sine over ~100 s, so the lattice family drifts across a track
 #   - a mid-band term, so busy passages restructure faster
+#   - a narrow ~2 kHz term, so the lattice answers to where the melody and the
+#     vocal sit rather than to the whole 250 Hz - 4 kHz mid average
 #   - a per-beat kick, eased just enough to read as a surge rather than a jitter
+#
+# WHY THE NARROW TERM EARNS ITS PLACE. `mid` is a mean over most of the audible
+# range, so it barely moves between a sparse verse and a dense chorus - the
+# average is dominated by whatever is always there. A single log band at ~2 kHz
+# is nearly silent under a pad and loud under a lead line, so it separates
+# passages the wideband scalar reads as identical. It is kept to roughly half
+# the mid term's weight because `d` re-lattices the ENTIRE web.
 #
 # `n` also steps between three petal counts on comparison gates, so the preset
 # has three distinct structural personalities layered under the `d` sweep -
@@ -30,7 +39,7 @@ family = "maurer_rose"
 # re-forming every few bars. The mid term and the beat kick are both cut to a
 # third: `d` re-lattices the entire web, so a large fast term on it is the most
 # restless thing this preset can do, and it was doing all three at once.
-d = "71 + sin(time * 0.0068) * 13 + clamp(mid * 1.8, 0, 1.25) + beat * 0.70"
+d = "71 + sin(time * 0.0068) * 13 + clamp(mid * 1.8, 0, 1.25) + clamp(bin(0.65) * 1.6, 0, 0.60) + beat * 0.70"
 
 # Three petal personalities on the energy. Eased hard below, so the change
 # reads as the figure re-forming rather than as a cut.

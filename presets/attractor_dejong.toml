@@ -6,8 +6,32 @@
 # wire mesh instead of blooming it out.
 #
 # Shape: the four De Jong coefficients drift on four incommensurate slow sines
-# (periods ~170/217/275/331 s, so the figure never repeats) with a small band
-# term on top - the map bends with the music rather than cutting between poses.
+# (periods ~170/217/275/331 s, so the figure never repeats) with a small
+# SPECTRUM term on top - the map bends with the music rather than cutting
+# between poses.
+#
+# WHY EACH COEFFICIENT ALSO READS A bin() (Plan 0034). There are four
+# coefficients and only three band scalars, so the old version drove `a` and `d`
+# from the SAME `bass` - two of the four axes moved in lockstep and the map
+# effectively morphed in three dimensions instead of four. Each coefficient now
+# adds its own narrow probe on the log spectrum, which is what de-correlates
+# them:
+#   a ~ 65 Hz (kick fundamental)   b ~ 900 Hz (body)
+#   d ~ 157 Hz (bass body)         c ~ 5.2 kHz (presence)
+# (The log axis runs 35 Hz to 18 kHz over 64 bands, so position `x` is
+# 35 * 514.3^x Hz - worth recomputing rather than eyeballing if you move one.)
+#
+# THE BAND TERM STAYS UNDERNEATH, deliberately, and the split is about 40/60 of
+# the original gain with the clamp ceilings unchanged. Two reasons. A bin is
+# SELECTIVE - it falls to zero when its own region is empty, where the wideband
+# scalar still reads something - so bin-only would let a coefficient go
+# completely still on material that happens to miss its region. And `shot`'s
+# `--set` / `--report` stimuli cannot populate the spectrum array at all, so a
+# bin-only preset reads as dead in the very harness this lane verifies through
+# (measured: dropping the band terms took this preset's treble column from 0.090
+# to 0.010 while the real CI reactivity gate, which does light the bands, stayed
+# green). Magnitudes are compatible: a single bin measures ~0.02-0.05 on
+# broadband noise against ~0.022 for a band scalar.
 # Colour: a deep indigo -> violet -> magenta -> gold gradient crossfading to
 # `ice` on treble, so the shimmer cools as the top end opens up.
 # Composite: a tinted vignette backdrop underneath, and the screen-space
@@ -31,12 +55,13 @@ stops = [
 name = "ice"
 
 [params]
-# SHAPE - slow incommensurate drift plus a gentle band bend. Chaotic maps punish
-# big jumps, so every band term is small and clamped.
-a = "1.641 + sin(time * 0.0370) * 0.070 + clamp(bass * 0.40, 0, 0.085)"
-b = "1.902 - sin(time * 0.0289) * 0.055 - clamp(mid * 0.35, 0, 0.070)"
-c = "0.316 + sin(time * 0.0228) * 0.090 + clamp(treb * 0.30, 0, 0.055)"
-d = "1.525 + cos(time * 0.0190) * 0.075 - clamp(bass * 0.25, 0, 0.050)"
+# SHAPE - slow incommensurate drift plus a gentle spectral bend. Chaotic maps
+# punish big jumps, so every audio term is small and clamped. Four coefficients,
+# four separate frequency regions - see the header.
+a = "1.641 + sin(time * 0.0370) * 0.070 + clamp(bass * 0.16 + bin(0.10) * 0.28, 0, 0.085)"
+b = "1.902 - sin(time * 0.0289) * 0.055 - clamp(mid * 0.14 + bin(0.52) * 0.25, 0, 0.070)"
+c = "0.316 + sin(time * 0.0228) * 0.090 + clamp(treb * 0.12 + bin(0.80) * 0.21, 0, 0.055)"
+d = "1.525 + cos(time * 0.0190) * 0.075 - clamp(bass * 0.10 + bin(0.24) * 0.18, 0, 0.050)"
 
 # DENSITY - the inversion fix. Loud = shorter trails and finer points. The base
 # values are deliberately low: at the Plan 0027 surface-sized grid, `fade` much

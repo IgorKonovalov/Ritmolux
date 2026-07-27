@@ -8,6 +8,26 @@
 # `fragment_warp.toml`): an aurora is a LOW-luminance phenomenon with a lot of
 # internal structure, and the old version pushed `glow` to 0.95+ on the bands,
 # which flattened the curtains into a pastel smear.
+#
+# AIR-AGAINST-SUB ON THE COLOUR (Plan 0034). A real aurora's colour is set by
+# what is being excited, not by how loud it is - so the colour centre rides the
+# CONTRAST between two narrow probes: `bin(0.84)` (~6.6 kHz air) minus
+# `bin(0.14)` (~84 Hz sub). It is signed, so the clamp is signed too. A dark,
+# bass-heavy passage pulls the curtain green; an open, cymbal-lit one pushes it
+# toward the lilac end; a crescendo that lifts both ends together leaves it put,
+# which is exactly what the `treb` term above cannot do on its own.
+#
+# READ THIS BEFORE MOVING EITHER POSITION. `bin()` interpolates between the two
+# adjacent bands, so one call sees about 2 of the 64 - a window only ~0.03 wide
+# in `x`. It is a NARROW PROBE, not a region average, and the difference is not
+# academic: measured against a 6.5 kHz tone, `bin(0.84)` reads 0.094 while
+# `bin(0.82)` (~5.8 kHz) and `bin(0.88)` (~8.5 kHz) both read exactly ZERO. So
+# covering a region would need a call every ~0.03, and the "average a few calls"
+# idiom spot-samples it rather than covering it.
+# That is why this is deliberately framed as two probes rather than as a
+# spectrum-wide tilt - a tilt is what `treb - bass` already gives you, since
+# those scalars are true means over their ranges. Use `bin()` for selectivity,
+# the band scalars for regions.
 system = "fragment_field"
 name = "Aurora"
 
@@ -24,8 +44,11 @@ stops = [
 ]
 
 [params]
-# STRUCTURE - slow folding curtains. Bass deepens the fold; nothing snaps.
-warp  = "0.52 + sin(time * 0.0430) * 0.14 + cos(time * 0.0197) * 0.09 + clamp(bass * 6.0, 0, 0.95)"
+# STRUCTURE - slow folding curtains. Bass deepens the fold; nothing snaps. The
+# second, narrower term reads ~58 Hz alone, so a kick creases the curtain a
+# little further than the wideband bass term already does - a fold that answers
+# to the drum rather than to the whole bottom end.
+warp  = "0.52 + sin(time * 0.0430) * 0.14 + cos(time * 0.0197) * 0.09 + clamp(bass * 6.0, 0, 0.95) + clamp(bin(0.08) * 4.0, 0, 0.30)"
 zoom  = "2.20 + sin(time * 0.0231) * 0.24 + bar * 0.12 + clamp(bass * 5.0, 0, 0.90)"
 pan_x = "sin(time * 0.0137) * 0.34 + time * 0.004"
 pan_y = "cos(time * 0.0101) * 0.20"
@@ -37,7 +60,7 @@ flash = "clamp(onset * 0.6, 0, 0.20)"
 # COLOUR - the whole gradient across the frame at once, its centre swaying
 # slowly, crossfading into a colder green-to-lilac variant over minutes.
 color_span   = "0.80 + sin(time * 0.0173) * 0.12 + clamp(mid * 4.0, 0, 0.45)"
-color_center = "0.04 + sin(time * 0.0290) * 0.12 + clamp(treb * 4.5, 0, 0.30)"
+color_center = "0.04 + sin(time * 0.0290) * 0.12 + clamp(treb * 4.5, 0, 0.30) + clamp((bin(0.84) - bin(0.14)) * 2.0, -0.18, 0.18)"
 saturation   = "0.95 + clamp(mid * 3.2, 0, 0.50)"
 palette_mix  = "0.5 + sin(time * 0.0077) * 0.45"
 
