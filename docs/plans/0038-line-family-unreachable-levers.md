@@ -11,6 +11,15 @@
 > [0035](../adrs/0035-asymmetric-attack-release-easing.md) (the easing Phase 3 orders against)
 > **Backlog entries closed:** [0016](../design-backlog.md), [0017](../design-backlog.md),
 > [0018](../design-backlog.md), [0019](../design-backlog.md)
+> **Amended 2026-07-27, after approval — [Plan 0037](0037-verifying-easing-transient-probe-and-dynamic-signal.md)
+> Phase 1 landed first (`ece3291`), which changes one done-when for the better.** This plan was
+> written assuming no transient probe existed, so Phase 3 could only pin ADR-0040's curve-vs-easing
+> ordering with a unit test on the pure per-element step. `capture_preset_over` and `step_response`
+> now exist, so **Phase 3 done-when 6** measures the ordering claim at the pixel level instead of
+> leaving it as an argument. The dependency is on 0037 **Phase 1 only**, which has landed, so this
+> is satisfiable today and does not wait on the rest of 0037. Nothing else changes: same decision,
+> same phase order, same ADR. Note also that 0037's two `easing_*` fixtures are `parametric_curve`,
+> so **Phase 1's byte-identical-goldens claim now covers them too** — `glow` touches that scene.
 
 ## TL;DR
 
@@ -163,7 +172,7 @@ Each phase ships as its own commit. Phases 1–5 are `dev`; Phase 6 is the user'
 - **What:** ADR-0040's decision. The phase that makes a dB-like readout authorable *without*
   surrendering `[spectrum] smoothing`. Closes backlog 0017.
 - **Files touched:** `core/src/render/scenes/lines/spectrum.rs`, `core/tests/` (a unit test on the
-  ordering)
+  ordering), `core/tests/fixtures/` (a **spectrum** easing fixture for done-when 6)
 - **Done when:**
   1. `curve` is a bound parameter, default **exactly `1.0`**, applied as `level.max(0).powf(curve)`
      **to the downsampled level before the smoother**, per ADR-0040. The per-element pipeline reads
@@ -182,6 +191,28 @@ Each phase ships as its own commit. Phases 1–5 are `dev`; Phase 6 is the user'
      typical levels are ~0.02–0.05, and at `curve = 0.5` a level of `0.03` becomes `0.173` — a
      **5.8x** boost — so a preset adopting a curve must bring `scale` down by roughly that factor.
      This is the reason the default must stay `1.0`.
+  6. **Measure the ordering with Plan 0037's probe, not only with the unit test above** (added
+     2026-07-27 — see the header note). Done-when 3 proves the ordering is *implemented as
+     specified*; it cannot show the chosen order produces the motion ADR-0040 claims. Plan 0037
+     Phase 1 has landed `Renderer::capture_preset_over(name, stimulus)` and
+     `metrics::step_response(rise, fall) -> StepResponse` (`ece3291`), so that claim is now directly
+     measurable and should not ship on argument.
+
+     Add a **spectrum** easing fixture — the two `easing_*` fixtures Plan 0037 added are
+     `parametric_curve` and cannot exercise this path — and drive it with a step whose frames
+     populate the **`spectrum` array**, not just the scalar bands, since the element levels come from
+     `frame.spectrum`. Capture the fall under a non-unit `curve` **both ways round** and record
+     `StepResponse` for each in the commit body.
+
+     **The expected result is ADR-0040's property, stated as a property:** curve-then-ease should
+     produce a fall whose measured progress is closer to even across its travel than ease-then-curve,
+     which should show a fast start and a long crawl. **No threshold is asserted** — this plan has
+     not earned one, and inventing a number here is the Plan 0033 mistake.
+
+     **If the measurement contradicts ADR-0040, stop and route it to `architect`.** Do not retune
+     `curve`, the fixture, or the smoother until the numbers agree — a falsified ADR is a finding
+     worth an Outcome section (the ADR-0034 and ADR-0036 precedent), not a tuning exercise. Say so
+     with the numbers.
 
 ### Phase 4 — `log(x)` joins the expression grammar
 - **Owner skill:** dev
@@ -240,8 +271,15 @@ Each phase ships as its own commit. Phases 1–5 are `dev`; Phase 6 is the user'
 
 - **The `curve`/easing coupling is a documented price, not a solved problem** (ADR-0040's main
   negative). An author who changes `curve` and then finds their `release` feels wrong has hit a real
-  interaction. Phase 5 documents it; Plan 0037's transient probe is what would let anyone *measure*
-  it, which is a reason to keep this plan's easing claims as properties rather than numbers.
+  interaction. Phase 5 documents it. **Since Plan 0037 Phase 1 landed, it is also measurable** —
+  Phase 3 done-when 6 exercises exactly that coupling, so the plan now produces numbers for it
+  instead of only a warning. The claims stay stated as *properties* regardless: the probe measures
+  the frame, not the parameter, so it is a floor on observability rather than a guarantee.
+- **ADR-0040 could be wrong, and Phase 3 is now able to find that out.** Curve-then-ease is a design
+  bet made from meter-ballistics reasoning, not from a measurement of this engine. Done-when 6 exists
+  so the bet is checked before the surface ships to authors; its instruction on a contradiction is to
+  **stop and route to `architect`**, not to tune until the ADR looks right. A falsified ADR gets an
+  Outcome section, which this repo has done twice (0034, 0036) and is not a failure.
 - **Phase 2 is the ADR-0037 trap's natural habitat.** The whole point of `span` is framing, and the
   tempting implementation is "ask how wide the target is". Done-when 4 exists specifically to catch
   that, and it should be checked by grep rather than trusted.
