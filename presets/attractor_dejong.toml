@@ -16,10 +16,15 @@
 # effectively morphed in three dimensions instead of four. Each coefficient now
 # adds its own narrow probe on the log spectrum, which is what de-correlates
 # them:
-#   a ~ 65 Hz (kick fundamental)   b ~ 900 Hz (body)
-#   d ~ 157 Hz (bass body)         c ~ 5.2 kHz (presence)
-# (The log axis runs 35 Hz to 18 kHz over 64 bands, so position `x` is
-# 35 * 514.3^x Hz - worth recomputing rather than eyeballing if you move one.)
+#   a ~ 190 Hz (bass body)   d ~ 400 Hz (low-mid)
+#   b ~ 880 Hz (midrange)    c ~ 5.1 kHz (presence)
+#
+# DO NOT compute those frequencies from a formula if you move a position - read
+# them off the table in docs/presets.md. The band axis is HALF LINEAR: the edges
+# start on a log curve but every band is floored at one FFT bin (23.4 Hz at
+# 48 kHz), which binds up to ~750 Hz, so 31 of the 64 bands are linear slices. A
+# log-curve fit is up to 2.9x wrong down here - an earlier revision of this
+# header used one and put `a` at 65 Hz when it is really ~190.
 #
 # THE BAND TERM STAYS UNDERNEATH, deliberately, and the split is about 40/60 of
 # the original gain with the clamp ceilings unchanged. Two reasons. A bin is

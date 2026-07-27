@@ -9,25 +9,32 @@
 # internal structure, and the old version pushed `glow` to 0.95+ on the bands,
 # which flattened the curtains into a pastel smear.
 #
-# AIR-AGAINST-SUB ON THE COLOUR (Plan 0034). A real aurora's colour is set by
+# AIR-AGAINST-LOW-MID ON THE COLOUR (Plan 0034). A real aurora's colour is set by
 # what is being excited, not by how loud it is - so the colour centre rides the
-# CONTRAST between two narrow probes: `bin(0.84)` (~6.6 kHz air) minus
-# `bin(0.14)` (~84 Hz sub). It is signed, so the clamp is signed too. A dark,
+# CONTRAST between two narrow probes: `bin(0.84)` (~6.5 kHz air) minus
+# `bin(0.14)` (~246 Hz low-mid). It is signed, so the clamp is signed too. A dark,
 # bass-heavy passage pulls the curtain green; an open, cymbal-lit one pushes it
 # toward the lilac end; a crescendo that lifts both ends together leaves it put,
 # which is exactly what the `treb` term above cannot do on its own.
 #
-# READ THIS BEFORE MOVING EITHER POSITION. `bin()` interpolates between the two
-# adjacent bands, so one call sees about 2 of the 64 - a window only ~0.03 wide
-# in `x`. It is a NARROW PROBE, not a region average, and the difference is not
-# academic: measured against a 6.5 kHz tone, `bin(0.84)` reads 0.094 while
-# `bin(0.82)` (~5.8 kHz) and `bin(0.88)` (~8.5 kHz) both read exactly ZERO. So
-# covering a region would need a call every ~0.03, and the "average a few calls"
-# idiom spot-samples it rather than covering it.
-# That is why this is deliberately framed as two probes rather than as a
-# spectrum-wide tilt - a tilt is what `treb - bass` already gives you, since
-# those scalars are true means over their ranges. Use `bin()` for selectivity,
-# the band scalars for regions.
+# READ THIS BEFORE MOVING EITHER POSITION - two traps, and both bit here.
+#
+# 1. `bin()` is a NARROW PROBE, not a region average. It interpolates between two
+#    adjacent bands, so one call sees about 2 of the 64, and the difference is not
+#    academic: measured against a 6.5 kHz tone, `bin(0.84)` reads 0.094 while
+#    `bin(0.82)` and `bin(0.88)` both read exactly ZERO. Averaging a few calls
+#    spot-samples a region rather than integrating it. That is why this is framed
+#    as two probes and not as a spectrum-wide tilt - a tilt is what `treb - bass`
+#    already gives you, those scalars being true means over their ranges. Use
+#    `bin()` for selectivity, the band scalars for regions.
+#
+# 2. DO NOT compute a position's frequency from a formula - read the table in
+#    docs/presets.md. The axis is HALF LINEAR: the band edges start on a log curve
+#    but each band is floored at one FFT bin (23.4 Hz at 48 kHz), which binds up
+#    to ~750 Hz, so 31 of the 64 bands are linear slices. A log-curve fit is up to
+#    2.9x wrong below that crossover, and down there the mapping even moves with
+#    the sample rate. An earlier revision of this header called `bin(0.14)` a
+#    ~84 Hz sub probe on exactly that mistake; it is really ~246 Hz, a low-mid.
 system = "fragment_field"
 name = "Aurora"
 
@@ -45,9 +52,11 @@ stops = [
 
 [params]
 # STRUCTURE - slow folding curtains. Bass deepens the fold; nothing snaps. The
-# second, narrower term reads ~58 Hz alone, so a kick creases the curtain a
-# little further than the wideband bass term already does - a fold that answers
-# to the drum rather than to the whole bottom end.
+# second, narrower term reads ~165 Hz alone - the bass body rather than the sub -
+# so it creases the curtain further on a bassline note than the wideband term
+# does on its own. (It was written as a ~58 Hz kick probe; that was the
+# log-curve-fit error described above. The binding was tuned by effect and is
+# unchanged - only this description was wrong.)
 warp  = "0.52 + sin(time * 0.0430) * 0.14 + cos(time * 0.0197) * 0.09 + clamp(bass * 6.0, 0, 0.95) + clamp(bin(0.08) * 4.0, 0, 0.30)"
 zoom  = "2.20 + sin(time * 0.0231) * 0.24 + bar * 0.12 + clamp(bass * 5.0, 0, 0.90)"
 pan_x = "sin(time * 0.0137) * 0.34 + time * 0.004"
