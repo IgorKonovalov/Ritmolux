@@ -45,7 +45,11 @@ filing it as new.
   evaluator is pure by hard invariant; smoothing lives in the render layer as `[smoothing]`, which
   covers easing but **not** "hold this value until the next beat". Beat-latched state is a real,
   repeatedly-felt gap.
-- **No per-bin spectrum access** — three bands plus `onset`/`beat`/`bar`/`tempo`/`novelty`.
+- ~~**No per-bin spectrum access**~~ — **delivered by Plan 0034.** `bin(x)` samples the 64-band
+  log-spaced array at a normalized position; a `spectrum` system draws N elements off it; and a
+  binding naming `index` is evaluated once per element. Note `bin()` is a **narrow probe** (~2 of
+  the 64 bands, a window ~0.032 wide in `x`), not a region average — see backlog 0016. Still
+  absent: `bin_range(lo, hi)`.
 - **No randomness / noise function** (by design: determinism, NFR §6).
 - No user-defined variables or intermediate bindings — a long expression cannot be factored, so a
   repeated sub-expression is written out each time.

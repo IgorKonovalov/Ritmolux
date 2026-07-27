@@ -70,7 +70,7 @@ that "needs just a small code change" is not a preset, it's a routed request.
 
 ## The authoring surface in one screen
 
-**Seven systems** (`system = "…"`, the underscore name — distinct from a scene's display name):
+**Eight systems** (`system = "…"`, the underscore name — distinct from a scene's display name):
 
 | `system` | Look | Structural config |
 |----------|------|-------------------|
@@ -81,6 +81,7 @@ that "needs just a small code change" is not a preset, it's a routed request.
 | `star_pattern` | Hankin star rosette | `[generator]` — **required** |
 | `reaction_diffusion` | Gray-Scott coral/maze field | none (regime lives in `feed`/`kill`/`flow`) |
 | `attractor` | GPU compute particles on a strange attractor | `[particles] family = …` (optional; defaults `de_jong`) |
+| `spectrum` | N elements off the log-spaced band array — bars, polyline or radial ring | `[spectrum]` (optional; `elements` 2..=64, `layout`, per-element `smoothing`) |
 
 **Every** preset, whatever its system, may additionally bind the engine-wide composite: the shared
 view transform (`zoom`, `pan_x`, `pan_y`), the background pre-pass (`bg_*`), feedback `trails`, the
@@ -89,13 +90,36 @@ screen-space kaleidoscope (`kaleido_*`), and the terminal ink-on-paper remap
 
 **The expression grammar** (every `[params]` value is a quoted string, even a bare number):
 
-- **Variables (9):** `bass mid treb onset beat bar time tempo novelty`. Bands read *small*;
+- **Variables (10):** `bass mid treb onset beat bar time tempo novelty index`. Bands read *small*;
   `beat` is a `0`/`1` gate; `bar` is the `0..1` beat phase; **`tempo` is BPM, not `0..1`** — scale it
-  (`tempo / 180`) or compare it (`tempo > 128`); `novelty` is experimental.
+  (`tempo / 180`) or compare it (`tempo > 128`); `novelty` is experimental. **`index` is not audio** —
+  it is the per-element position (Plan 0034), see below.
 - **Constants:** `pi`, `tau`.
-- **Functions (13):** `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep select`.
+- **Functions (14):** `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep select bin`.
   `mod` is floored (`mod(-0.2, 1.0)` is `0.8` — cyclic hue never jumps); `select` evaluates **only**
   the taken branch, so `select(x >= 0, sqrt(x), 0)` is safe.
+- **`bin(x)` reaches the spectrum** — the 64-band array at normalized position `x` (`0` = lowest,
+  `1` = highest), interpolated, total, clamped. Two things to internalise, both of which have already
+  cost this lane a round trip:
+  - **It is a NARROW PROBE, not a region average.** One call sees ~2 of the 64 bands, so averaging a
+    few calls **spot-samples** a region rather than integrating it. Measured against a 6.5 kHz tone,
+    `bin(0.84)` reads `0.094` while `bin(0.82)` and `bin(0.88)` read **exactly zero**. Use `bin()`
+    for *selectivity* and `bass`/`mid`/`treb` when you want a region *integrated* (those are true
+    means). Both together is usually right — a band scalar for the body, a `bin()` term for the edge.
+    Gains transfer between them unchanged.
+  - **DO NOT COMPUTE A POSITION FROM A FORMULA — read the table in `docs/presets.md`.** The axis is
+    **half linear**: band edges start on a log curve from 35 Hz to 18 kHz, but every band is floored
+    at one FFT bin (23.4 Hz at 48 kHz), which binds up to ~750 Hz — so **31 of the 64 bands are
+    linear**. A curve fitted to the log edges is up to **2.9x wrong** below the crossover
+    (it puts `bin(0.14)` at 84 Hz; the real answer is ~246 Hz). The bottom is the array's musically
+    **coarsest** region — band 0 is a full octave — not its finest, and below the crossover the
+    mapping **moves with the sample rate**.
+- **`index` makes one binding per-element.** On `spectrum`, a binding whose text names `index` is
+  evaluated once per element with `index` at that element's `0..1` position, so
+  `thickness = "0.01 + bin(index) * 0.05"` thickens each element by its own band. Five params vary
+  per element (`base` `scale` `thickness` `brightness` `hue`); the whole-figure ones take the
+  `index = 0` value. `index` reads `0` everywhere else, and `[smoothing]` on a per-element binding is
+  a surfaced **warning** — ease with `[spectrum] smoothing` instead.
 - **Operators:** `+ - * /`, unary `-`, parentheses, and six comparisons `> < >= <= == !=` at the
   **lowest** precedence, each yielding a clean `1`/`0`. No booleans — `min` is and, `max` is or,
   `1 - c` is not.
@@ -234,6 +258,12 @@ off, and note that an embedded preset must survive the behavioral gates (`sanity
   warnings**, so a typo is invisible in exactly the tool you verify through (a known open minor).
   Check names against `presets/README.md` rather than trusting a clean render.
 - **A bare still is silent.** Always `--set` a loud frame or use `--signal`.
+- **`--set` cannot drive the spectrum — only `--signal` / `--audio` can.** `apply_set` writes the
+  frame *scalars* and there is deliberately no key for the 64-band array, so **every `bin()` term
+  reads `0`** in a `--set` still and a `spectrum` preset renders flat there (`spectrum_ridge` comes
+  out as two straight lines — that is the stimulus, not the preset). `--report` and the contact
+  sheets are **fine** since `ca99cb1`: their frames now light the log-band slice each named band
+  summarises, mirroring `reactivity.rs`. **Verify anything spectral with `--signal`.**
 - **Bands read small.** Un-gained `bass` barely moves the look; gain-then-clamp or it looks dead.
 - **`tempo` is BPM.** Using it raw blows out any parameter.
 - **`zoom` is inverted between families.** On line/swarm/attractor, `zoom > 1` moves the camera *in*;

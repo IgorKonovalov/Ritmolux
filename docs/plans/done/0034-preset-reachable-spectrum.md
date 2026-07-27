@@ -1,6 +1,6 @@
 # 0034 — Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
@@ -290,3 +290,84 @@ pub enum SpectrumLayout { Bars, Polyline, RadialRing }
 - A GPU-side spectrum texture, if and when a scene wants per-particle spectral response.
 - Backlog [0005](../design-backlog.md) (bloom) and [0007](../design-backlog.md) (`star_pattern`,
   decided *invest*) remain undesigned.
+
+## Close — 2026-07-27
+
+**Done.** Passed the Mode 4 review with **no blockers**; two majors, four minors and two nits, **all
+fixed in `ca99cb1`** rather than carried. Five `dev` phase commits — `a379b28` (`bin(x)`), `2450c2a`
+(the `spectrum` system), `a553b2e` (the `[spectrum]` table), `6950c94` (per-element `index`),
+`fe11659` (the operator sweep) — plus `ca99cb1` (the review fixes) and `4d41884` (the band-axis
+documentation correction).
+
+The plan's central scoping claim **held in fact**: no new DSP, no new render idiom, no `Scene`-trait
+change, no C-ABI change (stays v4), no new dependency. The 64-band array already existed on
+`AnalysisFrame`, every scene already received it, and `LineRenderer` already drew arbitrary segment
+lists, so the eighth `SystemKind` cost an exhaustive-match arm rather than a pipeline.
+`Variables` avoided the feared 264-byte per-binding copy **better than the plan proposed** — by
+borrowing with a lifetime (`Variables<'a>` holding `spectrum: &'a [f32]`), so the hot path carries a
+fat pointer and the bundle never exists.
+
+**Major 1 — a gradient that repeats is not a gradient that is continuous.** All four stop-list
+palettes run dark to light, so a full `hue_spread` walk puts the sharpest transition somewhere on the
+ring. `Spectrum Corona` demonstrated the falsehood it was written to illustrate — a hard pale-gold to
+near-navy seam, reproduced at 700x700. Its palettes are now custom stops re-cut to return to their
+starting colour at 1.0.
+
+**Major 2 — Phase 2 taught `sanity`, `reactivity`, `golden` and `distinctness` to light the band
+array but not `shot`.** So the surface the `preset-author` lane self-verifies through scored a
+spectrum preset on its scalar bindings alone while `cargo test` passed it. The report frames now
+mirror `reactivity.rs`. Measured on `Spectrum Comb`: bass 0.040 → 0.084, mid 0.030 → 0.091, treb
+0.016 → 0.047, onset 0.000 → 0.119, coverage 0.664 → 0.913. **`--set` is deliberately unchanged** —
+it writes the frame scalars and there is no key for the array — and `docs/capturing.md` carries that
+as its third calibration trap, pointing at `--signal`/`--audio`.
+
+**The documentation correction is the substantive postscript.** ADR-0036 and this plan both stated
+the band resolution profile **backwards**: "64 log-spaced bands over 20 Hz–Nyquist", with "the low
+end finely resolved and the top octave one or two bands". Verified against `core/src/dsp/fft.rs` and
+by independent numerical replication, **both halves are false**. The range is **35 Hz to 18 kHz**,
+and `new()` floors every band at one FFT bin *after* computing the log edges — 23.4 Hz at a
+2048-point window — which binds from band 1 to **band 30 (~750 Hz)**. So **31 of the 64 bands are
+linear slices, not logarithmic**; band 0 spans 23–47 Hz, *a full octave in one number*; resolution
+peaks around 500–800 Hz (band 30 is 0.55 semitones) and settles at ~1.7 semitones above 1 kHz. The
+bottom is the array's **coarsest** region musically, which is the opposite of what was written, and
+below the crossover the mapping **moves with the sample rate**. `4d41884` replaces the guidance in
+`docs/presets.md` and `presets/README.md` with a measured position table and the instruction to read
+it rather than compute from a curve. [ADR-0036](../adrs/0036-preset-reachable-spectrum.md) is
+**accepted with an Outcome section** recording the correction (the ADR-0034 precedent).
+
+That error propagated once before it was caught: the content lane's first adoption pass (`037825d`)
+annotated its probes from the log-edge curve `35 * 514.3^x`, which is accurate above the crossover
+and **up to 2.9x wrong below it** — it put `bin(0.14)` at 84 Hz where the real answer is ~246 Hz. The
+bindings were tuned by effect and are unchanged; only the comments were wrong, and they are corrected.
+
+**Also learned and now documented:** a band value is the **peak** linear bin within the band, while
+`bass`/`mid`/`treb` are **means** over wide ranges — so a single `bin()` measures comparably to a band
+scalar on broadband material (~0.02–0.05 against ~0.022) and gains transfer between them unchanged,
+but reaches far higher on tonal content. Averaging a few `bin()` calls **spot-samples** a region
+rather than integrating it: against a 6.5 kHz tone `bin(0.84)` reads 0.094 while `bin(0.82)` and
+`bin(0.88)` read exactly zero. That is the strongest argument yet for the deferred `bin_range(lo,
+hi)`, and it is why `docs/presets.md` now says "use `bin()` for selectivity, the band scalars for
+regions".
+
+**Minors, all fixed in `ca99cb1`:** the readout spans the frame **height** (~56 % of the width at
+16:9) and `Spectrum Comb`'s note had claimed the whole width; that header also said 24 elements
+against its own `elements = 26`; `docs/presets.md` had replaced a re-drifting count with another one
+("Seven systems" → "Eight systems"), now count-free; and a per-element binding cost **N + 1**
+evaluations, because the loop evaluated the expression once at `index = 0` and pushed it through the
+smoother before the routing match discarded both — the `uses_index` test now precedes the scalar
+eval, and skipping the smoother with it is observationally free since a per-element binding's `tau`
+is always `INSTANT` (the loader forces it and warns). **Nits:** `index` normalizes over the *span*
+(`i/(n-1)`, so `bin(index)` reaches both ends) while `hue_spread` normalizes over the *count*
+(`i/n`, so steps around a closed figure stay even) — documented in both preset docs, since a
+hand-walked hue is therefore not identical to `hue_spread = 1`.
+
+**Verified at the close:** `fmt --check` and `clippy --workspace --all-targets -D warnings` clean;
+`nextest --workspace` **251/251**; `core/tests/golden/` **byte-untouched**, so no baseline moved.
+
+**Two open items routed to the backlog rather than fixed here:**
+[0015](../design-backlog.md) — whether the half-linear axis is a defect to fix (a longer window,
+or edges that respect the bin floor) or a characteristic to live with; **ADR-worthy if acted on**.
+[0016](../design-backlog.md) — the readout has no `span`/`width` param, so a full-width bar display,
+the most conventional form this scene has, is not authorable.
+
+Version **minor 0.17.1 → 0.18.0** at close (a feature plan).

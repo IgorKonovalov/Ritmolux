@@ -553,3 +553,70 @@ a generated strip committed as an image) closes it. Bundle with any other doc sw
 
 - **PROMOTED 2026-07-26 → [Plan 0037](plans/0037-verifying-easing-transient-probe-and-dynamic-signal.md)
   Phase 5**, which carries the measured swatch points to seed the table.
+
+---
+
+## Entries 0015-0016 — the 2026-07-27 batch (third, post-Plan-0034)
+
+Surfaced by the Plan 0034 **close review** and by the lane's first adoption pass (`037825d`), which
+put `bin()` into five curated presets. Most of that batch was fixed in the close itself (`ca99cb1`
+the `shot` report stimuli and the palette wrap seam, `4d41884` the band-axis documentation). These
+two are what survived as open design questions.
+
+---
+
+## 0015 — the band axis is half linear, and it is undecided whether that is a defect
+
+- **Raised:** 2026-07-27, from the Plan 0034 close review.
+- **Verified against code and by independent computation** (`core/src/dsp/fft.rs:56-76`, replicated
+  numerically at 48 kHz).
+
+`SpectrumAnalyzer::new` lays the 64 band edges on a log curve from `BAND_LO_HZ = 35` to
+`BAND_HI_HZ = 18_000`, then runs a fix-up loop guaranteeing every band **at least one FFT bin**. At a
+2048-point window that floor is `sample_rate / 2048` = **23.4 Hz at 48 kHz**, and it binds from band
+1 all the way to **band 30 (~750 Hz)**. So:
+
+- **31 of the 64 bands are linear 23.4 Hz slices, not logarithmic.** The array has two regimes with a
+  crossover at `x ~ 0.48`.
+- **The low end is the array's musically coarsest region, not its finest.** Band 0 spans 23-47 Hz —
+  **a full octave in one number**. Band 8 is 1.8 semitones, band 20 is 0.81, band 30 is 0.55.
+  Resolution *peaks* around 500-800 Hz and settles at a constant ~1.7 semitones above ~1 kHz.
+- **Below the crossover the mapping moves with the sample rate.** The log half is stable; the linear
+  half is not, so the same `bin(x)` means a different frequency at 44.1 kHz than at 48 kHz.
+
+**The documentation half is already closed** (`4d41884`: `docs/presets.md` and `presets/README.md`
+carry a measured position table and both consequences). **What is open is whether the axis itself
+should change**, and it is a real decision with real alternatives:
+
+- **Leave it, documented.** Free. But a preset's low-end probes are sample-rate dependent, and the
+  bottom two octaves — where kick and bass live, the most-reached-for region in this whole surface —
+  are the least resolved part of a "log-spaced" array.
+- **A longer analysis window** (4096 pushes the floor to 11.7 Hz, halving the linear span) costs
+  latency and CPU on the hot path, and NFR budgets would have to be re-argued.
+- **Let the edges respect the bin floor** — allocate the 64 bands over a range the window can
+  actually resolve logarithmically, e.g. starting nearer 250 Hz, rather than pretending below it.
+  Changes what every existing `bin()` position means, so it is breaking for the five presets in
+  `037825d` and the three `spectrum_*` ones.
+
+**Impact:** currently documentation-only, but it is load-bearing for the lane's most common reach
+(bass-region probes) and it interacts with the deferred `bin_range(lo, hi)` followup — a range
+integrator would paper over the resolution question without answering it. **ADR-worthy if acted on**;
+the alternatives above are the ones to weigh.
+
+---
+
+## 0016 — the `spectrum` readout has no width control
+
+- **Raised:** 2026-07-27, from the Plan 0034 close review (minor 1).
+- **Verified against code:** `core/src/render/scenes/lines/spectrum.rs` — `SPAN_X = 1.0` is a
+  **constant**, and the figure spans 2 world units, which the line renderer maps to the frame
+  **height**. At 16:9 that is about **56 % of the width**, with the rest empty on both sides.
+
+`zoom` is no substitute: it scales the whole figure about the frame centre, so widening the readout
+also lifts its baseline off the bottom and grows the element lengths. There is no `span`/`width`
+param in [`PARAMS`](../core/src/render/scenes/lines/spectrum.rs), so a full-width bar readout — the
+single most conventional form this scene has — is not authorable.
+
+**Impact:** small and contained. One named param on one scene, no new idiom, no ABI or trait change;
+it would ride any plan that touches the scene. Noted at the close rather than fixed there because the
+close was already carrying two majors. Not ADR-worthy — there is no alternative worth recording.
