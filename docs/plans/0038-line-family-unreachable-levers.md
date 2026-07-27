@@ -11,7 +11,7 @@
 > [0035](../adrs/0035-asymmetric-attack-release-easing.md) (the easing Phase 3 orders against)
 > **Backlog entries closed:** [0016](../design-backlog.md), [0017](../design-backlog.md),
 > [0018](../design-backlog.md), [0019](../design-backlog.md)
-> **Amended 2026-07-27, after approval — [Plan 0037](0037-verifying-easing-transient-probe-and-dynamic-signal.md)
+> **Amended 2026-07-27, after approval — [Plan 0037](done/0037-verifying-easing-transient-probe-and-dynamic-signal.md)
 > Phase 1 landed first (`ece3291`), which changes one done-when for the better.** This plan was
 > written assuming no transient probe existed, so Phase 3 could only pin ADR-0040's curve-vs-easing
 > ordering with a unit test on the pure per-element step. `capture_preset_over` and `step_response`

@@ -354,6 +354,16 @@ confidence in the *invest* decision and narrows the ask to the second half.
 authors is verified through this harness, so a mis-calibrated harness mis-tunes everything downstream
 of it. Item 3 is the one with the widest blast radius and it is pure documentation plus a measurement.
 
+**~~CLOSED 2026-07-27~~ — item 3, the last one open, is answered.**
+[Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md) Phase 4 measured
+real material through `--audio` and recorded the range in
+[`capturing.md`](capturing.md#what-real-material-actually-produces): real bass **means** of
+`0.000`–`0.007` against peaks up to `0.190`. The answer is not one number — it is that a *continuous*
+binding must be gained against the **mean** and a *percussive* one against the **peak**, and that
+`--set bass=0.8` is ~100x the former. Phase 3's `--signal dynamic:<bpm>` supplies the realistic-shape
+stimulus the item also asked for. What that measurement then revealed about the shipped library is
+**[0020](#0020--the-shipped-library-is-gained-against-stimuli-6-100x-hotter-than-real-music)**.
+
 ---
 
 ## 0009 — the `animation.rs` gate penalizes two legitimate designs (informational)
@@ -492,8 +502,12 @@ measurement one.
 **Impact:** downgraded from a measurement change to a documentation sentence — `docs/capturing.md`
 should say that a low `cover` is expected and correct for a deliberately sparse or ink-remapped look,
 and that the column names suspects rather than convicting them. Folded into
-[Plan 0037](plans/0037-verifying-easing-transient-probe-and-dynamic-signal.md)'s doc phase alongside
-0014. No code change, no ADR.
+[Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md)'s doc phase
+alongside 0014. No code change, no ADR.
+
+**~~CLOSED 2026-07-27~~** — `bca1457` added
+[the "A low `cover` is not a defect" section](capturing.md#a-low-cover-is-not-a-defect), naming
+`reaction_coral_bloom` at 0.128 as the healthy worked example.
 
 *(Second entry in this batch whose diagnosis inverted under verification — see 0010. Both were filed
 in good faith from real symptoms; both attributed the symptom to the wrong mechanism. The lane's
@@ -505,11 +519,20 @@ symptom reports are reliable; its causal claims want checking against code befor
 
 - **Raised:** 2026-07-26, from `preset-author`, after adopting `{ attack, release }` on 20 presets.
 - **PROMOTED 2026-07-26 → [ADR-0039](adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md) +
-  [Plan 0037](plans/0037-verifying-easing-transient-probe-and-dynamic-signal.md)** — a deterministic
-  transient probe (the primary answer) plus one synthesized generator with musical dynamics; a
-  committed reference clip was rejected, and 0008's item 3 calibration question is closed by a
-  `human` phase that measures the user's own audio and records the numbers. **0012 and 0014 ride
-  along as documentation** in that plan's Phase 5. Notes retained below as the origin record.
+  [Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md). ~~CLOSED
+  2026-07-27~~**, with its limitation measured rather than assumed: the probe proves easing on a
+  purpose-built near-linear fixture (`fall/rise` 20.33 against a scalar entry's 1.03), but over the
+  *shipped* set it separates the two populations only **directionally** — asymmetric median 1.02
+  against scalar-only 0.61 — because it measures the frame, not the parameter. Neither the probe
+  window nor its render resolution is the cause; both were tested. `--signal dynamic:<bpm>` closes
+  the stimulus half, and 0008 item 3's calibration question is answered in
+  [`capturing.md`](capturing.md#what-real-material-actually-produces), which routed
+  **[0020](#0020--the-shipped-library-is-gained-against-stimuli-6-100x-hotter-than-real-music)**.
+  What shipped is what was designed: a deterministic transient probe (the primary answer) plus one
+  synthesized generator with musical dynamics, with a committed reference clip rejected and the
+  calibration numbers taken from a `human` phase instead. **0012 and 0014 rode along as
+  documentation** in that plan's Phase 5 and are closed too. Notes retained below as the origin
+  record.
 - **This is the unresolved half of 0008.** That entry's item 3 asked for a `--signal` matching real
   music levels; Plan 0033 Phase 1 shipped the *measurement* (the band-level report) and *documented*
   the trap, but added no such signal. The trap is now visible and still unavoidable.
@@ -538,9 +561,20 @@ merely documentation this time.
 ## 0014 — the line scenes' cosine `hue` ramp is not a hue wheel, and nothing documents it
 
 - **Raised:** 2026-07-26, from `preset-author`, choosing a glow colour for Fern Grow.
-- **Verified by a rendered six-way sweep.** Predicted 0.06 = amber, 0.17 = gold-green, 0.62 = violet.
-  Measured: **0.06 lavender, 0.17 turquoise, 0.30 cyan, 0.46 near-white/green, 0.62 gold, 0.82 rose.**
-  Every prediction was wrong.
+- **Verified by a rendered six-way sweep**, whose *conclusion* held and whose *colour names were
+  wrong*. The sweep established that the ramp is not a hue wheel and that every prediction from the
+  name (0.06 = amber, 0.17 = gold-green, 0.62 = violet) missed — which is the finding, and it stands.
+  The six names it recorded (0.06 lavender, 0.17 turquoise, 0.30 cyan, 0.46 near-white/green,
+  0.62 gold, 0.82 rose) **name the ramp roughly 0.16 further along than the shader produces** and are
+  superseded.
+- **CORRECTED 2026-07-27 at Plan 0037's close.** `palette(t)`
+  (`core/src/render/scenes/lines/mod.rs:117`) is three cosines phased 0.10 / 0.42 / 0.62, giving
+  **0.06 magenta, 0.17 orchid, 0.30 cornflower blue, 0.46 aqua, 0.62 mint, 0.82 amber**. Settled by a
+  **15-point rendered sweep measuring the median chromaticity of each frame's unclipped lit pixels**,
+  not by arithmetic alone: it tracks `palette(t)` at every point and is nowhere near
+  `palette(t + 0.16)`. Re-derived independently at review. **The 20-row table now in
+  [`preset-palettes.md`](preset-palettes.md#the-line-scenes-cosine-ramp--what-hue-actually-looks-like)
+  is the verified ramp; read it rather than any figure in this entry.**
 
 Three of the four line scenes (`parametric_curve`, `lsystem`, `star_pattern`) ignore `[palette]`
 entirely and colour through their own cosine ramp, so `hue` is their *only* colour control — and its
@@ -551,8 +585,10 @@ the swatch table below is still owed for the other three.)
 **Impact:** small, recurring, purely documentation — a swatch table in `docs/preset-palettes.md` (or
 a generated strip committed as an image) closes it. Bundle with any other doc sweep.
 
-- **PROMOTED 2026-07-26 → [Plan 0037](plans/0037-verifying-easing-transient-probe-and-dynamic-signal.md)
-  Phase 5**, which carries the measured swatch points to seed the table.
+- **PROMOTED 2026-07-26 → [Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md)
+  Phase 5. ~~CLOSED 2026-07-27~~** — the swatch table shipped in `bca1457`, with `presets/README.md`
+  pointing at it from both places that mention `hue`. Retained above only because the correction is
+  worth remembering.
 
 ---
 
@@ -621,6 +657,17 @@ the one part of the array that cannot distinguish anything.
 
 So this entry is **no longer documentation-only**. It should be promoted to an ADR weighing the three
 alternatives above; the empirical half of its impact question is now answered.
+
+**Routed at Plan 0037's close (2026-07-27): this is the repo's next ADR-worthy design item**, ahead
+of the rest of the open backlog. Two things a design here inherits and must not rediscover. First,
+it is **breaking**: the eight presets that reach `bin()` (`037825d`'s five plus the three
+`spectrum_*`) encode positions against today's axis, and the third alternative — re-laying the edges
+over a range the window can actually resolve — moves every one of them. Second, the
+`bin_range(lo, hi)` followup deferred from [ADR-0036](adrs/0036-preset-reachable-spectrum.md) is
+**not** an answer to this and should not be allowed to look like one: integrating over a range the
+array cannot resolve returns the same undifferentiated number more smoothly. Interview before
+drafting — the three alternatives trade latency, CPU on the hot path, and breakage against each
+other, and only the user can price the last one.
 
 ---
 

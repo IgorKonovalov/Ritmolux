@@ -195,9 +195,9 @@ What it runs, stopping at the first failure and naming the step that failed:
 | Lint | `cargo clippy --all-targets -- -D warnings` |
 | Tests | `cargo nextest run` (narrowed — see below) |
 
-**Measured warm wall time: ~28 s** (fmt ~0.5 s, clippy ~0.7 s, tests ~26 s —
-most of the suite, minus the nine excluded below). The full suite would be
-~98 s, so the hook excludes the nine
+**Measured warm wall time: ~39 s** (fmt ~0.5 s, clippy ~0.7 s, tests ~38 s —
+most of the suite, minus the nine excluded below). The full suite is
+~121 s, so the hook excludes the nine
 GPU-heavy suites that iterate every shipped preset or scene through a real
 adapter — `golden`, `attractor`, `reaction_diffusion`, `background_composite`,
 `ink`, `reactivity`, `animation`, `sanity`, `distinctness`. It **prints which
