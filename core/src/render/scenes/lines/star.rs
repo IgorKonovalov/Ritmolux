@@ -44,6 +44,10 @@ const DEFAULT_DRAW_PROGRESS: f32 = 1.0;
 const DEFAULT_THICKNESS: f32 = 2.0;
 const DEFAULT_SCALE: f32 = 1.0;
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
+/// The line renderer's **per-segment falloff** multiplier (Plan 0038 Phase 1) —
+/// not a post-process bloom. `1.0` is the value this scene passed as a literal
+/// before it was bound, so the default is exactly today's look.
+const DEFAULT_GLOW: f32 = 1.0;
 // Shared view transform (ADR-0018): identity by default.
 const DEFAULT_ZOOM: f32 = 1.0;
 const DEFAULT_PAN: f32 = 0.0;
@@ -74,6 +78,7 @@ pub struct StarPatternScene {
     thickness: f32,
     scale: f32,
     brightness: f32,
+    glow: f32,
     zoom: f32,
     pan_x: f32,
     pan_y: f32,
@@ -99,6 +104,7 @@ impl StarPatternScene {
             thickness: DEFAULT_THICKNESS,
             scale: DEFAULT_SCALE,
             brightness: DEFAULT_BRIGHTNESS,
+            glow: DEFAULT_GLOW,
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
@@ -132,6 +138,7 @@ pub const PARAMS: &[&str] = &[
     "thickness",
     "scale",
     "brightness",
+    "glow",
     "zoom",
     "pan_x",
     "pan_y",
@@ -156,6 +163,7 @@ impl Scene for StarPatternScene {
         self.thickness = DEFAULT_THICKNESS;
         self.scale = DEFAULT_SCALE;
         self.brightness = DEFAULT_BRIGHTNESS;
+        self.glow = DEFAULT_GLOW;
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
@@ -172,6 +180,7 @@ impl Scene for StarPatternScene {
             "thickness" => self.thickness = value,
             "scale" => self.scale = value,
             "brightness" => self.brightness = value,
+            "glow" => self.glow = value,
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
@@ -266,8 +275,14 @@ impl Scene for StarPatternScene {
             pan: [self.pan_x, self.pan_y],
             _pad: 0.0,
         };
-        self.renderer
-            .borrow_mut()
-            .draw(queue, encoder, view, aspect, 1.0, xform, &self.draw_buf);
+        self.renderer.borrow_mut().draw(
+            queue,
+            encoder,
+            view,
+            aspect,
+            self.glow,
+            xform,
+            &self.draw_buf,
+        );
     }
 }
