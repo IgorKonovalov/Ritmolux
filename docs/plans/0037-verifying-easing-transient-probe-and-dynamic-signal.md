@@ -10,6 +10,14 @@
 > **Backlog entries closed:** [0013](../design-backlog.md), the unresolved half of
 > [0008](../design-backlog.md), plus [0012](../design-backlog.md) and [0014](../design-backlog.md) as
 > documentation
+> **Amended 2026-07-27, after approval and after Plan 0034 closed.** Two additions, neither changing
+> the decision, the phase order, or ADR-0039: **Phase 1 done-when 5** pins that the new time-varying
+> stimulus must preserve the `spectrum` lighting `ca99cb1` just added to the very functions this
+> phase rewrites, and **Phase 4 done-when 4** picks up the empirical half of
+> [backlog 0015](../design-backlog.md) while the user is already measuring real audio. The plan's
+> premise was **re-verified** against the post-0034 tree: `capture_preset` still takes a single
+> `&AnalysisFrame` (`core/src/render/mod.rs:1462`) and `--report` is still built on it
+> (`standalone/examples/shot.rs:654`), so "the report is identical for any easing constant" holds.
 
 ## TL;DR
 
@@ -133,6 +141,20 @@ Each phase ships as its own commit. Phases 1-3 and 5 are `dev`; Phase 4 is the u
      case is ~1.0 and the asymmetric case is far from it, and **state the measured pixel-domain
      numbers in the commit body** so the next change has a reference.
   4. Verified non-vacuous: with the two fixtures' `[smoothing]` tables swapped, the test fails.
+  5. **Do not regress the spectrum stimuli** (added 2026-07-27, after this plan was approved). Plan
+     0034's close landed `ca99cb1`, which made `shot`'s stimulus frames light the log-band `spectrum`
+     array — `band_stimuli()` lights the slice its named band summarises (mirroring
+     `reactivity.rs`), and `loud_frame()` fills it. **Those are the exact functions this phase
+     rewrites to vary over time**, so a regenerated stimulus path can silently drop the lighting and
+     undo the close's Major 2. Nothing would catch it: `--report` has no gate, and the in-crate
+     suites build their own frames.
+
+     So: every frame the new time-varying path emits **carries a populated `spectrum` alongside the
+     scalars**, on the same convention. Prove it behaviorally rather than by inspection — a
+     `bin()`-driven or `spectrum`-system preset must still move under the new path. The cheapest
+     check is that `--report`'s existing columns for `Spectrum Comb` stay in the region `ca99cb1`
+     measured (bass 0.084, mid 0.091, treb 0.047, onset 0.119, coverage 0.913) rather than collapsing
+     toward the pre-fix values (0.040 / 0.030 / 0.016 / 0.000 / 0.664).
 
 ### Phase 2 — The probe becomes a `--report` column
 - **Owner skill:** dev
@@ -183,6 +205,13 @@ Each phase ships as its own commit. Phases 1-3 and 5 are `dev`; Phase 4 is the u
   3. If the measured levels differ substantially from what the shipped library is gained for, that is
      **captured as a new backlog entry**, not fixed here — re-gaining the whole set is a content-lane
      pass with its own scope.
+  4. **Opportunistic, while the meter is out** (added 2026-07-27): the same clips answer the
+     empirical half of [backlog 0015](../design-backlog.md) — the band axis is **half linear**, so
+     31 of the 64 bands are 23.4 Hz slices and the bottom two octaves, where kick and bass live, are
+     the least-resolved part of the array. Note whether that is *audible as a limitation* when
+     driving a `bin()` binding from the low end, or merely a documented curiosity. One or two
+     sentences appended to backlog 0015 is enough. This is **not** a gate on the phase — it costs
+     nothing extra here and would otherwise need its own listening session.
 
 ### Phase 5 — The doc sweep
 - **Owner skill:** dev
