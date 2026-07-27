@@ -1,6 +1,8 @@
 # 0037 — Verifying easing: a transient probe, a signal with dynamics, and the levels authors calibrate against
 
-> **Status:** in-progress
+> **Status:** done — 2026-07-27 (five phase commits `ece3291` / `29bc035` / `6de5ad0` / `bca1457` /
+> `b3f18a6`; passed Mode 4 review with **no blockers and no majors** — four minors, four nits. See
+> **Close** at the bottom.)
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
@@ -229,9 +231,20 @@ Each phase ships as its own commit. Phases 1-3 and 5 are `dev`; Phase 4 is the u
      **expected and correct** for a deliberately sparse or ink-remapped look (`reaction_coral_bloom`
      at 0.128 is healthy), and that the column names suspects rather than convicting them.
   3. **Backlog 0014.** `docs/preset-palettes.md` gains a swatch table for the line scenes' cosine
-     `hue` ramp, which is not a hue wheel and is currently undocumented. Measured points to seed it:
-     **0.06 lavender, 0.17 turquoise, 0.30 cyan, 0.46 near-white/green, 0.62 gold, 0.82 rose.** Note
-     that the three line scenes ignore `[palette]` entirely, so this is their only colour control.
+     `hue` ramp, which is not a hue wheel and is currently undocumented. Note that the three line
+     scenes ignore `[palette]` entirely, so this is their only colour control.
+
+     > **Corrected at close (2026-07-27). The seed points this plan shipped with were wrong.** It
+     > recorded *0.06 lavender, 0.17 turquoise, 0.30 cyan, 0.46 near-white/green, 0.62 gold,
+     > 0.82 rose* — those name the ramp roughly **0.16 further along** than the shader produces.
+     > `palette(t)` (`core/src/render/scenes/lines/mod.rs:117`) is three cosines phased
+     > 0.10 / 0.42 / 0.62, which gives **0.06 magenta, 0.17 orchid, 0.30 cornflower blue, 0.46 aqua,
+     > 0.62 mint, 0.82 amber**. `dev` caught it and did not settle it by arithmetic alone: a 15-point
+     > rendered sweep measuring the median chromaticity of each frame's unclipped lit pixels tracks
+     > `palette(t)` at every point and is nowhere near `palette(t + 0.16)`. Re-derived independently
+     > at review from the shader plus the sRGB transfer curve, which lands inside the committed
+     > table's own rows. **The 20-row table in `docs/preset-palettes.md` is the verified ramp** — read
+     > it, not this paragraph's history.
   4. No count-bearing sentence is introduced that will re-drift.
 
 ## Data shapes
@@ -298,3 +311,118 @@ pub struct StepResponse {
 - A content-lane re-gain pass, if Phase 4's measurements say the library is calibrated wrong.
 - Backlog 0010 (the kaleidoscope fold's out-of-range clamp) and 0011 (the fold axis versus `pan_*`) —
   unrelated to this plan, still waiting, and 0010 is ADR-worthy.
+
+---
+
+## Close (2026-07-27)
+
+Passed Mode 4 review: **no blockers, no majors**; four minors, four nits. Five phase commits —
+`ece3291` the time-varying stimulus + the step-response measure, `29bc035` the `--report` columns,
+`6de5ad0` `--signal dynamic`, `bca1457` the doc sweep, `b3f18a6` the `human` measurement phase.
+`[smoothing]` is observable: `Renderer::capture_preset_over(name, stimulus)` renders one frame per
+`AnalysisFrame` and reads each back, and `metrics::step_response` turns a rise segment and a fall
+segment into frames-to-settle each way. The identity ADR-0039 opened with — "the report is the same
+for any easing constant" — is broken for the first time.
+
+**The shape `dev` chose, and it is the right one.** `capture_preset_over` is a **sibling** of
+`capture_preset`, not a generalization: the old method reads the GPU back once per *call*, the new
+one once per *frame*, so folding them would have made `sanity`, `reactivity`, `animation` and
+`--report` an order of magnitude slower. What they share is the reset preamble, extracted to
+`reset_for_capture`, and `easing.rs::holding_one_stimulus_reproduces_capture_preset` pins the two
+paths together byte-for-byte so they cannot drift.
+
+**The measure works in linear light, and that is load-bearing rather than a detail.** sRGB's transfer
+curve is concave, so a symmetrically eased parameter crosses 90 % of its *pixel* change early going
+up and late coming down; `metrics.rs::measuring_in_srgb_would_fake_an_asymmetry` measures the same
+synthetic ramp both ways and shows the sRGB reading skewed past 2x. Reusing `frame_diff` would have
+made every scalar `[smoothing]` entry read asymmetric.
+
+**Verified at review rather than taken on trust.** `fmt --check` and `clippy --workspace
+--all-targets -D warnings` clean; `nextest --workspace` **263/263**; `core/tests/golden/`
+**byte-untouched** across the whole range; `core/src/ffi.rs`, `core/src/render/scenes/mod.rs` and all
+four manifests untouched, so **C ABI stays v4**, the `Scene` trait is unchanged and no dependency was
+added; no preset `.toml` changed. **Non-vacuity reproduced independently**: swapping the two
+fixtures' `[smoothing]` tables fails
+`a_scalar_smoothing_entry_measures_symmetric_and_an_asymmetric_one_does_not` at
+`core/tests/easing.rs:194` reporting *rise 3 fall 61 (ratio 20.33)* where it demands symmetry, and
+the asymmetric fixture then reads *34 / 35 / 1.03* — the same four numbers `ece3291` recorded, from a
+cold reviewer's tree. **Phase 2's statistic recomputed from the JSON report over `presets/`**:
+asymmetric n=24 median `fall/rise` **1.02**, `fall > rise` **12/24**; scalar-only n=14 median
+**0.61**, `fall > rise` **0/14** — matching `29bc035` to a rounding digit and one boundary preset,
+and matching across a debug/release build change, so the probe is build-invariant too.
+
+**Phase 2 done-when 2 came back a partial negative, exactly as the plan allowed for, and it was
+diagnosed rather than absorbed.** The columns separate the two populations *directionally* and lose
+the magnitude: `Smooth Pulse` (release 0.60 s) reads `26 / 31` where the purpose-built near-linear
+fixture at release 0.5 s reads `3 / 61`, and several presets read `fall` **below** `rise`, which is
+backwards for any easing and is the scene's own motion being measured. `dev` tested the obvious
+confound — the 48-frame window — by rerunning at 96 and found the separation got **worse**
+(scalar-only median 0.60 → 0.92) for double the wall clock, so truncation is not what is hiding the
+magnitude. **Review tested the other confound `dev` did not**: the probe renders at 96x96 while the
+rest of the report runs at 192x192, and backlog 0009 already documents thin-stroke figures nearly
+vanishing at 96 px. Rebuilt with `PROBE_SIZE = 192` and re-run over `presets/`, **every reading moves
+by at most two frames and most are identical** — so resolution is not a confound either and
+`docs/capturing.md`'s "what it measures is temporal, so resolution buys nothing" is earned. The
+scene's visual response is the cause, which is what ADR-0039 predicted and why the plan defers a CI
+gate. **Not a failed phase; the documented limitation is simply larger than hoped.**
+
+**Phase 4 (`human`) ran and produced the number the whole calibration question was waiting for.**
+Real material peaks where a full-scale sine does (808 bass peak `0.190` against `bass:60`'s `0.187` —
+the analyzer attenuates nothing) but its **mean** is `0.007`, about 25x lower. So percussive bindings
+calibrated against a synthesized tone are roughly right and **continuous ones are badly over-gained**,
+which `docs/capturing.md` now states with the full ladder from `--set 0.8` (~100x) down through
+`dynamic:110` (~6x). Routed to **[backlog 0020](../design-backlog.md)** rather than fixed, per the
+phase's own done-when 3. Done-when 4's opportunistic half came back **positive**: driving
+`Spectrum Comb` from the 808 clip collapses the whole kick-and-sub region into the first one or two
+elements, so **[backlog 0015](../design-backlog.md) is no longer documentation-only** and is now the
+repo's next ADR-worthy design item.
+
+**One edit outside a phase's file list, disclosed in its commit rather than absorbed:** one line of
+`print_usage` in `standalone/examples/shot.rs`, enumerating the `--signal` kinds. Shipping a kind the
+CLI's own `--help` denies is worse than the edit. **Accepted.**
+
+**Minors** (none blocking; the first is fixed in this close commit):
+
+1. **`README.md`'s pre-push gate timing went stale.** It says "**Measured warm wall time: ~28 s**
+   (… tests ~26 s)". The `easing` binary and the now-1.49x-slower full-library `--report` inside
+   `shot_cli` are both in the hook's *narrowed* set, and the narrowed set measures **38 s** warm at
+   review (the full suite is 121 s, against the stated ~98 s — Plan 0034's suites contribute too).
+   **Fixed here.** Whether `easing` should join the nine skipped GPU-heavy suites is a judgement for
+   the next plan that touches the hook: it is a real gate on a real capability, and the dominant cost
+   is actually `shot_cli`'s full-library report, not `easing`.
+2. **`core/src/signal.rs:106-110`'s rustdoc describes a design the code abandoned.** The bullet list
+   says "**hat**, on each off-beat: a very short broadband tick" and "**pad**: a three-note chord
+   around 220-330 Hz" — but the implementation puts hats on *every eighth* with a ~60 ms decay and a
+   one-tap high-pass, and the pad is *two voices five harmonics deep* from 165 Hz to 1.65 kHz. The
+   inline comments 60 lines below explain, correctly and at length, why each of those was replaced.
+   The public-facing doc comment is the one a reader meets first. `docs/capturing.md:330` is right.
+3. **`docs/capturing.md`'s library-precedence section does not warn that level 4 is a stale cache**,
+   and the transient columns are far more sensitive to that than the existing ones. Measured at
+   review: a default `--report` (no `--presets`) resolves the `%APPDATA%` directory, which on this
+   machine holds **36 presets against the repo's 38**, still carries a deleted one, and differs in
+   every file — under it `Aurora` reads `1 / 1` and `Rose Bloom` `1 / 1`, against `34 / 16` and
+   `24 / 26` from `presets/`. The `[source]` line does name the winner, but nothing says that
+   directory is seeded **write-if-absent** and never refreshed (ADR-0014's known cost). One sentence
+   there would have closed it.
+4. **`docs/capturing.md:81`'s Trap 2 still quantifies the `--set` error as "roughly four times"** and
+   does not link forward to the new "What real material actually produces" section, whose ladder puts
+   `--set bass=0.8` at **~100x** a real mean. Both are true of different things (a peak versus a
+   mean) and the new section is the one an author needs; the older number now reads as the whole
+   story to anyone who stops at the traps.
+
+**Nits.** `standalone/examples/shot.rs:655` falls back to `StepResponse { 0, 0 }` via
+`transients.get(index).copied().unwrap_or(..)` for an index that cannot be out of range — a real
+mismatch would report as "no transient" rather than failing. `core/src/signal.rs`'s determinism test
+asserts the 0.9 bound with the message "peak normalization did not hold the 0.9 headroom", but this
+generator deliberately does **not** peak-normalize (that was the third dead end); the bound is right,
+the message names the mechanism it replaced. The same file's hat comment says "90 ms of decay" where
+`exp(-t * 16)` is a 62 ms time constant and the commit body says 60 ms. And `capture_preset_over`
+allocates one `CaptureImage` per stimulus frame with no bound — harmless at the probe's 96x96 x 102
+frames (~3.8 MB), a foot-gun at a 4K target.
+
+**⚠ Nothing new for the on-device pass.** This plan adds no per-frame work: the probe and the
+generator live entirely in the capture/`shot` path, and the app's render loop is untouched.
+
+**[ADR-0039](../adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md) accepted.**
+Version **minor 0.18.0 -> 0.19.0** (a feature plan: a new core capture primitive, a new measure, a
+new `--signal` kind, two new report columns).

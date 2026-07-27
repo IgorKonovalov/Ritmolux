@@ -119,7 +119,7 @@ worth having and the plan adds it, but it does not answer this entry.
 
 ## Notes
 
-- The default being exactly `1.0` is what lets this land **before** [Plan 0037](../plans/0037-verifying-easing-transient-probe-and-dynamic-signal.md)'s
+- The default being exactly `1.0` is what lets this land **before** [Plan 0037](../plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md)'s
   transient probe exists. The ordering decision above is the one claim here that the probe would
   measure directly, and it is deliberately recorded as a *property* ("a decaying element falls
   perceptually evenly") rather than a tuned number, so the probe can confirm or refute it later

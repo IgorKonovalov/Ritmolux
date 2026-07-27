@@ -9,8 +9,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
-| [0037](0037-verifying-easing-transient-probe-and-dynamic-signal.md) | Verifying easing: a transient probe, a signal with dynamics, and the levels authors calibrate against | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0038](0038-line-family-unreachable-levers.md) | The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log` | **approved 2026-07-27** — ready for `dev`, **take this first** | dev, human |
+| [0038](0038-line-family-unreachable-levers.md) | The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log` | **approved 2026-07-27** — ready for `dev`, **take this next** | dev, human |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
@@ -21,26 +20,29 @@ post stages have their first capture-level pixel guard, and the two copy-pasted 
 function in `render/grid.rs`. See Recently closed. Every later stage inherits that rule, so backlog
 0005's bloom stage now builds against it rather than against the defect.
 
-**[0034] has landed and closed** — `bin(x)`, the eighth `SystemKind` (`spectrum`), the `[spectrum]`
-table and per-element `index` are all live, and the curated set uses them (`037825d`). See Recently
-closed. **Take [0037] next.**
+**[0037] has landed and closed** — `[smoothing]` is observable for the first time. See Recently
+closed. **Take [0038] next**; it was already sequenced ahead of the rest of the backlog and
+`2f7f213` amended its Phase 3 to use the probe [0037] just landed.
 
-The consequence accepted when [0037] was sequenced *after* [0034] (the user's explicit choice,
-2026-07-26) **materialised and was caught at the close, not by the harness**: Phase 2 taught
-`sanity`, `reactivity`, `golden` and `distinctness` to light the band array but left `shot` blind, so
-the surface the content lane self-verifies through scored a spectrum preset on its scalar bindings
-alone while `cargo test` passed it. Fixed in `ca99cb1`. That is the second time in three plans a
-capability shipped without the content lane being able to see it, which is exactly [0037]'s subject.
+**[0038] is approved and is now the only active render plan.** It closes the whole 0016–0019 backlog
+batch: four levers that already exist in the engine and are simply not reachable from a `.toml`.
+**Every new parameter defaults to today's constant**, so Phases 1–5 are behaviour-preserving and
+assert byte-identical goldens. Its **Phase 3 done-when 6** (added `2f7f213`, after [0037] Phase 1
+landed) measures [ADR-0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md)'s
+curve-before-easing ordering with the probe instead of leaving it as an argument. **Two things
+[0037]'s close tells that phase, and they point the same way:** the probe works well on a
+*purpose-built near-linear fixture* and only directionally on a *shipped preset*, so done-when 6 is
+right to demand its own spectrum fixture and must not be satisfied against a curated preset; and
+`step_response` alone reports frames-to-90 % each way, which **cannot** distinguish "even across its
+travel" from "fast start, long crawl" — that shape claim needs
+`metrics::frames_to_settle(segment, settle_frac)` sampled at several fractions, which is `pub` and
+takes exactly that argument. [0038] Phase 6 is a `preset-author` pass and is the only phase that
+changes how anything looks.
 
-**[0038] is approved and sequenced before [0037] at the user's explicit choice (2026-07-27)** —
-design first, then implement. **Take it next.** It closes the whole 0016–0019 backlog batch: four levers that already
-exist in the engine and are simply not reachable from a `.toml`. It is safe to take ahead of [0037]
-because **every new parameter defaults to today's constant**, so Phases 1–5 are behaviour-preserving
-and assert byte-identical goldens; the one claim [0037]'s probe would measure directly
-([ADR-0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md)'s curve-before-easing
-ordering) is deliberately recorded as a *property* rather than a tuned number, so the probe can
-confirm or refute it later without this plan having invented a threshold. [0038] Phase 6 is a
-`preset-author` pass and is the only phase that changes how anything looks.
+**The next ADR is design-backlog 0015** — the band axis is half linear, and Plan 0037 Phase 4's
+listening test turned it from a documented curiosity into a **user-confirmed real limitation**: on
+every 808 hit the whole kick-and-sub region collapses into one or two elements. It is undesigned, it
+is breaking for the eight presets that reach `bin()`, and it wants an interview before a draft.
 
 **[0033]'s Phase 8 (`human`) is open and independent** — the aesthetic re-tune on the user's
 2048x1152 display: run the `preset-author` lane over the four `reaction_*` presets (now free of the
@@ -180,6 +182,76 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0037 — Verifying easing: a transient probe, a signal with dynamics, and the levels authors
+  calibrate against](done/0037-verifying-easing-transient-probe-and-dynamic-signal.md) — **done
+  2026-07-27**, passed Mode 4 review (**no blockers, no majors**; four minors, four nits). Five phase
+  commits (`ece3291` the time-varying stimulus + the step-response measure, `29bc035` the `--report`
+  columns, `6de5ad0` `--signal dynamic`, `bca1457` the doc sweep, `b3f18a6` the `human` measurement).
+  **`[smoothing]` is observable.** `Renderer::capture_preset_over(name, stimulus)` renders one frame
+  per `AnalysisFrame` and reads each back; `metrics::step_response(rise, fall) -> StepResponse` turns
+  two segments into frames-to-settle each way. The identity ADR-0039 opened with — the report is the
+  same for any easing constant — is broken. The new method is a **sibling** of `capture_preset`, not
+  a generalization: the old one reads back once per *call*, the new one once per *frame*, so folding
+  them would have made `sanity`/`reactivity`/`animation`/`--report` an order of magnitude slower;
+  they share `reset_for_capture`, and a test pins them byte-for-byte. The measure works in **linear
+  light** and that is load-bearing — sRGB's concave transfer curve makes a symmetrically eased
+  parameter cross 90 % of its *pixel* change early up and late down, and a unit test shows the sRGB
+  reading skewed past 2x, so reusing `frame_diff` would have made every scalar entry read asymmetric.
+  **Phase 2's done-when 2 is a reported partial negative, as the plan allowed for**: on the
+  purpose-built near-linear fixture the pair reads `3 / 61` against the scalar's `34 / 35`, but over
+  the shipped set the separation is **directional only** — asymmetric median `fall/rise` 1.02
+  (12/24 with `fall > rise`) against scalar-only 0.61 (0/14) — and several presets read `fall` *below*
+  `rise`, which is the scene's own motion being measured. **Both confounds were tested and neither is
+  the cause**: `dev` reran at a 96-frame window and the separation got *worse* (scalar-only 0.60 →
+  0.92) for double the wall clock; review rebuilt at `PROBE_SIZE = 192` and **every reading moved by
+  at most two frames**, so `capturing.md`'s "what it measures is temporal, so resolution buys nothing"
+  is earned. The scene's visual response is what hides the magnitude, exactly as ADR-0039 predicted,
+  and it is why **no CI gate** ships. `--signal dynamic:<bpm>` is the first generator with dynamics —
+  three layers on a beat grid under an 8-beat build-and-rest phrase, `max/mean` 2.67 / 3.07 / 5.45
+  against `bass:60`'s exactly 1.000 — and its test asserts that comparison against noise measured **in
+  the same run** rather than a remembered constant. Three design dead ends are recorded in `6de5ad0`
+  and worth reading before touching it: a bare 220/277/330 chord puts almost nothing in `mid` (that
+  band is a *mean* over 250 Hz–4 kHz), a 1 %-duty tick is "silence with a good crest factor", and peak
+  normalization makes three layers **zero-sum**, so it soft-clips with `tanh` instead. **Phase 4
+  (`human`) ran** and produced the calibration number the harness had wanted since backlog 0008: real
+  material peaks where a full-scale sine does (808 bass `0.190` against `0.187`) but its **mean** is
+  `0.007`, so *percussive* bindings calibrated against a tone are roughly right and *continuous* ones
+  are badly over-gained — `capturing.md` now carries the ladder from `--set 0.8` (~100x) down through
+  `dynamic:110` (~6x). **Verified at review** rather than taken on trust: `fmt --check` + `clippy
+  --workspace --all-targets -D warnings` clean, `nextest --workspace` **263/263**,
+  `core/tests/golden/` **byte-untouched**, and `ffi.rs` / `scenes/mod.rs` / all four manifests
+  untouched (**C ABI stays v4**, `Scene` unchanged, no new dependency, no preset `.toml` change).
+  **Non-vacuity reproduced independently** — swapping the two fixtures' `[smoothing]` tables fails at
+  `easing.rs:194` reporting *rise 3 fall 61 (ratio 20.33)* where it demands symmetry — and **Phase 2's
+  statistic recomputed** from the JSON report over `presets/`, matching `29bc035` to a rounding digit
+  across a debug→release build change. **One edit outside a phase's file list, disclosed in its
+  commit and accepted:** one `print_usage` line enumerating the `--signal` kinds. **The plan's seed
+  swatches for backlog 0014 were wrong and are corrected in both places** — the recorded names are the
+  ramp ~0.16 further along than `palette(t)` produces; `dev` settled it with a 15-point rendered sweep
+  measuring median chromaticity, review re-derived it, and the 20-row table in
+  `docs/preset-palettes.md` is the verified ramp. **Backlog 0008 (item 3), 0012, 0013 and 0014 all
+  close here. Two entries route onward:** **0020** is new (the shipped library is gained against
+  stimuli 6–100x hotter than real music *on the mean*; peaks are fine, and nobody has audited how much
+  of the set is actually mis-gained), and **0015 is no longer documentation-only** — the user's call,
+  from the listening test, is that the half-linear band axis is a real limitation, which makes it the
+  repo's **next ADR**. **Minors:** (1) `README.md`'s pre-push gate said "~28 s" where the narrowed set
+  now measures **38 s** — the dominant new cost is `shot_cli`'s full-library `--report`, not the
+  `easing` binary — **fixed in this close commit**; (2) `core/src/signal.rs:106-110`'s rustdoc still
+  describes the *abandoned* design (an off-beat tick, a three-note 220–330 Hz chord) that the inline
+  comments 60 lines below explain being replaced; (3) `capturing.md`'s library-precedence section does
+  not warn that `%APPDATA%` is seeded **write-if-absent** and never refreshed — measured at review, a
+  default `--report` there ran **36 presets against the repo's 38** and read `Aurora` `1 / 1` against
+  `34 / 16` from `presets/`, so the new columns are much more sensitive to that stale cache than the
+  old ones; (4) Trap 2's "roughly four times" doesn't link forward to the new ~100x ladder.
+  **Nits:** an unreachable `unwrap_or(StepResponse{0,0})` in the report loop that would report a
+  mismatch as "no transient"; a determinism-test message naming "peak normalization" in the one
+  generator that deliberately doesn't peak-normalize; "90 ms of decay" against an `exp(-t*16)` 62 ms
+  constant; and `capture_preset_over`'s unbounded per-frame image `Vec` (~3.8 MB at the probe's size,
+  a foot-gun at 4K). **⚠ Nothing new for the on-device pass** — the probe and the generator live
+  entirely in the capture/`shot` path; the app's render loop is untouched.
+  **[ADR-0039](../adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md) accepted.**
+  Version **minor 0.18.0 -> 0.19.0**.
 
 - [0034 — Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element
   evaluation](done/0034-preset-reachable-spectrum.md) — **done 2026-07-27**, passed Mode 4 review
