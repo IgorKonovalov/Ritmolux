@@ -30,6 +30,16 @@ pub fn json_matrix(rows: &[Vec<f32>]) -> String {
     s
 }
 
+/// The transient probe's reading as a JSON object (Plan 0037): the two frame
+/// counts stay **integers**, because they are counted frames rather than a
+/// measurement, and the ratio uses the shared 4-decimal field.
+pub fn json_transient(rise_frames: u32, fall_frames: u32, ratio: f32) -> String {
+    format!(
+        "{{\"rise_frames\":{rise_frames},\"fall_frames\":{fall_frames},\"ratio\":{}}}",
+        num(ratio)
+    )
+}
+
 /// Minimal JSON string escaping (quotes, backslash, control chars), including the
 /// surrounding quotes.
 pub fn json_string(s: &str) -> String {
@@ -100,6 +110,20 @@ mod tests {
         assert_eq!(num(1.0), "1.0000");
         assert_eq!(num(0.123_45), "0.1235", "rounds, not truncates");
         assert_eq!(num(-0.5), "-0.5000");
+    }
+
+    #[test]
+    fn json_transient_keeps_frame_counts_integral() {
+        assert_eq!(
+            json_transient(3, 61, 20.333_334),
+            r#"{"rise_frames":3,"fall_frames":61,"ratio":20.3333}"#
+        );
+        // A preset the step never moved reads as three zeros rather than a null
+        // or a NaN, either of which would break a consumer parsing the schema.
+        assert_eq!(
+            json_transient(0, 0, 0.0),
+            r#"{"rise_frames":0,"fall_frames":0,"ratio":0.0000}"#
+        );
     }
 
     #[test]

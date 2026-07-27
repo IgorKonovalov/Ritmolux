@@ -49,7 +49,7 @@ Flags:
 | `--size <WxH>` | render size (default 1280x720) |
 | `--out <path>` | output PNG (single shot) or dir/file (`--all`) |
 | `--all` | contact sheet of every preset, labeled (needs `--out`) |
-| `--report [family=<sys>]` | per-family metrics table; `family=` takes any `system` name (`fragment_field`, `swarm`, `parametric_curve`, `lsystem`, `star_pattern`, `reaction_diffusion`, `attractor`) |
+| `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage and the [transient probe](#the-transient-columns); `family=` takes any `system` name (`fragment_field`, `swarm`, `parametric_curve`, `lsystem`, `star_pattern`, `reaction_diffusion`, `attractor`, `spectrum`) |
 | `--json` | emit the report as JSON instead of a text table |
 | `--signal <kind:param>` | synth-audio filmstrip (see below) |
 | `--audio <clip.wav>` | filmstrip from a 16-bit PCM WAV |
@@ -126,6 +126,55 @@ cargo run -p standalone --example shot -- --preset "Spectrum Comb" \
 `--report` builds its stimulus frames in code rather than from `--set`, and those
 **do** light the band array (each named band lights the slice of the log spectrum
 it summarises), so the report's numbers are real for a spectrum preset.
+
+### What the report's columns mean
+
+```
+  preset            bass     mid    treb   onset    anim   cover  rise  fall
+  Smooth Pulse     0.167   0.087   0.250   0.206   0.076   0.927    26    31
+```
+
+| column | question it answers |
+|---|---|
+| `bass` `mid` `treb` `onset` | how far the frame moves when that stimulus alone comes up, against silence — "does this preset respond to bass at all" |
+| `anim` | how far the frame moves between two capture depths **under silence** — does it have a life of its own |
+| `cover` | fraction of the frame that is lit, against the corner background |
+| `rise` `fall` | the **transient probe** (below) — frames to settle after a step up, and after the matching step down |
+
+Every one of those but the last two is a **settled** measurement: the capture
+holds one stimulus for every frame it renders, so each smoother has converged
+long before the pixels are read. That is the right question for "does it
+respond", and it is exactly why those columns are **identical for any
+`[smoothing]` constant**.
+
+#### The transient columns
+
+`rise` and `fall` are the one pair that is *not* settled. The probe drives a
+step — silence, a held stimulus, silence again — reads back **every** frame, and
+counts how many it takes for the frame to reach 90 % of its total change each
+way ([ADR-0039](adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md)).
+That makes [ADR-0035](adrs/0035-asymmetric-attack-release-easing.md)'s
+`{ attack, release }` pair visible: a scalar `[smoothing]` entry selects the same
+constant both ways, so its two numbers match; a pair snaps up and glides down, so
+`fall` runs well past `rise`.
+
+Reading them:
+
+- **`1` and `1`** — no easing on whatever the stimulus drives. The frame is fully
+  there the frame after the step.
+- **equal, both large** — a scalar `[smoothing]` entry, or an asymmetric one whose
+  two constants are close.
+- **`fall` much larger than `rise`** — an `{ attack, release }` pair doing its job.
+- **`0` and `0`** — the step did not move the frame at all. Check the reactivity
+  columns: this usually means the preset does not respond to the stimulus, not
+  that its easing is instant.
+
+Two limits worth knowing before you act on a number. The probe's window is
+**48 frames (0.8 s) each way**, so a release constant longer than about 0.35 s
+does not fully settle inside it and reads *clamped* rather than measured — the
+asymmetry still shows, the magnitude understates. And more fundamentally, the
+probe measures the **frame**, not the parameter; a preset whose visual response
+saturates reads flat no matter what its easing says.
 
 ### Which preset library a shot uses
 
@@ -221,7 +270,8 @@ encodings are a followup.
 > audio pipeline can be validated without adding anything.
 
 The `--report --json` schema is a nested object of numbers keyed by
-family/preset: per-band `reactivity`, `animation`, `coverage`, the pairwise
+family/preset: per-band `reactivity`, `animation`, `coverage`, `transient`
+(`rise_frames` / `fall_frames` as integers plus their `ratio`), the pairwise
 `pixel`/`shape` distinctness matrices, and `near_duplicates`.
 
 ## The `core/tests/` harness
