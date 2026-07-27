@@ -5,7 +5,7 @@
 
 use lmv_core::audio::AudioFormat;
 use lmv_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE};
-use lmv_core::signal::{bass_sine, chord, click_track, noise, treble_tone};
+use lmv_core::signal::{bass_sine, chord, click_track, dynamic_groove, noise, treble_tone};
 
 use super::film::FILMSTRIP_WARMUP;
 
@@ -79,9 +79,12 @@ pub fn synth_signal(spec: &str) -> Result<(Vec<f32>, AudioFormat), String> {
             noise(seed, SIGNAL_SECS, 0.8, format)
         }
         "chord" => chord(&[220.0, 277.0, 330.0], SIGNAL_SECS, format),
+        // The one kind with dynamics — everything above is a steady tone or
+        // steady noise (Plan 0037 Phase 3).
+        "dynamic" => dynamic_groove(parse_param(param, "dynamic BPM")?, SIGNAL_SECS, format),
         other => {
             return Err(format!(
-                "--signal: unknown kind `{other}` (click|bass|treble|noise|chord)"
+                "--signal: unknown kind `{other}` (click|bass|treble|noise|chord|dynamic)"
             ));
         }
     };
@@ -259,6 +262,7 @@ mod tests {
             "treb:8000",
             "noise:7",
             "chord",
+            "dynamic:110",
         ] {
             let (pcm, format) = synth_signal(spec).unwrap_or_else(|e| panic!("{spec}: {e}"));
             assert_eq!(format.sample_rate, 48_000);
@@ -280,6 +284,8 @@ mod tests {
         // A numeric kind still needs its number.
         assert!(synth_signal("click:fast").is_err());
         assert!(synth_signal("click").is_err(), "click needs a BPM");
+        assert!(synth_signal("dynamic").is_err(), "dynamic needs a BPM");
+        assert!(synth_signal("dynamic:fast").is_err());
     }
 
     /// The measurement has to put energy where the signal put it, or the numbers

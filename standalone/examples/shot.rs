@@ -24,7 +24,7 @@
 //!   --all                    contact sheet of every preset (needs --out)
 //!   --report [family=<sys>]  per-family reactivity / animation / distinctness
 //!            [--json]        emit JSON instead of a text table
-//!   --signal <kind:param>    synth audio filmstrip (click:120, bass:60, ...)
+//!   --signal <kind:param>    synth audio filmstrip (click:120, dynamic:110, ...)
 //!   --audio <clip.wav>       filmstrip from a 16-bit PCM WAV
 //!   --strip <N>              frames tiled along the audio (default 8)
 //!
@@ -189,7 +189,8 @@ fn print_usage() {
          --report [family=<sys>]    metrics table (fragment_field | swarm)\n\
          --json                     emit the report as JSON\n\
          --signal <kind:param>      synth audio filmstrip: click:120 bass:60\n\
-                                    treble:10000 noise:7 chord (needs --out)\n\
+                                    treble:10000 noise:7 chord dynamic:110\n\
+                                    (needs --out)\n\
          --audio <clip.wav>         filmstrip from a 16-bit PCM WAV (needs --out)\n\
          --strip <N>                frames tiled along the audio (default 8)"
     );
