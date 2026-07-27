@@ -40,10 +40,17 @@ size       = "2.1 + clamp(mid * 1.2, 0, 0.7) + beat * 0.35"
 
 # COLOUR - one cool family, sliding. palette_mix crossfades `ice` toward a
 # custom deep-blue-to-foam gradient as the top end opens.
+#
+# `treb` is a mean from 4 kHz all the way to 18 kHz, so on most material it is
+# dominated by broadband hiss and sits nearly constant - which is why the
+# crossfade below used to feel stuck. `bin(0.78)` is ~4.6 kHz, where cymbals and
+# consonants actually live, so the foam arrives when the top end OPENS rather
+# than whenever there is any high-frequency content at all. The wideband term
+# stays underneath as the floor; the narrow one is what moves.
 hue_spread  = "0.28 + clamp(treb * 1.4, 0, 0.26)"
 hue_center  = "0.46 + sin(time * 0.041) * 0.10 + clamp(bass * 0.7, 0, 0.14)"
 saturation  = "1.00 + clamp(mid * 1.0, 0, 0.25)"
-palette_mix = "clamp(treb * 1.8, 0, 0.6)"
+palette_mix = "clamp(treb * 1.0, 0, 0.30) + clamp(bin(0.78) * 2.2, 0, 0.45)"
 
 # VIEW - a slow lateral drift, so the river appears to run rather than sit.
 zoom  = "1.02 + bar * 0.07 + clamp(bass * 0.4, 0, 0.16)"
