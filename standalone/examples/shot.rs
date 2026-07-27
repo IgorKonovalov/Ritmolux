@@ -41,12 +41,14 @@ use std::path::{Path, PathBuf};
 use lmv_core::audio::AudioFormat;
 use lmv_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
 use lmv_core::preset::{Preset, SystemKind, default_presets, load_dir};
-use lmv_core::render::metrics::{coverage, frame_diff, quadrant_spread, struct_diff};
+use lmv_core::render::metrics::{
+    StepResponse, coverage, frame_diff, quadrant_spread, step_response, struct_diff,
+};
 use lmv_core::render::{CaptureImage, HeadlessOptions, Renderer};
 use standalone::shot::args::{BandLevels, apply_set, band_levels, parse_size, synth_signal};
 use standalone::shot::film::{StripLayout, filmstrip_indices, filmstrip_layout};
 use standalone::shot::glyph::{GLYPH_ADVANCE, GLYPH_COLS, glyph_for};
-use standalone::shot::json::{json_matrix, json_string, num};
+use standalone::shot::json::{json_matrix, json_string, json_transient, num};
 use standalone::shot::wav::parse_wav_16bit;
 use standalone::{PRESET_DIR_ENV, resolve_preset_dir};
 
@@ -537,11 +539,33 @@ const REPORT_FRAMES_LATE: u32 = 48;
 const NEAR_DUP_STRUCT: f32 = 0.08;
 const COVERAGE_EPS: u8 = 10;
 
+/// Render size for the transient probe, deliberately smaller than
+/// [`REPORT_SIZE`]. The probe reads the GPU back **once per frame** rather than
+/// once per capture, so its cost is dominated by readbacks in a way no other
+/// column is — and what it measures is temporal, not spatial: rounding the
+/// settle frame is unaffected by resolution, while quartering the pixels is
+/// most of what keeps a full-library `--report` in the same time bracket it has
+/// always been in.
+const PROBE_SIZE: u32 = 96;
+/// Frames of silence before the step, so the response starts settled.
+const PROBE_PRE: usize = 6;
+/// Frames held on each side of the step. The rise and fall windows are the
+/// **same length** on purpose (see `step_response`): each is normalized against
+/// its own final frame, so unequal windows would give the two directions
+/// different truncation bias and a symmetric ease would not read as symmetric.
+///
+/// 48 frames is 0.8 s. A release constant longer than about 0.35 s does not
+/// fully settle inside it and reads **clamped** rather than measured — the
+/// asymmetry still shows, the magnitude understates. Lengthening this is a
+/// direct multiplier on the report's wall clock.
+const PROBE_WINDOW: usize = 48;
+
 struct PresetReport {
     name: String,
     reactivity: [f32; 4], // bass, mid, treb, onset
     animation: f32,
     coverage: f32,
+    transient: StepResponse,
 }
 
 struct FamilyReport {
@@ -591,9 +615,22 @@ fn build_family_report(
     let loud = loud_frame();
     let bands = band_stimuli();
 
+    // The transient probe runs first and at its own smaller size, so the resize
+    // happens twice per family rather than twice per preset.
+    r.resize(PROBE_SIZE, PROBE_SIZE);
+    let stimulus = step_stimulus();
+    let mut transients = Vec::with_capacity(names.len());
+    for name in names {
+        let images = r
+            .capture_preset_over(name, &stimulus)
+            .map_err(|e| format!("probe `{name}`: {e}"))?;
+        transients.push(probe_response(&images));
+    }
+    r.resize(REPORT_SIZE, REPORT_SIZE);
+
     let mut presets = Vec::new();
     let mut fixed_caps = Vec::new();
-    for name in names {
+    for (index, name) in names.iter().enumerate() {
         let base = capture(r, name, &silent, REPORT_FRAMES)?;
         let mut reactivity = [0.0f32; 4];
         for (i, frame) in bands.iter().enumerate() {
@@ -615,6 +652,10 @@ fn build_family_report(
             reactivity,
             animation,
             coverage: cov,
+            transient: transients.get(index).copied().unwrap_or(StepResponse {
+                rise_frames: 0,
+                fall_frames: 0,
+            }),
         });
         fixed_caps.push(fixed);
     }
@@ -701,6 +742,33 @@ fn band_stimuli() -> [AnalysisFrame; 4] {
     ]
 }
 
+/// The probe stimulus (Plan 0037): silence, a step up to [`loud_frame`], then a
+/// step back down. This is the whole reason the probe can see easing at all — a
+/// held stimulus converges every smoother before the pixels are read, so it
+/// reports the settled response and is identical for any `[smoothing]` constant.
+///
+/// It steps to `loud_frame()` rather than to a hand-built frame precisely so the
+/// log-band array is lit on the same convention every other stimulus here uses.
+fn step_stimulus() -> Vec<AnalysisFrame> {
+    let silent = AnalysisFrame::default();
+    let mut frames = vec![silent; PROBE_PRE];
+    frames.extend(std::iter::repeat_n(loud_frame(), PROBE_WINDOW));
+    frames.extend(std::iter::repeat_n(silent, PROBE_WINDOW));
+    frames
+}
+
+/// Measure a probe capture. Each segment starts at the last frame *before* its
+/// step, which is the settled state the response departs from.
+fn probe_response(images: &[CaptureImage]) -> StepResponse {
+    let rise = images
+        .get(PROBE_PRE - 1..PROBE_PRE + PROBE_WINDOW)
+        .unwrap_or_default();
+    let fall = images
+        .get(PROBE_PRE + PROBE_WINDOW - 1..PROBE_PRE + 2 * PROBE_WINDOW)
+        .unwrap_or_default();
+    step_response(rise, fall)
+}
+
 fn loud_frame() -> AnalysisFrame {
     AnalysisFrame {
         bass: 1.0,
@@ -734,12 +802,12 @@ fn print_text_report(source: &str, reports: &[FamilyReport]) {
             fam.presets.len()
         );
         println!(
-            "  {:<14} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7}",
-            "preset", "bass", "mid", "treb", "onset", "anim", "cover"
+            "  {:<14} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5}",
+            "preset", "bass", "mid", "treb", "onset", "anim", "cover", "rise", "fall"
         );
         for p in &fam.presets {
             println!(
-                "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3}",
+                "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>5} {:>5}",
                 p.name,
                 p.reactivity[0],
                 p.reactivity[1],
@@ -747,6 +815,8 @@ fn print_text_report(source: &str, reports: &[FamilyReport]) {
                 p.reactivity[3],
                 p.animation,
                 p.coverage,
+                p.transient.rise_frames,
+                p.transient.fall_frames,
             );
         }
         if fam.near_dups.is_empty() {
@@ -788,7 +858,15 @@ fn render_json(source: &str, reports: &[FamilyReport]) -> String {
                 num(p.reactivity[3]),
             ));
             out.push_str(&format!("\"animation\":{},", num(p.animation)));
-            out.push_str(&format!("\"coverage\":{}", num(p.coverage)));
+            out.push_str(&format!("\"coverage\":{},", num(p.coverage)));
+            out.push_str(&format!(
+                "\"transient\":{}",
+                json_transient(
+                    p.transient.rise_frames,
+                    p.transient.fall_frames,
+                    p.transient.ratio()
+                )
+            ));
             out.push('}');
         }
         out.push_str("},");

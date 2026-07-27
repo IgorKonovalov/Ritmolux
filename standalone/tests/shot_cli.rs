@@ -428,6 +428,103 @@ fn the_json_report_is_well_formed_and_carries_its_top_level_keys() {
     }
 }
 
+/// The transient columns carry a real measurement all the way out of the CLI
+/// (Plan 0037 Phase 2), in both presentations.
+///
+/// The two `easing_*` fixtures are the right subject precisely because they are
+/// twins apart from their `[smoothing]` table (see `core/tests/fixtures/`), so a
+/// difference in the reported columns can only have come from the easing. This
+/// asserts the *wiring* — that the numbers reach the table and the JSON and
+/// differ with the table — not the measurement itself, which
+/// `core/tests/easing.rs` owns at a probe window long enough to let the release
+/// constant settle. `--report`'s own window is shorter, so the fall here reads
+/// clamped rather than measured; the separation is what matters.
+#[test]
+fn the_report_transient_columns_separate_the_two_easing_fixtures() {
+    /// `(rise, fall)` off the one data row of a single-preset text report.
+    fn columns(report: &str) -> (u32, u32) {
+        let row = report
+            .lines()
+            .find(|l| l.trim_start().starts_with("fixture_easing"))
+            .unwrap_or_else(|| panic!("no fixture row in the report:\n{report}"));
+        let cols: Vec<&str> = row.split_whitespace().collect();
+        let n = cols.len();
+        let parse = |s: &str| s.parse().unwrap_or_else(|_| panic!("`{s}` in {row}"));
+        (parse(cols[n - 2]), parse(cols[n - 1]))
+    }
+
+    let probe = |file: &str| -> Option<(u32, u32)> {
+        let out = run(&["--report", "--preset-file", file]);
+        if skipped_for_no_adapter(&out) {
+            return None;
+        }
+        assert!(
+            out.status.success(),
+            "--report on {file} failed\nstderr: {}",
+            stderr(&out)
+        );
+        let text = stdout(&out);
+        assert!(
+            text.contains("rise") && text.contains("fall"),
+            "the report header lost its transient columns:\n{text}"
+        );
+        Some(columns(&text))
+    };
+
+    let Some((scalar_rise, scalar_fall)) = probe("core/tests/fixtures/easing_scalar.toml") else {
+        return;
+    };
+    let Some((asym_rise, asym_fall)) = probe("core/tests/fixtures/easing_asymmetric.toml") else {
+        return;
+    };
+    println!("scalar {scalar_rise}/{scalar_fall}, asymmetric {asym_rise}/{asym_fall}");
+
+    assert!(
+        scalar_rise > 0 && scalar_fall > 0,
+        "the scalar fixture reported no transient at all ({scalar_rise}/{scalar_fall}) — \
+         the column is not measuring anything"
+    );
+    assert!(
+        asym_rise * 3 < scalar_rise,
+        "the pair's fast attack did not reach the report: {asym_rise} frames \
+         against the scalar's {scalar_rise}"
+    );
+    assert!(
+        asym_fall > asym_rise * 3,
+        "the report did not separate the two tables: asymmetric read \
+         {asym_rise}/{asym_fall}"
+    );
+
+    // ...and the same numbers are in the JSON, as integers under `transient`.
+    let out = run(&[
+        "--report",
+        "--json",
+        "--preset-file",
+        "core/tests/fixtures/easing_asymmetric.toml",
+    ]);
+    assert!(out.status.success(), "json report: {}", stderr(&out));
+    let json = stdout(&out);
+    assert!(
+        json_is_balanced(&json),
+        "the report with the transient object is not well-formed JSON:\n{json}"
+    );
+    for key in [
+        "\"transient\":",
+        "\"rise_frames\":",
+        "\"fall_frames\":",
+        "\"ratio\":",
+    ] {
+        assert!(
+            json.contains(key),
+            "the JSON report is missing {key}:\n{json}"
+        );
+    }
+    assert!(
+        json.contains(&format!("\"rise_frames\":{asym_rise}")),
+        "the JSON rise ({asym_rise} in the text table) is missing or differs:\n{json}"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Minimal JSON structural checks
 //
