@@ -137,10 +137,10 @@ This is real-time audio + graphics, so a few rules are non-negotiable:
 
 Visuals are driven by **presets** — small TOML files that bind a built-in
 rendering system's parameters to short expressions over the live audio analysis
-(no Rust, no rebuild). The whole curated set ships across seven systems (fragment
-field, particle swarm, parametric curve, L-system, star pattern,
-reaction-diffusion, attractor), seeded into a per-user directory that both the
-standalone app and the foobar plugin share.
+(no Rust, no rebuild). The whole curated set ships across every built-in system —
+fragment field, particle swarm, parametric curve, L-system, star pattern,
+reaction-diffusion, attractor, spectrum readout — seeded into a per-user directory
+that both the standalone app and the foobar plugin share.
 
 See **[`docs/presets.md`](docs/presets.md)** for the authoring guide and the
 expression reference — grammar, variables, constants, functions, comparisons and
