@@ -14,16 +14,17 @@
 # coefficient adds its own narrow log-spectrum probe through `bin()` on top of a
 # reduced band term, so the four axes de-correlate instead of two of them
 # sharing `bass`:
-#   a ~ 51 Hz    d ~ 200 Hz    b ~ 1.15 kHz    c ~ 5.2 kHz
-# (The log axis runs 35 Hz to 18 kHz over 64 bands: position `x` is
-# 35 * 514.3^x Hz.)
+#   a ~ 120 Hz    d ~ 450 Hz    b ~ 1.2 kHz    c ~ 5.1 kHz
+# Read those off the table in docs/presets.md rather than computing them - the
+# band axis is half linear below ~750 Hz and a log-curve fit is up to 2.9x wrong
+# there. See attractor_dejong.toml.
 # See attractor_dejong.toml for why the band term stays underneath rather than
 # being replaced outright.
 #
 # Colour: a crimson -> ember -> white-hot custom gradient crossfading toward the
 # built-in `mono` on sustained mids, so busy sections desaturate into smoke.
 # The hue centre rides the CONTRAST between two narrow probes - `bin(0.84)`
-# (~6.6 kHz air) minus `bin(0.14)` (~84 Hz sub). That is a TIMBRE signal, not a
+# (~6.5 kHz air) minus `bin(0.14)` (~246 Hz low-mid). That is a TIMBRE signal, not a
 # loudness one: it goes positive when the mix is bright and negative when it is
 # dark, and it stays put through a crescendo that raises both ends together. It
 # is signed, so the clamp is signed too. `bin()` is a NARROW probe (~2 of the 64
