@@ -105,6 +105,135 @@ pub fn quadrant_spread(img: &CaptureImage, bg: [u8; 4], eps: u8) -> u8 {
     hit.iter().filter(|&&b| b).count() as u8
 }
 
+// ---------------------------------------------------------------------------
+// Step response — how fast the frame reaches its new steady state (Plan 0037)
+// ---------------------------------------------------------------------------
+
+/// Fraction of a step's total change the response must reach to count as
+/// settled. 0.9 is the textbook rise-time convention, and it is the one the
+/// one-pole arithmetic in ADR-0019 is quoted against: a smoother with time
+/// constant `tau` reaches it at `t = tau * ln(10) = 2.303 * tau`.
+pub const SETTLE_FRAC: f32 = 0.9;
+
+/// How many frames a captured response took to settle after a step up and after
+/// the matching step down (Plan 0037, ADR-0039).
+///
+/// The whole point of ADR-0035's `{ attack, release }` pair is that these two
+/// differ; a scalar `[smoothing]` entry makes them equal by construction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StepResponse {
+    /// Frames from the step up until the frame settled at [`SETTLE_FRAC`].
+    pub rise_frames: u32,
+    /// Frames from the step down until the frame settled at [`SETTLE_FRAC`].
+    pub fall_frames: u32,
+}
+
+impl StepResponse {
+    /// `fall / rise` — the asymmetry, which is the number that reads.
+    ///
+    /// **This is a pixel-domain ratio, not a parameter-domain one.** A scene's
+    /// response to its own parameter is rarely linear, so the value differs from
+    /// the ratio of the `[smoothing]` constants themselves (ADR-0039); only its
+    /// distance from 1.0 is meaningful. A frame that never moved reports
+    /// `0.0` rather than dividing by zero.
+    pub fn ratio(self) -> f32 {
+        self.fall_frames as f32 / self.rise_frames.max(1) as f32
+    }
+}
+
+/// Measure a step response from two captured segments: `rise` starting at the
+/// last frame *before* the step up, `fall` starting at the last frame before the
+/// step down. Each segment's own last frame is taken as its settled state.
+///
+/// Both segments should be the **same length**, because each is normalized
+/// against its own final frame: a segment that has not fully settled
+/// underestimates the total change and so settles early, and only equal windows
+/// make that bias cancel in [`StepResponse::ratio`].
+pub fn step_response(rise: &[CaptureImage], fall: &[CaptureImage]) -> StepResponse {
+    StepResponse {
+        rise_frames: frames_to_settle(rise, SETTLE_FRAC),
+        fall_frames: frames_to_settle(fall, SETTLE_FRAC),
+    }
+}
+
+/// Index of the first frame in `segment` whose distance from `segment[0]` has
+/// reached `settle_frac` of the distance between the first and last frames.
+///
+/// `segment[0]` is the state at the step and the last entry is the settled
+/// state, so the answer is in frames-since-the-step. A segment that never moves
+/// (total change at or below the float epsilon) reports `0` — the honest answer
+/// for a preset the stimulus does not reach, and the one that keeps
+/// [`StepResponse::ratio`] finite.
+pub fn frames_to_settle(segment: &[CaptureImage], settle_frac: f32) -> u32 {
+    let (Some(start), Some(end)) = (segment.first(), segment.last()) else {
+        return 0;
+    };
+    let total = linear_diff(start, end);
+    if total <= f32::EPSILON {
+        return 0;
+    }
+    let target = total * settle_frac.clamp(0.0, 1.0);
+    for (i, img) in segment.iter().enumerate() {
+        if linear_diff(start, img) >= target {
+            return i as u32;
+        }
+    }
+    segment.len().saturating_sub(1) as u32
+}
+
+/// Mean absolute per-channel difference between two images in **linear light**,
+/// normalized to `0.0..=1.0`. Mismatched dimensions read as fully different.
+///
+/// [`frame_diff`] works on the stored sRGB bytes, which is right for "how
+/// different do these two look". It is *wrong* for a step response: sRGB's
+/// transfer curve is concave, so a parameter easing linearly toward its target
+/// crosses 90 % of its pixel change early on the way up and late on the way
+/// down, and a symmetric `[smoothing]` entry would measure asymmetric. Decoding
+/// first makes the probe's response proportional to the parameter for a scene
+/// whose shader is, which is exactly what the purpose-built easing fixtures are.
+fn linear_diff(a: &CaptureImage, b: &CaptureImage) -> f32 {
+    if a.width != b.width || a.height != b.height || a.rgba.len() != b.rgba.len() {
+        return 1.0;
+    }
+    let lut = srgb_decode_lut();
+    let mut sum = 0.0f64;
+    let mut count: u64 = 0;
+    for (pa, pb) in a.rgba.chunks_exact(4).zip(b.rgba.chunks_exact(4)) {
+        for c in 0..3 {
+            let (Some(&x), Some(&y)) = (pa.get(c), pb.get(c)) else {
+                continue;
+            };
+            let lx = lut.get(x as usize).copied().unwrap_or(0.0);
+            let ly = lut.get(y as usize).copied().unwrap_or(0.0);
+            sum += f64::from((lx - ly).abs());
+            count += 1;
+        }
+    }
+    if count == 0 {
+        return 0.0;
+    }
+    (sum / count as f64) as f32
+}
+
+/// The 256-entry sRGB→linear decode table, built once. A table rather than a
+/// `powf` per channel because [`frames_to_settle`] runs a full-frame difference
+/// per captured frame, and the probe is a whole sequence of them.
+fn srgb_decode_lut() -> &'static [f32; 256] {
+    static LUT: std::sync::OnceLock<[f32; 256]> = std::sync::OnceLock::new();
+    LUT.get_or_init(|| {
+        let mut table = [0.0f32; 256];
+        for (i, slot) in table.iter_mut().enumerate() {
+            let c = i as f32 / 255.0;
+            *slot = if c <= 0.040_45 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            };
+        }
+        table
+    })
+}
+
 /// Whether a pixel's RGB differs from `bg` by more than `eps` on any channel.
 fn is_lit(px: &[u8], bg: [u8; 4], eps: u8) -> bool {
     px.iter()
@@ -245,6 +374,126 @@ mod tests {
             }
         });
         assert_eq!(quadrant_spread(&dot, BLACK, 8), 1);
+    }
+
+    /// One frame at 60 Hz — the clock `capture_preset_over` advances by.
+    const DT: f32 = 1.0 / 60.0;
+
+    /// sRGB-encode a linear value into the byte a capture would hold, the
+    /// inverse of [`srgb_decode_lut`].
+    fn encode(linear: f32) -> u8 {
+        let c = if linear <= 0.003_130_8 {
+            linear * 12.92
+        } else {
+            1.055 * linear.powf(1.0 / 2.4) - 0.055
+        };
+        (c.clamp(0.0, 1.0) * 255.0).round() as u8
+    }
+
+    /// A flat image whose **linear** grey level is `linear`.
+    fn solid_linear(linear: f32) -> CaptureImage {
+        let v = encode(linear);
+        solid(16, 16, [v, v, v, 255])
+    }
+
+    /// A one-pole segment: `n` frames easing from `from` to `to` with time
+    /// constant `tau`, rendered as linear grey.
+    fn one_pole(from: f32, to: f32, tau: f32, n: usize) -> Vec<CaptureImage> {
+        (0..n)
+            .map(|i| {
+                let p = 1.0 - (-(i as f32 * DT) / tau).exp();
+                solid_linear(from + (to - from) * p)
+            })
+            .collect()
+    }
+
+    /// The measurement's contract against the arithmetic ADR-0019 is quoted in:
+    /// a one-pole reaches 90 % of a step at `t = tau * ln(10)`, and it does so in
+    /// the same number of frames going down as going up.
+    #[test]
+    fn frames_to_settle_matches_the_one_pole_arithmetic_in_both_directions() {
+        let tau = 0.25f32;
+        // 2.303 * 0.25 s = 0.576 s = 34.5 frames at 60 Hz.
+        let expected = (tau * 10.0f32.ln() / DT).round() as i32;
+        // Long enough (2 s = 8 tau) that the segment's own last frame is settled,
+        // so normalizing against it costs nothing.
+        let n = 120;
+
+        let rise = frames_to_settle(&one_pole(0.0, 1.0, tau, n), SETTLE_FRAC) as i32;
+        let fall = frames_to_settle(&one_pole(1.0, 0.0, tau, n), SETTLE_FRAC) as i32;
+        println!("one-pole tau={tau}: rise {rise}, fall {fall}, expected {expected}");
+        assert!(
+            (rise - expected).abs() <= 2,
+            "rise {rise} should be within 2 frames of {expected}"
+        );
+        assert!(
+            (fall - expected).abs() <= 2,
+            "fall {fall} should be within 2 frames of {expected}"
+        );
+        assert_eq!(rise, fall, "a symmetric ease must measure symmetric");
+
+        // A faster constant settles proportionally sooner — the measure tracks
+        // tau rather than reporting a fixed fraction of the window.
+        let quick = frames_to_settle(&one_pole(0.0, 1.0, 0.05, n), SETTLE_FRAC) as i32;
+        assert!(quick * 3 < rise, "tau 0.05 ({quick}) vs tau 0.25 ({rise})");
+    }
+
+    /// Why [`linear_diff`] exists rather than reusing [`frame_diff`]: on the very
+    /// same symmetric ramp, measuring in the stored sRGB bytes reports a rise and
+    /// a fall that differ by more than 2x, so a scalar `[smoothing]` entry would
+    /// read as asymmetric and the probe would be measuring the transfer curve.
+    #[test]
+    fn measuring_in_srgb_would_fake_an_asymmetry() {
+        let tau = 0.25f32;
+        let n = 120;
+        let srgb_settle = |seg: &[CaptureImage]| -> usize {
+            let total = frame_diff(&seg[0], seg.last().unwrap());
+            seg.iter()
+                .position(|img| frame_diff(&seg[0], img) >= SETTLE_FRAC * total)
+                .unwrap_or(0)
+        };
+        let rise = srgb_settle(&one_pole(0.0, 1.0, tau, n));
+        let fall = srgb_settle(&one_pole(1.0, 0.0, tau, n));
+        println!("same ramp measured in sRGB: rise {rise}, fall {fall}");
+        assert!(
+            fall > rise * 2,
+            "sRGB rise {rise} / fall {fall} should be badly skewed — if they are \
+             now close, linear_diff is no longer earning its keep"
+        );
+    }
+
+    /// A stimulus a preset does not respond to must not divide by zero or invent
+    /// a transient: both directions read 0 and the ratio is 0.
+    #[test]
+    fn a_frame_that_never_moves_reports_no_transient() {
+        let flat: Vec<CaptureImage> = (0..30).map(|_| solid_linear(0.4)).collect();
+        let r = step_response(&flat, &flat);
+        assert_eq!(
+            r,
+            StepResponse {
+                rise_frames: 0,
+                fall_frames: 0
+            }
+        );
+        assert_eq!(r.ratio(), 0.0);
+        // ...and an empty capture is total too.
+        assert_eq!(frames_to_settle(&[], SETTLE_FRAC), 0);
+    }
+
+    #[test]
+    fn step_response_ratio_reports_the_asymmetry() {
+        // A 3-frame rise against a 69-frame fall is the shape
+        // `{ attack = 0.02, release = 0.5 }` produces at 60 Hz.
+        let r = StepResponse {
+            rise_frames: 3,
+            fall_frames: 69,
+        };
+        assert!((r.ratio() - 23.0).abs() < 1e-6, "got {}", r.ratio());
+        let sym = StepResponse {
+            rise_frames: 35,
+            fall_frames: 35,
+        };
+        assert_eq!(sym.ratio(), 1.0);
     }
 
     #[test]

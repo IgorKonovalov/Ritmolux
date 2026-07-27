@@ -1,8 +1,9 @@
 # Golden drift fixtures
 
 These TOML files are **test-only frozen fixtures** for the golden drift guard
-(`core/tests/golden.rs`), one per `SystemKind` — plus the two `composite_*`
-fixtures described at the bottom, which belong to a different guard. They exist to catch **unintended
+(`core/tests/golden.rs`), one per `SystemKind` — plus the two `composite_*` and
+two `easing_*` fixtures described at the bottom, which belong to different
+guards. They exist to catch **unintended
 engine rendering drift** — a shader or scene-math change that silently perturbs
 output — by pinning each scene's pixels to a committed baseline PNG under
 `core/tests/golden/`.
@@ -66,3 +67,24 @@ Two things about them differ from the rest of this directory, both deliberate:
 
 They are otherwise governed by everything above: do not tune, bless on WARP,
 eyeball before committing.
+
+## The `easing_*` fixtures are a third guard, and pin no pixels
+
+`easing_scalar.toml` and `easing_asymmetric.toml` belong to `core/tests/easing.rs`
+(Plan 0037 Phase 1, ADR-0039), the transient probe. They are **twins**: the same
+`[curve]` family and the same `[params]` bindings, differing only in their `name`
+and their `[smoothing]` table — one scalar, one an `{ attack, release }` pair. The
+test asserts that twinship, because the probe's whole claim is that the table is
+the only thing that differs.
+
+They have **no committed baseline**. Nothing here is blessed and `LMV_BLESS` does
+not touch them: the probe measures a *relative* property (how many frames the
+frame takes to settle after a step, up against down), so there is no PNG to drift.
+
+"Do not tune" applies to them for a different reason than to the golden roster. A
+tuned `easing_*` fixture does not fail loudly — it quietly starts measuring the
+scene instead of the easing, because the probe reads the **frame** rather than the
+parameter and can only see through a near-linear visual response. Their headers
+say exactly which choices keep that response linear (a static figure, one
+directly-multiplying param, an amplitude below the additive-blend clamp, no
+composite stage). Read them before editing either file.

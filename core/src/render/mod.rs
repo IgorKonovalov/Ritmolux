@@ -1465,21 +1465,7 @@ impl Renderer {
         frame: &AnalysisFrame,
         frames: u32,
     ) -> Result<CaptureImage, RenderError> {
-        if !self.select_preset_by_name_now(name) {
-            return Err(RenderError::UnknownPreset(name.to_string()));
-        }
-        // Reset simulation state to the deterministic seed and the clock to 0,
-        // so the same (name, frame, frames) always yields identical pixels and
-        // differential probes (Phase 3) isolate the stimulus, not history.
-        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
-        self.cancel_transition();
-        self.side.reset_resources();
-        self.ink.reset_resources();
-        self.blend.reset_resources();
-        self.time = 0.0;
-        // The rebuilt scenes are fresh — re-apply the active preset's structural
-        // config (ADR-0007) so a line scene captures with its geometry built.
-        self.configure_active_scene();
+        self.reset_for_capture(name)?;
 
         let (width, height) = (self.ctx.config.width, self.ctx.config.height);
         let format = self.ctx.surface_format();
@@ -1517,6 +1503,96 @@ impl Renderer {
         self.text_layer.end_frame();
 
         capture::read_back(&self.ctx.device, &buffer, width, height, padded_bpr)
+    }
+
+    /// Capture preset `name` across a **time-varying** stimulus (Plan 0037):
+    /// one rendered frame per entry of `stimulus`, read back in order, so the
+    /// returned images are the response *while it changes* rather than after it
+    /// settles.
+    ///
+    /// This is the primitive [`capture_preset`](Self::capture_preset) cannot be:
+    /// holding one frame for every step converges every smoother before the
+    /// pixels are read, which makes the result identical for any `[smoothing]`
+    /// constant (ADR-0039). `capture_preset` is left exactly as it was — four
+    /// suites and `--report` consume it — and this is its sibling, sharing the
+    /// same [`reset_for_capture`](Self::reset_for_capture) seed so both are pure
+    /// functions of their arguments.
+    ///
+    /// The clock advances one [`FALLBACK_DT`](scenes::FALLBACK_DT) per entry, so
+    /// index `i` is second `i * dt` of the response. An empty `stimulus` yields
+    /// no images. Errors if `name` is not in the roster.
+    ///
+    /// **Off the hot path, and more so than its sibling** — it blocks on a GPU
+    /// readback *per frame*, not once per call. The target and readback buffer
+    /// are allocated up front rather than per frame, because building GPU
+    /// resources mid-sequence perturbs what the feedback stages resolve to on the
+    /// DX12 software adapter.
+    pub fn capture_preset_over(
+        &mut self,
+        name: &str,
+        stimulus: &[AnalysisFrame],
+    ) -> Result<Vec<CaptureImage>, RenderError> {
+        self.reset_for_capture(name)?;
+
+        let (width, height) = (self.ctx.config.width, self.ctx.config.height);
+        let format = self.ctx.surface_format();
+        let (texture, view) = capture::create_target(&self.ctx.device, format, width, height);
+        let (buffer, padded_bpr) = capture::create_readback(&self.ctx.device, width, height);
+
+        let mut images = Vec::with_capacity(stimulus.len());
+        for frame in stimulus {
+            self.time += scenes::FALLBACK_DT;
+            let mut encoder =
+                self.ctx
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("lmv-capture-over"),
+                    });
+            capture::record_clear(&mut encoder, &view);
+            let _ = self.draw_frame(
+                frame,
+                &mut encoder,
+                &view,
+                width,
+                height,
+                scenes::FALLBACK_DT,
+            );
+            capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, width, height);
+            self.ctx.queue.submit(std::iter::once(encoder.finish()));
+
+            #[cfg(feature = "text")]
+            self.text_layer.end_frame();
+
+            images.push(capture::read_back(
+                &self.ctx.device,
+                &buffer,
+                width,
+                height,
+                padded_bpr,
+            )?);
+        }
+        Ok(images)
+    }
+
+    /// Select `name` and reset every stateful system to its deterministic seed —
+    /// the shared preamble of [`capture_preset`](Self::capture_preset) and
+    /// [`capture_preset_over`](Self::capture_preset_over), so both are pure
+    /// functions of their arguments and neither inherits an earlier capture's
+    /// history.
+    fn reset_for_capture(&mut self, name: &str) -> Result<(), RenderError> {
+        if !self.select_preset_by_name_now(name) {
+            return Err(RenderError::UnknownPreset(name.to_string()));
+        }
+        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
+        self.cancel_transition();
+        self.side.reset_resources();
+        self.ink.reset_resources();
+        self.blend.reset_resources();
+        self.time = 0.0;
+        // The rebuilt scenes are fresh — re-apply the active preset's structural
+        // config (ADR-0007) so a line scene captures with its geometry built.
+        self.configure_active_scene();
+        Ok(())
     }
 
     /// Drive preset `name` with **real audio through the real analyzer** and

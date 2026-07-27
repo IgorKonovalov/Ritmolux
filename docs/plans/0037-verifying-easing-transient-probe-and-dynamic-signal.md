@@ -1,6 +1,6 @@
 # 0037 — Verifying easing: a transient probe, a signal with dynamics, and the levels authors calibrate against
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
