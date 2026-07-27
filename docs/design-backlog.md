@@ -611,6 +611,17 @@ should change**, and it is a real decision with real alternatives:
 integrator would paper over the resolution question without answering it. **ADR-worthy if acted on**;
 the alternatives above are the ones to weigh.
 
+**Checked empirically 2026-07-27** (Plan 0037 Phase 4, opportunistically, while real audio was
+already on the meter). Drove `Spectrum Comb` from a trap clip with a prominent 808 sub, peak-normalized
+to -1 dBFS. On every 808 hit the entire kick-and-sub region collapses into the **first one or two
+elements** with no internal structure, while the rest of the array reads as a flat ridge — the
+resolution table's arithmetic, visible. **The user's call: this is a real limitation, not a documented
+curiosity.** The bottom two octaves are where a `bin()` binding is reached for most often, and they are
+the one part of the array that cannot distinguish anything.
+
+So this entry is **no longer documentation-only**. It should be promoted to an ADR weighing the three
+alternatives above; the empirical half of its impact question is now answered.
+
 ---
 
 ## 0016 — the `spectrum` readout has no width control, and density makes it worse
@@ -713,3 +724,44 @@ deliberately whether this ships *ahead* of 0005 — it is nearly free and immedi
 waits so the two are designed as one coherent luminance story. **Recommendation: ship ahead.** A
 per-segment falloff param and a screen-space bloom are different tools an author would reach for
 differently, and holding a one-line win behind an undesigned stage has no payoff.
+
+---
+
+## Entry 0020 — from the Plan 0037 measurement phase
+
+Not part of the 0015-0019 batch above. Raised by the one thing in this repo only the user can do:
+play real music through the harness and read the meter.
+
+---
+
+## 0020 — the shipped library is gained against stimuli 6-100x hotter than real music
+
+- **Raised:** 2026-07-27, from Plan 0037 Phase 4 (the `human` measurement phase), which routes this
+  here rather than fixing it: re-gaining the set is a content-lane pass with its own scope.
+- **Verified by measurement** through `--audio` on three local clips, peak-normalized to -1 dBFS.
+  Numbers and material descriptions are in [`capturing.md`](capturing.md#what-real-material-actually-produces).
+
+Real material produces bass **means** of `0.000`-`0.007` and **peaks** up to `0.190`. Every stimulus
+an author has actually been able to reach sits above that:
+
+| stimulus | bass | vs. a real mean |
+|---|---|---|
+| `--set bass=0.8` | `0.800` | ~100x |
+| `--signal bass:60` | `0.187` | ~25x |
+| `--signal dynamic:110` (Plan 0037 Phase 3) | mean `0.040` | ~6x |
+
+**The peak is not the problem — the mean is.** An 808's bass peak (`0.190`) lands on a full-scale
+60 Hz sine (`0.187`), so percussive bindings calibrated against a synthesized tone are roughly right.
+Continuous bindings are not: a size, a zoom or a hue drift spends its life near the *mean*, which is
+25x lower than the loudest thing an author could previously synthesize and 100x lower than the
+`--set` magnitude most of the library was authored against.
+
+**What is NOT yet known** and would gate the work: how much of the shipped set is actually
+mis-gained. A binding reading `bass * 0.4` on a preset whose look tolerates a wide range is fine; one
+gating a `select()` threshold is not. Nobody has audited which is which.
+
+**Impact:** content-lane, potentially library-wide, and it wants evidence before it wants a plan. The
+cheap first step is a pass with `--signal dynamic:110` over the library looking for presets that
+barely move — that is now possible and was not before. No ADR: this is tuning, not architecture,
+unless the audit turns up a *grammar* gap (e.g. no way to express "normalize this band against its
+own recent range"), which would be its own entry.
