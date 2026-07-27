@@ -1,6 +1,6 @@
 # 0038 — The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log`
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-07-27
 > **Approved:** 2026-07-27 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human

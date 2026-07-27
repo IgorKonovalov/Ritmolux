@@ -34,6 +34,8 @@
 //!   `spectrum` palette is that same cosine, so an author who sets no `[palette]`
 //!   sees the engine's usual colour language.
 //! - `thickness` / `brightness` / `scale` / `base` — ordinary stroke styling.
+//! - `glow` — the line renderer's per-segment falloff multiplier (Plan 0038),
+//!   whole-figure like on the other three line scenes. Not a post bloom.
 //!
 //! `radius` is **layout-specific**: it is the ring's inner radius and has no
 //! meaning for bars or the polyline. That is stated in `presets/README.md` and
@@ -87,6 +89,10 @@ const DEFAULT_HUE_SPREAD: f32 = 0.0;
 const DEFAULT_SATURATION: f32 = 1.0;
 const DEFAULT_PALETTE_MIX: f32 = 0.0;
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
+/// The line renderer's **per-segment falloff** multiplier (Plan 0038 Phase 1) —
+/// not a post-process bloom. `1.0` is the value this scene passed as a literal
+/// before it was bound, so the default is exactly today's look.
+const DEFAULT_GLOW: f32 = 1.0;
 const DEFAULT_SCALE: f32 = 1.2;
 /// Minimum element length, in world units. Non-zero on purpose: a spectrum
 /// readout at rest is a comb, not an empty frame, so the figure stays on screen
@@ -115,6 +121,7 @@ pub const PARAMS: &[&str] = &[
     "saturation",
     "palette_mix",
     "brightness",
+    "glow",
     "zoom",
     "pan_x",
     "pan_y",
@@ -347,6 +354,7 @@ pub struct SpectrumScene {
     saturation: f32,
     palette_mix: f32,
     brightness: f32,
+    glow: f32,
     scale: f32,
     base: f32,
     radius: f32,
@@ -387,6 +395,7 @@ impl SpectrumScene {
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
             brightness: DEFAULT_BRIGHTNESS,
+            glow: DEFAULT_GLOW,
             scale: DEFAULT_SCALE,
             base: DEFAULT_BASE,
             radius: DEFAULT_RADIUS,
@@ -453,6 +462,7 @@ impl Scene for SpectrumScene {
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
         self.brightness = DEFAULT_BRIGHTNESS;
+        self.glow = DEFAULT_GLOW;
         self.scale = DEFAULT_SCALE;
         self.base = DEFAULT_BASE;
         self.radius = DEFAULT_RADIUS;
@@ -480,6 +490,7 @@ impl Scene for SpectrumScene {
             "saturation" => self.saturation = value,
             "palette_mix" => self.palette_mix = value,
             "brightness" => self.brightness = value,
+            "glow" => self.glow = value,
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
@@ -634,9 +645,15 @@ impl Scene for SpectrumScene {
             pan: [self.pan_x, self.pan_y],
             _pad: 0.0,
         };
-        self.renderer
-            .borrow_mut()
-            .draw(queue, encoder, view, aspect, 1.0, xform, &self.segments);
+        self.renderer.borrow_mut().draw(
+            queue,
+            encoder,
+            view,
+            aspect,
+            self.glow,
+            xform,
+            &self.segments,
+        );
     }
 }
 

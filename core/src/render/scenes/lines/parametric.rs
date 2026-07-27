@@ -43,6 +43,10 @@ const DEFAULT_HUE: f32 = 0.6;
 const DEFAULT_SPIN: f32 = 0.1;
 const DEFAULT_SCALE: f32 = 0.9;
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
+/// The line renderer's **per-segment falloff** multiplier (Plan 0038 Phase 1) —
+/// not a post-process bloom. `1.0` is the value every line scene passed as a
+/// literal before it was bound, so the default is exactly today's look.
+const DEFAULT_GLOW: f32 = 1.0;
 const DEFAULT_DRAW_PROGRESS: f32 = 1.0;
 // Shared view transform (ADR-0018): identity by default, so an unbound preset is
 // unchanged.
@@ -82,6 +86,7 @@ pub struct ParametricCurveScene {
     spin: f32,
     scale: f32,
     brightness: f32,
+    glow: f32,
     draw_progress: f32,
     zoom: f32,
     pan_x: f32,
@@ -111,6 +116,7 @@ impl ParametricCurveScene {
             spin: DEFAULT_SPIN,
             scale: DEFAULT_SCALE,
             brightness: DEFAULT_BRIGHTNESS,
+            glow: DEFAULT_GLOW,
             draw_progress: DEFAULT_DRAW_PROGRESS,
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
@@ -134,6 +140,7 @@ pub const PARAMS: &[&str] = &[
     "spin",
     "scale",
     "brightness",
+    "glow",
     "draw_progress",
     "zoom",
     "pan_x",
@@ -162,6 +169,7 @@ impl Scene for ParametricCurveScene {
         self.spin = DEFAULT_SPIN;
         self.scale = DEFAULT_SCALE;
         self.brightness = DEFAULT_BRIGHTNESS;
+        self.glow = DEFAULT_GLOW;
         self.draw_progress = DEFAULT_DRAW_PROGRESS;
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
@@ -182,6 +190,7 @@ impl Scene for ParametricCurveScene {
             "spin" => self.spin = value,
             "scale" => self.scale = value,
             "brightness" => self.brightness = value,
+            "glow" => self.glow = value,
             "draw_progress" => self.draw_progress = value,
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
@@ -280,14 +289,21 @@ impl Scene for ParametricCurveScene {
         view: &wgpu::TextureView,
         aspect: f32,
     ) {
-        // Segments carry brightness in their colour; glow multiplier stays 1.0.
+        // Segments carry brightness in their colour; `glow` is the renderer's
+        // separate per-segment falloff multiplier (Plan 0038 Phase 1).
         let xform = ViewTransform {
             zoom: self.zoom,
             pan: [self.pan_x, self.pan_y],
             _pad: 0.0,
         };
-        self.renderer
-            .borrow_mut()
-            .draw(queue, encoder, view, aspect, 1.0, xform, &self.segments);
+        self.renderer.borrow_mut().draw(
+            queue,
+            encoder,
+            view,
+            aspect,
+            self.glow,
+            xform,
+            &self.segments,
+        );
     }
 }
