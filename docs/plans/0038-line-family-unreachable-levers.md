@@ -1,7 +1,8 @@
 # 0038 — The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log`
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-07-27
+> **Approved:** 2026-07-27 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md) (this
 > plan's decision — curve before easing, as a bindable exponent),

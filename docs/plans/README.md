@@ -10,7 +10,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0037](0037-verifying-easing-transient-probe-and-dynamic-signal.md) | Verifying easing: a transient probe, a signal with dynamics, and the levels authors calibrate against | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0038](0038-line-family-unreachable-levers.md) | The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log` | **draft 2026-07-27** — awaiting the user's go | dev, human |
+| [0038](0038-line-family-unreachable-levers.md) | The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log` | **approved 2026-07-27** — ready for `dev`, **take this first** | dev, human |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
@@ -32,8 +32,8 @@ the surface the content lane self-verifies through scored a spectrum preset on i
 alone while `cargo test` passed it. Fixed in `ca99cb1`. That is the second time in three plans a
 capability shipped without the content lane being able to see it, which is exactly [0037]'s subject.
 
-**[0038] is drafted and sequenced before [0037] at the user's explicit choice (2026-07-27)** —
-design first, then implement. It closes the whole 0016–0019 backlog batch: four levers that already
+**[0038] is approved and sequenced before [0037] at the user's explicit choice (2026-07-27)** —
+design first, then implement. **Take it next.** It closes the whole 0016–0019 backlog batch: four levers that already
 exist in the engine and are simply not reachable from a `.toml`. It is safe to take ahead of [0037]
 because **every new parameter defaults to today's constant**, so Phases 1–5 are behaviour-preserving
 and assert byte-identical goldens; the one claim [0037]'s probe would measure directly
