@@ -130,6 +130,43 @@ each defaulting to that family's canonical value.
 
 ---
 
+## `spectrum` — the frequency-axis readout (Plan 0034)
+
+*A measurement you can look at.* A line system like the three above, but its figure is the engine's
+64-band log-spaced array rather than a generator's geometry. `[spectrum]` is optional:
+`elements` (2..=64, default 24), `layout` (`bars` | `polyline` | `radial_ring`, default `bars`), and
+a per-element `smoothing` (seconds, or `{ attack, release }`).
+
+**Nothing in `[params]` maps audio to position — that mapping *is* the scene.** Element 0 is the
+bottom of the spectrum, the last is the top. The params say how the elements look and how far they
+reach.
+
+| Param | Typical | Controls / natural driver |
+|-------|---------|---------------------------|
+| `base` | `0.1 – 0.6` | the length every element has **before** audio, in world units (the frame is 2 tall). Deliberately non-zero: at `0` the readout vanishes in a silence and reads as broken. Bind to `time` for a resting breath. |
+| `scale` | well above `1` | multiplier on the element's own band level — the bands read **small**, same caveat as `bass`/`mid`/`treb`. |
+| `radius` | `0.2 – 0.6` | **`radial_ring` only** — the inner circle the spokes stand on. No effect on the other two layouts. |
+| `rotation` | radians | turns the whole figure; the natural motion on the ring, a tilt on bars/polyline. |
+| `hue_spread` | `0 – 1` | walks the palette across the elements, so you can see *where* a peak is. `1` on `radial_ring` wraps continuously. |
+
+**This is the only line system that reads `[palette]`** — the other three colour through their own
+cosine `hue`. It honours the view transform, the geometry mirror (transformative on `bars`/
+`polyline`, near-noop on `radial_ring` for the same reason as `star_pattern`), and every engine stage.
+
+**Per-element bindings.** A binding whose text names `index` is evaluated once per element, with
+`index` at that element's `0..1` position — so `thickness = "0.01 + bin(index) * 0.05"` thickens each
+element by its own band, and `base = "0.16 + index * 0.12"` gives the quiet top end a longer rest.
+Five params genuinely vary per element (`base` `scale` `thickness` `brightness` `hue`); the
+whole-figure ones take the `index = 0` value rather than being dropped. `[smoothing]` cannot ease a
+per-element binding (a surfaced warning) — use `[spectrum] smoothing`, where an asymmetric
+`{ attack, release }` earns its keep more than almost anywhere else: the bands are the rawest signal
+in the engine, so a fast attack keeps a transient's shape while a slow release lets elements fall
+like a meter instead of strobing.
+
+**Verify these with `--signal`, never `--set`** — see the spectrum footgun in `SKILL.md`.
+
+---
+
 ## Engine-wide stages (any system)
 
 | Param | Default | Note |

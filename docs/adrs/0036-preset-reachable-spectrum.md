@@ -1,7 +1,9 @@
 # ADR-0036 — Preset-reachable spectrum: a scalar `bin(x)` function, an N-element spectrum scene, and per-element evaluation as a bounded third step
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-07-26
+> **Accepted:** 2026-07-27 at the Plan 0034 close, **with the Outcome section below** correcting one
+> claim implementation falsified
 > **Related plan(s):** [0034](../plans/0034-preset-reachable-spectrum.md)
 > **Supplements:** [ADR-0002](0002-layered-preset-architecture.md) (the expression layer),
 > [ADR-0020](0020-preset-grammar-v2-branching-functions-tempo.md) (grammar v2),
@@ -146,6 +148,49 @@ frequency.
 Cheapest possible answer, and it does unlock the attractor morphing. Rejected because it leaves the
 literally-stated request — a visible spectrum readout — unmet, and because the scene is inexpensive
 given that the data, the renderer, and the delivery channel all already exist.
+
+## Outcome (added 2026-07-27 at acceptance)
+
+The decision held: `bin(x)` + a `spectrum` system + per-element `index` shipped in five phases with
+no new DSP, no new render idiom, no `Scene`-trait change and no C-ABI change, exactly as scoped. The
+`Variables` copy concern above was answered better than the plan proposed — by **borrowing with a
+lifetime** (`Variables<'a>` holding `spectrum: &'a [f32]`), so the per-binding path carries a fat
+pointer and the 264-byte bundle never exists.
+
+**One claim in Consequences is wrong and is corrected here rather than edited above** (this ADR is
+append-only; same treatment as [ADR-0034](0034-internal-resolution-follows-the-target.md)):
+
+> "64 log-spaced bands over 20 Hz–Nyquist means a single `bin()` call covers a wide musical interval
+> at the top and a narrow one at the bottom."
+
+**Both halves are false**, verified against `core/src/dsp/fft.rs:56-76` and by independent numerical
+replication at 48 kHz:
+
+- **The range is 35 Hz to 18 kHz** (`BAND_LO_HZ` / `BAND_HI_HZ`, the top additionally clamped to
+  `0.45 * sample_rate`), not 20 Hz to Nyquist.
+- **The array is not log-spaced over half its length.** `new()` computes log edges and then floors
+  every band at one FFT bin; at a 2048-point window that floor is 23.4 Hz and it binds from band 1 to
+  **band 30 (~750 Hz)**, so **31 of the 64 bands are linear 23.4 Hz slices**.
+- **The resolution profile is therefore backwards from the claim.** The *bottom* is the coarsest part
+  musically — band 0 spans 23–47 Hz, a full octave in one number — resolution peaks around
+  500–800 Hz (band 30 is 0.55 semitones), and the *top* is a constant ~1.7 semitones per band. The
+  aliasing hazard the ADR predicted is real but sits at the **bottom**, not the top.
+- **A consequence the ADR did not anticipate:** below the crossover the mapping depends on
+  `sample_rate / 2048`, so the same `bin(x)` names a different frequency at 44.1 kHz than at 48 kHz.
+
+The documentation obligation the ADR correctly identified is discharged in `4d41884`
+(`docs/presets.md` and `presets/README.md` carry a measured position table and both consequences),
+and the surviving question — whether the half-linear axis is a defect to fix or a characteristic to
+live with — is **[design-backlog 0015](../design-backlog.md)**, with three weighed alternatives. It
+is ADR-worthy if acted on.
+
+Also learned, and now documented rather than left to be rediscovered: a band value is the **peak**
+linear bin within the band while `bass`/`mid`/`treb` are **means** over wide ranges, so a single
+`bin()` measures comparably to a band scalar on broadband material (~0.02–0.05 against ~0.022) but
+reaches far higher on tonal content. Gains transfer between the two unchanged; what differs is
+selectivity. Averaging a few `bin()` calls **spot-samples** a region rather than integrating it —
+measured against a 6.5 kHz tone, `bin(0.84)` reads 0.094 while `bin(0.82)` and `bin(0.88)` read
+exactly zero — which is the strongest argument yet for the deferred `bin_range(lo, hi)`.
 
 ## Notes
 

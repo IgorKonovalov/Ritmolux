@@ -11,7 +11,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 |------|-------|--------|----------------|
 | [0037](0037-verifying-easing-transient-probe-and-dynamic-signal.md) | Verifying easing: a transient probe, a signal with dynamics, and the levels authors calibrate against | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0034](0034-preset-reachable-spectrum.md) | Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
 
@@ -21,10 +20,16 @@ post stages have their first capture-level pixel guard, and the two copy-pasted 
 function in `render/grid.rs`. See Recently closed. Every later stage inherits that rule, so backlog
 0005's bloom stage now builds against it rather than against the defect.
 
-**Take [0034] first, then [0037].** [0037] is sequenced *after* [0034] at the user's explicit choice
-(2026-07-26), with the consequence stated and accepted: [0034]'s new spectrum scene will land
-**unverifiable in the same way** the easing capability did, because the transient probe that would
-check it arrives afterwards. The alternative — probe first — was offered and declined.
+**[0034] has landed and closed** — `bin(x)`, the eighth `SystemKind` (`spectrum`), the `[spectrum]`
+table and per-element `index` are all live, and the curated set uses them (`037825d`). See Recently
+closed. **Take [0037] next.**
+
+The consequence accepted when [0037] was sequenced *after* [0034] (the user's explicit choice,
+2026-07-26) **materialised and was caught at the close, not by the harness**: Phase 2 taught
+`sanity`, `reactivity`, `golden` and `distinctness` to light the band array but left `shot` blind, so
+the surface the content lane self-verifies through scored a spectrum preset on its scalar bindings
+alone while `cargo test` passed it. Fixed in `ca99cb1`. That is the second time in three plans a
+capability shipped without the content lane being able to see it, which is exactly [0037]'s subject.
 
 **[0033]'s Phase 8 (`human`) is open and independent** — the aesthetic re-tune on the user's
 2048x1152 display: run the `preset-author` lane over the four `reaction_*` presets (now free of the
@@ -164,6 +169,40 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0034 — Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element
+  evaluation](done/0034-preset-reachable-spectrum.md) — **done 2026-07-27**, passed Mode 4 review
+  (**no blockers**; two majors, four minors, two nits, **all fixed in `ca99cb1`** rather than
+  carried). Five `dev` phase commits (`a379b28` `bin(x)`, `2450c2a` the `spectrum` system, `a553b2e`
+  the `[spectrum]` table, `6950c94` per-element `index`, `fe11659` the operator sweep) plus
+  `ca99cb1` the review fixes and `4d41884` the band-axis documentation correction. Closes backlog
+  0002, the capability the user asked for twice. The scoping claim **held**: no new DSP, no new
+  render idiom, no `Scene`-trait change, **C ABI stays v4**, no new dependency — the 64-band array
+  already existed on `AnalysisFrame`, every scene already received it, and `LineRenderer` already
+  drew arbitrary segment lists, so an eighth `SystemKind` cost an exhaustive-match arm rather than a
+  pipeline. `Variables` beat its own feared 264-byte per-binding copy by **borrowing with a
+  lifetime**. **Major 1:** a gradient that *repeats* past its ends is not *continuous* there — all
+  four stop-list palettes run dark to light, so a full `hue_spread` walk puts the sharpest transition
+  on the ring; `Spectrum Corona` demonstrated the falsehood it was written to illustrate and its
+  palettes were re-cut to return to their starting colour. **Major 2:** Phase 2 lit the band array in
+  `sanity`/`reactivity`/`golden`/`distinctness` **but not in `shot`**, so the lane's own verification
+  surface scored spectrum presets on their scalar bindings alone (`Spectrum Comb` bass 0.040 → 0.084,
+  onset 0.000 → 0.119, coverage 0.664 → 0.913 once fixed). `--set` stays scalar-only **deliberately**,
+  documented in `docs/capturing.md` as its third calibration trap. **The substantive postscript:**
+  ADR-0036 and the plan both stated the band resolution profile **backwards**. The array is
+  **35 Hz–18 kHz**, not 20 Hz–Nyquist, and `fft.rs` floors every band at one FFT bin *after* laying
+  the log edges — 23.4 Hz at 2048 — which binds to **band 30 (~750 Hz)**, so **31 of the 64 bands are
+  linear**. Band 0 spans 23–47 Hz, *a full octave in one number*; resolution peaks near 500–800 Hz and
+  settles at ~1.7 semitones above 1 kHz, so **the low end is the coarsest region musically, not the
+  finest** — and below the crossover the mapping moves with the sample rate. The error propagated once
+  before it was caught (`037825d` annotated its probes from the log-edge curve, **up to 2.9x wrong**
+  below the crossover; bindings were tuned by effect and unchanged, comments corrected).
+  **[ADR-0036](../adrs/0036-preset-reachable-spectrum.md) accepted with an Outcome section.**
+  **Verified at close:** `fmt --check` + `clippy --workspace --all-targets -D warnings` clean,
+  `nextest --workspace` **251/251**, `core/tests/golden/` **byte-untouched**. **Two items routed to
+  the backlog:** [0015](../design-backlog.md) whether the half-linear axis is a defect (**ADR-worthy
+  if acted on**) and [0016](../design-backlog.md) the readout's missing `span`/`width` param. Version
+  **minor 0.17.1 → 0.18.0**.
 
 - [0035 — The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a
   pixel guard for the post stages](done/0035-composite-aspect-and-grid-policy.md) — **done
