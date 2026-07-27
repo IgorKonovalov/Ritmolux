@@ -115,7 +115,7 @@ it is still the same pure expression over the same frame.
 
 ## The built-in systems
 
-Eight systems are addressable from a preset. Their **named parameters, defaults,
+Every built-in system is addressable from a preset. Their **named parameters, defaults,
 and per-system notes are tabulated in [`presets/README.md`](../presets/README.md#systems-and-their-named-parameters)** —
 that table is maintained alongside the presets and is the authoritative list.
 
@@ -413,6 +413,13 @@ Things worth knowing before you reach for it:
 - **Outside a per-element evaluation, `index` reads `0`.** Naming it on any other
   system is not an error and not a warning — the binding simply evaluates once
   with `index = 0`, which is the value the first element would have seen.
+- **`index` normalizes over the span, `hue_spread` over the count.** `index` is
+  `i/(n-1)`, so the last element is exactly `1.0` — that is what makes `bin(index)`
+  cover the whole spectrum end to end. The scene's own `hue_spread` walk is `i/n`,
+  which is what keeps its steps even around a closed figure. So `hue = "index"` is
+  **not** the same as `hue_spread = 1`: the former lands the last element on the
+  same colour as the first. See
+  [preset-palettes.md](preset-palettes.md#spectrum--colour-along-the-frequency-axis).
 - **Not every parameter is per-element.** On `spectrum`, `base`, `scale`,
   `thickness`, `brightness` and `hue` genuinely vary per element. The
   whole-figure ones — `radius`, `rotation`, `hue_spread`, `palette_mix`,

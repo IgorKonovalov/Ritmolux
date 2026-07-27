@@ -397,6 +397,27 @@ fn evaluate_preset(
     scene.reset_params();
     let mut ink = ink;
     for (index, (binding, route)) in preset.params.iter().zip(routes).enumerate() {
+        // A binding that names `index` is asking to be evaluated once per
+        // element (Plan 0034 Phase 4). The test is a `bool` read decided at
+        // compile, and `series` is empty for every system without a per-element
+        // surface — so for the other seven systems this branch is never taken
+        // and the path below is the one that ran before this existed.
+        //
+        // Tested *before* the scalar evaluation, not inside the routing match:
+        // the scalar `eval` would be the same expression a second time (at
+        // `index = 0`) and its result is not read, so evaluating it would make a
+        // per-element binding cost N + 1 evaluations instead of N. The smoother
+        // is skipped with it — a per-element binding's `tau` is always
+        // `INSTANT` (the loader forces it and warns), so its slot was a
+        // passthrough nothing read.
+        if matches!(*route, ParamRoute::Scene) && !series.is_empty() && binding.expr.uses_index() {
+            // The scene eases the element levels itself through
+            // `[spectrum] smoothing`; a series has no single value for the
+            // per-binding smoother to hold.
+            evaluate_series(&binding.expr, vars, series);
+            scene.set_param_series(&binding.name, series);
+            continue;
+        }
         let raw = binding.expr.eval(vars);
         // Ease the evaluated value on the injected real `dt` before applying it
         // (ADR-0019). `tau` came off the preset's `[smoothing]` table at load;
@@ -418,24 +439,7 @@ fn evaluate_preset(
                 }
             }
             ParamRoute::Scene => {
-                // A binding that names `index` is asking to be evaluated once
-                // per element (Plan 0034 Phase 4). The test is a `bool` read
-                // decided at compile, and `series` is empty for every system
-                // without a per-element surface — so for the other seven
-                // systems this branch is never taken and the path below is the
-                // one that ran before this existed.
-                if !series.is_empty() && binding.expr.uses_index() {
-                    // Deliberately the *raw* expression, not `value`: the
-                    // per-binding smoother holds one scalar, and a series has
-                    // no single value for it to hold. The scene eases the
-                    // element levels itself through `[spectrum] smoothing`, and
-                    // a `[smoothing]` entry naming a per-element binding is a
-                    // surfaced load warning rather than a silent no-op.
-                    evaluate_series(&binding.expr, vars, series);
-                    scene.set_param_series(&binding.name, series);
-                } else {
-                    scene.set_param(&binding.name, value);
-                }
+                scene.set_param(&binding.name, value);
             }
             // Nothing consumes it. Surfaced at load, silent here (ADR-0020).
             ParamRoute::Unclaimed => {}

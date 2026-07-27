@@ -44,7 +44,7 @@ Flags:
 | `--preset <name>` | preset to render (by name, as shown in the report / library); optional when the library holds exactly one preset |
 | `--presets <dir>` | load the library from `<dir>` instead of the resolved preset directory |
 | `--preset-file <path>` | load exactly one preset from `<path>` (beats `--presets`) |
-| `--set k=v,...` | constant stimulus frame: `bass,mid,treb,onset,bar,novelty` (0..1), `tempo` (BPM), `beat` (non-zero = true). Keys are the **grammar's** names, so `tempo` is what a binding writes — see [the calibration traps](#the-two-calibration-traps) before trusting a value |
+| `--set k=v,...` | constant stimulus frame: `bass,mid,treb,onset,bar,novelty` (0..1), `tempo` (BPM), `beat` (non-zero = true). Keys are the **grammar's** names, so `tempo` is what a binding writes. It reaches the frame's scalars only — **not** the 64-band spectrum, so `bin(x)` reads `0` — see [the calibration traps](#the-three-calibration-traps) before trusting a value |
 | `--frames <N>` | frames to advance before capture (default 120) |
 | `--size <WxH>` | render size (default 1280x720) |
 | `--out <path>` | output PNG (single shot) or dir/file (`--all`) |
@@ -57,11 +57,11 @@ Flags:
 
 Bad arguments and unknown presets exit non-zero with a message.
 
-### The two calibration traps
+### The three calibration traps
 
 `--set` is a **held** stimulus: it writes the analysis frame directly and that
 same frame drives every captured frame. That makes it perfect for isolating one
-binding and wrong for two things people reach for it anyway.
+binding and wrong for three things people reach for it anyway.
 
 **Trap 1 — `--set beat=1` holds the beat gate high for the whole capture.** Real
 beats are transient: `beat` fires on one hop and is false on the next. Held high,
@@ -101,6 +101,31 @@ audio levels over 367 analysis hops (past warm-up) — calibrate gains against t
 actually produce"; `--signal` answers it for a known synthetic tone. Use `--set`
 to ask "does this binding do anything at all", not to decide how much of it to
 apply.
+
+**Trap 3 — `--set` leaves the 64-band spectrum silent, so `bin(x)` reads `0`.**
+`--set` writes the analysis frame's *scalars*; there is no key for the log-band
+array, and `AnalysisFrame::default()` leaves all 64 bands at zero. So under any
+`--set` capture:
+
+- every `bin(x)` call in an expression returns `0`, whatever `bass`/`mid`/`treb`
+  say, and
+- the whole **`spectrum`** system draws its `base` resting comb and nothing else —
+  the readout is inert, which looks exactly like a broken preset.
+
+This is not a bug in `--set` (it writes what you ask and nothing else); it is the
+one part of the frame it cannot reach. **`bin(x)` and the `spectrum` system have
+to be verified through `--signal` or `--audio`**, both of which run the real
+analyzer over real samples and therefore populate the array:
+
+```bash
+# The band array through the real FFT - the readout actually moves
+cargo run -p standalone --example shot -- --preset "Spectrum Comb" \
+  --signal chord --strip 3 --out comb.png
+```
+
+`--report` builds its stimulus frames in code rather than from `--set`, and those
+**do** light the band array (each named band lights the slice of the log spectrum
+it summarises), so the report's numbers are real for a spectrum preset.
 
 ### Which preset library a shot uses
 

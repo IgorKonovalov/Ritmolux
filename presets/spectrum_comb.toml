@@ -1,5 +1,5 @@
 # Spectrum Comb - the first preset on the `spectrum` system (Plan 0034): the
-# engine's 64 log-spaced bands reduced to 24 upright elements, one per contiguous
+# engine's 64 log-spaced bands reduced to 26 upright elements, one per contiguous
 # slice of the array. This is the readout in its plainest form; it exists to show
 # that the frequency axis is really on screen and really moving, and the later
 # spectrum presets build looks on top of it.
@@ -7,7 +7,7 @@
 # WHAT IS DIFFERENT ABOUT THIS SYSTEM. Every other preset in the set drives its
 # figure with `bass`/`mid`/`treb` - three numbers standing in for the whole
 # audible range. Here the figure IS the range: element 0 is the bottom of the
-# spectrum and element 23 the top, so a bass note lifts the left of the frame and
+# spectrum and element 25 the top, so a bass note lifts the left of the frame and
 # a hi-hat the right, with no expression in between doing the mapping. Nothing in
 # [params] mentions a band at all; `base` and `scale` only say how tall the
 # elements stand.
@@ -49,10 +49,12 @@ base = "0.30 + sin(time * 1.5) * 0.15"
 # useful height without clipping off the top of the frame at a peak.
 scale = "2.6"
 
-# STROKE - heavy on purpose. At 24 elements across the frame each one owns about
-# a twenty-fourth of the width, and a thin stroke inside that slot reads as a
-# scatter of dots rather than a comb. This fills most of the slot and leaves a
-# visible gap.
+# STROKE - heavy on purpose. The readout is 2 world units wide and the renderer
+# divides world x by the target aspect, so the comb spans the frame's HEIGHT in
+# pixels - about 56% of the width at 16:9, not the whole of it. Each of the 26
+# elements owns a twenty-sixth of that, and a thin stroke inside so narrow a slot
+# reads as a scatter of dots rather than a comb. This fills most of the slot and
+# leaves a visible gap.
 thickness  = "12 + clamp(bass * 6.0, 0, 3.0)"
 brightness = "0.72 + clamp(mid * 1.4, 0, 0.34)"
 

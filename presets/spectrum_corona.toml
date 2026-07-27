@@ -21,11 +21,34 @@ layout   = "radial_ring"
 # be fast as well - and a ring of jittering spokes reads as static.
 smoothing = { attack = 0.05, release = 0.40 }
 
+# CYCLIC PALETTES, and this is the one preset in the set where that is a
+# requirement rather than a preference. `hue_spread = 1` below walks the whole
+# gradient once around the ring, so the last spoke lands next to the first - and
+# the gradient repeating past its ends is NOT the same as it being continuous
+# there. Every built-in stop-list palette (`ember`, `ice`, `mono`, `aurora`) runs
+# dark to light, so a full walk would put a hard dark/light seam somewhere on the
+# circle. These are `ember` and `ice` re-cut to return to their starting colour
+# at 1.0: the same two colour identities, with the bright end in the middle of
+# the walk instead of at its edge.
 [palette]
-name = "ember"
+stops = [
+  { at = 0.00, color = [0.05, 0.01, 0.00] },  # deep ember - and the wrap point
+  { at = 0.25, color = [0.60, 0.12, 0.02] },
+  { at = 0.45, color = [1.00, 0.42, 0.06] },
+  { at = 0.55, color = [1.00, 0.86, 0.52] },  # pale gold, opposite the wrap
+  { at = 0.78, color = [0.70, 0.20, 0.03] },
+  { at = 1.00, color = [0.05, 0.01, 0.00] },  # back to the start, no seam
+]
 
 [palette_b]
-name = "ice"
+stops = [
+  { at = 0.00, color = [0.00, 0.05, 0.18] },  # deep ice - and the wrap point
+  { at = 0.28, color = [0.09, 0.42, 0.72] },
+  { at = 0.50, color = [0.40, 0.75, 0.92] },
+  { at = 0.60, color = [0.85, 0.95, 1.00] },  # near-white, opposite the wrap
+  { at = 0.82, color = [0.12, 0.45, 0.78] },
+  { at = 1.00, color = [0.00, 0.05, 0.18] },  # back to the start, no seam
+]
 
 [params]
 # ROTATION - the preset's spine. A steady turn, which on a ring is the one motion
@@ -61,9 +84,11 @@ base  = "0.16 + index * 0.12 + sin(time * 1.1) * 0.07"
 scale = "2.4"
 
 # COLOUR AROUND THE RING. A full `hue_spread` walks the palette once round the
-# circle, so the wrap is continuous - the last spoke lands next to the first in
-# colour as well as in position, which is the whole reason to spend the spread on
-# this layout rather than on the comb.
+# circle in even steps (the walk is normalized over the element COUNT, so the
+# last spoke sits one step short of the first rather than on top of it). With the
+# cyclic stops above the wrap is genuinely invisible, which is the whole reason
+# to spend the spread on this layout rather than on the comb - and `hue` can then
+# rotate the colour independently of the geometry without a seam sweeping past.
 hue         = "mod(time * 0.03, 1)"
 hue_spread  = "1.0"
 saturation  = "1.0"

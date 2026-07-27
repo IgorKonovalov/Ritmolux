@@ -39,7 +39,7 @@
 use std::path::{Path, PathBuf};
 
 use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::AnalysisFrame;
+use lmv_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
 use lmv_core::preset::{Preset, SystemKind, default_presets, load_dir};
 use lmv_core::render::metrics::{coverage, frame_diff, quadrant_spread, struct_diff};
 use lmv_core::render::{CaptureImage, HeadlessOptions, Renderer};
@@ -655,23 +655,47 @@ fn capture(
         .map_err(|e| format!("capture `{name}`: {e}"))
 }
 
+/// The log-band index ranges each named band roughly occupies, so a report
+/// stimulus lights the part of the `spectrum` array its own scalar summarises.
+/// Mirrors `core/tests/reactivity.rs`: a frame claiming `bass = 1.0` over 64
+/// silent log-bands is not a frame any audio could produce, and under it a
+/// preset reading the array through `bin()` — or the whole `spectrum` system —
+/// would correctly draw nothing, so the report would be scoring the fixture
+/// rather than the preset.
+///
+/// **Approximate**, derived from the ~20 Hz-Nyquist log spacing and the
+/// ~250 Hz / ~4 kHz band edges. They only need to be *distinct* regions for the
+/// differential columns to mean anything; nothing here is a contract with the
+/// DSP's exact edges.
+const BASS_BANDS: std::ops::Range<usize> = 0..22;
+const MID_BANDS: std::ops::Range<usize> = 22..48;
+const TREB_BANDS: std::ops::Range<usize> = 48..64;
+
+/// A held frame with one scalar band up and the matching slice of the log
+/// spectrum lit.
+fn band_stimulus(
+    scalar: impl Fn(&mut AnalysisFrame),
+    bands: std::ops::Range<usize>,
+) -> AnalysisFrame {
+    let mut frame = AnalysisFrame::default();
+    scalar(&mut frame);
+    for band in frame.spectrum.iter_mut().take(bands.end).skip(bands.start) {
+        *band = 1.0;
+    }
+    frame
+}
+
 fn band_stimuli() -> [AnalysisFrame; 4] {
     [
+        band_stimulus(|f| f.bass = 1.0, BASS_BANDS),
+        band_stimulus(|f| f.mid = 1.0, MID_BANDS),
+        band_stimulus(|f| f.treb = 1.0, TREB_BANDS),
         AnalysisFrame {
-            bass: 1.0,
-            ..Default::default()
-        },
-        AnalysisFrame {
-            mid: 1.0,
-            ..Default::default()
-        },
-        AnalysisFrame {
-            treb: 1.0,
-            ..Default::default()
-        },
-        AnalysisFrame {
+            // A transient is broadband, so the onset stimulus lights the whole
+            // array rather than a slice.
             onset: 1.0,
             beat: true,
+            spectrum: [1.0; SPECTRUM_BINS],
             ..Default::default()
         },
     ]
@@ -685,6 +709,9 @@ fn loud_frame() -> AnalysisFrame {
         onset: 1.0,
         beat: true,
         bar: 0.5,
+        // "Every band up" includes the log-band array itself — see
+        // [`BASS_BANDS`].
+        spectrum: [1.0; SPECTRUM_BINS],
         ..Default::default()
     }
 }
