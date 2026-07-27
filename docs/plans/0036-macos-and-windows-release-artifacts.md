@@ -1,6 +1,6 @@
 # 0036 — macOS and Windows release artifacts: a tag-driven Release with a universal `.app`
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
