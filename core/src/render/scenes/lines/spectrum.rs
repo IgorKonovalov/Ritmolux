@@ -63,7 +63,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::super::Scene;
-use super::renderer::{LineRenderer, SegmentInstance};
+use super::renderer::{JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
 use super::{
     CapOverflow, GeneratorConfig, MAX_SEGMENTS, MirrorSpec, OverflowContext, ViewTransform,
     replicate_mirror,
@@ -377,12 +377,24 @@ pub(crate) fn build(
             let mut prev = point(0, lengths.first().copied().unwrap_or(0.0));
             for (i, &length) in lengths.iter().enumerate().skip(1) {
                 let next = point(i, length);
+                // Chained (ADR-0041): consecutive segments share a point, so
+                // every interior endpoint is a joint. Only the two ends of the
+                // whole figure are free — segment `i` runs from point `i - 1` to
+                // point `i`, so its `a` is joined for every segment but the
+                // first and its `b` for every segment but the last.
+                let mut joined = 0;
+                if i > 1 {
+                    joined |= JOINED_A;
+                }
+                if i < gaps {
+                    joined |= JOINED_B;
+                }
                 out.push(SegmentInstance {
                     a: prev,
                     b: next,
                     color: color_of(i),
                     width: width_of(i),
-                    joined: 0,
+                    joined,
                 });
                 prev = next;
             }
@@ -1332,6 +1344,76 @@ mod tests {
             assert!(
                 (step - expected).abs() < 1e-5,
                 "spoke {i} sits one even step around the circle, got {step}"
+            );
+        }
+    }
+
+    /// Plan 0039 Phase 2 done-when 1 and 2 (ADR-0041). This scene is the one
+    /// producer emitting **both** connectivities from a single `build()`, so it
+    /// is what proves the flag is per endpoint rather than per scene.
+    ///
+    /// The isolated half is the load-bearing one: it is the done-when that would
+    /// have caught the rejected unconditional-extend design. A bar whose `a` end
+    /// extended would hang below `baseline` — breaking the `baseline = 0`
+    /// centre-mirror Plan 0038 shipped — and a spoke whose `a` end extended would
+    /// grow inward through `radius` and fill the inner circle.
+    #[test]
+    fn only_the_polyline_declares_its_endpoints_joined() {
+        let levels = [0.1f32, 0.4, 0.9, 0.3, 0.6];
+
+        // Chained: every interior vertex is a joint; the figure's two outer ends
+        // stay free, or the stroke would run half a width past each edge.
+        let chain = figure(SpectrumLayout::Polyline, &levels);
+        assert_eq!(
+            chain.iter().map(|s| s.joined).collect::<Vec<_>>(),
+            vec![JOINED_B, JOINED_A | JOINED_B, JOINED_A | JOINED_B, JOINED_A,],
+            "the interior endpoints of the chain are joined and only those"
+        );
+        // ...and every flag matches a genuinely shared point, which is the
+        // invariant nothing else in the pipeline validates.
+        for i in 1..chain.len() {
+            assert_eq!(chain[i - 1].b, chain[i].a, "segment {i} shares a point");
+            assert_ne!(
+                chain[i - 1].joined & JOINED_B,
+                0,
+                "seen from the segment before"
+            );
+            assert_ne!(chain[i].joined & JOINED_A, 0, "and from the one after");
+        }
+        // Two elements make one segment, which is all end and no joint.
+        let lone = figure(SpectrumLayout::Polyline, &[0.3, 0.7]);
+        assert_eq!(lone.len(), 1);
+        assert_eq!(lone[0].joined, 0, "a lone segment has two free ends");
+
+        // Isolated: one segment per element, both ends free, and the endpoints
+        // stay exactly where they always were.
+        let bars = figure(SpectrumLayout::Bars, &levels);
+        for (i, seg) in bars.iter().enumerate() {
+            assert_eq!(seg.joined, 0, "bar {i} is isolated");
+            assert_eq!(
+                seg.a[1], DEFAULT_BASELINE,
+                "bar {i} still stands on the baseline"
+            );
+            assert!(
+                (seg.b[1] - (DEFAULT_BASELINE + levels[i])).abs() < 1e-6,
+                "bar {i} still ends exactly at baseline + length"
+            );
+        }
+
+        let ring = placed(
+            SpectrumLayout::RadialRing,
+            &levels,
+            Placement {
+                radius: 0.4,
+                ..Placement::default()
+            },
+        );
+        for (i, seg) in ring.iter().enumerate() {
+            assert_eq!(seg.joined, 0, "spoke {i} is isolated");
+            let inner = (seg.a[0] * seg.a[0] + seg.a[1] * seg.a[1]).sqrt();
+            assert!(
+                (inner - 0.4).abs() < 1e-5,
+                "spoke {i} still starts exactly on the ring, got {inner}"
             );
         }
     }
