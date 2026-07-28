@@ -910,3 +910,57 @@ record is honest, but the next author has no reason to expect it.
 bundled with 0020 into a decision about what level the report's stimuli should represent, which is a
 real question with a real rejected alternative (full-scale stimuli are reproducible and
 sample-rate-independent; realistic ones are neither).
+
+---
+
+## 0023 — `LineRenderer` has no line joins, so every direction change leaves a notch
+
+**Raised by `preset-author`, 2026-07-28, from a user looking at `spectrum_ridge` full-screen.** The
+report was "there are gaps between lines, looks very strange" — visible as a thin dark tick across
+the stroke at *every* vertex, on gentle slopes as well as sharp ones. It is not a preset defect and
+no `[params]` value fixes it.
+
+**The cause, from the shader** (`core/src/render/scenes/lines/renderer.rs`, `SHADER`):
+
+```wgsl
+let nrm  = vec2<f32>(-dir.y, dir.x);
+let base = mix(a_s, b_s, c.x);
+let pos  = base + nrm * c.y * width;
+```
+
+Each segment is an independent rectangle built from **its own** perpendicular, and nothing joins
+consecutive ones. Where the direction changes by `theta`, the two rectangles share the centre point
+but their outer corners diverge, leaving a wedge on the outside of the turn (and a double-covered
+overlap on the inside). The gap's width goes as `width * tan(theta/2)`, so it is visible at any turn
+once the stroke is thick enough — which is why it reads at every vertex rather than only at corners.
+
+**Why it surfaced now, and why it will keep surfacing.** The four line scenes are affected equally,
+but the three generator-driven ones (`parametric_curve`, `lsystem`, `star_pattern`) draw smooth
+figures whose consecutive segments are nearly collinear, so `theta` is small and the notch is
+sub-pixel. **`spectrum` with `layout = "polyline"` is the opposite**: consecutive points are adjacent
+frequency bands, which are genuinely uncorrelated, so `theta` is large and arbitrary. Plan 0038 made
+this much worse by design — the whole point of the `curve` lever is to give neighbouring elements
+*more* height contrast, and height contrast on a polyline is exactly turn angle.
+
+**The only preset-side lever is stroke width**, since the notch scales with it. `spectrum_ridge` now
+carries `thickness = 3.2` where its look wanted more, and that is a real cost paid to a renderer
+limitation. Raising `elements` does **not** help and slightly hurts: more points over a fixed `span`
+shortens the x-step while the y-differences stay, which steepens every turn.
+
+**The cheap fix, if it is wanted.** Extend each segment quad by `width` along its own direction
+(`base = mix(a_s - dir*width, b_s + dir*width, c.x)`), so consecutive quads overlap by half a stroke
+and the notch is covered. That is a two-line vertex-shader change, costs no extra geometry and no
+extra draw, and is a decent approximation of a round join for a soft-falloff stroke. It does lengthen
+every stroke by one width at each end, which is visible on a *short* isolated segment — the
+`spectrum` `bars` layout is the case to check, since there each element is one short segment and the
+bars would grow by a stroke width at both ends.
+
+The fuller fixes, both more expensive: a real miter join (extra vertices per joint, needs a
+miter-limit rule for near-180-degree turns), or a round join drawn as a disc per interior vertex
+(one extra instanced quad per point, simplest to reason about and the usual choice for a glowing
+stroke).
+
+**ADR-worthy?** Probably not on its own — it is a defect fix inside an existing renderer, not a new
+capability or a rejected-alternative decision. It wants a small plan with a golden-baseline
+re-bless, because *every* line-scene golden moves. Worth noting the re-bless is the main cost here,
+not the shader edit.
