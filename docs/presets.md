@@ -527,8 +527,8 @@ not. There is deliberately **no `log10`**, so convert with `ln(10)`:
 
 Worked against a real measurement: a typical band level is around `0.03`, and
 `log(0.03)` is `-3.5066`, so that expression gives **-30.5 dB**. Silence is the
-edge to respect — `log(0)` is `-inf`, which propagates into a parameter as an
-undefined-looking visual — so floor the input rather than the output:
+edge to respect — `log(0)` is `-inf`, and silence produces it every time the
+music stops — so floor the input rather than the output:
 
 ```
 20 * log(max(bass, 0.0001)) / 2.302585  # floored at -80 dB instead of -inf
@@ -536,6 +536,16 @@ undefined-looking visual — so floor the input rather than the output:
 
 `log` follows `sqrt`'s posture exactly: mathematically honest at the edges
 (`log(0)` = `-inf`, `log(-1)` = `NaN`), with `max` and `select` as the guards.
+
+**What the engine does if you don't floor it.** A non-finite value reaching a
+parameter **snaps** rather than easing: if that parameter is listed in
+`[smoothing]`, the smoother passes the value straight through and keeps no state
+for that frame, so the binding tracks the input again as soon as it is finite.
+It used to be worse — the value poisoned the smoother permanently, and the
+binding stayed dead until you switched presets — which is why flooring the input
+is still the right thing to write. The guard is a floor under the failure, not a
+reason to skip yours: a `-inf` still reaches the scene for as long as the input
+is silent, and what that looks like is the scene's business.
 
 **This does not reach the `spectrum` scene's own element levels.** An expression
 only sees what the grammar exposes, and those levels are scene state computed

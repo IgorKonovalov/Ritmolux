@@ -220,7 +220,24 @@ impl Easing {
     /// A selected constant of `<= 0` (the default) or non-finite, or a
     /// non-positive `dt`, passes `raw` through unchanged. Total and
     /// allocation-free — it runs per element per frame.
+    ///
+    /// **A non-finite `held` or `raw` also passes `raw` through** — a snap,
+    /// which is what a smoother with no valid state should do (Plan 0038
+    /// Phase 9). This is not a theoretical edge: `log(0)` is `-inf` and silence
+    /// produces it every time the music stops, so a `[smoothing]`-listed binding
+    /// reaches this on ordinary material. Without the guard the arithmetic below
+    /// is `-inf + alpha * (-inf - -inf)` = `NaN`, and `NaN` is **absorbing**
+    /// here — `raw > held` is false for every `raw`, so the release branch is
+    /// taken and the state stays `NaN` forever. The binding would be dead for
+    /// the rest of the preset's run, recovering only on a switch.
+    ///
+    /// Both operands are checked because guarding `raw` alone does not fix it:
+    /// a stored `-inf` against a *finite* `raw` selects `attack` and computes
+    /// `-inf + inf`, which is `NaN` on the very next frame.
     pub fn step(self, held: f32, raw: f32, dt: f32) -> f32 {
+        if !held.is_finite() || !raw.is_finite() {
+            return raw;
+        }
         let tau = if raw > held {
             self.attack
         } else {
