@@ -33,7 +33,7 @@ pub mod turtle;
 
 pub use lsystem::LSystemScene;
 pub use parametric::ParametricCurveScene;
-pub use renderer::{LineRenderer, SegmentInstance};
+pub use renderer::{JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
 pub use spectrum::{SpectrumLayout, SpectrumScene};
 pub use star::StarPatternScene;
 
@@ -152,6 +152,9 @@ pub(crate) fn transform_cached(
             b: rot(seg.b),
             color,
             width,
+            // Connectivity is a property of the cached structure, not of this
+            // frame's rotation/scale/colour, so it passes straight through.
+            joined: seg.joined,
         });
     }
 }
@@ -237,6 +240,9 @@ pub(crate) fn replicate_mirror(
                     b: map(seg.b),
                     color: seg.color,
                     width: seg.width,
+                    // A reflected or rotated copy has the same connectivity as
+                    // its source: the geometry moves, the topology does not.
+                    joined: seg.joined,
                 });
             }
         }
@@ -258,6 +264,7 @@ mod tests {
             b,
             color: [0.4, 0.7, 1.0],
             width: 0.01,
+            joined: 0,
         }
     }
 
@@ -394,6 +401,68 @@ mod tests {
                  (dropped 1 segment(s)); reduce the structure or its depth"
             )
         );
+    }
+
+    /// Plan 0039 Phase 1 done-when 4. Replication moves geometry; it does not
+    /// change **topology**. A rotated or reflected copy of a joined chain is
+    /// still a joined chain, so every copy must carry its source's per-endpoint
+    /// flags through verbatim — dropping them would silently reopen the notch on
+    /// every mirrored copy while the un-mirrored original looked correct.
+    #[test]
+    fn the_mirror_carries_the_join_flags_through() {
+        let mut single = vec![
+            seg([0.1, 0.05], [0.4, 0.2]),
+            seg([0.4, 0.2], [0.3, 0.5]),
+            seg([0.3, 0.5], [0.6, 0.45]),
+        ];
+        // A three-segment chain: the interior vertices are joints, the two outer
+        // ends are free — the pattern every chained producer emits.
+        single[0].joined = JOINED_B;
+        single[1].joined = JOINED_A | JOINED_B;
+        single[2].joined = JOINED_A;
+        let expected: Vec<u32> = single.iter().map(|s| s.joined).collect();
+
+        for spec in [
+            MirrorSpec {
+                order: 4,
+                reflect: false,
+            },
+            MirrorSpec {
+                order: 3,
+                reflect: true,
+            },
+        ] {
+            let mut out = Vec::new();
+            let dropped = replicate_mirror(&single, spec, 10_000, &mut out);
+            assert_eq!(dropped, 0, "well under the cap");
+            assert_eq!(out.len(), single.len() * spec.copies());
+            for (i, produced) in out.iter().enumerate() {
+                assert_eq!(
+                    produced.joined,
+                    expected[i % expected.len()],
+                    "{spec:?} copy of segment {} lost its connectivity",
+                    i % expected.len()
+                );
+            }
+        }
+    }
+
+    /// The same claim for the generator scenes' per-frame transform: rotation,
+    /// scale, colour and width are this frame's styling, but connectivity
+    /// belongs to the cached structure and survives untouched.
+    #[test]
+    fn the_cached_transform_carries_the_join_flags_through() {
+        let mut base = vec![seg([0.0, 0.0], [0.3, 0.1]), seg([0.3, 0.1], [0.5, 0.4])];
+        base[0].joined = JOINED_B;
+        base[1].joined = JOINED_A;
+
+        let mut out = Vec::new();
+        transform_cached(&base, 0.7, 1.4, [0.2, 0.9, 0.3], 0.02, 1.0, &mut out);
+        assert_eq!(out.len(), base.len());
+        for (produced, source) in out.iter().zip(&base) {
+            assert_eq!(produced.joined, source.joined);
+            assert_ne!(produced.color, source.color, "styling still applies");
+        }
     }
 
     /// Reflection doubles the copy count and stays rotationally symmetric.

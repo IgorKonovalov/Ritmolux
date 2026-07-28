@@ -355,6 +355,10 @@ pub(crate) fn build(
                     b: turn([x, place.baseline + length]),
                     color: color_of(i),
                     width: width_of(i),
+                    // Isolated: one segment per element, both ends free. Bars
+                    // must keep exactly their previous geometry, or a bar would
+                    // hang below `baseline` and break the centre-mirror.
+                    joined: 0,
                 });
             }
         }
@@ -378,6 +382,7 @@ pub(crate) fn build(
                     b: next,
                     color: color_of(i),
                     width: width_of(i),
+                    joined: 0,
                 });
                 prev = next;
             }
@@ -397,6 +402,9 @@ pub(crate) fn build(
                     b: [c * outer, s * outer],
                     color: color_of(i),
                     width: width_of(i),
+                    // Isolated, like the bars: a spoke that extended inward
+                    // would grow through `radius` and fill the inner circle.
+                    joined: 0,
                 });
             }
         }
@@ -1415,6 +1423,7 @@ mod tests {
                 b: [9.0, 9.0],
                 color: [1.0, 1.0, 1.0],
                 width: 1.0,
+                joined: 0,
             }];
             build(layout, &none, &[], &[], Placement::default(), &mut out);
             assert!(out.is_empty(), "{layout:?}: no elements, no segments");
