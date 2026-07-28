@@ -42,7 +42,8 @@ use lmv_core::audio::AudioFormat;
 use lmv_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
 use lmv_core::preset::{Preset, SystemKind, default_presets, load_dir};
 use lmv_core::render::metrics::{
-    StepResponse, coverage, frame_diff, quadrant_spread, step_response, struct_diff,
+    StepResponse, coverage, frame_diff, quadrant_spread, segment_settled, step_response,
+    struct_diff,
 };
 use lmv_core::render::{CaptureImage, HeadlessOptions, Renderer};
 use standalone::shot::args::{BandLevels, apply_set, band_levels, parse_size, synth_signal};
@@ -553,20 +554,38 @@ const PROBE_PRE: usize = 6;
 /// Frames held on each side of the step. The rise and fall windows are the
 /// **same length** on purpose (see `step_response`): each is normalized against
 /// its own final frame, so unequal windows would give the two directions
-/// different truncation bias and a symmetric ease would not read as symmetric.
+/// different truncation bias.
 ///
-/// 48 frames is 0.8 s. A release constant longer than about 0.35 s does not
-/// fully settle inside it and reads **clamped** rather than measured — the
-/// asymmetry still shows, the magnitude understates. Lengthening this is a
-/// direct multiplier on the report's wall clock.
+/// **48 frames is 0.8 s, and a great many presets do not settle inside it.**
+/// This comment used to say such a response "reads *clamped* rather than
+/// measured — the asymmetry still shows, the magnitude understates", and every
+/// clause of that was wrong (corrected by Plan 0038 Phase 8). Nothing is
+/// clamped: `frames_to_settle` normalizes against the segment's own last frame,
+/// so a still-travelling response supplies a short total, crosses every
+/// threshold early, and returns a **plausible smaller number** with no signal
+/// that anything went wrong. The bias is uneven across thresholds, so the shape
+/// is distorted toward *even* as well — which is how a truncated window once
+/// falsified an ADR here.
+///
+/// The arithmetic: staying inside [`PROBE_SETTLE_TOL`] needs about
+/// `0.8 / ln(50)` — a release above roughly **0.2 s** is already truncated, and
+/// most of the `{ attack, release }` pairs in the shipped set are well above it.
+///
+/// Lengthening this is a direct multiplier on the report's wall clock, so the
+/// fix is not a wider window — it is that a truncated cell is **marked** rather
+/// than published bare. See [`probe_response`].
 const PROBE_WINDOW: usize = 48;
+
+/// Fraction of a segment's travel that may still be unfinished at its last frame
+/// before its transient cell is marked. Matches the easing suite's own gate.
+const PROBE_SETTLE_TOL: f32 = 0.02;
 
 struct PresetReport {
     name: String,
     reactivity: [f32; 4], // bass, mid, treb, onset
     animation: f32,
     coverage: f32,
-    transient: StepResponse,
+    transient: Transient,
 }
 
 struct FamilyReport {
@@ -653,9 +672,14 @@ fn build_family_report(
             reactivity,
             animation,
             coverage: cov,
-            transient: transients.get(index).copied().unwrap_or(StepResponse {
-                rise_frames: 0,
-                fall_frames: 0,
+            transient: transients.get(index).copied().unwrap_or(Transient {
+                response: StepResponse {
+                    rise_frames: 0,
+                    fall_frames: 0,
+                },
+                // A probe that never ran is not a settled measurement.
+                rise_settled: false,
+                fall_settled: false,
             }),
         });
         fixed_caps.push(fixed);
@@ -758,16 +782,56 @@ fn step_stimulus() -> Vec<AnalysisFrame> {
     frames
 }
 
+/// A transient measurement together with whether each direction actually
+/// arrived anywhere inside its window (Plan 0038 Phase 8).
+///
+/// The two booleans are not decoration. `frames_to_settle` normalizes against
+/// its segment's own last frame, so it *always* answers inside the segment and
+/// its output carries no evidence about its own validity — a truncated response
+/// and a settled one are indistinguishable from the number alone. Only
+/// `segment_settled` can tell them apart, which is why an unmarked cell is a
+/// claim this report was not previously entitled to make.
+#[derive(Clone, Copy)]
+struct Transient {
+    response: StepResponse,
+    rise_settled: bool,
+    fall_settled: bool,
+}
+
 /// Measure a probe capture. Each segment starts at the last frame *before* its
 /// step, which is the settled state the response departs from.
-fn probe_response(images: &[CaptureImage]) -> StepResponse {
+fn probe_response(images: &[CaptureImage]) -> Transient {
     let rise = images
         .get(PROBE_PRE - 1..PROBE_PRE + PROBE_WINDOW)
         .unwrap_or_default();
     let fall = images
         .get(PROBE_PRE + PROBE_WINDOW - 1..PROBE_PRE + 2 * PROBE_WINDOW)
         .unwrap_or_default();
-    step_response(rise, fall)
+    Transient {
+        response: step_response(rise, fall),
+        rise_settled: segment_settled(rise, PROBE_SETTLE_TOL),
+        fall_settled: segment_settled(fall, PROBE_SETTLE_TOL),
+    }
+}
+
+/// One transient cell: the frame count, suffixed `+` when `segment_settled`
+/// could not certify the response arrived. Read a marked cell as *at least this
+/// many*, never as a measurement.
+///
+/// **Most of the shipped set marks, for two different reasons the suffix cannot
+/// tell apart** (measured, Plan 0038 Phase 8). Either the response outran the
+/// 0.8 s window — a release above ~0.2 s does — or, far more commonly here, the
+/// scene never stops moving, so there is no asymptote to settle to and
+/// `segment_settled` correctly declines to certify one. The second is the same
+/// limitation `docs/capturing.md` already documents as "the scene's own motion is
+/// measured too"; the mark makes it visible per cell instead of leaving it as a
+/// caveat the reader has to remember.
+fn transient_cell(frames: u32, settled: bool) -> String {
+    if settled {
+        frames.to_string()
+    } else {
+        format!("{frames}+")
+    }
 }
 
 fn loud_frame() -> AnalysisFrame {
@@ -816,8 +880,23 @@ fn print_text_report(source: &str, reports: &[FamilyReport]) {
                 p.reactivity[3],
                 p.animation,
                 p.coverage,
-                p.transient.rise_frames,
-                p.transient.fall_frames,
+                transient_cell(p.transient.response.rise_frames, p.transient.rise_settled),
+                transient_cell(p.transient.response.fall_frames, p.transient.fall_settled),
+            );
+        }
+        let marked = fam
+            .presets
+            .iter()
+            .filter(|p| !p.transient.rise_settled || !p.transient.fall_settled)
+            .count();
+        if marked > 0 {
+            println!(
+                "  {marked} of {} presets carry a `+` transient cell: not a settled \
+                 measurement, so read it as a lower bound. Two causes, and the mark \
+                 does not distinguish them — the response outran the \
+                 {PROBE_WINDOW}-frame window, or the scene's own motion means it has \
+                 no asymptote to settle to at all",
+                fam.presets.len()
             );
         }
         if fam.near_dups.is_empty() {
@@ -863,9 +942,11 @@ fn render_json(source: &str, reports: &[FamilyReport]) -> String {
             out.push_str(&format!(
                 "\"transient\":{}",
                 json_transient(
-                    p.transient.rise_frames,
-                    p.transient.fall_frames,
-                    p.transient.ratio()
+                    p.transient.response.rise_frames,
+                    p.transient.response.fall_frames,
+                    p.transient.response.ratio(),
+                    p.transient.rise_settled,
+                    p.transient.fall_settled,
                 )
             ));
             out.push('}');

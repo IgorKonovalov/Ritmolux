@@ -41,10 +41,29 @@ const SIZE: u32 = 96;
 const PRE: usize = 12;
 /// Frames held on each side of the step. The rise and fall windows are the
 /// **same length** on purpose: each is normalized against its own final frame,
-/// so unequal windows would give the two directions different truncation bias
-/// and a symmetric ease would not measure as symmetric. 96 frames is 1.6 s, over
-/// three time constants of the slowest constant either fixture uses.
-const WINDOW: usize = 96;
+/// so unequal windows would give the two directions different truncation bias.
+///
+/// **180 frames is 3 s, and the previous 96 was not enough** (Plan 0038 Phase 8).
+/// The slowest constant either fixture uses is `easing_asymmetric`'s
+/// `release = 0.5`, and 1.6 s of window is only 3.2 τ — a **4.1 %** residual,
+/// twice [`SETTLE_TOL`]. That truncation was live: the asymmetric fall measured
+/// **61** frames where the settled answer is `-0.5·ln(0.1)` = 1.151 s ≈ **69**,
+/// which is the number its own fixture header predicts. 3 s is 6 τ, a 0.25 %
+/// residual — the margin the scalar arm (`0.25`, 12 τ) always had.
+///
+/// Do not shorten this back without checking `segment_settled` still passes on
+/// both arms; the guard that used to sit here could not have told you.
+const WINDOW: usize = 180;
+
+/// Fraction of a segment's travel that may remain unfinished at its last frame
+/// before the measurement is refused (Plan 0038 Phase 7). Two percent is well
+/// inside the pixel quantum at these sizes and far outside the ~20-45 %
+/// truncation that produced Phase 3's original numbers.
+///
+/// **Gates every probe in this file**, not just the curve one — Phase 8 found
+/// the shared probe above was itself truncated, and nothing in the file could
+/// have said so.
+const SETTLE_TOL: f32 = 0.02;
 
 const SCALAR: &str = include_str!("fixtures/easing_scalar.toml");
 const ASYMMETRIC: &str = include_str!("fixtures/easing_asymmetric.toml");
@@ -157,7 +176,7 @@ fn a_scalar_smoothing_entry_measures_symmetric_and_an_asymmetric_one_does_not() 
     };
 
     let (scalar, scalar_imgs) = probe(&mut r, SCALAR);
-    let (asym, _) = probe(&mut r, ASYMMETRIC);
+    let (asym, asym_imgs) = probe(&mut r, ASYMMETRIC);
     println!(
         "scalar     rise {:>3} fall {:>3} ratio {:.2}",
         scalar.rise_frames,
@@ -180,17 +199,29 @@ fn a_scalar_smoothing_entry_measures_symmetric_and_an_asymmetric_one_does_not() 
         "the step barely changed the frame ({travel:.4}) — the fixture is not \
          responding to the stimulus and the ratios below are meaningless"
     );
-    for (label, r) in [("scalar", scalar), ("asymmetric", asym)] {
+    for (label, r, imgs) in [
+        ("scalar", scalar, &scalar_imgs),
+        ("asymmetric", asym, &asym_imgs),
+    ] {
         assert!(
             r.rise_frames > 0 && r.fall_frames > 0,
             "{label} reported no transient at all: {r:?}"
         );
-        assert!(
-            r.fall_frames < WINDOW as u32,
-            "{label} never settled inside the {WINDOW}-frame window: {r:?} — the \
-             window is too short for its release constant, so the measurement is \
-             clamped rather than measured"
-        );
+        // Plan 0038 Phase 8. This replaces a `fall_frames < WINDOW` guard that
+        // could never fire: `frames_to_settle` normalizes against the segment's
+        // own last frame, so it always answers inside the segment and that
+        // comparison was a tautology (Phase 7). The real question is whether the
+        // last frame had arrived anywhere, and only `segment_settled` asks it.
+        let (rise, fall) = segments(imgs);
+        for (dir, seg) in [("rise", rise), ("fall", fall)] {
+            assert!(
+                segment_settled(seg, SETTLE_TOL),
+                "{label} {dir}: still travelling at the end of its {WINDOW}-frame \
+                 window, so `frames_to_settle` normalized against a moving target \
+                 and returned a plausible but short count ({r:?}). Widen `WINDOW` \
+                 — the numbers below are not measurements until this passes"
+            );
+        }
     }
 
     // --- The property. A scalar entry selects one constant in both directions,
@@ -368,12 +399,6 @@ fn fall_evenness(fall: &[CaptureImage]) -> f32 {
 const CURVE_PRE: usize = 12;
 const CURVE_RISE: usize = 96;
 const CURVE_FALL: usize = 600;
-
-/// Fraction of a segment's travel that may remain unfinished at its last frame
-/// before the measurement is refused. Two percent is well inside the pixel
-/// quantum at these sizes and far outside the ~20-45 % truncation that produced
-/// Plan 0038 Phase 3's original numbers.
-const SETTLE_TOL: f32 = 0.02;
 
 /// `CURVE_PRE` frames of silence, `CURVE_RISE` held loud, `CURVE_FALL` silent.
 fn curve_stimulus() -> Vec<AnalysisFrame> {

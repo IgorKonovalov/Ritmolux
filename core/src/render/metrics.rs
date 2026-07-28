@@ -147,8 +147,19 @@ impl StepResponse {
 ///
 /// Both segments should be the **same length**, because each is normalized
 /// against its own final frame: a segment that has not fully settled
-/// underestimates the total change and so settles early, and only equal windows
-/// make that bias cancel in [`StepResponse::ratio`].
+/// underestimates the total change and so settles early.
+///
+/// **Equal windows do not make that bias cancel, and this comment used to claim
+/// they did** (corrected by Plan 0038 Phase 8). Cancellation would need both
+/// directions to be truncated by the same fraction, which is exactly what an
+/// `{ attack, release }` pair is built not to do: at `attack = 0.02` against a
+/// `release = 0.5` the rise finishes in 80 τ and carries **no** bias at all, so
+/// the fall's has nothing to cancel against and passes straight into
+/// [`StepResponse::ratio`]. That is not hypothetical — it is how this repo's own
+/// asymmetric probe reported a fall of 61 frames where the settled answer is 69.
+///
+/// Equal windows remain the right default. They are just not a guarantee:
+/// **gate on [`segment_settled`] before trusting either number.**
 pub fn step_response(rise: &[CaptureImage], fall: &[CaptureImage]) -> StepResponse {
     StepResponse {
         rise_frames: frames_to_settle(rise, SETTLE_FRAC),

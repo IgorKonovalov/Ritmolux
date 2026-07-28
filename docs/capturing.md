@@ -139,7 +139,7 @@ it summarises), so the report's numbers are real for a spectrum preset.
 | `bass` `mid` `treb` `onset` | how far the frame moves when that stimulus alone comes up, against silence — "does this preset respond to bass at all" |
 | `anim` | how far the frame moves between two capture depths **under silence** — does it have a life of its own |
 | `cover` | fraction of the frame that differs from the corner background — [a low value is often correct](#a-low-cover-is-not-a-defect) |
-| `rise` `fall` | the **transient probe** (below) — frames to settle after a step up, and after the matching step down; [read them as evidence, not a verdict](#what-the-transient-columns-cannot-see) |
+| `rise` `fall` | the **transient probe** (below) — frames to settle after a step up, and after the matching step down; a **`+` suffix** means the value is a *lower bound*, not a measurement (below); [read them as evidence, not a verdict](#what-the-transient-columns-cannot-see) |
 
 Every one of those but the last two is a **settled** measurement: the capture
 holds one stimulus for every frame it renders, so each smoother has converged
@@ -198,6 +198,16 @@ not a figure anyone maintains — presets carrying at least one
 reads `26 / 31` where a purpose-built near-linear fixture at a 0.5 s release reads
 `3 / 61`.
 
+> **Those numbers were taken before the `+` marker existed, and every one of them
+> would carry it today** (Plan 0038 Phase 8). They were produced by exactly the
+> defect this section goes on to describe: at `PROBE_WINDOW` = 48 a 0.60 s release
+> is 1.33 τ, leaving ~26 % of the travel undone, and the fixture's `3 / 61` is now
+> known to be `3 / 69` when measured to settlement. Read the snapshot for its
+> *shape* — two populations, separated directionally, magnitude lost — and not for
+> its magnitudes, which is the same warning the rest of this section gives, now
+> with the arithmetic behind it. It has not been re-taken: re-snapshotting is not
+> what makes the columns trustworthy, marking them is.
+
 **Read the columns as evidence, not as a verdict.** A wide `fall / rise` gap is
 good evidence the easing is working. A narrow one is not evidence it is broken.
 The place easing is proven is `core/tests/easing.rs`, against fixtures built to
@@ -232,6 +242,23 @@ within `tol` of the asymptote. Sample widely rather than from the end: captures
 are 8-bit, and a response slow enough to outrun its window moves by *less than one
 code value per frame* near the end, so adjacent frames decode as identical and
 read as settled exactly when they are not.
+
+**So `--report` marks rather than pretends** (Plan 0038 Phase 8). A transient cell
+carries a **`+`** when `segment_settled` cannot certify the response arrived —
+`61+` means *at least 61 frames*, never 61. Each family's table then names how
+many of its presets marked. `--json` carries the same fact as `rise_settled` and
+`fall_settled` booleans, so a consumer reading only the counts cannot mistake a
+truncated response for a settled one.
+
+**Expect most of the shipped set to mark, and for two different reasons the
+suffix does not separate.** One is the window, above. The other is far more
+common here and is not a defect in the probe at all: a scene whose own motion
+never stops — a fragment field's fold, a feedback trail, a particle cloud — has
+**no asymptote to settle to**, so `segment_settled` correctly declines to certify
+one. That is the same limitation this page already describes as "the scene's own
+motion is measured too"; the mark just moves it from a caveat you have to remember
+into the cell itself. A preset whose cells are *unmarked* is the interesting case:
+it means the number is a measurement.
 
 Widening the `--report` window does not fix that table's *separation* problem,
 which is a different thing — measured at 96 frames the scalar-only median got
@@ -470,7 +497,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
 | `background_composite` | HARD (**hardware only**) | RD / attractor presents alpha-blend over the `bg_*` backdrop; **skipped** on a software adapter, which mis-renders that pipeline set |
 | `transition` | HARD | every switch path (cycle **and** select) renders intermediate blended frames as a ramp, reproducibly from the injected `dt`; each blend kind shows its own signature; a switch arriving mid-dissolve lands on the last index requested; a hot-reload mid-dissolve cancels cleanly; the heavy attractor ↔ reaction-diffusion pair dissolves on the freeze fallback (set `LMV_TRANSITION_STRIP=<dir>` to also dump filmstrips) |
-| `easing` | HARD | `[smoothing]` is observable: a scalar entry measures symmetric and an `{ attack, release }` pair does not, against purpose-built near-linear fixtures ([ADR-0039](adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md)). Also measures the `spectrum` `curve`↔easing **ordering** both ways round through one renderer — every frame count there is gated on `segment_settled` first, because a window shorter than the response is what falsified the wrong thing once already |
+| `easing` | HARD | `[smoothing]` is observable: a scalar entry measures symmetric and an `{ attack, release }` pair does not, against purpose-built near-linear fixtures ([ADR-0039](adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md)). Also measures the `spectrum` `curve`↔easing **ordering** both ways round through one renderer — **every** frame count in the suite is gated on `segment_settled` first — the shared probe's window is 180 frames (3 s, 6 τ) because at 96 its own asymmetric arm was truncated, reading 61 where the settled answer is 69 |
 | `preset` | HARD | the expression evaluator and TOML schema: exact values, rejection without panic, **zero allocation** per eval, and the `PARAMS` ↔ `set_param` drift guard |
 | `dsp` / `ffi` / `hygiene` | HARD | known-signal analysis fixtures; the C ABI across the boundary; the hot-path panic pragma + exact dependency pinning |
 
