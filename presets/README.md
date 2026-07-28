@@ -89,7 +89,28 @@ so a very large window resolves the attractor alone slightly finer.
 
 ### Line-art parameter notes (Plan 0010)
 
+**Strokes join at their interior vertices** (Plan 0039,
+[ADR-0041](../docs/adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)).
+A line scene builds its figure as a list of segments, but a *connected* run of
+them renders as one continuous stroke: where the stroke turns, the quads either
+side of the vertex overlap instead of leaving the wedge of background they used
+to. There is no parameter for this and it is not authorable — each scene declares
+its own connectivity, so a genuinely separate segment keeps its exact ends and
+does not grow. A `spectrum` bar still stands exactly on `baseline`, a radial
+spoke still starts exactly on `radius`, and an L-system branch still begins where
+it begins.
+
+Two things follow for authoring. **A thin stroke is a real option now**: the dark
+tick that used to cross every vertex scaled with `thickness`, so a figure with
+sharp turns — a `polyline` spectrum above all — had to be drawn heavy to hide it,
+and that constraint is gone. And **a very sharp turn reads slightly bright**
+rather than broken, since the two overlapping quads add under the additive blend.
+That is the trade ADR-0041 took in place of a miter limit; it is far less visible
+than the gap it replaced, but if a near-reversal is meant to read as a fine point
+rather than a bead, soften the turn rather than the stroke.
+
 - `thickness` — stroke weight (roughly 1–5); scaled to a projector-friendly glow.
+  Pick it for the weight you want: it no longer trades against a joint artifact.
 - `glow` — the line renderer's **per-segment falloff** multiplier, default `1.0`
   (exactly what these scenes drew before it was bindable), whole-figure on all
   four. It scales the shader's core-to-edge term straight into the stroke colour:
