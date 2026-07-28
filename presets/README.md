@@ -107,7 +107,12 @@ and that constraint is gone. And **a very sharp turn reads slightly bright**
 rather than broken, since the two overlapping quads add under the additive blend.
 That is the trade ADR-0041 took in place of a miter limit; it is far less visible
 than the gap it replaced, but if a near-reversal is meant to read as a fine point
-rather than a bead, soften the turn rather than the stroke.
+rather than a bead, soften the turn rather than the stroke. On `star_pattern` the
+turn is `[generator] contact_angle_deg`, not a `[params]` binding: a low angle
+makes the outer points sharper, so their studs tighten and the point blunts by
+about a half-width. The bead is most distinct in the middle of the range, where
+the two strokes leave the vertex far enough apart to overlap in a compact spot
+instead of along the whole point.
 
 - `thickness` — stroke weight (roughly 1–5); scaled to a projector-friendly glow.
   Pick it for the weight you want: it no longer trades against a joint artifact.
