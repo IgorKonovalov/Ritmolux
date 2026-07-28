@@ -1,6 +1,20 @@
 # 0038 — The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log`
 
-> **Status:** in-progress
+> **Status:** done — **closed 2026-07-28** after a Mode 4 review in a fresh session.
+> All nine phases landed: `a1c67f4` (`glow`), `f3945be` (`span`/`baseline`), `c9121fd` (`curve`),
+> `e31ae88` (`log`), `a3f5d04` (the doc sweep), `9739232` (the settle gate), `4863bdd` (the marked
+> transient cell), `9a62754` (the non-finite guard), plus `8e84acf` + `ea781d0` (Phase 6, the
+> `preset-author` adoption pass). **Verdict: no blockers; one major, five minors, two nits** — the
+> major and three minors fixed in the close commit. Verified rather than taken on trust: `fmt
+> --check` + `clippy --workspace --all-targets -D warnings` clean, `nextest --workspace`
+> **273/273, 0 skipped**, `core/tests/golden/` **byte-untouched**, and `ffi.rs` / `scenes/mod.rs` /
+> all four manifests untouched (**C ABI stays v4**, `Scene` unchanged, no new dependency).
+> Both new guards reproduced non-vacuously at review: reverting `WINDOW` to 96 fails the shared
+> probe on the asymmetric fall *only*, printing exactly the predicted `61`; deleting the
+> `Easing::step` finite check fails `a_non_finite_value_cannot_poison_a_smoother_permanently`.
+> **Backlog 0016, 0017, 0018 and 0019 all close here**;
+> [0021](../design-backlog.md), [0022](../design-backlog.md) and [0023](../design-backlog.md) route
+> onward, the last into [Plan 0039](../plans/0039-line-joins.md).
 > **Created:** 2026-07-27
 > **Approved:** 2026-07-27 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human

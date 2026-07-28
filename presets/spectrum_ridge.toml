@@ -34,7 +34,7 @@ name = "aurora"
 # THE RESTING CONTOUR, and it is much lower than it used to be (was 0.55 +/-
 # 0.20). With the pair now mirrored about the axis, `base` is the HALF-GAP
 # between the two contours: at 0.55 they sat 1.1 world units apart with a dead
-# void between them. At 0.14 they share a foot line and read as one figure
+# void between them. At 0.12 they share a foot line and read as one figure
 # opening and closing, which is the whole point of the mirror.
 base  = "0.12 + sin(time * 1.3) * 0.12"
 
@@ -43,12 +43,19 @@ base  = "0.12 + sin(time * 1.3) * 0.12"
 # CONTOUR that matters more than on the comb, because a flat run of stubs is a
 # straight line and carries no shape at all.
 #
-# The retune, with the arithmetic (Plan 0038 asks for the factor). At curve 0.55
-# a typical quiet level of 0.03 becomes 0.03^0.55 = 0.145, a 4.9x boost, while a
-# loud element at 0.30 becomes 0.516, only 1.7x. That gap IS the compression.
-# `scale` drops 2.2 -> 0.80, a 2.75x cut, which nets the quiet elements about
-# 1.8x taller and the peak about 0.6x - legible low end, peak still inside the
-# frame. Timing is untouched: the easing runs on the curved value, so the
+# The retune, with the arithmetic (Plan 0038 asks for the factor). Measured
+# against `shot --signal dynamic:110`, where mid and treb mean 0.006 and bass
+# means 0.040 with a 0.106 peak: at curve 0.85 a quiet 0.006 becomes 0.0129, a
+# 2.2x boost, while a loud 0.106 becomes 0.148, only 1.4x. That gap IS the
+# compression.
+#
+# `scale` moves the OPPOSITE way from the docs' worked example - 2.2 -> 4.50, a
+# 2.05x rise rather than a cut - and the reason is `base`, not the curve. Putting
+# the feet on the axis dropped the floor from 0.55 to 0.12, so the audio term now
+# has to carry the height that constant used to. The curve on its own would have
+# asked for a cut; the floor asked for more than the curve gave back.
+#
+# Timing is untouched either way: the easing runs on the curved value, so the
 # `release` above means the same duration at any curve (ADR-0040).
 scale = "4.50"
 curve = "0.85"
