@@ -1,0 +1,24 @@
+# PROBE FIXTURE (Plan 0038 Phase 3, ADR-0040) - do not tune.
+# The curve-then-ease arm: a non-unit `curve` AND a non-instant [spectrum]
+# smoothing, so the smoother eases the already-compressed level. This is what
+# the engine does; the arm it is measured against is spectrum_curve_instant.toml,
+# which must stay its twin apart from `name` and the `smoothing` key.
+#
+# Every param is a constant and no `time` term appears anywhere, so the only
+# thing moving the pixels is the band array the stimulus supplies. `base = 0`
+# maximises the travel the probe measures: silence draws nothing at all.
+system = "spectrum"
+name   = "fixture_spectrum_curve_eased"
+
+[params]
+base       = "0.0"
+scale      = "1.0"
+curve      = "0.5"
+thickness  = "6"
+hue        = "0.55"
+brightness = "0.9"
+
+[spectrum]
+elements  = 24
+layout    = "bars"
+smoothing = { attack = 0.02, release = 0.5 }

@@ -1,0 +1,24 @@
+# PROBE FIXTURE (Plan 0038 Phase 3, ADR-0040) - do not tune.
+# The ease-then-curve arm, and the reason it can be measured at all: with
+# [spectrum] smoothing absent the scene's easing is INSTANT, so the drawn length
+# is `curve(input)` with no smoother in between. Feed it a stimulus whose bands
+# have ALREADY been eased on the CPU and the pixels show `curve(ease(raw))` -
+# the ordering ADR-0040 rejected - through the same renderer as the other arm.
+#
+# Twin of spectrum_curve_eased.toml apart from `name` and the `smoothing` key;
+# a test asserts that, because two arms that drifted apart would be comparing
+# two scenes rather than two orderings.
+system = "spectrum"
+name   = "fixture_spectrum_curve_instant"
+
+[params]
+base       = "0.0"
+scale      = "1.0"
+curve      = "0.5"
+thickness  = "6"
+hue        = "0.55"
+brightness = "0.9"
+
+[spectrum]
+elements  = 24
+layout    = "bars"

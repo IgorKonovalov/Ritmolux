@@ -34,6 +34,10 @@
 //!   `spectrum` palette is that same cosine, so an author who sets no `[palette]`
 //!   sees the engine's usual colour language.
 //! - `thickness` / `brightness` / `scale` / `base` — ordinary stroke styling.
+//! - `curve` — the level-shaping exponent (ADR-0040, Plan 0038 Phase 3), applied
+//!   to the downsampled level **before** the per-element smoother so the easing
+//!   operates in the displayed domain. `1.0` is exactly linear. It is the third
+//!   per-element lever on an element's length, beside `base` and `scale`.
 //! - `glow` — the line renderer's per-segment falloff multiplier (Plan 0038),
 //!   whole-figure like on the other three line scenes. Not a post bloom.
 //!
@@ -122,6 +126,22 @@ const DEFAULT_SPAN: f32 = 1.0;
 /// frame centre, while one standing at `-0.85` throws its copy against the top
 /// edge (design-backlog 0018).
 const DEFAULT_BASELINE: f32 = -0.85;
+/// Level-shaping exponent ([ADR-0040](../../../../../docs/adrs/0040-spectrum-level-curve-applies-before-the-easing.md)).
+/// `1.0` is exactly linear — `powf(x, 1.0) == x`, the map this scene had before
+/// Plan 0038 Phase 3 — `0.5` is a square root, and lower values compress harder.
+///
+/// It applies to the **downsampled level, before the per-element smoother**, so
+/// `[spectrum] smoothing` eases the displayed quantity the way meter ballistics
+/// do. That ordering is the ADR's whole content; see [`curve_level`].
+const DEFAULT_CURVE: f32 = 1.0;
+/// The range [`curve_level`] clamps the exponent into before the `powf`.
+///
+/// **Totality is part of ADR-0040's decision, not an implementation detail.**
+/// This runs per element per frame on the render path, where a `NaN` or an
+/// infinite length must not reach the geometry. A floor strictly above zero is
+/// what rules out `pow(0, 0)` and `pow(0, -1)` for every author expression.
+const CURVE_MIN: f32 = 0.05;
+const CURVE_MAX: f32 = 4.0;
 const DEFAULT_ROTATION: f32 = 0.0;
 // Shared view transform (ADR-0018): identity by default.
 const DEFAULT_ZOOM: f32 = 1.0;
@@ -135,6 +155,7 @@ const DEFAULT_MIRROR_REFLECT: f32 = 0.0;
 pub const PARAMS: &[&str] = &[
     "base",
     "scale",
+    "curve",
     "radius",
     "span",
     "baseline",
@@ -222,12 +243,17 @@ impl Default for Placement {
 ///
 /// **Index order matches the `SERIES_*` constants below** — the two are read
 /// together by `set_param_series` and `update`.
-const SERIES_PARAMS: [&str; 5] = ["base", "scale", "thickness", "brightness", "hue"];
+const SERIES_PARAMS: [&str; 6] = ["base", "scale", "curve", "thickness", "brightness", "hue"];
 const SERIES_BASE: usize = 0;
 const SERIES_SCALE: usize = 1;
-const SERIES_THICKNESS: usize = 2;
-const SERIES_BRIGHTNESS: usize = 3;
-const SERIES_HUE: usize = 4;
+/// `curve` sits with `base` and `scale` because it is the third lever on an
+/// element's *length*, and per-element is a shape ADR-0040 names explicitly
+/// ("walk it per element with `index`") — a series aimed at it has to reach the
+/// elements rather than degrade to its `index = 0` value.
+const SERIES_CURVE: usize = 2;
+const SERIES_THICKNESS: usize = 3;
+const SERIES_BRIGHTNESS: usize = 4;
+const SERIES_HUE: usize = 5;
 
 /// Reduce the engine's band array to `levels.len()` elements by **averaging each
 /// element's own contiguous slice of bands**.
@@ -257,6 +283,33 @@ pub(crate) fn downsample(spectrum: &[f32], levels: &mut [f32]) {
             slice.iter().sum::<f32>() / slice.len() as f32
         };
     }
+}
+
+/// Shape a raw downsampled level by the exponent `curve` — ADR-0040's decision,
+/// and the step that runs **before** the per-element smoother.
+///
+/// Audio level is perceptually logarithmic, so the linear map this scene had
+/// spent most of its range on the loudest element. `curve = 1.0` is exactly the
+/// identity, which is what lets the default leave every existing preset and
+/// every golden baseline unchanged.
+///
+/// **Total by construction**, because it runs per element per frame on the
+/// render path and no author guard stands between an expression and this call:
+///
+/// - the level is floored at `0` — `f32::max` returns the non-`NaN` operand, so
+///   a `NaN` level floors to `0` too, and a negative one can never become a
+///   fractional power of a negative base;
+/// - the exponent is clamped into `[CURVE_MIN, CURVE_MAX]`, a range that
+///   excludes `0`, so neither `pow(0, 0)` nor `pow(0, -1)` is reachable. `NaN`
+///   has no clamped image (`f32::clamp` propagates it), so it is mapped to the
+///   linear default rather than allowed through.
+pub(crate) fn curve_level(level: f32, curve: f32) -> f32 {
+    let exponent = if curve.is_nan() {
+        DEFAULT_CURVE
+    } else {
+        curve.clamp(CURVE_MIN, CURVE_MAX)
+    };
+    level.max(0.0).powf(exponent)
 }
 
 /// The world-space length an element reaches, `base + scale * level`, floored at
@@ -400,6 +453,7 @@ pub struct SpectrumScene {
     glow: f32,
     scale: f32,
     base: f32,
+    curve: f32,
     radius: f32,
     span: f32,
     baseline: f32,
@@ -443,6 +497,7 @@ impl SpectrumScene {
             glow: DEFAULT_GLOW,
             scale: DEFAULT_SCALE,
             base: DEFAULT_BASE,
+            curve: DEFAULT_CURVE,
             radius: DEFAULT_RADIUS,
             span: DEFAULT_SPAN,
             baseline: DEFAULT_BASELINE,
@@ -512,6 +567,7 @@ impl Scene for SpectrumScene {
         self.glow = DEFAULT_GLOW;
         self.scale = DEFAULT_SCALE;
         self.base = DEFAULT_BASE;
+        self.curve = DEFAULT_CURVE;
         self.radius = DEFAULT_RADIUS;
         self.span = DEFAULT_SPAN;
         self.baseline = DEFAULT_BASELINE;
@@ -531,6 +587,7 @@ impl Scene for SpectrumScene {
         match name {
             "base" => self.base = value,
             "scale" => self.scale = value,
+            "curve" => self.curve = value,
             "radius" => self.radius = value,
             "span" => self.span = value,
             "baseline" => self.baseline = value,
@@ -612,12 +669,26 @@ impl Scene for SpectrumScene {
 
     fn update(&mut self, frame: &AnalysisFrame) {
         downsample(&frame.spectrum, &mut self.raw_levels);
-        // Per-element temporal easing on the injected real `dt`, through the same
-        // `Easing` the `[smoothing]` table uses (ADR-0035) — so "0.2 seconds"
-        // means the same thing here as on a binding, at any frame rate. The
-        // default is `INSTANT`, which passes the raw level straight through.
-        for (held, &raw) in self.levels.iter_mut().zip(self.raw_levels.iter()) {
-            *held = self.easing.step(*held, raw, self.dt);
+        // `downsample -> curve -> ease`, in that order, which is ADR-0040's
+        // decision and not an incidental arrangement of two lines: the smoother
+        // operates on the **curved** value, so `[spectrum] smoothing` eases the
+        // displayed quantity the way analog meter ballistics do and a slow
+        // `release` reads as a perceptually even fall. Easing first instead would
+        // make a decaying element drop fast through the top of its travel and
+        // then crawl through the bottom.
+        //
+        // The easing itself is per element on the injected real `dt`, through the
+        // same `Easing` the `[smoothing]` table uses (ADR-0035) — so "0.2
+        // seconds" means the same thing here as on a binding, at any frame rate.
+        // The default is `INSTANT`, which passes the curved level straight
+        // through, and the default `curve` is `1.0`, which is the identity.
+        let (easing, dt) = (self.easing, self.dt);
+        for i in 0..self.levels.len() {
+            let raw = self.raw_levels.get(i).copied().unwrap_or(0.0);
+            let shaped = curve_level(raw, self.series_value(SERIES_CURVE, i, self.curve));
+            if let Some(held) = self.levels.get_mut(i) {
+                *held = easing.step(*held, shaped, dt);
+            }
         }
 
         // Per-element geometry and colour. Each scalar below reads its own series
@@ -903,6 +974,160 @@ mod tests {
         // And a level can never pull an element below its baseline, whatever a
         // degenerate `scale` does.
         assert_eq!(element_length(1.0, 0.0, -5.0), 0.0, "length floors at zero");
+    }
+
+    /// Plan 0038 Phase 3 done-when 2, ADR-0040's totality clause. `curve_level`
+    /// runs per element per frame on the render path with no author guard in
+    /// front of it, so **every** degenerate combination has to land on a finite,
+    /// non-negative number — not merely the ones an author is likely to write.
+    #[test]
+    fn the_level_curve_is_total_over_degenerate_input() {
+        // `1.0` is exactly the identity, which is the property the whole
+        // byte-identical-goldens claim rests on. Asserted bit-for-bit.
+        for level in [0.0f32, 0.003, 0.03, 0.5, 1.0, 7.5] {
+            assert_eq!(
+                curve_level(level, 1.0),
+                level,
+                "curve = 1.0 must be exactly `powf(x, 1.0) == x` for {level}"
+            );
+        }
+
+        // The exponent is the author-reachable half: `curve` is an expression, so
+        // every one of these is something a preset can actually produce.
+        let exponents = [
+            0.0f32,
+            -0.0,
+            -1.0,
+            -1e30,
+            1e30,
+            f32::NAN,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::MIN_POSITIVE,
+            0.5,
+            CURVE_MIN,
+            CURVE_MAX,
+        ];
+        // The level is the engine-side half — it comes from `downsample` over the
+        // band array, never from an expression. These span far past anything the
+        // DSP produces (bands sit around 0.02-0.05).
+        let levels = [0.0f32, -0.0, -1.0, -1e3, f32::MIN_POSITIVE, 0.03, 1.0, 1e3];
+
+        for &curve in &exponents {
+            // Whatever the exponent, a level the DSP can produce stays drawable
+            // all the way through to the geometry.
+            for &level in &levels {
+                let out = curve_level(level, curve);
+                assert!(
+                    out.is_finite() && out >= 0.0,
+                    "curve_level({level}, {curve}) = {out} is not a drawable level"
+                );
+                let len = element_length(out, 0.06, 1.1);
+                assert!(
+                    len.is_finite() && len >= 0.0,
+                    "element_length after curve_level({level}, {curve}) = {len}"
+                );
+            }
+            // And the weaker claim that holds for *any* level at all, including
+            // the non-finite ones no band array should ever contain: the curve
+            // never manufactures a `NaN` and never inverts an element. An
+            // infinite level still maps to an infinite length, exactly as it did
+            // through `element_length` before this step existed — that is the
+            // DSP's boundary to hold, not this function's.
+            for &level in &[f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+                let out = curve_level(level, curve);
+                assert!(
+                    !out.is_nan() && out >= 0.0,
+                    "curve_level({level}, {curve}) = {out} introduced a NaN or a \
+                     negative where the input had neither"
+                );
+            }
+        }
+        // A non-finite level that is not `+inf` is neutralised outright, because
+        // the floor runs before the `powf`.
+        assert_eq!(curve_level(f32::NAN, 0.5), 0.0);
+        assert_eq!(curve_level(f32::NEG_INFINITY, 0.5), 0.0);
+
+        // The two clauses that make `pow(0, 0)` and `pow(0, -1)` unreachable: the
+        // exponent floor is strictly positive, so a silent element stays at zero
+        // rather than jumping to one or to infinity.
+        assert_eq!(curve_level(0.0, 0.0), 0.0, "pow(0, 0) is not reachable");
+        assert_eq!(curve_level(0.0, -1.0), 0.0, "pow(0, -1) is not reachable");
+        assert_eq!(
+            curve_level(0.0, f32::NAN),
+            0.0,
+            "a NaN exponent falls back to the linear default, not through clamp"
+        );
+        // A negative level can never become a fractional power of a negative
+        // base, because it is floored before the `powf` rather than after.
+        assert_eq!(curve_level(-4.0, 0.5), 0.0, "a negative level floors first");
+        // The exponent clamp bites at both ends rather than passing through.
+        assert_eq!(curve_level(0.25, 10.0), curve_level(0.25, CURVE_MAX));
+        assert_eq!(curve_level(0.25, 0.0001), curve_level(0.25, CURVE_MIN));
+    }
+
+    /// Plan 0038 Phase 3 done-when 3, and the reason ADR-0040 exists. The
+    /// ordering is invisible in a still frame — it only shows in *motion* — so
+    /// nothing but a test stops a later refactor from swapping two lines and
+    /// silently inverting the decision.
+    ///
+    /// Asserted as a **property**, not against a tuned constant: for a
+    /// compressive `curve` and a non-instant smoother, curving-then-easing and
+    /// easing-then-curving disagree, and they disagree in a *stated direction* —
+    /// during a fall the curve-first value is the higher of the two, which is the
+    /// "even fall" against the "fast drop then a long crawl" that the ADR is
+    /// choosing between. **Swap the two steps in `update` and this fails.**
+    #[test]
+    fn the_curve_runs_before_the_easing_and_the_two_orders_differ() {
+        const CURVE: f32 = 0.5;
+        const DT: f32 = 1.0 / 60.0;
+        let easing = Easing {
+            attack: 0.02,
+            release: 0.5,
+        };
+
+        // A step down from a settled loud element to silence — the fall ADR-0040
+        // reasons about. Both orders start from the same settled state, so the
+        // only thing that differs downstream is where the curve sits.
+        let settled = curve_level(1.0, CURVE);
+        let (mut curve_first, mut ease_first) = (settled, 1.0f32);
+        let mut saw_difference = false;
+
+        for frame in 0..90 {
+            // Curve then ease: the smoother sees the compressed value. This is
+            // exactly what `update` does.
+            curve_first = easing.step(curve_first, curve_level(0.0, CURVE), DT);
+            // Ease then curve: the smoother sees the linear value and the curve
+            // is applied to the eased result. The rejected alternative.
+            ease_first = easing.step(ease_first, 0.0, DT);
+            let ease_first_shown = curve_level(ease_first, CURVE);
+
+            if (curve_first - ease_first_shown).abs() > 1e-6 {
+                saw_difference = true;
+                assert!(
+                    curve_first < ease_first_shown,
+                    "frame {frame}: curve-then-ease ({curve_first}) should sit \
+                     below ease-then-curve ({ease_first_shown}) during a fall — \
+                     the compressive curve is what holds the rejected order up \
+                     near the top of its travel before it crawls"
+                );
+            }
+        }
+        assert!(
+            saw_difference,
+            "the two orders never diverged, so this test would pass with the \
+             steps swapped — the fixture is not exercising ADR-0040 at all"
+        );
+
+        // ...and the ordering is a no-op at the default, which is the other half
+        // of the claim: `curve = 1.0` makes the two orders identical, so the
+        // decision costs nothing until a preset opts in.
+        let (mut a, mut b) = (1.0f32, 1.0f32);
+        for _ in 0..30 {
+            a = easing.step(a, curve_level(0.0, 1.0), DT);
+            b = curve_level(easing.step(b, 0.0, DT), 1.0);
+            assert_eq!(a, b, "at curve = 1.0 the two orders must coincide");
+        }
     }
 
     /// Plan 0038 Phase 2. `span` and `baseline` place the figure in **world**
