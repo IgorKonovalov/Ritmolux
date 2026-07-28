@@ -24,8 +24,8 @@
 //! Skips with no adapter per ADR-0016.
 
 use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::metrics::{StepResponse, frame_diff, step_response};
+use lmv_core::preset::{Easing, Preset};
+use lmv_core::render::metrics::{StepResponse, frame_diff, frames_to_settle, step_response};
 use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
 
 const SIZE: u32 = 96;
@@ -254,6 +254,232 @@ fn the_step_stimulus_lights_the_band_array_not_only_the_scalars() {
         "the spectrum readout did not move under the step ({moved:.4}): the \
          time-varying stimulus is not lighting the log-band array, only the \
          scalar bands"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Plan 0038 Phase 3 done-when 6 — ADR-0040's curve-vs-easing ordering, measured
+// at the pixel level rather than argued.
+//
+// The unit test in the scene pins that the ordering is IMPLEMENTED as specified.
+// It cannot show that the chosen order produces the motion the ADR claims, which
+// is a statement about a decaying element on screen. That needs the probe.
+//
+// The trick that makes "both ways round" measurable without shipping a second
+// ordering: with `[spectrum] smoothing` absent the scene's easing is INSTANT, so
+// the drawn length is `curve(input)` and nothing else. Pre-ease the stimulus on
+// the CPU and that same scene draws `curve(ease(raw))` — the rejected order —
+// through the identical renderer, shader and metric as the engine's own
+// `ease(curve(raw))`. The control test below proves the construction is exact.
+// ---------------------------------------------------------------------------
+
+const CURVE_EASED: &str = include_str!("fixtures/spectrum_curve_eased.toml");
+const CURVE_INSTANT: &str = include_str!("fixtures/spectrum_curve_instant.toml");
+
+/// The constants the eased arm's `[spectrum] smoothing` declares, mirrored here
+/// so the instant arm's stimulus can be pre-eased with the same envelope.
+const PROBE_EASING: Easing = Easing {
+    attack: 0.02,
+    release: 0.5,
+};
+
+/// The clock `capture_preset_over` advances per stimulus frame — `FALLBACK_DT`,
+/// which is `pub(crate)` and so not nameable from an integration test.
+///
+/// **Not trusted on faith:** `at_curve_one_the_pre_eased_arm_matches_the_engine`
+/// is its drift guard. At `curve = 1.0` the two orders are algebraically
+/// identical, so the two arms must agree frame for frame — which they cannot if
+/// this number stops matching the engine's.
+const DT: f32 = 1.0 / 60.0;
+
+/// The `curve` line both probe fixtures carry, and the handle the control arm
+/// uses to build its `curve = 1.0` variant.
+const CURVE_LINE: &str = "curve      = \"0.5\"";
+
+/// Re-ease a stimulus on the CPU with [`PROBE_EASING`], band by band.
+///
+/// Easing the **bands** and letting the scene downsample is exactly equal to the
+/// scene easing the **downsampled levels**, which is what makes this arm a fair
+/// comparison rather than an approximation: `downsample` is a mean, the one-pole
+/// step is linear in `(raw - held)`, and every band inside one element moves in
+/// the same direction under this stimulus, so all of them select the same
+/// constant. Mean-then-ease and ease-then-mean therefore coincide.
+fn pre_eased(stimulus: &[AnalysisFrame]) -> Vec<AnalysisFrame> {
+    let mut bands = [0.0f32; lmv_core::dsp::SPECTRUM_BINS];
+    let mut bass = 0.0f32;
+    stimulus
+        .iter()
+        .map(|frame| {
+            for (held, &raw) in bands.iter_mut().zip(frame.spectrum.iter()) {
+                *held = PROBE_EASING.step(*held, raw, DT);
+            }
+            bass = PROBE_EASING.step(bass, frame.bass, DT);
+            let mut out = *frame;
+            out.spectrum = bands;
+            out.bass = bass;
+            out
+        })
+        .collect()
+}
+
+fn capture_arm(r: &mut Renderer, src: &str, stimulus: &[AnalysisFrame]) -> Vec<CaptureImage> {
+    let p = preset(src);
+    let name = p.name.clone();
+    r.set_presets(vec![p]);
+    r.capture_preset_over(&name, stimulus)
+        .unwrap_or_else(|e| panic!("probe `{name}`: {e}"))
+}
+
+/// How **even** a fall is: the share of its settling time spent covering the
+/// first half of its travel.
+///
+/// This is the quantity ADR-0040 actually argues about — "a perceptually even
+/// fall" against "a fast start and a long crawl" — and `StepResponse` alone
+/// cannot express it, because a response can settle quickly and still be
+/// lopsided. A perfectly linear ramp reads `0.5/0.9 = 0.56`; a pure exponential
+/// reads `ln 2 / ln 10 = 0.30`. Higher is more even.
+fn fall_evenness(fall: &[CaptureImage]) -> f32 {
+    frames_to_settle(fall, 0.5) as f32 / frames_to_settle(fall, 0.9).max(1) as f32
+}
+
+/// The two arms must be twins apart from `name` and the `smoothing` key —
+/// otherwise the probe is comparing two scenes, not two orderings.
+#[test]
+fn the_two_curve_arms_differ_only_in_their_spectrum_smoothing() {
+    fn body(src: &str) -> Vec<&str> {
+        src.lines()
+            .map(str::trim)
+            .filter(|l| {
+                !l.is_empty()
+                    && !l.starts_with('#')
+                    && !l.starts_with("name")
+                    && !l.starts_with("smoothing")
+            })
+            .collect()
+    }
+    let (a, b) = (body(CURVE_EASED), body(CURVE_INSTANT));
+    assert!(!a.is_empty(), "the fixture body did not parse into lines");
+    assert_eq!(
+        a, b,
+        "the curve probe fixtures have drifted apart — the measurement would be \
+         of the difference between two scenes, not between two orderings"
+    );
+    for (label, src) in [("eased", CURVE_EASED), ("instant", CURVE_INSTANT)] {
+        assert!(
+            src.contains(CURVE_LINE),
+            "the {label} arm no longer carries `{CURVE_LINE}`, so the curve arms \
+             would be measuring a linear readout and agree vacuously"
+        );
+    }
+    // Against the comment-stripped body, not the raw text: both files *mention*
+    // smoothing in their headers, and only one may declare it.
+    let declares = |src: &str| {
+        src.lines()
+            .map(str::trim)
+            .any(|l| !l.starts_with('#') && l.starts_with("smoothing"))
+    };
+    assert!(
+        declares(CURVE_EASED) && !declares(CURVE_INSTANT),
+        "the eased arm must declare [spectrum] smoothing and the instant arm \
+         must not — that difference is the whole experiment"
+    );
+}
+
+/// The control, and the drift guard on [`DT`] and on [`pre_eased`] alike.
+///
+/// At `curve = 1.0` the exponent is the identity, so `ease(curve(raw))` and
+/// `curve(ease(raw))` are the *same function*. The two arms must therefore land
+/// on identical pixels, every frame. If `FALLBACK_DT` changes, if `pre_eased`
+/// stops mirroring the scene's smoother, or if the mean/ease commutation
+/// argument is wrong, this is what fails — before the measurement below is
+/// allowed to mean anything.
+#[test]
+fn at_curve_one_the_pre_eased_arm_matches_the_engine() {
+    let Some(mut r) = headless() else {
+        return;
+    };
+    let linear = |src: &str| src.replace(CURVE_LINE, "curve      = \"1.0\"");
+
+    let raw = step_stimulus();
+    let engine = capture_arm(&mut r, &linear(CURVE_EASED), &raw);
+    let rebuilt = capture_arm(&mut r, &linear(CURVE_INSTANT), &pre_eased(&raw));
+
+    // Non-vacuity: a pair of all-black captures would match trivially.
+    let (rise, _) = segments(&engine);
+    let travel = frame_diff(&rise[0], rise.last().unwrap_or(&rise[0]));
+    assert!(
+        travel > 0.02,
+        "the probe fixture barely moved under the step ({travel:.4}) — the \
+         agreement below would be between two static frames"
+    );
+
+    let mismatched = engine
+        .iter()
+        .zip(&rebuilt)
+        .enumerate()
+        .find(|(_, (a, b))| a.rgba != b.rgba);
+    assert!(
+        mismatched.is_none(),
+        "at curve = 1.0 the CPU-eased arm diverged from the engine's own easing \
+         at frame {:?} — DT or `pre_eased` no longer mirrors the scene, so the \
+         ordering measurement would be meaningless",
+        mismatched.map(|(i, _)| i)
+    );
+}
+
+/// Plan 0038 Phase 3 done-when 6. Measure the fall **both ways round** under a
+/// non-unit `curve` and record what each does.
+///
+/// **No threshold is asserted on the ordering claim** — this plan has not earned
+/// one, and inventing a number here is the Plan 0033 mistake. The test asserts
+/// only that the measurement is non-vacuous and that the two orders are
+/// genuinely distinguishable at the pixel level; the numbers are printed for the
+/// commit body and for ADR-0040 to be judged against.
+#[test]
+fn the_two_curve_orderings_measure_differently_in_the_frame() {
+    let Some(mut r) = headless() else {
+        return;
+    };
+    let raw = step_stimulus();
+    let curve_then_ease = capture_arm(&mut r, CURVE_EASED, &raw);
+    let ease_then_curve = capture_arm(&mut r, CURVE_INSTANT, &pre_eased(&raw));
+
+    let mut reported = Vec::new();
+    for (label, images) in [
+        ("curve-then-ease (ADR-0040)", &curve_then_ease),
+        ("ease-then-curve (rejected)", &ease_then_curve),
+    ] {
+        let (rise, fall) = segments(images);
+        let response = step_response(rise, fall);
+        let evenness = fall_evenness(fall);
+        println!(
+            "{label:<28} rise {:>3} fall {:>3} ratio {:>5.2} fall-evenness {evenness:.3}",
+            response.rise_frames,
+            response.fall_frames,
+            response.ratio()
+        );
+        assert!(
+            response.rise_frames > 0 && response.fall_frames > 0,
+            "{label} reported no transient at all: {response:?} — the arm is not \
+             responding to the stimulus"
+        );
+        assert!(
+            response.fall_frames < WINDOW as u32,
+            "{label} never settled inside the {WINDOW}-frame window: {response:?} \
+             — the measurement is clamped rather than measured"
+        );
+        reported.push((label, response, evenness));
+    }
+
+    // The one property that must hold for the experiment to have run at all: a
+    // non-unit curve makes the two orders visibly different. If they measured
+    // the same, either arm could be mislabelled and nothing above would notice.
+    let (a, b) = (reported[0].1, reported[1].1);
+    assert_ne!(
+        (a.fall_frames, reported[0].2.to_bits()),
+        (b.fall_frames, reported[1].2.to_bits()),
+        "the two orderings measured identically, so this probe cannot tell them \
+         apart and its numbers say nothing about ADR-0040"
     );
 }
 
