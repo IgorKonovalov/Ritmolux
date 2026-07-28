@@ -3,12 +3,13 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0040** (ADRs are a separate sequence — next free there is **0042**.)
+**Next free number: 0041** (ADRs are a separate sequence — next free there is **0042**.)
 
 ## Active roster
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
+| [0040](0040-line-joins-finish-the-job.md) | Line joins, finished: the star's other half, and a pin under the reported defect | **approved 2026-07-28** — ready for `dev`; [0039] has closed, so nothing blocks it | dev |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
@@ -29,10 +30,24 @@ number is *not* a measurement (`metrics::segment_settled`, and a `+` marker on e
 `--report` cell), and closed backlog **0016–0019** outright.
 
 **[0039] has landed and closed** — a stroke no longer comes apart at its vertices. See Recently
-closed. **No render plan is mid-flight.** Two follow-ups it left, both small and independent: its
-**Phase 5 (`human`)** — re-choose `spectrum_ridge`'s `thickness`, which still ships the `4.2`
-compromise picked against the artifact rather than for the look — and new design-backlog **0024**,
-the star rosette's contact points, which are joints the plan's own connectivity table called free.
+closed. **No render plan is mid-flight.** Its **Phase 5 (`human`)** stays open and independent —
+re-choose `spectrum_ridge`'s `thickness`, which still ships the `4.2` compromise picked against the
+artifact rather than for the look. That one is `preset-author`'s, not `dev`'s.
+
+**[0040] is approved and is the next plan to take** (2026-07-28), from [0039]'s Mode 4 review — it
+takes the three findings that need code. The star rosette is a **closed chain**, not the set of pairs
+ADR-0041's connectivity table described: its contact points are shared between adjacent petals, so
+half its joints were never flagged, and the unflagged half is the sharper one (the wedge there is
+`half_width / tan(contact_angle)`, against an angle clamped as low as 8 degrees). The shader tests
+raw `1u`/`2u` with nothing tying them to `JOINED_A`/`JOINED_B`, and a **swap would not be caught**
+because the pixel test only probes interior joints where both bits are set. And the reported defect
+itself has **no committed baseline** — the `spectrum` golden fixture takes the `bars` layout, so the
+pin lands beside `composite.rs` rather than in the `SystemKind` roster, which
+[ADR-0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)'s exhaustive match will not
+admit a second entry to. **Closes backlog 0024. No new ADR** — the mechanism was decided in
+ADR-0041; this is an unfinished application of it. The one live risk is aesthetic and Phase 3 makes
+it a stopping condition: a joined contact point is a near-reversal, so it reads as a bright bead, and
+if that reads as a defect at the pointy end it routes back rather than getting tuned around.
 
 **Version is at `0.21.0`** — bumped at [0039]'s close (a feature plan) per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Nothing is owed until the next close.

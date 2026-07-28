@@ -1049,3 +1049,11 @@ it may read as a deliberate stud or as a defect.
 **Not ADR-worthy** — the mechanism is already decided and the per-endpoint flag expresses the closed
 chain exactly. This is an unfinished application of it. Small enough to ride along with the next plan
 that touches the line family, or with Plan 0039's open Phase 5.
+
+- **PROMOTED 2026-07-28 → [Plan 0040](plans/0040-line-joins-finish-the-job.md) Phase 3**, the same
+  day it was raised, alongside the review's two other code findings (the shader's untied bit
+  literals, and the missing pixel pin under the reported defect). The plan takes this entry's
+  proposed fix as written and adds the thing this entry only gestured at: the look. A joined contact
+  point is a near-reversal, so it reads as a bright bead, and Phase 3 makes "capture it at the
+  8-degree floor and say what it looks like" a done-when with a **stopping condition** rather than a
+  note.
