@@ -1,15 +1,25 @@
 # 0039 — Line joins: the stroke stops coming apart at every vertex
 
-> **Status:** in-progress 2026-07-28 — `dev` is implementing phases 1-4 (the handoff was manual on
-> purpose). [Plan 0038](done/0038-line-family-unreachable-levers.md) has closed, so nothing blocks
-> it. Three reference errors were corrected at approval and are noted below.
+> **Status:** done 2026-07-28 — phases 1-4 landed in four commits (`5dfc81c` the per-endpoint flag
+> and the shader extension, `b184021` the spectrum polyline plus `core/tests/line_joints.rs`,
+> `12e6ab2` the rose / L-system / star, `f78ff2f` the doc sweep) and passed the Mode 4 review:
+> **no blockers**, one major, three minors, two nits. Verified rather than trusted: the Phase 1
+> byte-identical claim (no line-scene baseline moved), the fail-first evidence for the new pixel
+> test (re-run at close — joint `0.6431`/`0.6440` against interiors `0.4885`/`0.4588`), every
+> per-producer flag-pattern assertion, and that the join extension takes its aspect from the render
+> target's uniform rather than from any grid (ADR-0037). **[ADR-0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
+> is accepted, and carries an Outcome section**: its connectivity table's `star_rosette` row is
+> wrong — the contact points are shared between adjacent petals, so the rosette is a closed chain and
+> Phase 3 flagged only half its joints. That is the review's one major, left unfixed deliberately and
+> captured as design-backlog **0024**. **Phase 5 (`human`) is open** — `spectrum_ridge` still ships
+> the compromise `thickness = 4.2 + …`, and the constraint that forced it is gone.
 > **Created:** 2026-07-28
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
+> **Related ADRs:** [0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
 > (this plan's decision — a per-endpoint joined flag, extend in the shader),
-> [0007](../adrs/0007-line-geometry-generators.md) (the instanced-quad primitive being extended),
-> [0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (the re-bless discipline)
-> **Backlog entry closed:** [0023](../design-backlog.md)
+> [0007](../../adrs/0007-line-geometry-generators.md) (the instanced-quad primitive being extended),
+> [0023](../../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (the re-bless discipline)
+> **Backlog entry closed:** [0023](../../design-backlog.md)
 
 ## TL;DR
 
@@ -34,7 +44,7 @@ let pos  = base + nrm * c.y * width;
 **Why now.** The artifact is as old as the primitive, but the three generator-driven line scenes draw
 near-collinear neighbours, so `theta` is small and the wedge is sub-pixel. `spectrum` with
 `layout = "polyline"` joins adjacent *frequency bands*, which are uncorrelated — and
-[Plan 0038](done/0038-line-family-unreachable-levers.md)'s `curve` lever exists to **increase** the
+[Plan 0038](0038-line-family-unreachable-levers.md)'s `curve` lever exists to **increase** the
 height contrast between neighbours. On a polyline, height contrast is turn angle, so the lever
 aggravates the artifact exactly by doing its job.
 
@@ -66,7 +76,7 @@ through `radius`.
 
 ## Decision
 
-Per [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md): a
+Per [ADR-0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md): a
 **per-endpoint joined flag on `SegmentInstance`**, with the vertex shader extending by the
 half-width only at flagged ends. Rejected there: unconditional extend, unconditional round cap, a
 true miter join, and a disc per interior vertex.
@@ -238,6 +248,6 @@ Each phase ships as its own commit. Phases 1–4 are `dev`; Phase 5 is the user'
 - **No new preset-facing parameter.** Joining is not authorable and should not be: a stroke that
   comes apart at its vertices is a defect, not a look. If a *deliberately* segmented stroke is ever
   wanted, that is a new lever and a separate decision.
-- **No fix for backlog [0022](../design-backlog.md)** (`--report`'s reactivity columns are blind to
+- **No fix for backlog [0022](../../design-backlog.md)** (`--report`'s reactivity columns are blind to
   a level `curve`). Filed in the same session, unrelated mechanism, and it interacts with backlog
   0020 rather than with this.

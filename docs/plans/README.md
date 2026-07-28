@@ -3,13 +3,12 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0040**
+**Next free number: 0040** (ADRs are a separate sequence — next free there is **0042**.)
 
 ## Active roster
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
-| [0039](0039-line-joins.md) | Line joins: the stroke stops coming apart at every vertex | **approved 2026-07-28** — ready for `dev`; [0038] has closed, so nothing blocks it | dev, human |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
@@ -27,21 +26,15 @@ closed.
 plus `log(x)` are preset-reachable, each defaulting to exactly the constant it replaced, and the
 curated set now uses them. See Recently closed. It also left the easing harness able to say when a
 number is *not* a measurement (`metrics::segment_settled`, and a `+` marker on every truncated
-`--report` cell), and closed backlog **0016–0019** outright. **No render plan is mid-flight, and
-[0039] is approved and ready to take.**
+`--report` cell), and closed backlog **0016–0019** outright.
 
-**[0039] is approved and is the next plan to take** (2026-07-28), from `preset-author` routing
-design-backlog 0023: `LineRenderer` builds every segment as an independent quad with no join
-geometry, so each direction change leaves a wedge of `width * tan(theta/2)` — a dark tick at every
-vertex, reported by a user watching `spectrum_ridge` full-screen. The decision is
-[ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md): a **per-endpoint**
-joined flag, extended in the shader only where flagged, because the five producers disagree about
-connectivity — `spectrum`'s `Bars` and `RadialRing` emit **isolated** segments and an unconditional
-extend would grow a bar 60 % at rest and hang it below its own `baseline`. The payoff beyond the
-artifact: `spectrum_ridge` currently ships `thickness = 4.2` chosen against the defect rather than
-for the look.
+**[0039] has landed and closed** — a stroke no longer comes apart at its vertices. See Recently
+closed. **No render plan is mid-flight.** Two follow-ups it left, both small and independent: its
+**Phase 5 (`human`)** — re-choose `spectrum_ridge`'s `thickness`, which still ships the `4.2`
+compromise picked against the artifact rather than for the look — and new design-backlog **0024**,
+the star rosette's contact points, which are joints the plan's own connectivity table called free.
 
-**Version is at `0.20.0`** — bumped at [0038]'s close (a feature plan) per
+**Version is at `0.21.0`** — bumped at [0039]'s close (a feature plan) per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Nothing is owed until the next close.
 
 **The next ADR is design-backlog 0015** — the band axis is half linear, and Plan 0037 Phase 4's
@@ -188,6 +181,27 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 
 ## Recently closed
 
+- [0039 — Line joins: the stroke stops coming apart at every vertex](done/0039-line-joins.md) —
+  **done 2026-07-28**, passed Mode 4 review (**no blockers**; one major, three minors, two nits —
+  nothing fixed in the close commit, the major is deliberately backlogged instead). Four `dev`
+  commits: `5dfc81c` the per-endpoint `joined` bitfield plus the shader extension, `b184021` the
+  spectrum polyline and the new `core/tests/line_joints.rs`, `12e6ab2` the rose / L-system / star,
+  `f78ff2f` the doc sweep. **Closes backlog 0023; opens backlog 0024.**
+  [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) is **accepted with
+  an Outcome section**. The design's load-bearing claim held in fact: with every producer flagging
+  nothing, **no line-scene baseline moved** — so the later re-blesses are attributable to specific
+  scenes rather than to the primitive, which is what a walking-skeleton phase is for. The new pixel
+  test is threshold-free and was proven to fail first (`0.0000` at the joint against interiors of
+  `0.4885`/`0.4588`), and it **measured** the overshoot the ADR accepted in place of a miter limit
+  rather than leaving it a prediction: a sharp joint now reads `0.6431`, brighter than either
+  interior. Two things the plan got wrong, both caught by `dev` and handled honestly rather than
+  papered over: Phase 2's "re-bless the polyline goldens" was **vacuous** (the golden fixture takes
+  the default `bars` layout, so no polyline golden exists — `spectrum_ridge` is guarded behaviorally
+  per ADR-0023), and Phase 3's golden enumeration **missed `composite_trails` and
+  `composite_kaleido`**, which draw a `maurer_rose` through a post stage and so moved from the same
+  cause. The review's one major is the star rosette: its contact points are shared between adjacent
+  petals, making the figure a closed chain whose every vertex is a joint, so Phase 3 flagged only
+  half of them. **Phase 5 (`human`) is open** — `spectrum_ridge`'s `thickness` re-tune.
 - [0038 — The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and
   `log`](done/0038-line-family-unreachable-levers.md) — **done 2026-07-28**, passed Mode 4 review
   (**no blockers**; one major, five minors, two nits — the major and three minors **fixed in the
