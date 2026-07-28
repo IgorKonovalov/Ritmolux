@@ -1110,3 +1110,59 @@ fn load_dir_loads_the_good_and_reports_the_bad() {
 
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// Plan 0038 Phase 9. `log(0)` is `-inf`, which silence produces every time the
+/// music stops — and a `[smoothing]`-listed binding that sees it must not be
+/// dead for the rest of the preset's run.
+///
+/// **The defect was never one bad frame; it was permanence.** `Easing::step`
+/// computes `held + alpha * (raw - held)`, so a `-inf` held against a `-inf` raw
+/// is `-inf + alpha*NaN` = `NaN` — and `NaN` is absorbing there, because
+/// `raw > held` is false for *every* `raw`, so the release branch is taken and
+/// the result stays `NaN` no matter what the audio does afterwards. Only a preset
+/// switch, which resets the smoother, cleared it.
+///
+/// So this asserts the **recovery**, not the absence of a `NaN`. Asserting only
+/// that one frame survives would pass on a fix that leaves the state poisoned.
+#[test]
+fn a_non_finite_value_cannot_poison_a_smoother_permanently() {
+    use lmv_core::preset::Easing;
+    const DT: f32 = 1.0 / 60.0;
+    let tau = Easing::symmetric(0.25);
+
+    // Silence, through the dB idiom `docs/presets.md` documents.
+    let silent = (0.0f32).ln();
+    assert!(silent.is_infinite(), "log(0) is the reachable path here");
+
+    // The render layer seeds its state with the first value it sees, so the
+    // held value and the raw value are both -inf on the frame after a reset.
+    let mut held = tau.step(silent, silent, DT);
+    assert!(
+        !held.is_nan(),
+        "a -inf held against a -inf raw produced NaN — this is the frame the \
+         binding used to die on"
+    );
+
+    // Audio returns, and stays. The binding must track it again.
+    for _ in 0..600 {
+        held = tau.step(held, 0.5, DT);
+    }
+    assert!(
+        (held - 0.5).abs() < 0.001,
+        "the binding never recovered: after 10 s of a finite 0.5 input it holds \
+         {held}. A smoother that cannot come back from silence is the defect, \
+         not the single frame that started it"
+    );
+
+    // The same for the other reachable non-finite: `sqrt(-1)` is NaN, and it
+    // must not stick either.
+    let mut held = 0.5f32;
+    held = tau.step(held, (-1.0f32).sqrt(), DT);
+    for _ in 0..600 {
+        held = tau.step(held, 0.25, DT);
+    }
+    assert!(
+        (held - 0.25).abs() < 0.001,
+        "a NaN input poisoned the smoother permanently: holds {held}"
+    );
+}
