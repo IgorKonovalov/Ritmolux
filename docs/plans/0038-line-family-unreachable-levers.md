@@ -20,6 +20,18 @@
 > is satisfiable today and does not wait on the rest of 0037. Nothing else changes: same decision,
 > same phase order, same ADR. Note also that 0037's two `easing_*` fixtures are `parametric_curve`,
 > so **Phase 1's byte-identical-goldens claim now covers them too** — `glow` touches that scene.
+> **Amended again 2026-07-28, mid-plan, after Phase 3's done-when 6 measurement came back against
+> [ADR-0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md).** Phases 1–4 have
+> landed (`a1c67f4`, `f3945be`, `c9121fd`, `e31ae88`) and Phase 3 did what done-when 6 told it to:
+> it measured, found the ADR's justification falsified, retuned nothing, and routed to `architect`.
+> The ruling is **[ADR-0040's Outcome](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement)**:
+> **the shipped ordering stands and no scene code changes**, but its stated rationale ("a perceptually
+> even fall") is wrong — both orderings are exponentials of identical shape, and the real difference
+> is that ease-then-curve would make the effective release `release / curve`. Two things follow, and
+> they are the only changes to this plan: **Phase 5's done-when 3 is rewritten** (it would otherwise
+> document the falsified coupling), Phase 5 gains a done-when for the in-code comments that state the
+> falsified mechanism, and a new **Phase 7** fixes the probe defect that produced the one part of the
+> measurement that was an artifact. Phases 1, 2 and 4 are unaffected; Phase 6 is unaffected.
 
 ## TL;DR
 
@@ -128,7 +140,7 @@ The green pair is ADR-0040's ordering decision: **curve then ease**, not the rev
 
 ## Implementation phases
 
-Each phase ships as its own commit. Phases 1–5 are `dev`; Phase 6 is the user's.
+Each phase ships as its own commit. Phases 1–5 and 7 are `dev`; Phase 6 is the user's.
 
 ### Phase 1 — `glow` reaches all four line scenes
 - **Owner skill:** dev
@@ -239,19 +251,43 @@ Each phase ships as its own commit. Phases 1–5 are `dev`; Phase 6 is the user'
 - **What:** The required operator-doc sweep. The three bolded rows of the architect's Mode 4 table
   are all in play here, and this lane's whole design rests on them being true.
 - **Files touched:** `presets/README.md`, `docs/presets.md`, `docs/preset-palettes.md` (if `glow`
-  belongs beside the colour surface)
+  belongs beside the colour surface), `core/src/render/scenes/lines/spectrum.rs` (comments only, per
+  done-when 6)
 - **Done when:**
   1. `presets/README.md`'s per-system roster carries `glow` on **all four** line scenes and `span`,
      `baseline`, `curve` on `spectrum`, with defaults and the whole-figure/per-element distinction.
   2. The `span` aspect consequence is stated honestly: it is a **world** quantity, so `span ≈ 1.78`
      fills a 16:9 frame and leaves an ultrawide short; there is deliberately no `fit` mode, and why.
-  3. The `curve`↔`scale` interaction is documented with the 5.8x figure from Phase 3, and the
-     `curve`↔`[spectrum] smoothing` coupling ADR-0040 names as its price — the same `release` looks
-     different once a curve is engaged.
+  3. **Rewritten 2026-07-28 — do not document the coupling as ADR-0040's Consequences section states
+     it.** The `curve`↔`scale` interaction is documented with the 5.8x figure from Phase 3: that one
+     is real, it is an **amplitude** coupling, and it is the interaction an author hits first. The
+     `curve`↔`[spectrum] smoothing` coupling is documented as
+     [ADR-0040's Outcome](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement)
+     **corrects** it: under the shipped ordering the smoother's state *is* the displayed quantity, so a
+     fall's time constant is exactly `release` **for every value of `curve`** — the two knobs are
+     independent in time. **Do not repeat "the same `release` looks different once a curve is
+     engaged"**; that describes the rejected ordering, where the effective release would have been
+     `release / curve`. Nor claim an even fall: an exponential covers the first half of its travel in
+     30 % of its settling time (`ln2 / ln10`) at any `curve`, and no ordering changes that.
   4. `baseline = 0` is documented as the way to get a centre-mirrored readout, since that is the
      non-obvious fix for a thing that reads as a bug.
   5. No count-bearing sentence is introduced that will re-drift (the "Seven systems" → "Eight
      systems" lesson from Plan 0034's close).
+  6. **Added 2026-07-28. No comment left in the code states the falsified mechanism** — the sentences
+     are wrong, not merely stale, and a reader has no way to know that from the source. Three sites,
+     all comment-only, no behaviour change and goldens untouched:
+     - `spectrum.rs` `update()`'s ordering comment ("a slow `release` reads as a perceptually even
+       fall. Easing first instead would make a decaying element drop fast through the top of its
+       travel and then crawl through the bottom") → the corrected rationale: the smoother's state *is*
+       the displayed quantity, so `release` names the same duration at any `curve`, where easing first
+       would have made it `release / curve`.
+     - The scene unit test's doc comment, which says "during a fall the curve-first value is the
+       higher of the two" while the assertion three lines down asserts it is **lower**. The assertion
+       is right; the prose is backwards **and** rests on the falsified narrative. Fix the prose, keep
+       the assertion.
+     - That test's failure message ("the compressive curve is what holds the rejected order up near
+       the top of its travel before it crawls") → the real reason the rejected order sits higher: it
+       decays at `curve · (1/release)`, so it is simply slower.
 
 ### Phase 6 — adopt the new levers in the curated set
 - **Owner skill:** human
@@ -267,6 +303,57 @@ Each phase ships as its own commit. Phases 1–5 are `dev`; Phase 6 is the user'
      `distinctness`), and `--report` is run before/after with the numbers stated.
   4. Any preset whose `scale` is retuned for a `curve` says so in its header, with the factor.
 
+### Phase 7 — the transient probe cannot report a truncated window as a settled one
+- **Owner skill:** dev
+- **Added 2026-07-28**, from the ADR-0040 ruling. Runs after Phase 5; independent of Phase 6, which
+  does not use the transient probe.
+- **What:** Phase 3's evenness numbers were an artifact of the instrument, not a property of the two
+  orderings. `metrics::frames_to_settle` normalizes against **the segment's own last frame**, so a
+  response still travelling at the end of the window supplies a short "total" and crosses every
+  threshold early — harder at 0.9 than at 0.5, which is precisely what inflates an evenness reading.
+  The rejected arm's effective time constant is `release / curve` = 1.0 s and 2.0 s against a
+  `WINDOW` of 1.6 s, so it had 20 % and 45 % of its travel left at the frame taken as settled.
+
+  **The existing guard cannot fire.** `assert!(response.fall_frames < WINDOW)` — commented "the
+  measurement is clamped rather than measured" — is unreachable by construction: normalizing against
+  the last frame guarantees the threshold is crossed inside the segment, so the return is always
+  `< len`. Nothing in Plan 0037's harness can distinguish *settled at frame k* from *still moving at
+  frame k*, which is the whole difference between a measurement and a truncation. That is Plan 0037's
+  probe rather than this plan's scene, but it is what produced this plan's one wrong conclusion, so it
+  is fixed here rather than filed.
+- **Files touched:** `core/src/render/metrics.rs`, `core/tests/easing.rs`, `docs/capturing.md`
+- **Done when:**
+  1. **A settle measurement is normalized against a settled reference, not against whichever frame the
+     window happened to end on.** The straightforward shape: the probe's stimulus grows a **settle
+     tail** — the final stimulus held well past the measured window — and both directions normalize
+     against a frame from that tail. Then "did not settle inside the window" surfaces as the metric
+     running to the end of its segment, and the existing `fall_frames < WINDOW` guard becomes a real
+     assertion instead of a tautology. Any shape that makes the two states distinguishable is
+     acceptable; state the rule in a comment, because the next reader will assume the current one.
+  2. **Unit-tested in `metrics.rs` against a synthetic one-pole whose τ exceeds the window** — the
+     case the existing test cannot reach. `frames_to_settle_matches_the_one_pole_arithmetic_in_both_directions`
+     runs τ = 0.25 s over 120 frames = 8τ, where truncation is ~0.03 % and invisible; that
+     configuration is exactly why the defect survived. Assert that a τ of, say, 2 s over the same 120
+     frames is **reported as unsettled** rather than as a plausible frame count.
+  3. **Phase 3's done-when 6 is re-measured under the fixed instrument and the corrected numbers are
+     recorded in the commit body**, replacing `c9121fd`'s. Either window is fine, with the arithmetic
+     stated: reaching 99 % of travel takes `4.6 · release / curve`, so at the fixture's
+     `release = 0.5` and `curve = 0.5` the rejected arm needs **4.6 s ≈ 276 frames** of fall (and
+     9.2 s ≈ 552 at `curve = 0.25`) against today's 96 — or drop the fixture's `release` to **0.15 s**,
+     which brings the rejected arm's settle to 1.38 s ≈ 83 frames and fits the window unchanged. If
+     the `release` route is taken, `PROBE_EASING` and the twin-check test move with it; the fixture
+     header's "do not tune" stands against tuning for a *result*, not against re-scoping the
+     instrument so it is valid.
+  4. **Stated as a property, not a threshold:** with both arms measured to settlement the two falls
+     have the **same shape** — for a step to silence both are exponentials in the displayed level —
+     and differ only in **effective speed**, the rejected arm taking about `1/curve` times as long.
+     Fall-evenness should therefore come out **equal for the two arms and unchanged by `curve`**,
+     near the pure-exponential reference the test already names. If it does not, that is a second
+     finding and routes to `architect` the same way this one did.
+  5. `docs/capturing.md`'s transient-probe section states the limitation and the rule from done-when 1,
+     so the next person measuring an easing knows what the numbers do and do not survive. It is the
+     operator doc for this harness and it currently says nothing about window length.
+
 ## Risks & open questions
 
 - **The `curve`/easing coupling is a documented price, not a solved problem** (ADR-0040's main
@@ -280,6 +367,18 @@ Each phase ships as its own commit. Phases 1–5 are `dev`; Phase 6 is the user'
   so the bet is checked before the surface ships to authors; its instruction on a contradiction is to
   **stop and route to `architect`**, not to tune until the ADR looks right. A falsified ADR gets an
   Outcome section, which this repo has done twice (0034, 0036) and is not a failure.
+
+  > **RESOLVED 2026-07-28 — it was wrong, and this risk entry did its job.** Phase 3 measured, found
+  > against the ADR, retuned nothing and routed to `architect`. The ruling is
+  > [ADR-0040's Outcome](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement):
+  > **the ordering stands, no scene code changes, and the justification is replaced** — both orderings
+  > produce exponentials of identical shape, so neither is "more even"; the real difference is that
+  > ease-then-curve would make the effective release `release / curve`, while the shipped order leaves
+  > `release` naming the same duration at any `curve`. Phase 5 done-when 3 and 6 carry the correction;
+  > Phase 7 fixes the probe defect that made one half of the measurement an artifact. The general
+  > lesson, worth more than the ruling: **a claim about the shape of a one-pole response is arithmetic
+  > before it is a measurement** — two lines of algebra on `Easing::step` settle it with no GPU, and
+  > would have caught this at design time.
 - **Phase 2 is the ADR-0037 trap's natural habitat.** The whole point of `span` is framing, and the
   tempting implementation is "ask how wide the target is". Done-when 4 exists specifically to catch
   that, and it should be checked by grep rather than trusted.
