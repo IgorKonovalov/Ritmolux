@@ -2,6 +2,13 @@
 # a comb. One continuous line through one point per element, mirrored about the
 # centre so the frequency axis reads as a landscape and its own reflection.
 #
+# THAT SENTENCE WAS ASPIRATIONAL UNTIL PLAN 0038. The mirror reflects across the
+# x-axis, and the elements used to stand on a hardcoded baseline of -0.85, so a
+# reflected copy hung from +0.85 - two contours pinned against opposite edges,
+# not a landscape and its reflection. `baseline` is a parameter now, and moving
+# the feet onto the axis is what makes the mirror mean what this header always
+# said. Three of the four Plan 0038 levers are here: `baseline`, `span`, `curve`.
+#
 # WHY THE LAYOUT IS THE WHOLE POINT. A comb shows each band as an independent
 # quantity; a polyline shows the SHAPE of the spectrum - where the slope is, how
 # broad a peak is, whether the top end is a shelf or a cliff. That is a different
@@ -24,20 +31,60 @@ smoothing = { attack = 0.04, release = 0.34 }
 name = "aurora"
 
 [params]
-# THE RESTING CONTOUR. Same reasoning as the comb: at zero the line collapses
-# onto the baseline and the preset reads as broken during a silence. This
-# breathes, and the amplitude is large because a single stroke covers far fewer
-# pixels than 26 bars do - the motion has to be geometric to be visible at all.
-base  = "0.55 + sin(time * 1.3) * 0.20"
-scale = "2.2"
+# THE RESTING CONTOUR, and it is much lower than it used to be (was 0.55 +/-
+# 0.20). With the pair now mirrored about the axis, `base` is the HALF-GAP
+# between the two contours: at 0.55 they sat 1.1 world units apart with a dead
+# void between them. At 0.14 they share a foot line and read as one figure
+# opening and closing, which is the whole point of the mirror.
+base  = "0.14 + sin(time * 1.3) * 0.07"
 
-# THE FOLD. Order 2 puts a second copy of the contour through a half turn, so the
-# figure closes into a symmetric band across the frame instead of hanging as one
-# line near the bottom. On a polyline the mirror is genuinely transformative -
-# unlike on the radial ring, where the figure is already rotationally symmetric
-# and the copies land nearly on top of the original.
-mirror_order   = "2"
-mirror_reflect = "0"
+# THE LEVEL CURVE, and the `scale` retune it forces. `curve` compresses the
+# element level before the easing, so quiet elements stop being stubs - on a
+# CONTOUR that matters more than on the comb, because a flat run of stubs is a
+# straight line and carries no shape at all.
+#
+# The retune, with the arithmetic (Plan 0038 asks for the factor). At curve 0.55
+# a typical quiet level of 0.03 becomes 0.03^0.55 = 0.145, a 4.9x boost, while a
+# loud element at 0.30 becomes 0.516, only 1.7x. That gap IS the compression.
+# `scale` drops 2.2 -> 0.80, a 2.75x cut, which nets the quiet elements about
+# 1.8x taller and the peak about 0.6x - legible low end, peak still inside the
+# frame. Timing is untouched: the easing runs on the curved value, so the
+# `release` above means the same duration at any curve (ADR-0040).
+scale = "0.80"
+curve = "0.55"
+
+# WIDTH, AND THE SILENT-AUDIO MOTION. `span` is a world half-width, and 1.72
+# fills a 16:9 frame very nearly edge to edge (1.78 is exact). It is deliberately
+# NOT a "fit" switch - on an ultrawide this same number leaves the contour short,
+# which is correct for a world quantity and is why no auto mode exists
+# (ADR-0037).
+#
+# Breathing it is a kind of motion this preset could not have before, and it
+# earns its place rather than being decoration. Putting the feet on the axis cost
+# the old resting breath most of its travel - `base` had to fall from 0.55 to
+# 0.14 so the mirrored pair would share a foot line - and a spectrum readout has
+# no rotation of its own to fall back on. Widening and narrowing the whole figure
+# on a slow cycle restores that, and it reads differently from a vertical breath:
+# the contour stretches along the frequency axis, so the shape stays put while
+# the frame it is drawn in opens and closes.
+span  = "1.72 + sin(time * 0.31) * 0.16"
+
+# THE FOLD - a true reflection now, not a rotation. Order 1 means no rotational
+# copy; `mirror_reflect` adds the mirrored one. The difference matters and is not
+# cosmetic: a half-turn (the old order 2) flips x as well as y, so the reflected
+# copy ran its frequency axis BACKWARDS - bass met treble in the middle. A
+# reflection across the x-axis keeps the axis pointing the same way in both
+# halves, so low is left in the copy too and the figure reads as one spectrum
+# seen twice.
+#
+# `baseline = 0` is the line the pair share. This is the parameter that did not
+# exist before Plan 0038, and without it the reflection lands against the top
+# edge instead of on the axis. `pan_y` cannot substitute - the mirror runs on
+# world coordinates in update() while the view transform is applied later in the
+# shader, so panning moves the mirrored pair together.
+mirror_order   = "1"
+mirror_reflect = "1"
+baseline       = "0"
 
 # A SLOW TILT - the contour turning a few degrees either way. This is the motion
 # that carries the preset through a silence, and it works here precisely because
