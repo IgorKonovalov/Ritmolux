@@ -195,7 +195,7 @@ What it runs, stopping at the first failure and naming the step that failed:
 | Lint | `cargo clippy --all-targets -- -D warnings` |
 | Tests | `cargo nextest run` (narrowed — see below) |
 
-**Measured warm wall time: ~39 s** (fmt ~0.5 s, clippy ~0.7 s, tests ~38 s —
+**Measured warm wall time: ~41 s** (fmt ~0.5 s, clippy ~0.7 s, tests ~40 s —
 most of the suite, minus the nine excluded below). The full suite is
 ~121 s, so the hook excludes the nine
 GPU-heavy suites that iterate every shipped preset or scene through a real

@@ -9,8 +9,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
-| [0038](0038-line-family-unreachable-levers.md) | The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log` | **in-progress** — Phases 1-5 and 7 landed and reviewed; **Phases 8 and 9 added 2026-07-28** by that review, and both run **before** Phase 6, which is the user's | dev, human |
-| [0039](0039-line-joins.md) | Line joins: the stroke stops coming apart at every vertex | **draft 2026-07-28** — needs approval; land **after** [0038] closes | dev, human |
+| [0039](0039-line-joins.md) | Line joins: the stroke stops coming apart at every vertex | **draft 2026-07-28** — needs approval; [0038] has now closed, so nothing blocks it | dev, human |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
@@ -22,47 +21,16 @@ function in `render/grid.rs`. See Recently closed. Every later stage inherits th
 0005's bloom stage now builds against it rather than against the defect.
 
 **[0037] has landed and closed** — `[smoothing]` is observable for the first time. See Recently
-closed. **Resume [0038] next** — Phases 5 and 7, in that order; `2f7f213` amended its Phase 3 to use
-the probe [0037] just landed, and Phase 7 now fixes what that measurement exposed in the probe itself.
+closed.
 
-**[0038] is mid-flight and is the only active render plan.** It closes the whole 0016–0019 backlog
-batch: four levers that already exist in the engine and are simply not reachable from a `.toml`.
-**Every new parameter defaults to today's constant**, so Phases 1–5 are behaviour-preserving and
-assert byte-identical goldens — verified: `glow`, `span`, `baseline`, `curve` and `log` all landed
-(`a1c67f4`, `f3945be`, `c9121fd`, `e31ae88`) with the golden suite byte-identical and no re-bless.
+**[0038] has landed and closed** — all four unreachable levers (`glow`, `span`, `baseline`, `curve`)
+plus `log(x)` are preset-reachable, each defaulting to exactly the constant it replaced, and the
+curated set now uses them. See Recently closed. It also left the easing harness able to say when a
+number is *not* a measurement (`metrics::segment_settled`, and a `+` marker on every truncated
+`--report` cell), and closed backlog **0016–0019** outright. **No active render plan is mid-flight;
+[0039] is the next one and is drafted, waiting only on approval.**
 
-**Its Phase 3 done-when 6 found against [ADR-0040] and the ruling is in** (2026-07-28, this plan's
-mid-flight architect pass): **the ordering stands, no scene code changes, and the stated rationale is
-replaced.** Both orderings produce exponentials of identical shape for a step to silence, so neither
-is "more even" and the ADR argued for a property no ordering can deliver; the real difference is that
-ease-then-curve would make the effective release `release / curve`, where the shipped order leaves
-`release` naming the same duration at any `curve`. See
-[ADR-0040's Outcome](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement).
-**Two consequences for whoever picks this up:** Phase 5 is unblocked and its done-when 3 is rewritten
-(it would otherwise have documented the falsified coupling), plus a done-when 6 correcting three
-in-code comments that still assert it; and a new **Phase 7** fixes a real defect in [0037]'s probe —
-`metrics::frames_to_settle` normalizes against the *segment's own last frame*, so a response still
-travelling at the end of the window reads as settled, and the guard against that
-(`fall_frames < WINDOW`) is unreachable by construction. That artifact is what produced the one half
-of the Phase 3 measurement that did not hold up. [0038] Phase 6 is a `preset-author` pass and is the
-only phase that changes how anything looks.
-
-**Phases 5 and 7 have landed and been reviewed** (`a3f5d04`, `9739232`; architect pass 2026-07-28).
-Both met every done-when and neither is reopened — Phase 7 in particular replaced the falsified
-evenness finding with a settled measurement (73 / 145 frames, a 1.99 ratio against a closed-form
-2.00). The review added **two phases, and both run before Phase 6**, because Phase 8 changes what
-`--report` prints and Phase 6 reads that table before and after its work:
-
-- **Phase 8** — the corrected mechanism reaches the two callers Phase 7's file list did not: the
-  `--report` probe comment in `shot.rs`, still stating the falsified "reads clamped"; and the shared
-  probe's own guard in `easing.rs`, unreachable by construction with the same wording. That one is
-  not cosmetic — **the shared probe is itself truncated**: `release = 0.5` against a 96-frame window
-  is 3.2 τ, and the asymmetric arm reads **61 frames where its own fixture header says 69**.
-- **Phase 9** — `log(0)` is `-inf`, which silence produces, and the render layer's smoother turns
-  that into a **permanently** NaN binding that only a preset switch clears. One guard in
-  `Easing::step` covers both smoothers.
-
-**[0039] is drafted and waiting on [0038]'s close** (2026-07-28), from `preset-author` routing
+**[0039] is drafted and unblocked** (2026-07-28), from `preset-author` routing
 design-backlog 0023: `LineRenderer` builds every segment as an independent quad with no join
 geometry, so each direction change leaves a wedge of `width * tan(theta/2)` — a dark tick at every
 vertex, reported by a user watching `spectrum_ridge` full-screen. The decision is
@@ -73,8 +41,8 @@ extend would grow a bar 60 % at rest and hang it below its own `baseline`. The p
 artifact: `spectrum_ridge` currently ships `thickness = 4.2` chosen against the defect rather than
 for the look.
 
-**No version bump yet** — [0038] is not closed. The bump is owed at its close, per
-[ADR-0005](../adrs/0005-versioning-and-release-cadence.md); the version is at `0.19.0`.
+**Version is at `0.20.0`** — bumped at [0038]'s close (a feature plan) per
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Nothing is owed until the next close.
 
 **The next ADR is design-backlog 0015** — the band axis is half linear, and Plan 0037 Phase 4's
 listening test turned it from a documented curiosity into a **user-confirmed real limitation**: on
@@ -219,6 +187,101 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0038 — The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and
+  `log`](done/0038-line-family-unreachable-levers.md) — **done 2026-07-28**, passed Mode 4 review
+  (**no blockers**; one major, five minors, two nits — the major and three minors **fixed in the
+  close commit**). Ten commits: eight `dev` phases (`a1c67f4` `glow`, `f3945be` `span`/`baseline`,
+  `c9121fd` `curve`, `e31ae88` `log(x)`, `a3f5d04` the doc sweep, `9739232` the settle gate,
+  `4863bdd` the marked transient cell, `9a62754` the non-finite guard) plus `8e84acf` + `ea781d0`,
+  the Phase 6 `preset-author` adoption pass. **Closes backlog 0016, 0017, 0018 and 0019 outright.**
+  The plan's central safety claim **held in fact**: `core/tests/golden/` is **byte-untouched across
+  the whole range**, so every one of the four new params really does default to the constant it
+  replaced. `span` and `baseline` are **world** quantities and the ADR-0037 trap was avoided by
+  construction — `grep aspect` over `spectrum.rs` finds it only being *passed through* to
+  `LineRenderer::draw`, never read to size anything, and a unit test asserts doubling `span` exactly
+  doubles an x coordinate and moves no y.
+  **The plan's own risk entry did its job and the ADR lost.** Phase 3 measured ADR-0040's
+  curve-vs-easing ordering with Plan 0037's probe, found against the stated rationale, **retuned
+  nothing and routed to `architect`** exactly as instructed. The ruling:
+  [**ADR-0040 is accepted with an Outcome section**](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement)
+  — the ordering stands and no scene code changed, but "a perceptually even fall" is a property **no
+  ordering can deliver**: for a step to silence both orderings are exponentials of identical shape,
+  and an exponential covers the first half of its travel in `ln2 / ln10` = 30 % of its settling time
+  whatever `curve` is. The real difference is that ease-then-curve would make the effective release
+  `release / curve`, where the shipped order leaves `release` naming the same duration at any
+  `curve`. **The general lesson is worth more than the ruling: a claim about the shape of a one-pole
+  is arithmetic before it is a measurement**, and two lines of algebra on `Easing::step` would have
+  caught it at design time.
+  **Half of that measurement was the instrument, and fixing it is the plan's most durable output.**
+  `metrics::frames_to_settle` normalizes against **the segment's own last frame**, so a response
+  still travelling at the end of its window supplies a short total, crosses every threshold early,
+  and returns a *plausible* smaller number — and because normalizing against the last frame
+  guarantees the threshold is crossed inside the segment, `frames_to_settle(seg, f) < seg.len()` was
+  a **tautology, not a check**. The guard written against exactly this (`fall_frames < WINDOW`,
+  commented "clamped rather than measured") was unreachable by construction. `metrics::segment_settled`
+  now extrapolates the geometric tail from **three points spread across the segment** — deliberately
+  not from adjacent frames, because at 8 bits a response slow enough to outrun its window moves by
+  *less than one code value per frame* near the end, so the adjacent-frame version reported a
+  response settled with 37 % of its travel left. **The shared probe turned out to be truncated
+  itself**: `easing_asymmetric.toml`'s `release = 0.5` against a 96-frame window is 3.2 τ, and the
+  suite printed **61** where the closed form and its own fixture header both say **69**. `WINDOW` is
+  now 180 (6 τ, a 0.25 % residual), every existing ratio bound survived untouched, and the suite
+  costs 9.0 → 12.1 s inside the pre-push gate. `--report` **marks** rather than widens: a `+` suffix
+  and `rise_settled`/`fall_settled` in `--json`, with each family naming how many cells marked.
+  **Measured: 38 of 38 presets mark**, and the report says plainly that the suffix cannot separate
+  its two causes — a window a release outran, or a scene whose own motion has **no asymptote at
+  all**, which is the commoner one here. `tol` was not loosened to make the table quieter.
+  **Phase 9 is a real live defect Phase 4 created and the review caught**: `log(0)` is `-inf`, which
+  silence produces every time the music stops, and `Easing::step` computed `-inf + alpha * NaN` =
+  NaN — **absorbing**, because `raw > held` is false for every `raw`, so the release branch was taken
+  forever and **the binding was dead for the rest of the preset's run**, recovering only on a switch.
+  The guard sits in `Easing::step` (the single implementation both smoothers call) and checks **both
+  operands**, because a stored `-inf` against a *finite* `raw` selects `attack` and computes
+  `-inf + inf` on the very next frame. `sqrt(-1)` could already reach it, so the defect predates
+  Phase 4 — but `sqrt` needs a contrived negative argument where `log` needs silence.
+  **Verified at review** rather than taken on trust: `fmt --check` + `clippy --workspace
+  --all-targets -D warnings` clean, `nextest --workspace` **273/273, 0 skipped**,
+  `core/tests/golden/` byte-untouched, and `ffi.rs` / `scenes/mod.rs` / all four manifests untouched
+  (**C ABI stays v4**, `Scene` unchanged, no new dependency). **Both new guards reproduced
+  non-vacuously**: reverting `WINDOW` to 96 fails the shared probe on the **asymmetric fall only**
+  (scalar both directions and asymmetric rise still pass), printing exactly the predicted `61`; and
+  deleting the `Easing::step` finite check fails
+  `a_non_finite_value_cannot_poison_a_smoother_permanently`. The `--report` table was re-run
+  independently over `presets/` and matches `ea781d0`'s numbers.
+  **Major, fixed here:** `spectrum_comb` and `spectrum_ridge` shipped headers whose stated
+  arithmetic is for a **superseded** tuning — `ea781d0` retuned the bindings and swept only part of
+  the prose. The comb argued `curve = 0.72` with a 4.2x / 1.9x lift while shipping `0.85` (where the
+  same levels lift **2.2x / 1.4x**), and named `base` 0.08, `scale` 7.0 and a `12 -> 20` stroke
+  against shipped `0.13`, `10.0` and `13`; the ridge's whole retune paragraph was for `curve 0.55`
+  and described `scale` as a **2.75x cut** where it shipped as a **2.05x rise** (2.2 → 4.50) — the
+  opposite direction. That matters because Phase 6 done-when 4 made "says so in its header, with the
+  factor" a contract precisely so the content lane stops guessing, and `spectrum_corona` (whose
+  numbers are correct) shows the intended standard. Every figure recomputed against the shipped
+  bindings; **no binding changed**. `ea781d0`'s commit body carries the same 4.2x / 1.9x slip and
+  stands as the historical record.
+  **Minors:** (1) backlog 0016–0019 carried no closure markers though the plan header names them —
+  **added here**; (2) backlog 0023 said `spectrum_ridge` "now carries `thickness = 3.2`" where it
+  ships `4.2`, which is the entry [0039] builds on — **fixed here**; (3) `README.md`'s pre-push
+  "~39 s" predated `WINDOW` 96 → 180 (measured 39.7 s of nextest now) — **fixed here**; (4) Phase 8's
+  commit body answers "over which presets" for seven families totalling 35 and **omits `spectrum`**,
+  the plan's own subject system, which also marks 3 of 3 (measured at review) — so 38 of 38, not 35;
+  (5) backlog 0022 quotes `curve = 0.62` / `scale 1.75` in the present tense from a tuning superseded
+  the same day — annotated here rather than restated, since the defect is structural and survives any
+  exponent. **Nits:** `segment_settled` returns `true` for an **empty** segment ("no claim to
+  invalidate"), which is the permissive direction for a gate whose purpose is refusing uncertified
+  numbers — reachable through `probe_response`'s `unwrap_or_default()`, though today's window
+  arithmetic never produces one; and `Placement::default()`'s doc says "the scene's own defaults
+  rather than zeroes" while `radius` is exactly `0.0` against a scene default of `0.35` (tests only).
+  **⚠ Unmeasured, as the plan disclosed:** the per-frame cost of up to 64 `powf` calls is asserted
+  negligible against the existing per-element work, and no number is claimed. Nothing new for the
+  on-device pass otherwise — the render loop's structure is unchanged and the probe work lives
+  entirely in the capture/`shot` path. **Three entries route onward:**
+  [0021](../design-backlog.md) (an even fall is unreachable with a one-pole in any ordering),
+  [0022](../design-backlog.md) (`--report`'s reactivity columns are structurally blind to a `curve`,
+  because its stimuli are full-scale and `1^curve` is `1`), and [0023](../design-backlog.md), which
+  is already [Plan 0039](0039-line-joins.md) + [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md).
+  Version **minor 0.19.0 → 0.20.0** (a feature plan).
 
 - [0037 — Verifying easing: a transient probe, a signal with dynamics, and the levels authors
   calibrate against](done/0037-verifying-easing-transient-probe-and-dynamic-signal.md) — **done

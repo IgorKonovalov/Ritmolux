@@ -72,19 +72,19 @@ rotation = "sin(time * 0.9) * 0.09"
 # what makes the scene hard to gain: left linear the top end is invisible, and
 # flattened too far every element is the same height and the comb says nothing.
 #
-# `curve = 0.72` is the compromise, deliberately gentler than the 0.5 the docs
-# use as their worked example. At 0.72 a quiet 0.006 becomes 0.025 - a 4.2x lift,
-# so the top end is legible - while a loud 0.106 becomes 0.199, only 1.9x. That
-# keeps roughly an 8:1 height ratio between the ends. Compressing harder buys
+# `curve = 0.85` is the compromise, far gentler than the 0.5 the docs use as
+# their worked example. At 0.85 a quiet 0.006 becomes 0.0129 - a 2.2x lift, so
+# the top end is legible - while a loud 0.106 becomes 0.148, only 1.4x. That
+# pulls the two ends from 17.7:1 apart to about 11.5:1. Compressing harder buys
 # visibility at the top and pays for it in the very contrast the comb is for.
 #
 # `base` is the other half of the gain and it was the bigger error. It is a
 # constant added to EVERY element, so it is pure "the same at all frequencies":
 # at 0.26, against audio terms in the 0.1-0.6 range, the floor was most of what
-# you saw and the readout looked flat whatever the curve did. 0.08 is enough that
+# you saw and the readout looked flat whatever the curve did. 0.13 is enough that
 # a silence still shows a comb rather than nothing, and not a unit more.
 #
-# `scale` then buys the height back at 7.0, aimed slightly hot on purpose: real
+# `scale` then buys the height back at 10.0, aimed slightly hot on purpose: real
 # music through loopback runs louder than any stimulus synthesized here, so the
 # honest calibration target is the live app, not this file's arithmetic.
 #
@@ -106,8 +106,10 @@ span  = "1.72"
 # one. Each of the 26 elements owns a twenty-sixth of the readout's width, and a
 # thin stroke in a narrow slot reads as a scatter of dots rather than a comb.
 # `span` widened the readout by ~1.7x, which widened every slot by the same
-# factor, so the stroke rises with it (12 -> 20) to keep the bars looking like
-# bars with a visible gap between them.
+# factor, so the stroke rises with it - but only to 13, not the 20 that factor
+# suggests. Scaling it the full 1.7x was tried and read as blurry and upscaled:
+# 0.12 world units of stroke against a 0.132 slot is 91 % fill and mostly soft
+# skirt. `glow` below tightens the core instead, which is the cheaper lever.
 thickness  = "13 + clamp(bass * 5.0, 0, 3.0)"
 
 # STROKE SHARPNESS. `glow` scales the renderer's core-to-edge falloff, and below

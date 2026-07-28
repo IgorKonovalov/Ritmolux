@@ -1,7 +1,8 @@
 # ADR-0040 — The spectrum level curve applies *before* the per-element easing, and is a bindable exponent rather than a named mode
 
-> **Status:** proposed — **see [Outcome](#outcome-2026-07-28-after-plan-0038-phase-3s-measurement)
-> below (2026-07-28): the decision stands, its stated mechanism is falsified and corrected there.**
+> **Status:** accepted (2026-07-28, at Plan 0038's close) — **but see
+> [Outcome](#outcome-2026-07-28-after-plan-0038-phase-3s-measurement) below: the decision stands,
+> its stated mechanism is falsified and corrected there.**
 > Read the Outcome before quoting anything in Decision or Consequences about *even falls*.
 > **Date:** 2026-07-27
 > **Related plan(s):** [0038](../plans/0038-line-family-unreachable-levers.md)

@@ -699,6 +699,13 @@ one problem, not two.
 Not ADR-worthy on its own, but see **0018**: it and this are the two halves of "the readout's shape
 is pinned by constants", and they should be designed together.
 
+- **PROMOTED 2026-07-27 → [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) Phase 2
+  (with 0018, as this entry asked). ~~CLOSED 2026-07-28~~** — `f3945be` made `span` a bound
+  **world** half-width defaulting to exactly the old `SPAN_X = 1.0`, with a unit test asserting no
+  aspect or target size is read anywhere in the scene. The binding constraint held: `span ≈ 1.78`
+  fills a 16:9 frame and leaves an ultrawide short, and `presets/README.md` states that rather than
+  offering a `fit` mode. `spectrum_comb` and `spectrum_ridge` now ship at `1.72`.
+
 ---
 
 ## 0017 — `[spectrum]` has no level curve, and the grammar has no `log`, so a dB readout is impossible
@@ -729,6 +736,16 @@ consequence worth recording — **ADR-worthy**.
 Adding `log` to the expression grammar is the *other* candidate and is broader (it would serve every
 system, not just this one), but it does not fix the easing-bypass leg on its own. Weigh both.
 
+- **PROMOTED 2026-07-27 → [ADR-0040](adrs/0040-spectrum-level-curve-applies-before-the-easing.md) +
+  [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) Phases 3 and 4 — both candidates,
+  as this entry asked. ~~CLOSED 2026-07-28~~** — `c9121fd` shipped `curve` as a bindable exponent
+  applied **before** the easing, and `e31ae88` shipped `log(x)`. The either/or this entry called
+  ADR-worthy was decided, then **measured and half-falsified**: the ordering stands, but not for the
+  "perceptually even fall" reason — see the ADR's Outcome. Read the two consequences it left behind
+  before quoting this entry's framing: an even fall is unreachable in any ordering
+  ([0021](#0021--an-even-fall-is-not-reachable-with-a-one-pole-in-any-ordering)), and `--report`
+  cannot see a curve at all ([0022](#0022--reports-reactivity-columns-are-structurally-blind-to-a-level-curve)).
+
 ---
 
 ## 0018 — `BASELINE_Y` is a constant, so `mirror_reflect` throws the copy to the top of the frame
@@ -752,6 +769,14 @@ the figure.
 scene should be a param", both are one named param, and a fix touching `BASELINE_Y` wants to think
 about `SPAN_X` at the same time. Same ADR-0037 constraint applies: world quantities only.
 
+- **PROMOTED 2026-07-27 → [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) Phase 2
+  (with 0016). ~~CLOSED 2026-07-28~~** — `f3945be` made `baseline` a bound world y, defaulting to
+  exactly the old `-0.85`, and **fixed this by moving the figure rather than by special-casing the
+  mirror**: no new mirror semantics, the reflection is still across the x-axis on every line scene
+  alike. `baseline = 0` is the centre-mirrored readout, pinned by a test that counts the distinct
+  foot lines (one at `0`, two at `-0.85`/`+0.85`). `spectrum_ridge` ships it, and the sentence its
+  header had claimed aspirationally since it was written is now true.
+
 ---
 
 ## 0019 — `glow` is unreachable from a preset on all four line scenes
@@ -771,6 +796,15 @@ deliberately whether this ships *ahead* of 0005 — it is nearly free and immedi
 waits so the two are designed as one coherent luminance story. **Recommendation: ship ahead.** A
 per-segment falloff param and a screen-space bloom are different tools an author would reach for
 differently, and holding a one-line win behind an undesigned stage has no payoff.
+
+- **PROMOTED 2026-07-27 → [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) Phase 1,
+  ahead of 0005 as recommended. ~~CLOSED 2026-07-28~~** — `a1c67f4` bound `glow` on all four line
+  scenes at a default of exactly `1.0`, goldens byte-identical. The range question the entry did not
+  ask was answered by the non-vacuity measurement: **downward has more range than upward** (0.25 vs
+  0.17 per lit pixel on the rose), because strokes blend additively into an 8-bit target so `glow`
+  above 1 saturates the core and only widens the skirt. `lsystem_arrowhead` ships `0.55` and
+  `spectrum_comb` `0.75`. **0005 is untouched and still open** — this is the renderer's per-segment
+  falloff, not a post-process bloom, and `presets/README.md` says so beside the param.
 
 ---
 
@@ -881,6 +915,11 @@ of quiet elements carries visible shape in every frame where it used to be a run
 stubs. `--report` recorded the opposite — `bass` 0.084 → 0.068, `treb` 0.047 → 0.020 — reading as a
 substantial loss of reactivity on a preset that had just become *more* legible.
 
+> Those are the values at the moment this was raised; the preset was retuned again the same day and
+> ships `curve = 0.85` / `scale = 10.0`. The numbers are left as the worked example because the
+> defect is **structural** — the report is blind to a curve at *any* exponent, so nothing about the
+> argument moves with the tuning.
+
 **Why, and it is not a tuning accident.** The report's band stimuli drive their bands to **full
 scale**, and `curve` is `level^curve`, so at a level of `1.0` it is the **identity** — `1^0.62 = 1`
 at any exponent. The compression only exists below 1.0. So the reactivity columns see the `scale`
@@ -943,8 +982,9 @@ this much worse by design — the whole point of the `curve` lever is to give ne
 *more* height contrast, and height contrast on a polyline is exactly turn angle.
 
 **The only preset-side lever is stroke width**, since the notch scales with it. `spectrum_ridge` now
-carries `thickness = 3.2` where its look wanted more, and that is a real cost paid to a renderer
-limitation. Raising `elements` does **not** help and slightly hurts: more points over a fixed `span`
+carries `thickness = 4.2` — thinned from `5.0`, but not as far as the artifact wanted, because
+thinning far enough to hide the notch drops the figure under the `animation` gate's motion floor.
+That is a real cost paid to a renderer limitation. Raising `elements` does **not** help and slightly hurts: more points over a fixed `span`
 shortens the x-step while the y-differences stay, which steepens every turn.
 
 **The cheap fix, if it is wanted.** Extend each segment quad by `width` along its own direction
