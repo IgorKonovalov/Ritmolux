@@ -18,7 +18,7 @@
 //!
 //! Variables: `bass mid treb onset beat bar time tempo novelty index`.
 //! Constants: `pi tau`.
-//! Functions: `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep
+//! Functions: `sin cos abs floor sqrt log min max pow mod clamp lerp smoothstep
 //! select bin`. Compilation is fallible (a malformed expression is
 //! rejected with a surfaced error, never a panic); evaluation of a compiled
 //! expression is total, panic-free, and allocation-free — it walks a prebuilt
@@ -166,6 +166,10 @@ enum Func {
     Abs,
     Floor,
     Sqrt,
+    /// `log(x)` — **natural** logarithm (Plan 0038 Phase 4). There is no
+    /// `log10`; divide by `ln(10)` = `2.302585` for a decade-based one, which is
+    /// what the dB idiom in `docs/presets.md` does.
+    Log,
     Min,
     Max,
     Pow,
@@ -188,6 +192,7 @@ impl Func {
             "abs" => Func::Abs,
             "floor" => Func::Floor,
             "sqrt" => Func::Sqrt,
+            "log" => Func::Log,
             "min" => Func::Min,
             "max" => Func::Max,
             "pow" => Func::Pow,
@@ -203,7 +208,13 @@ impl Func {
 
     fn arity(self) -> usize {
         match self {
-            Func::Sin | Func::Cos | Func::Abs | Func::Floor | Func::Sqrt | Func::Bin => 1,
+            Func::Sin
+            | Func::Cos
+            | Func::Abs
+            | Func::Floor
+            | Func::Sqrt
+            | Func::Log
+            | Func::Bin => 1,
             Func::Min | Func::Max | Func::Pow | Func::Mod => 2,
             Func::Clamp | Func::Lerp | Func::Smoothstep | Func::Select => 3,
         }
@@ -294,6 +305,10 @@ impl Node {
                 (Func::Floor, [x]) => x.eval(vars).floor(),
                 // Out-of-domain input yields NaN, not a panic.
                 (Func::Sqrt, [x]) => x.eval(vars).sqrt(),
+                // Same posture as `sqrt` rather than a new rule: mathematically
+                // honest at the edges, so `log(0)` is -inf and `log(-1)` is NaN.
+                // `max` and `select` are the guard idiom (see `docs/presets.md`).
+                (Func::Log, [x]) => x.eval(vars).ln(),
                 (Func::Min, [a, b]) => a.eval(vars).min(b.eval(vars)),
                 (Func::Max, [a, b]) => a.eval(vars).max(b.eval(vars)),
                 (Func::Pow, [b, e]) => b.eval(vars).powf(e.eval(vars)),

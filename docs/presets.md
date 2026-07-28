@@ -330,6 +330,7 @@ identifier that is neither a constant nor a variable is a compile error.
 | `abs(x)` | 1 | Absolute value. |
 | `floor(x)` | 1 | Largest integer ≤ `x`. |
 | `sqrt(x)` | 1 | Square root. `sqrt` of a negative is `NaN` — guard it with `select` or `max(x, 0)`. |
+| `log(x)` | 1 | **Natural** logarithm (base `e`). Same posture as `sqrt` at the edges: `log(0)` is `-inf` and `log(-1)` is `NaN` — guard with `select` or `max(x, tiny)`. There is **no `log10`**; divide by `ln(10)` = `2.302585`. See [Decibels](#decibels). |
 | `min(a, b)` | 2 | Smaller of `a`, `b`. |
 | `max(a, b)` | 2 | Larger of `a`, `b`. |
 | `pow(base, exp)` | 2 | `base` raised to `exp`. Shape a response curve: `pow(bass * 8, 2)` is punchier, `pow(x, 0.5)` gentler. |
@@ -505,6 +506,34 @@ max(beat, onset > 0.6)                # on a beat OR a strong transient
 **Chained comparisons are legal but rarely what you mean.** `a > b > c` parses
 left-associatively as `(a > b) > c`, comparing a `0`/`1` against `c`. Write
 `min(a > b, b > c)` instead.
+
+### Decibels
+
+`log(x)` is a **natural** logarithm, and it exists mainly so a preset can reach a
+decibel scale — audio level is perceptually logarithmic, and the raw bands are
+not. There is deliberately **no `log10`**, so convert with `ln(10)`:
+
+```
+20 * log(x) / 2.302585                 # x as decibels (2.302585 is ln(10))
+```
+
+Worked against a real measurement: a typical band level is around `0.03`, and
+`log(0.03)` is `-3.5066`, so that expression gives **-30.5 dB**. Silence is the
+edge to respect — `log(0)` is `-inf`, which propagates into a parameter as an
+undefined-looking visual — so floor the input rather than the output:
+
+```
+20 * log(max(bass, 0.0001)) / 2.302585  # floored at -80 dB instead of -inf
+```
+
+`log` follows `sqrt`'s posture exactly: mathematically honest at the edges
+(`log(0)` = `-inf`, `log(-1)` = `NaN`), with `max` and `select` as the guards.
+
+**This does not reach the `spectrum` scene's own element levels.** An expression
+only sees what the grammar exposes, and those levels are scene state computed
+after every binding has been evaluated. To shape them, use that scene's `curve`
+parameter instead (see [Systems](#systems)); `log` is for shaping a value you can
+already name.
 
 ### Idioms (patterns from the curated set)
 

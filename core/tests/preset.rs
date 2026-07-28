@@ -142,6 +142,53 @@ fn v2_math_functions_compute_expected_values() {
     assert!((eval(composite) - 10.5).abs() < 1e-6);
 }
 
+/// Plan 0038 Phase 4. `log(x)` is the **natural** logarithm, arity 1, and the
+/// reason it exists is the decibel idiom in `docs/presets.md`.
+#[test]
+fn log_is_the_natural_logarithm_at_arity_one() {
+    let zero = Variables::default();
+    let eval = |src: &str| compile(src).expect("compiles").eval(&zero);
+
+    // Exact interior values, not just "is finite": base e, not base 10.
+    assert!((eval("log(1)")).abs() < 1e-6, "log(1) = 0");
+    assert!(
+        (eval("log(2.718281828)") - 1.0).abs() < 1e-6,
+        "log(e) = 1, so this is the natural log"
+    );
+    assert!(
+        (eval("log(10)") - std::f32::consts::LN_10).abs() < 1e-5,
+        "log(10) = ln(10), NOT 1 — there is no log10"
+    );
+    // The literal `docs/presets.md` tells authors to divide by, guarded against
+    // drifting from the real constant. Parsed from a string rather than written
+    // as a float so it is the *documented* value being checked.
+    assert!(
+        (eval("2.302585") - std::f32::consts::LN_10).abs() < 1e-6,
+        "the ln(10) constant in the docs' decibel idiom has drifted"
+    );
+
+    // The worked dB example the docs promise: a typical measured band level of
+    // 0.03 reads -30.5 dB.
+    let db = eval("20 * log(0.03) / 2.302585");
+    assert!(
+        (eval("log(0.03)") + 3.5066).abs() < 1e-3,
+        "log(0.03) = -3.5066"
+    );
+    assert!(
+        (db + 30.457).abs() < 1e-2,
+        "20 * log(0.03) / ln(10) should be about -30.5 dB, got {db}"
+    );
+
+    // Arity is checked at compile time like every other call, so a `log10`-shaped
+    // two-argument call is a surfaced load error rather than a silent misread.
+    assert!(
+        compile("log(0.1, 2)").is_err(),
+        "log takes exactly one argument"
+    );
+    // ...and a bare `log` is an unknown identifier, not a zero-arg call.
+    assert!(compile("log").is_err(), "a bare `log` is not a value");
+}
+
 /// Degenerate inputs to the v2 functions yield `NaN`/`inf`/`0`, never a panic —
 /// `eval` must stay total on the per-frame hot path.
 #[test]
@@ -150,6 +197,18 @@ fn v2_math_functions_are_total_on_degenerate_input() {
     let eval = |src: &str| compile(src).expect("compiles").eval(&zero);
 
     assert!(eval("sqrt(0 - 1)").is_nan(), "sqrt of a negative is NaN");
+    // `log` follows sqrt's posture rather than inventing a new rule: honest at
+    // the edges, guarded by the author with `max`/`select` (Plan 0038 Phase 4).
+    assert_eq!(
+        eval("log(0)"),
+        f32::NEG_INFINITY,
+        "log(0) is -inf, not a clamped floor"
+    );
+    assert!(eval("log(0 - 1)").is_nan(), "log of a negative is NaN");
+    assert!(
+        eval("max(log(max(0, 0.0001)), 0 - 80)").is_finite(),
+        "the documented guard idiom keeps a silent input finite"
+    );
     assert!(eval("mod(1, 0)").is_nan(), "a zero divisor is NaN");
     // edge0 == edge1 divides by zero; the clamp folds the result into [0, 1].
     let degenerate = eval("smoothstep(1, 1, 2)");
