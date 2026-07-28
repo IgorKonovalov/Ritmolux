@@ -9,7 +9,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
-| [0038](0038-line-family-unreachable-levers.md) | The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log` | **approved 2026-07-27** — ready for `dev`, **take this next** | dev, human |
+| [0038](0038-line-family-unreachable-levers.md) | The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log` | **in-progress** — Phases 1-4 landed; **Phase 5 unblocked 2026-07-28** by the ADR-0040 ruling, and a new **Phase 7** added by it. Phase 6 is the user's | dev, human |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
@@ -21,23 +21,33 @@ function in `render/grid.rs`. See Recently closed. Every later stage inherits th
 0005's bloom stage now builds against it rather than against the defect.
 
 **[0037] has landed and closed** — `[smoothing]` is observable for the first time. See Recently
-closed. **Take [0038] next**; it was already sequenced ahead of the rest of the backlog and
-`2f7f213` amended its Phase 3 to use the probe [0037] just landed.
+closed. **Resume [0038] next** — Phases 5 and 7, in that order; `2f7f213` amended its Phase 3 to use
+the probe [0037] just landed, and Phase 7 now fixes what that measurement exposed in the probe itself.
 
-**[0038] is approved and is now the only active render plan.** It closes the whole 0016–0019 backlog
+**[0038] is mid-flight and is the only active render plan.** It closes the whole 0016–0019 backlog
 batch: four levers that already exist in the engine and are simply not reachable from a `.toml`.
 **Every new parameter defaults to today's constant**, so Phases 1–5 are behaviour-preserving and
-assert byte-identical goldens. Its **Phase 3 done-when 6** (added `2f7f213`, after [0037] Phase 1
-landed) measures [ADR-0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md)'s
-curve-before-easing ordering with the probe instead of leaving it as an argument. **Two things
-[0037]'s close tells that phase, and they point the same way:** the probe works well on a
-*purpose-built near-linear fixture* and only directionally on a *shipped preset*, so done-when 6 is
-right to demand its own spectrum fixture and must not be satisfied against a curated preset; and
-`step_response` alone reports frames-to-90 % each way, which **cannot** distinguish "even across its
-travel" from "fast start, long crawl" — that shape claim needs
-`metrics::frames_to_settle(segment, settle_frac)` sampled at several fractions, which is `pub` and
-takes exactly that argument. [0038] Phase 6 is a `preset-author` pass and is the only phase that
-changes how anything looks.
+assert byte-identical goldens — verified: `glow`, `span`, `baseline`, `curve` and `log` all landed
+(`a1c67f4`, `f3945be`, `c9121fd`, `e31ae88`) with the golden suite byte-identical and no re-bless.
+
+**Its Phase 3 done-when 6 found against [ADR-0040] and the ruling is in** (2026-07-28, this plan's
+mid-flight architect pass): **the ordering stands, no scene code changes, and the stated rationale is
+replaced.** Both orderings produce exponentials of identical shape for a step to silence, so neither
+is "more even" and the ADR argued for a property no ordering can deliver; the real difference is that
+ease-then-curve would make the effective release `release / curve`, where the shipped order leaves
+`release` naming the same duration at any `curve`. See
+[ADR-0040's Outcome](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement).
+**Two consequences for whoever picks this up:** Phase 5 is unblocked and its done-when 3 is rewritten
+(it would otherwise have documented the falsified coupling), plus a done-when 6 correcting three
+in-code comments that still assert it; and a new **Phase 7** fixes a real defect in [0037]'s probe —
+`metrics::frames_to_settle` normalizes against the *segment's own last frame*, so a response still
+travelling at the end of the window reads as settled, and the guard against that
+(`fall_frames < WINDOW`) is unreachable by construction. That artifact is what produced the one half
+of the Phase 3 measurement that did not hold up. [0038] Phase 6 is a `preset-author` pass and is the
+only phase that changes how anything looks.
+
+**No version bump yet** — [0038] is not closed. The bump is owed at its close, per
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md); the version is at `0.19.0`.
 
 **The next ADR is design-backlog 0015** — the band axis is half linear, and Plan 0037 Phase 4's
 listening test turned it from a documented curiosity into a **user-confirmed real limitation**: on

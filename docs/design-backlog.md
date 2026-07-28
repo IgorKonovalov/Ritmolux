@@ -812,3 +812,57 @@ cheap first step is a pass with `--signal dynamic:110` over the library looking 
 barely move — that is now possible and was not before. No ADR: this is tuning, not architecture,
 unless the audit turns up a *grammar* gap (e.g. no way to express "normalize this band against its
 own recent range"), which would be its own entry.
+
+---
+
+## Entry 0021 — from the Plan 0038 / ADR-0040 ruling
+
+Not from the content lane. Raised by an `architect` ruling that had to falsify a claim in order to
+answer a `dev` finding, and left a real want with nowhere to live.
+
+---
+
+## 0021 — an "even fall" is not reachable with a one-pole, in any ordering
+
+- **Raised:** 2026-07-28, from
+  [ADR-0040's Outcome](adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement).
+  ADR-0040 chose the spectrum level curve's position in the pipeline partly to buy "a perceptually
+  even fall". Plan 0038 Phase 3 measured it, and the closed form settles it: **no ordering can deliver
+  that**, because every `[smoothing]` response in this engine is a one-pole exponential and a power of
+  an exponential is an exponential.
+- **Verified against code:** yes. `Easing::step` (`core/src/preset/schema.rs:223`) is
+  `held + (1 - exp(-dt/tau)) * (raw - held)`, one constant per direction (ADR-0035), no shape.
+  `Smoother::smooth` (`core/src/render/mod.rs:317`) is the same arithmetic for bindings, and the
+  spectrum scene's per-element easing calls the same method.
+
+**The measurement, for the record.** An exponential spends **30 %** of its settling time covering the
+first half of its travel (`ln2 / ln10` = 0.301); a linear ramp spends **56 %**. Both curve orderings
+measure 0.301 when measured to settlement. So "even" is a ~1.8x gap from what the engine can currently
+produce, in either ordering, at any exponent.
+
+**The want is legitimate and has been asked for twice.** This is the half of
+[0006](#0006--smoothing-is-a-one-pole-low-pass-no-attackrelease-split-no-s-curve) that
+[ADR-0035](adrs/0035-asymmetric-attack-release-easing.md) deliberately did not take — 0006's origin
+ask was literally "use some qubic bezziere function or something", and the asymmetric one-pole
+answered the *symmetry* half of that defect while leaving the *shape* half untouched. A meter that
+falls at a constant rate is the classic look this cannot make.
+
+**The cheap shape, if it is wanted:** a **rate-limited (slew) release** rather than a curve —
+`held += clamp(raw - held, -rate * dt, +rate * dt)` — which is a third `[smoothing]` form beside
+today's scalar and `{ attack, release }`, needs **no** new per-binding state (the slot exists), stays
+stateless from the author's side, and is frame-rate-independent for the same reason the one-pole is
+(ADR-0019's injected real `dt`). A constant-rate fall is exactly evenness 0.556. The nameable rejected
+alternative is a full parametric ease curve, which needs a notion of "a transition in progress" and a
+rule for a target that moves mid-ease — the same reason it lost in 0006.
+
+**Not the thing ADR-0035 already rejected.** Its Alternative C was a `slew(x, up, down)` **function in
+the grammar**, refused outright because expressions are pure and stateless by hard invariant. The
+proposal here is the opposite location: a `[smoothing]`-table *form*, where the state already lives and
+where the asymmetric one-pole itself landed. That distinction is the whole reason this is a fresh entry
+rather than a re-litigation, and any ADR must say so explicitly or it will read as reopening 0035.
+
+**ADR-worthy** as a short supplement to [ADR-0019](adrs/0019-eased-parameters.md) /
+[ADR-0035](adrs/0035-asymmetric-attack-release-easing.md) if acted on. **Not urgent**: nothing shipped
+is broken, and unlike most entries here this one is a *new capability* rather than a wall the content
+lane has already hit. It wants a preset-author "I want this look and cannot get it" before it wants a
+plan — the evidence so far is an architect's arithmetic, not a frustrated author.
