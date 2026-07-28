@@ -9,7 +9,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
-| [0039](0039-line-joins.md) | Line joins: the stroke stops coming apart at every vertex | **draft 2026-07-28** — needs approval; [0038] has now closed, so nothing blocks it | dev, human |
+| [0039](0039-line-joins.md) | Line joins: the stroke stops coming apart at every vertex | **approved 2026-07-28** — ready for `dev`; [0038] has closed, so nothing blocks it | dev, human |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
@@ -27,10 +27,10 @@ closed.
 plus `log(x)` are preset-reachable, each defaulting to exactly the constant it replaced, and the
 curated set now uses them. See Recently closed. It also left the easing harness able to say when a
 number is *not* a measurement (`metrics::segment_settled`, and a `+` marker on every truncated
-`--report` cell), and closed backlog **0016–0019** outright. **No active render plan is mid-flight;
-[0039] is the next one and is drafted, waiting only on approval.**
+`--report` cell), and closed backlog **0016–0019** outright. **No render plan is mid-flight, and
+[0039] is approved and ready to take.**
 
-**[0039] is drafted and unblocked** (2026-07-28), from `preset-author` routing
+**[0039] is approved and is the next plan to take** (2026-07-28), from `preset-author` routing
 design-backlog 0023: `LineRenderer` builds every segment as an independent quad with no join
 geometry, so each direction change leaves a wedge of `width * tan(theta/2)` — a dark tick at every
 vertex, reported by a user watching `spectrum_ridge` full-screen. The decision is
