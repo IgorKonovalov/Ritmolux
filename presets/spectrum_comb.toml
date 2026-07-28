@@ -42,20 +42,49 @@ smoothing = { attack = 0.025, release = 0.22 }
 # thing that moves without audio. A spectrum readout has no rotation to turn and
 # no field to evolve; the elements sit where the frequency axis puts them. So the
 # breath has to be real, or the preset reads as frozen in a silence.
-base = "0.30 + sin(time * 1.5) * 0.15"
+base = "0.26 + sin(time * 1.5) * 0.17"
 
-# THE AUDIO TERM. The bands read small on real music - the same scale caveat as
-# `bass`/`mid`/`treb` - so this multiplies well above 1 and the elements reach a
-# useful height without clipping off the top of the frame at a peak.
-scale = "2.6"
+# THE AUDIO TERM, and THE LEVEL CURVE that now shapes it (Plan 0038). The bands
+# read small on real music, but they are also spread very unevenly: a linear map
+# spends the whole range on the loudest element and leaves every other one a stub
+# of nearly the same height. That is what this comb looked like before - one
+# spike over a flat shelf - and it is the reason `curve` exists.
+#
+# THE RETUNE, WITH THE FACTOR, because adopting a curve without one sends the
+# readout off the top of the frame. At curve 0.62 a typical quiet level of 0.03
+# becomes 0.03^0.62 = 0.114, a 3.8x boost, while a loud element at 0.30 becomes
+# 0.474, only 1.6x. `scale` drops 2.6 -> 1.75 to pay for it, a 1.5x cut, and the
+# two factors together are the whole point of the change:
+#
+#   quiet element   3.8x boost / 1.5x cut  =  ~2.5x TALLER than before
+#   loud element    1.6x boost / 1.5x cut  =  ~1.05x, i.e. it did not move
+#
+# The peak stays exactly where it was and the shelf underneath it comes up to
+# meet it. That is what a dB-like readout is for, and it is why the retune had to
+# be measured rather than guessed - cutting `scale` by the full 3.8x would have
+# flattened the peak along with everything else.
+#
+# What the curve does NOT touch is timing. The easing runs on the curved value -
+# the one you see - so the [spectrum] release above means the same duration at
+# every curve (ADR-0040). A curve costs a `scale` retune, never a `release` one.
+scale = "1.75"
+curve = "0.62"
 
-# STROKE - heavy on purpose. The readout is 2 world units wide and the renderer
-# divides world x by the target aspect, so the comb spans the frame's HEIGHT in
-# pixels - about 56% of the width at 16:9, not the whole of it. Each of the 26
-# elements owns a twenty-sixth of that, and a thin stroke inside so narrow a slot
-# reads as a scatter of dots rather than a comb. This fills most of the slot and
-# leaves a visible gap.
-thickness  = "12 + clamp(bass * 6.0, 0, 3.0)"
+# WIDTH. `span` is the figure's half-width in WORLD units and 1.72 fills a 16:9
+# frame very nearly edge to edge. Before this was bindable the comb was stuck at
+# 1.0, which is why the stroke below used to be so heavy - it was compensating
+# for a readout crammed into 56% of the width. It is not a "fill the frame"
+# switch: on an ultrawide 1.72 is still 1.72 and leaves the comb short, which is
+# correct for a world quantity and why there is no auto mode (ADR-0037).
+span  = "1.72"
+
+# STROKE - heavier again, and for the same reason as before rather than a new
+# one. Each of the 26 elements owns a twenty-sixth of the readout's width, and a
+# thin stroke in a narrow slot reads as a scatter of dots rather than a comb.
+# `span` widened the readout by ~1.7x, which widened every slot by the same
+# factor, so the stroke rises with it (12 -> 20) to keep the bars looking like
+# bars with a visible gap between them.
+thickness  = "20 + clamp(bass * 10.0, 0, 5.0)"
 brightness = "0.72 + clamp(mid * 1.4, 0, 0.34)"
 
 # COLOUR - a slow full rotation of the wheel (~40 s), pushed forward a little by

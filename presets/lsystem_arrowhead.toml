@@ -41,6 +41,25 @@ rotation = "0.88 * time + sin(time * 0.029) * 0.24"
 
 draw_progress = "clamp(0.60 + bar * 0.55 + clamp(onset * 0.6, 0, 0.18), 0, 1)"
 
+# STROKE FALLOFF (Plan 0038). `glow` scales the line renderer's core-to-edge
+# term - it is the shader's per-segment falloff, NOT a bloom stage and NOT the
+# same quantity as `glow` on fragment_field or reaction_diffusion, where the name
+# is shared and the meaning is not.
+#
+# This preset is the reason it was worth binding. At depth 7 the arrowhead curve
+# is the densest figure in the set - it measured the highest coverage of any
+# preset here, with nearly the whole frame lit - and at the default 1.0 the fine
+# curls fuse into a warm wash where the self-similarity stops reading. Pulling
+# the falloff down separates them again and lets the backdrop through, which is
+# what makes it legible as a fractal rather than as texture.
+#
+# 0.55 rather than lower on purpose: the docs note there is more usable range
+# below 1.0 than above it, and by 0.30 this figure has gone cool and lacy and no
+# longer looks like itself. There is no audio term - the strokes already carry
+# `brightness`, and stacking a second luminance driver on an additive renderer is
+# how a peak clips to white.
+glow = "0.55"
+
 thickness  = "1.35 + clamp(mid * 1.1, 0, 0.95)"
 brightness = "0.72 + clamp(mid * 0.40, 0, 0.20)"
 scale      = "0.82 + sin(time * 0.95) * 0.07 + bar * 0.05 + clamp(bass * 0.30, 0, 0.13)"
