@@ -42,7 +42,16 @@ smoothing = { attack = 0.025, release = 0.22 }
 # thing that moves without audio. A spectrum readout has no rotation to turn and
 # no field to evolve; the elements sit where the frequency axis puts them. So the
 # breath has to be real, or the preset reads as frozen in a silence.
-base = "0.26 + sin(time * 1.5) * 0.17"
+base = "0.13 + sin(time * 1.5) * 0.12"
+
+# A GENTLE ROCK, and it is the comb's main silent-audio motion now. In a silence
+# every element's length is exactly `base` - `scale` is multiplied by a zero
+# level - so a spectrum readout has only two things that can move without audio:
+# the resting length, and the view. Tilting matters more than it sounds: rotation
+# is about the frame CENTRE, and `span` now puts the outer elements 1.7 world
+# units out, so a couple of degrees sweeps them through much more than their own
+# width while the middle of the comb barely shifts.
+rotation = "sin(time * 0.9) * 0.09"
 
 # THE AUDIO TERM, and THE LEVEL CURVE that now shapes it (Plan 0038). The bands
 # read small on real music, but they are also spread very unevenly: a linear map
@@ -50,25 +59,40 @@ base = "0.26 + sin(time * 1.5) * 0.17"
 # of nearly the same height. That is what this comb looked like before - one
 # spike over a flat shelf - and it is the reason `curve` exists.
 #
-# THE RETUNE, WITH THE FACTOR, because adopting a curve without one sends the
-# readout off the top of the frame. At curve 0.62 a typical quiet level of 0.03
-# becomes 0.03^0.62 = 0.114, a 3.8x boost, while a loud element at 0.30 becomes
-# 0.474, only 1.6x. `scale` drops 2.6 -> 1.75 to pay for it, a 1.5x cut, and the
-# two factors together are the whole point of the change:
+# CALIBRATED AGAINST MEASURED LEVELS, not against --set magnitudes, because
+# guessing them is what got this preset wrong once already. `shot --signal`
+# prints what it measured, and for `dynamic:110`:
 #
-#   quiet element   3.8x boost / 1.5x cut  =  ~2.5x TALLER than before
-#   loud element    1.6x boost / 1.5x cut  =  ~1.05x, i.e. it did not move
+#   bass  min 0.004  mean 0.040  max 0.106
+#   mid   min 0.000  mean 0.006  max 0.019
+#   treb  min 0.000  mean 0.006  max 0.032
 #
-# The peak stays exactly where it was and the shelf underneath it comes up to
-# meet it. That is what a dB-like readout is for, and it is why the retune had to
-# be measured rather than guessed - cutting `scale` by the full 3.8x would have
-# flattened the peak along with everything else.
+# The top of the spectrum runs about SEVEN TIMES quieter than the bottom on real
+# material. That spread is the thing this readout exists to show, and it is also
+# what makes the scene hard to gain: left linear the top end is invisible, and
+# flattened too far every element is the same height and the comb says nothing.
+#
+# `curve = 0.72` is the compromise, deliberately gentler than the 0.5 the docs
+# use as their worked example. At 0.72 a quiet 0.006 becomes 0.025 - a 4.2x lift,
+# so the top end is legible - while a loud 0.106 becomes 0.199, only 1.9x. That
+# keeps roughly an 8:1 height ratio between the ends. Compressing harder buys
+# visibility at the top and pays for it in the very contrast the comb is for.
+#
+# `base` is the other half of the gain and it was the bigger error. It is a
+# constant added to EVERY element, so it is pure "the same at all frequencies":
+# at 0.26, against audio terms in the 0.1-0.6 range, the floor was most of what
+# you saw and the readout looked flat whatever the curve did. 0.08 is enough that
+# a silence still shows a comb rather than nothing, and not a unit more.
+#
+# `scale` then buys the height back at 7.0, aimed slightly hot on purpose: real
+# music through loopback runs louder than any stimulus synthesized here, so the
+# honest calibration target is the live app, not this file's arithmetic.
 #
 # What the curve does NOT touch is timing. The easing runs on the curved value -
 # the one you see - so the [spectrum] release above means the same duration at
 # every curve (ADR-0040). A curve costs a `scale` retune, never a `release` one.
-scale = "1.75"
-curve = "0.62"
+scale = "10.00"
+curve = "0.85"
 
 # WIDTH. `span` is the figure's half-width in WORLD units and 1.72 fills a 16:9
 # frame very nearly edge to edge. Before this was bindable the comb was stuck at
@@ -84,7 +108,14 @@ span  = "1.72"
 # `span` widened the readout by ~1.7x, which widened every slot by the same
 # factor, so the stroke rises with it (12 -> 20) to keep the bars looking like
 # bars with a visible gap between them.
-thickness  = "20 + clamp(bass * 10.0, 0, 5.0)"
+thickness  = "13 + clamp(bass * 5.0, 0, 3.0)"
+
+# STROKE SHARPNESS. `glow` scales the renderer's core-to-edge falloff, and below
+# 1.0 it tightens the stroke toward its core. It matters more here than on the
+# other line scenes because a bar is a SHORT, WIDE stroke: the soft skirt runs
+# along its whole length, so a fat bar reads as a blurred block rather than a
+# bar. Between this and the thinner stroke above, the comb has hard edges again.
+glow       = "0.75"
 brightness = "0.72 + clamp(mid * 1.4, 0, 0.34)"
 
 # COLOUR - a slow full rotation of the wheel (~40 s), pushed forward a little by

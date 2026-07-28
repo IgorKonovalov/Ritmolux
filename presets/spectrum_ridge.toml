@@ -36,7 +36,7 @@ name = "aurora"
 # between the two contours: at 0.55 they sat 1.1 world units apart with a dead
 # void between them. At 0.14 they share a foot line and read as one figure
 # opening and closing, which is the whole point of the mirror.
-base  = "0.14 + sin(time * 1.3) * 0.07"
+base  = "0.12 + sin(time * 1.3) * 0.12"
 
 # THE LEVEL CURVE, and the `scale` retune it forces. `curve` compresses the
 # element level before the easing, so quiet elements stop being stubs - on a
@@ -50,8 +50,8 @@ base  = "0.14 + sin(time * 1.3) * 0.07"
 # 1.8x taller and the peak about 0.6x - legible low end, peak still inside the
 # frame. Timing is untouched: the easing runs on the curved value, so the
 # `release` above means the same duration at any curve (ADR-0040).
-scale = "0.80"
-curve = "0.55"
+scale = "4.50"
+curve = "0.85"
 
 # WIDTH, AND THE SILENT-AUDIO MOTION. `span` is a world half-width, and 1.72
 # fills a 16:9 frame very nearly edge to edge (1.78 is exact). It is deliberately
@@ -89,7 +89,7 @@ baseline       = "0"
 # A SLOW TILT - the contour turning a few degrees either way. This is the motion
 # that carries the preset through a silence, and it works here precisely because
 # the figure is off-centre: rotating it sweeps the line across its own width.
-rotation = "sin(time * 0.4) * 0.30 + clamp(bass * 0.5, 0, 0.10)"
+rotation = "sin(time * 0.9) * 0.40 + clamp(bass * 0.5, 0, 0.10)"
 
 # COLOUR ALONG THE AXIS. `hue_spread` walks the palette from the lowest element
 # to the highest, so the low end and the top end are different colours and you
@@ -99,7 +99,21 @@ hue        = "mod(0.10 + time * 0.02, 1)"
 hue_spread = "0.75"
 saturation = "0.95"
 
-thickness  = "5.0 + clamp(mid * 8.0, 0, 3.0)"
+# STROKE, trimmed from 5.0 but not as far as the artifact below would want.
+# `LineRenderer` draws each segment as an INDEPENDENT quad with its own
+# perpendicular and no join geometry, so wherever the contour changes direction
+# the two rectangles' outer corners diverge and leave a wedge-shaped notch. The
+# notch scales with stroke width, so a thinner line is the only lever a preset
+# has - and it is a weak one, because thinning far enough to hide the notch also
+# drops the figure below the animation gate's motion floor. 4.2 is the balance;
+# the real fix is a line join in the renderer (design-backlog 0023).
+#
+# A polyline feels this far more than the other three line scenes, whose smooth
+# parametric figures have near-collinear neighbours. Here consecutive points are
+# adjacent frequency bands, which are genuinely uncorrelated - and the `curve`
+# above deliberately increases the height contrast between them, so it makes the
+# turns sharper as a direct consequence of doing its job.
+thickness  = "4.2 + clamp(mid * 6.0, 0, 2.4)"
 brightness = "0.80 + clamp(bass * 1.2, 0, 0.30)"
 
 zoom  = "1.00 + sin(time * 0.23) * 0.05"
