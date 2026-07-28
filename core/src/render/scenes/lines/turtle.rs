@@ -24,7 +24,7 @@
 
 use std::f32::consts::FRAC_PI_2;
 
-use super::renderer::SegmentInstance;
+use super::renderer::{JOINED_A, JOINED_B, SegmentInstance};
 
 /// Walk `s` into `out` (cleared first) as base geometry — positions only; the
 /// scene fills colour/width per frame. `angle` is in radians. Segments beyond
@@ -40,6 +40,10 @@ pub fn walk(s: &str, angle: f32, max_segments: usize, out: &mut Vec<SegmentInsta
     let mut heading = FRAC_PI_2;
     let mut stack: Vec<(f32, f32, f32)> = Vec::new();
     let mut dropped = 0usize;
+    // Index of the segment the pen is currently continuing from, or `None` when
+    // the run is broken (ADR-0041). This is what a join flag has to be true of:
+    // the next drawn segment starts exactly where that one ended.
+    let mut run: Option<usize> = None;
 
     for ch in s.chars() {
         match ch {
@@ -48,15 +52,26 @@ pub fn walk(s: &str, angle: f32, max_segments: usize, out: &mut Vec<SegmentInsta
                 let nx = x + dx * step;
                 let ny = y + dy * step;
                 if out.len() < max_segments {
+                    // One joint, flagged from both sides. A turn does not break
+                    // the run — `+`/`-` only change heading — which is why the
+                    // state is a run rather than a look at the previous char.
+                    let mut joined = 0;
+                    if let Some(prev) = run.and_then(|i| out.get_mut(i)) {
+                        prev.joined |= JOINED_B;
+                        joined |= JOINED_A;
+                    }
+                    run = Some(out.len());
                     out.push(SegmentInstance {
                         a: [x, y],
                         b: [nx, ny],
                         color: [1.0, 1.0, 1.0],
                         width: 0.01,
-                        joined: 0,
+                        joined,
                     });
                 } else {
                     dropped += 1;
+                    // Nothing can join to a segment that was never emitted.
+                    run = None;
                 }
                 x = nx;
                 y = ny;
@@ -65,16 +80,26 @@ pub fn walk(s: &str, angle: f32, max_segments: usize, out: &mut Vec<SegmentInsta
                 let (dy, dx) = heading.sin_cos();
                 x += dx * step;
                 y += dy * step;
+                // The pen moved without drawing, so the next segment starts
+                // somewhere the last one does not reach.
+                run = None;
             }
             '+' => heading += angle,
             '-' => heading -= angle,
-            '[' => stack.push((x, y, heading)),
+            '[' => {
+                stack.push((x, y, heading));
+                // A branch start is not a continuation of the segment before it;
+                // flagging it would extend that stroke backward along the
+                // branch's own direction, into space it never covered.
+                run = None;
+            }
             ']' => {
                 if let Some((px, py, ph)) = stack.pop() {
                     x = px;
                     y = py;
                     heading = ph;
                 }
+                run = None;
             }
             _ => {}
         }
@@ -129,6 +154,63 @@ mod tests {
         out.clear();
         walk("F[+F]F", std::f32::consts::FRAC_PI_2, 100, &mut out);
         assert_eq!(out.len(), 3, "trunk + branch + trunk");
+    }
+
+    /// Plan 0039 Phase 3 done-when 2 and 4 (ADR-0041). The turtle is the tricky
+    /// producer: it is a chain, but the chain **breaks** every time the pen stops
+    /// continuing from where it was — at a branch push or pop, and at a
+    /// move-without-draw. Asserted on the flag pattern rather than on pixels.
+    #[test]
+    fn the_turtle_joins_within_a_run_and_breaks_at_a_branch() {
+        let mut out = Vec::with_capacity(16);
+        // Trunk of two, a one-segment branch, then a trunk of two more.
+        walk("FF[+F]FF", FRAC_PI_2, 100, &mut out);
+        assert_eq!(out.len(), 5, "two trunk, one branch, two trunk");
+        assert_eq!(
+            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
+            vec![JOINED_B, JOINED_A, 0, JOINED_B, JOINED_A],
+            "joined inside each run, free on both sides of the branch"
+        );
+        // The branch segment starts at the same point the first run ended, and
+        // that is exactly the case the flag must *not* claim: it is a new stroke,
+        // not a continuation, so extending it backward would run along the
+        // branch's own direction into space it never covered.
+        assert_eq!(
+            out[1].b, out[2].a,
+            "the branch does start at the trunk's end"
+        );
+        assert_eq!(out[2].joined, 0, "and is still free at both ends");
+
+        // A turn is not a break — that is the whole reason the walk tracks a run
+        // rather than looking at the previous character.
+        out.clear();
+        walk("F+F", FRAC_PI_2, 100, &mut out);
+        assert_eq!(
+            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
+            vec![JOINED_B, JOINED_A],
+            "a turn keeps the pen on the paper"
+        );
+
+        // A move-without-draw is: the pen teleports, so the next segment starts
+        // somewhere the last one never reached.
+        out.clear();
+        walk("FfF", 0.0, 100, &mut out);
+        assert_eq!(
+            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
+            vec![0, 0],
+            "`f` breaks the run"
+        );
+        assert_ne!(out[0].b, out[1].a, "and the two really are disjoint");
+
+        // A segment lost to the cap cannot be joined to, either.
+        out.clear();
+        let dropped = walk("FFFF", 0.0, 2, &mut out);
+        assert_eq!((out.len(), dropped), (2, 2));
+        assert_eq!(
+            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
+            vec![JOINED_B, JOINED_A],
+            "the kept prefix keeps its own joint and claims none past the cap"
+        );
     }
 
     #[test]

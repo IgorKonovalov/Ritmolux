@@ -13,7 +13,7 @@
     clippy::unreachable
 )]
 
-use super::renderer::SegmentInstance;
+use super::renderer::{JOINED_A, JOINED_B, SegmentInstance};
 
 /// Everything [`maurer_rose`] needs, by name.
 ///
@@ -91,12 +91,24 @@ pub fn maurer_rose(p: RoseParams, out: &mut Vec<SegmentInstance>) {
     let mut prev = point(0);
     for k in 1..=drawn {
         let cur = point(k);
+        // Chained (ADR-0041): consecutive chords share a sampled point, so every
+        // interior vertex is a joint. The two ends of the walk stay free — and
+        // that includes the head of a partially revealed curve, so
+        // `draw_progress` never pushes the stroke half a width past the point it
+        // actually reached.
+        let mut joined = 0;
+        if k > 1 {
+            joined |= JOINED_A;
+        }
+        if k < drawn {
+            joined |= JOINED_B;
+        }
         out.push(SegmentInstance {
             a: prev,
             b: cur,
             color: p.color,
             width: p.width,
-            joined: 0,
+            joined,
         });
         prev = cur;
     }
@@ -207,6 +219,63 @@ mod tests {
                 expected_r.abs() * p.scale,
             );
         }
+    }
+
+    /// Plan 0039 Phase 3 done-when 1 and 4 (ADR-0041). Asserted on the **flag
+    /// pattern**, not on pixels: a producer that silently forgets to flag its
+    /// joints keeps the notch and nothing else in the pipeline notices, so only
+    /// a per-producer test catches it.
+    #[test]
+    fn the_rose_flags_every_interior_vertex_of_its_chain() {
+        let mut arc = Vec::with_capacity(8);
+        maurer_rose(
+            RoseParams {
+                samples: 3,
+                ..rose()
+            },
+            &mut arc,
+        );
+        assert_eq!(arc.len(), 3, "three chords through four sampled points");
+        assert_eq!(
+            arc.iter().map(|s| s.joined).collect::<Vec<_>>(),
+            vec![JOINED_B, JOINED_A | JOINED_B, JOINED_A],
+            "the two interior vertices are joints; the walk's own ends are free"
+        );
+        // Each flag stands for a genuinely shared point.
+        for k in 1..arc.len() {
+            assert_eq!(arc[k - 1].b, arc[k].a, "chord {k} continues the previous");
+        }
+
+        // A partially revealed curve ends where it actually stopped: the head of
+        // the drawn prefix is a free end, not a joint into geometry that is not
+        // being drawn.
+        let mut half = Vec::with_capacity(16);
+        maurer_rose(
+            RoseParams {
+                samples: 8,
+                draw_progress: 0.5,
+                ..rose()
+            },
+            &mut half,
+        );
+        assert_eq!(half.len(), 4, "half of eight chords");
+        assert_eq!(
+            half[3].joined, JOINED_A,
+            "the drawing head is a free end, so draw_progress cannot push the \
+             stroke past the point it reached"
+        );
+
+        // One chord is all ends and no joint.
+        let mut single = Vec::with_capacity(4);
+        maurer_rose(
+            RoseParams {
+                samples: 1,
+                ..rose()
+            },
+            &mut single,
+        );
+        assert_eq!(single.len(), 1);
+        assert_eq!(single[0].joined, 0);
     }
 
     /// A nonzero `radial_offset` shifts every sampled radius by that constant.
