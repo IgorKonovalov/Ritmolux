@@ -1050,7 +1050,16 @@ it may read as a deliberate stud or as a defect.
 chain exactly. This is an unfinished application of it. Small enough to ride along with the next plan
 that touches the line family, or with Plan 0039's open Phase 5.
 
-- **PROMOTED 2026-07-28 → [Plan 0040](plans/0040-line-joins-finish-the-job.md) Phase 3**, the same
+- **CLOSED 2026-07-28 by [Plan 0040](plans/done/0040-line-joins-finish-the-job.md) Phase 3**
+  (`0bc33a6`). Both segments at a contact point carry `JOINED_A | JOINED_B`, all `2n` vertices are
+  flagged, the silent test was replaced with one that asserts the sharing *across* pairs, and
+  `star_pattern.png` is the only baseline that moved. The "worth checking by eye first" caution was
+  honoured and **came back the other way round**: the bead is more distinct at a *wide* turn than at
+  the 8-degree floor, where the two extensions merge into the already-bright core and the point just
+  ends in a point. Neither reads as a defect; no miter limit, no route-back. Recorded in
+  [ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)'s Outcome and in
+  `presets/README.md`'s line-art notes.
+- **PROMOTED 2026-07-28 → [Plan 0040](plans/done/0040-line-joins-finish-the-job.md) Phase 3**, the same
   day it was raised, alongside the review's two other code findings (the shader's untied bit
   literals, and the missing pixel pin under the reported defect). The plan takes this entry's
   proposed fix as written and adds the thing this entry only gestured at: the look. A joined contact

@@ -1,14 +1,29 @@
 # 0040 — Line joins, finished: the star's other half, and a pin under the reported defect
 
-> **Status:** in-progress 2026-07-28 — `dev` is implementing it.
-> [Plan 0039](done/0039-line-joins.md) has closed, so nothing blocks it.
+> **Status:** done 2026-07-28 — all three phases landed in three commits (`4c68bbd` the pixel pin
+> under the polyline joint, `434ac1d` the join bits generated into the shader plus a swap test,
+> `0bc33a6` the star rosette's contact points) and passed the Mode 4 review: **no blockers, no
+> majors**, two minors, two nits. Verified rather than trusted: the new baseline reproduces
+> bit-exact (`mean 0.0000 / outlier 0`), `star_pattern.png` is the **only** baseline that moved,
+> `fmt --check` + `clippy --workspace --all-targets -D warnings` are clean, and
+> `cargo nextest run --workspace` is **280/280, 0 skipped** — which corrects `dev`'s close report:
+> the `--test transition` abort is real and pre-existing (reproduced at `3e4dec5` in a scratch
+> worktree) but it is the known in-process parallel-GPU-teardown fault, and all 12 of those tests
+> execute and pass under the project's canonical runner. `dev`'s correction to Phase 2 done-when 2's
+> premise is accepted: the old assertion does fire on a bit swap, at element 1 only and by `0.008`,
+> where the replacement carries `~0.23` margins on both ends. **Phase 3's stopping condition was
+> exercised and cleared** — the bead was captured at the 8-degree floor and at 40 degrees, reads as
+> a deliberate stud rather than a defect at both, and is *more* distinct mid-range than at the
+> pointy end, the opposite of what this plan expected. No route-back, no miter limit.
+> [Plan 0039](0039-line-joins.md) has closed, so nothing blocked it.
 > **Created:** 2026-07-28
 > **Owner skill(s):** dev
-> **Related ADRs:** [0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
+> **Related ADRs:** [0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
 > (the mechanism, already accepted — this plan finishes applying it, and its **Outcome** section is
-> the source of Phase 3), [0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (why the
-> new pin cannot join the golden roster)
-> **Backlog entry closed:** [0024](../design-backlog.md)
+> the source of Phase 3, now extended with this plan's result),
+> [0023](../../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (why the new pin cannot join
+> the golden roster)
+> **Backlog entry closed:** [0024](../../design-backlog.md)
 > **No new ADR.** Every decision here was made in ADR-0041; what is left is an unfinished
 > application of it plus test hygiene. There is no alternative worth rejecting in writing.
 
@@ -235,5 +250,5 @@ Each phase ships as its own commit. All three are `dev`.
 - **No second `spectrum` entry in the golden roster.** ADR-0023's one-fixture-per-`SystemKind`
   invariant is enforced by a test; the pin goes beside `composite.rs` instead.
 - **No `Scene` trait change, no C ABI change** (stays v4), and no new dependency.
-- **No `spectrum_ridge` re-tune.** That is [Plan 0039](done/0039-line-joins.md)'s open Phase 5 and it
+- **No `spectrum_ridge` re-tune.** That is [Plan 0039](0039-line-joins.md)'s open Phase 5 and it
   belongs to `preset-author`, not to `dev`.
