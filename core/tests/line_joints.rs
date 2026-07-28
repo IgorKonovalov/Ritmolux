@@ -16,7 +16,13 @@
 //!
 //! Software adapter (`prefer_software`) so it holds on any CI GPU.
 //!
-//! # Two duties, one capture, in this order
+//! # Three duties, one capture, in this order
+//!
+//! Plan 0040 Phase 2 added the middle one: the figure's two **outer** ends are
+//! free, so the stroke must not reach past them. That is the only place a swap
+//! of `JOINED_A` and `JOINED_B` is visible — an interior joint carries both bits
+//! and renders identically either way — and it is why the pair is now generated
+//! into the shader from the Rust constants rather than restated as `1u`/`2u`.
 //!
 //! Plan 0040 Phase 1 added a **committed baseline** beside the relative claim,
 //! because the reported defect — the polyline's notch — was pinned by no pixels
@@ -224,11 +230,19 @@ fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
 /// place of a miter limit, and this fixture is sharp enough to show it — which is
 /// the point. It is recorded here rather than discovered later.
 ///
-/// Since Plan 0040 Phase 1 this is the **first** of the capture's two duties;
-/// [`compare_against_baseline`] is the second, and the module docs say why it
-/// runs after rather than before.
-fn assert_no_notch(img: &CaptureImage) {
+/// Since Plan 0040 Phase 1 this is the **first** of the capture's three duties;
+/// [`compare_against_baseline`] is the last, and the module docs say why it runs
+/// after rather than before.
+///
+/// Returns the **dimmest interior sample** it measured, which
+/// [`assert_the_outer_ends_are_free`] uses as its comparator (Plan 0040
+/// Phase 2). These are samples of a stroke lit at an *off-centre* offset, so
+/// anything genuinely on the stroke's centre line reads brighter — which is what
+/// makes "darker than this" a statement about background rather than a tuned
+/// threshold.
+fn assert_no_notch(img: &CaptureImage) -> f32 {
     let half_width = THICKNESS * WIDTH_SCALE;
+    let mut dimmest_interior = f32::INFINITY;
 
     // The last point is the figure's free end, never a joint — so the interior
     // peaks are the odd elements below it.
@@ -270,6 +284,87 @@ fn assert_no_notch(img: &CaptureImage) {
             "element {j}: the joint is a local luminance minimum ({joint:.4} \
              against interiors {left:.4} and {right:.4}) — the stroke is coming \
              apart at the vertex"
+        );
+        dimmest_interior = dimmest_interior.min(left).min(right);
+    }
+    dimmest_interior
+}
+
+/// Plan 0040 Phase 2: **a swap of [`JOINED_A`] and [`JOINED_B`] must fail a
+/// test**, which before this nothing did.
+///
+/// `line_joints.rs` probed only *interior* joints, where a chained segment
+/// carries both bits and the two are indistinguishable — swap them and every
+/// interior vertex renders identically. The bits are only separable where a
+/// segment carries **one** of them, and the fixture already has exactly that
+/// shape: six elements, five segments, `joined[0] = JOINED_B` (its `a` free) and
+/// `joined[4] = JOINED_A` (its `b` free). No new fixture needed.
+///
+/// The property, stated rather than thresholded: **the stroke must not extend
+/// past the figure's own first and last points.** Those two ends are free, so a
+/// probe just beyond them along the stroke direction falls in background. Swap
+/// the bits and each grows by a half-width, putting that probe on the stroke's
+/// **centre line** — where the shader's falloff is 1, so it reads brighter than
+/// any of the off-centre interior samples [`assert_no_notch`] measured. Hence
+/// the ordinal comparison: dimmer than the dimmest stroke sample separates
+/// "background" from "stroke" without inventing a constant.
+///
+/// The probe sits **half** an extension out, not a full one: at a full
+/// half-width it would land exactly on the flat end-cut a swapped quad would
+/// draw, and a boundary sample decides nothing. Halfway is unambiguous either
+/// way — 9 px at this capture size, against `luma_at`'s 1 px box.
+///
+/// "Lit or not" is then decided by **classification between two measured
+/// regimes**, not by a constant: unlit background sampled from the frame, lit
+/// stroke from `dimmest_interior`, and the probe must fall on the background
+/// side of the midpoint. Both regimes come from this same capture, so nothing
+/// here is tuned — and both margins are wide, where comparing straight against
+/// `dimmest_interior` left only 0.03 on the failing side.
+fn assert_the_outer_ends_are_free(img: &CaptureImage, dimmest_interior: f32) {
+    let half_width = THICKNESS * WIDTH_SCALE;
+
+    // Unlit reference, well clear of the figure: the polyline's highest point is
+    // `BASELINE + HIGH` and it can only reach a half-width beyond that.
+    let background = luma_at(img, [0.0, 0.9]);
+    assert!(
+        background < dimmest_interior,
+        "the background probe landed on the figure ({background:.4} against a stroke \
+         interior of {dimmest_interior:.4}) — the fixture's geometry has moved and \
+         the classification below has no two regimes to separate"
+    );
+    let unlit_side_of = 0.5 * (background + dimmest_interior);
+
+    // (label, the free endpoint, the interior point the segment runs from/to).
+    // Segment 0 runs point(0) -> point(1) with `a` free, so its outward
+    // direction is away from point(1); segment 4 runs point(4) -> point(5) with
+    // `b` free, so its outward direction is away from point(4).
+    let ends = [
+        ("first", point(0), point(1)),
+        ("last", point(ELEMENTS - 1), point(ELEMENTS - 2)),
+    ];
+
+    for (label, end, inward) in ends {
+        let d = [end[0] - inward[0], end[1] - inward[1]];
+        let len = (d[0] * d[0] + d[1] * d[1]).sqrt();
+        let outward = [d[0] / len, d[1] / len];
+        let reach = half_width * 0.5;
+        let probe = [end[0] + outward[0] * reach, end[1] + outward[1] * reach];
+
+        let beyond = luma_at(img, probe);
+        println!(
+            "{label} end: beyond {beyond:.4} (background {background:.4}, dimmest \
+             stroke interior {dimmest_interior:.4}, unlit below {unlit_side_of:.4}; \
+             probe {reach:.4} NDC past the endpoint)"
+        );
+
+        assert!(
+            beyond < unlit_side_of,
+            "the {label} end of the figure is free, but the stroke reaches past it: \
+             {beyond:.4} sits on the lit side of {unlit_side_of:.4} (background \
+             {background:.4}, stroke {dimmest_interior:.4}). The most likely cause \
+             is JOINED_A and JOINED_B being swapped between the Rust constants and \
+             the shader — the outer ends are the only endpoints carrying a single \
+             bit, so they are the only place a swap is fully visible."
         );
     }
 }
@@ -318,7 +413,8 @@ fn compare_against_baseline(img: &CaptureImage) {
     );
 }
 
-/// The suite: one capture, both duties, in the order the module docs argue for.
+/// The suite: one capture, all three duties, in the order the module docs argue
+/// for.
 #[test]
 fn the_joined_polyline_holds_its_shape_and_its_pixels() {
     let Some(mut renderer) = headless() else {
@@ -333,6 +429,7 @@ fn the_joined_polyline_holds_its_shape_and_its_pixels() {
         .capture_preset(&name, &zigzag_frame(), FRAMES)
         .expect("capture the zigzag fixture");
 
-    assert_no_notch(&img);
+    let dimmest_interior = assert_no_notch(&img);
+    assert_the_outer_ends_are_free(&img, dimmest_interior);
     compare_against_baseline(&img);
 }

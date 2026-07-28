@@ -65,7 +65,9 @@ struct Uniforms {
     view: [f32; 4],
 }
 
-const SHADER: &str = r#"
+/// The WGSL body, minus the join-bit constants — [`shader_source`] prepends
+/// those, generated from [`JOINED_A`] / [`JOINED_B`] themselves.
+const SHADER_BODY: &str = r#"
 struct Uniforms {
     v: vec4<f32>,
     view: vec4<f32>,
@@ -124,8 +126,8 @@ fn vs_main(
     // divergent perpendiculars would otherwise leave. Each end is independent,
     // and an unflagged end keeps its exact previous geometry — `dir * 0.0` is
     // exactly zero, so a producer that flags nothing is byte-identical.
-    let ext_a = select(0.0, width, (joined & 1u) != 0u);
-    let ext_b = select(0.0, width, (joined & 2u) != 0u);
+    let ext_a = select(0.0, width, (joined & JOINED_A) != 0u);
+    let ext_b = select(0.0, width, (joined & JOINED_B) != 0u);
     let a_j = a_s - dir * ext_a;
     let b_j = b_s + dir * ext_b;
 
@@ -148,6 +150,23 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     return vec4<f32>(in.color * g * u.v.y, 1.0);
 }
 "#;
+
+/// The full WGSL, with the join bits **generated from the Rust constants**
+/// rather than restated as literals (Plan 0040 Phase 2).
+///
+/// The shader used to test `(joined & 1u)` and `(joined & 2u)` against
+/// [`JOINED_A`] / [`JOINED_B`] defined here, with nothing tying the two together
+/// — a swap or a renumbering would have compiled, passed, and rendered wrongly.
+/// Emitting the WGSL `const`s from the Rust ones makes that divergence
+/// **unrepresentable** rather than merely detected: there is one definition, and
+/// the shader reads it by name. Prepending a generated prelude rather than
+/// `format!`-ing the whole body is deliberate — the body is full of braces, and
+/// every one would need escaping.
+///
+/// Runs once per [`LineRenderer::new`] (pipeline build, not the hot path).
+fn shader_source() -> String {
+    format!("const JOINED_A: u32 = {JOINED_A}u;\nconst JOINED_B: u32 = {JOINED_B}u;\n{SHADER_BODY}")
+}
 
 /// Draws segment buffers as thick glowing quads. Owns its pipeline, a
 /// fixed-capacity instance buffer, and the aspect/glow uniform.
@@ -174,7 +193,7 @@ impl LineRenderer {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(&format!("{label}-shader")),
-            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+            source: wgpu::ShaderSource::Wgsl(shader_source().into()),
         });
         let instances = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(&format!("{label}-instances")),

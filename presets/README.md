@@ -87,7 +87,7 @@ window. Two authoring consequences: `size` now reads *finer* at high resolution
 attractor the way it did against the old fixed 1280x720 — the two caps still differ,
 so a very large window resolves the attractor alone slightly finer.
 
-### Line-art parameter notes (Plan 0010)
+### Line-art parameter notes — strokes, joins, and per-scene shape
 
 **Strokes join at their interior vertices** (Plan 0039,
 [ADR-0041](../docs/adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)).
