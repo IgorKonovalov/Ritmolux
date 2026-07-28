@@ -204,11 +204,40 @@ The place easing is proven is `core/tests/easing.rs`, against fixtures built to
 have a near-linear response precisely so the measurement is of the easing and not
 of a scene; everything else is a preset-shaped approximation of that.
 
-One smaller limit: the probe's window is **48 frames (0.8 s) each way**, so a
-release constant longer than about 0.35 s does not fully settle inside it and
-reads *clamped*. Widening it does not help — measured at 96 frames the separation
-got **worse** (scalar-only median 0.60 → 0.92), for double the wall clock. The
-window is not what is hiding the magnitude.
+One smaller limit, and it is sharper than it was first written: the probe's window
+is **48 frames (0.8 s) each way**, so a release constant longer than about 0.35 s
+does not fully settle inside it. This page used to say such a response "reads
+*clamped*" — **it does not, and that word was the trap.** `frames_to_settle`
+normalizes against *the segment's own last frame*, so when that frame is still
+travelling the measured total is short and every threshold is crossed early. The
+number that comes back is not pinned at the window length and is not obviously
+wrong; it is a plausible, smaller frame count. Worse, the bias is uneven — the
+0.9 threshold is pulled in harder than the 0.5 one — so a truncated fall also
+reads as a *more even* fall than it is.
+
+That is not hypothetical. Plan 0038 Phase 3 measured two easing orderings, one of
+which had an effective time constant of 1.0 s against a 1.6 s window, and read the
+truncation as a difference in the shape of the two falls. Measured to settlement
+the two shapes are identical and differ only in speed — 73 frames against 145,
+where the truncated run said 61 against 78. See
+[ADR-0040](adrs/0040-spectrum-level-curve-applies-before-the-easing.md)'s Outcome.
+
+**The rule, and the function that enforces it.** `frames_to_settle` cannot detect
+this about itself: normalizing against the last frame *guarantees* the threshold
+is crossed inside the segment, so `frames_to_settle(seg, f) < seg.len()` is a
+tautology rather than a check. Before trusting a frame count, gate it on
+`metrics::segment_settled(segment, tol)`, which extrapolates the geometric tail
+from three points spread across the segment and answers whether the last frame is
+within `tol` of the asymptote. Sample widely rather than from the end: captures
+are 8-bit, and a response slow enough to outrun its window moves by *less than one
+code value per frame* near the end, so adjacent frames decode as identical and
+read as settled exactly when they are not.
+
+Widening the `--report` window does not fix that table's *separation* problem,
+which is a different thing — measured at 96 frames the scalar-only median got
+**worse** (0.60 → 0.92) for double the wall clock. Scene saturation is what hides
+the magnitude there. Window length is what corrupts a slow response's shape, and
+the two are not the same defect.
 
 #### A low `cover` is not a defect
 
@@ -441,6 +470,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
 | `background_composite` | HARD (**hardware only**) | RD / attractor presents alpha-blend over the `bg_*` backdrop; **skipped** on a software adapter, which mis-renders that pipeline set |
 | `transition` | HARD | every switch path (cycle **and** select) renders intermediate blended frames as a ramp, reproducibly from the injected `dt`; each blend kind shows its own signature; a switch arriving mid-dissolve lands on the last index requested; a hot-reload mid-dissolve cancels cleanly; the heavy attractor ↔ reaction-diffusion pair dissolves on the freeze fallback (set `LMV_TRANSITION_STRIP=<dir>` to also dump filmstrips) |
+| `easing` | HARD | `[smoothing]` is observable: a scalar entry measures symmetric and an `{ attack, release }` pair does not, against purpose-built near-linear fixtures ([ADR-0039](adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md)). Also measures the `spectrum` `curve`↔easing **ordering** both ways round through one renderer — every frame count there is gated on `segment_settled` first, because a window shorter than the response is what falsified the wrong thing once already |
 | `preset` | HARD | the expression evaluator and TOML schema: exact values, rejection without panic, **zero allocation** per eval, and the `PARAMS` ↔ `set_param` drift guard |
 | `dsp` / `ffi` / `hygiene` | HARD | known-signal analysis fixtures; the C ABI across the boundary; the hot-path panic pragma + exact dependency pinning |
 
@@ -453,7 +483,9 @@ tune them freely without re-blessing pixels. A new `SystemKind` variant fails
 
 `core::signal` (pure, zero-dep) synthesizes the test audio; `core::render::metrics`
 (pure) provides `frame_diff`, `struct_diff`, `coverage`, and `quadrant_spread`,
-shared by the tests and the CLI report.
+shared by the tests and the CLI report, plus the step-response pair
+`frames_to_settle` / `step_response` and the `segment_settled` gate that says
+whether either of those two is worth reading.
 
 ### Golden baselines
 

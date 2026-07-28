@@ -25,7 +25,14 @@
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::{Easing, Preset};
-use lmv_core::render::metrics::{StepResponse, frame_diff, frames_to_settle, step_response};
+use lmv_core::render::metrics::{
+    StepResponse, frame_diff, frames_to_settle, segment_settled, step_response,
+};
+
+/// The evenness a pure exponential fall reads, and therefore what a one-pole
+/// measures whichever side of it a `curve` sits on: `ln 2 / ln 10`, which is
+/// `log10(2)` and so already in `std` rather than spelled out as a literal.
+const LN2_OVER_LN10: f32 = std::f32::consts::LOG10_2;
 use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
 
 const SIZE: u32 = 96;
@@ -333,13 +340,56 @@ fn capture_arm(r: &mut Renderer, src: &str, stimulus: &[AnalysisFrame]) -> Vec<C
 /// How **even** a fall is: the share of its settling time spent covering the
 /// first half of its travel.
 ///
-/// This is the quantity ADR-0040 actually argues about — "a perceptually even
-/// fall" against "a fast start and a long crawl" — and `StepResponse` alone
-/// cannot express it, because a response can settle quickly and still be
-/// lopsided. A perfectly linear ramp reads `0.5/0.9 = 0.56`; a pure exponential
-/// reads `ln 2 / ln 10 = 0.30`. Higher is more even.
+/// A perfectly linear ramp reads `0.5/0.9 = 0.56`; a pure exponential reads
+/// `ln 2 / ln 10 = 0.30`. Higher is more even.
+///
+/// **Only meaningful on a segment that actually settled** (Plan 0038 Phase 7).
+/// Both frame counts are normalized against the segment's last frame, so on a
+/// truncated window the 0.9 threshold is pulled in harder than the 0.5 one and
+/// the ratio climbs — which reads exactly like a more even fall and is not one.
+/// Gate on [`segment_settled`] before believing a number from here.
 fn fall_evenness(fall: &[CaptureImage]) -> f32 {
     frames_to_settle(fall, 0.5) as f32 / frames_to_settle(fall, 0.9).max(1) as f32
+}
+
+/// Frames the **curve** probe holds each side of its step, replacing the shared
+/// `PRE`/`WINDOW` for that measurement only (Plan 0038 Phase 7).
+///
+/// The rejected arm's effective time constant is `release / curve` = 1.0 s, so
+/// the shared 96-frame (1.6 s) window leaves a fifth of its travel undone and
+/// `frames_to_settle` answers with a plausible wrong number rather than a
+/// failure. 600 frames is 10 s — ten of those time constants.
+///
+/// The two windows are deliberately **unequal**, which `step_response`'s contract
+/// warns against. That rule exists so truncation bias cancels between the two
+/// directions; once both segments are measured to settlement there is no bias
+/// left to cancel, and asserting settlement is strictly stronger than balancing
+/// two errors against each other.
+const CURVE_PRE: usize = 12;
+const CURVE_RISE: usize = 96;
+const CURVE_FALL: usize = 600;
+
+/// Fraction of a segment's travel that may remain unfinished at its last frame
+/// before the measurement is refused. Two percent is well inside the pixel
+/// quantum at these sizes and far outside the ~20-45 % truncation that produced
+/// Plan 0038 Phase 3's original numbers.
+const SETTLE_TOL: f32 = 0.02;
+
+/// `CURVE_PRE` frames of silence, `CURVE_RISE` held loud, `CURVE_FALL` silent.
+fn curve_stimulus() -> Vec<AnalysisFrame> {
+    let silent = AnalysisFrame::default();
+    let mut frames = vec![silent; CURVE_PRE];
+    frames.extend(std::iter::repeat_n(loud(), CURVE_RISE));
+    frames.extend(std::iter::repeat_n(silent, CURVE_FALL));
+    frames
+}
+
+/// Split a [`curve_stimulus`] capture, each segment starting at the last frame
+/// *before* its step — the settled state the response departs from.
+fn curve_segments(images: &[CaptureImage]) -> (&[CaptureImage], &[CaptureImage]) {
+    let rise = &images[CURVE_PRE - 1..CURVE_PRE + CURVE_RISE];
+    let fall = &images[CURVE_PRE + CURVE_RISE - 1..];
+    (rise, fall)
 }
 
 /// The two arms must be twins apart from `name` and the `smoothing` key —
@@ -427,20 +477,25 @@ fn at_curve_one_the_pre_eased_arm_matches_the_engine() {
     );
 }
 
-/// Plan 0038 Phase 3 done-when 6. Measure the fall **both ways round** under a
-/// non-unit `curve` and record what each does.
+/// Plan 0038 Phase 3 done-when 6, **re-measured under Phase 7's fixed instrument**.
 ///
-/// **No threshold is asserted on the ordering claim** — this plan has not earned
-/// one, and inventing a number here is the Plan 0033 mistake. The test asserts
-/// only that the measurement is non-vacuous and that the two orders are
-/// genuinely distinguishable at the pixel level; the numbers are printed for the
-/// commit body and for ADR-0040 to be judged against.
+/// The original run of this test read the two orderings as differing in the
+/// *shape* of their fall, which is what routed ADR-0040 back to `architect`. Half
+/// of that was right and half was the instrument: the rejected arm never settled
+/// inside the window it was measured in, so its numbers came from a truncated
+/// normalization. See the ADR's Outcome. What survives, and what this now asserts:
+///
+/// - both falls have the **same shape** — for a step to silence each is an
+///   exponential in the displayed level, so their evenness agrees and neither is
+///   the "even fall" ADR-0040 originally claimed for the shipped order;
+/// - they differ in **effective speed**, the rejected arm taking about `1/curve`
+///   times as long, because curving after the smoother stretches the decay.
 #[test]
-fn the_two_curve_orderings_measure_differently_in_the_frame() {
+fn the_two_curve_orderings_differ_in_speed_and_not_in_shape() {
     let Some(mut r) = headless() else {
         return;
     };
-    let raw = step_stimulus();
+    let raw = curve_stimulus();
     let curve_then_ease = capture_arm(&mut r, CURVE_EASED, &raw);
     let ease_then_curve = capture_arm(&mut r, CURVE_INSTANT, &pre_eased(&raw));
 
@@ -449,37 +504,62 @@ fn the_two_curve_orderings_measure_differently_in_the_frame() {
         ("curve-then-ease (ADR-0040)", &curve_then_ease),
         ("ease-then-curve (rejected)", &ease_then_curve),
     ] {
-        let (rise, fall) = segments(images);
+        let (rise, fall) = curve_segments(images);
+        // The gate Phase 7 exists for, and it runs BEFORE any number below is
+        // read. `frames_to_settle` cannot fail on a truncated window — it always
+        // answers inside the segment — so without this the numbers look fine.
+        assert!(
+            segment_settled(fall, SETTLE_TOL),
+            "{label}: the fall had not settled by the end of its {CURVE_FALL}-frame \
+             window, so every frame count below would be normalized against a \
+             moving target — widen the window rather than reading the numbers"
+        );
         let response = step_response(rise, fall);
         let evenness = fall_evenness(fall);
         println!(
-            "{label:<28} rise {:>3} fall {:>3} ratio {:>5.2} fall-evenness {evenness:.3}",
-            response.rise_frames,
-            response.fall_frames,
-            response.ratio()
+            "{label:<28} rise {:>3} fall {:>3} fall-evenness {evenness:.3}",
+            response.rise_frames, response.fall_frames
         );
         assert!(
             response.rise_frames > 0 && response.fall_frames > 0,
             "{label} reported no transient at all: {response:?} — the arm is not \
              responding to the stimulus"
         );
-        assert!(
-            response.fall_frames < WINDOW as u32,
-            "{label} never settled inside the {WINDOW}-frame window: {response:?} \
-             — the measurement is clamped rather than measured"
-        );
         reported.push((label, response, evenness));
     }
 
-    // The one property that must hold for the experiment to have run at all: a
-    // non-unit curve makes the two orders visibly different. If they measured
-    // the same, either arm could be mislabelled and nothing above would notice.
     let (a, b) = (reported[0].1, reported[1].1);
-    assert_ne!(
-        (a.fall_frames, reported[0].2.to_bits()),
-        (b.fall_frames, reported[1].2.to_bits()),
-        "the two orderings measured identically, so this probe cannot tell them \
-         apart and its numbers say nothing about ADR-0040"
+    let (even_a, even_b) = (reported[0].2, reported[1].2);
+
+    // Same shape. Both are exponentials, so both sit at ln2/ln10 = 0.301 and,
+    // more to the point, at the SAME value as each other. The tolerance is earned
+    // from the measurement's own granularity: evenness is a ratio of two integer
+    // frame counts, so at the shipped arm's ~70-frame fall one frame of rounding
+    // is already ~0.015, and 0.05 is a few frames of slack rather than a fitted
+    // number.
+    assert!(
+        (even_a - even_b).abs() <= 0.05,
+        "the two orderings measured different fall SHAPES ({even_a:.3} vs \
+         {even_b:.3}) — the closed form says both are exponentials of identical \
+         shape, so this is either a truncated window that slipped the gate above \
+         or a real finding that routes to architect"
+    );
+    assert!(
+        (even_a - LN2_OVER_LN10).abs() <= 0.05,
+        "the shipped arm's fall measured {even_a:.3}, not the pure-exponential \
+         {LN2_OVER_LN10:.3} — a one-pole should produce nothing else"
+    );
+
+    // Different speed, by about 1/curve. The fixtures carry curve = 0.5, so the
+    // rejected arm's decay is stretched twofold.
+    let speedup = b.fall_frames as f32 / a.fall_frames.max(1) as f32;
+    println!("fall-length ratio (rejected / shipped) {speedup:.2}, expected ~2.0");
+    assert!(
+        (1.7..=2.3).contains(&speedup),
+        "the rejected ordering's fall should run about 1/curve = 2.0x the \
+         shipped one's; measured {speedup:.2} from {} and {} frames",
+        b.fall_frames,
+        a.fall_frames
     );
 }
 
