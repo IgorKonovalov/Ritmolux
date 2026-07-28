@@ -23,7 +23,7 @@
 
 use std::f32::consts::TAU;
 
-use super::renderer::{JOINED_B, SegmentInstance};
+use super::renderer::{JOINED_A, JOINED_B, SegmentInstance};
 
 /// Map a `tiling` name to its star order `n`. Accepts a few named/numeric
 /// regular tilings (the v1 set); returns `None` for anything else so the loader
@@ -83,12 +83,22 @@ pub fn star_rosette(n: u32, contact_angle: f32, out: &mut Vec<SegmentInstance>) 
         let d0 = rotate(in0, -contact_angle);
         let d1 = rotate(in1, contact_angle);
         if let Some(tip) = line_intersect(m0, d0, m1, d1) {
-            // The pair meets at the tip, so the `b` end of each is the joint and
-            // both contact points are free ends (ADR-0041). Exactly one joined
-            // end per segment, and it is the same end for both — the case that
-            // makes per-endpoint the right granularity rather than per-segment.
-            out.push(seg(m0, tip, JOINED_B));
-            out.push(seg(m1, tip, JOINED_B));
+            // The rosette is a **closed chain**, so every one of its `2n`
+            // vertices is a joint (ADR-0041's Outcome note; Plan 0040 Phase 3).
+            // The `b` ends meet at this petal's tip — but the `a` ends are not
+            // free either: petal `k + 1` starts from `contact(k + 1)` again, the
+            // same point from the same closure, so each contact point is shared
+            // by two segments' `a` ends and the figure runs
+            // `contact(0) -> tip(0) -> contact(1) -> tip(1) -> …`.
+            //
+            // The contact points are the **sharper** half. The two rays leave
+            // one `2 * contact_angle` apart, so a stroke through turns by
+            // `pi - 2 * contact_angle` and the wedge is
+            // `half_width / tan(contact_angle)` — wider than the one at the tips
+            // for any star pointier than 45 degrees, against `star.rs`'s
+            // `CONTACT_MIN_DEG = 8`. Plan 0039 flagged only the tips.
+            out.push(seg(m0, tip, JOINED_A | JOINED_B));
+            out.push(seg(m1, tip, JOINED_A | JOINED_B));
         }
     }
 }
@@ -129,25 +139,35 @@ mod tests {
         assert_eq!(oct.len(), 16);
     }
 
-    /// Plan 0039 Phase 3 done-when 3 and 4 (ADR-0041). The star does not join in
-    /// a run at all: its segments meet in **pairs** at a petal tip, so each has
-    /// exactly one joined end and it is the same end (`b`) for both. That is the
-    /// case that makes a per-endpoint flag the right granularity — a per-segment
-    /// one could not say it, and a chain-shaped rule would get it wrong.
+    /// Plan 0040 Phase 3 (ADR-0041's Outcome note), replacing Plan 0039's
+    /// `the_star_joins_in_pairs_at_the_petal_tip`.
+    ///
+    /// **The shipped test could not see the defect it was meant to guard.** It
+    /// asserted `!close(pair[0].a, pair[1].a)` — that the two contact points
+    /// *within* one petal are distinct, which is true and stays true — and said
+    /// nothing about the sharing *across* petals. So it passed unchanged both
+    /// before and after this fix, which is exactly why it is gone.
+    ///
+    /// The rosette is a **closed chain**, not a set of pairs: petal `k` emits
+    /// segments from `contact(k)` and `contact(k + 1)`, and petal `k + 1` emits
+    /// one from `contact(k + 1)` again. All `2n` vertices are joints.
     #[test]
-    fn the_star_joins_in_pairs_at_the_petal_tip() {
+    fn the_star_is_a_closed_chain_joined_at_every_vertex() {
+        let n = 5usize;
         let mut out = Vec::new();
-        star_rosette(5, 30f32.to_radians(), &mut out);
-        assert_eq!(out.len(), 10, "two segments per petal on a 5-fold star");
+        star_rosette(n as u32, 30f32.to_radians(), &mut out);
+        assert_eq!(out.len(), 2 * n, "two segments per petal on a 5-fold star");
 
         for (i, seg) in out.iter().enumerate() {
             assert_eq!(
-                seg.joined, JOINED_B,
-                "segment {i} joins at its tip and nowhere else"
+                seg.joined,
+                JOINED_A | JOINED_B,
+                "segment {i} lies in a closed chain, so both its ends are joints"
             );
         }
-        // ...and the pair genuinely shares that tip, while the contact points it
-        // leaves free are distinct.
+
+        // Within a petal: both rays end on the shared tip, and they start from
+        // two distinct contact points.
         for (p, pair) in out.chunks_exact(2).enumerate() {
             assert!(
                 close(pair[0].b, pair[1].b),
@@ -155,7 +175,29 @@ mod tests {
             );
             assert!(
                 !close(pair[0].a, pair[1].a),
-                "petal {p}: the two contact points are distinct free ends"
+                "petal {p}: a petal spans two distinct contact points"
+            );
+        }
+
+        // Across petals — the half Plan 0039 missed. Segment `2k + 1` starts at
+        // `contact(k + 1)` and so does segment `2k + 2`.
+        //
+        // The wrap-around pair (`2n - 1` against `0`) is the reason this uses
+        // `close` rather than an exact compare: it is `contact(n)` against
+        // `contact(0)`, the same point reached as `cos(TAU)` and `cos(0)`, which
+        // are not bit-identical in f32.
+        for k in 0..n {
+            let (i, j) = (2 * k + 1, (2 * k + 2) % (2 * n));
+            assert!(
+                close(out[i].a, out[j].a),
+                "segments {i} and {j} must meet at contact point {}",
+                k + 1
+            );
+            assert!(
+                out[i].joined & JOINED_A != 0 && out[j].joined & JOINED_A != 0,
+                "both segments at contact point {} must declare that end joined, \
+                 or the sharper half of the rosette keeps the notch",
+                k + 1
             );
         }
     }
