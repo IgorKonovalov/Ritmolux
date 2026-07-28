@@ -218,16 +218,23 @@ worth knowing before you tune one:
   `[smoothing]` has no name to attach to them. Asymmetric values earn their keep:
   the bands are the rawest signal in the engine, so a fast `attack` keeps a
   transient's shape while a slow `release` lets the elements fall like a meter
-  instead of strobing on every analysis hop.
+  instead of strobing on every analysis hop. It eases the level *after* the
+  `curve` param has shaped it — the value you see — so a `release` means the same
+  duration whatever `curve` is set to
+  ([ADR-0040](adrs/0040-spectrum-level-curve-applies-before-the-easing.md)).
 
 This is also the one system that reads **per-element bindings**: a `[params]`
 expression naming [`index`](#index--one-binding-evaluated-once-per-element) is
 evaluated once for each element, so the relationship between a frequency region
 and what is drawn there is preset content rather than scene code.
 
-Full parameter notes — including which composite controls this system honors, and
-the one layout-specific parameter (`radius`) — are in
-[`presets/README.md`](../presets/README.md#spectrum--the-frequency-axis-readout-plan-0034).
+Full parameter notes are in
+[`presets/README.md`](../presets/README.md#spectrum--the-frequency-axis-readout-plan-0034),
+including which composite controls this system honors, the layout-specific
+parameters (`radius` on the ring; `span` and `baseline` on `bars`/`polyline`), and
+the `curve`↔`scale` retune a level curve costs — a **5.8x** amplitude change at
+`curve = 0.5` against measured typical band levels, which is the reason the
+default is exactly linear.
 
 ### Transitions between presets
 
@@ -453,11 +460,12 @@ Things worth knowing before you reach for it:
   **not** the same as `hue_spread = 1`: the former lands the last element on the
   same colour as the first. See
   [preset-palettes.md](preset-palettes.md#spectrum--colour-along-the-frequency-axis).
-- **Not every parameter is per-element.** On `spectrum`, `base`, `scale`,
-  `thickness`, `brightness` and `hue` genuinely vary per element. The
-  whole-figure ones — `radius`, `rotation`, `hue_spread`, `palette_mix`,
-  `saturation`, and the view transform / mirror — take the `index = 0` value of
-  the series instead of silently dropping the binding.
+- **Not every parameter is per-element.** On `spectrum` the ones describing a
+  single element vary per element — `base`, `scale`, `curve`, `thickness`,
+  `brightness` and `hue`. The whole-figure ones — `span`, `baseline`, `radius`,
+  `rotation`, `glow`, `hue_spread`, `palette_mix`, `saturation`, and the view
+  transform / mirror — take the `index = 0` value of the series instead of
+  silently dropping the binding.
 - **`[smoothing]` cannot ease a per-element binding**, because the smoother holds
   one scalar and a series has no single value. Listing one is a surfaced load
   **warning**, not a silent no-op; the easing you want is
