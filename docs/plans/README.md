@@ -9,7 +9,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
-| [0040](0040-line-joins-finish-the-job.md) | Line joins, finished: the star's other half, and a pin under the reported defect | **approved 2026-07-28** — ready for `dev`; [0039] has closed, so nothing blocks it | dev |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
@@ -30,26 +29,16 @@ number is *not* a measurement (`metrics::segment_settled`, and a `+` marker on e
 `--report` cell), and closed backlog **0016–0019** outright.
 
 **[0039] has landed and closed** — a stroke no longer comes apart at its vertices. See Recently
-closed. **No render plan is mid-flight.** Its **Phase 5 (`human`)** stays open and independent —
-re-choose `spectrum_ridge`'s `thickness`, which still ships the `4.2` compromise picked against the
-artifact rather than for the look. That one is `preset-author`'s, not `dev`'s.
+closed. Its one major and its open backlog entry are both taken by [0040] below.
 
-**[0040] is approved and is the next plan to take** (2026-07-28), from [0039]'s Mode 4 review — it
-takes the three findings that need code. The star rosette is a **closed chain**, not the set of pairs
-ADR-0041's connectivity table described: its contact points are shared between adjacent petals, so
-half its joints were never flagged, and the unflagged half is the sharper one (the wedge there is
-`half_width / tan(contact_angle)`, against an angle clamped as low as 8 degrees). The shader tests
-raw `1u`/`2u` with nothing tying them to `JOINED_A`/`JOINED_B`, and a **swap would not be caught**
-because the pixel test only probes interior joints where both bits are set. And the reported defect
-itself has **no committed baseline** — the `spectrum` golden fixture takes the `bars` layout, so the
-pin lands beside `composite.rs` rather than in the `SystemKind` roster, which
-[ADR-0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)'s exhaustive match will not
-admit a second entry to. **Closes backlog 0024. No new ADR** — the mechanism was decided in
-ADR-0041; this is an unfinished application of it. The one live risk is aesthetic and Phase 3 makes
-it a stopping condition: a joined contact point is a near-reversal, so it reads as a bright bead, and
-if that reads as a defect at the pointy end it routes back rather than getting tuned around.
+**[0040] has landed and closed** — the line-join work is finished: every vertex of the star rosette
+is joined, the shader's join bits are generated from the Rust constants, and the reported defect has
+a pixel baseline. See Recently closed. **No render plan is mid-flight.** [0039]'s **Phase 5
+(`human`)** stays open and independent — re-choose `spectrum_ridge`'s `thickness`, which still ships
+the `4.2` compromise picked against the artifact rather than for the look. That one is
+`preset-author`'s, not `dev`'s.
 
-**Version is at `0.21.0`** — bumped at [0039]'s close (a feature plan) per
+**Version is at `0.21.1`** — bumped at [0040]'s close (a fix/coverage/refactor plan, no feature) per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Nothing is owed until the next close.
 
 **The next ADR is design-backlog 0015** — the band axis is half linear, and Plan 0037 Phase 4's
@@ -195,6 +184,85 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0040 — Line joins, finished: the star's other half, and a pin under the reported
+  defect](done/0040-line-joins-finish-the-job.md) — **done 2026-07-28**, passed Mode 4 review
+  (**no blockers, no majors**; two minors, two nits). Three `dev` commits: `4c68bbd` the pixel pin
+  under the polyline joint, `434ac1d` the join bits generated into the shader plus a swap test,
+  `0bc33a6` the star rosette's contact points. **Closes backlog 0024.** No new ADR —
+  [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) had already
+  decided the mechanism and now carries a **Plan 0040 note in its Outcome**.
+  **The star rosette is fully joined.** Both segments at a contact point take `JOINED_A | JOINED_B`,
+  so all `2n` vertices of the closed chain are flagged rather than the `n` tips Plan 0039 reached.
+  The shipped test was **replaced, not amended** — it asserted only that the two contact points
+  *within* a petal are distinct, which is true and silent about the sharing *across* petals, so it
+  passed unchanged both before and after the fix; the replacement asserts that segments `2k + 1` and
+  `2k + 2` meet at a shared contact point and both declare that end joined, using `close` on the
+  wrap-around pair because `contact(n)` and `contact(0)` are `cos(TAU)` against `cos(0)`.
+  **Phase 3's stopping condition was exercised and it cleared — with the plan's expectation
+  reversed.** `dev` captured the star at `contact_angle = 8` (the `CONTACT_MIN_DEG` floor) and at
+  40, before and after, full-frame and at 6x/20x with thickness scaled to the zoom so magnification
+  could not flatter the fix. At 8 degrees there is **no separable bead**: the two extensions run
+  nearly parallel and merge into the already-bright core, turning a hollow flat cut into a point that
+  ends in a point. At 40 degrees the dark V fills and leaves a compact bright dot. So the
+  near-reversal case ADR-0041 and this plan both worried about is the **benign** one, and the bead is
+  most distinct mid-range — recorded in the ADR's Outcome and in `presets/README.md`, which now names
+  `[generator] contact_angle_deg` as the lever, not a `[params]` binding. **No route-back, no miter
+  limit.**
+  **Phase 2 chose generation over assertion, which is stronger than the plan asked for.**
+  `shader_source()` emits `const JOINED_A` / `const JOINED_B` into the WGSL from the Rust constants
+  at pipeline build, so a **renumbering** is unrepresentable rather than merely detected; a **swap**
+  (still hand-writable in the shader) is caught by a new assertion that the stroke does not reach
+  past the figure's own first and last points — the only endpoints carrying a single bit, since an
+  interior joint carries both and renders identically either way. Lit-or-not is classified between
+  two regimes measured **in the same capture** (background from the frame, stroke from the dimmest
+  interior probe), so no constant is introduced, and the probe sits **half** an extension out rather
+  than a full one, which would land on the exact end-cut a swapped quad draws.
+  **The plan's Phase 2 done-when 2 premise was slightly wrong and `dev` said so instead of working
+  around it.** A swap *is* caught by the pre-existing local-minimum assertion — at element 1 only,
+  reading `0.4510` against `0.4588`. That `0.008` margin is inside the noise of any rasterization
+  change, so "nothing catches a swap" was directionally right and literally wrong; the replacement's
+  `~0.23` margins on both ends are the answer either way. `dev` disabled the old assertion
+  temporarily to prove the new one fires on its own merits (`0.4911` against a `0.2294` cutoff), then
+  restored it.
+  **Phase 1's pin is ordered so the notch cannot be blessed back in.** `line_joints.rs` compares
+  against `golden/line_joint_zigzag.png` following `composite.rs` — its own compare, its own
+  `LMV_BLESS`, its own binary — and the **relative assertion runs first, including under
+  `LMV_BLESS`**, so a reopened notch aborts before the bless can run. That ordering is the whole
+  answer to "a baseline can always be re-blessed". One capture serves all three duties, deliberately:
+  a second `Renderer::new_headless` mid-run is the thing `composite.rs` documents as changing what
+  WARP resolves. **Bless scoping was checked rather than assumed** (one file written, ten baselines
+  untouched, `golden.rs` not built by that invocation), and Phase 3's `LMV_BLESS` over `--test
+  golden` did rewrite `fragment_field.png` and `swarm.png` on WARP noise — both restored before
+  staging, the standing trap behaving exactly as [0039] and [0033] recorded it.
+  **Verified at review** rather than taken on trust: `fmt --check` + `clippy --workspace
+  --all-targets -D warnings` clean; `cargo nextest run --workspace` **280/280, 0 skipped**; the new
+  baseline reproduces **bit-exact** (mean `0.0000`, outlier `0`) and the probe still reads ADR-0041's
+  recorded numbers (joint `0.6431`/`0.6440` against interiors `0.4885`/`0.4588`); `git diff --stat`
+  over the range confirms `star_pattern.png` is the **only** baseline that moved and
+  `line_joint_zigzag.png` the only one added; both composite fixtures were opened and are
+  `parametric_curve` figures with no star, and both still read `mean 0.0000`; `ffi.rs`,
+  `scenes/mod.rs` and every manifest are untouched (**C ABI stays v4**, `Scene` unchanged, no new
+  dependency, no preset `.toml` change). The join extension still takes its aspect from the render
+  target's uniform, and the non-square coverage for it lives in `composite.rs`'s 160x100 rose
+  fixtures — `line_joints.rs` is square **on purpose**, so its world coordinates are NDC and the
+  probe arithmetic is derivable.
+  **Minors:** (1) `dev`'s close report that `--test transition`'s 12 tests "are not executing on this
+  machine" is **wrong, though the crash it rests on is real**. The abort reproduces at `3e4dec5` in a
+  scratch worktree, so it is genuinely pre-existing — but it is the known in-process parallel-GPU
+  teardown fault ([0035]'s close recorded the same thing for `--lib render::post`), and all 12 tests
+  pass in 3.2 s under `cargo nextest run -p lmv-core --test transition`. There is no coverage gap.
+  (2) `docs/capturing.md` is what licensed that conclusion — it said `cargo test -p lmv-core` is
+  "also fine, except where noted below" and the note below covered only `preset`'s allocation
+  counter — **fixed in this close commit**, which now names the `0xc0000005` abort as a runner
+  artifact and says to re-run under nextest before concluding anything about coverage.
+  **Nits:** the generated prelude shifts every WGSL line number by two relative to `SHADER_BODY`, so
+  a naga compile error's reported line no longer matches what you count in `renderer.rs`; and
+  `assert_no_notch` returns `f32::INFINITY` for an empty joint list, guarded by an assertion above it
+  rather than by construction. **⚠ Nothing new for the on-device pass** — no instance count changed,
+  the flag was already in the instance, and the shader work per vertex is identical; the plan
+  disclosed that cost as asserted-negligible and claimed no number, which stands.
+  Version **patch 0.21.0 → 0.21.1** (a fix/coverage/refactor plan, no feature).
 
 - [0039 — Line joins: the stroke stops coming apart at every vertex](done/0039-line-joins.md) —
   **done 2026-07-28**, passed Mode 4 review (**no blockers**; one major, three minors, two nits —

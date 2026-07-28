@@ -136,6 +136,30 @@ the close rather than tuned in during a review, and captured as **design-backlog
 that the two contact points *within* a pair are distinct and is silent about the sharing *across*
 pairs.
 
+### Closed by Plan 0040 (2026-07-28)
+
+Both segments at a contact point now carry `JOINED_A | JOINED_B`, so all `2n` vertices of the
+rosette are flagged, and the `hankin.rs` test was **replaced** rather than amended — it now asserts
+that segments `2k + 1` and `2k + 2` meet at a shared contact point and both declare that end joined,
+over the wrap-around pair too. Only `star_pattern.png` moved.
+
+**The look was measured, and it contradicts what both this ADR's Outcome and Plan 0040 expected.**
+The bead is *more* distinct at a **wide** turn than at a sharp one. At `contact_angle = 8` (the
+`CONTACT_MIN_DEG` floor) the two extensions run nearly parallel and merge into the already-bright
+core: the hollow flat cut is gone and the point simply ends in a point, with no separable bead. At
+`contact_angle = 40` the before is a clean dark V bitten into the corner and the after fills it with
+a small bright dot at the vertex — the two extensions overlap in a compact spot rather than along the
+whole point. So the near-reversal case this ADR worried about is the *benign* one, and the trade it
+accepted in place of a miter limit is cheaper than priced. Neither reads as a defect at shipped
+thickness; **no miter limit is owed**.
+
+The join bits also stopped being magic numbers here. `renderer.rs` now generates the WGSL
+`const JOINED_A` / `const JOINED_B` from the Rust constants at pipeline build rather than restating
+`1u`/`2u` in the shader source, which makes a renumbering unrepresentable rather than merely
+detectable; and a **swap** — still writable by hand in the WGSL — is caught by a new assertion that
+the stroke does not reach past the figure's own first and last points, the only endpoints carrying a
+single bit and therefore the only place the two bits are separable.
+
 ## Alternatives considered
 
 **Extend every quad unconditionally (no flags).** The two-line change originally proposed in

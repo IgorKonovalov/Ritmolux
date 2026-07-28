@@ -468,13 +468,27 @@ they hold on any GPU; the exceptions say so below. Run the whole suite:
 
 ```bash
 cargo nextest run -p lmv-core     # what CI runs (per-test process isolation)
-cargo test -p lmv-core            # also fine, except where noted below
+cargo test -p lmv-core            # single binaries only — see the two caveats below
 ```
 
-> **Use `nextest` for the whole suite.** `preset`'s zero-allocation assertion
+> **Use `nextest` for the whole suite**, for two independent reasons.
+>
+> `preset`'s zero-allocation assertion
 > counts allocations through a process-global allocator hook, so it is only
 > reliable under nextest's per-test process isolation — under stock `cargo test`
-> a concurrently-running test's allocations bleed into the count. Tests that need
+> a concurrently-running test's allocations bleed into the count.
+>
+> And **stock `cargo test` runs a binary's tests as threads in one process, which
+> the GPU tests do not survive.** Several of them build and drop a `Renderer` (and
+> so a wgpu device) concurrently, and the driver aborts the process with
+> `STATUS_ACCESS_VIOLATION` — `--test transition` every run on WARP, `--lib`
+> intermittently at teardown, `--lib render::post` since Plan 0035. **This is a
+> runner artifact, not a failing test**: the same binaries pass in full under
+> `cargo nextest run`, which gives each test its own process. If a `cargo test`
+> invocation aborts with `0xc0000005`, re-run it under nextest (or
+> `-- --test-threads=1`) before concluding anything about coverage.
+>
+> Tests that need
 > a real GPU (`background_composite`, and the in-crate dual-live dissolve check in
 > `render/mod.rs`) **skip themselves** when only a software rasterizer is present,
 > per [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md). WARP mis-renders both:
