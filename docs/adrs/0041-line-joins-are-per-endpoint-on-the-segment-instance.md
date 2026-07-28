@@ -1,11 +1,12 @@
 # ADR-0041 — Line joins are a per-endpoint flag on the segment instance, not a global cap rule
 
-> **Status:** proposed
+> **Status:** accepted 2026-07-28 (implemented by [Plan 0039](../plans/done/0039-line-joins.md),
+> which passed Mode 4 review — see the Outcome note below)
 > **Date:** 2026-07-28
-> **Related plan(s):** [0039](../plans/0039-line-joins.md)
-> **Supplements:** [ADR-0007](0007-instanced-quads-not-native-line-primitives.md) (the instanced-quad
-> line primitive this extends), [ADR-0023](0023-golden-fixtures-are-frozen.md) (the golden re-bless
-> this forces)
+> **Related plan(s):** [0039](../plans/done/0039-line-joins.md)
+> **Supplements:** [ADR-0007](0007-line-geometry-generators.md) (the instanced-quad
+> line primitive this extends), [ADR-0023](0023-golden-drift-guard-uses-frozen-fixtures.md) (the
+> golden re-bless this forces)
 > **Backlog entry closed:** [0023](../design-backlog.md)
 
 ## Context
@@ -106,6 +107,34 @@ joints, rather than every line scene in the set.
 - The flag describes connectivity the producer asserts, and nothing validates it. A producer could
   flag an end that is not actually shared, and the result would be a stroke a half-width too long
   with no error.
+
+## Outcome (added 2026-07-28 at Plan 0039's close)
+
+The decision holds and shipped as written: `SegmentInstance.joined` is a `u32` bitfield
+(`JOINED_A`/`JOINED_B`, 32 -> 36 bytes), the shader extends only at a flagged end, and the
+byte-identical property was verified rather than assumed — `spectrum`'s `Bars` and `RadialRing`
+baselines did not move. `core/tests/line_joints.rs` measured the near-180-degree overshoot this ADR
+accepted in place of a miter limit: at the fixture's ~125-degree turn the joint reads `0.6431`
+against interiors of `0.4885`/`0.4588`, so the trade is a slightly bright bead, as predicted.
+
+**One row of the connectivity table above is wrong.** It says `hankin.rs::star_rosette` produces
+"pairs meeting at a shared petal tip … `m0`/`m1` are free". The contact points are **not** free:
+petal `k` emits segments from `contact(k)` and `contact(k + 1)`, and petal `k + 1` emits one from
+`contact(k + 1)` again, so every contact point is shared by two segments' `a` ends. The rosette is a
+**closed chain** — `contact(0) -> tip(0) -> contact(1) -> tip(1) -> …` — in which every vertex is a
+joint, and Plan 0039 flagged only half of them (the tips). The contact-point vertices keep the notch,
+and they are the sharper half: the two rays leave a contact point `2 * contact_angle` apart, so the
+through-turn is `pi - 2 * contact_angle` and the wedge is `half_width / tan(contact_angle)` — larger
+than a half-width for any star pointier than 45 degrees, against a `contact_angle` clamped as low as
+8 degrees.
+
+This is an error in the analysis, not in the mechanism: the per-endpoint flag expresses the closed
+chain exactly (both segments at a contact point would carry `JOINED_A`, both at a tip carry
+`JOINED_B`), which is further evidence for the granularity chosen here. Left unfixed deliberately at
+the close rather than tuned in during a review, and captured as **design-backlog 0024**; it wants a
+`star_pattern` golden re-bless and an amended `hankin.rs` test, since the shipped one asserts only
+that the two contact points *within* a pair are distinct and is silent about the sharing *across*
+pairs.
 
 ## Alternatives considered
 

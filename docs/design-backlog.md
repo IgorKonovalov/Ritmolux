@@ -1004,3 +1004,48 @@ stroke).
 capability or a rejected-alternative decision. It wants a small plan with a golden-baseline
 re-bless, because *every* line-scene golden moves. Worth noting the re-bless is the main cost here,
 not the shader edit.
+
+- **PROMOTED 2026-07-28 → [ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
+  + [Plan 0039](plans/done/0039-line-joins.md). ~~CLOSED 2026-07-28~~** — and the "ADR-worthy?"
+  reading above is the part this entry got wrong, which is why it turned into an ADR after all. The
+  cheap fix it proposed (extend every quad unconditionally) is **incorrect**, for exactly the reason
+  the entry half-spotted in its own `bars` caveat: at `spectrum_comb`'s `thickness = 13` an
+  unconditional extend grows a bar ~60 % at rest and hangs it below `baseline`. The shipped shape is
+  a **per-endpoint** flag on `SegmentInstance`, so a producer that flags nothing is byte-identical.
+  `spectrum_ridge`'s `thickness` re-tune — the cost this entry priced — is Plan 0039's Phase 5 and is
+  **still open**. One residue: the star rosette's contact points were mis-analysed as free ends and
+  remain unjoined; that is **0024** below.
+
+---
+
+## 0024 — the star rosette is a closed chain, and half its joints are still unjoined
+
+- **Raised:** 2026-07-28, from `architect`'s Mode 4 review of [Plan 0039](plans/done/0039-line-joins.md).
+- **Verified against code:** yes — `core/src/render/scenes/lines/hankin.rs`, `star_rosette`.
+
+[ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)'s connectivity table
+says the star produces "pairs meeting at a shared petal tip … `m0`/`m1` are free", and Plan 0039
+Phase 3 implemented exactly that: both rays of a petal carry `JOINED_B` and both contact points stay
+free. **The contact points are not free.** Petal `k` emits segments starting at `contact(k)` and
+`contact(k + 1)`; petal `k + 1` emits one starting at `contact(k + 1)` again. So the figure is a
+closed chain — `contact(0) -> tip(0) -> contact(1) -> tip(1) -> …` — and every one of its `2n`
+vertices is a joint. Only the `n` tips were flagged.
+
+**It is the sharper half that was missed.** The two rays leave a contact point `2 * contact_angle`
+apart, so the through-turn is `pi - 2 * contact_angle` and the wedge is
+`half_width / tan(contact_angle)` — bigger than a half-width for any star pointier than 45 degrees,
+against a `contact_angle` clamped as low as 8 degrees (`star.rs`, `CONTACT_MIN_DEG`). The notch that
+survives at a contact point is therefore wider than the one that was removed at the tip.
+
+**The shape of a fix.** Two lines: both segments at a contact point take `JOINED_A` as well, so
+`out.push(seg(m0, tip, JOINED_A | JOINED_B))` for both rays. It costs a `star_pattern` golden
+re-bless and an amended test — the shipped
+`the_star_joins_in_pairs_at_the_petal_tip` asserts only that the two contact points *within* a pair
+are distinct and is silent about the sharing *across* pairs, so it would pass unchanged today. Worth
+checking by eye first: a contact point is a near-reversal, which is the case ADR-0041 accepts as a
+slightly bright bead rather than a gap, and on a pointy star that bead sits on the outer circle where
+it may read as a deliberate stud or as a defect.
+
+**Not ADR-worthy** — the mechanism is already decided and the per-endpoint flag expresses the closed
+chain exactly. This is an unfinished application of it. Small enough to ride along with the next plan
+that touches the line family, or with Plan 0039's open Phase 5.
