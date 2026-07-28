@@ -1,7 +1,7 @@
 # 0040 — Line joins, finished: the star's other half, and a pin under the reported defect
 
-> **Status:** approved 2026-07-28 — ready for `dev` (a fresh session; the handoff is manual on
-> purpose). [Plan 0039](done/0039-line-joins.md) has closed, so nothing blocks it.
+> **Status:** in-progress 2026-07-28 — `dev` is implementing it.
+> [Plan 0039](done/0039-line-joins.md) has closed, so nothing blocks it.
 > **Created:** 2026-07-28
 > **Owner skill(s):** dev
 > **Related ADRs:** [0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)

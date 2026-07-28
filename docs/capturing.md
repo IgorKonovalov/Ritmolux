@@ -494,7 +494,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `composite` | HARD (tolerance) | the **post stages** — one fixture composes `trails`, one composes `kaleido_*` — match their baselines. Captured at **160x100**, a size whose internal grid is *not* the target's shape, so an aspect error is visible ([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) |
 | `reaction_diffusion` | HARD | the first stateful-feedback scene: seed reproducibility, regime response ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
 | `attractor` | HARD | the first compute-particle scene: seed reproducibility + beat perturbation ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
-| `line_joints` | HARD | a **flagged joint stops leaving a hole** in the stroke ([ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)): against a purpose-built zigzag `polyline`, a vertex is not a local luminance minimum relative to the segment interiors either side of it. Threshold-free, and captured at **512x512** because the wedge it measures is a fraction of a stroke-width across. Pins no pixels, so `LMV_BLESS` does not touch it |
+| `line_joints` | HARD (+ tolerance) | a **flagged joint stops leaving a hole** in the stroke ([ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)): against a purpose-built zigzag `polyline`, a vertex is not a local luminance minimum relative to the segment interiors either side of it. Threshold-free, and captured at **512x512** because the wedge it measures is a fraction of a stroke-width across. The same capture is then pinned to a committed baseline (Plan 0040), since the reported defect had no pixel guard anywhere; the relative claim runs **first, even under `LMV_BLESS`**, so the notch cannot be blessed back in. Bless with `--test line_joints`, which cannot reach the golden roster |
 | `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
 | `background_composite` | HARD (**hardware only**) | RD / attractor presents alpha-blend over the `bg_*` backdrop; **skipped** on a software adapter, which mis-renders that pipeline set |
 | `transition` | HARD | every switch path (cycle **and** select) renders intermediate blended frames as a ramp, reproducibly from the injected `dt`; each blend kind shows its own signature; a switch arriving mid-dissolve lands on the last index requested; a hot-reload mid-dissolve cancels cleanly; the heavy attractor ↔ reaction-diffusion pair dissolves on the freeze fallback (set `LMV_TRANSITION_STRIP=<dir>` to also dump filmstrips) |
@@ -523,12 +523,15 @@ change:
 
 ```bash
 LMV_BLESS=1 cargo test -p lmv-core --test golden
-LMV_BLESS=1 cargo test -p lmv-core --test composite   # the two post-stage baselines
+LMV_BLESS=1 cargo test -p lmv-core --test composite     # the post-stage baselines
+LMV_BLESS=1 cargo test -p lmv-core --test line_joints   # the joined-polyline baseline
 ```
 
-The `composite_*.png` pair belongs to the `composite` test, not to `golden` —
-bless it by naming that binary, which is also what keeps the two scopes from
-rewriting each other.
+Only the first of those owns the per-`SystemKind` roster. The `composite_*.png`
+pair belongs to the `composite` test and `line_joint_zigzag.png` to
+`line_joints`; blessing by binary is what keeps the scopes from rewriting each
+other. `line_joints` additionally refuses to bless at all while its
+local-minimum claim is failing, so a reopened notch cannot be baselined in.
 
 **Eyeball the regenerated PNGs before committing** — the first baseline is easy
 to enshrine wrong. The compare tolerates minor cross-GPU rasterization drift; a
