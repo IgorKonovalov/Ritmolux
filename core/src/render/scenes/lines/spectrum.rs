@@ -37,9 +37,13 @@
 //! - `glow` — the line renderer's per-segment falloff multiplier (Plan 0038),
 //!   whole-figure like on the other three line scenes. Not a post bloom.
 //!
-//! `radius` is **layout-specific**: it is the ring's inner radius and has no
-//! meaning for bars or the polyline. That is stated in `presets/README.md` and
-//! `docs/presets.md` rather than left for an author to discover.
+//! Three parameters are **layout-specific**, and each is a no-op on the layouts
+//! it does not describe — stated in `presets/README.md` and `docs/presets.md`
+//! rather than left for an author to discover:
+//!
+//! - `radius` is the ring's inner radius; no meaning for bars or the polyline.
+//! - `span` and `baseline` place the bars/polyline figure in **world** space; no
+//!   meaning for the ring, which `radius` sizes instead (Plan 0038 Phase 2).
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). `update`/`render` run every displayed frame.
@@ -74,14 +78,6 @@ const WIDTH_SCALE: f32 = 0.003;
 /// per-element scratch to it (Plan 0034 Phase 4), so the two cannot disagree.
 pub const MAX_ELEMENTS: usize = crate::dsp::SPECTRUM_BINS;
 
-/// World-space half-width the readout spans. The renderer divides x by the
-/// target aspect, so this is a **world** extent, not a screen one — the scene
-/// never sees an aspect and so cannot take one from the wrong place (ADR-0037).
-const SPAN_X: f32 = 1.0;
-
-/// World-space y the bars and the polyline rest on.
-const BASELINE_Y: f32 = -0.85;
-
 // Parameter defaults — a legible, calm readout when a preset binds nothing.
 const DEFAULT_THICKNESS: f32 = 6.0;
 const DEFAULT_HUE: f32 = 0.55;
@@ -100,6 +96,32 @@ const DEFAULT_SCALE: f32 = 1.2;
 const DEFAULT_BASE: f32 = 0.06;
 /// Inner radius of the radial ring (ignored by the other two layouts).
 const DEFAULT_RADIUS: f32 = 0.35;
+/// World-space **half-width** the readout spans, so the figure is `2 * span`
+/// wide — `1.0` is the constant this scene was pinned to before Plan 0038
+/// Phase 2 bound it.
+///
+/// It is a **world** quantity, not a screen one. The renderer divides x by the
+/// target aspect on the GPU, so this scene never sees an aspect and cannot take
+/// one from the wrong place ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+/// The honest consequence: *"fill the width"* is aspect-dependent — `span ≈
+/// 1.78` fills a 16:9 frame and leaves an ultrawide short. There is
+/// deliberately no `fit` mode.
+///
+/// Applies to [`SpectrumLayout::Bars`] and [`SpectrumLayout::Polyline`]; a
+/// **no-op on [`SpectrumLayout::RadialRing`]**, which is sized by `radius`
+/// instead — the mirror image of `radius` already being a no-op on the
+/// other two.
+const DEFAULT_SPAN: f32 = 1.0;
+/// World-space y the bars and the polyline rest on — the constant this scene
+/// was pinned to before Plan 0038 Phase 2 bound it. Also a **no-op on
+/// [`SpectrumLayout::RadialRing`]**, whose spokes start on the ring.
+///
+/// `baseline = 0` is what makes `mirror_reflect` mean what it means everywhere
+/// else: the mirror reflects across the **x-axis**, so a figure standing on the
+/// axis reflects into a symmetric "landscape and its reflection" about the
+/// frame centre, while one standing at `-0.85` throws its copy against the top
+/// edge (design-backlog 0018).
+const DEFAULT_BASELINE: f32 = -0.85;
 const DEFAULT_ROTATION: f32 = 0.0;
 // Shared view transform (ADR-0018): identity by default.
 const DEFAULT_ZOOM: f32 = 1.0;
@@ -114,6 +136,8 @@ pub const PARAMS: &[&str] = &[
     "base",
     "scale",
     "radius",
+    "span",
+    "baseline",
     "rotation",
     "thickness",
     "hue",
@@ -160,14 +184,33 @@ impl SpectrumLayout {
     }
 }
 
-/// Where the figure sits — the two scalars that belong to the **whole** readout
+/// Where the figure sits — the scalars that belong to the **whole** readout
 /// rather than to an element, so they stay off the per-element arrays.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct Placement {
     /// Inner radius — [`SpectrumLayout::RadialRing`] only.
     pub radius: f32,
+    /// World-space half-width — [`SpectrumLayout::Bars`] and
+    /// [`SpectrumLayout::Polyline`] only. See [`DEFAULT_SPAN`].
+    pub span: f32,
+    /// World-space y the figure rests on — bars and polyline only. See
+    /// [`DEFAULT_BASELINE`].
+    pub baseline: f32,
     /// Whole-figure rotation in radians, about the world origin.
     pub rotation: f32,
+}
+
+/// The scene's own defaults rather than zeroes: a `Placement` with `span = 0`
+/// would collapse the figure to a point, which is never a sensible fallback.
+impl Default for Placement {
+    fn default() -> Self {
+        Self {
+            radius: 0.0,
+            span: DEFAULT_SPAN,
+            baseline: DEFAULT_BASELINE,
+            rotation: 0.0,
+        }
+    }
 }
 
 /// The parameters this scene accepts as a **per-element series** (Plan 0034
@@ -251,12 +294,12 @@ pub(crate) fn build(
 
     match layout {
         SpectrumLayout::Bars => {
-            let step = 2.0 * SPAN_X / lengths.len() as f32;
+            let step = 2.0 * place.span / lengths.len() as f32;
             for (i, &length) in lengths.iter().enumerate() {
-                let x = -SPAN_X + step * (i as f32 + 0.5);
+                let x = -place.span + step * (i as f32 + 0.5);
                 out.push(SegmentInstance {
-                    a: turn([x, BASELINE_Y]),
-                    b: turn([x, BASELINE_Y + length]),
+                    a: turn([x, place.baseline]),
+                    b: turn([x, place.baseline + length]),
                     color: color_of(i),
                     width: width_of(i),
                 });
@@ -266,13 +309,13 @@ pub(crate) fn build(
             // One point per element, spanning edge to edge, joined by n-1
             // segments. A single element has no segment to draw, which is why
             // the loader's minimum count is 2.
-            let span = lengths.len().saturating_sub(1);
-            if span == 0 {
+            let gaps = lengths.len().saturating_sub(1);
+            if gaps == 0 {
                 return;
             }
-            let step = 2.0 * SPAN_X / span as f32;
+            let step = 2.0 * place.span / gaps as f32;
             let point = |i: usize, length: f32| -> [f32; 2] {
-                turn([-SPAN_X + step * i as f32, BASELINE_Y + length])
+                turn([-place.span + step * i as f32, place.baseline + length])
             };
             let mut prev = point(0, lengths.first().copied().unwrap_or(0.0));
             for (i, &length) in lengths.iter().enumerate().skip(1) {
@@ -358,6 +401,8 @@ pub struct SpectrumScene {
     scale: f32,
     base: f32,
     radius: f32,
+    span: f32,
+    baseline: f32,
     rotation: f32,
     zoom: f32,
     pan_x: f32,
@@ -399,6 +444,8 @@ impl SpectrumScene {
             scale: DEFAULT_SCALE,
             base: DEFAULT_BASE,
             radius: DEFAULT_RADIUS,
+            span: DEFAULT_SPAN,
+            baseline: DEFAULT_BASELINE,
             rotation: DEFAULT_ROTATION,
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
@@ -466,6 +513,8 @@ impl Scene for SpectrumScene {
         self.scale = DEFAULT_SCALE;
         self.base = DEFAULT_BASE;
         self.radius = DEFAULT_RADIUS;
+        self.span = DEFAULT_SPAN;
+        self.baseline = DEFAULT_BASELINE;
         self.rotation = DEFAULT_ROTATION;
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
@@ -483,6 +532,8 @@ impl Scene for SpectrumScene {
             "base" => self.base = value,
             "scale" => self.scale = value,
             "radius" => self.radius = value,
+            "span" => self.span = value,
+            "baseline" => self.baseline = value,
             "rotation" => self.rotation = value,
             "thickness" => self.thickness = value,
             "hue" => self.hue = value,
@@ -606,6 +657,8 @@ impl Scene for SpectrumScene {
 
         let place = Placement {
             radius: self.radius,
+            span: self.span,
+            baseline: self.baseline,
             rotation: self.rotation,
         };
         build(
@@ -674,18 +727,24 @@ mod tests {
         vec![0.01; n]
     }
 
-    /// Build one figure from raw per-element lengths, at the origin, unturned.
-    fn figure(layout: SpectrumLayout, lengths: &[f32]) -> Vec<SegmentInstance> {
+    /// Build one figure from raw per-element lengths at an explicit placement.
+    fn placed(layout: SpectrumLayout, lengths: &[f32], place: Placement) -> Vec<SegmentInstance> {
         let mut out = Vec::new();
         build(
             layout,
             lengths,
             &even_widths(lengths.len()),
             &white(lengths.len()),
-            Placement::default(),
+            place,
             &mut out,
         );
         out
+    }
+
+    /// Build one figure from raw per-element lengths, at the default placement,
+    /// unturned.
+    fn figure(layout: SpectrumLayout, lengths: &[f32]) -> Vec<SegmentInstance> {
+        placed(layout, lengths, Placement::default())
     }
 
     /// The element lengths a stimulus produces, low index first — the whole
@@ -807,9 +866,12 @@ mod tests {
         let spacing = out[1].a[0] - out[0].a[0];
         for (i, seg) in out.iter().enumerate() {
             assert_eq!(seg.a[0], seg.b[0], "element {i} is upright");
-            assert_eq!(seg.a[1], BASELINE_Y, "element {i} stands on the baseline");
+            assert_eq!(
+                seg.a[1], DEFAULT_BASELINE,
+                "element {i} stands on the baseline"
+            );
             assert!(
-                seg.a[0].abs() <= SPAN_X,
+                seg.a[0].abs() <= DEFAULT_SPAN,
                 "element {i} stays inside the span"
             );
             if i > 0 {
@@ -843,6 +905,124 @@ mod tests {
         assert_eq!(element_length(1.0, 0.0, -5.0), 0.0, "length floors at zero");
     }
 
+    /// Plan 0038 Phase 2. `span` and `baseline` place the figure in **world**
+    /// space — no aspect and no target size is read anywhere in this scene to
+    /// compute them (ADR-0037), which is why doubling `span` is exactly doubling
+    /// an x coordinate and nothing else.
+    #[test]
+    fn span_and_baseline_place_the_figure_in_world_space() {
+        let lengths = [0.2f32, 0.5, 0.9, 0.4];
+
+        for layout in [SpectrumLayout::Bars, SpectrumLayout::Polyline] {
+            let narrow = placed(layout, &lengths, Placement::default());
+            let wide = placed(
+                layout,
+                &lengths,
+                Placement {
+                    span: 2.0 * DEFAULT_SPAN,
+                    ..Placement::default()
+                },
+            );
+            for (i, (n, w)) in narrow.iter().zip(&wide).enumerate() {
+                assert!(
+                    (w.a[0] - 2.0 * n.a[0]).abs() < 1e-6 && (w.b[0] - 2.0 * n.b[0]).abs() < 1e-6,
+                    "{layout:?} segment {i}: doubling span must double x, got {} from {}",
+                    w.a[0],
+                    n.a[0]
+                );
+                assert_eq!(
+                    (w.a[1], w.b[1]),
+                    (n.a[1], n.b[1]),
+                    "{layout:?} segment {i}: span must not move y"
+                );
+            }
+
+            // `baseline` is a pure y offset, again with no x effect.
+            let lifted = placed(
+                layout,
+                &lengths,
+                Placement {
+                    baseline: DEFAULT_BASELINE + 0.5,
+                    ..Placement::default()
+                },
+            );
+            for (i, (n, l)) in narrow.iter().zip(&lifted).enumerate() {
+                assert!(
+                    (l.a[1] - n.a[1] - 0.5).abs() < 1e-6,
+                    "{layout:?} segment {i}: baseline must offset y by exactly its change"
+                );
+                assert_eq!(
+                    l.a[0], n.a[0],
+                    "{layout:?} segment {i}: baseline moves no x"
+                );
+            }
+        }
+
+        // Both are no-ops on the ring, which `radius` sizes instead.
+        let ring = placed(SpectrumLayout::RadialRing, &lengths, Placement::default());
+        let ring_moved = placed(
+            SpectrumLayout::RadialRing,
+            &lengths,
+            Placement {
+                span: 4.0,
+                baseline: 0.7,
+                ..Placement::default()
+            },
+        );
+        assert_eq!(
+            ring.iter().map(|s| (s.a, s.b)).collect::<Vec<_>>(),
+            ring_moved.iter().map(|s| (s.a, s.b)).collect::<Vec<_>>(),
+            "span and baseline are no-ops on the radial ring"
+        );
+    }
+
+    /// Plan 0038 Phase 2 done-when 3, the design-backlog 0018 fix. The geometry
+    /// mirror reflects across the **x-axis** (`lines/mod.rs`) on every line
+    /// scene alike; nothing about that changes here. What changes is where the
+    /// figure stands. At `baseline = 0` the two copies share one foot line — the
+    /// symmetric "landscape and its reflection". At the default `-0.85` they
+    /// have two feet lines 1.7 apart, so the copy hangs from the top edge
+    /// instead of mirroring about a shared centre.
+    #[test]
+    fn baseline_zero_mirrors_the_readout_about_the_frame_centre() {
+        let lengths = [0.2f32, 0.5, 0.9, 0.4];
+        let mirror = MirrorSpec::from_params(1.0, 1.0);
+        assert!(!mirror.is_identity(), "the probe must actually replicate");
+
+        // The distinct y values the bars' feet (their `a` endpoints) rest on,
+        // rounded so float noise cannot invent a second line.
+        let feet = |place: Placement| -> Vec<i32> {
+            let single = placed(SpectrumLayout::Bars, &lengths, place);
+            let mut out = Vec::new();
+            replicate_mirror(&single, mirror, MAX_SEGMENTS, &mut out);
+            let mut ys: Vec<i32> = out.iter().map(|s| (s.a[1] * 1e4) as i32).collect();
+            ys.sort_unstable();
+            ys.dedup();
+            ys
+        };
+
+        assert_eq!(
+            feet(Placement {
+                baseline: 0.0,
+                ..Placement::default()
+            }),
+            vec![0],
+            "baseline = 0: both copies stand on the one centre line"
+        );
+        let default_feet = feet(Placement::default());
+        assert_eq!(
+            default_feet.len(),
+            2,
+            "the default baseline gives the pair two separate foot lines"
+        );
+        assert_eq!(
+            default_feet,
+            vec![-8500, 8500],
+            "and they sit at -0.85 and +0.85, 1.7 apart — the copy against the \
+             top edge that design-backlog 0018 reported"
+        );
+    }
+
     /// Plan 0034 Phase 3 done-when 1: each layout draws the *same data* as a
     /// different figure, and each is structurally what its name claims.
     #[test]
@@ -862,11 +1042,11 @@ mod tests {
         }
         // The chain spans the full width, edge to edge.
         assert!(
-            (out[0].a[0] + SPAN_X).abs() < 1e-6,
+            (out[0].a[0] + DEFAULT_SPAN).abs() < 1e-6,
             "starts at the left edge"
         );
         assert!(
-            (out[out.len() - 1].b[0] - SPAN_X).abs() < 1e-6,
+            (out[out.len() - 1].b[0] - DEFAULT_SPAN).abs() < 1e-6,
             "ends at the right edge"
         );
 
@@ -880,7 +1060,7 @@ mod tests {
             &white(levels.len()),
             Placement {
                 radius: 0.4,
-                rotation: 0.0,
+                ..Placement::default()
             },
             &mut out,
         );
@@ -930,8 +1110,8 @@ mod tests {
                 &even_widths(levels.len()),
                 &white(levels.len()),
                 Placement {
-                    radius: 0.0,
                     rotation: quarter,
+                    ..Placement::default()
                 },
                 &mut turned,
             );
