@@ -1,9 +1,9 @@
 # Golden drift fixtures
 
 These TOML files are **test-only frozen fixtures** for the golden drift guard
-(`core/tests/golden.rs`), one per `SystemKind` — plus the two `composite_*` and
-two `easing_*` fixtures described at the bottom, which belong to different
-guards. They exist to catch **unintended
+(`core/tests/golden.rs`), one per `SystemKind` — plus the `composite_*`,
+`easing_*` and `line_joint_*` fixtures described at the bottom, which belong to
+different guards. They exist to catch **unintended
 engine rendering drift** — a shader or scene-math change that silently perturbs
 output — by pinning each scene's pixels to a committed baseline PNG under
 `core/tests/golden/`.
@@ -88,3 +88,23 @@ parameter and can only see through a near-linear visual response. Their headers
 say exactly which choices keep that response linear (a static figure, one
 directly-multiplying param, an amplitude below the additive-blend clamp, no
 composite stage). Read them before editing either file.
+
+## `line_joint_zigzag.toml` is a fourth guard, and also pins no pixels
+
+It belongs to `core/tests/line_joints.rs` (Plan 0039 Phase 2, ADR-0041), which
+asserts that a flagged joint stops leaving a hole in the stroke. Like the
+`easing_*` pair it has **no committed baseline** and `LMV_BLESS` does not touch
+it: the test measures a *relative* property — that a vertex is not a local
+luminance minimum against the segment interiors either side of it — so there is
+no PNG to drift.
+
+It is captured at **512x512**, not the golden roster's 128. The feature under
+test is a wedge a fraction of a stroke-width across; at 128 px there is nothing
+left of it to measure. Square, so the aspect divide is the identity and the test
+can turn world coordinates into pixels directly.
+
+"Do not tune" bites hardest here: the test **recomputes the vertex positions**
+from `elements`, `span`, `baseline` and `thickness`, so changing any of them
+moves the probes off the geometry and the test starts comparing two pieces of
+background (which it fails on, deliberately, rather than passing vacuously). The
+header says what each value is holding.

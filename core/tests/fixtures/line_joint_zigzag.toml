@@ -1,0 +1,42 @@
+# TEST FIXTURE - do not tune. `core/tests/line_joints.rs` reads the joint
+# positions back out of these exact numbers, so every value here is load-bearing
+# geometry rather than a look. Pins no pixels and is never blessed.
+#
+# A deliberately hostile polyline: six elements whose levels alternate hard
+# between 0.05 and 0.75, so consecutive points sit 0.70 apart in y over a
+# 0.36 x-step and every interior vertex turns by ~125 degrees. That is far
+# sharper than any music produces, and it is the point - the wedge a
+# joinless stroke leaves is `half_width * tan(theta/2)`, so a sharp turn makes
+# the defect many pixels wide instead of the sub-pixel tick the generator
+# scenes show.
+#
+# Why each param is what it is:
+#   base/scale  - length is exactly the element level, so the test can compute
+#                 the vertex coordinates from the band array it supplies.
+#   thickness   - 24 gives a 0.072 NDC half-width, ~18 px at the 512 px capture.
+#                 Below about 8 the wedge stops being resolvable and the test
+#                 measures rasterization instead of geometry.
+#   saturation  - 0 flattens the palette to neutral grey, so all three channels
+#                 carry the signal and the measurement does not depend on which
+#                 hue the palette happens to put where.
+#   brightness  - held so that two overlapping strokes still land below the
+#                 additive-blend clamp; a joint that saturates would pass the
+#                 assertion for the wrong reason.
+#   no time term anywhere, so the frame is canonical.
+system = "spectrum"
+name   = "fixture_line_joint_zigzag"
+
+[spectrum]
+elements = 6
+layout   = "polyline"
+
+[params]
+base       = "0"
+scale      = "1"
+span       = "0.9"
+baseline   = "-0.45"
+thickness  = "24"
+hue        = "0.0"
+saturation = "0"
+brightness = "0.7"
+glow       = "1"
