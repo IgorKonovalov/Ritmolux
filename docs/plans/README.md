@@ -3,13 +3,14 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0039**
+**Next free number: 0040**
 
 ## Active roster
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0038](0038-line-family-unreachable-levers.md) | The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log` | **in-progress** — Phases 1-5 and 7 landed and reviewed; **Phases 8 and 9 added 2026-07-28** by that review, and both run **before** Phase 6, which is the user's | dev, human |
+| [0039](0039-line-joins.md) | Line joins: the stroke stops coming apart at every vertex | **draft 2026-07-28** — needs approval; land **after** [0038] closes | dev, human |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
@@ -60,6 +61,17 @@ evenness finding with a settled measurement (73 / 145 frames, a 1.99 ratio again
 - **Phase 9** — `log(0)` is `-inf`, which silence produces, and the render layer's smoother turns
   that into a **permanently** NaN binding that only a preset switch clears. One guard in
   `Easing::step` covers both smoothers.
+
+**[0039] is drafted and waiting on [0038]'s close** (2026-07-28), from `preset-author` routing
+design-backlog 0023: `LineRenderer` builds every segment as an independent quad with no join
+geometry, so each direction change leaves a wedge of `width * tan(theta/2)` — a dark tick at every
+vertex, reported by a user watching `spectrum_ridge` full-screen. The decision is
+[ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md): a **per-endpoint**
+joined flag, extended in the shader only where flagged, because the five producers disagree about
+connectivity — `spectrum`'s `Bars` and `RadialRing` emit **isolated** segments and an unconditional
+extend would grow a bar 60 % at rest and hang it below its own `baseline`. The payoff beyond the
+artifact: `spectrum_ridge` currently ships `thickness = 4.2` chosen against the defect rather than
+for the look.
 
 **No version bump yet** — [0038] is not closed. The bump is owed at its close, per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md); the version is at `0.19.0`.
