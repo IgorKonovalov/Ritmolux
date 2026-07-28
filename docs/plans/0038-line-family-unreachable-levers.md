@@ -32,6 +32,16 @@
 > document the falsified coupling), Phase 5 gains a done-when for the in-code comments that state the
 > falsified mechanism, and a new **Phase 7** fixes the probe defect that produced the one part of the
 > measurement that was an artifact. Phases 1, 2 and 4 are unaffected; Phase 6 is unaffected.
+> **Amended a third time 2026-07-28, from the `architect` review of Phases 5 and 7.** Both phases met
+> every done-when and neither is reopened. The review found the corrected mechanism **surviving in
+> three places outside those two phases' file lists** — `shot.rs`'s probe comment, the shared probe's
+> unreachable guard in `easing.rs`, and `step_response`'s cancellation argument — and one of them is
+> corrupting a number the repo prints today: the asymmetric arm's fall reads **61 frames where its own
+> fixture header says 69**, exactly the truncation Phase 7 fixed elsewhere. It also found that
+> Phase 4's `log` makes `-inf` reachable from silence, where the render layer's smoother turns it into
+> a **permanently** NaN binding. Two new phases follow, **both before Phase 6** because they change
+> `--report`'s output and Phase 6 reads that table: **Phase 8** (the sweep and the truncated
+> measurement) and **Phase 9** (the finite guard). Phases 1-5 and 7 are unaffected.
 
 ## TL;DR
 
@@ -140,7 +150,9 @@ The green pair is ADR-0040's ordering decision: **curve then ease**, not the rev
 
 ## Implementation phases
 
-Each phase ships as its own commit. Phases 1–5 and 7 are `dev`; Phase 6 is the user's.
+Each phase ships as its own commit. Phases 1–5 and 7–9 are `dev`; Phase 6 is the user's. **Phases 8
+and 9 run before Phase 6**, because Phase 8 changes what `--report` prints and Phase 6 reads that
+table before and after its work.
 
 ### Phase 1 — `glow` reaches all four line scenes
 - **Owner skill:** dev
@@ -353,6 +365,106 @@ Each phase ships as its own commit. Phases 1–5 and 7 are `dev`; Phase 6 is the
   5. `docs/capturing.md`'s transient-probe section states the limitation and the rule from done-when 1,
      so the next person measuring an easing knows what the numbers do and do not survive. It is the
      operator doc for this harness and it currently says nothing about window length.
+
+### Phase 8 — the corrected mechanism reaches the two callers Phase 7 did not touch
+
+- **Owner skill:** dev
+- **Added 2026-07-28**, from the `architect` review of Phases 5 and 7. Runs **before** Phase 6.
+- **What:** Phase 7 fixed the instrument and Phase 5 swept the comments, but each worked from its own
+  file list, and the falsified mechanism lives in three places outside both. One of them is not a
+  comment: **the shared probe is itself truncated.** `easing_asymmetric.toml` is `release = 0.5` and
+  `WINDOW` is 96 frames (1.6 s) — 3.2 τ, a **4.1 %** residual, above Phase 7's own `SETTLE_TOL` of
+  `0.02`. The arithmetic: truncation moves the 0.9 crossing from `-0.5·ln(0.1)` = 1.151 s ≈ **69
+  frames** to `-0.5·ln(0.137)` = 0.99 s ≈ **61**, and the test prints 61 against a fixture header that
+  says "glides back down over about 69". The scalar arm is fine and stays fine — `brightness = 0.25`
+  is 6.4 τ inside the same window, a 0.17 % residual.
+- **Files touched:** `core/tests/easing.rs`, `core/src/render/metrics.rs` (doc comment),
+  `standalone/examples/shot.rs`, `docs/capturing.md`
+- **Done when:**
+  1. **The shared probe's `fall_frames < WINDOW` assertion is replaced by `segment_settled` on both
+     arms** (`easing.rs:188-193`). That assertion is unreachable by construction — Phase 7's whole
+     argument — and its message still says "clamped rather than measured", the wording
+     `docs/capturing.md` now names as the trap. Its replacement must **fail on today's `WINDOW`**;
+     if it passes, `segment_settled` is not measuring what Phase 7 says it measures and that is a
+     finding, not a green check.
+  2. **`WINDOW` widens until both arms are settled.** `180` frames (3 s = 6 τ of the slowest constant
+     either fixture uses, a 0.25 % residual — the same margin the scalar arm already has) is the
+     stated target; any value clearing `0.5·ln(50)` = 1.956 s ≈ **118 frames** with margin is
+     acceptable. **The existing ratio bounds are expected to survive unchanged** — settled, the
+     asymmetric arm reads ≈ 69/3 ≈ 23 against its `> 3.0` and `> 2.5x scalar` bounds, and the scalar
+     arm barely moves from 34/35. Retuning a bound is a signal something else changed; say so rather
+     than adjusting it quietly. State the measured before/after frame counts in the commit body.
+  3. **The suite's wall clock is reported, not assumed.** `WINDOW` multiplies five `step_stimulus`
+     captures; the measured baseline is **9.0 s warm** for `--test easing`, and this suite is *in* the
+     pre-push subset (`.githooks/pre-push` does not exclude it). Estimated ~1.8x; if it lands far
+     above that, say so — a slower gate is a real cost and the `release`-shortening route from
+     Phase 7 done-when 3 is still available.
+  4. **`shot.rs:557-560` stops stating the falsified mechanism.** "A release constant longer than
+     about 0.35 s ... reads **clamped** rather than measured — the asymmetry still shows, the
+     magnitude understates" is the corrected sentence verbatim. Replace it with what actually happens:
+     a plausible smaller number, biased unevenly across thresholds. The arithmetic for that comment:
+     at `PROBE_WINDOW` = 48 (0.8 s), a release above ≈ **0.2 s** already leaves more than
+     `SETTLE_TOL` undone.
+  5. **`--report` marks a truncated transient cell rather than printing it bare.** `segment_settled`
+     exists and the caller publishing numbers for the whole shipped library does not call it. A
+     suffix meaning *at least this many* is enough — do not suppress the number and do not widen
+     `PROBE_WINDOW` (its comment is right that this is a direct multiplier on the report's wall
+     clock). **Report how many cells mark, and over which presets.** Expect many: a 0.8 s window
+     truncates any release above ~0.2 s, and most of the ADR-0035 pairs in the set are above that.
+     **If cells mark for a reason other than window length** — a scene whose own motion makes the
+     response non-monotone, so `segment_settled` refuses it as *not decaying* rather than as *not
+     finished* — **say so and leave it marked.** Do not loosen `tol` to make the table quieter; that
+     is the same tuning-until-it-agrees the Phase 3 instruction forbade.
+  6. **`step_response`'s doc comment stops promising a cancellation that does not happen**
+     (`metrics.rs:145-150`: "only equal windows make that bias cancel"). It is false for exactly the
+     shipped asymmetric case — with `attack = 0.02` the rise settles in 80 τ and carries **no** bias,
+     so there is nothing for the fall's 4 % to cancel against, which is why 61 stood. Equal windows
+     are still the right default; the reason is weaker than stated and the honest one is
+     `segment_settled`.
+  7. **`docs/capturing.md`'s measured snapshot gets the caveat it now needs.** The 2026-07-27 figures
+     it quotes — the 1.02 / 0.60 medians, and `Smooth Pulse` "with a 0.60 s release, reads 26 / 31" —
+     were all taken at `PROBE_WINDOW` = 48, and 0.6 s against 0.8 s is 1.33 τ with ~26 % of travel
+     undone. The page already explains the defect; it must not go on quoting numbers produced by it
+     without saying they are subject to it. The `easing` row in the harness table is updated if
+     `WINDOW` moved.
+
+### Phase 9 — a non-finite value cannot poison a smoother permanently
+
+- **Owner skill:** dev
+- **Added 2026-07-28**, from the same review. Independent of Phase 8; also before Phase 6.
+- **What:** Phase 4 shipped `log`, and `log(0)` is `-inf` — which silence produces every time the
+  music stops. Traced end to end: `ParamSmoother::smooth` (`render/mod.rs:317`) seeds its state with
+  the raw value, then `Easing::step` (`preset/schema.rs:236`) computes `held + alpha * (raw - held)`
+  = `-inf + alpha·NaN` = **NaN**. NaN is absorbing here: `raw > held` is false for *every* `raw`, so
+  the release branch is taken and the result stays NaN. **The binding is dead for the rest of the
+  preset's run** — audio returning does not recover it, only a preset switch (which resets the
+  smoother) does. It needs the param to be listed in `[smoothing]` with a positive constant; an
+  unlisted param passes `-inf` through and recovers on its own.
+
+  `sqrt(-1)` could already reach this, so the defect predates Phase 4 — but `sqrt` needs a contrived
+  negative argument where `log` needs silence, and `docs/presets.md:530` currently calls the result
+  "an undefined-looking visual", which describes a frame, not a permanent one.
+- **Files touched:** `core/src/preset/schema.rs`, `core/tests/preset.rs`, `docs/presets.md`
+- **Done when:**
+  1. **The guard goes in `Easing::step`, not in `ParamSmoother`.** That function is documented as the
+     single implementation of this vocabulary and both smoothers call it, so one guard covers the
+     render layer and the spectrum scene's per-element path alike. It also matches the posture already
+     three lines above it, where a non-finite `tau` passes `raw` through.
+  2. **Both operands are guarded, because guarding only `raw` does not fix it.** With `held = -inf`
+     and a finite `raw`, `raw > held` selects `attack` and `held + alpha * (raw - held)` is
+     `-inf + inf` = NaN — so a run that ever stored `-inf` is still poisoned on the *next* frame.
+     A non-finite `held` **or** `raw` returns `raw`: a snap, which is what a smoother with no valid
+     state should do.
+  3. **Unit-tested as the reachable sequence, not as an abstract edge:** silence → `-inf` held →
+     audio returns → the binding tracks the finite value again. Assert the recovery, since permanence
+     is the actual defect; asserting only "one frame of NaN is avoided" would pass on a fix that
+     leaves the state poisoned.
+  4. **`docs/presets.md`'s dB section says *permanent*.** "Propagates into a parameter as an
+     undefined-looking visual" understates a binding that never comes back. Keep the guard idiom as
+     the advice — flooring the input is still the right thing to write — and state what the engine
+     now does if you don't, so the two are not confused.
+  5. No behaviour changes for any finite input: the `preset` suite still passes, every shipped preset
+     still loads warning-free, and the goldens are byte-identical with no re-bless.
 
 ## Risks & open questions
 
