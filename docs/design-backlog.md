@@ -866,3 +866,47 @@ rather than a re-litigation, and any ADR must say so explicitly or it will read 
 is broken, and unlike most entries here this one is a *new capability* rather than a wall the content
 lane has already hit. It wants a preset-author "I want this look and cannot get it" before it wants a
 plan — the evidence so far is an architect's arithmetic, not a frustrated author.
+
+---
+
+## 0022 — `--report`'s reactivity columns are structurally blind to a level `curve`
+
+**Raised by `preset-author`, 2026-07-28, while verifying Plan 0038 Phase 6.** Not a wall this lane
+hit while authoring — the presets landed fine — but a wall it hit while *proving* they landed fine,
+which is worse in a different way: the measurement disagreed with the render and the render was right.
+
+**What happened.** `spectrum_comb` adopted `curve = 0.62` with the `scale` retune it forces (2.6 →
+1.75). Rendered against `--signal dynamic:110` the change is exactly what the curve is for: the shelf
+of quiet elements carries visible shape in every frame where it used to be a run of near-identical
+stubs. `--report` recorded the opposite — `bass` 0.084 → 0.068, `treb` 0.047 → 0.020 — reading as a
+substantial loss of reactivity on a preset that had just become *more* legible.
+
+**Why, and it is not a tuning accident.** The report's band stimuli drive their bands to **full
+scale**, and `curve` is `level^curve`, so at a level of `1.0` it is the **identity** — `1^0.62 = 1`
+at any exponent. The compression only exists below 1.0. So the reactivity columns see the `scale`
+cut, which is the *price* of the curve, and are mathematically incapable of seeing the compression
+that price bought. The stronger the curve, the bigger the apparent regression.
+
+This is the same family as [0020](#0020--the-shipped-library-is-gained-against-stimuli-6-100x-hotter-than-real-music)
+— stimuli hotter than real music — but it is not the same defect and 0020's fix would not fix it.
+0020 is about *gain calibration* being wrong at full scale; this is about a whole parameter being
+**invisible** at full scale. A preset could set `curve = 0.05` and the report would show nothing but
+the scale cut.
+
+**Consequences today.** Any future `curve` adoption will look like a regression in the table, and the
+obvious "fix" — putting `scale` back — is precisely the wrong move and would send the readout off the
+top of the frame. The numbers are in Plan 0038 Phase 6's commit with this caveat attached, so the
+record is honest, but the next author has no reason to expect it.
+
+**The shape of a fix, unranked** — this lane names the friction, `architect` picks:
+- a reactivity stimulus at a **realistic level** rather than full scale (interacts with 0020, and
+  arguably they should be decided together);
+- or a second reactivity column measured at a low level, so compression is visible as the *gap*
+  between the two;
+- or simply document it in `docs/capturing.md` beside the existing "what the transient columns cannot
+  see" section, which is the cheap honest option and costs nothing but a paragraph.
+
+**Probably not ADR-worthy on its own** — the third option is a doc fix. It becomes ADR-worthy only if
+bundled with 0020 into a decision about what level the report's stimuli should represent, which is a
+real question with a real rejected alternative (full-scale stimuli are reproducible and
+sample-rate-independent; realistic ones are neither).
