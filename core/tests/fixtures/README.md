@@ -89,14 +89,32 @@ say exactly which choices keep that response linear (a static figure, one
 directly-multiplying param, an amplitude below the additive-blend clamp, no
 composite stage). Read them before editing either file.
 
-## `line_joint_zigzag.toml` is a fourth guard, and also pins no pixels
+## `line_joint_zigzag.toml` is a fourth guard, and it pins pixels *as well*
 
 It belongs to `core/tests/line_joints.rs` (Plan 0039 Phase 2, ADR-0041), which
-asserts that a flagged joint stops leaving a hole in the stroke. Like the
-`easing_*` pair it has **no committed baseline** and `LMV_BLESS` does not touch
-it: the test measures a *relative* property — that a vertex is not a local
-luminance minimum against the segment interiors either side of it — so there is
-no PNG to drift.
+asserts that a flagged joint stops leaving a hole in the stroke — a *relative*
+property: a vertex is not a local luminance minimum against the segment interiors
+either side of it.
+
+**Since Plan 0040 Phase 1 it also carries a committed baseline**,
+`golden/line_joint_zigzag.png`, blessed with
+`LMV_BLESS=1 cargo test -p lmv-core --test line_joints`. It exists because the
+defect that motivated ADR-0041 — the polyline's notch — was pinned by no pixels
+anywhere: `spectrum.toml` below takes the default `bars` layout, and
+`spectrum_ridge` is a shipped preset guarded behaviorally. A shader edit could
+have reopened the notch on a gentler figure than this deliberately hostile zigzag
+and moved no file.
+
+The two claims are not redundant and the order matters: the relative assertion
+runs **first, including under `LMV_BLESS`**, so the notch cannot be blessed back
+in by someone reading the diff as drift — the bless never runs. A baseline alone
+only says "something moved"; the relative claim fails loudly and says why.
+
+The pin lives here rather than in the `golden.rs` roster because that roster is
+one fixture per `SystemKind` (enforced by `systems_rosters_every_variant`) and a
+second `spectrum` entry would break the invariant ADR-0023 rests on. Blessing by
+`--test line_joints` therefore rewrites this one PNG and **cannot** reach the
+roster — verified, not assumed.
 
 It is captured at **512x512**, not the golden roster's 128. The feature under
 test is a wedge a fraction of a stroke-width across; at 128 px there is nothing

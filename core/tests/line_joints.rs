@@ -1,4 +1,5 @@
-//! Line joins at the pixel level (Plan 0039 Phase 2, ADR-0041).
+//! Line joins at the pixel level (Plan 0039 Phase 2, ADR-0041; the baseline
+//! added by Plan 0040 Phase 1).
 //!
 //! The unit tests beside the producers assert the **flag pattern** — which
 //! endpoints a producer declares as joined. This file asserts the thing no unit
@@ -14,10 +15,39 @@
 //! no producer flagging) before the polyline began flagging its joints.
 //!
 //! Software adapter (`prefer_software`) so it holds on any CI GPU.
+//!
+//! # Two duties, one capture, in this order
+//!
+//! Plan 0040 Phase 1 added a **committed baseline** beside the relative claim,
+//! because the reported defect — the polyline's notch — was pinned by no pixels
+//! anywhere: `fixtures/spectrum.toml` takes the default `bars` layout, and
+//! `spectrum_ridge` is a shipped preset guarded behaviorally (ADR-0023). A
+//! shader edit could reopen the notch on a gentler figure than this deliberately
+//! hostile zigzag and move no file.
+//!
+//! The two are **not** redundant, and neither replaces the other. The baseline
+//! catches a silent change; the relative assertion says *why* the change
+//! matters. So the relative assertion runs **first, including under `LMV_BLESS`**
+//! — the notch therefore cannot be blessed back in by someone who reads the diff
+//! as drift, because the bless never runs. That ordering is the whole answer to
+//! "a baseline can always be re-blessed".
+//!
+//! They share **one** capture. A second `Renderer::new_headless` in this binary
+//! would be a second GPU resource build mid-run, which `composite.rs` documents
+//! as changing what the software adapter resolves — a risk taken for nothing
+//! when the pixels the pin wants are the pixels the probe already measured.
+//!
+//! The pin follows `composite.rs` rather than joining `golden.rs`: that roster is
+//! one fixture per `SystemKind`, enforced by `systems_rosters_every_variant`, and
+//! a second `spectrum` entry would break the invariant ADR-0023 rests on. Its own
+//! binary also means `LMV_BLESS=1 cargo test -p lmv-core --test line_joints`
+//! rewrites **this** baseline and cannot reach the roster.
+
+use std::path::{Path, PathBuf};
 
 use lmv_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
 
 /// Capture size. Larger than the other suites' 96–128 on purpose: the feature
 /// under test is a wedge a fraction of a stroke-width across, and at 128 px a
@@ -42,6 +72,20 @@ const WIDTH_SCALE: f32 = 0.003;
 /// The two element levels the zigzag alternates between.
 const LOW: f32 = 0.05;
 const HIGH: f32 = 0.75;
+
+/// Baseline file stem under `tests/golden/` (Plan 0040 Phase 1).
+const BASELINE_STEM: &str = "line_joint_zigzag";
+/// Mean per-channel difference (0..1) a fresh render may drift from baseline.
+/// `composite.rs`'s tolerance, unchanged — no measurement here asked for another.
+const MEAN_TOL: f32 = 0.02;
+/// Largest single-channel byte difference tolerated at any pixel.
+const MAX_OUTLIER: u8 = 48;
+
+fn golden_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("golden")
+}
 
 /// Build a headless `Renderer`, or `None` (a logged skip) when the runner
 /// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
@@ -126,6 +170,40 @@ fn luma_at(img: &CaptureImage, world: [f32; 2]) -> f32 {
     sum / n.max(1.0)
 }
 
+fn decode(path: &Path) -> CaptureImage {
+    let img = image::open(path)
+        .unwrap_or_else(|e| panic!("decode baseline {}: {e}", path.display()))
+        .to_rgba8();
+    CaptureImage {
+        width: img.width(),
+        height: img.height(),
+        rgba: img.into_raw(),
+    }
+}
+
+fn encode(img: &CaptureImage, path: &Path) {
+    let buffer = image::RgbaImage::from_raw(img.width, img.height, img.rgba.clone())
+        .expect("capture buffer matches its declared dimensions");
+    buffer
+        .save(path)
+        .unwrap_or_else(|e| panic!("write baseline {}: {e}", path.display()));
+}
+
+/// Largest absolute single-channel (RGB) byte difference across the two images.
+fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
+    a.rgba
+        .chunks_exact(4)
+        .zip(b.rgba.chunks_exact(4))
+        .flat_map(|(pa, pb)| {
+            pa.iter()
+                .zip(pb.iter())
+                .take(3)
+                .map(|(x, y)| x.abs_diff(*y))
+        })
+        .max()
+        .unwrap_or(0)
+}
+
 /// Plan 0039 Phase 2 done-when 3, and the reported defect itself.
 ///
 /// Every odd element of the fixture is a **peak**, so the outside of each turn
@@ -145,20 +223,11 @@ fn luma_at(img: &CaptureImage, world: [f32; 2]) -> f32 {
 /// blend sums them. That is the near-180-degree overshoot ADR-0041 accepts in
 /// place of a miter limit, and this fixture is sharp enough to show it — which is
 /// the point. It is recorded here rather than discovered later.
-#[test]
-fn a_polyline_joint_is_not_a_notch() {
-    let Some(mut renderer) = headless() else {
-        return;
-    };
-    let preset = Preset::from_toml_str(include_str!("fixtures/line_joint_zigzag.toml"))
-        .expect("the zigzag fixture is a valid preset");
-    let name = preset.name.clone();
-    renderer.set_presets(vec![preset]);
-
-    let img = renderer
-        .capture_preset(&name, &zigzag_frame(), FRAMES)
-        .expect("capture the zigzag fixture");
-
+///
+/// Since Plan 0040 Phase 1 this is the **first** of the capture's two duties;
+/// [`compare_against_baseline`] is the second, and the module docs say why it
+/// runs after rather than before.
+fn assert_no_notch(img: &CaptureImage) {
     let half_width = THICKNESS * WIDTH_SCALE;
 
     // The last point is the figure's free end, never a joint — so the interior
@@ -182,9 +251,9 @@ fn a_polyline_joint_is_not_a_notch() {
         let offset = half_width * cos_theta * 0.5;
         let lift = |p: [f32; 2]| [p[0], p[1] + offset];
 
-        let left = luma_at(&img, lift(midpoint(before, vertex)));
-        let joint = luma_at(&img, lift(vertex));
-        let right = luma_at(&img, lift(midpoint(vertex, after)));
+        let left = luma_at(img, lift(midpoint(before, vertex)));
+        let joint = luma_at(img, lift(vertex));
+        let right = luma_at(img, lift(midpoint(vertex, after)));
         println!(
             "element {j}: interior {left:.4} | joint {joint:.4} | interior {right:.4} \
              (offset {offset:.4} NDC above the path)"
@@ -203,4 +272,67 @@ fn a_polyline_joint_is_not_a_notch() {
              apart at the vertex"
         );
     }
+}
+
+/// Plan 0040 Phase 1: the reported defect, pinned in pixels.
+///
+/// [`assert_no_notch`] measures one property at six probe points. This measures
+/// **the whole frame**, so a shader edit that reopens the notch somewhere the
+/// probes do not look — a gentler turn, a free end, the falloff — moves a file
+/// instead of passing quietly. It is the coarse net under the sharp claim.
+///
+/// `LMV_BLESS=1 cargo test -p lmv-core --test line_joints` rewrites this one
+/// baseline. Scoped to this binary it **cannot** reach the `golden.rs` roster:
+/// that suite renders `SystemKind::ALL` and is not built by this invocation. Run
+/// against the whole suite (`cargo test` with `LMV_BLESS` set) it would rewrite
+/// every baseline in the repository — bless by `--test line_joints` and check
+/// `git status`, the trap that cost Plan 0039 two manual restores.
+fn compare_against_baseline(img: &CaptureImage) {
+    std::fs::create_dir_all(golden_dir()).expect("create tests/golden");
+    let path = golden_dir().join(format!("{BASELINE_STEM}.png"));
+
+    if std::env::var_os("LMV_BLESS").is_some() {
+        encode(img, &path);
+        println!("blessed {}", path.display());
+        return;
+    }
+
+    assert!(
+        path.exists(),
+        "missing baseline {} — run `LMV_BLESS=1 cargo test -p lmv-core --test line_joints`",
+        path.display()
+    );
+    let baseline = decode(&path);
+    let mean = frame_diff(&baseline, img);
+    let outlier = max_channel_outlier(&baseline, img);
+    println!(
+        "{BASELINE_STEM:<18} mean {mean:.4} (tol {MEAN_TOL}) max_outlier {outlier} (tol {MAX_OUTLIER})"
+    );
+    assert!(
+        mean <= MEAN_TOL && outlier <= MAX_OUTLIER,
+        "the joined polyline has drifted from its baseline: mean {mean:.4} / outlier \
+         {outlier} exceeds tolerance. The stroke still passes the local-minimum claim, \
+         so this is a change in *how* the joint renders rather than the notch \
+         reopening. Bless with LMV_BLESS=1 only if that change was intended \
+         (ADR-0041)."
+    );
+}
+
+/// The suite: one capture, both duties, in the order the module docs argue for.
+#[test]
+fn the_joined_polyline_holds_its_shape_and_its_pixels() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let preset = Preset::from_toml_str(include_str!("fixtures/line_joint_zigzag.toml"))
+        .expect("the zigzag fixture is a valid preset");
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+
+    let img = renderer
+        .capture_preset(&name, &zigzag_frame(), FRAMES)
+        .expect("capture the zigzag fixture");
+
+    assert_no_notch(&img);
+    compare_against_baseline(&img);
 }
