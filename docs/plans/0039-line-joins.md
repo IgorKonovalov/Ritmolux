@@ -1,12 +1,14 @@
 # 0039 — Line joins: the stroke stops coming apart at every vertex
 
-> **Status:** draft
+> **Status:** approved 2026-07-28 — ready for `dev` (a fresh session; the handoff is manual on
+> purpose). [Plan 0038](done/0038-line-family-unreachable-levers.md) has closed, so nothing blocks
+> it. Three reference errors were corrected at approval and are noted below.
 > **Created:** 2026-07-28
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
 > (this plan's decision — a per-endpoint joined flag, extend in the shader),
-> [0007](../adrs/0007-instanced-quads-not-native-line-primitives.md) (the instanced-quad primitive
-> being extended), [0023](../adrs/0023-golden-fixtures-are-frozen.md) (the re-bless discipline)
+> [0007](../adrs/0007-line-geometry-generators.md) (the instanced-quad primitive being extended),
+> [0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (the re-bless discipline)
 > **Backlog entry closed:** [0023](../design-backlog.md)
 
 ## TL;DR
@@ -55,7 +57,9 @@ y-differences stay, steepening every turn.
 | `spectrum` `Bars`, `RadialRing` | **isolated** — one segment per element, both ends free |
 
 So a fix that treats all ends alike breaks the isolated cases. At `spectrum_comb`'s shipped
-`thickness = 13` the half-width is `13 * 0.003 = 0.039`, so extending both ends grows a bar by
+`thickness = 13` the half-width is `13 * WIDTH_SCALE` = `13 * 0.003` = `0.039` (`spectrum.rs:77`;
+`SegmentInstance::width` is already documented as a **half**-width in NDC-y, so the extension unit is
+the field itself), so extending both ends grows a bar by
 `0.078` against a resting length near `0.13` — **+60 % at rest**, bars hanging below `baseline`
 (breaking the `baseline = 0` centre-mirror Plan 0038 just shipped), and ring spokes growing inward
 through `radius`.
@@ -131,7 +135,7 @@ Each phase ships as its own commit. Phases 1–4 are `dev`; Phase 5 is the user'
   emits chained *and* isolated geometry from one `build()`, so this phase moves the polyline
   goldens while leaving bars and ring provably untouched.
 - **Files touched:** `core/src/render/scenes/lines/spectrum.rs`, `core/tests/` (a joint fixture +
-  test), `core/tests/goldens/`
+  test), `core/tests/golden/`
 - **Done when:**
   1. `SpectrumLayout::Polyline` flags every interior endpoint: each segment's `a` is joined except
      the first, each `b` is joined except the last. `Bars` and `RadialRing` flag nothing.
@@ -159,7 +163,7 @@ Each phase ships as its own commit. Phases 1–4 are `dev`; Phase 5 is the user'
   tricky part: the L-system breaks its chain at every branch, and the star joins in pairs at a tip
   rather than in a run.
 - **Files touched:** `core/src/render/scenes/lines/{curves,hankin,lsystem}.rs`, `core/tests/`,
-  `core/tests/goldens/`
+  `core/tests/golden/`
 - **Done when:**
   1. `maurer_rose` flags every interior vertex of its chain; the first `a` and last `b` stay free.
   2. `lsystem` flags joints **within** a run and leaves them free across a branch push/pop. A branch
