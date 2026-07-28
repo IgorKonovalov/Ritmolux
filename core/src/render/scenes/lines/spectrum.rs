@@ -670,12 +670,18 @@ impl Scene for SpectrumScene {
     fn update(&mut self, frame: &AnalysisFrame) {
         downsample(&frame.spectrum, &mut self.raw_levels);
         // `downsample -> curve -> ease`, in that order, which is ADR-0040's
-        // decision and not an incidental arrangement of two lines: the smoother
-        // operates on the **curved** value, so `[spectrum] smoothing` eases the
-        // displayed quantity the way analog meter ballistics do and a slow
-        // `release` reads as a perceptually even fall. Easing first instead would
-        // make a decaying element drop fast through the top of its travel and
-        // then crawl through the bottom.
+        // decision and not an incidental arrangement of two lines: the smoother's
+        // state **is** the displayed quantity, so a fall's time constant is
+        // exactly the `release` the preset wrote, at every value of `curve`.
+        // Easing first would have made the effective release `release / curve` —
+        // engaging `curve = 0.5` would silently double every fall time, and a
+        // fall to a non-zero floor would stop being exponential at all, so
+        // `release` would name no duration.
+        //
+        // ADR-0040 originally argued this ordering bought a perceptually *even*
+        // fall. Plan 0038 Phase 3 measured that and it is false — both orderings
+        // are exponentials of identical shape and differ only in speed. See the
+        // ADR's Outcome section; the ordering survives on the reason above.
         //
         // The easing itself is per element on the injected real `dt`, through the
         // same `Easing` the `[smoothing]` table uses (ADR-0035) — so "0.2
@@ -1074,9 +1080,16 @@ mod tests {
     /// Asserted as a **property**, not against a tuned constant: for a
     /// compressive `curve` and a non-instant smoother, curving-then-easing and
     /// easing-then-curving disagree, and they disagree in a *stated direction* —
-    /// during a fall the curve-first value is the higher of the two, which is the
-    /// "even fall" against the "fast drop then a long crawl" that the ADR is
-    /// choosing between. **Swap the two steps in `update` and this fails.**
+    /// during a fall the curve-first value sits **below** the ease-first one,
+    /// because curving after the smoother stretches the decay by `1 / curve` and
+    /// a slower decay is a higher value at every instant. **Swap the two steps in
+    /// `update` and this fails.**
+    ///
+    /// The direction is all this asserts. It is *not* evidence for the "even
+    /// fall" ADR-0040 originally claimed — Plan 0038 Phase 3 measured that and
+    /// found both orderings to be exponentials of identical shape, differing only
+    /// in speed (see the ADR's Outcome). The ordering is still worth pinning,
+    /// because it is invisible in a still frame and a refactor can swap two lines.
     #[test]
     fn the_curve_runs_before_the_easing_and_the_two_orders_differ() {
         const CURVE: f32 = 0.5;
@@ -1108,8 +1121,8 @@ mod tests {
                     curve_first < ease_first_shown,
                     "frame {frame}: curve-then-ease ({curve_first}) should sit \
                      below ease-then-curve ({ease_first_shown}) during a fall — \
-                     the compressive curve is what holds the rejected order up \
-                     near the top of its travel before it crawls"
+                     applying the curve after the smoother stretches the decay \
+                     by 1 / curve, and the slower fall is the higher value"
                 );
             }
         }

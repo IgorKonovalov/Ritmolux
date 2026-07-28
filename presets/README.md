@@ -57,12 +57,12 @@ Full grammar reference: [`../docs/presets.md`](../docs/presets.md#the-expression
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `swarm`           | `force` `spin` `burst` `hue` `brightness` `size` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
-| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
-| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
-| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
+| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
+| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
+| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
-| `spectrum`        | `base` `scale` `radius` `rotation` `thickness` `hue` `brightness` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
+| `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -90,6 +90,17 @@ so a very large window resolves the attractor alone slightly finer.
 ### Line-art parameter notes (Plan 0010)
 
 - `thickness` — stroke weight (roughly 1–5); scaled to a projector-friendly glow.
+- `glow` — the line renderer's **per-segment falloff** multiplier, default `1.0`
+  (exactly what these scenes drew before it was bindable), whole-figure on all
+  four. It scales the shader's core-to-edge term straight into the stroke colour:
+  below `1` the stroke thins toward a dim hairline, above `1` it saturates the core
+  and only widens the visible skirt. **There is more range downward than upward** —
+  measured per lit pixel, `1.0 → 0.3` moves a rose about 0.25 while `1.0 → 2.5`
+  moves it 0.17 — so reach for `glow < 1` when you want the figure to recede.
+  **It is not the same quantity as `glow` on `fragment_field` or
+  `reaction_diffusion`**, which is a term inside those shaders; the name is shared,
+  the meaning is not, and a value that reads well on one will not transfer.
+  Also **not** a post-process bloom — there is no bloom stage in the engine.
 - `hue` — offset into the line scenes' own cosine ramp (add `time * k` for a slow
   drift). **It is not a hue wheel**, and on these three scenes it is the *only*
   colour control — `[palette]` is inert here. The measured swatch table is in
@@ -129,20 +140,62 @@ look and how far they reach.
 - `scale` — multiplier on the element's own band level. The bands read **small**
   on real music, the same caveat as `bass`/`mid`/`treb`, so useful values are
   well above 1.
-- `radius` — **`radial_ring` only**: the inner circle the spokes stand on. It has
-  no effect on `bars` or `polyline`, and that is the one layout-specific
-  parameter on this system.
+- `curve` — the level-shaping **exponent**, default `1.0` (exactly linear, the map
+  this scene had before it existed). `level^curve`, applied to the element's raw
+  level *before* the easing; `0.5` is a square root and lower values compress
+  harder, which is how you get a dB-like readout where the quiet elements are
+  legible instead of stubbed. Per element, so it can be walked with `index`. The
+  level is floored at `0` and the exponent clamped to `[0.05, 4.0]`, so no
+  expression can produce a `NaN` length.
+- `radius` — **`radial_ring` only**: the inner circle the spokes stand on. No
+  effect on `bars` or `polyline`.
+- `span` — the figure's **half-width in world units**, default `1.0`.
+  **`bars` and `polyline` only** (the ring is sized by `radius`).
+- `baseline` — the world y the elements stand on, default `-0.85`, so bars grow
+  upward from near the bottom edge. **`bars` and `polyline` only.**
 
-**How wide the readout is, since there is no parameter for it.** The figure is
-2 world units across, and the line renderer divides world x by the target's
-aspect — the same rule every line scene follows, and the reason a `radial_ring`
-comes out a circle rather than an ellipse. The consequence for the two flat
-layouts is worth stating plainly: `bars` and `polyline` span the frame's
-**height** in pixels, which is about **56 % of its width at 16:9** and less on an
-ultrawide. There is no `span`/`width` param, and `zoom` is not a substitute — it
-scales y as well, so widening the comb also lifts its baseline off the bottom of
-the frame. Design for a centred figure with room either side rather than for an
-edge-to-edge meter.
+**`curve` and `scale` are not independent, and the factor is large.** Measured
+typical band levels are ~0.02–0.05. At `curve = 0.5` a level of `0.03` becomes
+`0.173` — a **5.8x** boost — so a preset adopting a curve has to bring `scale`
+down by roughly that factor or the readout leaves the top of the frame. That is
+why the default is exactly `1.0`: a curve is opt-in, and opting in means retuning
+`scale` in the same edit. Say so in the preset's header comment, with the factor.
+
+**What `curve` does *not* disturb is the timing.** The easing runs on the curved
+value, which is the value you see, so a fall's time constant is exactly the
+`release` you wrote — at `curve = 1.0`, at `0.5`, at `0.25`. The two knobs are
+independent *in time*; what a curve changes is amplitude. (Curving after the
+easing instead would have made the effective release `release / curve`, silently
+doubling every fall at `curve = 0.5`. That ordering was measured and rejected —
+[ADR-0040](../docs/adrs/0040-spectrum-level-curve-applies-before-the-easing.md).)
+Neither ordering produces an *even* fall: a one-pole is exponential, so it covers
+the first half of its travel in about 30 % of its settling time at any `curve`.
+
+**How wide the readout is, and why `span` is not a "fill the frame" switch.** The
+line renderer divides world x by the target's aspect — the same rule every line
+scene follows, and the reason a `radial_ring` comes out a circle rather than an
+ellipse. `span` is therefore a **world** quantity, not a fraction of the frame:
+the default `1.0` makes `bars` and `polyline` span the frame's **height** in
+pixels, which is about **56 % of its width at 16:9**. `span ≈ 1.78` fills a 16:9
+frame edge to edge — and leaves an ultrawide short, because 1.78 is still 1.78
+there. That is correct behaviour for a world quantity and the reason there is
+deliberately **no `fit`/`auto` mode**: a scene that sized itself from its render
+target's aspect is exactly the trap
+[ADR-0037](../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) exists
+to forbid, and it has shipped twice in this codebase. Pick the `span` that suits
+the frames you care about, or bind it and accept that the number means world
+units. Note `zoom` is still not a substitute for either lever — it scales y with
+x, so widening the comb also lifts it.
+
+**`baseline = 0` is how you get a centre-mirrored readout.** With the default
+`-0.85`, `mirror_reflect` produces two combs pinned against the top and bottom
+edges growing toward each other — which reads as a bug and is not. The geometry
+mirror reflects across the **x-axis** on every line scene, so a figure standing at
+`-0.85` reflects to one hanging from `+0.85`. Move the feet onto the axis and the
+same mirror gives the symmetric "landscape and its reflection": bars up, their
+copy down, sharing one foot line on the frame centre. `pan_y` cannot substitute —
+the mirror runs on world coordinates in `update()` while the view transform is
+applied later in the shader, so panning moves the mirrored pair together.
 - `rotation` — turns the whole figure about the frame centre, in radians, on
   every layout. On the ring it is the natural motion; on bars and the polyline it
   tilts the readout, which is what makes those two worth folding with `mirror_*`.
@@ -164,8 +217,9 @@ base      = "0.16 + index * 0.12"        # a longer rest toward the quiet top en
 hue       = "index * 0.3 + time * 0.02"  # colour walked by hand instead of hue_spread
 ```
 
-Five params genuinely vary per element — `base`, `scale`, `thickness`,
-`brightness`, `hue`. The rest describe the whole figure (`radius`, `rotation`,
+The params that genuinely vary per element are the ones describing a single
+element — `base`, `scale`, `curve`, `thickness`, `brightness`, `hue`. The rest
+describe the whole figure (`span`, `baseline`, `radius`, `rotation`, `glow`,
 `hue_spread`, `palette_mix`, `saturation`, the view transform, the mirror), so a
 series aimed at one of those takes its `index = 0` value rather than being
 dropped. `index` reads `0` on every other system, and a `[smoothing]` entry naming
@@ -539,7 +593,10 @@ anywhere else — the bands are the rawest signal in the engine, so a fast `atta
 keeps a transient's shape while a slow `release` lets the elements fall like a
 meter instead of strobing on every analysis hop. Like all easing in this engine it
 is expressed in seconds against the real frame time, so it looks the same at 60
-and 144 Hz.
+and 144 Hz — **and the same at any `curve`**, since what it eases is the curved
+level, which is the one you see. Engaging a
+[`curve`](#spectrum--the-frequency-axis-readout-plan-0034) costs you a `scale`
+retune, not a `release` retune.
 
 Two attractor params behave unlike anything else in the set:
 
