@@ -9,7 +9,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
-| [0038](0038-line-family-unreachable-levers.md) | The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log` | **in-progress** — Phases 1-4 landed; **Phase 5 unblocked 2026-07-28** by the ADR-0040 ruling, and a new **Phase 7** added by it. Phase 6 is the user's | dev, human |
+| [0038](0038-line-family-unreachable-levers.md) | The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log` | **in-progress** — Phases 1-5 and 7 landed and reviewed; **Phases 8 and 9 added 2026-07-28** by that review, and both run **before** Phase 6, which is the user's | dev, human |
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 
 ## Recommended execution sequence
@@ -45,6 +45,21 @@ travelling at the end of the window reads as settled, and the guard against that
 (`fall_frames < WINDOW`) is unreachable by construction. That artifact is what produced the one half
 of the Phase 3 measurement that did not hold up. [0038] Phase 6 is a `preset-author` pass and is the
 only phase that changes how anything looks.
+
+**Phases 5 and 7 have landed and been reviewed** (`a3f5d04`, `9739232`; architect pass 2026-07-28).
+Both met every done-when and neither is reopened — Phase 7 in particular replaced the falsified
+evenness finding with a settled measurement (73 / 145 frames, a 1.99 ratio against a closed-form
+2.00). The review added **two phases, and both run before Phase 6**, because Phase 8 changes what
+`--report` prints and Phase 6 reads that table before and after its work:
+
+- **Phase 8** — the corrected mechanism reaches the two callers Phase 7's file list did not: the
+  `--report` probe comment in `shot.rs`, still stating the falsified "reads clamped"; and the shared
+  probe's own guard in `easing.rs`, unreachable by construction with the same wording. That one is
+  not cosmetic — **the shared probe is itself truncated**: `release = 0.5` against a 96-frame window
+  is 3.2 τ, and the asymmetric arm reads **61 frames where its own fixture header says 69**.
+- **Phase 9** — `log(0)` is `-inf`, which silence produces, and the render layer's smoother turns
+  that into a **permanently** NaN binding that only a preset switch clears. One guard in
+  `Easing::step` covers both smoothers.
 
 **No version bump yet** — [0038] is not closed. The bump is owed at its close, per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md); the version is at `0.19.0`.
