@@ -33,9 +33,21 @@ pub fn json_matrix(rows: &[Vec<f32>]) -> String {
 /// The transient probe's reading as a JSON object (Plan 0037): the two frame
 /// counts stay **integers**, because they are counted frames rather than a
 /// measurement, and the ratio uses the shared 4-decimal field.
-pub fn json_transient(rise_frames: u32, fall_frames: u32, ratio: f32) -> String {
+/// The `settled` flags say whether each direction reached its asymptote inside
+/// the probe's window (Plan 0038 Phase 8). A `false` means the frame count is a
+/// **lower bound**, not a measurement — the text table marks the same thing with
+/// a `+` suffix, and a consumer reading only the counts would otherwise have no
+/// way to tell a truncated response from a settled one.
+pub fn json_transient(
+    rise_frames: u32,
+    fall_frames: u32,
+    ratio: f32,
+    rise_settled: bool,
+    fall_settled: bool,
+) -> String {
     format!(
-        "{{\"rise_frames\":{rise_frames},\"fall_frames\":{fall_frames},\"ratio\":{}}}",
+        "{{\"rise_frames\":{rise_frames},\"fall_frames\":{fall_frames},\"ratio\":{},\
+         \"rise_settled\":{rise_settled},\"fall_settled\":{fall_settled}}}",
         num(ratio)
     )
 }
@@ -114,15 +126,18 @@ mod tests {
 
     #[test]
     fn json_transient_keeps_frame_counts_integral() {
+        // The historical 3/61 reading, and it is the worked example of why the
+        // flags exist: that fall was truncated (the settled answer is 69), and
+        // nothing in the three numbers alone could say so.
         assert_eq!(
-            json_transient(3, 61, 20.333_334),
-            r#"{"rise_frames":3,"fall_frames":61,"ratio":20.3333}"#
+            json_transient(3, 61, 20.333_334, true, false),
+            r#"{"rise_frames":3,"fall_frames":61,"ratio":20.3333,"rise_settled":true,"fall_settled":false}"#
         );
         // A preset the step never moved reads as three zeros rather than a null
         // or a NaN, either of which would break a consumer parsing the schema.
         assert_eq!(
-            json_transient(0, 0, 0.0),
-            r#"{"rise_frames":0,"fall_frames":0,"ratio":0.0000}"#
+            json_transient(0, 0, 0.0, true, true),
+            r#"{"rise_frames":0,"fall_frames":0,"ratio":0.0000,"rise_settled":true,"fall_settled":true}"#
         );
     }
 

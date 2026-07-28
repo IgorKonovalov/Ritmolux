@@ -437,23 +437,39 @@ fn the_json_report_is_well_formed_and_carries_its_top_level_keys() {
 /// asserts the *wiring* — that the numbers reach the table and the JSON and
 /// differ with the table — not the measurement itself, which
 /// `core/tests/easing.rs` owns at a probe window long enough to let the release
-/// constant settle. `--report`'s own window is shorter, so the fall here reads
-/// clamped rather than measured; the separation is what matters.
+/// constant settle.
+///
+/// `--report`'s own window is shorter, and this comment used to say the fall
+/// therefore "reads clamped rather than measured". It does not — nothing clamps;
+/// `frames_to_settle` returns a plausible smaller number (Plan 0038 Phase 8).
+/// That is why the cell carries a `+` here, which this test now also asserts
+/// reaches both presentations. The separation is what matters either way.
 #[test]
 fn the_report_transient_columns_separate_the_two_easing_fixtures() {
-    /// `(rise, fall)` off the one data row of a single-preset text report.
-    fn columns(report: &str) -> (u32, u32) {
+    /// `(rise, fall, fall_marked)` off the one data row of a single-preset text
+    /// report. A cell may carry a trailing `+` meaning *at least this many*
+    /// (Plan 0038 Phase 8), which is stripped before parsing and reported
+    /// separately.
+    fn columns(report: &str) -> (u32, u32, bool) {
         let row = report
             .lines()
             .find(|l| l.trim_start().starts_with("fixture_easing"))
             .unwrap_or_else(|| panic!("no fixture row in the report:\n{report}"));
         let cols: Vec<&str> = row.split_whitespace().collect();
         let n = cols.len();
-        let parse = |s: &str| s.parse().unwrap_or_else(|_| panic!("`{s}` in {row}"));
-        (parse(cols[n - 2]), parse(cols[n - 1]))
+        let parse = |s: &str| {
+            s.trim_end_matches('+')
+                .parse()
+                .unwrap_or_else(|_| panic!("`{s}` in {row}"))
+        };
+        (
+            parse(cols[n - 2]),
+            parse(cols[n - 1]),
+            cols[n - 1].ends_with('+'),
+        )
     }
 
-    let probe = |file: &str| -> Option<(u32, u32)> {
+    let probe = |file: &str| -> Option<(u32, u32, bool)> {
         let out = run(&["--report", "--preset-file", file]);
         if skipped_for_no_adapter(&out) {
             return None;
@@ -471,13 +487,27 @@ fn the_report_transient_columns_separate_the_two_easing_fixtures() {
         Some(columns(&text))
     };
 
-    let Some((scalar_rise, scalar_fall)) = probe("core/tests/fixtures/easing_scalar.toml") else {
+    let Some((scalar_rise, scalar_fall, _)) = probe("core/tests/fixtures/easing_scalar.toml")
+    else {
         return;
     };
-    let Some((asym_rise, asym_fall)) = probe("core/tests/fixtures/easing_asymmetric.toml") else {
+    let Some((asym_rise, asym_fall, asym_fall_marked)) =
+        probe("core/tests/fixtures/easing_asymmetric.toml")
+    else {
         return;
     };
     println!("scalar {scalar_rise}/{scalar_fall}, asymmetric {asym_rise}/{asym_fall}");
+
+    // The marker reaches the text table, and this fixture is the case that
+    // earns it: `release = 0.5` against a 0.8 s window leaves ~4x more travel
+    // undone than `PROBE_SETTLE_TOL` allows, so the fall here is a lower bound
+    // and the report must say so rather than printing it bare.
+    assert!(
+        asym_fall_marked,
+        "the asymmetric fall ({asym_fall}) reached the table unmarked — a 0.5 s \
+         release cannot settle in --report's 0.8 s window, so `segment_settled` \
+         is not wired into the cell"
+    );
 
     assert!(
         scalar_rise > 0 && scalar_fall > 0,
@@ -513,6 +543,9 @@ fn the_report_transient_columns_separate_the_two_easing_fixtures() {
         "\"rise_frames\":",
         "\"fall_frames\":",
         "\"ratio\":",
+        // The text table's `+` has a JSON equivalent, or a consumer reading only
+        // the counts cannot tell a truncated response from a settled one.
+        "\"fall_settled\":false",
     ] {
         assert!(
             json.contains(key),
