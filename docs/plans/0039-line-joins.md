@@ -1,6 +1,6 @@
 # 0039 — Line joins: the stroke stops coming apart at every vertex
 
-> **Status:** approved 2026-07-28 — ready for `dev` (a fresh session; the handoff is manual on
+> **Status:** in-progress 2026-07-28 — `dev` is implementing phases 1-4 (the handoff was manual on
 > purpose). [Plan 0038](done/0038-line-family-unreachable-levers.md) has closed, so nothing blocks
 > it. Three reference errors were corrected at approval and are noted below.
 > **Created:** 2026-07-28

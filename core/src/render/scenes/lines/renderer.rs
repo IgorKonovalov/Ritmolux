@@ -19,9 +19,18 @@
     clippy::unreachable
 )]
 
+/// [`SegmentInstance::joined`] bit: the `a` end continues a neighbouring
+/// segment, so the quad extends **backward** along its own direction by the
+/// half-width (ADR-0041).
+pub const JOINED_A: u32 = 1 << 0;
+/// [`SegmentInstance::joined`] bit: the `b` end continues a neighbouring
+/// segment, so the quad extends **forward** by the half-width (ADR-0041).
+pub const JOINED_B: u32 = 1 << 1;
+
 /// One line segment: endpoints `a`/`b` in world space (x is divided by aspect
-/// in the shader, matching the swarm's convention), an RGB colour, and a
-/// half-width in NDC-y units (uniform on screen after the aspect divide).
+/// in the shader, matching the swarm's convention), an RGB colour, a
+/// half-width in NDC-y units (uniform on screen after the aspect divide), and
+/// the per-endpoint connectivity the join needs.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SegmentInstance {
@@ -33,6 +42,18 @@ pub struct SegmentInstance {
     pub color: [f32; 3],
     /// Half-width in NDC-y units.
     pub width: f32,
+    /// Per-endpoint join flags — [`JOINED_A`] and/or [`JOINED_B`] (ADR-0041).
+    ///
+    /// Connectivity is the **producer's** to declare: only it knows whether an
+    /// end is shared with a neighbour. `0` (neither end joined) renders exactly
+    /// the pre-Plan-0039 geometry, which is what keeps the isolated producers —
+    /// `spectrum`'s `Bars` and `RadialRing` — byte-identical.
+    ///
+    /// A bitfield rather than two `f32`s: 4 bytes instead of 8 against
+    /// ADR-0007's fixed-capacity instance buffer, still `Pod` (32 + 4 = 36 with
+    /// no padding at align 4), and it leaves 30 bits for whatever the next
+    /// per-endpoint property turns out to be.
+    pub joined: u32,
 }
 
 #[repr(C)]
@@ -65,6 +86,7 @@ fn vs_main(
     @location(1) b: vec2<f32>,
     @location(2) color: vec3<f32>,
     @location(3) width: f32,
+    @location(4) joined: u32,
 ) -> VsOut {
     // (along, side): along runs a->b, side spans -1..1 across the width.
     var corners = array<vec2<f32>, 6>(
@@ -94,7 +116,20 @@ fn vs_main(
         dir = vec2<f32>(1.0, 0.0);
     }
     let nrm = vec2<f32>(-dir.y, dir.x);
-    let base = mix(a_s, b_s, c.x);
+
+    // Join (ADR-0041): a flagged end continues into a neighbouring segment, so
+    // push the quad past that endpoint by the half-width along its **own**
+    // direction. Adjacent quads then overlap by half a stroke on both sides of
+    // the shared vertex and the additive falloff fills the wedge the two
+    // divergent perpendiculars would otherwise leave. Each end is independent,
+    // and an unflagged end keeps its exact previous geometry — `dir * 0.0` is
+    // exactly zero, so a producer that flags nothing is byte-identical.
+    let ext_a = select(0.0, width, (joined & 1u) != 0u);
+    let ext_b = select(0.0, width, (joined & 2u) != 0u);
+    let a_j = a_s - dir * ext_a;
+    let b_j = b_s + dir * ext_b;
+
+    let base = mix(a_j, b_j, c.x);
     let pos = base + nrm * c.y * width;
 
     var out: VsOut;
@@ -194,6 +229,7 @@ impl LineRenderer {
                         1 => Float32x2,
                         2 => Float32x3,
                         3 => Float32,
+                        4 => Uint32,
                     ],
                 })],
             },

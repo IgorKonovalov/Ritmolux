@@ -53,6 +53,7 @@ pub fn walk(s: &str, angle: f32, max_segments: usize, out: &mut Vec<SegmentInsta
                         b: [nx, ny],
                         color: [1.0, 1.0, 1.0],
                         width: 0.01,
+                        joined: 0,
                     });
                 } else {
                     dropped += 1;
