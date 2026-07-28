@@ -181,6 +181,71 @@ pub fn frames_to_settle(segment: &[CaptureImage], settle_frac: f32) -> u32 {
     segment.len().saturating_sub(1) as u32
 }
 
+/// Whether `segment`'s last frame is close enough to its asymptote for
+/// [`frames_to_settle`] to mean anything — the question that function cannot
+/// answer about itself (Plan 0038 Phase 7).
+///
+/// **Why this is needed at all.** [`frames_to_settle`] normalizes against the
+/// segment's *own last frame*. When that frame is still travelling, the measured
+/// total is short and every threshold is crossed early — and the returned frame
+/// count is a plausible-looking number rather than an obvious failure, because
+/// normalizing against the last frame *guarantees* the threshold is reached
+/// inside the segment. So `frames_to_settle(seg, f) < seg.len()` is a tautology,
+/// not a check, and a caller has no way to tell *settled at frame k* from *still
+/// moving at frame k*. Plan 0038 Phase 3 read a truncated window as a shape
+/// difference between two orderings on exactly this basis; see
+/// [ADR-0040](../../../../docs/adrs/0040-spectrum-level-curve-applies-before-the-easing.md)'s
+/// Outcome.
+///
+/// **The rule.** A settling response's change per unit time decays
+/// geometrically, so the tail beyond the last frame can be extrapolated without
+/// knowing the time constant. Sample three points at equal spacing `h` — the
+/// first frame `A`, the midpoint `B`, the last `C` — and for an exponential
+/// approach `|C - B| / |B - A|` is `exp(-h/tau)`, whatever `tau` is. The travel
+/// still to come after `C` is then `|C - B| * rho / (1 - rho)`. Settled means
+/// that estimate is under `tol` of the change measured so far.
+///
+/// **The three points are spread across the whole segment on purpose, not taken
+/// from the end.** Captures are 8-bit, and a response slow enough to outrun its
+/// window moves by *less than one code value per frame* near the end — the
+/// residual is large but each individual step is sub-quantum, so consecutive
+/// frames decode as identical and any estimator reading adjacent deltas concludes
+/// "flat, therefore settled" precisely in the case worth catching. Half a segment
+/// of travel is always far above the quantum. (Measured while building this: at
+/// `tau` = 2 s over a 2 s window the per-frame step is ~0.003 linear against a
+/// ~0.004 quantum at that brightness, and the adjacent-frame version of this
+/// function reported the response settled with 37 % of its travel left.)
+///
+/// Assumes a monotone approach, which every one-pole in this engine is — a
+/// response that overshoots is outside what this can judge.
+///
+/// This deliberately does **not** change [`frames_to_settle`] or
+/// [`step_response`], whose numbers `shot --report` publishes for the whole
+/// shipped library. Use it as the gate *before* trusting one of those numbers.
+pub fn segment_settled(segment: &[CaptureImage], tol: f32) -> bool {
+    let (Some(start), Some(end)) = (segment.first(), segment.last()) else {
+        return true; // Nothing captured: no claim to invalidate.
+    };
+    let total = linear_diff(start, end);
+    if total <= f32::EPSILON {
+        return true; // Never moved; `frames_to_settle` reports 0 and says so.
+    }
+    // Equal spacing is what makes the ratio below a pure function of tau.
+    let Some(mid) = segment.get(segment.len() / 2) else {
+        return false; // Too short to see a trend — assume nothing.
+    };
+    let (first_half, second_half) = (linear_diff(start, mid), linear_diff(mid, end));
+    if first_half <= f32::EPSILON {
+        return false; // No motion in the first half: nothing to extrapolate from.
+    }
+    let rho = second_half / first_half;
+    if !(0.0..1.0).contains(&rho) {
+        return false; // Not decaying: still ramping, or accelerating.
+    }
+    let remaining = second_half * rho / (1.0 - rho);
+    remaining <= tol * total
+}
+
 /// Mean absolute per-channel difference between two images in **linear light**,
 /// normalized to `0.0..=1.0`. Mismatched dimensions read as fully different.
 ///
@@ -436,6 +501,57 @@ mod tests {
         // tau rather than reporting a fixed fraction of the window.
         let quick = frames_to_settle(&one_pole(0.0, 1.0, 0.05, n), SETTLE_FRAC) as i32;
         assert!(quick * 3 < rise, "tau 0.05 ({quick}) vs tau 0.25 ({rise})");
+    }
+
+    /// Plan 0038 Phase 7 done-when 2. The case the test above **cannot** reach,
+    /// and the reason a truncated measurement shipped as a finding: at `tau = 0.25`
+    /// over 120 frames the window is 8 tau, where the unsettled residual is 0.03 %
+    /// and normalizing against the last frame costs nothing. Every easing
+    /// measurement in this repo has been made at a configuration like that.
+    ///
+    /// Push tau past the window and [`frames_to_settle`] does not fail, complain,
+    /// or clamp — it returns a plausible number that is simply wrong.
+    /// [`segment_settled`] is what tells the two apart.
+    #[test]
+    fn a_response_slower_than_its_window_is_reported_unsettled_not_clamped() {
+        const TOL: f32 = 0.02;
+        let n = 120; // 2 s at 60 Hz.
+
+        // Settled: 8 tau of window. Both directions, since the estimator reads
+        // per-frame deltas and must not care which way the ramp goes.
+        for (from, to) in [(0.0f32, 1.0f32), (1.0, 0.0)] {
+            let fast = one_pole(from, to, 0.25, n);
+            assert!(
+                segment_settled(&fast, TOL),
+                "tau 0.25 over {n} frames is 8 tau — must read settled ({from} -> {to})"
+            );
+        }
+
+        // Unsettled: tau 2.0 s over the same 2 s window leaves ~37 % of the
+        // travel undone, yet `frames_to_settle` still answers inside the segment.
+        let slow = one_pole(0.0, 1.0, 2.0, n);
+        let reported = frames_to_settle(&slow, SETTLE_FRAC);
+        assert!(
+            reported < n as u32,
+            "the premise of this test: frames_to_settle always answers inside \
+             the segment, which is why it cannot self-detect truncation — got \
+             {reported} for a response that has barely started"
+        );
+        assert!(
+            !segment_settled(&slow, TOL),
+            "tau 2.0 over {n} frames has ~37 % of its travel left — must read \
+             unsettled, otherwise `{reported}` would pass for a measurement"
+        );
+
+        // The boundary is a property of the residual, not of a frame count: the
+        // same tau reads settled once the window is long enough to earn it.
+        let slow_but_long = one_pole(0.0, 1.0, 2.0, 8 * n);
+        assert!(
+            segment_settled(&slow_but_long, TOL),
+            "tau 2.0 over {} frames is 8 tau — the same response, measured to \
+             settlement, must read settled",
+            8 * n
+        );
     }
 
     /// Why [`linear_diff`] exists rather than reusing [`frame_diff`]: on the very
