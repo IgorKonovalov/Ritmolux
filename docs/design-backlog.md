@@ -1329,3 +1329,80 @@ written down where an author meets them:
   far apart they are set. The measured `paper_bright = 0.055` / `ink_bright = 0.94` flat-slate-grey
   Gray-Scott result is quoted, along with where the inversion *does* work: a line scene against
   black, where most pixels already sit near 0 or 1.
+
+---
+
+## Entry 0028 — from the 2026-07-29 `preset-author` post-Plan-0041 library sweep
+
+## 0028 — reachability only reports `select`/`clamp` nodes, so a bare comparison is invisible and a dead band gate can hide behind a live `tempo` one
+
+- **Raised:** 2026-07-29, from `preset-author` (first library audit using Plan 0041's new
+  reachability check).
+- **Verified against code:** yes — `collect_flags` in `core/src/preset/expr.rs`.
+- **Not a re-raise of [0022](#0022----reports-reactivity-columns-are-structurally-blind-to-a-level-curve).**
+  0022 was about the *reactivity columns* being blind to a level `curve`, and Plan 0041 closed it.
+  This is about the *reachability check itself*, which 0041 added.
+
+Plan 0041 works: it found four presets whose headline mechanism had never run, all four are now
+fixed, and every one of them would have stayed invisible without it. This entry is about the
+**second five**, which the checker did not find and structurally cannot.
+
+### The mechanism
+
+`Node::probe` walks and records **every** node in the tree. But `collect_flags` only *emits* a
+`GateFlag` for two node shapes:
+
+```rust
+(Node::Call(Func::Select, args), NodeObservation::Select { saw_true, saw_false })
+    if saw_true != saw_false => …
+(Node::Call(Func::Clamp, _), NodeObservation::Clamp { peak_fraction_of_bound })
+    if peak_fraction_of_bound < 1.0 => …
+```
+
+`NodeObservation` has no variant for a comparison, so a `Node::Bin(Cmp, …)` that is not a
+`select()` condition records `Untouched` and is never reported. Two consequences, both of which
+shipped in the library for months and both found by hand:
+
+**1. A bare comparison as the whole binding.** The idiomatic way to write a boolean param is
+`reseed = "onset > 0.55"` — no `select` anywhere. Combined with `onset` being **raw spectral flux**
+(peak `0.016`, not a `0..1` envelope), every attractor in the set had never reseeded once, and
+`rose_web.mirror_reflect` had never reflected:
+
+```toml
+reseed         = "onset > 0.55"   # attractor_clifford — 34x unreachable
+mirror_reflect = "onset > 0.18"   # rose_web           — 11x unreachable
+```
+
+All five scored a clean `gates 0`.
+
+**2. A dead band gate behind a live `tempo` one — the worse case, because it reports as clean.**
+
+```toml
+kaleido_order = "select(min(tempo > 124, bass + treb > 0.38), 4, 1)"   # attractor_lorenz
+```
+
+The flag names the **whole `min(...)`** as the condition, and the report's own guidance says a
+`tempo` gate is correctly one-sided under a single-BPM probe — so the reader dismisses it. The
+`bass + treb > 0.38` half is separately dead (the sum peaks near `0.138`) and is never named. The
+excusable half launders the inexcusable one. `swarm_storm` has the same shape with a *reachable*
+band half, so the two are indistinguishable in today's output.
+
+### Impact
+
+This is the instrument all three lanes verify through, and the failure mode is a **false clean
+reading**, which is worse than no reading. It cost this lane a full manual sweep
+(`grep -rnoE '(bass|mid|treb|onset)[^"]*?[><]=? *[0-9.]+' presets/*.toml`, then every threshold
+checked by hand against `LOW_LEVELS`) *after* `--report` had said the library was healthy.
+
+Nine dead gates total were fixed in `e9a1c3c`; **five of the nine** were invisible to the check.
+
+### What I am not deciding
+
+Whether the fix is a `NodeObservation::Compare` variant reported like `Select`, or reporting the
+innermost comparisons of a composite condition separately rather than the whole condition text, or
+both. That is architect's call. The recording walk already visits every node, so the missing piece
+looks like reporting rather than instrumentation — but that is an observation, not a design.
+
+Worth deciding alongside it: ADR-0042 shipped this **advisory**, to be gated once the library is
+clean. The library is clean *as measured today*; gating on a check with this blind spot would
+freeze the false-clean reading into CI.
