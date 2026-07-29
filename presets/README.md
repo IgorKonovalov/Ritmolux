@@ -51,6 +51,52 @@ surfaced error — the engine keeps the last good preset, never crashes (NFR 10)
 
 Full grammar reference: [`../docs/presets.md`](../docs/presets.md#the-expression-language).
 
+### What range the bands actually occupy
+
+**Every threshold and every gain must be set from measured levels.** `bass`,
+`mid` and `treb` are *not* `0..1` variables in practice — they arrive through the
+analyzer's normalization and spend their lives one to two orders of magnitude
+below full scale:
+
+| variable | min | mean | max | note |
+|---|---|---|---|---|
+| `bass` | 0.004 | **0.040** | 0.106 | |
+| `mid` | 0.000 | **0.006** | 0.019 | |
+| `treb` | 0.000 | **0.006** | 0.032 | |
+| `onset` | 0.000 | **0.002** | 0.016 | raw spectral flux, **not** a 0..1 envelope |
+| `bass + mid + treb` | 0.005 | 0.052 | 0.132 | the three-band sum, per hop |
+| `bin(x)` | — | 0.020 | 0.338 | the band array is on its own scale, hotter than the scalars |
+
+Measured 2026-07-29 over `--signal dynamic:110`. **Re-measure rather than guess**
+— any filmstrip run prints the band table:
+
+```sh
+cargo run -p standalone --example shot -- --signal dynamic:110 --out strip.png
+```
+
+Real music reads *lower* still in most bands most of the time
+([`../docs/capturing.md`](../docs/capturing.md#what-real-material-actually-produces)
+has the `--audio` measurements). `--set bass=0.8` is about **100×** a real mean:
+it is a debugging stimulus, never a calibration reference.
+
+This is not a style note. Comparison gates written against `--set` magnitudes —
+`bass + mid + treb > 0.90`, `mid > 0.22` — are **dead code**: six shipped presets
+had their defining mechanism disabled for months because their thresholds sat
+above anything music produces, and every one of them looked healthy in
+`--report`. Two rules follow:
+
+- **A threshold goes between the mean and the max of what it reads.** Above the
+  max it never fires; below the min it always does. `select(bass + mid > 0.085,
+  12, 6)` is a live gate; `select(bass + mid > 0.42, 12, 6)` is the constant `6`.
+- **Calibrate a continuous parameter against the mean and a percussive one
+  against the peak.** A zoom or a hue drift spends its life near the mean; a
+  flash or a burst exists to fire on the hit.
+
+`--report` now checks this for you: the second table reads at these levels, and
+its `gates` / `ceils` columns name any `select()` that never went both ways and
+any `clamp()` ceiling the value never reached
+([`../docs/capturing.md`](../docs/capturing.md#reachability-gates-the-probe-never-drove-both-ways)).
+
 ## Systems and their named parameters
 
 | System            | Named `[params]`                                                         |
@@ -442,6 +488,16 @@ middle rather than sit in it); pick `0` or `1` when you want to stay somewhere. 
 sparse, faint drawing comes from the scene — a finer `size`, a shorter `fade` —
 not from a half-strength remap.
 
+**Swapping the poles does not make a dark look on a continuous field.** The pass
+is `mix(paper, ink, luminance)` — it **interpolates**, it does not map. Setting a
+dark paper against a bright ink is the obvious way to try to turn a print into a
+glow, and it works only where most pixels already sit near 0 or near 1: a line
+scene against black, not a continuous field. A source at *mid* luminance lands
+halfway between the poles no matter how far apart you set them. Measured:
+`paper_bright = 0.055` against `ink_bright = 0.94` on a developed Gray-Scott
+field renders **flat slate grey**. To darken a continuous field, change what the
+scene produces — exposure, contour density, the palette — not the poles.
+
 **In ink mode a scene's palette collapses to the duotone.** The remap keys on
 *luminance* only, so the hue a `[palette]` produced is discarded and every pixel
 lands somewhere on the paper→ink ramp. The palette still matters — it shapes which
@@ -477,6 +533,15 @@ color_span = "0.3"             # fragment/RD: low = a cohesive single-family moo
 hue_spread = "0.15"            # swarm/attractor: low = a coherent-colour cloud
 saturation = "0.8 + mid * 2"
 ```
+
+**`color_center` (and `hue_center`) is a CYCLIC coordinate.** It slides a window
+along the gradient, and the coordinate **wraps** — it does not clamp. So pushing
+it negative to reach the palette's dark end lands the field in the palette's
+*bright* stops instead, and the picture gets brighter. That cost the content lane
+three rendered iterations of chasing exposure and contour density, all downstream
+of a cause that was neither. To darken, change the palette's stops or the scene's
+own exposure; to *move* the tonal centre, keep the centre inside `0..1` and know
+that `-0.1` and `0.9` are the same place.
 
 Full reference — built-in names, custom-stops rules, the per-scene colour params,
 and the A/B crossfade — is in **[docs/preset-palettes.md](../docs/preset-palettes.md)**.

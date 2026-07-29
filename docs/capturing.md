@@ -284,6 +284,73 @@ alongside a dead `anim` and flat reactivity columns is worth investigating; a lo
 `cover` on a preset that is deliberately a thin figure on a wide ground is the
 report working.
 
+#### The second reading: the same columns at realistic levels
+
+Under each family's table is a second block
+([ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md)):
+
+```
+  at realistic levels (bass 0.04 mid 0.006 treb 0.006 onset 0.0016) — read the *gap* ...
+  preset            bass     mid    treb   onset   gates   ceils
+  Aurora           0.110   0.010   0.020   0.001       0       9
+  Warp Drive       0.040   0.009   0.008   0.122       2      11
+```
+
+The four columns are measured exactly as the ones above, from stimuli set to
+[what real material produces](#what-real-material-actually-produces) instead of
+to `1.0`. **The gap between the two rows is the reading, not either number
+alone**, and it has a direction:
+
+| what you see | what it means |
+|---|---|
+| both healthy | the preset responds at levels it will actually meet |
+| **full scale lively, realistic ~0** | gained or gated against a magnitude music never reaches. This is the defect that hid six presets for months |
+| realistic close to full scale | a compressive `curve`/`smoothstep` doing its job, or a binding already saturating at low input |
+| **realistic > full scale** | something inverted or saturating — a parameter past its useful range at full scale, reading *back* down |
+
+The last row is why the full-scale columns stayed. They also keep every number
+quoted in an older commit, ADR or backlog entry meaning what it said.
+
+Two things this pair cannot see. **`beat` is an event, not a magnitude**, so it
+is `true` in both readings — a beat-latched binding holds across the gap while an
+`onset`-scaled one falls away, which is a distinction, not a fault. And the
+**band array is on its own scale**: the low stimulus lights the `spectrum` slice
+to the same level as the scalar, while real material's per-band mean is `0.020`
+with peaks to `0.338`, so a `bin()`-reading preset reads *lower* here than the
+scalar gap suggests.
+
+#### Reachability: gates the probe never drove both ways
+
+The `gates` and `ceils` counts are not measured from pixels at all. They come
+from walking each preset's **expression trees** while evaluating them over 12 s
+of `dynamic:110` through the real analyzer, recording whether every `select()`
+condition went each way and how close every `clamp()` came to its upper bound.
+A frame differential structurally cannot answer this — `select(c, 6, 8)` and
+`select(c, 6, 6)` diff identically, and neither names *which* gate.
+
+- **`gates`** — `select()` conditions that never went both ways. One branch of
+  the preset has never rendered. Each is named underneath the table with its
+  source text, so the threshold to re-gain is in front of you.
+- **`ceils`** — `clamp()` upper bounds the value never approached. The bound is
+  decorative and the parameter's real range is narrower than it reads. Counted
+  per preset, the worst few named per family, all of them in `--json`.
+
+**A flag is a suspect, not a conviction.** It says *this* stimulus never drove
+the gate both ways, which is a fact about the probe as much as about the preset.
+The standing false positive is **`tempo`**: the probe runs at one BPM, so
+`select(tempo > 132, ...)` is *correctly* one-sided and will flag forever. Check
+those two by hand with `--set tempo=90` / `--set tempo=160` (see
+[Examples](#examples)); a gate on a band is the one worth acting on.
+
+The probe runs 12 s rather than the 4 s a `--signal` filmstrip synthesizes,
+because the tempo tracker needs about 4 s to lock. Under a short clip `tempo`
+reads a flat `0` and every `tempo` comparison flags for the wrong reason.
+
+This is advisory output. It is **not** a CI gate, and deliberately so: at least
+nine shipped presets would fail on day one and block everyone on an unrelated
+content pass ([ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md)
+Alternative C).
+
 ### Which preset library a shot uses
 
 Highest precedence first:
@@ -457,9 +524,16 @@ figures; whether it needs a re-gain pass is
 > audio pipeline can be validated without adding anything.
 
 The `--report --json` schema is a nested object of numbers keyed by
-family/preset: per-band `reactivity`, `animation`, `coverage`, `transient`
-(`rise_frames` / `fall_frames` as integers plus their `ratio`), the pairwise
-`pixel`/`shape` distinctness matrices, and `near_duplicates`.
+family/preset: per-band `reactivity` and `reactivity_low`, `animation`,
+`coverage`, `transient` (`rise_frames` / `fall_frames` as integers plus their
+`ratio`), `reachability`, the pairwise `pixel`/`shape` distinctness matrices, and
+`near_duplicates`.
+
+`reachability` carries `dead_branches` and `unapproached_ceilings` counts, the
+full `gates` list (each with `param`, `source`, `kind`, and either `always` or
+`peak_fraction_of_bound`), and a `probe` object naming the signal, BPM and
+duration they were observed under. Keep the provenance when you consume it: a
+flag only ever means *not observed under this stimulus*.
 
 ## The `core/tests/` harness
 
