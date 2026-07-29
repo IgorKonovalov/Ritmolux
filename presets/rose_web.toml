@@ -65,12 +65,17 @@ hue = "mod(0.05 + time * 0.022 + clamp(mid * 18.0, 0, 0.26) + sin(time * 0.041) 
 # GEOMETRY MIRROR - modest, because the chord count is already carrying the
 # density. Reflection on a hard onset rather than every beat.
 #
-# `onset > 0.40` was reachable but rare - a once-a-passage event rather than a
-# rhythm reading - so 0.18 puts the reflected state on genuine hits. The fold
-# COUNT moves now as well, so the web gains and loses arms with the mid content
-# instead of being a fixed four-armed figure.
+# The note this comment used to carry was wrong, and worth correcting rather
+# than deleting: `onset > 0.40` was not "reachable but rare", it was DEAD, and
+# so was the 0.18 that replaced it. `onset` is raw spectral flux, not a
+# normalized 0..1 envelope - it peaks at 0.016 on music-like material (mean
+# 0.002), so this web has never once reflected. A bare comparison is not a
+# `select` condition, so `--report` reachability cannot see this shape at all;
+# it was found by sweeping thresholds against the measured band table
+# (`LOW_LEVELS` in standalone/examples/shot.rs). 0.007 is what "genuine hits"
+# actually costs.
 mirror_order   = "select(mid > 0.011, 6, 4)"
-mirror_reflect = "onset > 0.18"
+mirror_reflect = "onset > 0.007"
 
 # VIEW + COMPOSITE - pushed in slightly so the lattice runs off the frame edge,
 # over a cold backdrop, with a long feedback that thickens the weave.

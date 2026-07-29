@@ -73,7 +73,9 @@ d = "1.525 + cos(time * 0.0190) * 0.075 - clamp(bass * 0.10 + bin(0.24) * 0.18, 
 # above ~0.92 with `size` near 1 saturates the accumulation into a white blot.
 fade   = "0.905 - clamp(bass * 0.16, 0, 0.055) - beat * 0.020"
 size   = "0.58 - clamp((bass + mid) * 0.15, 0, 0.17) + beat * 0.08"
-reseed = "onset > 0.42"
+# MEASURED. Read 0.42 and never fired - `onset` is raw spectral flux peaking at
+# 0.016, not a 0..1 envelope. The most eager reseed in the family, as before.
+reseed = "onset > 0.008"
 
 # COLOUR - a narrow window that slides, not a rainbow. palette_mix finally earns
 # its keep: the gradient cools toward `ice` as treble opens.
@@ -94,7 +96,14 @@ pan_y = "cos(time * 0.037) * 0.05"
 bg_hue        = "0.25 + sin(time * 0.017) * 0.05"
 bg_bright     = "0.06 + clamp(mid * 0.5, 0, 0.07)"
 bg_vignette   = "0.80"
-kaleido_order = "select(bass + mid > 0.34, 5, 1)"
+# THE THRESHOLD IS MEASURED, NOT GUESSED. This read 0.34 until Plan 0041's
+# reachability check proved the branch dead: written against `--set bass=1`
+# magnitudes, but on music-like material `bass` peaks at 0.106 and `mid` at
+# 0.019, so `bass + mid` tops out near 0.125 and the symmetry never arrived on
+# any section. 0.070 sits well above the sum's ~0.046 mean, which keeps the
+# "loud sections only" intent above intact instead of leaving it on constantly.
+# Band table: `LOW_LEVELS` in standalone/examples/shot.rs.
+kaleido_order = "select(bass + mid > 0.070, 5, 1)"
 kaleido_angle = "time * 0.07"
 
 [smoothing]

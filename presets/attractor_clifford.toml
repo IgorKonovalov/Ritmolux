@@ -60,7 +60,15 @@ d = "0.70 + cos(time * 0.0151) * 0.090 - clamp(bass * 0.08 + bin(0.28) * 0.14, 0
 # below, not from letting the accumulation grid saturate.
 fade   = "0.885 - clamp(bass * 0.18, 0, 0.060) - beat * 0.020"
 size   = "0.62 - clamp((bass + treb) * 0.16, 0, 0.18) + beat * 0.10"
-reseed = "onset > 0.55"
+# RESEED IS A MEASURED THRESHOLD. This read 0.55 and therefore never fired
+# once: `onset` is raw spectral flux, not a normalized envelope, and it peaks
+# at 0.016 on music-like material (mean 0.002) - so every attractor in this
+# family shipped with its reseed permanently off. Note the checker cannot catch
+# this shape: a bare comparison is not a `select` condition, so `--report`
+# reachability is blind to it. 0.012 is the most reluctant setting in the
+# family, matching this preset's original rank. Band table: `LOW_LEVELS` in
+# standalone/examples/shot.rs.
+reseed = "onset > 0.012"
 
 # COLOUR - a hot but narrow window; treble slides the centre toward white-hot.
 hue_spread  = "0.16 + clamp(treb * 1.0, 0, 0.22)"
