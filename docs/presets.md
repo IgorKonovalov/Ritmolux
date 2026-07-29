@@ -515,6 +515,45 @@ max(beat, onset > 0.6)                # on a beat OR a strong transient
 left-associatively as `(a > b) > c`, comparing a `0`/`1` against `c`. Write
 `min(a > b, b > c)` instead.
 
+#### Set the threshold from a measured level, not from `--set`
+
+**This is the single most expensive mistake an author can make here.** A gate is
+only a gate if the value it reads actually crosses it, and the bands do not span
+`0..1`:
+
+| variable | mean | max | so a live threshold sits… |
+|---|---|---|---|
+| `bass` | 0.040 | 0.106 | around `0.03`–`0.09` |
+| `mid` | 0.006 | 0.019 | around `0.005`–`0.015` |
+| `treb` | 0.006 | 0.032 | around `0.005`–`0.02` |
+| `bass + mid + treb` | 0.052 | 0.132 | around `0.04`–`0.11` |
+
+Measured 2026-07-29 over `--signal dynamic:110`; re-measure any time with
+`shot --signal dynamic:110 --out strip.png`, which prints the table. Real music
+reads lower still in most bands most of the time — the `--audio` measurements are
+in [capturing.md](capturing.md#what-real-material-actually-produces).
+
+`--set bass=1` writes the band straight onto the analysis frame and is roughly
+**100×** a real mean. A threshold picked while looking at a `--set` capture is
+therefore usually dead code:
+
+```
+select(bass + mid + treb > 0.90, 24, 6)   # never fires. The constant 6.
+select(bass + mid + treb > 0.075, 24, 6)  # a real gate
+```
+
+Six shipped presets had their defining mechanism disabled this way for months —
+`fragment_kaleido` never left 6 folds, `reaction_reef` never folded at all — and
+all six scored **healthy** in `--report`, because its stimuli were full-scale too.
+They no longer do: `--report`'s reachability check walks every expression and
+names any `select()` whose condition never went both ways, and any `clamp()`
+ceiling the value never reached
+([capturing.md](capturing.md#reachability-gates-the-probe-never-drove-both-ways)).
+Run it before you ship a gate.
+
+The same arithmetic applies to a `clamp()` ceiling: `clamp(bass * 0.1, 0, 0.5)`
+reads as a parameter spanning half a unit and delivers about `0.01`.
+
 ### Decibels
 
 `log(x)` is a **natural** logarithm, and it exists mainly so a preset can reach a
