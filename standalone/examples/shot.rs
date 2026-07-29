@@ -992,7 +992,7 @@ fn print_ceiling_summary(fam: &FamilyReport) {
                 GateKind::Clamp {
                     peak_fraction_of_bound,
                 } => Some((p.name.as_str(), g, peak_fraction_of_bound)),
-                GateKind::Select { .. } => None,
+                GateKind::Select { .. } | GateKind::Compare { .. } => None,
             })
         })
         .collect();
@@ -1028,6 +1028,16 @@ fn gate_line(preset: &str, gate: &GateReport) -> String {
             };
             format!(
                 "  GATE {preset}.{}: `{}` never went {never}, so its `{branch}` branch never ran",
+                gate.param, gate.flag.source
+            )
+        }
+        // A comparison has no branches to name, so the consequence is stated as
+        // the constant it collapsed to — which is what an author has to picture
+        // to see that a boolean param never turned on (ADR-0043).
+        GateKind::Compare { always } => {
+            let (never, constant) = if always { ("false", 1) } else { ("true", 0) };
+            format!(
+                "  COMP {preset}.{}: `{}` never went {never}, so it read as a constant {constant}",
                 gate.param, gate.flag.source
             )
         }
@@ -1109,17 +1119,23 @@ fn transient_cell(frames: u32, settled: bool) -> String {
     }
 }
 
-/// `(dead branches, unapproached ceilings)` for one preset. Counted apart
-/// because they are different claims: a one-sided `select()` means a branch of
-/// the preset has never rendered, while a `clamp()` short of its bound only
-/// means the ceiling is doing no work.
+/// `(dead gates, unapproached ceilings)` for one preset. Counted apart because
+/// they are different claims: a one-sided `select()` or comparison means a
+/// branch of the preset has never rendered, while a `clamp()` short of its bound
+/// only means the ceiling is doing no work.
 fn gate_counts(p: &PresetReport) -> (usize, usize) {
-    let dead = p
-        .gates
-        .iter()
-        .filter(|g| matches!(g.flag.kind, GateKind::Select { .. }))
-        .count();
+    let dead = p.gates.iter().filter(|g| is_dead_gate(g)).count();
     (dead, p.gates.len() - dead)
+}
+
+/// Whether this flag is a never-exercised gate rather than a decorative
+/// ceiling. A comparison counts with the `select()`s: both say a branch of the
+/// preset's behavior has never happened (ADR-0043).
+fn is_dead_gate(gate: &GateReport) -> bool {
+    matches!(
+        gate.flag.kind,
+        GateKind::Select { .. } | GateKind::Compare { .. }
+    )
 }
 
 fn loud_frame() -> AnalysisFrame {
@@ -1204,7 +1220,7 @@ fn print_text_report(source: &str, reports: &[FamilyReport]) {
             .flat_map(|p| {
                 p.gates
                     .iter()
-                    .filter(|g| matches!(g.flag.kind, GateKind::Select { .. }))
+                    .filter(|g| is_dead_gate(g))
                     .map(move |g| (p.name.as_str(), g))
             })
             .collect();
@@ -1345,6 +1361,10 @@ fn json_reachability(p: &PresetReport) -> String {
         match gate.flag.kind {
             GateKind::Select { always } => out.push_str(&format!(
                 "\"kind\":\"select\",\"always\":{always}}}",
+                always = if always { "true" } else { "false" }
+            )),
+            GateKind::Compare { always } => out.push_str(&format!(
+                "\"kind\":\"compare\",\"always\":{always}}}",
                 always = if always { "true" } else { "false" }
             )),
             GateKind::Clamp {

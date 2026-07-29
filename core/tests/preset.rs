@@ -1420,6 +1420,97 @@ fn a_condition_that_never_crosses_is_reported_one_sided() {
 }
 
 #[test]
+fn a_comparison_that_is_a_selects_own_condition_is_not_reported_twice() {
+    // ADR-0043's suppression rule. The `select()` already names this condition,
+    // and in better words — it can say which branch never ran, which a bare
+    // comparison flag cannot. Reporting both would double every finding the
+    // check already makes.
+    let e = compile("select(bass > 1.5, 10, 2)").expect("compiles");
+    let spectrum = [0.0f32; 64];
+    let mut obs = lmv_core::preset::Observations::new();
+    for v in &variable_sweep(&spectrum) {
+        e.eval_probed(v, &mut obs);
+    }
+    let flags = e.flag_gates(&obs);
+    assert_eq!(flags.len(), 1, "one gate is one finding: {flags:?}");
+    assert_eq!(
+        flags.first().map(|f| f.kind),
+        Some(lmv_core::preset::GateKind::Select { always: false }),
+        "the surviving flag is the select one, not the comparison"
+    );
+}
+
+#[test]
+fn a_bare_comparison_is_reported_as_its_own_gate() {
+    // The reseed shape: no `select()` anywhere, so nothing suppresses it and
+    // nothing used to report it either.
+    let e = compile("onset > 0.55").expect("compiles");
+    let mut obs = lmv_core::preset::Observations::new();
+    for onset in [0.0f32, 0.004, 0.016, 0.1, 0.3] {
+        e.eval_probed(&vars(0.04, 0.006, 0.006, onset, 0.0, 0.0, 0.0), &mut obs);
+    }
+    let flags = e.flag_gates(&obs);
+    assert_eq!(
+        flags.len(),
+        1,
+        "expected exactly one flagged comparison: {flags:?}"
+    );
+    let flag = flags.first().expect("one flag");
+    assert_eq!(
+        flag.kind,
+        lmv_core::preset::GateKind::Compare { always: false },
+        "the comparison never went true, so the param sat at 0 for the whole run"
+    );
+    assert_eq!(flag.source, "onset > 0.55", "the flag names the comparison");
+}
+
+#[test]
+fn both_halves_of_a_composite_condition_are_named_separately() {
+    // The case that reported *clean* before this plan (ADR-0043): the flag named
+    // the whole `min(...)`, and the report's own guidance says a `tempo` gate is
+    // legitimately one-sided under a single-BPM probe — so a reader dismissed a
+    // flag whose other half was separately dead. Neither comparison is the
+    // `select()`'s direct condition, so neither is suppressed.
+    let e = compile("select(min(tempo > 124, bass + treb > 0.38), 4, 1)").expect("compiles");
+    let mut obs = lmv_core::preset::Observations::new();
+    // The probe's own conditions: one BPM, realistic band levels.
+    for i in 0..64 {
+        let t = i as f32 / 64.0;
+        e.eval_probed(
+            &Variables::new(0.040, 0.006, 0.006, 0.010, 0.0, t, t, 110.0, 0.0),
+            &mut obs,
+        );
+    }
+    let flags = e.flag_gates(&obs);
+    let comparisons: Vec<&str> = flags
+        .iter()
+        .filter(|f| matches!(f.kind, lmv_core::preset::GateKind::Compare { .. }))
+        .map(|f| f.source.as_str())
+        .collect();
+    assert_eq!(
+        comparisons,
+        vec!["tempo > 124", "bass + treb > 0.38"],
+        "each half is named on its own, so the excusable one cannot launder the other"
+    );
+    // The `select()` still reports the composite condition it was always handed
+    // — ADR-0043 adds the halves, it does not replace the gate flag (its
+    // Alternative B). The finding is three-part, and the two new parts are the
+    // ones an author can act on.
+    assert_eq!(
+        flags.len(),
+        3,
+        "the select flag stands alongside the two comparison flags: {flags:?}"
+    );
+    assert_eq!(
+        flags
+            .iter()
+            .find(|f| matches!(f.kind, lmv_core::preset::GateKind::Select { .. }))
+            .map(|f| f.source.as_str()),
+        Some("min(tempo > 124, bass + treb > 0.38)"),
+    );
+}
+
+#[test]
 fn a_dead_branch_hides_the_gates_inside_it_rather_than_doubling_the_finding() {
     // The outer gate never fires, so the inner one is never evaluated. It stays
     // untouched and silent: fixing the outer gate is what makes it reportable.
@@ -1540,4 +1631,44 @@ fn a_flagged_gate_is_named_in_source_that_compiles_back() {
             );
         }
     }
+
+    // The same property on the strings a flag actually carries, comparisons
+    // included: a `Compare` flag names a sub-expression rather than a whole
+    // binding, and that fragment has to stand on its own too.
+    let mut compared = 0usize;
+    for src in [
+        // Thresholds past the top of the sweep, so each is genuinely one-sided.
+        "onset > 1.5",
+        "select(min(tempo > 400, bass + treb > 2.5), 4, 1)",
+        "clamp(bass * 0.001, 0, 0.5) + (mid >= 1.5)",
+    ] {
+        let e = compile(src).expect("compiles");
+        let mut obs = lmv_core::preset::Observations::new();
+        for v in &variable_sweep(&spectrum) {
+            e.eval_probed(v, &mut obs);
+        }
+        let flags = e.flag_gates(&obs);
+        assert!(!flags.is_empty(), "`{src}` was expected to flag");
+        for flag in &flags {
+            let re = compile(&flag.source).unwrap_or_else(|err| {
+                panic!(
+                    "`{src}` flagged `{}`, which does not compile: {err:?}",
+                    flag.source
+                )
+            });
+            assert_eq!(
+                re.source(),
+                flag.source,
+                "`{}` does not re-render as itself",
+                flag.source
+            );
+            if matches!(flag.kind, lmv_core::preset::GateKind::Compare { .. }) {
+                compared += 1;
+            }
+        }
+    }
+    assert!(
+        compared >= 4,
+        "expected the comparison flags to be covered, saw {compared}"
+    );
 }
