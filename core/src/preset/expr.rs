@@ -206,6 +206,28 @@ impl Func {
         })
     }
 
+    /// The source name — the inverse of [`Func::from_name`], for
+    /// [`Node::write_source`].
+    fn name(self) -> &'static str {
+        match self {
+            Func::Sin => "sin",
+            Func::Cos => "cos",
+            Func::Abs => "abs",
+            Func::Floor => "floor",
+            Func::Sqrt => "sqrt",
+            Func::Log => "log",
+            Func::Min => "min",
+            Func::Max => "max",
+            Func::Pow => "pow",
+            Func::Mod => "mod",
+            Func::Clamp => "clamp",
+            Func::Lerp => "lerp",
+            Func::Smoothstep => "smoothstep",
+            Func::Select => "select",
+            Func::Bin => "bin",
+        }
+    }
+
     fn arity(self) -> usize {
         match self {
             Func::Sin
@@ -245,6 +267,33 @@ enum BinOp {
     Ne,
 }
 
+impl BinOp {
+    /// The source token, for [`Node::write_source`].
+    fn symbol(self) -> &'static str {
+        match self {
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::Gt => ">",
+            BinOp::Lt => "<",
+            BinOp::Ge => ">=",
+            BinOp::Le => "<=",
+            BinOp::Eq => "==",
+            BinOp::Ne => "!=",
+        }
+    }
+
+    /// Which grammar tier this operator belongs to.
+    fn precedence(self) -> u8 {
+        match self {
+            BinOp::Gt | BinOp::Lt | BinOp::Ge | BinOp::Le | BinOp::Eq | BinOp::Ne => PREC_CMP,
+            BinOp::Add | BinOp::Sub => PREC_SUM,
+            BinOp::Mul | BinOp::Div => PREC_TERM,
+        }
+    }
+}
+
 /// Compiled AST node. `Box`/`Box<[_]>` allocate once at compile; evaluation
 /// only reads them.
 #[derive(Debug)]
@@ -257,6 +306,18 @@ enum Node {
 }
 
 impl Node {
+    /// Nodes in this subtree, counting itself. Used only by the probe walk, to
+    /// keep a node's index the same no matter which branch a `select()` took on
+    /// this evaluation — an untaken subtree still occupies its indices.
+    fn node_count(&self) -> usize {
+        1 + match self {
+            Node::Const(_) | Node::Var(_) => 0,
+            Node::Neg(inner) => inner.node_count(),
+            Node::Bin(_, l, r) => l.node_count() + r.node_count(),
+            Node::Call(_, args) => args.iter().map(Node::node_count).sum(),
+        }
+    }
+
     /// Whether this subtree reads variable `slot`. Walked **once at compile**,
     /// never per frame.
     fn references(&self, slot: usize) -> bool {
@@ -357,7 +418,132 @@ impl Node {
             },
         }
     }
+
+    /// Walk the subtree rooted here — whose own node index is `index` — and
+    /// record what each `select()` condition and each `clamp()` bound did under
+    /// `vars`. Descends only into the branch a `select()` actually took, which
+    /// is the whole point: an unreached subtree stays [`NodeObservation::Untouched`].
+    ///
+    /// **This records; it does not compute.** The value of a probed evaluation
+    /// comes from [`Node::eval`] itself (see [`Expr::eval_probed`]), so there is
+    /// no second copy of the arithmetic to drift out of step with the first —
+    /// the divergence ADR-0042 names as this approach's main cost is removed by
+    /// construction rather than merely tested for. The price is that conditions
+    /// and clamp arguments are evaluated twice per probed call, which is free:
+    /// expressions are pure and nothing but the harness calls this.
+    fn probe(&self, vars: &Variables<'_>, obs: &mut Observations, index: usize) {
+        match self {
+            Node::Const(_) | Node::Var(_) => {}
+            Node::Neg(inner) => inner.probe(vars, obs, index + 1),
+            Node::Bin(_, l, r) => {
+                l.probe(vars, obs, index + 1);
+                r.probe(vars, obs, index + 1 + l.node_count());
+            }
+            Node::Call(func, args) => match (func, args.as_ref()) {
+                (Func::Select, [cond, x, y]) => {
+                    let taken = cond.eval(vars) != 0.0;
+                    obs.record_select(index, taken);
+                    let cond_at = index + 1;
+                    let x_at = cond_at + cond.node_count();
+                    cond.probe(vars, obs, cond_at);
+                    // Only the live branch, matching what `eval` executes.
+                    if taken {
+                        x.probe(vars, obs, x_at);
+                    } else {
+                        y.probe(vars, obs, x_at + x.node_count());
+                    }
+                }
+                (Func::Clamp, [x, lo, hi]) => {
+                    obs.record_clamp(index, x.eval(vars), hi.eval(vars));
+                    let x_at = index + 1;
+                    let lo_at = x_at + x.node_count();
+                    x.probe(vars, obs, x_at);
+                    lo.probe(vars, obs, lo_at);
+                    hi.probe(vars, obs, lo_at + lo.node_count());
+                }
+                // Every other call evaluates all of its arguments, so all of
+                // them are on the live path.
+                (_, rest) => {
+                    let mut at = index + 1;
+                    for arg in rest {
+                        arg.probe(vars, obs, at);
+                        at += arg.node_count();
+                    }
+                }
+            },
+        }
+    }
+
+    /// Re-render this subtree as source text, parenthesized only where its own
+    /// precedence is below `parent_prec`. Used to *name* a flagged gate: a node
+    /// index tells a reader nothing, and the preset's original text is not kept
+    /// past compile.
+    ///
+    /// Round-trips through [`compile`] (asserted in the tests) but is not
+    /// character-identical to what the author wrote — whitespace and redundant
+    /// parentheses are gone, and `2` prints for `2.0`.
+    fn write_source(&self, out: &mut String, parent_prec: u8) {
+        match self {
+            Node::Const(c) => out.push_str(&c.to_string()),
+            Node::Var(slot) => out.push_str(VAR_NAMES.get(*slot).copied().unwrap_or("?")),
+            Node::Neg(inner) => {
+                // Unary binds tighter than everything but a call, so it only
+                // needs wrapping inside another unary-or-higher context.
+                let wrap = parent_prec > PREC_UNARY;
+                if wrap {
+                    out.push('(');
+                }
+                out.push('-');
+                inner.write_source(out, PREC_UNARY);
+                if wrap {
+                    out.push(')');
+                }
+            }
+            Node::Bin(op, l, r) => {
+                let prec = op.precedence();
+                let wrap = prec < parent_prec;
+                if wrap {
+                    out.push('(');
+                }
+                l.write_source(out, prec);
+                out.push(' ');
+                out.push_str(op.symbol());
+                out.push(' ');
+                // The right operand of a left-associative tier needs one more
+                // level, so `a - (b - c)` keeps its parentheses.
+                r.write_source(out, prec + 1);
+                if wrap {
+                    out.push(')');
+                }
+            }
+            Node::Call(func, args) => {
+                out.push_str(func.name());
+                out.push('(');
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        out.push_str(", ");
+                    }
+                    arg.write_source(out, PREC_CMP);
+                }
+                out.push(')');
+            }
+        }
+    }
+
+    /// This subtree as source text, at statement level.
+    fn source(&self) -> String {
+        let mut out = String::new();
+        self.write_source(&mut out, PREC_CMP);
+        out
+    }
 }
+
+/// Precedence tiers for [`Node::write_source`], matching the grammar in the
+/// module docs: comparisons are loosest, a call or literal binds tightest.
+const PREC_CMP: u8 = 0;
+const PREC_SUM: u8 = 2;
+const PREC_TERM: u8 = 4;
+const PREC_UNARY: u8 = 6;
 
 /// A compiled expression: parse once, [`eval`](Expr::eval) every frame.
 #[derive(Debug)]
@@ -376,12 +562,248 @@ impl Expr {
         self.root.eval(vars)
     }
 
+    /// Evaluate exactly as [`eval`](Expr::eval) does, additionally accumulating
+    /// per-node reachability into `obs` (Plan 0041 / ADR-0042).
+    ///
+    /// **Harness only.** Nothing on the render path calls this: it allocates
+    /// (the observation arena grows on first touch) and it walks the tree twice.
+    /// `eval` is untouched and remains the only thing a frame executes.
+    ///
+    /// Call it repeatedly with the *same* `obs` across a run of varying
+    /// [`Variables`] — one `Observations` per expression. What accumulates is
+    /// which way each `select()` condition went and how close each `clamp()`
+    /// came to its upper bound; [`flag_gates`](Expr::flag_gates) reads the
+    /// verdict back out.
+    pub fn eval_probed(&self, vars: &Variables<'_>, obs: &mut Observations) -> f32 {
+        self.root.probe(vars, obs, 0);
+        // The value is `eval`'s, not a re-derivation of it.
+        self.root.eval(vars)
+    }
+
+    /// The gates `obs` never saw exercised, named by their source text.
+    ///
+    /// Read every one as a **suspect, not a conviction**: it says the run these
+    /// observations came from never drove the gate both ways, which is a
+    /// property of the stimulus as much as of the preset. A gate on `tempo` is
+    /// correctly one-sided under a single-BPM generator.
+    ///
+    /// Nodes never reached at all are silent — a `select()` buried inside a dead
+    /// branch is not a second finding, it is the same one. Fix the outer gate
+    /// and the inner one starts reporting.
+    pub fn flag_gates(&self, obs: &Observations) -> Vec<GateFlag> {
+        let mut flags = Vec::new();
+        collect_flags(&self.root, obs, 0, &mut flags);
+        flags
+    }
+
+    /// Nodes in this expression's tree — the arena size a full
+    /// [`Observations`] for it reaches.
+    pub fn node_count(&self) -> usize {
+        self.root.node_count()
+    }
+
+    /// This expression rendered back to source text (normalized whitespace and
+    /// parentheses, not the author's original characters).
+    pub fn source(&self) -> String {
+        self.root.source()
+    }
+
     /// Whether this expression references the per-element `index`, i.e. whether
     /// it wants to be evaluated **once per element** rather than once per frame
     /// (Plan 0034 Phase 4). Free to call — the answer was computed at compile.
     pub fn uses_index(&self) -> bool {
         self.uses_index
     }
+}
+
+/// Walk `node` (whose index is `index`) and report the gates `obs` never saw
+/// exercised. Recurses into every child, including a flagged gate's own
+/// branches — a dead gate can still contain a live one.
+fn collect_flags(node: &Node, obs: &Observations, index: usize, out: &mut Vec<GateFlag>) {
+    match (node, obs.node(index)) {
+        (
+            Node::Call(Func::Select, args),
+            NodeObservation::Select {
+                saw_true,
+                saw_false,
+            },
+        ) if saw_true != saw_false => {
+            // The condition is the text worth printing, not the whole call: it
+            // is the part an author has to re-gain.
+            out.push(GateFlag {
+                kind: GateKind::Select { always: saw_true },
+                source: args.first().map(Node::source).unwrap_or_default(),
+            });
+        }
+        (
+            Node::Call(Func::Clamp, _),
+            NodeObservation::Clamp {
+                peak_fraction_of_bound,
+            },
+        ) if peak_fraction_of_bound < 1.0 => {
+            out.push(GateFlag {
+                kind: GateKind::Clamp {
+                    peak_fraction_of_bound,
+                },
+                source: node.source(),
+            });
+        }
+        _ => {}
+    }
+
+    let mut at = index + 1;
+    match node {
+        Node::Const(_) | Node::Var(_) => {}
+        Node::Neg(inner) => collect_flags(inner, obs, at, out),
+        Node::Bin(_, l, r) => {
+            collect_flags(l, obs, at, out);
+            collect_flags(r, obs, at + l.node_count(), out);
+        }
+        Node::Call(_, args) => {
+            for arg in args.iter() {
+                collect_flags(arg, obs, at, out);
+                at += arg.node_count();
+            }
+        }
+    }
+}
+
+/// Per-AST-node reachability accumulated across a run of probed evaluations
+/// (ADR-0042). One of these belongs to one [`Expr`].
+///
+/// Lives only in the harness path: [`Expr::eval`] neither reads nor writes it,
+/// and no type a frame touches gained a field for it.
+#[derive(Debug, Default, Clone)]
+pub struct Observations {
+    /// Indexed by the node's pre-order position in its expression's tree. The
+    /// index of a node does **not** depend on which branch a `select()` took —
+    /// an untaken subtree still occupies its slots — so observations from
+    /// different evaluations land in the same places.
+    nodes: Vec<NodeObservation>,
+}
+
+impl Observations {
+    /// An empty set of observations. Grows to fit as nodes are touched.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// What was observed at `index`; [`NodeObservation::Untouched`] for a node
+    /// this run never reached.
+    pub fn node(&self, index: usize) -> NodeObservation {
+        self.nodes.get(index).copied().unwrap_or_default()
+    }
+
+    /// Every recorded slot, in node order.
+    pub fn nodes(&self) -> &[NodeObservation] {
+        &self.nodes
+    }
+
+    /// The slot for `index`, growing the arena to fit. `None` is unreachable
+    /// after the resize — it is how this file stays free of a panic path.
+    fn slot(&mut self, index: usize) -> Option<&mut NodeObservation> {
+        if self.nodes.len() <= index {
+            self.nodes.resize(index + 1, NodeObservation::Untouched);
+        }
+        self.nodes.get_mut(index)
+    }
+
+    fn record_select(&mut self, index: usize, taken: bool) {
+        let Some(slot) = self.slot(index) else {
+            return;
+        };
+        let (was_true, was_false) = match *slot {
+            NodeObservation::Select {
+                saw_true,
+                saw_false,
+            } => (saw_true, saw_false),
+            _ => (false, false),
+        };
+        *slot = NodeObservation::Select {
+            saw_true: was_true || taken,
+            saw_false: was_false || !taken,
+        };
+    }
+
+    /// Record how close `value` came to the clamp's upper bound `hi`.
+    ///
+    /// A non-positive or non-finite bound is recorded as *reached*: "fraction of
+    /// the bound" means nothing there, and a false accusation is worse than a
+    /// missed one for an advisory check.
+    fn record_clamp(&mut self, index: usize, value: f32, hi: f32) {
+        let fraction = if hi.is_finite() && hi > 0.0 {
+            value / hi
+        } else {
+            1.0
+        };
+        let Some(slot) = self.slot(index) else {
+            return;
+        };
+        let previous = match *slot {
+            NodeObservation::Clamp {
+                peak_fraction_of_bound,
+            } => peak_fraction_of_bound,
+            _ => f32::NEG_INFINITY,
+        };
+        *slot = NodeObservation::Clamp {
+            // `max` returns the non-NaN operand, so a NaN inner value cannot
+            // poison the peak.
+            peak_fraction_of_bound: previous.max(fraction),
+        };
+    }
+}
+
+/// What one AST node did across a run.
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub enum NodeObservation {
+    /// Never evaluated — either not a `select()`/`clamp()`, or inside a branch
+    /// the run never took.
+    #[default]
+    Untouched,
+    /// A `select()` condition: did it ever go each way?
+    Select {
+        /// The condition evaluated non-zero at least once.
+        saw_true: bool,
+        /// The condition evaluated zero at least once.
+        saw_false: bool,
+    },
+    /// A `clamp()`: the highest fraction of its upper bound the inner value
+    /// reached. Below `1.0` across a whole run means the bound never bit at this
+    /// stimulus — the ceiling is decorative and the parameter's real range is
+    /// narrower than the preset reads.
+    Clamp {
+        /// Peak of `value / upper_bound` over the run.
+        peak_fraction_of_bound: f32,
+    },
+}
+
+/// A gate that a run never exercised, with the source text that names it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GateFlag {
+    /// Which kind of gate, and what it did.
+    pub kind: GateKind,
+    /// The gate's source: a `select()`'s **condition**, or a `clamp()`'s whole
+    /// call. Re-rendered from the AST (see [`Expr::source`]), so whitespace and
+    /// redundant parentheses will not match the preset file character for
+    /// character.
+    pub source: String,
+}
+
+/// The two structural findings [`Expr::flag_gates`] reports.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum GateKind {
+    /// A `select()` whose condition only ever went one way — so one branch is
+    /// dead and the preset renders as if the `select()` were the constant it
+    /// always chose.
+    Select {
+        /// The side it always took: `true` means the condition never went false.
+        always: bool,
+    },
+    /// A `clamp()` whose inner value never approached its upper bound.
+    Clamp {
+        /// Peak of `value / upper_bound` over the run.
+        peak_fraction_of_bound: f32,
+    },
 }
 
 /// Why an expression failed to compile. Evaluation never errors.

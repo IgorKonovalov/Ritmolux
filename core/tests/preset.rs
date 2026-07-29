@@ -1166,3 +1166,244 @@ fn a_non_finite_value_cannot_poison_a_smoother_permanently() {
         "a NaN input poisoned the smoother permanently: holds {held}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Probed evaluation and reachability (Plan 0041 Phase 2 / ADR-0042)
+// ---------------------------------------------------------------------------
+
+/// A deterministic sweep of variable bindings spanning both scales the harness
+/// reads at: realistic band levels (bass ~0.04, mid/treb ~0.006) and the
+/// full-scale `1.0` the report has always used, plus the odd extreme. Fixed LCG,
+/// no wall clock, so a failure reproduces exactly.
+fn variable_sweep(spectrum: &[f32]) -> Vec<Variables<'_>> {
+    let mut state: u32 = 0x5eed_1041;
+    let mut next = |hi: f32| {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        (state >> 8) as f32 / (1u32 << 24) as f32 * hi
+    };
+    let mut out = Vec::new();
+    for i in 0..256 {
+        // Half the samples at music-like magnitudes, half at full scale, so an
+        // expression gated anywhere in between is crossed by the sweep.
+        let scale = if i % 2 == 0 { 0.12 } else { 1.0 };
+        out.push(
+            Variables::new(
+                next(scale),
+                next(scale),
+                next(scale),
+                next(scale),
+                f32::from(i % 3 == 0),
+                next(1.0),
+                next(120.0),
+                // `tempo` is a BPM, not a 0..1 band — and 0 while the tracker
+                // is still cold.
+                if i % 7 == 0 { 0.0 } else { 60.0 + next(140.0) },
+                next(scale),
+            )
+            .with_spectrum(spectrum)
+            .with_index(next(1.0)),
+        );
+    }
+    out
+}
+
+/// Equality that treats two NaNs as equal — an expression is allowed to produce
+/// NaN (`sqrt(-1)`), and both paths must agree on that too.
+fn same_value(a: f32, b: f32) -> bool {
+    a == b || (a.is_nan() && b.is_nan())
+}
+
+#[test]
+fn probed_evaluation_returns_exactly_what_eval_returns_across_the_library() {
+    // The risk ADR-0042 names as this approach's main cost: a second evaluation
+    // path that quietly disagrees with the one the render loop runs, making the
+    // report describe a preset that does not exist. Pinned over the real shipped
+    // set rather than a spot check.
+    let spectrum: Vec<f32> = (0..64).map(|i| (i as f32 * 0.017).sin().abs()).collect();
+    let sweep = variable_sweep(&spectrum);
+    let presets = lmv_core::preset::default_presets();
+    assert!(!presets.is_empty(), "the embedded library is not empty");
+
+    let mut checked = 0usize;
+    for preset in &presets {
+        for binding in &preset.params {
+            let mut obs = lmv_core::preset::Observations::new();
+            for v in &sweep {
+                let plain = binding.expr.eval(v);
+                let probed = binding.expr.eval_probed(v, &mut obs);
+                assert!(
+                    same_value(plain, probed),
+                    "`{}` param `{}`: eval gave {plain}, eval_probed gave {probed}",
+                    preset.name,
+                    binding.name,
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(
+        checked > 1000,
+        "expected the library to supply a substantial number of evaluations, got {checked}"
+    );
+}
+
+#[test]
+fn a_condition_that_never_crosses_is_reported_one_sided() {
+    // A threshold past even full scale, so this select can only ever pick `y`.
+    let dead = compile("select(bass > 1.5, 10, 2)").expect("compiles");
+    let spectrum = [0.0f32; 64];
+    let mut obs = lmv_core::preset::Observations::new();
+    for v in &variable_sweep(&spectrum) {
+        dead.eval_probed(v, &mut obs);
+    }
+    let flags = dead.flag_gates(&obs);
+    assert_eq!(
+        flags.len(),
+        1,
+        "expected exactly one flagged gate: {flags:?}"
+    );
+    let flag = flags.first().expect("one flag");
+    assert_eq!(
+        flag.kind,
+        lmv_core::preset::GateKind::Select { always: false },
+        "the condition never went true, so the `10` branch is dead"
+    );
+    assert_eq!(
+        flag.source, "bass > 1.5",
+        "the flag names the condition, so an author knows what to re-gain"
+    );
+
+    // ...and a threshold the sweep does cross reports nothing.
+    let live = compile("select(bass > 0.05, 10, 2)").expect("compiles");
+    let mut obs = lmv_core::preset::Observations::new();
+    for v in &variable_sweep(&spectrum) {
+        live.eval_probed(v, &mut obs);
+    }
+    assert!(
+        live.flag_gates(&obs).is_empty(),
+        "a condition that goes both ways is not a finding"
+    );
+}
+
+#[test]
+fn a_dead_branch_hides_the_gates_inside_it_rather_than_doubling_the_finding() {
+    // The outer gate never fires, so the inner one is never evaluated. It stays
+    // untouched and silent: fixing the outer gate is what makes it reportable.
+    let e = compile("select(bass > 1.5, select(mid > 0.5, 1, 2), 3)").expect("compiles");
+    let spectrum = [0.0f32; 64];
+    let mut obs = lmv_core::preset::Observations::new();
+    for v in &variable_sweep(&spectrum) {
+        e.eval_probed(v, &mut obs);
+    }
+    let flags = e.flag_gates(&obs);
+    assert_eq!(
+        flags.len(),
+        1,
+        "one dead outer gate is one finding, not two: {flags:?}"
+    );
+    assert_eq!(flags.first().map(|f| f.source.as_str()), Some("bass > 1.5"));
+}
+
+#[test]
+fn a_nodes_index_does_not_move_with_the_branch_the_run_took() {
+    // Both inner gates are reached (the outer one crosses), and each is dead in
+    // the opposite direction. If a node's index shifted with the branch taken —
+    // the obvious way to write this walk — the two would land in the same slot,
+    // merge into a healthy-looking two-sided reading, and neither would be
+    // reported. Two findings here is what proves the indices are static.
+    let e = compile("select(bass > 0.05, select(mid > 1.5, 1, 2), select(treb < 1.5, 3, 4))")
+        .expect("compiles");
+    let spectrum = [0.0f32; 64];
+    let mut obs = lmv_core::preset::Observations::new();
+    for v in &variable_sweep(&spectrum) {
+        e.eval_probed(v, &mut obs);
+    }
+    let flags = e.flag_gates(&obs);
+    let sources: Vec<&str> = flags.iter().map(|f| f.source.as_str()).collect();
+    assert_eq!(
+        sources,
+        vec!["mid > 1.5", "treb < 1.5"],
+        "both inner gates are one-sided and both must be named"
+    );
+}
+
+#[test]
+fn a_clamp_bound_the_value_never_reaches_is_flagged_and_one_it_reaches_is_not() {
+    // The gain-against-full-scale mistake in its other form: a ceiling written
+    // for `bass = 1` that real levels never come near.
+    let decorative = compile("clamp(bass * 0.001, 0, 0.5)").expect("compiles");
+    let reached = compile("clamp(bass * 0.1, 0, 0.02)").expect("compiles");
+    let spectrum = [0.0f32; 64];
+    let sweep = variable_sweep(&spectrum);
+
+    let mut obs = lmv_core::preset::Observations::new();
+    for v in &sweep {
+        decorative.eval_probed(v, &mut obs);
+    }
+    let flags = decorative.flag_gates(&obs);
+    match flags.first().map(|f| f.kind) {
+        Some(lmv_core::preset::GateKind::Clamp {
+            peak_fraction_of_bound,
+        }) => assert!(
+            peak_fraction_of_bound < 1.0,
+            "flagged with a peak of {peak_fraction_of_bound}, which is not below the bound"
+        ),
+        other => panic!("expected a flagged clamp, got {other:?}"),
+    }
+    assert_eq!(
+        flags.first().map(|f| f.source.as_str()),
+        Some("clamp(bass * 0.001, 0, 0.5)"),
+        "the flag names the whole call, bound included"
+    );
+
+    let mut obs = lmv_core::preset::Observations::new();
+    for v in &sweep {
+        reached.eval_probed(v, &mut obs);
+    }
+    assert!(
+        reached.flag_gates(&obs).is_empty(),
+        "a bound the value actually hits is not a finding"
+    );
+}
+
+#[test]
+fn observations_untouched_by_a_plain_eval_claim_nothing() {
+    // The structural half of "the render path pays nothing": a frame only ever
+    // calls `eval`, so an Observations no probe ever wrote to must yield no
+    // findings rather than reporting every gate as dead.
+    let e = compile("select(bass > 0.2, clamp(mid, 0, 1), 0)").expect("compiles");
+    let v = vars(0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0);
+    for _ in 0..100 {
+        let _ = e.eval(&v);
+    }
+    let untouched = lmv_core::preset::Observations::new();
+    assert!(untouched.nodes().is_empty(), "eval recorded nothing");
+    assert!(
+        e.flag_gates(&untouched).is_empty(),
+        "no observations means no claims"
+    );
+}
+
+#[test]
+fn a_flagged_gate_is_named_in_source_that_compiles_back() {
+    // The report prints these strings; an author has to be able to paste one
+    // into a preset and have it mean the same thing.
+    let spectrum: Vec<f32> = (0..64).map(|i| i as f32 / 64.0).collect();
+    for src in [
+        "bass + mid > 0.34",
+        "select(min(tempo > 124, bass + treb > 0.38), 4, 1)",
+        "clamp(bass * 0.1, 0, 0.045)",
+        "-bass * (mid + treb) / 2 - (bar - time)",
+        "lerp(1, 2, smoothstep(0, 1, bin(0.5)))",
+    ] {
+        let original = compile(src).expect("compiles");
+        let text = original.source();
+        let round_tripped = compile(&text).expect("the rendered source compiles");
+        for v in variable_sweep(&spectrum).iter().take(32) {
+            assert!(
+                same_value(original.eval(v), round_tripped.eval(v)),
+                "`{src}` rendered as `{text}`, which evaluates differently"
+            );
+        }
+    }
+}
