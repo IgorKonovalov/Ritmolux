@@ -1,6 +1,6 @@
 # 0041 — `--report` reads at two levels, and expression reachability is measured on the AST
 
-> **Status:** draft
+> **Status:** approved 2026-07-29 — ready for `dev`
 > **Created:** 2026-07-28
 > **Owner skill(s):** dev
 > **Related ADRs:** [0042](../adrs/0042-reachability-measured-on-the-expression-tree.md)
