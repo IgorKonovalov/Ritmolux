@@ -1477,3 +1477,71 @@ or resetting a particle's feedback contribution on wrap. That is architect's cal
 only that `BOUND_X = 1.8` vs `BOUND_Y = 1.0` already encodes a 16:9 assumption, so whatever
 replaces it should take the render target's aspect rather than a constant
 ([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+
+---
+
+## 0030 — the library binds audio to luminance and colour far more than to the numbers that rebuild geometry
+
+- **Raised:** 2026-07-29, from `preset-author`, prompted by user feedback on the shipped set:
+  *"too safe, there is just nothing curious... I should see wonders and other worlds"*.
+- **Verified against code:** n/a — this is an authoring principle with measured evidence, not a
+  claim about the engine.
+- **Not an engine gap.** Filed here because it is durable, measurable, and the thing a future
+  content pass should be pointed at. It needs no ADR and no plan.
+
+### The observation
+
+Most of the shipped library binds its band terms to `brightness`, `glow`, `flash`, `thickness`,
+`hue` and `palette_mix` — parameters that change how a figure is *lit or coloured*. Comparatively
+few bind to the parameters that change what the figure *is*.
+
+Every system has at least one of the latter, and they were largely unused:
+
+| System | The numbers that rebuild the geometry |
+|--------|----------------------------------------|
+| `parametric_curve` | `n`, `d`, `radial_offset`, `phase` |
+| `attractor` | `a`, `b`, `c`, `d` (the family's coefficients) |
+| `reaction_diffusion` | `feed`, `kill` (which regime the chemistry is in) |
+| `fragment_field` | `warp`, and `kaleido_order` as a *stepping* fold |
+| `lsystem` | `visible_depth` |
+| `star_pattern` | `variant`, `mirror_order` |
+
+### The evidence
+
+Four presets authored on 2026-07-29 (`a51c431`) bind audio to the geometry column instead, and
+measure well outside the set they joined:
+
+| preset | system | driven by audio | `anim` | reactivity at realistic levels |
+|--------|--------|-----------------|--------|-------------------------------|
+| Supernova | `fragment_field` | `warp` + a 3/8/16-fold stepping fold | **0.234** | 0.178 / 0.085 / 0.068 / 0.155 |
+| Reliquary | `reaction_diffusion` | `feed`/`kill` inside the filament regime | 0.095 | 0.134 / 0.009 / 0.017 / 0.017 |
+| Leviathan | `attractor` | all four de Jong coefficients | 0.087 | 0.144 / 0.085 / 0.093 / 0.036 |
+| Cathedral | `parametric_curve` | the Maurer rose's `n` and `d` | 0.056 | 0.163 / 0.058 / 0.016 / 0.026 |
+
+Supernova is the most animated preset in the library; the prior best outside the rose family was
+`fragment_warp` at `0.183`. All four register on every band at realistic levels, where much of the
+shipped set reads `0.000` on treble.
+
+### Why it works, mechanically
+
+It is the same principle as the additive ceiling seen from the other side. Luminance is **bounded** —
+the frame clips per channel, so past a point more energy on `brightness` produces less picture, not
+more. Geometry is **not** bounded that way: a fold order stepping 3 -> 8 -> 16, or a rose's `n`
+moving through fractional values, changes the image without ever running out of headroom. Peak
+energy spent on structure has somewhere to go.
+
+Two practical notes from authoring the four:
+
+- **Ease the shape numbers.** A geometry parameter moving on a raw band term twitches; the four
+  above use `[smoothing]` constants of 0.5-0.9 s on the shape numbers so a change reads as a morph.
+  Fractional values are valid for `n`/`d`/`feed`/`kill`, so the morph is genuinely continuous.
+- **Cutting luminance is usually the precondition.** `Cathedral` first rendered as a solid white
+  disc, and only became legible after `thickness` 1.45 -> 0.42, `brightness` 0.92 -> 0.34 and
+  `glow` 1.05 -> 0.55. Symmetry multiplies luminance: a six-fold mirror under an eight-fold screen
+  fold stacks the same stroke dozens of times.
+
+### Where this should end up
+
+`references/craft.md` in the `preset-author` skill is the working home for the rule — it already
+leads with the additive ceiling, and this belongs beside it as the second structural principle.
+This entry is the record and the evidence; that file is where it changes behaviour.
