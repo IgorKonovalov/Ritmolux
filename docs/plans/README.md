@@ -10,9 +10,24 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0041](0041-report-two-level-stimuli-and-expression-reachability.md) | `--report` reads at two levels, and expression reachability is measured on the AST | **draft 2026-07-28** — interview done, awaiting the user's go | dev |
+| [0041](0041-report-two-level-stimuli-and-expression-reachability.md) | `--report` reads at two levels, and expression reachability is measured on the AST | **approved 2026-07-29** — ready for `dev` | dev |
 
 ## Recommended execution sequence
+
+**[0041] is the next one to build** (approved 2026-07-29). It fixes the instrument every lane
+self-verifies through: `--report` scores a preset healthy at full-scale stimuli while its gates are
+dead code, which is how six shipped presets ran for months with their headline mechanism disabled.
+Two `dev`-owned halves — a second realistic-level reading beside the existing columns, and
+reachability measured on the expression tree rather than inferred from pixels
+([ADR-0042](../adrs/0042-reachability-measured-on-the-expression-tree.md), proposed; it accepts at
+this plan's close).
+
+**Sequencing that matters and is easy to get backwards:** the ~10 un-swept presets
+(`attractor_*` x5, `fragment_aurora`, `fragment_pulse`, `fragment_warp`, `lsystem_fern`,
+`star_rosette`) still carry dead gates and `--set`-calibrated gains. That re-gain is a
+`preset-author` content pass and it belongs **after** this plan, so it can be verified by an
+instrument that can see the defect. Doing it first means verifying it twice — which is exactly what
+happened to the 2026-07-28 pass that raised this plan.
 
 **[0035] has landed and closed** — the composite's aspect is the render target's
 ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), now **accepted**), the two
