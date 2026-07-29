@@ -341,6 +341,88 @@ fn tempo_and_novelty_read_through_without_shifting_the_other_slots() {
     assert_eq!(gate.eval(&cold), 0.0, "tempo is 0 before the tracker warms");
 }
 
+/// Plan 0041 review: every analysis variable reads the `AnalysisFrame` field it
+/// is named for, asserted through `Variables::from_frame` — the one place that
+/// mapping is written.
+///
+/// This is the guard the finding asked for. The renderer and `shot`'s
+/// reachability probe both bind a frame; until this constructor existed they did
+/// it with two hand-written copies of the same nine positional arguments, and
+/// nothing would have caught them drifting apart — a probe reading `treb` where
+/// the engine reads `mid` reports dead gates about an expression the renderer
+/// never evaluates.
+///
+/// Deliberately asserted against the **grammar's own variable names** rather
+/// than against a locally-written `Variables::new(..)`: comparing the
+/// constructor to a second copy of itself would restate the duplication this
+/// closes, in a test.
+#[test]
+fn from_frame_binds_every_analysis_variable_to_its_own_field() {
+    // A distinct value per field, none of them a plausible neighbour, so a
+    // crossed pair reads a wrong number rather than coincidentally matching.
+    // `spectrum` is ramped so `bin()` cannot pass by reading a flat array.
+    let frame = lmv_core::dsp::AnalysisFrame {
+        bass: 0.11,
+        mid: 0.22,
+        treb: 0.33,
+        onset: 0.44,
+        beat: true,
+        bar: 0.66,
+        bpm: 128.0,
+        novelty: 0.88,
+        spectrum: std::array::from_fn(|i| i as f32 / 64.0),
+    };
+    // Not on the frame: the renderer supplies its own clock here, the probe the
+    // hop position it synthesized. That is why it stays an argument.
+    let v = lmv_core::preset::Variables::from_frame(&frame, 7.5);
+
+    for (name, expected) in [
+        ("bass", 0.11),
+        ("mid", 0.22),
+        ("treb", 0.33),
+        ("onset", 0.44),
+        ("beat", 1.0),
+        ("bar", 0.66),
+        ("time", 7.5),
+        ("tempo", 128.0),
+        ("novelty", 0.88),
+    ] {
+        let e = compile(name).unwrap_or_else(|err| panic!("{name} compiles: {err}"));
+        assert_eq!(
+            e.eval(&v),
+            expected,
+            "`{name}` does not read the AnalysisFrame field it is named for"
+        );
+    }
+
+    // `beat` is a bool on the frame and a float in the grammar, so the
+    // conversion is part of the mapping and gets its own claim.
+    let quiet = lmv_core::dsp::AnalysisFrame {
+        beat: false,
+        ..frame
+    };
+    let e = compile("beat").expect("compiles");
+    assert_eq!(
+        e.eval(&lmv_core::preset::Variables::from_frame(&quiet, 7.5)),
+        0.0,
+        "a frame without a beat must bind `beat` to 0"
+    );
+
+    // The band array comes across too, and by borrow — `bin()` reading the ramp
+    // is what says the spectrum was attached at all.
+    let last = compile("bin(1)").expect("compiles");
+    assert_eq!(
+        last.eval(&v),
+        63.0 / 64.0,
+        "from_frame did not attach the frame's spectrum"
+    );
+
+    // `index` is not audio: it belongs to a per-element evaluation and must
+    // start at zero here rather than pick up a frame field.
+    let index = compile("index").expect("compiles");
+    assert_eq!(index.eval(&v), 0.0, "`index` is not fed by the frame");
+}
+
 /// Plan 0034 Phase 1: `bin(x)` samples the log-spaced band array at a
 /// **normalized** position, interpolating between adjacent bands — so a preset
 /// addresses a frequency region without ever naming `SPECTRUM_BINS`.

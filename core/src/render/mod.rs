@@ -1189,18 +1189,10 @@ impl Renderer {
         // The band array rides along **by borrow** (ADR-0036): this bundle is
         // built once per frame here but read once per binding below, so a
         // by-value spectrum would put a 256-byte copy on the per-binding path.
-        let vars = Variables::new(
-            frame.bass,
-            frame.mid,
-            frame.treb,
-            frame.onset,
-            if frame.beat { 1.0 } else { 0.0 },
-            frame.bar,
-            *time,
-            frame.bpm,
-            frame.novelty,
-        )
-        .with_spectrum(&frame.spectrum);
+        //
+        // Through `from_frame` rather than the nine positional arguments, so the
+        // harness probe that reads the same frame cannot bind it differently.
+        let vars = Variables::from_frame(frame, *time);
 
         // Fixed-order composite (ADR-0018/0028/0032): background (owns the clear)
         // -> scene -> the per-preset post chain -> [blend] -> ink -> present. Where
