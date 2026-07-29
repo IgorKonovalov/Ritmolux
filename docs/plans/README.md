@@ -10,14 +10,16 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0042](0042-reachability-sees-every-comparison.md) | Reachability sees every comparison, and the library is re-audited against it | draft 2026-07-29 | dev |
-| [0043](0043-swarm-depth-and-domain.md) | The swarm gets a depth axis and a domain that follows the target | draft 2026-07-29 | dev |
+| [0042](0042-reachability-sees-every-comparison.md) | Reachability sees every comparison, and the library is re-audited against it | **approved 2026-07-29** — ready for `dev` (run first) | dev |
+| [0043](0043-swarm-depth-and-domain.md) | The swarm gets a depth axis and a domain that follows the target | **approved 2026-07-29** — ready for `dev` (run after 0042) | dev |
 
 ## Recommended execution sequence
 
-**Two drafts are queued, and [0042] should go first.** It repairs the instrument that [0043]'s
+**Both are approved (2026-07-29) and [0042] runs first.** It repairs the instrument that [0043]'s
 content phase — and every other lane — verifies through. Same sequencing logic that paid off for
-[0041]: fix the measurement, then do the content once instead of twice.
+[0041]: fix the measurement, then do the content once instead of twice. They are separate `dev`
+sessions with a Mode 4 review between them, not one run: 0042 ends on a measurement that 0043's
+Phase 4 reads.
 
 - **[0042] — reachability sees every comparison.** Plan 0041's check reports `select()` and
   `clamp()` only, so a bare comparison (`reseed = "onset > 0.55"`) is never observed and a dead band

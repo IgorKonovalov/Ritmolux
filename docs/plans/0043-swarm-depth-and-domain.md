@@ -1,6 +1,6 @@
 # 0043 — The swarm gets a depth axis and a domain that follows the target
 
-> **Status:** draft
+> **Status:** approved 2026-07-29 — ready for `dev` (run after [0042](0042-reachability-sees-every-comparison.md))
 > **Created:** 2026-07-29
 > **Owner skill(s):** dev
 > **Related ADRs:** [0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) (this
