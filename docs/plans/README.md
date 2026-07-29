@@ -10,24 +10,18 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0041](0041-report-two-level-stimuli-and-expression-reachability.md) | `--report` reads at two levels, and expression reachability is measured on the AST | **approved 2026-07-29** — ready for `dev` | dev |
 
 ## Recommended execution sequence
 
-**[0041] is the next one to build** (approved 2026-07-29). It fixes the instrument every lane
-self-verifies through: `--report` scores a preset healthy at full-scale stimuli while its gates are
-dead code, which is how six shipped presets ran for months with their headline mechanism disabled.
-Two `dev`-owned halves — a second realistic-level reading beside the existing columns, and
-reachability measured on the expression tree rather than inferred from pixels
-([ADR-0042](../adrs/0042-reachability-measured-on-the-expression-tree.md), proposed; it accepts at
-this plan's close).
-
-**Sequencing that matters and is easy to get backwards:** the ~10 un-swept presets
-(`attractor_*` x5, `fragment_aurora`, `fragment_pulse`, `fragment_warp`, `lsystem_fern`,
-`star_rosette`) still carry dead gates and `--set`-calibrated gains. That re-gain is a
-`preset-author` content pass and it belongs **after** this plan, so it can be verified by an
-instrument that can see the defect. Doing it first means verifying it twice — which is exactly what
-happened to the 2026-07-28 pass that raised this plan.
+**[0041] has landed and closed** — the instrument every lane self-verifies through can now see the
+defect it was blind to. See Recently closed. **The next move is the content half it unblocks:** a
+`preset-author` re-gaining pass over the ~10 un-swept presets (`attractor_*` x5, `fragment_aurora`,
+`fragment_pulse`, `fragment_warp`, `lsystem_fern`, `star_rosette`), which still carry dead gates and
+`--set`-calibrated gains. That sequencing was deliberate and is now paid off: `--report`'s realistic
+columns and its `gates` / `ceils` flags are the acceptance check for the pass, so it gets verified
+once instead of twice. As it stands the library reports **20 dead branches and 159 unapproached
+ceilings**, of which 14 dead branches are the standing `tempo` false positive — the six real ones are
+`fragment_warp` (2), `lsystem_fern` (2), `attractor_dejong` and `star_rosette`.
 
 **[0035] has landed and closed** — the composite's aspect is the render target's
 ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), now **accepted**), the two
@@ -61,7 +55,7 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.21.1`** — bumped at [0040]'s close (a fix/coverage/refactor plan, no feature) per
+**Version is at `0.22.0`** — bumped at [0041]'s close (a feature plan) per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Nothing is owed until the next close.
 
 **The next ADR is design-backlog 0015** — the band axis is half linear, and Plan 0037 Phase 4's
@@ -207,6 +201,82 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0041 — `--report` reads at two levels, and expression reachability is measured on the
+  AST](done/0041-report-two-level-stimuli-and-expression-reachability.md) — **done 2026-07-29**,
+  passed Mode 4 review (**no blockers**; one major, four minors, three nits — one minor fixed in the
+  close commit). Four `dev` phase commits: `1c8f216` the realistic-level stimulus, `5901e0e` probed
+  evaluation, `27c84cd` the report surface, `efd25bb` the doc sweep. **Closes design-backlog 0022 and
+  0027 outright, and 0020's harness half.**
+  [ADR-0042](../adrs/0042-reachability-measured-on-the-expression-tree.md) is **accepted with an
+  Outcome section**.
+  **The instrument can now see the defect it was blind to**, and that was verified by re-running it
+  rather than taken on trust: `--report --presets presets` flags `attractor_dejong`
+  (`bass + mid > 0.34`), `attractor_lorenz` (`bass + treb > 0.38`) and `fragment_warp`
+  (`bass + treb > 0.55`), and clears `fragment_kaleido`, `reaction_reef` and `lsystem_arrowhead`,
+  which were recalibrated on 2026-07-28. That contrast — a library containing both, discriminated
+  correctly — is Phase 3's acceptance test, reproduced at review. It also caught `lsystem_fern` and
+  `star_rosette`, which the plan did not name.
+  **Phase 2 shipped a third shape, better than either the plan's primary or its named fallback.**
+  The plan offered a duplicated `eval` body pinned by an equality test, with a generic
+  zero-sized-vs-recording observer as the fallback if the duplication looked fragile. `dev` took
+  neither: the probe walk **only records**, and `eval_probed` returns `Expr::eval`'s own value. The
+  divergence ADR-0042 named as this approach's main cost is **unrepresentable** rather than merely
+  tested for, and the library-wide equality assertion survives as a regression guard instead of as
+  the load-bearing proof. Said so in the phase commit, as the plan's risk entry required. The
+  property that makes it work — a node's index does not move with the branch a run took, so an
+  untaken subtree still occupies its slots — is load-bearing and carries a test the plan never asked
+  for: without it two one-sided sibling gates merge into a healthy-looking two-sided reading and
+  neither is reported.
+  **The non-breaking claim is structural, not just diffed.** `Renderer::capture_preset` calls
+  `reset_for_capture` first, so interleaving the four low-level captures between the full-scale ones
+  and the `late` capture cannot move the existing columns; `FULL_LEVELS = [1.0; 4]` reproduces the
+  old `band_stimulus` exactly, including the onset frame's `spectrum: [1.0; SPECTRUM_BINS]`.
+  Corroborated independently at review: the run reads `Kaleido Field` bass **0.228**, exactly the
+  figure backlog 0013 recorded before this plan. `docs/capturing.md`'s worked example block is a real
+  measurement — `Aurora 0.110 0.010 0.020 0.001 0 9` and `Warp Drive 0.040 0.009 0.008 0.122 2 11`
+  reproduce to the digit.
+  **The layout call went to a second block rather than four more columns**, so the table stayed nine
+  wide and every number a previous run printed is still in the same place — the "thirteen-ish
+  columns" ADR-0042 worried about never happened.
+  **Verified at review** rather than taken on trust: `fmt --check` + `clippy --workspace
+  --all-targets -D warnings` clean; `nextest --workspace` **287/287, 0 skipped**;
+  `core/tests/golden/` **byte-untouched**; `core/src/ffi.rs`, `render/scenes/mod.rs`, every manifest
+  and **every preset `.toml`** untouched (**C ABI stays v4**, `Scene` unchanged, no new dependency).
+  The hot-path pragma at `expr.rs:37` still covers the module, the new code adds no `unwrap`/`expect`,
+  and both allocation-counter tests still pass. The probe is deterministic (`dynamic_groove`, no wall
+  clock, no RNG) and the test sweep is a fixed-seed LCG. No `aspect` anywhere in the diff.
+  **Major:** `standalone/examples/shot.rs:933-943` re-types the render path's nine positional
+  `Variables::new` arguments from `core/src/render/mod.rs:1192-1203`, with nothing tying the two
+  together. Add a tenth variable or reorder two and the probe binds different values than the engine,
+  so every flag would describe an expression the renderer never evaluates — which is exactly the
+  "the report describes a preset that does not exist" failure ADR-0042 named and that Phase 2 went
+  out of its way to make unrepresentable one level down. Two sources that agree on today's
+  configuration, and no test can say which one the code used. Wants a shared
+  `Variables::from_frame(&AnalysisFrame, time)` in `core`, or a test asserting the two agree.
+  **Minors:** (1) the ceiling check flags on strict `peak_fraction_of_bound < 1.0` where ADR-0042
+  says "approached", so a bound reached at **99 %** is named among a family's "furthest from biting"
+  (`Spectrum Corona.trails`); a named threshold would make the 159-flag count mean *decorative*.
+  (2) `docs/preset-palettes.md` was not swept for backlog 0027's `color_center` half — the entry
+  names that file explicitly and the plan's Phase 4 file list omitted it, leaving the canonical
+  colour doc silent on the wrap while `presets/README.md` explained it. That file is one of the three
+  the `preset-author` lane is pointed at *instead of* keeping its own catalogue, so the gap is the
+  exact failure mode that sweep exists to prevent — **fixed in this close commit**, for both
+  `color_center` and `hue_center`. (3) Nothing pins the new JSON fields:
+  `standalone/tests/shot_cli.rs:406` checks brace balance and two top-level keys only. Verified by
+  hand at review — 32 presets each carry `reactivity_low`, `reachability`, `dead_branches`,
+  `unapproached_ceilings` and `probe`, with 159 `peak_fraction_of_bound` entries. (4) Phase 3's
+  acceptance contrast has no regression guard, **disclosed by `dev`** on the reasoning that it is a
+  fact about preset content the follow-up re-gaining pass is meant to change. That is the right call,
+  and it means the pass will remove the only presets currently demonstrating the check discriminates.
+  **Nits:** `Expr::node_count()` is `pub` and called nowhere outside its module — dead public surface
+  on the shared core; `probe_reachability` hardcodes `48_000.0` for `hop_seconds` beside a `format`
+  it just built with `sample_rate: 48_000`; and both `presets/README.md`'s table and `shot.rs`'s
+  `LOW_LEVELS` comment print an `onset` mean of `0.002` while the constant is `0.0016`, so a reader
+  checking the arithmetic against the table is off by 25 %.
+  **⚠ Nothing new for the on-device pass** — `Expr::eval` is untouched and every addition lives in
+  the `shot`/harness path; the app's render loop executes nothing new.
+  Version **minor 0.21.1 → 0.22.0** (a feature plan).
 
 - [0040 — Line joins, finished: the star's other half, and a pin under the reported
   defect](done/0040-line-joins-finish-the-job.md) — **done 2026-07-28**, passed Mode 4 review

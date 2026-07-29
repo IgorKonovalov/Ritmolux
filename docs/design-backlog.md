@@ -943,6 +943,21 @@ plan; the library re-gain of the ~10 un-swept presets is a separate `preset-auth
 should follow it, so the sweep can be verified by an instrument that can see the defect. Doing the
 content pass first — as happened here — means re-verifying it later anyway.
 
+**~~HARNESS HALF CLOSED 2026-07-29~~ by [Plan 0041](plans/done/0041-report-two-level-stimuli-and-expression-reachability.md)
++ [ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md).** The split above was taken
+exactly as recommended, and this is the first half. `--report` now reads at realistic levels beside
+its full-scale ones, and walks every preset's expression tree to name any `select()` whose condition
+never went both ways. Run over the shipped set it flags `attractor_dejong` (`bass + mid > 0.34`),
+`attractor_lorenz` (`bass + treb > 0.38`) and `fragment_warp` (`bass + treb > 0.55`) — the three this
+entry lists as *still dead today* — plus `lsystem_fern` and `star_rosette`, which nobody had named.
+The instrument can now see the defect it was blind to. Authors are told the measured range where
+they write a threshold: `presets/README.md` and `docs/presets.md` both carry the table.
+
+**The content half stays open.** Re-gaining the ~10 un-swept presets (`attractor_*` x5,
+`fragment_aurora`, `fragment_pulse`, `fragment_warp`, `lsystem_fern`, `star_rosette`) is a
+`preset-author` pass and is now unblocked — and verifiable, which is the whole reason it was
+sequenced second. `--report`'s new columns and flags are the acceptance check for it.
+
 ---
 
 ## Entry 0021 — from the Plan 0038 / ADR-0040 ruling
@@ -1045,6 +1060,17 @@ record is honest, but the next author has no reason to expect it.
 bundled with 0020 into a decision about what level the report's stimuli should represent, which is a
 real question with a real rejected alternative (full-scale stimuli are reproducible and
 sample-rate-independent; realistic ones are neither).
+
+**~~CLOSED 2026-07-29~~ by [Plan 0041](plans/done/0041-report-two-level-stimuli-and-expression-reachability.md)
++ [ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md)** — the promotion condition
+this entry named was met, it *was* bundled with 0020, and the second of the three unranked shapes
+above is what shipped. `--report` keeps its full-scale columns and prints a realistic-level reading
+in a second block under each family, so a level `curve` shows up as the **gap** between the two
+readings rather than being mathematically invisible. `docs/capturing.md` carries a direction table
+for reading that gap — including the case this entry hit, where full scale looks lively and the
+realistic reading does not — plus what the pair still cannot see (`beat` is an event, and the band
+array is on its own scale, hotter than the scalars). The third option, documenting it and nothing
+else, was not taken: the first two were affordable together.
 
 ---
 
@@ -1288,3 +1314,18 @@ obvious thing to want and this is the obvious way to try it.
 [0014](#0014--the-line-scenes-cosine-hue-ramp-is-not-a-hue-wheel-and-nothing-documents-it) did —
 every author who reaches for these pays the same round-trips. **Not ADR-worthy.** Bundle with the
 next doc sweep, or with whichever plan next touches the palette or ink surface.
+
+**~~CLOSED 2026-07-29~~ by [Plan 0041](plans/done/0041-report-two-level-stimuli-and-expression-reachability.md)
+Phase 4**, folded into that plan's doc sweep exactly as this entry suggested. Both behaviours are now
+written down where an author meets them:
+
+- **`color_center` is cyclic** — `presets/README.md` says a negative centre wraps into the palette's
+  *bright* stops rather than clamping toward the dark ones, and that `-0.1` and `0.9` are the same
+  place. `docs/preset-palettes.md` — which this entry also named, and which the plan's Phase 4 file
+  list omitted — carries the same note beside the `color_center` row and beside `hue_center`, which
+  is cyclic for the same reason. Added at the Mode 4 close.
+- **The ink pass interpolates** — `presets/README.md` says `mix(paper, ink, luminance)` is an
+  interpolation, not a mapping, so a source at mid luminance lands halfway between the poles however
+  far apart they are set. The measured `paper_bright = 0.055` / `ink_bright = 0.94` flat-slate-grey
+  Gray-Scott result is quoted, along with where the inversion *does* work: a line scene against
+  black, where most pixels already sit near 0 or 1.

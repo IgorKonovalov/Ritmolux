@@ -110,9 +110,18 @@ the audio vocabulary (`bass mid treb onset beat bar time` …) — only the grad
 | Param | Default | What it does |
 |-------|---------|--------------|
 | `color_span`   | `0.6` (fragment) / `0.85` (RD) | Multiplies the scene's field level to set how much of the gradient it spans. **Low = a cohesive single-family mood**; high = a wide sweep. |
-| `color_center` | `0.0` | Where that window sits in the gradient. Slide it (e.g. `0.1 + treb*0.2`) to move the tonal centre. |
+| `color_center` | `0.0` | Where that window sits in the gradient. Slide it (e.g. `0.1 + treb*0.2`) to move the tonal centre. **Cyclic** — see below. |
 
 A warm, cohesive field: a warm palette + a low `color_span`.
+
+**`color_center` is a cyclic coordinate, and it wraps rather than clamps.** It rides
+the same repeating gradient described above, so pushing it *negative* to reach a
+palette's dark end lands the field in that palette's **bright** stops instead and the
+picture gets brighter — the opposite of the intent. This is not hypothetical: it cost
+the content lane three rendered iterations of chasing exposure, contour density and the
+palette ramp, all downstream of a cause that was none of them (design-backlog 0027).
+Keep the centre inside `0..1` and know that `-0.1` and `0.9` are the same place. To
+actually darken a field, change the palette's stops or the scene's own exposure.
 
 **Reaction-diffusion needs a much larger `color_span` than the fragment field.**
 `color_span` multiplies each scene's *native* field level, and those ranges differ:
@@ -133,7 +142,9 @@ higher than a thin maze. On the fragment field, keep `color_span` in the usual
 | `hue_spread` | `1.0` (swarm) / `0.15` (attractor) | Width of the per-particle hue band. **Low = a coherent, single-family cloud**; `1.0` on the swarm is the full-wheel rainbow. |
 | `hue_center` | `0.5` (swarm) / `0.075` (attractor) | Centre of that band in the gradient. Two presets that differ only here render as different colours. |
 
-Particle hues occupy `hue_center + (particle_seed - 0.5) * hue_spread`.
+Particle hues occupy `hue_center + (particle_seed - 0.5) * hue_spread`. `hue_center`
+is cyclic for the same reason `color_center` is — a negative centre wraps into the
+bright end of the gradient, it does not clamp toward the dark one.
 
 ### Spectrum — colour along the frequency axis
 
