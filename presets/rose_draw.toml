@@ -23,12 +23,25 @@ family = "maurer_rose"
 # fixed 1280x720, so `trails` no longer costs this preset its sharpness.
 
 [params]
-# SHAPE - a seven-petal curve, morphing slowly under the sweep.
+# SHAPE - a seven-petal curve, morphing under the sweep.
+#
+# THE GAINS, and they are the fix the whole rose family needed. `bass` measures
+# a mean of 0.040 on real material (`shot --signal dynamic:110`), so the old
+# `bass * 0.4` capped at 0.11 delivered a swing of 0.016 radians on `phase` -
+# about a hundredth of the sine term sitting next to it. Every rose in the set
+# was written that way, which is why they reacted so little AND why they all
+# looked alike: with the audio contributing almost nothing, what remained was
+# eleven slow sine drifts over the same curve family.
+#
+# Peak energy goes on SHAPE here, not luminance - `phase` and `radial_offset`
+# morph the curve itself, so a loud passage changes what the figure IS rather
+# than how bright it is. That is the additive-ceiling discipline and it is also
+# just the more interesting reading of the music.
 n             = "7"
-d             = "131"
+d             = "131 + clamp(treb * 90.0, 0, 6.0)"
 samples       = "420"
-phase         = "sin(time * 0.0215) * 0.26 + clamp(bass * 0.4, 0, 0.11)"
-radial_offset = "sin(time * 0.0123) * 0.11"
+phase         = "sin(time * 0.0215) * 0.26 + clamp(bass * 9.0, 0, 0.42)"
+radial_offset = "sin(time * 0.0123) * 0.11 + clamp(mid * 14.0, 0, 0.20)"
 
 # THE REVEAL - the point of the preset. A floor of 0.35 keeps the figure
 # present; the bar ramp sweeps the leading edge round it once per beat, and a
@@ -36,15 +49,27 @@ radial_offset = "sin(time * 0.0123) * 0.11"
 draw_progress = "clamp(0.35 + bar * 0.80 + clamp(onset * 0.8, 0, 0.25), 0, 1)"
 
 # MOTION - a slow turn under the sweep, so the two rates beat against each other.
-spin  = "0.24 + sin(time * 0.019) * 0.03"
-scale = "0.70 + beat * 0.043 + clamp(bass * 0.4, 0, 0.11)"
+# NO SPIN. `spin` is angular velocity - the scene integrates `rotation = spin *
+# time` - so any nonzero value here is a permanent turn, and there is no value
+# small enough to be "a little rotation" over a track's length.
+#
+# The preset does not need it. `draw_progress` already sweeps a leading edge
+# round the figure once per beat, and that reveal is a far more legible rhythm
+# reading than a turn: the eye follows a moving endpoint, where a rotating
+# seven-fold figure is near-indistinguishable from itself a moment later. Losing
+# the turn actually makes the sweep easier to see.
+spin  = "0"
+scale = "0.70 + beat * 0.043 + clamp(bass * 8.0, 0, 0.26)"
 
-# STROKE - flat brightness; the reveal supplies the dynamics.
-thickness  = "0.72 + clamp(bass * 0.48, 0, 0.25) + beat * 0.074"
-brightness = "0.46 + clamp(bass * 0.20, 0, 0.10)"
+# STROKE - flat brightness; the reveal supplies the dynamics. Gained to the
+# measured means but the CAPS barely move: this preset draws seven mirrored
+# copies additively into a long feedback buffer, so luminance headroom is the
+# scarcest thing it has. Structure got the peak energy above.
+thickness  = "0.72 + clamp(bass * 7.0, 0, 0.28) + beat * 0.074"
+brightness = "0.46 + clamp(bass * 3.0, 0, 0.12)"
 
 # COLOUR - a slow green-to-cyan journey, swept by treble.
-hue = "0.35 + time * 0.023 + clamp(treb * 0.8, 0, 0.26) + bar * 0.05"
+hue = "mod(0.35 + time * 0.030 + clamp(treb * 22.0, 0, 0.30) + bar * 0.05, 1)"
 
 # GEOMETRY MIRROR - seven-fold to match the petal count, purely rotational.
 mirror_order   = "7"
@@ -52,24 +77,32 @@ mirror_reflect = "0"
 
 # VIEW + COMPOSITE - a long feedback, which is what makes the sweep legible:
 # the drawn part persists as the leading edge moves on.
-zoom        = "1.06 + bar * 0.06 + clamp(bass * 0.35, 0, 0.14)"
+zoom        = "1.06 + bar * 0.06 + clamp(bass * 5.0, 0, 0.18)"
 pan_x       = "sin(time * 0.021) * 0.045"
 pan_y       = "cos(time * 0.029) * 0.035"
 bg_hue      = "0.44 + sin(time * 0.011) * 0.05"
-bg_bright   = "0.018 + clamp(mid * 0.09, 0, 0.012)"
+bg_bright   = "0.018 + clamp(mid * 2.0, 0, 0.012)"
 bg_vignette = "0.82"
 
 # FEEDBACK - restored (Plan 0033). Held back: a seven-fold mirror sweeps a lot of area per frame.
-trails = "0.55 + clamp(mid * 0.20, 0, 0.10)"
+trails = "0.55 + clamp(mid * 8.0, 0, 0.12)"
 
 [smoothing]
 # `draw_progress` is NOT smoothed - easing it would blur the leading edge into
 # the body and lose the sweep entirely.
-phase         = 1.04
-radial_offset = 1.17
-scale         = { attack = 0.05, release = 0.68 }
-thickness     = { attack = 0.03, release = 0.60 }
-hue           = 1.04
-zoom          = 0.47
-bg_bright     = 1.04
+#
+# THE CONSTANTS COME IN BY ROUGHLY A THIRD, and this half of the fix matters as
+# much as the gains. The rose family ran 1.0-2.2 s on its shape params, which
+# meant that even after the gains above, a morph would take most of a bar to
+# arrive and would still be arriving when the next one started. Slow easing on
+# top of tiny gains is what "reacts to music too little" actually was.
+phase         = 0.38
+radial_offset = 0.45
+scale         = { attack = 0.05, release = 0.55 }
+thickness     = { attack = 0.03, release = 0.50 }
+d             = 0.42
+spin          = 0.40
+hue           = 0.55
+zoom          = 0.36
+bg_bright     = 0.60
 trails       = 0.50

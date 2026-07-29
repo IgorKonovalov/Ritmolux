@@ -18,24 +18,57 @@ name = "spectrum"
 [params]
 # MOTION - the fastest churn in the set, but the steering still sits inside the
 # ceiling. Treble runs the shimmer; mid runs the body.
-force = "1.35 + clamp(mid * 1.5, 0, 0.60) + sin(time * 0.061) * 0.12"
-spin  = "0.85 + clamp(treb * 2.6, 0, 1.05) + clamp(mid * 0.9, 0, 0.35)"
-burst = "clamp(beat * 1.4 + onset * 1.0, 0, 2.2)"
+#
+# THE CORNER ARTIFACT WAS OVER-DRIVEN MOTION, not a renderer bug. `burst` pushes
+# particles radially outward from the centre, and at a cap of 2.2 on top of a
+# `force` of nearly 2.0 a loud passage flung the entire swarm to the frame edge
+# inside a beat. What that produced was a bright ring hugging the border, long
+# streaks piling into the corners (the corners are the furthest travel, so they
+# collect the longest trails), and a dead void where the shoal should be. It is
+# the exact mirror of the additive ceiling: instead of clipping to white, the
+# picture leaves the frame, so a loud frame reads as LESS than a quiet one.
+#
+# `burst` is the lever, so it takes the cut - roughly halved, and its `onset`
+# term is now clamped before it is summed rather than only after, so a single
+# hard transient cannot carry the total to the cap on its own. `force` keeps its
+# churn but loses the peak that stacked on top of the burst.
+#
+# FLOCKING GEOMETRY - mechanism documented in `swarm_drift.toml`. `spin` is the
+# flow field's rate of CHANGE rather than vorticity, and at 0.85-1.8 this field
+# was being rewritten faster than any particle could cross it, so the densest
+# swarm in the set rendered as the most featureless. Held low, the streamlines
+# stand still long enough to be followed and ten thousand particles become a
+# murmuration instead of a texture.
+#
+# DENSE IS THE TIGHT ONE - the most particles, the smallest sprites, the
+# quickest field of the calm three. Treble rides the field rate so the top end
+# makes the formation shimmer and reorganise rather than scatter.
+force = "1.30 + clamp(mid * 16.0, 0, 0.30) + sin(time * 0.061) * 0.10"
+spin  = "0.105 + clamp(treb * 5.0, 0, 0.08) + clamp(mid * 3.5, 0, 0.045)"
+burst = "clamp(beat * 0.25 + clamp(onset * 0.6, 0, 0.30), 0, 0.50)"
 
 # APPEARANCE - flat brightness, and size FALLS slightly under treble: a loud
 # top end should read as finer, faster glitter, not as a brighter smear.
-brightness = "0.78 + clamp(bass * 0.8, 0, 0.20)"
-size       = "1.9 - clamp(treb * 0.7, 0, 0.35) + beat * 0.30"
+brightness = "0.76 + clamp(bass * 5.0, 0, 0.16)"
+size       = "0.95 - clamp(treb * 10.0, 0, 0.18) + beat * 0.18"
 
 # COLOUR - the tightest hue window in the set. This is the cohesion knob: low
 # spread is what separates "one shimmering body" from "novelty confetti".
-hue_spread  = "0.11 + clamp(treb * 0.9, 0, 0.15)"
-hue_center  = "0.70 + sin(time * 0.037) * 0.08 + clamp(treb * 0.8, 0, 0.13)"
-saturation  = "1.05 + clamp(mid * 1.2, 0, 0.28)"
-palette_mix = "clamp((bass + treb) * 0.9, 0, 0.35)"
+hue_spread  = "0.11 + clamp(treb * 16.0, 0, 0.15)"
+hue_center  = "0.70 + sin(time * 0.037) * 0.08 + clamp(treb * 14.0, 0, 0.13)"
+saturation  = "1.05 + clamp(mid * 22.0, 0, 0.28)"
+palette_mix = "clamp((bass + treb) * 8.0, 0, 0.35)"
 
-# VIEW - pushed in so the shoal fills its wedge before the fold repeats it.
-zoom  = "1.22 + bar * 0.10 + clamp(bass * 0.5, 0, 0.22)"
+# VIEW - and this was the second half of the corner problem. Pushing the camera
+# in magnifies the outward travel: the same burst that moved a particle to 80 %
+# of the frame at zoom 1.0 puts it past the edge at 1.22, so the zoom was
+# actively helping throw the shoal out of view. It also PUMPED on the bar, which
+# meant the frame emptied hardest exactly when the music was loudest.
+#
+# Backed off to just over 1.0. "Fills its wedge before the fold repeats it" is
+# still true - the shoal fills it by being dense, which is the preset's name,
+# not by being magnified until it overflows.
+zoom  = "1.04 + bar * 0.05 + clamp(bass * 3.0, 0, 0.10)"
 pan_x = "sin(time * 0.033) * 0.07"
 pan_y = "cos(time * 0.025) * 0.05"
 
@@ -48,11 +81,32 @@ pan_y = "cos(time * 0.025) * 0.05"
 # wedge it is replicating, and the further the order is pushed the more corner
 # area comes from out-of-range samples. Six is the highest that stays clean at
 # 16:9.
-trails        = "0.42 + clamp(mid * 0.35, 0, 0.16)"
-kaleido_order = "6"
+# Shortened a little as well. Long trails are what put a sustained bright streak
+# on the frame border in the first place, and a shorter exposure suits an
+# unfolded field: the glitter reads as glitter rather than as combed strokes.
+trails        = "0.72 + clamp(mid * 8.0, 0, 0.12)"
+# THE SCREEN FOLD IS OFF, and this is a mitigation for an ENGINE artifact rather
+# than a taste decision - it is written up as feedback for architect.
+#
+# At `kaleido_order = 6` this preset grew hard, bright, straight bars along the
+# left and right frame edges and bright wedges in the corners, in every frame.
+# An A/B with the identical file at order 1 is clean, so it is the fold and not
+# the swarm. The mechanism: the fold samples its source beyond the frame edge and
+# clamps to the edge texel, so any bright pixel sitting ON the border gets
+# replicated along the entire fold seam. A sparse particle field over a
+# near-black background is the worst case for that - the full-frame scenes
+# (fragment_field, reaction_diffusion) have no dark background for a smeared
+# edge texel to stand out against, which is why only this preset shows it.
+#
+# No preset-side lever fixes it: the artifact is in the sampling, not in what is
+# handed to it, and dimming the source enough to hide the bars also erases the
+# figure. So Dense runs unfolded. It loses nothing essential - ten thousand
+# particles in a tight hue window IS the preset - and the geometry mirror is not
+# an option here either, since `swarm` is not a line system.
+kaleido_order = "1"
 kaleido_angle = "time * 0.055"
 bg_hue        = "0.40 + sin(time * 0.013) * 0.05"
-bg_bright     = "0.011 + clamp(mid * 0.09, 0, 0.011)"
+bg_bright     = "0.011 + clamp(mid * 2.2, 0, 0.011)"
 bg_vignette   = "0.74"
 
 [smoothing]

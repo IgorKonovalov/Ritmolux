@@ -26,16 +26,24 @@ family = "maurer_rose"
 n             = "5"
 d             = "97"
 samples       = "420"
-phase         = "sin(time * 0.02) * 0.24 + clamp(bass * 0.4, 0, 0.11)"
-radial_offset = "sin(time * 0.0123) * 0.10"
+phase         = "sin(time * 0.02) * 0.24 + clamp(bass * 9.0, 0, 0.38)"
+radial_offset = "sin(time * 0.0123) * 0.10 + clamp(mid * 12.0, 0, 0.18)"
 
-spin          = "0.19 + sin(time * 0.017) * 0.03"
-scale         = "0.72 + clamp(bass * 0.30, 0, 0.087)"
+# NO SPIN. The camera is this preset's whole subject - it pumps and pushes
+# through the figure - and a rotating subject underneath a moving camera reads
+# as two unrelated motions competing. With the turn gone the zoom is the only
+# thing moving the frame, which is what a zoom preset wants. `pan_x`/`pan_y`
+# still drift the viewpoint across the figure, so it is not a static shot.
+spin          = "0"
+scale         = "0.72 + clamp(bass * 7.0, 0, 0.24)"
 draw_progress = "1"
 
-thickness  = "0.95 + clamp(bass * 0.9, 0, 0.47) + beat * 0.155"
-brightness = "0.62 + clamp(bass * 0.30, 0, 0.14)"
-hue        = "0.72 + time * 0.021 + clamp(treb * 0.7, 0, 0.26)"
+# Caps trimmed as well as gained. At this zoom the mirror is filling the frame
+# with replicated chords, so the figure is denser on screen than its segment
+# count suggests and luminance headroom is tighter than it looks.
+thickness  = "0.95 + clamp(bass * 9.0, 0, 0.40) + beat * 0.155"
+brightness = "0.62 + clamp(bass * 3.5, 0, 0.13)"
+hue        = "mod(0.72 + time * 0.028 + clamp(treb * 20.0, 0, 0.28), 1)"
 
 mirror_order   = "4"
 mirror_reflect = "0"
@@ -46,25 +54,34 @@ mirror_reflect = "0"
 # picture becomes a moving detail of it, which is the point of a zoom preset.
 # The four-fold mirror is what keeps it legible that close - the replicated
 # chords keep filling frame as the original geometry leaves it.
-zoom  = "select(tempo > 130, 2.75, 2.15) + clamp(bass * 1.6, 0, 0.85) + bar * 0.18"
+#
+# The tempo gate is the one comparison in the library that was ALREADY correct,
+# because `tempo` is BPM and 130 is a real BPM - it is the band-magnitude gates
+# that were written against `--set` values and never fired. Left exactly as is;
+# `standalone/tests/shot_cli.rs` uses this preset as its tempo-gated fixture.
+# The bass term beside it is gained to the measured mean like everything else.
+zoom  = "select(tempo > 130, 2.75, 2.15) + clamp(bass * 16.0, 0, 0.85) + bar * 0.18"
 pan_x = "sin(time * 0.083) * 0.14"
 pan_y = "cos(time * 0.06) * 0.11"
 
 # COMPOSITE - a feedback long enough that the pump leaves a visible tunnel.
 bg_hue      = "0.18 + sin(time * 0.013) * 0.05"
-bg_bright   = "0.018 + clamp(mid * 0.10, 0, 0.013)"
+bg_bright   = "0.018 + clamp(mid * 2.2, 0, 0.013)"
 bg_vignette = "0.80"
 
 # FEEDBACK - restored at native resolution (Plan 0033).
-trails = "0.62 + clamp(bass * 0.22, 0, 0.10)"
+trails = "0.62 + clamp(bass * 3.0, 0, 0.10)"
 
 [smoothing]
-# A punchy pump that still eases - the canonical use of a short constant.
+# A punchy pump that still eases - the canonical use of a short constant. This
+# 0.31 is load-bearing beyond taste: `shot_cli.rs` times its two tempo captures
+# against it, so it stays put while the rest come down.
 zoom          = 0.31
-phase         = 0.91
-radial_offset = 1.04
-scale         = 0.42
-thickness     = { attack = 0.03, release = 0.60 }
-hue           = 1.04
-bg_bright     = 1.04
+phase         = 0.40
+radial_offset = 0.45
+scale         = 0.34
+spin          = 0.42
+thickness     = { attack = 0.03, release = 0.50 }
+hue           = 0.55
+bg_bright     = 0.60
 trails       = 0.50

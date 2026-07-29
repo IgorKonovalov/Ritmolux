@@ -57,8 +57,18 @@ base  = "0.12 + sin(time * 1.3) * 0.12"
 #
 # Timing is untouched either way: the easing runs on the curved value, so the
 # `release` above means the same duration at any curve (ADR-0040).
-scale = "4.50"
-curve = "0.85"
+#
+# 0.85 -> 0.55, matching the comb's retune and for the same measured reason: a
+# treble mean of 0.006 lifted to 0.0129 is not a shape, it is a flat run. On a
+# CONTOUR that costs more than on a comb, because a flat run of equal-height
+# points is a straight line and carries no information at all - and this preset
+# measured the lowest reactivity in the whole library. At 0.55 the same mean
+# reaches 0.060 and the top half of the ridge has relief.
+#
+# `scale` comes down 4.50 -> 3.20 to pay for it, since the curve now hands back
+# far more height than it used to.
+scale = "3.20"
+curve = "0.55"
 
 # WIDTH, AND THE SILENT-AUDIO MOTION. `span` is a world half-width, and 1.72
 # fills a 16:9 frame very nearly edge to edge (1.78 is exact). It is deliberately
@@ -96,7 +106,7 @@ baseline       = "0"
 # A SLOW TILT - the contour turning a few degrees either way. This is the motion
 # that carries the preset through a silence, and it works here precisely because
 # the figure is off-centre: rotating it sweeps the line across its own width.
-rotation = "sin(time * 0.9) * 0.40 + clamp(bass * 0.5, 0, 0.10)"
+rotation = "sin(time * 0.9) * 0.40 + clamp(bass * 4.0, 0, 0.10)"
 
 # COLOUR ALONG THE AXIS. `hue_spread` walks the palette from the lowest element
 # to the highest, so the low end and the top end are different colours and you
@@ -106,38 +116,70 @@ hue        = "mod(0.10 + time * 0.02, 1)"
 hue_spread = "0.75"
 saturation = "0.95"
 
-# STROKE, trimmed from 5.0 but not as far as the artifact below would want.
-# `LineRenderer` draws each segment as an INDEPENDENT quad with its own
-# perpendicular and no join geometry, so wherever the contour changes direction
-# the two rectangles' outer corners diverge and leave a wedge-shaped notch. The
-# notch scales with stroke width, so a thinner line is the only lever a preset
-# has - and it is a weak one, because thinning far enough to hide the notch also
-# drops the figure below the animation gate's motion floor. 4.2 is the balance;
-# the real fix is a line join in the renderer (design-backlog 0023).
+# STROKE - and the constraint that set it is GONE. This param used to be pinned
+# at 4.2 as a compromise with a renderer artifact: each segment was drawn as an
+# independent quad, so wherever the contour turned, the two rectangles' outer
+# corners diverged and left a wedge-shaped notch that scaled with stroke width.
+# A polyline suffers that worse than any other line scene, because consecutive
+# points are adjacent frequency bands and genuinely uncorrelated, so every
+# vertex is a sharp turn.
 #
-# A polyline feels this far more than the other three line scenes, whose smooth
-# parametric figures have near-collinear neighbours. Here consecutive points are
-# adjacent frequency bands, which are genuinely uncorrelated - and the `curve`
-# above deliberately increases the height contrast between them, so it makes the
-# turns sharper as a direct consequence of doing its job.
-thickness  = "4.2 + clamp(mid * 6.0, 0, 2.4)"
-brightness = "0.80 + clamp(bass * 1.2, 0, 0.30)"
+# Plan 0039 and Plan 0040 (ADR-0041) put real joins in the renderer: a connected
+# run of segments now overlaps at its interior vertices instead of gapping, and
+# `presets/README.md` states outright that `thickness` no longer trades against
+# a joint artifact. So the contour can finally be drawn with the weight the look
+# wants - 7.4 rather than 4.2 - and it is a continuous ridge line instead of a
+# dotted one. A near-reversal now reads slightly BRIGHT where the quads overlap
+# rather than broken, which on a spectrum peak is a highlight, not a defect.
+thickness  = "7.40 + clamp(mid * 40.0, 0, 2.6)"
+
+# THE HALO, and what it is not. There is no bloom stage anywhere in the engine,
+# so "glow" on a line scene means one specific thing: a multiplier on the
+# shader's per-segment core-to-edge falloff. Above 1.0 it saturates the core and
+# widens the visible skirt, which on a single bright contour against a near-dark
+# field is exactly the soft halo this preset was missing. It is bound rather
+# than constant so the ridge blooms on the low end and settles back.
+#
+# Kept modest at 1.30: the README measures far more usable range below 1.0 than
+# above it, and this stacks with `brightness`, `thickness` and the long `trails`
+# below on an additive renderer. The halo is meant to be the last thing added,
+# not the thing that clips the contour to white.
+# TRIMMED after rendering it. 1.30 with a 0.30 swing clipped to flat white in
+# one specific place, and the place is the tell: where the spectrum falls away
+# at the top end, the two mirrored contours converge toward the foot line and
+# their halos overlap. Two haloed strokes at the same spot add on an additive
+# renderer, so the quietest part of the readout was rendering as its brightest -
+# a bead of white exactly where there is least to show. This is the additive
+# ceiling arriving through the mirror rather than through a band term.
+glow       = "1.12 + clamp(bass * 5.0, 0, 0.20)"
+brightness = "0.80 + clamp(bass * 4.0, 0, 0.18)"
 
 zoom  = "1.00 + sin(time * 0.23) * 0.05"
 pan_y = "0.02"
 
 bg_hue      = "0.44 + sin(time * 0.008) * 0.05"
-bg_bright   = "0.020 + clamp(treb * 0.12, 0, 0.014)"
+bg_bright   = "0.020 + clamp(treb * 3.0, 0, 0.014)"
 bg_vignette = "0.80"
 
-# A short tail. The contour is a thin stroke, so a little persistence gives it
-# body without smearing the shape it exists to show.
-trails = "0.30 + clamp(mid * 0.12, 0, 0.06)"
+# THE AFTER-PATH. 0.30 -> 0.66, and this is the other half of what "needs glow
+# or an after path" was asking for. Feedback persistence is the only mechanism
+# in the engine that draws where the figure HAS BEEN, and on a contour that is
+# worth more than on any other spectrum layout: the ridge line sweeps vertically
+# as the spectrum moves, so a long tail paints the recent envelope as a soft
+# ghost body underneath the live line. The shape it exists to show stays legible
+# because the live stroke is far brighter than its own tail.
+#
+# This is also why the tail is bound to `bass` rather than `mid`: it should
+# lengthen when the low end drives the contour hardest and the sweep is widest.
+trails = "0.66 + clamp(bass * 4.0, 0, 0.10)"
 
 [smoothing]
 rotation   = 0.20
 thickness  = { attack = 0.03, release = 0.30 }
 brightness = { attack = 0.04, release = 0.26 }
+# The halo swells fast and lingers - a slow attack would put the bloom behind
+# the peak that caused it, which reads as unrelated rather than as a response.
+glow       = { attack = 0.05, release = 0.55 }
 hue        = 0.40
 zoom       = 0.25
 bg_bright  = 0.40

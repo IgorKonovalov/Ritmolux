@@ -29,28 +29,65 @@ stops = [
 name = "ember"
 
 [params]
-# STRUCTURE - a rich wedge for the fold to work on.
-warp  = "0.85 + sin(time * 0.059) * 0.16 + clamp(bass * 1.5, 0, 0.70) + beat * 0.18"
-zoom  = "1.55 + sin(time * 0.037) * 0.12 + clamp(treb * 0.9, 0, 0.40)"
+# HOW THIS PRESET READS VOLUME AT EACH FREQUENCY - the whole map in one place,
+# because a folded field makes it hard to tell by eye which band did what.
+#
+#   bass  -> `warp` (how turbulent the wedge is) + `trails` + `palette_mix`
+#   mid   -> `glow` + `color_span` (how much colour each wedge carries)
+#   treb  -> `zoom` (field scale, so detail fineness) + `saturation` + `hue`
+#   sum   -> `kaleido_order`, the fold COUNT (the ladder further down)
+#   onset -> `flash`
+#
+# So low end = churn and smear, mids = colour body and lift, highs = fine
+# detail and vividness, and total loudness = how many wedges the rosette has.
+#
+# ALL THE GAINS BELOW WERE RECALIBRATED, and until they were, none of that map
+# was real. The fold ladder was fixed first and the per-band terms were missed:
+# against measured levels (`shot --signal dynamic:110` - bass mean 0.040, mid
+# and treb 0.006) the old multipliers delivered 1-10 % of their own caps. Every
+# `clamp(..., 0, 0.40)` was decoration; `treb * 0.9` moved `zoom` by 0.005.
+# Total energy drove the fold count and nothing else moved with volume at all.
+#
+# Multipliers are set so a band's MEAN reaches about half its cap and a peak
+# reaches the cap - that is what makes a cap a working range rather than a
+# number that is never approached.
+warp  = "0.85 + sin(time * 0.059) * 0.16 + clamp(bass * 9.0, 0, 0.70) + beat * 0.18"
+zoom  = "1.55 + sin(time * 0.037) * 0.12 + clamp(treb * 33.0, 0, 0.40)"
 pan_x = "sin(time * 0.023) * 0.26"
 pan_y = "cos(time * 0.031) * 0.22"
 
 # LUMINANCE - flat. The fold multiplies whatever it is given.
-glow  = "0.72 + clamp(mid * 0.5, 0, 0.15)"
+# Gained like the rest, but this is the ONE cap that does not open up. The fold
+# replicates luminance as well as structure, so a mid term worth 0.15 unfolded
+# is worth up to twenty-four times that across the rosette. Mids get their
+# volume reading through `color_span` below instead, which costs no light.
+glow  = "0.72 + clamp(mid * 12.5, 0, 0.15)"
 flash = "clamp(onset * 0.8, 0, 0.26)"
 
 # COLOUR - a wide, saturated window so each wedge carries several hues.
-hue          = "0.50 + time * 0.021 + clamp(treb * 0.6, 0, 0.14)"
-color_span   = "0.80 + clamp(mid * 0.7, 0, 0.22)"
+hue          = "0.50 + time * 0.021 + clamp(treb * 12.0, 0, 0.14)"
+color_span   = "0.80 + clamp(mid * 18.0, 0, 0.22)"
 color_center = "sin(time * 0.047) * 0.18"
-saturation   = "1.15 + clamp(treb * 0.8, 0, 0.22)"
-palette_mix  = "clamp(bass * 1.3, 0, 0.50)"
+saturation   = "1.15 + clamp(treb * 18.0, 0, 0.22)"
+palette_mix  = "clamp(bass * 6.0, 0, 0.50)"
 
 # COMPOSITE - the ladder. Three nested comparisons pick the fold count; the
 # angle turns underneath it continuously.
-kaleido_order = "select(bass + mid + treb > 0.90, 24, select(bass + mid + treb > 0.55, 16, select(bass + mid + treb > 0.25, 10, 6)))"
+#
+# THE LADDER WAS UNREACHABLE, which is why this preset read as not responding to
+# music at all. Measured with `shot --signal dynamic:110`, the three bands mean
+# 0.040 / 0.006 / 0.006 and their sum PEAKS around 0.157. Every rung here was
+# written against `--set`-style magnitudes where each band is 1 and the sum is
+# 3: at 0.90, 0.55 and even 0.25, not one comparison could ever return 1. The
+# rosette sat at six folds permanently and the "audio-driven symmetry" this
+# preset exists to demonstrate never happened once.
+#
+# Rebuilt against the measurement. 0.045 is just above the measured mean, so a
+# normal passage lives at 10-16 folds; 0.075 and 0.115 are reached on real
+# peaks. The figure now actually climbs the ladder.
+kaleido_order = "select(bass + mid + treb > 0.115, 24, select(bass + mid + treb > 0.075, 16, select(bass + mid + treb > 0.045, 10, 6)))"
 kaleido_angle = "time * 0.13"
-trails        = "0.34 + clamp(bass * 0.5, 0, 0.22)"
+trails        = "0.34 + clamp(bass * 3.0, 0, 0.22)"
 
 [smoothing]
 # Smoothed hard, everywhere. This preset folds the frame, and the fold
@@ -65,21 +102,31 @@ trails        = "0.34 + clamp(bass * 0.5, 0, 0.22)"
 # hovers near a boundary for whole passages, and a short constant would let the
 # fold count flicker between two figures. Long enough that a boundary crossing
 # has to be sustained before the picture commits to it.
-kaleido_order = 2.1
+#
+# 2.1 -> 1.3. It stays the longest constant in the file for the reason above,
+# but 2.1 s was tuned when the ladder could not fire at all, so nothing was ever
+# waiting on it. Now that the rungs are reachable, two full seconds of lag meant
+# a passage could come and go before the fold count agreed to move.
+kaleido_order = 1.3
 
 # `warp` is CONTINUOUS structure here, not a percussive accent - so it stays
 # symmetric and long. An { attack, release } pair belongs on things that should
 # hit; giving it a fast attack made the per-beat term snap, which through the
 # fold is exactly the jarring the preset must not have.
-warp          = 0.62
+warp          = 0.40
 
 # `flash` was the one unsmoothed param in the file - an instant onset strobe,
 # multiplied by up to 24 wedges. Now it eases in and decays out.
 flash         = { attack = 0.09, release = 0.70 }
 
-zoom          = 0.45
-glow          = 0.42
-color_span    = 0.55
-color_center  = 0.62
-palette_mix   = 0.95
-trails        = 0.48
+# The rest come down roughly a third. Every constant in this file was set long
+# on the reasoning that the fold replicates motion - which is true, and they are
+# still the longest of the fragment family. But they were also compensating for
+# a ladder that never moved: with the only structural change unreachable, slow
+# colour was all the preset had, and slowing it further cost nothing visible.
+zoom          = 0.32
+glow          = 0.32
+color_span    = 0.38
+color_center  = 0.42
+palette_mix   = 0.75
+trails        = 0.38

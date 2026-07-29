@@ -27,34 +27,59 @@ stops = [
 
 [params]
 # STRUCTURE - broad slow sheets, opened up so the facets have something to fold.
-warp  = "0.46 + sin(time * 0.0210) * 0.11 + clamp(bass * 1.2, 0, 0.48)"
-zoom  = "2.80 + sin(time * 0.0143) * 0.24 + bar * 0.14 + clamp(bass * 1.0, 0, 0.40)"
+#
+# GAINS CALIBRATED AGAINST MEASURED LEVELS. `shot --signal dynamic:110` reports
+# bass mean 0.040 / max 0.106, mid and treb mean 0.006. The old gains here were
+# `bass * 1.2` capped at 0.48 - against a 0.040 mean that is a 0.048 swing on a
+# 0.46 base, about a tenth of the cap, so the cap was decoration and the preset
+# measured as one of the two deadest in the library. The multipliers below are
+# what it takes for a real bass mean to actually reach the cap.
+warp  = "0.46 + sin(time * 0.0210) * 0.11 + clamp(bass * 9.0, 0, 0.52) + clamp(onset * 1.6, 0, 0.16)"
+zoom  = "2.80 + sin(time * 0.0143) * 0.24 + bar * 0.14 + clamp(bass * 7.5, 0, 0.44)"
 pan_x = "sin(time * 0.0091) * 0.24"
 pan_y = "cos(time * 0.0127) * 0.18 + time * 0.003"
 
 # LUMINANCE - the dimmest in the set. Glaciers are not bright; they are pale.
-glow  = "0.52 + clamp(mid * 0.5, 0, 0.16)"
-flash = "clamp(onset * 0.5, 0, 0.16)"
+# Gained like everything else, but the CAPS are barely raised: reactivity was
+# the problem, and luminance is the one place where fixing it by opening the cap
+# would clip the pale end of the palette to flat white.
+glow  = "0.52 + clamp(mid * 22.0, 0, 0.20)"
+flash = "clamp(onset * 0.9, 0, 0.18)"
 
 # COLOUR - the tightest window in the fragment family. Do not widen it without
 # also reconsidering the palette; the cohesion IS the preset.
-color_center = "0.10 + sin(time * 0.0230) * 0.05 + clamp(treb * 0.5, 0, 0.07)"
-color_span   = "0.34 + clamp(mid * 0.6, 0, 0.14)"
-saturation   = "0.94 + clamp(treb * 0.7, 0, 0.18)"
+color_center = "0.10 + sin(time * 0.0230) * 0.05 + clamp(treb * 9.0, 0, 0.16)"
+color_span   = "0.34 + clamp(mid * 18.0, 0, 0.26)"
+saturation   = "0.94 + clamp(treb * 12.0, 0, 0.28)"
 palette_mix  = "0.35 + sin(time * 0.0071) * 0.30"
 
-# COMPOSITE - a low fold for facets, stepping up once on genuinely loud
-# material, and a long feedback that reads as ice depth.
-kaleido_order = "select(bass + mid > 0.42, 6, 3)"
+# COMPOSITE - a low fold for facets, stepping up on loud material, and a long
+# feedback that reads as ice depth.
+#
+# THE GATE WAS THE REAL BUG, and it is worth stating plainly because the same
+# mistake was in five other presets. `bass + mid > 0.42` was written against
+# `--set bass=1,mid=1` magnitudes, where the sum is 2. On MEASURED audio the sum
+# means about 0.046 and peaks near 0.13, so the comparison never returned 1 and
+# this preset sat at three folds for the entire life of the program. It was not
+# under-reacting to the fold; it was never folding at all. The threshold below
+# is set just under the measured mean, so a normal passage folds and a quiet one
+# relaxes back.
+kaleido_order = "select(bass + mid > 0.035, 6, 3)"
 kaleido_angle = "time * 0.031"
-trails        = "0.62 + clamp(mid * 0.25, 0, 0.12)"
+trails        = "0.62 + clamp(mid * 9.0, 0, 0.16)"
 
 [smoothing]
-warp          = 0.50
-zoom          = 0.50
-glow          = 0.45
-color_center  = 0.55
-color_span    = 0.50
+# Shortened across the board. The gains above are what make this preset move;
+# these are what let the movement ARRIVE. At 0.50-0.55 s a swell took most of a
+# bar to land, which on top of gains a tenth this size is why it read as frozen.
+warp          = 0.30
+zoom          = 0.34
+glow          = 0.34
+color_center  = 0.38
+color_span    = 0.34
 palette_mix   = 1.3
-kaleido_order = 1.4
-trails        = 0.55
+# Still long, and deliberately the longest here: this one gates a DISCRETE jump
+# between three and six folds, and the sum it reads hovers near the threshold
+# for whole passages. Short would flicker between two figures.
+kaleido_order = 1.1
+trails        = 0.45

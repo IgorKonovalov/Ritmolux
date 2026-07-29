@@ -7,8 +7,9 @@
 # kaleidoscope rather than the geometry mirror: the arrowhead is already a
 # closed, edge-to-edge fractal, so replicating its geometry just crowds it,
 # while folding the finished PIXELS builds a larger tiling out of it. The two
-# symmetry tools are not interchangeable - see `rose_kaleidoscope.toml` for the
-# preset that runs both at once.
+# symmetry tools are not interchangeable - and this preset now runs both at
+# once itself, the geometry mirror for the arms and the screen fold for the
+# tiling. See the `kaleido_order` note below.
 #
 # The old version's `brightness = 0.5 + 0.5 * sin(time * 4)` strobe is gone.
 system = "lsystem"
@@ -30,16 +31,36 @@ seed      = 1
 [params]
 # THE SUBDIVISION - four levels on three comparison gates. Each step roughly
 # triples the segment count, so this is the widest structural range in the set.
-visible_depth = "select(mid + treb > 0.50, 7, select(mid + treb > 0.28, 6, select(mid + treb > 0.10, 5, 4)))"
+#
+# AND IT NEVER LEFT THE BOTTOM RUNG. Measured with `shot --signal dynamic:110`,
+# mid and treb both mean 0.006, so `mid + treb` means about 0.012 and peaks near
+# 0.051. Against thresholds of 0.50, 0.28 and 0.10 not one gate could return 1:
+# this preset drew depth 4 - the coarsest, sparsest version of the figure - for
+# its entire existence. "Boring" was not a matter of taste; the widest
+# structural range in the set was wired shut.
+#
+# Rebuilt against the measurement: 0.008 sits just under the mean so quiet
+# material still resolves past the coarse form, 0.018 is normal, and 0.030 is a
+# genuine peak. The fractal now actually subdivides, which is the one thing this
+# preset is for.
+visible_depth = "select(mid + treb > 0.030, 7, select(mid + treb > 0.018, 6, select(mid + treb > 0.008, 5, 4)))"
 
-# MOTION - a continuous, audio-independent turn (radians) plus a slow sway. The
-# rate is deliberately brisk: this figure is large and near-symmetric, so a
-# slower turn moves almost no pixels and the preset reads as frozen. (Its
-# predecessor faked liveness with `brightness = 0.5 + 0.5 * sin(time * 4)` - a
-# ~0.64 Hz luminance strobe unrelated to the audio. Real rotation replaces it.)
-rotation = "0.88 * time + sin(time * 0.029) * 0.24"
+# NO ROTATION. This used to turn at 0.88 rad/s continuously, and the argument
+# for it was that a large near-symmetric figure needs a brisk turn or it reads
+# as frozen. That argument is now void, because the figure is no longer static
+# underneath: the depth ladder and the mirror ladder were both unreachable when
+# that rate was chosen, so rotation genuinely was the only thing moving. With
+# both ladders live, the arrowhead subdivides and gains arms on its own, and the
+# per-beat reveal below sweeps across it - all without the whole frame spinning.
+#
+# Held at exactly 0 rather than at a slow sway: the axis-aligned fold below only
+# reads as a top-to-bottom, left-to-right tiling if the source it folds is
+# itself square to the frame. Any residual turn puts the tiling on a diagonal.
+rotation = "0"
 
-draw_progress = "clamp(0.60 + bar * 0.55 + clamp(onset * 0.6, 0, 0.18), 0, 1)"
+# The reveal now carries the per-beat motion that rotation used to. Deepened a
+# little to take that over: it sweeps further into the figure each beat.
+draw_progress = "clamp(0.45 + bar * 0.70 + clamp(onset * 0.6, 0, 0.18), 0, 1)"
 
 # STROKE FALLOFF (Plan 0038). `glow` scales the line renderer's core-to-edge
 # term - it is the shader's per-segment falloff, NOT a bloom stage and NOT the
@@ -58,32 +79,86 @@ draw_progress = "clamp(0.60 + bar * 0.55 + clamp(onset * 0.6, 0, 0.18), 0, 1)"
 # longer looks like itself. There is no audio term - the strokes already carry
 # `brightness`, and stacking a second luminance driver on an additive renderer is
 # how a peak clips to white.
-glow = "0.55"
+# Bound rather than constant now, and it moves the OPPOSITE way to the density.
+# The argument above still holds - a dense figure at high falloff fuses into a
+# wash - but the density is no longer fixed: with the depth ladder reachable,
+# this preset is sparse at depth 4 and very dense at depth 7. So the falloff
+# rides `bass` upward to give the sparse figure some body, and the cap is small
+# enough that it cannot fatten a depth-7 frame into a blur.
+glow = "0.55 + clamp(bass * 5.0, 0, 0.26)"
 
-thickness  = "1.35 + clamp(mid * 1.1, 0, 0.95)"
-brightness = "0.72 + clamp(mid * 0.40, 0, 0.20)"
-scale      = "0.82 + sin(time * 0.95) * 0.07 + bar * 0.05 + clamp(bass * 0.30, 0, 0.13)"
-hue        = "0.62 + time * 0.023 + clamp(treb * 0.8, 0, 0.26)"
+thickness  = "1.35 + clamp(mid * 30.0, 0, 0.85)"
+brightness = "0.72 + clamp(mid * 12.0, 0, 0.16)"
+scale      = "0.82 + sin(time * 0.95) * 0.07 + bar * 0.05 + clamp(bass * 4.0, 0, 0.14)"
 
-# GEOMETRY MIRROR - the source of the "several lines". Six rotational copies of
-# the whole fractal, interleaving into a radial web, and MID drives the fold
-# count so the number of arms is itself a band reading. Full resolution.
-mirror_order   = "select(mid > 0.22, 8, select(mid > 0.08, 6, 4))"
+# COLOUR, and this is the "more colours" ask - within what the system allows.
+# `hue` is an offset into the line scenes' own cosine ramp and it is whole-figure:
+# `lsystem` has no `hue_spread`, and `[palette]` is inert on the line scenes, so
+# there is NO way from a preset to give one branch a different colour from
+# another. Per-segment colour on an L-system is an engine gap, not an authoring
+# choice - it is written up for architect rather than worked around here.
+#
+# What is available is the whole figure travelling further and faster through the
+# ramp, so it is no longer the fixed orange it sat at. The drift rate doubles
+# (a full wheel in ~22 s rather than ~43 s), the treble term is gained to the
+# measured mean so it actually contributes, and a per-beat half-sine nudges the
+# colour on the pulse. `mod(…, 1)` keeps the wrap clean - the ramp is cyclic, so
+# without it the value climbs forever and the smoothing below has to chase it.
+hue        = "mod(0.62 + time * 0.045 + clamp(treb * 18.0, 0, 0.28) + sin(bar * pi) * 0.05, 1)"
+
+# GEOMETRY MIRROR - the source of the "several lines". Rotational copies of the
+# whole fractal, interleaving into a radial web, and MID drives the fold count
+# so the number of arms is itself a band reading. Full resolution.
+#
+# Same unreachable-gate bug as the depth ladder, and worse: mid alone means
+# 0.006 and peaks at 0.019, so `mid > 0.22` and `mid > 0.08` BOTH never fired
+# and the mirror was frozen at four copies. Recalibrated, and the top rung
+# raised 8 -> 10 now that it can actually be reached.
+mirror_order   = "select(mid > 0.012, 10, select(mid > 0.005, 7, 4))"
 mirror_reflect = "0"
 
+# THE SCREEN FOLD, newly bound - and there was already a `kaleido_order` entry
+# sitting in the [smoothing] table below for a param this file never bound, so
+# the intent was here and the binding was simply missing. The header argues that
+# the arrowhead pairs better with the screen-space kaleidoscope than with more
+# geometry, because it is already a closed edge-to-edge fractal: replicating its
+# geometry crowds it, while folding the finished PIXELS builds a larger tiling
+# out of it. Both are now running, which is what turns a single fractal triangle
+# into a field.
+#
+# Held low on purpose. The mirror above is already up to ten copies, and the
+# fold multiplies whatever luminance it is handed - a high order over a dense
+# depth-7 figure is how this becomes a white wash.
+# AXIS-ALIGNED, AND FIXED. `kaleido_order = 4` with the angle pinned at 0 folds
+# the frame about the vertical and horizontal axes, so the tiling runs top to
+# bottom and left to right rather than as a rotating radial rosette. Both parts
+# are required: the order sets how many wedges, the ANGLE is what decides
+# whether their seams line up with the frame or sweep round it. A turning angle
+# is what made this read as a spinning mandala.
+#
+# The order is a constant now for the same reason - stepping it 2 -> 3 -> 4 with
+# the audio would keep changing the tiling's axis count, and only 4 gives the
+# square top/bottom, left/right symmetry asked for. The audio drives the figure
+# INSIDE the tiling (depth, arms, reveal) rather than the tiling itself.
+kaleido_order = "4"
+kaleido_angle = "0"
 
-zoom        = "1.05 + bar * 0.05 + clamp(bass * 0.30, 0, 0.13)"
+
+zoom        = "1.05 + bar * 0.05 + clamp(bass * 4.0, 0, 0.14)"
 pan_y       = "-0.04 + cos(time * 0.0130) * 0.05"
 bg_hue      = "0.44 + sin(time * 0.0110) * 0.06"
-bg_bright   = "0.080 + clamp((bass + mid) * 0.55, 0, 0.13)"
+# Cap cut 0.13 -> 0.06 as well as gained. This is a full-frame wash sitting
+# under a figure that now reaches depth 7 across ten mirror copies and a screen
+# fold; the backdrop is the one luminance term with nothing to gain from a big
+# swing, and it is the cheapest thing to take headroom from.
+bg_bright   = "0.070 + clamp((bass + mid) * 1.2, 0, 0.06)"
 bg_vignette = "0.52"
 
 # FEEDBACK - restored (Plan 0033), held short: rotation is 0.88 rad/s, the fastest sweep of the two L-systems.
-trails = "0.46 + clamp(mid * 0.20, 0, 0.10)"
+trails = "0.52 + clamp(mid * 9.0, 0, 0.12)"
 
 [smoothing]
 visible_depth = 1.1
-kaleido_order = 1.3
 rotation      = 0.18
 thickness     = 0.15
 scale         = 0.06

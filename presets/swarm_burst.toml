@@ -27,31 +27,46 @@ stops = [
 
 [params]
 # MOTION - a modest gathered swarm; the detonation is `burst`, not `force`.
-force = "1.15 + clamp(bass * 1.2, 0, 0.50) + sin(time * 0.053) * 0.10"
-spin  = "0.34 + clamp(mid * 1.5, 0, 0.55)"
-burst = "clamp(beat * 2.6 + clamp(onset * 2.2, 0, 1.6), 0, 3.4)"
+#
+# Band gains recalibrated against measured levels like the rest of the family
+# (`--signal dynamic:110`: bass mean 0.040, mid 0.006). The percussive terms are
+# untouched - `beat` and `onset` were already the right size, which is why this
+# preset measured as the liveliest of the five and needs no rescue, only the
+# same arithmetic correction as its siblings.
+#
+# FLOCKING GEOMETRY - mechanism in `swarm_drift.toml`. `spin` is the field's
+# rate of change; held low so the streamlines persist and the swarm has a
+# formation to be scattered FROM. That contrast is what this preset is about:
+# with the field churning at 0.34 there was no resting shape, so a burst had
+# nothing to disrupt and read as noise getting briefly louder.
+force = "1.18 + clamp(bass * 6.0, 0, 0.34) + sin(time * 0.053) * 0.10"
+spin  = "0.095 + clamp(mid * 4.0, 0, 0.06)"
+# Capped down 3.4 -> 2.6. Same outward-fling trap that emptied the middle of
+# Dense; this preset survives a bigger burst because its `force` floor is lower,
+# but 3.4 still threw the swarm past the frame on a hard hit.
+burst = "clamp(beat * 2.2 + clamp(onset * 2.2, 0, 1.4), 0, 2.60)"
 
 # APPEARANCE - the swell IS the accent, so `size` carries the beat hard while
 # brightness stays close to flat. A bright frame at peak just clips.
-brightness = "0.70 + clamp(bass * 0.9, 0, 0.22) + beat * 0.10"
-size       = "1.7 + beat * 1.1 + clamp(onset * 1.4, 0, 0.8)"
+brightness = "0.70 + clamp(bass * 5.0, 0, 0.20) + beat * 0.10"
+size       = "1.10 + beat * 0.55 + clamp(onset * 0.8, 0, 0.40)"
 
 # COLOUR - a hot fan across the ember band; a hit flares the centre toward gold.
 hue_spread  = "0.30 + clamp(onset * 1.2, 0, 0.22)"
 hue_center  = "0.48 + clamp(onset * 1.5, 0, 0.24) + beat * 0.09"
-saturation  = "1.05 + clamp(bass * 1.1, 0, 0.26)"
-palette_mix = "clamp(bass * 1.5, 0, 0.55)"
+saturation  = "1.05 + clamp(bass * 7.0, 0, 0.26)"
+palette_mix = "clamp(bass * 12.0, 0, 0.55)"
 
 # VIEW - a hard per-beat punch-in that recovers between hits.
-zoom  = "1.06 + beat * 0.18 + clamp(bass * 0.6, 0, 0.24)"
+zoom  = "1.06 + beat * 0.18 + clamp(bass * 4.5, 0, 0.20)"
 pan_x = "sin(time * 0.043) * 0.05"
 pan_y = "cos(time * 0.031) * 0.04"
 
 # COMPOSITE - a short exposure so each detonation leaves a visible shockwave,
 # over a dark ember field that flares with the hits.
 trails      = "0.46 + clamp(onset * 0.6, 0, 0.22)"
-bg_hue      = "0.97 + clamp(bass * 0.15, 0, 0.025)"
-bg_bright   = "0.008 + clamp(onset * 0.12, 0, 0.016)"
+bg_hue      = "0.97 + clamp(bass * 3.0, 0, 0.025)"
+bg_bright   = "0.008 + clamp(onset * 0.30, 0, 0.016)"
 bg_vignette = "0.86"
 
 [smoothing]

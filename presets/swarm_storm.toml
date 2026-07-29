@@ -27,46 +27,90 @@ name = "mono"
 [params]
 # MOTION - hard for this family, still inside the ceiling. The driving
 # personality churns faster and leans harder on every bar.
-force = "select(tempo > 132, 1.95, 1.55) + clamp(bass * 1.6, 0, 0.60) + bar * 0.14"
-spin  = "select(tempo > 132, 1.35, 0.80) + clamp(mid * 2.2, 0, 0.95)"
-burst = "clamp(beat * 2.2 + clamp(onset * 1.8, 0, 1.4), 0, 3.0)"
+#
+# STORM'S DRIVER IS THE TRANSIENT. Drift takes `mid` and Flow takes the top end;
+# this preset takes `onset` and `beat`, which is what it was always reaching for
+# and never actually got - the band terms were gained for `--set` magnitudes, so
+# on a real mix a `bass * 1.6` capped at 0.60 contributed 0.06 and the churn was
+# effectively constant. The percussive terms are now the loudest thing in the
+# file by a wide margin, and the band terms sit underneath as a floor.
+#
+# `onset` is the rawest signal the engine exposes, which is exactly right here
+# and exactly wrong on the other two - it is why Storm keeps short smoothing
+# constants below where Drift runs long ones.
+#
+# FLOCKING GEOMETRY - the mechanism is documented in `swarm_drift.toml`: `spin`
+# is the flow field's rate of CHANGE and has to stay low for the streamlines to
+# hold still long enough to be followed, and `force` has to stay near 1.2-1.6 or
+# the steering overrides each particle's momentum and the swarm collapses onto a
+# single curve. This preset was the worst offender in the family at spin 0.80 to
+# 2.2 - a field rewriting itself several times a second, which no particle can
+# track, so ten thousand of them averaged into static noise.
+#
+# STORM'S FLOCK IS A STARTLED ONE, and this is where its `onset` driver now
+# goes. Rather than shoving particles outward, a transient KICKS THE FIELD: the
+# `onset` term rides `spin`, so a hit rewrites the streamlines and the formation
+# has to break and re-form around the new ones. That is what a flock does when
+# something startles it, and it is a far better reading of a drum than an
+# explosion was. It is still the highest field rate of the five - Storm is the
+# restless one - but it is now in the range where a formation exists to disrupt.
+force = "select(tempo > 132, 1.62, 1.42) + clamp(bass * 6.0, 0, 0.34) + bar * 0.14"
+spin  = "select(tempo > 132, 0.175, 0.135) + clamp(mid * 4.0, 0, 0.07) + clamp(onset * 0.85, 0, 0.16)"
+# Kept, and the largest of the five, but a fraction of what it was: Storm is
+# allowed a real scatter on the beat where the others are not. 3.4 tore the
+# formation to the frame edges and left the middle empty.
+burst = "clamp(beat * 0.85 + clamp(onset * 1.6, 0, 0.75), 0, 1.35)"
 
 # APPEARANCE - flat brightness. This is the preset that most wants to be pushed
 # and most punishes it: a firestorm rendered additively at brightness 1.9 (what
 # the old file asked for) is a white rectangle.
-brightness = "0.80 + clamp(bass * 0.8, 0, 0.22)"
-size       = "1.8 - clamp(mid * 0.5, 0, 0.30) + beat * 0.55"
+brightness = "0.78 + clamp(bass * 5.0, 0, 0.16)"
+size       = "1.05 - clamp(mid * 10.0, 0, 0.18) + beat * 0.30 + clamp(onset * 1.1, 0, 0.22)"
 
 # COLOUR - wide and hot on the rolling personality; the driving one desaturates
 # toward `mono`, so hard sections read as smoke and sparks rather than fire.
-hue_spread  = "select(tempo > 132, 0.52, 0.66) + clamp(treb * 0.8, 0, 0.14)"
-hue_center  = "0.46 + clamp(bass * 1.3, 0, 0.26) + beat * 0.08"
-saturation  = "1.05 + clamp(bass * 1.0, 0, 0.24)"
-palette_mix = "select(tempo > 132, 0.45, 0.08) + clamp(mid * 0.6, 0, 0.16)"
+hue_spread  = "select(tempo > 132, 0.52, 0.66) + clamp(treb * 14.0, 0, 0.16)"
+hue_center  = "0.46 + clamp(bass * 8.0, 0, 0.24) + clamp(onset * 1.2, 0, 0.14)"
+saturation  = "1.05 + clamp(bass * 6.0, 0, 0.24)"
+palette_mix = "select(tempo > 132, 0.45, 0.08) + clamp(mid * 12.0, 0, 0.18)"
 
 # VIEW - the driving personality sits closer in and pumps harder per bar.
-zoom  = "select(tempo > 132, 1.28, 1.08) + bar * 0.14 + clamp(bass * 0.6, 0, 0.26)"
+zoom  = "select(tempo > 132, 1.28, 1.08) + bar * 0.14 + clamp(bass * 5.0, 0, 0.24)"
 pan_x = "sin(time * 0.057) * 0.09"
 pan_y = "cos(time * 0.041) * 0.07"
 
 # COMPOSITE - a short exposure and a fold that only engages when the driving
 # personality is ALSO carrying real energy (a two-term comparison via `min`).
-trails        = "select(tempo > 132, 0.40, 0.60) + clamp(mid * 0.3, 0, 0.14)"
-kaleido_order = "select(min(tempo > 132, bass + mid > 0.40), 3, 1)"
+#
+# The `min` idiom is right and stays; the THRESHOLD inside it was not. Measured,
+# `bass + mid` means about 0.046, so `> 0.40` never returned 1 and the fold half
+# of that conjunction was permanently false - the preset ran unfolded no matter
+# what the tempo was. 0.055 sits just above the mean, so the fold now engages on
+# genuinely energetic passages of fast material, which is what was intended.
+trails        = "select(tempo > 132, 0.40, 0.60) + clamp(mid * 10.0, 0, 0.16)"
+kaleido_order = "select(min(tempo > 132, bass + mid > 0.055), 3, 1)"
 kaleido_angle = "time * 0.13"
-bg_hue        = "0.965 + clamp(bass * 0.18, 0, 0.030)"
-bg_bright     = "0.009 + clamp(mid * 0.10, 0, 0.014)"
+bg_hue        = "0.965 + clamp(bass * 3.0, 0, 0.030)"
+bg_bright     = "0.009 + clamp(mid * 2.5, 0, 0.014)"
 bg_vignette   = "0.82"
 
 [smoothing]
 # The tempo-gated params get long constants so a wobbling BPM estimate crossing
 # the threshold eases the look across rather than hard-cutting it.
-force         = 1.0
-spin          = 1.0
+# SHORT, and shorter than the other two swarms on purpose. Storm rides `onset`,
+# and a percussive driver behind a 1.0 s constant arrives after the hit that
+# caused it - which reads as unrelated motion rather than as a response. Drift
+# keeps the long constants; this one is allowed to be abrupt, because abrupt is
+# the preset.
+force         = { attack = 0.05, release = 0.55 }
+# `spin` keeps a fast attack HERE, uniquely in the family, because on this
+# preset the field rate IS the percussive gesture - the startle has to land on
+# the hit. The long release is what lets the formation settle back afterwards.
+spin          = { attack = 0.04, release = 0.85 }
 hue_spread    = 1.4
 palette_mix   = 1.6
-zoom          = 1.0
-trails        = 1.2
+zoom          = 0.45
+trails        = 0.70
 kaleido_order = 1.8
 brightness    = 0.20
 hue_center    = 0.12
