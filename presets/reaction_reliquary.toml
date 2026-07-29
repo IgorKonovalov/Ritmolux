@@ -1,0 +1,62 @@
+# Reliquary - a Gray-Scott field pushed into its filament regime and folded at
+# high order, so the coral grows INTO a rose window. The existing reaction
+# presets all sit in dark teal/olive; this one runs a hot metallic gradient with
+# the contour and hatch lines lifted, which is what turns a biological blob into
+# something built.
+system = "reaction_diffusion"
+name = "Reliquary"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#07000e" },
+  { at = 0.26, color = "#5c1046" },
+  { at = 0.52, color = "#e0603a" },
+  { at = 0.74, color = "#ffc247" },
+  { at = 1.00, color = "#fff6d8" },
+]
+
+[palette_b]
+name = "ice"
+
+[params]
+# THE REGIME - feed/kill decide whether this is coral, maze or mitosis. Held in
+# the filament band and nudged by the low end, so a drop changes what the
+# chemistry GROWS rather than how bright it is.
+feed   = "0.0305 + clamp(bass * 9.0, 0, 1) * 0.0024 + sin(time * 0.033) * 0.0018"
+kill   = "0.0566 + clamp(mid * 12.0, 0, 1) * 0.0009 + cos(time * 0.024) * 0.0008"
+flow   = "1.00 + clamp(treb * 14.0, 0, 1) * 0.26"
+inject = "clamp(onset * 14.0, 0, 0.45) + beat * 0.16"
+
+# THE BUILT LOOK - contour and hatch are what read as engraving rather than mould.
+contour = "5.2 + sin(time * 0.41) * 2.0 + clamp(treb * 55.0, 0, 3.0) + beat * 1.8"
+hatch   = "3.2 + sin(time * 0.26) * 0.9 + clamp(mid * 35.0, 0, 1.8)"
+glow    = "0.84 + clamp((bass + mid) * 5.0, 0, 0.22)"
+
+hue          = "0.08 + time * 0.017 + clamp(treb * 5.0, 0, 0.18)"
+color_span   = "0.86 + clamp(treb * 6.0, 0, 0.22)"
+color_center = "0.12 + sin(time * 0.023) * 0.14 + clamp(bass * 1.4, 0, 0.12)"
+saturation   = "1.18 + clamp(mid * 14.0, 0, 0.22)"
+palette_mix  = "clamp(treb * 9.0, 0, 0.32) + sin(time * 0.0091) * 0.18"
+
+# `zoom` on this family shows MORE field when raised.
+zoom  = "0.88 + sin(time * 0.017) * 0.08 + clamp(bass * 3.0, 0, 0.16)"
+pan_x = "sin(time * 0.0130) * 0.10"
+pan_y = "cos(time * 0.0110) * 0.08"
+
+kaleido_order = "select(bass + mid > 0.075, 8, 4)"
+kaleido_angle = "time * 0.065"
+trails        = "0.30 + clamp(onset * 8.0, 0, 0.18)"
+
+[smoothing]
+feed          = 0.90
+kill          = 0.90
+flow          = 0.40
+contour       = 0.35
+hatch         = 0.35
+glow          = 0.25
+hue           = 0.40
+color_center  = 0.45
+palette_mix   = 0.80
+zoom          = 0.30
+kaleido_order = 1.2
+trails        = 0.40

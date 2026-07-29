@@ -1,0 +1,55 @@
+# Supernova - a domain-warp field driven far past where the existing fragment
+# presets stop, folded at high order into a rose window of itself. The whole
+# colour wheel is on screen at once and it RACES; the fold order steps with
+# energy so a drop physically multiplies the symmetry.
+system = "fragment_field"
+name = "Supernova"
+
+[palette]
+name = "spectrum"
+
+[palette_b]
+stops = [
+  { at = 0.00, color = "#12002b" },
+  { at = 0.20, color = "#7a00b8" },
+  { at = 0.44, color = "#00d4ff" },
+  { at = 0.66, color = "#ffe600" },
+  { at = 0.84, color = "#ff2d55" },
+  { at = 1.00, color = "#ffffff" },
+]
+
+[params]
+# STRUCTURE carries all the peak energy. `zoom` is INVERTED here - higher shows
+# MORE field, so a drop reads as finer, busier cells rather than a brighter blur.
+warp  = "1.55 + sin(time * 0.089) * 0.30 + clamp(treb * 9.0, 0, 1.30) + beat * 0.30"
+zoom  = "2.40 + sin(time * 0.127) * 0.22 + clamp(bass * 5.5, 0, 0.90) + clamp(onset * 9.0, 0, 0.30)"
+pan_x = "sin(time * 0.043) * 0.35 + time * 0.017"
+pan_y = "cos(time * 0.031) * 0.28"
+
+# LUMINANCE held nearly flat - the additive ceiling is what erases a look like
+# this, and the fold below stacks brightness on top of whatever is here.
+glow  = "0.74 + clamp(mid * 5.0, 0, 0.14)"
+flash = "clamp(onset * 8.0, 0, 0.22)"
+
+# COLOUR - the widest window the scene allows, racing on the clock.
+hue          = "0.20 + time * 0.061 + clamp(mid * 8.0, 0, 0.20)"
+color_span   = "1.00 + clamp(treb * 7.0, 0, 0.28)"
+color_center = "sin(time * 0.049) * 0.22 + clamp(bass * 1.6, 0, 0.14)"
+saturation   = "1.25 + clamp(treb * 8.0, 0, 0.24)"
+palette_mix  = "0.35 + sin(time * 0.0170) * 0.35 + clamp(treb * 6.0, 0, 0.22)"
+
+# THE FOLD - three orders, thresholds against measured levels (bass+treb peaks
+# near 0.138, mean 0.046).
+kaleido_order = "select(bass + treb > 0.095, 16, select(bass + treb > 0.055, 8, 3))"
+kaleido_angle = "time * 0.145"
+trails        = "0.42 + clamp(onset * 12.0, 0, 0.26)"
+
+[smoothing]
+warp          = { attack = 0.02, release = 0.26 }
+zoom          = { attack = 0.02, release = 0.34 }
+glow          = 0.20
+color_span    = 0.30
+color_center  = 0.35
+palette_mix   = 0.60
+kaleido_order = 0.9
+trails        = { attack = 0.03, release = 0.50 }
