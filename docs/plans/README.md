@@ -3,13 +3,14 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0041** (ADRs are a separate sequence — next free there is **0042**.)
+**Next free number: 0042** (ADRs are a separate sequence — next free there is **0043**.)
 
 ## Active roster
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
+| [0041](0041-report-two-level-stimuli-and-expression-reachability.md) | `--report` reads at two levels, and expression reachability is measured on the AST | **draft 2026-07-28** — interview done, awaiting the user's go | dev |
 
 ## Recommended execution sequence
 
@@ -33,10 +34,17 @@ closed. Its one major and its open backlog entry are both taken by [0040] below.
 
 **[0040] has landed and closed** — the line-join work is finished: every vertex of the star rosette
 is joined, the shader's join bits are generated from the Rust constants, and the reported defect has
-a pixel baseline. See Recently closed. **No render plan is mid-flight.** [0039]'s **Phase 5
-(`human`)** stays open and independent — re-choose `spectrum_ridge`'s `thickness`, which still ships
-the `4.2` compromise picked against the artifact rather than for the look. That one is
-`preset-author`'s, not `dev`'s.
+a pixel baseline. See Recently closed. **No render plan is mid-flight.**
+
+**[0039]'s Phase 5 (`human`) is now satisfied** (2026-07-28, by `preset-author`). It asked for
+`spectrum_ridge`'s `thickness` to be re-chosen for the look rather than against the joint artifact.
+The preset now ships `7.40 + clamp(mid * 40.0, 0, 2.6)`, up from the `4.2` compromise, and the file's
+stale comment citing design-backlog 0023 is replaced with the post-Plan-0040 reasoning. The lane also
+took `glow = 1.12` on the same preset for the halo the thin stroke could not carry — and found the
+additive ceiling arriving through the **mirror**: where the spectrum falls away at the top end, the
+two mirrored contours converge and their halos sum, so the *quietest* part of the readout was
+rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
+mirrored line preset.
 
 **Version is at `0.21.1`** — bumped at [0040]'s close (a fix/coverage/refactor plan, no feature) per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Nothing is owed until the next close.
