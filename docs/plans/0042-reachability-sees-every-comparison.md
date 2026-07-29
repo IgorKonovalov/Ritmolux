@@ -1,6 +1,6 @@
 # 0042 — Reachability sees every comparison, and the library is re-audited against it
 
-> **Status:** approved 2026-07-29 — ready for `dev`
+> **Status:** in-progress 2026-07-29
 > **Created:** 2026-07-29
 > **Owner skill(s):** dev
 > **Related ADRs:** [0043](../adrs/0043-reachability-reports-comparison-nodes.md) (this plan's

@@ -324,6 +324,17 @@ impl BinOp {
             BinOp::Mul | BinOp::Div => PREC_TERM,
         }
     }
+
+    /// Whether this operator yields a gate (a clean `0.0`/`1.0`) rather than a
+    /// magnitude. Stated as its own predicate rather than as
+    /// `precedence() == PREC_CMP`, because [`Node::probe`] observes exactly this
+    /// set (ADR-0043) and a future tier reshuffle must not silently redefine it.
+    fn is_comparison(self) -> bool {
+        match self {
+            BinOp::Gt | BinOp::Lt | BinOp::Ge | BinOp::Le | BinOp::Eq | BinOp::Ne => true,
+            BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div => false,
+        }
+    }
 }
 
 /// Compiled AST node. `Box`/`Box<[_]>` allocate once at compile; evaluation
@@ -452,9 +463,10 @@ impl Node {
     }
 
     /// Walk the subtree rooted here — whose own node index is `index` — and
-    /// record what each `select()` condition and each `clamp()` bound did under
-    /// `vars`. Descends only into the branch a `select()` actually took, which
-    /// is the whole point: an unreached subtree stays [`NodeObservation::Untouched`].
+    /// record what each comparison, each `select()` condition and each `clamp()`
+    /// bound did under `vars`. Descends only into the branch a `select()`
+    /// actually took, which is the whole point: an unreached subtree stays
+    /// [`NodeObservation::Untouched`].
     ///
     /// **This records; it does not compute.** The value of a probed evaluation
     /// comes from [`Node::eval`] itself (see [`Expr::eval_probed`]), so there is
@@ -467,7 +479,15 @@ impl Node {
         match self {
             Node::Const(_) | Node::Var(_) => {}
             Node::Neg(inner) => inner.probe(vars, obs, index + 1),
-            Node::Bin(_, l, r) => {
+            Node::Bin(op, l, r) => {
+                // A comparison is a gate whether or not it sits in a `select()`
+                // (ADR-0043): `reseed = "onset > 0.55"` is the idiomatic boolean
+                // form and contains no `select()` at all. Arithmetic operators
+                // carry no branch, so they only recurse.
+                if op.is_comparison() {
+                    obs.record_compare(index, self.eval(vars) != 0.0);
+                }
+                // Both operands are evaluated either way, so both are live.
                 l.probe(vars, obs, index + 1);
                 r.probe(vars, obs, index + 1 + l.node_count());
             }
@@ -603,9 +623,9 @@ impl Expr {
     ///
     /// Call it repeatedly with the *same* `obs` across a run of varying
     /// [`Variables`] — one `Observations` per expression. What accumulates is
-    /// which way each `select()` condition went and how close each `clamp()`
-    /// came to its upper bound; [`flag_gates`](Expr::flag_gates) reads the
-    /// verdict back out.
+    /// which way each comparison and each `select()` condition went, and how
+    /// close each `clamp()` came to its upper bound;
+    /// [`flag_gates`](Expr::flag_gates) reads the verdict back out.
     pub fn eval_probed(&self, vars: &Variables<'_>, obs: &mut Observations) -> f32 {
         self.root.probe(vars, obs, 0);
         // The value is `eval`'s, not a re-derivation of it.
@@ -751,6 +771,26 @@ impl Observations {
         };
     }
 
+    /// Record which way a comparison operator went. Same two-valued shape as
+    /// [`record_select`](Self::record_select) — deliberately, so the reporting
+    /// logic reads the same verdict out of both (ADR-0043).
+    fn record_compare(&mut self, index: usize, taken: bool) {
+        let Some(slot) = self.slot(index) else {
+            return;
+        };
+        let (was_true, was_false) = match *slot {
+            NodeObservation::Compare {
+                saw_true,
+                saw_false,
+            } => (saw_true, saw_false),
+            _ => (false, false),
+        };
+        *slot = NodeObservation::Compare {
+            saw_true: was_true || taken,
+            saw_false: was_false || !taken,
+        };
+    }
+
     /// Record how close `value` came to the clamp's upper bound `hi`.
     ///
     /// A non-positive or non-finite bound is recorded as *reached*: "fraction of
@@ -782,8 +822,8 @@ impl Observations {
 /// What one AST node did across a run.
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub enum NodeObservation {
-    /// Never evaluated — either not a `select()`/`clamp()`, or inside a branch
-    /// the run never took.
+    /// Never evaluated — either not a comparison/`select()`/`clamp()`, or inside
+    /// a branch the run never took.
     #[default]
     Untouched,
     /// A `select()` condition: did it ever go each way?
@@ -791,6 +831,17 @@ pub enum NodeObservation {
         /// The condition evaluated non-zero at least once.
         saw_true: bool,
         /// The condition evaluated zero at least once.
+        saw_false: bool,
+    },
+    /// A comparison operator (`> < >= <= == !=`), wherever it sits in the tree.
+    /// Same two-valued shape as [`Select`](Self::Select) — deliberately, so the
+    /// reporting logic is shared (ADR-0043). A comparison that is the direct
+    /// condition of a `select()` is still observed here; it is *reporting* that
+    /// suppresses it, because the `select()` names it in better words.
+    Compare {
+        /// The comparison evaluated true at least once.
+        saw_true: bool,
+        /// The comparison evaluated false at least once.
         saw_false: bool,
     },
     /// A `clamp()`: the highest fraction of its upper bound the inner value
