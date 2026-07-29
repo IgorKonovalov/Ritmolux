@@ -27,16 +27,51 @@ stops = [
 [params]
 # MOTION - steering stays inside the ceiling; a slow sine keeps it alive in
 # silence and the bar gives it a gentle per-beat lean.
-force = "1.05 + sin(time * 0.083) * 0.16 + clamp(bass * 1.4, 0, 0.55) + bar * 0.10"
-spin  = "0.14 + clamp(mid * 1.6, 0, 0.42) + sin(time * 0.047) * 0.05"
-burst = "clamp(beat * 1.1 + onset * 0.9, 0, 1.8)"
+#
+# FLOW'S DRIVER IS THE TOP END, read two ways. Drift rides `mid` and Storm rides
+# transients; this preset takes treble, and it takes it through BOTH kinds of
+# probe because they answer different questions. `treb` is a true mean over
+# 4-18 kHz, so it is the wideband floor - steady, dominated by hiss, good for a
+# quantity that should sit rather than jump. `bin()` is a NARROW probe: one call
+# sees about two of the sixty-four bands, so it is selective, and it moves when
+# a specific part of the top end opens rather than whenever anything up there is
+# loud. Body from the band scalar, edge from the bin - the pairing this file
+# already used for `palette_mix` below, now carrying the motion as well.
+#
+# `bin(0.86)` sits where hi-hats and cymbal shimmer live. Gains are against
+# measured levels (treb mean 0.006, max 0.032), so a x20 term is what it takes
+# to reach the cap at all.
+#
+# FLOCKING GEOMETRY - see the long note in `swarm_drift.toml` for the mechanism.
+# In short: `spin` is the flow field's rate of CHANGE, not vorticity, so a low
+# value leaves the streamlines standing still long enough for particles to fall
+# into them and travel together; and `force` has to stay near 1.2 or the
+# steering overrides each particle's momentum and the whole swarm collapses onto
+# one curve. Both were far too high across this family, which is why five
+# presets of ten thousand particles all averaged out into uniform shimmer.
+#
+# Flow runs a slightly faster field than Drift and steers a little harder - it
+# is the directed CURRENT of the set, streams that commit to a direction and
+# hold it, where Drift wanders. The treble terms move the field rate rather than
+# the steering: the top end makes the formation reorganise, not scatter.
+force = "1.32 + sin(time * 0.083) * 0.14 + clamp(bass * 6.0, 0, 0.34) + bar * 0.10"
+spin  = "0.115 + clamp(treb * 4.0, 0, 0.075) + clamp(bin(0.86) * 2.2, 0, 0.045) + sin(time * 0.047) * 0.012"
+# Cut hard. `burst` shoves particles radially outward from the centre, which is
+# the exact opposite of a formation holding together - it is an explosion, and
+# it was tearing the flock apart on every beat.
+burst = "clamp(beat * 0.30 + clamp(onset * 0.7, 0, 0.35), 0, 0.60)"
 
 # APPEARANCE - brightness held near flat on purpose. The particles draw
 # additively into a feedback buffer, so pushing brightness at peak clips the
 # ribbons to white and destroys exactly the streamline detail this preset is
 # about. Peak buys length and size, not luminance.
-brightness = "0.72 + clamp(bass * 0.9, 0, 0.24)"
-size       = "2.1 + clamp(mid * 1.2, 0, 0.7) + beat * 0.35"
+brightness = "0.70 + clamp(bass * 5.0, 0, 0.18)"
+# 2.1 -> 1.15. A flock has to be made of individuals or the formation has
+# nothing to be a formation of; at the old size neighbouring sprites merged into
+# continuous fog and hid the streamline structure. The scene multiplies each
+# particle's brightness by its own SPEED, so small sprites also let the fast
+# channels separate out bright against the slack water - depth for free.
+size       = "1.15 + clamp(bin(0.86) * 9.0, 0, 0.40) + sin(bar * pi) * 0.18"
 
 # COLOUR - one cool family, sliding. palette_mix crossfades `ice` toward a
 # custom deep-blue-to-foam gradient as the top end opens.
@@ -47,26 +82,28 @@ size       = "2.1 + clamp(mid * 1.2, 0, 0.7) + beat * 0.35"
 # consonants actually live, so the foam arrives when the top end OPENS rather
 # than whenever there is any high-frequency content at all. The wideband term
 # stays underneath as the floor; the narrow one is what moves.
-hue_spread  = "0.28 + clamp(treb * 1.4, 0, 0.26)"
-hue_center  = "0.46 + sin(time * 0.041) * 0.10 + clamp(bass * 0.7, 0, 0.14)"
-saturation  = "1.00 + clamp(mid * 1.0, 0, 0.25)"
-palette_mix = "clamp(treb * 1.0, 0, 0.30) + clamp(bin(0.78) * 2.2, 0, 0.45)"
+hue_spread  = "0.28 + clamp(treb * 20.0, 0, 0.30)"
+hue_center  = "0.46 + sin(time * 0.041) * 0.10 + clamp(bass * 5.0, 0, 0.16)"
+saturation  = "1.00 + clamp(mid * 18.0, 0, 0.26)"
+palette_mix = "clamp(treb * 18.0, 0, 0.30) + clamp(bin(0.78) * 12.0, 0, 0.45)"
 
 # VIEW - a slow lateral drift, so the river appears to run rather than sit.
-zoom  = "1.02 + bar * 0.07 + clamp(bass * 0.4, 0, 0.16)"
+zoom  = "1.02 + bar * 0.07 + clamp(bass * 4.5, 0, 0.16)"
 pan_x = "sin(time * 0.029) * 0.12"
 pan_y = "cos(time * 0.019) * 0.06"
 
 # COMPOSITE - the ribbons, over a cold vignetted deep. `trails` is what turns a
 # point cloud into streamlines, so it is the one thing that rises with energy.
-trails      = "0.58 + clamp((bass + mid) * 0.30, 0, 0.26)"
+trails      = "0.78 + clamp((bass + mid) * 3.0, 0, 0.16)"
 bg_hue      = "0.33 + sin(time * 0.011) * 0.04"
-bg_bright   = "0.010 + clamp(mid * 0.08, 0, 0.010)"
+bg_bright   = "0.010 + clamp(mid * 2.0, 0, 0.010)"
 bg_vignette = "0.80"
 
 [smoothing]
-force       = 0.35
-spin        = 0.30
+force       = 0.45
+# Long: the field rate is the formation's coherence, and a formation that
+# reorganises on a band term is not a formation.
+spin        = 1.10
 brightness  = 0.18
 size        = 0.15
 trails      = 0.45

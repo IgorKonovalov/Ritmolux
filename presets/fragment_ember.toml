@@ -30,7 +30,7 @@ stops = [
 [params]
 # STRUCTURE - big slow cells. Low warp keeps them smouldering and coherent;
 # the zoom is what supplies the layering.
-warp  = "0.34 + sin(time * 0.0330) * 0.09 + clamp(bass * 1.1, 0, 0.45) + beat * 0.14"
+warp  = "0.34 + sin(time * 0.0330) * 0.09 + clamp(bass * 1.1, 0, 0.45) + sin(bar * pi) * 0.10"
 zoom  = "2.70 + sin(time * 0.0190) * 0.22 + clamp(bass * 1.2, 0, 0.50)"
 pan_x = "sin(time * 0.0117) * 0.20 + time * 0.005"
 pan_y = "cos(time * 0.0163) * 0.16"
@@ -40,7 +40,16 @@ glow  = "0.60 + clamp((mid + bass) * 0.45, 0, 0.18)"
 flash = "clamp(onset * 0.8, 0, 0.24)"
 
 # COLOUR - the beat slides the window up into the gold. This is the accent.
-color_center = "0.02 + sin(time * 0.0410) * 0.04 + beat * 0.26 + clamp(onset * 0.9, 0, 0.12)"
+#
+# `sin(bar * pi)` RATHER THAN `beat`, and that swap is the whole reason this
+# preset stopped feeling frantic. `beat` is a 0/1 GATE - it slams to 1 for one
+# frame and drops - so a 0.26 palette-window jump on it is a step function, and
+# no smoothing constant short enough to still read as a beat can round that off.
+# `bar` is the 0..1 phase THROUGH the beat, so `sin(bar * pi)` is a half-sine
+# hump: it rises from the hit, peaks mid-beat, and falls back to zero by the
+# next one. Same tempo, same accent, but it is a swell instead of a strobe -
+# which is what "molten" wanted in the first place.
+color_center = "0.02 + sin(time * 0.0410) * 0.04 + sin(bar * pi) * 0.15 + clamp(onset * 0.9, 0, 0.12)"
 color_span   = "0.80 + clamp(mid * 0.6, 0, 0.16)"
 saturation   = "1.08 + clamp(onset * 0.9, 0, 0.26)"
 palette_mix  = "clamp(bass * 1.2, 0, 0.50)"
@@ -50,11 +59,20 @@ trails = "0.58 + clamp(mid * 0.30, 0, 0.14)"
 
 [smoothing]
 # The gold flare swells and falls; everything structural drifts.
-color_center = 0.22
-warp         = { attack = 0.03, release = 0.58 }
+#
+# `flash` USED TO HAVE NO ENTRY HERE AT ALL. It is driven straight off `onset`,
+# the rawest signal in the engine, so unsmoothed it was a per-hop luminance
+# strobe sitting on top of the colour accent - the single biggest contributor to
+# this preset reading as too rapid. It now has the longest release in the file.
+flash        = { attack = 0.12, release = 0.80 }
+color_center = 0.45
+# Attack lengthened 0.03 -> 0.20. Warp is CONTINUOUS structure on this preset -
+# convection cells, not a percussive accent - and a 30 ms attack made the
+# per-beat term snap the whole field.
+warp         = { attack = 0.20, release = 0.62 }
 zoom         = 0.35
 glow         = 0.35
 color_span   = 0.40
 palette_mix  = 0.70
 trails       = 0.45
-saturation   = 0.25
+saturation   = 0.45

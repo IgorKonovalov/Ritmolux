@@ -26,15 +26,30 @@ name = "aurora"
 [params]
 # CHEMISTRY - solitons. The lowest feed in the family; the lobes stay massive
 # rather than dissolving into spots.
-feed   = "0.0222 + sin(time * 0.033) * 0.0026 + clamp(bass * 1.6, 0, 1) * 0.0055"
-kill   = "0.0512 + cos(time * 0.024) * 0.0010 + clamp(mid * 1.6, 0, 1) * 0.0028"
-flow   = "1.00 + clamp(treb * 1.0, 0, 1) * 0.22"
+# THE WORM REGIME - F 0.0580 / k 0.0630, the high-feed end of Gray-Scott space
+# and a long way from where this preset used to sit (0.0222 / 0.0512, which is
+# the same dense-maze neighbourhood the other three occupied). Worms grow as
+# elongated open strands that curl and branch WITHOUT closing into a labyrinth,
+# so the field keeps wide dark channels between them. That is a different
+# silhouette from Coral's isolated spots rather than a different tint of the
+# same texture, which is the whole point of spreading the four apart.
+# Modulation centred and bounded to stay inside the pattern-forming band - see
+# the long note in `reaction_coral.toml`, where getting this wrong froze the
+# field completely. F 0.0580 was also too far up: it measured as a near-
+# duplicate of Coral rather than as worms, because that far out the field barely
+# organises at all. 0.0380 / 0.0610 is the worms-and-loops regime proper.
+feed   = "0.0340 + sin(time * 0.033) * 0.0016 + clamp(bass * 9.0, 0, 1) * 0.0020"
+kill   = "0.0575 + cos(time * 0.024) * 0.0008 + (sin(bar * pi) - 0.5) * 0.0010 + clamp(mid * 12.0, 0, 1) * 0.0008"
+flow   = "1.00 + clamp(treb * 14.0, 0, 1) * 0.22"
 inject = "beat"
 
 # THE FAST LEVERS - broad contours and a loose hatch keep the lobes soft.
-contour = "4.0 + clamp(treb * 4.0, 0, 3.2) + beat * 1.4"
-hatch   = "6.0 + clamp(mid * 2.5, 0, 2.2)"
-glow    = "0.85 + clamp((bass + mid) * 0.45, 0, 0.25)"
+# Thinned so the channels between the worms stay open - the same reasoning as on
+# Coral, where dense iso-lines were filling back in the gaps the chemistry had
+# just made.
+contour = "3.4 + sin(time * 0.47) * 1.7 + clamp(treb * 55.0, 0, 2.6) + beat * 1.4"
+hatch   = "3.4 + sin(time * 0.26) * 0.9 + clamp(mid * 35.0, 0, 1.8)"
+glow    = "0.85 + clamp((bass + mid) * 5.0, 0, 0.25)"
 
 # VIEW - UNPINNED (Plan 0033), and this is the lever the family used to lack.
 # The Gray-Scott field is finite but TOROIDAL, and the present sampler now
@@ -43,21 +58,21 @@ glow    = "0.85 + clamp((bass + mid) * 0.45, 0, 0.25)"
 # Catmull-Rom reconstruction landed in the same plan, so it no longer reads as
 # angular pixel blobs), above 1.0 tiles. Keep zoom under ~1.3 - past that the
 # repeat becomes legible as wallpaper rather than as more field.
-zoom  = "0.70 + sin(time * 0.013) * 0.06 + clamp(bass * 0.7, 0, 0.14)"
+zoom  = "0.70 + sin(time * 0.013) * 0.06 + clamp(bass * 3.0, 0, 0.14)"
 pan_x = "sin(time * 0.009) * 0.07"
 pan_y = "time * 0.009 + cos(time * 0.007) * 0.05"
 
 # COLOUR - warm lobes over green-teal valleys, drifting toward aurora greens.
-color_span   = "2.00 + clamp(mid * 0.7, 0, 0.35)"
+color_span   = "2.00 + clamp(mid * 24.0, 0, 0.35)"
 color_center = "sin(time * 0.0170) * 0.06"
-saturation   = "1.05 + clamp(treb * 0.7, 0, 0.20)"
+saturation   = "1.05 + clamp(treb * 14.0, 0, 0.20)"
 palette_mix  = "0.30 + sin(time * 0.0063) * 0.28"
 
 # COMPOSITE - a long feedback so the drifting mass smears, plus the backdrop
 # showing through the interior holes.
-trails      = "0.50 + clamp(mid * 0.25, 0, 0.12)"
+trails      = "0.50 + clamp(mid * 10.0, 0, 0.12)"
 bg_hue      = "0.56 + sin(time * 0.0083) * 0.05"
-bg_bright   = "0.024 + clamp(mid * 0.11, 0, 0.015)"
+bg_bright   = "0.024 + clamp(mid * 2.6, 0, 0.015)"
 bg_vignette = "0.70"
 
 [smoothing]

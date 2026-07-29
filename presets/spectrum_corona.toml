@@ -12,9 +12,15 @@ system = "spectrum"
 name   = "Spectrum Corona"
 
 [spectrum]
-# One spoke per band would be a solid disc at this radius; 32 keeps them
-# separate all the way round.
-elements = 32
+# WHY THIS WENT UP 32 -> 44, and it is the main fix for the corona reading as
+# UPSCALED - as though a low-resolution image had been blown up. Nothing about
+# the render was low-resolution; the SPOKES were. Each one was a short, wide,
+# soft-edged rectangle, and a ring of 32 of those is a ring of blocks. Three
+# things made them blocky and all three are fixed below: they were too few, too
+# fat (`thickness` 4.5 on a stroke only ~0.2 long), and drawn at the default
+# `glow = 1.0`, whose soft skirt runs the whole length of a short stroke so the
+# edges never resolve. More spokes, thinner, sharper, and longer.
+elements = 44
 layout   = "radial_ring"
 # Slower than the comb on both sides. A spoke sweeping past the eye already
 # carries the transient through the rotation, so the envelope does not have to
@@ -55,13 +61,13 @@ stops = [
 # that is always visible: every spoke crosses the position its neighbour just
 # left. The audio term is a small nudge to the PHASE rather than a speed change,
 # because a band term on an angle reads as the figure lurching.
-rotation = "time * 0.42 + sin(time * 0.05) * 0.30 + clamp(bass * 0.7, 0, 0.18)"
+rotation = "time * 0.42 + sin(time * 0.05) * 0.30 + clamp(bass * 6.0, 0, 0.18)"
 
 # THE RING. `radius` is the one layout-specific parameter on this system - it is
 # the inner circle the spokes stand on, and it does nothing at all on bars or the
 # polyline. Bound here to a slow breath plus the low end, so the whole corona
 # expands on a heavy bar.
-radius = "0.34 + sin(time * 0.27) * 0.05 + clamp(bass * 1.1, 0, 0.14)"
+radius = "0.34 + sin(time * 0.27) * 0.05 + clamp(bass * 3.5, 0, 0.14)"
 
 # SPOKE LENGTH, and the one PER-ELEMENT binding in the shipped set. `index` is
 # the element's own position along the frequency axis, normalized 0..1, and a
@@ -80,8 +86,8 @@ radius = "0.34 + sin(time * 0.27) * 0.05 + clamp(bass * 1.1, 0, 0.14)"
 # binding is delivered as a series and cannot be eased as one value. The engine
 # says so at load rather than ignoring the entry, and the easing that DOES apply
 # to a spectrum readout is [spectrum] smoothing above.
-base  = "0.10 + index * 0.05 + sin(time * 1.1) * 0.09"
-scale = "4.0"
+base  = "0.09 + index * 0.04 + sin(time * 1.1) * 0.07"
+scale = "5.20"
 
 # THE LEVEL CURVE now does most of what that `index` tilt was hand-rolling.
 # Lengthening the high spokes at rest tilted the figure back toward a circle, but
@@ -94,7 +100,15 @@ scale = "4.0"
 # length when their band is actually loud. The static tilt drops from 0.12 to
 # 0.05 - still a little, because the ring wants to read as a ring at rest - and
 # `scale` rises 2.4 -> 4.0 to spend the room that frees.
-curve = "0.85"
+#
+# 0.85 -> 0.58, and on this layout the curve is a SHAPE lever as much as a
+# reactivity one. A spoke's blockiness is its width against its length, so the
+# same stroke reads as a stud when short and as a ray when long. At 0.85 a
+# treble mean of 0.006 lengthened a spoke by 0.013 - invisible - so most of the
+# ring was permanently at its stubby resting length. At 0.58 the same mean gives
+# 0.051, and with `scale` up 4.0 -> 5.2 that is a spoke that actually extends.
+# Fixing the reactivity and fixing the upscaled look are the same edit here.
+curve = "0.58"
 
 # COLOUR AROUND THE RING. A full `hue_spread` walks the palette once round the
 # circle in even steps (the walk is normalized over the element COUNT, so the
@@ -108,8 +122,15 @@ saturation  = "1.0"
 # The A/B crossfade, driven slowly: ember through ice and back on a ~35 s cycle.
 palette_mix = "0.5 + sin(time * 0.18) * 0.5"
 
-thickness  = "4.5 + clamp(treb * 10.0, 0, 3.5)"
-brightness = "0.78 + clamp(mid * 1.6, 0, 0.32)"
+# STROKE - nearly halved, and paired with a falloff below 1.0 for the first
+# time. `glow` scales the renderer's core-to-edge term, and a value under 1
+# tightens the stroke toward its core; the comb already runs 0.75 for exactly
+# this reason and a radial spoke is an even shorter stroke than a bar, so its
+# soft skirt covers proportionally more of it. Between the thinner stroke, the
+# extra elements and this, the spokes have edges again.
+thickness  = "2.4 + clamp(treb * 45.0, 0, 1.8)"
+glow       = "0.68"
+brightness = "0.78 + clamp(mid * 40.0, 0, 0.24)"
 
 # NO GEOMETRY MIRROR, and it is worth recording why rather than leaving it as an
 # omission. The mirror replicates the segment set by rotating it about the frame
@@ -122,12 +143,12 @@ zoom  = "1.05 + bar * 0.05"
 pan_y = "0.0"
 
 bg_hue      = "0.06 + sin(time * 0.009) * 0.05"
-bg_bright   = "0.024 + clamp(bass * 0.10, 0, 0.014)"
+bg_bright   = "0.024 + clamp(bass * 2.5, 0, 0.014)"
 bg_vignette = "0.86"
 
 # A long tail: the spokes sweep, so persistence draws the sweep itself as a
 # glowing annulus behind them.
-trails = "0.52 + clamp(mid * 0.14, 0, 0.08)"
+trails = "0.52 + clamp(mid * 4.0, 0, 0.08)"
 
 [smoothing]
 rotation    = 0.15

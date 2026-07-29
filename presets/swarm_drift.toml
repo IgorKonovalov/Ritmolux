@@ -23,43 +23,111 @@ stops = [
 
 [params]
 # MOTION - three incommensurate sines so the cloud never settles into a loop,
-# with only a whisper of band input on top.
-force = "1.00 + sin(time * 0.037) * 0.16 + cos(time * 0.023) * 0.10 + clamp(bass * 0.8, 0, 0.30)"
-spin  = "0.07 + sin(time * 0.019) * 0.03 + clamp(mid * 0.7, 0, 0.15)"
-burst = "clamp(beat * 0.5 + onset * 0.4, 0, 0.9)"
+# and DRIFT'S DRIVER IS MID.
+#
+# That last part is what now separates this preset from Flow and Storm. All
+# three used to ride `bass` with a token `mid` term, which is most of the reason
+# they read as the same preset three times over. Mid carries the sustained body
+# of a mix - pads, chords, vocal weight - so it swells across bars instead of
+# punching on beats, which is exactly the slow nebula this preset is for. Storm
+# takes the transients, Flow takes the top end, Drift takes the middle.
+#
+# The gains are against MEASURED levels (`--signal dynamic:110`: mid mean 0.006,
+# max 0.019), which is why the multipliers look enormous next to what was here.
+# They are not hot - they are simply the size a mid term has to be to reach its
+# own cap. The old `mid * 0.7` capped at 0.15 moved `spin` by about 0.004 on a
+# real mix, which is the numeric form of "does not react to music".
+#
+# `spin` IS NOT VORTICITY - it is the flow field's RATE OF CHANGE. The scene
+# integrates `field_t = time * spin`, so `spin` says how fast the streamlines
+# themselves are rewritten, and this is the single parameter that decides
+# whether the swarm reads as a flock or as noise.
+#
+# At the old values (0.07 up to 0.35) the field was being redrawn faster than a
+# particle could traverse it. Every frame each particle was steered somewhere
+# new by a field that had already moved on, so ten thousand of them averaged out
+# into a uniform shimmer - which is exactly what "looks lame" was seeing. It was
+# not too few particles or too little reactivity; it was that no two of them
+# were ever going the same way.
+#
+# Held near-frozen instead. With the field almost static, particles fall onto
+# its streamlines and STAY on them, so neighbours travel together, funnel
+# through the same channels and peel off at the same places. That is flocking,
+# and it emerges from the field rather than from any per-particle rule. Drift
+# gets the lowest value of the five - a high, lazy flock whose formation holds
+# for many seconds at a time.
+#
+# AND `force` IS THE OTHER HALF, discovered by bracketing it rather than by
+# reasoning. Freezing the field alone does not give a flock - it gives a
+# COLLAPSE. At force 1.95 the steering completely overrides each particle's
+# retained momentum (the scene keeps 86 % of velocity per frame), so within a
+# couple of seconds every one of the ten thousand had committed to the field's
+# attracting curve and the rest of the frame was empty. One bright ribbon is not
+# a flock either.
+#
+# The flock lives in the balance: weak enough steering that particles keep their
+# own momentum and CROSS streamlines, strong enough that they still tend along
+# them. Measured at 0.85 / 1.15 / 1.45 with everything else fixed, 1.15-1.20 is
+# where the field stays populated while showing density waves, gathering crests
+# and thinning wakes - birds moving together without being a single line.
+force = "1.20 + sin(time * 0.037) * 0.16 + cos(time * 0.023) * 0.10 + clamp(mid * 18.0, 0, 0.40)"
+spin  = "0.085 + sin(time * 0.019) * 0.012 + clamp(mid * 2.6, 0, 0.035)"
+# Deliberately the weakest burst of the three: a transient here should ripple
+# through the cloud, not detonate inside it.
+burst = "clamp(beat * 0.5 + clamp(onset * 0.9, 0, 0.5), 0, 1.1)"
 
-# APPEARANCE - big soft particles are what make this read as a nebula rather
-# than a starfield. Brightness is nearly flat; size does the breathing.
-brightness = "0.76 + clamp(bass * 0.7, 0, 0.20)"
-size       = "2.6 + sin(time * 0.031) * 0.4 + clamp(bass * 1.2, 0, 0.7) + beat * 0.3"
+# APPEARANCE - and `size` comes down hard, 2.6 -> 1.35, for the same reason the
+# field was frozen. A big soft sprite is a cloud; a flock has to be made of
+# individuals you can pick out, or the formation has nothing to be a formation
+# OF. At 2.6 neighbouring particles overlapped into continuous fog and the
+# streamline structure underneath was invisible however coherent it was.
+#
+# The depth cue is free and worth knowing about: the scene multiplies each
+# particle's brightness by its own SPEED (`0.25 + speed * 0.7`). On a coherent
+# field, particles in the fast channels are markedly brighter than ones idling
+# in slack water, so the flock separates into bright leading streams and dim
+# trailing bodies without any depth parameter existing. Small sprites are what
+# let that read - a fat one saturates and loses the gradient.
+brightness = "0.72 + clamp(mid * 14.0, 0, 0.16)"
+size       = "1.05 + sin(time * 0.031) * 0.18 + clamp(mid * 14.0, 0, 0.35) + sin(bar * pi) * 0.12"
 
 # COLOUR - the slowest hue journey in the set: a full slow wander through the
 # aurora band, crossfading into a violet-to-amber gradient over minutes.
-hue_spread  = "0.34 + sin(time * 0.017) * 0.10 + clamp(treb * 0.9, 0, 0.16)"
-hue_center  = "0.62 + sin(time * 0.0130) * 0.16 + clamp(mid * 0.6, 0, 0.10)"
-saturation  = "0.94 + clamp(treb * 1.1, 0, 0.22)"
+hue_spread  = "0.34 + sin(time * 0.017) * 0.10 + clamp(treb * 12.0, 0, 0.20)"
+hue_center  = "0.62 + sin(time * 0.0130) * 0.16 + clamp(mid * 18.0, 0, 0.14)"
+saturation  = "0.94 + clamp(treb * 16.0, 0, 0.24)"
 palette_mix = "0.5 + sin(time * 0.0091) * 0.45"
 
 # VIEW - a very slow parallax wander around the frame.
-zoom  = "1.05 + sin(time * 0.021) * 0.06 + bar * 0.04 + clamp(bass * 0.3, 0, 0.12)"
+zoom  = "1.05 + sin(time * 0.021) * 0.06 + bar * 0.04 + clamp(bass * 4.0, 0, 0.12)"
 pan_x = "sin(time * 0.0170) * 0.16"
 pan_y = "cos(time * 0.0113) * 0.11"
 
 # COMPOSITE - a long, soft exposure over a deep violet field. The nebula is
 # mostly made of its own afterimage.
-trails      = "0.40 + clamp(mid * 0.22, 0, 0.10)"
+# Lengthened. Persistence is what draws each bird's flight PATH rather than its
+# position, and on a coherent field those paths are parallel - which is most of
+# what makes a flock legible as a flock in a still frame.
+trails      = "0.80 + clamp(mid * 8.0, 0, 0.10)"
 bg_hue      = "0.17 + sin(time * 0.0083) * 0.06"
-bg_bright   = "0.012 + clamp(mid * 0.08, 0, 0.010)"
+bg_bright   = "0.012 + clamp(mid * 2.0, 0, 0.010)"
 bg_vignette = "0.68"
 
 [smoothing]
-force       = 0.8
-spin        = 0.8
-brightness  = 0.5
-size        = 0.45
-trails      = 0.7
-zoom        = 0.5
-hue_center  = 0.9
-hue_spread  = 0.9
+# Still the longest constants of the three swarms - Drift is the slow one and
+# that is its identity - but pulled in by roughly a third. At 0.8-1.2 s, on top
+# of gains that moved the params by fractions of a percent, this preset had no
+# mechanism left that could respond to anything. Slow is a character; frozen is
+# a bug, and it measured as the latter.
+force       = 0.55
+# `spin` gets the longest constant in the file now. It is the formation's
+# coherence, and a formation that reorganises on a band term is not a formation.
+spin        = 1.30
+brightness  = 0.38
+size        = 0.34
+trails      = 0.55
+zoom        = 0.38
+hue_center  = 0.65
+hue_spread  = 0.65
 palette_mix = 1.2
-bg_bright   = 0.6
+bg_bright   = 0.5

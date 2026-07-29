@@ -21,15 +21,22 @@ family = "maurer_rose"
 n             = "3"
 d             = "80"
 samples       = "260"
-phase         = "sin(time * 0.028) * 0.38 + clamp(bass * 0.6, 0, 0.16)"
-radial_offset = "0.20 + sin(time * 0.015) * 0.22"
+#
+# THE BRUSH PATH takes the peak energy on this preset. The figure is a moving
+# stroke rather than a static shape, so morphing `phase` and `radial_offset`
+# changes the path the brush travels and the whole painted ribbon reorganises -
+# a far larger visual change per unit of drive than anything luminance could buy
+# here, and this is a preset where luminance is genuinely dangerous (see the
+# stroke note below).
+phase         = "sin(time * 0.028) * 0.38 + clamp(bass * 11.0, 0, 0.44)"
+radial_offset = "0.20 + sin(time * 0.015) * 0.22 + clamp(mid * 16.0, 0, 0.26)"
 
 # MOTION - the fastest spin in the set, and a STEADY one. This IS the
 # light-painting brush, and a brush whose speed jerks with the music paints a
 # lurching stroke rather than a spiral.
 spin          = "1.25 + sin(time * 0.029) * 0.08"
 # BIGGER - the ribbon now sweeps most of the frame rather than a third of it.
-scale         = "0.80 + bar * 0.10 + clamp(bass * 0.45, 0, 0.124)"
+scale         = "0.80 + bar * 0.10 + clamp(bass * 8.0, 0, 0.28)"
 draw_progress = "1"
 
 # STROKE - MORE GLOW, bought mostly with thickness rather than brightness,
@@ -46,29 +53,38 @@ draw_progress = "1"
 # five-way sweep from 1.10 to 2.30 rendered indistinguishably, including the
 # untouched original. Only the running app, with real material, separates them.
 # So this sits mid-range rather than at the top of what a still would allow.
-thickness  = "1.70 + clamp(bass * 1.0, 0, 0.55)"
-brightness = "0.50 + clamp(bass * 0.22, 0, 0.11)"
-hue        = "0.48 + time * 0.033 + clamp(treb * 0.8, 0, 0.26)"
+#
+# The gains below are corrected to measured levels, but the CAPS are held where
+# they were - that restraint is the point of the paragraph above and it survives
+# the recalibration unchanged. What the old expressions did was reach a fraction
+# of these caps on real audio; what they do now is reach them. Nothing is being
+# opened up.
+thickness  = "1.70 + clamp(bass * 12.0, 0, 0.55)"
+brightness = "0.50 + clamp(bass * 2.6, 0, 0.11)"
+hue        = "mod(0.48 + time * 0.038 + clamp(treb * 20.0, 0, 0.28), 1)"
 
 mirror_order   = "3"
 mirror_reflect = "beat"
 
 # VIEW - the pan is what turns a spiral into a ribbon travelling across frame.
-zoom  = "1.05 + bar * 0.09 + clamp(bass * 0.5, 0, 0.22)"
+zoom  = "1.05 + bar * 0.09 + clamp(bass * 5.5, 0, 0.22)"
 pan_x = "sin(time * 0.037) * 0.16"
 pan_y = "cos(time * 0.029) * 0.12"
 
 # COMPOSITE - the subject. Long, and lengthening with the low end.
-trails      = "0.78 + clamp(bass * 0.25, 0, 0.13)"
+trails      = "0.78 + clamp(bass * 3.0, 0, 0.13)"
 bg_hue      = "0.50 + sin(time * 0.011) * 0.06"
-bg_bright   = "0.012 + clamp(mid * 0.08, 0, 0.01)"
+bg_bright   = "0.012 + clamp(mid * 1.8, 0, 0.01)"
 bg_vignette = "0.86"
 
 [smoothing]
+# `spin` keeps a long constant on purpose - it is the brush speed, and the
+# header explains why that must not jerk. The SHAPE params are what come down,
+# because those are what the music is now allowed to move.
 spin          = 0.65
-phase         = 1.04
-radial_offset = 1.17
-scale         = 0.42
+phase         = 0.42
+radial_offset = 0.50
+scale         = 0.36
 thickness     = 0.36
 hue           = 1.04
 zoom          = 0.42

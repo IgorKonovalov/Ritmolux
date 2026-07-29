@@ -649,10 +649,11 @@ Presets worth reading as **worked examples** of one control each:
 | Preset | Shows |
 |--------|-------|
 | `rose_zoom` | the shared view **zoom** pumping on bass, with a slow sine pan |
-| `rose_atmosphere` | a scene over a vignetted **background** gradient (`bg_*`) |
-| `rose_kaleidoscope` | the six-fold **geometry mirror**, reflection toggled on the beat |
+| `rose_web` | a scene over a vignetted **background** gradient (`bg_*`), and the **geometry mirror** with reflection toggled on a hard onset |
+| `reaction_reef` | the screen-space **kaleidoscope** turning a field into a figure |
 | `rose_trails` | **feedback trails** smearing a spinning curve into a spiral |
 | `fragment_kaleido` | the screen-space **kaleidoscope** over a fragment field |
 | `fragment_smooth` | beat-driven flash/glow **eased** through a `[smoothing]` table |
 | `attractor_ink` | the terminal **ink-on-paper** remap (`ink_*` / `paper_*`) |
-| `rose_maurer_sweep`, `rose_overflow`, `rose_beat_bloom` | the audio-morphable curve **shape** params (`phase`, `radial_offset`) |
+| `rose_overflow`, `rose_web` | the audio-morphable curve **shape** params (`phase`, `radial_offset`) |
+| `rose_draw` | `draw_progress` ridden on `bar` for a per-beat **line-draw-on** |

@@ -42,7 +42,18 @@ smoothing = { attack = 0.025, release = 0.22 }
 # thing that moves without audio. A spectrum readout has no rotation to turn and
 # no field to evolve; the elements sit where the frequency axis puts them. So the
 # breath has to be real, or the preset reads as frozen in a silence.
-base = "0.13 + sin(time * 1.5) * 0.12"
+# THE MEAN AND THE SWING ARE SEPARATE DECISIONS, and conflating them broke the
+# CI animation gate. Cutting `base` for reactivity (a big constant floor is
+# added to every element and competes with the thing the comb exists to show)
+# also cut the amplitude of the breath, and the breath is this preset's ONLY
+# motion in a silence - a spectrum readout has no rotation to turn and no field
+# to evolve, and `scale` is multiplied by a zero level. Measured motion fell to
+# 0.0067 against a floor of 0.01 and `every_preset_animates_over_time` failed.
+#
+# So the mean stays low - that is the reactivity fix and it was right - and the
+# swing goes back UP past where it started. 0.09 +/- 0.075 has a lower floor
+# than the old 0.13 +/- 0.12 while breathing across a wider range.
+base = "0.09 + sin(time * 1.5) * 0.075"
 
 # A GENTLE ROCK, and it is the comb's main silent-audio motion now. In a silence
 # every element's length is exactly `base` - `scale` is multiplied by a zero
@@ -51,7 +62,7 @@ base = "0.13 + sin(time * 1.5) * 0.12"
 # is about the frame CENTRE, and `span` now puts the outer elements 1.7 world
 # units out, so a couple of degrees sweeps them through much more than their own
 # width while the middle of the comb barely shifts.
-rotation = "sin(time * 0.9) * 0.09"
+rotation = "sin(time * 0.9) * 0.135"
 
 # THE AUDIO TERM, and THE LEVEL CURVE that now shapes it (Plan 0038). The bands
 # read small on real music, but they are also spread very unevenly: a linear map
@@ -91,8 +102,32 @@ rotation = "sin(time * 0.9) * 0.09"
 # What the curve does NOT touch is timing. The easing runs on the curved value -
 # the one you see - so the [spectrum] release above means the same duration at
 # every curve (ADR-0040). A curve costs a `scale` retune, never a `release` one.
-scale = "10.00"
-curve = "0.85"
+# RETUNED, because 0.85 was still far too gentle and `base` was still too high.
+# Work the arithmetic at the measured means rather than trusting the shape of
+# the curve: at 0.85 a treble mean of 0.006 became 0.0129, and against a `base`
+# of 0.13 the audio contributed less than the constant floor did. Every element
+# outside the bass was a stub sitting on a shelf - which is exactly what "reacts
+# too little" looks like on a comb.
+#
+# At 0.55 the same 0.006 becomes 0.060, a 4.6x lift rather than 2.2x, and the
+# bass mean 0.040 becomes 0.170. That pulls the two ends from 6.6:1 apart to
+# 2.8:1 - firmer compression than before, and it has to be, because the spread
+# is what was burying the top of the readout.
+#
+# `base` drops 0.13 -> 0.07 for the same reason. It is added to EVERY element,
+# so it is pure "the same at all frequencies" and it competes directly with the
+# thing the comb exists to show. It is now small enough that a silence still
+# shows a comb and not one unit more.
+#
+# `scale` then falls 10.0 -> 3.8, and it falls because the curve gives so much
+# more back: a bass mean now stands 0.65 tall and a peak reaches ~1.1, against a
+# treble mean of 0.23. Aimed slightly conservative on purpose - loopback runs
+# louder than anything synthesized here, so the honest target is the live app.
+#
+# Timing is untouched by any of this: the easing runs on the curved value, so
+# the [spectrum] release above means the same duration at any curve (ADR-0040).
+scale = "3.80"
+curve = "0.55"
 
 # WIDTH. `span` is the figure's half-width in WORLD units and 1.72 fills a 16:9
 # frame very nearly edge to edge. Before this was bindable the comb was stuck at
@@ -110,7 +145,7 @@ span  = "1.72"
 # suggests. Scaling it the full 1.7x was tried and read as blurry and upscaled:
 # 0.12 world units of stroke against a 0.132 slot is 91 % fill and mostly soft
 # skirt. `glow` below tightens the core instead, which is the cheaper lever.
-thickness  = "13 + clamp(bass * 5.0, 0, 3.0)"
+thickness  = "13 + clamp(bass * 45.0, 0, 3.5)"
 
 # STROKE SHARPNESS. `glow` scales the renderer's core-to-edge falloff, and below
 # 1.0 it tightens the stroke toward its core. It matters more here than on the
@@ -118,13 +153,16 @@ thickness  = "13 + clamp(bass * 5.0, 0, 3.0)"
 # along its whole length, so a fat bar reads as a blurred block rather than a
 # bar. Between this and the thinner stroke above, the comb has hard edges again.
 glow       = "0.75"
-brightness = "0.72 + clamp(mid * 1.4, 0, 0.34)"
+# Gain raised ~30x to match the measured mid mean of 0.006, but the CAP is cut
+# 0.34 -> 0.26. Reactivity was the fault, not headroom: on an additive renderer
+# a comb whose bars are already tall does not also want a big luminance swing.
+brightness = "0.72 + clamp(mid * 40.0, 0, 0.26)"
 
 # COLOUR - a slow full rotation of the wheel (~40 s), pushed forward a little by
 # the top end. The whole comb is one hue in this preset; colouring each element
 # by its own position along the axis is a Phase 3 lever, and the point of THIS
 # preset is the geometry.
-hue = "mod(time * 0.09 + clamp(treb * 1.8, 0, 0.14), 1)"
+hue = "mod(time * 0.09 + clamp(treb * 22.0, 0, 0.14), 1)"
 
 # CAMERA - the second half of the silent-audio motion, and it does more work than
 # its size suggests. The zoom scales world coordinates about the frame centre, so
@@ -132,13 +170,13 @@ hue = "mod(time * 0.09 + clamp(treb * 1.8, 0, 0.14), 1)"
 # near the middle: the whole readout stretches and gathers rather than just
 # growing. At this element spacing that is on the order of a stroke width, which
 # is exactly the scale at which a change actually reads.
-zoom  = "1.05 + sin(time * 1.1) * 0.09 + clamp(bass * 0.5, 0, 0.10)"
+zoom  = "1.05 + sin(time * 1.1) * 0.125 + clamp(bass * 4.0, 0, 0.10)"
 # A slight lift so the comb sits off the bottom edge rather than on it.
 pan_y = "0.06 + sin(time * 0.17) * 0.03"
 
 # BACKDROP - dim and cool, so the comb is the only bright thing.
 bg_hue      = "0.58 + sin(time * 0.011) * 0.05"
-bg_bright   = "0.022 + clamp(mid * 0.09, 0, 0.012)"
+bg_bright   = "0.022 + clamp(mid * 2.5, 0, 0.012)"
 bg_vignette = "0.75"
 
 [smoothing]

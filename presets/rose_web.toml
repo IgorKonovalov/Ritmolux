@@ -27,46 +27,74 @@ family = "maurer_rose"
 n             = "2"
 d             = "39"
 samples       = "1600"
-phase         = "sin(time * 0.015) * 0.42 + clamp(mid * 0.6, 0, 0.16)"
-radial_offset = "0.18 + sin(time * 0.0093) * 0.20 + clamp(bass * 0.4, 0, 0.087)"
+#
+# `radial_offset` IS THIS PRESET'S MECHANISM, and that is what now distinguishes
+# it inside the family. At n = 2 the rose is a pair of lobes rather than a
+# many-petalled disc, and pushing it off origin opens those lobes into a wide
+# sparse annulus - so the audio changes the TOPOLOGY of the figure here, not
+# just its petal shape. The other survivors morph mostly through `phase`. This
+# is the open, airy one, and the only member of the five that is not a disc.
+#
+# Gains against measured levels (bass mean 0.040, mid 0.006): the old
+# `bass * 0.4` capped at 0.087 moved the radius by 0.016 on a real mix, which is
+# invisible against a sine term of 0.20 sitting beside it.
+phase         = "sin(time * 0.052) * 0.46 + clamp(mid * 16.0, 0, 0.30)"
+radial_offset = "0.18 + sin(time * 0.0093) * 0.20 + clamp(bass * 11.0, 0, 0.40)"
 
-# MOTION - a fast, STEADY turn; the lattice shimmers as the crossings sweep
-# past. The rate is audio-independent on purpose (see `rose_star.toml`).
-spin          = "0.42 + sin(time * 0.031) * 0.05"
-scale         = "0.76 + bar * 0.05 + clamp(mid * 0.4, 0, 0.11)"
+# NO SPIN - `spin` is angular velocity, so anything nonzero is a permanent turn.
+#
+# This preset leaned on it harder than the others (the lattice shimmered as the
+# crossings swept past), so the shimmer has to come from somewhere else, and it
+# does: `phase` advances the petals THROUGH the figure rather than rotating the
+# finished figure, which moves the crossings against each other instead of
+# moving all of them together. That is the better source of moire anyway - a
+# rigid rotation slides the whole interference pattern past the eye unchanged,
+# while a phase advance reshapes it. The rate is raised to take over.
+spin          = "0"
+scale         = "0.76 + bar * 0.05 + clamp(mid * 12.0, 0, 0.24)"
 draw_progress = "1"
 
 # STROKE - the thinnest in the set. A thick stroke at this chord count fills
 # solid and destroys the moire that is the entire preset.
-thickness  = "0.95 + clamp(mid * 1.0, 0, 0.53)"
-brightness = "0.70 + clamp(mid * 0.5, 0, 0.20)"
+thickness  = "0.95 + clamp(mid * 20.0, 0, 0.45)"
+brightness = "0.70 + clamp(mid * 8.0, 0, 0.16)"
 
 # COLOUR - cool steel blues, sweeping slowly.
-hue = "0.05 + time * 0.017 + clamp(mid * 0.6, 0, 0.22) + sin(time * 0.041) * 0.05"
+hue = "mod(0.05 + time * 0.022 + clamp(mid * 18.0, 0, 0.26) + sin(time * 0.041) * 0.05, 1)"
 
 # GEOMETRY MIRROR - modest, because the chord count is already carrying the
 # density. Reflection on a hard onset rather than every beat.
-mirror_order   = "4"
-mirror_reflect = "onset > 0.40"
+#
+# `onset > 0.40` was reachable but rare - a once-a-passage event rather than a
+# rhythm reading - so 0.18 puts the reflected state on genuine hits. The fold
+# COUNT moves now as well, so the web gains and loses arms with the mid content
+# instead of being a fixed four-armed figure.
+mirror_order   = "select(mid > 0.011, 6, 4)"
+mirror_reflect = "onset > 0.18"
 
 # VIEW + COMPOSITE - pushed in slightly so the lattice runs off the frame edge,
 # over a cold backdrop, with a long feedback that thickens the weave.
-zoom        = "1.10 + bar * 0.05 + clamp(bass * 0.35, 0, 0.14)"
+zoom        = "1.10 + bar * 0.05 + clamp(bass * 4.5, 0, 0.16)"
 pan_x       = "sin(time * 0.017) * 0.06"
 pan_y       = "cos(time * 0.0113) * 0.05"
 bg_hue      = "0.30 + sin(time * 0.009) * 0.05"
-bg_bright   = "0.018 + clamp(mid * 0.09, 0, 0.012)"
+bg_bright   = "0.018 + clamp(mid * 2.0, 0, 0.012)"
 bg_vignette = "0.84"
 
 # FEEDBACK - restored (Plan 0033) but the SHORTEST in the set. 6400 segments at the highest brightness here: a longer tail fills the weave solid and erases the moire that is the whole preset.
-trails = "0.30 + clamp(mid * 0.15, 0, 0.07)"
+trails = "0.30 + clamp(mid * 6.0, 0, 0.08)"
 
 [smoothing]
-phase         = 1.17
-radial_offset = 1.3
-scale         = 0.52
-thickness     = 0.39
-hue           = 1.17
-zoom          = 0.52
-bg_bright     = 1.04
+# Constants cut by roughly two thirds, same as the rest of the family. Gains and
+# easing were BOTH wrong on these presets, and fixing only one leaves the other
+# in charge: a big term behind a 1.3 s constant still arrives a bar late.
+phase         = 0.42
+radial_offset = 0.48
+scale         = 0.38
+thickness     = 0.32
+spin          = 0.40
+mirror_order  = 1.4
+hue           = 0.60
+zoom          = 0.40
+bg_bright     = 0.60
 trails       = 0.55
