@@ -1406,3 +1406,74 @@ looks like reporting rather than instrumentation — but that is an observation,
 Worth deciding alongside it: ADR-0042 shipped this **advisory**, to be gated once the library is
 clean. The library is clean *as measured today*; gating on a check with this blind spot would
 freeze the false-clean reading into CI.
+
+---
+
+## 0029 — the swarm's toroidal wrap seam sits exactly on the frame edge, and feedback burns it into a bright bar
+
+- **Raised:** 2026-07-29, from `preset-author` — reported by the user as a visible artifact in the
+  running app, then reproduced headless.
+- **Verified against code:** yes — `core/src/render/scenes/swarm.rs`.
+- **This is a bug report, not a capability request.** Unlike most entries here, nothing about it is
+  a matter of taste, and **no preset lever fixes it.**
+
+### Symptom
+
+A hard, bright, near-horizontal bar along the top and bottom of the frame on every `swarm` preset,
+growing brighter the longer the preset runs. Reproduce:
+
+```sh
+cargo run -p standalone --example shot -- --preset-file presets/swarm_drift.toml \
+  --signal dynamic:110 --frames 400 --size 960x540 --out drift.png
+```
+
+By the last frames of that strip the bands are the brightest thing on screen, and the interior has
+visibly *drained* — the picture is dimmer and flatter than it started. Present on **every** swarm
+preset, and present before the 2026-07-29 retune (`714856a`), so it is not a content regression;
+that commit's longer exposures and coarser sprites only made it more legible.
+
+### Mechanism
+
+```rust
+const BOUND_X: f32 = 1.8;
+const BOUND_Y: f32 = 1.0;
+…
+// Toroidal wrap keeps the field populated (no respawns/hitches).
+if p.pos[1] > BOUND_Y { p.pos[1] -= 2.0 * BOUND_Y; }
+else if p.pos[1] < -BOUND_Y { p.pos[1] += 2.0 * BOUND_Y; }
+```
+
+`BOUND_Y = 1.0` is the NDC frame edge. So the wrap seam is not somewhere off in the simulation's
+margin — **it coincides with the top and bottom of the visible frame.** Every particle that leaves
+the field teleports across at exactly that line, so the line is the one place on screen every
+wrapping particle is guaranteed to paint. The feedback stage then integrates it: with `trails` in
+the 0.7–0.9 range the whole family uses, a per-frame deposit at a fixed y accumulates into a
+saturated bar over a few hundred frames.
+
+The wrap comment is right about what it buys (no respawn hitches) — the defect is the seam's
+*placement*, not the toroid.
+
+### Why no preset can work around it
+
+- **`trails` can only trade it against the look.** Shortening the exposure dims the bar and the
+  figure equally; the bar wins because it is re-deposited every frame while the figure moves.
+- **`zoom` cannot hide it.** Below `1.0` the camera pulls back far enough to expose the domain
+  boundary as a hard rectangle inset from the frame (bracketed at 0.78 — unusable), so the family
+  is pinned at or above 1.0, which is exactly where the seam is. There is no value that puts the
+  seam off-screen without exposing the other edge.
+- `BOUND_X`/`BOUND_Y` are private constants with no param binding.
+
+### Impact
+
+Five shipped presets, plus any future `swarm` content. It is the first thing the eye goes to on a
+dark background, and it is what a user watching the app actually notices — this entry exists
+because one did. It also interacts badly with ADR-0024's dissolves, since the add/burn kind sums
+two frames and both may carry a bar.
+
+### Not deciding
+
+Whether the fix is pushing the bounds outside the view, fading particle alpha approaching the seam,
+or resetting a particle's feedback contribution on wrap. That is architect's call. Worth noting
+only that `BOUND_X = 1.8` vs `BOUND_Y = 1.0` already encodes a 16:9 assumption, so whatever
+replaces it should take the render target's aspect rather than a constant
+([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
