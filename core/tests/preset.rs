@@ -1330,6 +1330,58 @@ fn probed_evaluation_returns_exactly_what_eval_returns_across_the_library() {
 }
 
 #[test]
+fn a_bare_comparison_is_observed_two_valued_and_arithmetic_is_not_observed_at_all() {
+    // The shape Plan 0041 was blind to (ADR-0043): `reseed = "onset > 0.55"` is
+    // the idiomatic boolean-param form and holds no `select()`, so nothing in
+    // the tree used to be observed. `onset` is raw spectral flux — it never
+    // approaches 0.55 in real material, which is how all five attractor presets
+    // shipped without ever reseeding.
+    let spectrum = [0.0f32; 64];
+    let dead = compile("onset > 0.55").expect("compiles");
+    let mut obs = lmv_core::preset::Observations::new();
+    for onset in [0.0f32, 0.004, 0.016, 0.1, 0.3] {
+        dead.eval_probed(&vars(0.04, 0.006, 0.006, onset, 0.0, 0.0, 0.0), &mut obs);
+    }
+    assert_eq!(
+        obs.node(0),
+        lmv_core::preset::NodeObservation::Compare {
+            saw_true: false,
+            saw_false: true,
+        },
+        "a threshold nothing in the run crosses is observed one-sided"
+    );
+
+    // The same expression against stimuli that straddle 0.55 records both.
+    let mut obs = lmv_core::preset::Observations::new();
+    for v in &variable_sweep(&spectrum) {
+        dead.eval_probed(v, &mut obs);
+    }
+    assert_eq!(
+        obs.node(0),
+        lmv_core::preset::NodeObservation::Compare {
+            saw_true: true,
+            saw_false: true,
+        },
+        "the sweep drives `onset` past 0.55, so the same node is two-valued"
+    );
+
+    // Arithmetic carries no branch, so it is not observed — the arena stays
+    // sparse rather than growing a slot for every node in the tree.
+    let arithmetic = compile("bass + mid").expect("compiles");
+    let mut obs = lmv_core::preset::Observations::new();
+    for v in &variable_sweep(&spectrum) {
+        arithmetic.eval_probed(v, &mut obs);
+    }
+    assert!(
+        obs.nodes()
+            .iter()
+            .all(|n| *n == lmv_core::preset::NodeObservation::Untouched),
+        "an arithmetic tree records nothing: {:?}",
+        obs.nodes()
+    );
+}
+
+#[test]
 fn a_condition_that_never_crosses_is_reported_one_sided() {
     // A threshold past even full scale, so this select can only ever pick `y`.
     let dead = compile("select(bass > 1.5, 10, 2)").expect("compiles");
