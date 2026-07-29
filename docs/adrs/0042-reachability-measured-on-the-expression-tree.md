@@ -1,8 +1,8 @@
 # ADR-0042 — Preset reachability is measured on the expression tree, not inferred from frames; `--report` reads at two levels
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-07-28
-> **Related plan(s):** [0041](../plans/0041-report-two-level-stimuli-and-expression-reachability.md)
+> **Related plan(s):** [0041](../plans/done/0041-report-two-level-stimuli-and-expression-reachability.md)
 > **Supplements:** [ADR-0036](0036-preset-reachable-spectrum.md) (the band axis this measures against),
 > [ADR-0039](0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md) (the stimulus policy this extends)
 
@@ -152,6 +152,33 @@ those forces. `--audio` remains available to a user pointing at their own file.
 The measured levels this ADR reasons from are in
 [`docs/capturing.md`](../capturing.md#what-real-material-actually-produces) (real material, via
 `--audio`) and reproduced by `shot --signal dynamic:110`, which prints them.
+
+## Outcome (2026-07-29, after Plan 0041)
+
+**The main negative did not materialize, because the implementation removed it rather than tested
+around it.** "A second evaluation path can diverge from the real one" assumed two copies of the
+arithmetic. There is one: the probe walk in `core/src/preset/expr.rs` *only records*, and
+`Expr::eval_probed` returns `Expr::eval`'s own value. Divergence is unrepresentable, and the equality
+assertion over the shipped library that this ADR asked for survives as a regression guard rather than
+as the load-bearing proof. The price is that a `select()` condition and a `clamp()`'s arguments are
+evaluated twice per probed call, which is free on a pure grammar nothing but the harness calls.
+
+**The layout call went to a second block, not a wider table.** Nine columns stayed nine; the
+realistic reading is its own block under each family, so every number a previous run printed is still
+in the same place. The "thirteen-ish columns" this ADR worried about never happened.
+
+**The clamp half is noisier than the `select()` half by an order of magnitude.** Over the 32 shipped
+presets the probe reports **20 dead branches and 159 unapproached ceilings** — nearly every `clamp()`
+in the library was written as a ceiling for full-scale input, which is the same mis-gaining. `--report`
+answers with a count plus a per-family worst-three line and puts all of them in `--json`. Worth knowing
+before the follow-on gate is designed: the two findings need different floors, and the ceiling check
+currently flags on strict `< 1.0` rather than on "approached", so a bound reached at 99 % still counts.
+
+**The false positive this ADR predicted is real, measured and standing.** `tempo` gates account for
+**14 of the 20** dead branches — `swarm_storm` (7), `attractor_lorenz` (6) and `rose_zoom` (1) — leaving
+six genuine band gates: `fragment_warp` (2), `lsystem_fern` (2), `attractor_dejong` and `star_rosette`.
+The report's wording carries the suspect-not-conviction discipline this ADR required, and names the
+`tempo` case explicitly as the standing exception.
 
 Worth stating for whoever writes the follow-on gate: the honest floor for a reachability gate is
 almost certainly **not** "every gate must fire". A preset gated on `tempo > 132` is correctly dead

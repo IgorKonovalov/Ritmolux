@@ -1,11 +1,11 @@
 # 0041 — `--report` reads at two levels, and expression reachability is measured on the AST
 
-> **Status:** in-progress 2026-07-29
+> **Status:** done 2026-07-29
 > **Created:** 2026-07-28
 > **Owner skill(s):** dev
-> **Related ADRs:** [0042](../adrs/0042-reachability-measured-on-the-expression-tree.md)
-> **Closes backlog:** [0020](../design-backlog.md#0020--the-shipped-library-is-gained-against-stimuli-6-100x-hotter-than-real-music)
-> (the harness half), [0022](../design-backlog.md#0022--reports-reactivity-columns-are-structurally-blind-to-a-level-curve)
+> **Related ADRs:** [0042](../../adrs/0042-reachability-measured-on-the-expression-tree.md)
+> **Closes backlog:** [0020](../../design-backlog.md#0020--the-shipped-library-is-gained-against-stimuli-6-100x-hotter-than-real-music)
+> (the harness half), [0022](../../design-backlog.md#0022--reports-reactivity-columns-are-structurally-blind-to-a-level-curve)
 
 ## TL;DR
 
@@ -28,7 +28,7 @@ and at full scale every dead gate fires. The same full-scale property makes the 
 level `curve` (backlog 0022: `1^curve = 1` at any exponent). One property of the instrument, two
 classes of blindness, and the instrument is what all three lanes verify through.
 
-The interview settled four points, recorded in [ADR-0042](../adrs/0042-reachability-measured-on-the-expression-tree.md):
+The interview settled four points, recorded in [ADR-0042](../../adrs/0042-reachability-measured-on-the-expression-tree.md):
 keep full-scale and **add** a low-level reading (non-breaking, and the *gap* is the signal); flag both
 dead branches and unreachable clamps; ship **advisory** and gate only after the library is clean;
 stay on **synthesized** stimuli, leaving ADR-0039's rejection of a committed clip intact.
@@ -130,7 +130,7 @@ flowchart TB
 - **Files touched:** `docs/capturing.md`, `presets/README.md`, `docs/presets.md`.
 - **Done when:** an author reading `presets/README.md` on how to write a `select()` threshold is told
   what range the bands actually occupy, in that document, without needing to open a preset to find it.
-  Also fold in backlog [0027](../design-backlog.md#0027--two-engine-behaviours-that-are-correct-non-obvious-and-undocumented):
+  Also fold in backlog [0027](../../design-backlog.md#0027--two-engine-behaviours-that-are-correct-non-obvious-and-undocumented):
   `color_center` is cyclic (a negative centre wraps into the bright end, it does not clamp toward the
   dark one), and the ink pass is `mix(paper, ink, luminance)` and therefore **interpolates**, so
   inverting its poles does not darken a continuous field. Both cost the content lane multiple render
@@ -189,3 +189,24 @@ pub enum NodeObservation {
   the array's coarsest region) is a live, separate, ADR-worthy question about the DSP. Nothing here
   changes what `bin(x)` means.
 - **It does not change `Expr::eval`,** the grammar, or anything the render path executes.
+
+## Outcome (2026-07-29 — Mode 4 close)
+
+Landed in four `dev` commits — `1c8f216` the second stimulus, `5901e0e` probed evaluation,
+`27c84cd` the report surface, `efd25bb` the docs. Passed Mode 4 review: **no blockers**, one major,
+four minors, three nits. `--report` now flags `attractor_dejong`, `attractor_lorenz` and
+`fragment_warp` and clears `fragment_kaleido`, `reaction_reef` and `lsystem_arrowhead`, which is
+Phase 3's acceptance contrast reproduced at review; it also caught `lsystem_fern` and `star_rosette`,
+which this plan did not name.
+
+**Phase 2 shipped a better shape than the plan asked for.** The plan offered a duplicated body plus
+an equality test, with a generic zero-sized-observer as the named fallback. `dev` took neither: the
+probe walk **only records** and the value returned is `Expr::eval`'s own, so the divergence ADR-0042
+called this approach's main cost is impossible by construction and the equality assertion over the
+shipped library survives as a regression guard rather than as the load-bearing proof. The static
+node-index property this requires is load-bearing in its own right and carries a test the plan never
+asked for (`a_nodes_index_does_not_move_with_the_branch_the_run_took`).
+
+Closes design-backlog **0020** (the harness half only — the ~10 un-swept presets are still a
+`preset-author` content pass), **0022** and **0027**. [ADR-0042](../../adrs/0042-reachability-measured-on-the-expression-tree.md)
+is accepted with an Outcome section. Version **minor 0.21.1 → 0.22.0**.
