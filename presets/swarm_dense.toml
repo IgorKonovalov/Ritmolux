@@ -40,17 +40,41 @@ name = "spectrum"
 # stand still long enough to be followed and ten thousand particles become a
 # murmuration instead of a texture.
 #
-# DENSE IS THE TIGHT ONE - the most particles, the smallest sprites, the
-# quickest field of the calm three. Treble rides the field rate so the top end
-# makes the formation shimmer and reorganise rather than scatter.
+# DENSE IS THE FINE-GRAINED ONE, and that is now a MEASURED separation rather
+# than a described one. Dense, Drift and Flow used to sit within 20 % of each
+# other on every lever (force 1.30/1.20/1.32, spin 0.105/0.085/0.115, size
+# 0.95/1.05/1.15, zoom 1.04/1.05/1.02) - three presets separated by less than
+# the audio modulation range of each param, which is why they read as one
+# preset with three palettes however different their band drivers were. Band
+# assignment is nearly invisible in a still; GRAIN SIZE and EXPOSURE LENGTH are
+# what the eye actually separates, so the family now splits on those:
+#
+#   Dense   size 0.58   trails 0.76   spin 0.130   fine dashes, busy weave
+#   Drift   size 2.20   trails 0.86   spin 0.040   large soft blobs, nebula
+#   Flow    size 0.75   trails 0.92   spin 0.050   long combed silk filaments
+#
+# Two constraints found by bracketing, both worth not rediscovering:
+#   - `zoom` BELOW 1.0 exposes the particle domain boundary as a hard rectangle
+#     inset from the frame edge. The whole family stays at or above 1.0, which
+#     kills the obvious "pull the camera back for empty space" move.
+#   - `force` is visually inert across 1.30..1.62 at these settings. It is not
+#     the differentiator it reads as; the collapse warning in swarm_drift.toml
+#     is about much larger values.
 force = "1.30 + clamp(mid * 16.0, 0, 0.30) + sin(time * 0.061) * 0.10"
-spin  = "0.105 + clamp(treb * 5.0, 0, 0.08) + clamp(mid * 3.5, 0, 0.045)"
+spin  = "0.130 + clamp(treb * 5.0, 0, 0.08) + clamp(mid * 3.5, 0, 0.045)"
 burst = "clamp(beat * 0.25 + clamp(onset * 0.6, 0, 0.30), 0, 0.50)"
 
-# APPEARANCE - flat brightness, and size FALLS slightly under treble: a loud
-# top end should read as finer, faster glitter, not as a brighter smear.
-brightness = "0.76 + clamp(bass * 5.0, 0, 0.16)"
-size       = "0.95 - clamp(treb * 10.0, 0, 0.18) + beat * 0.18"
+# APPEARANCE - the finest sprite in the family, and the brightest to compensate.
+# Size FALLS slightly under treble: a loud top end should read as finer, faster
+# glitter, not as a brighter smear.
+#
+# Brightness went 0.76 -> 0.92 because the two moved together: at 0.58 each
+# particle covers roughly a third of the pixels it did at 0.95, so the same
+# brightness rendered the densest preset in the set as the DIMMEST. Fine grain
+# needs the per-particle intensity back or it reads as an empty frame - which
+# is exactly what a 0.58/0.76 pairing produced when bracketed.
+brightness = "0.92 + clamp(bass * 5.0, 0, 0.18)"
+size       = "0.58 - clamp(treb * 6.0, 0, 0.10) + beat * 0.14"
 
 # COLOUR - the tightest hue window in the set. This is the cohesion knob: low
 # spread is what separates "one shimmering body" from "novelty confetti".
@@ -68,7 +92,7 @@ palette_mix = "clamp((bass + treb) * 8.0, 0, 0.35)"
 # Backed off to just over 1.0. "Fills its wedge before the fold repeats it" is
 # still true - the shoal fills it by being dense, which is the preset's name,
 # not by being magnified until it overflows.
-zoom  = "1.04 + bar * 0.05 + clamp(bass * 3.0, 0, 0.10)"
+zoom  = "1.02 + bar * 0.05 + clamp(bass * 3.0, 0, 0.10)"
 pan_x = "sin(time * 0.033) * 0.07"
 pan_y = "cos(time * 0.025) * 0.05"
 
@@ -81,10 +105,14 @@ pan_y = "cos(time * 0.025) * 0.05"
 # wedge it is replicating, and the further the order is pushed the more corner
 # area comes from out-of-range samples. Six is the highest that stays clean at
 # 16:9.
-# Shortened a little as well. Long trails are what put a sustained bright streak
-# on the frame border in the first place, and a shorter exposure suits an
-# unfolded field: the glitter reads as glitter rather than as combed strokes.
-trails        = "0.72 + clamp(mid * 8.0, 0, 0.12)"
+# EXPOSURE IS THE OTHER HALF OF THE GRAIN, and it was bracketed at 0.40 / 0.62
+# / 0.76 against Flow as a reference. The short end is the trap: at 0.40 each
+# fine sprite draws a dot rather than a dash, and "Dense" rendered as the
+# SPARSEST preset of the three - the frame nearly empty, the name contradicted.
+# Persistence is what turns ten thousand points into continuous coverage. 0.76
+# is the value that fills the frame while still reading as separate strokes;
+# past ~0.85 the dashes fuse and it becomes Flow's silk.
+trails        = "0.76 + clamp(mid * 8.0, 0, 0.10)"
 # THE SCREEN FOLD IS OFF, and this is a mitigation for an ENGINE artifact rather
 # than a taste decision - it is written up as feedback for architect.
 #

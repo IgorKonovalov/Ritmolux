@@ -54,8 +54,20 @@ stops = [
 # is the directed CURRENT of the set, streams that commit to a direction and
 # hold it, where Drift wanders. The treble terms move the field rate rather than
 # the steering: the top end makes the formation reorganise, not scatter.
+# FLOW IS THE SILK ONE, and it is the clearest identity the family has. See the
+# split documented in `swarm_dense.toml`: the three calm swarms used to differ
+# by less than their own modulation range. Flow takes the LONGEST exposure with
+# a fine sprite and a near-frozen field, and the combination produces something
+# none of the others do - long, combed, parallel filaments with an obvious sweep
+# across the frame, rather than the dash texture the whole family used to share.
+#
+# `spin` 0.115 -> 0.050 is what makes it silk. Persistence draws each particle's
+# PATH, but a path is only smooth if the field it was following held still while
+# the particle traversed it; at 0.115 the streamlines were rewritten mid-stroke
+# and the trails came out as short crooked dashes however long the exposure was.
+# Low spin plus long trails is the pairing - neither alone gives filaments.
 force = "1.32 + sin(time * 0.083) * 0.14 + clamp(bass * 6.0, 0, 0.34) + bar * 0.10"
-spin  = "0.115 + clamp(treb * 4.0, 0, 0.075) + clamp(bin(0.86) * 2.2, 0, 0.045) + sin(time * 0.047) * 0.012"
+spin  = "0.050 + clamp(treb * 4.0, 0, 0.075) + clamp(bin(0.86) * 2.2, 0, 0.045) + sin(time * 0.047) * 0.012"
 # Cut hard. `burst` shoves particles radially outward from the centre, which is
 # the exact opposite of a formation holding together - it is an explosion, and
 # it was tearing the flock apart on every beat.
@@ -71,7 +83,7 @@ brightness = "0.70 + clamp(bass * 5.0, 0, 0.18)"
 # continuous fog and hid the streamline structure. The scene multiplies each
 # particle's brightness by its own SPEED, so small sprites also let the fast
 # channels separate out bright against the slack water - depth for free.
-size       = "1.15 + clamp(bin(0.86) * 9.0, 0, 0.40) + sin(bar * pi) * 0.18"
+size       = "0.75 + clamp(bin(0.86) * 9.0, 0, 0.40) + sin(bar * pi) * 0.18"
 
 # COLOUR - one cool family, sliding. palette_mix crossfades `ice` toward a
 # custom deep-blue-to-foam gradient as the top end opens.
@@ -88,13 +100,17 @@ saturation  = "1.00 + clamp(mid * 18.0, 0, 0.26)"
 palette_mix = "clamp(treb * 18.0, 0, 0.30) + clamp(bin(0.78) * 12.0, 0, 0.45)"
 
 # VIEW - a slow lateral drift, so the river appears to run rather than sit.
-zoom  = "1.02 + bar * 0.07 + clamp(bass * 4.5, 0, 0.16)"
+zoom  = "1.05 + bar * 0.07 + clamp(bass * 4.5, 0, 0.16)"
 pan_x = "sin(time * 0.029) * 0.12"
 pan_y = "cos(time * 0.019) * 0.06"
 
 # COMPOSITE - the ribbons, over a cold vignetted deep. `trails` is what turns a
 # point cloud into streamlines, so it is the one thing that rises with energy.
-trails      = "0.78 + clamp((bass + mid) * 3.0, 0, 0.16)"
+# THE LONGEST EXPOSURE IN THE SET, and on this preset it is structural rather
+# than atmospheric: the filaments ARE the accumulation. The reactive term is
+# small on purpose - at this length the trail buffer is most of the frame, so a
+# big band term on it pumps the whole image rather than the figure.
+trails      = "0.92 + clamp((bass + mid) * 3.0, 0, 0.06)"
 bg_hue      = "0.33 + sin(time * 0.011) * 0.04"
 bg_bright   = "0.010 + clamp(mid * 2.0, 0, 0.010)"
 bg_vignette = "0.80"
