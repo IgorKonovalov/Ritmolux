@@ -583,6 +583,15 @@ const PROBE_SETTLE_TOL: f32 = 0.02;
 struct PresetReport {
     name: String,
     reactivity: [f32; 4], // bass, mid, treb, onset
+    /// The same four differentials measured under [`band_stimuli_low`]. Stored
+    /// beside the full-scale triple rather than replacing it — the pair is the
+    /// reading (ADR-0042).
+    #[expect(
+        dead_code,
+        reason = "Plan 0041 Phase 3 prints these; Phase 1 only has to measure and \
+                  store them, so that the report's existing output diffs clean"
+    )]
+    reactivity_low: [f32; 4],
     animation: f32,
     coverage: f32,
     transient: Transient,
@@ -634,6 +643,7 @@ fn build_family_report(
     let silent = AnalysisFrame::default();
     let loud = loud_frame();
     let bands = band_stimuli();
+    let bands_low = band_stimuli_low();
 
     // The transient probe runs first and at its own smaller size, so the resize
     // happens twice per family rather than twice per preset.
@@ -653,9 +663,16 @@ fn build_family_report(
     for (index, name) in names.iter().enumerate() {
         let base = capture(r, name, &silent, REPORT_FRAMES)?;
         let mut reactivity = [0.0f32; 4];
+        let mut reactivity_low = [0.0f32; 4];
         for (i, frame) in bands.iter().enumerate() {
             let lit = capture(r, name, frame, REPORT_FRAMES)?;
             reactivity[i] = frame_diff(&base, &lit);
+        }
+        // Against the same silent baseline, so the two triples differ only in
+        // the stimulus level.
+        for (i, frame) in bands_low.iter().enumerate() {
+            let lit = capture(r, name, frame, REPORT_FRAMES)?;
+            reactivity_low[i] = frame_diff(&base, &lit);
         }
         let late = capture(r, name, &silent, REPORT_FRAMES_LATE)?;
         let animation = frame_diff(&base, &late);
@@ -670,6 +687,7 @@ fn build_family_report(
         presets.push(PresetReport {
             name: name.clone(),
             reactivity,
+            reactivity_low,
             animation,
             coverage: cov,
             transient: transients.get(index).copied().unwrap_or(Transient {
@@ -737,31 +755,98 @@ const BASS_BANDS: std::ops::Range<usize> = 0..22;
 const MID_BANDS: std::ops::Range<usize> = 22..48;
 const TREB_BANDS: std::ops::Range<usize> = 48..64;
 
-/// A held frame with one scalar band up and the matching slice of the log
-/// spectrum lit.
+/// A held frame with one scalar band up to `level` and the matching slice of the
+/// log spectrum lit to the same level.
+///
+/// The slice tracks the scalar rather than carrying a second measured number:
+/// the two are on different scales (the band array's own realistic level is
+/// nothing like its scalar's — see [`LOW_LEVELS`]), and what a differential
+/// column reads is a *ratio between two runs of the same shape*, so keeping one
+/// level argument keeps the pair comparable.
 fn band_stimulus(
-    scalar: impl Fn(&mut AnalysisFrame),
+    scalar: impl Fn(&mut AnalysisFrame, f32),
     bands: std::ops::Range<usize>,
+    level: f32,
 ) -> AnalysisFrame {
     let mut frame = AnalysisFrame::default();
-    scalar(&mut frame);
+    scalar(&mut frame, level);
     for band in frame.spectrum.iter_mut().take(bands.end).skip(bands.start) {
-        *band = 1.0;
+        *band = level;
     }
     frame
 }
 
+/// The four stimuli at **full scale** — the historical reading. Every
+/// `--report` number quoted in a commit message, an ADR Outcome or a backlog
+/// entry was measured under these, and they are unchanged so those numbers keep
+/// meaning what they said (ADR-0042).
 fn band_stimuli() -> [AnalysisFrame; 4] {
+    band_stimuli_at(FULL_LEVELS)
+}
+
+/// The same four stimuli at **realistic** levels ([`LOW_LEVELS`]). Read beside
+/// the full-scale columns: the *gap* is the signal (ADR-0042). A binding gated
+/// on a threshold real audio never reaches moves in one and not the other, and a
+/// level `curve` — `level^curve`, the identity at `level = 1` for any exponent —
+/// can only show up here.
+fn band_stimuli_low() -> [AnalysisFrame; 4] {
+    band_stimuli_at(LOW_LEVELS)
+}
+
+/// `[bass, mid, treb, onset]` levels for one reading.
+type StimulusLevels = [f32; 4];
+
+/// Full scale: every band pinned at `1.0`, the convention `--report` has always
+/// used.
+const FULL_LEVELS: StimulusLevels = [1.0, 1.0, 1.0, 1.0];
+
+/// What the analyzer actually derives from music-like material, and therefore
+/// what a shipped preset's thresholds and gains have to be written against.
+///
+/// **Measured 2026-07-29** from `shot --signal dynamic:110`, over the 367
+/// analysis hops past warm-up that a filmstrip of that clip would render. The
+/// first three are the means the run prints; `onset` is not printed (it is not a
+/// band) and was measured the same way over the same hops:
+///
+/// ```text
+/// band     min     mean      max
+/// bass   0.004    0.040    0.106
+/// mid    0.000    0.006    0.019
+/// treb   0.000    0.006    0.032
+/// onset  0.000    0.002    0.016
+/// ```
+///
+/// Two things to know before trusting these. **`onset` is raw spectral flux**,
+/// not a normalized `0..1` envelope — a preset multiplying `onset` by a gain
+/// tuned against `--set onset=1` is off by roughly two orders of magnitude, and
+/// this column is where that shows. And the **band array is on its own scale**:
+/// across the same hops its per-band mean is `0.020` and its hottest single band
+/// `0.338`, so a `bin()`-reading preset reads low here by more than the scalar
+/// gap suggests (`docs/capturing.md`).
+///
+/// **Re-measure rather than guess** if you doubt them: `cargo run -p standalone
+/// --example shot -- --signal dynamic:110 --out strip.png` prints the band table
+/// on every run. These are one generator at one BPM — a judgment baked into the
+/// harness (ADR-0042), which is why its provenance is written down instead of
+/// the number standing alone.
+const LOW_LEVELS: StimulusLevels = [0.040, 0.006, 0.006, 0.0016];
+
+fn band_stimuli_at(levels: StimulusLevels) -> [AnalysisFrame; 4] {
+    let [bass, mid, treb, onset] = levels;
     [
-        band_stimulus(|f| f.bass = 1.0, BASS_BANDS),
-        band_stimulus(|f| f.mid = 1.0, MID_BANDS),
-        band_stimulus(|f| f.treb = 1.0, TREB_BANDS),
+        band_stimulus(|f, v| f.bass = v, BASS_BANDS, bass),
+        band_stimulus(|f, v| f.mid = v, MID_BANDS, mid),
+        band_stimulus(|f, v| f.treb = v, TREB_BANDS, treb),
         AnalysisFrame {
             // A transient is broadband, so the onset stimulus lights the whole
             // array rather than a slice.
-            onset: 1.0,
+            onset,
+            // `beat` stays true at both levels on purpose: it is an event, not a
+            // magnitude, and real material does raise it. So a beat-latched
+            // binding holds across the pair while an `onset`-scaled one falls
+            // away — which is the distinction this column can now draw.
             beat: true,
-            spectrum: [1.0; SPECTRUM_BINS],
+            spectrum: [onset; SPECTRUM_BINS],
             ..Default::default()
         },
     ]
