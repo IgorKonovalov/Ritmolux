@@ -39,15 +39,17 @@
 use std::path::{Path, PathBuf};
 
 use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
-use lmv_core::preset::{Preset, SystemKind, default_presets, load_dir};
+use lmv_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS};
+use lmv_core::preset::{
+    GateFlag, GateKind, Observations, Preset, SystemKind, Variables, default_presets, load_dir,
+};
 use lmv_core::render::metrics::{
     StepResponse, coverage, frame_diff, quadrant_spread, segment_settled, step_response,
     struct_diff,
 };
 use lmv_core::render::{CaptureImage, HeadlessOptions, Renderer};
 use standalone::shot::args::{BandLevels, apply_set, band_levels, parse_size, synth_signal};
-use standalone::shot::film::{StripLayout, filmstrip_indices, filmstrip_layout};
+use standalone::shot::film::{FILMSTRIP_WARMUP, StripLayout, filmstrip_indices, filmstrip_layout};
 use standalone::shot::glyph::{GLYPH_ADVANCE, GLYPH_COLS, glyph_for};
 use standalone::shot::json::{json_matrix, json_string, json_transient, num};
 use standalone::shot::wav::parse_wav_16bit;
@@ -586,15 +588,21 @@ struct PresetReport {
     /// The same four differentials measured under [`band_stimuli_low`]. Stored
     /// beside the full-scale triple rather than replacing it — the pair is the
     /// reading (ADR-0042).
-    #[expect(
-        dead_code,
-        reason = "Plan 0041 Phase 3 prints these; Phase 1 only has to measure and \
-                  store them, so that the report's existing output diffs clean"
-    )]
     reactivity_low: [f32; 4],
     animation: f32,
     coverage: f32,
     transient: Transient,
+    /// Gates this preset's expressions never exercised under the realistic
+    /// probe — suspects, not convictions (see [`probe_reachability`]).
+    gates: Vec<GateReport>,
+}
+
+/// One flagged gate, together with the binding it came from.
+#[derive(Clone)]
+struct GateReport {
+    /// The parameter whose expression holds the gate.
+    param: String,
+    flag: GateFlag,
 }
 
 struct FamilyReport {
@@ -607,6 +615,9 @@ struct FamilyReport {
 
 fn report(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
     let meta = preset_meta(&presets);
+    // The structural pass runs first: it reads the compiled expressions, and the
+    // renderer is about to take ownership of them.
+    let gates = reachability_pass(&presets)?;
     let mut r = renderer(REPORT_SIZE, REPORT_SIZE, presets)?;
 
     // The roster, not a copy of it: a hand-maintained list here silently omitted
@@ -624,7 +635,7 @@ fn report(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> 
         if names.is_empty() {
             continue;
         }
-        reports.push(build_family_report(&mut r, system, &names)?);
+        reports.push(build_family_report(&mut r, system, &names, &gates)?);
     }
 
     if args.json {
@@ -639,6 +650,7 @@ fn build_family_report(
     r: &mut Renderer,
     system: SystemKind,
     names: &[String],
+    gates: &[(String, Vec<GateReport>)],
 ) -> Result<FamilyReport, String> {
     let silent = AnalysisFrame::default();
     let loud = loud_frame();
@@ -699,6 +711,11 @@ fn build_family_report(
                 rise_settled: false,
                 fall_settled: false,
             }),
+            gates: gates
+                .iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, g)| g.clone())
+                .unwrap_or_default(),
         });
         fixed_caps.push(fixed);
     }
@@ -852,6 +869,181 @@ fn band_stimuli_at(levels: StimulusLevels) -> [AnalysisFrame; 4] {
     ]
 }
 
+// ---------------------------------------------------------------------------
+// Reachability (Plan 0041 Phase 3 / ADR-0042)
+// ---------------------------------------------------------------------------
+
+/// BPM the reachability probe generates. Matches the clip [`LOW_LEVELS`] was
+/// measured from, so the columns and the flags describe the same material.
+const REACH_BPM: f32 = 110.0;
+
+/// Seconds of that clip to evaluate over — deliberately longer than the 4 s a
+/// `--signal` filmstrip synthesizes. The tempo tracker needs time to lock, and
+/// under a 4 s clip it never does: `tempo` reads a flat `0`, which turns every
+/// `tempo` comparison into a gate that was never really asked. At this length it
+/// settles near the generator's own BPM, so a `tempo > 124` flag means "110 is
+/// not above 124" — a true statement about one BPM — instead of "the tracker was
+/// still cold".
+const REACH_SECS: f32 = 12.0;
+
+/// Positions the per-element `index` is sampled at for a binding that reads it.
+/// Endpoints included, so a gate on the first or last element is exercised.
+const REACH_INDEX_SAMPLES: usize = 5;
+
+/// Analysis frames the reachability probe drives every expression with: the
+/// **real** analyzer over the same generator [`LOW_LEVELS`] came from, not a
+/// hand-built frame. Bands move together the way music's do, `bin()` sees a real
+/// band array, and `beat`/`bar`/`onset` arrive as the detector produces them.
+///
+/// CPU only — no GPU, no rendering. This is the structural measurement
+/// ADR-0042 adds beside the frame differentials.
+fn reachability_frames() -> Result<Vec<AnalysisFrame>, String> {
+    let format = AudioFormat {
+        sample_rate: 48_000,
+        channels: 2,
+    };
+    let pcm = lmv_core::signal::dynamic_groove(REACH_BPM, REACH_SECS, format);
+    let mut analyzer = Analyzer::new(format).map_err(|e| format!("reachability analyzer: {e}"))?;
+    let hop_samples = HOP_SIZE * format.channels as usize;
+    let mut frames = Vec::new();
+    for (index, hop) in pcm.chunks(hop_samples).enumerate() {
+        analyzer.push_interleaved(hop);
+        let frame = analyzer.take_frame();
+        // Skip warm-up for the same reason `band_levels` does: until the window
+        // fills every band reads zero, and a gate would look dead on evidence
+        // that is only the analyzer starting up.
+        if index >= FILMSTRIP_WARMUP {
+            frames.push(frame);
+        }
+    }
+    if frames.is_empty() {
+        return Err("reachability probe produced no analysis frames".to_string());
+    }
+    Ok(frames)
+}
+
+/// Walk every binding of `preset` under `frames`, and report the gates that
+/// never went both ways.
+fn probe_reachability(preset: &Preset, frames: &[AnalysisFrame]) -> Vec<GateReport> {
+    let hop_seconds = HOP_SIZE as f32 / 48_000.0;
+    let mut out = Vec::new();
+    for binding in &preset.params {
+        let mut obs = Observations::new();
+        for (hop, frame) in frames.iter().enumerate() {
+            let vars = Variables::new(
+                frame.bass,
+                frame.mid,
+                frame.treb,
+                frame.onset,
+                f32::from(frame.beat),
+                frame.bar,
+                hop as f32 * hop_seconds,
+                frame.bpm,
+                frame.novelty,
+            )
+            .with_spectrum(&frame.spectrum);
+            // A per-element binding is evaluated once per element by the render
+            // loop, so a gate of its can be live at one end of the strip and
+            // dead at the other. Sampling `index` is what keeps this honest.
+            if binding.expr.uses_index() {
+                for step in 0..REACH_INDEX_SAMPLES {
+                    let t = step as f32 / (REACH_INDEX_SAMPLES.max(2) - 1) as f32;
+                    binding.expr.eval_probed(&vars.with_index(t), &mut obs);
+                }
+            } else {
+                binding.expr.eval_probed(&vars, &mut obs);
+            }
+        }
+        for flag in binding.expr.flag_gates(&obs) {
+            out.push(GateReport {
+                param: binding.name.clone(),
+                flag,
+            });
+        }
+    }
+    out
+}
+
+/// `(preset name, flagged gates)` for the whole library. Run **before** the
+/// renderer takes ownership of the presets — it reads their compiled
+/// expressions, which is the one thing a capture cannot show.
+fn reachability_pass(presets: &[Preset]) -> Result<Vec<(String, Vec<GateReport>)>, String> {
+    let frames = reachability_frames()?;
+    Ok(presets
+        .iter()
+        .map(|p| (p.name.clone(), probe_reachability(p, &frames)))
+        .collect())
+}
+
+/// Ceilings named in the text report per family. The whole library trips over
+/// 200 of these — nearly every `clamp()` in it was written as a ceiling for
+/// full-scale input, which is the same mis-gaining the columns show — and
+/// printing them all buries the dozen dead branches that are actually
+/// actionable. The count is per preset in the table, the worst few are named
+/// here, and `--json` carries every one.
+const CEILINGS_NAMED: usize = 3;
+
+/// The per-family ceiling line: how many `clamp()` upper bounds never bit, and
+/// the ones furthest from biting.
+fn print_ceiling_summary(fam: &FamilyReport) {
+    let mut ceilings: Vec<(&str, &GateReport, f32)> = fam
+        .presets
+        .iter()
+        .flat_map(|p| {
+            p.gates.iter().filter_map(move |g| match g.flag.kind {
+                GateKind::Clamp {
+                    peak_fraction_of_bound,
+                } => Some((p.name.as_str(), g, peak_fraction_of_bound)),
+                GateKind::Select { .. } => None,
+            })
+        })
+        .collect();
+    if ceilings.is_empty() {
+        return;
+    }
+    // Furthest from its bound first — the most decorative ceiling is the one
+    // most worth re-gaining.
+    ceilings.sort_by(|a, b| a.2.total_cmp(&b.2));
+    let named: Vec<String> = ceilings
+        .iter()
+        .take(CEILINGS_NAMED)
+        .map(|(name, gate, fraction)| format!("{name}.{} at {:.0}%", gate.param, fraction * 100.0))
+        .collect();
+    println!(
+        "  {} clamp ceiling(s) never approached at this level (furthest: {}) — \
+         a bound that never bites is a parameter with a narrower real range than \
+         it reads; --json lists them all",
+        ceilings.len(),
+        named.join(", ")
+    );
+}
+
+/// One flagged gate as a line of report text. Worded as a suspect: it says what
+/// was observed, not what is wrong.
+fn gate_line(preset: &str, gate: &GateReport) -> String {
+    match gate.flag.kind {
+        GateKind::Select { always } => {
+            let (never, branch) = if always {
+                ("false", "else")
+            } else {
+                ("true", "then")
+            };
+            format!(
+                "  GATE {preset}.{}: `{}` never went {never}, so its `{branch}` branch never ran",
+                gate.param, gate.flag.source
+            )
+        }
+        GateKind::Clamp {
+            peak_fraction_of_bound,
+        } => format!(
+            "  CEIL {preset}.{}: `{}` reached {:.0}% of its upper bound",
+            gate.param,
+            gate.flag.source,
+            peak_fraction_of_bound * 100.0
+        ),
+    }
+}
+
 /// The probe stimulus (Plan 0037): silence, a step up to [`loud_frame`], then a
 /// step back down. This is the whole reason the probe can see easing at all — a
 /// held stimulus converges every smoother before the pixels are read, so it
@@ -919,6 +1111,19 @@ fn transient_cell(frames: u32, settled: bool) -> String {
     }
 }
 
+/// `(dead branches, unapproached ceilings)` for one preset. Counted apart
+/// because they are different claims: a one-sided `select()` means a branch of
+/// the preset has never rendered, while a `clamp()` short of its bound only
+/// means the ceiling is doing no work.
+fn gate_counts(p: &PresetReport) -> (usize, usize) {
+    let dead = p
+        .gates
+        .iter()
+        .filter(|g| matches!(g.flag.kind, GateKind::Select { .. }))
+        .count();
+    (dead, p.gates.len() - dead)
+}
+
 fn loud_frame() -> AnalysisFrame {
     AnalysisFrame {
         bass: 1.0,
@@ -969,6 +1174,56 @@ fn print_text_report(source: &str, reports: &[FamilyReport]) {
                 transient_cell(p.transient.response.fall_frames, p.transient.fall_settled),
             );
         }
+        // The second reading, as its own block rather than four more columns:
+        // the table above is already nine wide and a wide terminal is not
+        // guaranteed (ADR-0042). Keeping it un-widened also means every number
+        // a previous run printed is still in the same place.
+        let [bass_lo, mid_lo, treb_lo, onset_lo] = LOW_LEVELS;
+        println!(
+            "\n  at realistic levels (bass {bass_lo} mid {mid_lo} treb {treb_lo} onset \
+             {onset_lo}) — read the *gap* against the columns above, not the value alone:"
+        );
+        println!(
+            "  {:<14} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7}",
+            "preset", "bass", "mid", "treb", "onset", "gates", "ceils"
+        );
+        for p in &fam.presets {
+            let (dead, ceilings) = gate_counts(p);
+            println!(
+                "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7} {:>7}",
+                p.name,
+                p.reactivity_low[0],
+                p.reactivity_low[1],
+                p.reactivity_low[2],
+                p.reactivity_low[3],
+                dead,
+                ceilings,
+            );
+        }
+        let dead: Vec<(&str, &GateReport)> = fam
+            .presets
+            .iter()
+            .flat_map(|p| {
+                p.gates
+                    .iter()
+                    .filter(|g| matches!(g.flag.kind, GateKind::Select { .. }))
+                    .map(move |g| (p.name.as_str(), g))
+            })
+            .collect();
+        if dead.is_empty() {
+            println!("  every branch was taken under the {REACH_BPM} BPM probe");
+        } else {
+            println!(
+                "  a flag is a suspect, not a conviction: it says this {REACH_SECS} s \
+                 {REACH_BPM} BPM probe never drove the gate both ways. A gate on `tempo` \
+                 is correctly one-sided under a single BPM"
+            );
+            for (name, gate) in &dead {
+                println!("{}", gate_line(name, gate));
+            }
+        }
+        print_ceiling_summary(fam);
+
         let marked = fam
             .presets
             .iter()
@@ -1022,10 +1277,17 @@ fn render_json(source: &str, reports: &[FamilyReport]) -> String {
                 num(p.reactivity[2]),
                 num(p.reactivity[3]),
             ));
+            out.push_str(&format!(
+                "\"reactivity_low\":{{\"bass\":{},\"mid\":{},\"treb\":{},\"onset\":{}}},",
+                num(p.reactivity_low[0]),
+                num(p.reactivity_low[1]),
+                num(p.reactivity_low[2]),
+                num(p.reactivity_low[3]),
+            ));
             out.push_str(&format!("\"animation\":{},", num(p.animation)));
             out.push_str(&format!("\"coverage\":{},", num(p.coverage)));
             out.push_str(&format!(
-                "\"transient\":{}",
+                "\"transient\":{},",
                 json_transient(
                     p.transient.response.rise_frames,
                     p.transient.response.fall_frames,
@@ -1034,6 +1296,7 @@ fn render_json(source: &str, reports: &[FamilyReport]) -> String {
                     p.transient.fall_settled,
                 )
             ));
+            out.push_str(&format!("\"reachability\":{}", json_reachability(p)));
             out.push('}');
         }
         out.push_str("},");
@@ -1054,6 +1317,47 @@ fn render_json(source: &str, reports: &[FamilyReport]) -> String {
     }
     out.push_str("}}");
     out.push('\n');
+    out
+}
+
+/// One preset's reachability findings, machine-readable: the same counts the
+/// table shows plus every flagged gate named by parameter and source text.
+///
+/// `probe` records what produced them, because a flag only ever means "not
+/// observed under *this* stimulus" — a consumer that drops the provenance is
+/// reading the numbers as convictions.
+fn json_reachability(p: &PresetReport) -> String {
+    let (dead, ceilings) = gate_counts(p);
+    let mut out = String::new();
+    out.push_str(&format!(
+        "{{\"probe\":{{\"signal\":\"dynamic\",\"bpm\":{},\"seconds\":{}}},\
+         \"dead_branches\":{dead},\"unapproached_ceilings\":{ceilings},\"gates\":[",
+        num(REACH_BPM),
+        num(REACH_SECS),
+    ));
+    for (i, gate) in p.gates.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push_str(&format!(
+            "{{\"param\":{},\"source\":{},",
+            json_string(&gate.param),
+            json_string(&gate.flag.source)
+        ));
+        match gate.flag.kind {
+            GateKind::Select { always } => out.push_str(&format!(
+                "\"kind\":\"select\",\"always\":{always}}}",
+                always = if always { "true" } else { "false" }
+            )),
+            GateKind::Clamp {
+                peak_fraction_of_bound,
+            } => out.push_str(&format!(
+                "\"kind\":\"clamp\",\"peak_fraction_of_bound\":{}}}",
+                num(peak_fraction_of_bound)
+            )),
+        }
+    }
+    out.push_str("]}");
     out
 }
 
