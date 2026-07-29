@@ -163,3 +163,76 @@ pub enum NodeObservation {
   historical reactivity number keeps its meaning (ADR-0042).
 - **It does not solve the `tempo` false positive.** That needs a multi-BPM probe or an exemption
   rule, and is the natural precondition for gating.
+
+## Outcome — Phase 3 re-audit (2026-07-29)
+
+Measured with `cargo run -p standalone --example shot -- --presets presets --report` over the 36
+shipped presets, at HEAD `e7a40b7` (Phases 1–2 landed).
+
+**The library is clean. Every one of the 16 gate flags is the standing `tempo` false positive, and
+none is a genuinely dead gate.**
+
+| | count |
+|---|---|
+| Gate flags **before** this plan (`GATE` only) | **14** |
+| Gate flags **after** (`GATE` + `COMP`) | **16** |
+| …of which are the `tempo` single-BPM false positive | **16** |
+| …of which are **genuinely dead** | **0** |
+
+The before-count needs no rebuild: this change is purely additive — no `select()` flag is suppressed
+and `CEIL` is untouched — so the old report is exactly the new one minus its two `COMP` lines. The
+190 clamp-ceiling flags are unchanged by this plan and are not part of this count.
+
+All 16 flags, by preset — every one names `tempo > N`:
+
+- `swarm_storm` — 8 (7 `GATE` + 1 `COMP`), all `tempo > 132`: `force`, `spin`, `hue_spread`,
+  `palette_mix`, `trails`, `zoom`, `kaleido_order`'s `min(...)`, plus the new `COMP` on the `min`'s
+  tempo half.
+- `attractor_lorenz` — 7 (6 `GATE` + 1 `COMP`), all `tempo > 124`: `fade`, `size`, `hue_spread`,
+  `palette_mix`, `zoom`, `kaleido_order`'s `min(...)`, plus the new `COMP` on the tempo half.
+- `rose_zoom` — 1 `GATE`, `tempo > 130` on `zoom`.
+
+### What the corrected instrument proves, by what it did *not* flag
+
+The two negative results are the deliverable, and neither was obtainable before this plan:
+
+1. **The masked band halves are alive.** `min(tempo > 132, bass + mid > 0.055)` in `swarm_storm` and
+   `min(tempo > 124, bass + treb > 0.1)` in `attractor_lorenz` each emitted a `COMP` for the *tempo*
+   half only. Both operands of a `min` are always evaluated, so the band half was observed and went
+   both ways — it is reachable. This is precisely the shape ADR-0043 was built to expose, and it now
+   reports the excusable half by name instead of laundering an inexcusable one behind it.
+2. **Every bare comparison is alive.** The seven bare-comparison bindings in the shipped set — six
+   `reseed = "onset > 0.008…0.012"` (`attractor_clifford`, `_dejong`, `_ink`, `_leviathan`,
+   `_lorenz`, `_thomas`) and `rose_web.mirror_reflect = "onset > 0.007"` — produced **zero** flags.
+   These are the shape that was invisible to the old check, and against which ADR-0043 recorded that
+   the attractor presets "shipped without ever reseeding". They are now visible and they score
+   clean, which is direct confirmation that the 2026-07-29 content re-gain (`e9a1c3c`) actually
+   took. Without Phase 1 this could only have been asserted, not measured.
+
+### The count rose, as predicted — but by +2, not by 14
+
+The plan and ADR-0043 both expected the raw count to rise, and it did: 14 → 16. **This is not a
+regression** — it is two newly-visible flags on a known-benign cause. The rise is far smaller than
+Alternative A's projected near-doubling because the suppression rule holds: every other `tempo > N`
+in the library is a *direct* `select()` condition and so reports once as a `GATE`, not twice. The
+gate section got 14% louder, not 100% louder, and the noise it added is confined to the two `min()`
+composites.
+
+### Recommendation on CI gating
+
+**Do not gate yet — but the blocker has changed, and it is now a single known problem.**
+
+ADR-0042 deferred gating until a library audit showed the library was clean. That audit is this
+section, and the substantive answer is yes: **0 genuinely dead gates across 36 presets.** The
+precondition is met.
+
+What blocks gating is no longer the library, it is the instrument: 16 of 16 flags are false
+positives from the 110 BPM single-tempo probe, so a naive "fail if flags > 0" gate would fail CI
+permanently and a threshold gate would be tuned to noise. The next step is therefore the `tempo`
+false positive — a multi-BPM probe (drive the stimulus above and below each threshold) or an explicit
+exemption for `tempo` comparisons — after which "genuinely dead == 0" becomes a gate that is both
+meaningful and, on today's library, green. That work is out of scope here, as this plan's
+"What this plan does NOT do" states.
+
+Equality operators (`==` / `!=`) produced no flags because no shipped preset uses one on a float, so
+the Risks section's noise question stays open and untested by real content.
