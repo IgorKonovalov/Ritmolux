@@ -644,7 +644,8 @@ impl Expr {
     /// and the inner one starts reporting.
     pub fn flag_gates(&self, obs: &Observations) -> Vec<GateFlag> {
         let mut flags = Vec::new();
-        collect_flags(&self.root, obs, 0, &mut flags);
+        // The root is nobody's condition, so a bare `onset > 0.55` reports.
+        collect_flags(&self.root, obs, 0, false, &mut flags);
         flags
     }
 
@@ -665,7 +666,22 @@ impl Expr {
 /// Walk `node` (whose index is `index`) and report the gates `obs` never saw
 /// exercised. Recurses into every child, including a flagged gate's own
 /// branches — a dead gate can still contain a live one.
-fn collect_flags(node: &Node, obs: &Observations, index: usize, out: &mut Vec<GateFlag>) {
+///
+/// `is_select_condition` is true only when `node` is the **direct** first
+/// argument of an enclosing `select()`. A one-sided comparison there is
+/// suppressed, because that `select()` already reports it and in better words:
+/// a gate flag names the *consequence* ("its `then` branch never ran"), which a
+/// comparison flag cannot (ADR-0043). Stating the rule as tree position rather
+/// than as a property of the operator is what keeps it from drifting out of step
+/// with the grammar — a construct that later grows a condition child reports
+/// noisily through the comparison rule until it is taught to report its own.
+fn collect_flags(
+    node: &Node,
+    obs: &Observations,
+    index: usize,
+    is_select_condition: bool,
+    out: &mut Vec<GateFlag>,
+) {
     match (node, obs.node(index)) {
         (
             Node::Call(Func::Select, args),
@@ -679,6 +695,20 @@ fn collect_flags(node: &Node, obs: &Observations, index: usize, out: &mut Vec<Ga
             out.push(GateFlag {
                 kind: GateKind::Select { always: saw_true },
                 source: args.first().map(Node::source).unwrap_or_default(),
+            });
+        }
+        (
+            Node::Bin(..),
+            NodeObservation::Compare {
+                saw_true,
+                saw_false,
+            },
+        ) if saw_true != saw_false && !is_select_condition => {
+            // The comparison names itself: unlike a `select()`, there is no
+            // enclosing call whose branches are the interesting part.
+            out.push(GateFlag {
+                kind: GateKind::Compare { always: saw_true },
+                source: node.source(),
             });
         }
         (
@@ -700,14 +730,19 @@ fn collect_flags(node: &Node, obs: &Observations, index: usize, out: &mut Vec<Ga
     let mut at = index + 1;
     match node {
         Node::Const(_) | Node::Var(_) => {}
-        Node::Neg(inner) => collect_flags(inner, obs, at, out),
+        Node::Neg(inner) => collect_flags(inner, obs, at, false, out),
         Node::Bin(_, l, r) => {
-            collect_flags(l, obs, at, out);
-            collect_flags(r, obs, at + l.node_count(), out);
+            collect_flags(l, obs, at, false, out);
+            collect_flags(r, obs, at + l.node_count(), false, out);
         }
-        Node::Call(_, args) => {
-            for arg in args.iter() {
-                collect_flags(arg, obs, at, out);
+        Node::Call(func, args) => {
+            for (i, arg) in args.iter().enumerate() {
+                // Only argument 0 of a `select()` is a condition. A comparison
+                // one level deeper — `select(min(tempo > 124, bass > 0.38), …)` —
+                // is *not* suppressed, which is the whole point: the excusable
+                // half no longer launders the inexcusable one.
+                let condition = matches!(func, Func::Select) && i == 0;
+                collect_flags(arg, obs, at, condition, out);
                 at += arg.node_count();
             }
         }
@@ -859,14 +894,14 @@ pub enum NodeObservation {
 pub struct GateFlag {
     /// Which kind of gate, and what it did.
     pub kind: GateKind,
-    /// The gate's source: a `select()`'s **condition**, or a `clamp()`'s whole
-    /// call. Re-rendered from the AST (see [`Expr::source`]), so whitespace and
-    /// redundant parentheses will not match the preset file character for
-    /// character.
+    /// The gate's source: a `select()`'s **condition**, a comparison's own text,
+    /// or a `clamp()`'s whole call. Re-rendered from the AST (see
+    /// [`Expr::source`]), so whitespace and redundant parentheses will not match
+    /// the preset file character for character.
     pub source: String,
 }
 
-/// The two structural findings [`Expr::flag_gates`] reports.
+/// The three structural findings [`Expr::flag_gates`] reports.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GateKind {
     /// A `select()` whose condition only ever went one way — so one branch is
@@ -874,6 +909,16 @@ pub enum GateKind {
     /// always chose.
     Select {
         /// The side it always took: `true` means the condition never went false.
+        always: bool,
+    },
+    /// A comparison that only ever took one value, and that no `select()` flag
+    /// already names (ADR-0043). Either the whole binding is the comparison
+    /// (`reseed = "onset > 0.55"` — a boolean param stuck at one value), or it
+    /// is a term inside a composite condition, where it is the half a
+    /// `select()` flag would have hidden behind the other.
+    Compare {
+        /// The value it always took: `true` means the comparison never went
+        /// false.
         always: bool,
     },
     /// A `clamp()` whose inner value never approached its upper bound.
