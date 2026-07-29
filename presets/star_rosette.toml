@@ -83,7 +83,12 @@ hue        = "0.50 + time * 0.023 + clamp(treb * 2.6, 0, 0.45)"
 # preset is intrinsically a ring - the sparse, minimal member of the set rather
 # than a dense one. Making it dense would need engine work (more tilings, or an
 # off-centre mirror), not a preset change.
-mirror_order   = "select(mid > 0.18, 7, 5)"
+# THE THRESHOLD IS MEASURED, NOT GUESSED. This read 0.18 until Plan 0041's
+# reachability check proved the branch dead: `mid` peaks at 0.019 on music-like
+# material, an order of magnitude short, so the order never left 5. 0.011 sits
+# above the band's ~0.006 mean; the 2.5 s ease below wants a gate that holds
+# rather than one that spikes. Band table: `LOW_LEVELS` in shot.rs.
+mirror_order   = "select(mid > 0.011, 7, 5)"
 mirror_reflect = "0"
 
 # SCREEN FOLD at SEVEN, turning against the star's own rotation. Seven does not

@@ -48,7 +48,9 @@ c = "2.667 + sin(time * 0.0173) * 0.075 - clamp(treb * 0.30, 0, 0.060)"
 # frames is what keeps the sheet reading as filaments.
 fade   = "select(tempo > 124, 0.680, 0.760) - clamp(bass * 0.10, 0, 0.045) - beat * 0.015"
 size   = "select(tempo > 124, 0.30, 0.40) - clamp(bass * 0.08, 0, 0.09) + beat * 0.05"
-reseed = "onset > 0.48"
+# MEASURED. Read 0.48 and never fired - `onset` is raw spectral flux peaking at
+# 0.016, not a 0..1 envelope. Rank preserved within the family.
+reseed = "onset > 0.010"
 
 # COLOUR - the fast personality heats toward `ember` and widens; the slow one
 # stays a cool, cohesive single family.
@@ -75,7 +77,13 @@ pan_y = "cos(time * 0.028) * 0.06"
 bg_hue        = "0.30 + clamp(bass * 0.5, 0, 0.10)"
 bg_bright     = "0.04 + clamp(mid * 0.35, 0, 0.045)"
 bg_vignette   = "0.88"
-kaleido_order = "select(min(tempo > 124, bass + treb > 0.38), 4, 1)"
+# THE BAND HALF WAS DEAD BEHIND THE TEMPO HALF. `bass + treb > 0.38` cannot be
+# reached - the sum tops out near 0.138 - so this fold would not have engaged
+# even at 130 BPM. `--report` flags the whole `min(...)` as one gate and blames
+# the `tempo` half, which is legitimately one-sided under a single-BPM probe,
+# so the dead half hid behind the excusable one. 0.10 is the same near-peak
+# placement used by Warp Drive's top tier.
+kaleido_order = "select(min(tempo > 124, bass + treb > 0.10), 4, 1)"
 kaleido_angle = "time * 0.11"
 
 [smoothing]

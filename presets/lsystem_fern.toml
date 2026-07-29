@@ -33,7 +33,20 @@ seed      = 1
 [params]
 # THE GROWTH - three generations on two comparison gates. Eased below, so a
 # section change reads as the thicket sprouting rather than as a jump cut.
-visible_depth = "select(bass + mid > 0.42, 6, select(bass + mid > 0.18, 5, 4))"
+#
+# THE THRESHOLDS ARE MEASURED, NOT GUESSED. These read 0.42 / 0.18 until Plan
+# 0041's reachability check proved both branches dead: written against
+# `--set bass=1` magnitudes, but on music-like material `bass` peaks at 0.106
+# and `mid` at 0.019, so `bass + mid` tops out near 0.125 - the fern shipped
+# frozen at depth 4 and never grew at all, which is the entire point of it. The
+# band table lives in `LOW_LEVELS` in standalone/examples/shot.rs.
+#
+# Placed inside that distribution: the sum's mean is ~0.046, so 0.050 carries
+# depth 5 through the louder passages and 0.095 reaches depth 6 only near the
+# peak. The 1.2 s constant below matters to the choice - a gate crossed only at
+# transient peaks barely moves a value eased that long, so the first tier is set
+# to be crossed for SUSTAINED stretches rather than on spikes.
+visible_depth = "select(bass + mid > 0.095, 6, select(bass + mid > 0.050, 5, 4))"
 
 # MOTION - a steady turn plus a slow sway, both in radians and both
 # audio-independent. `rotation` is an ANGLE, so a band term on it is a
