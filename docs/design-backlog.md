@@ -433,6 +433,37 @@ not exist.
 `fragment_warp`, `attractor_dejong`, `attractor_lorenz`, `rose_kaleidoscope`, `reaction_reef`,
 `swarm_dense`, `swarm_storm`). There is no preset-level workaround short of disabling the fold.
 
+**RE-CONFIRMED 2026-07-28, from `preset-author`, with a cleaner reproduction and two new facts.**
+The user reported it again from the running app, unprompted, on the same preset and then on a second
+one (`reaction_reef`). Still open; the diagnosis above is unchanged and correct.
+
+- **The A/B is now decisive and trivially repeatable.** `swarm_dense` at `kaleido_order = 6` against a
+  byte-identical copy at `order = 1`, same `--signal click:110`, same size: hard bright bars along the
+  left and right frame edges and wedges in the corners in **every** frame at 6, completely clean at 1.
+  That is a two-command reproduction for whoever takes the fix, and it removes any remaining doubt
+  that the swarm scene contributes.
+- **Aspect makes it dramatically worse, and this is new.** The user hit it in a **portrait** window.
+  The entry's arithmetic explains why and it is worth stating in the general form: the fold keeps each
+  output pixel's radius and only changes its angle, so the failure is governed by the ratio between
+  the frame's **corner** radius and its **shortest** half-extent. At 16:9 that is ~1.02 against 0.889.
+  At the user's roughly 0.44:1 portrait window it is far larger, so most of the frame's area is
+  out-of-range rather than just the corners — the artifact stops being corner debris and becomes long
+  stripes over the whole picture. Any fix should be evaluated at a non-16:9 aspect, and any test
+  pinning it should not be written at 16:9 only. (Same lesson as
+  [ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): the configuration we develop at
+  hides it.)
+- **Impact list correction.** `rose_kaleidoscope` no longer exists (retired in the 2026-07-28 library
+  pass, which cut the rose family from eleven presets to five), and `swarm_dense` now ships
+  `kaleido_order = "1"` **specifically to dodge this defect** — the file says so. `lsystem_arrowhead`
+  newly binds the fold. Current bindings: `fragment_kaleido`, `fragment_glacier`, `fragment_warp`,
+  `attractor_dejong`, `attractor_lorenz`, `reaction_reef`, `swarm_storm`, `lsystem_arrowhead`. So the
+  defect has now cost one preset its fold outright, which is the first time avoiding it has changed
+  what ships.
+- **A second, cheaper mitigation was found and is worth recording as a workaround, not a fix:**
+  pinning `kaleido_angle` to a constant. A rotating fold drags the wedge seams through the corners
+  continuously, so the debris sweeps and reads as motion; a fixed angle keeps each seam in one place
+  where it is far less noticeable. `reaction_reef` ships this. It does not remove the artifact.
+
 **ADR-worthy — a real choice with a real cost on each side:**
 
 - **Clamp the fold radius** to the largest disc the source contains (0.5 in the short axis), so
@@ -847,6 +878,71 @@ barely move — that is now possible and was not before. No ADR: this is tuning,
 unless the audit turns up a *grammar* gap (e.g. no way to express "normalize this band against its
 own recent range"), which would be its own entry.
 
+### THE AUDIT IS DONE (2026-07-28, from `preset-author`) — and it found a second, worse failure mode
+
+The gating question above — *"how much of the shipped set is actually mis-gained, and nobody has
+audited which is which"* — is answered. The lane ran the `--signal dynamic:110` pass this entry asked
+for while retuning the library against live user feedback. **Both halves of the prediction held, and a
+third thing turned up that this entry did not anticipate.**
+
+**The measurement it was calibrated against** (`shot --signal dynamic:110`, printed by the harness):
+
+| band | min | mean | max |
+|---|---|---|---|
+| bass | 0.004 | **0.040** | 0.106 |
+| mid  | 0.000 | **0.006** | 0.019 |
+| treb | 0.000 | **0.006** | 0.032 |
+
+**The new failure mode: a comparison gate that can never fire.** This entry framed the defect as
+*gain* — a binding that moves too little. That is real, and widespread (`clamp(bass * 0.4, 0, 0.11)`
+moves a param by 0.016 on real music, ~15 % of its own cap). But a `select()` threshold written
+against `--set` magnitudes is not merely weak, it is **dead code**: the branch never evaluates, so
+the mechanism the preset is *built around* has never run once in the program's life. The three-band
+sum peaks near **0.157** on real audio; the shipped thresholds were written as if it reached 3.
+
+Confirmed dead before this pass, each one the preset's headline mechanism:
+
+| preset | gate as shipped | consequence |
+|---|---|---|
+| `fragment_kaleido` | `bass + mid + treb > 0.90 / 0.55 / 0.25` | frozen at 6 folds — the entire audio-driven-symmetry idea the preset exists to demonstrate had never run |
+| `reaction_reef` | `bass + mid > 0.40` | never folded; the family's designated *figure* preset rendered as flat texture |
+| `lsystem_arrowhead` | `mid + treb > 0.50 / 0.28 / 0.10`, `mid > 0.22 / 0.08` | never subdivided past its coarsest depth, stuck at 4 mirror copies — "boring" was wiring, not taste |
+| `fragment_glacier` | `bass + mid > 0.42` | never folded |
+| `rose_overflow` | `floor(2 + clamp(bass * 7, 0, 3.72))` | petal count never stepped off 2 |
+| `swarm_storm` | `min(tempo > 132, bass + mid > 0.40)` | the conjunction's second term was permanently false |
+
+**Still dead today** — the lane fixed only what the user flagged, and these were not in scope:
+`attractor_dejong` (`bass + mid > 0.34`), `attractor_lorenz` (`bass + treb > 0.38`), `fragment_warp`
+(`bass + treb > 0.55 / 0.30`). Three more folds that have never engaged. The wider un-swept set is
+all five `attractor_*`, `fragment_aurora`, `fragment_pulse`, `fragment_warp`, `lsystem_fern`,
+`star_rosette`.
+
+**Why nothing caught this, which is the part that matters.** `--report` scored every one of these
+presets as healthy while they were inert, and the reason is
+[0022](#0022--reports-reactivity-columns-are-structurally-blind-to-a-level-curve)'s: **the report's
+band stimuli drive their bands to full scale.** At `bass = 1.0` every gate above fires happily. The
+harness the lane self-verifies through is the one instrument that could not see the defect — and the
+same full-scale stimulus is 0022's root cause too. That is no longer a coincidence between two
+entries; it is one property of the report causing two different classes of blindness.
+
+**So the promotion condition 0022 named is now met.** That entry says it becomes ADR-worthy *"only if
+bundled with 0020 into a decision about what level the report's stimuli should represent, which is a
+real question with a real rejected alternative."* Bundled, the decision is:
+
+- **What level should `--report`'s stimuli represent?** Full scale is reproducible and
+  sample-rate-independent; realistic levels are neither, but they are the only ones that measure what
+  a preset actually does. A second low-level column, so compression and dead gates both show as the
+  *gap* between two readings, is the third option.
+- **Should the harness detect an unreachable gate directly?** This is new and cheap and would have
+  caught all nine presets mechanically: evaluate each `select()` condition across the run and flag any
+  that never changes value. It is a property of the *expression*, not of the frame, so it is immune to
+  whatever the stimulus level is — which arguably makes it the more robust half of the answer.
+
+**Recommended split when this is promoted:** the harness/report decision is an ADR plus a small `dev`
+plan; the library re-gain of the ~10 un-swept presets is a separate `preset-author` content pass that
+should follow it, so the sweep can be verified by an instrument that can see the defect. Doing the
+content pass first — as happened here — means re-verifying it later anyway.
+
 ---
 
 ## Entry 0021 — from the Plan 0038 / ADR-0040 ruling
@@ -1066,3 +1162,129 @@ that touches the line family, or with Plan 0039's open Phase 5.
   point is a near-reversal, so it reads as a bright bead, and Phase 3 makes "capture it at the
   8-degree floor and say what it looks like" a done-when with a **stopping condition** rather than a
   note.
+
+---
+
+## Entries 0025-0027 — the 2026-07-28 `preset-author` batch (fourth), from the full library retune
+
+Raised while retuning most of `presets/` against live user feedback — the same pass that answered
+[0020](#0020--the-shipped-library-is-gained-against-stimuli-6-100x-hotter-than-real-music)'s audit
+question and re-confirmed [0010](#0010--the-kaleidoscope-fold-samples-outside-its-source-rectangle-and-clamps-leaving-edge-debris).
+Those two are updated in place above rather than duplicated here. These three are new.
+
+---
+
+## 0025 — `swarm` cannot express a flock: no depth, no cohesion, and its field frequency is a constant
+
+- **Raised:** 2026-07-28, from `preset-author`. The user, on the whole swarm family: *"swarms still
+  looks lame. they should look like floks of birds, swirling and dancing in 3d-like space"*.
+- **Verified against code:** `core/src/render/scenes/swarm.rs`.
+
+**Two thirds of this was a preset defect and is fixed; the remaining third is real.** Recording the
+fixed part too, because the mechanism was badly non-obvious and the next author will need it.
+
+**What was authorable and was wrong.** `spin` is not vorticity — it is the flow field's **rate of
+change** (`let field_t = self.time * self.spin`, then the field is sampled at `field_t`). The whole
+family shipped `spin` between 0.34 and 2.2, which rewrites the streamlines faster than a particle can
+cross them: every particle is steered somewhere new each frame by a field that has already moved on,
+so ten thousand of them average into uniform shimmer. **That is what "lame" was.** Held near 0.1 the
+field stands still long enough for particles to fall onto its streamlines and travel together, which
+reads as flocking without any per-particle rule. The second half is that `force` cannot go with it:
+at ~1.9 the steering overrides each particle's retained momentum (`DAMPING = 0.86`) and the entire
+swarm collapses onto the field's attracting curve within seconds, leaving one bright ribbon in an
+empty frame. Bracketed at 0.85 / 1.15 / 1.45, the flock lives near **1.2**. Small sprites and a long
+`trails` then draw each bird as a directional dash. This is now documented in `swarm_drift.toml` and
+cross-referenced from the other four.
+
+**What is not authorable, and is the actual gap:**
+
+- **No depth axis.** `Particle.pos` is `[f32; 2]` and the world is a 2D torus (`BOUND_X`/`BOUND_Y`).
+  There is no z, no parallax, no perspective. The only depth cue in the scene is incidental:
+  `bright = (0.25 + speed * 0.7) * p.bright`, so fast particles read as nearer. "3d-like space" is
+  not reachable by any combination of existing params.
+- **No flocking rules.** Motion is pure advection through a scalar-potential curl field. There is no
+  cohesion, separation or alignment term — the apparent flocking above is entirely an artifact of
+  neighbouring particles sharing a streamline, which is why it is fragile and needs the narrow
+  `force` window to survive at all.
+- **`FIELD_FREQ` is a `const 2.3`, not a param.** This is the cheapest and most interesting of the
+  three: the field's spatial frequency sets how tight the vortices are, and therefore how many
+  distinct streams fit in frame. One bindable value would let an author choose between a few broad
+  currents and many tight swirls — which is most of the visual difference between "drifting cloud"
+  and "murmuration" — at the cost of one `set_param` arm. **Recommend taking this one alone first**
+  and seeing how far it gets before designing anything larger.
+
+**ADR-worthy only if the depth/boids half is pursued** — that is a new simulation model for the
+scene, with a genuine rejected alternative (a 2.5D fake: a per-particle z used only for sprite scale
+and parallax offset, no z-sorting and no 3D field, which is far cheaper and might be
+indistinguishable at 10 000 additive sprites). The `FIELD_FREQ` param on its own is not ADR-worthy —
+it is [0019](#0019--glow-is-unreachable-from-a-preset-on-all-four-line-scenes)'s shape exactly: a
+constant that should be a param, already plumbed, defaulting to the value it replaces.
+
+---
+
+## 0026 — `lsystem` has no per-segment colour, and the asymmetry with `spectrum` looks unintentional
+
+- **Raised:** 2026-07-28, from `preset-author`. The user, on Arrowhead: *"we should introduce ether
+  more lines, or glow or some more colors"*. The first two were authorable; the third was not.
+- **Verified against code:** `lsystem`'s `PARAMS` has no `hue_spread`; `[palette]` is inert on the
+  three generator-driven line scenes, which colour through their own cosine ramp
+  ([0014](#0014--the-line-scenes-cosine-hue-ramp-is-not-a-hue-wheel-and-nothing-documents-it)). So
+  `hue` is whole-figure and is the *only* colour control.
+
+There is no way from a preset to give one branch of an L-system a different colour from another —
+not by depth, not by position along the curve, not by anything. The only available answer to "more
+colours" was to make the whole figure travel further and faster through the ramp, which is a
+different thing and the user will notice it is a different thing.
+
+**The asymmetry is the argument.** `spectrum` — added later, by Plan 0034 — *does* have `hue_spread`,
+walking the palette across its elements, and on `radial_ring` that single param is most of what makes
+`spectrum_corona` read as a designed object rather than a readout. The same lever on an L-system
+(hue by recursion depth, or by distance along the turtle path) would do the same work for the whole
+generator family. Nothing suggests the omission was decided; `spectrum` simply had a reason to need it
+first.
+
+**Impact:** moderate and permanent — it caps how rich any `lsystem` or `star_pattern` preset can look,
+and those are 3 of the shipped set. Not urgent.
+
+**Probably ADR-worthy, for one reason only:** *what* the spread should be indexed by is a real choice
+with real alternatives, and unlike `spectrum` there is no obvious answer. `spectrum` has a natural
+axis (frequency, `index` over elements). An L-system has at least three candidates — recursion depth
+(structural, reads as "older growth is a different colour"), segment ordinal along the turtle path
+(reads as a gradient sweeping through the figure as it draws), or world position — and they look
+completely different. Picking one is the decision; the plumbing is trivial either way. Note the
+`SegmentInstance` budget constraint from
+[ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) (8 floats, fixed
+capacity, no-alloc) applies if this needs a per-segment value uploaded rather than derived in-shader.
+
+---
+
+## 0027 — two engine behaviours that are correct, non-obvious, and undocumented
+
+- **Raised:** 2026-07-28, from `preset-author`. Neither is a defect. Both cost the lane multiple
+  render round-trips in one session, and both are the kind of thing that will cost the *next* author
+  exactly as much, because in each case the intuitive mental model is wrong in a way the render does
+  not explain.
+
+**1. `color_center` is CYCLIC.** The lane, wanting a dark render of a reaction-diffusion field,
+reasoned that pushing `color_center` negative would slide the field's values toward the palette's
+dark end. It does the opposite: the coordinate wraps, so a negative centre lands the bulk of the
+field in the palette's *bright* stops and the picture gets brighter. Three rendered iterations were
+spent tuning exposure, contour density and the palette ramp — all downstream of a cause that was
+none of them — before the wrap was identified. `presets/README.md` and `docs/preset-palettes.md`
+should say the coordinate is cyclic and that a negative centre is a wrap, not a clamp.
+
+**2. The ink pass INTERPOLATES, so inverting its poles does not make a dark duotone.** The shader
+(`core/src/render/ink.rs`) is `remapped = mix(paper, ink, d)` where `d` is the source's Rec.709
+luminance. The intuitive reading of the two poles is that they are a *mapping* — dark input becomes
+paper, bright input becomes ink — and therefore that swapping them (dark paper, bright ink) turns a
+print into a glow. It does not, because a source sitting at **mid** luminance lands halfway between
+the poles no matter how far apart they are set. Measured: `paper_bright = 0.055` against
+`ink_bright = 0.94` on a developed Gray-Scott field rendered **flat slate grey**. The inversion only
+works where most pixels are already near 0 or near 1 — a line scene against black, not a continuous
+field. Worth a sentence beside the `ink_*` table in `presets/README.md`, because "make it dark" is an
+obvious thing to want and this is the obvious way to try it.
+
+**Impact:** pure documentation, cheap, and it compounds the way
+[0014](#0014--the-line-scenes-cosine-hue-ramp-is-not-a-hue-wheel-and-nothing-documents-it) did —
+every author who reaches for these pays the same round-trips. **Not ADR-worthy.** Bundle with the
+next doc sweep, or with whichever plan next touches the palette or ink surface.
