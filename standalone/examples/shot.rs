@@ -877,6 +877,14 @@ fn band_stimuli_at(levels: StimulusLevels) -> [AnalysisFrame; 4] {
 /// measured from, so the columns and the flags describe the same material.
 const REACH_BPM: f32 = 110.0;
 
+/// Format the reachability probe synthesizes and analyzes at. Named once so the
+/// hop clock `probe_reachability` derives `time` from cannot drift from the rate
+/// the frames were actually produced at.
+const REACH_FORMAT: AudioFormat = AudioFormat {
+    sample_rate: 48_000,
+    channels: 2,
+};
+
 /// Seconds of that clip to evaluate over — deliberately longer than the 4 s a
 /// `--signal` filmstrip synthesizes. The tempo tracker needs time to lock, and
 /// under a 4 s clip it never does: `tempo` reads a flat `0`, which turns every
@@ -898,10 +906,7 @@ const REACH_INDEX_SAMPLES: usize = 5;
 /// CPU only — no GPU, no rendering. This is the structural measurement
 /// ADR-0042 adds beside the frame differentials.
 fn reachability_frames() -> Result<Vec<AnalysisFrame>, String> {
-    let format = AudioFormat {
-        sample_rate: 48_000,
-        channels: 2,
-    };
+    let format = REACH_FORMAT;
     let pcm = lmv_core::signal::dynamic_groove(REACH_BPM, REACH_SECS, format);
     let mut analyzer = Analyzer::new(format).map_err(|e| format!("reachability analyzer: {e}"))?;
     let hop_samples = HOP_SIZE * format.channels as usize;
@@ -925,23 +930,16 @@ fn reachability_frames() -> Result<Vec<AnalysisFrame>, String> {
 /// Walk every binding of `preset` under `frames`, and report the gates that
 /// never went both ways.
 fn probe_reachability(preset: &Preset, frames: &[AnalysisFrame]) -> Vec<GateReport> {
-    let hop_seconds = HOP_SIZE as f32 / 48_000.0;
+    let hop_seconds = HOP_SIZE as f32 / REACH_FORMAT.sample_rate as f32;
     let mut out = Vec::new();
     for binding in &preset.params {
         let mut obs = Observations::new();
         for (hop, frame) in frames.iter().enumerate() {
-            let vars = Variables::new(
-                frame.bass,
-                frame.mid,
-                frame.treb,
-                frame.onset,
-                f32::from(frame.beat),
-                frame.bar,
-                hop as f32 * hop_seconds,
-                frame.bpm,
-                frame.novelty,
-            )
-            .with_spectrum(&frame.spectrum);
+            // Through the engine's own frame binding, so the probe cannot read
+            // the frame differently than the renderer does — see
+            // `Variables::from_frame`. Only `time` is ours to supply: there is
+            // no render clock here, so it is the hop's position in the clip.
+            let vars = Variables::from_frame(frame, hop as f32 * hop_seconds);
             // A per-element binding is evaluated once per element by the render
             // loop, so a gate of its can be live at one end of the strip and
             // dead at the other. Sampling `index` is what keeps this honest.

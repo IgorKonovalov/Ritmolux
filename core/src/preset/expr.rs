@@ -101,6 +101,38 @@ impl<'a> Variables<'a> {
         }
     }
 
+    /// Bind the nine analysis variables from `frame`, with the clock at `time`.
+    ///
+    /// **This is the only place the frame-to-slot mapping is written.** Both the
+    /// render loop and `shot`'s reachability probe come through here, so a tenth
+    /// variable or a reordered slot is a one-file change rather than two copies
+    /// that happen to agree. They did agree — and nothing could have told you
+    /// which one the code actually used, which is the failure this closes: a
+    /// probe binding different values than the engine would report flags about
+    /// an expression the renderer never evaluates (Plan 0041 review).
+    ///
+    /// `time` stays an argument because it is the one variable that is not on
+    /// the frame — the renderer passes its own clock, the probe the hop position
+    /// it synthesized.
+    ///
+    /// The band array rides **by borrow** (ADR-0036), so this costs exactly what
+    /// [`new`](Self::new) plus [`with_spectrum`](Self::with_spectrum) cost: no
+    /// copy of the spectrum, nothing allocated, safe on the per-frame path.
+    pub fn from_frame(frame: &'a crate::dsp::AnalysisFrame, time: f32) -> Self {
+        Self::new(
+            frame.bass,
+            frame.mid,
+            frame.treb,
+            frame.onset,
+            f32::from(frame.beat),
+            frame.bar,
+            time,
+            frame.bpm,
+            frame.novelty,
+        )
+        .with_spectrum(&frame.spectrum)
+    }
+
     /// Rebind the per-element `index` to `t` (the element's normalized `0..1`
     /// position), returning a fresh binding — the caller evaluates once per
     /// element against these (Plan 0034 Phase 4).
@@ -594,12 +626,6 @@ impl Expr {
         let mut flags = Vec::new();
         collect_flags(&self.root, obs, 0, &mut flags);
         flags
-    }
-
-    /// Nodes in this expression's tree — the arena size a full
-    /// [`Observations`] for it reaches.
-    pub fn node_count(&self) -> usize {
-        self.root.node_count()
     }
 
     /// This expression rendered back to source text (normalized whitespace and
