@@ -70,26 +70,38 @@ stops = [
 # them. Measured at 0.85 / 1.15 / 1.45 with everything else fixed, 1.15-1.20 is
 # where the field stays populated while showing density waves, gathering crests
 # and thinning wakes - birds moving together without being a single line.
+# DRIFT NOW OWNS THE COARSEST GRAIN AND THE SLOWEST FIELD. See the family split
+# documented in `swarm_dense.toml`: the three calm swarms used to sit within
+# 20 % of each other on every lever, so they read as one preset regardless of
+# which band drove them. Drift takes the large-sprite, near-frozen end.
 force = "1.20 + sin(time * 0.037) * 0.16 + cos(time * 0.023) * 0.10 + clamp(mid * 18.0, 0, 0.40)"
-spin  = "0.085 + sin(time * 0.019) * 0.012 + clamp(mid * 2.6, 0, 0.035)"
+spin  = "0.040 + sin(time * 0.019) * 0.010 + clamp(mid * 2.6, 0, 0.035)"
 # Deliberately the weakest burst of the three: a transient here should ripple
 # through the cloud, not detonate inside it.
 burst = "clamp(beat * 0.5 + clamp(onset * 0.9, 0, 0.5), 0, 1.1)"
 
-# APPEARANCE - and `size` comes down hard, 2.6 -> 1.35, for the same reason the
-# field was frozen. A big soft sprite is a cloud; a flock has to be made of
-# individuals you can pick out, or the formation has nothing to be a formation
-# OF. At 2.6 neighbouring particles overlapped into continuous fog and the
-# streamline structure underneath was invisible however coherent it was.
+# APPEARANCE - `size` goes back UP to 2.20, and the reasoning that had pulled it
+# down to ~1.05 needs correcting rather than deleting, because it was half
+# right. The old note said a big sprite fogs the frame and hides the streamline
+# structure. That was measured at spin 0.085; at 0.040 the field is slow enough
+# that the blobs travel TOGETHER, so the coherence survives the sprite size and
+# what you get is large soft grain with visible flow in it rather than fog. The
+# fog was the fast field, not the sprite.
+#
+# The trade the old note describes is real but it is a TRADE, not a rule: fine
+# sprites resolve individuals, coarse sprites resolve mass. Dense takes the
+# first (0.58), Drift takes the second - that separation is the whole point,
+# and collapsing both to ~1.05 is how the family lost its identities.
 #
 # The depth cue is free and worth knowing about: the scene multiplies each
 # particle's brightness by its own SPEED (`0.25 + speed * 0.7`). On a coherent
 # field, particles in the fast channels are markedly brighter than ones idling
 # in slack water, so the flock separates into bright leading streams and dim
-# trailing bodies without any depth parameter existing. Small sprites are what
-# let that read - a fat one saturates and loses the gradient.
+# trailing bodies without any depth parameter existing. A coarse sprite softens
+# that gradient rather than erasing it - it reads as depth in a cloud instead of
+# as individual leaders, which suits this preset.
 brightness = "0.72 + clamp(mid * 14.0, 0, 0.16)"
-size       = "1.05 + sin(time * 0.031) * 0.18 + clamp(mid * 14.0, 0, 0.35) + sin(bar * pi) * 0.12"
+size       = "2.20 + sin(time * 0.031) * 0.22 + clamp(mid * 14.0, 0, 0.35) + sin(bar * pi) * 0.14"
 
 # COLOUR - the slowest hue journey in the set: a full slow wander through the
 # aurora band, crossfading into a violet-to-amber gradient over minutes.
@@ -99,7 +111,12 @@ saturation  = "0.94 + clamp(treb * 16.0, 0, 0.24)"
 palette_mix = "0.5 + sin(time * 0.0091) * 0.45"
 
 # VIEW - a very slow parallax wander around the frame.
-zoom  = "1.05 + sin(time * 0.021) * 0.06 + bar * 0.04 + clamp(bass * 4.0, 0, 0.12)"
+# NOTE `zoom` STAYS AT OR ABOVE 1.0. Pulling the camera back to buy this preset
+# genuine empty space is the obvious move and it does not work: below 1.0 the
+# particle domain boundary appears as a hard rectangle inset from the frame
+# edge. Bracketed at 0.78 - unusable. Spaciousness has to come from the
+# vignette and the sprite scale instead.
+zoom  = "1.02 + sin(time * 0.021) * 0.05 + bar * 0.04 + clamp(bass * 4.0, 0, 0.12)"
 pan_x = "sin(time * 0.0170) * 0.16"
 pan_y = "cos(time * 0.0113) * 0.11"
 
@@ -108,7 +125,7 @@ pan_y = "cos(time * 0.0113) * 0.11"
 # Lengthened. Persistence is what draws each bird's flight PATH rather than its
 # position, and on a coherent field those paths are parallel - which is most of
 # what makes a flock legible as a flock in a still frame.
-trails      = "0.80 + clamp(mid * 8.0, 0, 0.10)"
+trails      = "0.86 + clamp(mid * 6.0, 0, 0.06)"
 bg_hue      = "0.17 + sin(time * 0.0083) * 0.06"
 bg_bright   = "0.012 + clamp(mid * 2.0, 0, 0.010)"
 bg_vignette = "0.68"
