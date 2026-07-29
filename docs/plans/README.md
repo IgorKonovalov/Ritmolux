@@ -3,25 +3,37 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0042** (ADRs are a separate sequence — next free there is **0043**.)
+**Next free number: 0044** (ADRs are a separate sequence — next free there is **0045**.)
 
 ## Active roster
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
+| [0042](0042-reachability-sees-every-comparison.md) | Reachability sees every comparison, and the library is re-audited against it | draft 2026-07-29 | dev |
+| [0043](0043-swarm-depth-and-domain.md) | The swarm gets a depth axis and a domain that follows the target | draft 2026-07-29 | dev |
 
 ## Recommended execution sequence
 
-**[0041] has landed and closed** — the instrument every lane self-verifies through can now see the
-defect it was blind to. See Recently closed. **The next move is the content half it unblocks:** a
-`preset-author` re-gaining pass over the ~10 un-swept presets (`attractor_*` x5, `fragment_aurora`,
-`fragment_pulse`, `fragment_warp`, `lsystem_fern`, `star_rosette`), which still carry dead gates and
-`--set`-calibrated gains. That sequencing was deliberate and is now paid off: `--report`'s realistic
-columns and its `gates` / `ceils` flags are the acceptance check for the pass, so it gets verified
-once instead of twice. As it stands the library reports **20 dead branches and 159 unapproached
-ceilings**, of which 14 dead branches are the standing `tempo` false positive — the six real ones are
-`fragment_warp` (2), `lsystem_fern` (2), `attractor_dejong` and `star_rosette`.
+**Two drafts are queued, and [0042] should go first.** It repairs the instrument that [0043]'s
+content phase — and every other lane — verifies through. Same sequencing logic that paid off for
+[0041]: fix the measurement, then do the content once instead of twice.
+
+- **[0042] — reachability sees every comparison.** Plan 0041's check reports `select()` and
+  `clamp()` only, so a bare comparison (`reseed = "onset > 0.55"`) is never observed and a dead band
+  gate `min`ed with a live `tempo` gate is dismissed as the tempo gate. Small, two code phases plus a
+  measurement phase. [ADR-0043](../adrs/0043-reachability-reports-comparison-nodes.md).
+- **[0043] — the swarm gets a depth axis and a domain that follows the target.** Fixes the
+  user-reported bright-bar artifact at its cause (the wrap seam is on the frame edge), retires a
+  fixed 16:9 that ADR-0037 rules against, and adds the 2.5D depth the family has always needed.
+  Four phases, one file plus a content pass. [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md).
+
+**[0041]'s content half is done** (2026-07-29, `e9a1c3c`). The re-gaining pass this section used to
+recommend was carried out: nine dead gates were rescaled to measured band levels across
+`fragment_warp`, `lsystem_fern`, `attractor_dejong`, `star_rosette`, all five `attractor_*` reseeds
+and `rose_web`. Five of those nine were **invisible** to `--report` — which is what [0042] exists to
+fix, and why the "20 dead branches" figure this section used to quote was an undercount rather than a
+census.
 
 **[0035] has landed and closed** — the composite's aspect is the render target's
 ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), now **accepted**), the two
