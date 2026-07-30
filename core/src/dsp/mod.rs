@@ -71,7 +71,10 @@ pub const SPECTRUM_BINS: usize = 64;
 /// confident (ADR-0050).
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisFrame {
-    /// Per-band energy, each band normalized against its own recent peak.
+    /// Per-band energy, the whole array normalized against **one shared** recent
+    /// peak — so every ratio inside it, and therefore every `bin()` contrast,
+    /// comes through untouched. Not a per-band normalization: that was the draft
+    /// ADR-0049 rejected, because it flattens the very shape a spectrum is for.
     pub spectrum: [f32; SPECTRUM_BINS],
     /// Spectral-flux onset envelope, normalized against its recent peak.
     pub onset: f32,
