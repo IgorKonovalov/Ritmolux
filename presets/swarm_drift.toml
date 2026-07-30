@@ -4,9 +4,27 @@
 # long ambient passage - it evolves almost entirely on `time`, so it keeps
 # changing when the audio gives it nothing.
 #
-# See `swarm_flow.toml` for the force-ceiling note that governs the whole family.
-# This preset sits at the very bottom of that range: even a loud frame barely
-# moves the steering, because the point of it is that nothing is in a hurry.
+# THIS FILE CARRIES THE FAMILY'S SHARED NOTES. The swarm set was cut from five
+# presets to three in Plan 0043 (Flow and Burst retired), and the two mechanisms
+# every swarm author needs were documented in the files that went. They are here
+# now, along with the flocking geometry this file always owned.
+#
+# THE FORCE CEILING. An older version of this set ran `force = 1.1 + clamp(bass
+# * 16, 0, 3)`, which at a loud frame is ~4 against a scene default of 1.4 -
+# hard enough that every particle is flung to the frame edge and the middle of
+# the picture goes black. Loud is supposed to look like MORE, and it looked like
+# nothing. Every swarm preset holds `force` inside roughly 0.7 - 2.4 and spends
+# peak energy on churn, size, colour and the composite instead. Drift sits at the
+# very bottom of that range: even a loud frame barely moves the steering, because
+# the point of it is that nothing is in a hurry.
+#
+# THE GRAIN/EXPOSURE SPLIT, which is what actually separates these three. Band
+# assignment is nearly invisible in a still; sprite size, exposure length and -
+# since Plan 0043 - FIELD FREQUENCY are what the eye separates:
+#
+#   Dense   size 0.62   trails 0.76   spin 0.130   field_freq ~5.2   tight ribbons
+#   Drift   size 2.55   trails 0.86   spin 0.040   field_freq ~1.9   broad nebula
+#   Storm   size 1.20   trails 0.50   spin 0.155   field_freq ~3.0   torn churn
 system = "swarm"
 name = "Drift"
 
@@ -76,6 +94,24 @@ stops = [
 # which band drove them. Drift takes the large-sprite, near-frozen end.
 force = "1.20 + sin(time * 0.037) * 0.16 + cos(time * 0.023) * 0.10 + clamp(mid * 18.0, 0, 0.40)"
 spin  = "0.040 + sin(time * 0.019) * 0.010 + clamp(mid * 2.6, 0, 0.035)"
+
+# STRUCTURE - `field_freq` is new in Plan 0043 and it is the lever this preset
+# had been missing. `spin` says how fast the streamlines are rewritten and Drift
+# holds it near zero on purpose; `field_freq` says how LARGE they are, which is a
+# shape the preset can move without giving up its stillness.
+#
+# Drift takes the coarse end of the family: around 1.9, breathing between roughly
+# 1.5 and 2.4. At that scale a handful of currents span the whole frame, so
+# neighbouring particles share one for a long time and the nebula gathers into
+# slow arcs rather than resolving into separate streams. Below ~1.2 the structure
+# grows larger than the frame and the picture flattens into an undifferentiated
+# mass - measured, and the reason the low bound here is not lower.
+#
+# Mid drives it, like everything else on this preset: a sustained passage TIGHTENS
+# the field, so the nebula draws itself into visible channels as the pads swell
+# and relaxes back into a wash when they fall away. That is a structural response
+# to music, which this family could not express before.
+field_freq = "1.90 + sin(time * 0.029) * 0.42 + cos(time * 0.017) * 0.16 + clamp(mid * 26.0, 0, 0.55)"
 # Deliberately the weakest burst of the three: a transient here should ripple
 # through the cloud, not detonate inside it.
 burst = "clamp(beat * 0.5 + clamp(onset * 0.9, 0, 0.5), 0, 1.1)"
@@ -100,8 +136,16 @@ burst = "clamp(beat * 0.5 + clamp(onset * 0.9, 0, 0.5), 0, 1.1)"
 # trailing bodies without any depth parameter existing. A coarse sprite softens
 # that gradient rather than erasing it - it reads as depth in a cloud instead of
 # as individual leaders, which suits this preset.
-brightness = "0.72 + clamp(mid * 14.0, 0, 0.16)"
-size       = "2.20 + sin(time * 0.031) * 0.22 + clamp(mid * 14.0, 0, 0.35) + sin(bar * pi) * 0.14"
+#
+# BOTH WENT UP FOR PLAN 0043, and neither is a taste change - they are paying for
+# two engine changes that each removed light from the frame. The domain now
+# extends a quarter past the visible frame so the wrap seam is off-screen, which
+# puts about a quarter of the ten thousand particles outside the picture at any
+# moment; and each particle is now faded by its depth, which costs the far half
+# of the swarm roughly half its brightness. A file carried over unchanged reads
+# dimmer and sparser than it did, and the fix is here rather than in the engine.
+brightness = "0.96 + clamp(mid * 16.0, 0, 0.20)"
+size       = "2.55 + sin(time * 0.031) * 0.26 + clamp(mid * 14.0, 0, 0.35) + sin(bar * pi) * 0.16"
 
 # COLOUR - the slowest hue journey in the set: a full slow wander through the
 # aurora band, crossfading into a violet-to-amber gradient over minutes.
@@ -110,13 +154,28 @@ hue_center  = "0.62 + sin(time * 0.0130) * 0.16 + clamp(mid * 18.0, 0, 0.14)"
 saturation  = "0.94 + clamp(treb * 16.0, 0, 0.24)"
 palette_mix = "0.5 + sin(time * 0.0091) * 0.45"
 
-# VIEW - a very slow parallax wander around the frame.
-# NOTE `zoom` STAYS AT OR ABOVE 1.0. Pulling the camera back to buy this preset
-# genuine empty space is the obvious move and it does not work: below 1.0 the
-# particle domain boundary appears as a hard rectangle inset from the frame
-# edge. Bracketed at 0.78 - unusable. Spaciousness has to come from the
-# vignette and the sprite scale instead.
-zoom  = "1.02 + sin(time * 0.021) * 0.05 + bar * 0.04 + clamp(bass * 4.0, 0, 0.12)"
+# VIEW - a very slow wander, and since Plan 0043 it is a REAL parallax rather
+# than a figure of speech. Each particle now carries a depth that scales how much
+# of the pan it takes, so a near one crosses the frame about 1.9x faster than a
+# far one and this slow drift separates the cloud into sliding layers instead of
+# translating it as a sheet. On the slowest preset in the set that is the single
+# most valuable thing depth bought: there is finally something happening in a
+# still ten seconds apart other than the particles having moved.
+#
+# THE `zoom` WALL MOVED, IT DID NOT VANISH, and the arithmetic is worth having in
+# front of you before reaching for it. The old note here said zoom below 1.0
+# exposes the particle domain as a hard rectangle inset from the frame; that
+# rectangle is now a quarter-frame further out, so the camera has room. What
+# comes back first is not the rectangle but the WRAP SEAM, and pan brings it back
+# sooner than zoom alone does, because the near depth layer takes 1.25x of both:
+#
+#   seam clears while   1.25 * (1 + (zoom - 1) * 1.25) - |pan| * 1.25  >  1
+#
+# At this file's pan of 0.16 that bottoms out around zoom 0.99, which is why the
+# base sits at 1.04 with a 0.05 swing rather than being pulled back further.
+# Trading pan for zoom is the move if a future edit wants genuine empty space -
+# at pan 0.10 the same expression clears down to about 0.94.
+zoom  = "1.04 + sin(time * 0.021) * 0.05 + bar * 0.04 + clamp(bass * 4.0, 0, 0.12)"
 pan_x = "sin(time * 0.0170) * 0.16"
 pan_y = "cos(time * 0.0113) * 0.11"
 
@@ -148,3 +207,7 @@ hue_center  = 0.65
 hue_spread  = 0.65
 palette_mix = 1.2
 bg_bright   = 0.5
+# The longest constant in the file after `spin`, and for the same reason: field
+# SCALE is formation geometry, and a nebula that re-scales itself on a band term
+# is not a nebula. This is the slow breath, not a response.
+field_freq  = 1.60
