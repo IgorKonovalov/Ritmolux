@@ -102,7 +102,7 @@ any `clamp()` ceiling the value never reached
 | System            | Named `[params]`                                                         |
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
-| `swarm`           | `force` `spin` `burst` `hue` `brightness` `size` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
+| `swarm`           | `force` `spin` `burst` `field_freq` `hue` `brightness` `size` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
@@ -132,6 +132,39 @@ window. Two authoring consequences: `size` now reads *finer* at high resolution
 0033 that grid follows the render target too, so stacking them no longer softens the
 attractor the way it did against the old fixed 1280x720 — the two caps still differ,
 so a very large window resolves the attractor alone slightly finer.
+
+### Swarm flow-field structure (Plan 0043)
+
+`field_freq` is the swarm's **spatial** lever and the one that decides how many
+distinct streams a frame can hold. The scene steers every particle by a scalar
+potential sampled at `world * field_freq`, so it sets the size of a current
+relative to the frame. Default `2.3`, which is the constant it replaced — a preset
+that does not bind it is unchanged. Measured across the range on `Drift`:
+
+| value | what the frame does |
+|---|---|
+| **0.8** | the field's structure is *larger than the frame*, so there are no legible channels at all — a uniform dense mass with one slow convergence front migrating across it over tens of seconds |
+| **2.3** | broad rolling currents with visible density waves: crests gathering, wakes thinning |
+| **6.0** | a few sharply resolved sinuous ribbons with genuinely empty dark space between them |
+
+Note which direction reads as *busier*: it is the low end, not the high one. A
+high `field_freq` does not make confetti — it separates the swarm into distinct
+streams and gives back negative space, while a low one packs the frame edge to
+edge because every particle is inside the same enormous current.
+
+Read it against `spin`, which is the **temporal** lever and a different question
+entirely: `field_freq` says how finely the field is divided, `spin` how fast it is
+rewritten. The family's apparent flocking is not a per-particle rule — it emerges
+from neighbours falling onto the *same* streamline and travelling together — so a
+coarse field (low `field_freq`) with a near-frozen one (low `spin`) is the
+formation-holding end, and raising either dissolves the flock toward shimmer.
+
+One thing the swarm does on its own, with nothing to bind: the toroidal domain
+follows the render target and extends a quarter past the frame, so the wrap seam
+is off-screen. That is what retired the bright top/bottom bar, and it is why
+`zoom` below `1.0` no longer exposes a hard domain rectangle — the camera is
+usable down to about `0.8`. The margin costs the visible density about a quarter
+of the particle count; that is priced into the shipped presets' `size`.
 
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 
