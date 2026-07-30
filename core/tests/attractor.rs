@@ -189,10 +189,14 @@ fn attractor_contract() {
 // `trail_grid_size` is pure, so these need no GPU and never skip. They mirror the
 // scene's private policy constants; a change there must change these deliberately.
 
-/// The per-axis cap (`TRAIL_MAX_W`/`TRAIL_MAX_H`) and quantization step
-/// (`TRAIL_GRID_STEP`) the scene applies.
-const CAP_W: u32 = 2560;
-const CAP_H: u32 = 1440;
+/// The per-axis cap and quantization step (`TRAIL_GRID_STEP`) the scene applies.
+///
+/// The cap is a **tier** value now (Plan 0044), so these read the floor tier's —
+/// which is the value they were written against and the one every golden capture
+/// and every `new_headless` renderer uses.
+const CAP: (u32, u32) = lmv_core::render::TierConfig::FLOOR.attractor_trail_cap;
+const CAP_W: u32 = CAP.0;
+const CAP_H: u32 = CAP.1;
 const STEP: u32 = 256;
 
 /// Above the cap the grid must keep the *target's* proportions. The previous
@@ -201,7 +205,7 @@ const STEP: u32 = 256;
 /// attractor's shape changed discontinuously as the window crossed 2560 wide.
 #[test]
 fn trail_grid_preserves_aspect_above_the_cap() {
-    let (w, h) = trail_grid_size(3440, 1440);
+    let (w, h) = trail_grid_size(3440, 1440, CAP);
     assert_eq!(w, CAP_W, "the binding axis should sit at its cap");
     assert!(
         h < CAP_H,
@@ -217,7 +221,7 @@ fn trail_grid_preserves_aspect_above_the_cap() {
     );
 
     // The same property on the other binding axis (a portrait/ultra-tall target).
-    let (tw, th) = trail_grid_size(1080, 3440);
+    let (tw, th) = trail_grid_size(1080, 3440, CAP);
     assert_eq!(th, CAP_H, "the binding axis should sit at its cap");
     let exact_w = th as f32 * 1080.0 / 3440.0;
     assert!(
@@ -231,18 +235,18 @@ fn trail_grid_preserves_aspect_above_the_cap() {
 #[test]
 fn trail_grid_quantizes_nearby_targets_to_one_grid() {
     assert_eq!(
-        trail_grid_size(1920, 1080),
-        trail_grid_size(1900, 1070),
+        trail_grid_size(1920, 1080, CAP),
+        trail_grid_size(1900, 1070, CAP),
         "a 20 px drag changed the grid — quantization is not in effect"
     );
     // ...and it is quantization, not a constant: a target a step away differs.
     assert_ne!(
-        trail_grid_size(1920, 1080),
-        trail_grid_size(1280, 720),
+        trail_grid_size(1920, 1080, CAP),
+        trail_grid_size(1280, 720, CAP),
         "every target maps to the same grid — the size is not following the target"
     );
     // Both axes land on a step multiple below the cap.
-    let (w, h) = trail_grid_size(1920, 1080);
+    let (w, h) = trail_grid_size(1920, 1080, CAP);
     assert_eq!(
         (w % STEP, h % STEP),
         (0, 0),
@@ -265,7 +269,7 @@ fn trail_grid_never_exceeds_the_cap_or_collapses() {
         (7680, 4320),
         (u32::MAX, u32::MAX),
     ] {
-        let (gw, gh) = trail_grid_size(w, h);
+        let (gw, gh) = trail_grid_size(w, h, CAP);
         assert!(
             gw >= 1 && gh >= 1,
             "{w}x{h} produced an empty grid {gw}x{gh}"
@@ -359,8 +363,8 @@ fn lit_bbox_ratio(img: &CaptureImage) -> f32 {
 fn attractor_projects_at_the_target_aspect() {
     // Verify the premise before spending two captures on it: these two targets
     // must genuinely disagree about the grid, or the test proves nothing.
-    let exact_grid = trail_grid_size(EXACT_TARGET.0, EXACT_TARGET.1);
-    let quantized_grid = trail_grid_size(QUANTIZED_TARGET.0, QUANTIZED_TARGET.1);
+    let exact_grid = trail_grid_size(EXACT_TARGET.0, EXACT_TARGET.1, CAP);
+    let quantized_grid = trail_grid_size(QUANTIZED_TARGET.0, QUANTIZED_TARGET.1, CAP);
     assert_eq!(
         exact_grid, EXACT_TARGET,
         "{EXACT_TARGET:?} is no longer aspect-exact — pick a target whose axes are STEP multiples"

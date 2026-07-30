@@ -119,6 +119,43 @@ pub struct TierConfig {
     /// 2560x1440 it is ~88 MB and ~177 MB — which is exactly the trade ADR-0034
     /// priced and declined at floor budgets, and which the rich tier now takes.
     pub post_cap: (u32, u32),
+
+    /// How many GPU-resident particles the attractor integrates and draws.
+    ///
+    /// State is ~16 bytes each, so even the rich count is well under 3 MB of
+    /// storage; the real ceiling is **additive-blend fill rate**, which is why the
+    /// floor value was described as the number to validate against the 60 fps @
+    /// 1080p floor (ADR-0015 Risks).
+    pub attractor_particles: u32,
+
+    /// Upper bound on each axis of the attractor's trail accumulation grid.
+    ///
+    /// The floor is the ceiling Plan 0027/0029 chose for a high-DPI display while
+    /// keeping the worst case bounded on the iGPU: every frame pays a decay pass
+    /// plus the full additive instance draw over this grid, so cost scales with
+    /// its area. Rich lifts it to 4K so a 4K or ultrawide display sizes near 1:1
+    /// instead of degrading to a uniform upscale.
+    pub attractor_trail_cap: (u32, u32),
+
+    /// How many particles the swarm simulates.
+    ///
+    /// Plan 0043 left the floor value at an **unmeasured** iGPU cost (+0.5 ms per
+    /// frame of depth math on the dev box, and not fill rate), which is why the
+    /// plans index calls this a live tier candidate rather than a settled
+    /// constant. If the on-device floor check misses, this is the lever — on the
+    /// floor value, and that routes back through `architect`.
+    pub swarm_particles: usize,
+
+    /// Ceiling on the segment count a line scene may draw in one frame, after
+    /// generation and mirror replication.
+    ///
+    /// The one capacity value here that a preset can *see*: past it geometry is
+    /// truncated, and ADR-0007 requires that be surfaced rather than silently cut.
+    /// So a preset whose mirror pushes over the floor cap reports an overflow at
+    /// the floor and not at rich — the message is the tier's most visible edge for
+    /// the content lane, which is why shipped presets are authored against the
+    /// floor.
+    pub max_segments: usize,
 }
 
 impl TierConfig {
@@ -126,12 +163,27 @@ impl TierConfig {
     pub const FLOOR: Self = Self {
         tier: Tier::Floor,
         post_cap: (1920, 1080),
+        attractor_particles: 50_000,
+        attractor_trail_cap: (2560, 1440),
+        swarm_particles: 10_000,
+        max_segments: 20_000,
     };
 
     /// The midrange-discrete tier.
+    ///
+    /// **These are provisional multipliers, not measurements.** Plan 0044 Phase 4
+    /// runs the standalone pinned here on the target GPU at native fullscreen
+    /// across the heaviest preset of each family and records the frame times; the
+    /// values that ship are the ones that hold the display rate. A number that
+    /// misses gets lowered, and no number here is invented upward to look good.
+    /// Until that phase closes, treat every field below as a starting point.
     pub const RICH: Self = Self {
         tier: Tier::Rich,
         post_cap: (2560, 1440),
+        attractor_particles: 150_000,
+        attractor_trail_cap: (3840, 2160),
+        swarm_particles: 30_000,
+        max_segments: 60_000,
     };
 
     /// The config for `tier`.
@@ -289,6 +341,11 @@ mod tests {
         let (floor, rich) = (TierConfig::FLOOR, TierConfig::RICH);
         assert!(rich.post_cap.0 >= floor.post_cap.0);
         assert!(rich.post_cap.1 >= floor.post_cap.1);
+        assert!(rich.attractor_particles >= floor.attractor_particles);
+        assert!(rich.attractor_trail_cap.0 >= floor.attractor_trail_cap.0);
+        assert!(rich.attractor_trail_cap.1 >= floor.attractor_trail_cap.1);
+        assert!(rich.swarm_particles >= floor.swarm_particles);
+        assert!(rich.max_segments >= floor.max_segments);
     }
 
     /// The floor is the pre-tier engine. These are the literals the constants
@@ -297,7 +354,12 @@ mod tests {
     /// change to the floor commitment rather than a tuning that slipped in.
     #[test]
     fn the_floor_is_the_pre_tier_engine() {
-        assert_eq!(TierConfig::FLOOR.post_cap, (1920, 1080));
+        let floor = TierConfig::FLOOR;
+        assert_eq!(floor.post_cap, (1920, 1080)); // post.rs:88
+        assert_eq!(floor.attractor_particles, 50_000); // particles/mod.rs:66
+        assert_eq!(floor.attractor_trail_cap, (2560, 1440)); // particles/mod.rs:87
+        assert_eq!(floor.swarm_particles, 10_000); // swarm.rs:28
+        assert_eq!(floor.max_segments, 20_000); // lines/mod.rs:51
     }
 
     // -----------------------------------------------------------------------

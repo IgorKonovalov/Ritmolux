@@ -100,8 +100,13 @@ mod tests {
     #![allow(clippy::panic)]
 
     use super::grid_size;
+    use crate::render::TierConfig;
     use crate::render::post::internal_grid_size;
     use crate::render::scenes::particles::trail_grid_size;
+
+    /// Both call sites' caps at the tier every golden capture runs at (Plan 0044).
+    /// These tests pin the shared *policy*, not either tier's numbers.
+    const FLOOR: TierConfig = TierConfig::FLOOR;
 
     /// Sizes whose quantized grid lands under **both** call sites' caps, so
     /// neither cap binds and the two wrappers are answering the same question.
@@ -124,8 +129,8 @@ mod tests {
     #[test]
     fn the_two_call_sites_are_one_policy() {
         for surface in UNCAPPED {
-            let post = internal_grid_size(surface, crate::render::TierConfig::FLOOR.post_cap);
-            let trail = trail_grid_size(surface.0, surface.1);
+            let post = internal_grid_size(surface, FLOOR.post_cap);
+            let trail = trail_grid_size(surface.0, surface.1, FLOOR.attractor_trail_cap);
             assert_eq!(
                 post, trail,
                 "{surface:?}: the post stages and the attractor must quantize \
@@ -143,8 +148,8 @@ mod tests {
     fn the_caps_stay_different_on_purpose() {
         let surface = (3840, 2160);
         assert_ne!(
-            internal_grid_size(surface, crate::render::TierConfig::FLOOR.post_cap),
-            trail_grid_size(surface.0, surface.1),
+            internal_grid_size(surface, FLOOR.post_cap),
+            trail_grid_size(surface.0, surface.1, FLOOR.attractor_trail_cap),
             "above the post cap the two must diverge — the attractor is allowed a \
              larger grid than the stages, which are charged twice by a dual-live dissolve"
         );
