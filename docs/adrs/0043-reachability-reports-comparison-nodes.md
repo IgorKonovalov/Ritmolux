@@ -1,6 +1,7 @@
 # ADR-0043 — Reachability reports comparison nodes, suppressed only where a `select()` already names them
 
-> **Status:** proposed
+> **Status:** accepted 2026-07-30 (implemented by Plan 0042; the re-audit its Notes section calls
+> for is that plan's Outcome, and it measured 0 genuinely dead gates across the shipped set)
 > **Date:** 2026-07-29
 > **Related plan(s):** [0042](../plans/0042-reachability-sees-every-comparison.md)
 > **Supplements:** [ADR-0042](0042-reachability-measured-on-the-expression-tree.md) (the mechanism

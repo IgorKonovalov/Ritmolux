@@ -10,21 +10,14 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0042](0042-reachability-sees-every-comparison.md) | Reachability sees every comparison, and the library is re-audited against it | **approved 2026-07-29** — ready for `dev` (run first) | dev |
-| [0043](0043-swarm-depth-and-domain.md) | The swarm gets a depth axis and a domain that follows the target | **approved 2026-07-29** — ready for `dev` (run after 0042) | dev |
+| [0043](0043-swarm-depth-and-domain.md) | The swarm gets a depth axis and a domain that follows the target | **approved 2026-07-29** — ready for `dev` (its 0042 precondition is now closed) | dev |
 
 ## Recommended execution sequence
 
-**Both are approved (2026-07-29) and [0042] runs first.** It repairs the instrument that [0043]'s
-content phase — and every other lane — verifies through. Same sequencing logic that paid off for
-[0041]: fix the measurement, then do the content once instead of twice. They are separate `dev`
-sessions with a Mode 4 review between them, not one run: 0042 ends on a measurement that 0043's
-Phase 4 reads.
+**[0043] is the one to run.** Its precondition — [0042], the instrument repair — **landed and closed
+on 2026-07-30**, so the measurement 0043's Phase 4 reads is now trustworthy. That sequencing paid
+off exactly as it did for [0041]: fix the measurement, then do the content once instead of twice.
 
-- **[0042] — reachability sees every comparison.** Plan 0041's check reports `select()` and
-  `clamp()` only, so a bare comparison (`reseed = "onset > 0.55"`) is never observed and a dead band
-  gate `min`ed with a live `tempo` gate is dismissed as the tempo gate. Small, two code phases plus a
-  measurement phase. [ADR-0043](../adrs/0043-reachability-reports-comparison-nodes.md).
 - **[0043] — the swarm gets a depth axis and a domain that follows the target.** Fixes the
   user-reported bright-bar artifact at its cause (the wrap seam is on the frame edge), retires a
   fixed 16:9 that ADR-0037 rules against, and adds the 2.5D depth the family has always needed.
@@ -33,9 +26,10 @@ Phase 4 reads.
 **[0041]'s content half is done** (2026-07-29, `e9a1c3c`). The re-gaining pass this section used to
 recommend was carried out: nine dead gates were rescaled to measured band levels across
 `fragment_warp`, `lsystem_fern`, `attractor_dejong`, `star_rosette`, all five `attractor_*` reseeds
-and `rose_web`. Five of those nine were **invisible** to `--report` — which is what [0042] exists to
-fix, and why the "20 dead branches" figure this section used to quote was an undercount rather than a
-census.
+and `rose_web`. Five of those nine were **invisible** to `--report` — which is what [0042] fixed, and
+why the "20 dead branches" figure this section used to quote was an undercount rather than a census.
+**[0042]'s re-audit has since taken the census**: 0 genuinely dead gates across the shipped set, so
+that content pass was the last one owed. See Recently closed.
 
 **[0035] has landed and closed** — the composite's aspect is the render target's
 ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), now **accepted**), the two
@@ -69,7 +63,8 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.22.0`** — bumped at [0041]'s close (a feature plan) per
+**Version is at `0.23.0`** — bumped at [0042]'s close (a feature plan: a new observation variant, a
+new `GateKind`, a new report line) per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Nothing is owed until the next close.
 
 **The next ADR is design-backlog 0015** — the band axis is half linear, and Plan 0037 Phase 4's
@@ -215,6 +210,25 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0042 — reachability sees every comparison, and the library is re-audited against
+  it](done/0042-reachability-sees-every-comparison.md) — **done 2026-07-30**, passed Mode 4 review
+  (**no blockers**; one major, two minors, one nit — the major and both minors fixed in the close
+  commit). Three `dev` phase commits: `8c170a3` observe every comparison, `e7a40b7` report a
+  one-sided one unless a `select()` already names it, `f50e8cf` the Phase 3 re-audit. **Closes
+  design-backlog 0028.** [ADR-0043](../adrs/0043-reachability-reports-comparison-nodes.md) is
+  **accepted**.
+  **The library is clean, and that is a measurement rather than an assumption** — re-run at review
+  time, not taken on trust: 16 gate flags across the shipped set, **every one** the standing `tempo`
+  single-BPM false positive, **0 genuinely dead**. The two negative results are the real deliverable
+  and neither was obtainable before this plan: the band halves inside `min(tempo > 132, bass + mid >
+  0.055)` and `min(tempo > 124, bass + treb > 0.1)` each stayed unflagged while their tempo half
+  emitted a `COMP`, and all seven bare-comparison bindings (six `attractor_* reseed`, plus
+  `rose_web.mirror_reflect`) score clean — direct confirmation the `e9a1c3c` content re-gain took.
+  **The blocker on CI gating has changed identity:** the library was the precondition and it is met;
+  what remains is the instrument, so a multi-BPM probe or an explicit `tempo` exemption is now the
+  single thing between here and a meaningful green gate. `docs/capturing.md` no longer justifies the
+  advisory posture with the nine-failing-presets figure this plan measured to zero.
 
 - [0041 — `--report` reads at two levels, and expression reachability is measured on the
   AST](done/0041-report-two-level-stimuli-and-expression-reachability.md) — **done 2026-07-29**,

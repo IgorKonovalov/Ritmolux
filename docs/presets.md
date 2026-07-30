@@ -546,10 +546,18 @@ Six shipped presets had their defining mechanism disabled this way for months �
 `fragment_kaleido` never left 6 folds, `reaction_reef` never folded at all — and
 all six scored **healthy** in `--report`, because its stimuli were full-scale too.
 They no longer do: `--report`'s reachability check walks every expression and
-names any `select()` whose condition never went both ways, and any `clamp()`
-ceiling the value never reached
+names any comparison that only ever took one value, any `select()` whose
+condition never went both ways, and any `clamp()` ceiling the value never
+reached
 ([capturing.md](capturing.md#reachability-gates-the-probe-never-drove-both-ways)).
 Run it before you ship a gate.
+
+That covers the bare-comparison form too, which is the one this page tells you to
+write: `reseed = "onset > 0.55"` holds no `select()`, and a threshold nothing
+crosses makes it a boolean param stuck at `0` forever. It reports as a `COMP`
+line ([ADR-0043](adrs/0043-reachability-reports-comparison-nodes.md)) — worth
+knowing, because `onset` is raw spectral flux with a peak near `0.016`, so a
+threshold that looks conservative on a `0..1` reading is usually unreachable.
 
 The same arithmetic applies to a `clamp()` ceiling: `clamp(bass * 0.1, 0, 0.5)`
 reads as a parameter spanning half a unit and delivers about `0.01`.

@@ -1334,11 +1334,17 @@ written down where an author meets them:
 
 ## Entry 0028 — from the 2026-07-29 `preset-author` post-Plan-0041 library sweep
 
-## 0028 — reachability only reports `select`/`clamp` nodes, so a bare comparison is invisible and a dead band gate can hide behind a live `tempo` one
+## ~~0028 — reachability only reports `select`/`clamp` nodes, so a bare comparison is invisible and a dead band gate can hide behind a live `tempo` one~~
 
 - **Raised:** 2026-07-29, from `preset-author` (first library audit using Plan 0041's new
   reachability check).
 - **Verified against code:** yes — `collect_flags` in `core/src/preset/expr.rs`.
+- **PROMOTED 2026-07-29 → [ADR-0043](adrs/0043-reachability-reports-comparison-nodes.md) +
+  [Plan 0042](plans/done/0042-reachability-sees-every-comparison.md); closed 2026-07-30.** Both
+  shapes are now reported, as a `COMP` line. The re-audit the fix enabled found **0 genuinely dead
+  gates** across the shipped set — so the second five this entry describes were the last of them,
+  and the seven bare comparisons the old check could not see score clean. Notes retained below as
+  the origin record; the mechanism section describes the *pre-fix* code.
 - **Not a re-raise of [0022](#0022----reports-reactivity-columns-are-structurally-blind-to-a-level-curve).**
   0022 was about the *reactivity columns* being blind to a level `curve`, and Plan 0041 closed it.
   This is about the *reachability check itself*, which 0041 added.
