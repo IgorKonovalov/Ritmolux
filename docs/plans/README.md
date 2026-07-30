@@ -1738,6 +1738,14 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Roadmap (agreed 2026-07-21, revised same day for the live-show use case; numbers assigned when drafted)
 
+> **2026-07-30: a second, strategic roadmap now exists —
+> [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md)** — from the user-requested
+> "why is everything dull" architecture review. It diagnoses the five capability caps (single
+> quality tier, decay-only feedback, 8-bit additive composite, one-scene/fixed-chain
+> composition, starved grammar) and orders the themes R0-R6 that answer them. Item 3's
+> remaining half below (quality tiers + governor) is that roadmap's R0. New visual-capability
+> plans should cite it.
+
 Execution order after Plan 0001, per the NFR interviews ([docs/nfr.md](../nfr.md)):
 
 1. **Preset / scripting engine** — layered presets per
