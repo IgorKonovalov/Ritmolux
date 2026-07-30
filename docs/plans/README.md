@@ -10,8 +10,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0043](0043-swarm-depth-and-domain.md) | The swarm gets a depth axis and a domain that follows the target | **approved 2026-07-29** — ready for `dev` (its 0042 precondition is now closed) | dev |
-| [0044](0044-quality-tiers.md) | Quality tiers: `Floor` and `Rich`, a governor, and the constants that move | **approved 2026-07-30** — ready for `dev` after [0043] closes; roadmap R0, [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) | dev, human |
+| [0044](0044-quality-tiers.md) | Quality tiers: `Floor` and `Rich`, a governor, and the constants that move | **approved 2026-07-30** — ready for `dev` **now** ([0043] closed) ; roadmap R0, [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) | dev, human |
 | [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **approved 2026-07-30** — ready for `dev` after [0044]; roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0047](0047-expression-randomness.md) | Expression randomness: `hash`, `noise`, and the seed that finally does something | **approved 2026-07-30** — ready for `dev` now; roadmap R5 (small half), [ADR-0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md); **parallel lane** (expr/schema files, no render collision) | dev |
@@ -19,18 +18,23 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 ## Recommended execution sequence
 
-**[0043] is the one to run.** Its precondition — [0042], the instrument repair — **landed and closed
-on 2026-07-30**, so the measurement 0043's Phase 4 reads is now trustworthy. That sequencing paid
-off exactly as it did for [0041]: fix the measurement, then do the content once instead of twice.
+**[0044] is the one to run.** [0043] **has landed and closed** (2026-07-30) — see Recently closed —
+which releases the one sequencing constraint [0044] had: its Phase 3 touches `swarm.rs`, and that
+file is now settled. The [0042] → [0043] ordering paid off exactly as it did for [0041]: fix the
+measurement, then do the content once instead of twice — Phase 4's `anim` improvements are read off
+a trustworthy instrument.
 
-**Then the visual-richness pair, in order: [0044] → [0045]** (the first two engine steps of
+**The visual-richness pair runs in order: [0044] → [0045]** (the first two engine steps of
 [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md), drafted 2026-07-30 from the R0+R1
 interview; **both approved 2026-07-30**).
 
 - **[0044] — quality tiers.** `TierConfig` (Floor = today's constants, Rich calibrated on the
   user's discrete GPU), auto-select with a one-way governor and an explicit pin; captures pin
-  Floor so every baseline stays byte-identical. **Must start after [0043] closes** — its Phase 3
-  touches `swarm.rs`. [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md).
+  Floor so every baseline stays byte-identical. Its `swarm.rs` conflict with [0043] is resolved —
+  that plan closed. [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md). **Note for its Phase 3:**
+  [0043] left `PARTICLES` at 10 000 with an **unmeasured** iGPU floor (+0.5 ms/frame of depth math on
+  the dev box), so the particle count is now a live tier candidate rather than a settled constant —
+  see the `docs/on-device-validation.md` item.
 - **[0045] — linear light + bloom.** The kaleidoscope fold fix first (disc + falloff + bindable
   centre, [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md), confirmed from
   rendered samples), then the `Rgba16Float` linear composite with one engine-fixed tonemap, then
@@ -39,10 +43,13 @@ interview; **both approved 2026-07-30**).
   eyes-on. Runs after [0044] — bloom levels and the Floor bandwidth relief are tier values.
   Closes backlog 0005, 0010 and 0011.
 
-- **[0043] — the swarm gets a depth axis and a domain that follows the target.** Fixes the
-  user-reported bright-bar artifact at its cause (the wrap seam is on the frame edge), retires a
-  fixed 16:9 that ADR-0037 rules against, and adds the 2.5D depth the family has always needed.
-  Four phases, one file plus a content pass. [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md).
+**[0043] has landed and closed** — the swarm's wrap seam is off-screen, its domain has the render
+target's shape, and every particle carries a depth. See Recently closed. Two things later work
+inherits: **ADR-0037 now covers simulation domains, not just render grids** (this was its first
+application to one, and the plan's own text named the wrong hook — `set_target_size` carries the
+quantized grid, `Scene::render`'s argument carries the surface), and the **family is three presets,
+not five** — `swarm_flow.toml` and `swarm_burst.toml` are retired, with the family-wide authoring
+notes consolidated into `swarm_drift.toml`.
 
 **[0041]'s content half is done** (2026-07-29, `e9a1c3c`). The re-gaining pass this section used to
 recommend was carried out: nine dead gates were rescaled to measured band levels across
@@ -84,8 +91,8 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.23.0`** — bumped at [0042]'s close (a feature plan: a new observation variant, a
-new `GateKind`, a new report line) per
+**Version is at `0.24.0`** — bumped at [0043]'s close (a feature plan: a new bindable param, a depth
+axis, a target-derived domain, a re-authored preset family) per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Nothing is owed until the next close.
 
 **The next ADR is design-backlog 0015** — the band axis is half linear, and Plan 0037 Phase 4's
@@ -231,6 +238,48 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0043 — the swarm gets a depth axis and a domain that follows the
+  target](done/0043-swarm-depth-and-domain.md) — **done 2026-07-30**, passed Mode 4 review
+  (**no blockers**; two minors and a nit — both minors fixed in the close commit). Four `dev` phase
+  commits: `ae6f638` the target-sized domain, `7f54e2a` `field_freq`, `7eaa848` the depth axis,
+  `de707cb` the family cut to three and re-authored. **Closes design-backlog 0029 and 0025 in full.**
+  [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) is **accepted**.
+  **The user-reported bright bar is gone at its cause**, not hidden: `BOUND_Y = 1.0` *was* the NDC
+  frame edge, so the toroidal seam was the one place on screen every wrapping particle was guaranteed
+  to paint and the feedback stage integrated it. The half-extents now follow the render target's
+  aspect times `MARGIN = 1.25`, chosen by measurement against the family's working `zoom` range
+  rather than rounded — at margin 1.0 the 400-frame `dynamic:110` capture reproduces the bar, at 1.25
+  it is gone at both 16:9 and 16:10. **Positions moved to normalized `[-1, 1)` storage**, which is
+  what makes a resize a rescale instead of a mass teleport and keeps the seeded scatter
+  aspect-independent (NFR §6).
+  **ADR-0037 now reaches simulation domains.** This is its first application to one, and it produced
+  the review's most useful finding: the plan told `dev` to source the aspect from
+  `Scene::set_target_size`, and `dev` correctly refused — that hook carries the post chain's grid,
+  quantized to a 256 px step, and every swarm preset composes `trails`, so it is exactly the
+  quantized case. `Scene::render`'s argument is the surface (`render/post.rs:442`). The plan text is
+  corrected in place; **the pattern to carry forward is that "the target-size hook" is not a synonym
+  for "the target's shape"**.
+  **Depth is a 2.5D fake and the tests say why that is cheap**: one `z` per particle driving sprite
+  scale, an atmospheric fade, parallax against `zoom`/`pan_*` (near traverses ~1.9x faster than far),
+  and a z-dependent flow-field phase offset — the term that separates volume from a sprite sheet at
+  two scales. No sort, because additive blending is commutative. Parallax rides a per-instance vertex
+  attribute, so the shader holds no depth constants and reduces to the identity at zoom 1 / pan 0.
+  All seven `swarm` unit tests carry a counter-assertion that makes them non-vacuous — the replaced
+  constants genuinely disagree with 16:10, a world-space store genuinely teleports by >2 world units,
+  the identity transform genuinely is depth-independent.
+  **One acceptance criterion is outstanding and is not a defect:** Phase 3 named NFR §1/§9's ≥ 60 fps
+  @ 1080p iGPU floor, which no session can measure — the dev-box marginal cost is **+0.5 ms/frame**
+  (1.03–1.09 → 1.56–1.58 over 5000 frames at 1920x1080), and it is not fill rate. Carried forward as
+  a `docs/on-device-validation.md` item; if it misses, the lever is `PARTICLES` and that routes back
+  here rather than being taken silently. **[0044]'s Phase 3 should treat the particle count as a live
+  tier candidate.**
+  Content: the family is **three** presets separated for the first time by *structure* rather than
+  palette and band driver — Drift ~1.9, Storm ~3.0, Dense ~5.2 of `field_freq` — with `anim` improved
+  on all three against the pre-plan baseline (0.090→0.098, 0.041→0.050, 0.044→0.051) and the reduced
+  set passing `sanity` / `reactivity` / `animation` / `distinctness`. The counter-intuitive result is
+  documented in `presets/README.md`: it is the **low** end of `field_freq` that reads busier, because
+  a field structure larger than the frame packs it edge to edge.
 
 - [0042 — reachability sees every comparison, and the library is re-audited against
   it](done/0042-reachability-sees-every-comparison.md) — **done 2026-07-30**, passed Mode 4 review

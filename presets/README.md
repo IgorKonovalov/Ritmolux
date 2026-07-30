@@ -203,7 +203,11 @@ Two things the swarm does on its own, with nothing to bind.
 The **toroidal domain follows the render target** and extends a quarter past the
 frame, so the wrap seam is off-screen. That is what retired the bright top/bottom
 bar, and it is why `zoom` below `1.0` no longer exposes a hard domain rectangle —
-the camera is usable down to about `0.8`.
+the camera is usable down to about **`0.84`**. Note that figure is the *near depth
+layer's*, not the domain's: `1.25 * zoom` alone would reach the frame edge at
+`0.80`, but the near layer takes 1.25x of the zoom deflection too, so it is the
+first thing to show an edge and it does so at `1.25 * (1 + (zoom - 1) * 1.25) = 1`.
+Pan pulls that further up — see the arithmetic in `swarm_drift.toml`.
 
 And **every particle carries a depth**, 0 far to 1 near, fixed for its life from
 the seeded scatter. It scales the sprite (0.55x–1.5x), fades brightness with
