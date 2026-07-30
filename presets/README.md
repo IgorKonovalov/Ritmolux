@@ -159,12 +159,30 @@ from neighbours falling onto the *same* streamline and travelling together — s
 coarse field (low `field_freq`) with a near-frozen one (low `spin`) is the
 formation-holding end, and raising either dissolves the flock toward shimmer.
 
-One thing the swarm does on its own, with nothing to bind: the toroidal domain
-follows the render target and extends a quarter past the frame, so the wrap seam
-is off-screen. That is what retired the bright top/bottom bar, and it is why
-`zoom` below `1.0` no longer exposes a hard domain rectangle — the camera is
-usable down to about `0.8`. The margin costs the visible density about a quarter
-of the particle count; that is priced into the shipped presets' `size`.
+Two things the swarm does on its own, with nothing to bind.
+
+The **toroidal domain follows the render target** and extends a quarter past the
+frame, so the wrap seam is off-screen. That is what retired the bright top/bottom
+bar, and it is why `zoom` below `1.0` no longer exposes a hard domain rectangle —
+the camera is usable down to about `0.8`.
+
+And **every particle carries a depth**, 0 far to 1 near, fixed for its life from
+the seeded scatter. It scales the sprite (0.55x–1.5x), fades brightness with
+distance, gives the particle its own parallax against `zoom`/`pan_*` — a near one
+traverses the frame about 1.9x faster than a far one, so panning now sweeps the
+near field past the far one instead of sliding a flat sheet — and offsets *which
+current it rides*, so the layers follow different streamlines rather than the same
+ones at several sizes. There is no sorting and no perspective: the scene blends
+additively, so draw order does not matter, and two particles at different depths
+that overlap simply sum. That means **no occlusion** — the illusion is strongest
+on a sparse field and flattens as density rises, so a very dense preset is the one
+place depth reads weakest.
+
+Both cost visible density — the margin puts about a quarter of the particles
+off-screen, and the fade dims the far half — which is priced into the shipped
+presets' `size` and `brightness`. A swarm preset carried over from before Plan
+0043 will read dimmer and sparser than it used to; raise those two rather than
+assuming something broke.
 
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 

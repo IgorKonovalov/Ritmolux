@@ -60,6 +60,46 @@ const FALLBACK_ASPECT: f32 = 16.0 / 9.0;
 /// Velocity retained per frame (the rest is re-steered by the flow field).
 const DAMPING: f32 = 0.86;
 
+// --- The depth axis (Plan 0043 Phase 3, ADR-0044) -------------------------------
+//
+// Each particle carries a `z` in `0..1` — 0 far, 1 near — seeded with the rest of
+// the scatter. It drives four things and **never** a sort: the scene blends
+// additively, and addition is commutative, so draw order is irrelevant. That one
+// fact is what makes a depth axis nearly free here; the per-frame sort a 3D
+// particle system normally pays buys occlusion an additive scene does not have.
+//
+// It is an honest fake. There is no occlusion and no perspective divide — two
+// particles at different depths that overlap simply sum — so the illusion flattens
+// as density rises. That is the known limit of the 2.5D choice, not a defect.
+/// Sprite scale at `z = 0` and `z = 1`. The mean is ~1, so the family's `size`
+/// bindings keep roughly their old meaning.
+const DEPTH_SCALE_FAR: f32 = 0.55;
+const DEPTH_SCALE_NEAR: f32 = 1.50;
+/// Atmospheric fade: brightness multiplier at `z = 0` and `z = 1`. Distance
+/// washing out contrast is the oldest depth cue there is, and it is what keeps a
+/// far particle from reading as merely a small near one.
+const DEPTH_FADE_FAR: f32 = 0.45;
+const DEPTH_FADE_NEAR: f32 = 1.05;
+/// Parallax strength against the shared view transform at `z = 0` and `z = 1`.
+///
+/// A near particle traverses the frame ~1.9x faster than a far one under the same
+/// `pan_*`, which is the difference between a depth axis and a sprite sheet at two
+/// scales. Both ends are deliberately kept near 1 rather than spread wide: the
+/// near layer is the binding case for the [`MARGIN`] seam clearance (it is the one
+/// pan pushes furthest toward the frame), and at `zoom = 1` with the family's
+/// `pan` of 0.16 this still leaves the seam off-screen.
+const DEPTH_PARALLAX_FAR: f32 = 0.65;
+const DEPTH_PARALLAX_NEAR: f32 = 1.25;
+/// Phase offset, in radians, applied to the flow-field sample per unit of `z`.
+///
+/// **This is the term that makes it read as volume.** Without it every depth layer
+/// rides identical streamlines and the result is one flock drawn at several sizes;
+/// with it the near and far layers follow genuinely different currents, so they
+/// cross and separate the way real depth does. Sized as a large fraction of the
+/// field's `TAU` period — enough to decorrelate the layers, short of wrapping them
+/// back onto each other.
+const DEPTH_FIELD_OFFSET: f32 = 2.6;
+
 /// Parameter defaults — a calm idle drift when nothing is bound.
 const DEFAULT_FORCE: f32 = 1.4;
 const DEFAULT_SPIN: f32 = 0.3;
@@ -116,6 +156,7 @@ fn vs_main(
     @location(0) center: vec2<f32>,
     @location(1) size: f32,
     @location(2) color: vec3<f32>,
+    @location(3) parallax: f32,
 ) -> VsOut {
     var corners = array<vec2<f32>, 6>(
         vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(0.0, 1.0),
@@ -124,9 +165,15 @@ fn vs_main(
     let c = corners[vi] * 2.0 - vec2<f32>(1.0, 1.0);
     // Shared ViewTransform (ADR-0018): zoom about the frame centre, then pan the
     // particle position; the sprite quad (c * size) keeps its on-screen size.
+    //
+    // Depth parallax (Plan 0043 Phase 3): `parallax` is the per-particle strength
+    // the CPU derived from `z`, so a near particle takes more of the pan and more
+    // of the zoom deflection than a far one and the layers slide across each other
+    // as the camera moves. At the identity transform (zoom 1, pan 0) this reduces
+    // to `center` for every depth, so an unbound preset is untouched.
     let zoom = misc.v.y;
     let pan = misc.v.zw;
-    let center_v = center * zoom + pan;
+    let center_v = center * (1.0 + (zoom - 1.0) * parallax) + pan * parallax;
     let world = center_v + c * size;
     var out: VsOut;
     out.pos = vec4<f32>(world.x / misc.v.x, world.y, 0.0, 1.0);
@@ -150,6 +197,9 @@ struct Instance {
     center: [f32; 2],
     size: f32,
     color: [f32; 3],
+    /// The particle's depth parallax strength, resolved from its `z` on the CPU so
+    /// the shader needs no depth constants (Plan 0043 Phase 3).
+    parallax: f32,
 }
 
 #[repr(C)]
@@ -176,6 +226,15 @@ struct Particle {
     /// Velocity in **world** units per second — the flow field and the burst are
     /// screen-space forces, so they must not change magnitude with the domain.
     vel: [f32; 2],
+    /// Depth: 0 = far, 1 = near (Plan 0043 Phase 3). Drives sprite scale, an
+    /// atmospheric brightness fade, a parallax offset against the shared view
+    /// transform, and which current the particle rides — **never** sorting, since
+    /// the scene blends additively (ADR-0044).
+    ///
+    /// Fixed for the particle's life, like `hue` and `bright`: it comes off the
+    /// seeded scatter, so the same seed gives the same depth sequence every run
+    /// (NFR §6).
+    z: f32,
     /// Per-particle palette offset and brightness, from the seeded scatter.
     hue: f32,
     bright: f32,
@@ -292,6 +351,7 @@ impl SwarmScene {
                         0 => Float32x2,
                         1 => Float32,
                         2 => Float32x3,
+                        3 => Float32,
                     ],
                 })],
             },
@@ -334,6 +394,7 @@ impl SwarmScene {
                     center: [0.0, 0.0],
                     size: 0.0,
                     color: [0.0, 0.0, 0.0],
+                    parallax: 1.0,
                 };
                 PARTICLES
             ],
@@ -372,6 +433,7 @@ impl SwarmScene {
         Particle {
             pos: [rng.range(-1.0, 1.0), rng.range(-1.0, 1.0)],
             vel: [angle.cos() * 0.2, angle.sin() * 0.2],
+            z: rng.next_f32(),
             hue: rng.next_f32(),
             bright: rng.range(0.5, 1.0),
             size: rng.range(0.004, 0.011),
@@ -505,9 +567,13 @@ impl Scene for SwarmScene {
             // burst and the sprite all work in.
             let world = [p.pos[0] * bound_x, p.pos[1] * bound_y];
 
-            // Scalar potential -> flow direction (cheap curl-ish field).
-            let a = (world[0] * field_freq + field_t).sin()
-                + (world[1] * field_freq - field_t * 0.8).cos();
+            // Scalar potential -> flow direction (cheap curl-ish field), sampled at
+            // a depth-dependent phase so each layer rides its own currents rather
+            // than the same streamlines at several sizes (Plan 0043 Phase 3). The
+            // two axes take different offsets, so layers decorrelate in both.
+            let zo = p.z * DEPTH_FIELD_OFFSET;
+            let a = (world[0] * field_freq + field_t + zo).sin()
+                + (world[1] * field_freq - field_t * 0.8 - zo * 0.7).cos();
             let dir = [a.cos(), a.sin()];
 
             p.vel[0] = p.vel[0] * damp + dir[0] * force * dt;
@@ -548,12 +614,23 @@ impl Scene for SwarmScene {
                 self.palette.sample(coord, self.palette_mix),
                 self.saturation,
             );
-            let bright = ((0.25 + speed * 0.7) * p.bright).min(1.6) * self.brightness;
+            // Depth, resolved into the three visual terms it drives (Plan 0043
+            // Phase 3). Three `mul_add`-shaped lerps on a value that never changes
+            // — the whole per-particle cost of the depth axis.
+            let depth_scale = DEPTH_SCALE_FAR + (DEPTH_SCALE_NEAR - DEPTH_SCALE_FAR) * p.z;
+            let depth_fade = DEPTH_FADE_FAR + (DEPTH_FADE_NEAR - DEPTH_FADE_FAR) * p.z;
+            let parallax = DEPTH_PARALLAX_FAR + (DEPTH_PARALLAX_NEAR - DEPTH_PARALLAX_FAR) * p.z;
+
+            // The speed cue predates depth and still earns its place: on a coherent
+            // field the fast channels read brighter than slack water. The
+            // atmospheric fade multiplies it rather than replacing it.
+            let bright = ((0.25 + speed * 0.7) * p.bright).min(1.6) * self.brightness * depth_fade;
 
             *inst = Instance {
                 center: [p.pos[0] * bound_x, p.pos[1] * bound_y],
-                size: p.size * self.size,
+                size: p.size * self.size * depth_scale,
                 color: [base[0] * bright, base[1] * bright, base[2] * bright],
+                parallax,
             };
         }
     }
@@ -614,8 +691,12 @@ mod tests {
     // pragma — this is not the render path.
     #![allow(clippy::indexing_slicing)]
 
-    use super::{DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, MARGIN, bounds, hue_coord};
+    use super::{
+        DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, DEPTH_PARALLAX_FAR,
+        DEPTH_PARALLAX_NEAR, MARGIN, PARTICLES, SEED, SwarmScene, bounds, hue_coord,
+    };
     use crate::render::palette::Palette;
+    use crate::render::scenes::SeededRng;
 
     /// Target aspects worth checking a domain against: 16:9, the 16:10 the fixed
     /// constants disagreed with, 4:3, an ultrawide, and a portrait.
@@ -696,21 +777,27 @@ mod tests {
             }
         }
 
-        // Concrete: the pan the swarm presets reach, against every landscape target.
+        // Concrete: the pan the swarm presets reach, against every landscape
+        // target, **at the near depth layer**. Parallax scales both the pan offset
+        // and the zoom deflection, and the near layer takes the most pan — so it is
+        // the one whose seam sits closest to the frame and the only one worth
+        // asserting. Checking a depth-agnostic 1.0 here would pass while the layer
+        // that actually binds went unmeasured.
         for aspect in [16.0 / 9.0, 16.0 / 10.0, 4.0 / 3.0, 21.0 / 9.0] {
             let (bx, by) = bounds(aspect);
             for zoom in ZOOMS {
+                let par = DEPTH_PARALLAX_NEAR;
+                let seam_y = by * (1.0 + (zoom - 1.0) * par) - PAN * par;
+                let seam_x = bx * (1.0 + (zoom - 1.0) * par) - PAN * par;
                 assert!(
-                    by * zoom - PAN > 1.0,
-                    "y seam at bound {by:.3}, zoom {zoom:.2}, pan {PAN} projects to {:.3} \
-                     — inside the frame",
-                    by * zoom - PAN
+                    seam_y > 1.0,
+                    "near-layer y seam projects to {seam_y:.3} at zoom {zoom:.2}, pan {PAN} \
+                     — inside the frame"
                 );
                 assert!(
-                    bx * zoom - PAN > aspect,
-                    "x seam at bound {bx:.3}, zoom {zoom:.2}, pan {PAN} projects to {:.3} \
-                     — inside the half-width {aspect:.3}",
-                    bx * zoom - PAN
+                    seam_x > aspect,
+                    "near-layer x seam projects to {seam_x:.3} at zoom {zoom:.2}, pan {PAN} \
+                     — inside the half-width {aspect:.3}"
                 );
             }
         }
@@ -721,6 +808,87 @@ mod tests {
         assert!(
             (0.5..0.85).contains(&visible),
             "a margin keeping under half the particles on screen is too expensive: {visible:.3}"
+        );
+    }
+
+    /// **Parallax is present, not merely a scale change** (Plan 0043 Phase 3's
+    /// done-when): under the same `pan_*`, a near particle traverses the frame
+    /// measurably faster than a far one.
+    ///
+    /// Replicates the vertex shader's projection exactly — that one expression is
+    /// the whole depth transform, so asserting on it is asserting on what the GPU
+    /// does. Two claims, and the second is what stops this from being a tautology
+    /// about a constant: the layers separate under a pan, and they do **not**
+    /// separate at the identity transform, so an unbound preset gets no parallax
+    /// distortion at all.
+    #[test]
+    fn near_particles_traverse_the_frame_faster_than_far_ones() {
+        // `misc.v`: ndc.x = (center.x * (1 + (zoom - 1) * par) + pan.x * par) / aspect
+        let project = |center_x: f32, zoom: f32, pan_x: f32, par: f32, aspect: f32| {
+            (center_x * (1.0 + (zoom - 1.0) * par) + pan_x * par) / aspect
+        };
+        let aspect = 16.0 / 9.0;
+        let (near, far) = (DEPTH_PARALLAX_NEAR, DEPTH_PARALLAX_FAR);
+
+        // Two particles at the same place, at opposite depths, under a pan sweep.
+        let center_x = 0.4;
+        let (pan_a, pan_b) = (0.0, 0.3);
+        let travel = |par: f32| {
+            (project(center_x, 1.0, pan_b, par, aspect)
+                - project(center_x, 1.0, pan_a, par, aspect))
+            .abs()
+        };
+        let (near_travel, far_travel) = (travel(near), travel(far));
+        assert!(
+            near_travel > far_travel * 1.5,
+            "the near layer must outrun the far one: {near_travel:.4} vs {far_travel:.4} \
+             (ratio {:.2})",
+            near_travel / far_travel
+        );
+
+        // A zoom deflection separates them too — depth is not pan-only.
+        let zoomed = |par: f32| (project(center_x, 1.3, 0.0, par, aspect)).abs();
+        assert!(
+            zoomed(near) > zoomed(far) * 1.05,
+            "zoom must deflect the near layer further: {:.4} vs {:.4}",
+            zoomed(near),
+            zoomed(far)
+        );
+
+        // ...and at the identity transform every depth projects to the same place,
+        // so an unbound preset is untouched by the depth axis' parallax term.
+        for par in [far, 1.0, near] {
+            assert!(
+                (project(center_x, 1.0, 0.0, par, aspect) - center_x / aspect).abs() < 1e-6,
+                "identity zoom/pan must be depth-independent"
+            );
+        }
+    }
+
+    /// The depth axis is **seeded**, so a capture is reproducible run-to-run
+    /// (NFR §6) — and it genuinely spans the range, which is what makes the scale,
+    /// fade and parallax lerps do anything.
+    #[test]
+    fn the_seeded_scatter_reproduces_the_same_depth_sequence() {
+        let depths = || {
+            let mut rng = SeededRng::new(SEED);
+            (0..PARTICLES)
+                .map(|_| SwarmScene::spawn(&mut rng).z)
+                .collect::<Vec<f32>>()
+        };
+        let (a, b) = (depths(), depths());
+        assert_eq!(a, b, "the same seed must give the same depth sequence");
+
+        let lo = a.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = a.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let mean = a.iter().sum::<f32>() / a.len() as f32;
+        assert!(
+            (0.0..0.02).contains(&lo) && (0.98..=1.0).contains(&hi),
+            "depth must span the full 0..1 range, got {lo:.4}..{hi:.4}"
+        );
+        assert!(
+            (0.45..0.55).contains(&mean),
+            "depth must populate the range evenly, mean was {mean:.4}"
         );
     }
 
