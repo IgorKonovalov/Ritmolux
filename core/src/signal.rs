@@ -296,12 +296,19 @@ mod tests {
         for (i, chunk) in pcm.chunks(hop).enumerate() {
             an.push_interleaved(chunk);
             let f = an.take_frame();
-            if i < warmup {
+            // Past the analyzer's own warm-up (derived — see `WARMUP_HOPS`) plus
+            // whatever settling the caller asked for on top.
+            if i < crate::dsp::WARMUP_HOPS + warmup {
                 continue;
             }
-            bands[0].push(f.bass);
-            bands[1].push(f.mid);
-            bands[2].push(f.treb);
+            // The **raw** levels, deliberately. These measurements are claims
+            // about the *generator* — does this PCM have dynamics — and ADR-0049's
+            // normalization exists precisely to flatten absolute dynamics away, so
+            // reading the normalized values here would measure the AGC's crest
+            // factor instead of the signal's.
+            bands[0].push(f.bass_raw);
+            bands[1].push(f.mid_raw);
+            bands[2].push(f.treb_raw);
         }
         std::array::from_fn(|i| {
             let v = &bands[i];

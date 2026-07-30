@@ -16,7 +16,10 @@
 //! There are no boolean operators: with clean `0/1` results, `min` is and,
 //! `max` is or, and `1 - c` is not.
 //!
-//! Variables: `bass mid treb onset beat bar time tempo novelty index`.
+//! Variables: `bass mid treb onset beat bar time tempo novelty index`, plus the
+//! absolute-level escapes `bass_raw mid_raw treb_raw onset_raw` — the first four
+//! are normalized against their own recent peak (ADR-0049), so a threshold on
+//! them means "loud for this track" rather than naming a magnitude.
 //! Constants: `pi tau`.
 //! Functions: `sin cos abs floor sqrt log min max pow mod clamp lerp smoothstep
 //! select bin hash noise`. Compilation is fallible (a malformed expression is
@@ -53,18 +56,46 @@ use std::fmt;
 
 /// The analysis variables an expression may reference, in slot order.
 ///
-/// The first nine are the analysis frame. `index` is different in kind: it is
-/// **not** audio but the *element's own position* during a per-element
-/// evaluation (Plan 0034 Phase 4), and it reads `0` anywhere else.
-pub const VAR_NAMES: [&str; 10] = [
-    "bass", "mid", "treb", "onset", "beat", "bar", "time", "tempo", "novelty", "index",
+/// The first nine are the analysis frame's headline values, `bass` through
+/// `novelty`. The four `*_raw` names after them are the absolute magnitudes the
+/// first four used to carry before ADR-0049 normalized them — reachable for
+/// looks that genuinely want absolute level rather than "loud for this track".
+/// `index` stays **last** and is different in kind: it is not audio but the
+/// *element's own position* during a per-element evaluation (Plan 0034 Phase 4),
+/// and it reads `0` anywhere else.
+pub const VAR_NAMES: [&str; 14] = [
+    "bass",
+    "mid",
+    "treb",
+    "onset",
+    "beat",
+    "bar",
+    "time",
+    "tempo",
+    "novelty",
+    "bass_raw",
+    "mid_raw",
+    "treb_raw",
+    "onset_raw",
+    "index",
 ];
 /// Number of expression variables.
 pub const VAR_COUNT: usize = VAR_NAMES.len();
 
-/// Slot of the implicit per-element `index` variable — the last one, appended
-/// after the nine analysis variables so no existing slot moved.
+/// Slot of the implicit per-element `index` variable — kept last, so it stays
+/// derivable from the count however many analysis variables precede it.
 const INDEX_SLOT: usize = VAR_COUNT - 1;
+
+/// Slot of `bass_raw`, the first of the four raw levels, which occupy
+/// `RAW_SLOT_BASE..RAW_SLOT_BASE + 4` in [`VAR_NAMES`] order.
+///
+/// A named base rather than four literals threaded through
+/// [`with_raw`](Variables::with_raw), and `raw_slots_are_where_the_names_say`
+/// asserts the four names really do live here — so reordering `VAR_NAMES` fails
+/// a test instead of silently binding `treb_raw` to `onset_raw`. That is the
+/// same "two sources that agree today and nothing ties them" failure Plan 0041's
+/// review found in the old duplicated construction sites.
+const RAW_SLOT_BASE: usize = 9;
 
 /// A bound set of variable values for one evaluation. Field order matches
 /// [`VAR_NAMES`]; `beat` is the caller's bool coerced to 0.0/1.0.
@@ -108,17 +139,34 @@ impl<'a> Variables<'a> {
         tempo: f32,
         novelty: f32,
     ) -> Self {
+        let mut values = [0.0f32; VAR_COUNT];
+        // The nine headline slots. Everything after them — the four raw levels
+        // and `index` — starts at 0, so an expression naming one outside the
+        // caller that supplies it reads zero rather than something undefined.
+        values[..9].copy_from_slice(&[bass, mid, treb, onset, beat, bar, time, tempo, novelty]);
         Self {
-            // `index` starts at 0: an expression naming it outside a per-element
-            // evaluation reads zero rather than something undefined.
-            values: [bass, mid, treb, onset, beat, bar, time, tempo, novelty, 0.0],
+            values,
             spectrum: &[],
             // Unsalted until a caller says otherwise — see `with_salt`.
             salt: 0,
         }
     }
 
-    /// Bind the nine analysis variables from `frame`, with the clock at `time`.
+    /// Bind the four absolute levels `bass_raw`/`mid_raw`/`treb_raw`/`onset_raw`
+    /// (ADR-0049), leaving everything else as it was.
+    ///
+    /// A builder rather than four more positional arguments on
+    /// [`new`](Self::new): that constructor is already at the argument-count lint
+    /// and growing it to thirteen is how a caller silently transposes two levels.
+    pub fn with_raw(self, bass_raw: f32, mid_raw: f32, treb_raw: f32, onset_raw: f32) -> Self {
+        let mut next = self;
+        if let Some(slots) = next.values.get_mut(RAW_SLOT_BASE..RAW_SLOT_BASE + 4) {
+            slots.copy_from_slice(&[bass_raw, mid_raw, treb_raw, onset_raw]);
+        }
+        next
+    }
+
+    /// Bind every analysis variable from `frame`, with the clock at `time`.
     ///
     /// **This is the only place the frame-to-slot mapping is written.** Both the
     /// render loop and `shot`'s reachability probe come through here, so a tenth
@@ -146,6 +194,12 @@ impl<'a> Variables<'a> {
             time,
             frame.bpm,
             frame.novelty,
+        )
+        .with_raw(
+            frame.bass_raw,
+            frame.mid_raw,
+            frame.treb_raw,
+            frame.onset_raw,
         )
         .with_spectrum(&frame.spectrum)
     }
@@ -1394,5 +1448,57 @@ impl Parser {
             Some(other) => Err(ExprError::UnexpectedToken(other.describe())),
             None => Err(ExprError::UnexpectedEnd),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The slot-base constants are the one place this module trades a name for a
+    /// number, so they get the assertion. Inline rather than in
+    /// `core/tests/preset.rs` because both constants are private — and they
+    /// should stay private, which makes this the only place the claim is
+    /// checkable.
+    ///
+    /// Without it, inserting a variable before `bass_raw` would leave
+    /// [`Variables::with_raw`] writing four floats into `novelty` and the three
+    /// slots after it, quietly, with every existing test still green: the raw
+    /// values would simply read as each other.
+    #[test]
+    fn raw_slots_are_where_the_names_say() {
+        assert_eq!(
+            VAR_NAMES.get(RAW_SLOT_BASE..RAW_SLOT_BASE + 4),
+            Some(["bass_raw", "mid_raw", "treb_raw", "onset_raw"].as_slice()),
+            "with_raw writes four floats starting at RAW_SLOT_BASE; those are the names it must land on"
+        );
+        assert_eq!(
+            VAR_NAMES.get(INDEX_SLOT),
+            Some(&"index"),
+            "`index` must stay last: INDEX_SLOT is derived from the variable count"
+        );
+    }
+
+    /// `with_raw` fills exactly its own four slots — it must not disturb the
+    /// headline levels it sits beside, which is the failure a copy_from_slice
+    /// with a wrong base would produce.
+    #[test]
+    fn with_raw_touches_only_the_raw_slots() {
+        let base = Variables::new(0.1, 0.2, 0.3, 0.4, 1.0, 0.5, 6.0, 120.0, 0.7);
+        let with = base.with_raw(0.01, 0.02, 0.03, 0.04);
+        assert_eq!(
+            base.values.get(..RAW_SLOT_BASE),
+            with.values.get(..RAW_SLOT_BASE),
+            "the nine headline slots must be untouched"
+        );
+        assert_eq!(
+            with.values.get(RAW_SLOT_BASE..RAW_SLOT_BASE + 4),
+            Some([0.01f32, 0.02, 0.03, 0.04].as_slice())
+        );
+        assert_eq!(
+            with.values.get(INDEX_SLOT),
+            Some(&0.0),
+            "`index` sits after the raw block and must not be clipped by it"
+        );
     }
 }

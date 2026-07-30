@@ -23,6 +23,7 @@
 
 pub mod bands;
 pub mod fft;
+pub mod gain;
 pub mod novelty;
 pub mod onset;
 pub mod tempo;
@@ -33,33 +34,58 @@ use crate::audio::{AudioFormat, FormatError};
 pub const WINDOW_SIZE: usize = 2048;
 /// Second, longer FFT window feeding the bands below the crossover (~171 ms at
 /// 48 kHz). Chosen by measurement in Plan 0048 Phase 1 against the plan's rule
-/// — 4096 first, 8192 only if 4096 still leaves sub-bass bands bin-starved:
-/// 4096 leaves 13 bands unresolvable up to 124 Hz (the whole 808 fundamental
-/// region), 8192 leaves 6 up to 63 Hz. See [`fft::BandLayout`] and ADR-0049;
-/// `the_long_window_was_chosen_by_measurement` pins the figures.
+/// — 4096 first, 8192 only if 4096 still leaves sub-bass bands bin-starved. Of
+/// the 20 bands below the crossover, 4096 leaves **all 20** still one bin wide
+/// and 8192 leaves 8, pulling the unresolved boundary down from 246 Hz to 76 Hz.
+/// See [`fft::BandLayout`] and ADR-0049;
+/// `the_long_window_was_chosen_by_measurement` pins all three candidates.
 pub const LOW_WINDOW_SIZE: usize = 8192;
 /// Samples between successive analysis hops (~10.7 ms at 48 kHz).
 pub const HOP_SIZE: usize = 512;
+/// Hops the analyzer consumes before it publishes its first frame — the time the
+/// **longer** window takes to fill (~171 ms at 48 kHz).
+///
+/// Exported so callers that sample a clip "past warm-up" derive the offset
+/// instead of restating it as a literal. Two already did, and both were silently
+/// wrong the moment [`LOW_WINDOW_SIZE`] arrived.
+pub const WARMUP_HOPS: usize = LOW_WINDOW_SIZE / HOP_SIZE;
 /// Log-frequency bands exposed to scenes.
 pub const SPECTRUM_BINS: usize = 64;
 
-/// One hop's worth of analysis. `spectrum` values are normalized so a
-/// full-scale sine lands near 1.0 in its band; `onset` is the spectral-flux
-/// envelope; `beat` flags an onset event this hop.
+/// One hop's worth of analysis.
+///
+/// **The four headline levels are normalized** (ADR-0049): `bass`, `mid`, `treb`
+/// and `onset` are each a 0..1 fraction of that signal's own slowly-decaying
+/// recent peak, so `> 0.5` means "loud for this track" rather than naming an
+/// absolute magnitude that depended on the gain staging. The absolute values
+/// remain as `*_raw` for looks that genuinely want them, and for harness
+/// continuity. `spectrum` normalizes per band, by the same rule.
+///
+/// `beat` flags an onset event this hop; `bpm`/`bar` come from the tempo tracker,
+/// which reads the **raw** onset — see [`gain`] for why the internal consumers
+/// are deliberately left on raw values.
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisFrame {
-    /// Per-band energy, normalized so a full-scale sine reads near 1.0.
+    /// Per-band energy, each band normalized against its own recent peak.
     pub spectrum: [f32; SPECTRUM_BINS],
-    /// Spectral-flux onset envelope for this hop.
+    /// Spectral-flux onset envelope, normalized against its recent peak.
     pub onset: f32,
     /// Whether a beat (onset event) fired this hop.
     pub beat: bool,
-    /// Mean magnitude in the bass band (~20-250 Hz).
+    /// Bass-band level (~20-250 Hz), normalized against its recent peak.
     pub bass: f32,
-    /// Mean magnitude in the mid band (~250-4000 Hz).
+    /// Mid-band level (~250-4000 Hz), normalized against its recent peak.
     pub mid: f32,
-    /// Mean magnitude in the treble band (~4-18 kHz).
+    /// Treble-band level (~4-18 kHz), normalized against its recent peak.
     pub treb: f32,
+    /// Raw mean magnitude in the bass band — the pre-ADR-0049 `bass`, unchanged.
+    pub bass_raw: f32,
+    /// Raw mean magnitude in the mid band — the pre-ADR-0049 `mid`, unchanged.
+    pub mid_raw: f32,
+    /// Raw mean magnitude in the treble band — the pre-ADR-0049 `treb`, unchanged.
+    pub treb_raw: f32,
+    /// Raw spectral-flux envelope — the pre-ADR-0049 `onset`, unchanged.
+    pub onset_raw: f32,
     /// Tempo estimate in BPM (hop-clock autocorrelation; 0 until warm).
     pub bpm: f32,
     /// Beat phase in [0, 1): 0 on each beat, ramping to the next.
@@ -79,6 +105,10 @@ impl Default for AnalysisFrame {
             bass: 0.0,
             mid: 0.0,
             treb: 0.0,
+            bass_raw: 0.0,
+            mid_raw: 0.0,
+            treb_raw: 0.0,
+            onset_raw: 0.0,
             bpm: 0.0,
             bar: 0.0,
             novelty: 0.0,
@@ -99,6 +129,13 @@ pub struct Analyzer {
     bands: bands::BandSplitter,
     tempo: tempo::TempoTracker,
     novelty: novelty::NoveltyDetector,
+    /// Published-surface normalizers (ADR-0049). Deliberately *after* the
+    /// detectors above in the hop, so each of those keeps reading raw values.
+    band_gain: gain::BandNormalizer,
+    bass_gain: gain::PeakNormalizer,
+    mid_gain: gain::PeakNormalizer,
+    treb_gain: gain::PeakNormalizer,
+    onset_gain: gain::PeakNormalizer,
     window: [f32; WINDOW_SIZE],
     /// The long window feeding the sub-crossover bands (ADR-0049). Heap-held:
     /// 32 KB, and `Analyzer` is moved by value.
@@ -133,6 +170,11 @@ impl Analyzer {
             bands: bands::BandSplitter::new(format.sample_rate),
             tempo: tempo::TempoTracker::new(format.sample_rate),
             novelty: novelty::NoveltyDetector::new(format.sample_rate),
+            band_gain: gain::BandNormalizer::new(format.sample_rate),
+            bass_gain: gain::PeakNormalizer::new(format.sample_rate, gain::BAND_FLOOR),
+            mid_gain: gain::PeakNormalizer::new(format.sample_rate, gain::BAND_FLOOR),
+            treb_gain: gain::PeakNormalizer::new(format.sample_rate, gain::BAND_FLOOR),
+            onset_gain: gain::PeakNormalizer::new(format.sample_rate, gain::ONSET_FLOOR),
             window: [0.0; WINDOW_SIZE],
             low_window: vec![0.0; LOW_WINDOW_SIZE],
             filled: 0,
@@ -174,18 +216,34 @@ impl Analyzer {
                 self.low_window[LOW_WINDOW_SIZE - HOP_SIZE..].copy_from_slice(&self.hop);
                 self.filled = (self.filled + HOP_SIZE).min(LOW_WINDOW_SIZE);
                 if self.filled == LOW_WINDOW_SIZE {
-                    let spectrum = self.spectrum.analyze(&self.window, &self.low_window);
-                    let (onset, beat) = self.onset.process(self.spectrum.magnitudes());
-                    let (bass, mid, treb) = self.bands.split(self.spectrum.magnitudes());
-                    let (bpm, bar) = self.tempo.process(onset, beat);
-                    let novelty = self.novelty.process(&spectrum);
+                    let raw_spectrum = self.spectrum.analyze(&self.window, &self.low_window);
+                    let (onset_raw, beat) = self.onset.process(self.spectrum.magnitudes());
+                    let (bass_raw, mid_raw, treb_raw) =
+                        self.bands.split(self.spectrum.magnitudes());
+
+                    // Every consumer below this line reads RAW values on purpose
+                    // (see `gain`'s module docs): the tempo tracker
+                    // autocorrelates the onset envelope, and peak-normalizing it
+                    // would distort the periodicity it looks for, while novelty
+                    // measures spectral shape, which per-band normalization
+                    // flattens by construction.
+                    let (bpm, bar) = self.tempo.process(onset_raw, beat);
+                    let novelty = self.novelty.process(&raw_spectrum);
+
+                    // ...and normalization happens last, on the way out.
+                    let mut spectrum = raw_spectrum;
+                    self.band_gain.normalize(&mut spectrum);
                     self.latest = AnalysisFrame {
                         spectrum,
-                        onset,
+                        onset: self.onset_gain.normalize(onset_raw),
                         beat,
-                        bass,
-                        mid,
-                        treb,
+                        bass: self.bass_gain.normalize(bass_raw),
+                        mid: self.mid_gain.normalize(mid_raw),
+                        treb: self.treb_gain.normalize(treb_raw),
+                        bass_raw,
+                        mid_raw,
+                        treb_raw,
+                        onset_raw,
                         bpm,
                         bar,
                         novelty,

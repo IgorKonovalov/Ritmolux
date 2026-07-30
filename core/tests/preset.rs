@@ -549,6 +549,14 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
         bar: 0.66,
         bpm: 128.0,
         novelty: 0.88,
+        // The four raw levels (ADR-0049) are the pairing most worth guarding:
+        // each sits beside the normalized value of the same name, so a crossed
+        // slot would bind `bass` where `bass_raw` was asked for and the
+        // difference is invisible in any test that only checks one of them.
+        bass_raw: 0.011,
+        mid_raw: 0.022,
+        treb_raw: 0.033,
+        onset_raw: 0.044,
         spectrum: std::array::from_fn(|i| i as f32 / 64.0),
     };
     // Not on the frame: the renderer supplies its own clock here, the probe the
@@ -565,6 +573,10 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
         ("time", 7.5),
         ("tempo", 128.0),
         ("novelty", 0.88),
+        ("bass_raw", 0.011),
+        ("mid_raw", 0.022),
+        ("treb_raw", 0.033),
+        ("onset_raw", 0.044),
     ] {
         let e = compile(name).unwrap_or_else(|err| panic!("{name} compiles: {err}"));
         assert_eq!(
