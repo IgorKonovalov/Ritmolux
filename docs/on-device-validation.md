@@ -101,6 +101,19 @@ footprint so the vendor spread is on record.
       shader and reverting it is cheap, but it costs the coral look outright — so route a failure to
       `architect` with the number, and let the look/perf tradeoff be decided rather than assumed.
       _(Plan 0033 shipped this and never measured it; extracted at Plan 0035's Phase 4.)_
+- [ ] **The swarm's depth axis, on the low-end box, 1080p.** Plan 0043 Phase 3 added per-particle
+      depth math and a fourth vertex attribute inside a loop that runs **10 000 times per frame**.
+      Measured on the dev box over 5000 frames at 1920x1080: **1.03–1.09 ms/frame before,
+      1.56–1.58 ms after — about +0.5 ms**. That is *not* fill rate (pinning the sprite scale flat
+      still measures 1.60), so it is the depth math plus the wider instance, and it will not shrink
+      on a slower box. Phase 3's done-when named NFR §1/§9's ≥ 60 fps @ 1080p floor as the
+      acceptance criterion and **that floor was never measured** — it is defined on this box.
+      Load **`swarm_dense.toml`** (the highest visible density of the three survivors, and the one
+      whose `field_freq ~5.2` keeps the most particles resolving separately), let it settle with the
+      overlay on (`F3`), and report **(a)** whether fps holds ≥ 60 and **(b)** the p99. **If it
+      fails, the lever is `PARTICLES`** (`core/src/render/scenes/swarm.rs`) — and per Plan 0043's
+      own risk bullet that is a **look decision that routes back to `architect`**, not a constant to
+      quietly lower. _(Plan 0043 Phase 3's done-when, extracted at that plan's close.)_
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
       behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
       Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was

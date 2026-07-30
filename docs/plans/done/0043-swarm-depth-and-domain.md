@@ -1,6 +1,20 @@
 # 0043 — The swarm gets a depth axis and a domain that follows the target
 
-> **Status:** in-progress 2026-07-30 — `dev` implementing (ran after [0042](0042-reachability-sees-every-comparison.md))
+> **Status:** done 2026-07-30 — all four phases landed (`ae6f638` the target-sized domain,
+> `7f54e2a` `field_freq`, `7eaa848` the depth axis, `de707cb` the family cut to three and
+> re-authored). Mode 4 review passed with **no blockers**; two minors and one nit, both minors
+> fixed in the close commit. Re-verified independently at review time: the seven `swarm` unit tests
+> all carry a counter-assertion that makes them non-vacuous (the replaced constants genuinely
+> disagree with 16:10; a world-space store genuinely teleports; the identity transform genuinely is
+> depth-independent), `fmt`/`clippy` clean, and `golden` / `sanity` / `reactivity` / `animation` /
+> `distinctness` / `preset` / `hygiene` all green. Only `golden/swarm.png` moved — the incidental
+> `fragment_field` re-bless was caught and reverted by `dev`. **Phase 1's "via the existing
+> per-frame target-size hook" was wrong and is corrected in place below**: `set_target_size` carries
+> the post chain's quantized internal grid, so ADR-0037 forbids sourcing a shape from it; the
+> implementation correctly reads `Scene::render`'s `aspect` argument, which `post.rs:442` sets from
+> the surface. **Phase 3's NFR 1/9 floor is not verified** — it is defined on the iGPU box no
+> session can reach; the dev-box marginal cost is +0.5 ms/frame at 1080p, and the check is carried
+> forward as a `docs/on-device-validation.md` item rather than assumed.
 > **Created:** 2026-07-29
 > **Owner skill(s):** dev
 > **Related ADRs:** [0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) (this
@@ -99,8 +113,16 @@ flowchart TB
 
 - **Owner skill:** dev
 - **What:** replace `BOUND_X`/`BOUND_Y` constants with bounds computed from the render target's
-  aspect (via the existing per-frame target-size hook) times a margin factor. The wrap must stay
-  stable across a resize — recomputing bounds must not teleport every particle at once.
+  aspect times a margin factor. The wrap must stay stable across a resize — recomputing bounds must
+  not teleport every particle at once.
+- **Correction (made at close, 2026-07-30):** this phase originally said "via the existing per-frame
+  target-size hook", meaning [`Scene::set_target_size`](../adrs/0030-scene-target-size-hot-path-hook.md).
+  That was wrong and the implementation was right to ignore it. `set_target_size` receives the post
+  chain's **internal grid** — quantized to a 256 px step and capped, i.e. a resolution, not a shape
+  ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) — and every swarm preset
+  composes `trails`, so that is exactly the quantized case. The correct source is `Scene::render`'s
+  `aspect` argument, which `core/src/render/post.rs:442` computes from the **surface**. The plan
+  named the wrong hook for the rule it was invoking.
 - **Files touched:** `core/src/render/scenes/swarm.rs`
 - **Done when:** rendering `presets/swarm_drift.toml` for 400 frames under
   `--signal dynamic:110` shows **no bright horizontal band** at the top or bottom of the frame —
