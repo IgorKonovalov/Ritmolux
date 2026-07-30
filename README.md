@@ -112,8 +112,14 @@ one, so you always land where you asked.
 - `--list-devices` — enumerate audio capture devices (Windows-only).
 - `--soak [path]` — write a long-run instrumentation trace (frame-time stats) for stability
   testing; a bare `--soak` logs to a default path under the per-user data dir.
+- `--tier floor|rich` — pin the quality tier instead of letting the engine pick. Unpinned, the app
+  starts on `rich` and a frame-time governor demotes it to `floor` once if the display's frame
+  budget is not being held (announced on stderr and marked with a `*` in the `F3` overlay). A pin
+  is never demoted, so this is also how you keep `rich` on a machine a transient stall demoted.
 - `LMV_PRESET_DIR=<dir>` — point the app at a custom preset folder instead of the seeded per-user
   directory; edits to `*.toml` there hot-reload live.
+- `LMV_TIER=floor|rich` — the same pin as `--tier`, for a one-off run. Precedence is
+  `--tier` > `LMV_TIER` > `config.toml`'s `[quality] tier` > auto.
 
 > **macOS:** loopback capture is not wired up yet (macOS has no WASAPI equivalent — it needs
 > ScreenCaptureKit or a virtual device like BlackHole, a later phase). The app builds and runs,
