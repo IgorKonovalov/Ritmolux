@@ -1,4 +1,18 @@
-//! The kaleidoscope fold does not tear at a fractional order (Plan 0049 Phase 1).
+//! Pixel-level properties of the kaleidoscope fold: it does not tear at a
+//! fractional order (Plan 0049 Phase 1), and it does not paint outside its disc
+//! (Plan 0045 Phase 1 / [ADR-0047], design-backlog 0010).
+//!
+//! # Why the disc guard lives here and not in `composite.rs`
+//!
+//! Plan 0045 Phase 1 lists `core/tests/composite.rs` for it. That file pins two
+//! **blessed baselines** at a load-bearing 160x100, and its own module docs are
+//! the record of why building GPU resources mid-run must not happen near them: a
+//! second `Renderer::new_headless` is documented to change what the trails stage
+//! resolves to on the WARP software adapter. This guard needs a *portrait* target
+//! and a border-filling fixture, so it cannot share that renderer — it would have
+//! to construct a second one in the same binary, beside the baselines, which is
+//! the one thing that file exists to avoid. It is the same fold, so it joins the
+//! fold's own binary instead. Nothing else about the assertion changes.
 //!
 //! The fold wraps `a = atan2(p.y, p.x) + angle` with `a - seg * floor(a / seg)`,
 //! `seg = 2*pi/order`, then mirrors within the wedge. `atan2`'s branch cut lies on
@@ -100,10 +114,10 @@ fn fixture_with(extra: &str) -> Preset {
     Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("kaleido fixture parses: {e}"))
 }
 
-fn headless() -> Option<Renderer> {
+fn headless(width: u32, height: u32) -> Option<Renderer> {
     match Renderer::new_headless(HeadlessOptions {
-        width: WIDTH,
-        height: HEIGHT,
+        width,
+        height,
         prefer_software: true,
     }) {
         Ok(r) => Some(r),
@@ -147,7 +161,7 @@ fn midline_seam(img: &CaptureImage) -> f32 {
 
 #[test]
 fn fractional_fold_order_does_not_tear_the_minus_x_ray() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = headless(WIDTH, HEIGHT) else {
         return;
     };
     let frame = AnalysisFrame {
@@ -199,5 +213,159 @@ fn fractional_fold_order_does_not_tear_the_minus_x_ray() {
         lo.rgba, hi.rgba,
         "orders {CONTROL_LO} and {CONTROL_HI} render identically — the fixture is not \
          exercising the fold, so nothing above proves anything"
+    );
+}
+
+// --- The fold's domain: nothing is drawn outside the inscribed disc. ---------
+//
+// design-backlog 0010, the guard that entry says is owed. The pinned fixture
+// `composite_kaleido.png` cannot serve: measured at Plan 0035's close, the
+// inscribed-disc fix leaves it **green** at 94 % of its drift budget, so it would
+// not announce the fix and the next unrelated fold change would trip it blaming
+// the wrong thing.
+
+/// **Portrait, and that is the point.** The fold keeps each output pixel's radius
+/// and only changes its angle, so what governs the defect is the ratio between the
+/// frame's corner radius and its shortest half-extent — `sqrt(1 + (long/short)^2)`,
+/// about 2.04 at 16:9 and 2.28 here. At 16:9 the out-of-range region is corner
+/// debris; in a portrait window it is stripes across the whole picture, which is
+/// where the user hit it. **A square or 16:9 size would weaken this test.**
+const FIELD_W: u32 = 128;
+const FIELD_H: u32 = 224;
+
+/// A border-filling fixture — the frozen `fragment_field` golden. Its `[params]`
+/// table is last, so appended `kaleido_*` lines land inside it.
+///
+/// A centred line figure would not do: it leaves the source's border a smooth
+/// backdrop gradient, which smears into more smooth gradient. `composite_kaleido`'s
+/// header says exactly this about itself. A fullscreen field paints the border with
+/// high-frequency content, which is what the old `ClampToEdge` smear was made of.
+const FIELD_FIXTURE: &str = include_str!("fixtures/fragment_field.toml");
+const FIELD_FIXTURE_NAME: &str = "fixture_fragment_field";
+
+/// Radius past which the frame must be empty, as a multiple of the disc's own
+/// `r_max`.
+///
+/// Deliberately **above** the engine's falloff band (0.35 of `r_max`, so the fade
+/// completes at 1.35x) rather than equal to it: the test then pins the property —
+/// *the fold does not reach out here* — without re-stating a constant it cannot
+/// see from an integration test, and a modest re-tune of the band does not have to
+/// touch this file. Anything at or beyond 1.5x is out of the fold's reach under
+/// every treatment that clamps.
+const OUT_OF_DISC: f32 = 1.5;
+
+/// Brightest channel tolerated in the out-of-disc region. Not zero only because the
+/// falloff multiplies rather than discards; past the band it is exactly zero, and
+/// this leaves room for the 8-bit round-trip.
+const EMPTY_TOL: u8 = 2;
+
+/// The disc's radius in pixels: `min(w, h) / 2`.
+///
+/// The fold's aspect correction makes its space isotropic **in pixels** —
+/// `p = (dx_px, dy_px) / h` — so `r_max`, the nearest source edge in that space,
+/// is the inscribed circle of the frame and lands at half the shorter side however
+/// non-square the target is.
+fn disc_radius(w: u32, h: u32) -> f32 {
+    w.min(h) as f32 * 0.5
+}
+
+/// `(brightest channel, lit pixel count, region size)` over the pixels at or
+/// beyond `factor * r_max` from the frame centre. `factor = 0` is the whole frame.
+fn beyond_disc(img: &CaptureImage, factor: f32) -> (u8, usize, usize) {
+    let (w, h) = (img.width as usize, img.height as usize);
+    let cutoff = disc_radius(img.width, img.height) * factor;
+    let (cx, cy) = (w as f32 * 0.5, h as f32 * 0.5);
+    let mut peak = 0u8;
+    let mut lit = 0usize;
+    let mut total = 0usize;
+    for y in 0..h {
+        for x in 0..w {
+            let (dx, dy) = (x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+            if (dx * dx + dy * dy).sqrt() < cutoff {
+                continue;
+            }
+            total += 1;
+            let px = &img.rgba[(y * w + x) * 4..(y * w + x) * 4 + 3];
+            let bright = px.iter().copied().max().unwrap_or(0);
+            peak = peak.max(bright);
+            if bright > EMPTY_TOL {
+                lit += 1;
+            }
+        }
+    }
+    (peak, lit, total)
+}
+
+/// The active fold reaches nothing outside its inscribed disc — the direct guard
+/// design-backlog 0010 asks for.
+///
+/// Before ADR-0047 the fold reconstructed sample coordinates outside `[0, 1]` for
+/// every output pixel past the source's extent in the folded direction, and
+/// `ClampToEdge` smeared the border texel radially across all of them. Clamping the
+/// *sample* radius to `r_max` and fading past it means those pixels are not painted
+/// at all.
+#[test]
+fn the_fold_paints_nothing_outside_its_disc() {
+    let Some(mut renderer) = headless(FIELD_W, FIELD_H) else {
+        return;
+    };
+    let frame = AnalysisFrame {
+        bass: 0.6,
+        mid: 0.5,
+        treb: 0.6,
+        onset: 0.4,
+        bar: 0.25,
+        ..Default::default()
+    };
+    let mut capture = |order: f32| {
+        let toml =
+            format!("{FIELD_FIXTURE}kaleido_order = \"{order}\"\nkaleido_angle = \"{ANGLE}\"\n");
+        let preset = Preset::from_toml_str(&toml)
+            .unwrap_or_else(|e| panic!("field fixture parses at order {order}: {e}"));
+        renderer.set_presets(vec![preset]);
+        renderer
+            .capture_preset(FIELD_FIXTURE_NAME, &frame, FRAMES)
+            .unwrap_or_else(|e| panic!("capture field fixture at order {order}: {e}"))
+    };
+
+    // Order 1 is the identity passthrough: the stage is skipped entirely, so this
+    // is the fixture as the fold's source sees it.
+    let unfolded = capture(1.0);
+    let folded = capture(6.0);
+
+    let (unfolded_peak, unfolded_lit, region) = beyond_disc(&unfolded, OUT_OF_DISC);
+    let (folded_peak, folded_lit, _) = beyond_disc(&folded, OUT_OF_DISC);
+    println!(
+        "beyond {OUT_OF_DISC}x r_max ({:.1} px of a {FIELD_W}x{FIELD_H} frame, \
+         {region} px region): unfolded peak {unfolded_peak} / {unfolded_lit} lit | \
+         folded peak {folded_peak} / {folded_lit} lit",
+        disc_radius(FIELD_W, FIELD_H) * OUT_OF_DISC
+    );
+
+    // --- The property. On the unfixed shader this region carried the smeared
+    // border texel; it must now carry nothing. ---
+    assert!(
+        folded_peak <= EMPTY_TOL,
+        "the fold painted outside its disc: brightest channel {folded_peak} beyond \
+         {OUT_OF_DISC}x r_max ({folded_lit} pixels lit) — the clamped-sample smear of \
+         design-backlog 0010 is back"
+    );
+
+    // --- Non-vacuity 1: the region IS lit in the fold's own input, so the
+    // emptiness above is the disc's doing and not an empty fixture. ---
+    assert!(
+        unfolded_lit * 2 > region && unfolded_peak > 64,
+        "the unfolded fixture leaves the out-of-disc region dark (peak {unfolded_peak}, \
+         {unfolded_lit} of {region} px lit), so the folded frame being dark there proves \
+         nothing — this fixture no longer fills the frame"
+    );
+
+    // --- Non-vacuity 2: the fold drew *something*. A stage that failed to build,
+    // or a disc computed as zero, would satisfy the property with a black frame. ---
+    let inside = beyond_disc(&folded, 0.0).1 - folded_lit;
+    assert!(
+        inside > (FIELD_W * FIELD_H) as usize / 10,
+        "only {inside} pixels are lit inside the disc — the fold rendered (near) nothing, \
+         so the out-of-disc assertion is satisfied vacuously"
     );
 }
