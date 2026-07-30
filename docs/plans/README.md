@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0044** (ADRs are a separate sequence — next free there is **0045**.)
+**Next free number: 0046** (ADRs are a separate sequence — next free there is **0048**.)
 
 ## Active roster
 
@@ -11,12 +11,30 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0043](0043-swarm-depth-and-domain.md) | The swarm gets a depth axis and a domain that follows the target | **approved 2026-07-29** — ready for `dev` (its 0042 precondition is now closed) | dev |
+| [0044](0044-quality-tiers.md) | Quality tiers: `Floor` and `Rich`, a governor, and the constants that move | **draft 2026-07-30** — roadmap R0, [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) | dev, human |
+| [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **draft 2026-07-30** — roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); runs after [0044] | dev, human |
 
 ## Recommended execution sequence
 
 **[0043] is the one to run.** Its precondition — [0042], the instrument repair — **landed and closed
 on 2026-07-30**, so the measurement 0043's Phase 4 reads is now trustworthy. That sequencing paid
 off exactly as it did for [0041]: fix the measurement, then do the content once instead of twice.
+
+**Then the visual-richness pair, in order: [0044] → [0045]** (the first two engine steps of
+[docs/roadmap-visual-richness.md](../roadmap-visual-richness.md), drafted 2026-07-30 from the R0+R1
+interview; awaiting user approval).
+
+- **[0044] — quality tiers.** `TierConfig` (Floor = today's constants, Rich calibrated on the
+  user's discrete GPU), auto-select with a one-way governor and an explicit pin; captures pin
+  Floor so every baseline stays byte-identical. **Must start after [0043] closes** — its Phase 3
+  touches `swarm.rs`. [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md).
+- **[0045] — linear light + bloom.** The kaleidoscope fold fix first (disc + falloff + bindable
+  centre, [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md), confirmed from
+  rendered samples), then the `Rgba16Float` linear composite with one engine-fixed tonemap, then
+  the bloom `PostStage` with bindable `exposure`/`bloom_*`
+  ([ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)). Every golden moves once,
+  eyes-on. Runs after [0044] — bloom levels and the Floor bandwidth relief are tier values.
+  Closes backlog 0005, 0010 and 0011.
 
 - **[0043] — the swarm gets a depth axis and a domain that follows the target.** Fixes the
   user-reported bright-bar artifact at its cause (the wrap seam is on the frame edge), retires a
