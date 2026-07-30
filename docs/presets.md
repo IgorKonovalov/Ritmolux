@@ -277,9 +277,11 @@ primary:= number | ident | ident '(' expr (',' expr)* ')' | '(' expr ')'
   `1 + 1 > 3 - 2` reads as `(1 + 1) > (3 - 2)`.
 - **Numbers:** decimal `f32` literals (`0.3`, `14`, `1.8`).
 
-There is no randomness and no way to read wall-clock time — the only clock is
-`time`, the renderer's shared scene clock, so a preset is reproducible given the
-same audio.
+There is no way to read wall-clock time — the only clock is `time`, the
+renderer's shared scene clock. Randomness exists, but only the **seeded** kind:
+`hash(x)` and `noise(x)` are pure functions of their argument and the preset's
+seed ([below](#hashx-and-noisex--seeded-randomness)), so a preset is still
+reproducible given the same audio and the same seed.
 
 ### Variables
 
@@ -347,6 +349,8 @@ identifier that is neither a constant nor a variable is a compile error.
 | `smoothstep(e0, e1, x)` | 3 | Eased `0 → 1` ramp as `x` crosses `e0 → e1` (`0` below, `1` above). The easing primitive — smoother than `clamp` for a threshold. |
 | `select(cond, x, y)` | 3 | `x` if `cond != 0.0`, else `y`. **Only the taken branch is evaluated.** |
 | `bin(x)` | 1 | The **spectrum** at normalized position `x` (`0` = lowest frequency, `1` = highest), interpolated between adjacent bands. See below. |
+| `hash(x)` | 1 | A **scattered** value in `[0, 1)`: neighbouring arguments give unrelated results. Seeded per preset — see below. |
+| `noise(x)` | 1 | **Smooth** value noise in `[0, 1]`: a wander that changes over one unit of `x`. Seeded per preset — see below. |
 
 Calling a function with the wrong number of arguments, or referencing an unknown
 name, is a **compile error** — the preset is rejected at load and the app keeps
@@ -421,6 +425,69 @@ errors and never rejects a preset at load.
 Values come off the same normalization as the bands: a full-scale sine reads near
 `1.0` in its band, and ordinary music reads **small**, so multiply up and clamp
 exactly as you would with `bass`.
+
+### `hash(x)` and `noise(x)` — seeded randomness
+
+Two functions give a preset variety no arithmetic can fake. Both are **pure**:
+the result depends on the argument and on the preset's seed, and on nothing else.
+Call either twice with the same argument in the same frame and you get the same
+number — they are dice you rolled once, not dice you keep rolling.
+
+| | shape | reach for it when |
+|---|---|---|
+| `hash(x)` | a **scatter** in `[0, 1)` — neighbouring arguments are unrelated | you want something *different* per beat, per bar, per element |
+| `noise(x)` | a **wander** in `[0, 1]` — smooth, changing over one unit of `x` | you want a parameter to drift organically instead of cycling |
+
+```toml
+[params]
+# A wander that never repeats — one call replacing a sum of detuned sines.
+# The coefficient is the speed: 0.3 moves noticeably, 0.03 is a slow tide.
+hue = "noise(time * 0.3)"
+
+# A different value twice a second: floor(time * 2) steps to a new integer
+# every 0.5 s, and hash turns each of those into an unrelated number.
+burst = "0.4 + hash(floor(time * 2)) * 0.6"
+
+# Scatter a per-element readout so it stops looking combed (see `index`).
+thickness = "2 + hash(index * 64) * 3"
+```
+
+**Layer `noise` for a richer wander.** One call is one octave — smooth and a bit
+plain. Sum two or three at different rates and amplitudes and you get something
+that reads as organic:
+
+```
+noise(time * 0.11) * 0.6 + noise(time * 0.43) * 0.3 + noise(time * 1.7) * 0.1
+```
+
+Give the calls **different arguments**, not just different multipliers of the
+same one, if you want two parameters to wander independently — `noise(time * 0.2)`
+and `noise(time * 0.2 + 50)` are two unrelated wanders at the same speed.
+
+#### The seed
+
+`[generator] seed` decides the scatter. It has been accepted (and ignored) since
+the L-system landed; it now salts `hash`/`noise` for **any** system, so a preset
+that is not an L-system can carry a `[generator]` table containing nothing else:
+
+```toml
+[generator]
+seed = 12          # any non-negative integer: the same look, every time
+# seed = "random"  # a different look every time the app starts
+```
+
+- **No seed** means seed `0` — a perfectly good scatter, and what every preset
+  had before this existed.
+- **A number** makes the preset reproducible: same audio, same picture, forever.
+  Two presets with the same expression and different seeds look different.
+- **`"random"`** draws a fresh seed each time the preset loads, so the look
+  differs between app launches. It is drawn **once, at load** — never per frame.
+
+> **`"random"` and captures.** Every capture path — `shot`, the golden baselines,
+> `--report`, the behavioral gates — forces the numeric seed (`0`) so its output
+> stays reproducible. So a `seed = "random"` preset's captured frame is **not**
+> the frame you saw live: same statistics, different instance. Tune with a
+> number, switch to `"random"` at the end if you want the surprise.
 
 ### `index` — one binding, evaluated once per element
 
@@ -620,6 +687,23 @@ already name.
   time * 0.03
   ```
   Small coefficients (`0.008`–`0.08` in the library) set how fast a hue rotates.
+  That is a *ramp*, though — it only ever goes one way. For a drift that
+  genuinely wanders, [`noise`](#hashx-and-noisex--seeded-randomness) says it in
+  one call:
+  ```
+  noise(time * 0.3)
+  ```
+  Presets in this library used to fake that with a **sum of detuned sines** —
+  four of them, with periods chosen not to line up, in `attractor_dejong` alone.
+  That idiom still works and there is no need to go and rewrite it, but write new
+  ones with `noise`: it is one term instead of four, and it has no period at all
+  rather than a very long one.
+
+- **Per-beat variety** — something different on each beat, not merely louder:
+  ```
+  0.4 + hash(floor(time * 2)) * 0.6
+  ```
+  `hash` turns each integer into an unrelated number, which no sine sum can do.
 
 - **Beat gate** — add something only on beat frames:
   ```
@@ -816,7 +900,11 @@ for `shot`'s equivalent `--presets` / `--preset-file` flags.
 
 **Adding an expression variable, function, or operator** touches
 `core/src/preset/expr.rs` and [The expression language](#the-expression-language)
-in this file. A change to the grammar is **ADR territory** (ADR-0002 fixed the
+in this file — **and every other place that re-types the roster**, in the same
+commit: the short list in [`presets/README.md`](../presets/README.md), and the
+`preset-author` skill's `SKILL.md` and `references/grammar.md`. Four copies of a
+list is four chances to drift, and a stale roster silently costs the content lane
+a capability. A change to the grammar is **ADR territory** (ADR-0002 fixed the
 model; ADR-0020 grew it to v2) — flag it rather than quietly widening the
 vocabulary here.
 

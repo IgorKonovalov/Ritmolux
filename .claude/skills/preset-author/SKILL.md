@@ -95,9 +95,20 @@ screen-space kaleidoscope (`kaleido_*`), and the terminal ink-on-paper remap
   (`tempo / 180`) or compare it (`tempo > 128`); `novelty` is experimental. **`index` is not audio** —
   it is the per-element position (Plan 0034), see below.
 - **Constants:** `pi`, `tau`.
-- **Functions (14):** `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep select bin`.
-  `mod` is floored (`mod(-0.2, 1.0)` is `0.8` — cyclic hue never jumps); `select` evaluates **only**
-  the taken branch, so `select(x >= 0, sqrt(x), 0)` is safe.
+- **Functions (17):** `sin cos abs floor sqrt log min max pow mod clamp lerp smoothstep select bin
+  hash noise`. `mod` is floored (`mod(-0.2, 1.0)` is `0.8` — cyclic hue never jumps); `select`
+  evaluates **only** the taken branch, so `select(x >= 0, sqrt(x), 0)` is safe; `log` is the
+  **natural** log and `log(0)` is `-inf`, so guard it (`log(max(x, 0.0001))`).
+- **`hash(x)` / `noise(x)` are the seeded randomness** (Plan 0047). `hash` scatters — neighbouring
+  arguments give unrelated results in `[0, 1)`; `noise` wanders — smooth over one unit of `x`, in
+  `[0, 1]`. Both are pure functions of the argument and the preset's `[generator] seed`, so nothing
+  about determinism changes. **Reach for `noise(time * k)` instead of summing detuned sines** (the
+  older files fake a wander with three or four; `attractor_dejong` has four), and for `hash` when you
+  want something genuinely *different* per beat or per element rather than merely louder:
+  `hash(floor(time * 2))`, `hash(index * 64)`. Sum `noise` calls at different rates for depth; offset
+  the argument (`+ 50`) to decorrelate two parameters. `seed = "random"` varies per app launch — but
+  **every capture path pins it to `0`**, so a filmstrip of one shows an instance, not the live look.
+  Tune with a number.
 - **`bin(x)` reaches the spectrum** — the 64-band array at normalized position `x` (`0` = lowest,
   `1` = highest), interpolated, total, clamped. Two things to internalise, both of which have already
   cost this lane a round trip:

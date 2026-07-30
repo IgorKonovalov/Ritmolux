@@ -40,10 +40,15 @@ Each `[params]` value is a pure expression evaluated every frame. A malformed
 expression (or structural config) makes the whole preset fail to load with a
 surfaced error — the engine keeps the last good preset, never crashes (NFR 10).
 
-- **Variables:** `bass mid treb onset beat bar time tempo novelty`
+- **Variables:** `bass mid treb onset beat bar time tempo novelty index`
   (`beat` is 0/1; `bar` is the 0..1 beat phase; `time` is seconds; `tempo` is
-  **BPM**, not a 0..1 band; `novelty` is an experimental track-change transient).
-- **Functions:** `sin cos abs floor sqrt min max pow mod clamp lerp smoothstep select`.
+  **BPM**, not a 0..1 band; `novelty` is an experimental track-change transient;
+  `index` is the element's own 0..1 position in a per-element binding, and `0`
+  everywhere else).
+- **Functions:** `sin cos abs floor sqrt log min max pow mod clamp lerp
+  smoothstep select bin hash noise` (17). `log` is the **natural** log; `bin(x)`
+  reads the spectrum at a normalized position; `hash`/`noise` are the seeded
+  randomness below.
 - **Constants:** `pi`, `tau`.
 - **Comparisons:** `> < >= <= == !=`, each yielding `1`/`0`, plus
   `select(cond, x, y)`. No boolean operators — `min` is and, `max` is or,
@@ -96,6 +101,40 @@ above anything music produces, and every one of them looked healthy in
 its `gates` / `ceils` columns name any `select()` that never went both ways and
 any `clamp()` ceiling the value never reached
 ([`../docs/capturing.md`](../docs/capturing.md#reachability-gates-the-probe-never-drove-both-ways)).
+
+### Seeded randomness — `hash`, `noise`, and `[generator] seed`
+
+`hash(x)` scatters (neighbouring arguments unrelated, `[0, 1)`); `noise(x)`
+wanders (smooth over one unit of `x`, `[0, 1]`). Both are **pure functions of the
+argument and the preset's seed** — same input, same frame, same number.
+
+```toml
+[params]
+hue       = "noise(time * 0.3)"                 # organic drift, not a ramp
+burst     = "0.4 + hash(floor(time * 2)) * 0.6" # a new value twice a second
+thickness = "2 + hash(index * 64) * 3"          # scatter a per-element readout
+
+[generator]
+seed = 12          # any non-negative integer: the same look, every time
+# seed = "random"  # a different look each time the app starts
+```
+
+- **Prefer `noise(time * k)` to a sum of detuned sines** in new presets. The
+  older files fake a wander with three or four sines whose periods do not line
+  up (`attractor_dejong` has four); one `noise` call is shorter and has no period
+  at all. Existing ones are fine as they are — this is not a rewrite.
+- **Sum `noise` calls at different rates** for a richer wander:
+  `noise(t*0.11)*0.6 + noise(t*0.43)*0.3`. There is no octave machinery and does
+  not need to be.
+- **Offset the argument, not just its scale**, to decorrelate two parameters:
+  `noise(time * 0.2)` and `noise(time * 0.2 + 50)` wander independently.
+- **`seed` is not an L-system key** despite living in that table. Any preset of
+  any system may carry a `[generator]` table holding nothing but a seed.
+
+> **`seed = "random"` is invisible to the harness.** Every capture path — `shot`,
+> the goldens, `--report`, the behavioral gates — forces the numeric fallback
+> (`0`), so a filmstrip of a random-seeded preset shows *an* instance, not the one
+> the app will draw. Tune with a number; switch to `"random"` last, if at all.
 
 ## Systems and their named parameters
 
@@ -661,7 +700,7 @@ expressions. Validated at load; a bad value is a surfaced error.
 | `rules`     | table `k = "v"` | Each key a single character (the predecessor). Required.    |
 | `angle_deg` | number          | Turn angle for `+`/`-`. Default 25.                         |
 | `max_depth` | integer         | Iterations to precompute; clamped to `1..=7`. Default 4.    |
-| `seed`      | integer         | Reserved for future stochastic rules (deterministic today). |
+| `seed`      | integer or `"random"` | The salt for `hash()`/`noise()` — see [Seeded randomness](#seeded-randomness--hash-noise-and-generator-seed). **Not** an L-system key: the expansion is deterministic and ignores it, and any system's preset may declare one. Default 0. |
 
 Turtle vocabulary in the expanded string: `F`/`G` draw forward, `f` moves without
 drawing, `+`/`-` turn by `angle_deg`, `[`/`]` push/pop the branch state, any other

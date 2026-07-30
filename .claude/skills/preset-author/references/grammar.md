@@ -16,6 +16,9 @@ name   = "Lorenz Drift"     # optional — display name, and what `--preset` mat
 [particles]                 # structural config: [curve] | [generator] | [particles]
 family = "lorenz"
 
+[generator]                 # any system may carry one just for the seed
+seed = 12                   # salts hash()/noise(); "random" varies per launch
+
 [palette]                   # colour: a built-in `name` OR custom `stops`, never both
 name = "ice"
 
@@ -43,6 +46,9 @@ Bindings apply name-sorted, so file order is irrelevant (group them for a human 
 | a hard either/or | `select(cond, a, b)` — **only the taken branch evaluates**, so it also guards partial functions: `select(x >= 0, sqrt(x), 0)` |
 | a punchier or gentler response curve | `pow(bass * 8, 2)` / `pow(x, 0.5)` |
 | a value that wraps cleanly | `mod(time * 0.2, 1.0)` — floored, so it never returns negative |
+| a drift that wanders instead of ramping | `noise(time * 0.3)` — seeded value noise, `[0, 1]`. One call replaces the sum-of-detuned-sines idiom the older files use |
+| something *different* per beat / per element | `hash(floor(time * 2))` / `hash(index * 64)` — a scatter in `[0, 1)`, unrelated between neighbouring arguments |
+| a level in dB | `20 * log(max(x, 0.0001)) / 2.302585` — `log` is natural, and `log(0)` is `-inf` |
 | "loud AND fast" / "beat OR strong hit" | `min(bass > 0.3, tempo > 120)` / `max(beat, onset > 0.6)` — no booleans exist; comparisons give clean `1`/`0` |
 | behaviour that changes with tempo | `select(tempo > 128, fast, calm)` — never use `tempo` raw, it's BPM |
 | a driver that stops jittering | move it to `[smoothing]`, don't fake it with arithmetic |
