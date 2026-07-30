@@ -57,6 +57,31 @@ const MIN_ACTIVE_ORDER: f32 = 2.0;
 /// Ceiling on the fold order — beyond a couple dozen wedges the fold is a blur.
 const MAX_ORDER: f32 = 48.0;
 
+/// The wedge count the shader is handed: clamped to the active range, then
+/// **rounded to an integer**.
+///
+/// The shader wraps with `a - seg * floor(a / seg)` where `seg = 2*pi/order`, then
+/// mirrors within the wedge — a function periodic in `seg`. `atan2`'s branch cut
+/// lies on the **-x ray**: crossing it, `a` jumps by exactly `2*pi`, and a
+/// `seg`-periodic function absorbs that jump only when `2*pi` is a whole multiple
+/// of `seg` — that is, only when `order` is an integer. At any fractional order
+/// the frame tears along one horizontal ray from the centre to the left edge.
+///
+/// Two things make that constant rather than rare. `kaleido_order` sits under
+/// `[smoothing]` in nearly every shipped kaleido preset, so each ladder step eases
+/// through a second or more of fractional orders and preset dissolves interpolate
+/// it too; and the fold's mirror is *even*, so the jump cancels exactly at
+/// `kaleido_angle = 0` and only at 0 — which 9 of the 11 shipped kaleido presets
+/// leave behind immediately, driving the angle off `time`.
+///
+/// Rounding **here** rather than in WGSL keeps the shader's precondition visible
+/// in Rust: the uniform never carries a fractional order. The cost is that
+/// `kaleido_order` becomes a **stepped** parameter (a 12.5-wedge kaleidoscope is
+/// not a thing); `presets/README.md` says so beside the param.
+fn fold_order(order: f32) -> f32 {
+    order.clamp(MIN_ACTIVE_ORDER, MAX_ORDER).round()
+}
+
 const SHADER: &str = r#"
 struct K { v: vec4<f32> } // x: order, y: angle, z: aspect
 
@@ -78,6 +103,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let seg = 6.28318530 / order;
     var a = atan2(p.y, p.x) + angle;
     // Wrap into one wedge, then mirror within it (dihedral fold).
+    //
+    // PRECONDITION: `order` is integral (the CPU side rounds it — see
+    // `fold_order`). `atan2` jumps by 2*pi across the -x ray, and this wrap only
+    // absorbs that jump when 2*pi is a whole multiple of `seg`. A fractional
+    // order tears the frame along that ray.
     a = a - seg * floor(a / seg);
     a = abs(a - seg * 0.5);
 
@@ -310,7 +340,7 @@ impl PostStage for Kaleidoscope {
         let Some(res) = self.res.as_ref() else {
             return 0;
         };
-        let order = self.order.clamp(MIN_ACTIVE_ORDER, MAX_ORDER);
+        let order = fold_order(self.order);
         // The **render target's** ratio, not this stage's input grid's (ADR-0037).
         // The fold happens in the destination's space and the frame it samples was
         // drawn pre-squashed at this same aspect, so both the output geometry and
@@ -354,5 +384,41 @@ impl PostStage for Kaleidoscope {
     /// the WARP adapter (module docs).
     fn reset_resources(&mut self) {
         self.res = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The uniform never carries a fractional wedge count, whatever a preset (or
+    /// the smoothing that eases between two ladder steps) hands the stage. The
+    /// pixel-level consequence — no tear across the -x ray — is
+    /// `core/tests/kaleidoscope.rs`; this pins the arithmetic that guarantees it.
+    #[test]
+    fn fold_order_is_always_integral() {
+        for &raw in &[2.0f32, 2.4, 6.0, 12.5, 12.4999, 13.5, 30.7, 47.999] {
+            let order = fold_order(raw);
+            assert_eq!(
+                order,
+                order.round(),
+                "fold_order({raw}) = {order} is not an integer"
+            );
+        }
+        // Nearest-integer, not truncation: an eased sweep must land on the step
+        // it is closest to rather than always the one below it.
+        assert_eq!(fold_order(12.4), 12.0);
+        assert_eq!(fold_order(12.6), 13.0);
+    }
+
+    /// Rounding happens inside the active range, so it can never hand the shader
+    /// an order the stage would have skipped (`< MIN_ACTIVE_ORDER`) or one past
+    /// the blur ceiling.
+    #[test]
+    fn fold_order_stays_within_the_active_range() {
+        assert_eq!(fold_order(0.0), MIN_ACTIVE_ORDER);
+        assert_eq!(fold_order(1.9), MIN_ACTIVE_ORDER);
+        assert_eq!(fold_order(1e9), MAX_ORDER);
+        assert_eq!(fold_order(f32::NEG_INFINITY), MIN_ACTIVE_ORDER);
     }
 }

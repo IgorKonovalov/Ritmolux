@@ -1,6 +1,6 @@
 # 0049 — The analysis diagnostics surface: making Plan 0048 Phase 6 measurable (and the kaleidoscope seam)
 
-> **Status:** draft 2026-07-30
+> **Status:** in-progress 2026-07-30
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev
 > **Related ADRs:** [0052](../adrs/0052-analysis-diagnostics-are-native-only.md) (native-only, no ABI change);
