@@ -202,6 +202,9 @@ pub struct Kaleidoscope {
     res: Option<Resources>,
     order: f32,
     angle: f32,
+    /// The active tier's cap on this stage's internal grid — see
+    /// [`Trails::post_cap`](super::trails::Trails).
+    post_cap: (u32, u32),
     /// How many times [`Resources::build`] has run — see
     /// [`Trails::builds`](super::trails::Trails).
     builds: u32,
@@ -213,13 +216,18 @@ pub const PARAMS: &[&str] = &["kaleido_order", "kaleido_angle"];
 
 impl Kaleidoscope {
     /// Store the device/format for a lazy build; no GPU resources yet.
-    pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        post_cap: (u32, u32),
+    ) -> Self {
         Self {
             device: device.clone(),
             surface_format,
             res: None,
             order: DEFAULT_ORDER,
             angle: DEFAULT_ANGLE,
+            post_cap,
             builds: 0,
         }
     }
@@ -268,7 +276,7 @@ impl PostStage for Kaleidoscope {
     /// the one [`resolve`](PostStage::resolve) folds about, is the render target's
     /// (ADR-0037).
     fn internal_size(&self, surface: (u32, u32)) -> (u32, u32) {
-        internal_grid_size(surface)
+        internal_grid_size(surface, self.post_cap)
     }
 
     /// Build the resources if needed and return the offscreen view the composite

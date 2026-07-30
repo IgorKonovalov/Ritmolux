@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn the_two_call_sites_are_one_policy() {
         for surface in UNCAPPED {
-            let post = internal_grid_size(surface);
+            let post = internal_grid_size(surface, crate::render::TierConfig::FLOOR.post_cap);
             let trail = trail_grid_size(surface.0, surface.1);
             assert_eq!(
                 post, trail,
@@ -143,7 +143,7 @@ mod tests {
     fn the_caps_stay_different_on_purpose() {
         let surface = (3840, 2160);
         assert_ne!(
-            internal_grid_size(surface),
+            internal_grid_size(surface, crate::render::TierConfig::FLOOR.post_cap),
             trail_grid_size(surface.0, surface.1),
             "above the post cap the two must diverge — the attractor is allowed a \
              larger grid than the stages, which are charged twice by a dual-live dissolve"
