@@ -59,8 +59,6 @@ const FALLBACK_ASPECT: f32 = 16.0 / 9.0;
 
 /// Velocity retained per frame (the rest is re-steered by the flow field).
 const DAMPING: f32 = 0.86;
-/// Spatial frequency of the flow field.
-const FIELD_FREQ: f32 = 2.3;
 
 /// Parameter defaults — a calm idle drift when nothing is bound.
 const DEFAULT_FORCE: f32 = 1.4;
@@ -69,6 +67,19 @@ const DEFAULT_BURST: f32 = 0.0;
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_BRIGHTNESS: f32 = 0.8;
 const DEFAULT_SIZE: f32 = 1.0;
+/// Spatial frequency of the flow field — how many vortices fit across the world,
+/// and so how many distinct streams a frame can hold (Plan 0043 Phase 2).
+///
+/// Was a bare `const FIELD_FREQ`; it is now the bindable `field_freq`, and this
+/// default is **exactly** the constant it replaced, so a preset that does not bind
+/// it renders unchanged.
+///
+/// It is this scene's first structural lever. Low values give a few broad
+/// currents that many particles share — which is where the family's apparent
+/// flocking comes from, since neighbours on one streamline travel together — and
+/// high values give many tight swirls. `spin` says how fast the field is rewritten;
+/// this says how finely it is divided.
+const DEFAULT_FIELD_FREQ: f32 = 2.3;
 // Shared palette color knobs (ADR-0021). Each particle's hue occupies the band
 // `hue_center + (particle_hue - 0.5) * hue_spread`; the defaults (`center = 0.5`,
 // `spread = 1`) reproduce the prior full-wheel look (`particle_hue`), and
@@ -206,6 +217,7 @@ pub struct SwarmScene {
     hue: f32,
     brightness: f32,
     size: f32,
+    field_freq: f32,
     zoom: f32,
     pan_x: f32,
     pan_y: f32,
@@ -334,6 +346,7 @@ impl SwarmScene {
             hue: DEFAULT_HUE,
             brightness: DEFAULT_BRIGHTNESS,
             size: DEFAULT_SIZE,
+            field_freq: DEFAULT_FIELD_FREQ,
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
@@ -394,6 +407,7 @@ pub const PARAMS: &[&str] = &[
     "hue",
     "brightness",
     "size",
+    "field_freq",
     "zoom",
     "pan_x",
     "pan_y",
@@ -429,6 +443,7 @@ impl Scene for SwarmScene {
         self.hue = DEFAULT_HUE;
         self.brightness = DEFAULT_BRIGHTNESS;
         self.size = DEFAULT_SIZE;
+        self.field_freq = DEFAULT_FIELD_FREQ;
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
@@ -446,6 +461,7 @@ impl Scene for SwarmScene {
             "hue" => self.hue = value,
             "brightness" => self.brightness = value,
             "size" => self.size = value,
+            "field_freq" => self.field_freq = value,
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
@@ -466,6 +482,8 @@ impl Scene for SwarmScene {
         let field_t = self.time * self.spin;
         let force = self.force;
         let burst_kick = self.burst;
+        // Hoisted out of the loop: one read, 10 000 uses (Plan 0043 Phase 2).
+        let field_freq = self.field_freq;
 
         // Frame-rate-independent integration (Plan 0014 Phase 2): scale the
         // acceleration/advection by real `dt`, and raise the per-frame damping to
@@ -488,8 +506,8 @@ impl Scene for SwarmScene {
             let world = [p.pos[0] * bound_x, p.pos[1] * bound_y];
 
             // Scalar potential -> flow direction (cheap curl-ish field).
-            let a = (world[0] * FIELD_FREQ + field_t).sin()
-                + (world[1] * FIELD_FREQ - field_t * 0.8).cos();
+            let a = (world[0] * field_freq + field_t).sin()
+                + (world[1] * field_freq - field_t * 0.8).cos();
             let dir = [a.cos(), a.sin()];
 
             p.vel[0] = p.vel[0] * damp + dir[0] * force * dt;
