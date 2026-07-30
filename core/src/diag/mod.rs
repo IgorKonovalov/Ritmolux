@@ -27,7 +27,15 @@ use std::time::Instant;
 
 /// Recent frame durations retained for the rolling stats. 240 samples is ~4 s
 /// at 60 fps — long enough for a stable p99, short enough to react to a stall.
-const RING: usize = 240;
+///
+/// **Lowering this is not a free tuning.** [`samples`](FrameStats::samples) is
+/// what feeds the quality governor, so this value is also the longest series
+/// [`sustained_miss`](crate::render::tier::sustained_miss) can ever be handed —
+/// and below its
+/// [`MIN_SAMPLES`](crate::render::tier::MIN_SAMPLES) the governor would stop
+/// demoting entirely, silently. `pub(crate)` so that coupling is checked by a
+/// compile-time assertion over there rather than left to whoever edits this line.
+pub(crate) const RING: usize = 240;
 
 /// A snapshot of the current diagnostics, mirroring the C ABI `LmvMetrics`
 /// struct (ADR-0008) on the native side so both frontends surface identical
