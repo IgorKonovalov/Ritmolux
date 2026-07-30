@@ -329,11 +329,12 @@ came to its upper bound. A frame differential structurally cannot answer this �
 `select(c, 6, 8)` and `select(c, 6, 6)` diff identically, and neither names
 *which* gate.
 
-Three kinds of finding are printed, each on its own prefixed line:
+Three kinds of finding come out of that walk. The first two are named one per
+line underneath the table; the third is summarized:
 
 - **`GATE`** — a `select()` whose condition never went both ways. One branch of
-  the preset has never rendered. Named underneath the table with its source text,
-  so the threshold to re-gain is in front of you.
+  the preset has never rendered. Named with its source text, so the threshold to
+  re-gain is in front of you.
 - **`COMP`** — a **comparison** (`> < >= <= == !=`) that only ever took one
   value, so it read as a constant `0` or `1`
   ([ADR-0043](adrs/0043-reachability-reports-comparison-nodes.md)). This catches
@@ -344,9 +345,10 @@ Three kinds of finding are printed, each on its own prefixed line:
   the whole `min(...)`, and since a `tempo` gate is legitimately one-sided here
   (below), a reader would dismiss it — so each half is also reported on its own,
   and the excusable one can no longer launder the other.
-- **`CEIL`** — a `clamp()` upper bound the value never approached. The bound is
-  decorative and the parameter's real range is narrower than it reads. Counted
-  per preset, the worst few named per family, all of them in `--json`.
+- **clamp ceilings** — a `clamp()` upper bound the value never approached. The
+  bound is decorative and the parameter's real range is narrower than it reads.
+  These are **not** printed one per line: a single summary line per family gives
+  the count and names the furthest three. All of them are in `--json`.
 
 A comparison that is the **direct condition** of a `select()` reports once, as
 the `GATE` line only — that line already names it and says which branch never
@@ -354,7 +356,7 @@ ran, which a `COMP` line cannot. So `GATE` and `COMP` never double-report the
 same finding.
 
 The `gates` column counts `GATE` + `COMP` together: both say a branch of the
-preset's behavior has never happened. `ceils` counts `CEIL`.
+preset's behavior has never happened. `ceils` counts the ceilings.
 
 **A flag is a suspect, not a conviction.** It says *this* stimulus never drove
 the gate both ways, which is a fact about the probe as much as about the preset.
