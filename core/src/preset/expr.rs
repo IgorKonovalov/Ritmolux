@@ -60,10 +60,11 @@ use std::fmt;
 /// `novelty`. The four `*_raw` names after them are the absolute magnitudes the
 /// first four used to carry before ADR-0049 normalized them — reachable for
 /// looks that genuinely want absolute level rather than "loud for this track".
-/// `index` stays **last** and is different in kind: it is not audio but the
-/// *element's own position* during a per-element evaluation (Plan 0034 Phase 4),
-/// and it reads `0` anywhere else.
-pub const VAR_NAMES: [&str; 14] = [
+/// Then `beat_index` and `time_since_beat`, ADR-0050's unconditional Layer 1
+/// musical clock. `index` stays **last** and is different in kind: it is not
+/// audio but the *element's own position* during a per-element evaluation
+/// (Plan 0034 Phase 4), and it reads `0` anywhere else.
+pub const VAR_NAMES: [&str; 16] = [
     "bass",
     "mid",
     "treb",
@@ -77,6 +78,8 @@ pub const VAR_NAMES: [&str; 14] = [
     "mid_raw",
     "treb_raw",
     "onset_raw",
+    "beat_index",
+    "time_since_beat",
     "index",
 ];
 /// Number of expression variables.
@@ -96,6 +99,25 @@ const INDEX_SLOT: usize = VAR_COUNT - 1;
 /// same "two sources that agree today and nothing ties them" failure Plan 0041's
 /// review found in the old duplicated construction sites.
 const RAW_SLOT_BASE: usize = 9;
+
+/// Slot of `beat_index`, followed by `time_since_beat` — ADR-0050's Layer 1 pair,
+/// written by [`with_beat_clock`](Variables::with_beat_clock) and checked by the
+/// same name assertion the raw block gets.
+const CLOCK_SLOT_BASE: usize = 13;
+
+// The three slot blocks must not overlap. Every bound here is a compile-time
+// constant, so this is checked at compile time: an overlapping base is a build
+// failure, not a test failure. `raw_slots_are_where_the_names_say` covers the
+// half a constant cannot — that the *names* at these offsets are the expected
+// ones.
+const _: () = assert!(
+    RAW_SLOT_BASE + 4 <= CLOCK_SLOT_BASE,
+    "the raw block must end before the clock block begins"
+);
+const _: () = assert!(
+    CLOCK_SLOT_BASE + 2 <= INDEX_SLOT,
+    "the clock block must end before `index`"
+);
 
 /// A bound set of variable values for one evaluation. Field order matches
 /// [`VAR_NAMES`]; `beat` is the caller's bool coerced to 0.0/1.0.
@@ -166,6 +188,19 @@ impl<'a> Variables<'a> {
         next
     }
 
+    /// Bind `beat_index` and `time_since_beat` (ADR-0050 Layer 1), leaving
+    /// everything else as it was.
+    ///
+    /// `beat_index` arrives as the frame's `u32` and converts here: exact up to
+    /// 2^24 beats, which at 200 BPM is about 1400 hours of continuous playback.
+    pub fn with_beat_clock(self, beat_index: u32, time_since_beat: f32) -> Self {
+        let mut next = self;
+        if let Some(slots) = next.values.get_mut(CLOCK_SLOT_BASE..CLOCK_SLOT_BASE + 2) {
+            slots.copy_from_slice(&[beat_index as f32, time_since_beat]);
+        }
+        next
+    }
+
     /// Bind every analysis variable from `frame`, with the clock at `time`.
     ///
     /// **This is the only place the frame-to-slot mapping is written.** Both the
@@ -201,6 +236,7 @@ impl<'a> Variables<'a> {
             frame.treb_raw,
             frame.onset_raw,
         )
+        .with_beat_clock(frame.beat_index, frame.time_since_beat)
         .with_spectrum(&frame.spectrum)
     }
 
@@ -1473,10 +1509,18 @@ mod tests {
             "with_raw writes four floats starting at RAW_SLOT_BASE; those are the names it must land on"
         );
         assert_eq!(
+            VAR_NAMES.get(CLOCK_SLOT_BASE..CLOCK_SLOT_BASE + 2),
+            Some(["beat_index", "time_since_beat"].as_slice()),
+            "with_beat_clock writes two floats starting at CLOCK_SLOT_BASE"
+        );
+        assert_eq!(
             VAR_NAMES.get(INDEX_SLOT),
             Some(&"index"),
             "`index` must stay last: INDEX_SLOT is derived from the variable count"
         );
+        // The blocks must not overlap either — see the `const` assertions beside
+        // the constants themselves, which reject an overlap at compile time
+        // rather than waiting for this test to run.
     }
 
     /// `with_raw` fills exactly its own four slots — it must not disturb the

@@ -89,7 +89,15 @@ pub struct AnalysisFrame {
     /// Tempo estimate in BPM (hop-clock autocorrelation; 0 until warm).
     pub bpm: f32,
     /// Beat phase in [0, 1): 0 on each beat, ramping to the next.
+    ///
+    /// The name is a **documented misnomer** — this is beat phase, not bar phase.
+    /// Too widely bound to rename (ADR-0050); `bar_phase` is the true quantity.
     pub bar: f32,
+    /// Monotone count of beats since the stream started, 0 on the first beat
+    /// (ADR-0050 Layer 1). Unconditional and deterministic — no confidence gate.
+    pub beat_index: u32,
+    /// Seconds since the last detected beat; exactly 0 on a beat hop.
+    pub time_since_beat: f32,
     /// Experimental spectral track-change novelty (Plan 0009 Phase 4): ~0 within
     /// a steady segment, spiking at a spectral boundary. Native-API only — not
     /// exposed across the C ABI.
@@ -111,6 +119,8 @@ impl Default for AnalysisFrame {
             onset_raw: 0.0,
             bpm: 0.0,
             bar: 0.0,
+            beat_index: 0,
+            time_since_beat: 0.0,
             novelty: 0.0,
         }
     }
@@ -227,7 +237,7 @@ impl Analyzer {
                     // would distort the periodicity it looks for, while novelty
                     // measures spectral shape, which per-band normalization
                     // flattens by construction.
-                    let (bpm, bar) = self.tempo.process(onset_raw, beat);
+                    let clock = self.tempo.process(onset_raw, beat);
                     let novelty = self.novelty.process(&raw_spectrum);
 
                     // ...and normalization happens last, on the way out.
@@ -244,8 +254,10 @@ impl Analyzer {
                         mid_raw,
                         treb_raw,
                         onset_raw,
-                        bpm,
-                        bar,
+                        bpm: clock.bpm,
+                        bar: clock.bar,
+                        beat_index: clock.beat_index,
+                        time_since_beat: clock.time_since_beat,
                         novelty,
                     };
                     self.pending_beat |= beat;
