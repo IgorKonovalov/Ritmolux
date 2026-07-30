@@ -1578,3 +1578,75 @@ Two practical notes from authoring the four:
 `references/craft.md` in the `preset-author` skill is the working home for the rule — it already
 leads with the additive ceiling, and this belongs beside it as the second structural principle.
 This entry is the record and the evidence; that file is where it changes behaviour.
+
+---
+
+## 0031 — the Rich tier's 3x particle count makes the attractor reseed transient opaque, and `clifford` blows out
+
+- **Raised:** 2026-07-30, from the **user**, running the standalone at the `Rich` tier the day
+  Plan 0044 landed: *"clifford is too bright and has artifacts"*, with a screenshot.
+- **Verified against code:** partly — see the split below. One half is reproduced by capture, the
+  other is a hypothesis with strong supporting evidence and no repro.
+
+The screenshot shows `attractor_clifford` as a near-white/yellow saturated disc, overlaid with
+**hard-edged, uniformly-speckled quadrilateral slabs** at odd angles, extending outside the disc.
+
+### Half one — too bright. Reproduced, and expected.
+
+Confirmed by capture: `shot --tier floor` vs `--tier rich` on this preset at 1280x800 and at
+2048x1152 both show `Rich` visibly hotter, with the ribbon cores clipping to white where `Floor`
+still holds tone. Nothing is wrong with the tier mechanism — this is `attractor_particles`
+50 000 -> 150 000 depositing **3x the energy per texel** into an 8-bit additive composite with no
+tonemap. That is roadmap [Wrong turn 3](roadmap-visual-richness.md) (the additive ceiling) meeting
+R0's raised capacity, and it is the first field evidence that **the provisional 3x multiplier is
+too high** — the number Plan 0044 Phase 4 was supposed to measure and did not.
+
+Two independent fixes are already queued, and this entry is not asking for a third:
+
+- **R1 / [Plan 0045](plans/0045-linear-light-and-bloom.md)** — the `Rgba16Float` linear composite
+  with a real tonemap is the *structural* answer: with headroom, 3x the deposit stops clipping and
+  starts reading as brightness. This preset is a good acceptance case for that plan.
+- **Plan 0044 Phase 4** (carried to `on-device-validation.md`) — the *calibration* answer: measure,
+  and bring `attractor_particles` down to the value that holds. Do this **after** R1, or the
+  measurement is taken against a ceiling that is about to move.
+
+### Half two — the slabs. Not reproduced; best-supported hypothesis is the seed box.
+
+**Four captures did not reproduce it**: both tiers x {1280x800 static, 2048x1152 static}, plus an
+onset-driven `--signal click:120` filmstrip at both tiers. So it needs something the headless
+harness does not do — live loudness, a resize/fullscreen reallocation, a dissolve, or a transient
+too short for a filmstrip's 8 sampled frames to land on.
+
+The hypothesis, from the preset and the scene code rather than from a repro:
+
+1. `attractor_clifford.toml` binds `reseed = "onset > 0.012"`, and its own comment records that
+   `onset` peaks around 0.016 on music-like material — so **the reseed genuinely fires** on real
+   audio (it is the most reluctant setting in the family, not an unreachable one).
+2. A reseed re-uploads every particle to `AttractorScene::seed`, which scatters them **uniformly
+   through `family.seed_box()` — a rectangle**. For a few frames after each reseed, the particle
+   set *is* a uniform-density box, before the map contracts it onto the attractor.
+3. This preset binds `trails = "0.62 + clamp((bass + mid) * 0.35, 0, 0.28)"` — a long exposure,
+   rising with energy. The engine-wide feedback stage **holds that box in the accumulation** long
+   after the particles have moved on.
+4. At `Floor` that transient is 50 000 particles spread over a large rectangle — a faint wash.
+   At `Rich` it is **150 000 in the same box**, three times the density, and the wash becomes an
+   opaque slab. The view transform (`zoom`, `pan_x`, `pan_y`) rotates and offsets it, which matches
+   the odd angles and the extent past the disc edge.
+
+If that is right, the tier did not *create* the artifact — it made a pre-existing transient
+visible, which is a fair description of a whole class of thing `Rich` will surface.
+
+### What would settle it
+
+- **A `--tier floor` run of the same preset on the same audio.** If the slabs vanish or go faint,
+  it is density-amplified (hypothesis holds). If they persist identically, the seed box is not the
+  mechanism and this needs a fresh look. *This is one command and it is the cheapest discriminator.*
+- Failing that: a capture path that can hold a reseed transient — a filmstrip whose frame indices
+  bracket a known onset rather than sampling evenly.
+
+### Where it goes
+
+`dev` investigation, not a preset fix — an author cannot see the seed box from the grammar, and
+turning `reseed` off to hide it would cost the preset its intended behaviour. Route after R1
+lands, since the linear composite changes what "too bright" means and may change the verdict on
+the slabs' visibility too.

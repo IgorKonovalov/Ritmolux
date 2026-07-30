@@ -1,8 +1,8 @@
 # ADR-0045 — Quality tiers: a `Rich` tier beside the iGPU `Floor`, auto-selected with a manual pin
 
-> **Status:** proposed
+> **Status:** accepted 2026-07-30 (implemented and reviewed at Plan 0044's close)
 > **Date:** 2026-07-30
-> **Related plan(s):** 0044-quality-tiers (R0 of [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md))
+> **Related plan(s):** [0044-quality-tiers](../plans/done/0044-quality-tiers.md) — **done** (R0 of [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md))
 
 ## Context
 
