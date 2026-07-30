@@ -1,9 +1,12 @@
 # 0044 — Quality tiers: `Floor` and `Rich`, a governor, and the constants that move
 
-> **Status:** approved 2026-07-30 — ready for `dev` (start after Plan 0043 closes; Phase 3 touches `swarm.rs`)
+> **Status:** done 2026-07-30 — Phases 1, 2, 3, 5 landed in `e44b3a6`, `89d4ad4`, `6292286`,
+> `3e807f4`. **Phase 4 (`human`, the Rich calibration) is carried forward unrun** — see the
+> phase and the close note below. Mode 4 review: no blockers, one major (the governor's
+> `MIN_SAMPLES` depends on `diag::RING` with nothing tying them), two minor.
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0045](../adrs/0045-quality-tiers-floor-and-rich.md) (tiers), [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md) R0
+> **Related ADRs:** [0045](../adrs/0045-quality-tiers-floor-and-rich.md) (tiers, **accepted**), [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md) R0
 
 ## TL;DR
 
@@ -113,6 +116,14 @@ flowchart LR
   or the misses are listed with numbers so the closing `dev` step can lower the specific
   Rich values that missed. No number is invented: the constants that ship are the measured
   ones.
+- **Status at close: NOT RUN.** No frame times were recorded here, so the shipped
+  `TierConfig::RICH` values are the Phase 3 provisional multipliers — 150k attractor
+  particles, 60k segments, 30k swarm particles, a 2560x1440 post cap, a 4K trail cap. The
+  code says so itself (`core/src/render/tier.rs`, `RICH`: "**These are provisional
+  multipliers, not measurements**"), and that comment stays true until this runs. Carried
+  forward to [`docs/on-device-validation.md`](../on-device-validation.md) rather than
+  holding the plan open, per that file's standing rule that hardware-gated checks never gate
+  a close.
 
 ### Phase 5 — Docs sweep and NFR update
 - **Owner skill:** dev
@@ -170,3 +181,48 @@ pub struct RendererOptions {
 
 - ADR-0046's `bloom_levels` joins `TierConfig`.
 - A plugin-side tier setting if foobar users ask (ABI-touching, ADR-worthy).
+
+## Close note (architect, 2026-07-30)
+
+Reviewed against this plan and ADR-0045 in a fresh session. All 324 workspace tests pass,
+`cargo fmt --check` and `clippy --all-targets` are clean, and **no golden baseline was
+re-blessed** — which is Phase 1's byte-identical done-when proved rather than asserted.
+
+Verified rather than assumed:
+
+- **`TierConfig::FLOOR` is the pre-tier engine, field for field**, compared against each
+  constant's former definition site at `92579ef`: `(1920, 1080)`, `50_000`, `(2560, 1440)`,
+  `10_000`, `20_000`. `the_floor_is_the_pre_tier_engine` pins all five with file:line comments.
+- **The tests are non-vacuous.** `the_rich_tier_raises_the_grid_only_where_the_floor_cap_binds`
+  asserts both directions — larger where the cap binds, *exactly equal* where it does not — and
+  the second half is what makes the first mean anything. `the_overflow_message_names_the_cap_it_carries`
+  states outright that the floor assertions would pass a reverted `Display` (the floor's cap *is*
+  20 000) and formats at the rich cap to break that. The overlay test checks the tier label's
+  characters exist in the 5x7 glyph table, since `glyph` returns a blank cell for an unknown one.
+- **ADR-0037 holds.** The whole diff introduces no `aspect` at all: a tier moves caps, and every
+  screen-destined geometry path still takes the render target's aspect.
+- **Real-time safety.** `sustained_miss` is allocation-free over an iterator; `apply_tier`
+  rebuilds GPU state at most once per session behind the latch; the hot-path panic pragma is on
+  `tier.rs` and `core/src/render/` was already in the hygiene guard's scan set.
+- **The C ABI is untouched at v4** — `ffi.rs` is not in the diff, as ADR-0045 requires.
+- **`new_headless` cannot produce a non-floor tier**: the tier is absent from `HeadlessOptions`
+  by construction rather than defaulted in it. Stronger than this plan asked for.
+
+Findings, all left open for a future `dev` touch:
+
+- **major — the governor's `MIN_SAMPLES` (`render/tier.rs`, 180) silently depends on
+  `diag::RING` (`diag/mod.rs`, 240)**, a private const in another module. Nothing ties them and
+  no test asserts the relation. `RING` is documented as a p99-window knob ("short enough to react
+  to a stall"); lower it below 180 and `sustained_miss` returns `false` forever — the governor
+  never demotes, silently, which is the one outcome ADR-0045 rules out. The Phase 2 suite cannot
+  catch it: every case feeds a synthetic `MIN_SAMPLES * 2 = 360`-sample series, 1.5x the ring's
+  whole capacity and a series the renderer physically cannot produce. Fix: assert
+  `MIN_SAMPLES <= RING` in a test, or drive one governor case off a genuinely filled `FrameStats`.
+- **minor — a lost line continuation in the demotion message** (`standalone/src/main.rs`): 18
+  spaces mid-sentence in "did not hold this&nbsp;&nbsp;...&nbsp;&nbsp;display's frame budget".
+  Cosmetic, but it lands on the one user-facing line whose entire purpose is that the demotion is
+  not silent.
+- **minor — `docs/on-device-validation.md` was not in Phase 5's sweep** and contradicted the
+  shipped engine in two places ("the shipped single fixed tier"; an fps miss routed to "the
+  adaptive-quality-tier plan waits on" — this plan). Fixed in this close commit, along with the
+  Phase 4 carry-forward item.

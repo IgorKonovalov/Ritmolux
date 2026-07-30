@@ -1,8 +1,8 @@
 //! Embedded 5x7 bitmap font for the diagnostics overlay (Plan 0011).
 //!
 //! A deliberately-minimal, dependency-free debug primitive: just the glyphs the
-//! numeric readout needs (digits, a decimal point, a space, and the unit labels
-//! FPS / MS / MB). It is intentionally *not* the glyphon text renderer of Plan
+//! numeric readout needs (digits, a decimal point, a space, the unit labels
+//! FPS / MS / MB, and the tier names FLOOR / RICH). It is intentionally *not* the glyphon text renderer of Plan
 //! 0008 / ADR-0009 — that is feature-gated and standalone-scoped, while this
 //! overlay is core-drawn and must paint in the foobar plugin too (all-three
 //! parity) without adding a dependency (NFR 4). Keep it self-contained so a
@@ -47,6 +47,15 @@ pub fn glyph(c: char) -> [u8; GLYPH_H] {
         'S' => [0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E],
         'M' => [0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11],
         'B' => [0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E],
+        // The quality-tier names FLOOR / RICH (Plan 0044). `F` is shared with FPS.
+        'L' => [0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F],
+        'O' => [0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E],
+        'R' => [0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11],
+        'I' => [0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E],
+        'C' => [0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E],
+        'H' => [0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11],
+        // Marks a tier the frame-time governor demoted (Plan 0044 Phase 2).
+        '*' => [0x00, 0x0A, 0x04, 0x1F, 0x04, 0x0A, 0x00],
         _ => [0x00; GLYPH_H],
     }
 }

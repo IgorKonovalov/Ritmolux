@@ -35,6 +35,81 @@ pub const APP_DIR_NAME: &str = "light-music-visualizer";
 /// or to any folder to run a custom preset library.
 pub const PRESET_DIR_ENV: &str = "LMV_PRESET_DIR";
 
+/// Environment variable pinning the quality tier — `floor` or `rich`
+/// (Plan 0044 / ADR-0045). Between the `--tier` flag and `config.toml` in
+/// precedence: handy for a one-off run without editing either.
+pub const TIER_ENV: &str = "LMV_TIER";
+
+/// Which of the three pin sources decided the tier, so a surprising tier is
+/// traceable to what set it rather than being a mystery on stderr.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TierSource {
+    /// `--tier <name>` on the command line.
+    Flag,
+    /// The [`TIER_ENV`] environment variable.
+    Env,
+    /// `config.toml`'s `[quality] tier`.
+    Config,
+    /// Nothing pinned it: the engine resolves the rich tier and the frame-time
+    /// governor may demote it once (ADR-0045).
+    Auto,
+}
+
+impl TierSource {
+    /// How to name this source in a log line.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TierSource::Flag => "--tier",
+            TierSource::Env => TIER_ENV,
+            TierSource::Config => "config.toml",
+            TierSource::Auto => "auto",
+        }
+    }
+}
+
+/// The tier [`TIER_ENV`] pins, or `None` when it is unset or empty — empty is
+/// treated as unset, the same rule `LMV_PRESET_DIR` follows, because an
+/// exported-but-blank variable is a shell artifact rather than a choice.
+///
+/// `Err` on an unparseable value. It has to be *reported* rather than silently
+/// defaulted — an operator who typed `LMV_TIER=rch` is otherwise convinced they
+/// pinned a tier they did not — but the app degrades to the next source down
+/// rather than refusing to start (NFR 10).
+pub fn tier_env() -> Result<Option<lmv_core::render::Tier>, String> {
+    parse_tier_env(std::env::var_os(TIER_ENV))
+}
+
+/// [`tier_env`]'s rule as a pure function of the raw value.
+fn parse_tier_env(raw: Option<OsString>) -> Result<Option<lmv_core::render::Tier>, String> {
+    let Some(raw) = raw.filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    let text = raw.to_string_lossy();
+    lmv_core::render::Tier::from_name(&text)
+        .map(Some)
+        .ok_or_else(|| format!("{TIER_ENV}=`{text}`: expected `floor` or `rich`"))
+}
+
+/// Resolve the quality-tier pin from the three sources, highest precedence
+/// first: `--tier`, then [`TIER_ENV`], then `config.toml`. `None` means auto —
+/// the renderer resolves the rich tier and the governor may demote it once.
+///
+/// Pure: every source arrives already parsed, so the precedence rule is testable
+/// without touching process-global environment state, and a source that failed
+/// to parse is simply `None` here — it does not swallow the sources below it.
+pub fn resolve_tier(
+    flag: Option<lmv_core::render::Tier>,
+    env: Option<lmv_core::render::Tier>,
+    config: Option<lmv_core::render::Tier>,
+) -> (Option<lmv_core::render::Tier>, TierSource) {
+    match (flag, env, config) {
+        (Some(tier), _, _) => (Some(tier), TierSource::Flag),
+        (None, Some(tier), _) => (Some(tier), TierSource::Env),
+        (None, None, Some(tier)) => (Some(tier), TierSource::Config),
+        (None, None, None) => (None, TierSource::Auto),
+    }
+}
+
 /// Where the preset directory came from, so the app knows whether to seed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PresetDir {
@@ -171,5 +246,60 @@ mod tests {
         };
         assert_eq!(resolve_preset_dir(), expected);
         assert!(!resolve_preset_dir().is_override());
+    }
+
+    /// The tier pin's precedence, one source at a time: flag beats env beats
+    /// config beats auto, and each source is reported as what set it.
+    #[test]
+    fn the_tier_pin_resolves_highest_precedence_first() {
+        use lmv_core::render::Tier;
+
+        // The flag wins even when both lower sources disagree with it.
+        assert_eq!(
+            resolve_tier(Some(Tier::Floor), Some(Tier::Rich), Some(Tier::Rich)),
+            (Some(Tier::Floor), TierSource::Flag)
+        );
+        // Env beats config.
+        assert_eq!(
+            resolve_tier(None, Some(Tier::Floor), Some(Tier::Rich)),
+            (Some(Tier::Floor), TierSource::Env)
+        );
+        // Config is the last pin.
+        assert_eq!(
+            resolve_tier(None, None, Some(Tier::Rich)),
+            (Some(Tier::Rich), TierSource::Config)
+        );
+        // Nothing set: auto, which the renderer resolves as rich + governor.
+        assert_eq!(resolve_tier(None, None, None), (None, TierSource::Auto));
+    }
+
+    /// The env var parses both tiers, treats empty as unset, and **reports** a
+    /// junk value rather than defaulting it — silently ignoring `LMV_TIER=rch`
+    /// would leave the operator convinced they had pinned a tier they had not.
+    #[test]
+    fn the_tier_env_var_parses_or_reports() {
+        use lmv_core::render::Tier;
+
+        assert_eq!(
+            parse_tier_env(Some(OsString::from("floor"))),
+            Ok(Some(Tier::Floor))
+        );
+        assert_eq!(
+            parse_tier_env(Some(OsString::from("RICH"))),
+            Ok(Some(Tier::Rich))
+        );
+        assert_eq!(parse_tier_env(None), Ok(None));
+        assert_eq!(parse_tier_env(Some(OsString::new())), Ok(None));
+
+        let err = parse_tier_env(Some(OsString::from("ultra"))).expect_err("`ultra` is not a tier");
+        assert!(err.contains(TIER_ENV), "{err}");
+        assert!(err.contains("ultra"), "{err}");
+
+        // A junk value does not swallow the config pin below it: it resolves to
+        // `None` here, and `resolve_tier` then falls through to the config.
+        assert_eq!(
+            resolve_tier(None, None, Some(Tier::Floor)),
+            (Some(Tier::Floor), TierSource::Config)
+        );
     }
 }

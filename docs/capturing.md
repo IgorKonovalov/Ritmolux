@@ -23,6 +23,35 @@ and the DSP is deterministic — so renders are reproducible and diff-able.
 > than the live app: a `seed = "random"` preset's filmstrip is *an* instance of it,
 > not the instance a user will see. Tune with a number.
 
+## Captures pin the floor tier
+
+**Every capture path renders at the `Floor` quality tier, and it cannot do
+otherwise by accident.** `Renderer::new_headless` takes no tier argument and
+resolves `Floor` by construction (Plan 0044 / [ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md)),
+so there is no field a test can forget and no environment variable that can change
+what a baseline looks like. `shot` defaults to `floor` for the same reason and
+deliberately does **not** read `LMV_TIER`.
+
+Two reasons, and both are load-bearing:
+
+- **Reproducibility.** A tier sets capacity — particle counts, the segment budget,
+  the internal-grid caps — so a baseline blessed on a rich-tier run and compared
+  against a floor-tier one differs for a reason that has nothing to do with the
+  change under test. A capture is a pure function of its inputs (NFR §6), and the
+  tier would otherwise be a hidden input.
+- **Suite cost.** The golden and visual-QA suites run on the WARP software
+  adapter, where fill and instance count translate directly into wall-clock. At
+  rich values the same suite would draw 3x the attractor particles into a 4K-capped
+  trail grid on a CPU rasterizer.
+
+`--tier rich` is the deliberate opt-in, for spot-checking that the raised budgets
+actually render. Use it to *look*, not to bless: a rich capture must never be
+written into `core/tests/golden/`.
+
+> The consequence ADR-0045 names and accepts: rich-tier regressions are caught only
+> by those spot checks and by on-device runs, not by the suite. That is a real hole,
+> not a solved problem.
+
 > `--size` is part of that tuple, and since Plan 0033 it does more than crop: the
 > `trails` and `kaleido_*` stages size their internal grid from the render target
 > (ADR-0034), so a preset composing either one genuinely renders *differently* at
@@ -62,6 +91,7 @@ Flags:
 | `--signal <kind:param>` | synth-audio filmstrip (see below) |
 | `--audio <clip.wav>` | filmstrip from a 16-bit PCM WAV |
 | `--strip <N>` | frames tiled along the audio (default 8) |
+| `--tier floor\|rich` | quality tier to capture at (default `floor` — see below) |
 
 Bad arguments and unknown presets exit non-zero with a message.
 

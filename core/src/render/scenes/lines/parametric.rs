@@ -20,8 +20,8 @@ use std::rc::Rc;
 use super::super::Scene;
 use super::renderer::{LineRenderer, SegmentInstance};
 use super::{
-    CapOverflow, CurveFamily, GeneratorConfig, MAX_SEGMENTS, MirrorSpec, OverflowContext,
-    ViewTransform, curves, palette, replicate_mirror,
+    CapOverflow, CurveFamily, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, curves,
+    palette, replicate_mirror,
 };
 use crate::dsp::AnalysisFrame;
 
@@ -69,6 +69,12 @@ pub struct ParametricCurveScene {
     /// Reused buffer for the single (pre-mirror) sampled curve, replicated into
     /// [`segments`](Self::segments) by [`replicate_mirror`]. Preallocated.
     single_buf: Vec<SegmentInstance>,
+    /// The active tier's segment ceiling
+    /// ([`TierConfig::max_segments`](crate::render::TierConfig::max_segments)),
+    /// resolved once at construction (Plan 0044). A field rather than a constant
+    /// so the tier can raise it; the buffers above are preallocated to it, which
+    /// is what keeps the per-frame replication allocation-free.
+    max_segments: usize,
     /// Set when this frame's mirror replication overflowed the segment cap
     /// (ADR-0007: never a silent cut); `None` when it fit.
     mirror_overflow: Option<CapOverflow>,
@@ -98,11 +104,12 @@ pub struct ParametricCurveScene {
 impl ParametricCurveScene {
     /// Build the scene over the shared line renderer, preallocating its segment
     /// buffer to the cap.
-    pub fn new(renderer: Rc<RefCell<LineRenderer>>) -> Self {
+    pub fn new(renderer: Rc<RefCell<LineRenderer>>, max_segments: usize) -> Self {
         Self {
             renderer,
-            segments: Vec::with_capacity(MAX_SEGMENTS),
-            single_buf: Vec::with_capacity(MAX_SEGMENTS),
+            segments: Vec::with_capacity(max_segments),
+            single_buf: Vec::with_capacity(max_segments),
+            max_segments,
             mirror_overflow: None,
             family: CurveFamily::MaurerRose,
             time: 0.0,
@@ -230,7 +237,7 @@ impl Scene for ParametricCurveScene {
         // frame, so there is no "load" moment to surface a truncation at, and a
         // sane curve preset (samples in the hundreds) never approaches the cap —
         // the clamp is a safety backstop, not a structural cut worth reporting.
-        let samples = (self.samples.max(0.0) as usize).min(MAX_SEGMENTS);
+        let samples = (self.samples.max(0.0) as usize).min(self.max_segments);
         let rotation = self.spin * self.time;
         let base = palette(self.hue);
         let color = [
@@ -264,21 +271,27 @@ impl Scene for ParametricCurveScene {
         if mirror.is_identity() {
             // Identity spec: replication would copy the whole segment set into a
             // second buffer to produce exactly what it was given. Swap instead —
-            // O(1), and both buffers were preallocated to `MAX_SEGMENTS`, so
+            // O(1), and both buffers were preallocated to `max_segments`, so
             // neither can grow later. `maurer_rose` clears before it fills, so
             // whatever lands back in `single_buf` is overwritten next frame.
             debug_assert!(
-                self.single_buf.len() <= MAX_SEGMENTS,
+                self.single_buf.len() <= self.max_segments,
                 "the sampler already clamps to the cap, so identity cannot truncate"
             );
             std::mem::swap(&mut self.single_buf, &mut self.segments);
             self.mirror_overflow = None;
             return;
         }
-        let dropped = replicate_mirror(&self.single_buf, mirror, MAX_SEGMENTS, &mut self.segments);
+        let dropped = replicate_mirror(
+            &self.single_buf,
+            mirror,
+            self.max_segments,
+            &mut self.segments,
+        );
         self.mirror_overflow = (dropped > 0).then_some(CapOverflow {
             dropped,
             context: OverflowContext::Mirror(mirror.order),
+            cap: self.max_segments,
         });
     }
 

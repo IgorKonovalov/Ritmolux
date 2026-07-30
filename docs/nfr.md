@@ -6,14 +6,31 @@ contradicts this file is a plan bug — surface it, don't guess.
 
 ## 1. Performance — adaptive quality
 
-- **Model:** scenes ship **quality tiers**; a **frame-time governor** picks the tier so the
-  render loop holds the display's refresh rate on whatever hardware is present. Rich tier on
-  discrete GPUs, reduced tier on the iGPU baseline — never a dropped-frame slideshow.
-- **Floor:** ≥ 60 fps at 1080p on the baseline hardware (below) at the reduced tier.
+- **Model:** the engine ships two named **quality tiers**, `Floor` and `Rich`
+  ([ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md)), carried as a `TierConfig` of capacity
+  values (particle counts, segment budget, internal-grid caps) resolved **once at renderer
+  construction**. A tier changes *how much* the engine draws, never *what* — so the same preset
+  reads the same on both, at different budgets.
+- **Selection:** unpinned resolves `Rich`, and a **frame-time governor** demotes it to `Floor` on a
+  sustained miss of the display's refresh budget — **once per session, one way**, reported in the
+  diagnostics overlay and on stderr, never silently. There is no auto-promotion: a demotion is
+  predictable and testable, where an oscillating or continuously feature-shedding design is
+  neither (ADR-0045 Alternatives A/B).
+- **Pinning:** `--tier floor|rich`, `LMV_TIER`, or `config.toml`'s `[quality] tier`, in that
+  precedence. A pin is honoured in both directions and the governor never touches it — which is
+  the escape hatch for a capable machine that a transient stall demoted.
+- **Floor:** ≥ 60 fps at 1080p on the baseline hardware (below) at the `Floor` tier, whose values
+  are exactly the pre-tier engine's. The floor commitment is unchanged by tiering: the governor
+  means a mispredicted rich budget degrades to a known-good state instead of stuttering.
+- **Rich:** calibrated against a midrange discrete GPU (RTX 3060 / RX 6600 class) **on device**,
+  not asserted from a multiplier — Plan 0044 Phase 4.
 - **Background cost:** when the window is minimized or fully occluded, rendering throttles to
   near-zero GPU; DSP may keep running so visuals resume in sync.
-- **v1 sequencing:** the MVP (Plan 0001) renders at a single fixed quality that must itself
-  hit the floor; the tier system + governor is its own follow-up plan.
+- **Captures pin `Floor`.** Headless capture is floor-tier by construction (`Renderer::new_headless`
+  cannot produce another tier), so every golden baseline stays byte-reproducible on the WARP
+  software adapter and the suite's cost does not scale with the rich tier. `Rich` is covered by
+  capture-level spot checks plus the on-device checklist — a real QA gap, named rather than solved
+  (ADR-0045 Consequences). See [capturing.md](capturing.md).
 
 ## 2. Platform baseline
 
@@ -130,7 +147,8 @@ All four are v1 requirements, delivered as their own plan after the Plan 0001 MV
 - Fullscreen toggle (borderless, hotkey).
 - Multi-monitor choice (pick the display to fullscreen on).
 - Always-on-top / mini mode.
-- Settings persistence (last scene, window size/position/mode, quality tier — small config file).
+- Settings persistence (last scene, window size/position/mode — small config file; the quality
+  tier already persists via `[quality] tier`).
 
 ## 12. Runtime memory (added 2026-07-21; retargeted 2026-07-22 per [ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md))
 

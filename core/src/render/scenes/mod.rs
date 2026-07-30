@@ -119,7 +119,7 @@ impl GeneratorConfig {
     }
 }
 
-/// Which construction hit the [`lines::MAX_SEGMENTS`] cap, for the surfaced message.
+/// Which construction hit the segment cap, for the surfaced message.
 ///
 /// An enum rather than a `String` because one of the two producers is **per
 /// frame**: an audio-driven `mirror_order` sitting over the cap used to build a
@@ -148,18 +148,22 @@ impl std::fmt::Display for OverflowContext {
     }
 }
 
-/// Reported when building a line scene's geometry hit the fixed [`lines::MAX_SEGMENTS`]
-/// cap and truncated. The cap must never be a silent cut (ADR-0007 Risks), so it
-/// travels to the frontend two ways: out of
-/// `Scene::configure` at preset load, and off
-/// `Scene::mirror_overflow` for the
-/// per-frame mirror. `None` is the normal case where geometry fit.
+/// Reported when building a line scene's geometry hit the segment cap and
+/// truncated. The cap must never be a silent cut (ADR-0007 Risks), so it travels
+/// to the frontend two ways: out of `Scene::configure` at preset load, and off
+/// `Scene::mirror_overflow` for the per-frame mirror. `None` is the normal case
+/// where geometry fit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CapOverflow {
     /// How many draw segments were dropped at the cap.
     pub dropped: usize,
     /// Where the drop happened, for the surfaced message.
     pub context: OverflowContext,
+    /// **The cap that bit**, carried rather than read from a constant: it is a
+    /// tier value now (Plan 0044), so the same preset overflows at 20 000
+    /// segments on the floor and not at all at 60 000 on rich. A message naming a
+    /// cap the run was not using would be worse than no message.
+    pub cap: usize,
 }
 
 impl std::fmt::Display for CapOverflow {
@@ -168,9 +172,7 @@ impl std::fmt::Display for CapOverflow {
             f,
             "geometry exceeded the {}-segment cap at {} (dropped {} segment(s)); \
              reduce the structure or its depth",
-            lines::MAX_SEGMENTS,
-            self.context,
-            self.dropped
+            self.cap, self.context, self.dropped
         )
     }
 }
@@ -299,6 +301,7 @@ pub(crate) trait Scene {
 pub(crate) fn create_all(
     device: &wgpu::Device,
     surface_format: wgpu::TextureFormat,
+    tier: &crate::render::TierConfig,
 ) -> Vec<(SystemKind, Box<dyn Scene>)> {
     // One shared line renderer for every line scene (ADR-0007: "one line
     // renderer"). A single instanced-quad pipeline + segment buffer, borrowed by
@@ -308,12 +311,17 @@ pub(crate) fn create_all(
     let line_renderer = Rc::new(RefCell::new(lines::LineRenderer::new(
         device,
         surface_format,
-        lines::MAX_SEGMENTS,
+        tier.max_segments,
         "lines",
     )));
     SystemKind::ALL
         .iter()
-        .map(|&kind| (kind, create(kind, device, surface_format, &line_renderer)))
+        .map(|&kind| {
+            (
+                kind,
+                create(kind, device, surface_format, &line_renderer, tier),
+            )
+        })
         .collect()
 }
 
@@ -360,24 +368,44 @@ fn create(
     device: &wgpu::Device,
     surface_format: wgpu::TextureFormat,
     line_renderer: &Rc<RefCell<lines::LineRenderer>>,
+    tier: &crate::render::TierConfig,
 ) -> Box<dyn Scene> {
     match kind {
         SystemKind::FragmentField => Box::new(fragment_field::FragmentFieldScene::new(
             device,
             surface_format,
         )),
-        SystemKind::Swarm => Box::new(swarm::SwarmScene::new(device, surface_format)),
-        SystemKind::ParametricCurve => {
-            Box::new(lines::ParametricCurveScene::new(line_renderer.clone()))
-        }
-        SystemKind::LSystem => Box::new(lines::LSystemScene::new(line_renderer.clone())),
-        SystemKind::StarPattern => Box::new(lines::StarPatternScene::new(line_renderer.clone())),
+        SystemKind::Swarm => Box::new(swarm::SwarmScene::new(
+            device,
+            surface_format,
+            tier.swarm_particles,
+        )),
+        SystemKind::ParametricCurve => Box::new(lines::ParametricCurveScene::new(
+            line_renderer.clone(),
+            tier.max_segments,
+        )),
+        SystemKind::LSystem => Box::new(lines::LSystemScene::new(
+            line_renderer.clone(),
+            tier.max_segments,
+        )),
+        SystemKind::StarPattern => Box::new(lines::StarPatternScene::new(
+            line_renderer.clone(),
+            tier.max_segments,
+        )),
         SystemKind::ReactionDiffusion => Box::new(reaction_diffusion::ReactionDiffusionScene::new(
             device,
             surface_format,
         )),
-        SystemKind::Attractor => Box::new(particles::AttractorScene::new(device, surface_format)),
-        SystemKind::Spectrum => Box::new(lines::SpectrumScene::new(line_renderer.clone())),
+        SystemKind::Attractor => Box::new(particles::AttractorScene::new(
+            device,
+            surface_format,
+            tier.attractor_particles,
+            tier.attractor_trail_cap,
+        )),
+        SystemKind::Spectrum => Box::new(lines::SpectrumScene::new(
+            line_renderer.clone(),
+            tier.max_segments,
+        )),
     }
 }
 
@@ -454,7 +482,11 @@ mod tests {
             Err(e) => panic!("headless context build failed: {e}"),
         };
 
-        let scenes = create_all(&ctx.device, ctx.surface_format());
+        let scenes = create_all(
+            &ctx.device,
+            ctx.surface_format(),
+            &crate::render::TierConfig::FLOOR,
+        );
 
         let kinds: Vec<SystemKind> = scenes.iter().map(|(kind, _)| *kind).collect();
         assert_eq!(

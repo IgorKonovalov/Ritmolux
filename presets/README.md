@@ -19,6 +19,17 @@ cargo run -p standalone --example shot -- --preset-file presets/<name>.toml --ou
 See [`../docs/presets.md`](../docs/presets.md#a-custom-preset-folder-lmv_preset_dir)
 and [`../docs/capturing.md`](../docs/capturing.md#editing-presets-live).
 
+**Author against the floor tier.** Shipped presets are authored and gated on
+`Floor` — every `shot` capture and every CI gate (`sanity` / `reactivity` /
+`animation` / `distinctness`) pins it (Plan 0044 /
+[ADR-0045](../docs/adrs/0045-quality-tiers-floor-and-rich.md)). `Rich` raises
+**capacity**, not behavior: more particles, more segments, a larger internal grid.
+No expression, param or structural field changes meaning, and nothing in the
+grammar can read the tier. The one edge worth knowing is the segment cap — it is a
+tier value, so geometry that overflows and truncates at the floor's 20 000 may fit
+at rich. Compose so the floor's cap is the one you tuned for, and treat the extra
+headroom as headroom.
+
 ## Skeleton
 
 ```toml

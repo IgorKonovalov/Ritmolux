@@ -65,8 +65,7 @@ use std::rc::Rc;
 use super::super::Scene;
 use super::renderer::{JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
 use super::{
-    CapOverflow, GeneratorConfig, MAX_SEGMENTS, MirrorSpec, OverflowContext, ViewTransform,
-    replicate_mirror,
+    CapOverflow, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, replicate_mirror,
 };
 use crate::dsp::AnalysisFrame;
 use crate::preset::Easing;
@@ -434,6 +433,12 @@ pub struct SpectrumScene {
     /// The single (pre-mirror) figure, replicated into
     /// [`segments`](Self::segments). Preallocated to the cap.
     single_buf: Vec<SegmentInstance>,
+    /// The active tier's segment ceiling
+    /// ([`TierConfig::max_segments`](crate::render::TierConfig::max_segments)),
+    /// resolved once at construction (Plan 0044). A field rather than a constant
+    /// so the tier can raise it; the buffers above are preallocated to it, which
+    /// is what keeps the per-frame replication allocation-free.
+    max_segments: usize,
     /// Set when this frame's mirror replication overflowed the cap.
     mirror_overflow: Option<CapOverflow>,
     /// This frame's downsampled band levels, before easing.
@@ -489,11 +494,12 @@ impl SpectrumScene {
     /// Build the scene over the shared line renderer, preallocating its segment
     /// buffers to the cap. The element buffers are sized by `configure`, which
     /// the renderer runs on every preset switch.
-    pub fn new(renderer: Rc<RefCell<LineRenderer>>) -> Self {
+    pub fn new(renderer: Rc<RefCell<LineRenderer>>, max_segments: usize) -> Self {
         Self {
             renderer,
-            segments: Vec::with_capacity(MAX_SEGMENTS),
-            single_buf: Vec::with_capacity(MAX_SEGMENTS),
+            segments: Vec::with_capacity(max_segments),
+            single_buf: Vec::with_capacity(max_segments),
+            max_segments,
             mirror_overflow: None,
             raw_levels: Vec::new(),
             levels: Vec::new(),
@@ -776,10 +782,16 @@ impl Scene for SpectrumScene {
             self.mirror_overflow = None;
             return;
         }
-        let dropped = replicate_mirror(&self.single_buf, mirror, MAX_SEGMENTS, &mut self.segments);
+        let dropped = replicate_mirror(
+            &self.single_buf,
+            mirror,
+            self.max_segments,
+            &mut self.segments,
+        );
         self.mirror_overflow = (dropped > 0).then_some(CapOverflow {
             dropped,
             context: OverflowContext::Mirror(mirror.order),
+            cap: self.max_segments,
         });
     }
 
@@ -815,6 +827,11 @@ mod tests {
 
     use super::*;
     use crate::dsp::SPECTRUM_BINS;
+
+    /// The cap these tests run at — the floor tier's, which is the value they were
+    /// written against and the one every shipped preset is authored and gated on
+    /// (Plan 0044).
+    const FLOOR_CAP: usize = crate::render::TierConfig::FLOOR.max_segments;
 
     fn white(n: usize) -> Vec<[f32; 3]> {
         vec![[1.0, 1.0, 1.0]; n]
@@ -1252,7 +1269,7 @@ mod tests {
         let feet = |place: Placement| -> Vec<i32> {
             let single = placed(SpectrumLayout::Bars, &lengths, place);
             let mut out = Vec::new();
-            replicate_mirror(&single, mirror, MAX_SEGMENTS, &mut out);
+            replicate_mirror(&single, mirror, FLOOR_CAP, &mut out);
             let mut ys: Vec<i32> = out.iter().map(|s| (s.a[1] * 1e4) as i32).collect();
             ys.sort_unstable();
             ys.dedup();
