@@ -44,6 +44,8 @@ const BAR_H: f32 = 12.0;
 const SPARK_MAX_MS: f32 = 33.3;
 /// A comfortable 60 fps budget; frames under this read green.
 const BUDGET_MS: f32 = 16.7;
+/// Suffix on a tier the governor demoted, rather than one that was asked for.
+const DEMOTED_MARK: &str = "*";
 /// GPU bytes that fill the footprint bar (512 MiB).
 const GPU_BAR_MAX_BYTES: f32 = 512.0 * 1024.0 * 1024.0;
 
@@ -184,7 +186,8 @@ impl Overlay {
     /// frame-time history (oldest first, milliseconds) for the sparkline, and
     /// `tier` is the active quality tier, named in the readout (ADR-0045) — the
     /// same preset looks different on different machines now, so which tier a run
-    /// resolved is diagnostics, not trivia.
+    /// resolved is diagnostics, not trivia. `demoted` marks a tier the frame-time
+    /// governor took back rather than one that was asked for.
     #[allow(
         clippy::too_many_arguments,
         reason = "the frame's overlay inputs, each read once; bundling them would name a struct after this call site"
@@ -197,6 +200,7 @@ impl Overlay {
         size: (u32, u32),
         metrics: Metrics,
         tier: Tier,
+        demoted: bool,
         frame_ms_samples: impl Iterator<Item = f32>,
     ) {
         let (width, height) = size;
@@ -206,7 +210,7 @@ impl Overlay {
         };
         self.samples.clear();
         self.samples.extend(frame_ms_samples);
-        self.build(vp, metrics, tier);
+        self.build(vp, metrics, tier, demoted);
 
         let n = self.quads.len().min(MAX_QUADS);
         let Some(slice) = self.quads.get(..n) else {
@@ -243,12 +247,12 @@ impl Overlay {
     ///
     /// Splitting the readout out of this method is what lets the panel's one line
     /// of prose be tested without a GPU — see [`write_readout`].
-    fn build(&mut self, vp: Vp, metrics: Metrics, tier: Tier) {
+    fn build(&mut self, vp: Vp, metrics: Metrics, tier: Tier, demoted: bool) {
         self.quads.clear();
 
         // Build the readout first so the panel sizes to whichever is wider — the
         // text row or the graph — and everything shares one content width.
-        write_readout(&mut self.text, metrics, tier);
+        write_readout(&mut self.text, metrics, tier, demoted);
         // Text width, excluding the last glyph's trailing gap.
         let text_w = (self.text.chars().count() as f32 * CHAR_ADVANCE - FONT_PX).max(0.0);
         let content_w = text_w.max(SPARK_W);
@@ -358,15 +362,20 @@ fn push_rect(out: &mut Vec<Quad>, vp: Vp, x: f32, y: f32, w: f32, h: f32, color:
 ///
 /// Takes the buffer by `&mut` rather than returning a `String`: the overlay reuses
 /// one allocation across frames, and this runs on every frame the panel is up.
-fn write_readout(out: &mut String, metrics: Metrics, tier: Tier) {
+fn write_readout(out: &mut String, metrics: Metrics, tier: Tier, demoted: bool) {
     out.clear();
     let _ = write!(
         out,
-        "{:.0} FPS  {:.1} MS  {:.0} MB  {}",
+        "{:.0} FPS  {:.1} MS  {:.0} MB  {}{}",
         metrics.fps,
         metrics.frame_ms_p99,
         metrics.gpu_bytes as f32 / (1024.0 * 1024.0),
         tier.label(),
+        // A demoted floor and a pinned floor are the same tier and very different
+        // facts, so the marker is what keeps the demotion from being silent
+        // (ADR-0045). One glyph, because the panel is already the width of its
+        // sparkline and this is the only place with room.
+        if demoted { DEMOTED_MARK } else { "" },
     );
 }
 
@@ -395,9 +404,18 @@ mod tests {
     // Test asserts panic on failure; allowed here over the file's pragma.
     #![allow(clippy::panic)]
 
-    use super::{Tier, write_readout};
+    use super::{DEMOTED_MARK, Tier, write_readout};
     use crate::diag::Metrics;
     use crate::render::overlay_font::{GLYPH_H, glyph};
+
+    fn metrics() -> Metrics {
+        Metrics {
+            fps: 60.0,
+            frame_ms_p99: 16.7,
+            gpu_bytes: 340 * 1024 * 1024,
+            ..Metrics::default()
+        }
+    }
 
     /// The overlay **names the active tier**, and every character it names it with
     /// actually has a glyph.
@@ -409,15 +427,10 @@ mod tests {
     /// nothing on screen. Nothing else in the engine would notice.
     #[test]
     fn the_readout_names_the_tier_in_glyphs_the_font_actually_has() {
-        let metrics = Metrics {
-            fps: 60.0,
-            frame_ms_p99: 16.7,
-            gpu_bytes: 340 * 1024 * 1024,
-            ..Metrics::default()
-        };
+        let metrics = metrics();
         let mut text = String::new();
         for tier in [Tier::Floor, Tier::Rich] {
-            write_readout(&mut text, metrics, tier);
+            write_readout(&mut text, metrics, tier, false);
             assert!(
                 text.contains(tier.label()),
                 "the readout does not name the {} tier: {text:?}",
@@ -437,6 +450,23 @@ mod tests {
         }
     }
 
+    /// **A demoted floor reads differently from a pinned floor.** They are the
+    /// same tier and very different facts — one is what the operator asked for,
+    /// the other is the engine telling them their machine could not hold the rich
+    /// budget — so if these two strings were equal the demotion would be silent,
+    /// which is exactly what ADR-0045 rules out.
+    #[test]
+    fn a_demoted_tier_is_marked_and_a_pinned_one_is_not() {
+        let (mut pinned, mut demoted) = (String::new(), String::new());
+        write_readout(&mut pinned, metrics(), Tier::Floor, false);
+        write_readout(&mut demoted, metrics(), Tier::Floor, true);
+        assert_ne!(pinned, demoted);
+        assert!(demoted.ends_with(DEMOTED_MARK), "{demoted:?}");
+        assert!(!pinned.ends_with(DEMOTED_MARK), "{pinned:?}");
+        // The mark is a suffix, not a replacement: the tier is still named.
+        assert!(demoted.contains(Tier::Floor.label()));
+    }
+
     /// A space is legitimately blank, so the check above would pass vacuously if
     /// the tier label were ever spaces — and it would also pass if `glyph` had
     /// stopped returning blanks for unknown characters, which is what makes the
@@ -446,6 +476,9 @@ mod tests {
         assert_eq!(glyph('\u{0}').len(), GLYPH_H);
         assert_eq!(glyph('~'), [0x00; GLYPH_H], "unknown must render blank");
         assert_ne!(glyph('F'), [0x00; GLYPH_H], "a covered glyph must be lit");
+        for c in DEMOTED_MARK.chars() {
+            assert_ne!(glyph(c), [0x00; GLYPH_H], "the demotion mark must be lit");
+        }
         for tier in [Tier::Floor, Tier::Rich] {
             assert!(!tier.label().trim().is_empty());
         }
