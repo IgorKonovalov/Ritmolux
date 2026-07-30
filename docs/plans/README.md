@@ -10,37 +10,30 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0044](0044-quality-tiers.md) | Quality tiers: `Floor` and `Rich`, a governor, and the constants that move | **approved 2026-07-30** — ready for `dev` **now** ([0043] closed) ; roadmap R0, [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) | dev, human |
-| [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **approved 2026-07-30** — ready for `dev` after [0044]; roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) | dev, human |
+| [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **approved 2026-07-30** — ready for `dev` **now** ([0044] closed); roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **approved 2026-07-30** — ready for `dev` **now** ([0047] closed); roadmap R5 (large half), [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)/[0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md); **parallel lane** | dev, human |
 
 ## Recommended execution sequence
 
-**[0044] is the one to run.** [0043] **has landed and closed** (2026-07-30) — see Recently closed —
-which releases the one sequencing constraint [0044] had: its Phase 3 touches `swarm.rs`, and that
-file is now settled. The [0042] → [0043] ordering paid off exactly as it did for [0041]: fix the
-measurement, then do the content once instead of twice — Phase 4's `anim` improvements are read off
-a trustworthy instrument.
+**[0045] is the one to run, and it got more urgent the day [0044] closed.** [0044] **has landed and
+closed** (2026-07-30) — see Recently closed — which delivers roadmap R0 and, with it, the
+`TierConfig` that [0045]'s bloom levels and `Floor` bandwidth relief were designed to hang off.
 
-**The visual-richness pair runs in order: [0044] → [0045]** (the first two engine steps of
-[docs/roadmap-visual-richness.md](../roadmap-visual-richness.md), drafted 2026-07-30 from the R0+R1
-interview; **both approved 2026-07-30**).
+**Why more urgent:** the first live `Rich`-tier run surfaced `attractor_clifford` blowing out to
+white (user report + screenshot, 2026-07-30, **[backlog 0031](../design-backlog.md)**). Confirmed by
+capture at two sizes: `Rich` triples the attractor's particle count, which triples the deposit into
+an 8-bit additive composite that has **no tonemap** — roadmap Wrong turn 3 meeting R0's raised
+capacity. [0045] *is* the structural fix, and `attractor_clifford` is its acceptance case. Note the
+ordering that follows: **do not calibrate the Rich values until after [0045]**, or the measurement
+is taken against a ceiling that is about to move.
 
-- **[0044] — quality tiers.** `TierConfig` (Floor = today's constants, Rich calibrated on the
-  user's discrete GPU), auto-select with a one-way governor and an explicit pin; captures pin
-  Floor so every baseline stays byte-identical. Its `swarm.rs` conflict with [0043] is resolved —
-  that plan closed. [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md). **Note for its Phase 3:**
-  [0043] left `PARTICLES` at 10 000 with an **unmeasured** iGPU floor (+0.5 ms/frame of depth math on
-  the dev box), so the particle count is now a live tier candidate rather than a settled constant —
-  see the `docs/on-device-validation.md` item.
 - **[0045] — linear light + bloom.** The kaleidoscope fold fix first (disc + falloff + bindable
   centre, [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md), confirmed from
   rendered samples), then the `Rgba16Float` linear composite with one engine-fixed tonemap, then
   the bloom `PostStage` with bindable `exposure`/`bloom_*`
   ([ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)). Every golden moves once,
-  eyes-on. Runs after [0044] — bloom levels and the Floor bandwidth relief are tier values.
-  Closes backlog 0005, 0010 and 0011.
+  eyes-on. Closes backlog 0005, 0010 and 0011, and is the answer to half of 0031.
 
 **[0043] has landed and closed** — the swarm's wrap seam is off-screen, its domain has the render
 target's shape, and every particle carries a depth. See Recently closed. Two things later work
@@ -241,6 +234,39 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 
 ## Recently closed
 
+- [0044 — quality tiers: `Floor` and `Rich`, a governor, and the constants that
+  move](done/0044-quality-tiers.md) — **done 2026-07-30**, passed Mode 4 review (**no blockers**;
+  one major, two minor). Four `dev` phase commits: `e44b3a6` `TierConfig` + resolution + the post
+  cap, `89d4ad4` the frame-time governor, `6292286` the remaining capacity constants, `3e807f4` the
+  docs sweep. [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) is **accepted**.
+  **Delivers roadmap R0** — the license every later richness item spends.
+  **Phase 4 (`human`, the `Rich` calibration) did not run** and is carried to
+  [`on-device-validation.md`](../on-device-validation.md); the shipped `Rich` values are therefore
+  still the provisional multipliers, and `TierConfig::RICH`'s own doc comment says so.
+  **The design worth carrying forward is that `Floor` is enforced by construction, not by
+  discipline.** `Renderer::new_headless` has no tier argument — a capture *cannot* be blessed at
+  another tier by forgetting a field, and `shot` deliberately does not read `LMV_TIER` so no ambient
+  environment variable can move a baseline. That is why the whole plan landed with **zero golden
+  re-blesses**, which is Phase 1's byte-identical done-when proved rather than asserted. The same
+  shape as Plan 0047's `SaltMode`: make the compiler, not a reviewer, the thing that forces a new
+  capture path to decide.
+  **Non-vacuity was built into the tests, not bolted on.** `the_rich_tier_raises_the_grid_only_where_the_floor_cap_binds`
+  asserts *both* directions — larger where the cap binds, exactly equal where it does not — and
+  `the_overflow_message_names_the_cap_it_carries` states outright that the floor assertions would
+  pass a reverted `Display` (the floor's cap *is* 20 000) and formats at the rich cap to break that.
+  The overlay test checks the tier label's characters exist in the 5x7 glyph table, because
+  `glyph` returns a blank cell for an unknown one and a "named" tier could otherwise paint as a gap.
+  **The one major is a cross-module coupling nothing ties together:** the governor's `MIN_SAMPLES`
+  (180, `render/tier.rs`) is only satisfiable because `diag::RING` is 240 — a private const in
+  another module, documented as a tunable p99 window. Lower it below 180 and the governor silently
+  never demotes, and the Phase 2 suite would not notice, because every case feeds a synthetic
+  360-sample series that is 1.5x the ring's entire capacity. Two minors: a lost line-continuation
+  putting 18 spaces mid-sentence in the demotion message (`standalone/src/main.rs`), and
+  `docs/on-device-validation.md` missing from Phase 5's sweep (fixed in the close commit, along
+  with two now-stale "lower this constant" pointers to constants that moved into `tier.rs`).
+  **First field consequence, same day:** `Rich`'s 3x attractor particle count blows
+  `attractor_clifford` out to white against the un-fixed additive ceiling — **[backlog
+  0031](../design-backlog.md)**, and the reason [0045] is now the urgent one.
 - [0047 — expression randomness: `hash`, `noise`, and the seed that finally does
   something](done/0047-expression-randomness.md) — **done 2026-07-30**, passed Mode 4 review
   (**no blockers, no majors**; three minors, the two doc ones fixed in the close commit). Three

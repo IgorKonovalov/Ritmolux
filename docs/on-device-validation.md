@@ -1,6 +1,7 @@
 # On-device validation — low-end Windows iGPU smoke
 
-> **Status:** standing / hardware-gated — **does not block plan closes.**
+> **Status:** standing / mostly hardware-gated — **does not block plan closes.** (One item, the
+> Plan 0044 `Rich` calibration, is runnable on the dev box today; it has its own section.)
 > **Owner:** human (the user; only runnable on the target hardware).
 > **Created:** 2026-07-22 (extracted from Plan 0012 Phase 3).
 
@@ -20,8 +21,12 @@ The §9 test matrix names an "older Windows PC (iGPU)" the dev box is not. Every
 far is one machine, one GPU vendor (AMD). Two questions can only be answered on that other
 hardware, and the user won't have access to it until later:
 
-1. Does the **NFR §1 perf floor** (≥ 60 fps @ 1080p at the shipped single fixed tier) hold on the
-   weakest box?
+1. Does the **NFR §1 perf floor** (≥ 60 fps @ 1080p at the `Floor` tier) hold on the weakest box?
+   Since Plan 0044 the engine ships two tiers ([ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md)),
+   and `Floor` is byte-for-byte the constants that were measured here before — so every item below
+   is a **`Floor`-tier** measurement unless it says otherwise. **Pin it: `lmv.exe --tier floor`.**
+   Unpinned, the app starts on `Rich` and the frame-time governor may demote mid-run, which would
+   put a tier change inside the very measurement being taken.
 2. Is the **~350 MB working-set soft ceiling** (NFR §12) AMD-specific, or does a second GPU vendor
    (Intel iGPU) land somewhere different?
 
@@ -72,8 +77,9 @@ footprint so the vendor spread is on record.
       Load **`rose_trails`** — it binds `trails` around 0.78 and is the shipped preset that exercises
       this path (`rose_kaleidoscope` and `fragment_kaleido` cover the fold). Let it settle with the
       overlay on (`F3`), and report **(a)** whether fps holds ≥ 60 and **(b)** the p99 against the
-      same preset with `trails = 0`. _(Plan 0033's stated main exposure. If it fails, lower the cap
-      constant in `core/src/render/post.rs` — do **not** re-fix the grids.)_
+      same preset with `trails = 0`. _(Plan 0033's stated main exposure. If it fails, lower
+      `TierConfig::FLOOR.post_cap` in `core/src/render/tier.rs` — the constant moved there in Plan
+      0044 — and do **not** re-fix the grids.)_
 - [ ] **Working-set delta from the target-sized post stages, including mid-dissolve.** The same
       change grows the composite's GPU memory from ~22 MB per chain to ~50 MB at the cap, and a
       dual-live dissolve holds **two** chains, so the transient peak is ~100 MB against NFR §12's
@@ -111,9 +117,10 @@ footprint so the vendor spread is on record.
       Load **`swarm_dense.toml`** (the highest visible density of the three survivors, and the one
       whose `field_freq ~5.2` keeps the most particles resolving separately), let it settle with the
       overlay on (`F3`), and report **(a)** whether fps holds ≥ 60 and **(b)** the p99. **If it
-      fails, the lever is `PARTICLES`** (`core/src/render/scenes/swarm.rs`) — and per Plan 0043's
-      own risk bullet that is a **look decision that routes back to `architect`**, not a constant to
-      quietly lower. _(Plan 0043 Phase 3's done-when, extracted at that plan's close.)_
+      fails, the lever is `TierConfig::FLOOR.swarm_particles`** (`core/src/render/tier.rs` — the
+      constant moved there in Plan 0044) — and per Plan 0043's own risk bullet that is a **look
+      decision that routes back to `architect`**, not a constant to quietly lower. _(Plan 0043
+      Phase 3's done-when, extracted at that plan's close.)_
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
       behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
       Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was
@@ -121,14 +128,44 @@ footprint so the vendor spread is on record.
       Run the standalone with the overlay on, let it settle, and report whether p99 moved.
       _(Plan 0030's dynamic-dispatch risk bullet, extracted.)_
 
+## Runnable now — the `Rich` tier calibration (Plan 0044 Phase 4)
+
+**This one is not hardware-gated.** Every item above waits on a box the user does not have; this
+waits only on the user sitting down at the machine they already own. It is here so it is not lost,
+not because it is blocked.
+
+Plan 0044 shipped `TierConfig::RICH` as **provisional multipliers, explicitly not measurements** —
+the code says so in its own doc comment. Phase 4 was to replace them with measured values and was
+not run at the plan's close, so the rich tier currently ships numbers nobody has timed.
+
+- [ ] **Calibrate `Rich` on the midrange discrete GPU, native fullscreen.** Run
+      `lmv.exe --tier rich` (the pin, so the governor cannot demote mid-measurement) with the
+      overlay on (`F3`), across the heaviest preset of each family: an `attractor_*`, a dense line
+      preset with mirror + fold (`rose_kaleidoscope`), `swarm_dense`, a `reaction_*`, and a
+      `spectrum_*`. Report per preset **(a)** whether frame time holds the display's refresh rate
+      and **(b)** the p99.
+      **Escalation:** a miss is not a failure, it is the measurement — record which preset missed
+      and by how much, and the specific `TierConfig::RICH` field that caused it comes down to the
+      measured value. Route to `dev` with the numbers. The five fields and their provisional
+      values: `post_cap` 2560x1440, `attractor_particles` 150 000, `attractor_trail_cap` 3840x2160,
+      `swarm_particles` 30 000, `max_segments` 60 000 (`core/src/render/tier.rs`).
+      **No number is invented upward to look good** — that was the phase's own rule, and it still
+      binds. _(Plan 0044 Phase 4, carried forward at that plan's close 2026-07-30.)_
+
 ## How to run
 
 From the repo root on the target box:
 
 ```
 cargo build -p standalone --release --bin lmv
-./target/release/lmv.exe
+./target/release/lmv.exe --tier floor
 ```
+
+**Pin the tier.** Every iGPU item above is a `Floor` measurement, and unpinned the app starts on
+`Rich` with a governor that may demote partway through a run — which would land a tier change,
+a full GPU-resource rebuild, and a one-frame trails blink inside the sample window. The pin also
+survives a stall the governor would otherwise read as a verdict. (Use `--tier rich` for the `Rich`
+calibration section instead.)
 
 Play any audio (loopback capture feeds the visuals). Then, in the window:
 
@@ -152,7 +189,10 @@ Columns: `unix_ms  fps  frame_ms_avg  frame_ms_p99  frames_total  frames_dropped
 - **Pass:** fps ≥ 60 @ 1080p (NFR §1 floor holds) and a recorded working-set / private-commit
   figure for the box.
 - **Fps below 60** → a §1 floor regression on the weakest box → route to `dev`/`architect` as a
-  new follow-up (this is the trigger the adaptive-quality-tier plan waits on).
+  new follow-up. The tier system that used to wait on this trigger **has landed** (Plan 0044 /
+  ADR-0045), so the response is no longer "build tiers" but "lower the specific `TierConfig::FLOOR`
+  value that missed" — and because `Floor` *is* the pre-tier engine, lowering one is a deliberate
+  change to the floor commitment, which routes through `architect`.
 - **A wildly different vendor footprint** (e.g. Intel far above or below the AMD ~350 MB ceiling)
   → route to `architect` to widen the NFR §12 soft ceiling from one-vendor to a measured spread.
 
