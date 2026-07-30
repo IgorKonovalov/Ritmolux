@@ -180,9 +180,16 @@ The 1 Hz log lands at:
 %APPDATA%\light-music-visualizer\diagnostics.log
 ```
 
-Columns: `unix_ms  fps  frame_ms_avg  frame_ms_p99  frames_total  frames_dropped  gpu_bytes  rss_bytes`.
+Columns: `unix_ms  fps  frame_ms_avg  frame_ms_p99  frames_total  frames_dropped  gpu_bytes  rss_bytes
+bass  mid  treb  onset  downbeat_confidence  downbeat_locked`.
 `rss_bytes` is the working set. For private commit too, run the throwaway floor spike or read
 `PrivateMemorySize64` via `Get-Process lmv` (the ADR-0010 method).
+
+The six trailing columns are the analysis snapshot (Plan 0049 / ADR-0052) — native-only, so the
+plugin's `plugin-diagnostics.log` has no counterpart. `downbeat_locked` is `0`/`1`, so the
+estimator's **lock rate** over a run is the mean of that column. A log written by an older build
+is rotated to `.log.1` on the next launch rather than appended to, so a file never mixes row
+widths.
 
 ## Pass criteria & escalation
 

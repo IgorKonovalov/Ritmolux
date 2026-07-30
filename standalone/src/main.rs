@@ -460,10 +460,16 @@ impl AppState {
             self.title_tick = 0;
             self.update_title();
         }
-        // Structured 1 Hz log (render thread). RSS is queried lazily, only on the
-        // seconds a sample is actually due.
+        // Structured 1 Hz log (render thread). The analysis snapshot and RSS are
+        // both read lazily, only on the seconds a sample is actually due — this
+        // runs every frame.
         let metrics = self.renderer.metrics();
-        self.diag_log.maybe_log(&metrics, rss::current_rss_bytes);
+        let renderer = &self.renderer;
+        self.diag_log.maybe_log(
+            &metrics,
+            || renderer.analysis_metrics(),
+            rss::current_rss_bytes,
+        );
         // Long-run soak trace (opt-in). Absent unless `--soak` was passed, so the
         // normal loop is unaffected; when present it samples only every few
         // seconds, off the per-frame path.
