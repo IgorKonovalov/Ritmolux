@@ -53,6 +53,18 @@ fn click_track(period_samples: usize, len: usize) -> Vec<f32> {
     signal
 }
 
+/// Energy lands in the band the frequency says it should, and stays there.
+///
+/// The concentration claim reads exactly as it did before ADR-0049, and that is
+/// the point: normalizing the array against **one** shared peak is a uniform
+/// gain, so every ratio inside the array is untouched and "distant bands sit far
+/// below the peak" remains a meaningful statement. Per-band normalization would
+/// have broken this test rather than merely shifted it — the leakage four bands
+/// out would have climbed to 1.0 as its own maximum.
+///
+/// The absolute-amplitude half of the old assertion moved to
+/// `dsp::fft::tests::a_tone_reads_its_amplitude_on_either_side_of_the_crossover`,
+/// which reads the raw band array where a magnitude is still a magnitude.
 #[test]
 fn sine_energy_concentrates_in_expected_band() {
     let mut analyzer = mono_analyzer();
@@ -74,12 +86,9 @@ fn sine_energy_concentrates_in_expected_band() {
         "energy should peak in the band containing {freq} Hz"
     );
 
-    // Normalization: a 0.8-amplitude sine should read near 0.8 in its band.
+    // The loudest band anchors the shared peak, so it reads full scale.
     let peak = frame.spectrum[expected];
-    assert!(
-        (0.55..=1.0).contains(&peak),
-        "peak band value {peak} should be near the sine amplitude 0.8"
-    );
+    assert_eq!(peak, 1.0, "the loudest band should anchor the array at 1.0");
 
     // The energy is concentrated: away from the peak's immediate neighbors
     // (Hann leakage), every band stays far below the peak.
@@ -93,88 +102,132 @@ fn sine_energy_concentrates_in_expected_band() {
     }
 }
 
-/// Plan 0048 Phase 1 / ADR-0049: the 808-collapse reproduction, inverted.
+/// Plan 0048 Phase 2 done-when: `*_raw` reproduce the pre-ADR-0049 values
+/// **bit-exactly**.
 ///
-/// A tone stepped across the sub-bass and bass region must climb the axis one
-/// band at a time instead of parking in one or two. The bound it has to beat is
-/// **derived, not chosen**: before the dual-resolution axis every band down here
-/// was a single 2048-window bin, so the whole region could only ever resolve as
-/// many distinct bands as there are `sample_rate / WINDOW_SIZE` bins inside it.
+/// The four literals below are not a re-derivation of this build's own output —
+/// they were measured by running this exact fixture against `92579ef`, the commit
+/// before the plan started, where `bass` *was* the raw value. So the test states
+/// a fact about the old code that this code has to match, which is the only form
+/// of "unchanged" worth asserting.
 ///
-/// Stepped tones rather than a continuous glide on purpose. The long window
-/// integrates 171 ms, so a fast sweep is genuinely smeared across it — that is
-/// the physics ADR-0049 accepts, and measuring the *axis* means holding each
-/// frequency long enough for the window to fill.
+/// Hop 200 is read deliberately: both builds have long since filled the short
+/// window there, and the raw levels come from the **short** window's magnitudes
+/// via `bands.rs`, which neither phase touched. The longer warm-up gate moves
+/// which hop publishes *first*, not what the window contains at hop 200.
 #[test]
-fn a_tone_stepped_through_the_bass_region_climbs_distinct_bands() {
-    const LO_HZ: f32 = 40.0;
-    const HI_HZ: f32 = 200.0;
-
-    let peak_band_at = |freq: f32| -> usize {
-        let mut analyzer = mono_analyzer();
-        // Half a second: comfortably past the 8192-sample long window.
-        analyzer.push_interleaved(&sine(freq, 0.8, SR as usize / 2));
-        let frame = analyzer.take_frame();
-        frame
-            .spectrum
-            .iter()
-            .enumerate()
-            .max_by(|a, b| a.1.total_cmp(b.1))
-            .map(|(k, _)| k)
-            .expect("spectrum is non-empty")
+fn raw_levels_are_bit_identical_to_the_pre_normalization_build() {
+    let mut analyzer = mono_analyzer();
+    let signal = {
+        let mut s = sine(440.0, 0.5, 4 * SR as usize);
+        let clicks = click_track(12_000, s.len());
+        for (a, b) in s.iter_mut().zip(clicks.iter()) {
+            *a += b;
+        }
+        s
     };
 
-    let steps = 64;
-    let visited: Vec<usize> = (0..=steps)
-        .map(|i| LO_HZ + (HI_HZ - LO_HZ) * i as f32 / steps as f32)
-        .map(peak_band_at)
-        .collect();
-
-    // Smooth: the peak band never walks backwards as the tone rises.
-    for pair in visited.windows(2) {
-        if let [a, b] = pair {
-            assert!(
-                b >= a,
-                "the peak band must not fall as frequency rises: {visited:?}"
-            );
+    let mut at_200 = None;
+    for (i, hop) in signal.chunks_exact(HOP_SIZE).enumerate() {
+        analyzer.push_interleaved(hop);
+        let frame = analyzer.take_frame();
+        if i == 200 {
+            at_200 = Some(frame);
         }
     }
+    let frame = at_200.expect("the fixture is long enough to reach hop 200");
 
-    let distinct = {
-        let mut v = visited.clone();
-        v.dedup();
-        v.len()
-    };
+    for (name, actual, expected) in [
+        ("bass_raw", frame.bass_raw, 0x3865_9855u32),
+        ("mid_raw", frame.mid_raw, 0x3bd5_81b5),
+        ("treb_raw", frame.treb_raw, 0x35f3_1745),
+        ("onset_raw", frame.onset_raw, 0x3486_5371),
+    ] {
+        assert_eq!(
+            actual.to_bits(),
+            expected,
+            "{name} = {actual} must reproduce the pre-ADR-0049 value bit-for-bit"
+        );
+    }
 
-    // The v1 ceiling: one 2048-window bin per band meant at most this many
-    // distinct bands were reachable between LO_HZ and HI_HZ, however many log
-    // bands nominally sat there.
-    let bin_hz = SR as f32 / WINDOW_SIZE as f32;
-    let v1_ceiling = (HI_HZ / bin_hz).floor() as usize - (LO_HZ / bin_hz).floor() as usize + 1;
-    assert_eq!(
-        v1_ceiling, 8,
-        "fixture sanity: the old axis could show 8 bands here"
-    );
-
-    assert!(
-        distinct > v1_ceiling,
-        "the dual-resolution axis should resolve more than the {v1_ceiling} bands a single \
-         2048 window could, got {distinct}: {visited:?}"
-    );
-    // And the region really is being spread across the axis, not nudged: the
-    // 40-200 Hz span covers log bands 3..21, so most of them should appear.
-    assert!(
-        distinct >= 14,
-        "40-200 Hz should light up most of its {} log bands, got {distinct}: {visited:?}",
-        analyzer_bands_between(LO_HZ, HI_HZ)
+    // The counter-assertion that stops this from being a tautology: the
+    // *normalized* values genuinely differ from the raw ones on this fixture. If
+    // normalization were a no-op the block above would pass just as happily.
+    assert_ne!(
+        frame.bass.to_bits(),
+        frame.bass_raw.to_bits(),
+        "normalization must actually do something (bass {} vs raw {})",
+        frame.bass,
+        frame.bass_raw
     );
 }
 
-/// How many log bands nominally span `[lo, hi)` — used to phrase the assertion
-/// above against the axis rather than against a hardcoded count.
-fn analyzer_bands_between(lo: f32, hi: f32) -> usize {
-    let analyzer = mono_analyzer();
-    analyzer.band_for_freq(hi) - analyzer.band_for_freq(lo) + 1
+/// Plan 0048 Phase 2 done-when, through the analyzer rather than the normalizer:
+/// the same music at two gains converges to the same normalized reading, and
+/// silence stays at zero.
+#[test]
+fn normalized_levels_are_portable_across_absolute_gain() {
+    // Real broadband content, at two gains. `dynamic_groove` rather than a tone
+    // plus clicks: the property is about music, and a fixture whose treble sits
+    // near the silence floor at full scale would cross it at -20 dB and diverge
+    // for a reason that is the floor working correctly, not the property failing.
+    let format = AudioFormat {
+        sample_rate: SR,
+        channels: 2,
+    };
+    let groove = lmv_core::signal::dynamic_groove(120.0, 6.0, format);
+    let hop_samples = HOP_SIZE * format.channels as usize;
+
+    let read = |gain: f32| -> Vec<(f32, f32, f32)> {
+        let mut analyzer = Analyzer::new(format).expect("valid format");
+        groove
+            .chunks(hop_samples)
+            .map(|hop| {
+                let scaled: Vec<f32> = hop.iter().map(|s| s * gain).collect();
+                analyzer.push_interleaved(&scaled);
+                let f = analyzer.take_frame();
+                (f.bass, f.mid, f.treb)
+            })
+            .collect()
+    };
+
+    let full = read(1.0);
+    // -20 dB: a factor of ten in amplitude.
+    let quiet = read(0.1);
+    let worst = full
+        .iter()
+        .zip(quiet.iter())
+        .map(|(a, b)| {
+            (a.0 - b.0)
+                .abs()
+                .max((a.1 - b.1).abs())
+                .max((a.2 - b.2).abs())
+        })
+        .fold(0.0f32, f32::max);
+    assert!(
+        worst < 1e-4,
+        "a -20 dB copy must produce the same normalized series, worst divergence {worst}"
+    );
+
+    // Non-vacuity: the series has real range, so the agreement is not two flat
+    // runs matching each other.
+    let spread = full.iter().map(|f| f.0).fold(0.0f32, f32::max)
+        - full.iter().map(|f| f.0).fold(1.0f32, f32::min);
+    assert!(
+        spread > 0.3,
+        "the fixture should exercise a real dynamic range, got {spread}"
+    );
+
+    // Silence stays silent: the floor means a quiet room is not amplified to
+    // full scale.
+    let mut analyzer = mono_analyzer();
+    let mut peak = 0.0f32;
+    for hop in vec![0.0f32; 3 * SR as usize].chunks_exact(HOP_SIZE) {
+        analyzer.push_interleaved(hop);
+        let f = analyzer.take_frame();
+        peak = peak.max(f.bass).max(f.mid).max(f.treb).max(f.onset);
+    }
+    assert_eq!(peak, 0.0, "silence must read zero, peaked at {peak}");
 }
 
 #[test]

@@ -526,6 +526,88 @@ mod tests {
         );
     }
 
+    /// Plan 0048 Phase 1 / ADR-0049: the 808-collapse reproduction, inverted.
+    ///
+    /// A tone stepped across the sub-bass and bass region must climb the axis one
+    /// band at a time instead of parking in one or two. The bound it has to beat
+    /// is **derived, not chosen**: before the dual-resolution axis every band down
+    /// here was a single short-window bin, so the region could only ever resolve
+    /// as many distinct bands as there are `sample_rate / WINDOW_SIZE` bins in it.
+    ///
+    /// Two deliberate choices about the instrument. **Stepped tones, not a glide:**
+    /// the long window integrates 171 ms, so a fast sweep is genuinely smeared
+    /// across it — the physics ADR-0049 accepts — and measuring the *axis* means
+    /// holding each frequency steady. **Read here rather than through `Analyzer`:**
+    /// this reads the raw band array, because the analyzer publishes a per-band
+    /// normalized one on which an argmax is meaningless — a tone's own band and
+    /// both neighbours all saturate at 1.0, so the peak index is arbitrary among
+    /// them. Placement is a property of the layout, and this is the layout's test.
+    #[test]
+    fn a_tone_stepped_through_the_bass_region_climbs_distinct_bands() {
+        const LO_HZ: f32 = 40.0;
+        const HI_HZ: f32 = 200.0;
+
+        let mut an = SpectrumAnalyzer::new(48_000);
+        let peak_band_at = |an: &mut SpectrumAnalyzer, freq: f32| -> usize {
+            let tone = |i: usize| 0.8 * (std::f32::consts::TAU * freq * i as f32 / SR).sin();
+            let short: [f32; WINDOW_SIZE] = std::array::from_fn(tone);
+            let long: Vec<f32> = (0..LOW_WINDOW_SIZE).map(tone).collect();
+            an.analyze(&short, &long)
+                .iter()
+                .enumerate()
+                .max_by(|a, b| a.1.total_cmp(b.1))
+                .map(|(k, _)| k)
+                .unwrap_or(0)
+        };
+
+        let steps = 64;
+        let visited: Vec<usize> = (0..=steps)
+            .map(|i| LO_HZ + (HI_HZ - LO_HZ) * i as f32 / steps as f32)
+            .map(|f| peak_band_at(&mut an, f))
+            .collect();
+
+        // Smooth: the peak band never walks backwards as the tone rises.
+        for pair in visited.windows(2) {
+            if let [a, b] = pair {
+                assert!(
+                    b >= a,
+                    "the peak band must not fall as frequency rises: {visited:?}"
+                );
+            }
+        }
+
+        let distinct = {
+            let mut v = visited.clone();
+            v.dedup();
+            v.len()
+        };
+
+        // The v1 ceiling: one short-window bin per band meant at most this many
+        // distinct bands were reachable between LO_HZ and HI_HZ, however many log
+        // bands nominally sat there.
+        let bin_hz = SR / WINDOW_SIZE as f32;
+        let v1_ceiling = (HI_HZ / bin_hz).floor() as usize - (LO_HZ / bin_hz).floor() as usize + 1;
+        assert_eq!(
+            v1_ceiling, 8,
+            "fixture sanity: the old axis could show 8 bands across this span"
+        );
+        assert!(
+            distinct > v1_ceiling,
+            "the dual-resolution axis should resolve more than the {v1_ceiling} bands a single \
+             {WINDOW_SIZE} window could, got {distinct}: {visited:?}"
+        );
+
+        // And the span really is spread across the axis rather than nudged: most
+        // of the log bands nominally covering 40-200 Hz should appear.
+        let layout = BandLayout::new(48_000);
+        let nominal = layout.band_for_freq(HI_HZ) - layout.band_for_freq(LO_HZ) + 1;
+        assert!(
+            distinct * 2 >= nominal,
+            "40-200 Hz spans {nominal} log bands and should light up most of them, \
+             got {distinct}: {visited:?}"
+        );
+    }
+
     #[test]
     fn band_for_freq_agrees_with_the_edge_table() {
         let layout = BandLayout::new(48_000);
