@@ -352,7 +352,8 @@ impl AppState {
         if self.renderer.tier_demoted() && !self.reported_demotion {
             self.reported_demotion = true;
             eprintln!(
-                "quality tier demoted to {} -- the rich tier did not hold this                  display's frame budget. Pin it with --tier rich to override.",
+                "quality tier demoted to {} -- the rich tier did not hold this \
+                 display's frame budget. Pin it with --tier rich to override.",
                 self.renderer.tier().as_str()
             );
             self.update_title();
