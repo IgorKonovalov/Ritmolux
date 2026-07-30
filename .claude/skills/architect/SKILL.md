@@ -341,8 +341,33 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    it. This is a separate axis from the C ABI version (`LMV_ABI_VERSION`), which moves only on an
    `extern "C"` shape change (ADR-0003) — never couple the two.
 
-(This project runs the lightweight harness — no git-worktree parallelism yet. If that gets added
-later, it becomes an ADR + extra close-ceremony steps.)
+### Closing a plan that was built in a worktree
+
+Since Plan 0047 this project runs plan lanes in **git worktrees** — `WORK/lmv-plan-NNNN` on a
+`plan-NNNN-<slug>` branch, alongside the main checkout. That is
+[ADR-0053](../../../docs/adrs/0053-plan-lanes-run-in-git-worktrees.md); read it once, then follow
+the order, because getting the merge direction backwards puts a merge commit and possibly a
+duplicate version tag on `main`. The four bookkeeping steps above are the **middle** of this
+sequence, not the whole of it:
+
+1. **Merge `main` into the plan branch, from the worktree** (`git merge main`), and resolve there.
+   Never update the main checkout's working tree from a lane — another session may be live in it.
+2. **Re-run the whole gate** (`fmt` + `clippy` + `nextest`) after that merge. It is the first moment
+   the two lanes' code has met; no earlier run covers the combination.
+3. **Then steps 1–4 above** — plan status, ADRs, both READMEs, and `cargo release <level>` — all
+   **on the branch**. The version is chosen against what `main` actually reached, not against the
+   branch's base (Plan 0047 sat at `v0.23.0` while `main` had already taken `v0.24.0`), and the
+   `vX.Y.Z` tag lands on the commit that becomes `main`'s tip.
+4. **Fast-forward `main` from the main checkout**, without leaving the worktree:
+   `git -C <main checkout> merge --ff-only <branch>`. By construction this is clean.
+5. **The user pushes** — branch and tag. You never push.
+
+Two standing hazards worth naming, both in ADR-0053's Negative section. The **stash stack is shared
+across every worktree**, so a bare `git stash` / `git stash pop` can take another lane's entry —
+prefer a WIP commit. And each worktree carries its own `target/` (one lane held ~8 GB in
+`target/debug/incremental` and filled the disk mid-session), so **remove a finished lane's
+worktree**; on Windows `git worktree remove` fails with `Permission denied` while any shell still
+has its working directory inside it.
 
 ---
 
