@@ -11,8 +11,8 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0043](0043-swarm-depth-and-domain.md) | The swarm gets a depth axis and a domain that follows the target | **approved 2026-07-29** — ready for `dev` (its 0042 precondition is now closed) | dev |
-| [0044](0044-quality-tiers.md) | Quality tiers: `Floor` and `Rich`, a governor, and the constants that move | **draft 2026-07-30** — roadmap R0, [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) | dev, human |
-| [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **draft 2026-07-30** — roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); runs after [0044] | dev, human |
+| [0044](0044-quality-tiers.md) | Quality tiers: `Floor` and `Rich`, a governor, and the constants that move | **approved 2026-07-30** — ready for `dev` after [0043] closes; roadmap R0, [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) | dev, human |
+| [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **approved 2026-07-30** — ready for `dev` after [0044]; roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) | dev, human |
 
 ## Recommended execution sequence
 
@@ -22,7 +22,7 @@ off exactly as it did for [0041]: fix the measurement, then do the content once 
 
 **Then the visual-richness pair, in order: [0044] → [0045]** (the first two engine steps of
 [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md), drafted 2026-07-30 from the R0+R1
-interview; awaiting user approval).
+interview; **both approved 2026-07-30**).
 
 - **[0044] — quality tiers.** `TierConfig` (Floor = today's constants, Rich calibrated on the
   user's discrete GPU), auto-select with a one-way governor and an explicit pin; captures pin

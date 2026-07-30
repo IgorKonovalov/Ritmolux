@@ -1,6 +1,6 @@
 # 0044 — Quality tiers: `Floor` and `Rich`, a governor, and the constants that move
 
-> **Status:** draft
+> **Status:** approved 2026-07-30 — ready for `dev` (start after Plan 0043 closes; Phase 3 touches `swarm.rs`)
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0045](../adrs/0045-quality-tiers-floor-and-rich.md) (tiers), [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md) R0

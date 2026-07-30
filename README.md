@@ -102,7 +102,7 @@ one, so you always land where you asked.
 |-----------|-------------------------------------------------------------|
 | `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
-| `Tab`     | Open/close the preset browser (`↑`/`↓` navigate, `Enter` select — also dissolves, `Esc` close) |
+| `Tab`     | Open/close the preset browser (`↑`/`↓` navigate, type to filter the list, `Enter` select — also dissolves, `Esc` close) |
 | `F`       | Toggle fullscreen                                           |
 | `D`       | Cycle to the next display/monitor                           |
 | `F3`      | Toggle the diagnostics overlay                              |
