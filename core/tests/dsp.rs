@@ -1,7 +1,7 @@
 //! Plan 0001 Phase 3 fixtures: known signals in, expected analysis out.
 
 use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{Analyzer, HOP_SIZE, SPECTRUM_BINS, WINDOW_SIZE};
+use lmv_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS, WINDOW_SIZE};
 
 const SR: u32 = 48_000;
 
@@ -230,6 +230,80 @@ fn normalized_levels_are_portable_across_absolute_gain() {
     assert_eq!(peak, 0.0, "silence must read zero, peaked at {peak}");
 }
 
+/// Plan 0048 Phase 3 done-when: `beat_index` is monotone and `time_since_beat`
+/// resets on each beat, under the click signal.
+///
+/// Driven through `signal::click_track` — the generator behind `shot`'s
+/// `--signal click`, so this is the same stimulus the done-when names, measured
+/// without a GPU.
+#[test]
+fn the_beat_clock_counts_monotonically_and_resets_on_every_beat() {
+    let format = AudioFormat {
+        sample_rate: SR,
+        channels: 2,
+    };
+    let bpm = 120.0;
+    let pcm = lmv_core::signal::click_track(bpm, 10.0, format);
+    let mut analyzer = Analyzer::new(format).expect("valid format");
+    let hop_samples = HOP_SIZE * format.channels as usize;
+
+    let mut series = Vec::new();
+    for hop in pcm.chunks(hop_samples) {
+        analyzer.push_interleaved(hop);
+        let f = analyzer.take_frame();
+        series.push((f.beat, f.beat_index, f.time_since_beat));
+    }
+
+    // Monotone, and never skipping: a counter that jumped would break
+    // `mod(beat_index, 4)` arithmetic in a way no visual would explain.
+    for pair in series.windows(2) {
+        if let [(_, a, _), (_, b, _)] = pair {
+            assert!(b >= a, "beat_index must never fall: {a} then {b}");
+            assert!(
+                b - a <= 1,
+                "beat_index must advance one beat at a time: {a} then {b}"
+            );
+        }
+    }
+
+    // Every beat hop resets the clock to exactly zero...
+    let beat_hops: Vec<usize> = series
+        .iter()
+        .enumerate()
+        .filter(|(_, (beat, _, _))| *beat)
+        .map(|(i, _)| i)
+        .collect();
+    assert!(
+        beat_hops.len() >= 15,
+        "10 s at {bpm} BPM should give ~20 beats, got {}",
+        beat_hops.len()
+    );
+    for &i in &beat_hops {
+        assert_eq!(
+            series[i].2, 0.0,
+            "time_since_beat must be exactly 0 on the beat hop at {i}"
+        );
+    }
+
+    // ...and it climbs in between, reaching most of a beat period before the
+    // next reset. Without this the test would pass on a constant zero.
+    let period = 60.0 / bpm;
+    let longest = series.iter().map(|(_, _, t)| *t).fold(0.0f32, f32::max);
+    assert!(
+        longest > period * 0.5,
+        "time_since_beat should climb toward the {period:.3} s beat period, peaked at {longest:.3}"
+    );
+
+    // The counter actually advanced across the clip, and by as many beats as
+    // were detected — the two are separate claims and both matter.
+    let final_index = series.last().map(|(_, i, _)| *i).unwrap_or(0);
+    assert_eq!(
+        final_index as usize,
+        beat_hops.len() - 1,
+        "the final beat_index should be one less than the number of beats seen"
+    );
+}
+
 #[test]
 fn click_track_produces_onsets_on_the_beats() {
     let mut analyzer = mono_analyzer();
@@ -383,21 +457,57 @@ fn analysis_is_deterministic() {
         s
     };
 
-    let run = |mut analyzer: Analyzer| -> Vec<(Vec<u32>, u32, bool, u32, u32, u32)> {
+    #[allow(clippy::type_complexity)]
+    let run = |mut analyzer: Analyzer| -> Vec<(Vec<u32>, Vec<u32>, bool, u32)> {
         signal
             .chunks_exact(HOP_SIZE)
             .map(|hop| {
                 analyzer.push_interleaved(hop);
                 let f = analyzer.take_frame();
-                // Bit-exact comparison via raw f32 bits — covers the enriched
-                // bpm/bar and novelty too, so those paths are proven deterministic.
+                // Bit-exact comparison via raw f32 bits. ADR-0049's normalizers
+                // and ADR-0050's beat clock are both new analyzer *state*, which
+                // is exactly the kind of addition that can make analysis
+                // history-dependent in a way a spot check would miss.
+                //
+                // Destructured rather than field-accessed, deliberately: naming
+                // every field means **adding one to `AnalysisFrame` stops this
+                // file compiling** until it is covered here. A `f.field` list
+                // would have gone quietly out of date instead.
+                let AnalysisFrame {
+                    spectrum,
+                    onset,
+                    beat,
+                    bass,
+                    mid,
+                    treb,
+                    bass_raw,
+                    mid_raw,
+                    treb_raw,
+                    onset_raw,
+                    bpm,
+                    bar,
+                    beat_index,
+                    time_since_beat,
+                    novelty,
+                } = f;
                 (
-                    f.spectrum.iter().map(|v| v.to_bits()).collect(),
-                    f.onset.to_bits(),
-                    f.beat,
-                    f.bpm.to_bits(),
-                    f.bar.to_bits(),
-                    f.novelty.to_bits(),
+                    spectrum.iter().map(|v| v.to_bits()).collect(),
+                    vec![
+                        onset.to_bits(),
+                        bass.to_bits(),
+                        mid.to_bits(),
+                        treb.to_bits(),
+                        bass_raw.to_bits(),
+                        mid_raw.to_bits(),
+                        treb_raw.to_bits(),
+                        onset_raw.to_bits(),
+                        bpm.to_bits(),
+                        bar.to_bits(),
+                        time_since_beat.to_bits(),
+                        novelty.to_bits(),
+                    ],
+                    beat,
+                    beat_index,
                 )
             })
             .collect()

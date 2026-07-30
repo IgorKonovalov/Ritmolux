@@ -557,6 +557,11 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
         mid_raw: 0.022,
         treb_raw: 0.033,
         onset_raw: 0.044,
+        // ADR-0050 Layer 1. `beat_index` is the one variable that crosses a type
+        // boundary — `u32` on the frame, `f32` in the grammar — so binding it to
+        // the wrong slot would still produce a plausible number.
+        beat_index: 37,
+        time_since_beat: 0.123,
         spectrum: std::array::from_fn(|i| i as f32 / 64.0),
     };
     // Not on the frame: the renderer supplies its own clock here, the probe the
@@ -577,6 +582,8 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
         ("mid_raw", 0.022),
         ("treb_raw", 0.033),
         ("onset_raw", 0.044),
+        ("beat_index", 37.0),
+        ("time_since_beat", 0.123),
     ] {
         let e = compile(name).unwrap_or_else(|err| panic!("{name} compiles: {err}"));
         assert_eq!(

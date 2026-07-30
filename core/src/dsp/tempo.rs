@@ -44,6 +44,29 @@ pub struct TempoTracker {
     bpm: f32,
     /// Beat phase in [0, 1): 0 at each beat, ramping toward the next.
     phase: f32,
+    /// Beats detected so far. `beat_index` publishes this less one, so the first
+    /// detected beat reads 0 and [`Layer 2`](super::downbeat)'s counter fallback
+    /// starts its bar on a beat rather than a beat and a bit.
+    beats_seen: u32,
+    /// Hops since the last detected beat, the integer `time_since_beat` is
+    /// derived from. Counted in hops rather than accumulated in seconds so it
+    /// cannot drift: the hop clock is the only clock here (NFR section 6).
+    hops_since_beat: u32,
+}
+
+/// One hop's beat-clock reading (ADR-0050 Layer 1 plus the pre-existing tempo
+/// pair), returned together because they all derive from the same beat stream.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct BeatClock {
+    /// Tempo estimate in BPM; 0 until the tracker warms.
+    pub bpm: f32,
+    /// Beat phase in [0, 1) — the shipped `bar` variable, whose name is a
+    /// documented misnomer (ADR-0050).
+    pub bar: f32,
+    /// Monotone count of beats seen, starting at 0 on the first one.
+    pub beat_index: u32,
+    /// Seconds since the last detected beat; exactly 0 on a beat hop.
+    pub time_since_beat: f32,
 }
 
 impl TempoTracker {
@@ -61,11 +84,13 @@ impl TempoTracker {
             max_lag,
             bpm: 0.0,
             phase: 0.0,
+            beats_seen: 0,
+            hops_since_beat: 0,
         }
     }
 
-    /// Advance one hop. Returns `(bpm, bar)` — `bar` is the 0..1 beat phase.
-    pub fn process(&mut self, onset: f32, beat: bool) -> (f32, f32) {
+    /// Advance one hop and return the whole beat clock.
+    pub fn process(&mut self, onset: f32, beat: bool) -> BeatClock {
         // Slide the newest onset into the tail (oldest falls off the front).
         self.env.copy_within(1.., 0);
         if let Some(last) = self.env.last_mut() {
@@ -81,12 +106,22 @@ impl TempoTracker {
         // to the music; otherwise advance by the current tempo.
         if beat {
             self.phase = 0.0;
-        } else if self.bpm > 0.0 {
-            self.phase += self.bpm * self.hop_sec / 60.0;
-            self.phase -= self.phase.floor(); // wrap into [0, 1)
+            self.beats_seen = self.beats_seen.saturating_add(1);
+            self.hops_since_beat = 0;
+        } else {
+            if self.bpm > 0.0 {
+                self.phase += self.bpm * self.hop_sec / 60.0;
+                self.phase -= self.phase.floor(); // wrap into [0, 1)
+            }
+            self.hops_since_beat = self.hops_since_beat.saturating_add(1);
         }
 
-        (self.bpm, self.phase)
+        BeatClock {
+            bpm: self.bpm,
+            bar: self.phase,
+            beat_index: self.beats_seen.saturating_sub(1),
+            time_since_beat: self.hops_since_beat as f32 * self.hop_sec,
+        }
     }
 
     /// Lag of the strongest mean-subtracted autocorrelation peak in the search
