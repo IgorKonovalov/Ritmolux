@@ -13,7 +13,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0043](0043-swarm-depth-and-domain.md) | The swarm gets a depth axis and a domain that follows the target | **approved 2026-07-29** — ready for `dev` (its 0042 precondition is now closed) | dev |
 | [0044](0044-quality-tiers.md) | Quality tiers: `Floor` and `Rich`, a governor, and the constants that move | **approved 2026-07-30** — ready for `dev` after [0043] closes; roadmap R0, [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) | dev, human |
 | [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **approved 2026-07-30** — ready for `dev` after [0044]; roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) | dev, human |
-| [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **draft 2026-07-30** — roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md); runs after [0045] | dev, human |
+| [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 
 ## Recommended execution sequence
 
