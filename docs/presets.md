@@ -285,26 +285,42 @@ reproducible given the same audio and the same seed.
 
 ### Variables
 
-Nine read-only variables carry the live audio analysis into your expressions,
+Eighteen read-only variables carry the live audio analysis into your expressions,
 plus one — `index` — that carries position rather than sound:
 
 | Variable | Meaning | Notes |
 |----------|---------|-------|
-| `bass` | Mean magnitude in the bass band (~20–250 Hz). | **Raw and small** — multiply up (e.g. `bass * 14`) and clamp. |
-| `mid`  | Mean magnitude in the mid band (~250–4000 Hz). | Same scale caveat as `bass`. |
-| `treb` | Mean magnitude in the treble band (~4–18 kHz). | Same scale caveat; treble reads smallest of the three. |
-| `onset` | Spectral-flux onset envelope for this hop. | A transient/attack strength, not a level — spikes on hits. |
+| `bass` | Bass-band level (~20–250 Hz), as a fraction of its own recent peak. | **`0–1`.** `> 0.5` means "loud for this track". |
+| `mid`  | Mid-band level (~250–4000 Hz), same basis. | `0–1`. |
+| `treb` | Treble-band level (~4–18 kHz), same basis. | `0–1`; reads lowest of the three on most material. |
+| `onset` | Onset/attack strength, as a fraction of its own recent peak. | `0–1`. A transient, not a level — spikes on hits. |
 | `beat` | `1.0` on a hop where a beat fired, else `0.0`. | A gate: `beat * k` adds `k` only on beat frames. |
-| `bar` | Beat phase in `[0, 1)`: `0` on each beat, ramping to the next. | A sawtooth that "breathes" between beats. |
+| `bar` | **Beat** phase in `[0, 1)`: `0` on each beat, ramping to the next. | A misnomer kept for compatibility — for real bar position use `bar_phase`. |
 | `time` | The scene clock in seconds (monotonic). | Use `time * k` for slow drift; `k` sets the speed. |
 | `tempo` | Tracked tempo in **BPM**. | **Not a `0–1` band** — see the warning below. |
 | `novelty` | Spectral-change transient: ~`0` within a steady segment, spiking at a track/section boundary. | **Experimental** — see below. |
+| `bass_raw` | Absolute bass magnitude — the pre-normalization value. | **Raw and small** (mean `0.040`): multiply up and clamp. |
+| `mid_raw` | Absolute mid magnitude. | Raw and small (mean `0.006`). |
+| `treb_raw` | Absolute treble magnitude. | Raw and small (mean `0.006`). |
+| `onset_raw` | Absolute spectral flux. | Raw and very small (mean `0.002`). |
+| `beat_index` | Monotone beat counter, `0` on the first beat. | Integer-valued. `mod(beat_index, 4)` for "every 4th beat". |
+| `time_since_beat` | Seconds since the last beat; exactly `0` on a beat hop. | A retriggered ramp — good for decays. |
+| `beat_in_bar` | Which beat of the bar, `0`–`3`. | `beat_in_bar == 0` is the downbeat. |
+| `bar_index` | Monotone bar counter. | `mod(bar_index, 8)` for an 8-bar arc. |
+| `bar_phase` | Position across the whole bar, `[0, 1)`. | The genuine bar phase, unlike `bar`. |
 | `index` | The element's own position in `[0, 1]` during a **per-element** evaluation. | Not audio. `0` everywhere else — see [below](#index--one-binding-evaluated-once-per-element). |
 
-The band values (`bass`/`mid`/`treb`) are raw mean magnitudes normalized so a
-full-scale sine reads near `1.0`, but real program material reads far lower — so
-curated presets consistently apply their own gain and then clamp to a bounded
-range. That is the central idiom (below).
+**The four headline levels are normalized** (ADR-0049): each is divided by its own
+slowly-decaying running peak, with a silence floor so a quiet room reads `0` rather
+than amplified noise. That is what makes a threshold portable across tracks and
+gain staging. The cost is deliberate — absolute dynamics are hidden, so a quiet
+passage and a loud one read alike. When a look *should* scale with real loudness,
+use the `*_raw` twin and expect the old tiny magnitudes.
+
+The five musical-time variables come from the beat tracker, and the three
+bar-position ones sit behind a confidence gate with a counter fallback, so they are
+always periodic and never confidently wrong about the music (ADR-0050). 4/4 is
+assumed.
 
 > **`tempo` is the one variable that is not roughly `0–1`.** It is `0` until the
 > tempo tracker warms up (the first several seconds of audio), then jumps to a
@@ -585,34 +601,92 @@ left-associatively as `(a > b) > c`, comparing a `0`/`1` against `c`. Write
 
 #### Set the threshold from a measured level, not from `--set`
 
-**This is the single most expensive mistake an author can make here.** A gate is
-only a gate if the value it reads actually crosses it, and the bands do not span
-`0..1`:
+**This used to be the single most expensive mistake an author could make here**,
+and ADR-0049 largely retired it. `bass`, `mid`, `treb` and `onset` are now each a
+fraction of their own slowly-decaying recent peak, so they genuinely span `0..1`
+and a threshold means the same thing on every track:
 
 | variable | mean | max | so a live threshold sits… |
 |---|---|---|---|
-| `bass` | 0.040 | 0.106 | around `0.03`–`0.09` |
-| `mid` | 0.006 | 0.019 | around `0.005`–`0.015` |
-| `treb` | 0.006 | 0.032 | around `0.005`–`0.02` |
-| `bass + mid + treb` | 0.052 | 0.132 | around `0.04`–`0.11` |
+| `bass` | 0.661 | 1.000 | around `0.7`–`0.95` |
+| `mid` | 0.575 | 1.000 | around `0.6`–`0.95` |
+| `treb` | 0.281 | 1.000 | around `0.3`–`0.9` |
+| `bass + mid + treb` | 1.517 | 3.000 | around `1.6`–`2.6` |
+| `bin(x)` | 0.089 | 1.000 | around `0.15`–`0.6` |
 
-Measured 2026-07-29 over `--signal dynamic:110`; re-measure any time with
-`shot --signal dynamic:110 --out strip.png`, which prints the table. Real music
-reads lower still in most bands most of the time — the `--audio` measurements are
-in [capturing.md](capturing.md#what-real-material-actually-produces).
+Measured 2026-07-30 over `--signal dynamic:110`; re-measure any time with
+`shot --signal dynamic:110 --out strip.png`, which prints the table.
 
-`--set bass=1` writes the band straight onto the analysis frame and is roughly
-**100×** a real mean. A threshold picked while looking at a `--set` capture is
-therefore usually dead code:
+Two traps remain, and they are the mirror image of the old one.
+
+**A threshold can now be too LOW.** The old failure was a gate above anything
+music produced, so it never fired. On the v2 scale the commoner failure is a gate
+*below* the typical level, which fires always — the `else` branch becomes dead code
+instead of the `then`. Nine bindings across the shipped library are in exactly this
+state, catalogued in
+[analysis-v2-before-flags.md](analysis-v2-before-flags.md); every one is a
+threshold written for raw levels that normalized values now clear constantly.
+
+**`bin(x)` is not on the scalars' scale.** The band array normalizes against one
+peak shared by all 64 bands — which is what keeps `bin(hi) - bin(lo)` a meaningful
+contrast — so a single band only reaches `1.000` when it is the loudest in the
+frame. Its typical value is `0.089`. A threshold tuned on `bass` is roughly 7×
+too high for `bin()`.
+
+`--set bass=1` writes the band straight onto the analysis frame, and since v2 that
+is a *reachable peak* rather than a fiction — so calibrating against a `--set`
+capture is now reasonable, remembering it is a held peak:
 
 ```
-select(bass + mid + treb > 0.90, 24, 6)   # never fires. The constant 6.
-select(bass + mid + treb > 0.075, 24, 6)  # a real gate
+select(bass + mid + treb > 2.8, 24, 6)   # near the 3.0 ceiling: fires rarely
+select(bass + mid + treb > 0.075, 24, 6) # below the 0.078 minimum: the constant 24
+select(bass + mid + treb > 1.9, 24, 6)   # a real gate
 ```
 
-Six shipped presets had their defining mechanism disabled this way for months —
-`fragment_kaleido` never left 6 folds, `reaction_reef` never folded at all — and
-all six scored **healthy** in `--report`, because its stimuli were full-scale too.
+Before v2, six shipped presets had their defining mechanism disabled by the
+opposite error for months — `fragment_kaleido` never left 6 folds, `reaction_reef`
+never folded at all — and all six scored **healthy** in `--report`, because its
+stimuli were full-scale too. That whole class is what normalization removes.
+
+#### Absolute level, when you actually want it
+
+`bass_raw`, `mid_raw`, `treb_raw` and `onset_raw` carry the pre-v2 magnitudes,
+unchanged: means of `0.040 / 0.006 / 0.006 / 0.002` against maxima of `0.106 /
+0.019 / 0.032 / 0.016`. Normalization deliberately hides absolute dynamics — a
+quiet track and a loud one read alike — so reach for a `*_raw` when a look *should*
+scale with real loudness. Everything the old warnings above said about tiny levels
+and unreachable thresholds applies to these in full.
+
+#### Musical time
+
+Five variables place you in the music rather than measuring it (ADR-0050):
+
+| variable | range | meaning |
+|---|---|---|
+| `beat_index` | `0`, `1`, `2`, … | monotone beat counter since the stream started |
+| `time_since_beat` | seconds | `0` exactly on a beat, climbing to the next |
+| `beat_in_bar` | `0`–`3` | which beat of the bar this is |
+| `bar_index` | `0`, `1`, `2`, … | monotone bar counter |
+| `bar_phase` | `0`–`1` | position across the whole bar |
+
+`bar` is **beat** phase under a historical name, kept because too much shipped
+content binds it; `bar_phase` is the real bar position. That is the one naming trap
+here.
+
+These make phrase-scale structure a one-liner:
+
+```
+select(beat_in_bar == 0, 1.4, 1.0)        # accent every downbeat
+0.5 + 0.5 * sin(bar_phase * tau)          # a sweep that breathes with the bar
+select(mod(bar_index, 8) < 4, 0.2, 0.8)   # an 8-bar A/B alternation
+1.0 - clamp(time_since_beat * 6, 0, 1)    # a decay retriggered by every beat
+```
+
+`beat_in_bar`, `bar_index` and `bar_phase` come from a downbeat estimator that
+publishes **only while it is confident**, and falls back to plain `beat_index`
+counters otherwise. So they are always periodic and always usable, and never
+confidently wrong about where the bar starts — you cannot see which mode is
+active, deliberately, and you do not need to. 4/4 is assumed.
 They no longer do: `--report`'s reachability check walks every expression and
 names any comparison that only ever took one value, any `select()` whose
 condition never went both ways, and any `clamp()` ceiling the value never

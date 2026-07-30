@@ -58,41 +58,64 @@ Full grammar reference: [`../docs/presets.md`](../docs/presets.md#the-expression
 
 ### What range the bands actually occupy
 
-**Every threshold and every gain must be set from measured levels.** `bass`,
-`mid` and `treb` are *not* `0..1` variables in practice — they arrive through the
-analyzer's normalization and spend their lives one to two orders of magnitude
-below full scale:
+**Since ADR-0049, `bass`/`mid`/`treb`/`onset` really are `0..1`.** Each is a
+fraction of that signal's *own slowly-decaying recent peak*, so `> 0.5` means
+"loud for this track" — on any track, at any gain, under any stimulus. This is the
+single biggest change to authoring in the project's history, and it deleted a
+whole class of defect: a threshold can no longer be quietly unreachable because
+the levels turned out to be a hundred times smaller than they looked.
 
 | variable | min | mean | max | note |
 |---|---|---|---|---|
-| `bass` | 0.004 | **0.040** | 0.106 | |
-| `mid` | 0.000 | **0.006** | 0.019 | |
-| `treb` | 0.000 | **0.006** | 0.032 | |
-| `onset` | 0.000 | **0.002** | 0.016 | raw spectral flux, **not** a 0..1 envelope |
-| `bass + mid + treb` | 0.005 | 0.052 | 0.132 | the three-band sum, per hop |
-| `bin(x)` | — | 0.020 | 0.338 | the band array is on its own scale, hotter than the scalars |
+| `bass` | 0.035 | **0.661** | 1.000 | |
+| `mid` | 0.031 | **0.575** | 1.000 | |
+| `treb` | 0.002 | **0.281** | 1.000 | |
+| `onset` | 0.001 | **0.145** | 1.000 | normalized envelope now, not raw flux |
+| `bass + mid + treb` | 0.078 | 1.517 | 3.000 | the three-band sum, per hop |
+| `bin(x)` | 0.000 | **0.089** | 1.000 | still on its own scale — see below |
 
-Measured 2026-07-29 over `--signal dynamic:110`. **Re-measure rather than guess**
+Measured 2026-07-30 over `--signal dynamic:110`. **Re-measure rather than guess**
 — any filmstrip run prints the band table:
 
 ```sh
 cargo run -p standalone --example shot -- --signal dynamic:110 --out strip.png
 ```
 
-Real music reads *lower* still in most bands most of the time
-([`../docs/capturing.md`](../docs/capturing.md#what-real-material-actually-produces)
-has the `--audio` measurements). `--set bass=0.8` is about **100×** a real mean:
-it is a debugging stimulus, never a calibration reference.
+Three things to carry from that table.
 
-This is not a style note. Comparison gates written against `--set` magnitudes —
-`bass + mid + treb > 0.90`, `mid > 0.22` — are **dead code**: six shipped presets
-had their defining mechanism disabled for months because their thresholds sat
-above anything music produces, and every one of them looked healthy in
+**Full scale is now reachable.** All four hit `1.000`, so `--set bass=1` is a
+*peak*, not the 100×-a-real-mean fiction it used to be. Calibrating against a
+`--set` capture is finally reasonable — with the caveat that you are looking at a
+held peak, so a gate that only fires there fires rarely.
+
+**`bin(x)` is still on its own scale, for a new reason.** The band array
+normalizes against one peak shared by all 64 bands (which is what keeps a
+`bin(hi) - bin(lo)` contrast meaningful), so a single band only reaches `1.000`
+when it *is* the loudest in the frame. Its typical value is `0.089`, an order of
+magnitude under the scalars. A threshold that works on `bass` will be far too high
+on `bin()`.
+
+**The `*_raw` escapes read on the old scale.** `bass_raw`, `mid_raw`, `treb_raw`
+and `onset_raw` are the pre-v2 magnitudes, unchanged — means of `0.040 / 0.006 /
+0.006 / 0.002`. Reach for them only when a look genuinely wants absolute loudness
+(a quiet track *should* look quieter), and when you do, the old warnings below
+apply to them in full.
+
+Comparison gates written against magnitudes on the wrong scale are **dead code**:
+six shipped presets had their defining mechanism disabled for months because their
+thresholds sat above anything music produces, and every one of them looked healthy
+in
 `--report`. Two rules follow:
 
 - **A threshold goes between the mean and the max of what it reads.** Above the
-  max it never fires; below the min it always does. `select(bass + mid > 0.085,
-  12, 6)` is a live gate; `select(bass + mid > 0.42, 12, 6)` is the constant `6`.
+  max it never fires; below the min it always does — and *both* halves of that bite.
+  On the v2 scale `bass + mid` has a mean of `1.24` against a max of `2.0`, so
+  `select(bass + mid > 1.5, 12, 6)` is a live gate while `select(bass + mid > 0.085,
+  12, 6)` is the constant `12` and `> 2.4` is the constant `6`. Pre-v2 the
+  low-threshold failure was rare because the levels were tiny; now it is the
+  commoner mistake, and it is what
+  [`../docs/analysis-v2-before-flags.md`](../docs/analysis-v2-before-flags.md)
+  catalogues across the un-retuned library.
 - **Calibrate a continuous parameter against the mean and a percussive one
   against the peak.** A zoom or a hue drift spends its life near the mean; a
   flash or a burst exists to fire on the hit.
