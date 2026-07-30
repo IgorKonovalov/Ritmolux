@@ -19,7 +19,7 @@
 //! Variables: `bass mid treb onset beat bar time tempo novelty index`.
 //! Constants: `pi tau`.
 //! Functions: `sin cos abs floor sqrt log min max pow mod clamp lerp smoothstep
-//! select bin`. Compilation is fallible (a malformed expression is
+//! select bin hash noise`. Compilation is fallible (a malformed expression is
 //! rejected with a surfaced error, never a panic); evaluation of a compiled
 //! expression is total, panic-free, and allocation-free — it walks a prebuilt
 //! AST returning `f32`, so it is safe to call every frame (hot-path §5).
@@ -29,6 +29,14 @@
 //! carries **by borrow** (ADR-0036). The language stays scalar-only — there is
 //! no array type and no indexing syntax; the band array is reachable only
 //! through this call, at a normalized position, interpolated.
+//!
+//! `hash(x)` and `noise(x)` are the grammar's only randomness (ADR-0051), and
+//! they are random the way a shader is: pure functions of `(argument, salt)`,
+//! where the salt is a per-preset constant [`Variables`] carries. Nothing here
+//! reads a clock or draws from an RNG — two evaluations of the same argument
+//! under the same salt are bit-identical, which is exactly what NFR §6 asks of
+//! visual randomness. Who supplies the salt is the preset's business (see
+//! [`schema::Preset`](super::schema::Preset)); this module only mixes it in.
 
 // Hot-path panic-denial pragma: `eval` runs per parameter per frame. This file
 // is a named target in the hygiene guard's scan (tests/hygiene.rs), so the
@@ -72,6 +80,13 @@ pub struct Variables<'a> {
     /// The log-spaced band array `bin(x)` samples, borrowed from the analysis
     /// frame. Empty when no caller supplied one, which makes `bin` read `0`.
     spectrum: &'a [f32],
+    /// The per-preset salt `hash()`/`noise()` mix into their argument
+    /// (ADR-0051). A **load-time constant**, never per-frame entropy: the caller
+    /// sets it once from the preset's `[generator] seed`, so two presets writing
+    /// the same expression scatter differently while one preset reproduces frame
+    /// to frame and run to run. `0` — the default — is a perfectly good salt,
+    /// and the one every preset that declares no seed gets.
+    salt: u32,
 }
 
 impl<'a> Variables<'a> {
@@ -98,6 +113,8 @@ impl<'a> Variables<'a> {
             // evaluation reads zero rather than something undefined.
             values: [bass, mid, treb, onset, beat, bar, time, tempo, novelty, 0.0],
             spectrum: &[],
+            // Unsalted until a caller says otherwise — see `with_salt`.
+            salt: 0,
         }
     }
 
@@ -153,6 +170,20 @@ impl<'a> Variables<'a> {
     /// every test) already uses.
     pub fn with_spectrum(self, spectrum: &'a [f32]) -> Self {
         Self { spectrum, ..self }
+    }
+
+    /// Bind the per-preset salt `hash()`/`noise()` mix in (ADR-0051).
+    ///
+    /// Its own builder rather than a constructor argument because the salt is a
+    /// fact about the **preset**, not about the analysis frame: the render loop
+    /// builds one [`Variables`] per frame from the frame alone, then re-salts it
+    /// per preset. That is what keeps both sides of a dissolve on their own seed
+    /// while they read the same audio.
+    ///
+    /// By value and `Copy`, like [`with_index`](Self::with_index) — re-salting
+    /// rebinds one `u32` without touching the borrowed spectrum or allocating.
+    pub fn with_salt(self, salt: u32) -> Self {
+        Self { salt, ..self }
     }
 
     /// Value in `slot` (0.0 for an out-of-range slot — never panics; compiled
@@ -214,6 +245,15 @@ enum Func {
     /// (ADR-0036). The only function whose result depends on [`Variables`]
     /// rather than on its arguments alone.
     Bin,
+    /// `hash(x)` — a deterministic uniform scatter of `x` into `[0, 1)`, salted
+    /// per preset (ADR-0051). Discontinuous by design: adjacent arguments give
+    /// unrelated results, which is what makes `hash(floor(time * 2))` a lottery
+    /// rather than a ramp.
+    Hash,
+    /// `noise(x)` — smooth value noise of `x` in `[0, 1]`, salted per preset
+    /// (ADR-0051). The continuous counterpart to [`Hash`](Func::Hash): one call
+    /// replaces a sum of incommensurate sines.
+    Noise,
 }
 
 impl Func {
@@ -234,6 +274,8 @@ impl Func {
             "smoothstep" => Func::Smoothstep,
             "select" => Func::Select,
             "bin" => Func::Bin,
+            "hash" => Func::Hash,
+            "noise" => Func::Noise,
             _ => return None,
         })
     }
@@ -257,6 +299,8 @@ impl Func {
             Func::Smoothstep => "smoothstep",
             Func::Select => "select",
             Func::Bin => "bin",
+            Func::Hash => "hash",
+            Func::Noise => "noise",
         }
     }
 
@@ -268,11 +312,79 @@ impl Func {
             | Func::Floor
             | Func::Sqrt
             | Func::Log
-            | Func::Bin => 1,
+            | Func::Bin
+            | Func::Hash
+            | Func::Noise => 1,
             Func::Min | Func::Max | Func::Pow | Func::Mod => 2,
             Func::Clamp | Func::Lerp | Func::Smoothstep | Func::Select => 3,
         }
     }
+}
+
+/// Integer avalanche — the mixer both seeded functions are built on. Every input
+/// bit affects every output bit, so two arguments one ULP apart scatter to
+/// unrelated results, which is the whole point of `hash`. Wrapping arithmetic
+/// throughout: there is no overflow to panic on, debug build included.
+const fn mix32(mut v: u32) -> u32 {
+    v ^= v >> 16;
+    v = v.wrapping_mul(0x7feb_352d);
+    v ^= v >> 15;
+    v = v.wrapping_mul(0x846c_a68b);
+    v ^= v >> 16;
+    v
+}
+
+/// A mixed `u32` as a uniform `f32` in `[0, 1)`.
+///
+/// The top **24** bits, not all 32, because `f32` carries a 24-bit mantissa: the
+/// division is then exact and every representable result is equally likely.
+/// Scaling the full 32 bits would round, and round *up* at the top end — which is
+/// how a generator documented as `[0, 1)` starts handing back exactly `1.0`.
+fn unit(v: u32) -> f32 {
+    (v >> 8) as f32 / 16_777_216.0
+}
+
+/// The scatter both seeded functions share: fold the salt in, then avalanche.
+/// The salt is mixed **before** the xor so that a small seed (`1`, `2`, `7` —
+/// what an author actually types) still changes every output bit.
+fn scatter(bits: u32, salt: u32) -> f32 {
+    unit(mix32(bits ^ mix32(salt)))
+}
+
+/// `hash(x)` — a deterministic uniform scatter of `x` into `[0, 1)` (ADR-0051).
+///
+/// Total for every input, infinities and `NaN` included: a float's bit pattern is
+/// always a valid `u32`, so there is no domain to guard and no branch to take.
+fn hash01(x: f32, salt: u32) -> f32 {
+    // `0.0` and `-0.0` are the same number carrying different bits, and an author
+    // writing `hash(a - b)` should not be able to see the sign of a zero.
+    let bits = if x == 0.0 { 0 } else { x.to_bits() };
+    scatter(bits, salt)
+}
+
+/// `noise(x)` — smooth value noise of `x` in `[0, 1]` (ADR-0051): a hashed value
+/// at each integer, eased across the cell `x` falls in.
+///
+/// One octave, deliberately (ADR-0051): an author wanting fBm sums calls at
+/// different rates, which costs them one line and costs the engine nothing.
+fn value_noise(x: f32, salt: u32) -> f32 {
+    // Total by construction, the same posture as `bin` and `clamp`: a non-finite
+    // argument names no cell, so it reads the midpoint instead of propagating a
+    // NaN into a scene parameter. Every input keeps the documented `[0, 1]`.
+    if !x.is_finite() {
+        return 0.5;
+    }
+    let cell = x.floor();
+    let frac = x - cell;
+    // `as` saturates rather than wrapping, so an argument past `i32` range pins
+    // to one lattice point — a flat stretch, not a wrap and not a panic.
+    let i = cell as i32;
+    let a = scatter(i as u32, salt);
+    let b = scatter(i.wrapping_add(1) as u32, salt);
+    // The same eased ramp `smoothstep` uses — zero derivative at both ends, so
+    // one cell joins the next without a crease.
+    let t = frac * frac * (3.0 - 2.0 * frac);
+    a + (b - a) * t
 }
 
 /// Bare identifiers that resolve to a literal. Resolved before the variable
@@ -457,6 +569,12 @@ impl Node {
                 // The one call that reads the variable bundle's non-scalar
                 // payload. Total for every input (see `Variables::bin`).
                 (Func::Bin, [x]) => vars.bin(x.eval(vars)),
+                // The two seeded functions (ADR-0051). Like `bin` they read the
+                // bundle rather than their arguments alone — but what they read
+                // is a load-time constant, so the expression stays pure: same
+                // argument, same salt, bit-identical result, every frame.
+                (Func::Hash, [x]) => hash01(x.eval(vars), vars.salt),
+                (Func::Noise, [x]) => value_noise(x.eval(vars), vars.salt),
                 _ => 0.0,
             },
         }

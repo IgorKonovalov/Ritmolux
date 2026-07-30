@@ -304,6 +304,15 @@ pub struct Preset {
     /// bindable `palette_mix` param crossfades between them per frame. `None`
     /// means no crossfade (palette A only).
     pub palette_b: Option<PaletteConfig>,
+    /// The salt this preset's `hash()`/`noise()` calls mix into their argument
+    /// (ADR-0051), folded at load from the `[generator] seed` key that had been
+    /// reserved and inert since Plan 0010. `0` when the preset declares none —
+    /// a perfectly good salt, and the one the whole shipped library used before
+    /// any preset asked for another.
+    ///
+    /// A load-time constant. Nothing per-frame recomputes it, and no expression
+    /// can read it except through the two functions it salts.
+    pub salt: u32,
     /// Non-fatal problems found while loading — today, bindings naming a
     /// parameter this system does not consume (ADR-0020). The preset loaded and
     /// its good bindings apply; these are surfaced so a typo stops failing
@@ -349,6 +358,18 @@ impl Preset {
                 tau: Easing::INSTANT,
             });
         }
+
+        // The salt the grammar's `hash()`/`noise()` mix in (ADR-0051), read from
+        // the long-reserved `[generator] seed`. Read **before** `build_config`
+        // consumes the table, and read for every system: only the L-system and
+        // the star pattern care about the rest of `[generator]`, but any preset
+        // may declare a seed, so a fragment or swarm preset can carry one table
+        // holding nothing else.
+        let salt = raw
+            .generator
+            .as_ref()
+            .and_then(|generator| generator.seed)
+            .map_or(0, salt_from_seed);
 
         // Structural config: validated once here (a bad family/grammar -> load
         // error, the caller keeps the last good preset), then trusted by the
@@ -412,9 +433,21 @@ impl Preset {
             config,
             palette,
             palette_b,
+            salt,
             warnings,
         })
     }
+}
+
+/// Fold a declared 64-bit `[generator] seed` into the 32-bit salt the grammar's
+/// `hash()`/`noise()` mix in (ADR-0051).
+///
+/// XOR-folded rather than truncated, so two seeds differing only in their high
+/// half still salt differently — `seed` is a `u64` in the schema and always has
+/// been, and silently ignoring half of what an author typed is the kind of
+/// surprise this file exists to prevent.
+fn salt_from_seed(seed: u64) -> u32 {
+    (seed as u32) ^ ((seed >> 32) as u32)
 }
 
 /// Assemble the optional structural config for `system` from the raw tables,
@@ -840,7 +873,11 @@ struct RawGenerator {
     /// L-system: iterations to precompute.
     #[serde(default)]
     max_depth: Option<u32>,
-    /// L-system: reserved seed (deterministic today).
+    /// The preset's random salt — what the grammar's `hash()`/`noise()` mix into
+    /// their argument (ADR-0051). **Not** an L-system key despite living in the
+    /// L-system's table: it was reserved here in Plan 0010 and stayed inert until
+    /// Plan 0047 gave it a meaning, and the expansion is still deterministic and
+    /// still ignores it. Any system's preset may declare one.
     #[serde(default)]
     seed: Option<u64>,
     /// Star pattern: the regular tiling (e.g. `"6.6.6"` / `"hexagon"` / `"12"`).
