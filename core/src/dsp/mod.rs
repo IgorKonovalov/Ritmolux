@@ -22,6 +22,7 @@
 )]
 
 pub mod bands;
+pub mod downbeat;
 pub mod fft;
 pub mod gain;
 pub mod novelty;
@@ -59,11 +60,15 @@ pub const SPECTRUM_BINS: usize = 64;
 /// recent peak, so `> 0.5` means "loud for this track" rather than naming an
 /// absolute magnitude that depended on the gain staging. The absolute values
 /// remain as `*_raw` for looks that genuinely want them, and for harness
-/// continuity. `spectrum` normalizes per band, by the same rule.
+/// continuity. `spectrum` normalizes against **one** peak shared by the whole
+/// array, so every ratio inside it — and therefore every `bin()` contrast — comes
+/// through untouched; see [`gain::BandNormalizer`] for why per-band would not.
 ///
 /// `beat` flags an onset event this hop; `bpm`/`bar` come from the tempo tracker,
 /// which reads the **raw** onset — see [`gain`] for why the internal consumers
-/// are deliberately left on raw values.
+/// are deliberately left on raw values. The bar-position trio comes from
+/// [`downbeat`], and falls back to plain counters whenever its estimate is not
+/// confident (ADR-0050).
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisFrame {
     /// Per-band energy, each band normalized against its own recent peak.
@@ -98,6 +103,20 @@ pub struct AnalysisFrame {
     pub beat_index: u32,
     /// Seconds since the last detected beat; exactly 0 on a beat hop.
     pub time_since_beat: f32,
+    /// Which beat of the bar this is, `0..4` (ADR-0050 Layer 2). Estimated when
+    /// the downbeat tracker is confident, `beat_index % 4` otherwise.
+    pub beat_in_bar: u32,
+    /// Monotone bar counter, on the same gated-or-counted basis.
+    pub bar_index: u32,
+    /// Position across the bar in `[0, 1)` — the true bar phase, as against
+    /// [`bar`](Self::bar), which is beat phase under a historical name.
+    pub bar_phase: f32,
+    /// Downbeat-alignment confidence in `0..1`. **Diagnostics only** — not a
+    /// grammar variable, so authors get behavior rather than homework.
+    pub downbeat_confidence: f32,
+    /// Whether the bar trio above came from the estimator rather than the
+    /// counter fallback. **Diagnostics only**, as with the confidence.
+    pub downbeat_locked: bool,
     /// Experimental spectral track-change novelty (Plan 0009 Phase 4): ~0 within
     /// a steady segment, spiking at a spectral boundary. Native-API only — not
     /// exposed across the C ABI.
@@ -121,6 +140,11 @@ impl Default for AnalysisFrame {
             bar: 0.0,
             beat_index: 0,
             time_since_beat: 0.0,
+            beat_in_bar: 0,
+            bar_index: 0,
+            bar_phase: 0.0,
+            downbeat_confidence: 0.0,
+            downbeat_locked: false,
             novelty: 0.0,
         }
     }
@@ -139,6 +163,10 @@ pub struct Analyzer {
     bands: bands::BandSplitter,
     tempo: tempo::TempoTracker,
     novelty: novelty::NoveltyDetector,
+    /// ADR-0050 Layer 2. Reads the **normalized** bass and flux, unlike the
+    /// detectors above: its accent blend weighs the two against each other, which
+    /// is only meaningful once both are on a common 0..1 scale.
+    downbeat: downbeat::DownbeatTracker,
     /// Published-surface normalizers (ADR-0049). Deliberately *after* the
     /// detectors above in the hop, so each of those keeps reading raw values.
     band_gain: gain::BandNormalizer,
@@ -180,6 +208,7 @@ impl Analyzer {
             bands: bands::BandSplitter::new(format.sample_rate),
             tempo: tempo::TempoTracker::new(format.sample_rate),
             novelty: novelty::NoveltyDetector::new(format.sample_rate),
+            downbeat: downbeat::DownbeatTracker::new(),
             band_gain: gain::BandNormalizer::new(format.sample_rate),
             bass_gain: gain::PeakNormalizer::new(format.sample_rate, gain::BAND_FLOOR),
             mid_gain: gain::PeakNormalizer::new(format.sample_rate, gain::BAND_FLOOR),
@@ -243,11 +272,20 @@ impl Analyzer {
                     // ...and normalization happens last, on the way out.
                     let mut spectrum = raw_spectrum;
                     self.band_gain.normalize(&mut spectrum);
+                    let onset = self.onset_gain.normalize(onset_raw);
+                    let bass = self.bass_gain.normalize(bass_raw);
+
+                    // The downbeat tracker sits after normalization on purpose —
+                    // it weighs bass against flux, which needs a common scale.
+                    let bars =
+                        self.downbeat
+                            .process(beat, clock.beat_index, bass, onset, clock.bar);
+
                     self.latest = AnalysisFrame {
                         spectrum,
-                        onset: self.onset_gain.normalize(onset_raw),
+                        onset,
                         beat,
-                        bass: self.bass_gain.normalize(bass_raw),
+                        bass,
                         mid: self.mid_gain.normalize(mid_raw),
                         treb: self.treb_gain.normalize(treb_raw),
                         bass_raw,
@@ -258,6 +296,11 @@ impl Analyzer {
                         bar: clock.bar,
                         beat_index: clock.beat_index,
                         time_since_beat: clock.time_since_beat,
+                        beat_in_bar: bars.beat_in_bar,
+                        bar_index: bars.bar_index,
+                        bar_phase: bars.bar_phase,
+                        downbeat_confidence: bars.confidence,
+                        downbeat_locked: bars.locked,
                         novelty,
                     };
                     self.pending_beat |= beat;

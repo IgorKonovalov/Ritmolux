@@ -16,10 +16,13 @@
 //! There are no boolean operators: with clean `0/1` results, `min` is and,
 //! `max` is or, and `1 - c` is not.
 //!
-//! Variables: `bass mid treb onset beat bar time tempo novelty index`, plus the
-//! absolute-level escapes `bass_raw mid_raw treb_raw onset_raw` — the first four
-//! are normalized against their own recent peak (ADR-0049), so a threshold on
-//! them means "loud for this track" rather than naming a magnitude.
+//! Variables: `bass mid treb onset beat bar time tempo novelty index`, the
+//! absolute-level escapes `bass_raw mid_raw treb_raw onset_raw`, and the musical
+//! clock `beat_index time_since_beat beat_in_bar bar_index bar_phase`. The first
+//! four are normalized against their own recent peak (ADR-0049), so a threshold
+//! on them means "loud for this track" rather than naming a magnitude. `bar` is
+//! **beat** phase under a historical name; `bar_phase` is the real thing
+//! (ADR-0050).
 //! Constants: `pi tau`.
 //! Functions: `sin cos abs floor sqrt log min max pow mod clamp lerp smoothstep
 //! select bin hash noise`. Compilation is fallible (a malformed expression is
@@ -61,10 +64,13 @@ use std::fmt;
 /// first four used to carry before ADR-0049 normalized them — reachable for
 /// looks that genuinely want absolute level rather than "loud for this track".
 /// Then `beat_index` and `time_since_beat`, ADR-0050's unconditional Layer 1
-/// musical clock. `index` stays **last** and is different in kind: it is not
+/// musical clock, and `beat_in_bar`/`bar_index`/`bar_phase`, its Layer 2 bar
+/// position — gated on a confidence the grammar deliberately cannot see, so these
+/// three are always *something* sensible and never wrong about the music.
+/// `index` stays **last** and is different in kind: it is not
 /// audio but the *element's own position* during a per-element evaluation
 /// (Plan 0034 Phase 4), and it reads `0` anywhere else.
-pub const VAR_NAMES: [&str; 16] = [
+pub const VAR_NAMES: [&str; 19] = [
     "bass",
     "mid",
     "treb",
@@ -80,6 +86,9 @@ pub const VAR_NAMES: [&str; 16] = [
     "onset_raw",
     "beat_index",
     "time_since_beat",
+    "beat_in_bar",
+    "bar_index",
+    "bar_phase",
     "index",
 ];
 /// Number of expression variables.
@@ -105,7 +114,15 @@ const RAW_SLOT_BASE: usize = 9;
 /// same name assertion the raw block gets.
 const CLOCK_SLOT_BASE: usize = 13;
 
-// The three slot blocks must not overlap. Every bound here is a compile-time
+/// Slot of `beat_in_bar`, followed by `bar_index` and `bar_phase` — ADR-0050's
+/// gated Layer 2 trio, written by [`with_bar`](Variables::with_bar).
+///
+/// The *confidence* behind these is deliberately absent from `VAR_NAMES`: an
+/// author gets bar-aware behavior with a counter fallback underneath it, not a
+/// gate to hand-tune. It rides on the analysis frame for diagnostics instead.
+const BAR_SLOT_BASE: usize = 15;
+
+// The four slot blocks must not overlap. Every bound here is a compile-time
 // constant, so this is checked at compile time: an overlapping base is a build
 // failure, not a test failure. `raw_slots_are_where_the_names_say` covers the
 // half a constant cannot — that the *names* at these offsets are the expected
@@ -115,8 +132,12 @@ const _: () = assert!(
     "the raw block must end before the clock block begins"
 );
 const _: () = assert!(
-    CLOCK_SLOT_BASE + 2 <= INDEX_SLOT,
-    "the clock block must end before `index`"
+    CLOCK_SLOT_BASE + 2 <= BAR_SLOT_BASE,
+    "the clock block must end before the bar block begins"
+);
+const _: () = assert!(
+    BAR_SLOT_BASE + 3 <= INDEX_SLOT,
+    "the bar block must end before `index`"
 );
 
 /// A bound set of variable values for one evaluation. Field order matches
@@ -201,6 +222,21 @@ impl<'a> Variables<'a> {
         next
     }
 
+    /// Bind `beat_in_bar`, `bar_index` and `bar_phase` (ADR-0050 Layer 2),
+    /// leaving everything else as it was.
+    ///
+    /// These arrive already resolved: the caller has decided whether they came
+    /// from the downbeat estimate or from the counter fallback, so nothing here
+    /// or downstream needs to know which. That is the point of the gate living in
+    /// the analyzer.
+    pub fn with_bar(self, beat_in_bar: u32, bar_index: u32, bar_phase: f32) -> Self {
+        let mut next = self;
+        if let Some(slots) = next.values.get_mut(BAR_SLOT_BASE..BAR_SLOT_BASE + 3) {
+            slots.copy_from_slice(&[beat_in_bar as f32, bar_index as f32, bar_phase]);
+        }
+        next
+    }
+
     /// Bind every analysis variable from `frame`, with the clock at `time`.
     ///
     /// **This is the only place the frame-to-slot mapping is written.** Both the
@@ -237,6 +273,7 @@ impl<'a> Variables<'a> {
             frame.onset_raw,
         )
         .with_beat_clock(frame.beat_index, frame.time_since_beat)
+        .with_bar(frame.beat_in_bar, frame.bar_index, frame.bar_phase)
         .with_spectrum(&frame.spectrum)
     }
 
@@ -1513,6 +1550,18 @@ mod tests {
             Some(["beat_index", "time_since_beat"].as_slice()),
             "with_beat_clock writes two floats starting at CLOCK_SLOT_BASE"
         );
+        assert_eq!(
+            VAR_NAMES.get(BAR_SLOT_BASE..BAR_SLOT_BASE + 3),
+            Some(["beat_in_bar", "bar_index", "bar_phase"].as_slice()),
+            "with_bar writes three floats starting at BAR_SLOT_BASE"
+        );
+        // The gate's own confidence must NOT be bindable (ADR-0050).
+        for hidden in ["downbeat_confidence", "confidence", "downbeat_locked"] {
+            assert!(
+                !VAR_NAMES.contains(&hidden),
+                "`{hidden}` must stay out of the grammar: authors get behavior, not homework"
+            );
+        }
         assert_eq!(
             VAR_NAMES.get(INDEX_SLOT),
             Some(&"index"),

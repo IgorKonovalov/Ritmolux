@@ -304,6 +304,101 @@ fn the_beat_clock_counts_monotonically_and_resets_on_every_beat() {
     );
 }
 
+/// A click every beat, with a low thump on every `accent_every`-th beat starting
+/// at `offset`. `accent_every = 0` means no accents at all.
+fn accented_clicks(period: usize, len: usize, accent_every: usize, offset: usize) -> Vec<f32> {
+    let mut signal = click_track(period, len);
+    if accent_every == 0 {
+        return signal;
+    }
+    let mut beat = 0usize;
+    let mut pos = period;
+    while pos + 4_000 < len {
+        if beat % accent_every == offset {
+            // A 60 Hz thump, coincident with the click so it reads as one onset
+            // rather than a second beat. Decaying, like a kick.
+            for i in 0..4_000 {
+                let t = i as f32 / SR as f32;
+                let env = (-t * 18.0).exp();
+                signal[pos + i] += 0.85 * env * (std::f32::consts::TAU * 60.0 * t).sin();
+            }
+        }
+        beat += 1;
+        pos += period;
+    }
+    signal
+}
+
+/// Plan 0048 Phase 4, end to end: the downbeat estimator locks onto a kick
+/// pattern in **real audio**, and stays in fallback without one.
+///
+/// The module's own tests drive the tracker with idealized accent numbers, which
+/// says the fold and the gate are right but says nothing about whether the accent
+/// *measure* can tell a kick from a click once it has been through an FFT, a
+/// band split and two normalizers. This is that claim.
+#[test]
+fn the_downbeat_estimator_locks_onto_a_kick_pattern_in_real_audio() {
+    let format = AudioFormat {
+        sample_rate: SR,
+        channels: 1,
+    };
+    // 120 BPM: a beat every 24000 samples. 24 s is 48 beats — comfortably past
+    // the 8-beat evidence floor and the 12-beat hysteresis.
+    let period = 24_000usize;
+    let len = 24 * SR as usize;
+
+    let run = |pcm: &[f32]| -> (bool, f32, Vec<(u32, u32)>) {
+        let mut analyzer = Analyzer::new(format).expect("valid format");
+        let mut pairs = Vec::new();
+        let mut locked = false;
+        let mut confidence = 0.0;
+        for hop in pcm.chunks_exact(HOP_SIZE) {
+            analyzer.push_interleaved(hop);
+            let f = analyzer.take_frame();
+            if f.beat {
+                pairs.push((f.beat_index, f.beat_in_bar));
+            }
+            locked = f.downbeat_locked;
+            confidence = f.downbeat_confidence;
+        }
+        (locked, confidence, pairs)
+    };
+
+    // Accent on every 4th beat, offset 2, so a tracker that always answers 0
+    // cannot pass.
+    let (locked, confidence, pairs) = run(&accented_clicks(period, len, 4, 2));
+    assert!(
+        locked,
+        "a kick every 4th beat should lock (confidence {confidence:.3})"
+    );
+    assert!(
+        confidence > 0.2,
+        "confidence {confidence:.3} should clear the gate with margin"
+    );
+
+    // The accented beats are the ones whose beat_index % 4 == 2 in the tracker's
+    // own numbering. Once locked, those must be beat 0 of the bar. Read from the
+    // back half so the lock has settled.
+    let settled: Vec<(u32, u32)> = pairs.iter().copied().skip(pairs.len() / 2).collect();
+    assert!(settled.len() > 8, "expected plenty of settled beats");
+    let accented_are_beat_one = settled
+        .iter()
+        .filter(|(index, _)| index % 4 == 2)
+        .all(|(_, in_bar)| *in_bar == 0);
+    assert!(
+        accented_are_beat_one,
+        "every accented beat should read beat_in_bar 0 once locked: {settled:?}"
+    );
+
+    // The counter-case: identical clicks with no kick must NOT lock. Without this
+    // the test above would pass on a tracker that locks onto anything.
+    let (flat_locked, flat_conf, _) = run(&accented_clicks(period, len, 0, 0));
+    assert!(
+        !flat_locked,
+        "an unaccented click train must stay in fallback (confidence {flat_conf:.3})"
+    );
+}
+
 #[test]
 fn click_track_produces_onsets_on_the_beats() {
     let mut analyzer = mono_analyzer();
@@ -458,7 +553,7 @@ fn analysis_is_deterministic() {
     };
 
     #[allow(clippy::type_complexity)]
-    let run = |mut analyzer: Analyzer| -> Vec<(Vec<u32>, Vec<u32>, bool, u32)> {
+    let run = |mut analyzer: Analyzer| -> Vec<(Vec<u32>, Vec<u32>, bool, Vec<u32>, bool)> {
         signal
             .chunks_exact(HOP_SIZE)
             .map(|hop| {
@@ -488,6 +583,11 @@ fn analysis_is_deterministic() {
                     bar,
                     beat_index,
                     time_since_beat,
+                    beat_in_bar,
+                    bar_index,
+                    bar_phase,
+                    downbeat_confidence,
+                    downbeat_locked,
                     novelty,
                 } = f;
                 (
@@ -504,10 +604,13 @@ fn analysis_is_deterministic() {
                         bpm.to_bits(),
                         bar.to_bits(),
                         time_since_beat.to_bits(),
+                        bar_phase.to_bits(),
+                        downbeat_confidence.to_bits(),
                         novelty.to_bits(),
                     ],
                     beat,
-                    beat_index,
+                    vec![beat_index, beat_in_bar, bar_index],
+                    downbeat_locked,
                 )
             })
             .collect()
