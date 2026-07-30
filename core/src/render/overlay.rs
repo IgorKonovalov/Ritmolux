@@ -1,6 +1,15 @@
 //! The diagnostics debug overlay (Plan 0011): a final compositing pass that,
 //! when enabled, paints a translucent panel over the scene with a frame-time
-//! sparkline, a GPU-footprint bar, and a numeric fps / frame-ms / MB readout.
+//! sparkline, a GPU-footprint bar, a numeric fps / frame-ms / MB readout, and —
+//! since Plan 0049 — the analysis block: the four normalized levels and the
+//! downbeat estimator's lock state.
+//!
+//! **The analysis levels are meters, not just numbers, and that is the point.**
+//! Plan 0048 Phase 6 asks whether the levels "ride the music without pumping or
+//! going numb" — a judgement about how a value *moves* against music you are
+//! hearing, made at a glance while it plays. Four digits re-rendered sixty times
+//! a second do not answer that; four bars do. The numbers stay beside them for
+//! the moments when a magnitude is what you want.
 //!
 //! Everything is drawn as solid-color quads through one instanced pipeline —
 //! the same instanced-quad pattern the scenes use — so there is no new
@@ -21,13 +30,15 @@
 
 use std::fmt::Write as _;
 
-use crate::diag::Metrics;
+use crate::diag::{AnalysisMetrics, Metrics};
 
 use super::overlay_font::{GLYPH_H, GLYPH_W, glyph};
 use super::tier::Tier;
 
 /// Instance buffer capacity in quads. Comfortably covers the panel, ~240
-/// sparkline bars, the bars, and every lit digit pixel of the readout.
+/// sparkline bars, the bars, and every lit font pixel of the readout — the
+/// frame-time line plus the five analysis rows come to roughly 1500 between
+/// them.
 const MAX_QUADS: usize = 4096;
 
 // Layout, in device pixels from the top-left corner.
@@ -49,6 +60,28 @@ const DEMOTED_MARK: &str = "*";
 /// GPU bytes that fill the footprint bar (512 MiB).
 const GPU_BAR_MAX_BYTES: f32 = 512.0 * 1024.0 * 1024.0;
 
+/// Vertical pitch between the stacked analysis rows — tighter than [`PAD`], so
+/// the five read as one block instead of five separate things.
+const ROW_GAP: f32 = 5.0;
+/// Height of one analysis meter.
+const METER_H: f32 = 9.0;
+/// Characters reserved for a row's `LABEL value` column, ahead of its meter.
+/// One wider than the longest of them (`ONSET 0.18`), so every meter starts on
+/// the same x — the four levels read as one stack — with a character of gap
+/// rather than the bar butting against the last digit.
+const ROW_TEXT_CHARS: f32 = 11.0;
+
+/// The analysis rows, in draw order, each with the label the panel prints. The
+/// labels are the **only** place these words appear, so the readout-alphabet test
+/// sweeps this table rather than a copy of the strings.
+const LEVEL_LABELS: [&str; 4] = ["BASS", "MID", "TREB", "ONSET"];
+/// What the lock row says when the downbeat estimator's confidence cleared its
+/// gate, and when it did not (ADR-0050). **Two words, not a colour** — the state
+/// has to survive a screenshot and a colour-blind reader, and this is the one
+/// value Plan 0048 Phase 6 records rather than watches.
+const LOCKED_LABEL: &str = "LOCK";
+const FREE_LABEL: &str = "FREE";
+
 type Rgba = [f32; 4];
 
 /// Viewport size in device pixels, threaded through the layout helpers so a
@@ -69,6 +102,14 @@ const BAR_FILL_COLOR: Rgba = [0.35, 0.60, 1.00, 1.0];
 // Dim reference line drawn across the sparkline at the 60 fps budget, so the
 // trace reads against a known mark instead of floating.
 const BUDGET_LINE_COLOR: Rgba = [0.55, 0.55, 0.62, 0.5];
+// The three band levels share a fill; `onset` gets its own because it is a
+// different kind of quantity — an event envelope, not a standing level — and
+// reading them as one stack of four identical bars invites comparing them.
+const LEVEL_FILL_COLOR: Rgba = [0.35, 0.80, 0.95, 1.0];
+const ONSET_FILL_COLOR: Rgba = [0.95, 0.70, 0.30, 1.0];
+// The lock row, reinforcing its word rather than replacing it.
+const LOCKED_COLOR: Rgba = [0.35, 0.95, 0.55, 1.0];
+const FREE_COLOR: Rgba = [0.62, 0.62, 0.70, 1.0];
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -199,6 +240,7 @@ impl Overlay {
         view: &wgpu::TextureView,
         size: (u32, u32),
         metrics: Metrics,
+        analysis: AnalysisMetrics,
         tier: Tier,
         demoted: bool,
         frame_ms_samples: impl Iterator<Item = f32>,
@@ -210,7 +252,7 @@ impl Overlay {
         };
         self.samples.clear();
         self.samples.extend(frame_ms_samples);
-        self.build(vp, metrics, tier, demoted);
+        self.build(vp, metrics, analysis, tier, demoted);
 
         let n = self.quads.len().min(MAX_QUADS);
         let Some(slice) = self.quads.get(..n) else {
@@ -247,7 +289,14 @@ impl Overlay {
     ///
     /// Splitting the readout out of this method is what lets the panel's one line
     /// of prose be tested without a GPU — see [`write_readout`].
-    fn build(&mut self, vp: Vp, metrics: Metrics, tier: Tier, demoted: bool) {
+    fn build(
+        &mut self,
+        vp: Vp,
+        metrics: Metrics,
+        analysis: AnalysisMetrics,
+        tier: Tier,
+        demoted: bool,
+    ) {
         self.quads.clear();
 
         // Build the readout first so the panel sizes to whichever is wider — the
@@ -261,8 +310,13 @@ impl Overlay {
         let text_y = MARGIN + PAD;
         let spark_y = text_y + TEXT_H + PAD;
         let bar_y = spark_y + SPARK_H + PAD;
+        // The analysis block sits below the renderer's own figures: read the
+        // frame-time group as one thing, the audio group as another.
+        let analysis_y = bar_y + BAR_H + PAD;
+        let row_pitch = TEXT_H.max(METER_H) + ROW_GAP;
+        // Five rows: the four levels, then the lock state.
         let panel_w = content_w + PAD * 2.0;
-        let panel_h = (bar_y + BAR_H + PAD) - MARGIN;
+        let panel_h = (analysis_y + row_pitch * 5.0 - ROW_GAP + PAD) - MARGIN;
         push_rect(
             &mut self.quads,
             vp,
@@ -273,7 +327,14 @@ impl Overlay {
             PANEL_COLOR,
         );
 
-        draw_text(&mut self.quads, vp, content_x, text_y, &self.text);
+        draw_text(
+            &mut self.quads,
+            vp,
+            content_x,
+            text_y,
+            &self.text,
+            TEXT_COLOR,
+        );
 
         // Frame-time sparkline: one vertical bar per retained sample, newest at
         // the right, colored by how close each frame ran to the 60 fps budget.
@@ -331,7 +392,56 @@ impl Overlay {
                 BAR_FILL_COLOR,
             );
         }
+
+        // --- the analysis block (Plan 0049 / ADR-0052) ---
+        let meter_x = content_x + ROW_TEXT_CHARS * CHAR_ADVANCE;
+        let meter_w = (content_x + content_w - meter_x).max(0.0);
+        let levels = [
+            (analysis.bass, LEVEL_FILL_COLOR),
+            (analysis.mid, LEVEL_FILL_COLOR),
+            (analysis.treb, LEVEL_FILL_COLOR),
+            (analysis.onset, ONSET_FILL_COLOR),
+        ];
+        for (row, (&label, (value, fill_color))) in LEVEL_LABELS.iter().zip(levels).enumerate() {
+            let y = analysis_y + row as f32 * row_pitch;
+            write_value_row(&mut self.text, label, value);
+            draw_text(&mut self.quads, vp, content_x, y, &self.text, TEXT_COLOR);
+            draw_meter(&mut self.quads, vp, meter_x, y, meter_w, value, fill_color);
+        }
+
+        // The lock row. Its word carries the state and its meter carries the
+        // confidence, so a screenshot says which one it was without a legend.
+        let lock_y = analysis_y + 4.0 * row_pitch;
+        let (label, color) = if analysis.downbeat_locked {
+            (LOCKED_LABEL, LOCKED_COLOR)
+        } else {
+            (FREE_LABEL, FREE_COLOR)
+        };
+        write_value_row(&mut self.text, label, analysis.downbeat_confidence);
+        draw_text(&mut self.quads, vp, content_x, lock_y, &self.text, color);
+        draw_meter(
+            &mut self.quads,
+            vp,
+            meter_x,
+            lock_y,
+            meter_w,
+            analysis.downbeat_confidence,
+            color,
+        );
     }
+}
+
+/// One analysis meter: a dark track with a fill proportional to `value` in 0..1.
+fn draw_meter(out: &mut Vec<Quad>, vp: Vp, x: f32, y: f32, w: f32, value: f32, fill: Rgba) {
+    // Centred against the text row so the label and its bar sit on one line.
+    let y = y + (TEXT_H - METER_H) * 0.5;
+    push_rect(out, vp, x, y, w, METER_H, BAR_BG_COLOR);
+    let frac = if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    push_rect(out, vp, x, y, w * frac, METER_H, fill);
 }
 
 /// Push one axis-aligned rectangle, given in top-left device-pixel coordinates,
@@ -379,8 +489,29 @@ fn write_readout(out: &mut String, metrics: Metrics, tier: Tier, demoted: bool) 
     );
 }
 
+/// Write one analysis row — `LABEL value` — into `out`, replacing its contents.
+///
+/// The value is left-padded to a fixed width so the four level rows line up as a
+/// column, which is most of what makes them readable as a stack.
+///
+/// **The value is clamped and non-finite is printed as zero.** This is a readout,
+/// not a validator: `{:.2}` of a `NaN` is the string `NaN`, whose lowercase `a`
+/// has no glyph and would paint a blank cell (see `overlay_font`), and a level
+/// far outside 0..1 would run its number into the meter. Neither should be
+/// possible from the analyzer — that is why this clamps rather than reports.
+fn write_value_row(out: &mut String, label: &str, value: f32) {
+    out.clear();
+    let v = if value.is_finite() {
+        value.clamp(0.0, 9.99)
+    } else {
+        0.0
+    };
+    // Label padded to the widest of them so every meter starts on one x.
+    let _ = write!(out, "{label:<5} {v:.2}");
+}
+
 /// Emit the lit font pixels of `text` starting at device-pixel (`x`, `y`).
-fn draw_text(out: &mut Vec<Quad>, vp: Vp, x: f32, y: f32, text: &str) {
+fn draw_text(out: &mut Vec<Quad>, vp: Vp, x: f32, y: f32, text: &str, color: Rgba) {
     for (ci, c) in text.chars().enumerate() {
         let gx = x + ci as f32 * CHAR_ADVANCE;
         for (row, bits) in glyph(c).iter().enumerate() {
@@ -389,7 +520,7 @@ fn draw_text(out: &mut Vec<Quad>, vp: Vp, x: f32, y: f32, text: &str) {
                 if (bits >> (GLYPH_W - 1 - col)) & 1 == 1 {
                     let px = gx + col as f32 * FONT_PX;
                     let py = y + row as f32 * FONT_PX;
-                    push_rect(out, vp, px, py, FONT_PX, FONT_PX, TEXT_COLOR);
+                    push_rect(out, vp, px, py, FONT_PX, FONT_PX, color);
                 }
             }
         }
@@ -404,7 +535,9 @@ mod tests {
     // Test asserts panic on failure; allowed here over the file's pragma.
     #![allow(clippy::panic)]
 
-    use super::{DEMOTED_MARK, Tier, write_readout};
+    use super::{
+        DEMOTED_MARK, FREE_LABEL, LEVEL_LABELS, LOCKED_LABEL, Tier, write_readout, write_value_row,
+    };
     use crate::diag::Metrics;
     use crate::render::overlay_font::{GLYPH_H, glyph};
 
@@ -465,6 +598,135 @@ mod tests {
         assert!(!pinned.ends_with(DEMOTED_MARK), "{pinned:?}");
         // The mark is a suffix, not a replacement: the tier is still named.
         assert!(demoted.contains(Tier::Floor.label()));
+    }
+
+    /// **Every character the readout can emit has a glyph.**
+    ///
+    /// This is the guard the whole analysis block rests on. `glyph` returns a
+    /// blank cell for an uncovered character rather than failing, so `BASS` in a
+    /// font without `A` paints `B SS` and nothing in the engine notices — no
+    /// error, no warning, no failing test. Plan 0044 hit the same trap with the
+    /// tier names.
+    ///
+    /// So this sweeps the readout's **alphabet**, not a fixed expected string: it
+    /// drives every writer the panel has over a range of inputs chosen to reach
+    /// every digit, both lock words, all four level labels, both tiers and the
+    /// demotion mark, and asserts each emitted non-space character is lit. A
+    /// changed format string stays covered; a new label does not sneak past.
+    #[test]
+    fn every_character_the_readout_can_emit_has_a_glyph() {
+        let mut text = String::new();
+        let mut seen = std::collections::BTreeSet::new();
+        let mut sweep = |text: &String| {
+            for c in text.chars() {
+                seen.insert(c);
+                if c == ' ' {
+                    continue;
+                }
+                assert_ne!(
+                    glyph(c),
+                    [0x00; GLYPH_H],
+                    "`{c}` has no glyph, so the readout `{text}` paints a blank cell there"
+                );
+            }
+        };
+
+        // The frame-time line, over values that between them print every digit,
+        // both tiers, and the demotion mark.
+        for (fps, p99, bytes) in [
+            (60.0, 16.7, 340 * 1024 * 1024),
+            (23.0, 45.9, 178 * 1024 * 1024),
+            (0.0, 0.0, 0),
+        ] {
+            for tier in [Tier::Floor, Tier::Rich] {
+                for demoted in [false, true] {
+                    write_readout(
+                        &mut text,
+                        Metrics {
+                            fps,
+                            frame_ms_p99: p99,
+                            gpu_bytes: bytes,
+                            ..Metrics::default()
+                        },
+                        tier,
+                        demoted,
+                    );
+                    sweep(&text);
+                }
+            }
+        }
+
+        // Every analysis row: all four level labels and both lock words, over
+        // values that reach every digit — plus the ones that must never reach the
+        // panel as text at all (non-finite, out of range, negative).
+        let labels: Vec<&str> = LEVEL_LABELS
+            .iter()
+            .copied()
+            .chain([LOCKED_LABEL, FREE_LABEL])
+            .collect();
+        for label in labels {
+            for value in [
+                0.0,
+                0.123,
+                0.456,
+                0.789,
+                1.0,
+                -0.5,
+                42.0,
+                f32::NAN,
+                f32::INFINITY,
+                f32::NEG_INFINITY,
+            ] {
+                write_value_row(&mut text, label, value);
+                sweep(&text);
+            }
+        }
+
+        // And the sweep must actually have covered letters — a writer that
+        // silently produced empty strings would satisfy every assertion above.
+        assert!(
+            seen.iter().filter(|c| c.is_ascii_uppercase()).count() >= 12,
+            "the sweep saw too few letters to be exercising the labels: {seen:?}"
+        );
+        assert!(
+            ('0'..='9').all(|d| seen.contains(&d)),
+            "the sweep never printed some digit: {seen:?}"
+        );
+    }
+
+    /// The lock state survives without colour. `LOCK` and `FREE` are the same
+    /// width and differ in every character, so a screenshot — or a colour-blind
+    /// reader — sees the estimator's gate rather than inferring it from a hue.
+    /// This is the value Plan 0048 Phase 6 records a **rate** from, and ADR-0050's
+    /// stopping condition is unfalsifiable without it.
+    #[test]
+    fn the_lock_row_states_the_gate_in_words() {
+        let (mut locked, mut free) = (String::new(), String::new());
+        write_value_row(&mut locked, LOCKED_LABEL, 0.83);
+        write_value_row(&mut free, FREE_LABEL, 0.21);
+        assert_ne!(locked, free);
+        assert!(locked.starts_with(LOCKED_LABEL), "{locked:?}");
+        assert!(free.starts_with(FREE_LABEL), "{free:?}");
+        // The confidence rides along, so the row says how close a free frame was.
+        assert!(locked.ends_with("0.83"), "{locked:?}");
+        assert!(free.ends_with("0.21"), "{free:?}");
+        // Same width, so the two states do not shift the column under them.
+        assert_eq!(locked.chars().count(), free.chars().count());
+    }
+
+    /// The four level rows are a column: same label field width, so their values
+    /// and meters line up. A ragged stack is the difference between reading four
+    /// bars at a glance and parsing four lines.
+    #[test]
+    fn the_level_rows_line_up_as_a_column() {
+        let mut text = String::new();
+        let mut widths = std::collections::BTreeSet::new();
+        for label in LEVEL_LABELS {
+            write_value_row(&mut text, label, 0.5);
+            widths.insert(text.chars().count());
+            assert!(text.starts_with(label), "{text:?}");
+        }
+        assert_eq!(widths.len(), 1, "rows are ragged: {widths:?}");
     }
 
     /// A space is legitimately blank, so the check above would pass vacuously if

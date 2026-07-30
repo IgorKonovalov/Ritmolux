@@ -1611,6 +1611,7 @@ impl Renderer {
                 view,
                 (width, height),
                 metrics,
+                diag.analysis(),
                 tier.tier,
                 *tier_demoted,
                 diag.stats().samples().map(|s| s * 1000.0),
