@@ -1,8 +1,18 @@
 //! Embedded 5x7 bitmap font for the diagnostics overlay (Plan 0011).
 //!
 //! A deliberately-minimal, dependency-free debug primitive: just the glyphs the
-//! numeric readout needs (digits, a decimal point, a space, the unit labels
-//! FPS / MS / MB, and the tier names FLOOR / RICH). It is intentionally *not* the glyphon text renderer of Plan
+//! readout needs (digits, a decimal point, a space, the unit labels FPS / MS /
+//! MB, the tier names FLOOR / RICH, and the analysis labels BASS / MID / TREB /
+//! ONSET / LOCK / FREE).
+//!
+//! **An uncovered character renders blank, not an error** ([`glyph`]'s fallback
+//! arm), so a label using a letter that is not in the table below paints a
+//! confident gap and nothing in the engine notices. Adding a word to the readout
+//! means checking this table first — `overlay.rs`'s
+//! `every_character_the_readout_can_emit_has_a_glyph` sweeps the readout's whole
+//! alphabet for exactly that reason.
+//!
+//! It is intentionally *not* the glyphon text renderer of Plan
 //! 0008 / ADR-0009 — that is feature-gated and standalone-scoped, while this
 //! overlay is core-drawn and must paint in the foobar plugin too (all-three
 //! parity) without adding a dependency (NFR 4). Keep it self-contained so a
@@ -56,6 +66,15 @@ pub fn glyph(c: char) -> [u8; GLYPH_H] {
         'H' => [0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11],
         // Marks a tier the frame-time governor demoted (Plan 0044 Phase 2).
         '*' => [0x00, 0x0A, 0x04, 0x1F, 0x04, 0x0A, 0x00],
+        // The analysis rows (Plan 0049 Phase 3): BASS / MID / TREB / ONSET, and
+        // LOCK / FREE for the downbeat estimator's gate. `B C F I L M O R S` were
+        // already here for the frame-time line and the tier names.
+        'A' => [0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11],
+        'D' => [0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E],
+        'E' => [0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F],
+        'K' => [0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11],
+        'N' => [0x11, 0x19, 0x1D, 0x15, 0x17, 0x13, 0x11],
+        'T' => [0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04],
         _ => [0x00; GLYPH_H],
     }
 }
