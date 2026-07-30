@@ -305,14 +305,28 @@ pub struct Preset {
     /// means no crossfade (palette A only).
     pub palette_b: Option<PaletteConfig>,
     /// The salt this preset's `hash()`/`noise()` calls mix into their argument
-    /// (ADR-0051), folded at load from the `[generator] seed` key that had been
-    /// reserved and inert since Plan 0010. `0` when the preset declares none —
-    /// a perfectly good salt, and the one the whole shipped library used before
-    /// any preset asked for another.
+    /// **in the live app** (ADR-0051): folded at load from the `[generator] seed`
+    /// key that had been reserved and inert since Plan 0010, or drawn once from
+    /// OS entropy where the preset declares `seed = "random"`. `0` when it
+    /// declares nothing — a perfectly good salt, and the one the whole shipped
+    /// library used before any preset asked for another.
     ///
     /// A load-time constant. Nothing per-frame recomputes it, and no expression
     /// can read it except through the two functions it salts.
     pub salt: u32,
+    /// The salt every **capture** path uses in place of [`salt`](Self::salt):
+    /// the declared number, or `0` for `seed = "random"`.
+    ///
+    /// Equal to `salt` unless the preset opted into per-run variety — the whole
+    /// point of the pair (ADR-0051, following ADR-0045's tier pinning). The live
+    /// app varies and the harness pins, so `shot`, the goldens, `--report` and
+    /// the behavioral gates stay pure functions of their inputs while a preset
+    /// can still be different every time the user starts the app.
+    ///
+    /// It is the *renderer* that chooses between the two, not the loader, and
+    /// deliberately: `default_presets()` feeds both the live C-ABI path and the
+    /// capture gates, so a decision taken at load would be wrong for one of them.
+    pub pinned_salt: u32,
     /// Non-fatal problems found while loading — today, bindings naming a
     /// parameter this system does not consume (ADR-0020). The preset loaded and
     /// its good bindings apply; these are surfaced so a typo stops failing
@@ -365,11 +379,17 @@ impl Preset {
         // the star pattern care about the rest of `[generator]`, but any preset
         // may declare a seed, so a fragment or swarm preset can carry one table
         // holding nothing else.
-        let salt = raw
-            .generator
-            .as_ref()
-            .and_then(|generator| generator.seed)
-            .map_or(0, salt_from_seed);
+        //
+        // Entropy is drawn here, once per load, and only for `seed = "random"` —
+        // never per frame, never from a clock inside evaluation (ADR-0051
+        // Alternative B). The pinned twin is what the capture paths read.
+        let (salt, pinned_salt) = match raw.generator.as_ref().and_then(|g| g.seed) {
+            Some(RawSeed::Random) => (entropy_salt(), 0),
+            declared => {
+                let salt = salt_from_seed(declared.map_or(0, RawSeed::numeric));
+                (salt, salt)
+            }
+        };
 
         // Structural config: validated once here (a bad family/grammar -> load
         // error, the caller keeps the last good preset), then trusted by the
@@ -434,6 +454,7 @@ impl Preset {
             palette,
             palette_b,
             salt,
+            pinned_salt,
             warnings,
         })
     }
@@ -448,6 +469,20 @@ impl Preset {
 /// surprise this file exists to prevent.
 fn salt_from_seed(seed: u64) -> u32 {
     (seed as u32) ^ ((seed >> 32) as u32)
+}
+
+/// A salt drawn from OS entropy — the `seed = "random"` path (ADR-0051). Called
+/// **once per preset load**, in the live app only: no capture path reaches it,
+/// because a capture reads [`Preset::pinned_salt`] instead.
+///
+/// `RandomState` is the standard library's own entropy: its keys are seeded from
+/// the OS once per process and advance on every `new()`, so two loads of the same
+/// preset — in one run or across two — draw different salts. Using it is what
+/// keeps "sometimes crazy" from costing a dependency (`lightweight is a feature`).
+fn entropy_salt() -> u32 {
+    use std::collections::hash_map::RandomState;
+    use std::hash::BuildHasher;
+    salt_from_seed(RandomState::new().hash_one(0u64))
 }
 
 /// Assemble the optional structural config for `system` from the raw tables,
@@ -838,6 +873,71 @@ impl RawSpectrum {
     }
 }
 
+/// One `[generator] seed` value, before resolution (ADR-0051): a number, or the
+/// literal string `"random"`.
+///
+/// Hand-deserialized rather than `#[serde(untagged)]` for the same reason
+/// [`RawSmoothing`] is: an untagged enum reports every failure as "data did not
+/// match any variant", where a misspelled `seed = "randmo"` deserves to be told
+/// what the accepted forms are.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RawSeed {
+    /// `seed = 7` — a fixed salt, the same in the live app and in a capture.
+    Fixed(u64),
+    /// `seed = "random"` — drawn once per preset load in the live app, and
+    /// pinned to the numeric fallback (`0`) on every capture path.
+    Random,
+}
+
+impl RawSeed {
+    /// The **declared** number: the value itself, or `0` for `"random"`. This is
+    /// what a capture resolves to, and what the L-system's inert seed field keeps
+    /// receiving.
+    fn numeric(self) -> u64 {
+        match self {
+            Self::Fixed(n) => n,
+            Self::Random => 0,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RawSeed {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        de.deserialize_any(RawSeedVisitor)
+    }
+}
+
+struct RawSeedVisitor;
+
+impl serde::de::Visitor<'_> for RawSeedVisitor {
+    type Value = RawSeed;
+
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("a non-negative integer, or the string \"random\"")
+    }
+
+    fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Self::Value, E> {
+        Ok(RawSeed::Fixed(v))
+    }
+
+    /// TOML has one integer type and it is **signed**, so a plain `seed = 7`
+    /// arrives here rather than at `visit_u64`. A negative seed is rejected
+    /// rather than reinterpreted as a huge unsigned one — the author meant
+    /// something, and it was not `18446744073709551609`.
+    fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Self::Value, E> {
+        u64::try_from(v)
+            .map(RawSeed::Fixed)
+            .map_err(|_| E::invalid_value(serde::de::Unexpected::Signed(v), &self))
+    }
+
+    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+        match v {
+            "random" => Ok(RawSeed::Random),
+            other => Err(E::invalid_value(serde::de::Unexpected::Str(other), &self)),
+        }
+    }
+}
+
 /// The raw `[curve]` table: declarative structure for a parametric-curve scene.
 #[derive(Deserialize)]
 struct RawCurve {
@@ -874,12 +974,13 @@ struct RawGenerator {
     #[serde(default)]
     max_depth: Option<u32>,
     /// The preset's random salt — what the grammar's `hash()`/`noise()` mix into
-    /// their argument (ADR-0051). **Not** an L-system key despite living in the
-    /// L-system's table: it was reserved here in Plan 0010 and stayed inert until
-    /// Plan 0047 gave it a meaning, and the expansion is still deterministic and
-    /// still ignores it. Any system's preset may declare one.
+    /// their argument (ADR-0051): a number, or `"random"` for a salt drawn per
+    /// app launch. **Not** an L-system key despite living in the L-system's
+    /// table: it was reserved here in Plan 0010 and stayed inert until Plan 0047
+    /// gave it a meaning, and the expansion is still deterministic and still
+    /// ignores it. Any system's preset may declare one.
     #[serde(default)]
-    seed: Option<u64>,
+    seed: Option<RawSeed>,
     /// Star pattern: the regular tiling (e.g. `"6.6.6"` / `"hexagon"` / `"12"`).
     #[serde(default)]
     tiling: Option<String>,
@@ -933,7 +1034,10 @@ impl RawGenerator {
             rules,
             angle_deg,
             max_depth,
-            seed: self.seed.unwrap_or(0),
+            // Still inert (the expansion is deterministic and ignores it), so a
+            // `"random"` seed reads as its numeric fallback here rather than
+            // pulling entropy into a structural config.
+            seed: self.seed.map_or(0, RawSeed::numeric),
         })
     }
 

@@ -939,7 +939,12 @@ fn probe_reachability(preset: &Preset, frames: &[AnalysisFrame]) -> Vec<GateRepo
             // the frame differently than the renderer does — see
             // `Variables::from_frame`. Only `time` is ours to supply: there is
             // no render clock here, so it is the hop's position in the clip.
-            let vars = Variables::from_frame(frame, hop as f32 * hop_seconds);
+            //
+            // Salted with the **pinned** salt, because the report is a capture
+            // path (ADR-0051): it must describe the preset the harness renders,
+            // and a `seed = "random"` preset's live salt is not that one.
+            let vars = Variables::from_frame(frame, hop as f32 * hop_seconds)
+                .with_salt(preset.pinned_salt);
             // A per-element binding is evaluated once per element by the render
             // loop, so a gate of its can be live at one end of the strip and
             // dead at the other. Sampling `index` is what keeps this honest.
