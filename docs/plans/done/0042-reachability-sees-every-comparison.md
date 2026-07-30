@@ -1,6 +1,16 @@
 # 0042 — Reachability sees every comparison, and the library is re-audited against it
 
-> **Status:** in-progress 2026-07-29
+> **Status:** done 2026-07-30 — all three phases landed (`8c170a3` observe every comparison,
+> `e7a40b7` report one-sided unless a select names it, `f50e8cf` the Phase 3 re-audit). Mode 4
+> review passed with no blockers: the Outcome section's numbers were re-measured independently
+> (14 `GATE` + 2 `COMP` = 16, every one `tempo > N`, 0 genuinely dead), both negative results
+> confirmed (the two `min()` band halves and all seven bare comparisons score clean), and the
+> `probe`/`collect_flags` index arithmetic verified consistent so a `Compare` observation cannot
+> land on an arithmetic node. Two doc-freshness items were fixed in the close commit rather than
+> left: `docs/capturing.md` and `docs/presets.md` still described a `select`/`clamp`-only check
+> while `COMP` lines were already in real output, and capturing.md still justified the no-CI-gate
+> posture with the nine-failing-presets figure this plan measured to zero. Phase 2's done-when
+> said "two flags" where ADR-0043 means three; corrected in place.
 > **Created:** 2026-07-29
 > **Owner skill(s):** dev
 > **Related ADRs:** [0043](../adrs/0043-reachability-reports-comparison-nodes.md) (this plan's
@@ -109,11 +119,13 @@ flowchart TB
 - **Files touched:** `core/src/preset/expr.rs`, `standalone/examples/shot.rs`
 - **Done when:** `select(bass > 0.3, a, b)` yields exactly **one** flag, the existing select one —
   not two. `reseed = "onset > 0.55"` yields exactly one flag naming the comparison. And
-  `select(min(tempo > 124, bass + treb > 0.38), 4, 1)` yields **two** flags naming
-  `tempo > 124` and `bass + treb > 0.38` *separately* rather than one naming the `min(...)`, which
-  is the case that reported clean before this plan. Each flagged comparison's `source` re-renders as
-  text that parses back to the same tree (the property the existing
-  `a_flagged_gate_is_named_in_source_that_compiles_back` test asserts, extended to the new kind).
+  `select(min(tempo > 124, bass + treb > 0.38), 4, 1)` yields **two comparison flags** naming
+  `tempo > 124` and `bass + treb > 0.38` *separately* — **alongside** the select flag on the whole
+  `min(...)`, which is retained (ADR-0043 rejects dropping it as its Alternative B), so the finding
+  is three flags in total. That composite is the case that reported clean before this plan. Each
+  flagged comparison's `source` re-renders as text that parses back to the same tree (the property
+  the existing `a_flagged_gate_is_named_in_source_that_compiles_back` test asserts, extended to the
+  new kind).
 
 ### Phase 3 — re-audit the shipped library and record what is actually there
 

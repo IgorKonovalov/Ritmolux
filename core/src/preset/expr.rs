@@ -472,8 +472,9 @@ impl Node {
     /// comes from [`Node::eval`] itself (see [`Expr::eval_probed`]), so there is
     /// no second copy of the arithmetic to drift out of step with the first —
     /// the divergence ADR-0042 names as this approach's main cost is removed by
-    /// construction rather than merely tested for. The price is that conditions
-    /// and clamp arguments are evaluated twice per probed call, which is free:
+    /// construction rather than merely tested for. The price is that comparisons,
+    /// conditions and clamp arguments are evaluated twice per probed call — and a
+    /// comparison nested under another one compounds it — which is free:
     /// expressions are pure and nothing but the harness calls this.
     fn probe(&self, vars: &Variables<'_>, obs: &mut Observations, index: usize) {
         match self {

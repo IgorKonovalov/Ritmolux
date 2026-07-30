@@ -323,17 +323,38 @@ scalar gap suggests.
 
 The `gates` and `ceils` counts are not measured from pixels at all. They come
 from walking each preset's **expression trees** while evaluating them over 12 s
-of `dynamic:110` through the real analyzer, recording whether every `select()`
-condition went each way and how close every `clamp()` came to its upper bound.
-A frame differential structurally cannot answer this — `select(c, 6, 8)` and
-`select(c, 6, 6)` diff identically, and neither names *which* gate.
+of `dynamic:110` through the real analyzer, recording which way every
+**comparison** and every `select()` condition went, and how close every `clamp()`
+came to its upper bound. A frame differential structurally cannot answer this —
+`select(c, 6, 8)` and `select(c, 6, 6)` diff identically, and neither names
+*which* gate.
 
-- **`gates`** — `select()` conditions that never went both ways. One branch of
-  the preset has never rendered. Each is named underneath the table with its
-  source text, so the threshold to re-gain is in front of you.
-- **`ceils`** — `clamp()` upper bounds the value never approached. The bound is
+Three kinds of finding are printed, each on its own prefixed line:
+
+- **`GATE`** — a `select()` whose condition never went both ways. One branch of
+  the preset has never rendered. Named underneath the table with its source text,
+  so the threshold to re-gain is in front of you.
+- **`COMP`** — a **comparison** (`> < >= <= == !=`) that only ever took one
+  value, so it read as a constant `0` or `1`
+  ([ADR-0043](adrs/0043-reachability-reports-comparison-nodes.md)). This catches
+  two shapes a `GATE` line cannot. One is the bare comparison as a whole
+  binding — `reseed = "onset > 0.55"`, the idiomatic boolean-param form, which
+  holds no `select()` at all. The other is one **half of a composite condition**:
+  in `select(min(tempo > 124, bass + treb > 0.38), 4, 1)` the `GATE` line names
+  the whole `min(...)`, and since a `tempo` gate is legitimately one-sided here
+  (below), a reader would dismiss it — so each half is also reported on its own,
+  and the excusable one can no longer launder the other.
+- **`CEIL`** — a `clamp()` upper bound the value never approached. The bound is
   decorative and the parameter's real range is narrower than it reads. Counted
   per preset, the worst few named per family, all of them in `--json`.
+
+A comparison that is the **direct condition** of a `select()` reports once, as
+the `GATE` line only — that line already names it and says which branch never
+ran, which a `COMP` line cannot. So `GATE` and `COMP` never double-report the
+same finding.
+
+The `gates` column counts `GATE` + `COMP` together: both say a branch of the
+preset's behavior has never happened. `ceils` counts `CEIL`.
 
 **A flag is a suspect, not a conviction.** It says *this* stimulus never drove
 the gate both ways, which is a fact about the probe as much as about the preset.
@@ -346,10 +367,17 @@ The probe runs 12 s rather than the 4 s a `--signal` filmstrip synthesizes,
 because the tempo tracker needs about 4 s to lock. Under a short clip `tempo`
 reads a flat `0` and every `tempo` comparison flags for the wrong reason.
 
-This is advisory output. It is **not** a CI gate, and deliberately so: at least
-nine shipped presets would fail on day one and block everyone on an unrelated
-content pass ([ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md)
-Alternative C).
+This is advisory output. It is **not** a CI gate, and deliberately so — but the
+reason has moved. ADR-0042 deferred gating because nine shipped presets would
+have failed on day one, blocking everyone on an unrelated content pass. Those
+nine were fixed on 2026-07-29, and the Plan 0042 re-audit against the corrected
+check measured **0 genuinely dead gates across the shipped set**. What blocks
+gating now is the instrument, not the library: every one of the flags the shipped
+set still produces is the `tempo` single-BPM false positive above, so a naive
+"fail if flags > 0" would fail CI permanently and a threshold would be tuned to
+noise. The precondition for gating is therefore a multi-BPM probe or an explicit
+`tempo` exemption
+([ADR-0043](adrs/0043-reachability-reports-comparison-nodes.md)).
 
 ### Which preset library a shot uses
 
@@ -532,8 +560,10 @@ family/preset: per-band `reactivity` and `reactivity_low`, `animation`,
 `reachability` carries `dead_branches` and `unapproached_ceilings` counts, the
 full `gates` list (each with `param`, `source`, `kind`, and either `always` or
 `peak_fraction_of_bound`), and a `probe` object naming the signal, BPM and
-duration they were observed under. Keep the provenance when you consume it: a
-flag only ever means *not observed under this stimulus*.
+duration they were observed under. `kind` is `"select"`, `"compare"` or
+`"clamp"` — matching the `GATE` / `COMP` / `CEIL` lines above — and
+`dead_branches` counts the first two together. Keep the provenance when you
+consume it: a flag only ever means *not observed under this stimulus*.
 
 ## The `core/tests/` harness
 
