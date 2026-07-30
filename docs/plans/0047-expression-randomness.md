@@ -1,6 +1,6 @@
 # 0047 — Expression randomness: `hash`, `noise`, and the seed that finally does something
 
-> **Status:** draft 2026-07-30 (parallel-safe: expr/schema/capture files only — no collision with the render queue)
+> **Status:** approved 2026-07-30 — ready for `dev` (parallel lane: expr/schema/capture files only — no collision with the render queue; may start immediately)
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev
 > **Related ADRs:** [0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md).
