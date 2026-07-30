@@ -1,6 +1,6 @@
 # ADR-0051 — `hash(x)` and `noise(x)` in the grammar, seeded per preset; an opt-in per-run seed that capture paths always pin
 
-> **Status:** proposed
+> **Status:** accepted 2026-07-30 (shipped by Plan 0047)
 > **Date:** 2026-07-30
 > **Related plan(s):** 0047-expression-randomness (R5)
 > **Supplements:** ADR-0002/0020 (the grammar), NFR §6 (seeded visual randomness)

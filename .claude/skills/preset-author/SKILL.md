@@ -106,7 +106,8 @@ screen-space kaleidoscope (`kaleido_*`), and the terminal ink-on-paper remap
   older files fake a wander with three or four; `attractor_dejong` has four), and for `hash` when you
   want something genuinely *different* per beat or per element rather than merely louder:
   `hash(floor(time * 2))`, `hash(index * 64)`. Sum `noise` calls at different rates for depth; offset
-  the argument (`+ 50`) to decorrelate two parameters. `seed = "random"` varies per app launch — but
+  the argument (`+ 50`) to decorrelate two parameters. `seed = "random"` re-rolls on every preset
+  **load** (app start, and each hot reload while you edit) — but
   **every capture path pins it to `0`**, so a filmstrip of one shows an instance, not the live look.
   Tune with a number.
 - **`bin(x)` reaches the spectrum** — the 64-band array at normalized position `x` (`0` = lowest,

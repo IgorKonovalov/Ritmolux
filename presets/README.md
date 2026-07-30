@@ -116,8 +116,11 @@ thickness = "2 + hash(index * 64) * 3"          # scatter a per-element readout
 
 [generator]
 seed = 12          # any non-negative integer: the same look, every time
-# seed = "random"  # a different look each time the app starts
+# seed = "random"  # a different look every time the preset loads
 ```
+
+`"random"` redraws on every **load** — app start, and every hot reload of the
+preset folder — so while you are editing a file it re-rolls on each save.
 
 - **Prefer `noise(time * k)` to a sum of detuned sines** in new presets. The
   older files fake a wander with three or four sines whose periods do not line

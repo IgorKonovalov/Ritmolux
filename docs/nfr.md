@@ -50,6 +50,12 @@ contradicts this file is a plan bug — surface it, don't guess.
 
 - DSP outputs (spectrum bins, onset envelope, beat estimate) are pure functions of the input
   window — no wall clock, no unseeded randomness. Visual randomness is explicitly seeded.
+- The grammar's `hash(x)`/`noise(x)` are that seeded randomness (Plan 0047 /
+  [ADR-0051](adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)): pure functions of
+  their argument and a per-preset salt, never of a clock. A preset may set `seed = "random"`,
+  which chooses **who supplies the seed** — OS entropy, once at load, in the live app — not
+  whether one exists; every capture path forces the declared number, so the harness stays a pure
+  function of its inputs.
 
 ## 7. CI
 

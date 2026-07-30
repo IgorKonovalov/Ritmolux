@@ -473,15 +473,16 @@ that is not an L-system can carry a `[generator]` table containing nothing else:
 ```toml
 [generator]
 seed = 12          # any non-negative integer: the same look, every time
-# seed = "random"  # a different look every time the app starts
+# seed = "random"  # a different look every time the preset loads
 ```
 
 - **No seed** means seed `0` — a perfectly good scatter, and what every preset
   had before this existed.
 - **A number** makes the preset reproducible: same audio, same picture, forever.
   Two presets with the same expression and different seeds look different.
-- **`"random"`** draws a fresh seed each time the preset loads, so the look
-  differs between app launches. It is drawn **once, at load** — never per frame.
+- **`"random"`** draws a fresh seed each time the preset **loads** — app start,
+  and every hot reload of the preset folder, so it re-rolls on each save while
+  you are editing. It is drawn once, at load — never per frame.
 
 > **`"random"` and captures.** Every capture path — `shot`, the golden baselines,
 > `--report`, the behavioral gates — forces the numeric seed (`0`) so its output

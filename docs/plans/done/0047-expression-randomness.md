@@ -1,6 +1,13 @@
 # 0047 — Expression randomness: `hash`, `noise`, and the seed that finally does something
 
-> **Status:** in-progress 2026-07-30 (parallel lane: expr/schema/capture files only — no collision with the render queue)
+> **Status:** done 2026-07-30 — all three phases shipped on `plan-0047-expression-randomness`
+> (`96d39c1` the two salted functions, `d72a4cc` `seed = "random"` + the capture pin, `8f7fc13`
+> the docs sweep), merged to `main`. Passed Mode 4 review: **no blockers, no majors**; three
+> minors (the pin is test-verified at one of five capture entry points; `docs/capturing.md` and
+> NFR §6 not swept) — the two doc minors fixed in this close commit, the test-coverage one left
+> as a `dev` followup below. Verified independently at review: all six `draw_frame` call sites
+> carry a `SaltMode` (one `Live`, five `Pinned`), no expression evaluation escapes the salt,
+> no C ABI change, no new dependency; `fmt`/`clippy`/`nextest` green (305 tests).
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev
 > **Related ADRs:** [0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md).
@@ -103,3 +110,10 @@ grammar.
 
 - The retune pass in Plan 0048 Phase 7 may adopt `noise`/`hash` opportunistically where a
   preset's sine-sum wander is being touched anyway.
+- **`dev`, small — widen the pin's test coverage.** `core/tests/seed.rs` proves the pin through
+  `capture_preset` only; `capture_at_clock`, `capture_preset_over` and `capture_audio` are pinned
+  by code inspection alone. The `step_offscreen` warm-up under `capture_preset` is not covered
+  either: the fixture is deliberately a stateless `fragment_field` with no `trails` (the
+  configuration WARP is faithful on), so a warm-up frame's salt cannot reach the read-back pixels.
+  Two more arms on `a_random_seeded_preset_captures_byte_identically` running the same fixture
+  through `capture_preset_over` and `capture_audio` turn a code-review guarantee into a test one.
