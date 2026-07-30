@@ -23,6 +23,46 @@ pub struct Config {
     pub output: Output,
     pub input: Input,
     pub rotate: Rotate,
+    pub quality: Quality,
+}
+
+/// `[quality]` — the render quality tier (Plan 0044 / ADR-0045).
+///
+/// Persisted because a pin is a property of the *machine*, not of a run: an
+/// operator who has decided their iGPU wants the floor should not have to pass
+/// `--tier floor` at every launch. `--tier` and `LMV_TIER` still win over this,
+/// in that order.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Quality {
+    /// Which tier to pin, or `auto` (the default) to let the engine resolve the
+    /// rich tier and demote it if the frame time says so.
+    pub tier: TierChoice,
+}
+
+/// A config-file tier choice — the two real tiers plus "let the engine decide".
+/// Serializes as the kebab-case strings the config uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TierChoice {
+    /// No pin: the engine resolves the rich tier and the governor may demote it.
+    #[default]
+    Auto,
+    /// Pin the iGPU floor.
+    Floor,
+    /// Pin the rich tier — the governor never demotes a pin.
+    Rich,
+}
+
+impl TierChoice {
+    /// The pin this choice represents, or `None` for `auto`.
+    pub fn tier(self) -> Option<lmv_core::render::Tier> {
+        match self {
+            TierChoice::Auto => None,
+            TierChoice::Floor => Some(lmv_core::render::Tier::Floor),
+            TierChoice::Rich => Some(lmv_core::render::Tier::Rich),
+        }
+    }
 }
 
 /// `[input]` — where audio comes from: loopback of whatever is playing, or a

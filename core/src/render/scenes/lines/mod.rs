@@ -45,11 +45,6 @@ pub use star::StarPatternScene;
 /// this path.
 pub use super::{CapOverflow, GeneratorConfig, OverflowContext};
 
-/// Fixed segment-buffer capacity for every line scene, tuned to the iGPU floor
-/// (ADR-0007 Risks: ~20k). A curve's `samples` and a generator's structure are
-/// both clamped to this, and any drop is surfaced at load — never a silent cut.
-pub const MAX_SEGMENTS: usize = 20_000;
-
 /// Hard clamp on L-system iteration depth, enforced at preset load. A branching
 /// rule expands exponentially, so an unbounded `max_depth` would stall a preset
 /// switch and blow the segment cap (ADR-0007 Risks). Curated presets stay well
@@ -59,7 +54,7 @@ pub const MAX_LSYSTEM_DEPTH: u32 = 7;
 /// Hard clamp on the geometry-mirror rotational order (Plan 0018 Phase 4). Beyond
 /// a couple dozen the fold is visually indistinguishable and only multiplies
 /// segment count toward the cap; a sane ceiling keeps a runaway `mirror_order`
-/// expression from doing useless work before the [`MAX_SEGMENTS`] cap bites.
+/// expression from doing useless work before the segment cap bites.
 pub const MAX_MIRROR_ORDER: u32 = 24;
 
 /// The shared camera transform every scene family applies (ADR-0018): a uniform
@@ -204,9 +199,10 @@ impl MirrorSpec {
 /// Replicate `single` (already positioned/coloured segments) about the frame
 /// centre under `mirror.order`-fold rotation, plus an optional reflected copy per
 /// sector, into `out` (cleared first) — a geometric kaleidoscope whose segment
-/// set is invariant under a `2*pi/order` rotation. Truncates at `cap` (the
-/// renderer's [`MAX_SEGMENTS`]) and returns the number of segments dropped, so the
-/// caller can surface it — the cap is never a silent cut (ADR-0007 Risks).
+/// set is invariant under a `2*pi/order` rotation. Truncates at `cap` (the active
+/// tier's [`max_segments`](crate::render::TierConfig::max_segments), which the
+/// scene resolved at construction) and returns the number of segments dropped, so
+/// the caller can surface it — the cap is never a silent cut (ADR-0007 Risks).
 ///
 /// Allocation-free into a preallocated `out`; the per-frame half of every mirrored
 /// line scene.
@@ -257,6 +253,11 @@ mod tests {
     #![allow(clippy::indexing_slicing)]
 
     use super::*;
+
+    /// The cap these tests run at — the floor tier's, which is the value they were
+    /// written against and the one every shipped preset is authored and gated on
+    /// (Plan 0044).
+    const FLOOR_CAP: usize = crate::render::TierConfig::FLOOR.max_segments;
 
     fn seg(a: [f32; 2], b: [f32; 2]) -> SegmentInstance {
         SegmentInstance {
@@ -383,10 +384,11 @@ mod tests {
             CapOverflow {
                 dropped: 350,
                 context: OverflowContext::Mirror(6),
+                cap: FLOOR_CAP,
             }
             .to_string(),
             format!(
-                "geometry exceeded the {MAX_SEGMENTS}-segment cap at mirror x6 \
+                "geometry exceeded the {FLOOR_CAP}-segment cap at mirror x6 \
                  (dropped 350 segment(s)); reduce the structure or its depth"
             )
         );
@@ -394,13 +396,52 @@ mod tests {
             CapOverflow {
                 dropped: 1,
                 context: OverflowContext::Depth(7),
+                cap: FLOOR_CAP,
             }
             .to_string(),
             format!(
-                "geometry exceeded the {MAX_SEGMENTS}-segment cap at depth 7 \
+                "geometry exceeded the {FLOOR_CAP}-segment cap at depth 7 \
                  (dropped 1 segment(s)); reduce the structure or its depth"
             )
         );
+    }
+
+    /// **The message names the cap that actually bit**, not a constant.
+    ///
+    /// The cap is a tier value now (Plan 0044), so the two assertions above would
+    /// both still pass if `Display` had gone back to reading a hardcoded 20 000 —
+    /// the floor's cap *is* 20 000. Formatting the same overflow at the rich cap
+    /// is what makes the reading non-vacuous: a reverted `Display` would print the
+    /// floor's number here and fail. ADR-0007 requires the surfaced cut be
+    /// informative, and a message quoting a cap the run was not using is worse
+    /// than none.
+    #[test]
+    fn the_overflow_message_names_the_cap_it_carries() {
+        let rich_cap = crate::render::TierConfig::RICH.max_segments;
+        assert_ne!(
+            rich_cap, FLOOR_CAP,
+            "the two tiers must differ for this to test anything"
+        );
+
+        let at = |cap: usize| {
+            CapOverflow {
+                dropped: 7,
+                context: OverflowContext::Mirror(3),
+                cap,
+            }
+            .to_string()
+        };
+        assert!(
+            at(rich_cap).contains(&rich_cap.to_string()),
+            "{}",
+            at(rich_cap)
+        );
+        assert!(
+            !at(rich_cap).contains(&FLOOR_CAP.to_string()),
+            "a rich-tier overflow must not quote the floor's cap: {}",
+            at(rich_cap)
+        );
+        assert_ne!(at(rich_cap), at(FLOOR_CAP));
     }
 
     /// Plan 0039 Phase 1 done-when 4. Replication moves geometry; it does not

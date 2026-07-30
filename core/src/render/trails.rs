@@ -276,6 +276,13 @@ pub struct Trails {
     surface_format: wgpu::TextureFormat,
     res: Option<Resources>,
     amount: f32,
+    /// The active tier's cap on this stage's internal grid
+    /// ([`TierConfig::post_cap`](super::TierConfig::post_cap)), resolved once at
+    /// construction. A field rather than a constant so the tier can raise it, and
+    /// read only through [`internal_size`](PostStage::internal_size) so that stays
+    /// a pure function of `surface` — which is what the chain's rebuild comparison
+    /// rests on.
+    post_cap: (u32, u32),
     /// How many times [`Resources::build`] has run on this stage. Diagnostic, and
     /// what pins ADR-0030's compare-first obligation in a test: rebuilding every
     /// frame would be correct-looking and would also clear the trail history every
@@ -289,12 +296,17 @@ pub const PARAMS: &[&str] = &["trails"];
 
 impl Trails {
     /// Store the device/format for a lazy build; no GPU resources yet.
-    pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        post_cap: (u32, u32),
+    ) -> Self {
         Self {
             device: device.clone(),
             surface_format,
             res: None,
             amount: DEFAULT_TRAILS,
+            post_cap,
             builds: 0,
         }
     }
@@ -347,7 +359,7 @@ impl PostStage for Trails {
     /// (ADR-0037), because the present below is a plain normalized stretch that
     /// undoes whatever shape this grid happens to have.
     fn internal_size(&self, surface: (u32, u32)) -> (u32, u32) {
-        internal_grid_size(surface)
+        internal_grid_size(surface, self.post_cap)
     }
 
     /// Build the resources if needed (clearing the fresh accumulation) and return

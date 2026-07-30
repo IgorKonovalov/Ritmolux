@@ -39,6 +39,7 @@ mod post;
 pub mod scenes;
 #[cfg(feature = "text")]
 pub mod text;
+pub mod tier;
 pub(crate) mod trails;
 mod transition;
 
@@ -59,6 +60,7 @@ pub use scenes::lines::CapOverflow;
 use text::TextLayer;
 #[cfg(feature = "text")]
 pub use text::TextRun;
+pub use tier::{Tier, TierConfig};
 use transition::{Blend, DEFAULT_DURATION_SECS, Mode, Transition, TransitionKind};
 
 /// Assumed bytes-per-pixel for the swapchain GPU-byte estimate (the common
@@ -524,10 +526,10 @@ struct CompositeSide {
 }
 
 impl CompositeSide {
-    fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+    fn new(device: &wgpu::Device, format: wgpu::TextureFormat, tier: &TierConfig) -> Self {
         Self {
             background: Background::new(device, format),
-            chain: PostChain::new(device, format),
+            chain: PostChain::new(device, format, tier),
         }
     }
 
@@ -547,6 +549,12 @@ impl CompositeSide {
 }
 
 /// How to build a headless [`Renderer`] for capture (Plan 0013).
+///
+/// Deliberately carries **no tier**: [`Renderer::new_headless`] is
+/// [`Tier::Floor`] by construction, which is what keeps every golden baseline
+/// byte-reproducible (ADR-0045). A capture at another tier goes through
+/// [`Renderer::new_headless_tiered`], where the choice is written at the call
+/// site and cannot be reached by forgetting a field.
 #[derive(Debug, Clone, Copy)]
 pub struct HeadlessOptions {
     /// Offscreen render width in pixels.
@@ -556,6 +564,27 @@ pub struct HeadlessOptions {
     /// Force a fallback (software) adapter — WARP on DX12 — so captures
     /// rasterize identically across machines. Tests want this on.
     pub prefer_software: bool,
+}
+
+/// Construction-time options for an on-surface [`Renderer`] (Plan 0044).
+///
+/// One field today and a struct anyway, because the tier pin is the first of a
+/// family: a renderer's *construction* choices (quality, later backend or format
+/// preferences) are decided once and never per frame, and threading them as
+/// positional arguments is how the three constructors drift apart.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RendererOptions {
+    /// An explicit tier pin, or `None` for auto — which resolves [`Tier::Rich`]
+    /// and leaves the frame-time governor free to demote it once (ADR-0045). A
+    /// pin is honoured in both directions and never demotes.
+    pub tier: Option<Tier>,
+}
+
+impl RendererOptions {
+    /// Options pinning `tier` explicitly.
+    pub fn pinned(tier: Tier) -> Self {
+        Self { tier: Some(tier) }
+    }
 }
 
 /// Owns the GPU context, the built-in systems, and the loaded presets; renders
@@ -620,6 +649,30 @@ pub struct Renderer {
     /// uses an empty prefix, which is what makes their path unchanged.
     series_scratch: Vec<f32>,
     param_smoother: ParamSmoother,
+    /// The active quality tier's capacity values, resolved **once** here at
+    /// construction (ADR-0045). Read at construction and reconfigure time only —
+    /// never branched on per frame.
+    tier: TierConfig,
+    /// True when the tier was pinned explicitly rather than auto-resolved. A pin
+    /// is honoured in both directions (ADR-0045), so the governor never touches
+    /// one — which is also the escape hatch for a machine whose transient stall
+    /// cost it the rich tier.
+    tier_pinned: bool,
+    /// **The governor's one-way latch.** Set the single time the frame-time
+    /// governor demotes `Rich -> Floor`, and never cleared: there is no
+    /// auto-promotion by design, so a demoted session stays demoted and the
+    /// decision cannot oscillate. The same shape as the dual-live freeze latch
+    /// below, for the same reason.
+    ///
+    /// Also what the frontend reads to report the demotion, so a pinned floor and
+    /// a demoted floor are distinguishable — otherwise the demotion would be
+    /// silent, which ADR-0045 rules out.
+    tier_demoted: bool,
+    /// The display's frame budget in seconds, set by the frontend from its
+    /// monitor's refresh rate ([`set_display_hz`](Self::set_display_hz)). Not read
+    /// from the platform here — a refresh rate is a shell concern, and `core`
+    /// stays source- and platform-agnostic.
+    frame_budget_secs: f32,
     /// The **outgoing** preset's easing state during a dual-live dissolve. Moved
     /// out of [`param_smoother`](Self::param_smoother) when the roster flips, so a
     /// heavily-smoothed preset keeps easing through the dissolve instead of
@@ -633,9 +686,13 @@ impl Renderer {
     /// embedded default presets. **The one construction path** — the three public
     /// constructors differ only in how they obtain the context, so a new field is
     /// a one-place edit here rather than three.
-    fn from_context(ctx: RenderContext) -> Self {
-        let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
-        let side = CompositeSide::new(&ctx.device, ctx.surface_format());
+    fn from_context(ctx: RenderContext, opts: RendererOptions) -> Self {
+        // The one tier resolution in the engine (ADR-0045): a pin wins, and
+        // unpinned is `Rich` — the governor's job is to take that back, not to
+        // hedge it here.
+        let tier = TierConfig::for_tier(opts.tier.unwrap_or(Tier::Rich));
+        let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format(), &tier);
+        let side = CompositeSide::new(&ctx.device, ctx.surface_format(), &tier);
         let ink = Ink::new(&ctx.device, ctx.surface_format());
         let blend = Blend::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
@@ -659,6 +716,10 @@ impl Renderer {
             cap_overflow: None,
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
             param_smoother: ParamSmoother::default(),
+            tier,
+            tier_pinned: opts.tier.is_some(),
+            tier_demoted: false,
+            frame_budget_secs: tier::budget_secs(tier::DEFAULT_DISPLAY_HZ),
             outgoing_smoother: ParamSmoother::default(),
         };
         // Apply the initial preset's structural config (ADR-0007) so a line
@@ -669,31 +730,55 @@ impl Renderer {
 
     /// Build a renderer drawing into `target` (a safe window handle — the
     /// standalone path). Starts with the embedded default presets.
+    ///
+    /// `opts` carries the quality-tier pin;
+    /// [`RendererOptions::default()`](RendererOptions) is auto (rich, governed).
     pub fn new(
         target: impl Into<wgpu::SurfaceTarget<'static>>,
         width: u32,
         height: u32,
+        opts: RendererOptions,
     ) -> Result<Self, RenderError> {
-        Ok(Self::from_context(RenderContext::new(
-            target, width, height,
-        )?))
+        Ok(Self::from_context(
+            RenderContext::new(target, width, height)?,
+            opts,
+        ))
     }
 
     /// Build a **headless** renderer that draws into offscreen textures instead
     /// of a window (Plan 0013 capture tooling). Same scenes, presets, and
     /// per-frame evaluation as the on-surface path — only the target differs.
     /// Starts with the embedded default presets.
+    ///
+    /// **Pinned [`Tier::Floor`], and there is no argument to say otherwise**
+    /// (ADR-0045). A capture is a pure function of its inputs (NFR §6), and a
+    /// baseline that moved because the machine that blessed it was fast is not a
+    /// baseline — so the floor is the default by construction here rather than by
+    /// every call site remembering to ask for it. Use
+    /// [`new_headless_tiered`](Self::new_headless_tiered) for a deliberate
+    /// rich-tier capture.
     pub fn new_headless(opts: HeadlessOptions) -> Result<Self, RenderError> {
-        Ok(Self::from_context(RenderContext::new_headless(
-            opts.width,
-            opts.height,
-            opts.prefer_software,
-        )?))
+        Self::new_headless_tiered(opts, Tier::Floor)
+    }
+
+    /// A headless renderer pinned to `tier` — the opt-in behind the `shot` CLI's
+    /// `--tier`, for spot-checking that the rich tier's raised budgets actually
+    /// render (Plan 0044 Phase 3). Always **pinned**, so a capture never demotes
+    /// mid-run and stays reproducible.
+    pub fn new_headless_tiered(opts: HeadlessOptions, tier: Tier) -> Result<Self, RenderError> {
+        Ok(Self::from_context(
+            RenderContext::new_headless(opts.width, opts.height, opts.prefer_software)?,
+            RendererOptions::pinned(tier),
+        ))
     }
 
     /// Renderer targeting a native Win32 window the host owns — the C ABI
     /// path (foobar2000 shim). Starts with the embedded default presets (no
     /// ABI surface for preset selection yet).
+    ///
+    /// Auto tier: the plugin gets rich-with-governor, because the C ABI stays v4
+    /// and a plugin-side tier picker is a future ABI question rather than part of
+    /// ADR-0045.
     ///
     /// # Safety
     /// `hwnd` must be a valid window handle that outlives this renderer.
@@ -715,7 +800,84 @@ impl Renderer {
         // promise about `hwnd`'s validity and lifetime. Construction past that
         // point is the same safe code the other two paths run.
         let ctx = unsafe { RenderContext::new_unsafe(target, width, height) }?;
-        Ok(Self::from_context(ctx))
+        Ok(Self::from_context(ctx, RendererOptions::default()))
+    }
+
+    /// The active quality tier (ADR-0045) — what the diagnostics overlay and the
+    /// `shot` report header name.
+    pub fn tier(&self) -> Tier {
+        self.tier.tier
+    }
+
+    /// Whether the frame-time governor demoted this session's tier.
+    ///
+    /// The frontend reports the **transition**, so a demotion is announced once
+    /// rather than shouted every frame — the same pattern
+    /// [`cap_overflow`](Self::cap_overflow) is surfaced through. A pinned floor
+    /// answers `false`; only a governed demotion sets this.
+    pub fn tier_demoted(&self) -> bool {
+        self.tier_demoted
+    }
+
+    /// Tell the renderer the display's refresh rate, which sets the frame budget
+    /// the governor measures against (ADR-0045). Defaults to
+    /// [`DEFAULT_DISPLAY_HZ`](tier::DEFAULT_DISPLAY_HZ); a rate that is not usable
+    /// falls back to it rather than producing a degenerate budget.
+    ///
+    /// Off the hot path — call it at startup and on a monitor change. The core
+    /// does not read this from the platform itself: a refresh rate is a shell
+    /// concern, and the whole point of the split is that `core` knows nothing
+    /// about windows.
+    pub fn set_display_hz(&mut self, hz: f32) {
+        self.frame_budget_secs = tier::budget_secs(hz);
+    }
+
+    /// Run the governor over the rolling frame-time history and demote if it says
+    /// so, returning whether this call was the demotion.
+    ///
+    /// Nothing happens when the tier is pinned, when it is already the floor, or
+    /// when the latch has already fired — so the decision is made **once per
+    /// session** and the expensive part below cannot run twice.
+    fn govern_tier(&mut self) -> bool {
+        if !tier::should_demote(
+            self.tier.tier,
+            self.tier_pinned,
+            self.tier_demoted,
+            self.diag.stats().samples(),
+            self.frame_budget_secs,
+        ) {
+            return false;
+        }
+        self.tier_demoted = true;
+        self.apply_tier(TierConfig::FLOOR);
+        true
+    }
+
+    /// Rebuild the tier-dependent GPU state for `tier`.
+    ///
+    /// Allocation at a **reconfigure**, not on the hot path: this runs at most
+    /// once in a session (the governor's latch is what guarantees that). The
+    /// visible cost is one blink of the trails accumulation as the field pair is
+    /// rebuilt at the smaller grid — the same blink a window resize across a grid
+    /// step produces, and ADR-0045 accepts it as the price of a rare, deliberately
+    /// visible event.
+    ///
+    /// A dissolve in flight is cancelled rather than migrated: its two sides are
+    /// GPU state built at the outgoing tier, and finishing a crossfade across a
+    /// tier change is a worse artifact than landing on the incoming preset.
+    fn apply_tier(&mut self, tier: TierConfig) {
+        self.tier = tier;
+        self.cancel_transition();
+        self.incoming_side = None;
+        self.side = CompositeSide::new(&self.ctx.device, self.ctx.surface_format(), &self.tier);
+        // The scenes carry tier capacities too — particle counts, the segment
+        // buffer, the trail-grid cap — and those are sized at construction, so a
+        // tier change means rebuilding them. Rebuilding also resets their
+        // simulation state to its seed, which is the visible half of a demotion:
+        // the attractor's cloud and the swarm restart rather than losing two
+        // thirds of their points mid-flight.
+        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format(), &self.tier);
+        self.configure_active_scene();
     }
 
     /// Reconfigure the surface for a new window size.
@@ -813,6 +975,7 @@ impl Renderer {
         self.incoming_side = Some(CompositeSide::new(
             &self.ctx.device,
             self.ctx.surface_format(),
+            &self.tier,
         ));
     }
 
@@ -1175,6 +1338,12 @@ impl Renderer {
 
         self.diag.set_draw_calls(draw_calls);
         self.diag.record_frame();
+        // The quality governor, after this frame is recorded: on sustained
+        // evidence that the rich tier does not fit the display budget it latches
+        // to the floor for the remainder of the session (ADR-0045). Cheap in the
+        // steady state — a pin, an already-floor tier, or a fired latch all return
+        // before the series is read — and it can rebuild GPU state at most once.
+        self.govern_tier();
         Ok(())
     }
 
@@ -1225,6 +1394,17 @@ impl Renderer {
             series_scratch,
             param_smoother,
             outgoing_smoother,
+            // Resolved once at construction; the overlay names it (ADR-0045). The
+            // capacity values themselves were consumed at construction time — the
+            // frame path reads the tier only to print it.
+            tier,
+            // Whether that tier was the governor's doing, so the overlay can tell
+            // a demoted floor from a pinned one.
+            tier_demoted,
+            // Governor inputs, read after the frame is encoded (see `govern_tier`)
+            // rather than while encoding it — not a per-frame drawing concern.
+            tier_pinned: _,
+            frame_budget_secs: _,
             // Switch-site policy state (the kind rotation) — not a per-frame concern.
             transitions_started: _,
         } = self;
@@ -1418,6 +1598,8 @@ impl Renderer {
                 view,
                 (width, height),
                 metrics,
+                tier.tier,
+                *tier_demoted,
                 diag.stats().samples().map(|s| s * 1000.0),
             );
             draw_calls += 1;
@@ -1634,7 +1816,7 @@ impl Renderer {
         if !self.select_preset_by_name_now(name) {
             return Err(RenderError::UnknownPreset(name.to_string()));
         }
-        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
+        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format(), &self.tier);
         self.cancel_transition();
         self.side.reset_resources();
         self.ink.reset_resources();
@@ -1670,7 +1852,7 @@ impl Renderer {
         }
         let mut analyzer = crate::dsp::Analyzer::new(format).map_err(RenderError::AudioFormat)?;
 
-        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
+        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format(), &self.tier);
         self.cancel_transition();
         self.side.reset_resources();
         self.ink.reset_resources();

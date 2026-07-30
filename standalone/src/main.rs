@@ -18,10 +18,13 @@ use diaglog::DiagLog;
 use director::Director;
 use lmv_core::audio::{AudioFormat, SampleConsumer};
 use lmv_core::dsp::Analyzer;
-use lmv_core::render::{CapOverflow, Renderer, TextRun};
+use lmv_core::render::{CapOverflow, Renderer, RendererOptions, TextRun, Tier};
 use overlay::{OverlayAction, OverlayKey, OverlayState};
 use soak::SoakLog;
-use standalone::{APP_DIR_NAME, PRESET_DIR_ENV, PresetDir, preset_data_root, resolve_preset_dir};
+use standalone::{
+    APP_DIR_NAME, PRESET_DIR_ENV, PresetDir, preset_data_root, resolve_preset_dir, resolve_tier,
+    tier_env,
+};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -131,6 +134,11 @@ struct AppState {
     /// core and never reported, because the only reader ran on a preset change.
     /// This field is what lets the frame loop report it without shouting.
     reported_overflow: Option<CapOverflow>,
+    /// Whether the quality governor's demotion has already been announced, so it
+    /// is reported once as a **transition** rather than every frame after it
+    /// (Plan 0044 Phase 2, the same shape as `reported_overflow` above). The
+    /// demotion is one-way, so this only ever goes false -> true.
+    reported_demotion: bool,
 }
 
 /// Narrow alias so the non-Windows build (no capture until Phase 9) compiles
@@ -145,19 +153,40 @@ mod capture_handle {
 }
 
 impl AppState {
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the shell's startup inputs, each read once on the way into one of the state's fields"
+    )]
     fn new(
         window: Arc<Window>,
         config: Config,
         config_path: Option<PathBuf>,
         display_index: usize,
         soak_path: Option<PathBuf>,
+        tier: Option<Tier>,
     ) -> Self {
         let size = window.inner_size();
-        let mut renderer = Renderer::new(Arc::clone(&window), size.width, size.height)
-            .unwrap_or_else(|err| {
-                eprintln!("renderer init failed: {err}");
-                std::process::exit(1);
-            });
+        let mut renderer = Renderer::new(
+            Arc::clone(&window),
+            size.width,
+            size.height,
+            RendererOptions { tier },
+        )
+        .unwrap_or_else(|err| {
+            eprintln!("renderer init failed: {err}");
+            std::process::exit(1);
+        });
+        // Say which tier the show is running at. The same preset looks different
+        // on different machines now (ADR-0045), so this is the first line an odd
+        // look should be checked against — and F3's overlay repeats it live.
+        eprintln!("quality tier: {}", renderer.tier().as_str());
+
+        // The governor measures against the *display's* frame budget, and a
+        // refresh rate is a shell concern — the core never reads one itself. An
+        // unreported rate leaves the core's 60 Hz default in place.
+        if let Some(hz) = display_hz(&window) {
+            renderer.set_display_hz(hz);
+        }
 
         // Resolve the preset directory, seed the curated set into it on first
         // run (write-if-absent — but never into an LMV_PRESET_DIR override,
@@ -206,6 +235,7 @@ impl AppState {
             // Seeded from what `reload_presets` already printed above, so the
             // frame loop does not re-announce the startup preset's truncation.
             reported_overflow: renderer_overflow,
+            reported_demotion: false,
             config,
             config_path,
             display_index,
@@ -244,6 +274,7 @@ impl AppState {
                 .set_fullscreen(Some(Fullscreen::Borderless(monitor)));
             self.config.output.fullscreen = true;
         }
+        self.refresh_display_hz();
         self.save_config();
         self.window.request_redraw();
     }
@@ -264,8 +295,21 @@ impl AppState {
             self.window
                 .set_fullscreen(Some(Fullscreen::Borderless(monitor)));
         }
+        self.refresh_display_hz();
         self.save_config();
         self.window.request_redraw();
+    }
+
+    /// Re-read the display's refresh rate into the renderer's governor budget.
+    ///
+    /// Called wherever the window may have changed monitor. A stale budget in the
+    /// *lenient* direction (60 Hz assumed on a 144 Hz panel) is harmless, but the
+    /// strict direction — assuming 60 on a 30 Hz output — would demote a machine
+    /// that was holding its actual rate perfectly well.
+    fn refresh_display_hz(&mut self) {
+        if let Some(hz) = display_hz(&self.window) {
+            self.renderer.set_display_hz(hz);
+        }
     }
 
     /// Report a **live** segment-cap truncation on entry, and its clearing once —
@@ -299,6 +343,21 @@ impl AppState {
             _ => {}
         }
         self.reported_overflow = current;
+    }
+
+    /// Announce a quality-tier demotion the first frame after it happens
+    /// (ADR-0045: never silent). One-way, so this fires at most once a session
+    /// and costs a bool read on every other frame.
+    fn poll_tier_demotion(&mut self) {
+        if self.renderer.tier_demoted() && !self.reported_demotion {
+            self.reported_demotion = true;
+            eprintln!(
+                "quality tier demoted to {} -- the rich tier did not hold this \
+                 display's frame budget. Pin it with --tier rich to override.",
+                self.renderer.tier().as_str()
+            );
+            self.update_title();
+        }
     }
 
     /// Re-scan the preset directory if the poll interval has elapsed and its
@@ -395,6 +454,7 @@ impl AppState {
         // The *live* half: a per-frame geometry-mirror overflow, which no
         // preset-change hook can see (ADR-0007 -- never a silent cut).
         self.poll_cap_overflow();
+        self.poll_tier_demotion();
         self.title_tick += 1;
         if self.title_tick >= TITLE_UPDATE_FRAMES {
             self.title_tick = 0;
@@ -713,6 +773,9 @@ struct App {
     config_path: Option<PathBuf>,
     /// Soak-log path from `--soak`, or `None` when the mode is off.
     soak_path: Option<PathBuf>,
+    /// The quality-tier pin, already resolved across `--tier` / `LMV_TIER` /
+    /// config (Plan 0044). `None` is auto — rich, governed.
+    tier: Option<Tier>,
     state: Option<AppState>,
 }
 
@@ -749,6 +812,7 @@ impl ApplicationHandler for App {
                         self.config_path.take(),
                         display_index,
                         self.soak_path.take(),
+                        self.tier,
                     );
                     state.window.request_redraw();
                     self.state = Some(state);
@@ -874,6 +938,31 @@ fn parse_soak_arg() -> Option<PathBuf> {
     None
 }
 
+/// The tier `--tier <name>` / `--tier=<name>` pins, or `None` when the flag is
+/// absent (Plan 0044).
+///
+/// `Err` on a missing or unparseable value. Unlike `LMV_TIER`, a bad `--tier` is
+/// a **usage error** rather than something to degrade past: it was typed for this
+/// run, so silently starting on another tier would answer the wrong question.
+fn parse_tier_arg() -> Result<Option<Tier>, String> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        let value = if let Some(inline) = arg.strip_prefix("--tier=") {
+            Some(inline.to_owned())
+        } else if arg == "--tier" {
+            Some(args.next().unwrap_or_default())
+        } else {
+            None
+        };
+        if let Some(value) = value {
+            return Tier::from_name(&value)
+                .map(Some)
+                .ok_or_else(|| format!("--tier `{value}`: expected `floor` or `rich`"));
+        }
+    }
+    Ok(None)
+}
+
 /// Default soak-log location: under the per-user app dir, or `soak.log` in the
 /// current directory if that can't be resolved — so `--soak` always logs
 /// somewhere.
@@ -986,6 +1075,17 @@ fn list_devices_and_exit() {
     eprintln!("--list-devices is Windows-only (Plan 0009 Phase 2)");
 }
 
+/// The refresh rate of the monitor this window is on, in Hz, or `None` when winit
+/// reports none — which is common on a virtual or remote display. The governor's
+/// budget falls back to 60 Hz in that case.
+fn display_hz(window: &Window) -> Option<f32> {
+    let millihertz = window
+        .current_monitor()
+        .or_else(|| window.primary_monitor())
+        .and_then(|m| m.refresh_rate_millihertz())?;
+    Some(millihertz as f32 / 1000.0)
+}
+
 /// Surface a line scene's segment-cap truncation to stderr (ADR-0007: the cap
 /// is never a silent cut). A no-op in the common case where the active preset's
 /// geometry fit within the cap. Called after every active-preset change.
@@ -1014,10 +1114,34 @@ fn main() {
 
     let soak_path = parse_soak_arg();
 
+    // Quality tier, highest precedence first: `--tier`, `LMV_TIER`, config
+    // (Plan 0044 / ADR-0045). A bad flag is a usage error; a bad env var is
+    // reported and stepped past, so a stale export cannot stop the show (NFR 10).
+    let tier_flag = match parse_tier_arg() {
+        Ok(tier) => tier,
+        Err(msg) => {
+            eprintln!("{msg}");
+            std::process::exit(1);
+        }
+    };
+    let tier_from_env = tier_env().unwrap_or_else(|msg| {
+        eprintln!("{msg}; ignoring");
+        None
+    });
+    let (tier, tier_source) = resolve_tier(tier_flag, tier_from_env, config.quality.tier.tier());
+    if let Some(tier) = tier {
+        eprintln!(
+            "quality tier pinned {} by {}",
+            tier.as_str(),
+            tier_source.as_str()
+        );
+    }
+
     let mut app = App {
         config,
         config_path,
         soak_path,
+        tier,
         state: None,
     };
     if let Err(err) = event_loop.run_app(&mut app) {

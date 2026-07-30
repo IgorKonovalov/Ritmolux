@@ -30,6 +30,7 @@
 //!   --signal <kind:param>    synth audio filmstrip (click:120, dynamic:110, ...)
 //!   --audio <clip.wav>       filmstrip from a 16-bit PCM WAV
 //!   --strip <N>              frames tiled along the audio (default 8)
+//!   --tier floor|rich        quality tier to capture at (default floor)
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
 //! `--presets`, the `LMV_PRESET_DIR` override, the per-user preset directory,
@@ -50,7 +51,7 @@ use lmv_core::render::metrics::{
     StepResponse, coverage, frame_diff, quadrant_spread, segment_settled, step_response,
     struct_diff,
 };
-use lmv_core::render::{CaptureImage, HeadlessOptions, Renderer};
+use lmv_core::render::{CaptureImage, HeadlessOptions, Renderer, Tier};
 use standalone::shot::args::{BandLevels, apply_set, band_levels, parse_size, synth_signal};
 use standalone::shot::film::{FILMSTRIP_WARMUP, StripLayout, filmstrip_indices, filmstrip_layout};
 use standalone::shot::glyph::{GLYPH_ADVANCE, GLYPH_COLS, glyph_for};
@@ -94,6 +95,13 @@ struct Args {
     signal: Option<String>,
     audio: Option<PathBuf>,
     strip: u32,
+    /// `--tier floor|rich`: the quality tier to capture at. **Floor by default**
+    /// — a capture is a pure function of its inputs (NFR §6) and every golden
+    /// baseline is blessed at the floor, so raising it is an explicit act. There
+    /// is deliberately no `LMV_TIER` read here: an ambient environment variable
+    /// silently changing what a capture renders is the reproducibility hazard the
+    /// pin exists to prevent (ADR-0045).
+    tier: Tier,
 }
 
 impl Default for Args {
@@ -113,6 +121,7 @@ impl Default for Args {
             signal: None,
             audio: None,
             strip: 8,
+            tier: Tier::Floor,
         }
     }
 }
@@ -142,6 +151,11 @@ fn parse_args() -> Result<Args, String> {
             "--all" => args.mode = Mode::All,
             "--report" => args.mode = Mode::Report,
             "--json" => args.json = true,
+            "--tier" => {
+                let value = next_value(&mut it, "--tier")?;
+                args.tier = Tier::from_name(&value)
+                    .ok_or_else(|| format!("--tier `{value}`: expected `floor` or `rich`"))?;
+            }
             "--signal" => args.signal = Some(next_value(&mut it, "--signal")?),
             "--audio" => args.audio = Some(PathBuf::from(next_value(&mut it, "--audio")?)),
             "--strip" => {
@@ -267,12 +281,15 @@ fn preset_meta(presets: &[Preset]) -> Vec<(String, SystemKind)> {
 
 /// A headless renderer over `presets`, using the real GPU at full quality (the
 /// CLI wants speed and true output, not the tests' software reproducibility).
-fn renderer(width: u32, height: u32, presets: Vec<Preset>) -> Result<Renderer, String> {
-    let mut r = Renderer::new_headless(HeadlessOptions {
-        width,
-        height,
-        prefer_software: false,
-    })
+fn renderer(width: u32, height: u32, presets: Vec<Preset>, tier: Tier) -> Result<Renderer, String> {
+    let mut r = Renderer::new_headless_tiered(
+        HeadlessOptions {
+            width,
+            height,
+            prefer_software: false,
+        },
+        tier,
+    )
     .map_err(|e| format!("headless renderer: {e}"))?;
     r.set_presets(presets);
     Ok(r)
@@ -306,7 +323,7 @@ fn shot(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
         (None, _) => return Err("--preset <name> is required for a single shot".to_string()),
     };
     let out = args.out.clone().ok_or("--out <path> is required")?;
-    let mut r = renderer(args.width, args.height, presets)?;
+    let mut r = renderer(args.width, args.height, presets, args.tier)?;
     let img = r
         .capture_preset(&name, &args.stimulus, args.frames)
         .map_err(|e| format!("capture `{name}`: {e}"))?;
@@ -348,7 +365,7 @@ fn contact_sheet(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), S
     if meta.is_empty() {
         return Err("no presets to tile".to_string());
     }
-    let mut r = renderer(args.width, args.height, presets)?;
+    let mut r = renderer(args.width, args.height, presets, args.tier)?;
 
     // Layout: a near-square grid of fixed-width thumbnails with a label strip.
     const THUMB_W: u32 = 320;
@@ -450,7 +467,7 @@ fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), Strin
         .or_else(|| meta.first().map(|(n, _)| n.clone()))
         .ok_or("no preset available to render")?;
 
-    let mut r = renderer(args.width, args.height, presets)?;
+    let mut r = renderer(args.width, args.height, presets, args.tier)?;
     let at = filmstrip_indices(pcm.len(), format, args.strip)?;
     let frames = r
         .capture_audio(&name, &pcm, format, &at)
@@ -624,7 +641,7 @@ fn report(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> 
     // The structural pass runs first: it reads the compiled expressions, and the
     // renderer is about to take ownership of them.
     let gates = reachability_pass(&presets)?;
-    let mut r = renderer(REPORT_SIZE, REPORT_SIZE, presets)?;
+    let mut r = renderer(REPORT_SIZE, REPORT_SIZE, presets, args.tier)?;
 
     // The roster, not a copy of it: a hand-maintained list here silently omitted
     // a new system from the report instead of failing to build.
@@ -645,9 +662,9 @@ fn report(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> 
     }
 
     if args.json {
-        print!("{}", render_json(source, &reports));
+        print!("{}", render_json(source, &reports, args.tier));
     } else {
-        print_text_report(source, &reports);
+        print_text_report(source, &reports, args.tier);
     }
     Ok(())
 }
@@ -1231,8 +1248,11 @@ fn corner(img: &CaptureImage) -> [u8; 4] {
     ]
 }
 
-fn print_text_report(source: &str, reports: &[FamilyReport]) {
-    println!("visual-QA report [{source}]");
+fn print_text_report(source: &str, reports: &[FamilyReport], tier: Tier) {
+    // The tier is in the header because every number below is measured at it: a
+    // report read against a preset rendered on another tier is comparing two
+    // different capacity budgets (ADR-0045).
+    println!("visual-QA report [{source}] tier {}", tier.as_str());
     for fam in reports {
         println!(
             "\n=== {} ({} presets) ===",
@@ -1336,10 +1356,11 @@ fn print_text_report(source: &str, reports: &[FamilyReport]) {
 // Hand-rolled JSON (fixed numeric schema, no serde)
 // ---------------------------------------------------------------------------
 
-fn render_json(source: &str, reports: &[FamilyReport]) -> String {
+fn render_json(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
     let mut out = String::new();
     out.push('{');
     out.push_str(&format!("\"source\":{},", json_string(source)));
+    out.push_str(&format!("\"tier\":{},", json_string(tier.as_str())));
     out.push_str("\"families\":{");
     for (fi, fam) in reports.iter().enumerate() {
         if fi > 0 {

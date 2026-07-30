@@ -25,7 +25,12 @@ recoverable, none requiring a rewrite. The pattern across all five: a v1 constra
 the iGPU floor or for schedule was never revisited once it stopped being necessary, and in two
 cases the seam for the richer capability was built and then never used.
 
-### Wrong turn 1 — the iGPU floor became a universal ceiling (the root cause)
+### Wrong turn 1 — the iGPU floor became a universal ceiling (the root cause) — **fixed**
+
+> **Corrected by R0** (Plan 0044, 2026-07-30). The diagnosis below is kept as written, as the
+> record of why. Its `file:line` citations are now stale on purpose: those five constants moved
+> into `TierConfig` in `core/src/render/tier.rs` and no longer exist at the sites named. `GRID`
+> and `STAGE_COUNT` are the two that did **not** move — see R0's note.
 
 NFR §1 always specified quality **tiers** — a reduced tier holding 60 fps on the ~2015 iGPU
 baseline, a rich tier for capable hardware. The tier system and frame-time governor were
@@ -130,7 +135,23 @@ Ordered by leverage. R0 and R1 are the hinge — most of what follows either nee
 multiplied by them. Every item is its own ADR + plan; costs below are order-of-magnitude
 honesty, not commitments.
 
-### R0 — the license: quality tiers (finally building NFR §1's second half)
+### R0 — the license: quality tiers (finally building NFR §1's second half) — **DONE 2026-07-30**
+
+> **Delivered by [Plan 0044](plans/done/0044-quality-tiers.md) /
+> [ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md)** (accepted). `TierConfig` resolves once at
+> renderer construction; unpinned starts `Rich` and a one-way frame-time governor demotes to
+> `Floor` on a sustained miss, announced not silent; `--tier` / `LMV_TIER` / `[quality] tier` pin
+> it; captures and goldens pin `Floor` **by construction**, so every baseline stayed
+> byte-identical through the change. `Floor` is the pre-tier engine field for field.
+>
+> **Two deltas from the sketch below.** The **RD grid stays 256² in both tiers** — it is a
+> *content*-changing constant (pattern scale moves with resolution, ADR-0034), so it was
+> deliberately left out of `TierConfig`; changing it is its own future decision. **`STAGE_COUNT`
+> is likewise untouched** — it lands in R1, where the bloom stage is what needs it. And the
+> **`Rich` values are still provisional multipliers, not measurements**: Plan 0044's Phase 4
+> calibration did not run, and is carried in
+> [`on-device-validation.md`](on-device-validation.md#runnable-now--the-rich-tier-calibration-plan-0044-phase-4).
+> So the *license* is granted; the *budget* is still a guess.
 
 An ADR that ends the single-tier era: a `rich` tier as the default on capable hardware, the
 existing constants becoming the `floor` tier, and a frame-time governor that demotes gracefully
@@ -231,11 +252,13 @@ phrase, cellular fields that crack open on the bass.
 
 ## Sequencing and the first three moves
 
-1. **Run the approved roster first**: Plans 0042 → 0043 are approved and in flight-order;
-   they repair the measurement instrument and the swarm. Nothing above touches their files.
-2. **R0 + R1 next** — one interview covering both (tier policy and the HDR/bloom/tonemap
-   shape), then the ADRs, then plans. R1 is the largest single visible change available.
-3. **R2 immediately after** (it renders *into* the R1 pipeline), with 0010/0011 folded in.
+1. ~~**Run the approved roster first**: Plans 0042 → 0043~~ — **both closed 2026-07-30.**
+2. ~~**R0 + R1 next** — one interview covering both~~ — the interview ran, both ADRs and plans
+   landed, and **R0 is done** (Plan 0044). **R1 ([Plan 0045](plans/0045-linear-light-and-bloom.md))
+   is now the one to run** — the largest single visible change available, and its bloom levels and
+   `Floor` bandwidth relief hang off the `TierConfig` R0 just built.
+3. **R2 immediately after** ([Plan 0046](plans/0046-transformed-feedback.md) — it renders *into*
+   the R1 pipeline), with 0010/0011 folded in.
 
 R4 items 1-2 and the R5 grammar items are small enough to interleave whenever a gap opens.
 
@@ -255,6 +278,9 @@ visually).
   pressure against adding pipelines) is a live constraint on R1/R2/R3's test strategy —
   the suite may need per-stage gating rather than one mega-composite test.
 - **Tier bifurcation doubles the visual-QA surface** (floor and rich renders differ).
-  Decide in R0's ADR which tier the golden suite pins, and what the other tier gets.
+  ~~Decide in R0's ADR which tier the golden suite pins, and what the other tier gets.~~
+  **Decided and shipped:** the suite pins `Floor` by construction, and `Rich` gets `shot --tier
+  rich` spot checks plus the on-device checklist (ADR-0045, `docs/capturing.md`). The risk is not
+  retired — it is *named and accepted*: rich-tier regressions have no baseline to catch them.
 - **Scope gravity**: every item above is interview-sized on its own. The failure mode is
   bundling them; the loop (one ADR, one plan, one review) is the antidote.
