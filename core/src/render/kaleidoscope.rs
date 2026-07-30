@@ -71,8 +71,8 @@ const MAX_ORDER: f32 = 48.0;
 /// `[smoothing]` in nearly every shipped kaleido preset, so each ladder step eases
 /// through a second or more of fractional orders and preset dissolves interpolate
 /// it too; and the fold's mirror is *even*, so the jump cancels exactly at
-/// `kaleido_angle = 0` and only at 0 — which 9 of the 11 shipped kaleido presets
-/// leave behind immediately, driving the angle off `time`.
+/// `kaleido_angle = 0` and only at 0 — which 10 of the 12 shipped presets with an
+/// active fold leave behind immediately, driving the angle off `time`.
 ///
 /// Rounding **here** rather than in WGSL keeps the shader's precondition visible
 /// in Rust: the uniform never carries a fractional order. The cost is that

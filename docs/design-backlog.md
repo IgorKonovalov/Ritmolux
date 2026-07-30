@@ -1650,3 +1650,55 @@ visible, which is a fair description of a whole class of thing `Rich` will surfa
 turning `reseed` off to hide it would cost the preset its intended behaviour. Route after R1
 lands, since the linear composite changes what "too bright" means and may change the verdict on
 the slabs' visibility too.
+
+---
+
+## Entry 0032 — from the Plan 0049 Phase 5 sample-rate sweep
+
+## 0032 — both analysis windows are sized in **samples**, so a third of the band axis loses resolution at 96 kHz
+
+- **Raised:** 2026-07-30, by `dev` implementing Plan 0049 Phase 5 item 3 (the sample-rate coverage
+  gap Plan 0048's Mode 4 review named), and confirmed at that plan's close review.
+- **Verified against code:** yes — measured, and the measurement is pinned by
+  `core/src/dsp/fft.rs::the_axis_holds_at_the_rates_we_do_not_develop_at`.
+
+Every band-layout test was at 48 kHz until Plan 0049. `AudioFormat` accepts 8 kHz-384 kHz, and
+WASAPI loopback runs at whatever the device mix format is — 96 kHz is an ordinary setting on a
+discrete DAC or an audio interface. The sweep measured:
+
+| rate | crossover band | crossover | bin-starved bands |
+|------|----------------|-----------|-------------------|
+| 44.1 kHz | 19 | ~223 Hz | 8 |
+| 48 kHz | 20 | ~246 Hz | 8 |
+| 96 kHz | 27 | ~487 Hz | **21** |
+
+**44.1 kHz found nothing, which is the good outcome** — one band lower, same starved count — and
+that is the rate foobar hands the plugin for CD material, so the plugin path is unaffected.
+
+**The mechanism at 96 kHz.** `WINDOW_SIZE` and the long window are both fixed in **samples**, not
+seconds, so at twice the rate each spans half the time and resolves half the frequency detail. The
+crossover rides `sample_rate / WINDOW_SIZE`, and the region the long window still cannot resolve
+grows from 8 bands to 21 — a third of the axis — because the widening cascades through `fill`'s
+`prev_hi` chain, each widened band pushing the next one's floor up.
+
+**This is not an ADR-0049 regression.** That ADR's claim is about band **edges in Hz** below the
+crossover, and those do not move at any rate. It is physics working as specified: a higher sample
+rate buys time resolution and spends frequency resolution. But a third of the axis reading at
+one-bin resolution is a real difference in what a preset's `bin()` sees on a 96 kHz device, and it
+was invisible before the test existed.
+
+### What a fix would be
+
+Size both windows in **seconds** rather than samples, so the analysis time-span — and therefore the
+frequency resolution behind every band — is the same on every device. That has real consequences to
+weigh (a rate-dependent FFT size, its cost at 192/384 kHz, whether `HOP_SIZE` follows, and what it
+does to the onset envelope's cadence and to `docs/nfr.md`'s window budget), and it re-opens a
+decision ADR-0049 made. **So it is ADR territory, not a patch** — which is exactly why Plan 0049
+recorded it rather than acting on it.
+
+### Priority
+
+Low and honest about it. Nobody has reported it, the two rates that dominate (44.1 / 48 kHz) are
+clean, and the failure is a coarser low end rather than anything broken. Worth taking the day
+someone runs the standalone on a 96 kHz interface and says the sub-bass reads mushy — at which
+point this entry is the starting measurement rather than a fresh investigation.

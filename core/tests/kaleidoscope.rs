@@ -19,8 +19,9 @@
 //!
 //! Rotate the fold and the cancellation goes: the two rows are then `a = angle ±
 //! (pi - d)`, no longer negatives of each other, and they land half a wedge apart.
-//! That is not a contrived configuration — **9 of the 11 shipped kaleido presets
-//! drive `kaleido_angle = "time * k"`**, so the angle is non-zero on all but a
+//! That is not a contrived configuration — **10 of the 12 shipped presets with an
+//! active fold drive `kaleido_angle = "time * k"`** (a thirteenth, `swarm_dense`,
+//! pins the order at 1 so the fold is off), so the angle is non-zero on all but a
 //! measure-zero set of frames. (The two that pin it at 0, `lsystem_arrowhead` and
 //! `reaction_reef`, are genuinely immune, `reaction_reef` despite easing its order
 //! through fractional values the whole time.) So this file captures at a fixed
