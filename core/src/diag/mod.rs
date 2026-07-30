@@ -25,6 +25,8 @@
 
 use std::time::Instant;
 
+use crate::dsp::AnalysisFrame;
+
 /// Recent frame durations retained for the rolling stats. 240 samples is ~4 s
 /// at 60 fps — long enough for a stable p99, short enough to react to a stall.
 ///
@@ -57,6 +59,59 @@ pub struct Metrics {
     pub gpu_bytes: u64,
     /// Draw/render-pass calls issued on the last frame.
     pub draw_calls: u32,
+}
+
+/// A snapshot of the **analysis** side of diagnostics: what the audio is doing,
+/// as against [`Metrics`]'s what the renderer is doing.
+///
+/// # Why this is a second struct rather than six more fields on `Metrics`
+///
+/// [`Metrics`] claims, in its doc comment, to mirror the C ABI's `LmvMetrics`.
+/// Growing it would either widen the C ABI or quietly make that claim false, and
+/// ADR-0052 chose neither: these values stay **native-only**, so the split makes
+/// "does not cross the ABI" a property of the type instead of a comment on a
+/// field that a later plan has no reason to read. It follows the standing line
+/// rather than inventing one — no analysis value has ever crossed the boundary
+/// (`novelty` is already marked native-API-only on the frame itself).
+///
+/// The named cost, from the same ADR: the foobar plugin gets no analysis
+/// diagnostics, and it is the one frontend that never touches loopback capture.
+/// If the estimator ever needs validating on that path, `LmvMetrics` still leads
+/// with `struct_size`, so the growth is available — behind a superseding ADR.
+///
+/// Exactly the six values Plan 0048 Phase 6 needs to make its two judgements:
+/// whether the normalized levels ride the music, and whether the downbeat
+/// estimator locks. Nothing speculative — the `*_raw` twins, `bpm`, `bar` and
+/// `novelty` stay off until something asks.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct AnalysisMetrics {
+    /// Bass level, normalized against its recent peak (ADR-0049).
+    pub bass: f32,
+    /// Mid level, normalized against its recent peak.
+    pub mid: f32,
+    /// Treble level, normalized against its recent peak.
+    pub treb: f32,
+    /// Onset envelope, normalized against its recent peak.
+    pub onset: f32,
+    /// The downbeat estimator's confidence in `0..1` (ADR-0050).
+    pub downbeat_confidence: f32,
+    /// Whether the bar position came from the estimator rather than the counter
+    /// fallback. **This is the value ADR-0050's stopping condition needs:** from
+    /// outside the app a wrong lock and the fallback look identical.
+    pub downbeat_locked: bool,
+}
+
+impl From<&AnalysisFrame> for AnalysisMetrics {
+    fn from(frame: &AnalysisFrame) -> Self {
+        Self {
+            bass: frame.bass,
+            mid: frame.mid,
+            treb: frame.treb,
+            onset: frame.onset,
+            downbeat_confidence: frame.downbeat_confidence,
+            downbeat_locked: frame.downbeat_locked,
+        }
+    }
 }
 
 /// Pure rolling frame-time accumulator. Fed explicit deltas (seconds); holds no
@@ -178,6 +233,12 @@ pub struct Diag {
     last: Option<Instant>,
     gpu_bytes: u64,
     draw_calls: u32,
+    /// The latest frame's analysis snapshot. Held here rather than recomputed on
+    /// read so the overlay and the 1 Hz logger see the same six values, and so
+    /// the logger's sampling stays a plain field read on the frames a line is
+    /// due. Not gated by `collecting`: it holds no clock, and the overlay is
+    /// independently toggled.
+    analysis: AnalysisMetrics,
 }
 
 impl Default for Diag {
@@ -196,6 +257,7 @@ impl Diag {
             last: None,
             gpu_bytes: 0,
             draw_calls: 0,
+            analysis: AnalysisMetrics::default(),
         }
     }
 
@@ -275,6 +337,18 @@ impl Diag {
             gpu_bytes: self.gpu_bytes,
             draw_calls: self.draw_calls,
         }
+    }
+
+    /// Take this frame's analysis snapshot. Called once per drawn frame from the
+    /// render seam, which is the one place that holds the [`AnalysisFrame`].
+    pub fn set_analysis(&mut self, frame: &AnalysisFrame) {
+        self.analysis = AnalysisMetrics::from(frame);
+    }
+
+    /// The latest analysis snapshot — the native-only companion to
+    /// [`metrics`](Diag::metrics). See [`AnalysisMetrics`] for why it is separate.
+    pub fn analysis(&self) -> AnalysisMetrics {
+        self.analysis
     }
 
     /// Read-only view of the rolling stats (the overlay reads this to draw the
@@ -363,6 +437,77 @@ mod tests {
         // Only the 20 ms samples remain → avg 20 ms, fps 50.
         assert!((stats.frame_ms_avg() - 20.0).abs() < 1e-3);
         assert!((stats.fps() - 50.0).abs() < 1e-2);
+    }
+
+    /// The six values are the frame's own, taken from a synthesized frame rather
+    /// than eyeballed on screen — and the destructure is exhaustive, so a field
+    /// added to `AnalysisMetrics` fails to compile until it is populated here.
+    #[test]
+    fn analysis_metrics_are_the_frames_own_values() {
+        let frame = AnalysisFrame {
+            bass: 0.25,
+            mid: 0.5,
+            treb: 0.75,
+            onset: 0.125,
+            downbeat_confidence: 0.875,
+            downbeat_locked: true,
+            // Values that must NOT leak into the six — the raw twins carry
+            // deliberately different magnitudes so a mixed-up field is visible.
+            bass_raw: 9.0,
+            mid_raw: 9.0,
+            treb_raw: 9.0,
+            onset_raw: 9.0,
+            ..Default::default()
+        };
+
+        let mut diag = Diag::new();
+        assert_eq!(
+            diag.analysis(),
+            AnalysisMetrics::default(),
+            "a fresh Diag reports zeros, not stale or uninitialized analysis"
+        );
+        diag.set_analysis(&frame);
+
+        let AnalysisMetrics {
+            bass,
+            mid,
+            treb,
+            onset,
+            downbeat_confidence,
+            downbeat_locked,
+        } = diag.analysis();
+        assert_eq!(bass, 0.25);
+        assert_eq!(mid, 0.5);
+        assert_eq!(treb, 0.75);
+        assert_eq!(onset, 0.125);
+        assert_eq!(downbeat_confidence, 0.875);
+        assert!(downbeat_locked);
+    }
+
+    /// ADR-0052 keeps `Metrics`'s "mirrors `LmvMetrics`" claim literally true by
+    /// putting the analysis values on their own type. This exhaustive destructure
+    /// is what enforces it: adding a field to `Metrics` stops compiling here, so a
+    /// later plan has to come and read this comment before widening the mirror.
+    /// `core/tests/ffi.rs` holds the other half — `LmvMetrics` is still 56 bytes
+    /// and `LMV_ABI_VERSION` is still 4.
+    #[test]
+    fn metrics_still_carries_exactly_the_mirrored_fields() {
+        let Metrics {
+            fps,
+            frame_ms_avg,
+            frame_ms_p99,
+            frames_total,
+            frames_dropped,
+            gpu_bytes,
+            draw_calls,
+        } = Diag::new().metrics();
+        assert_eq!(
+            (fps, frame_ms_avg, frame_ms_p99),
+            (0.0, 0.0, 0.0),
+            "a fresh Diag reports zero frame-time statistics"
+        );
+        assert_eq!((frames_total, frames_dropped, gpu_bytes), (0, 0, 0));
+        assert_eq!(draw_calls, 0);
     }
 
     /// `samples()` yields the retained durations chronologically.
