@@ -1,6 +1,6 @@
 # 0046 — Transformed feedback: the past learns to move
 
-> **Status:** draft 2026-07-30 (runs after Plan 0045; same render files)
+> **Status:** approved 2026-07-30 — ready for `dev` (runs after Plan 0045; same render files)
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0048](../adrs/0048-transformed-feedback.md).
