@@ -516,6 +516,14 @@ Folds the finished frame into `kaleido_order` mirrored wedges before present.
 `kaleido_angle` (radians) rotates the fold — ride it on `time` for a turning
 kaleidoscope. Works on any scene.
 
+**`kaleido_order` is a stepped parameter — it is rounded to a whole number.** A
+wedge count has to divide the circle evenly or the frame tears along a horizontal
+ray to the left (the fold's angle wrap cannot absorb `atan2`'s branch cut at a
+fractional order), so the engine rounds to the nearest integer. Bind or smooth it
+however you like — an eased `kaleido_order` still eases, it just **snaps at each
+half-integer** instead of sweeping continuously. If you want a continuous
+kaleidoscopic motion, ride `kaleido_angle`; that one is fully smooth.
+
 ### Mirror or kaleidoscope? They are not the same cost
 
 `mirror_*` and `kaleido_*` both give you N-fold symmetry, and on a line scene they
