@@ -218,6 +218,185 @@ fn v2_math_functions_are_total_on_degenerate_input() {
     );
 }
 
+/// A binding of `time` at `t` under salt `salt` — the shape every seeded-function
+/// test below evaluates against.
+fn salted(t: f32, salt: u32) -> Variables<'static> {
+    vars(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, t).with_salt(salt)
+}
+
+/// Plan 0047 Phase 1 / ADR-0051. `hash(x)` fills `[0, 1)` rather than clustering.
+///
+/// A **coarse bucket census**, not a threshold on any single value: what makes a
+/// scatter usable is that it covers its range roughly evenly, and that is a
+/// property a sweep can state without tuning a constant to the mixer.
+#[test]
+fn hash_scatters_uniformly_over_a_sweep() {
+    const SAMPLES: usize = 2_000;
+    const BUCKETS: usize = 10;
+
+    let e = compile("hash(time)").expect("compiles");
+    let mut counts = [0usize; BUCKETS];
+    for i in 0..SAMPLES {
+        // An irrational-ish step, so the arguments are ordinary floats rather
+        // than the integer lattice `noise` is built on.
+        let x = e.eval(&salted(i as f32 * 0.37, 12_345));
+        assert!(
+            (0.0..1.0).contains(&x),
+            "hash is documented as [0, 1), got {x} at sample {i}"
+        );
+        let bucket = ((x * BUCKETS as f32) as usize).min(BUCKETS - 1);
+        counts[bucket] += 1;
+    }
+
+    // Half to double the uniform expectation. Wide on purpose — this is a
+    // coverage claim, not a chi-squared test — but it fails hard for a mixer that
+    // correlates with its input, which is the defect worth catching.
+    let expected = SAMPLES / BUCKETS;
+    for (i, &count) in counts.iter().enumerate() {
+        assert!(
+            count >= expected / 2 && count <= expected * 2,
+            "bucket {i} holds {count} of {SAMPLES}, expected about {expected}: {counts:?}"
+        );
+    }
+}
+
+/// Plan 0047 Phase 1 / ADR-0051. `noise(x)` is the **continuous** one: nearby
+/// arguments give nearby values, distant ones do not. Asserted as a ratio between
+/// two measurements from the same sweep, so nothing here is a tuned constant —
+/// and contrasted against `hash` on the identical arguments, since being smooth
+/// where `hash` is not is the entire reason both exist.
+#[test]
+fn noise_is_continuous_and_bounded_where_hash_is_not() {
+    const SAMPLES: usize = 500;
+
+    let noise = compile("noise(time)").expect("compiles");
+    let hash = compile("hash(time)").expect("compiles");
+
+    let mean_step = |e: &lmv_core::preset::Expr, step: f32| {
+        let total: f32 = (0..SAMPLES)
+            .map(|i| {
+                let t = i as f32 * 0.113;
+                (e.eval(&salted(t, 99)) - e.eval(&salted(t + step, 99))).abs()
+            })
+            .sum();
+        total / SAMPLES as f32
+    };
+
+    for i in 0..SAMPLES {
+        let v = noise.eval(&salted(i as f32 * 0.113, 99));
+        assert!(
+            (0.0..=1.0).contains(&v),
+            "noise is documented as [0, 1], got {v} at sample {i}"
+        );
+    }
+
+    let near = mean_step(&noise, 0.01);
+    let far = mean_step(&noise, 0.5);
+    assert!(
+        near * 10.0 < far,
+        "noise must move less over a short step than a long one, got {near} vs {far}"
+    );
+    // Not a constant function — a "smooth" noise that never moves would pass the
+    // test above trivially.
+    assert!(
+        far > 0.05,
+        "noise barely moves at all over half a cell: {far}"
+    );
+
+    let hash_near = mean_step(&hash, 0.01);
+    assert!(
+        hash_near > near * 10.0,
+        "hash must scatter where noise glides: {hash_near} vs {near}"
+    );
+}
+
+/// Plan 0047 Phase 1 / ADR-0051 — the property NFR §6 actually asks for: seeded,
+/// not unpredictable. One salt reproduces **bit-exactly**; two salts disagree.
+#[test]
+fn a_seeded_expression_reproduces_under_one_salt_and_differs_under_two() {
+    let e = compile("hash(time) + noise(time * 0.3)").expect("compiles");
+
+    let mut differences = 0;
+    for i in 0..64 {
+        let t = i as f32 * 0.17;
+        // Bit-exact, not approximate: an expression is a pure function of its
+        // argument and its salt, so there is nothing here to drift.
+        assert_eq!(
+            e.eval(&salted(t, 7)),
+            e.eval(&salted(t, 7)),
+            "the same salt must reproduce exactly at t = {t}"
+        );
+        if e.eval(&salted(t, 7)) != e.eval(&salted(t, 8)) {
+            differences += 1;
+        }
+    }
+    assert_eq!(
+        differences, 64,
+        "two salts should disagree at every sampled argument"
+    );
+
+    // Salt `0` is not a special "off" value — it is just another salt, and the
+    // one an unseeded preset gets.
+    assert_ne!(e.eval(&salted(1.5, 0)), e.eval(&salted(1.5, 1)));
+}
+
+/// Wrong arity is a load error for the seeded pair exactly as for every other
+/// function — the parser checks them through the same `Func::arity`.
+#[test]
+fn the_seeded_functions_take_exactly_one_argument() {
+    for src in ["hash(1, 2)", "hash()", "noise(1, 2)", "noise()"] {
+        assert!(compile(src).is_err(), "`{src}` must be a compile error");
+    }
+    assert!(compile("hash").is_err(), "a bare `hash` is not a value");
+    assert!(compile("noise").is_err(), "a bare `noise` is not a value");
+}
+
+/// Plan 0047 Phase 1: `[generator] seed` stops being reserved — it is the salt,
+/// for **any** system, not just the L-system whose table it has always sat in.
+#[test]
+fn generator_seed_becomes_the_preset_salt() {
+    let salt_of = |table: &str| {
+        Preset::from_toml_str(&format!("system = \"swarm\"\nparams = {{}}\n{table}"))
+            .expect("valid preset")
+            .salt
+    };
+
+    assert_eq!(salt_of(""), 0, "a preset declaring no seed is salted 0");
+    assert_ne!(salt_of("[generator]\nseed = 7\n"), 0);
+    assert_ne!(
+        salt_of("[generator]\nseed = 7\n"),
+        salt_of("[generator]\nseed = 8\n"),
+        "two seeds must not fold to one salt"
+    );
+    // The declared key is a `u64`; a seed living entirely above bit 32 must not
+    // fold away to nothing.
+    assert_ne!(
+        salt_of("[generator]\nseed = 4294967296\n"),
+        0,
+        "the high half of a 64-bit seed reaches the salt"
+    );
+
+    // ...and the salt is the one the preset's own expressions are evaluated
+    // under, which is what makes two identical presets look different.
+    let seeded = |seed: u32| {
+        let preset = Preset::from_toml_str(&format!(
+            "system = \"swarm\"\n[params]\nhue = \"hash(time)\"\n[generator]\nseed = {seed}\n"
+        ))
+        .expect("valid preset");
+        preset
+            .params
+            .first()
+            .expect("one binding")
+            .expr
+            .eval(&salted(1.0, preset.salt))
+    };
+    assert_ne!(
+        seeded(1),
+        seeded(2),
+        "the same expression under two preset seeds must scatter differently"
+    );
+}
+
 /// A bare unknown identifier is still a compile error — the constants are
 /// checked before the variable lookup, not instead of it.
 #[test]
@@ -965,8 +1144,14 @@ fn set_param_arm_names(text: &str, file: &std::path::Path) -> Vec<String> {
 
 #[test]
 fn compiled_eval_performs_no_heap_allocation() {
-    let e = compile("clamp(bass * 2 + sin(time), 0, 1) + lerp(mid, treb, bar)").expect("compiles");
-    let v = vars(0.5, 0.2, 0.1, 0.0, 1.0, 0.3, 1.23);
+    // The seeded pair rides in here too (Plan 0047): they are the newest thing on
+    // the per-parameter-per-frame path, and "allocation-free" is a claim their
+    // docs make.
+    let e = compile(
+        "clamp(bass * 2 + sin(time), 0, 1) + lerp(mid, treb, bar) + hash(time) + noise(time)",
+    )
+    .expect("compiles");
+    let v = vars(0.5, 0.2, 0.1, 0.0, 1.0, 0.3, 1.23).with_salt(31);
 
     // Warm up (touch any lazy statics before measuring).
     let _ = e.eval(&v);
