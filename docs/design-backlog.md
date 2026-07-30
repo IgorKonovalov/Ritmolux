@@ -1200,11 +1200,24 @@ Those two are updated in place above rather than duplicated here. These three ar
 
 ---
 
-## 0025 — `swarm` cannot express a flock: no depth, no cohesion, and its field frequency is a constant
+## ~~0025 — `swarm` cannot express a flock: no depth, no cohesion, and its field frequency is a constant~~
 
 - **Raised:** 2026-07-28, from `preset-author`. The user, on the whole swarm family: *"swarms still
   looks lame. they should look like floks of birds, swirling and dancing in 3d-like space"*.
 - **Verified against code:** `core/src/render/scenes/swarm.rs`.
+- **PROMOTED 2026-07-29 → [ADR-0044](adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) +
+  [Plan 0043](plans/done/0043-swarm-depth-and-domain.md); closed 2026-07-30.** Both open items are
+  delivered, and **this entry's own recommendation set the order**: `field_freq` was taken alone
+  first (Phase 2, defaulting to exactly the `2.3` it replaced), and it turned out to be the family's
+  first *structural* separator — the three surviving presets now sit at ~1.9 / ~3.0 / ~5.2 of it. The
+  depth half took the **2.5D fake this entry named as the rejected alternative** and ADR-0044 chose
+  it on the reason this entry did not have: the scene blends **additively**, so there is no draw
+  order to get right and the sort a 3D particle system pays buys occlusion that does not exist here.
+  One `z` per particle drives sprite scale, an atmospheric fade, parallax against `zoom`/`pan_*`, and
+  — the term that separates volume from a sprite sheet — *which current the particle rides*. **Boids
+  stays rejected** (ADR-0044 Alternative B, on the O(n²) and per-frame-allocation grounds this entry
+  anticipated); it needs its own ADR and a measured budget if ever wanted. The known limit is honest
+  and recorded: no occlusion, so the illusion flattens as density rises.
 
 **Two thirds of this was a preset defect and is fixed; the remaining third is real.** Recording the
 fixed part too, because the mechanism was badly non-obvious and the next author will need it.
@@ -1415,11 +1428,25 @@ freeze the false-clean reading into CI.
 
 ---
 
-## 0029 — the swarm's toroidal wrap seam sits exactly on the frame edge, and feedback burns it into a bright bar
+## ~~0029 — the swarm's toroidal wrap seam sits exactly on the frame edge, and feedback burns it into a bright bar~~
 
 - **Raised:** 2026-07-29, from `preset-author` — reported by the user as a visible artifact in the
   running app, then reproduced headless.
 - **Verified against code:** yes — `core/src/render/scenes/swarm.rs`.
+- **PROMOTED 2026-07-29 → [ADR-0044](adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) +
+  [Plan 0043](plans/done/0043-swarm-depth-and-domain.md); closed 2026-07-30.** Fixed at the cause,
+  which is the option this entry's "Not deciding" section listed first: the half-extents now follow
+  the **render target's** aspect times a `MARGIN` of 1.25, so the seam projects outside the visible
+  frame across the family's whole working `zoom`/`pan` range and the feedback stage has no fixed line
+  to integrate. The 400-frame `dynamic:110` capture in the Reproduce block above is clean on all
+  three surviving presets. Alpha-fading near the seam was rejected explicitly (ADR-0044 Alternative
+  C — it keeps the 16:9 constant and trades a bright artifact for a dim one), as was respawning
+  (Alternative D). This entry's closing note was taken: the replacement takes the target's aspect per
+  [ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), and it is the first time that
+  rule has been applied to a **simulation domain** rather than a render grid. Two consequences are
+  priced in rather than hidden: `zoom` is usable down to ~0.84 (the wall moved, it did not vanish),
+  and the margin puts about a quarter of the particles off-frame, which is why the surviving presets'
+  `size`/`brightness` went up.
 - **This is a bug report, not a capability request.** Unlike most entries here, nothing about it is
   a matter of taste, and **no preset lever fixes it.**
 

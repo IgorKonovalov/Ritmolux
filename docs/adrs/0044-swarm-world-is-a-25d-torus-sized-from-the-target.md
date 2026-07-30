@@ -1,8 +1,8 @@
 # ADR-0044 — The swarm's world is a 2.5D torus sized from the render target, and additive blending is why the depth axis is nearly free
 
-> **Status:** proposed
+> **Status:** accepted 2026-07-30 (implemented by [Plan 0043](../plans/done/0043-swarm-depth-and-domain.md))
 > **Date:** 2026-07-29
-> **Related plan(s):** [0043](../plans/0043-swarm-depth-and-domain.md)
+> **Related plan(s):** [0043](../plans/done/0043-swarm-depth-and-domain.md)
 > **Supplements:** [ADR-0037](0037-internal-grid-is-a-resolution-not-a-shape.md) (the aspect rule
 > this applies to a simulation domain for the first time)
 > **Closes backlog:** [0029](../design-backlog.md), and the depth half of
