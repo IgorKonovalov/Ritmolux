@@ -1,6 +1,6 @@
 # 0048 — Analysis v2: the dual-resolution axis, normalized bands, phrase time, and the one retune that pays for all of it
 
-> **Status:** draft 2026-07-30 (parallel-safe against the render queue except one named touch; see file fence)
+> **Status:** approved 2026-07-30 — ready for `dev` after Plan 0047 (parallel lane against the render queue except one named touch; see file fence)
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (axis + normalization),
