@@ -44,7 +44,7 @@ pub(crate) mod trails;
 mod transition;
 
 use crate::audio::AudioFormat;
-use crate::diag::{Diag, Metrics};
+use crate::diag::{AnalysisMetrics, Diag, Metrics};
 use crate::dsp::AnalysisFrame;
 use crate::preset::{Easing, Expr, Preset, SystemKind, Variables};
 use background::Background;
@@ -1191,6 +1191,13 @@ impl Renderer {
         self.diag.metrics()
     }
 
+    /// The last drawn frame's analysis snapshot — the levels and the downbeat
+    /// lock state. **Native-only**: deliberately absent from the C ABI, so the
+    /// foobar plugin has no counterpart (ADR-0052).
+    pub fn analysis_metrics(&self) -> AnalysisMetrics {
+        self.diag.analysis()
+    }
+
     /// Name of the currently active preset.
     pub fn preset_name(&self) -> &str {
         self.roster.name()
@@ -1408,6 +1415,12 @@ impl Renderer {
             // Switch-site policy state (the kind rotation) — not a per-frame concern.
             transitions_started: _,
         } = self;
+
+        // The analysis snapshot for the overlay and the 1 Hz log (ADR-0052).
+        // Taken here rather than in `render` so a capture records it too, and
+        // before the early return below so it is the frame's own values even when
+        // there is no preset to draw them under.
+        diag.set_analysis(frame);
 
         let Some(preset) = roster.active_preset() else {
             return 0; // no presets loaded — nothing to draw
@@ -1983,8 +1996,8 @@ mod tests {
     #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
     use super::{
-        CaptureImage, HeadlessOptions, Mode, ParamRoute, ParamSmoother, RenderError, Renderer,
-        Roster, element_prefix, evaluate_series, resolve_route,
+        AnalysisMetrics, CaptureImage, HeadlessOptions, Mode, ParamRoute, ParamSmoother,
+        RenderError, Renderer, Roster, element_prefix, evaluate_series, resolve_route,
     };
     use crate::dsp::AnalysisFrame;
     use crate::preset::{Easing, Preset, SystemKind, Variables, compile};
@@ -2276,6 +2289,51 @@ mod tests {
             .chunks_exact(4)
             .any(|px| px[0] > 0 || px[1] > 0 || px[2] > 0);
         assert!(non_black, "the active preset drew at least one lit pixel");
+    }
+
+    /// Plan 0049 Phase 2: the analysis snapshot survives the trip from the frame
+    /// the render seam is handed to the accessor the overlay and the 1 Hz logger
+    /// read. The `diag` unit tests cover the conversion; this covers the plumbing,
+    /// which is the half a pure test cannot see.
+    #[test]
+    fn analysis_metrics_follow_the_drawn_frame() {
+        let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+            width: 64,
+            height: 64,
+            prefer_software: true,
+        }) else {
+            return;
+        };
+        assert_eq!(
+            renderer.analysis_metrics(),
+            AnalysisMetrics::default(),
+            "nothing drawn yet — zeros, not stale state"
+        );
+
+        let frame = AnalysisFrame {
+            bass: 0.3,
+            mid: 0.6,
+            treb: 0.9,
+            onset: 0.45,
+            downbeat_confidence: 0.72,
+            downbeat_locked: true,
+            ..Default::default()
+        };
+        renderer
+            .capture_frame(&frame)
+            .expect("capture the analysis frame");
+
+        assert_eq!(
+            renderer.analysis_metrics(),
+            AnalysisMetrics {
+                bass: 0.3,
+                mid: 0.6,
+                treb: 0.9,
+                onset: 0.45,
+                downbeat_confidence: 0.72,
+                downbeat_locked: true,
+            },
+        );
     }
 
     /// Phase 2 (Plan 0013): `capture_preset` is a pure function of
