@@ -109,7 +109,12 @@ pub struct AnalysisFrame {
     /// Which beat of the bar this is, `0..4` (ADR-0050 Layer 2). Estimated when
     /// the downbeat tracker is confident, `beat_index % 4` otherwise.
     pub beat_in_bar: u32,
-    /// Monotone bar counter, on the same gated-or-counted basis.
+    /// Bar counter, on the same gated-or-counted basis. **Monotone except across
+    /// an alignment change** — it is `(beat_index - alignment) / 4`, so the beat
+    /// the estimator locks, drops back, or moves its alignment can repeat or skip
+    /// a bar. Hysteresis makes that rare (a challenger must lead for three bars),
+    /// and a repeated bar is a far softer failure than a wrong downbeat — but
+    /// `mod(bar_index, 8)` will see it.
     pub bar_index: u32,
     /// Position across the bar in `[0, 1)` — the true bar phase, as against
     /// [`bar`](Self::bar), which is beat phase under a historical name.

@@ -75,7 +75,11 @@ const BASS_WEIGHT: f32 = 0.7;
 pub struct BarClock {
     /// Which beat of the bar this is, `0..BEATS_PER_BAR`.
     pub beat_in_bar: u32,
-    /// Monotone bar counter.
+    /// Bar counter — **monotone except across an alignment change**, since it is
+    /// `(beat_index - alignment) / BEATS_PER_BAR` and `alignment` moves when the
+    /// estimator locks, drops back, or is overtaken by a challenger. See
+    /// `bar_index_steps_back_across_an_alignment_change`, which pins the size of
+    /// that step at one bar.
     pub bar_index: u32,
     /// Position across the bar in `[0, 1)`, including the fraction through the
     /// current beat — the true "bar phase" the shipped `bar` variable is not.
@@ -363,6 +367,77 @@ mod tests {
                 "offset {offset}: the accented beat should read beat_in_bar 0"
             );
         }
+    }
+
+    /// **`bar_index` is not monotone across an alignment change, and this is the
+    /// size of the step.**
+    ///
+    /// Three places documented it as monotone and it is not: `bar_index` is
+    /// `(beat_index - alignment) / BEATS_PER_BAR`, so the beat the estimator locks
+    /// onto a non-zero alignment subtracts up to three beats and the counter can
+    /// step back by one bar. Plan 0049 chose to soften those docs rather than
+    /// publish a second never-decreasing counter — the counter would need
+    /// history-dependent state on the determinism-sensitive path and would give up
+    /// the "one formula for both paths" property that makes the lock and the
+    /// fallback auditable against each other, all to buy immunity from a rare
+    /// one-bar repeat that is already the soft failure the gate exists to prefer.
+    ///
+    /// Softening a doc is only honest if the behaviour it now describes is pinned,
+    /// so: the step happens, and it is **exactly one bar**.
+    #[test]
+    fn bar_index_steps_back_across_an_alignment_change() {
+        // Accent beat 2 of every bar, so the estimator's alignment is 2 rather
+        // than the fallback's 0 — the case where locking shifts the counter.
+        const OFFSET: u32 = 2;
+        let mut t = DownbeatTracker::new();
+
+        // Feed one beat short of the lock, then read the counter at a known beat
+        // while still in fallback.
+        let mut before = None;
+        let mut after = None;
+        for i in 0..40u32 {
+            let (bass, onset) = accented(OFFSET)(i);
+            let out = t.process(true, i, bass, onset, 0.0);
+            if !out.locked {
+                before = Some((i, out.bar_index));
+            } else if after.is_none() {
+                after = Some((i, out.bar_index));
+            }
+        }
+        let (last_free_beat, free_bar) = before.expect("the tracker starts in fallback");
+        let (first_locked_beat, locked_bar) =
+            after.expect("an accented pattern eventually locks (see the test above)");
+        assert_eq!(
+            first_locked_beat,
+            last_free_beat + 1,
+            "the two readings must be consecutive beats for the step to be the lock's doing"
+        );
+
+        // In fallback the counter is beat_index / 4; locked it is
+        // (beat_index - 2) / 4. Across the lock it therefore repeats a bar
+        // whenever the beat index has already passed the alignment within its bar.
+        assert_eq!(
+            locked_bar,
+            first_locked_beat.saturating_sub(OFFSET) / BEATS_PER_BAR,
+            "the locked reading is the alignment-shifted counter"
+        );
+        assert_eq!(
+            free_bar,
+            last_free_beat / BEATS_PER_BAR,
+            "the fallback reading is the plain counter"
+        );
+        // The claim the docs now make: it can fail to advance, and never by more
+        // than one bar in either direction.
+        let step = locked_bar as i64 - free_bar as i64;
+        assert!(
+            (-1..=1).contains(&step),
+            "bar_index moved {step} bars across the lock at beat {first_locked_beat}"
+        );
+        assert!(
+            step <= 0,
+            "this fixture is the repeat case: locking to alignment {OFFSET} must not \
+             advance the counter (free {free_bar} -> locked {locked_bar})"
+        );
     }
 
     /// ADR-0050's second pinned test: an unaccented pattern must stay in
