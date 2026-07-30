@@ -1,6 +1,8 @@
 # ADR-0052 — The analysis diagnostics surface is native-only and does not cross the C ABI
 
-> **Status:** proposed
+> **Status:** accepted 2026-07-30 (implemented by
+> [Plan 0049](../plans/done/0049-analysis-diagnostics-surface.md), which passed Mode 4 review —
+> see the Outcome note below, which corrects one Consequences bullet)
 > **Date:** 2026-07-30
 > **Related plan(s):** 0049-analysis-diagnostics-surface
 > **Supplements:** [ADR-0008](0008-c-abi-v3-diagnostics.md) (the diagnostics/metrics surface),
@@ -58,7 +60,9 @@ with an asterisk.
   Analysis values have never crossed the boundary; this keeps that line where it is.
 
 ### Negative
-- **The foobar plugin gets no analysis diagnostics.** If the estimator later needs
+- **The foobar plugin gets no analysis diagnostics.** *(Corrected at Plan 0049's close — see the
+  Outcome section: the core-drawn overlay does reach the plugin under `LMV_DEBUG_OVERLAY`; it is
+  the programmatic half that is absent.)* If the estimator later needs
   validating on that path — and the plugin is the one frontend that never touches loopback
   capture, so its input differs — this decision has to be revisited by a superseding ADR.
   That is a real gap, named rather than hidden.
@@ -95,3 +99,31 @@ The six values are a Phase 6 instrument first and a general debugging surface se
 later plan wants the full frame on screen, that is a widening worth its own thought, not a
 default — the overlay is read at a glance while music plays, and every field added costs
 some of the glance.
+
+## Outcome (added 2026-07-30 at Plan 0049's close)
+
+The decision holds and shipped as written: `diag::AnalysisMetrics` sits beside `Metrics` with
+exactly the six values, `core/src/ffi.rs` is untouched, `LMV_ABI_VERSION` is still 4 and
+`LmvMetrics` still 56 bytes. The "two structs make it a property of the type" argument earned
+more than it claimed — the enforcement mechanism `dev` chose is an **exhaustive destructure** of
+`Metrics` in a unit test, so a later plan adding a field to the mirror does not merely trip a
+reviewer, it stops compiling.
+
+**One Consequences bullet is wrong and is corrected here.** The first Negative reads "The foobar
+plugin gets no analysis diagnostics." It gets half of them. The overlay is **core-drawn** —
+`render/mod.rs` paints it whenever `diag.overlay_enabled()`, and `ffi.rs` sets that flag from
+`LMV_DEBUG_OVERLAY` — so a foobar host that turns the debug overlay on sees the same four level
+meters and the same `LOCK`/`FREE` row the standalone's `F3` shows, over its own PCM. What the
+plugin genuinely lacks is the **programmatic** half: no `lmv_get_metrics` counterpart and no log,
+so nothing on that path can compute a **lock rate**. That is the gap that would justify revisiting
+this ADR, and it is narrower than the bullet suggests — which matters, because a future reader
+weighing Alternative A's ABI v5 against "the plugin is blind" would be weighing against something
+that was never true. The type's doc comment in `core/src/diag/mod.rs` states the corrected version.
+
+The overlay-only rejection (Alternative C) is vindicated in the implementation rather than merely
+asserted: the four levels shipped as **meters** with the numbers beside them, precisely because
+"pumping versus numbness" is a judgement about how a value *moves*. And the log half went further
+than the ADR asked — `downbeat_locked` is written as `0`/`1`, so the lock rate Phase 6 records is
+the arithmetic mean of a column rather than a string match, and a log left by an older build is
+**rotated** rather than appended to, so the by-index parse can never meet two row widths in one
+file.

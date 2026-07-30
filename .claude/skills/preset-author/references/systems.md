@@ -174,7 +174,7 @@ like a meter instead of strobing.
 | `zoom` / `pan_x` / `pan_y` | `1` / `0` / `0` | camera **in** on line/swarm/attractor; **out** (shows more) on fragment/RD. |
 | `bg_hue` / `bg_bright` / `bg_vignette` | `0` / `0` / `0` | backdrop is black until `bg_bright > 0`. Visible behind sparse scenes and RD voids; **invisible behind `fragment_field`**. |
 | `trails` | `0` | per-frame decay; `0` off, higher = longer. Needs real motion to read. |
-| `kaleido_order` / `kaleido_angle` | `1` / `0` | `< 2` is passthrough; ride the angle on `time` for a turning fold. |
+| `kaleido_order` / `kaleido_angle` | `1` / `0` | `< 2` is passthrough. **The order is rounded to a whole number** (a fractional wedge count tears the frame), so it snaps at each half-integer even when smoothed — ride `kaleido_angle` on `time` for continuous motion. |
 | `mirror_order` / `mirror_reflect` | `1` / `0` | **line scenes only**; folds geometry (before the segment cap), not pixels. |
 | `ink_amount` | `0` | `1` = black-on-white; `paper_*`/`ink_*` make it any duotone. Collapses the palette to two colours. |
 

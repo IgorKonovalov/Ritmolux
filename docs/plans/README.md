@@ -12,21 +12,17 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **approved 2026-07-30** — ready for `dev` **now** ([0044] closed); roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
-| [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **in-progress 2026-07-30** — Phases 1-5 (`dev`) landed and merged to `main` (`b06766b`), Mode 4 review done; **Phases 6-7 (`human`) owed** and Phase 6 is blocked on [0049] | dev, human |
-| [0049](0049-analysis-diagnostics-surface.md) | The analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope seam) | **draft 2026-07-30** — ready for `dev`; [ADR-0052](../adrs/0052-analysis-diagnostics-are-native-only.md); **blocks [0048] Phase 6** | dev |
+| [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **in-progress 2026-07-30** — Phases 1-5 (`dev`) landed and merged to `main` (`b06766b`), Mode 4 review done; **Phases 6-7 (`human`) owed**. Phase 6 is **no longer blocked** — [0049] built its instrument and closed | dev, human |
 
 ## Recommended execution sequence
 
-**[0049] goes first — it is small and it unblocks a plan that is already half-landed.** [0048]'s
-five `dev` phases are merged to `main`, but its Phase 6 listening test cannot be performed: nothing
-in the running app displays an analysis value, so ADR-0050's "never locks wrong" stopping condition —
-the thing that made a research-grade downbeat estimator an acceptable risk — is currently
-unfalsifiable. [0049] builds that instrument (four levels + confidence + lock, native-only per
-[ADR-0052](../adrs/0052-analysis-diagnostics-are-native-only.md), overlay **and** 1 Hz log), and
-carries two riders: the **kaleidoscope seam** (user report + reproduction, 2026-07-30 — a fractional
-`kaleido_order` tears the frame along `atan2`'s branch cut on the −x ray, and every kaleido preset
-eases that param through fractional values) and the code-touching findings from [0048]'s Mode 4
-review. Then [0048] Phase 6 → Phase 7 → [0048] closes.
+**[0048] Phase 6 is the next thing to run, and it is a `human` phase — [0049] has landed and
+closed** (see Recently closed), so the instrument it was waiting on exists: press `F3` and the panel
+shows four level meters and a `LOCK`/`FREE` row with the estimator's confidence, while the 1 Hz
+`diagnostics.log` carries the same six as columns (`downbeat_locked` is `0`/`1`, so the **lock rate**
+ADR-0050's stopping condition needs is the mean of that column). Play 2-3 real tracks, judge whether
+the normalized levels ride the music without pumping or going numb, record the lock rate, then
+Phase 7 → [0048] closes.
 
 **[0045] is the one to run after that, and it got more urgent the day [0044] closed.** [0044] **has landed and
 closed** (2026-07-30) — see Recently closed — which delivers roadmap R0 and, with it, the
@@ -42,8 +38,11 @@ is taken against a ceiling that is about to move.
 
 - **[0045] — linear light + bloom.** The kaleidoscope fold fix first (disc + falloff + bindable
   centre, [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md), confirmed from
-  rendered samples) — **note [0049] Phase 1 already fixes the fractional-order seam** in that same
-  file, so this phase inherits an integral `kaleido_order` and owns the *domain* redesign only. Then the `Rgba16Float` linear composite with one engine-fixed tonemap, then
+  rendered samples) — **[0049] Phase 1 has landed and already fixed the fractional-order seam** in
+  that same file (`fold_order` rounds CPU-side; `core/tests/kaleidoscope.rs` pins it), so this phase
+  inherits an integral `kaleido_order` and owns the *domain* redesign only. Keep the rounding: the
+  seam test captures at a **non-zero** `kaleido_angle` on purpose, and a domain change that moves
+  the fold must not quietly retire it. Then the `Rgba16Float` linear composite with one engine-fixed tonemap, then
   the bloom `PostStage` with bindable `exposure`/`bloom_*`
   ([ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)). Every golden moves once,
   eyes-on. Closes backlog 0005, 0010 and 0011, and is the answer to half of 0031.
@@ -96,8 +95,8 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.24.0`** — bumped at [0043]'s close (a feature plan: a new bindable param, a depth
-axis, a target-derived domain, a re-authored preset family) per
+**Version is at `0.27.0`** — bumped at [0049]'s close (a feature plan: a native-only
+`AnalysisMetrics`, five new overlay rows, six new log columns, and a render fix) per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Nothing is owed until the next close.
 
 **The next ADR is design-backlog 0015** — the band axis is half linear, and Plan 0037 Phase 4's
@@ -246,6 +245,68 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0049 — the analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope
+  seam)](done/0049-analysis-diagnostics-surface.md) — **done 2026-07-30**, passed Mode 4 review
+  (**no blockers, no majors**; four minors and a nit — three minors and the nit fixed in the close
+  commit). Seven `dev` phase commits: `a335f35` the integral fold order, `69761b9`
+  `AnalysisMetrics` plumbed to the render seam, `a387909` the overlay rows, `4dabb3f` the six log
+  columns, and `38dc792` / `44c96a9` / `d5c9bd7` for Phase 5's four review items.
+  [ADR-0052](../adrs/0052-analysis-diagnostics-are-native-only.md) is **accepted with an Outcome
+  section**. **Unblocks [0048] Phase 6**, which is now the next thing to run.
+  **The reproduction needed a non-zero `kaleido_angle`, and that is the finding worth carrying.**
+  The plan described the tear without it. The mirrored wrap is an **even** function, so at
+  `kaleido_angle = 0` the two rows straddling the −x ray map to the same folded angle and the `2*pi`
+  branch-cut jump cancels **exactly, at every order** — a capture at angle 0 reads a perfect zero
+  seam whether or not the bug is present, and `dev`'s first test draft pinned the angle at 0 and
+  passed vacuously. The shipped case is the exposed one: 10 of the 12 presets with an active fold
+  drive the angle off `time`; `lsystem_arrowhead` and `reaction_reef` pin it at 0 and are genuinely
+  immune, `reaction_reef` despite easing its order through fractional values continuously. Both
+  assertions were confirmed to fail on the unfixed code. `core/tests/kaleidoscope.rs`'s module docs
+  say outright that **setting `ANGLE` back to 0 silently retires the test** — [0045]'s fold-domain
+  phase touches this same file and should read that first.
+  **Phase 5 item 3 found something at 96 kHz, and it is now [backlog
+  0032](../design-backlog.md).** 44.1 kHz — the rate foobar hands the plugin — is indistinguishable
+  from 48 kHz (crossover band 19 vs 20, same 8 bin-starved bands), so that half of the sweep found
+  nothing, which is the good outcome. At 96 kHz the crossover moves to ~487 Hz and the bin-starved
+  region grows from 8 bands to **21, a third of the axis**, because both windows are fixed in
+  **samples** rather than seconds and the widening cascades through `fill`'s `prev_hi` chain. Not an
+  ADR-0049 regression — that claim is about band edges in **Hz** below the crossover, which do not
+  move — but a real difference in what a preset's `bin()` sees on a 96 kHz device, and invisible
+  before this test. The fix (windows sized in seconds) re-opens an ADR-0049 decision, so it was
+  recorded rather than taken.
+  **Phase 5 item 4 chose the docs over a second counter, and pinned the behaviour it now
+  describes.** `bar_index` is `(beat_index - alignment) / 4`, so a lock can repeat or skip one bar;
+  a never-decreasing counter would need history-dependent state on the determinism-sensitive path
+  and would give up the "one formula for both paths" property in `process()`, all to buy immunity
+  from a rare one-bar repeat that is *already* the soft failure ADR-0050's gate exists to prefer.
+  Softened in all three places, with a new test asserting the step is **exactly one bar** and never
+  forward in that fixture.
+  **The review's one substantive correction is to ADR-0052 itself**, recorded in its Outcome: the
+  ADR's Negative says "the foobar plugin gets no analysis diagnostics", and that is only half true.
+  The overlay is **core-drawn**, so a host setting `LMV_DEBUG_OVERLAY` paints all six rows on the
+  plugin path too; what is absent is the **programmatic** half (no `lmv_get_metrics` counterpart, no
+  log), so nothing there can compute a lock **rate**. That narrows the gap a future reader would
+  weigh Alternative A's ABI v5 against.
+  **`beat_in_bar` was deliberately left off the overlay.** The plan permits it and the interview's
+  mock showed `bar 2/4`, but ADR-0052 pins `AnalysisMetrics` at exactly six values. Left as a
+  widening for whoever needs it.
+  **Content note for `preset-author`: `kaleido_order` is now a stepped parameter** — an eased sweep
+  snaps at each half-integer, because a fractional wedge count cannot divide the circle and tears
+  the frame. That is a visible content change made by an engine plan. `presets/README.md` documents
+  it and points at `kaleido_angle` for continuous motion; the lane's `references/systems.md` table
+  row was swept in the close commit.
+  **Verified at review** rather than taken on trust: `fmt --check` + `clippy --workspace
+  --all-targets -D warnings` clean; `cargo nextest run --workspace` **367/367, 0 skipped**;
+  `core/tests/golden/`, every preset `.toml`, `core/src/ffi.rs`, `render/scenes/mod.rs` and every
+  manifest **byte-untouched** (**C ABI stays v4** at 56 bytes, `Scene` unchanged, no new
+  dependency); no `aspect` anywhere in the diff; every added `expect` is in test code; and
+  `core/tests/hygiene.rs` already scans `core/src/diag`.
+  **Minor left open:** the overlay truncates at `MAX_QUADS = 4096` with `.min()` and no diagnostic,
+  and the analysis block is built **last** — so the block that would vanish first under any future
+  growth is exactly the Phase 6 instrument. Measured at roughly 1900 quads today, so there is real
+  headroom; worth knowing before the next thing is added to that panel.
+  Version **minor 0.26.0 → 0.27.0** (a feature plan).
 
 - [0044 — quality tiers: `Floor` and `Rich`, a governor, and the constants that
   move](done/0044-quality-tiers.md) — **done 2026-07-30**, passed Mode 4 review (**no blockers**;

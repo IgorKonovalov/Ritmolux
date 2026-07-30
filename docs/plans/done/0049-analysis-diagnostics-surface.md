@@ -1,6 +1,16 @@
 # 0049 — The analysis diagnostics surface: making Plan 0048 Phase 6 measurable (and the kaleidoscope seam)
 
-> **Status:** in-progress 2026-07-30
+> **Status:** done 2026-07-30 — all five phases landed in seven `dev` commits (`a335f35` the
+> integral fold order, `69761b9` `AnalysisMetrics` plumbed to the render seam, `a387909` the
+> overlay rows, `4dabb3f` the six log columns, then `38dc792` / `44c96a9` / `d5c9bd7` for Phase 5's
+> four items). Passed Mode 4 review: **no blockers, no majors**, four minors and a nit — three
+> minors and the nit fixed in the close commit. Verified at review rather than taken on trust:
+> `fmt --check` and `clippy --workspace --all-targets -D warnings` clean, `cargo nextest run
+> --workspace` **367/367, 0 skipped**, and `core/tests/golden/`, every preset `.toml`, `core/src/ffi.rs`
+> and every manifest **byte-untouched** (C ABI stays v4, `Scene` unchanged, no new dependency).
+> [ADR-0052](../adrs/0052-analysis-diagnostics-are-native-only.md) is **accepted with an Outcome
+> section**. **Unblocks Plan 0048 Phase 6.** Phase 5 item 3's 96 kHz finding is recorded as
+> [design-backlog 0032](../design-backlog.md).
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev
 > **Related ADRs:** [0052](../adrs/0052-analysis-diagnostics-are-native-only.md) (native-only, no ABI change);

@@ -172,7 +172,9 @@ Play any audio (loopback capture feeds the visuals). Then, in the window:
 - **`Space`** — cycle presets (step through the whole embedded set; each should render and react).
   Each switch **dissolves** over ~1 s rather than cutting, so the frame time during the dissolve is
   its own measurement — see the dual-live budget item above.
-- **`F3`** — toggle the diagnostics overlay (frame-time sparkline + GPU bar + fps/p99 readout).
+- **`F3`** — toggle the diagnostics overlay (frame-time sparkline + GPU bar + fps/p99 readout, and
+  below them the analysis block: `BASS` / `MID` / `TREB` / `ONSET` as meters with their numbers,
+  plus a `LOCK` / `FREE` row carrying the downbeat estimator's confidence — Plan 0049).
 
 The 1 Hz log lands at:
 

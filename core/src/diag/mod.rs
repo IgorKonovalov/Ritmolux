@@ -75,9 +75,14 @@ pub struct Metrics {
 /// (`novelty` is already marked native-API-only on the frame itself).
 ///
 /// The named cost, from the same ADR: the foobar plugin gets no analysis
-/// diagnostics, and it is the one frontend that never touches loopback capture.
-/// If the estimator ever needs validating on that path, `LmvMetrics` still leads
-/// with `struct_size`, so the growth is available — behind a superseding ADR.
+/// diagnostics **programmatically** — no `lmv_get_metrics` counterpart, so
+/// nothing on that path can compute a lock rate — and it is the one frontend
+/// that never touches loopback capture. It does get them **on screen**: this
+/// overlay is core-drawn, so a host setting `LMV_DEBUG_OVERLAY` paints the same
+/// six rows the standalone's `F3` does (Plan 0049 close review corrected
+/// ADR-0052 on that point; see its Outcome section). If the estimator ever needs
+/// the machine-readable half on that path, `LmvMetrics` still leads with
+/// `struct_size`, so the growth is available — behind a superseding ADR.
 ///
 /// Exactly the six values Plan 0048 Phase 6 needs to make its two judgements:
 /// whether the normalized levels ride the music, and whether the downbeat
