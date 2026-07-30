@@ -364,6 +364,36 @@ fn evaluate_series(expr: &Expr, vars: &Variables<'_>, out: &mut [f32]) {
     }
 }
 
+/// Which of a preset's two salts this frame's `hash()`/`noise()` calls mix in
+/// (ADR-0051).
+///
+/// A **parameter**, not renderer state, and deliberately: it is threaded from
+/// each entry point down to the evaluation, so the compiler — not a reviewer —
+/// is what guarantees every capture path pins. A flag on `Renderer` could be
+/// forgotten at one of the five capture call sites and nothing would say so; the
+/// frames would just quietly stop reproducing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SaltMode {
+    /// The live app: a preset declaring `seed = "random"` renders under the salt
+    /// it drew at load, so it looks different every launch.
+    Live,
+    /// Every capture path — `capture_preset`, `capture_preset_over`,
+    /// `capture_frame`, `capture_audio`, and the warm-up steps under them. Forces
+    /// the declared numeric seed so the harness stays a pure function of its
+    /// inputs (the same discipline ADR-0045 applies to quality tiers).
+    Pinned,
+}
+
+impl SaltMode {
+    /// The salt `preset` evaluates under in this mode.
+    fn of(self, preset: &Preset) -> u32 {
+        match self {
+            SaltMode::Live => preset.salt,
+            SaltMode::Pinned => preset.pinned_salt,
+        }
+    }
+}
+
 /// Evaluate one preset's bindings into a composite side, an optional ink pass,
 /// and its scene. **Routing only** — nothing is encoded here, because the frame's
 /// destination is not known until ink's activity is (ADR-0032).
@@ -1123,7 +1153,18 @@ impl Renderer {
             });
 
         let (width, height) = (self.ctx.config.width, self.ctx.config.height);
-        let draw_calls = self.draw_frame(frame, &mut encoder, &view, width, height, dt);
+        // The one live call site: a preset that asked for `seed = "random"` gets
+        // the salt it drew at load (ADR-0051). Every other caller of `draw_frame`
+        // is a capture and pins.
+        let draw_calls = self.draw_frame(
+            frame,
+            &mut encoder,
+            &view,
+            width,
+            height,
+            dt,
+            SaltMode::Live,
+        );
 
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
         self.ctx.queue.present(surface_tex);
@@ -1145,7 +1186,16 @@ impl Renderer {
     /// (`self.time`, advanced by the caller — this does not touch it) and
     /// injects `dt` real seconds into the scene's [`advance`](scenes::Scene::advance)
     /// so its simulation steps at the same wall-clock rate on any refresh.
+    /// `salt` says which of the active preset's two salts its `hash()`/`noise()`
+    /// calls mix in (ADR-0051) — [`SaltMode::Live`] from the one on-surface
+    /// caller, [`SaltMode::Pinned`] from every capture path.
+    ///
     /// Returns the draw-call count.
+    // Eight arguments, one past the lint: they are the frame's inputs and each is
+    // read once. The same allowance `evaluate_preset` above carries, and for the
+    // same reason — bundling them would name a struct after a call site rather
+    // than after anything in the design.
+    #[allow(clippy::too_many_arguments)]
     fn draw_frame(
         &mut self,
         frame: &AnalysisFrame,
@@ -1154,6 +1204,7 @@ impl Renderer {
         width: u32,
         height: u32,
         dt: f32,
+        salt: SaltMode,
     ) -> u32 {
         let Self {
             ctx,
@@ -1192,6 +1243,11 @@ impl Renderer {
         //
         // Through `from_frame` rather than the nine positional arguments, so the
         // harness probe that reads the same frame cannot bind it differently.
+        //
+        // The one thing that is *not* shared is the salt (ADR-0051): it is a fact
+        // about a preset, not about the audio, so each side re-salts this bundle
+        // below with its own. Sharing it would put the incoming preset's seed on
+        // the outgoing preset's `hash()` for the second a dissolve lasts.
         let vars = Variables::from_frame(frame, *time);
 
         // Fixed-order composite (ADR-0018/0028/0032): background (owns the clear)
@@ -1231,7 +1287,7 @@ impl Renderer {
                     side,
                     None,
                     outgoing_smoother,
-                    &vars,
+                    &vars.with_salt(salt.of(outgoing)),
                     frame,
                     *time,
                     dt,
@@ -1265,7 +1321,7 @@ impl Renderer {
             live_side,
             Some(ink),
             param_smoother,
-            &vars,
+            &vars.with_salt(salt.of(preset)),
             frame,
             *time,
             dt,
@@ -1434,6 +1490,7 @@ impl Renderer {
             width,
             height,
             scenes::FALLBACK_DT,
+            SaltMode::Pinned,
         );
         capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, width, height);
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
@@ -1487,6 +1544,7 @@ impl Renderer {
             width,
             height,
             scenes::FALLBACK_DT,
+            SaltMode::Pinned,
         );
         capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, width, height);
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
@@ -1548,6 +1606,7 @@ impl Renderer {
                 width,
                 height,
                 scenes::FALLBACK_DT,
+                SaltMode::Pinned,
             );
             capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, width, height);
             self.ctx.queue.submit(std::iter::once(encoder.finish()));
@@ -1652,6 +1711,7 @@ impl Renderer {
                     width,
                     height,
                     scenes::FALLBACK_DT,
+                    SaltMode::Pinned,
                 );
                 capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, width, height);
                 self.ctx.queue.submit(std::iter::once(encoder.finish()));
@@ -1694,7 +1754,15 @@ impl Renderer {
                 label: Some("lmv-capture-step"),
             });
         capture::record_clear(&mut encoder, view);
-        let _ = self.draw_frame(frame, &mut encoder, view, width, height, dt);
+        let _ = self.draw_frame(
+            frame,
+            &mut encoder,
+            view,
+            width,
+            height,
+            dt,
+            SaltMode::Pinned,
+        );
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
 
         #[cfg(feature = "text")]
