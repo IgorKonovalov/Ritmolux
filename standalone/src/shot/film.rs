@@ -7,10 +7,17 @@
 //! way a human would not notice, so they are the part worth testing.
 
 use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::HOP_SIZE;
+use lmv_core::dsp::{HOP_SIZE, LOW_WINDOW_SIZE};
 
 /// Hops skipped at the start so the strip samples past the analyzer's warm-up.
-pub const FILMSTRIP_WARMUP: usize = 8;
+///
+/// **Derived, not chosen.** The analyzer publishes nothing until its longer
+/// window is full (ADR-0049), which takes `LOW_WINDOW_SIZE / HOP_SIZE` hops, and
+/// the original four hops of slack past that boundary are kept. This used to be
+/// a bare `8` against a 2048-sample window, which Plan 0048 Phase 1 silently
+/// invalidated — deriving it means changing a window size cannot leave the
+/// harness sampling zero frames again.
+pub const FILMSTRIP_WARMUP: usize = LOW_WINDOW_SIZE / HOP_SIZE + 4;
 
 /// Rendered height of each frame in a strip.
 pub const STRIP_H: u32 = 200;

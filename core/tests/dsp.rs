@@ -93,6 +93,90 @@ fn sine_energy_concentrates_in_expected_band() {
     }
 }
 
+/// Plan 0048 Phase 1 / ADR-0049: the 808-collapse reproduction, inverted.
+///
+/// A tone stepped across the sub-bass and bass region must climb the axis one
+/// band at a time instead of parking in one or two. The bound it has to beat is
+/// **derived, not chosen**: before the dual-resolution axis every band down here
+/// was a single 2048-window bin, so the whole region could only ever resolve as
+/// many distinct bands as there are `sample_rate / WINDOW_SIZE` bins inside it.
+///
+/// Stepped tones rather than a continuous glide on purpose. The long window
+/// integrates 171 ms, so a fast sweep is genuinely smeared across it — that is
+/// the physics ADR-0049 accepts, and measuring the *axis* means holding each
+/// frequency long enough for the window to fill.
+#[test]
+fn a_tone_stepped_through_the_bass_region_climbs_distinct_bands() {
+    const LO_HZ: f32 = 40.0;
+    const HI_HZ: f32 = 200.0;
+
+    let peak_band_at = |freq: f32| -> usize {
+        let mut analyzer = mono_analyzer();
+        // Half a second: comfortably past the 8192-sample long window.
+        analyzer.push_interleaved(&sine(freq, 0.8, SR as usize / 2));
+        let frame = analyzer.take_frame();
+        frame
+            .spectrum
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.total_cmp(b.1))
+            .map(|(k, _)| k)
+            .expect("spectrum is non-empty")
+    };
+
+    let steps = 64;
+    let visited: Vec<usize> = (0..=steps)
+        .map(|i| LO_HZ + (HI_HZ - LO_HZ) * i as f32 / steps as f32)
+        .map(peak_band_at)
+        .collect();
+
+    // Smooth: the peak band never walks backwards as the tone rises.
+    for pair in visited.windows(2) {
+        if let [a, b] = pair {
+            assert!(
+                b >= a,
+                "the peak band must not fall as frequency rises: {visited:?}"
+            );
+        }
+    }
+
+    let distinct = {
+        let mut v = visited.clone();
+        v.dedup();
+        v.len()
+    };
+
+    // The v1 ceiling: one 2048-window bin per band meant at most this many
+    // distinct bands were reachable between LO_HZ and HI_HZ, however many log
+    // bands nominally sat there.
+    let bin_hz = SR as f32 / WINDOW_SIZE as f32;
+    let v1_ceiling = (HI_HZ / bin_hz).floor() as usize - (LO_HZ / bin_hz).floor() as usize + 1;
+    assert_eq!(
+        v1_ceiling, 8,
+        "fixture sanity: the old axis could show 8 bands here"
+    );
+
+    assert!(
+        distinct > v1_ceiling,
+        "the dual-resolution axis should resolve more than the {v1_ceiling} bands a single \
+         2048 window could, got {distinct}: {visited:?}"
+    );
+    // And the region really is being spread across the axis, not nudged: the
+    // 40-200 Hz span covers log bands 3..21, so most of them should appear.
+    assert!(
+        distinct >= 14,
+        "40-200 Hz should light up most of its {} log bands, got {distinct}: {visited:?}",
+        analyzer_bands_between(LO_HZ, HI_HZ)
+    );
+}
+
+/// How many log bands nominally span `[lo, hi)` — used to phrase the assertion
+/// above against the axis rather than against a hardcoded count.
+fn analyzer_bands_between(lo: f32, hi: f32) -> usize {
+    let analyzer = mono_analyzer();
+    analyzer.band_for_freq(hi) - analyzer.band_for_freq(lo) + 1
+}
+
 #[test]
 fn click_track_produces_onsets_on_the_beats() {
     let mut analyzer = mono_analyzer();
@@ -284,6 +368,16 @@ fn one_hop_analyzes_well_under_the_hop_interval() {
         analyzer.push_interleaved(hop);
     }
     let per_hop = start.elapsed() / 1000;
+
+    // Printed, not just asserted: Plan 0048 Phase 1's done-when asks for the
+    // measured per-hop cost against NFR section 3, and the dual-resolution axis
+    // added a second FFT to this path. Run with `--release --nocapture` for a
+    // number worth quoting.
+    let hop_budget = std::time::Duration::from_secs_f32(HOP_SIZE as f32 / SR as f32);
+    println!(
+        "per-hop analysis: {per_hop:?} of a {hop_budget:?} hop ({:.2}% of budget)",
+        per_hop.as_secs_f64() / hop_budget.as_secs_f64() * 100.0
+    );
 
     // Hop interval is ~10.7 ms at 48 kHz; even unoptimized builds should sit
     // far below it (NFR section 3 / plan done-when).
