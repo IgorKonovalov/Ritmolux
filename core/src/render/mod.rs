@@ -691,7 +691,7 @@ impl Renderer {
         // unpinned is `Rich` — the governor's job is to take that back, not to
         // hedge it here.
         let tier = TierConfig::for_tier(opts.tier.unwrap_or(Tier::Rich));
-        let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
+        let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format(), &tier);
         let side = CompositeSide::new(&ctx.device, ctx.surface_format(), &tier);
         let ink = Ink::new(&ctx.device, ctx.surface_format());
         let blend = Blend::new(&ctx.device, ctx.surface_format());
@@ -870,6 +870,13 @@ impl Renderer {
         self.cancel_transition();
         self.incoming_side = None;
         self.side = CompositeSide::new(&self.ctx.device, self.ctx.surface_format(), &self.tier);
+        // The scenes carry tier capacities too — particle counts, the segment
+        // buffer, the trail-grid cap — and those are sized at construction, so a
+        // tier change means rebuilding them. Rebuilding also resets their
+        // simulation state to its seed, which is the visible half of a demotion:
+        // the attractor's cloud and the swarm restart rather than losing two
+        // thirds of their points mid-flight.
+        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format(), &self.tier);
         self.configure_active_scene();
     }
 
@@ -1809,7 +1816,7 @@ impl Renderer {
         if !self.select_preset_by_name_now(name) {
             return Err(RenderError::UnknownPreset(name.to_string()));
         }
-        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
+        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format(), &self.tier);
         self.cancel_transition();
         self.side.reset_resources();
         self.ink.reset_resources();
@@ -1845,7 +1852,7 @@ impl Renderer {
         }
         let mut analyzer = crate::dsp::Analyzer::new(format).map_err(RenderError::AudioFormat)?;
 
-        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format());
+        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format(), &self.tier);
         self.cancel_transition();
         self.side.reset_resources();
         self.ink.reset_resources();

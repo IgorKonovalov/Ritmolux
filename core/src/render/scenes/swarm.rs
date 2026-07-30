@@ -22,10 +22,6 @@ use super::{FALLBACK_DT, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
 
-/// Particle count. 10k is the target look (Plan 0003); it holds the primary
-/// dev box comfortably and is the number to validate against the 60 fps @
-/// 1080p floor on the iGPU test PC (NFR 1/9), reducing here if it misses.
-const PARTICLES: usize = 10_000;
 const SEED: u64 = 0x4C4D_565F_5357_524D; // "LMV_SWRM"
 
 /// How far the toroidal domain extends past the visible frame (Plan 0043 Phase 1,
@@ -294,14 +290,23 @@ pub struct SwarmScene {
 
 impl SwarmScene {
     /// Build the pipeline, buffers, and seeded particle set on `device`.
-    pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    /// `particles` is the active tier's
+    /// [`swarm_particles`](crate::render::TierConfig::swarm_particles). The count
+    /// is fixed for the life of the scene — the instance buffer and the CPU
+    /// mirror are both sized to it here, so the per-frame path never allocates —
+    /// and a tier change rebuilds the scene rather than resizing it.
+    pub fn new(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        particles: usize,
+    ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("swarm-shader"),
             source: wgpu::ShaderSource::Wgsl(SHADER.into()),
         });
         let instances = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("swarm-instances"),
-            size: (PARTICLES * std::mem::size_of::<Instance>()) as u64,
+            size: (particles * std::mem::size_of::<Instance>()) as u64,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -381,14 +386,14 @@ impl SwarmScene {
         });
 
         let mut rng = SeededRng::new(SEED);
-        let particles = (0..PARTICLES).map(|_| Self::spawn(&mut rng)).collect();
+        let particle_state: Vec<Particle> = (0..particles).map(|_| Self::spawn(&mut rng)).collect();
 
         Self {
             pipeline,
             instances,
             uniforms,
             bind_group,
-            particles,
+            particles: particle_state,
             instance_data: vec![
                 Instance {
                     center: [0.0, 0.0],
@@ -396,7 +401,7 @@ impl SwarmScene {
                     color: [0.0, 0.0, 0.0],
                     parallax: 1.0,
                 };
-                PARTICLES
+                particles
             ],
             time: 0.0,
             aspect: FALLBACK_ASPECT,
@@ -681,7 +686,7 @@ impl Scene for SwarmScene {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_vertex_buffer(0, self.instances.slice(..));
-        pass.draw(0..6, 0..PARTICLES as u32);
+        pass.draw(0..6, 0..self.particles.len() as u32);
     }
 }
 
@@ -693,10 +698,15 @@ mod tests {
 
     use super::{
         DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, DEPTH_PARALLAX_FAR,
-        DEPTH_PARALLAX_NEAR, MARGIN, PARTICLES, SEED, SwarmScene, bounds, hue_coord,
+        DEPTH_PARALLAX_NEAR, MARGIN, SEED, SwarmScene, bounds, hue_coord,
     };
     use crate::render::palette::Palette;
     use crate::render::scenes::SeededRng;
+
+    /// The particle count these tests run at — the floor tier's, which is the
+    /// number the seeded-scatter assertions below were written against and the one
+    /// every golden capture draws (Plan 0044).
+    const FLOOR_PARTICLES: usize = crate::render::TierConfig::FLOOR.swarm_particles;
 
     /// Target aspects worth checking a domain against: 16:9, the 16:10 the fixed
     /// constants disagreed with, 4:3, an ultrawide, and a portrait.
@@ -883,7 +893,7 @@ mod tests {
     fn the_seeded_scatter_reproduces_the_same_depth_sequence() {
         let depths = || {
             let mut rng = SeededRng::new(SEED);
-            (0..PARTICLES)
+            (0..FLOOR_PARTICLES)
                 .map(|_| SwarmScene::spawn(&mut rng).z)
                 .collect::<Vec<f32>>()
         };

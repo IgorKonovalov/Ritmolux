@@ -25,8 +25,8 @@ use std::rc::Rc;
 use super::super::Scene;
 use super::renderer::{LineRenderer, SegmentInstance};
 use super::{
-    CapOverflow, GeneratorConfig, MAX_LSYSTEM_DEPTH, MAX_SEGMENTS, MirrorSpec, OverflowContext,
-    ViewTransform, grammar, palette, replicate_mirror, transform_cached, turtle,
+    CapOverflow, GeneratorConfig, MAX_LSYSTEM_DEPTH, MirrorSpec, OverflowContext, ViewTransform,
+    grammar, palette, replicate_mirror, transform_cached, turtle,
 };
 use crate::dsp::AnalysisFrame;
 
@@ -64,6 +64,12 @@ pub struct LSystemScene {
     /// Reused buffer for the single (pre-mirror) transformed depth, replicated
     /// into [`draw_buf`](Self::draw_buf) by [`replicate_mirror`]. Preallocated.
     single_buf: Vec<SegmentInstance>,
+    /// The active tier's segment ceiling
+    /// ([`TierConfig::max_segments`](crate::render::TierConfig::max_segments)),
+    /// resolved once at construction (Plan 0044). A field rather than a constant
+    /// so the tier can raise it; both buffers above are preallocated to it, which
+    /// is what keeps the per-frame replication allocation-free.
+    max_segments: usize,
     /// Set when this frame's mirror replication overflowed the cap (Phase 4);
     /// `None` when it fit. Distinct from the load-time `overflow` below.
     mirror_overflow: Option<CapOverflow>,
@@ -91,12 +97,13 @@ pub struct LSystemScene {
 impl LSystemScene {
     /// Build the scene over the shared line renderer, preallocating the draw
     /// buffer. No grammar is expanded until a preset configures one.
-    pub fn new(renderer: Rc<RefCell<LineRenderer>>) -> Self {
+    pub fn new(renderer: Rc<RefCell<LineRenderer>>, max_segments: usize) -> Self {
         Self {
             renderer,
             cached: Vec::new(),
-            draw_buf: Vec::with_capacity(MAX_SEGMENTS),
-            single_buf: Vec::with_capacity(MAX_SEGMENTS),
+            draw_buf: Vec::with_capacity(max_segments),
+            single_buf: Vec::with_capacity(max_segments),
+            max_segments,
             mirror_overflow: None,
             overflow: None,
             time: 0.0,
@@ -127,7 +134,7 @@ impl LSystemScene {
         for d in 1..=depth {
             let string = grammar::expand(axiom, rules, d);
             let mut segs = Vec::new();
-            let dropped = turtle::walk(&string, angle, MAX_SEGMENTS, &mut segs);
+            let dropped = turtle::walk(&string, angle, self.max_segments, &mut segs);
             turtle::normalize_fit(&mut segs, 0.9);
             if dropped > 0 && self.overflow.is_none() {
                 self.overflow = Some((d, dropped));
@@ -220,6 +227,7 @@ impl Scene for LSystemScene {
         self.overflow.map(|(depth, dropped)| CapOverflow {
             dropped,
             context: OverflowContext::Depth(depth),
+            cap: self.max_segments,
         })
     }
 
@@ -261,22 +269,28 @@ impl Scene for LSystemScene {
         // 4). At the default identity spec, skip it: replication would copy the
         // whole segment set into a second buffer to produce exactly what it was
         // given, so swap instead — O(1), and both buffers were preallocated to
-        // `MAX_SEGMENTS`, so neither can grow later. `transform_cached` clears
+        // `max_segments`, so neither can grow later. `transform_cached` clears
         // before it fills, so whatever lands back in `single_buf` is overwritten.
         let mirror = MirrorSpec::from_params(self.mirror_order, self.mirror_reflect);
         if mirror.is_identity() {
             debug_assert!(
-                self.single_buf.len() <= MAX_SEGMENTS,
+                self.single_buf.len() <= self.max_segments,
                 "the cached base is capped at load, so identity cannot truncate"
             );
             std::mem::swap(&mut self.single_buf, &mut self.draw_buf);
             self.mirror_overflow = None;
             return;
         }
-        let dropped = replicate_mirror(&self.single_buf, mirror, MAX_SEGMENTS, &mut self.draw_buf);
+        let dropped = replicate_mirror(
+            &self.single_buf,
+            mirror,
+            self.max_segments,
+            &mut self.draw_buf,
+        );
         self.mirror_overflow = (dropped > 0).then_some(CapOverflow {
             dropped,
             context: OverflowContext::Mirror(mirror.order),
+            cap: self.max_segments,
         });
     }
 
@@ -310,16 +324,21 @@ mod tests {
 
     use super::*;
 
+    /// The cap these tests run at — the floor tier's, which is the value the
+    /// assertions below were written against and the one every shipped preset is
+    /// authored and gated on.
+    const CAP: usize = crate::render::TierConfig::FLOOR.max_segments;
+
     /// A fixed base + repeated per-frame transforms must not grow the draw
     /// buffer — the per-frame half is allocation-free (ADR-0007). This is the
     /// "inspection" proof; expansion/turtle-walking live only in `build`.
     #[test]
     fn per_frame_transform_does_not_allocate() {
         let mut base = Vec::with_capacity(64);
-        turtle::walk("F+F+F+F+F[-F]F", 0.5, MAX_SEGMENTS, &mut base);
+        turtle::walk("F+F+F+F+F[-F]F", 0.5, CAP, &mut base);
         turtle::normalize_fit(&mut base, 0.9);
 
-        let mut out = Vec::with_capacity(MAX_SEGMENTS);
+        let mut out = Vec::with_capacity(CAP);
         let cap = out.capacity();
         for frame in 0..16 {
             let rotation = frame as f32 * 0.05;
@@ -332,7 +351,7 @@ mod tests {
     #[test]
     fn draw_progress_reveals_a_prefix() {
         let mut base = Vec::with_capacity(64);
-        turtle::walk("FFFFFFFF", 0.0, MAX_SEGMENTS, &mut base);
+        turtle::walk("FFFFFFFF", 0.0, CAP, &mut base);
         let mut out = Vec::with_capacity(64);
         transform_cached(&base, 0.0, 1.0, [1.0; 3], 0.01, 0.5, &mut out);
         assert_eq!(out.len(), 4, "half of eight segments");

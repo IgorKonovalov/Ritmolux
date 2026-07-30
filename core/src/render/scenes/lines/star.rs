@@ -22,8 +22,8 @@ use std::rc::Rc;
 use super::super::Scene;
 use super::renderer::{LineRenderer, SegmentInstance};
 use super::{
-    CapOverflow, GeneratorConfig, MAX_SEGMENTS, MirrorSpec, OverflowContext, ViewTransform, hankin,
-    palette, replicate_mirror, transform_cached, turtle,
+    CapOverflow, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, hankin, palette,
+    replicate_mirror, transform_cached, turtle,
 };
 use crate::dsp::AnalysisFrame;
 
@@ -67,6 +67,12 @@ pub struct StarPatternScene {
     /// Reused buffer for the single (pre-mirror) transformed variant, replicated
     /// into [`draw_buf`](Self::draw_buf) by [`replicate_mirror`]. Preallocated.
     single_buf: Vec<SegmentInstance>,
+    /// The active tier's segment ceiling
+    /// ([`TierConfig::max_segments`](crate::render::TierConfig::max_segments)),
+    /// resolved once at construction (Plan 0044). A field rather than a constant
+    /// so the tier can raise it; the buffers above are preallocated to it, which
+    /// is what keeps the per-frame replication allocation-free.
+    max_segments: usize,
     /// Set when this frame's mirror replication overflowed the cap (Phase 4).
     mirror_overflow: Option<CapOverflow>,
     /// Shared scene clock (seconds).
@@ -89,12 +95,13 @@ pub struct StarPatternScene {
 impl StarPatternScene {
     /// Build the scene over the shared line renderer, preallocating the draw
     /// buffer. No pattern is built until a preset configures one.
-    pub fn new(renderer: Rc<RefCell<LineRenderer>>) -> Self {
+    pub fn new(renderer: Rc<RefCell<LineRenderer>>, max_segments: usize) -> Self {
         Self {
             renderer,
             cached: Vec::new(),
-            draw_buf: Vec::with_capacity(MAX_SEGMENTS),
-            single_buf: Vec::with_capacity(MAX_SEGMENTS),
+            draw_buf: Vec::with_capacity(max_segments),
+            single_buf: Vec::with_capacity(max_segments),
+            max_segments,
             mirror_overflow: None,
             time: 0.0,
             variant: DEFAULT_VARIANT,
@@ -244,22 +251,28 @@ impl Scene for StarPatternScene {
         // (Phase 4). At the default identity spec, skip it: replication would copy
         // the whole segment set into a second buffer to produce exactly what it
         // was given, so swap instead — O(1), and both buffers were preallocated to
-        // `MAX_SEGMENTS`, so neither can grow later. `transform_cached` clears
+        // `max_segments`, so neither can grow later. `transform_cached` clears
         // before it fills, so whatever lands back in `single_buf` is overwritten.
         let mirror = MirrorSpec::from_params(self.mirror_order, self.mirror_reflect);
         if mirror.is_identity() {
             debug_assert!(
-                self.single_buf.len() <= MAX_SEGMENTS,
+                self.single_buf.len() <= self.max_segments,
                 "the cached variant is capped at load, so identity cannot truncate"
             );
             std::mem::swap(&mut self.single_buf, &mut self.draw_buf);
             self.mirror_overflow = None;
             return;
         }
-        let dropped = replicate_mirror(&self.single_buf, mirror, MAX_SEGMENTS, &mut self.draw_buf);
+        let dropped = replicate_mirror(
+            &self.single_buf,
+            mirror,
+            self.max_segments,
+            &mut self.draw_buf,
+        );
         self.mirror_overflow = (dropped > 0).then_some(CapOverflow {
             dropped,
             context: OverflowContext::Mirror(mirror.order),
+            cap: self.max_segments,
         });
     }
 

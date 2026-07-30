@@ -28,7 +28,7 @@
 //! unperturbed).
 //!
 //! The accumulation field is sized to the render target and capped (Plan 0027
-//! Phase 2, `TRAIL_MAX_W`/`TRAIL_MAX_H`) rather than fixed at 640x360, so the
+//! Phase 2, now the tier's `attractor_trail_cap`) rather than fixed at 640x360, so the
 //! present is close to 1:1 up to the cap instead of a soft upscale on a 1080p+
 //! display. That size is quantized to `TRAIL_GRID_STEP`, so a live window drag
 //! re-allocates the field a handful of times rather than once per frame.
@@ -58,34 +58,10 @@ use crate::dsp::AnalysisFrame;
 use crate::render::feedback::PingPongField;
 use crate::render::palette::{self, Palette};
 
-/// Particle count. GPU-resident state is ~16 bytes each, so this is ~0.8 MB of
-/// storage (negligible); the real ceiling is additive-blend fill rate at high
-/// counts, an on-device iGPU concern routed to `docs/on-device-validation.md`
-/// (ADR-0015 Risks). The headless capture tests draw this many instances at a
-/// small size, which the software adapter handles briskly.
-const PARTICLE_COUNT: u32 = 50_000;
 /// Compute workgroup size (1D). 64 is a safe, portable default across DX12/Metal.
 const WORKGROUP: u32 = 64;
 const SEED: u64 = 0x4C4D_5641_5454_5231; // "LMVATTR1"
 
-/// Upper bound on each axis of the trail accumulation grid (Plan 0027 Phase 2).
-///
-/// The grid used to be a fixed 640x360 that was upscaled with linear filtering
-/// onto the surface, and that stretch — not the glow — is what read as soft on a
-/// 1080p+ display. It is now sized from the render target (see
-/// [`Scene::set_target_size`](crate::render::scenes::Scene::set_target_size))
-/// and scaled under this cap, so a 1080p window gets a ~1:1 grid and a
-/// 4K/ultrawide one degrades to a mild, uniform upscale instead of an unbounded
-/// fill bill.
-///
-/// **The cap is the NFR §1 tradeoff.** Every frame pays a decay pass plus a
-/// 50k-instance additive draw over the grid, so fill scales with its area: 1440p
-/// is ~16x the old 640x360. 2560x1440 is the chosen ceiling — enough headroom for
-/// a high-DPI display while keeping the worst case bounded on the iGPU floor. The
-/// headless captures run well under it, so they size close to 1:1 and stay
-/// deterministic at a fixed `--size` (NFR §6).
-const TRAIL_MAX_W: u32 = 2560;
-const TRAIL_MAX_H: u32 = 1440;
 /// Grid size before the first
 /// [`Scene::set_target_size`](crate::render::scenes::Scene::set_target_size) —
 /// only reached if a scene renders without one, which the renderer never does.
@@ -110,8 +86,9 @@ const TRAIL_GRID_STEP: u32 = 256;
 /// here, and `post.rs` held a line-for-line copy of it; that duplication is how
 /// the aspect lesson this scene already paid for failed to reach the post stages
 /// and shipped as a defect a second time (ADR-0037). The **numbers** stay here,
-/// because they are genuinely this call site's — see `TRAIL_MAX_*` for why the
-/// attractor may take a larger grid than a post stage.
+/// because they are genuinely this call site's — see
+/// [`TierConfig::attractor_trail_cap`](crate::render::TierConfig::attractor_trail_cap)
+/// for why the attractor may take a larger grid than a post stage.
 ///
 /// **Still `pub`, deliberately.** Plan 0029's close logged this as a nit (public
 /// API widened for a test's benefit), and Plan 0035 re-examined it while touching
@@ -121,8 +98,8 @@ const TRAIL_GRID_STEP: u32 = 256;
 /// behavioral gain. `core/` is not a published API surface; the cost of the
 /// widening is a doc-comment's worth of noise, and the cost of the churn is a
 /// silent scope expansion. Kept.
-pub fn trail_grid_size(width: u32, height: u32) -> (u32, u32) {
-    crate::render::grid::grid_size((width, height), (TRAIL_MAX_W, TRAIL_MAX_H), TRAIL_GRID_STEP)
+pub fn trail_grid_size(width: u32, height: u32, cap: (u32, u32)) -> (u32, u32) {
+    crate::render::grid::grid_size((width, height), cap, TRAIL_GRID_STEP)
 }
 
 /// Wall-clock duration of one attractor iteration (Plan 0014 injected `dt`). The
@@ -531,6 +508,12 @@ struct PipelineResources {
     decay_layout: wgpu::BindGroupLayout,
     present_layout: wgpu::BindGroupLayout,
     field_sampler: wgpu::Sampler,
+    /// How many particles the buffer above holds — the active tier's
+    /// [`attractor_particles`](crate::render::TierConfig::attractor_particles),
+    /// fixed for the life of these resources. Carried here rather than read from a
+    /// constant so the compute dispatch, the instance draw and the step uniform
+    /// all take the count from the buffer that was actually allocated.
+    count: u32,
 }
 
 /// The grid-**dependent** GPU state: the accumulation field and the four bind
@@ -558,8 +541,9 @@ impl Resources {
         surface_format: wgpu::TextureFormat,
         trail_w: u32,
         trail_h: u32,
+        count: u32,
     ) -> Self {
-        let pipelines = PipelineResources::build(device, surface_format);
+        let pipelines = PipelineResources::build(device, surface_format, count);
         let grid = FieldResources::build(device, &pipelines, trail_w, trail_h);
         Self { pipelines, grid }
     }
@@ -574,7 +558,7 @@ impl Resources {
 }
 
 impl PipelineResources {
-    fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat, count: u32) -> Self {
         let step_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("attractor-step-shader"),
             source: wgpu::ShaderSource::Wgsl(STEP_SHADER.into()),
@@ -601,7 +585,7 @@ impl PipelineResources {
         // the CPU (COPY_DST). One buffer, two roles — no CPU round-trip.
         let particles = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("attractor-particles"),
-            size: (PARTICLE_COUNT as usize * std::mem::size_of::<Particle>()) as u64,
+            size: (count as usize * std::mem::size_of::<Particle>()) as u64,
             usage: wgpu::BufferUsages::STORAGE
                 | wgpu::BufferUsages::VERTEX
                 | wgpu::BufferUsages::COPY_DST,
@@ -819,6 +803,7 @@ impl PipelineResources {
             decay_layout,
             present_layout,
             field_sampler,
+            count,
         }
     }
 }
@@ -978,6 +963,16 @@ pub struct AttractorScene {
     /// work inside the hook (ADR-0030 condition 2).
     trail_w: u32,
     trail_h: u32,
+    /// The active tier's cap on the trail grid
+    /// ([`TierConfig::attractor_trail_cap`](crate::render::TierConfig::attractor_trail_cap)),
+    /// resolved once at construction. Read only in `set_target_size`, so the grid
+    /// stays a pure function of the target and the cap.
+    trail_cap: (u32, u32),
+    /// The active tier's particle count
+    /// ([`TierConfig::attractor_particles`](crate::render::TierConfig::attractor_particles)).
+    /// Fixed for the life of the scene: the storage buffer and the seeded scatter
+    /// are both sized to it, and a tier change rebuilds the scene.
+    particle_count: u32,
     /// The deterministic seeded scatter, uploaded on the first frame after a
     /// (re)build so a rebuilt scene restarts identically (capture determinism).
     seed_particles: Vec<Particle>,
@@ -1035,14 +1030,21 @@ pub struct AttractorScene {
 impl AttractorScene {
     /// Build the CPU-side seeded scatter. GPU resources are deferred to the first
     /// render (module docs).
-    pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        particle_count: u32,
+        trail_cap: (u32, u32),
+    ) -> Self {
         let family = AttractorFamily::DeJong;
-        let seed_particles = Self::seed(family);
+        let seed_particles = Self::seed(family, particle_count);
         let [a, b, c, d] = family.default_coeffs();
         Self {
             device: device.clone(),
             surface_format,
             res: None,
+            trail_cap,
+            particle_count,
             trail_w: TRAIL_FALLBACK_W,
             trail_h: TRAIL_FALLBACK_H,
             seed_particles,
@@ -1130,6 +1132,7 @@ impl AttractorScene {
                     self.surface_format,
                     self.trail_w,
                     self.trail_h,
+                    self.particle_count,
                 )
             }
         };
@@ -1137,10 +1140,10 @@ impl AttractorScene {
         self.needs_clear = true;
     }
 
-    fn seed(family: AttractorFamily) -> Vec<Particle> {
+    fn seed(family: AttractorFamily, count: u32) -> Vec<Particle> {
         let (spread, center) = family.seed_box();
         let mut rng = SeededRng::new(SEED);
-        let mut particles: Vec<Particle> = (0..PARTICLE_COUNT)
+        let mut particles: Vec<Particle> = (0..count)
             .map(|_| {
                 let x = center[0] + rng.range(-spread[0], spread[0]);
                 let y = center[1] + rng.range(-spread[1], spread[1]);
@@ -1198,7 +1201,7 @@ impl Scene for AttractorScene {
     /// the request — no allocation, no GPU work — and `render` re-allocates the
     /// field when it differs from what the live one was built for.
     fn set_target_size(&mut self, width: u32, height: u32) {
-        let (w, h) = trail_grid_size(width, height);
+        let (w, h) = trail_grid_size(width, height, self.trail_cap);
         self.trail_w = w;
         self.trail_h = h;
     }
@@ -1288,7 +1291,7 @@ impl Scene for AttractorScene {
             self.d = d;
             // Re-seed with the new family's box (its scale differs) and clear the
             // trail so the new attractor forms cleanly.
-            self.seed_particles = Self::seed(*family);
+            self.seed_particles = Self::seed(*family, self.particle_count);
             self.needs_upload = true;
             self.needs_clear = true;
         }
@@ -1464,7 +1467,7 @@ fn upload_uniforms(queue: &wgpu::Queue, pipelines: &PipelineResources, inputs: &
             coeffs: inputs.coeffs,
             dt: FIXED_STEP,
             family: inputs.family.shader_id(),
-            count: PARTICLE_COUNT,
+            count: pipelines.count,
             pad: 0,
         }),
     );
@@ -1520,7 +1523,7 @@ fn encode_steps(
     pipelines: &PipelineResources,
     pending_steps: u32,
 ) {
-    let groups = PARTICLE_COUNT.div_ceil(WORKGROUP);
+    let groups = pipelines.count.div_ceil(WORKGROUP);
     for _ in 0..pending_steps {
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("attractor-step-pass"),
@@ -1569,7 +1572,7 @@ fn encode_trail_pass(
     pass.set_pipeline(&pipelines.draw_pipeline);
     pass.set_bind_group(0, &pipelines.draw_bg, &[]);
     pass.set_vertex_buffer(0, pipelines.particles.slice(..));
-    pass.draw(0..6, 0..PARTICLE_COUNT);
+    pass.draw(0..6, 0..pipelines.count);
 }
 
 /// Present the freshly-written accumulation to the target, loading over whatever
