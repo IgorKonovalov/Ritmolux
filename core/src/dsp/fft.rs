@@ -333,6 +333,7 @@ fn hann_at(i: usize, n: usize) -> f32 {
 )]
 mod tests {
     use super::*;
+    use crate::dsp::bands::BASS_HI_HZ;
 
     const SR: f32 = 48_000.0;
 
@@ -449,6 +450,126 @@ mod tests {
             layout.starved(),
             8,
             "at 8192 and 48 kHz exactly 8 sub-76 Hz bands stay one bin wide"
+        );
+    }
+
+    /// **The axis holds up at the sample rates we do not develop at.**
+    ///
+    /// Every layout test above is at 48 kHz. `AudioFormat` accepts 8 kHz-384 kHz,
+    /// and foobar hands the plugin **44.1 kHz** for CD material — the single most
+    /// common rate this engine will ever see, and the one no test looked at.
+    /// ADR-0049's stated benefit is literally *"the axis stops depending on sample
+    /// rate in its bottom half"*: that is the claim, and until now it was the one
+    /// claim no test could see.
+    ///
+    /// # What this found: the crossover is not rate-independent, and should not be
+    ///
+    /// The measured figures, which this test pins:
+    ///
+    /// | rate | crossover band | crossover | bin-starved bands |
+    /// |------|----------------|-----------|-------------------|
+    /// | 44.1 kHz | 19 | ~223 Hz | 8 |
+    /// | 48 kHz | 20 | ~246 Hz | 8 |
+    /// | 96 kHz | 27 | ~487 Hz | **21** |
+    ///
+    /// **Both windows are fixed in samples, not seconds**, so at 96 kHz each one
+    /// spans half the time and resolves half the frequency detail. The crossover
+    /// therefore rides `sample_rate / WINDOW_SIZE`, and the region the long window
+    /// still cannot resolve grows from 8 bands to **21 — a third of the axis**
+    /// (the widening cascades: `fill` chains `prev_hi`, so each widened band
+    /// pushes the next one's floor up).
+    ///
+    /// That is physics working as specified rather than a defect — a higher rate
+    /// buys time resolution and spends frequency resolution — and ADR-0049's claim
+    /// survives it intact, because the claim is about the band **edges in Hz**
+    /// below the crossover, which do not move at all. But a third of the axis
+    /// reading at one-bin resolution is a real difference in what a preset's
+    /// `bin()` sees on a 96 kHz device, and it was invisible before this test.
+    /// Fixing it would mean sizing the windows in **seconds** rather than samples,
+    /// which is an ADR, not a test. Recorded here so the next person to think
+    /// about it starts from the measurement.
+    ///
+    /// 44.1 kHz — the rate that actually matters, since foobar hands the plugin
+    /// CD material — is indistinguishable from 48 kHz: one band lower, same
+    /// starved count. That half of the sweep found nothing, which is the good
+    /// outcome.
+    ///
+    /// So this asserts the invariant rather than a number: the crossover is
+    /// wherever the axis reaches one short-window bin, at every rate. The
+    /// near-`BASS_HI_HZ` coincidence the 48 kHz test pins is asserted **only at
+    /// 44.1 kHz**, where it holds and where it matters — that is the rate foobar
+    /// hands the plugin for CD material.
+    ///
+    /// It also carries the release-mode half of a claim that currently has none:
+    /// `with_windows`'s `debug_assert_eq!(short_widened, 0)` is the only guard
+    /// that the crossover really keeps the short region unstarved, **and a
+    /// `debug_assert` does not run in release**. The width check below is the same
+    /// property stated on the axis rather than on the fill, so it runs in both.
+    #[test]
+    fn the_axis_holds_at_the_rates_we_do_not_develop_at() {
+        // (rate, expected bin-starved bands) — see the table above.
+        for (sr, expect_starved) in [(44_100u32, 8usize), (48_000, 8), (96_000, 21)] {
+            let layout = BandLayout::new(sr);
+            let short_bin_hz = sr as f32 / WINDOW_SIZE as f32;
+
+            // 1. No dead stripes: an empty band reads zero in every `bin()` a
+            //    preset takes, at every level of input.
+            for k in 0..SPECTRUM_BINS {
+                let (lo, hi) = layout.bins[k];
+                assert!(
+                    hi > lo,
+                    "at {sr} Hz band {k} spans no bins ({lo}..{hi}) — a dead stripe"
+                );
+            }
+
+            // 2. The crossover is exactly where the axis reaches one short-window
+            //    bin. This is the invariant; the hertz figure it lands on is a
+            //    consequence of the rate, not a constant.
+            let width = |k: usize| layout.edges_hz[k + 1] - layout.edges_hz[k];
+            let crossover = layout.crossover_band();
+            assert!(
+                crossover > 0 && crossover < SPECTRUM_BINS,
+                "at {sr} Hz the crossover swallowed or vacated the axis: {crossover}"
+            );
+            assert!(
+                width(crossover - 1) < short_bin_hz && width(crossover) >= short_bin_hz,
+                "at {sr} Hz the crossover at band {crossover} is not the one-short-bin \
+                 boundary: widths {} then {}, bin {short_bin_hz} Hz",
+                width(crossover - 1),
+                width(crossover)
+            );
+
+            // 3. The short region's width claim, stated on the axis so it runs in
+            //    release too — see this test's doc comment.
+            for k in crossover..SPECTRUM_BINS {
+                assert!(
+                    width(k) >= short_bin_hz,
+                    "at {sr} Hz band {k} is above the crossover but only {} Hz wide, under \
+                     one {short_bin_hz} Hz short-window bin — the fill would widen it, and \
+                     only a debug_assert would notice",
+                    width(k)
+                );
+            }
+
+            // 4. The bin-starved count, pinned per rate. It rises with the rate
+            //    because both windows are fixed in samples; a change here is a
+            //    change in how much sub-bass the long window resolves, which is
+            //    the thing ADR-0049 exists to protect.
+            assert_eq!(
+                layout.starved(),
+                expect_starved,
+                "at {sr} Hz the bin-starved sub-bass region changed size"
+            );
+        }
+
+        // At the rate foobar hands the plugin for CD material, the crossover still
+        // sits just under the bass split — the same near-coincidence the 48 kHz
+        // test pins, and the reason the axis behaves the same on that path.
+        let hz = BandLayout::new(44_100).crossover_hz();
+        assert!(
+            (BASS_HI_HZ * 0.85..BASS_HI_HZ).contains(&hz),
+            "at 44.1 kHz the crossover moved to {hz} Hz, away from just under the \
+             {BASS_HI_HZ} Hz bass split"
         );
     }
 
