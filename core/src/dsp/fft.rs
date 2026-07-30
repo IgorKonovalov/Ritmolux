@@ -538,10 +538,13 @@ mod tests {
     /// the long window integrates 171 ms, so a fast sweep is genuinely smeared
     /// across it — the physics ADR-0049 accepts — and measuring the *axis* means
     /// holding each frequency steady. **Read here rather than through `Analyzer`:**
-    /// this reads the raw band array, because the analyzer publishes a per-band
-    /// normalized one on which an argmax is meaningless — a tone's own band and
-    /// both neighbours all saturate at 1.0, so the peak index is arbitrary among
-    /// them. Placement is a property of the layout, and this is the layout's test.
+    /// band placement is a property of the *layout*, and this is the layout's
+    /// test — going through the analyzer would put its normalizer's state, warm-up
+    /// and decay in the path of a question that has nothing to do with any of them.
+    /// (The published array would in fact preserve the argmax: ADR-0049 normalizes
+    /// the whole spectrum against one shared peak, and a uniform gain keeps the
+    /// ordering. It is the per-band normalization that would have destroyed it —
+    /// the draft that ADR was written to reject.)
     #[test]
     fn a_tone_stepped_through_the_bass_region_climbs_distinct_bands() {
         const LO_HZ: f32 = 40.0;
