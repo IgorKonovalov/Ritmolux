@@ -47,6 +47,16 @@ contradicts this file is a plan bug — surface it, don't guess.
   render + present ≤ 1-2 frames.
 - The ring buffer may hold more than 60 ms of *capacity*; the requirement is that the DSP
   reads near the write head, not that the buffer is small.
+- **The `window ≤ 2048` bound above governs the transient path, not the whole analyzer.**
+  Since [ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) a second
+  **8192** window feeds only the bands below the ~246 Hz crossover, which a 23.4 Hz bin
+  cannot resolve. The 60 ms budget is unaffected because onset, beat and tempo all still
+  read the 2048 window — the beat-to-reaction path never touches the long one. What the
+  long window does cost is **low-band level response: ~85 ms of Hann group delay**, accepted
+  as physics rather than compensated away, and applying to `bass` and the sub-crossover
+  `bin()` positions only. Measured per-hop analysis cost after the change is 31.5 µs
+  (from 17.2 µs), against the ~11 ms allocated here — roughly 350x headroom. Cold start
+  now publishes its first frame at ~171 ms instead of ~43 ms, once per stream.
 
 ## 4. Size and dependencies
 
