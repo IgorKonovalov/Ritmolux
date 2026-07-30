@@ -49,10 +49,36 @@ pub fn apply_set(frame: &mut AnalysisFrame, spec: &str) -> Result<(), String> {
             // used them: an author could not drive either one in a capture.
             "tempo" => frame.bpm = v,
             "novelty" => frame.novelty = v,
+            // Analysis v2 (Plan 0048 / ADR-0049, ADR-0050). Added here in the
+            // same breath as the variables themselves, precisely because the
+            // comment above is the lesson: a variable an author cannot drive in
+            // a capture is a variable no preset ends up using.
+            "bass_raw" => frame.bass_raw = v,
+            "mid_raw" => frame.mid_raw = v,
+            "treb_raw" => frame.treb_raw = v,
+            "onset_raw" => frame.onset_raw = v,
+            "time_since_beat" => frame.time_since_beat = v,
+            "bar_phase" => frame.bar_phase = v,
+            // Counters are integers on the frame and floats in the grammar, so a
+            // negative or fractional request is clamped rather than wrapping to
+            // something enormous.
+            "beat_index" => frame.beat_index = whole(v),
+            "beat_in_bar" => frame.beat_in_bar = whole(v),
+            "bar_index" => frame.bar_index = whole(v),
             other => return Err(format!("--set: unknown key `{other}`")),
         }
     }
     Ok(())
+}
+
+/// A grammar float as a frame counter: truncated, and clamped into `u32` so a
+/// negative or absurd `--set beat_index=-3` cannot wrap.
+fn whole(v: f32) -> u32 {
+    if v.is_finite() {
+        v.clamp(0.0, u32::MAX as f32) as u32
+    } else {
+        0
+    }
 }
 
 /// One numeric `--signal` parameter (a BPM, a frequency), named in the error.

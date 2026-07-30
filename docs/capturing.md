@@ -298,11 +298,16 @@ Under each family's table is a second block
 ([ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md)):
 
 ```
-  at realistic levels (bass 0.04 mid 0.006 treb 0.006 onset 0.0016) — read the *gap* ...
+  at realistic levels (bass 0.661 mid 0.575 treb 0.281 onset 0.145) — read the *gap* ...
   preset            bass     mid    treb   onset   gates   ceils
-  Aurora           0.110   0.010   0.020   0.001       0       9
-  Warp Drive       0.040   0.009   0.008   0.122       2      11
+  Aurora           0.212   0.199   0.228   0.048       0       0
+  Ember            0.104   0.100   0.000   0.090       0       0
 ```
+
+> **The realistic levels changed meaning in Plan 0048.** They are now fractions of
+> each signal's own recent peak (ADR-0049), not magnitudes, which is why they read
+> `0.661` where they used to read `0.04`. Any `--report` number quoted in an older
+> commit message, ADR Outcome or backlog entry was measured on the raw scale.
 
 The four columns are measured exactly as the ones above, from stimuli set to
 [what real material produces](#what-real-material-actually-produces) instead of
@@ -377,17 +382,24 @@ The probe runs 12 s rather than the 4 s a `--signal` filmstrip synthesizes,
 because the tempo tracker needs about 4 s to lock. Under a short clip `tempo`
 reads a flat `0` and every `tempo` comparison flags for the wrong reason.
 
-This is advisory output. It is **not** a CI gate, and deliberately so — but the
-reason has moved. ADR-0042 deferred gating because nine shipped presets would
-have failed on day one, blocking everyone on an unrelated content pass. Those
-nine were fixed on 2026-07-29, and the Plan 0042 re-audit against the corrected
-check measured **0 genuinely dead gates across the shipped set**. What blocks
-gating now is the instrument, not the library: every one of the flags the shipped
-set still produces is the `tempo` single-BPM false positive above, so a naive
-"fail if flags > 0" would fail CI permanently and a threshold would be tuned to
-noise. The precondition for gating is therefore a multi-BPM probe or an explicit
+This is advisory output. It is **not** a CI gate, and deliberately so — and as of
+Plan 0048 **both** of the reasons are live again.
+
+The instrument is one of them, and that has not changed: the `tempo` single-BPM
+false positive above accounts for 17 of the 26 flags the shipped set currently
+produces, so a naive "fail if flags > 0" would fail CI permanently and a threshold
+would be tuned to noise. The precondition remains a multi-BPM probe or an explicit
 `tempo` exemption
 ([ADR-0043](adrs/0043-reachability-reports-comparison-nodes.md)).
+
+The library is the other, and it regressed on purpose. Plan 0042's re-audit
+measured **0 genuinely dead gates**, and that held until ADR-0049 changed what a
+band level means. Nine bindings written against raw levels now compare against
+normalized ones and never go false, so their `else` branches are dead. That is the
+priced cost of the one-time retune ADR-0049 chose, the flags are catalogued in
+[analysis-v2-before-flags.md](analysis-v2-before-flags.md), and clearing them is
+Plan 0048's Phase 7. **Until that lands, a non-zero Group 2 count is expected
+rather than news.**
 
 ### Which preset library a shot uses
 
@@ -503,6 +515,21 @@ against `noise:<seed>`'s 1.78 / 1.15 / 1.07 — and it was the liveliest kind th
 was. Like every generator here it is a pure function of its arguments, so a
 filmstrip of it is reproducible.
 
+Those are **raw** magnitudes, so since ADR-0049 they describe `bass_raw` /
+`mid_raw` / `treb_raw`. Through the normalizers the same clip reads:
+
+| variable | min | mean | max |
+|---|---|---|---|
+| `bass` | 0.035 | 0.661 | 1.000 |
+| `mid` | 0.031 | 0.575 | 1.000 |
+| `treb` | 0.002 | 0.281 | 1.000 |
+| `onset` | 0.001 | 0.145 | 1.000 |
+
+The crest factors above are what normalization *preserves* — it divides by a
+slowly-moving peak, so a clip's dynamics survive while its absolute level does
+not. Note every variable reaches `1.000`: full scale is a state real material
+visits, not a corner.
+
 > **It exercises dynamics. It is not evidence about real loopback levels.** A
 > preset that looks right under `dynamic:110` is a preset that survives material
 > which rises and falls — that is all this says. Nothing synthesized can tell you
@@ -513,10 +540,18 @@ filmstrip of it is reproducible.
 #### What real material actually produces
 
 Measured 2026-07-27 through `--audio` on three local clips, none committed (see
-the note above about `assets/test/`). **These are the numbers to calibrate a gain
-against.** All three were peak-normalized to −1 dBFS first, because two of them
-arrived 20–26 dB under-levelled and every band read zero — a level problem in the
-file, not a fact about the music.
+the note above about `assets/test/`). All three were peak-normalized to −1 dBFS
+first, because two of them arrived 20–26 dB under-levelled and every band read
+zero — a level problem in the file, not a fact about the music.
+
+> **These are raw magnitudes, so they now describe `bass_raw` / `mid_raw` /
+> `treb_raw`** (ADR-0049). They used to be "the numbers to calibrate a gain
+> against", and for the normalized `bass` / `mid` / `treb` they no longer are —
+> that is the entire point of normalizing. Calibrate those against the `0–1` table
+> in [presets.md](presets.md#set-the-threshold-from-a-measured-level-not-from---set)
+> and they will hold on material like this without re-tuning. This section is now
+> the reference for the **`*_raw`** variables, and for understanding *why* the
+> normalized ones exist: look at how far apart the three rows below are.
 
 | material | RMS | bass min / mean / max | mid | treb |
 |---|---|---|---|---|
@@ -532,16 +567,25 @@ Everything else here reads lower still: a guitar loop with no drums puts
 essentially nothing in bass or treble, which is correct and is what most material
 does in most bands most of the time.
 
-So, in descending order of how far a stimulus is from real music:
+So, in descending order of how far a stimulus is from real music — **on the raw
+scale, i.e. what `bass_raw` sees**:
 
-| stimulus | bass it produces | vs. a real mean |
+| stimulus | `bass_raw` it produces | vs. a real mean |
 |---|---|---|
-| `--set bass=0.8` | `0.800` | **~100×** too hot |
+| `--set bass_raw=0.8` | `0.800` | **~100×** too hot |
 | `--signal bass:60` (full-scale sine) | `0.187` | ~25× too hot |
 | `--signal dynamic:110` | mean `0.040`, max `0.106` | ~6× too hot, right order for peaks |
 | real music (above) | mean `0.000`–`0.007`, max up to `0.190` | — |
 
-Two practical consequences:
+**This ladder is exactly what ADR-0049 abolished for the normalized variables.**
+Its four rows span three orders of magnitude, and picking a threshold meant
+knowing which rung you were standing on — which is why nine shipped mechanisms sat
+dead for months. On the normalized scale every rung that carries real dynamics
+lands in the same `0–1` range, so `bass > 0.8` means "near this material's own
+peak" whether the material is an 808 at −1 dBFS or a quiet guitar loop. The ladder
+survives here because `*_raw` still climbs it.
+
+Two practical consequences, both of which still apply to `*_raw` and to `bin()`:
 
 - **Calibrate against a mean, not a peak, for anything continuous** — a size, a
   zoom, a hue drift. Those spend their life near the mean, so a gain tuned to look

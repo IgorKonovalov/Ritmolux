@@ -16,8 +16,11 @@
 //!   --preset <name>          single-shot the named preset
 //!   --presets <dir>          load the library from <dir> (e.g. the repo's presets/)
 //!   --preset-file <path>     load exactly one preset from <path>
-//!   --set k=v,...            constant stimulus (bass/mid/treb/onset/beat/bar/
-//!                            tempo/novelty) — a *held* value, not a transient
+//!   --set k=v,...            constant stimulus — a *held* value, not a
+//!                            transient. bass/mid/treb/onset (normalized 0..1),
+//!                            their *_raw twins, beat/bar/tempo/novelty, and the
+//!                            clock beat_index/time_since_beat/beat_in_bar/
+//!                            bar_index/bar_phase
 //!   --frames <N>             frames to advance before capture (default 120)
 //!   --size <WxH>             render size (default 1280x720)
 //!   --out <path>             output PNG (single shot) or dir/file (--all)
@@ -183,7 +186,10 @@ fn print_usage() {
          --preset <name>            single-shot the named preset (needs --out)\n\
          --presets <dir>            library directory (beats LMV_PRESET_DIR)\n\
          --preset-file <path>       one preset from a file (beats --presets)\n\
-         --set k=v,...              bass,mid,treb,onset,bar,beat,tempo,novelty\n\
+         --set k=v,...              bass,mid,treb,onset (normalized 0..1) and\n\
+         their bass_raw,mid_raw,treb_raw,onset_raw twins,\n\
+         bar,beat,tempo,novelty,beat_index,time_since_beat,\n\
+         beat_in_bar,bar_index,bar_phase\n\
          (each HELD for every captured frame - see docs/capturing.md)\n\
          --frames <N>               frames before capture (default 120)\n\
          --size <WxH>               render size (default 1280x720)\n\
@@ -781,17 +787,27 @@ const TREB_BANDS: std::ops::Range<usize> = 48..64;
 /// column reads is a *ratio between two runs of the same shape*, so keeping one
 /// level argument keeps the pair comparable.
 fn band_stimulus(
-    scalar: impl Fn(&mut AnalysisFrame, f32),
+    scalar: impl Fn(&mut AnalysisFrame, f32, f32),
     bands: std::ops::Range<usize>,
     level: f32,
+    raw: f32,
 ) -> AnalysisFrame {
     let mut frame = AnalysisFrame::default();
-    scalar(&mut frame, level);
+    scalar(&mut frame, level, raw);
     for band in frame.spectrum.iter_mut().take(bands.end).skip(bands.start) {
         *band = level;
     }
     frame
 }
+
+/// The raw magnitude each normalized `1.0` corresponds to on the report's own
+/// clip — the measured peaks, since `normalized = raw / peak` (ADR-0049).
+///
+/// A stimulus has to set the `*_raw` twin beside every normalized level it sets.
+/// Leaving them at zero would report every `*_raw` gate in the library as dead,
+/// which is precisely the "the report describes a preset that does not exist"
+/// failure Plans 0041 and 0042 were spent closing.
+const RAW_AT_FULL_SCALE: StimulusLevels = [0.106, 0.019, 0.032, 0.017];
 
 /// The four stimuli at **full scale** — the historical reading. Every
 /// `--report` number quoted in a commit message, an ADR Outcome or a backlog
@@ -815,49 +831,97 @@ type StimulusLevels = [f32; 4];
 
 /// Full scale: every band pinned at `1.0`, the convention `--report` has always
 /// used.
+///
+/// Since ADR-0049 this is also a level real audio *reaches* — all four normalized
+/// signals touch `1.000` on the report's own clip — so the full-scale column
+/// describes peaks rather than a fiction. Historical `--report` numbers were
+/// measured under these same levels, but note that what `bass = 1.0` **means**
+/// changed underneath them: pre-v2 it was an unreachable magnitude, now it is
+/// "at its recent peak".
 const FULL_LEVELS: StimulusLevels = [1.0, 1.0, 1.0, 1.0];
 
 /// What the analyzer actually derives from music-like material, and therefore
 /// what a shipped preset's thresholds and gains have to be written against.
 ///
-/// **Measured 2026-07-29** from `shot --signal dynamic:110`, over the 367
-/// analysis hops past warm-up that a filmstrip of that clip would render. The
-/// first three are the means the run prints; `onset` is not printed (it is not a
-/// band) and was measured the same way over the same hops:
+/// **Re-measured 2026-07-30 for ADR-0049**, from `shot --signal dynamic:110`
+/// over the [`REACH_SECS`] the reachability probe evaluates — so these levels and
+/// the flags describe the same hops. Means, past warm-up:
 ///
 /// ```text
-/// band     min     mean      max
-/// bass   0.004    0.040    0.106
-/// mid    0.000    0.006    0.019
-/// treb   0.000    0.006    0.032
-/// onset  0.000    0.002    0.016
+/// variable    min     mean      max
+/// bass      0.035    0.661    1.000
+/// mid       0.031    0.575    1.000
+/// treb      0.002    0.281    1.000
+/// onset     0.001    0.145    1.000
 /// ```
 ///
-/// Two things to know before trusting these. **`onset` is raw spectral flux**,
-/// not a normalized `0..1` envelope — a preset multiplying `onset` by a gain
-/// tuned against `--set onset=1` is off by roughly two orders of magnitude, and
-/// this column is where that shows. And the **band array is on its own scale**:
-/// across the same hops its per-band mean is `0.020` and its hottest single band
-/// `0.338`, so a `bin()`-reading preset reads low here by more than the scalar
-/// gap suggests (`docs/capturing.md`).
+/// **These are normalized fractions of each signal's own recent peak, not
+/// magnitudes** (ADR-0049). The previous values — `0.040 / 0.006 / 0.006 /
+/// 0.0016` — were raw, and they are why the shipped library was gained 6-100x
+/// hot: an author writing `bass > 0.3` was writing a gate real audio could not
+/// reach. The `*_raw` variables still read on the old scale, and a threshold on
+/// one of *those* still needs a table like the old one.
+///
+/// Two things follow, and both are improvements.
+///
+/// **Full scale stopped being fictional.** Every one of the four reaches `1.000`
+/// on this clip, so [`FULL_LEVELS`] now describes a state real music produces on
+/// every peak rather than a corner no signal ever visited. The gap between the
+/// two columns therefore reads as *peak versus typical* — which is what an author
+/// wants to know — instead of *reachable versus not*.
+///
+/// **The band array is still on its own scale**, for a new reason. It normalizes
+/// against one peak shared by all 64 bands, so a single band only reaches `1.000`
+/// when it *is* the loudest; across these hops the per-band mean is `0.089`
+/// against the hottest band's `1.000`. So a `bin()`-reading preset still reads low
+/// here relative to the scalars, and by more than the scalar gap suggests
+/// (`docs/capturing.md`).
 ///
 /// **Re-measure rather than guess** if you doubt them: `cargo run -p standalone
 /// --example shot -- --signal dynamic:110 --out strip.png` prints the band table
 /// on every run. These are one generator at one BPM — a judgment baked into the
 /// harness (ADR-0042), which is why its provenance is written down instead of
 /// the number standing alone.
-const LOW_LEVELS: StimulusLevels = [0.040, 0.006, 0.006, 0.0016];
+const LOW_LEVELS: StimulusLevels = [0.661, 0.575, 0.281, 0.145];
 
 fn band_stimuli_at(levels: StimulusLevels) -> [AnalysisFrame; 4] {
     let [bass, mid, treb, onset] = levels;
+    let [bass_r, mid_r, treb_r, onset_r] = std::array::from_fn(|i| {
+        levels.get(i).copied().unwrap_or(0.0) * RAW_AT_FULL_SCALE.get(i).copied().unwrap_or(0.0)
+    });
     [
-        band_stimulus(|f, v| f.bass = v, BASS_BANDS, bass),
-        band_stimulus(|f, v| f.mid = v, MID_BANDS, mid),
-        band_stimulus(|f, v| f.treb = v, TREB_BANDS, treb),
+        band_stimulus(
+            |f, v, r| {
+                f.bass = v;
+                f.bass_raw = r;
+            },
+            BASS_BANDS,
+            bass,
+            bass_r,
+        ),
+        band_stimulus(
+            |f, v, r| {
+                f.mid = v;
+                f.mid_raw = r;
+            },
+            MID_BANDS,
+            mid,
+            mid_r,
+        ),
+        band_stimulus(
+            |f, v, r| {
+                f.treb = v;
+                f.treb_raw = r;
+            },
+            TREB_BANDS,
+            treb,
+            treb_r,
+        ),
         AnalysisFrame {
             // A transient is broadband, so the onset stimulus lights the whole
             // array rather than a slice.
             onset,
+            onset_raw: onset_r,
             // `beat` stays true at both levels on purpose: it is an event, not a
             // magnitude, and real material does raise it. So a beat-latched
             // binding holds across the pair while an `onset`-scaled one falls
