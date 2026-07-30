@@ -4,8 +4,9 @@
 # kaleidoscope, which turns the shoal into a slowly-rotating mandala of itself.
 #
 # The shimmer comes from CHURN SPEED (`spin`), not from small particles - tiny
-# points simply vanish on this scene. See `swarm_flow.toml` for the force
-# ceiling that governs the family.
+# points simply vanish on this scene. See `swarm_drift.toml` for the force
+# ceiling and the grain/exposure split that govern the family (that file absorbed
+# both when Plan 0043 cut the set from five presets to three).
 system = "swarm"
 name = "Dense"
 
@@ -64,6 +65,28 @@ force = "1.30 + clamp(mid * 16.0, 0, 0.30) + sin(time * 0.061) * 0.10"
 spin  = "0.130 + clamp(treb * 5.0, 0, 0.08) + clamp(mid * 3.5, 0, 0.045)"
 burst = "clamp(beat * 0.25 + clamp(onset * 0.6, 0, 0.30), 0, 0.50)"
 
+# STRUCTURE - `field_freq` (Plan 0043), and DENSE TAKES THE FINE END of it, which
+# is the lever that finally makes this preset's name a geometry rather than just
+# a particle count. Around 5.2, against Drift's 1.9 and Storm's 3.0.
+#
+# At that scale the frame holds several tight, sinuous ribbons with genuinely
+# empty dark space between them, and the shoal becomes a THING WITH EDGES that
+# turns and doubles back - which is what "one glittering body" was always after
+# and could not reach while the field was a broad wash under every preset in the
+# set. Note which direction reads as busier: it is NOT this one. A high
+# `field_freq` separates the swarm and gives back negative space; the low end is
+# what packs the frame edge to edge, because every particle is then inside the
+# same enormous current.
+#
+# It pairs with this preset's fine sprite the way the coarse end pairs with
+# Drift's: fine grain resolves the ribbon's internal weave, where a large sprite
+# at this frequency would just fill the gaps back in and undo it.
+#
+# Treble drives it, matching the shimmer - an open top end tightens the weave a
+# further notch, so hats and cymbals read as the shoal contracting rather than
+# merely brightening.
+field_freq = "5.20 + sin(time * 0.043) * 0.65 + clamp(treb * 30.0, 0, 0.90)"
+
 # APPEARANCE - the finest sprite in the family, and the brightest to compensate.
 # Size FALLS slightly under treble: a loud top end should read as finer, faster
 # glitter, not as a brighter smear.
@@ -73,8 +96,14 @@ burst = "clamp(beat * 0.25 + clamp(onset * 0.6, 0, 0.30), 0, 0.50)"
 # brightness rendered the densest preset in the set as the DIMMEST. Fine grain
 # needs the per-particle intensity back or it reads as an empty frame - which
 # is exactly what a 0.58/0.76 pairing produced when bracketed.
-brightness = "0.92 + clamp(bass * 5.0, 0, 0.18)"
-size       = "0.58 - clamp(treb * 6.0, 0, 0.10) + beat * 0.14"
+#
+# Plan 0043 pushed both up again for the same reason it did on Drift, and this
+# preset is the one that needed it most: the domain margin puts a quarter of the
+# particles off-frame and the depth fade halves the far half's brightness, which
+# lands hardest on the file that was already trading per-particle size for count.
+# Fine grain has the least light to give away.
+brightness = "1.16 + clamp(bass * 5.0, 0, 0.20)"
+size       = "0.62 - clamp(treb * 6.0, 0, 0.10) + beat * 0.14"
 
 # COLOUR - the tightest hue window in the set. This is the cohesion knob: low
 # spread is what separates "one shimmering body" from "novelty confetti".
@@ -140,6 +169,10 @@ bg_vignette   = "0.74"
 [smoothing]
 force         = 0.30
 spin          = 0.22
+# Shorter than Drift's 1.60: the weave is allowed to breathe with the top end
+# here, since contracting on a cymbal IS this preset's gesture. Still well past
+# the band constants, so it reads as the shoal tightening rather than flickering.
+field_freq    = 0.85
 brightness    = 0.18
 size          = 0.14
 trails        = 0.40

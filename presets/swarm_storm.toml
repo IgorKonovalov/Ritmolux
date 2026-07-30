@@ -8,7 +8,9 @@
 #
 # This preset was the worst offender in the old library: `force = 2.0 +
 # clamp(bass * 24, 0, 5)` with `burst = beat * 11` emptied the frame completely
-# at a loud stimulus. See `swarm_flow.toml` for the ceiling that replaced it.
+# at a loud stimulus. See `swarm_drift.toml` for the ceiling that replaced it and
+# for the grain/exposure split across the family (that file absorbed both when
+# Plan 0043 cut the set from five presets to three).
 system = "swarm"
 name = "Storm"
 
@@ -61,11 +63,33 @@ spin  = "select(tempo > 132, 0.175, 0.135) + clamp(mid * 4.0, 0, 0.07) + clamp(o
 # formation to the frame edges and left the middle empty.
 burst = "clamp(beat * 0.85 + clamp(onset * 1.6, 0, 0.75), 0, 1.35)"
 
+# STRUCTURE - `field_freq` (Plan 0043), and Storm uses it the way it already uses
+# `spin`: as something a TRANSIENT KICKS. Drift breathes its field scale slowly
+# and Dense contracts its weave on the top end; here a hit does not just rewrite
+# the streamlines, it changes how big they are, so the formation that re-forms
+# after a drum is a different SHAPE from the one that broke - not the same flock
+# re-assembled.
+#
+# The base sits at 3.0, between Drift's 1.9 and Dense's 5.2, and a transient
+# drives it up by as much as 1.5. Tightening on the hit is the right direction:
+# the field subdivides, the torn mass fragments into more and smaller currents,
+# and it relaxes back to broad churn as the release constant unwinds. The driving
+# personality above 132 BPM runs finer at rest, so fast material reads as busier
+# structure and not merely as faster structure.
+field_freq = "select(tempo > 132, 3.35, 2.85) + clamp(onset * 7.0, 0, 1.50) + clamp(bass * 6.0, 0, 0.45)"
+
 # APPEARANCE - flat brightness. This is the preset that most wants to be pushed
 # and most punishes it: a firestorm rendered additively at brightness 1.9 (what
 # the old file asked for) is a white rectangle.
-brightness = "0.78 + clamp(bass * 5.0, 0, 0.16)"
-size       = "1.05 - clamp(mid * 10.0, 0, 0.18) + beat * 0.30 + clamp(onset * 1.1, 0, 0.22)"
+#
+# Up for Plan 0043, and the ceiling above still binds - the whole point of the
+# note is that this preset punishes being pushed. What changed is that the engine
+# took light away first: a quarter of the particles now sit outside the frame so
+# the wrap seam can, and the depth fade dims the far half. Restoring that is not
+# the same as pushing past the ceiling, and 1.02 is still well under the 1.9 that
+# renders a white rectangle.
+brightness = "1.02 + clamp(bass * 5.0, 0, 0.18)"
+size       = "1.20 - clamp(mid * 10.0, 0, 0.18) + beat * 0.30 + clamp(onset * 1.1, 0, 0.22)"
 
 # COLOUR - wide and hot on the rolling personality; the driving one desaturates
 # toward `mono`, so hard sections read as smoke and sparks rather than fire.
@@ -107,6 +131,11 @@ force         = { attack = 0.05, release = 0.55 }
 # preset the field rate IS the percussive gesture - the startle has to land on
 # the hit. The long release is what lets the formation settle back afterwards.
 spin          = { attack = 0.04, release = 0.85 }
+# Same asymmetry as `spin`, and for the same reason: the field has to RESIZE on
+# the hit for the startle to read, then unwind slowly enough that the frame is
+# visibly re-forming rather than snapping back. A longer release than `spin`,
+# because a shape settling should outlast the motion that broke it.
+field_freq    = { attack = 0.05, release = 1.10 }
 hue_spread    = 1.4
 palette_mix   = 1.6
 zoom          = 0.45
