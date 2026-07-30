@@ -71,23 +71,6 @@ use super::trails::Trails;
 /// a frame's routing costs no allocation.
 pub(crate) const STAGE_COUNT: usize = 2;
 
-/// Cap on a post stage's internal grid (ADR-0034).
-///
-/// **Not** the attractor's 2560x1440, and the difference is deliberate: the trails
-/// accumulation is a [`PingPongField`](super::feedback::PingPongField) of
-/// `Rgba16Float` (8 bytes/texel, **two** textures), and Plan 0023's dual-live
-/// dissolve holds two whole `PostChain`s at once, so the field pair is charged
-/// twice at the peak. At this cap that is ~50 MB per chain and ~100 MB dual-live,
-/// against NFR §12's ~350 MB soft ceiling that is mostly driver floor already; at
-/// 2560x1440 it would be ~88 MB and ~177 MB. 1920x1080 is also a 1.07x downscale
-/// on the 2048x1152 display this was built for — indistinguishable from native for
-/// less than half the memory.
-///
-/// It is one constant on purpose. If the iGPU frame budget (NFR §1) fails on
-/// device, lower this rather than re-fixing the grids.
-const POST_MAX_W: u32 = 1920;
-const POST_MAX_H: u32 = 1080;
-
 /// Quantization step for each axis of a post stage's internal grid.
 ///
 /// Same 256 px as the attractor's trail grid, for the same reason: a grid change
@@ -108,8 +91,14 @@ const POST_GRID_STEP: u32 = 256;
 /// behavior and how ADR-0037's defect shipped a second time; the numbers are
 /// what is genuinely this call site's, and they stay here with their reasoning
 /// (Plan 0035 Phase 3).
-pub(crate) fn internal_grid_size(surface: (u32, u32)) -> (u32, u32) {
-    super::grid::grid_size(surface, (POST_MAX_W, POST_MAX_H), POST_GRID_STEP)
+///
+/// `cap` is the active tier's [`post_cap`](super::TierConfig::post_cap) — the one
+/// number this call site used to hold as a constant (Plan 0044 Phase 1). It is
+/// passed rather than read from a global so the function stays pure: a stage
+/// resolves it once at construction and the chain's rebuild comparison keeps
+/// answering a pure function of `surface`.
+pub(crate) fn internal_grid_size(surface: (u32, u32), cap: (u32, u32)) -> (u32, u32) {
+    super::grid::grid_size(surface, cap, POST_GRID_STEP)
 }
 
 /// Composite positions, in chain order. Named so the routing tests and the
@@ -337,14 +326,18 @@ impl PostChain {
     /// handle and builds its GPU resources lazily on its first active frame, so a
     /// chain that is never used costs nothing — and two chains against the same
     /// device share no resources.
-    pub(crate) fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        tier: &super::TierConfig,
+    ) -> Self {
         let chain = Self {
             // ADR-0018's feedback-then-fold order. Ink is deliberately absent:
             // it is an engine-wide pass on the finished frame, so it runs after
             // the chain (and after the transition blend) — ADR-0032.
             stages: [
-                Box::new(Trails::new(device, surface_format)),
-                Box::new(Kaleidoscope::new(device, surface_format)),
+                Box::new(Trails::new(device, surface_format, tier.post_cap)),
+                Box::new(Kaleidoscope::new(device, surface_format, tier.post_cap)),
             ],
         };
         // The array above *is* the composite order, and the routing contract is
@@ -496,13 +489,27 @@ mod tests {
     #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
     use super::{
-        KALEIDOSCOPE, POST_GRID_STEP, POST_MAX_H, POST_MAX_W, PostChain, PostStage, Routing,
-        STAGE_COUNT, TRAILS, internal_grid_size, route,
+        KALEIDOSCOPE, POST_GRID_STEP, PostChain, PostStage, Routing, STAGE_COUNT, TRAILS,
+        internal_grid_size, route,
     };
+    use crate::render::TierConfig;
     use crate::render::background::Background;
     use crate::render::capture::{self, CaptureImage};
     use crate::render::context::{RenderContext, RenderError};
     use crate::render::gpu;
+
+    /// The tier every test in this module runs at, and the one every golden
+    /// baseline is blessed at (ADR-0045). These tests pin the **policy** — the
+    /// quantization, the single scale factor, the purity — not the tier, so they
+    /// read the floor cap the constants here used to be.
+    const FLOOR: TierConfig = TierConfig::FLOOR;
+    const POST_MAX_W: u32 = FLOOR.post_cap.0;
+    const POST_MAX_H: u32 = FLOOR.post_cap.1;
+
+    /// [`internal_grid_size`] at the floor cap.
+    fn floor_grid(surface: (u32, u32)) -> (u32, u32) {
+        internal_grid_size(surface, FLOOR.post_cap)
+    }
 
     // -----------------------------------------------------------------------
     // The internal-grid policy (ADR-0034) — GPU-free
@@ -518,7 +525,7 @@ mod tests {
         // Common desktop sizes, all under the cap: the grid is the target rounded
         // up to the step, never the old constant.
         for target in [(1280, 720), (1600, 900), (1920, 1080)] {
-            let grid = internal_grid_size(target);
+            let grid = floor_grid(target);
             assert!(
                 grid.0 >= target.0 && grid.1 >= target.1,
                 "{target:?} must not be downsampled below the target: got {grid:?}"
@@ -528,8 +535,8 @@ mod tests {
         // The display this plan exists for. 2048x1152 is 16:9 and above the width
         // cap, so it comes back capped *with its aspect exactly preserved* — a
         // 1.07x downscale, and emphatically not 1280x720 (ADR-0034).
-        assert_eq!(internal_grid_size((2048, 1152)), (1920, 1080));
-        assert_ne!(internal_grid_size((2048, 1152)), (1280, 720));
+        assert_eq!(floor_grid((2048, 1152)), (1920, 1080));
+        assert_ne!(floor_grid((2048, 1152)), (1280, 720));
     }
 
     /// Every axis lands on the quantization step (or the cap), never on 0.
@@ -548,7 +555,7 @@ mod tests {
             (3840, 2160),
             (100, 4000),
         ] {
-            let (w, h) = internal_grid_size(target);
+            let (w, h) = floor_grid(target);
             assert!(w > 0 && h > 0, "{target:?} produced a degenerate grid");
             assert!(
                 w <= POST_MAX_W && h <= POST_MAX_H,
@@ -575,7 +582,7 @@ mod tests {
     /// 16:9, which is the regression.
     #[test]
     fn a_capped_target_keeps_its_proportions_rather_than_the_caps() {
-        let ultrawide = internal_grid_size((3440, 1440));
+        let ultrawide = floor_grid((3440, 1440));
         let squashed_to_the_cap = (POST_MAX_W, POST_MAX_H);
         assert_ne!(
             ultrawide, squashed_to_the_cap,
@@ -595,7 +602,7 @@ mod tests {
         );
 
         // The same in portrait, where the height binds instead.
-        let portrait = internal_grid_size((1440, 3440));
+        let portrait = floor_grid((1440, 3440));
         assert!(
             (portrait.1 as f32 / portrait.0 as f32) > cap_aspect,
             "a portrait target must keep its proportions too: {portrait:?}"
@@ -608,7 +615,47 @@ mod tests {
     #[test]
     fn the_grid_policy_is_a_pure_function_of_the_target() {
         for target in [(800, 600), (2048, 1152), (3440, 1440)] {
-            assert_eq!(internal_grid_size(target), internal_grid_size(target));
+            assert_eq!(floor_grid(target), floor_grid(target));
+        }
+    }
+
+    /// **The tier's first visible effect** (Plan 0044 Phase 1): where the floor
+    /// cap binds, the rich tier resolves a genuinely larger grid; where it does
+    /// not, the two tiers agree exactly.
+    ///
+    /// The second half is what makes the first mean something. A tier raises a
+    /// **ceiling**, not the grid itself, so a preset diverges only where the floor
+    /// was actually costing it resolution — which is also why every golden
+    /// baseline is untouched by this plan (they capture at 1280x720 and smaller,
+    /// squarely in the agreeing set, and `new_headless` pins the floor regardless).
+    ///
+    /// **1920x1080 belongs in the *binding* set, not the agreeing one**, and that
+    /// is worth stating because it is the display size the floor was written for.
+    /// The policy quantizes *then* clamps, so a 1080p target rounds up to
+    /// 2048x1280 and the floor cap cuts it back to exactly 1920x1080 — meaning on
+    /// the rich tier a 1080p window supersamples its post stages by ~1.07x rather
+    /// than matching them to the surface.
+    #[test]
+    fn the_rich_tier_raises_the_grid_only_where_the_floor_cap_binds() {
+        let rich = TierConfig::RICH;
+        for target in [(1920, 1080), (2560, 1440), (3440, 1440), (3840, 2160)] {
+            let (fw, fh) = floor_grid(target);
+            let (rw, rh) = internal_grid_size(target, rich.post_cap);
+            assert!(
+                rw > fw && rh > fh,
+                "the floor cap binds at {target:?}, so rich must resolve a larger \
+                 grid: floor {fw}x{fh}, rich {rw}x{rh}"
+            );
+        }
+        // Targets whose *quantized* grid still fits under the floor cap, so
+        // neither cap binds and the tier cannot change the answer.
+        for target in [(640, 480), (1280, 720), (1600, 900)] {
+            assert_eq!(
+                floor_grid(target),
+                internal_grid_size(target, rich.post_cap),
+                "neither cap binds at {target:?}, so the tier must not change the \
+                 grid — a tier raises a ceiling, not the resolution"
+            );
         }
     }
 
@@ -723,7 +770,7 @@ mod tests {
         let Some(ctx) = headless_context_or_skip() else {
             return;
         };
-        let chain = PostChain::new(&ctx.device, ctx.surface_format());
+        let chain = PostChain::new(&ctx.device, ctx.surface_format(), &FLOOR);
         assert_eq!(
             chain.stage_names(),
             ["trails", "kaleidoscope"],
@@ -832,8 +879,8 @@ mod tests {
         let format = ctx.surface_format();
         let mut background = Background::new(&ctx.device, format);
 
-        let mut chain_a = PostChain::new(&ctx.device, format);
-        let mut chain_b = PostChain::new(&ctx.device, format);
+        let mut chain_a = PostChain::new(&ctx.device, format, &FLOOR);
+        let mut chain_b = PostChain::new(&ctx.device, format, &FLOOR);
         // A long trail on both, so a leaked accumulation would be glaring.
         assert!(
             chain_a.set_stage_param(TRAILS, "trails", 0.9),
@@ -904,8 +951,12 @@ mod tests {
         };
         let format = ctx.surface_format();
         let mut stages = Stages {
-            trails: crate::render::trails::Trails::new(&ctx.device, format),
-            kaleido: crate::render::kaleidoscope::Kaleidoscope::new(&ctx.device, format),
+            trails: crate::render::trails::Trails::new(&ctx.device, format, FLOOR.post_cap),
+            kaleido: crate::render::kaleidoscope::Kaleidoscope::new(
+                &ctx.device,
+                format,
+                FLOOR.post_cap,
+            ),
         };
         // Both stages have to be active or `begin` is never reached.
         assert!(stages.trails.set_param("trails", 0.9));
@@ -917,8 +968,8 @@ mod tests {
         let small = (512, 512);
         let large = (1024, 768);
         assert_ne!(
-            internal_grid_size(small),
-            internal_grid_size(large),
+            floor_grid(small),
+            floor_grid(large),
             "the two probe sizes must land on different grids for this test to mean anything"
         );
 
@@ -966,7 +1017,7 @@ mod tests {
         // makes a live window drag survivable. (512 sits exactly *on* a step, so
         // 513 is already the next grid up; the probe has to be inside the step.)
         let same_grid = (400, 400);
-        assert_eq!(internal_grid_size(small), internal_grid_size(same_grid));
+        assert_eq!(floor_grid(small), floor_grid(same_grid));
         pump(&ctx, &mut stages.trails, same_grid);
         assert_eq!(
             stages.trails.build_count(),
@@ -991,7 +1042,7 @@ mod tests {
             return;
         };
         let format = ctx.surface_format();
-        let mut chain = PostChain::new(&ctx.device, format);
+        let mut chain = PostChain::new(&ctx.device, format, &FLOOR);
         assert!(chain.set_stage_param(TRAILS, "trails", 0.9));
 
         let surface = (2048, 1152);
@@ -1026,7 +1077,8 @@ mod tests {
     fn fold_error_at(ctx: &RenderContext, surface: (u32, u32)) -> f32 {
         let format = ctx.surface_format();
         let mut background = Background::new(&ctx.device, format);
-        let mut kaleido = crate::render::kaleidoscope::Kaleidoscope::new(&ctx.device, format);
+        let mut kaleido =
+            crate::render::kaleidoscope::Kaleidoscope::new(&ctx.device, format, FLOOR.post_cap);
         assert!(kaleido.set_param("kaleido_order", FOLD_ORDER as f32));
 
         let (texture, view) = capture::create_target(&ctx.device, format, surface.0, surface.1);
@@ -1085,7 +1137,7 @@ mod tests {
 
         // The grid-agnostic probe (retained): grid and surface agree here.
         let agreeing = (512, 256);
-        assert_eq!(internal_grid_size(agreeing), (512, 256), "a 2:1 grid");
+        assert_eq!(floor_grid(agreeing), (512, 256), "a 2:1 grid");
         // Measured: 0.0099 with the target's aspect, 0.1860 with a baked 1280x720
         // — a 19x separation, and the threshold sits between them. Verified
         // non-vacuous by re-baking the old constant and watching this fail.
@@ -1100,7 +1152,7 @@ mod tests {
         // The discriminating probe: the grid's shape is not the target's here, so
         // only one of the two can be the axis the fold uses.
         let disagreeing = (320, 256);
-        let grid = internal_grid_size(disagreeing);
+        let grid = floor_grid(disagreeing);
         assert_eq!(grid, (512, 256), "the probe's grid must not be its surface");
         assert!(
             (grid.0 as f32 / grid.1 as f32 - disagreeing.0 as f32 / disagreeing.1 as f32).abs()
@@ -1296,7 +1348,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     /// identity, so anything that moves is the aspect and nothing else.
     fn disc_extent_ratio(ctx: &RenderContext, surface: (u32, u32), through_a_stage: bool) -> f32 {
         let format = ctx.surface_format();
-        let mut chain = PostChain::new(&ctx.device, format);
+        let mut chain = PostChain::new(&ctx.device, format, &FLOOR);
         if through_a_stage {
             assert!(chain.set_stage_param(TRAILS, "trails", 0.5));
         }
@@ -1348,13 +1400,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
         let skewing = (1280, 800);
         assert_eq!(
-            internal_grid_size(skewing),
+            floor_grid(skewing),
             (1280, 1024),
             "the probe size must be one where the grid's shape is not the target's"
         );
         let control = (1920, 1080);
         assert_eq!(
-            internal_grid_size(control),
+            floor_grid(control),
             control,
             "the control must be a size the policy returns exactly — that is what hid this"
         );
@@ -1365,7 +1417,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             eprintln!(
                 "{surface:?}: disc x/y = {plain:.4} with the chain skipped, \
                  {staged:.4} through trails (grid {:?})",
-                internal_grid_size(surface)
+                floor_grid(surface)
             );
             assert!(
                 (plain - 1.0).abs() < 0.03,

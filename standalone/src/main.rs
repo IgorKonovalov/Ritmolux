@@ -18,10 +18,13 @@ use diaglog::DiagLog;
 use director::Director;
 use lmv_core::audio::{AudioFormat, SampleConsumer};
 use lmv_core::dsp::Analyzer;
-use lmv_core::render::{CapOverflow, Renderer, TextRun};
+use lmv_core::render::{CapOverflow, Renderer, RendererOptions, TextRun, Tier};
 use overlay::{OverlayAction, OverlayKey, OverlayState};
 use soak::SoakLog;
-use standalone::{APP_DIR_NAME, PRESET_DIR_ENV, PresetDir, preset_data_root, resolve_preset_dir};
+use standalone::{
+    APP_DIR_NAME, PRESET_DIR_ENV, PresetDir, preset_data_root, resolve_preset_dir, resolve_tier,
+    tier_env,
+};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -145,19 +148,33 @@ mod capture_handle {
 }
 
 impl AppState {
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the shell's startup inputs, each read once on the way into one of the state's fields"
+    )]
     fn new(
         window: Arc<Window>,
         config: Config,
         config_path: Option<PathBuf>,
         display_index: usize,
         soak_path: Option<PathBuf>,
+        tier: Option<Tier>,
     ) -> Self {
         let size = window.inner_size();
-        let mut renderer = Renderer::new(Arc::clone(&window), size.width, size.height)
-            .unwrap_or_else(|err| {
-                eprintln!("renderer init failed: {err}");
-                std::process::exit(1);
-            });
+        let mut renderer = Renderer::new(
+            Arc::clone(&window),
+            size.width,
+            size.height,
+            RendererOptions { tier },
+        )
+        .unwrap_or_else(|err| {
+            eprintln!("renderer init failed: {err}");
+            std::process::exit(1);
+        });
+        // Say which tier the show is running at. The same preset looks different
+        // on different machines now (ADR-0045), so this is the first line an odd
+        // look should be checked against — and F3's overlay repeats it live.
+        eprintln!("quality tier: {}", renderer.tier().as_str());
 
         // Resolve the preset directory, seed the curated set into it on first
         // run (write-if-absent — but never into an LMV_PRESET_DIR override,
@@ -713,6 +730,9 @@ struct App {
     config_path: Option<PathBuf>,
     /// Soak-log path from `--soak`, or `None` when the mode is off.
     soak_path: Option<PathBuf>,
+    /// The quality-tier pin, already resolved across `--tier` / `LMV_TIER` /
+    /// config (Plan 0044). `None` is auto — rich, governed.
+    tier: Option<Tier>,
     state: Option<AppState>,
 }
 
@@ -749,6 +769,7 @@ impl ApplicationHandler for App {
                         self.config_path.take(),
                         display_index,
                         self.soak_path.take(),
+                        self.tier,
                     );
                     state.window.request_redraw();
                     self.state = Some(state);
@@ -872,6 +893,31 @@ fn parse_soak_arg() -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// The tier `--tier <name>` / `--tier=<name>` pins, or `None` when the flag is
+/// absent (Plan 0044).
+///
+/// `Err` on a missing or unparseable value. Unlike `LMV_TIER`, a bad `--tier` is
+/// a **usage error** rather than something to degrade past: it was typed for this
+/// run, so silently starting on another tier would answer the wrong question.
+fn parse_tier_arg() -> Result<Option<Tier>, String> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        let value = if let Some(inline) = arg.strip_prefix("--tier=") {
+            Some(inline.to_owned())
+        } else if arg == "--tier" {
+            Some(args.next().unwrap_or_default())
+        } else {
+            None
+        };
+        if let Some(value) = value {
+            return Tier::from_name(&value)
+                .map(Some)
+                .ok_or_else(|| format!("--tier `{value}`: expected `floor` or `rich`"));
+        }
+    }
+    Ok(None)
 }
 
 /// Default soak-log location: under the per-user app dir, or `soak.log` in the
@@ -1014,10 +1060,34 @@ fn main() {
 
     let soak_path = parse_soak_arg();
 
+    // Quality tier, highest precedence first: `--tier`, `LMV_TIER`, config
+    // (Plan 0044 / ADR-0045). A bad flag is a usage error; a bad env var is
+    // reported and stepped past, so a stale export cannot stop the show (NFR 10).
+    let tier_flag = match parse_tier_arg() {
+        Ok(tier) => tier,
+        Err(msg) => {
+            eprintln!("{msg}");
+            std::process::exit(1);
+        }
+    };
+    let tier_from_env = tier_env().unwrap_or_else(|msg| {
+        eprintln!("{msg}; ignoring");
+        None
+    });
+    let (tier, tier_source) = resolve_tier(tier_flag, tier_from_env, config.quality.tier.tier());
+    if let Some(tier) = tier {
+        eprintln!(
+            "quality tier pinned {} by {}",
+            tier.as_str(),
+            tier_source.as_str()
+        );
+    }
+
     let mut app = App {
         config,
         config_path,
         soak_path,
+        tier,
         state: None,
     };
     if let Err(err) = event_loop.run_app(&mut app) {

@@ -39,6 +39,7 @@ mod post;
 pub mod scenes;
 #[cfg(feature = "text")]
 pub mod text;
+pub mod tier;
 pub(crate) mod trails;
 mod transition;
 
@@ -59,6 +60,7 @@ pub use scenes::lines::CapOverflow;
 use text::TextLayer;
 #[cfg(feature = "text")]
 pub use text::TextRun;
+pub use tier::{Tier, TierConfig};
 use transition::{Blend, DEFAULT_DURATION_SECS, Mode, Transition, TransitionKind};
 
 /// Assumed bytes-per-pixel for the swapchain GPU-byte estimate (the common
@@ -524,10 +526,10 @@ struct CompositeSide {
 }
 
 impl CompositeSide {
-    fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+    fn new(device: &wgpu::Device, format: wgpu::TextureFormat, tier: &TierConfig) -> Self {
         Self {
             background: Background::new(device, format),
-            chain: PostChain::new(device, format),
+            chain: PostChain::new(device, format, tier),
         }
     }
 
@@ -547,6 +549,12 @@ impl CompositeSide {
 }
 
 /// How to build a headless [`Renderer`] for capture (Plan 0013).
+///
+/// Deliberately carries **no tier**: [`Renderer::new_headless`] is
+/// [`Tier::Floor`] by construction, which is what keeps every golden baseline
+/// byte-reproducible (ADR-0045). A capture at another tier goes through
+/// [`Renderer::new_headless_tiered`], where the choice is written at the call
+/// site and cannot be reached by forgetting a field.
 #[derive(Debug, Clone, Copy)]
 pub struct HeadlessOptions {
     /// Offscreen render width in pixels.
@@ -556,6 +564,27 @@ pub struct HeadlessOptions {
     /// Force a fallback (software) adapter — WARP on DX12 — so captures
     /// rasterize identically across machines. Tests want this on.
     pub prefer_software: bool,
+}
+
+/// Construction-time options for an on-surface [`Renderer`] (Plan 0044).
+///
+/// One field today and a struct anyway, because the tier pin is the first of a
+/// family: a renderer's *construction* choices (quality, later backend or format
+/// preferences) are decided once and never per frame, and threading them as
+/// positional arguments is how the three constructors drift apart.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RendererOptions {
+    /// An explicit tier pin, or `None` for auto — which resolves [`Tier::Rich`]
+    /// and leaves the frame-time governor free to demote it once (ADR-0045). A
+    /// pin is honoured in both directions and never demotes.
+    pub tier: Option<Tier>,
+}
+
+impl RendererOptions {
+    /// Options pinning `tier` explicitly.
+    pub fn pinned(tier: Tier) -> Self {
+        Self { tier: Some(tier) }
+    }
 }
 
 /// Owns the GPU context, the built-in systems, and the loaded presets; renders
@@ -620,6 +649,10 @@ pub struct Renderer {
     /// uses an empty prefix, which is what makes their path unchanged.
     series_scratch: Vec<f32>,
     param_smoother: ParamSmoother,
+    /// The active quality tier's capacity values, resolved **once** here at
+    /// construction (ADR-0045). Read at construction and reconfigure time only —
+    /// never branched on per frame.
+    tier: TierConfig,
     /// The **outgoing** preset's easing state during a dual-live dissolve. Moved
     /// out of [`param_smoother`](Self::param_smoother) when the roster flips, so a
     /// heavily-smoothed preset keeps easing through the dissolve instead of
@@ -633,9 +666,13 @@ impl Renderer {
     /// embedded default presets. **The one construction path** — the three public
     /// constructors differ only in how they obtain the context, so a new field is
     /// a one-place edit here rather than three.
-    fn from_context(ctx: RenderContext) -> Self {
+    fn from_context(ctx: RenderContext, opts: RendererOptions) -> Self {
+        // The one tier resolution in the engine (ADR-0045): a pin wins, and
+        // unpinned is `Rich` — the governor's job is to take that back, not to
+        // hedge it here.
+        let tier = TierConfig::for_tier(opts.tier.unwrap_or(Tier::Rich));
         let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format());
-        let side = CompositeSide::new(&ctx.device, ctx.surface_format());
+        let side = CompositeSide::new(&ctx.device, ctx.surface_format(), &tier);
         let ink = Ink::new(&ctx.device, ctx.surface_format());
         let blend = Blend::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
@@ -659,6 +696,7 @@ impl Renderer {
             cap_overflow: None,
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
             param_smoother: ParamSmoother::default(),
+            tier,
             outgoing_smoother: ParamSmoother::default(),
         };
         // Apply the initial preset's structural config (ADR-0007) so a line
@@ -669,31 +707,55 @@ impl Renderer {
 
     /// Build a renderer drawing into `target` (a safe window handle — the
     /// standalone path). Starts with the embedded default presets.
+    ///
+    /// `opts` carries the quality-tier pin;
+    /// [`RendererOptions::default()`](RendererOptions) is auto (rich, governed).
     pub fn new(
         target: impl Into<wgpu::SurfaceTarget<'static>>,
         width: u32,
         height: u32,
+        opts: RendererOptions,
     ) -> Result<Self, RenderError> {
-        Ok(Self::from_context(RenderContext::new(
-            target, width, height,
-        )?))
+        Ok(Self::from_context(
+            RenderContext::new(target, width, height)?,
+            opts,
+        ))
     }
 
     /// Build a **headless** renderer that draws into offscreen textures instead
     /// of a window (Plan 0013 capture tooling). Same scenes, presets, and
     /// per-frame evaluation as the on-surface path — only the target differs.
     /// Starts with the embedded default presets.
+    ///
+    /// **Pinned [`Tier::Floor`], and there is no argument to say otherwise**
+    /// (ADR-0045). A capture is a pure function of its inputs (NFR §6), and a
+    /// baseline that moved because the machine that blessed it was fast is not a
+    /// baseline — so the floor is the default by construction here rather than by
+    /// every call site remembering to ask for it. Use
+    /// [`new_headless_tiered`](Self::new_headless_tiered) for a deliberate
+    /// rich-tier capture.
     pub fn new_headless(opts: HeadlessOptions) -> Result<Self, RenderError> {
-        Ok(Self::from_context(RenderContext::new_headless(
-            opts.width,
-            opts.height,
-            opts.prefer_software,
-        )?))
+        Self::new_headless_tiered(opts, Tier::Floor)
+    }
+
+    /// A headless renderer pinned to `tier` — the opt-in behind the `shot` CLI's
+    /// `--tier`, for spot-checking that the rich tier's raised budgets actually
+    /// render (Plan 0044 Phase 3). Always **pinned**, so a capture never demotes
+    /// mid-run and stays reproducible.
+    pub fn new_headless_tiered(opts: HeadlessOptions, tier: Tier) -> Result<Self, RenderError> {
+        Ok(Self::from_context(
+            RenderContext::new_headless(opts.width, opts.height, opts.prefer_software)?,
+            RendererOptions::pinned(tier),
+        ))
     }
 
     /// Renderer targeting a native Win32 window the host owns — the C ABI
     /// path (foobar2000 shim). Starts with the embedded default presets (no
     /// ABI surface for preset selection yet).
+    ///
+    /// Auto tier: the plugin gets rich-with-governor, because the C ABI stays v4
+    /// and a plugin-side tier picker is a future ABI question rather than part of
+    /// ADR-0045.
     ///
     /// # Safety
     /// `hwnd` must be a valid window handle that outlives this renderer.
@@ -715,7 +777,13 @@ impl Renderer {
         // promise about `hwnd`'s validity and lifetime. Construction past that
         // point is the same safe code the other two paths run.
         let ctx = unsafe { RenderContext::new_unsafe(target, width, height) }?;
-        Ok(Self::from_context(ctx))
+        Ok(Self::from_context(ctx, RendererOptions::default()))
+    }
+
+    /// The active quality tier (ADR-0045) — what the diagnostics overlay and the
+    /// `shot` report header name.
+    pub fn tier(&self) -> Tier {
+        self.tier.tier
     }
 
     /// Reconfigure the surface for a new window size.
@@ -813,6 +881,7 @@ impl Renderer {
         self.incoming_side = Some(CompositeSide::new(
             &self.ctx.device,
             self.ctx.surface_format(),
+            &self.tier,
         ));
     }
 
@@ -1225,6 +1294,10 @@ impl Renderer {
             series_scratch,
             param_smoother,
             outgoing_smoother,
+            // Resolved once at construction; the overlay names it (ADR-0045). The
+            // capacity values themselves were consumed at construction time — the
+            // frame path reads the tier only to print it.
+            tier,
             // Switch-site policy state (the kind rotation) — not a per-frame concern.
             transitions_started: _,
         } = self;
@@ -1418,6 +1491,7 @@ impl Renderer {
                 view,
                 (width, height),
                 metrics,
+                tier.tier,
                 diag.stats().samples().map(|s| s * 1000.0),
             );
             draw_calls += 1;
