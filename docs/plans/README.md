@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0050** (ADRs are a separate sequence — next free there is **0053**.)
+**Next free number: 0051** (ADRs are a separate sequence — next free there is **0055**.)
 
 ## Active roster
 
@@ -13,8 +13,24 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **approved 2026-07-30** — ready for `dev` **now** ([0044] closed); roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **in-progress 2026-07-30** — Phases 1-5 (`dev`) landed and merged to `main` (`b06766b`), Mode 4 review done; **Phases 6-7 (`human`) owed**. Phase 6 is **no longer blocked** — [0049] built its instrument and closed | dev, human |
+| [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **draft 2026-07-30** — [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
 
 ## Recommended execution sequence
+
+**[0050] is orthogonal to everything below and can be taken whenever the user wants the app to be
+operable.** It touches one new `core` entry point (`Renderer::set_tier`, plus an `active_index`
+accessor) and is otherwise `standalone/` shell work — no scene, no shader, no DSP, no preset `.toml`,
+no C ABI change, and **no golden baseline may move**. So it neither blocks nor is blocked by [0045] /
+[0046]. Two couplings worth knowing before sequencing it:
+
+- **It makes [0044]'s never-run Phase 4 cheap.** The `Rich` calibration is carried in
+  `docs/on-device-validation.md` precisely because judging a tier means relaunching; with `[` / `]`
+  it is an A/B on one machine in one sitting. [0050] Phase 6 item 3 asks for that measurement.
+- **It makes [backlog 0031](../design-backlog.md) easier to hit.** An operator switching to `Rich`
+  on `attractor_clifford` will see the reported white-out, because [0045] has not landed yet. That is
+  a known defect being made reachable, not a regression — but if the ordering matters to you, run
+  [0045] first and the two meet cleanly.
+
 
 **[0048] Phase 6 is the next thing to run, and it is a `human` phase — [0049] has landed and
 closed** (see Recently closed), so the instrument it was waiting on exists: press `F3` and the panel
