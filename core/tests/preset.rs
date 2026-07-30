@@ -562,6 +562,13 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
         // the wrong slot would still produce a plausible number.
         beat_index: 37,
         time_since_beat: 0.123,
+        beat_in_bar: 2,
+        bar_index: 9,
+        bar_phase: 0.625,
+        // Diagnostics-only, and the assertion below that they are NOT bindable is
+        // the point: ADR-0050 keeps the gate out of the grammar.
+        downbeat_confidence: 0.77,
+        downbeat_locked: true,
         spectrum: std::array::from_fn(|i| i as f32 / 64.0),
     };
     // Not on the frame: the renderer supplies its own clock here, the probe the
@@ -584,6 +591,9 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
         ("onset_raw", 0.044),
         ("beat_index", 37.0),
         ("time_since_beat", 0.123),
+        ("beat_in_bar", 2.0),
+        ("bar_index", 9.0),
+        ("bar_phase", 0.625),
     ] {
         let e = compile(name).unwrap_or_else(|err| panic!("{name} compiles: {err}"));
         assert_eq!(
