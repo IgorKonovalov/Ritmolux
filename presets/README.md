@@ -509,12 +509,34 @@ moving shapes leave light trails. `trails = 0` (default) is off; `0 < trails < 1
 sets the per-frame decay (higher = longer trails). Best on a scene with real
 motion (a spinning curve, a drifting swarm).
 
-### Screen-space kaleidoscope — `kaleido_order`, `kaleido_angle`
+### Screen-space kaleidoscope — `kaleido_order`, `kaleido_angle`, `kaleido_center_x`, `kaleido_center_y`
 
 Folds the finished frame into `kaleido_order` mirrored wedges before present.
 `kaleido_order < 2` (default) is a passthrough; `>= 2` folds (clamped to 48).
 `kaleido_angle` (radians) rotates the fold — ride it on `time` for a turning
 kaleidoscope. Works on any scene.
+
+**The fold covers a disc, not the whole frame.** It is a polar operation on a
+rectangular picture, so it can only reach the largest circle the frame contains —
+radius half the **shorter** side, centred on the fold axis. Past that the picture
+fades out to the backdrop, and the corners are backdrop. That is a deliberate
+vignette (ADR-0047), and it replaces the hard streaks and chevron debris the fold
+used to leave out there, which were worst in a portrait window. Two consequences
+worth composing around:
+
+- **The fold crops.** At 16:9 the disc is 56 % of the frame's width, so a figure
+  that filled the frame before the fold will not fill it after. Scale the figure
+  up (`scale`, `zoom`) if you want it to reach the disc's edge.
+- **The corners are the backdrop's**, so `bg_hue` / `bg_bright` / `bg_vignette`
+  now decide what the frame's edge looks like on any folded preset. They compose
+  with the fold instead of being overwritten by it.
+
+`kaleido_center_x` / `kaleido_center_y` place the fold axis in the frame, `0..1`
+in normalized screen coordinates, default `0.5` (the centre). This is what makes
+`pan_x` / `pan_y` and the fold usable together: pan the scene and drive the fold
+centre with the same expression and the rosette travels with its own axis instead
+of sliding off it. Both are clamped into the frame; an off-centre axis shrinks the
+disc on the side it moved toward, which the falloff absorbs.
 
 **`kaleido_order` is a stepped parameter — it is rounded to a whole number.** A
 wedge count has to divide the circle evenly or the frame tears along a horizontal
@@ -529,7 +551,7 @@ kaleidoscopic motion, ride `kaleido_angle`; that one is fully smooth.
 `mirror_*` and `kaleido_*` both give you N-fold symmetry, and on a line scene they
 can look nearly alike — but they work at opposite ends of the pipeline:
 
-| | `mirror_order` / `mirror_reflect` | `kaleido_order` / `kaleido_angle` |
+| | `mirror_order` / `mirror_reflect` | the `kaleido_*` family |
 |---|---|---|
 | what it folds | the **geometry**, before rasterization | the finished **pixels** |
 | when | while the scene builds its segments | a post stage, after the scene has drawn |

@@ -6,8 +6,27 @@
 //! The fold is dihedral: each output pixel's angle is wrapped into one
 //! `2*pi/order` wedge and mirrored within it, so the frame is invariant under a
 //! `2*pi/order` rotation and carries a mirror line per wedge. `kaleido_angle`
-//! rotates the whole fold. Driven by the `kaleido_order` / `kaleido_angle` named
-//! params.
+//! rotates the whole fold, and `kaleido_center_x`/`_y` place its axis.
+//!
+//! # The fold folds a **disc** (ADR-0047)
+//!
+//! The operation is polar but the source is rectangular, so the two do not have
+//! the same shape. Each output pixel keeps its radius and only changes its angle,
+//! which means any pixel whose radius exceeds the source's extent *in the folded
+//! direction* reconstructs a coordinate outside `[0, 1]`. That used to be handed
+//! to a `ClampToEdge` sampler, which smeared the border texel radially into hard
+//! streaks and chevron debris — design-backlog 0010, user-reported three times,
+//! and catastrophic in a portrait window, where most of the frame is out of range
+//! rather than just the corners.
+//!
+//! So the **sample** radius is clamped to `r_max`, the largest disc around the
+//! fold axis that the source contains (the nearest of the four edges, in
+//! aspect-corrected space). Nothing is ever sampled outside the source, at any
+//! aspect or fold centre. Past `r_max` the result fades out over
+//! [`FALLOFF_BAND`], so the boundary is a designed vignette rather than a hard
+//! ring. Content outside that disc is discarded — the fold shows less of the
+//! source frame than the broken version pretended to, which ADR-0047 weighed and
+//! accepted for centred figures, the fold's overwhelming use.
 //!
 //! **Identity passthrough when `kaleido_order < 2`** — every shipped preset until
 //! one opts in — so the [`PostChain`](super::post::PostChain) skips this stage
@@ -51,6 +70,54 @@ use super::post::{PostStage, internal_grid_size};
 const DEFAULT_ORDER: f32 = 1.0;
 /// `kaleido_angle` default — no rotation.
 const DEFAULT_ANGLE: f32 = 0.0;
+/// `kaleido_center_x` / `kaleido_center_y` default — the screen centre, which is
+/// where the fold axis was hardcoded before it became bindable (ADR-0047).
+const DEFAULT_CENTER: f32 = 0.5;
+
+/// How far past the inscribed disc the vignette takes to fade out, as a fraction
+/// of `r_max` (ADR-0047).
+///
+/// The out-of-disc region is not small and its size is an aspect fact, not a
+/// tuning one: the fold keeps each output pixel's radius, so what matters is the
+/// ratio between the frame's corner radius and its shortest half-extent, which is
+/// `sqrt(1 + (long/short)^2)` — about **2.04x `r_max` at 16:9**, and larger the
+/// further the window is from square. A band of 0.35 therefore reaches the
+/// backdrop well before the corners at every aspect, which is what makes the edge
+/// read as a vignette rather than as a disc pasted on a rectangle.
+const FALLOFF_BAND: f32 = 0.35;
+
+/// **TEMPORARY — Plan 0045 Phase 2 deletes this parameter and the two losing
+/// branches it selects.** ADR-0047 is `proposed`, to be confirmed against rendered
+/// samples, so the two alternatives it names have to be renderable side by side
+/// from the same build. Exposing the choice as an ordinary named param is what
+/// lets `shot --preset-file` produce the confirmation set without three builds or
+/// an ambient environment variable (which is exactly the hidden capture input
+/// ADR-0045 refused for the tier). It is deliberately absent from
+/// `presets/README.md`: no shipped preset may bind it.
+const DOMAIN_FALLOFF: f32 = 0.0;
+/// Temporary — ADR-0047 Alternative B, the A/B control: clamp to the disc, no
+/// falloff, so the disc edge is a hard circle.
+const DOMAIN_HARD: f32 = 1.0;
+/// Temporary — ADR-0047 Alternative A: no clamp, `Repeat` addressing, so the
+/// out-of-range region tiles the frame's opposite edge instead.
+const DOMAIN_WRAP: f32 = 2.0;
+/// Temporary — **not one of ADR-0047's three**, and offered because rendering the
+/// other three showed the ADR's model of them to be off in a way that matters to
+/// the choice (Plan 0045 Phase 1 notes).
+///
+/// Clamping the *sample* radius does not produce the "hard flat ring" the ADR
+/// expects of a plain clamp: the clamped sample still varies with angle, so the
+/// disc's rim is replicated outward as a **sunburst of radial rays** — which is
+/// the streak family the fix exists to remove, merely bounded. `DOMAIN_FALLOFF`
+/// fades those rays out but does not stop drawing them. This variant fades to the
+/// backdrop **at** `r_max` instead of beyond it, over [`INNER_BAND`] of the disc's
+/// own outer rim, so no pixel outside the disc is ever painted and there is no ray
+/// to fade. It costs a rim of real content that the other two keep.
+const DOMAIN_VIGNETTE: f32 = 3.0;
+
+/// The rim of the disc [`DOMAIN_VIGNETTE`] fades out over, as a fraction of
+/// `r_max` — inward, unlike [`FALLOFF_BAND`].
+const INNER_BAND: f32 = 0.20;
 
 /// Below this order the fold is the identity passthrough (the stage is skipped).
 const MIN_ACTIVE_ORDER: f32 = 2.0;
@@ -82,8 +149,42 @@ fn fold_order(order: f32) -> f32 {
     order.clamp(MIN_ACTIVE_ORDER, MAX_ORDER).round()
 }
 
+/// One axis of the fold centre, in uv: clamped into the frame, with a non-finite
+/// binding falling back to the screen centre.
+///
+/// Off-frame is not a useful fold: the inscribed disc is the distance to the
+/// *nearest* source edge, so a centre outside `[0, 1]` has no disc at all and the
+/// falloff would take the whole frame to the backdrop. Clamping keeps an
+/// over-driven binding (an eased `pan`-like sweep that overshoots) at the frame
+/// edge instead of blanking the picture.
+fn fold_center(v: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(0.0, 1.0)
+    } else {
+        DEFAULT_CENTER
+    }
+}
+
+/// The out-of-disc treatment the shader is handed — **temporary**, see
+/// [`DOMAIN_FALLOFF`]. Snapped to one of the three modes so a smoothed or
+/// interpolated binding can never land between two branches.
+fn fold_domain(domain: f32) -> f32 {
+    if !domain.is_finite() {
+        return DOMAIN_FALLOFF;
+    }
+    match domain.clamp(DOMAIN_FALLOFF, DOMAIN_VIGNETTE).round() {
+        m if m == DOMAIN_HARD => DOMAIN_HARD,
+        m if m == DOMAIN_WRAP => DOMAIN_WRAP,
+        m if m == DOMAIN_VIGNETTE => DOMAIN_VIGNETTE,
+        _ => DOMAIN_FALLOFF,
+    }
+}
+
 const SHADER: &str = r#"
-struct K { v: vec4<f32> } // x: order, y: angle, z: aspect
+struct K {
+    v: vec4<f32>, // x: order, y: angle, z: aspect, w: domain mode
+    c: vec4<f32>, // x,y: fold centre (uv), z: falloff band (fraction of r_max)
+}
 
 @group(0) @binding(0) var<uniform> u: K;
 @group(0) @binding(1) var t_src: texture_2d<f32>;
@@ -94,9 +195,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let order = max(u.v.x, 1.0);
     let angle = u.v.y;
     let aspect = max(u.v.z, 0.001);
+    let mode = u.v.w;
+    let centre = u.c.xy;
 
     // Centre and aspect-correct so the wedges are radially symmetric.
-    var p = in.uv - vec2<f32>(0.5, 0.5);
+    var p = in.uv - centre;
     p.x = p.x * aspect;
 
     let r = length(p);
@@ -111,11 +214,40 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     a = a - seg * floor(a / seg);
     a = abs(a - seg * 0.5);
 
-    // Reconstruct the sample coordinate from the folded angle + original radius.
-    var q = vec2<f32>(cos(a), sin(a)) * r;
+    // The largest disc centred on the fold axis that the source rectangle
+    // contains, in this same aspect-corrected space: the nearest of the four
+    // edges. An off-centre fold shrinks it on one side by construction.
+    let r_max = max(min(min(centre.x, 1.0 - centre.x) * aspect,
+                        min(centre.y, 1.0 - centre.y)), 0.001);
+
+    var rs = r;
+    var w = 1.0;
+    if (mode > 2.5) {
+        // Temporary fourth treatment: the disc fades out at its own rim, so
+        // nothing outside it is drawn at all and the rim is never replicated
+        // outward as rays.
+        rs = min(r, r_max);
+        let band = max(u.c.w, 0.001);
+        w = 1.0 - smoothstep(r_max * (1.0 - band), r_max, r);
+    } else if (mode < 1.5) {
+        // Fold a DISC (ADR-0047). Clamping the SAMPLE radius — not the output
+        // pixel's — is what keeps every reconstructed coordinate inside [0,1]:
+        // beyond r_max the polar reconstruction used to land outside the source
+        // and `ClampToEdge` smeared the border texel radially into the streaks
+        // and chevrons of design-backlog 0010.
+        rs = min(r, r_max);
+        if (mode < 0.5) {
+            // ...and past the disc, fade out rather than leaving a flat ring.
+            let band = max(u.c.z, 0.001);
+            w = 1.0 - smoothstep(r_max, r_max * (1.0 + band), r);
+        }
+    }
+
+    // Reconstruct the sample coordinate from the folded angle + sample radius.
+    var q = vec2<f32>(cos(a), sin(a)) * rs;
     q.x = q.x / aspect;
-    let s_uv = q + vec2<f32>(0.5, 0.5);
-    return vec4<f32>(textureSample(t_src, samp, s_uv).rgb, 1.0);
+    let s_uv = q + centre;
+    return vec4<f32>(textureSample(t_src, samp, s_uv).rgb * w, 1.0);
 }
 "#;
 
@@ -123,12 +255,18 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct K {
     v: [f32; 4],
+    c: [f32; 4],
 }
 
 struct Resources {
     // The offscreen the composite (background + scene [+ trails]) renders into.
     /// The grid these were built for, so `begin` can compare before rebuilding.
     size: (u32, u32),
+    /// Whether the sampler was built with `Repeat` addressing — temporary, for
+    /// [`DOMAIN_WRAP`]; the address mode is baked into the sampler, so unlike the
+    /// other two treatments it cannot be a uniform. Compared in `begin` alongside
+    /// the size. Deleted with the switch at Plan 0045 Phase 2.
+    repeat: bool,
     // Kept alive so `src_view` stays valid; not read after construction.
     _src: wgpu::Texture,
     src_view: wgpu::TextureView,
@@ -138,7 +276,12 @@ struct Resources {
 }
 
 impl Resources {
-    fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat, size: (u32, u32)) -> Self {
+    fn build(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        size: (u32, u32),
+        repeat: bool,
+    ) -> Self {
         let src = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("kaleido-src"),
             size: wgpu::Extent3d {
@@ -154,11 +297,19 @@ impl Resources {
             view_formats: &[],
         });
         let src_view = src.create_view(&wgpu::TextureViewDescriptor::default());
+        // The disc treatments never sample outside [0,1], so their address mode is
+        // unreachable — it stays `ClampToEdge` as the defined fallback. `Repeat`
+        // is the temporary wrap variant (ADR-0047 Alternative A), where reaching
+        // outside is the whole point.
+        let address = if repeat {
+            wgpu::AddressMode::Repeat
+        } else {
+            wgpu::AddressMode::ClampToEdge
+        };
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("kaleido-sampler"),
-            // Clamp so folded coords past the edge sample the border, not wrap.
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_u: address,
+            address_mode_v: address,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
@@ -212,6 +363,7 @@ impl Resources {
 
         Self {
             size,
+            repeat,
             _src: src,
             src_view,
             uniform,
@@ -232,6 +384,10 @@ pub struct Kaleidoscope {
     res: Option<Resources>,
     order: f32,
     angle: f32,
+    center_x: f32,
+    center_y: f32,
+    /// Temporary — see [`DOMAIN_FALLOFF`]. Removed at Plan 0045 Phase 2.
+    domain: f32,
     /// The active tier's cap on this stage's internal grid — see
     /// [`Trails::post_cap`](super::trails::Trails).
     post_cap: (u32, u32),
@@ -242,7 +398,17 @@ pub struct Kaleidoscope {
 
 /// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &["kaleido_order", "kaleido_angle"];
+///
+/// `kaleido_domain` is the temporary confirmation switch (see [`DOMAIN_FALLOFF`]);
+/// it is listed here only because routing a binding requires it, and Plan 0045
+/// Phase 2 removes it.
+pub const PARAMS: &[&str] = &[
+    "kaleido_order",
+    "kaleido_angle",
+    "kaleido_center_x",
+    "kaleido_center_y",
+    "kaleido_domain",
+];
 
 impl Kaleidoscope {
     /// Store the device/format for a lazy build; no GPU resources yet.
@@ -257,6 +423,9 @@ impl Kaleidoscope {
             res: None,
             order: DEFAULT_ORDER,
             angle: DEFAULT_ANGLE,
+            center_x: DEFAULT_CENTER,
+            center_y: DEFAULT_CENTER,
+            domain: DOMAIN_FALLOFF,
             post_cap,
             builds: 0,
         }
@@ -278,6 +447,9 @@ impl PostStage for Kaleidoscope {
     fn reset_params(&mut self) {
         self.order = DEFAULT_ORDER;
         self.angle = DEFAULT_ANGLE;
+        self.center_x = DEFAULT_CENTER;
+        self.center_y = DEFAULT_CENTER;
+        self.domain = DOMAIN_FALLOFF;
     }
 
     /// Apply one named parameter, returning whether it was a `kaleido_*` param.
@@ -285,6 +457,9 @@ impl PostStage for Kaleidoscope {
         match name {
             "kaleido_order" => self.order = value,
             "kaleido_angle" => self.angle = value,
+            "kaleido_center_x" => self.center_x = value,
+            "kaleido_center_y" => self.center_y = value,
+            "kaleido_domain" => self.domain = value,
             _ => return false,
         }
         true
@@ -319,9 +494,21 @@ impl PostStage for Kaleidoscope {
         surface: (u32, u32),
     ) -> Option<wgpu::TextureView> {
         // Compare-first (ADR-0030): build once, then only when the grid changes.
+        // The temporary wrap treatment bakes its address mode into the sampler, so
+        // it is compared here too; the shipped default never changes it.
         let wanted = self.internal_size(surface);
-        if self.res.as_ref().is_none_or(|res| res.size != wanted) {
-            self.res = Some(Resources::build(&self.device, self.surface_format, wanted));
+        let repeat = fold_domain(self.domain) == DOMAIN_WRAP;
+        if self
+            .res
+            .as_ref()
+            .is_none_or(|res| res.size != wanted || res.repeat != repeat)
+        {
+            self.res = Some(Resources::build(
+                &self.device,
+                self.surface_format,
+                wanted,
+                repeat,
+            ));
             self.builds += 1;
         }
         self.res.as_ref().map(|res| res.src_view.clone())
@@ -353,7 +540,13 @@ impl PostStage for Kaleidoscope {
             &res.uniform,
             0,
             bytemuck::bytes_of(&K {
-                v: [order, self.angle, aspect, 0.0],
+                v: [order, self.angle, aspect, fold_domain(self.domain)],
+                c: [
+                    fold_center(self.center_x),
+                    fold_center(self.center_y),
+                    FALLOFF_BAND,
+                    INNER_BAND,
+                ],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -420,5 +613,45 @@ mod tests {
         assert_eq!(fold_order(1.9), MIN_ACTIVE_ORDER);
         assert_eq!(fold_order(1e9), MAX_ORDER);
         assert_eq!(fold_order(f32::NEG_INFINITY), MIN_ACTIVE_ORDER);
+    }
+
+    /// The fold axis stays inside the frame whatever a binding drives it to. A
+    /// centre outside `[0, 1]` has no inscribed disc — `r_max` would be negative
+    /// — so this is what keeps an overshooting sweep at the edge rather than
+    /// blanking the picture to the backdrop.
+    #[test]
+    fn fold_center_stays_inside_the_frame() {
+        assert_eq!(fold_center(0.5), 0.5);
+        assert_eq!(fold_center(0.2), 0.2);
+        assert_eq!(fold_center(-3.0), 0.0);
+        assert_eq!(fold_center(1.4), 1.0);
+        // Not merely finite-checked away: NaN would otherwise reach the uniform
+        // and every comparison in the shader's `min` chain would go false.
+        assert_eq!(fold_center(f32::NAN), DEFAULT_CENTER);
+        assert_eq!(fold_center(f32::INFINITY), DEFAULT_CENTER);
+    }
+
+    /// **Temporary with the switch itself** (Plan 0045 Phase 2). The shader
+    /// selects its treatment with two `<` comparisons, so a value that landed
+    /// between two modes would pick one silently; snapping means a smoothed or
+    /// dissolve-interpolated binding cannot do that.
+    #[test]
+    fn fold_domain_snaps_to_one_of_the_three_treatments() {
+        for &raw in &[-1.0f32, 0.0, 0.4, 0.5, 1.0, 1.49, 2.0, 3.0, 9.0, f32::NAN] {
+            let mode = fold_domain(raw);
+            assert!(
+                mode == DOMAIN_FALLOFF
+                    || mode == DOMAIN_HARD
+                    || mode == DOMAIN_WRAP
+                    || mode == DOMAIN_VIGNETTE,
+                "fold_domain({raw}) = {mode} is not one of the treatments"
+            );
+        }
+        assert_eq!(fold_domain(0.4), DOMAIN_FALLOFF);
+        assert_eq!(fold_domain(0.6), DOMAIN_HARD);
+        assert_eq!(fold_domain(1.6), DOMAIN_WRAP);
+        assert_eq!(fold_domain(2.6), DOMAIN_VIGNETTE);
+        assert_eq!(fold_domain(9.0), DOMAIN_VIGNETTE);
+        assert_eq!(fold_domain(f32::NAN), DOMAIN_FALLOFF);
     }
 }

@@ -1088,7 +1088,15 @@ fn declared_params_match_set_param() {
         (src.join("render/trails.rs"), &["trails"]),
         (
             src.join("render/kaleidoscope.rs"),
-            &["kaleido_order", "kaleido_angle"],
+            &[
+                "kaleido_order",
+                "kaleido_angle",
+                "kaleido_center_x",
+                "kaleido_center_y",
+                // Temporary: ADR-0047's confirmation switch, removed at Plan 0045
+                // Phase 2 along with the two treatments it selects.
+                "kaleido_domain",
+            ],
         ),
         (
             src.join("render/ink.rs"),

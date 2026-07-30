@@ -2,35 +2,49 @@
 # Plan 0035 Phase 2, the kaleidoscope half - see composite_trails.toml for why
 # these two exist outside the per-SystemKind golden roster.
 #
-# THIS BASELINE PINS A KNOWN DEFECT ON PURPOSE - design-backlog 0010.
+# THIS BASELINE USED TO PIN design-backlog 0010 ON PURPOSE. IT NOW PINS THE FIX.
 #
 # The fold is a polar operation on a RECTANGULAR source. Each output pixel keeps
-# its radius and takes a folded angle, so a pixel whose radius exceeds the
-# source's extent in the folded direction samples outside [0,1] and the
-# ClampToEdge sampler smears the border texel radially. At this fixture's capture
-# size 5.9% of the output pixels are clamped that way (computed from the shader's
+# its radius and takes a folded angle, so a pixel whose radius exceeded the
+# source's extent in the folded direction sampled outside [0,1] and the
+# ClampToEdge sampler smeared the border texel radially. At this fixture's capture
+# size 5.9% of the output pixels were clamped that way (computed from the shader's
 # own arithmetic, not estimated).
 #
-# BE PRECISE ABOUT WHAT YOU WILL SEE. The hard-edged corner streaks the defect
-# was reported as - on `swarm_dense`, at this same order - need high-frequency
-# content at the source's border. A centred line figure leaves that border as a
-# smooth backdrop gradient, which smears into more smooth gradient, so the
-# baseline looks clean to the eye. It is not clean: the clamped pixels are there,
-# and `bg_bright` below is what keeps them non-black, so every candidate 0010 fix
-# (clamp the radius, change the address mode, radial falloff) changes them and
-# MOVES THIS BASELINE. That is the signal - a fix must not pass silently.
+# Plan 0045 Phase 1 / ADR-0047 fixed it: the SAMPLE radius is clamped to the
+# largest disc the source contains, and past that the result fades out - so no
+# coordinate outside [0,1] is ever sampled, at any aspect or fold centre. This
+# baseline was re-blessed BY HAND at that change.
 #
-# There is no fold order that avoids the defect: at order 2 every output angle
-# folds into the first quadrant and a corner radius still overruns the
+# WHAT MOVED, eyes-on: the lit backdrop that used to reach the frame's corners
+# through the smear is now confined to the inscribed disc, with the corners
+# falling off to black. The rosette itself is untouched, and composite_trails.png
+# stayed byte-identical - which is how you can tell the change is the fold's
+# domain and nothing else.
+#
+# THE DRIFT WAS mean 0.1560 / outlier 160, against tolerances of 0.02 and 48.
+# Worth recording, because Plan 0035's close review measured the PLAIN inscribed-
+# disc clamp (no falloff) at mean 0.0189 - green, at 94% of the drift budget,
+# announcing nothing. The falloff is what lets this fixture see its own fix. It is
+# still not the direct guard 0010 asked for: that is
+# core/tests/kaleidoscope.rs::the_fold_paints_nothing_outside_its_disc, which
+# asserts the out-of-disc statistic on a border-filling fixture at a PORTRAIT
+# aspect, and which fails on the pre-fix shader with peak 199 and every one of
+# 6052 out-of-disc pixels lit.
+#
+# ADR-0047 IS STILL `proposed`. Plan 0045 Phase 2 confirms the treatment against
+# rendered samples, and if the user picks a different one this baseline moves ONE
+# MORE TIME. That move is also the decision landing, not a regression.
+#
+# There is no fold order that avoided the old defect: at order 2 every output
+# angle folds into the first quadrant and a corner radius still overruns the
 # rectangle's reach along x. Capturing at `order < 2` would skip the stage
 # entirely and cover nothing, so this fixture captures the real behaviour rather
 # than a clean order that does not exist.
 #
-# 0010 is NOT a Plan 0033 regression and NOT a Plan 0035 one - it dates from
+# 0010 was NOT a Plan 0033 regression and NOT a Plan 0035 one - it dated from
 # Plan 0018 Phase 7, verified against a worktree at 3f3b652~1. Plan 0033 only
-# removed the 1.6x upscale that had been blurring it. It is ADR-worthy and out of
-# scope for Plan 0035. WHEN IT LANDS, RE-BLESS THIS BASELINE; the move is the fix
-# arriving, not a regression.
+# removed the 1.6x upscale that had been blurring it.
 #
 # Order 6 is the order the artifact was reported at, so the baseline pins the
 # case a user actually saw.
@@ -57,9 +71,10 @@ kaleido_order = "6"
 kaleido_angle = "0"
 
 # A LIT BACKDROP, and it is not decoration - see the 0010 note above. On a black
-# backdrop the fold's out-of-range samples clamp to black, so a 0010 fix would
-# leave those pixels black too and this baseline would not move. The lit vignette
-# is what makes the clamped 5.9% fix-sensitive.
+# backdrop the fold's out-of-range samples clamped to black, so the fix would have
+# left those pixels black too and this baseline would not have moved at all. The
+# lit vignette is what made the clamped 5.9% fix-sensitive, and it is what the
+# disc's falloff is visibly cutting off in the current baseline.
 bg_bright     = "0.55"
 bg_hue        = "0.62"
 bg_vignette   = "0.35"
