@@ -306,7 +306,7 @@ plus one — `index` — that carries position rather than sound:
 | `beat_index` | Monotone beat counter, `0` on the first beat. | Integer-valued. `mod(beat_index, 4)` for "every 4th beat". |
 | `time_since_beat` | Seconds since the last beat; exactly `0` on a beat hop. | A retriggered ramp — good for decays. |
 | `beat_in_bar` | Which beat of the bar, `0`–`3`. | `beat_in_bar == 0` is the downbeat. |
-| `bar_index` | Monotone bar counter. | `mod(bar_index, 8)` for an 8-bar arc. |
+| `bar_index` | Bar counter — monotone except across an alignment change. | `mod(bar_index, 8)` for an 8-bar arc, which a lock can repeat or drop one bar of. |
 | `bar_phase` | Position across the whole bar, `[0, 1)`. | The genuine bar phase, unlike `bar`. |
 | `index` | The element's own position in `[0, 1]` during a **per-element** evaluation. | Not audio. `0` everywhere else — see [below](#index--one-binding-evaluated-once-per-element). |
 
@@ -666,7 +666,7 @@ Five variables place you in the music rather than measuring it (ADR-0050):
 | `beat_index` | `0`, `1`, `2`, … | monotone beat counter since the stream started |
 | `time_since_beat` | seconds | `0` exactly on a beat, climbing to the next |
 | `beat_in_bar` | `0`–`3` | which beat of the bar this is |
-| `bar_index` | `0`, `1`, `2`, … | monotone bar counter |
+| `bar_index` | `0`, `1`, `2`, … | bar counter (see the note below on monotonicity) |
 | `bar_phase` | `0`–`1` | position across the whole bar |
 
 `bar` is **beat** phase under a historical name, kept because too much shipped
@@ -687,6 +687,16 @@ publishes **only while it is confident**, and falls back to plain `beat_index`
 counters otherwise. So they are always periodic and always usable, and never
 confidently wrong about where the bar starts — you cannot see which mode is
 active, deliberately, and you do not need to. 4/4 is assumed.
+
+**`bar_index` is monotone except across an alignment change.** It is
+`(beat_index - alignment) / 4`, and `alignment` moves on the beat the estimator
+locks, drops back to the counter, or is overtaken by a challenger — so at that
+one beat the counter can repeat a bar or skip forward one. It never moves by
+more than a bar and hysteresis makes it rare (a challenger has to lead for three
+bars first), but if you write `mod(bar_index, 8)` for an 8-bar arc, know that a
+lock landing mid-phrase can repeat or drop one bar of it. That is the deliberate
+trade: a repeated bar is a much softer failure than a downbeat on the wrong beat,
+which is the whole reason the gate exists.
 They no longer do: `--report`'s reachability check walks every expression and
 names any comparison that only ever took one value, any `select()` whose
 condition never went both ways, and any `clamp()` ceiling the value never
