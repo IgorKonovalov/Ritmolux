@@ -149,6 +149,112 @@ impl Default for TierConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// The frame-time governor (Plan 0044 Phase 2)
+// ---------------------------------------------------------------------------
+
+/// The display budget assumed when the frontend has not named a refresh rate —
+/// 60 Hz, the rate NFR §1's floor is quoted at.
+pub const DEFAULT_DISPLAY_HZ: f32 = 60.0;
+
+/// How far past the display budget a single frame must run to count as a miss.
+///
+/// Not 1.0. A frame landing a hair over the budget is the ordinary condition of a
+/// vsynced renderer — the measured interval *is* the refresh interval, plus
+/// scheduling noise — so a bare comparison would read a perfectly healthy 60 fps
+/// run as missing on half its frames. 1.25 is "missing the budget by a quarter",
+/// which at 60 Hz is 20.8 ms: past it the run is visibly not holding the rate.
+pub const MISS_FACTOR: f32 = 1.25;
+
+/// What fraction of the observed frames must be misses before the governor
+/// demotes. Three quarters: high enough that an intermittently-heavy passage
+/// rides through, low enough that a genuine overload does not have to be
+/// unanimous (a demotion is triggered by *sustained* pressure, and a real
+/// overload still has fast frames in it — a cheap preset in the rotation, a
+/// dissolve that ended).
+pub const MISS_FRACTION: f32 = 0.75;
+
+/// Frames of history required before the governor will demote at all.
+///
+/// This is the hysteresis, and it is a *count* rather than a smoothing constant
+/// on purpose: it makes "a single spike must not demote" true by arithmetic
+/// instead of by tuning. With 180 frames required and 75 % of them needing to
+/// miss, no run of fewer than 135 consecutive bad frames can demote — so a window
+/// drag, a driver hiccup, or a shader compile cannot, whatever their magnitude.
+/// At 60 Hz it is also a 3 s warm-up, which keeps the pathological first frames
+/// of a session (pipeline creation, first-use resource builds) out of the verdict.
+pub const MIN_SAMPLES: usize = 180;
+
+/// Whether a frame-time series shows a **sustained** miss of the display budget,
+/// which is the one condition that demotes [`Tier::Rich`] to [`Tier::Floor`]
+/// (ADR-0045).
+///
+/// Pure and total: a function of the series and the budget with no clock, no
+/// state and no allocation, so the policy is unit-testable against injected
+/// series (which is how the spike-versus-overload distinction above is checked
+/// rather than asserted). `frame_secs` is the rolling history in **seconds**, the
+/// unit [`FrameStats::samples`](crate::diag::FrameStats::samples) yields; order
+/// does not matter, only the counts.
+///
+/// Says `false` for a non-positive or non-finite budget, and for a series shorter
+/// than [`MIN_SAMPLES`] — the safe direction, since a wrong `true` costs the user
+/// the rich tier for the rest of the session and a wrong `false` costs nothing but
+/// another second of measurement.
+pub fn sustained_miss(frame_secs: impl Iterator<Item = f32>, budget_secs: f32) -> bool {
+    if !budget_secs.is_finite() || budget_secs <= 0.0 {
+        return false;
+    }
+    let threshold = budget_secs * MISS_FACTOR;
+    let mut total = 0usize;
+    let mut missed = 0usize;
+    for dt in frame_secs {
+        total += 1;
+        if dt.is_finite() && dt > threshold {
+            missed += 1;
+        }
+    }
+    total >= MIN_SAMPLES && missed as f32 >= total as f32 * MISS_FRACTION
+}
+
+/// **The governor's whole decision**: whether to demote `tier` right now.
+///
+/// Pure — every input is a value, so the three properties ADR-0045 asks of the
+/// governor are unit-testable together rather than one being a fact about
+/// `Renderer`'s field layout: a pin never demotes, an already-demoted session
+/// never demotes again (the one-way latch), and only a sustained miss demotes.
+///
+/// The caller owns the latch: it sets its "demoted" flag and rebuilds when this
+/// says `true`, and passes that flag back in on every later frame. Keeping the
+/// flag out here is what makes "exactly once" a property of the decision instead
+/// of a property of the call site.
+pub fn should_demote(
+    tier: Tier,
+    pinned: bool,
+    already_demoted: bool,
+    frame_secs: impl Iterator<Item = f32>,
+    budget_secs: f32,
+) -> bool {
+    // Ordered cheapest-first: three flag reads settle the steady state, and the
+    // series is only walked on a governed rich session that has not yet demoted.
+    if pinned || already_demoted || tier == Tier::Floor {
+        return false;
+    }
+    sustained_miss(frame_secs, budget_secs)
+}
+
+/// The frame budget for a display running at `hz`, in seconds. Falls back to
+/// [`DEFAULT_DISPLAY_HZ`] for a value that is not a usable rate, so a frontend
+/// that cannot read its monitor still gets a governed session rather than an
+/// ungoverned one.
+pub fn budget_secs(hz: f32) -> f32 {
+    let hz = if hz.is_finite() && hz > 0.0 {
+        hz
+    } else {
+        DEFAULT_DISPLAY_HZ
+    };
+    1.0 / hz
+}
+
 #[cfg(test)]
 mod tests {
     // Test asserts panic on failure; allowed here over the file's pragma.
@@ -192,5 +298,173 @@ mod tests {
     #[test]
     fn the_floor_is_the_pre_tier_engine() {
         assert_eq!(TierConfig::FLOOR.post_cap, (1920, 1080));
+    }
+
+    // -----------------------------------------------------------------------
+    // The governor (Plan 0044 Phase 2)
+    // -----------------------------------------------------------------------
+
+    use super::{DEFAULT_DISPLAY_HZ, MIN_SAMPLES, budget_secs, should_demote, sustained_miss};
+
+    /// A 60 Hz budget, and the frame times either side of its miss threshold.
+    const BUDGET: f32 = 1.0 / 60.0;
+    /// Comfortably inside the budget — a healthy vsynced frame.
+    const GOOD: f32 = BUDGET;
+    /// Well past `BUDGET * MISS_FACTOR` — a frame that genuinely missed.
+    const BAD: f32 = BUDGET * 2.0;
+
+    /// A series of `n` frames, `bad` of them missing, the rest healthy.
+    fn series(n: usize, bad: usize) -> Vec<f32> {
+        (0..n).map(|i| if i < bad { BAD } else { GOOD }).collect()
+    }
+
+    /// **An isolated spike does not demote** — the first of Phase 2's three
+    /// cases. Neither one catastrophic frame nor a burst of them is enough,
+    /// whatever their magnitude: a 100 ms stall and a 10 s one read identically
+    /// here, because the verdict is a count and not an average.
+    #[test]
+    fn an_isolated_spike_does_not_demote() {
+        let full = MIN_SAMPLES * 2;
+        for spike in [1, 2, 10, 60] {
+            assert!(
+                !sustained_miss(series(full, spike).into_iter(), BUDGET),
+                "{spike} bad frames out of {full} must not demote"
+            );
+        }
+        // Magnitude is irrelevant — one frame that took a whole second is still
+        // one frame. This is the window-drag / driver-hiccup case ADR-0045 names
+        // as the one-way latch's main risk.
+        let one_huge = (0..full).map(|i| if i == full / 2 { 1.0 } else { GOOD });
+        assert!(!sustained_miss(one_huge, BUDGET));
+    }
+
+    /// **A sustained miss demotes** — the second case. Everything above the
+    /// fraction demotes; everything below it does not, so the threshold is
+    /// bracketed rather than only exceeded.
+    #[test]
+    fn a_sustained_miss_demotes() {
+        let full = MIN_SAMPLES * 2;
+        assert!(sustained_miss(series(full, full).into_iter(), BUDGET));
+        // Exactly at the fraction, and one frame either side of it.
+        let at = (full as f32 * super::MISS_FRACTION) as usize;
+        assert!(sustained_miss(series(full, at).into_iter(), BUDGET));
+        assert!(sustained_miss(series(full, at + 1).into_iter(), BUDGET));
+        assert!(
+            !sustained_miss(series(full, at - 1).into_iter(), BUDGET),
+            "one frame below the fraction must not demote — otherwise the \
+             fraction is decorative"
+        );
+    }
+
+    /// Below [`MIN_SAMPLES`] nothing demotes, however bad the frames are. This is
+    /// the warm-up half of the hysteresis: a session's opening frames pay for
+    /// pipeline creation and first-use resource builds, and demoting on those
+    /// would mean a capable machine could never reach the rich tier at all.
+    #[test]
+    fn a_short_series_never_demotes_however_bad() {
+        for n in [0, 1, 60, MIN_SAMPLES - 1] {
+            assert!(
+                !sustained_miss(series(n, n).into_iter(), BUDGET),
+                "{n} all-bad frames is below the {MIN_SAMPLES}-frame minimum"
+            );
+        }
+        // And the very next frame count does.
+        assert!(sustained_miss(
+            series(MIN_SAMPLES, MIN_SAMPLES).into_iter(),
+            BUDGET
+        ));
+    }
+
+    /// A healthy vsynced run does **not** demote, which is the failure mode a
+    /// bare `dt > budget` comparison would have: the measured interval on a
+    /// vsynced 60 Hz display *is* ~16.7 ms, so half those frames land a hair over
+    /// and a factor-free threshold would demote every capable machine in 3 s.
+    #[test]
+    fn a_healthy_vsynced_run_does_not_demote() {
+        let jittery: Vec<f32> = (0..MIN_SAMPLES * 2)
+            .map(|i| BUDGET * if i % 2 == 0 { 0.98 } else { 1.06 })
+            .collect();
+        assert!(!sustained_miss(jittery.into_iter(), BUDGET));
+    }
+
+    /// A degenerate budget is not a licence to demote — and a non-finite frame
+    /// time counts as observed but not as a miss, so a poisoned sample cannot
+    /// tip the verdict either way.
+    #[test]
+    fn a_degenerate_budget_or_sample_never_demotes() {
+        let full = MIN_SAMPLES * 2;
+        for bad_budget in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+            assert!(!sustained_miss(series(full, full).into_iter(), bad_budget));
+        }
+        assert!(!sustained_miss(vec![f32::NAN; full].into_iter(), BUDGET));
+
+        // The budget helper is total in the same direction: junk falls back to
+        // the 60 Hz default rather than producing a degenerate budget.
+        assert!((budget_secs(60.0) - BUDGET).abs() < 1e-6);
+        assert!((budget_secs(144.0) - 1.0 / 144.0).abs() < 1e-6);
+        for junk in [0.0, -60.0, f32::NAN, f32::INFINITY] {
+            assert!(
+                (budget_secs(junk) - 1.0 / DEFAULT_DISPLAY_HZ).abs() < 1e-6,
+                "budget_secs({junk}) must fall back to {DEFAULT_DISPLAY_HZ} Hz"
+            );
+        }
+    }
+
+    /// **A pin never demotes** — the third of Phase 2's three cases — and it holds
+    /// under the worst series there is, not just a marginal one. This is the
+    /// escape hatch ADR-0045 names for the one-way latch's main risk: an operator
+    /// whose transient stall cost them the rich tier passes `--tier rich` and the
+    /// governor is out of the picture for good.
+    #[test]
+    fn a_pinned_tier_never_demotes() {
+        let full = MIN_SAMPLES * 2;
+        let all_bad = || series(full, full).into_iter();
+        // The series alone *would* demote — so this is a test of the pin and not
+        // of a series that was never going to fire.
+        assert!(sustained_miss(all_bad(), BUDGET));
+        assert!(!should_demote(Tier::Rich, true, false, all_bad(), BUDGET));
+        assert!(!should_demote(Tier::Floor, true, false, all_bad(), BUDGET));
+    }
+
+    /// **A sustained miss demotes exactly once** — the one-way latch. The second
+    /// call sees the same catastrophic series and says no, because the caller has
+    /// recorded the first demotion; and a tier already at the floor never demotes,
+    /// which is what keeps the rebuild from firing on an iGPU every four seconds.
+    #[test]
+    fn the_demotion_is_one_way_and_happens_once() {
+        let full = MIN_SAMPLES * 2;
+        let all_bad = || series(full, full).into_iter();
+
+        // Frame N: governed, rich, not yet demoted, sustained miss -> demote.
+        assert!(should_demote(Tier::Rich, false, false, all_bad(), BUDGET));
+        // Frame N+1 onward: the caller latched, so nothing fires again however
+        // bad the frames stay. No oscillation design, by construction.
+        assert!(!should_demote(Tier::Floor, false, true, all_bad(), BUDGET));
+        // And the latch alone is enough — even if the tier somehow read rich.
+        assert!(!should_demote(Tier::Rich, false, true, all_bad(), BUDGET));
+        // A floor session is never a demotion candidate, latch or not. This is
+        // the case that matters for cost: the iGPU the floor exists for will miss
+        // its budget sometimes, and it must not pay a GPU rebuild for it.
+        assert!(!should_demote(Tier::Floor, false, false, all_bad(), BUDGET));
+    }
+
+    /// A healthy governed rich session stays rich — the decision's negative case
+    /// at the level the renderer actually calls it.
+    #[test]
+    fn a_healthy_governed_session_stays_rich() {
+        let steady = || vec![GOOD; MIN_SAMPLES * 2].into_iter();
+        assert!(!should_demote(Tier::Rich, false, false, steady(), BUDGET));
+    }
+
+    /// A faster display is a tighter budget: frames that pass at 60 Hz miss at
+    /// 144. The governor reads the *display's* rate, not a hardcoded 60.
+    #[test]
+    fn the_budget_follows_the_display_rate() {
+        let steady: Vec<f32> = vec![BUDGET; MIN_SAMPLES * 2];
+        assert!(!sustained_miss(steady.iter().copied(), budget_secs(60.0)));
+        assert!(
+            sustained_miss(steady.iter().copied(), budget_secs(144.0)),
+            "16.7 ms frames are a sustained miss of a 144 Hz budget"
+        );
     }
 }

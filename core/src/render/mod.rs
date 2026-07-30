@@ -653,6 +653,26 @@ pub struct Renderer {
     /// construction (ADR-0045). Read at construction and reconfigure time only —
     /// never branched on per frame.
     tier: TierConfig,
+    /// True when the tier was pinned explicitly rather than auto-resolved. A pin
+    /// is honoured in both directions (ADR-0045), so the governor never touches
+    /// one — which is also the escape hatch for a machine whose transient stall
+    /// cost it the rich tier.
+    tier_pinned: bool,
+    /// **The governor's one-way latch.** Set the single time the frame-time
+    /// governor demotes `Rich -> Floor`, and never cleared: there is no
+    /// auto-promotion by design, so a demoted session stays demoted and the
+    /// decision cannot oscillate. The same shape as the dual-live freeze latch
+    /// below, for the same reason.
+    ///
+    /// Also what the frontend reads to report the demotion, so a pinned floor and
+    /// a demoted floor are distinguishable — otherwise the demotion would be
+    /// silent, which ADR-0045 rules out.
+    tier_demoted: bool,
+    /// The display's frame budget in seconds, set by the frontend from its
+    /// monitor's refresh rate ([`set_display_hz`](Self::set_display_hz)). Not read
+    /// from the platform here — a refresh rate is a shell concern, and `core`
+    /// stays source- and platform-agnostic.
+    frame_budget_secs: f32,
     /// The **outgoing** preset's easing state during a dual-live dissolve. Moved
     /// out of [`param_smoother`](Self::param_smoother) when the roster flips, so a
     /// heavily-smoothed preset keeps easing through the dissolve instead of
@@ -697,6 +717,9 @@ impl Renderer {
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
             param_smoother: ParamSmoother::default(),
             tier,
+            tier_pinned: opts.tier.is_some(),
+            tier_demoted: false,
+            frame_budget_secs: tier::budget_secs(tier::DEFAULT_DISPLAY_HZ),
             outgoing_smoother: ParamSmoother::default(),
         };
         // Apply the initial preset's structural config (ADR-0007) so a line
@@ -784,6 +807,70 @@ impl Renderer {
     /// `shot` report header name.
     pub fn tier(&self) -> Tier {
         self.tier.tier
+    }
+
+    /// Whether the frame-time governor demoted this session's tier.
+    ///
+    /// The frontend reports the **transition**, so a demotion is announced once
+    /// rather than shouted every frame — the same pattern
+    /// [`cap_overflow`](Self::cap_overflow) is surfaced through. A pinned floor
+    /// answers `false`; only a governed demotion sets this.
+    pub fn tier_demoted(&self) -> bool {
+        self.tier_demoted
+    }
+
+    /// Tell the renderer the display's refresh rate, which sets the frame budget
+    /// the governor measures against (ADR-0045). Defaults to
+    /// [`DEFAULT_DISPLAY_HZ`](tier::DEFAULT_DISPLAY_HZ); a rate that is not usable
+    /// falls back to it rather than producing a degenerate budget.
+    ///
+    /// Off the hot path — call it at startup and on a monitor change. The core
+    /// does not read this from the platform itself: a refresh rate is a shell
+    /// concern, and the whole point of the split is that `core` knows nothing
+    /// about windows.
+    pub fn set_display_hz(&mut self, hz: f32) {
+        self.frame_budget_secs = tier::budget_secs(hz);
+    }
+
+    /// Run the governor over the rolling frame-time history and demote if it says
+    /// so, returning whether this call was the demotion.
+    ///
+    /// Nothing happens when the tier is pinned, when it is already the floor, or
+    /// when the latch has already fired — so the decision is made **once per
+    /// session** and the expensive part below cannot run twice.
+    fn govern_tier(&mut self) -> bool {
+        if !tier::should_demote(
+            self.tier.tier,
+            self.tier_pinned,
+            self.tier_demoted,
+            self.diag.stats().samples(),
+            self.frame_budget_secs,
+        ) {
+            return false;
+        }
+        self.tier_demoted = true;
+        self.apply_tier(TierConfig::FLOOR);
+        true
+    }
+
+    /// Rebuild the tier-dependent GPU state for `tier`.
+    ///
+    /// Allocation at a **reconfigure**, not on the hot path: this runs at most
+    /// once in a session (the governor's latch is what guarantees that). The
+    /// visible cost is one blink of the trails accumulation as the field pair is
+    /// rebuilt at the smaller grid — the same blink a window resize across a grid
+    /// step produces, and ADR-0045 accepts it as the price of a rare, deliberately
+    /// visible event.
+    ///
+    /// A dissolve in flight is cancelled rather than migrated: its two sides are
+    /// GPU state built at the outgoing tier, and finishing a crossfade across a
+    /// tier change is a worse artifact than landing on the incoming preset.
+    fn apply_tier(&mut self, tier: TierConfig) {
+        self.tier = tier;
+        self.cancel_transition();
+        self.incoming_side = None;
+        self.side = CompositeSide::new(&self.ctx.device, self.ctx.surface_format(), &self.tier);
+        self.configure_active_scene();
     }
 
     /// Reconfigure the surface for a new window size.
@@ -1244,6 +1331,12 @@ impl Renderer {
 
         self.diag.set_draw_calls(draw_calls);
         self.diag.record_frame();
+        // The quality governor, after this frame is recorded: on sustained
+        // evidence that the rich tier does not fit the display budget it latches
+        // to the floor for the remainder of the session (ADR-0045). Cheap in the
+        // steady state — a pin, an already-floor tier, or a fired latch all return
+        // before the series is read — and it can rebuild GPU state at most once.
+        self.govern_tier();
         Ok(())
     }
 
@@ -1298,6 +1391,13 @@ impl Renderer {
             // capacity values themselves were consumed at construction time — the
             // frame path reads the tier only to print it.
             tier,
+            // Whether that tier was the governor's doing, so the overlay can tell
+            // a demoted floor from a pinned one.
+            tier_demoted,
+            // Governor inputs, read after the frame is encoded (see `govern_tier`)
+            // rather than while encoding it — not a per-frame drawing concern.
+            tier_pinned: _,
+            frame_budget_secs: _,
             // Switch-site policy state (the kind rotation) — not a per-frame concern.
             transitions_started: _,
         } = self;
@@ -1492,6 +1592,7 @@ impl Renderer {
                 (width, height),
                 metrics,
                 tier.tier,
+                *tier_demoted,
                 diag.stats().samples().map(|s| s * 1000.0),
             );
             draw_calls += 1;
