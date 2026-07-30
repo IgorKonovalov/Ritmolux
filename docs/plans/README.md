@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0047** (ADRs are a separate sequence — next free there is **0049**.)
+**Next free number: 0049** (ADRs are a separate sequence — next free there is **0052**.)
 
 ## Active roster
 
@@ -14,6 +14,8 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0044](0044-quality-tiers.md) | Quality tiers: `Floor` and `Rich`, a governor, and the constants that move | **approved 2026-07-30** — ready for `dev` after [0043] closes; roadmap R0, [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) | dev, human |
 | [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **approved 2026-07-30** — ready for `dev` after [0044]; roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
+| [0047](0047-expression-randomness.md) | Expression randomness: `hash`, `noise`, and the seed that finally does something | **draft 2026-07-30** — roadmap R5 (small half), [ADR-0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md); **parallel lane** (expr/schema files, no render collision) | dev |
+| [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **draft 2026-07-30** — roadmap R5 (large half), [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)/[0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md); **parallel lane**, after [0047] | dev, human |
 
 ## Recommended execution sequence
 
