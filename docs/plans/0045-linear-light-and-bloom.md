@@ -1,6 +1,6 @@
 # 0045 — Linear light: the HDR composite, the bloom stage, and the fold that had to be fixed first
 
-> **Status:** draft
+> **Status:** approved 2026-07-30 — ready for `dev` (runs after Plan 0044)
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (linear-light + bloom + tonemap),
