@@ -235,7 +235,29 @@ pub const MISS_FRACTION: f32 = 0.75;
 /// drag, a driver hiccup, or a shader compile cannot, whatever their magnitude.
 /// At 60 Hz it is also a 3 s warm-up, which keeps the pathological first frames
 /// of a session (pipeline creation, first-use resource builds) out of the verdict.
+///
+/// **This number is only satisfiable because of a constant in another module.**
+/// The only series the renderer ever hands [`sustained_miss`] is
+/// [`FrameStats::samples`](crate::diag::FrameStats::samples), which yields at
+/// most [`crate::diag::RING`] items — so a `MIN_SAMPLES` above the ring's
+/// capacity makes the governor a permanent no-op. See the assertion below.
 pub const MIN_SAMPLES: usize = 180;
+
+/// The governor must be able to *reach* its own threshold from its real input.
+///
+/// A build failure rather than a test, because the failure it guards is silent:
+/// nothing observable happens when the governor stops demoting — a machine that
+/// cannot hold the rich budget simply stutters for the rest of the session, which
+/// is the exact NFR §1 outcome ADR-0045 built the governor to prevent. A runtime
+/// check could not fire (there is nothing to fire *on*), and a unit test over an
+/// injected series cannot see this at all: the series in the tests below are
+/// `Vec`s of any length we like, so they would keep passing while the real
+/// producer had gone too short to ever trigger a demotion.
+const _: () = assert!(
+    MIN_SAMPLES <= crate::diag::RING,
+    "the frame-time ring is shorter than the governor's minimum sample count, \
+     so the governor can never demote"
+);
 
 /// Whether a frame-time series shows a **sustained** miss of the display budget,
 /// which is the one condition that demotes [`Tier::Rich`] to [`Tier::Floor`]
@@ -516,6 +538,61 @@ mod tests {
     fn a_healthy_governed_session_stays_rich() {
         let steady = || vec![GOOD; MIN_SAMPLES * 2].into_iter();
         assert!(!should_demote(Tier::Rich, false, false, steady(), BUDGET));
+    }
+
+    /// **The governor can actually fire on the series the renderer feeds it.**
+    ///
+    /// Every other test in this module builds its own `Vec` of `MIN_SAMPLES * 2`
+    /// frames — 1.5x the whole capacity of the ring the renderer reads from, and
+    /// therefore a series the production call site cannot produce. So they pin the
+    /// *policy* and say nothing about the *wiring*: had `MIN_SAMPLES` been written
+    /// as 300, all of them would still pass and the governor would be dead on
+    /// arrival, with no symptom but a machine stuttering instead of demoting.
+    ///
+    /// This one drives the real producer through its real API — `FrameStats`,
+    /// `record`, `samples` — exactly as `Renderer::govern_tier` does. The
+    /// `assert!` on the sample count is the load-bearing line: it is what fails if
+    /// the ring is ever shortened past the threshold. (The compile-time assertion
+    /// beside `MIN_SAMPLES` catches that first; this is the behavioral half, and
+    /// it also covers the case where `samples` stops yielding a full ring for some
+    /// reason unrelated to its capacity.)
+    #[test]
+    fn a_real_frame_stats_ring_can_reach_the_governors_threshold() {
+        use crate::diag::FrameStats;
+
+        // Fill the ring the way the renderer does: one `record` per rendered
+        // frame, every one of them missing the budget.
+        let mut stats = FrameStats::new();
+        for _ in 0..crate::diag::RING {
+            stats.record(BAD);
+        }
+
+        assert!(
+            stats.samples().count() >= MIN_SAMPLES,
+            "the frame-time ring yields {} samples, below the governor's {MIN_SAMPLES}-frame \
+             minimum — the governor can never demote",
+            stats.samples().count()
+        );
+        assert!(
+            sustained_miss(stats.samples(), BUDGET),
+            "a full ring of missing frames must demote"
+        );
+        // And the same producer, healthy, does not — so the assertion above is
+        // reading the frame times and not merely the sample count.
+        let mut healthy = FrameStats::new();
+        for _ in 0..crate::diag::RING {
+            healthy.record(GOOD);
+        }
+        assert!(!sustained_miss(healthy.samples(), BUDGET));
+
+        // The decision at the level the renderer calls it, on the real series.
+        assert!(should_demote(
+            Tier::Rich,
+            false,
+            false,
+            stats.samples(),
+            BUDGET
+        ));
     }
 
     /// A faster display is a tighter budget: frames that pass at 60 Hz miss at
