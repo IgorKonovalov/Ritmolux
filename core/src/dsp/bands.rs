@@ -22,7 +22,10 @@ const MAG_BINS: usize = WINDOW_SIZE / 2;
 /// Band cutoffs in Hz. Bass starts above DC/rumble; treble tops out below the
 /// air band and is clamped to Nyquist on low sample rates.
 const BASS_LO_HZ: f32 = 20.0;
-const BASS_HI_HZ: f32 = 250.0;
+/// `pub(crate)` so `fft`'s layout tests can assert the dual-resolution crossover
+/// still lands near the bass split at other sample rates, against the constant
+/// itself rather than a copy of the number.
+pub(crate) const BASS_HI_HZ: f32 = 250.0;
 const MID_HI_HZ: f32 = 4_000.0;
 const TREB_HI_HZ: f32 = 18_000.0;
 
