@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0049** (ADRs are a separate sequence — next free there is **0052**.)
+**Next free number: 0050** (ADRs are a separate sequence — next free there is **0053**.)
 
 ## Active roster
 
@@ -12,11 +12,23 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **approved 2026-07-30** — ready for `dev` **now** ([0044] closed); roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
-| [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **approved 2026-07-30** — ready for `dev` **now** ([0047] closed); roadmap R5 (large half), [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)/[0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md); **parallel lane** | dev, human |
+| [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **in-progress 2026-07-30** — Phases 1-5 (`dev`) landed and merged to `main` (`b06766b`), Mode 4 review done; **Phases 6-7 (`human`) owed** and Phase 6 is blocked on [0049] | dev, human |
+| [0049](0049-analysis-diagnostics-surface.md) | The analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope seam) | **draft 2026-07-30** — ready for `dev`; [ADR-0052](../adrs/0052-analysis-diagnostics-are-native-only.md); **blocks [0048] Phase 6** | dev |
 
 ## Recommended execution sequence
 
-**[0045] is the one to run, and it got more urgent the day [0044] closed.** [0044] **has landed and
+**[0049] goes first — it is small and it unblocks a plan that is already half-landed.** [0048]'s
+five `dev` phases are merged to `main`, but its Phase 6 listening test cannot be performed: nothing
+in the running app displays an analysis value, so ADR-0050's "never locks wrong" stopping condition —
+the thing that made a research-grade downbeat estimator an acceptable risk — is currently
+unfalsifiable. [0049] builds that instrument (four levels + confidence + lock, native-only per
+[ADR-0052](../adrs/0052-analysis-diagnostics-are-native-only.md), overlay **and** 1 Hz log), and
+carries two riders: the **kaleidoscope seam** (user report + reproduction, 2026-07-30 — a fractional
+`kaleido_order` tears the frame along `atan2`'s branch cut on the −x ray, and every kaleido preset
+eases that param through fractional values) and the code-touching findings from [0048]'s Mode 4
+review. Then [0048] Phase 6 → Phase 7 → [0048] closes.
+
+**[0045] is the one to run after that, and it got more urgent the day [0044] closed.** [0044] **has landed and
 closed** (2026-07-30) — see Recently closed — which delivers roadmap R0 and, with it, the
 `TierConfig` that [0045]'s bloom levels and `Floor` bandwidth relief were designed to hang off.
 
@@ -30,7 +42,8 @@ is taken against a ceiling that is about to move.
 
 - **[0045] — linear light + bloom.** The kaleidoscope fold fix first (disc + falloff + bindable
   centre, [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md), confirmed from
-  rendered samples), then the `Rgba16Float` linear composite with one engine-fixed tonemap, then
+  rendered samples) — **note [0049] Phase 1 already fixes the fractional-order seam** in that same
+  file, so this phase inherits an integral `kaleido_order` and owns the *domain* redesign only. Then the `Rgba16Float` linear composite with one engine-fixed tonemap, then
   the bloom `PostStage` with bindable `exposure`/`bloom_*`
   ([ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)). Every golden moves once,
   eyes-on. Closes backlog 0005, 0010 and 0011, and is the answer to half of 0031.
