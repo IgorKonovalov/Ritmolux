@@ -13,8 +13,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0044](0044-quality-tiers.md) | Quality tiers: `Floor` and `Rich`, a governor, and the constants that move | **approved 2026-07-30** — ready for `dev` **now** ([0043] closed) ; roadmap R0, [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) | dev, human |
 | [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **approved 2026-07-30** — ready for `dev` after [0044]; roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
-| [0047](0047-expression-randomness.md) | Expression randomness: `hash`, `noise`, and the seed that finally does something | **approved 2026-07-30** — ready for `dev` now; roadmap R5 (small half), [ADR-0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md); **parallel lane** (expr/schema files, no render collision) | dev |
-| [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **approved 2026-07-30** — ready for `dev` after [0047]; roadmap R5 (large half), [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)/[0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md); **parallel lane** | dev, human |
+| [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **approved 2026-07-30** — ready for `dev` **now** ([0047] closed); roadmap R5 (large half), [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)/[0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md); **parallel lane** | dev, human |
 
 ## Recommended execution sequence
 
@@ -201,9 +200,12 @@ operators, and the `tempo`/`novelty` variables; an unknown parameter name is a s
 **warning** instead of a silent no-op. See Recently closed. Plans and presets below can assume the v2
 vocabulary — notably **[0028]**'s `phase`/`radial_offset` rose morphing now has `tempo` and thresholds
 to drive it. **Still outstanding at that close, user-gated:** the `preset-author` skill docs
-(`SKILL.md`, `references/grammar.md`, `references/render-loop.md`) still describe the **v1** grammar
-and still teach the pre-`LMV_PRESET_DIR` `%APPDATA%` copy-over — the assistant cannot edit
-`.claude/skills/**`, so the lane runs on a stale reference until the user applies it.)
+(`SKILL.md`, `references/grammar.md`, `references/render-loop.md`) still described the **v1**
+grammar and still taught the pre-`LMV_PRESET_DIR` `%APPDATA%` copy-over. **Both halves of that note
+are now obsolete and it is kept only for the history** — the skill docs were rewritten 2026-07-26
+(`1412a9b`) and have been swept since (`bin` at [0034], `hash`/`noise` at [0047]), and
+`.claude/skills/**` turned out to be editable after all: writes there are classifier-dependent,
+not blocked, so a stale skill doc is a close-ceremony sweep like any other.)
 
 (**[0020] Shared palette system has now landed and closed** — the shared `core/src/render/palette.rs`
 baked-LUT color surface (named + custom-stop palettes, bindable `saturation`/`hue`/`color_span`/
@@ -238,6 +240,37 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0047 — expression randomness: `hash`, `noise`, and the seed that finally does
+  something](done/0047-expression-randomness.md) — **done 2026-07-30**, passed Mode 4 review
+  (**no blockers, no majors**; three minors, the two doc ones fixed in the close commit). Three
+  `dev` phase commits on the `plan-0047-expression-randomness` worktree branch, merged to `main`:
+  `96d39c1` the two salted functions, `d72a4cc` `seed = "random"` + the capture pin, `8f7fc13` the
+  docs sweep. [ADR-0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md) is
+  **accepted**. **Delivers the first R5 item** — the grammar is 17 functions, and the
+  incommensurate-sine non-repetition idiom is retired for new work (`noise(time * 0.3)` in one
+  call; existing presets deliberately not rewritten — Plan [0048]'s Phase 7 picks them up
+  opportunistically, and no shipped preset uses either function yet).
+  **The design worth carrying forward is where the pin lives.** A preset carries *two* salts
+  (`salt`, `pinned_salt`) and the choice between them is a `SaltMode` **parameter threaded from
+  every entry point through `draw_frame`**, not a flag on `Renderer` — so the compiler, not a
+  reviewer, is what makes a new capture path decide. Reviewed all six call sites: one `Live` (the
+  on-surface `render`), five `Pinned`. Salting at the renderer rather than at load is likewise
+  forced, not stylistic: `default_presets()` feeds both the live C-ABI path and the behavioral
+  gates, so a load-time decision would be wrong for one of them. Entropy is
+  `std::collections::hash_map::RandomState` — **no new dependency**.
+  **Non-vacuity was proven rather than assumed**, which is the part most closes skip: pointing
+  `SaltMode::Pinned` at the live salt fails `seed.rs`'s byte-equality, and the same fixture under a
+  declared seed renders differently — so the equality is a pin, not pixels that ignore `hash`.
+  **Two lens-4 notes.** (1) Every shipped preset has `salt == pinned_salt == 0`, so the entire
+  golden/gate suite is structurally blind to whether a capture pinned — `core/tests/seed.rs` is the
+  only thing that can tell, and it covers `capture_preset` only; `capture_at_clock`,
+  `capture_preset_over` and `capture_audio` rest on code inspection. That is the plan's one open
+  `dev` followup. (2) The `[generator] seed` key is **not** an L-system key despite its table:
+  any system's preset may carry a `[generator]` table holding nothing else.
+  **Docs swept at close beyond the plan's own list:** `docs/capturing.md` (the seed pin is a
+  fourth ingredient in the headless-render purity claim) and NFR §6 (ADR-0051 promised the
+  clarifying sentence; §6 was already true, so this states *why* rather than carving out).
 
 - [0043 — the swarm gets a depth axis and a domain that follows the
   target](done/0043-swarm-depth-and-domain.md) — **done 2026-07-30**, passed Mode 4 review

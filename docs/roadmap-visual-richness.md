@@ -201,8 +201,10 @@ interleave.*
 
 Small, separable, each closing a named wall:
 
-- **Seeded `noise(x)` / `hash(x)`** in the expression grammar — pure, deterministic,
-  NFR §6-compliant; retires the four-incommensurate-sines workaround.
+- ~~**Seeded `noise(x)` / `hash(x)`** in the expression grammar — pure, deterministic,
+  NFR §6-compliant; retires the four-incommensurate-sines workaround.~~ **Landed** —
+  Plan [0047](plans/done/0047-expression-randomness.md) / ADR-0051, 2026-07-30, with
+  `seed = "random"` on top (per-run variety in the live app, pinned on every capture path).
 - **Normalized band variables** (auto-gain-controlled `bass_n`/`mid_n`/`treb_n` or a
   `norm(x)` form) — structurally kills the 6-100x mis-gain class of defect instead of
   re-tuning it away preset by preset (the largest observed source of dead mechanisms).

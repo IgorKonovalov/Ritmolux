@@ -13,7 +13,15 @@ built on that (Plan 0013):
 A headless render is a **pure function** of `(preset, input, frame-count, size)` —
 scenes are reseeded per capture, every frame steps at the fixed
 `scenes::FALLBACK_DT` (the live app injects its real `dt` instead; Plan 0014),
+every capture path pins the preset's **declared numeric seed** so the grammar's
+`hash()`/`noise()` reproduce even where the preset asked for `seed = "random"`
+(Plan 0047 / [ADR-0051](adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)
+— see [Seeded randomness](../presets/README.md#seeded-randomness--hash-noise-and-generator-seed)),
 and the DSP is deterministic — so renders are reproducible and diff-able.
+
+> The seed pin is the one place a capture deliberately shows you something other
+> than the live app: a `seed = "random"` preset's filmstrip is *an* instance of it,
+> not the instance a user will see. Tune with a number.
 
 > `--size` is part of that tuple, and since Plan 0033 it does more than crop: the
 > `trails` and `kaleido_*` stages size their internal grid from the render target
