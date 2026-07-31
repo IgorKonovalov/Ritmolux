@@ -1,8 +1,23 @@
 //! Background pre-pass (ADR-0018): fills the whole frame with an audio-tintable
 //! gradient + vignette *before* the active scene draws, so every scene composites
 //! over a shared backdrop instead of clearing its own near-black. This pass
-//! **owns the frame clear**; the scenes switched from `Clear` to `Load` (Plan
-//! 0018 Phase 3), so a mid-composite pass never wipes what a prior stage drew.
+//! **owns the destination's clear**; the scenes switched from `Clear` to `Load`
+//! (Plan 0018 Phase 3), so a mid-composite pass never wipes what a prior stage
+//! drew.
+//!
+//! # It paints the chain's *destination*, not the chain's input (ADR-0055)
+//!
+//! The backdrop used to render into the first active post stage's offscreen, which
+//! put it **inside** the texture the chain folds — so the kaleidoscope folded
+//! `bg_vignette`'s radial darkening into its wedges, and the fold's falloff had no
+//! backdrop to land on and faded to black instead.
+//!
+//! It now paints the chain's destination and the chain composites *over* it with
+//! premultiplied alpha. The backdrop is therefore never folded, never blurred, and
+//! never accumulated into the trails feedback — it is the plate underneath.
+//! [`PostChain::begin`](super::post::PostChain::begin) clears the chain's own input
+//! to transparent in its place. When no stage is active the two views are the same
+//! texture, so that path is unchanged.
 //!
 //! Driven by named params (`bg_hue`, `bg_bright`, `bg_vignette`) the renderer
 //! routes here before the scene's own bindings. At the defaults (`bg_bright = 0`)

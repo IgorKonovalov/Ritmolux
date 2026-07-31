@@ -481,8 +481,14 @@ fn evaluate_preset(
 }
 
 /// Encode one preset's composite into `destination`: the backdrop pre-pass (which
-/// owns the clear), then the scene, then the chain folded down. Returns the draw
-/// calls. Call after [`evaluate_preset`] has routed this side's params.
+/// owns `destination`'s clear), then the scene, then the chain folded down over
+/// it. Returns the draw calls. Call after [`evaluate_preset`] has routed this
+/// side's params.
+///
+/// The backdrop paints **`destination`, not the chain's input** (ADR-0055), so the
+/// chain never folds `bg_*` and its last stage composites over the backdrop with
+/// premultiplied alpha. When no stage is active `target.view` *is* `destination`,
+/// which makes that path bit-for-bit what it always was.
 fn composite_into(
     ctx: &RenderContext,
     scene: &mut Box<dyn Scene>,
@@ -492,7 +498,7 @@ fn composite_into(
     surface: (u32, u32),
 ) -> u32 {
     let target = side.chain.begin(encoder, destination, surface);
-    side.background.render(&ctx.queue, encoder, &target.view);
+    side.background.render(&ctx.queue, encoder, destination);
     // Hand the scene its target size before it renders: a scene with an internal
     // accumulation field (the attractor's trails) sizes that field from here rather
     // than a fixed grid (Plan 0027 Phase 2). A no-op for every other scene, and a
