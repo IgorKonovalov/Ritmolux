@@ -216,8 +216,13 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   ~350 MB soft ceiling above, most of which is driver floor already. At the rich cap (2560x1440) the
   same arithmetic is ~118 MB per chain. **The post cap is the relief lever** if the float chain misses
   §1 on a floor-tier iGPU: lower it rather than re-fixing the grids, since bandwidth roughly doubled
-  with the format and the grid policy is shared. Rich-tier frame time on the target GPU is Plan 0045
-  Phase 6; the floor side on real iGPU hardware stays with `docs/on-device-validation.md`.
+  with the format and the grid policy is shared. **Rich-tier frame time on the target GPU is measured
+  and bloom is not the expensive part:** windowed on the dev box's discrete GPU, `star_lantern` (the
+  one shipped preset that binds `bloom_*`) runs 164 fps at p99 **8.2 ms**, against
+  `attractor_clifford` at p99 19.9 ms and `attractor_leviathan` at 19.0 ms — neither of which
+  switches the stage on. The float composite plus the attractor is what puts the heaviest preset past
+  a 60 Hz frame at Rich. The fullscreen and `Floor`-pinned runs, and the whole real-iGPU side, stay
+  with `docs/on-device-validation.md`.
 - **Driver floor isolated (Plan 0012 Phase 2, resolved):** the once-optional dev spike ran —
   `standalone/examples/floor.rs`, a scene-less window standing up only the wgpu context — and put the
   hard **~327 MB private-commit** floor number on the split above. It confirms ADR-0010's diagnosis: the

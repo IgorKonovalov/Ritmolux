@@ -1,6 +1,8 @@
 # ADR-0046 — The composite accumulates in linear-light `Rgba16Float`, with a bloom stage and one engine-fixed tonemap at present
 
-> **Status:** proposed
+> **Status:** **accepted** (Plan 0045, closed 2026-07-31 — shipped in full: the
+> `Rgba16Float` composite, the engine-fixed tonemap + `exposure`, and the bloom stage
+> with `bloom_amount`/`bloom_threshold`/`bloom_radius`)
 > **Date:** 2026-07-30
 > **Related plan(s):** 0045-linear-light-and-bloom (R1 of [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md))
 > **Supplements:** 0018/0031 (the chain), 0028/0032 (ink stays terminal), 0021 (palette; gamma deferral ends here)

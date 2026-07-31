@@ -1,26 +1,47 @@
 # 0045 — Linear light: the HDR composite, the bloom stage, and the fold that had to be fixed first
 
-> **Status:** in-progress 2026-07-31 — **every `dev` phase has landed** in the `lmv-plan-0045`
-> worktree (`6f282e7`, `b67b9c2`, `c334b0e`, `f7ab148`, `96780e1`, `23703dc`) and both Mode 4
-> reviews are done: gate green on the branch (fmt + clippy + **386/386**, 0 skipped), no
-> blockers. Phase 4b landed the alpha clamp, the lit-backdrop guard, and the bind-layout
-> enumeration that replaced a false comment. **One thing blocks the close: Phase 6 (`human`)**,
-> half done — frame times are recorded for shipped presets, but nothing in the library binds
-> `bloom_*`, so the phase's actual subject (a bloom-active Rich run, plus the Floor-pinned
-> sanity pass) has not been run; it needs a scratch `LMV_PRESET_DIR`, per
-> `docs/on-device-validation.md`. The fold's disc coverage was rejected on sight and is **routed
-> to its own ADR + plan** rather than reopening this one (see Phase 6).
+> **Status:** **done 2026-07-31** — every `dev` phase landed (`6f282e7`, `b67b9c2`, `c334b0e`,
+> `f7ab148`, `96780e1`, `23703dc`, merged to `main` at `2f4a804`), both Mode 4 reviews passed with
+> **no blockers**, and Phase 6 (`human`) reported. Gate on `main` at the close: `cargo nextest run
+> --release -p lmv-core` **316/316, 0 skipped**. (`cargo test` — not nextest — segfaults on the lib
+> binary from many GPU devices in one process; that is the documented crash mode, not a
+> regression.) Version bumped **minor 0.27.0 → 0.28.0**.
 >
-> **Owed at the close, from the second Mode 4 review** (2026-07-31, no blockers, one `major`):
-> `core/src/render/tier.rs`'s `post_cap` docstring charges bloom "~11 MB … and ~22 MB dual-live",
-> counting the pyramid but not its own grid-sized `bloom-src` offscreen (16.6 MB at the floor
-> cap); `docs/nfr.md` §12 has it right and `docs/on-device-validation.md`'s bloom item repeats
-> the short framing. Fix both sentences. Strike through backlog **0005** (bloom), **0010** and
-> **0011** (the fold) with pointers here, and re-check **0031** (clifford at Rich) against the
-> tonemap. Absorb the disclosed out-of-list files — Phase 3's `schema.rs`, `capture.rs`,
-> `tier.rs`, `transition.rs`; Phase 5's three `preset-author` skill references. The WARP
-> identical-layout collisions the Phase 4b enumeration printed are **not** this plan's to fix —
-> [backlog 0039](../design-backlog.md).
+> **What shipped:** the `Rgba16Float` linear composite end to end, one engine-fixed tonemap +
+> `exposure` before ink, a bloom `PostStage` with `bloom_amount`/`bloom_threshold`/`bloom_radius`,
+> the disc fold with radial falloff and `kaleido_center_x/y`, and — added mid-plan — the backdrop
+> leaving the post chain so the chain composites premultiplied over it.
+> [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) and
+> [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md) are **accepted**; ADR-0047 was already
+> accepted with an Outcome. Closes design-backlog **0005**, **0010** and **0011**.
+>
+> **Phase 6's answer: bloom is not what is expensive.** `star_lantern` — which now ships and binds
+> all three bloom params, so the scratch-`LMV_PRESET_DIR` workaround the phase was written around
+> is obsolete — runs **164 fps, p99 8.2 ms** Rich-pinned and windowed on the discrete GPU, against
+> `attractor_clifford` at 19.9 ms and `attractor_leviathan` at 19.0 ms, neither of which switches
+> the stage on. The fullscreen and `Floor`-pinned runs are carried to
+> [`docs/on-device-validation.md`](../on-device-validation.md), which never blocks a close.
+>
+> **Out-of-list files, disclosed by `dev` and absorbed at the close** — all consequences of the
+> phases as written rather than scope creep: Phase 3 also touched `preset/schema.rs` (the four new
+> named params), `render/capture.rs` (readback of a float composite), `render/tier.rs`
+> (`bloom_levels` and the memory arithmetic) and `render/transition.rs` (the blend pair moving to
+> `Rgba16Float`); Phase 5 also swept the three `preset-author` skill references, which is a
+> required sweep rather than an extra — that lane keeps no catalogue of its own, so a plan adding
+> named params has to update them or the lane authors against a surface that does not exist.
+>
+> **Two things routed out rather than reopened here.** The fold's disc coverage was rejected in
+> motion on grounds ADR-0047 already records as its accepted cost — [backlog
+> 0037](../design-backlog.md). And the WARP identical-layout collisions the Phase 4b enumeration
+> printed are [backlog 0039](../design-backlog.md).
+>
+> **One defect this plan caused, found after the merge and routed to its own plan.** Phase 2b's
+> premultiplied composite made the scene→chain seam's alpha load-bearing, and two additive draw
+> pipelines emit a hard `1.0` alpha over the whole quad — so a lit backdrop is punched to black
+> around every sprite and stroke. That is ADR-0055's own first Negative bullet coming true at the
+> one seam this plan did not reach:
+> [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) +
+> [Plan 0051](0051-the-scene-seam-emits-premultiplied-alpha.md).
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (linear-light + bloom + tonemap),
@@ -286,21 +307,37 @@ side's `bg_*`.
   representative set, or the misses are recorded with numbers for the close to act on
   (lower `bloom_levels` at Rich, or the post cap — the levers are named in ADR-0046).
 
-- **Partial result, 2026-07-31 — the bloom half is still owed.** A Rich-pinned windowed run on
-  the discrete GPU, on **shipped** presets, which bind no `bloom_*` (this plan ships engine
-  defaults only, so nothing in the library switches the stage on):
+- **Result, 2026-07-31 — the bloom question is answered, and the answer is that bloom is not what
+  is expensive.** A Rich-pinned windowed run on the discrete GPU:
 
-  | preset | fps | p99 frame time |
-  |---|---|---|
-  | `attractor_leviathan` (attractor + fold + trails) | 83 | **19.0 ms** |
-  | `fragment_kaleido` (fragment field + fold + trails) | 162 | 11.3 ms |
+  | preset | binds `bloom_*` | fps | p99 frame time |
+  |---|---|---|---|
+  | `star_lantern` (line scene + bloom) | **yes** | 164 | **8.2 ms** |
+  | `fragment_kaleido` (fragment field + fold + trails) | no | 162 | 11.3 ms |
+  | `attractor_leviathan` (attractor + fold + trails) | no | 83 | **19.0 ms** |
+  | `attractor_clifford` (attractor + trails) | no | — | **19.9 ms** |
 
-  So the float composite alone already puts the heaviest shipped preset's p99 **past a 60 Hz
-  frame** (16.7 ms) at Rich, windowed — before bloom is added to it. That is a number for the
-  close to hold, not yet a miss against NFR §1, which is a `Floor` requirement. **What remains
-  is the phase's actual subject:** the same run with `bloom_amount > 0` at native fullscreen,
-  and the Floor-pinned sanity pass. Probe presets that bind bloom exist outside the repository
-  (a scratch `LMV_PRESET_DIR`); the library gets bloom bindings in R6, not here.
+  **The phase's subject changed while the plan was in flight, and this is the finding.** Phase 6
+  was written when nothing in the library bound `bloom_*`, so it asked for probe presets from a
+  scratch `LMV_PRESET_DIR`. `presets/star_lantern.toml` now ships and binds all three params, so
+  the measurement is on a real preset rather than a probe — and it lands at **p99 8.2 ms,
+  comfortably inside a 60 Hz frame**, against two bloom-*less* attractor presets at 19.0 and
+  19.9 ms on the same run. So the cost that puts the heaviest shipped preset past a 60 Hz frame
+  at Rich is **the float composite plus the attractor's particle count**, not this plan's new
+  stage. That is a number for the close to hold, and not yet a miss against NFR §1, which is a
+  `Floor` requirement.
+
+  **Carried to [`docs/on-device-validation.md`](../on-device-validation.md)** rather than blocking
+  the close, since that page never blocks a plan: the same `star_lantern` run at **native
+  fullscreen**, the **`Floor`-pinned** sanity pass, and the whole low-end-iGPU side. The bloom item
+  on that page now names `star_lantern` instead of the scratch-directory workaround, and carries
+  these numbers.
+
+  **One thing this run cannot settle, worth knowing before someone tries:** `shot` has **no
+  `--tier` flag** — headless capture is `Floor` by construction (ADR-0045), deliberately, so that
+  no baseline can be blessed at another tier. Every `Rich` question on this page therefore needs
+  the running app. [Plan 0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md)'s `[` / `]`
+  tier swap turns that from a relaunch into an A/B in one sitting.
 
 - **Visual result, 2026-07-31 — the fold's disc coverage is rejected, and it is routed out
   rather than reopened here.** On real presets in motion the user rejected two things Phase 2

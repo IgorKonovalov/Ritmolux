@@ -131,6 +131,20 @@ These are engine-wide and bindable, so treat them as instruments, not decoration
   build-up parameter of the two — a rising radius opens the frame up where a rising amount just
   brightens it. This is the stage a beat belongs on if you want a hit to feel like light rather than
   like a gain change.
+  **The trap, and it will get you first: a preset written to the old keep-it-under-1.0 habit gets
+  *nothing* from this stage.** The default threshold selects light that is genuinely *over* range,
+  so a frame that never crosses 1.0 hands the bright-pass an empty picture and the stage does
+  literally nothing — measured, a draft holding `brightness` under 1.0 rendered **pixel-identical**
+  with bloom on and at `bloom_amount = 0`. Something must deliberately cross 1.0, and the cheapest
+  fuel is **`glow`**, because it drives the stroke's core rather than its width (raising `thickness`
+  spreads the same light over a bigger quad and can move the peak the wrong way). `presets/star_lantern.toml`
+  is the shipped worked example and its header records what the renders taught.
+  **And verify it on a moving stimulus, never on a `--set` still.** A held `--set bass=1` flatters
+  every stage, but the threshold makes this one a cliff rather than a slope: at `bass = 1` the
+  figure sits far over range and the halo is enormous, while on real material — bass *mean* around
+  0.007 against peaks near 0.19 — the frame may never cross the threshold at all. Use
+  `--signal dynamic:<bpm>` or `--audio`, and read a `--set` still as the loudest single frame the
+  preset will ever have.
 - **`exposure`** (Plan 0045) — one linear multiplier on the whole frame before the tonemap. The honest
   way to make a finished preset brighter or darker without re-balancing every element against its own
   background. Binding it to audio pumps the entire picture, which reads as the *camera* reacting; that

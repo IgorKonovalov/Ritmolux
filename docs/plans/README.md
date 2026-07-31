@@ -3,14 +3,14 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0051** (ADRs are a separate sequence — next free there is **0055**.)
+**Next free number: 0052** (ADRs are a separate sequence — next free there is **0057**.)
 
 ## Active roster
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **in-progress 2026-07-31** — **every `dev` phase has landed** in the `lmv-plan-0045` worktree (`6f282e7` … `23703dc`); both Mode 4 reviews done, gate green on the branch (fmt + clippy + **386/386**, 0 skipped), no blockers. Phase 4b clamped the recombine's alpha, added the lit-backdrop guard, and replaced `tonemap.rs`'s false bind-layout comment with an enumeration. **One thing blocks the close: Phase 6 (`human`), half done** — frame times recorded for shipped presets, but nothing in the library binds `bloom_*`, so the phase's subject (a bloom-active Rich run + the Floor-pinned sanity pass, via a scratch `LMV_PRESET_DIR`) is unrun. Close-owed items are listed in the plan's status block. The fold's disc coverage was rejected on sight and is routed to its **own ADR + plan** ([backlog 0037](../design-backlog.md)), not reopened here. Roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md)/[0055](../adrs/0055-backdrop-leaves-the-post-chain.md) | dev, human |
+| [0051](0051-the-scene-seam-emits-premultiplied-alpha.md) | The scene seam emits premultiplied alpha: the swarm and the strokes stop punching holes in the backdrop | **draft 2026-07-31** — [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md); a **live regression** caused by [0045] Phase 2b and reproduced on two draw seams, so it is the next thing a `dev` session should take. Three phases, two shader lines and one blend state, and it **provably moves no golden** | dev |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **in-progress 2026-07-30** — Phases 1-5 (`dev`) landed and merged to `main` (`b06766b`), Mode 4 review done; **Phases 6-7 (`human`) owed**. Phase 6 is **no longer blocked** — [0049] built its instrument and closed | dev, human |
 | [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **draft 2026-07-30** — [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
@@ -40,22 +40,16 @@ ADR-0050's stopping condition needs is the mean of that column). Play 2-3 real t
 the normalized levels ride the music without pumping or going numb, record the lock rate, then
 Phase 7 → [0048] closes.
 
-**[0045] is code-complete in the `lmv-plan-0045` worktree, and what is left is one `human`
-measurement.** Every `dev` phase landed and both Mode 4 reviews passed with no blockers.
-
-- **Phase 4b (`dev`) — landed** (`23703dc`). The recombine's output alpha is clamped into `[0, 1]`
-  (colour stays unclamped, since carrying light past 1.0 into the tonemap is the point), with the
-  lit-backdrop guard that would have caught it: every bloom fixture runs `bg_bright = 0`, verbatim
-  the blind spot [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md)'s Negative section
-  names. **The guard reads the linear composite, not a capture** — a display-byte version cannot
-  be written, because the tonemap's hue-preserving scale moves dim channels by up to 15 bytes with
-  the stage switched off; the plan's Phase 4b carries the correction and the re-measured numbers.
-  `tonemap.rs`'s false uniqueness comment became an enumeration over every layout in `core/src`
-  (the collisions it printed are [backlog 0039](../design-backlog.md)), and the no-255 wording in
-  `composite.rs` / `capturing.md` is now a claim about one fixture rather than about the curve.
-- **Phase 6 (`human`)** — half done, and the only thing left. See the plan for the shipped-preset
-  frame times; the bloom half needs probe presets from a scratch `LMV_PRESET_DIR`, since the
-  library binds no `bloom_*` until R6, plus the Floor-pinned sanity pass.
+**[0045] has landed and closed** (2026-07-31) — see Recently closed. **What it left behind is
+[0051], and that is the next `dev` thing to take.** Phase 2b made the scene→chain seam's alpha
+load-bearing, and two additive draw pipelines emit a hard `1.0` alpha across their whole quad, so a
+lit backdrop is punched to black around every swarm sprite and every stroke. It reproduces on
+unmodified presets from history and is visible live. Every swarm and line golden runs
+`bg_bright = 0`, where a black backdrop times any alpha is still black — so the entire regression
+suite is structurally blind to it, which is verbatim the blind spot
+[ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md)'s Negative section named.
+[ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) decides it; the fix is two
+shader lines and one blend state, and it **provably moves no golden**.
 
 **The fold came back with a rejection, and it is routed out rather than reopened.** Seen in motion,
 the user rejected the falloff-disc's residual rays and its crop on fullscreen field scenes — both
@@ -63,32 +57,18 @@ already recorded as ADR-0047's *accepted cost*, so this is the bet not holding r
 Neither is reachable from a preset. It becomes an ADR-0047 supplement plus its own plan; the
 evidence and what the supplement should reconsider are in [backlog 0037](../design-backlog.md).
 
-It also got more urgent the day [0044] closed. [0044] **has landed and
-closed** (2026-07-30) — see Recently closed — which delivers roadmap R0 and, with it, the
-`TierConfig` that [0045]'s bloom levels and `Floor` bandwidth relief were designed to hang off.
-
-**Why more urgent:** the first live `Rich`-tier run surfaced `attractor_clifford` blowing out to
-white (user report + screenshot, 2026-07-30, **[backlog 0031](../design-backlog.md)**). Confirmed by
-capture at two sizes: `Rich` triples the attractor's particle count, which triples the deposit into
-an 8-bit additive composite that has **no tonemap** — roadmap Wrong turn 3 meeting R0's raised
-capacity. [0045] *is* the structural fix, and `attractor_clifford` is its acceptance case. Note the
-ordering that follows: **do not calibrate the Rich values until after [0045]**, or the measurement
-is taken against a ceiling that is about to move.
-
-- **[0045] — linear light + bloom.** The kaleidoscope fold fix first (disc + falloff + bindable
-  centre, [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md), confirmed from
-  rendered samples) — **[0049] Phase 1 has landed and already fixed the fractional-order seam** in
-  that same file (`fold_order` rounds CPU-side; `core/tests/kaleidoscope.rs` pins it), so this phase
-  inherits an integral `kaleido_order` and owns the *domain* redesign only. Keep the rounding: the
-  seam test captures at a **non-zero** `kaleido_angle` on purpose, and a domain change that moves
-  the fold must not quietly retire it. **Both are now landed and confirmed.** Then Phase 2b takes the
-  backdrop out of the chain so the fold composites over it instead of folding it
-  ([ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md)), then the `Rgba16Float` linear
-  composite with one engine-fixed tonemap, then the bloom `PostStage` with bindable
-  `exposure`/`bloom_*` ([ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)). Every
-  golden moves once, eyes-on — **except the lit-backdrop subset, which moves twice** (2b then 3), a
-  cost taken deliberately to keep the alpha restructure reviewable apart from the float conversion.
-  Closes backlog 0005, 0010 and 0011, and is the answer to half of 0031.
+**[0044]'s Phase 4 (`human`, the `Rich` calibration) is now unblocked, and it is the thing to run
+next on the tier axis.** It was told to wait for [0045], because measuring against an 8-bit
+additive ceiling that was about to move would have been wasted; that ceiling has now moved and
+settled. **[backlog 0031](../design-backlog.md)** — `attractor_clifford` blowing out to white at
+`Rich` — is what the calibration answers, and its re-check at [0045]'s close found the story is
+**half** closed, not closed: the tonemap holds tone at `Floor` with no clipping, but boundedness
+below 1.0 does not stop the sRGB byte rounding to 255, which takes a linear value of about 35 at
+the shipped knee — and `attractor.toml` already reaches that at `Floor` on hardware. `Rich` triples
+the deposit into the same texels. So the lever is the particle count, not the curve. Note the
+harness limit that re-check also surfaced: **`shot` has no `--tier` flag** — headless capture is
+`Floor` by construction (ADR-0045), deliberately — so every `Rich` question needs the running app,
+which is what [0050]'s `[` / `]` swap is for.
 
 **[0043] has landed and closed** — the swarm's wrap seam is off-screen, its domain has the render
 target's shape, and every particle carries a depth. See Recently closed. Two things later work
@@ -138,9 +118,14 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.27.0`** — bumped at [0049]'s close (a feature plan: a native-only
-`AnalysisMetrics`, five new overlay rows, six new log columns, and a render fix) per
+**Version is at `0.28.0`** — bumped at [0045]'s close (a feature plan: the linear-light composite,
+the tonemap, the bloom stage and the fold redesign) per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Nothing is owed until the next close.
+**Note the close order was disturbed and it is worth not repeating:** the plan branch was
+fast-forwarded into `main` *before* the bump, so ADR-0053's steps 1-2 (merge `main` into the branch,
+re-run the gate there) were moot and the bump and tag landed on `main` directly. That works, but it
+gives up the property ADR-0053 exists for — the version being chosen and tagged on the commit that
+*becomes* main's tip, with the gate having run on the merged combination first.
 
 **The next ADR is design-backlog 0015** — the band axis is half linear, and Plan 0037 Phase 4's
 listening test turned it from a documented curiosity into a **user-confirmed real limitation**: on
@@ -288,6 +273,43 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0045 — linear light: the HDR composite, the bloom stage, and the fold that had to be fixed
+  first](done/0045-linear-light-and-bloom.md) — **done 2026-07-31**, passed two Mode 4 reviews
+  (**no blockers**; one `major` routed out as [backlog 0039](../design-backlog.md)). Six `dev`
+  phase commits on the `plan-0045-linear-light` worktree branch, fast-forwarded into `main` at
+  `2f4a804`: `6f282e7` / `b67b9c2` the fold, `c334b0e` the backdrop leaving the chain, `f7ab148`
+  the float composite + tonemap, `96780e1` the bloom stage, `23703dc` the halo's alpha clamp.
+  [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) and
+  [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md) are **accepted**; ADR-0047 was already
+  accepted with an Outcome. **Delivers roadmap R1** and closes design-backlog **0005**, **0010**
+  and **0011**. Gate at the close on `main`: `nextest --release -p lmv-core` **316/316, 0 skipped**
+  (`cargo test`, not nextest, segfaults on the lib binary from many GPU devices in one process —
+  the documented crash mode, not a regression).
+  **Phase 6's answer is that bloom is not the expensive part**, which inverts the plan's own
+  worry. `star_lantern` — shipped during the plan, so the scratch-`LMV_PRESET_DIR` workaround
+  Phase 6 was written around is obsolete — runs **164 fps, p99 8.2 ms** Rich-pinned and windowed on
+  the discrete GPU, against `attractor_clifford` at 19.9 ms and `attractor_leviathan` at 19.0 ms,
+  neither of which binds `bloom_*` at all. So what puts the heaviest shipped preset past a 60 Hz
+  frame at `Rich` is the float composite plus the attractor's particle count. The fullscreen and
+  `Floor`-pinned runs are carried to [`on-device-validation.md`](../on-device-validation.md).
+  **The plan caused one defect, found after the merge and routed to [0051].** Phase 2b made the
+  scene→chain seam's alpha load-bearing and two additive draw pipelines never emitted a meaningful
+  one — ADR-0055's own first Negative bullet, at the one seam the plan did not reach. Three
+  instances of that bullet in one plan (the fold's black fade, the recombine's over-1 alpha, and
+  now this) is the signal worth carrying: **a lit backdrop is a distinct test configuration, and
+  every seam that touches alpha needs its own guard at it.** Two got one inside the plan; the
+  third was found by a `preset-author` session instead of by the suite.
+  **Bookkeeping fixed at the close beyond the plan's own list:** `tier.rs`'s `post_cap` docstring
+  charged bloom the pyramid (~11 MB) but not its own grid-sized `bloom-src` offscreen (16.6 MB at
+  the floor cap) — `nfr.md` §12 had it right and `on-device-validation.md` repeated the short
+  framing, both corrected to `16.6 + ~11 ≈ 28 MB`. `presets/README.md`'s bloom section gained the
+  consequence it never stated: **a preset authored to the additive-ceiling habit gets nothing from
+  the stage** — measured, a draft holding `brightness` under 1.0 rendered pixel-identical with
+  bloom on and off — plus the warning that `--set bass=1` flatters a bloom preset far worse than
+  any other stage, because the threshold makes the loud-frame/real-audio gap a cliff rather than a
+  slope. Backlog **0031** was re-checked and is **still open**; see the entry.
+  Version **minor 0.27.0 → 0.28.0** (a feature plan).
 
 - [0049 — the analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope
   seam)](done/0049-analysis-diagnostics-surface.md) — **done 2026-07-30**, passed Mode 4 review

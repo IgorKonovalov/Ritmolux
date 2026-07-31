@@ -1,6 +1,10 @@
 # ADR-0055 — The backdrop leaves the post chain: the composite carries premultiplied alpha and the backdrop is composited underneath
 
-> **Status:** proposed (accepted at Plan 0045's close)
+> **Status:** **accepted** (Plan 0045 Phase 2b, closed 2026-07-31). **Its first Negative
+> bullet came true at the one seam this plan did not reach** — the scene→chain seam, where
+> two additive draw pipelines emit a hard `1.0` alpha over the whole quad and therefore
+> punch the backdrop to black. Recorded in
+> [0056](0056-additive-scenes-emit-premultiplied-alpha.md) + [Plan 0051](../plans/0051-the-scene-seam-emits-premultiplied-alpha.md).
 > **Date:** 2026-07-31
 > **Related plan(s):** 0045-linear-light-and-bloom, Phase 2b
 > **Supplements:** [0026](0026-full-composite-coverage-fullscreen-scenes.md) (the
