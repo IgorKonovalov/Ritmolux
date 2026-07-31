@@ -20,6 +20,12 @@
 //! **reset on the capture scene-rebuild**, so a headless capture stays a pure
 //! function of its inputs (NFR §6).
 //!
+//! The `surface_format` this stage is built with is the **composite's** format
+//! (`Rgba16Float`, ADR-0046), not the surface's: the max-decay already ran in
+//! linear light — an 8-bit *sRGB* target blends linearly — so the arithmetic is
+//! unchanged, but a bright head no longer clips at 1.0 on its way into the
+//! accumulation, which was always `Rgba16Float` anyway.
+//!
 //! The composite runs at an internal resolution that **follows the render target**
 //! (ADR-0034), quantized to a 256 px step and capped — see
 //! [`internal_grid_size`](super::post::internal_grid_size). It used to be a fixed

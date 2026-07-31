@@ -44,6 +44,16 @@
 //! emissive ones draw additive in colour with `OVER` alpha — scene alpha was always
 //! meaningful; the chain simply used to discard it.
 //!
+//! # The chain runs in linear light (ADR-0046)
+//!
+//! Every target in here is [`COMPOSITE_FORMAT`](super::COMPOSITE_FORMAT), not the
+//! surface's — the `surface_format` a stage is constructed with is the
+//! *composite's* format, and the name is now a historical one. So an additive
+//! accumulation is free to exceed 1.0 and no hand-off clips: the frame becomes
+//! display-referred once, at the tonemap, downstream of everything here. The
+//! memory that costs, and the cap that relieves it, are in
+//! [`TierConfig::post_cap`](super::TierConfig::post_cap)'s docs.
+//!
 //! # What is *not* in the chain
 //!
 //! ADR-0032's rule: **a pass a preset composes belongs in the chain; a pass that
@@ -54,6 +64,8 @@
 //!   frame clear and never folds a rendered frame down;
 //! - the transition blend (Plan 0023) — two inputs, which a one-input
 //!   [`PostStage::begin`] cannot express, and live only while a dissolve runs;
+//! - [`Tonemap`](super::tonemap::Tonemap) — the exposure + tonemap pass, the
+//!   frame's linear/display boundary, which reads the one finished *composite*;
 //! - [`Ink`](super::ink::Ink) — the engine-wide tone remap, which reads the one
 //!   finished frame (ADR-0028) and so must run *after* the blend of two per-preset
 //!   composites.

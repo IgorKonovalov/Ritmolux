@@ -4,7 +4,10 @@
 //!
 //! # Where the blend sits
 //!
-//! `background -> scene -> PostChain -> [blend] -> ink -> surface`. The blend is
+//! `background -> scene -> PostChain -> [blend] -> tonemap -> ink -> surface`. The
+//! blend's two sides and its output are [`COMPOSITE_FORMAT`](super::COMPOSITE_FORMAT)
+//! — it mixes **linear light**, upstream of the tonemap, which is what keeps a
+//! dissolve between two bright presets from clipping mid-mix. The blend is
 //! **outside** the [`PostChain`](super::post::PostChain) and outside the
 //! [`PostStage`](super::post::PostStage) trait, per ADR-0032: it samples **two**
 //! textures, which a one-input `PostStage::begin` cannot express, and widening the
@@ -14,7 +17,7 @@
 //! blending the results would show a tone neither preset configures.
 //!
 //! Without a transition running the blend is absent entirely: no textures, no
-//! pipeline, and the chain resolves straight into ink's input (or the surface) —
+//! pipeline, and the chain resolves straight into the tonemap's input —
 //! the unchanged frame path, which is why a dissolve costs nothing between
 //! switches.
 //!
@@ -206,6 +209,11 @@ pub(crate) struct Transition {
     /// the one engine-wide ink pass can crossfade between the two sides
     /// (ADR-0032). `None` until that frame has run.
     outgoing_ink: Option<InkParams>,
+    /// The outgoing preset's evaluated `exposure`, held on the same frame and for
+    /// the same reason (ADR-0046): the tonemap is also one engine-wide pass over
+    /// a frame that is a *mix* of two presets, so it has to interpolate rather
+    /// than pick a side. `None` until the capture frame has run.
+    outgoing_exposure: Option<f32>,
 }
 
 impl Transition {
@@ -232,6 +240,7 @@ impl Transition {
             mode,
             stage: Stage::Capture,
             outgoing_ink: None,
+            outgoing_exposure: None,
         }
     }
 
@@ -292,17 +301,27 @@ impl Transition {
         self.outgoing_ink.as_ref()
     }
 
+    /// The outgoing preset's held `exposure`, once the capture frame has run.
+    pub(crate) fn outgoing_exposure(&self) -> Option<f32> {
+        self.outgoing_exposure
+    }
+
     /// Advance the dissolve by `dt` real seconds, after the frame at the current
     /// [`progress`](Self::progress) has been encoded.
     ///
     /// Returns `Some(to_index)` on the capture frame — the renderer must flip the
     /// roster to that index and reconfigure its scene, so the next frame
-    /// composites the incoming preset live. `outgoing_ink` is the ink params the
-    /// capture frame evaluated for the outgoing preset; they are held for the rest
-    /// of the dissolve.
+    /// composites the incoming preset live. `outgoing_ink` and
+    /// `outgoing_exposure` are the terminal params the capture frame evaluated for
+    /// the outgoing preset; they are held for the rest of the dissolve.
     ///
     /// [`finished`](Self::finished) becomes true once `t` reaches 1.
-    pub(crate) fn advance(&mut self, dt: f32, outgoing_ink: InkParams) -> Option<usize> {
+    pub(crate) fn advance(
+        &mut self,
+        dt: f32,
+        outgoing_ink: InkParams,
+        outgoing_exposure: f32,
+    ) -> Option<usize> {
         let step = if dt.is_finite() && dt > 0.0 {
             dt / self.dur
         } else {
@@ -312,6 +331,7 @@ impl Transition {
         if self.stage == Stage::Capture {
             self.stage = Stage::Dissolve;
             self.outgoing_ink = Some(outgoing_ink);
+            self.outgoing_exposure = Some(outgoing_exposure);
             return Some(self.to_index);
         }
         None
@@ -705,7 +725,7 @@ mod tests {
         assert_eq!(tr.progress(), 0.0, "t = 0 is exactly the outgoing look");
 
         assert_eq!(
-            tr.advance(1.0 / 60.0, default_ink()),
+            tr.advance(1.0 / 60.0, default_ink(), 1.0),
             Some(5),
             "the capture frame reports the index to flip the roster to"
         );
@@ -725,7 +745,7 @@ mod tests {
             let mut seen = Vec::new();
             for &dt in dts {
                 seen.push(tr.progress());
-                tr.advance(dt, default_ink());
+                tr.advance(dt, default_ink(), 1.0);
             }
             seen
         };
@@ -737,10 +757,10 @@ mod tests {
         let mut fast = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
         let mut slow = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
         for _ in 0..30 {
-            fast.advance(1.0 / 60.0, default_ink());
+            fast.advance(1.0 / 60.0, default_ink(), 1.0);
         }
         for _ in 0..15 {
-            slow.advance(1.0 / 30.0, default_ink());
+            slow.advance(1.0 / 30.0, default_ink(), 1.0);
         }
         assert!(
             (fast.progress() - slow.progress()).abs() < 1e-5,
@@ -762,7 +782,7 @@ mod tests {
         let mut tr = Transition::new(3, 7, 0.25, TransitionKind::Crossfade, Mode::Freeze);
         let mut frames = 0;
         while !tr.finished() {
-            tr.advance(1.0 / 60.0, default_ink());
+            tr.advance(1.0 / 60.0, default_ink(), 1.0);
             frames += 1;
             assert!(frames < 1000, "a 0.25 s dissolve must terminate");
         }
@@ -874,7 +894,7 @@ mod tests {
             !tr.is_dual_live(),
             "the opening frame is the outgoing composite itself, never a second one"
         );
-        tr.advance(1.0 / 60.0, InkParams::default());
+        tr.advance(1.0 / 60.0, InkParams::default(), 1.0);
         assert!(tr.is_dual_live(), "the frames after it run both sides live");
 
         tr.latch_freeze();
@@ -883,7 +903,7 @@ mod tests {
             "a demoted dissolve stops rendering the outgoing side"
         );
         for _ in 0..30 {
-            tr.advance(1.0 / 60.0, InkParams::default());
+            tr.advance(1.0 / 60.0, InkParams::default(), 1.0);
             assert!(!tr.is_dual_live(), "and never upgrades again");
         }
     }
@@ -894,7 +914,7 @@ mod tests {
         for dur in [0.0, -1.0, f32::NAN, f32::INFINITY] {
             let mut tr = Transition::new(0, 1, dur, TransitionKind::Crossfade, Mode::Freeze);
             for _ in 0..200 {
-                tr.advance(1.0 / 60.0, default_ink());
+                tr.advance(1.0 / 60.0, default_ink(), 1.0);
             }
             assert!(tr.finished(), "duration {dur} must still terminate");
             assert_eq!(tr.progress(), 1.0);
@@ -906,10 +926,10 @@ mod tests {
     #[test]
     fn a_degenerate_dt_holds_progress() {
         let mut tr = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
-        tr.advance(0.5, default_ink()); // past the capture frame
+        tr.advance(0.5, default_ink(), 1.0); // past the capture frame
         let held = tr.progress();
         for dt in [0.0, -0.5, f32::NAN] {
-            tr.advance(dt, default_ink());
+            tr.advance(dt, default_ink(), 1.0);
             assert_eq!(tr.progress(), held, "dt {dt} must not move progress");
         }
     }

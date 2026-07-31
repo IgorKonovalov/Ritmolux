@@ -131,9 +131,10 @@ struct InkUniform {
 }
 
 struct Resources {
-    /// The surface-sized offscreen the composite (background + scene [+ post
-    /// stages]) renders into. Kept alive so `src_view` stays valid; not read after
-    /// construction.
+    /// The surface-sized offscreen the **tonemap** writes into (ADR-0046) — so
+    /// this holds display-referred pixels at the surface format, which is exactly
+    /// what ink has always assumed it was remapping. Kept alive so `src_view`
+    /// stays valid; not read after construction.
     _src: wgpu::Texture,
     src_view: wgpu::TextureView,
     uniform: wgpu::Buffer,
