@@ -102,8 +102,12 @@ field_freq = "5.20 + sin(time * 0.043) * 0.65 + clamp(treb * 30.0, 0, 0.90)"
 # particles off-frame and the depth fade halves the far half's brightness, which
 # lands hardest on the file that was already trading per-particle size for count.
 # Fine grain has the least light to give away.
-brightness = "1.16 + clamp(bass * 5.0, 0, 0.20)"
-size       = "0.62 - clamp(treb * 6.0, 0, 0.10) + beat * 0.14"
+brightness = "1.24 + clamp(bass * 5.0, 0, 0.24)"
+# 0.62 drew dust - this preset was the least legible tile in the whole
+# library at full excitation (Plan 0045 review), against `swarm_drift`'s 2.55
+# which reads clearly. The treble term still THINS the particles, which is
+# the look; it just no longer thins them out of existence.
+size       = "1.55 - clamp(treb * 6.0, 0, 0.16) + beat * 0.20"
 
 # COLOUR - the tightest hue window in the set. This is the cohesion knob: low
 # spread is what separates "one shimmering body" from "novelty confetti".

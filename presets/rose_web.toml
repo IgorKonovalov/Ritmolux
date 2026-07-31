@@ -39,7 +39,10 @@ samples       = "1600"
 # `bass * 0.4` capped at 0.087 moved the radius by 0.016 on a real mix, which is
 # invisible against a sine term of 0.20 sitting beside it.
 phase         = "sin(time * 0.052) * 0.46 + clamp(mid * 16.0, 0, 0.30)"
-radial_offset = "0.18 + sin(time * 0.0093) * 0.20 + clamp(bass * 11.0, 0, 0.40)"
+# Treble reshapes the web rather than lighting it (Plan 0045 review: this
+# preset read treb 0.000 - every binding rode `mid`). `radial_offset` is the
+# rose's own geometry, so the top end changes what the figure IS.
+radial_offset = "0.18 + sin(time * 0.0093) * 0.20 + clamp(bass * 11.0, 0, 0.40) + clamp(treb * 9.0, 0, 0.22)"
 
 # NO SPIN - `spin` is angular velocity, so anything nonzero is a permanent turn.
 #
@@ -56,7 +59,7 @@ draw_progress = "1"
 
 # STROKE - the thinnest in the set. A thick stroke at this chord count fills
 # solid and destroys the moire that is the entire preset.
-thickness  = "0.95 + clamp(mid * 20.0, 0, 0.45)"
+thickness  = "0.95 + clamp(mid * 20.0, 0, 0.45) + clamp(treb * 12.0, 0, 0.30)"
 brightness = "0.70 + clamp(mid * 8.0, 0, 0.16)"
 
 # COLOUR - cool steel blues, sweeping slowly.
