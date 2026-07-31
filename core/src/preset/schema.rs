@@ -155,10 +155,11 @@ fn variant_roster_reminder(system: SystemKind) {
 /// pass (ADR-0032); only `bg_*` goes to a pass the renderer drives directly. The
 /// *names* are what this const is about — see `render::ParamRoute` for who
 /// actually owns each.
-pub const GLOBAL_PARAMS: [&[&str]; 5] = [
+pub const GLOBAL_PARAMS: [&[&str]; 6] = [
     crate::render::background::PARAMS,
     crate::render::trails::PARAMS,
     crate::render::kaleidoscope::PARAMS,
+    crate::render::bloom::PARAMS,
     crate::render::tonemap::PARAMS,
     crate::render::ink::PARAMS,
 ];

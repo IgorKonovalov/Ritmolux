@@ -1,0 +1,44 @@
+# COMPOSITE FIXTURE - do not tune; editing this invalidates the drift baseline.
+# Plan 0045 Phase 4, the bloom half. See composite_trails.toml for why these live
+# outside the per-SystemKind golden roster.
+#
+# A SMALL BRIGHT CORE ON BLACK, which is the configuration a bloom stage is for
+# and the one the rest of the suite does not have.
+#
+# `scale = 0.12` collapses composite_trails' rose into a compact knot near the
+# centre, and `brightness = 3.0` puts it well over the composite's 1.0 - so the
+# default `bloom_threshold = 1.0` selects the knot and NOTHING else in the frame.
+# That is the point: in linear light the threshold is a claim about energy, and on
+# the 8-bit composite this plan retired the same knot would have arrived clipped
+# at 1.0 and indistinguishable from any other white.
+#
+# `bg_bright = 0` on purpose. The halo is additive light, so on a lit backdrop its
+# outer reaches would be within a byte or two of the backdrop itself and the
+# baseline would be measuring the backdrop. On black, every lit pixel outside the
+# knot came from the pyramid.
+#
+# `spin = 0` freezes the figure, so the baseline is one frame rather than a phase.
+system = "parametric_curve"
+name   = "fixture_composite_bloom"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "5"
+d             = "43"
+samples       = "301"
+scale         = "0.12"
+spin          = "0"
+hue           = "0.12"
+thickness     = "2.5"
+brightness    = "3.0"
+draw_progress = "1"
+
+# The stage under test, at its defaults but for the amount - so the baseline pins
+# the shipped threshold and radius rather than a tuned pair.
+bloom_amount    = "1.0"
+bloom_threshold = "1.0"
+bloom_radius    = "1.0"
+
+bg_bright     = "0"

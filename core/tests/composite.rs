@@ -68,11 +68,18 @@ const MAX_OUTLIER: u8 = 48;
 /// The frozen fixtures: baseline file stem, and the TOML compiled in.
 ///
 /// One per stage — `trails` is the stage with cross-frame state, `kaleido_*` the
-/// one that computes geometry — plus, since Plan 0045 Phase 3, one that binds no
-/// stage at all and exercises the composite's **arithmetic** instead: a dense
-/// additive rose whose self-crossings used to clip to flat white on the 8-bit
-/// intermediates and now roll off through the tonemap.
-const FIXTURES: [(&str, &str); 3] = [
+/// one that computes geometry, `bloom_*` (Plan 0045 Phase 4) the one with an
+/// internal pyramid — plus, since Plan 0045 Phase 3, one that binds no stage at
+/// all and exercises the composite's **arithmetic** instead: a dense additive rose
+/// whose self-crossings used to clip to flat white on the 8-bit intermediates and
+/// now roll off through the tonemap.
+///
+/// **One stage per fixture, never all of them at once.** Bloom adds four
+/// pipelines, and the WARP software adapter's sensitivity to coexisting pipelines
+/// is the reason this file exists in the shape it does; a mega-composite fixture
+/// would put every stage's pipelines on the device at once and make any
+/// mis-render impossible to attribute.
+const FIXTURES: [(&str, &str); 4] = [
     (
         "composite_trails",
         include_str!("fixtures/composite_trails.toml"),
@@ -84,6 +91,10 @@ const FIXTURES: [(&str, &str); 3] = [
     (
         "composite_overlap",
         include_str!("fixtures/composite_overlap.toml"),
+    ),
+    (
+        "composite_bloom",
+        include_str!("fixtures/composite_bloom.toml"),
     ),
 ];
 
