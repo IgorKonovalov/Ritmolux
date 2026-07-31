@@ -1,6 +1,9 @@
 # ADR-0047 — The kaleidoscope folds a disc: radius clamped to the inscribed extent with a radial falloff, and a bindable fold centre
 
-> **Status:** proposed (decision to be confirmed against rendered samples — see Notes)
+> **Status:** accepted — **confirmed** against the rendered samples on 2026-07-31 (Plan 0045
+> Phase 2). Carries an **Outcome** section: the decision stands, but this ADR's model of two of
+> its own alternatives was wrong, and one Positive bullet is false as shipped (corrected by
+> [ADR-0055](0055-backdrop-leaves-the-post-chain.md)).
 > **Date:** 2026-07-30
 > **Related plan(s):** 0045-linear-light-and-bloom, Phase 1
 > **Resolves:** design-backlog 0010 and 0011. **Supplements:** 0018 (the stage), 0031 (the chain).
@@ -83,3 +86,47 @@ scenes (a centred figure and a border-filling field) under B (hard disc), D-mode
 the chosen falloff-disc, at 16:9 **and** portrait, and the user confirms or flips this
 decision from the captures before it is accepted. Any fix must be evaluated at a non-16:9
 aspect — the 16:9 dev configuration is what hid the defect (same lesson as ADR-0037).
+
+## Outcome (2026-07-31, Plan 0045 Phase 2)
+
+**The falloff-disc is confirmed and ships.** The user picked it from the sixteen-image set
+(two scenes x four treatments x two aspects) rendered in Phase 1. The stopping condition in
+Plan 0045 Phase 2 — route back to `architect` if the falloff loses — did not fire.
+
+**Why it won, in the user's terms.** On a centred figure (`star_rosette`) the residual rays
+read as a *designed sunburst corona* that blooms outward from the rosette; the `vignette`
+alternative below crops that corona to a tight ring and costs a rim of real content. The cost
+accepted is the other half of the same tradeoff: on a border-filling field (`swarm_storm`)
+those same rays remain visible — dim and short, out to 1.35 `r_max` — where they read as
+leftovers rather than as design. The fold is used overwhelmingly on centred figures, which is
+the bet this ADR already made in its Negative section.
+
+Three corrections to the record, all found by rendering rather than by argument:
+
+**1. This ADR's model of Alternative B was wrong.** It predicted a plain clamp would leave "a
+hard flat ring" with the corners going "flat" — a letterbox in disc form. It does not. The
+clamped sample still varies with angle, so the disc's rim is replicated **outward as a
+sunburst of radial rays** reaching every corner (`fold-field-9x16-hard.png`). That is the same
+streak family this ADR exists to remove, merely bounded and given a defined edge. So the
+falloff's real job is not "soften a hard ring" but "fade out rays that a clamp alone still
+draws" — a better argument for the decision than the one written above, arrived at only
+because Phase 1 rendered the control instead of reasoning about it.
+
+**2. A fourth treatment was rendered and considered.** `vignette` moves the fade *inside* the
+disc, over its outer 0.20, so nothing beyond `r_max` is ever painted and there is no ray to
+fade. It is not in this ADR's alternatives because the ray behaviour that motivates it was not
+known until Phase 1. It is the cleanest of the four on a border-filling field and the most
+costly on a figure; **not chosen**, and deleted along with the other losers.
+
+**3. The second Positive bullet is false as shipped.** "The falloff lands on the backdrop" and
+"composes with `bg_*` instead of fighting it" describe behaviour that does not exist: the
+shader multiplies the sampled colour by the falloff weight, so it fades to **black**, not to
+the backdrop. Both sample presets use a near-black backdrop, which is why sixteen captures
+did not show it; `core/tests/golden/composite_kaleido.png` (`bg_bright = 0.55`) is where it is
+visible. The cause is structural rather than a missing uniform — the backdrop is rendered
+*into* the fold's own input, so it is folded too, and there is nothing underneath to land on.
+**[ADR-0055](0055-backdrop-leaves-the-post-chain.md) corrects this** by taking the backdrop out
+of the post chain and compositing it under an alpha-carrying chain; Plan 0045 Phase 2b
+implements it, and Phase 3 is gated on it. Per this project's append-only rule the bullet above
+is left standing rather than edited — this Outcome is the correction.
+

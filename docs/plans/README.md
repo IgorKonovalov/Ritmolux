@@ -10,7 +10,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **approved 2026-07-30** — ready for `dev` **now** ([0044] closed); roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) | dev, human |
+| [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **in-progress 2026-07-31** — running in the `lmv-plan-0045` worktree on `plan-0045-linear-light`. Phase 1 landed (`6f282e7`); **Phase 2 (`human`) done** — the falloff-disc is confirmed, [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) carries an Outcome. **Phase 2b (`dev`) is next**, added mid-plan: [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md), the backdrop leaves the chain. **Phase 3 is gated on it.** Roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md)/[0055](../adrs/0055-backdrop-leaves-the-post-chain.md) | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **in-progress 2026-07-30** — Phases 1-5 (`dev`) landed and merged to `main` (`b06766b`), Mode 4 review done; **Phases 6-7 (`human`) owed**. Phase 6 is **no longer blocked** — [0049] built its instrument and closed | dev, human |
 | [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **draft 2026-07-30** — [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
@@ -40,7 +40,16 @@ ADR-0050's stopping condition needs is the mean of that column). Play 2-3 real t
 the normalized levels ride the music without pumping or going numb, record the lock rate, then
 Phase 7 → [0048] closes.
 
-**[0045] is the one to run after that, and it got more urgent the day [0044] closed.** [0044] **has landed and
+**[0045] is already running, in the `lmv-plan-0045` worktree, and its next phase is `dev` work.**
+Phase 1 landed the disc fold; Phase 2 (`human`) confirmed the falloff on 2026-07-31. The plan then
+**grew a phase**: the sample set exposed that the falloff fades to *black* rather than to the
+backdrop, because `post.rs` renders the backdrop **into** the fold's own input — so the fold folds
+`bg_vignette` too. That is [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md), and **Phase 2b
+implements it before Phase 3 may start**. Two carried debts to know about: Phase 2's own cleanup
+(delete the losing fold variants, the temporary `kaleido_domain` switch, and `docs/samples/`) is
+`dev`'s and folds into Phase 2b's commit, and it must be done **in the worktree, not in `main`**.
+
+It also got more urgent the day [0044] closed. [0044] **has landed and
 closed** (2026-07-30) — see Recently closed — which delivers roadmap R0 and, with it, the
 `TierConfig` that [0045]'s bloom levels and `Floor` bandwidth relief were designed to hang off.
 
@@ -58,10 +67,14 @@ is taken against a ceiling that is about to move.
   that same file (`fold_order` rounds CPU-side; `core/tests/kaleidoscope.rs` pins it), so this phase
   inherits an integral `kaleido_order` and owns the *domain* redesign only. Keep the rounding: the
   seam test captures at a **non-zero** `kaleido_angle` on purpose, and a domain change that moves
-  the fold must not quietly retire it. Then the `Rgba16Float` linear composite with one engine-fixed tonemap, then
-  the bloom `PostStage` with bindable `exposure`/`bloom_*`
-  ([ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)). Every golden moves once,
-  eyes-on. Closes backlog 0005, 0010 and 0011, and is the answer to half of 0031.
+  the fold must not quietly retire it. **Both are now landed and confirmed.** Then Phase 2b takes the
+  backdrop out of the chain so the fold composites over it instead of folding it
+  ([ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md)), then the `Rgba16Float` linear
+  composite with one engine-fixed tonemap, then the bloom `PostStage` with bindable
+  `exposure`/`bloom_*` ([ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)). Every
+  golden moves once, eyes-on — **except the lit-backdrop subset, which moves twice** (2b then 3), a
+  cost taken deliberately to keep the alpha restructure reviewable apart from the float conversion.
+  Closes backlog 0005, 0010 and 0011, and is the answer to half of 0031.
 
 **[0043] has landed and closed** — the swarm's wrap seam is off-screen, its domain has the render
 target's shape, and every particle carries a depth. See Recently closed. Two things later work
