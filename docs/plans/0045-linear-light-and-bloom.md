@@ -1,12 +1,14 @@
 # 0045 — Linear light: the HDR composite, the bloom stage, and the fold that had to be fixed first
 
-> **Status:** in-progress 2026-07-31 — Phases 1-2 done (the fold is confirmed: **falloff-disc
-> ships**, [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) now carries an
-> Outcome). **Phase 2b (`dev`) is next and Phase 3 is gated on it** — Phase 2 surfaced that the
-> falloff fades to black rather than to the backdrop, whose cause is structural
-> ([ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md)). Phase 2's own cleanup
-> (delete the losing fold variants, the temporary `kaleido_domain` switch, and `docs/samples/`)
-> is **owed by `dev`** and folds into Phase 2b's commit.
+> **Status:** in-progress 2026-07-31 — **Phases 1-5 landed** in the `lmv-plan-0045` worktree
+> (`6f282e7`, `b67b9c2`, `c334b0e`, `f7ab148`, `96780e1`) and the Mode 4 review is done: gate
+> green on the branch (fmt + clippy + **384/384**), no blockers, one `major` finding. **Two
+> things block the close.** (1) **Phase 4b (`dev`)**, added by that review: bloom's recombine
+> drives premultiplied alpha above 1 and subtracts the backdrop under its own halos — measured,
+> 1810 px, worst 45 bytes. (2) **Phase 6 (`human`)** is half done — frame times are recorded for
+> shipped presets, but nothing in the library binds `bloom_*`, so the phase's actual subject has
+> not been run. The fold's disc coverage was rejected on sight and is **routed to its own ADR +
+> plan** rather than reopening this one (see Phase 6).
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (linear-light + bloom + tonemap),
@@ -181,6 +183,64 @@ side's `bg_*`.
   (relative assertions, no magic thresholds); at Floor the level count is lower and the
   stage still passes its capture test.
 
+### Phase 4b — The halo does not punch a hole in the backdrop
+> **Added 2026-07-31 by the Mode 4 review**, which measured a defect in Phase 4's recombine.
+> The user chose to fix it on this branch rather than defer it, so the plan does not close
+> until this lands.
+
+- **Owner skill:** dev
+- **What:** the bloom recombine sums **alpha** as well as colour (`MIX_SHADER`,
+  `bloom.rs:346`: `base + halo * u.v.x`), and the pass blends
+  `PREMULTIPLIED_ALPHA_BLENDING` into the chain's destination, where ADR-0055 now paints the
+  backdrop. Where the scene is opaque (`base.a = 1`) and the halo is non-zero the source alpha
+  exceeds 1, `OneMinusSrcAlpha` goes **negative**, and the backdrop is *subtracted* under the
+  frame's brightest regions. **Clamp the recombine's output alpha** into `[0, 1]` — the colour
+  must stay unclamped, since carrying light past 1.0 into the tonemap is the whole point of the
+  linear region.
+
+  Then close the coverage gap that let it ship. Every bloom fixture runs `bg_bright = 0` on
+  purpose (`composite_bloom.toml:15`, and the reasoning is sound *for a baseline*), so the one
+  stage in the chain that can exceed alpha 1 has **no lit-backdrop test at all** — verbatim the
+  blind spot ADR-0055's Negative section and this plan's own risk bullet name. Phase 2b
+  installed that guard for the fold; it is owed here too.
+
+  Two corrections found in the same review, both cheap and both in files this plan touched:
+  `tonemap.rs:251` claims its `[texture, sampler, uniform]` layout is "a shape no other live
+  pipeline has" — `attractor-decay` (`particles/mod.rs:756`) is byte-identical, from the same
+  helpers. No mis-render was observed (the WARP-blessed `attractor.png` and a hardware render
+  agree: mean luma 51.84 vs 56.29, lit-pixel counts within 0.1 %, so the tone curve is not being
+  swapped), so this is a false comment on a live hazard surface rather than a bug — but the
+  comment *is* the stated justification for the ordering, so correct it and move the layout.
+  `[texture, uniform, sampler]` is unused across all of `core/src`. Separately,
+  `composite.rs` and `docs/capturing.md` both overstate the no-255 guard as a property of the
+  curve ("no longer reachable at all"); boundedness below 1 does not stop the sRGB byte
+  rounding to 255, which takes a linear value of about **35** at `KNEE = 0.6` — and
+  `attractor.toml` reaches it on the hardware adapter. The guard is right for
+  `composite_overlap`; the rationale is not, and an author could generalize it into a
+  suite-wide gate that fails.
+  One doc Phase 5 missed, folded in here since `dev` is already in these files:
+  `docs/on-device-validation.md` still describes the **pre-0045** memory model in the items it
+  asks an operator to measure (its trails/post-stage working-set rows were written against 8-bit
+  intermediates this plan doubled), and it has no bloom item at all — while `docs/nfr.md`'s new
+  §12 text points readers *at* it for the floor-tier side. Same drift shape as Plan 0026, where
+  the README was swept and this file was not.
+- **Files touched:** `core/src/render/bloom.rs` (the clamp), `core/src/render/tonemap.rs`
+  (layout + comment), `core/tests/bloom.rs` (the lit-backdrop assertion),
+  `core/tests/composite.rs` and `docs/capturing.md` (the no-255 wording),
+  `docs/on-device-validation.md` (the float memory model + a bloom row).
+- **Done when:** with bloom active, a capture at `bg_bright > 0` is **at least** the same
+  capture at `bg_bright = 0` at every pixel and channel, within **2 bytes**. That margin is
+  earned rather than picked: adding a backdrop under a correct premultiplied OVER can only add
+  light, so the true bound is 0, and the 2 bytes cover the one legitimate way a channel can dip
+  — where coverage is partial *and* the summed max channel crosses the tonemap knee, the
+  hue-preserving scale `f(m)/m` falls as `m` rises. Measured before the fix on the shipped
+  `composite_bloom` fixture at 512x512, hardware adapter, `bg_bright` 0 vs 0.45:
+  **1810 pixels of 262 144 violated it, worst deficit 45 bytes, one pixel's green driven 45 -> 0**;
+  the control at `bloom_amount = 0` violated at **0** pixels. So the guard has a ~20x margin
+  against the defect it exists for, and a control that proves the fixture can express it. Also:
+  `tonemap-bind-layout` is a shape no other layout in `core/src` has (the check is an
+  enumeration, not a claim), and no doc says a 255 byte is unreachable.
+
 ### Phase 5 — Docs sweep
 - **Owner skill:** dev
 - **What:** `presets/README.md` — the four new params + `kaleido_center_*`, the "authoring
@@ -202,6 +262,34 @@ side's `bg_*`.
 - **Done when:** frame time holds the display rate at Rich with bloom active on the
   representative set, or the misses are recorded with numbers for the close to act on
   (lower `bloom_levels` at Rich, or the post cap — the levers are named in ADR-0046).
+
+- **Partial result, 2026-07-31 — the bloom half is still owed.** A Rich-pinned windowed run on
+  the discrete GPU, on **shipped** presets, which bind no `bloom_*` (this plan ships engine
+  defaults only, so nothing in the library switches the stage on):
+
+  | preset | fps | p99 frame time |
+  |---|---|---|
+  | `attractor_leviathan` (attractor + fold + trails) | 83 | **19.0 ms** |
+  | `fragment_kaleido` (fragment field + fold + trails) | 162 | 11.3 ms |
+
+  So the float composite alone already puts the heaviest shipped preset's p99 **past a 60 Hz
+  frame** (16.7 ms) at Rich, windowed — before bloom is added to it. That is a number for the
+  close to hold, not yet a miss against NFR §1, which is a `Floor` requirement. **What remains
+  is the phase's actual subject:** the same run with `bloom_amount > 0` at native fullscreen,
+  and the Floor-pinned sanity pass. Probe presets that bind bloom exist outside the repository
+  (a scratch `LMV_PRESET_DIR`); the library gets bloom bindings in R6, not here.
+
+- **Visual result, 2026-07-31 — the fold's disc coverage is rejected, and it is routed out
+  rather than reopened here.** On real presets in motion the user rejected two things Phase 2
+  confirmed from stills: the residual rays around a centred figure (`attractor_leviathan`),
+  and the disc's crop on a fullscreen field scene (`fragment_kaleido`), which the frame used
+  to fill. Both are behaviour ADR-0047 **already records as its accepted cost** — its Outcome
+  says the rays "read as leftovers rather than as design" on dense content, and its Negative
+  says field scenes lose the most — so this is the bet not holding, not a defect. Neither has a
+  preset-side answer: the fold is polar on a rectangular source, so the corners cannot be
+  painted by it at any setting. The user chose to **close this plan and take the fold as its own
+  ADR + plan**, revisiting the per-preset treatment choice (falloff / vignette / wrap) that
+  ADR-0047 declined on WARP-pipeline-count grounds. Recorded here, and in `docs/design-backlog.md`.
 
 ## Data shapes
 
