@@ -72,28 +72,55 @@ footprint so the vendor spread is on record.
       stages size their internal grid from the render target instead of a fixed 1280x720
       (ADR-0034). With `trails` active that is now a **full-resolution `Rgba16Float` ping-pong
       read *and* write every frame** where it used to be a 720p one — roughly 2.25x the feedback
-      bandwidth at 1080p. NFR §1's ≥ 60 fps @ 1080p floor is exactly the claim at risk, and no
-      headless capture can speak to it: WARP timings say nothing about an iGPU's memory bandwidth.
+      bandwidth at 1080p. **Plan 0045 raised it again:** the accumulation was always float, but the
+      stage's *composited* output and the fold's source were the surface format and are now
+      `Rgba16Float` too (ADR-0046), so every hand-off between stages moved from 4 to 8 bytes a
+      texel. Composite bandwidth roughly doubled on top of the 2.25x. NFR §1's ≥ 60 fps @ 1080p
+      floor is exactly the claim at risk, and no headless capture can speak to it: WARP timings say
+      nothing about an iGPU's memory bandwidth.
       Load **`rose_trails`** — it binds `trails` around 0.78 and is the shipped preset that exercises
       this path (`rose_kaleidoscope` and `fragment_kaleido` cover the fold). Let it settle with the
       overlay on (`F3`), and report **(a)** whether fps holds ≥ 60 and **(b)** the p99 against the
-      same preset with `trails = 0`. _(Plan 0033's stated main exposure. If it fails, lower
-      `TierConfig::FLOOR.post_cap` in `core/src/render/tier.rs` — the constant moved there in Plan
-      0044 — and do **not** re-fix the grids.)_
-- [ ] **Working-set delta from the target-sized post stages, including mid-dissolve.** The same
-      change grows the composite's GPU memory from ~22 MB per chain to ~50 MB at the cap, and a
-      dual-live dissolve holds **two** chains, so the transient peak is ~100 MB against NFR §12's
-      ~350 MB soft ceiling — which is mostly driver floor already. **Those figures are arithmetic
-      from the texture descriptors, not a measurement.** On the low-end box, report the steady-state
-      working set with a `trails` preset active, and again *while holding down* preset switches so a
-      dissolve is live, against the same numbers with `trails = 0`. **Read `rss_bytes`, not
-      `gpu_bytes`** — the latter is a swapchain-only approximation (ADR-0008) that does not count the
-      post stages' offscreens, so it reads identically either way. Measured on the dev box after this
-      landed: `gpu_bytes` unchanged at 16,588,800 (= 1920x1080 x 4 B x 2 — the swapchain exactly),
-      and `rss_bytes` up only ~3 MB, because that box renders on a **discrete** GPU where the
-      textures sit in VRAM and never enter the working set. That is exactly why this item needs the
-      iGPU, where GPU memory *is* system memory. _(Plan 0033 Risks: "memory is a projection, not a
-      measurement". Same mitigation as above — the cap is one constant.)_
+      same preset with `trails = 0`. _(Plan 0033's stated main exposure, widened by Plan 0045. If it
+      fails, lower `TierConfig::FLOOR.post_cap` in `core/src/render/tier.rs` — the constant moved
+      there in Plan 0044 — and do **not** re-fix the grids.)_
+- [ ] **Working-set delta from the post stages, including mid-dissolve. Re-stated for the float
+      composite (Plan 0045).** These numbers moved twice: Plan 0033 grew the composite from ~22 MB
+      per chain to ~50 MB at the cap by sizing the grids from the target, and Plan 0045 took that to
+      **~66 MB** by moving every intermediate to `Rgba16Float` (8 bytes a texel, not 4). A dual-live
+      dissolve holds **two** chains, so the transient peak is **~133 MB**, and the worst case —
+      dual-live, every stage on including bloom, ink on — is **~246 MB** against NFR §12's ~350 MB
+      soft ceiling, which is mostly driver floor already. There is also a **genuinely new**
+      surface-sized float buffer that exists on every frame regardless of preset: the tonemap's
+      input, 16.6 MB at 1080p. The full before/after table is in [`nfr.md`](nfr.md) §12.
+      **Those figures are arithmetic from the texture descriptors, not a measurement.** On the
+      low-end box, report the steady-state working set with a `trails` preset active, and again
+      *while holding down* preset switches so a dissolve is live, against the same numbers with
+      `trails = 0`. **Read `rss_bytes`, not `gpu_bytes`** — the latter is a swapchain-only
+      approximation (ADR-0008) that does not count the post stages' offscreens, so it reads
+      identically either way. Measured on the dev box after Plan 0033 landed: `gpu_bytes` unchanged
+      at 16,588,800 (= 1920x1080 x 4 B x 2 — the swapchain exactly), and `rss_bytes` up only ~3 MB,
+      because that box renders on a **discrete** GPU where the textures sit in VRAM and never enter
+      the working set. That is exactly why this item needs the iGPU, where GPU memory *is* system
+      memory — and why the doubled float footprint is unmeasured rather than known-harmless.
+      _(Plan 0033 Risks: "memory is a projection, not a measurement". Same mitigation as above — the
+      cap is one constant.)_
+- [ ] **Bloom on the low-end box, 1080p — the stage no shipped preset switches on.** Plan 0045
+      Phase 4 added a bright-pass, a blur pyramid and a recombine as a third `PostStage`. It is
+      **off by default** (`bloom_amount = 0` skips the stage entirely — no offscreens, no pyramid,
+      no pipelines), and **nothing in the shipped library binds it**, so an ordinary run measures
+      none of it; the library gets bloom bindings in roadmap R6. That makes this the one item here
+      that needs a preset written for it: point `LMV_PRESET_DIR` at a scratch folder holding a copy
+      of a heavy preset with `bloom_amount = "1.0"` added, or capture through `shot --preset-file`.
+      When active the stage costs **4N passes** at `TierConfig::bloom_levels` (`Floor` = 4, `Rich` =
+      6) plus ~11 MB of pyramid at the floor cap. Report **(a)** whether fps holds ≥ 60 @ 1080p with
+      bloom active on top of `trails` + the fold, and **(b)** the p99 against the same preset with
+      `bloom_amount = 0`. **If it misses, the lever is `TierConfig::FLOOR.bloom_levels`** — a
+      capacity, not a look, so it is a smaller decision than the other levers on this page, but the
+      halo does visibly shorten. _(Plan 0045 Phase 6 measured the Rich side on the dev box's
+      discrete GPU on **shipped** presets only, and recorded that the float composite alone already
+      puts `attractor_leviathan`'s p99 at 19.0 ms there — past a 60 Hz frame, windowed. The bloom
+      half of that phase, and all of the floor-tier side, are still owed.)_
 - [ ] **The reaction-diffusion present's reconstruction cost, on the low-end box, 1080p.** Plan 0033
       replaced the RD present's field sampling with a Catmull-Rom reconstruction to get the coral
       look. The present pass now calls `sample_v` **five** times per fragment, each at **nine**

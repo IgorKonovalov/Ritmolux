@@ -118,10 +118,11 @@ pub(crate) fn map(x: f32) -> f32 {
 const SHADER: &str = r#"
 struct Ctl { v: vec4<f32> } // x: exposure, y: knee
 
-// The uniform is LAST, and that is load-bearing — see `Resources::build`.
+// The uniform sits BETWEEN the texture and the sampler, and that is
+// load-bearing — see `Resources::build`.
 @group(0) @binding(0) var t_src: texture_2d<f32>;
-@group(0) @binding(1) var samp: sampler;
-@group(0) @binding(2) var<uniform> u: Ctl;
+@group(0) @binding(1) var<uniform> u: Ctl;
+@group(0) @binding(2) var samp: sampler;
 
 // Identity below the knee, a rational shoulder above it. C1-continuous at k and
 // strictly monotone, so two values never swap order across the map.
@@ -247,14 +248,26 @@ impl Resources {
         // rendered both configurations correctly, which is precisely what makes
         // this class of defect expensive: the whole golden suite captures on WARP.
         //
-        // So: one group, with the uniform at binding 2 behind the texture and
-        // sampler — a shape no other live pipeline has.
+        // So: one group, with the uniform **between** the texture and the sampler
+        // — `[texture, uniform, sampler]`, which
+        // `the_tonemap_layout_is_a_shape_no_other_layout_in_core_has` proves is
+        // held by nothing else in `core/src`.
+        //
+        // **Plan 0045 Phase 4b moved it there, because the shipped ordering's own
+        // justification was false.** Phase 3 wrote `[texture, sampler, uniform]`
+        // and claimed it was unique; `attractor-decay`
+        // (`scenes/particles/mod.rs`) is byte-identical to it, from the same three
+        // helpers. No mis-render was ever observed from that collision — the
+        // WARP-blessed `attractor.png` and a hardware render of the same preset
+        // agree (mean luma 51.84 vs 56.29, lit-pixel counts within 0.1 %), so the
+        // curve was not being fed the decay pass's uniform — but a false comment
+        // on a hazard surface is worse than none, and the enumeration is cheap.
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("tonemap-bind-layout"),
             entries: &[
                 gpu::texture(0, true),
-                gpu::sampler(1),
-                gpu::uniform(2, wgpu::ShaderStages::FRAGMENT),
+                gpu::uniform(1, wgpu::ShaderStages::FRAGMENT),
+                gpu::sampler(2),
             ],
         });
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -267,11 +280,11 @@ impl Resources {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
+                    resource: uniform.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: uniform.as_entire_binding(),
+                    resource: wgpu::BindingResource::Sampler(&sampler),
                 },
             ],
         });
@@ -490,8 +503,16 @@ mod tests {
 
     /// **Monotone, and bounded below 1** (ADR-0046). A saturating ramp maps in
     /// strictly increasing order — so two values never swap places — and never
-    /// reaches the clip, so the 8-bit write below this pass cannot flatten a
-    /// bright region to white however much light lands in it.
+    /// reaches 1.0, so the 8-bit write below this pass has somewhere to put the
+    /// decade above 1.0 instead of flattening all of it onto one value.
+    ///
+    /// **Bounded below 1 is not "never 255".** The write is sRGB-encoded and then
+    /// rounded to a byte, and rounding is not injective: `f(x) < 1` for every
+    /// finite `x`, but `f(x)` still crosses the last byte's midpoint at a linear
+    /// input of about **36** at [`KNEE`] `= 0.6`. A frame carrying that much light
+    /// presents 255 legitimately. What the curve buys is the *separation* asserted
+    /// below — 2.0 and 4.0 landing on different bytes, where the 8-bit chain gave
+    /// both the same white.
     #[test]
     fn a_saturating_ramp_maps_monotonically_and_never_reaches_clip() {
         let mut previous = map(0.0);
@@ -683,8 +704,12 @@ mod tests {
             .count();
         assert_eq!(
             clipped, 0,
-            "{clipped} channels reached 255: the curve is bounded below 1, so \
-             nothing in a finite frame may clip"
+            "{clipped} channels of the overlap fixture reached 255. This is a \
+             claim about **this fixture**, not about the curve: bounded below 1 \
+             does not make a 255 byte unreachable (the sRGB write rounds, and a \
+             linear ~36 crosses the last byte's midpoint at KNEE = 0.6). What is \
+             true here is that this rose's crossings peak far below that and used \
+             to clip anyway on the 8-bit chain"
         );
     }
 
@@ -790,5 +815,220 @@ mod tests {
         } else {
             1.055 * x.powf(1.0 / 2.4) - 0.055
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // The bind-group layout enumeration (Plan 0045 Phase 4b)
+    // -----------------------------------------------------------------------
+
+    /// What one binding contributes to a layout's *shape*. Two layouts collide —
+    /// in the sense the DX12 WARP aliasing hazard cares about — when their kinds
+    /// match in order.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    enum Kind {
+        Texture,
+        Sampler,
+        Uniform,
+        Storage,
+    }
+
+    /// Every spelling of an entry this repository uses, **longest first**. The
+    /// scan takes the longest match at each byte, so `BufferBindingType::Uniform`
+    /// is never read as the `BindingType::…` substring it contains.
+    ///
+    /// A new spelling belongs here. Leaving it out does not weaken the guard
+    /// silently: the per-layout entry count below is derived independently, and a
+    /// marker the scan missed makes the two disagree and fails the test.
+    const MARKERS: &[(&str, Kind)] = &[
+        ("BufferBindingType::Uniform", Kind::Uniform),
+        ("BufferBindingType::Storage", Kind::Storage),
+        ("BindingType::Sampler", Kind::Sampler),
+        ("BindingType::Texture", Kind::Texture),
+        ("lut_vertex_texture(", Kind::Texture),
+        ("storage_entry(", Kind::Storage),
+        ("gpu::texture(", Kind::Texture),
+        ("gpu::sampler(", Kind::Sampler),
+        ("gpu::uniform(", Kind::Uniform),
+    ];
+
+    fn rs_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(dir).expect("read a core/src directory") {
+            let path = entry.expect("a directory entry").path();
+            if path.is_dir() {
+                rs_files(&path, out);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                out.push(path);
+            }
+        }
+    }
+
+    /// The text from `text[0]` up to the delimiter that closes an already-open
+    /// `open`, ignoring every other character.
+    fn balanced(text: &str, open: u8, close: u8) -> &str {
+        let mut depth = 1i32;
+        for (index, byte) in text.bytes().enumerate() {
+            if byte == open {
+                depth += 1;
+            } else if byte == close {
+                depth -= 1;
+                if depth == 0 {
+                    return &text[..index];
+                }
+            }
+        }
+        panic!("a bind-group-layout descriptor never closes");
+    }
+
+    /// How many entries a slice body holds, counted from its **top-level commas**
+    /// — independent of [`MARKERS`], which is what makes the two a cross-check.
+    fn entry_count(body: &str) -> usize {
+        let (mut depth, mut count, mut filled) = (0i32, 0usize, false);
+        for byte in body.bytes() {
+            match byte {
+                b'(' | b'[' | b'{' => depth += 1,
+                b')' | b']' | b'}' => depth -= 1,
+                b',' if depth == 0 => {
+                    if filled {
+                        count += 1;
+                    }
+                    filled = false;
+                    continue;
+                }
+                _ => {}
+            }
+            if !byte.is_ascii_whitespace() {
+                filled = true;
+            }
+        }
+        if filled {
+            count += 1;
+        }
+        count
+    }
+
+    /// `(label, kinds)` for every `create_bind_group_layout` call in one file.
+    fn layouts_in(text: &str, file: &str) -> Vec<(String, Vec<Kind>)> {
+        // Split so the constant does not match **itself** — this scan reads its
+        // own file, and an anchor spelled whole here would open a "descriptor"
+        // that runs to the end of the module.
+        const CALL: &str = concat!(
+            "create_bind_group_layout",
+            "(&wgpu::BindGroupLayoutDescriptor {"
+        );
+        const ENTRIES: &str = "entries: &[";
+        const LABELLED: &str = "label: Some(\"";
+
+        let mut found = Vec::new();
+        let mut cursor = 0usize;
+        while let Some(hit) = text[cursor..].find(CALL) {
+            cursor += hit + CALL.len();
+            // Bound everything to this descriptor's own braces, so a call with a
+            // computed label cannot borrow the next call's literal one.
+            let desc = balanced(&text[cursor..], b'{', b'}');
+            let label = match desc.find(LABELLED) {
+                Some(at) => {
+                    let from = at + LABELLED.len();
+                    let end = desc[from..].find('"').expect("the label string closes");
+                    desc[from..from + end].to_string()
+                }
+                // `lines/renderer.rs` formats its label per scene.
+                None => format!("{file} (computed label)"),
+            };
+            let entries_at = desc.find(ENTRIES).expect("a layout declares entries") + ENTRIES.len();
+            let body = balanced(&desc[entries_at..], b'[', b']');
+
+            let mut kinds = Vec::new();
+            let mut index = 0usize;
+            while index < body.len() {
+                let matched = MARKERS
+                    .iter()
+                    .find(|(marker, _)| body.as_bytes()[index..].starts_with(marker.as_bytes()));
+                match matched {
+                    Some((marker, kind)) => {
+                        kinds.push(*kind);
+                        index += marker.len();
+                    }
+                    None => index += 1,
+                }
+            }
+            assert_eq!(
+                kinds.len(),
+                entry_count(body),
+                "{file}: `{label}` declares {} entries but the scan recognized {} \
+                 of them. Teach `MARKERS` the spelling this layout uses — an \
+                 unrecognized entry would make the uniqueness check below blind \
+                 to a real collision.",
+                entry_count(body),
+                kinds.len(),
+            );
+            found.push((label, kinds));
+        }
+        found
+    }
+
+    /// **The tonemap's bind-group layout is a shape nothing else in `core/src`
+    /// has** — by enumerating every layout in the crate, not by asserting it in a
+    /// comment (Plan 0045 Phase 4b).
+    ///
+    /// The comment is exactly what went wrong. Phase 3 shipped
+    /// `[texture, sampler, uniform]` with a note saying no other live pipeline had
+    /// that shape; `attractor-decay` had had it all along, built from the same
+    /// three helpers. Nothing could catch that, because the claim was prose on a
+    /// hazard surface (ADR-0021 / Plan 0020: WARP hands a pipeline whose layout
+    /// matches another live one *the other pass's* resources).
+    ///
+    /// Only the tonemap is asserted on. Several older layouts genuinely do
+    /// collide — `ink` with the fold, `trails` with the blend, four separate
+    /// single-uniform groups — and those pairs are load-bearing history rather
+    /// than this phase's business; they are printed so the picture is visible.
+    #[test]
+    fn the_tonemap_layout_is_a_shape_no_other_layout_in_core_has() {
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        rs_files(&src, &mut files);
+        files.sort();
+
+        let mut all: Vec<(String, Vec<Kind>)> = Vec::new();
+        for file in &files {
+            let text = std::fs::read_to_string(file).expect("read a core source file");
+            let name = file
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("?")
+                .to_string();
+            all.extend(layouts_in(&text, &name));
+        }
+
+        for (label, kinds) in &all {
+            eprintln!("{label:<34} {kinds:?}");
+        }
+        // The scan is the whole evidence, so a scan that found (nearly) nothing
+        // must not read as a pass.
+        assert!(
+            all.len() >= 20,
+            "only {} bind-group layouts found across core/src — the scan is not \
+             seeing the crate",
+            all.len()
+        );
+
+        let mine = all
+            .iter()
+            .find(|(label, _)| label == "tonemap-bind-layout")
+            .expect("the tonemap's own layout is in the enumeration");
+        let sharers: Vec<&str> = all
+            .iter()
+            .filter(|(label, kinds)| kinds == &mine.1 && label != &mine.0)
+            .map(|(label, _)| label.as_str())
+            .collect();
+        assert!(
+            sharers.is_empty(),
+            "`tonemap-bind-layout` is {:?}, and so is {sharers:?}. This pass runs \
+             on every frame beside whatever the preset switched on, so it is the \
+             most exposed pipeline in the engine to the WARP identical-layout \
+             aliasing hazard. Move it to a shape this enumeration shows is free — \
+             and fix the comment in `Resources::build`, which is the thing that \
+             was wrong last time.",
+            mine.1
+        );
     }
 }

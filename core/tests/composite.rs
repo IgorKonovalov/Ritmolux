@@ -43,9 +43,17 @@
 //! Plan 0045 Phase 3 made every intermediate linear-light `Rgba16Float` and put a
 //! tonemap at the surface boundary. The third fixture binds **no** post stage: it
 //! draws a dense additive rose whose self-crossings sum past 1.0, which the 8-bit
-//! chain clipped to flat white. Its guard is that no channel in the frame reaches
-//! 255 — a claim about the curve (`f(x) < 1` for every finite `x`), not a
-//! tolerance.
+//! chain clipped to flat white. Its guard is that no channel in *that frame*
+//! reaches 255.
+//!
+//! **That is a claim about this fixture, not a property of the curve, and the
+//! difference matters** (Plan 0045 Phase 4b). `f(x) < 1` for every finite `x` is
+//! true, and it does *not* make a 255 byte unreachable: the surface write encodes
+//! to sRGB and rounds, so `f(x)` crosses the last byte's midpoint at a linear
+//! input of about **36** at `KNEE = 0.6` — and `attractor.toml` reaches it on the
+//! hardware adapter. What this rose demonstrates is that its crossings now roll
+//! off instead of flattening; generalizing the assertion into a suite-wide
+//! no-255 gate would fail on frames that are behaving correctly.
 
 use std::path::{Path, PathBuf};
 
@@ -215,11 +223,13 @@ fn composite_stages_match_golden_baselines() {
                 .count();
             assert_eq!(
                 clipped, 0,
-                "{clipped} channels of {stem} reached 255. The tonemap's curve is \
-                 bounded strictly below 1 (ADR-0046), so a frame of stacked \
-                 additive strokes must roll off rather than flatten to white — \
-                 this fixture clipped a large region of its crossings before Plan \
-                 0045 Phase 3"
+                "{clipped} channels of {stem} reached 255. This fixture's \
+                 crossings peak far below the linear ~36 it takes to round to 255 \
+                 through the tonemap, so they must roll off rather than flatten to \
+                 white — they clipped across a large region before Plan 0045 Phase \
+                 3. Note this is a fact about THIS fixture: bounded below 1 does \
+                 not make a 255 byte unreachable, so do not lift the check to the \
+                 whole suite (see the module docs)"
             );
         }
 
