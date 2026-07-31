@@ -195,7 +195,8 @@ the trailing group on the palette-coloured scenes (the four shader ones, plus
 `spectrum` since Plan 0034) is the shared **palette** colour surface (Plan 0020) —
 see [Colour — the palette surface](#colour--the-palette-surface-plan-0020).
 Every system additionally accepts the engine-stage params `bg_*`, `trails`,
-`kaleido_*`, and the final `ink_*`/`paper_*` remap documented there.
+`kaleido_*`, `bloom_*`, `exposure`, and the final `ink_*`/`paper_*` remap
+documented there.
 
 ### Attractor detail sharpness (Plan 0027)
 
@@ -435,7 +436,8 @@ the shared view transform, the geometry mirror, the palette surface
 (`[palette]`/`[palette_b]`/`palette_mix`/`saturation`, sampled per element — this
 is the **only line system that reads `[palette]`**; the other three still colour
 from the built-in cosine), and all the engine stages (`bg_*`, `trails`,
-`kaleido_*`, `ink_*`). On `radial_ring` the geometry mirror is close to a no-op
+`kaleido_*`, `bloom_*`, `exposure`, `ink_*`). On `radial_ring` the geometry
+mirror is close to a no-op
 for the same reason it is on `star_pattern` — the figure is already rotationally
 symmetric about the frame centre, so the copies land on the original. On `bars`
 and `polyline` it is genuinely transformative.
@@ -605,6 +607,83 @@ turning a stage on stretched the whole frame by up to 28 % on common window size
 (1280x800 and 1366x768 among them). If you are reading a preset comment written
 before then that talks about a stage changing the shape of a figure, it is stale.
 
+### Bloom — `bloom_amount`, `bloom_threshold`, `bloom_radius` (Plan 0045)
+
+The **last** stage in the per-preset chain, after the fold, so it blooms the
+finished composite. It picks out the parts of the frame that are brighter than
+`bloom_threshold`, blurs them across a pyramid, and adds the result back —
+so bright things spill light into the pixels around them.
+
+`bloom_amount = 0` (the default) switches the whole stage off, offscreens and
+all: a preset that does not bind it pays nothing and renders exactly as before.
+
+| Param | Default | Meaning |
+|---|---|---|
+| `bloom_amount` | `0` | Strength of the halo added back. `0` = off. Around `0.5–1.5` is a glow; past `2` the frame is mostly halo (clamped at `4`). Bindable — this is the one to put a beat on. |
+| `bloom_threshold` | `1.0` | Where "bright" starts, in **linear light**. At the default only light that is genuinely over range blooms — see below. Lower it to bloom mid-tones too; `0` blooms everything. |
+| `bloom_radius` | `1.0` | How far the halo scatters, `0..4`. Low is a tight rim around the figure; high is a wide wash. It does not change how much light there is, only where it goes. |
+
+**`bloom_threshold = 1.0` is a meaningful default, not a placeholder.** Since Plan
+0045 the composite carries light *above* 1.0 (see below), so a threshold of 1
+means precisely: bloom the light the display could not have shown anyway. Turn
+bloom on with nothing else and you get halos exactly where the frame used to
+clip, and nowhere else. That is usually what you want; reach for a lower
+threshold when you want the whole figure to glow rather than just its hot spots.
+
+```toml
+[params]
+brightness      = "0.8 + clamp(bass * 2, 0, 1.2)"   # peaks over 1.0 on a hit
+bloom_amount    = "0.4 + clamp(onset * 2, 0, 0.9)"  # ...and the hit blooms
+bloom_radius    = "1.2"
+```
+
+`bloom_amount` and `bloom_radius` are independent on purpose: raising the radius
+spreads the same energy wider rather than adding more, so a preset can ride the
+radius on a build-up without the frame getting brighter as it goes.
+
+**Cost.** Bloom is the most expensive engine stage — a dozen-odd passes over a
+shrinking pyramid — and the pyramid is one level deeper on the rich tier, so the
+halo reaches a little further there. Everything else about it is identical
+between tiers.
+
+### Linear light and `exposure` (Plan 0045)
+
+Worth knowing even if you never bind anything here, because it changed what the
+other luminance params mean.
+
+**The composite is no longer capped at 1.0.** Every stage from the scene to the
+transition blend now carries floating-point linear light, and a single engine
+tonemap turns it into a displayable picture at the very end. So two
+full-brightness strokes crossing no longer land on the same white as one, a
+`glow` above 1 is no longer thrown away, and `brightness` past 1 keeps carrying
+information instead of flattening.
+
+What that changes for authoring:
+
+- **The old "additive ceiling" habit is softer, not gone.** Stacking luminance
+  used to go **flat white** and take the colour with it; now it rolls off — the
+  hue survives, the structure inside a hot core stays readable, and a peak reads
+  as *intense* rather than as *broken*. Holding luminance nearly flat and
+  spending the peak on structure is still the better-looking choice, but it is
+  now a taste rule rather than a cliff.
+- **The roll-off is engine-fixed**, and it is the identity below about `0.6`, so
+  everything a preset was already doing in the low and mid range is untouched.
+  Above that it compresses, and it never reaches pure white at any input.
+- **`glow` above 1 now does something.** It used to widen a skirt around an
+  already-saturated core; now the core itself carries the extra energy, which is
+  also what makes it something for bloom to find.
+
+| Param | Default | Meaning |
+|---|---|---|
+| `exposure` | `1.0` | A linear multiplier on the whole frame before the tonemap. `2` is a stop up, `0.5` a stop down. Engine-wide and *not* per-stage, so like `ink_*` it crossfades across a preset dissolve rather than snapping. |
+
+`exposure` is the honest way to make a whole preset brighter or darker: it
+scales everything together and then rolls off, where raising `brightness` on
+each element re-balances the picture against its own background. Bind it
+sparingly — an `exposure` riding the bass pumps the entire frame, which reads as
+a camera reacting rather than as the music, and it is the same trap `glow` on a
+beat has always been.
+
 ### Ink on paper — `ink_amount`, `paper_*`, `ink_*` (Plan 0027)
 
 The **last** stage before present (ADR-0028), and the only engine-wide one that is
@@ -622,6 +701,14 @@ This is the one control that reaches a *dark-on-light* look at all. The scenes d
 **additively** (a lightening model), so a dark stroke colour adds nothing and a
 light `bg_bright` just washes the strokes out — no combination of `bg_*` and
 palette colours gets there. The remap inverts the tone at the end instead.
+
+**Ink reads the frame after the tonemap**, which is what it has always read —
+display-referred pixels in `0..1`. So nothing in this section changed with Plan
+0045's linear light, with one practical consequence worth stating: `exposure` and
+`bloom_amount` are *upstream* of the remap, so raising either pushes more of the
+frame toward the ink pole. That is the lever for an ink preset whose drawing is
+coming out too faint, and it is a better one than widening the two poles — see
+the note below on why the poles do not do what they look like they do.
 
 | Param | Default | Meaning |
 |---|---|---|

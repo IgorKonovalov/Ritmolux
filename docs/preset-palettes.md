@@ -74,6 +74,21 @@ every colour parseable. Any violation is a surfaced error and the engine keeps t
 last good preset (it never crashes). Values `0..1` are used directly (no gamma /
 perceptual management — that is a future addition).
 
+**A LUT value is a linear-light colour, and since Plan 0045 it stays one all the
+way to the display.** A stop's `0..1` components are taken as linear
+coefficients; the scene multiplies them by whatever luminance it has and writes
+the result into a floating-point composite that is free to exceed 1.0, and the
+engine tonemap at the end of the frame is the only place anything is compressed.
+So what a preset does to a palette colour is now *arithmetic on light* rather
+than on bytes, and two consequences follow for authoring: a stop is never
+silently clipped on its way through the composite, and the roll-off that finally
+applies is hue-preserving (see the ramp notes below). What has **not** changed is
+the mapping from a hex stop to a coefficient — `#ff5500` is still read as
+`(1.0, 0.33, 0.0)` with no sRGB decode, so the gradients look exactly as they
+did. Deciding whether that mapping *should* decode is the perceptual work
+ADR-0021 deferred; linear light is the structure that makes it possible, not the
+change itself.
+
 The gradient **repeats** past its ends: a colour coordinate that wraps past `1`
 comes back around at `0`.
 
@@ -240,10 +255,17 @@ Reading it:
   distinctions between two blues need smaller steps than between two ambers.
 - **`brightness` scales the ramp; overlap does not preserve it.** The line
   renderer blends **additively**, so where strokes cross, channels sum and the
-  crossing reads paler than the swatch — approaching white where three or more
-  overlap. A dense figure at high `brightness` therefore looks less saturated
-  than its `hue` says. Lower `brightness` (or `thickness`) rather than chasing the
-  colour with `hue`.
+  crossing reads paler than the swatch. A dense figure at high `brightness`
+  therefore looks less saturated than its `hue` says. Lower `brightness` (or
+  `thickness`) rather than chasing the colour with `hue`.
+
+  **Since Plan 0045 it no longer approaches *white*.** The composite carries
+  linear light past 1.0 and the engine tonemap rolls it off by scaling all three
+  channels by the *same* factor, taken from the brightest one — so the ratios
+  between R, G and B survive the roll-off exactly and a saturated crossing keeps
+  its hue instead of climbing toward white a channel at a time. A dense figure
+  still reads paler at its crossings, because the sum genuinely is less
+  saturated; it no longer goes colourless.
 
 ---
 

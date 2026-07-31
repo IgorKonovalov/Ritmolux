@@ -17,8 +17,10 @@ the shared **palette LUT** (`[palette]`, `saturation`, and either `color_span`/`
 **ignore `[palette]` silently** — see `docs/preset-palettes.md`.
 
 **Every scene also takes** the shared view transform (`zoom`, `pan_x`, `pan_y`) and the engine
-stages `bg_hue`/`bg_bright`/`bg_vignette`, `trails`, `kaleido_order`/`kaleido_angle`,
-`ink_amount`/`paper_*`/`ink_*`. Line scenes additionally take `mirror_order`/`mirror_reflect`.
+stages `bg_hue`/`bg_bright`/`bg_vignette`, `trails`,
+`kaleido_order`/`kaleido_angle`/`kaleido_center_x`/`kaleido_center_y`,
+`bloom_amount`/`bloom_threshold`/`bloom_radius`, `exposure`, `ink_amount`/`paper_*`/`ink_*`.
+Line scenes additionally take `mirror_order`/`mirror_reflect`.
 
 ---
 
@@ -175,6 +177,9 @@ like a meter instead of strobing.
 | `bg_hue` / `bg_bright` / `bg_vignette` | `0` / `0` / `0` | backdrop is black until `bg_bright > 0`. Visible behind sparse scenes and RD voids; **invisible behind `fragment_field`**. |
 | `trails` | `0` | per-frame decay; `0` off, higher = longer. Needs real motion to read. |
 | `kaleido_order` / `kaleido_angle` | `1` / `0` | `< 2` is passthrough. **The order is rounded to a whole number** (a fractional wedge count tears the frame), so it snaps at each half-integer even when smoothed — ride `kaleido_angle` on `time` for continuous motion. |
+| `kaleido_center_x` / `kaleido_center_y` | `0.5` / `0.5` | the fold axis, in uv; clamped into the frame. The fold shows the largest disc around that axis and fades out past it onto the backdrop. |
+| `bloom_amount` / `bloom_threshold` / `bloom_radius` | `0` / `1.0` / `1.0` | `0` amount is off and free. The threshold is in **linear light**, so the default blooms exactly what the display could not have shown. The radius spreads the same energy wider rather than adding more (`0..4`). |
+| `exposure` | `1.0` | linear multiplier on the whole frame before the engine tonemap. Crossfades across a preset switch like `ink_*` does. |
 | `mirror_order` / `mirror_reflect` | `1` / `0` | **line scenes only**; folds geometry (before the segment cap), not pixels. |
 | `ink_amount` | `0` | `1` = black-on-white; `paper_*`/`ink_*` make it any duotone. Collapses the palette to two colours. |
 

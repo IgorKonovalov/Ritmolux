@@ -193,6 +193,31 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   pending on-device capture — `docs/on-device-validation.md`.
 - **Our own Rust state stays <~1 MB** (ring buffer ~340 ms of f32, fixed DSP buffers, a few uniform
   buffers) — unchanged; the target was never our allocations.
+- **The linear-light composite is the largest single addition since this section was written**
+  (Plan 0045 / [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)). Every intermediate
+  upstream of the tonemap moved from the surface format to `Rgba16Float` — 8 bytes a texel, not 4 — so
+  the offscreens that were charged at the surface format doubled. The trails accumulation
+  (`PingPongField`, two textures) was already float and did not move. At the floor post cap
+  (1920x1080, 16.6 MB a full-size float texture):
+
+  | buffer | before | after |
+  |---|---|---|
+  | trails composited | 8.3 | 16.6 |
+  | trails accumulation (x2) | 33.2 | 33.2 |
+  | kaleidoscope source | 8.3 | 16.6 |
+  | **per chain, both stages live** | **50** | **66** |
+  | bloom source + pyramid (only when `bloom_amount > 0`) | — | 16.6 + ~11 |
+  | tonemap input (surface-sized, genuinely new) | — | 16.6 |
+  | transition snapshot + live, while a dissolve runs | 8.3 x2 | 16.6 x2 |
+  | ink input (stays 8-bit — the tonemap hands it display-referred pixels) | 8.3 | 8.3 |
+
+  Plan 0023's dual-live dissolve holds two whole chains, so the peak is ~133 MB rather than ~100, and
+  the worst case — dual-live, every stage on including bloom, ink on — is **~246 MB** against the
+  ~350 MB soft ceiling above, most of which is driver floor already. At the rich cap (2560x1440) the
+  same arithmetic is ~118 MB per chain. **The post cap is the relief lever** if the float chain misses
+  §1 on a floor-tier iGPU: lower it rather than re-fixing the grids, since bandwidth roughly doubled
+  with the format and the grid policy is shared. Rich-tier frame time on the target GPU is Plan 0045
+  Phase 6; the floor side on real iGPU hardware stays with `docs/on-device-validation.md`.
 - **Driver floor isolated (Plan 0012 Phase 2, resolved):** the once-optional dev spike ran —
   `standalone/examples/floor.rs`, a scene-less window standing up only the wgpu context — and put the
   hard **~327 MB private-commit** floor number on the split above. It confirms ADR-0010's diagnosis: the

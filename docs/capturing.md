@@ -693,7 +693,8 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `beat` | HARD | a 120 BPM click track through the **real** DSP makes a beat-accent preset render differently on-beat vs off-beat; a zeroed beat binding does not |
 | `distinctness` | ADVISORY | prints per-family pixel + shape pairwise matrices and flags near-duplicate geometry; never asserts |
 | `golden` | HARD (tolerance) | one **frozen fixture per system** matches its committed baseline PNG within a mean + max-outlier tolerance ([ADR-0023](adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)) |
-| `composite` | HARD (tolerance) | the **post stages** — one fixture composes `trails`, one composes `kaleido_*` — match their baselines. Captured at **160x100**, a size whose internal grid is *not* the target's shape, so an aspect error is visible ([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) |
+| `composite` | HARD (tolerance) | the **post stages**, one fixture each and never all at once — `trails`, `kaleido_*`, `bloom_*`, plus one that binds **no** stage and guards the composite's *arithmetic* (its assertion is that no channel reaches 255, a claim about the tonemap's curve rather than a tolerance). Captured at **160x100**, a size whose internal grid is *not* the target's shape, so an aspect error is visible ([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) |
+| `bloom` | HARD (relative) | the bloom stage's behaviour, beside its baseline rather than in it: halo **energy** rises with `bloom_amount`, halo **extent** rises with `bloom_radius`, the rich tier's deeper pyramid reaches further than the floor's, and the halo is **round**. Captured at **256x256** — square, and load-bearing: the roundness guard is what catches a separable kernel whose two passes step in different units, and it reads 1.001 today against 7.05 under the defect it was written for. No magic numbers: every assertion compares two captures of one fixture differing in one bound param |
 | `reaction_diffusion` | HARD | the first stateful-feedback scene: seed reproducibility, regime response ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
 | `attractor` | HARD | the first compute-particle scene: seed reproducibility + beat perturbation ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
 | `line_joints` | HARD (+ tolerance) | a **flagged joint stops leaving a hole** in the stroke ([ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)): against a purpose-built zigzag `polyline`, a vertex is not a local luminance minimum relative to the segment interiors either side of it. Threshold-free, and captured at **512x512** because the wedge it measures is a fraction of a stroke-width across. The same capture is then pinned to a committed baseline (Plan 0040), since the reported defect had no pixel guard anywhere; the relative claim runs **first, even under `LMV_BLESS`**, so the notch cannot be blessed back in. Bless with `--test line_joints`, which cannot reach the golden roster |
@@ -729,8 +730,8 @@ LMV_BLESS=1 cargo test -p lmv-core --test composite     # the post-stage baselin
 LMV_BLESS=1 cargo test -p lmv-core --test line_joints   # the joined-polyline baseline
 ```
 
-Only the first of those owns the per-`SystemKind` roster. The `composite_*.png`
-pair belongs to the `composite` test and `line_joint_zigzag.png` to
+Only the first of those owns the per-`SystemKind` roster. The four
+`composite_*.png` belong to the `composite` test and `line_joint_zigzag.png` to
 `line_joints`; blessing by binary is what keeps the scopes from rewriting each
 other. `line_joints` additionally refuses to bless at all while its
 local-minimum claim is failing, so a reopened notch cannot be baselined in.
@@ -738,6 +739,39 @@ local-minimum claim is failing, so a reopened notch cannot be baselined in.
 **Eyeball the regenerated PNGs before committing** — the first baseline is easy
 to enshrine wrong. The compare tolerates minor cross-GPU rasterization drift; a
 genuine change exceeds it.
+
+> **Eyeballing the baseline is not enough on its own, and Plan 0045 is the
+> record of why.** The whole suite captures on WARP, which is documented to hand
+> a pipeline another live pipeline's resources
+> ([ADR-0021](adrs/0021-shared-palette-baked-lut.md) / Plan 0020, the tonemap in
+> Phase 3, the bloom blur in Phase 4). A mis-rendered frame at these capture
+> sizes can look entirely plausible: Phase 4's bloom halo was 2:1 elongated in
+> one draft and smeared into a column of copies in another, and the 160x100
+> baseline looked like a reasonable glow under both. **Render the same fixture on
+> the hardware adapter at a size large enough to see it** (`shot` uses the
+> default adapter, so `cargo run -p standalone --example shot -- --preset-file
+> <fixture> --size 512x512` is the check) **and confirm the two adapters agree
+> before blessing.** Where they disagree, the hardware one is right and the
+> baseline is about to enshrine a driver bug.
+
+### The tonemap and pixel-level assertions (Plan 0045)
+
+Every baseline in the repository was re-blessed once at Plan 0045 Phase 3, when
+the composite became linear-light `Rgba16Float` with a tonemap at the surface
+boundary. Two things follow for anything that reads pixels here:
+
+- **A capture is downstream of a compressive curve.** The curve is the identity
+  below ~0.6 and rolls off above it, so a low- or mid-luminance assertion reads
+  what it always read, and a bright one reads lower than the linear value that
+  produced it. An assertion phrased as "this pixel is 255" is no longer reachable
+  at all — the curve is bounded strictly below 1 for every finite input, which is
+  exactly what `composite_overlap` exists to pin.
+- **`--report` moved, slightly and measurably.** Re-run over the library at that
+  change: reactivity max 0.060 / mean 0.012, animation max 0.042 / mean 0.006,
+  coverage max 0.187 / mean 0.010, distinctness max 0.12, reachability
+  identical everywhere and every floor still passing. Read that as the scale of
+  drift a luminance-model change produces in these columns — not as noise, and
+  not as something to re-derive without measuring.
 
 > **`LMV_BLESS=1` is not scoped to the scene you changed** — it rewrites **every**
 > baseline the run touches. `git status` after blessing and `git checkout` the
