@@ -28,7 +28,12 @@ name = "mono"
 [params]
 # SHAPE - Thomas uses `a` alone (canonical 0.19). Small numbers matter here: the
 # lattice opens out below ~0.17 and knots up above ~0.21.
-a = "0.190 + sin(time * 0.0233) * 0.014 - clamp(bass * 0.10, 0, 0.020)"
+# THE TREBLE BINDING MOVED HERE, and the reason is worth keeping. This preset
+# read treb 0.000 while visibly binding `clamp(treb * 0.6, 0, 0.15)` on
+# `saturation` - because `ink_amount = "1"` collapses the frame to two tones,
+# so saturation is exactly the one parameter an ink preset cannot show. `a` is
+# the Thomas attractor's own constant: the top end now bends the trajectory.
+a = "0.190 + sin(time * 0.0233) * 0.014 - clamp(bass * 0.10, 0, 0.020) + clamp(treb * 0.10, 0, 0.016)"
 
 # DENSITY - the duotone needs MORE source density than the black-on-white
 # drawing does. The remap keys on luminance, so a too-faint source never reaches
@@ -36,7 +41,7 @@ a = "0.190 + sin(time * 0.0233) * 0.014 - clamp(bass * 0.10, 0, 0.020)"
 # failure mode this preset hit first. Denser than `attractor_ink`, still well
 # under the blot ceiling.
 fade   = "0.912 - clamp(bass * 0.14, 0, 0.045) - beat * 0.015"
-size   = "0.78 - clamp((bass + mid) * 0.14, 0, 0.16) + beat * 0.08"
+size   = "0.78 - clamp((bass + mid) * 0.14, 0, 0.16) + clamp(treb * 0.5, 0, 0.10) + beat * 0.08"
 # MEASURED. Read 0.50 and never fired - `onset` is raw spectral flux peaking at
 # 0.016, not a 0..1 envelope. Rank preserved within the family.
 reseed = "onset > 0.011"

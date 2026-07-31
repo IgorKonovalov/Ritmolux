@@ -30,7 +30,10 @@ stops = [
 [params]
 # STRUCTURE - big slow cells. Low warp keeps them smouldering and coherent;
 # the zoom is what supplies the layering.
-warp  = "0.34 + sin(time * 0.0330) * 0.09 + clamp(bass * 1.1, 0, 0.45) + sin(bar * pi) * 0.10"
+# Treble rides the WARP, not a luminance term: the top end shows up as the
+# folds shimmering rather than the lava getting brighter (Plan 0045 review -
+# this preset read treb 0.000, having bound the band nowhere at all).
+warp  = "0.34 + sin(time * 0.0330) * 0.09 + clamp(bass * 1.1, 0, 0.45) + clamp(treb * 2.2, 0, 0.22) + sin(bar * pi) * 0.10"
 zoom  = "2.70 + sin(time * 0.0190) * 0.22 + clamp(bass * 1.2, 0, 0.50)"
 pan_x = "sin(time * 0.0117) * 0.20 + time * 0.005"
 pan_y = "cos(time * 0.0163) * 0.16"
@@ -50,7 +53,7 @@ flash = "clamp(onset * 0.8, 0, 0.24)"
 # next one. Same tempo, same accent, but it is a swell instead of a strobe -
 # which is what "molten" wanted in the first place.
 color_center = "0.02 + sin(time * 0.0410) * 0.04 + sin(bar * pi) * 0.15 + clamp(onset * 0.9, 0, 0.12)"
-color_span   = "0.80 + clamp(mid * 0.6, 0, 0.16)"
+color_span   = "0.80 + clamp(mid * 0.6, 0, 0.16) + clamp(treb * 1.4, 0, 0.14)"
 saturation   = "1.08 + clamp(onset * 0.9, 0, 0.26)"
 palette_mix  = "clamp(bass * 1.2, 0, 0.50)"
 

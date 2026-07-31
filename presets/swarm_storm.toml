@@ -88,8 +88,11 @@ field_freq = "select(tempo > 132, 3.35, 2.85) + clamp(onset * 7.0, 0, 1.50) + cl
 # the wrap seam can, and the depth fade dims the far half. Restoring that is not
 # the same as pushing past the ceiling, and 1.02 is still well under the 1.9 that
 # renders a white rectangle.
-brightness = "1.02 + clamp(bass * 5.0, 0, 0.18)"
-size       = "1.20 - clamp(mid * 10.0, 0, 0.18) + beat * 0.30 + clamp(onset * 1.1, 0, 0.22)"
+brightness = "1.18 + clamp(bass * 5.0, 0, 0.22)"
+# Raised for legibility (Plan 0045 review): at 1.20 the storm read as a dark
+# red haze at both of its tempo personalities, so neither branch was really
+# being seen.
+size       = "1.95 - clamp(mid * 10.0, 0, 0.22) + beat * 0.34 + clamp(onset * 1.1, 0, 0.26)"
 
 # COLOUR - wide and hot on the rolling personality; the driving one desaturates
 # toward `mono`, so hard sections read as smoke and sparks rather than fire.
