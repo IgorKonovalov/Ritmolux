@@ -1557,6 +1557,10 @@ shipped set reads `0.000` on treble.
 
 ### Why it works, mechanically
 
+> **Premise corrected 2026-07-31 (Plan 0045):** the frame no longer clips per channel — it rolls
+> off through an engine tonemap. The paragraph stands per this file's append-only rule and its
+> conclusion is unchanged (if anything stronger); the full correction is at the end of **0038**.
+
 It is the same principle as the additive ceiling seen from the other side. Luminance is **bounded** —
 the frame clips per channel, so past a point more energy on `brightness` produces less picture, not
 more. Geometry is **not** bounded that way: a fold order stepping 3 -> 8 -> 16, or a rose's `n`
@@ -1953,3 +1957,58 @@ premise retired with Plan 0045. The *conclusion* stands and is if anything stron
 still has somewhere to go when luminance does not — but the mechanism is now a roll-off, not a
 clip. Per this file's append-only rule the passage is left standing; this paragraph is the
 correction.
+
+---
+
+## 0039 — four bind-group layouts in `core/src` are shared by pipelines that go live in the same frame, and only the tonemap's uniqueness is asserted
+
+- **Raised:** 2026-07-31, from `architect`, at Plan 0045's second Mode 4 review (Phase 4b).
+- **Verified against code:** yes — the numbers below are the printout of a test that ships,
+  `the_tonemap_layout_is_a_shape_no_other_layout_in_core_has` (`core/src/render/tonemap.rs`).
+- **For:** `architect` then `dev`. Not content-lane work and not a shipping defect.
+
+The DX12 **WARP software adapter** hands a pipeline whose bind-group layout matches another live
+one *the other pass's resources*. That is ADR-0021 / Plan 0020's documented hazard, and Plan 0045
+reproduced it twice more, to the byte: the tonemap was fed the kaleidoscope's uniform (`exposure`
+became `kaleido_order = 6.0`), then the backdrop's (`bg_hue`, `bg_bright`), and the bloom blur
+passes behaved as though handed the vertical pass's buffer. Every one was invisible on hardware —
+and **the whole golden suite captures on WARP**, so a mis-render there is blessed rather than
+caught.
+
+Phase 4b replaced the tonemap's prose uniqueness claim with an enumeration over every
+`create_bind_group_layout` call in `core/src` (23 layouts; `standalone/` and the plugin add none).
+It asserts on the tonemap alone, and **prints three collision groups it asserts nothing about**:
+
+| shape | held by |
+|---|---|
+| `[Uniform, Texture, Sampler]` | `ink-bind-layout`, `kaleido-bind-layout` |
+| `[Texture, Sampler]` | `attractor-present-layout`, `trails-present-bind-layout` |
+| `[Uniform]` | `background`, `disc`, `fragment-field-uniform`, `renderer.rs` (per-scene), `rd-init`, `swarm` |
+
+The test's docstring calls these "older and deliberate". **Deliberate is a claim with no record
+behind it** — which is exactly the failure mode Phase 4b existed to retire, since the comment it
+replaced made the same kind of claim and was false (`attractor-decay` had held the tonemap's
+shipped shape all along).
+
+**One pair is live together on shipped content.** `attractor_clifford.toml` and
+`attractor_leviathan.toml` bind `trails` on the attractor, which puts `attractor-present` and
+`trails-present` — both `[Texture, Sampler]`, both plain blits — in the same command buffer. No
+golden fixture covers that combination (`core/tests/fixtures/attractor.toml` binds no trails), so
+the only thing that renders it on WARP is the preset behavioural suite, whose floors are coarse.
+`ink` + `kaleido_*` is the same shape of risk with no shipped preset binding both **today** —
+nothing stops the content lane writing one tomorrow, and the tonemap incident is proof that WARP
+aliases precisely that layout.
+
+**Nothing is observed to be wrong**, and hardware is unaffected: this is a test-fidelity hazard,
+not a shipping one. It is also pre-existing — Plan 0045 surfaced it, it did not cause it.
+
+**What would settle it.** Extending the assertion from one layout to "no two layouts that can be
+live in one frame share a shape" needs per-pair evidence, which is the design question rather than
+the edit: render each colliding pair's configuration on the hardware adapter *and* on WARP and
+compare, then either move a layout or record the pair on an explicit allowlist carrying that
+evidence. The `[Uniform]` group is the awkward one — six single-uniform groups is the natural
+shape for a fullscreen pass and reshuffling them all is a worse cure than the disease, so the
+allowlist half is probably the answer there and the assertion half for the rest. Cheap adjacent
+win while in the file: `bloom.rs`'s module docs make the same prose claim for its four layouts
+(bright, blur, up, mix) — the enumeration's printout shows it holds today, so asserting it costs
+four lines.

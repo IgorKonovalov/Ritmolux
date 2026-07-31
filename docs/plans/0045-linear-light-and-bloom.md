@@ -1,14 +1,26 @@
 # 0045 — Linear light: the HDR composite, the bloom stage, and the fold that had to be fixed first
 
-> **Status:** in-progress 2026-07-31 — **Phases 1-5 landed** in the `lmv-plan-0045` worktree
-> (`6f282e7`, `b67b9c2`, `c334b0e`, `f7ab148`, `96780e1`) and the Mode 4 review is done: gate
-> green on the branch (fmt + clippy + **384/384**), no blockers, one `major` finding. **Two
-> things block the close.** (1) **Phase 4b (`dev`)**, added by that review: bloom's recombine
-> drives premultiplied alpha above 1 and subtracts the backdrop under its own halos — measured,
-> 1810 px, worst 45 bytes. (2) **Phase 6 (`human`)** is half done — frame times are recorded for
-> shipped presets, but nothing in the library binds `bloom_*`, so the phase's actual subject has
-> not been run. The fold's disc coverage was rejected on sight and is **routed to its own ADR +
-> plan** rather than reopening this one (see Phase 6).
+> **Status:** in-progress 2026-07-31 — **every `dev` phase has landed** in the `lmv-plan-0045`
+> worktree (`6f282e7`, `b67b9c2`, `c334b0e`, `f7ab148`, `96780e1`, `23703dc`) and both Mode 4
+> reviews are done: gate green on the branch (fmt + clippy + **386/386**, 0 skipped), no
+> blockers. Phase 4b landed the alpha clamp, the lit-backdrop guard, and the bind-layout
+> enumeration that replaced a false comment. **One thing blocks the close: Phase 6 (`human`)**,
+> half done — frame times are recorded for shipped presets, but nothing in the library binds
+> `bloom_*`, so the phase's actual subject (a bloom-active Rich run, plus the Floor-pinned
+> sanity pass) has not been run; it needs a scratch `LMV_PRESET_DIR`, per
+> `docs/on-device-validation.md`. The fold's disc coverage was rejected on sight and is **routed
+> to its own ADR + plan** rather than reopening this one (see Phase 6).
+>
+> **Owed at the close, from the second Mode 4 review** (2026-07-31, no blockers, one `major`):
+> `core/src/render/tier.rs`'s `post_cap` docstring charges bloom "~11 MB … and ~22 MB dual-live",
+> counting the pyramid but not its own grid-sized `bloom-src` offscreen (16.6 MB at the floor
+> cap); `docs/nfr.md` §12 has it right and `docs/on-device-validation.md`'s bloom item repeats
+> the short framing. Fix both sentences. Strike through backlog **0005** (bloom), **0010** and
+> **0011** (the fold) with pointers here, and re-check **0031** (clifford at Rich) against the
+> tonemap. Absorb the disclosed out-of-list files — Phase 3's `schema.rs`, `capture.rs`,
+> `tier.rs`, `transition.rs`; Phase 5's three `preset-author` skill references. The WARP
+> identical-layout collisions the Phase 4b enumeration printed are **not** this plan's to fix —
+> [backlog 0039](../design-backlog.md).
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (linear-light + bloom + tonemap),
@@ -224,22 +236,33 @@ side's `bg_*`.
   intermediates this plan doubled), and it has no bloom item at all — while `docs/nfr.md`'s new
   §12 text points readers *at* it for the floor-tier side. Same drift shape as Plan 0026, where
   the README was swept and this file was not.
-- **Files touched:** `core/src/render/bloom.rs` (the clamp), `core/src/render/tonemap.rs`
-  (layout + comment), `core/tests/bloom.rs` (the lit-backdrop assertion),
+- **Files touched:** `core/src/render/bloom.rs` (the clamp **and the guard** — see the correction
+  below), `core/src/render/tonemap.rs` (layout + comment), `core/tests/bloom.rs`,
   `core/tests/composite.rs` and `docs/capturing.md` (the no-255 wording),
   `docs/on-device-validation.md` (the float memory model + a bloom row).
-- **Done when:** with bloom active, a capture at `bg_bright > 0` is **at least** the same
-  capture at `bg_bright = 0` at every pixel and channel, within **2 bytes**. That margin is
-  earned rather than picked: adding a backdrop under a correct premultiplied OVER can only add
-  light, so the true bound is 0, and the 2 bytes cover the one legitimate way a channel can dip
-  — where coverage is partial *and* the summed max channel crosses the tonemap knee, the
-  hue-preserving scale `f(m)/m` falls as `m` rises. Measured before the fix on the shipped
-  `composite_bloom` fixture at 512x512, hardware adapter, `bg_bright` 0 vs 0.45:
-  **1810 pixels of 262 144 violated it, worst deficit 45 bytes, one pixel's green driven 45 -> 0**;
-  the control at `bloom_amount = 0` violated at **0** pixels. So the guard has a ~20x margin
-  against the defect it exists for, and a control that proves the fixture can express it. Also:
-  `tonemap-bind-layout` is a shape no other layout in `core/src` has (the check is an
-  enumeration, not a claim), and no doc says a 255 byte is unreachable.
+- **Done when:** with bloom active, **the linear composite** at `bg_bright > 0` is **at least**
+  the same composite at `bg_bright = 0` in every colour channel, bound **0** (half-precision
+  slack only). Upstream of the tonemap the frame is a plain premultiplied OVER, so a backdrop
+  underneath can only add light and there is no tolerance to negotiate. Two non-vacuity arms:
+  the fixture must still bind a non-zero `bloom_amount`, and most of the frame must *gain* light
+  from the backdrop. Also: `tonemap-bind-layout` is a shape no other layout in `core/src` has
+  (the check is an enumeration, not a claim), and no doc says a 255 byte is unreachable.
+
+  > **Correction, 2026-07-31 — this done-when originally asked for a display-byte comparison
+  > within 2 bytes, and that assertion cannot be written.** The numbers it cited
+  > (1810 px violating, worst 45 bytes, a `bloom_amount = 0` control at 0 px) were readings of
+  > the *linear* composite reported as bytes. In display space the tonemap's hue-preserving
+  > scale `f(m)/m` (ADR-0046) darkens a bright pixel's dim channels whenever anything is added
+  > underneath — measured at up to **15 bytes** on `composite_bloom` with every post stage
+  > switched **off**, seven times the defect's own display-space signal, so no byte tolerance
+  > separates the two. Re-measured on both adapters at 512x512, the byte-space control violates
+  > at 458 px (hardware) / 439 px (WARP), and isolating the clamp moves at most 3 bytes, because
+  > on this fixture the opaque region *is* the blown-out region. `dev` moved the assertion
+  > upstream of the tonemap instead, where it is exact: unclamped reads 952 channels below the
+  > unlit capture with a worst deficit of 0.3125, the fix reads 0 and 0.0000, confirmed in both
+  > directions by reverting the clamp. **The guard therefore lives in
+  > `core/src/render/bloom.rs` rather than `core/tests/bloom.rs`** — `capture::read_back_linear`
+  > is `pub(crate)` — which is why both files are in the list above.
 
 ### Phase 5 — Docs sweep
 - **Owner skill:** dev
