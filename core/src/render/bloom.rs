@@ -78,6 +78,33 @@
 //! They look arbitrary because they are — the requirement is only that they be
 //! *distinct*, and the natural orderings are all taken.
 //!
+//! # The recombine adds light, and light is not coverage
+//!
+//! This stage is the only one in the chain whose output can exceed alpha 1, and
+//! that is a defect rather than a feature — [`MIX_SHADER`] clamps it (Plan 0045
+//! Phase 4b). The chain carries **premultiplied alpha** (ADR-0055) and the
+//! recombine is the pass that blends into the chain's destination, which is where
+//! the backdrop has already been painted. So the sum it writes is a blend source:
+//!
+//! ```text
+//!   dst' = src + dst * (1 - src.a)
+//! ```
+//!
+//! `src.rgb` above 1.0 is the whole point of the linear region — the tonemap turns
+//! it back into a picture. `src.a` above 1.0 is not analogous: it drives
+//! `1 - src.a` **negative**, and the backdrop is then subtracted under the frame's
+//! brightest regions rather than covered by them. Anywhere the upstream frame is
+//! already opaque (`base.a = 1`) a non-zero halo does exactly that, which is why
+//! the symptom is a dark hole tracking the bloom.
+//!
+//! It shipped because every bloom fixture runs `bg_bright = 0` on purpose (a black
+//! backdrop makes the baseline measure the pyramid rather than the backdrop) — and
+//! on a black backdrop subtracting the backdrop and covering it are the same
+//! picture. `a_backdrop_under_an_active_halo_only_ever_adds_light` below is the
+//! guard that closes it, the same shape as `core/tests/kaleidoscope.rs`'s for the
+//! fold; **it reads the linear composite rather than a capture**, and its docs say
+//! why a display-byte version of the same assertion cannot be written.
+//!
 //! # Every pass is orientation-preserving
 //!
 //! All of them use [`gpu::FULLSCREEN_VS_UV_FLIPPED`], which despite the name is
@@ -349,7 +376,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // Additive in linear light, and above 1.0 freely — the tonemap downstream is
     // what turns the sum back into a picture. This is the whole reason the stage
     // sits inside the linear region rather than after it.
-    return base + halo * u.v.x;
+    let sum = base + halo * u.v.x;
+    // COLOUR ABOVE 1 IS LIGHT; ALPHA ABOVE 1 IS A HOLE. See the module docs: this
+    // draw blends OVER the backdrop, and a source alpha past 1 makes the blend's
+    // `1 - src.a` factor negative, which *subtracts* the backdrop under exactly
+    // the frame's brightest regions. Clamp the coverage, keep the light.
+    return vec4<f32>(sum.rgb, clamp(sum.a, 0.0, 1.0));
 }
 "#;
 
@@ -1184,6 +1216,219 @@ mod tests {
         // Degenerate inputs stay finite and never divide the halo away.
         assert!(pyramid_sum(1.0, 4).is_finite() && pyramid_sum(1.0, 4) >= 1.0);
         assert!(pyramid_sum(0.5, 0) >= 1.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // The halo does not punch a hole in the backdrop (Plan 0045 Phase 4b)
+    // -----------------------------------------------------------------------
+
+    /// The fixture, shared with `composite.rs`'s blessed baseline and
+    /// `core/tests/bloom.rs`: a small bright core on black, over range by design.
+    /// Its `bg_bright` line is stripped and rewritten per capture — the whole
+    /// point here is the value it does *not* ship.
+    const BACKDROP_FIXTURE: &str = include_str!("../../tests/fixtures/composite_bloom.toml");
+
+    /// The lit half of the comparison. Bright enough to be unmistakably present in
+    /// every channel, dim enough not to wash out the knot the halo comes from.
+    const BACKDROP_BRIGHT: f32 = 0.45;
+
+    /// Slack for half-precision rounding. The composite is `Rgba16Float`, so a
+    /// value of magnitude `m` is stored to roughly `m / 1024`, and the lit capture
+    /// quantizes a *different* sum than the dark one. Four of those.
+    ///
+    /// It is slack, not a tolerance: the property below is exact in real
+    /// arithmetic. Measured, the fixed shader's worst deficit is **0.0000** and
+    /// the unclamped one's is **0.3125**, so this sits ~150x below the defect and
+    /// ~all the way above the noise.
+    fn half_slack(value: f32) -> f32 {
+        (4.0 / 1024.0) * value.abs().max(1.0)
+    }
+
+    /// **Compositing a backdrop underneath the chain may only ADD light** — the
+    /// guard the bloom stage shipped without.
+    ///
+    /// The recombine summed **alpha** as well as colour, and it blends
+    /// `PREMULTIPLIED_ALPHA_BLENDING` into the chain's destination, where ADR-0055
+    /// paints the backdrop. Where the frame was already opaque and the halo
+    /// non-zero the source alpha exceeded 1, `1 - src.a` went negative, and the
+    /// backdrop was *subtracted* under the frame's brightest regions. See the
+    /// module docs.
+    ///
+    /// # Why this reads the linear composite and not the capture
+    ///
+    /// **A display-byte version of this assertion cannot be written.** The bytes a
+    /// capture holds are downstream of the tonemap, which scales all three
+    /// channels by `f(m)/m` off the brightest one (ADR-0046, hue-preserving). Add
+    /// a red-dominant backdrop under a magenta stroke and `m` rises, so the scale
+    /// falls, so **blue comes out darker than it did over black** — measured at up
+    /// to **15 bytes on this fixture with the bloom stage switched off entirely**.
+    /// That is the curve behaving as designed, it is seven times the defect's own
+    /// display-space signal, and no byte-level tolerance separates them.
+    ///
+    /// Upstream of the tonemap there is no such confound: the composite is a plain
+    /// premultiplied OVER, so the true bound is **0** rather than a tolerance, and
+    /// the defect is unmasked — the same fixture reads a worst deficit of
+    /// **0.3125** linear on the unclamped shader against **0.0000** on the fixed
+    /// one. That readback is `pub(crate)`, which is why this test is here rather
+    /// than beside the stage's other pixel properties in `core/tests/bloom.rs`.
+    ///
+    /// # Why it needed writing at all
+    ///
+    /// Every bloom fixture runs `bg_bright = 0` — for a baseline that is the right
+    /// call (see the fixture's own comment), and it is also why the one stage in
+    /// the chain that can exceed alpha 1 had no lit-backdrop test. On black,
+    /// subtracting the backdrop and covering it are the same picture. Same shape
+    /// as the guard `core/tests/kaleidoscope.rs` installed for the fold, and the
+    /// blind spot ADR-0055's Negative section names outright.
+    #[test]
+    fn a_backdrop_under_an_active_halo_only_ever_adds_light() {
+        use crate::dsp::AnalysisFrame;
+        use crate::preset::Preset;
+        use crate::render::capture;
+        use crate::render::context::RenderError;
+        use crate::render::{HeadlessOptions, Renderer};
+
+        /// Square and modest: this reads back a whole float frame twice.
+        const SIZE: u32 = 256;
+        /// The fixture is frozen (`spin = 0`), so this only clears the draw-in.
+        const FRAMES: u32 = 40;
+
+        // --- Non-vacuity, before any GPU work: the fixture must still switch the
+        // stage on. Edit `bloom_amount` to 0 and every assertion below would hold
+        // for the trivial reason that the pyramid never ran. ---
+        let binds_bloom = BACKDROP_FIXTURE.lines().any(|line| {
+            let line = line.trim_start();
+            line.starts_with("bloom_amount")
+                && line.contains('"')
+                && !line.contains("\"0\"")
+                && !line.contains("\"0.0\"")
+        });
+        assert!(
+            binds_bloom,
+            "composite_bloom.toml no longer binds a non-zero `bloom_amount`, so \
+             this test renders a frame with no bloom stage in it and proves nothing"
+        );
+
+        /// The linear composite the tonemap is about to map, at a given backdrop.
+        ///
+        /// Builds and drops **one** renderer per call rather than holding two: a
+        /// second live device in a binary is what the software adapter falls over
+        /// on, and the whole point of this test is a configuration that puts an
+        /// extra fullscreen pipeline (the backdrop's) on the device.
+        fn linear_composite(bg_bright: f32) -> Option<Vec<f32>> {
+            let mut renderer = match Renderer::new_headless(HeadlessOptions {
+                width: SIZE,
+                height: SIZE,
+                prefer_software: true,
+            }) {
+                Ok(renderer) => renderer,
+                Err(RenderError::RequestAdapter(_)) => {
+                    eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                    return None;
+                }
+                Err(e) => panic!("headless renderer build failed: {e}"),
+            };
+            let base: String = BACKDROP_FIXTURE
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("bg_bright"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let toml = format!("{base}\nbg_bright = \"{bg_bright}\"\n");
+            let preset =
+                Preset::from_toml_str(&toml).expect("the bloom fixture parses with a backdrop");
+            let name = preset.name.clone();
+            renderer.set_presets(vec![preset]);
+
+            let frame = AnalysisFrame {
+                bass: 0.6,
+                mid: 0.5,
+                treb: 0.6,
+                onset: 0.4,
+                bar: 0.25,
+                ..Default::default()
+            };
+            renderer
+                .capture_preset(&name, &frame, FRAMES)
+                .expect("capture the bloom fixture");
+
+            // The tonemap's input still holds that frame's linear composite.
+            let device = renderer.ctx.device.clone();
+            let queue = renderer.ctx.queue.clone();
+            let src = renderer
+                .tonemap
+                .src_texture()
+                .expect("the tonemap built its input while capturing")
+                .clone();
+            let (buffer, padded_bpr) = capture::create_linear_readback(&device, SIZE, SIZE);
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("bloom-backdrop-readback"),
+            });
+            capture::record_copy(&mut encoder, &src, &buffer, padded_bpr, SIZE, SIZE);
+            queue.submit(std::iter::once(encoder.finish()));
+            Some(
+                capture::read_back_linear(&device, &buffer, SIZE, SIZE, padded_bpr)
+                    .expect("read back the linear composite"),
+            )
+        }
+
+        let Some(dark) = linear_composite(0.0) else {
+            return;
+        };
+        let Some(lit) = linear_composite(BACKDROP_BRIGHT) else {
+            return;
+        };
+        assert_eq!(dark.len(), lit.len(), "the two captures differ in size");
+
+        // Colour only: the composite's alpha is the backdrop's own (opaque)
+        // wherever the backdrop paints, so it is 1.0 in the lit capture by
+        // construction and says nothing about the recombine.
+        let colour = |values: &[f32]| -> Vec<f32> {
+            values
+                .chunks_exact(4)
+                .flat_map(|texel| texel[..3].to_vec())
+                .collect()
+        };
+        let (dark, lit) = (colour(&dark), colour(&lit));
+
+        let (mut worst, mut violations, mut gained) = (0.0f32, 0usize, 0usize);
+        for (&d, &l) in dark.iter().zip(lit.iter()) {
+            let deficit = d - l;
+            if deficit > worst {
+                worst = deficit;
+            }
+            if deficit > half_slack(d) {
+                violations += 1;
+            }
+            if l - d > half_slack(d) {
+                gained += 1;
+            }
+        }
+        eprintln!(
+            "linear composite, bg_bright 0 -> {BACKDROP_BRIGHT}: {gained} channels \
+             gained, {violations} lost, worst deficit {worst:.4} of {}",
+            dark.len()
+        );
+
+        // --- Non-vacuity: the backdrop genuinely reached the composite. Without
+        // this the comparison would pass on two identical frames. ---
+        assert!(
+            gained * 2 > dark.len(),
+            "only {gained} of {} channels gained light when bg_bright went 0 -> \
+             {BACKDROP_BRIGHT} — the backdrop is not reaching the composite, so \
+             the assertion below is about nothing",
+            dark.len()
+        );
+
+        // --- The property. ---
+        assert_eq!(
+            violations, 0,
+            "{violations} channels of the linear composite are DARKER with a \
+             backdrop underneath than without one (worst {worst:.4}). Upstream of \
+             the tonemap this is a plain premultiplied OVER, which cannot remove \
+             light — so this is the recombine driving source alpha past 1 and \
+             making the blend's `1 - src.a` factor negative, subtracting the \
+             backdrop under the halo instead of covering it"
+        );
     }
 
     /// The knee is a positive band at every threshold a preset can bind, including

@@ -693,7 +693,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `beat` | HARD | a 120 BPM click track through the **real** DSP makes a beat-accent preset render differently on-beat vs off-beat; a zeroed beat binding does not |
 | `distinctness` | ADVISORY | prints per-family pixel + shape pairwise matrices and flags near-duplicate geometry; never asserts |
 | `golden` | HARD (tolerance) | one **frozen fixture per system** matches its committed baseline PNG within a mean + max-outlier tolerance ([ADR-0023](adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)) |
-| `composite` | HARD (tolerance) | the **post stages**, one fixture each and never all at once — `trails`, `kaleido_*`, `bloom_*`, plus one that binds **no** stage and guards the composite's *arithmetic* (its assertion is that no channel reaches 255, a claim about the tonemap's curve rather than a tolerance). Captured at **160x100**, a size whose internal grid is *not* the target's shape, so an aspect error is visible ([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) |
+| `composite` | HARD (tolerance) | the **post stages**, one fixture each and never all at once — `trails`, `kaleido_*`, `bloom_*`, plus one that binds **no** stage and guards the composite's *arithmetic* (its assertion is that no channel of *that fixture* reaches 255 — a claim about the fixture, not a general property of the curve; see the re-bless note below). Captured at **160x100**, a size whose internal grid is *not* the target's shape, so an aspect error is visible ([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) |
 | `bloom` | HARD (relative) | the bloom stage's behaviour, beside its baseline rather than in it: halo **energy** rises with `bloom_amount`, halo **extent** rises with `bloom_radius`, the rich tier's deeper pyramid reaches further than the floor's, and the halo is **round**. Captured at **256x256** — square, and load-bearing: the roundness guard is what catches a separable kernel whose two passes step in different units, and it reads 1.001 today against 7.05 under the defect it was written for. No magic numbers: every assertion compares two captures of one fixture differing in one bound param |
 | `reaction_diffusion` | HARD | the first stateful-feedback scene: seed reproducibility, regime response ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
 | `attractor` | HARD | the first compute-particle scene: seed reproducibility + beat perturbation ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
@@ -763,9 +763,22 @@ boundary. Two things follow for anything that reads pixels here:
 - **A capture is downstream of a compressive curve.** The curve is the identity
   below ~0.6 and rolls off above it, so a low- or mid-luminance assertion reads
   what it always read, and a bright one reads lower than the linear value that
-  produced it. An assertion phrased as "this pixel is 255" is no longer reachable
-  at all — the curve is bounded strictly below 1 for every finite input, which is
-  exactly what `composite_overlap` exists to pin.
+  produced it. `composite_overlap` pins that a frame of stacked additive strokes
+  rolls off instead of flattening: no channel of *that fixture* reaches 255.
+  **Do not read that as "255 is unreachable".** The curve is bounded strictly
+  below 1 for every finite input, but the surface write encodes to sRGB and
+  *rounds*, so `f(x)` crosses the last byte's midpoint at a linear input of about
+  36 at the shipped knee — and `attractor.toml` reaches it on the hardware
+  adapter. A suite-wide no-255 gate would fail on correct frames.
+- **A backdrop makes a bright pixel's dim channels darker, and that is the curve
+  working.** The roll-off scales all three channels by `f(m)/m` off the
+  *brightest* one, so adding a red-dominant `bg_*` under a magenta stroke raises
+  `m`, drops the scale, and takes blue down with it — measured at up to 15 bytes
+  on `composite_bloom` with every post stage off. Any assertion of the form
+  "compositing something underneath may only add light" therefore has to be made
+  **upstream of the tonemap**, on the linear composite, where it is exact; see
+  `a_backdrop_under_an_active_halo_only_ever_adds_light` in
+  `core/src/render/bloom.rs` (Plan 0045 Phase 4b).
 - **`--report` moved, slightly and measurably.** Re-run over the library at that
   change: reactivity max 0.060 / mean 0.012, animation max 0.042 / mean 0.006,
   coverage max 0.187 / mean 0.010, distinctness max 0.12, reachability
