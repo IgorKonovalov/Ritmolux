@@ -15,8 +15,8 @@
 //! entirely — no offscreen, no pipeline, nothing encoded. So the routing is a
 //! function of the active flags alone:
 //!
-//! - the background + scene render into the **first active** stage's input, or
-//!   straight into the destination when no stage is active;
+//! - the scene renders into the **first active** stage's input, or straight into
+//!   the destination when no stage is active;
 //! - each active stage folds into the **next active** stage's input;
 //! - the **last active** stage folds into the destination.
 //!
@@ -25,6 +25,24 @@
 //! **pure function** over the flags, with no GPU and no `self`, so the contract is
 //! unit-testable (the tests at the bottom of this file are the composite's first
 //! real coverage).
+//!
+//! # The chain carries premultiplied alpha (ADR-0055)
+//!
+//! The **backdrop is not in the chain's input.** It is painted into the chain's
+//! *destination*, and the chain composites over it — so `bg_*` is never folded,
+//! blurred or accumulated, and a stage's alpha is what lets it show through.
+//!
+//! That makes two things load-bearing that were free before. A stage's input is
+//! cleared **transparent** rather than opaque (an opaque clear holds the backdrop
+//! out of every pixel the scene did not cover), and every stage must *propagate*
+//! alpha rather than write `1.0`. [`Fold`] is how a stage learns which of the two
+//! situations its `out` is in; both use one premultiplied-OVER pipeline, because
+//! over a transparent-cleared target that blend reduces exactly to `REPLACE`.
+//!
+//! This generalizes the convention ADR-0026 already established at the scene seam,
+//! where the fullscreen scenes present premultiplied over the backdrop and the
+//! emissive ones draw additive in colour with `OVER` alpha — scene alpha was always
+//! meaningful; the chain simply used to discard it.
 //!
 //! # What is *not* in the chain
 //!
@@ -198,18 +216,81 @@ pub(crate) trait PostStage {
     /// or the surface), so this *is* the destination's aspect today — passing
     /// `surface` rather than `out`'s size is what keeps that true if a stage is
     /// ever added after the fold.
+    ///
+    /// `fold` says whether `out` is this stage's to own or something already
+    /// painted to blend over — see [`Fold`].
     fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         out: &wgpu::TextureView,
         surface: (u32, u32),
+        fold: Fold,
     ) -> u32;
 
     /// Drop the lazily-built resources, so the next active frame starts from a
     /// fresh (cleared) state. Used on the capture scene-rebuild to keep a headless
     /// capture a pure function of its inputs (NFR §6).
     fn reset_resources(&mut self);
+}
+
+/// What a stage's [`resolve`](PostStage::resolve) finds in `out` — and therefore
+/// how it must treat what is already there (ADR-0055).
+///
+/// The chain carries **premultiplied alpha**, and the backdrop is no longer inside
+/// its input: it is painted into the chain's destination and the chain composites
+/// over it. So the last active stage must *blend*, while every earlier one is
+/// writing into a scratch offscreen it owns outright.
+///
+/// Both cases use the same premultiplied-OVER pipeline. Over a target just cleared
+/// to transparent, `src + dst * (1 - src.a)` reduces to `src` in every channel, so
+/// [`Own`](Self::Own) is bit-identical to a `REPLACE` write — which is why this
+/// distinction costs a load-op and not a second pipeline per stage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Fold {
+    /// `out` is the next stage's input: this stage owns it. Clear it to
+    /// transparent first — it holds the **previous frame's** content otherwise,
+    /// since stage offscreens are persistent textures, not transient ones.
+    Own,
+    /// `out` is the chain's destination, where the backdrop is already painted.
+    /// Load and blend over it, so `bg_*` survives underneath wherever this stage's
+    /// alpha is below 1.
+    Over,
+}
+
+impl Fold {
+    /// The colour attachment load op this fold implies.
+    pub(crate) fn load_op(self) -> wgpu::LoadOp<wgpu::Color> {
+        match self {
+            // TRANSPARENT, not BLACK: an opaque clear would hold the backdrop out
+            // of every pixel the scene did not cover.
+            Self::Own => wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            Self::Over => wgpu::LoadOp::Load,
+        }
+    }
+}
+
+/// Encode a clear-only pass that blanks `view` to transparent.
+///
+/// No pipeline and no draw — just the load op — so this costs a render-pass
+/// begin/end and nothing else.
+fn clear_transparent(encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, label: &str) {
+    let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some(label),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view,
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                store: wgpu::StoreOp::Store,
+            },
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    });
 }
 
 /// One frame's composite routing: the active stages, in chain order.
@@ -407,9 +488,15 @@ impl PostChain {
         route(&active)
     }
 
-    /// The target the background + scene render into this frame. Builds the first
-    /// active stage's resources if needed; falls back to `destination` when the
-    /// chain is skipped entirely.
+    /// The target the **scene** renders into this frame. Builds the first active
+    /// stage's resources if needed; falls back to `destination` when the chain is
+    /// skipped entirely.
+    ///
+    /// The backdrop is *not* in this target (ADR-0055) — it is painted into
+    /// `destination`, underneath everything the chain will fold down. So when a
+    /// stage is active this clears that stage's input to **transparent** and the
+    /// scene draws onto nothing; the chain's alpha is what lets the backdrop show
+    /// through at the end.
     ///
     /// `destination` is **whatever runs next downstream**, not the surface
     /// specifically (ADR-0032): the transition blend's input while a dissolve runs,
@@ -425,6 +512,11 @@ impl PostChain {
             let stage = self.stages.get_mut(index)?;
             let size = stage.internal_size(surface);
             let view = stage.begin(encoder, surface)?;
+            // The scene loads rather than clears (the backdrop pass used to own
+            // this clear, and now owns `destination`'s instead), and a stage
+            // offscreen persists between frames — so without this the scene would
+            // accumulate onto the previous frame.
+            clear_transparent(encoder, &view, "post-chain-input-clear");
             Some((view, size))
         });
         let (view, size) = first.unwrap_or_else(|| (destination.clone(), surface));
@@ -460,8 +552,15 @@ impl PostChain {
             let out = next_stage
                 .and_then(|next| self.stages.get_mut(next)?.begin(encoder, surface))
                 .unwrap_or_else(|| destination.clone());
+            // The last active stage lands on the backdrop and must blend; every
+            // earlier one owns the scratch offscreen it writes (ADR-0055).
+            let fold = if next_stage.is_some() {
+                Fold::Own
+            } else {
+                Fold::Over
+            };
             if let Some(stage) = self.stages.get_mut(stage) {
-                draw_calls += stage.resolve(queue, encoder, &out, surface);
+                draw_calls += stage.resolve(queue, encoder, &out, surface, fold);
             }
         }
         draw_calls
@@ -489,7 +588,7 @@ mod tests {
     #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
     use super::{
-        KALEIDOSCOPE, POST_GRID_STEP, PostChain, PostStage, Routing, STAGE_COUNT, TRAILS,
+        Fold, KALEIDOSCOPE, POST_GRID_STEP, PostChain, PostStage, Routing, STAGE_COUNT, TRAILS,
         internal_grid_size, route,
     };
     use crate::render::TierConfig;
@@ -932,7 +1031,7 @@ mod tests {
                 label: Some("post-resize"),
             });
         stage.begin(&mut encoder, surface);
-        stage.resolve(&ctx.queue, &mut encoder, &view, surface);
+        stage.resolve(&ctx.queue, &mut encoder, &view, surface, Fold::Over);
         ctx.queue.submit(std::iter::once(encoder.finish()));
     }
 
@@ -1093,8 +1192,12 @@ mod tests {
         let src = kaleido
             .begin(&mut encoder, surface)
             .expect("the fold builds its input");
+        // The backdrop is the fold's *test pattern* here, not the chain's backdrop
+        // — this probe wants radially-structured content to measure symmetry on,
+        // and paints it straight into the fold's input. `Fold::Own` because `view`
+        // is a fresh capture target with nothing underneath to blend with.
         background.render(&ctx.queue, &mut encoder, &src);
-        kaleido.resolve(&ctx.queue, &mut encoder, &view, surface);
+        kaleido.resolve(&ctx.queue, &mut encoder, &view, surface, Fold::Own);
         let (buffer, padded_bpr) = capture::create_readback(&ctx.device, surface.0, surface.1);
         capture::record_copy(
             &mut encoder,

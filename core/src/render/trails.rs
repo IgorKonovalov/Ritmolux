@@ -40,7 +40,7 @@
 
 use super::feedback::PingPongField;
 use super::gpu;
-use super::post::{PostStage, internal_grid_size};
+use super::post::{Fold, PostStage, internal_grid_size};
 
 /// `trails` param default — off, so an unbound preset pays nothing.
 const DEFAULT_TRAILS: f32 = 0.0;
@@ -62,10 +62,15 @@ struct Fade { v: vec4<f32> } // x: fade factor
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let cur = textureSample(t_composited, samp, in.uv).rgb;
-    let prev = textureSample(t_accum, samp, in.uv).rgb;
+    let cur = textureSample(t_composited, samp, in.uv);
+    let prev = textureSample(t_accum, samp, in.uv);
     // Max-decay: the current frame at full brightness, the past fading by `fade`.
-    return vec4<f32>(max(cur, prev * u.v.x), 1.0);
+    //
+    // On ALL FOUR channels (ADR-0055). Alpha is coverage and it decays on the same
+    // schedule as colour, so a trail releases the backdrop at the rate it dims.
+    // Forcing alpha to 1 here held `bg_*` out of every pixel the trail had ever
+    // touched, permanently.
+    return max(cur, prev * u.v.x);
 }
 "#;
 
@@ -76,7 +81,9 @@ const PRESENT_SHADER: &str = r#"
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    return vec4<f32>(textureSample(t_accum, samp, in.uv).rgb, 1.0);
+    // Alpha travels with the colour (ADR-0055) — the accumulation is premultiplied
+    // and the chain composites over the backdrop downstream.
+    return textureSample(t_accum, samp, in.uv);
 }
 "#;
 
@@ -217,12 +224,17 @@ impl Resources {
         };
         let present_bg_a = make_present_bg(accum.view_a(), "trails-present-bg-a");
         let present_bg_b = make_present_bg(accum.view_b(), "trails-present-bg-b");
+        // Premultiplied-alpha OVER (ADR-0055) — see the note on the fold's
+        // pipeline: into a transparent-cleared intermediate this is bit-identical
+        // to REPLACE, and into the chain's destination it composites the trail over
+        // the backdrop. The feedback pipeline above stays REPLACE: it overwrites the
+        // accumulation wholesale rather than compositing onto it.
         let present_pipeline = gpu::fullscreen_pipeline(
             device,
             &present_shader,
             &[&present_layout],
             surface_format,
-            wgpu::BlendState::REPLACE,
+            wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
             "trails-present",
         );
 
@@ -252,7 +264,12 @@ impl Resources {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        // TRANSPARENT, not BLACK (ADR-0055). The accumulation is
+                        // premultiplied and the feedback pass takes `max(cur, prev
+                        // * fade)` on all four channels — a fresh field cleared
+                        // opaque would start every pixel at alpha 1 and hold the
+                        // backdrop out of the whole frame until it decayed away.
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -406,6 +423,7 @@ impl PostStage for Trails {
         encoder: &mut wgpu::CommandEncoder,
         out: &wgpu::TextureView,
         _surface: (u32, u32),
+        fold: Fold,
     ) -> u32 {
         let Some(res) = self.res.as_mut() else {
             return 0;
@@ -433,7 +451,9 @@ impl PostStage for Trails {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        // Fully covered by the draw below; transparent for
+                        // consistency with the accumulation's premultiplied model.
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -461,7 +481,7 @@ impl PostStage for Trails {
                 depth_slice: None,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    load: fold.load_op(),
                     store: wgpu::StoreOp::Store,
                 },
             })],

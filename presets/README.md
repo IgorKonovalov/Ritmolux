@@ -530,6 +530,13 @@ worth composing around:
 - **The corners are the backdrop's**, so `bg_hue` / `bg_bright` / `bg_vignette`
   now decide what the frame's edge looks like on any folded preset. They compose
   with the fold instead of being overwritten by it.
+- **The backdrop is underneath the fold, not inside it** (ADR-0055). It is painted
+  first and the folded scene composites over it, so `bg_vignette`'s darkening stays
+  centred on the *frame* however you drive `kaleido_center_*`, and the backdrop is
+  never chopped into the wedges. A lit backdrop is the way to give a folded preset
+  a frame edge that is not black — and it is worth turning `bg_bright` up while
+  composing a fold, because the disc's boundary is much easier to judge against a
+  lit corner than a dark one.
 
 `kaleido_center_x` / `kaleido_center_y` place the fold axis in the frame, `0..1`
 in normalized screen coordinates, default `0.5` (the centre). This is what makes

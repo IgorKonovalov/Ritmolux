@@ -1,6 +1,14 @@
 //! Pixel-level properties of the kaleidoscope fold: it does not tear at a
-//! fractional order (Plan 0049 Phase 1), and it does not paint outside its disc
-//! (Plan 0045 Phase 1 / [ADR-0047], design-backlog 0010).
+//! fractional order (Plan 0049 Phase 1), it does not paint outside its disc
+//! (Plan 0045 Phase 1 / [ADR-0047], design-backlog 0010), and — Plan 0045 Phase
+//! 2b / [ADR-0055] — its falloff lands on the **backdrop** rather than on black,
+//! while the backdrop itself stays out of the fold.
+//!
+//! The last two need a **lit** backdrop and say so in their own comments: every
+//! fold fixture in the repository runs `bg_bright = 0`, and on a black backdrop a
+//! falloff that fades to black is pixel-for-pixel a falloff that composites over
+//! the backdrop. That configuration cannot tell the two apart, which is why the
+//! defect survived sixteen confirmation captures.
 //!
 //! # Why the disc guard lives here and not in `composite.rs`
 //!
@@ -269,6 +277,52 @@ fn disc_radius(w: u32, h: u32) -> f32 {
     w.min(h) as f32 * 0.5
 }
 
+/// Mean brightest-channel value over the pixels at or beyond `factor * r_max` from
+/// the frame centre — the same region [`beyond_disc`] counts, measured as a level
+/// rather than a count.
+fn beyond_disc_mean(img: &CaptureImage, factor: f32) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    let cutoff = disc_radius(img.width, img.height) * factor;
+    let (cx, cy) = (w as f32 * 0.5, h as f32 * 0.5);
+    let mut sum = 0.0f64;
+    let mut n = 0usize;
+    for y in 0..h {
+        for x in 0..w {
+            let (dx, dy) = (x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+            if (dx * dx + dy * dy).sqrt() < cutoff {
+                continue;
+            }
+            let px = &img.rgba[(y * w + x) * 4..(y * w + x) * 4 + 3];
+            sum += px.iter().copied().max().unwrap_or(0) as f64;
+            n += 1;
+        }
+    }
+    (sum / n.max(1) as f64) as f32
+}
+
+/// Largest per-channel difference between two same-sized captures over the pixels
+/// at or beyond `factor * r_max` from the frame centre.
+fn beyond_disc_max_diff(a: &CaptureImage, b: &CaptureImage, factor: f32) -> u8 {
+    assert_eq!((a.width, a.height), (b.width, b.height), "size mismatch");
+    let (w, h) = (a.width as usize, a.height as usize);
+    let cutoff = disc_radius(a.width, a.height) * factor;
+    let (cx, cy) = (w as f32 * 0.5, h as f32 * 0.5);
+    let mut worst = 0u8;
+    for y in 0..h {
+        for x in 0..w {
+            let (dx, dy) = (x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+            if (dx * dx + dy * dy).sqrt() < cutoff {
+                continue;
+            }
+            for c in 0..3 {
+                let i = (y * w + x) * 4 + c;
+                worst = worst.max(a.rgba[i].abs_diff(b.rgba[i]));
+            }
+        }
+    }
+    worst
+}
+
 /// `(brightest channel, lit pixel count, region size)` over the pixels at or
 /// beyond `factor * r_max` from the frame centre. `factor = 0` is the whole frame.
 fn beyond_disc(img: &CaptureImage, factor: f32) -> (u8, usize, usize) {
@@ -367,5 +421,175 @@ fn the_fold_paints_nothing_outside_its_disc() {
         inside > (FIELD_W * FIELD_H) as usize / 10,
         "only {inside} pixels are lit inside the disc — the fold rendered (near) nothing, \
          so the out-of-disc assertion is satisfied vacuously"
+    );
+}
+
+// --- The falloff lands on the BACKDROP, not on black (ADR-0055). -------------
+//
+// Plan 0045 Phase 2b. Both assertions below need a **lit** backdrop, and that is
+// the whole point: every fixture that exercises the fold has `bg_bright = 0`, and
+// so did all sixteen of Phase 1's confirmation samples. On a black backdrop a
+// falloff that fades to black and a falloff that composites over the backdrop are
+// *the same picture*, so nothing captured at that configuration could tell them
+// apart — ADR-0037's lesson in another costume.
+
+/// A lit backdrop for the fold fixtures. `bg_vignette` is deliberately non-zero:
+/// it is the backdrop's own frame-centred radial structure, and the second test
+/// below is that the fold no longer replicates it into the wedges.
+const LIT_BG: &str = "bg_bright = \"0.55\"\nbg_hue = \"0.62\"\nbg_vignette = \"0.35\"\n";
+
+/// An off-centre fold axis for the invariance test.
+///
+/// Chosen so the disc — even including its falloff band — stays clear of the
+/// region the assertion reads, with margin. In the shader's aspect-corrected space
+/// (`p.x` scaled by `aspect = 128/224 = 0.571`, radii in uv-y units), a centre at
+/// `(0.40, 0.44)` gives `r_max = min(0.40 * 0.571, 0.44) = 0.2286` uv-y = 51.2 px,
+/// and the fold reaches `1.35 r_max` = 69.1 px from an axis sitting 18.6 px off
+/// the frame centre — 87.7 px at the farthest, against the 96 px cutoff
+/// (`OUT_OF_DISC * min(w, h) / 2`). Everything read is backdrop.
+const OFF_CENTER: (f32, f32) = (0.40, 0.44);
+
+/// Capture the border-filling field with the fold active, at a chosen backdrop and
+/// fold centre.
+fn capture_folded(
+    renderer: &mut Renderer,
+    frame: &AnalysisFrame,
+    bg: &str,
+    center: (f32, f32),
+) -> CaptureImage {
+    let toml = format!(
+        "{FIELD_FIXTURE}kaleido_order = \"6\"\nkaleido_angle = \"{ANGLE}\"\n\
+         kaleido_center_x = \"{}\"\nkaleido_center_y = \"{}\"\n{bg}",
+        center.0, center.1
+    );
+    let preset = Preset::from_toml_str(&toml)
+        .unwrap_or_else(|e| panic!("lit-backdrop fold fixture parses: {e}"));
+    renderer.set_presets(vec![preset]);
+    renderer
+        .capture_preset(FIELD_FIXTURE_NAME, frame, FRAMES)
+        .unwrap_or_else(|e| panic!("capture lit-backdrop fold fixture: {e}"))
+}
+
+/// Outside the disc the frame carries the **backdrop**, not black.
+///
+/// Before ADR-0055 the fold multiplied only `.rgb` by the falloff weight and forced
+/// alpha to `1.0`, so the falloff drove the picture toward black — and the backdrop
+/// was inside the fold's own input, so there was nothing underneath to land on.
+/// ADR-0047's "the falloff lands on the backdrop" was false as shipped; this is the
+/// assertion that makes it true.
+#[test]
+fn the_falloff_lands_on_the_backdrop_not_on_black() {
+    let Some(mut renderer) = headless(FIELD_W, FIELD_H) else {
+        return;
+    };
+    let frame = AnalysisFrame {
+        bass: 0.6,
+        mid: 0.5,
+        treb: 0.6,
+        onset: 0.4,
+        bar: 0.25,
+        ..Default::default()
+    };
+
+    let centre = (0.5, 0.5);
+    let dark = capture_folded(&mut renderer, &frame, "", centre);
+    let lit = capture_folded(&mut renderer, &frame, LIT_BG, centre);
+
+    let (dark_peak, _, region) = beyond_disc(&dark, OUT_OF_DISC);
+    let (lit_peak, lit_count, _) = beyond_disc(&lit, OUT_OF_DISC);
+    let (dark_mean, lit_mean) = (
+        beyond_disc_mean(&dark, OUT_OF_DISC),
+        beyond_disc_mean(&lit, OUT_OF_DISC),
+    );
+    println!(
+        "beyond {OUT_OF_DISC}x r_max ({region} px): unlit backdrop peak {dark_peak} \
+         mean {dark_mean:.2} | lit backdrop peak {lit_peak} mean {lit_mean:.2} \
+         ({lit_count} px lit)"
+    );
+
+    // --- The property: with a lit backdrop the out-of-disc region carries it. A
+    // fade to black reads this region at the unlit level whatever `bg_bright` is,
+    // so this is exactly the assertion the old shader fails. ---
+    assert!(
+        lit_mean > 16.0 && lit_count * 2 > region,
+        "the falloff did not land on the backdrop: beyond {OUT_OF_DISC}x r_max the mean \
+         brightness is {lit_mean:.2} with only {lit_count} of {region} px lit, at \
+         bg_bright = 0.55 — the fold is still fading to black"
+    );
+
+    // --- Non-vacuity 1: the same region with no backdrop bound must be dark, so
+    // the brightness above is the backdrop's doing and not the fold leaking
+    // content out there (which is design-backlog 0010, guarded separately). ---
+    assert!(
+        dark_peak <= EMPTY_TOL,
+        "with no backdrop the out-of-disc region is not empty (peak {dark_peak}) — the \
+         lit reading above cannot be attributed to bg_* "
+    );
+
+    // --- Non-vacuity 2: the two captures must differ *only* by the backdrop, so
+    // the fold itself still drew a picture inside its disc. ---
+    let inside = beyond_disc(&lit, 0.0).1 - lit_count;
+    assert!(
+        inside > (FIELD_W * FIELD_H) as usize / 10,
+        "only {inside} pixels are lit inside the disc — the fold rendered (near) nothing"
+    );
+}
+
+/// The backdrop is composited **under** the fold, so moving the fold axis does not
+/// move the backdrop.
+///
+/// `post.rs` used to render the backdrop into the first active stage's *input*,
+/// which put it inside the texture the kaleidoscope folds: `bg_vignette`'s radial
+/// darkening was replicated into the wedges, around an axis that — once Phase 1
+/// made the fold centre bindable — need not be the vignette's centre at all. With
+/// the backdrop underneath the chain (ADR-0055), the region outside the disc is
+/// untouched backdrop and is therefore *identical* however the fold axis moves.
+#[test]
+fn the_backdrop_is_not_folded_so_it_does_not_move_with_the_fold_axis() {
+    let Some(mut renderer) = headless(FIELD_W, FIELD_H) else {
+        return;
+    };
+    let frame = AnalysisFrame {
+        bass: 0.6,
+        mid: 0.5,
+        treb: 0.6,
+        onset: 0.4,
+        bar: 0.25,
+        ..Default::default()
+    };
+
+    let centred = capture_folded(&mut renderer, &frame, LIT_BG, (0.5, 0.5));
+    let shifted = capture_folded(&mut renderer, &frame, LIT_BG, OFF_CENTER);
+
+    let drift = beyond_disc_max_diff(&centred, &shifted, OUT_OF_DISC);
+    let region = beyond_disc(&centred, OUT_OF_DISC).2;
+    println!(
+        "backdrop drift beyond {OUT_OF_DISC}x r_max over {region} px, fold centre \
+         (0.5, 0.5) vs {OFF_CENTER:?}: max per-channel {drift}"
+    );
+
+    // --- The property. Both captures show pure backdrop out here (see
+    // `OFF_CENTER`'s arithmetic), and the backdrop does not know the fold exists.
+    // A folded backdrop would smear its vignette differently in the two. ---
+    assert!(
+        drift <= EMPTY_TOL,
+        "the backdrop moved with the fold axis: {drift} per-channel beyond \
+         {OUT_OF_DISC}x r_max — bg_* is being folded again"
+    );
+
+    // --- Non-vacuity: the fold centre must actually have changed the picture, or
+    // the invariance above is satisfied by two identical frames. ---
+    assert_ne!(
+        centred.rgba, shifted.rgba,
+        "moving kaleido_center_* changed nothing — the fixture is not exercising the \
+         fold centre, so the invariance above proves nothing"
+    );
+
+    // --- ...and specifically *inside* the disc, which is where it should differ. ---
+    let inner = beyond_disc_max_diff(&centred, &shifted, 0.0);
+    assert!(
+        inner > EMPTY_TOL,
+        "the two folds differ by at most {inner} per-channel over the whole frame — \
+         the off-centre axis is too small a displacement to prove anything"
     );
 }
