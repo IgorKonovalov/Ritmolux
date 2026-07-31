@@ -85,8 +85,9 @@ that "needs just a small code change" is not a preset, it's a routed request.
 
 **Every** preset, whatever its system, may additionally bind the engine-wide composite: the shared
 view transform (`zoom`, `pan_x`, `pan_y`), the background pre-pass (`bg_*`), feedback `trails`, the
-screen-space kaleidoscope (`kaleido_*`), and the terminal ink-on-paper remap
-(`ink_amount`, `paper_*`, `ink_*`). Line systems also take the geometry mirror (`mirror_*`).
+screen-space kaleidoscope (`kaleido_*`), `bloom_*`, the frame `exposure`, and the terminal
+ink-on-paper remap (`ink_amount`, `paper_*`, `ink_*`). Line systems also take the geometry mirror
+(`mirror_*`).
 
 **The expression grammar** (every `[params]` value is a quoted string, even a bare number):
 
@@ -244,13 +245,17 @@ off, and note that an embedded preset must survive the behavioral gates (`sanity
 
 ## The footguns that ruin presets
 
-- **The additive ceiling is the single biggest one.** Every scene draws *additively* and the frame
-  clips per channel, so luminance terms stack (`brightness` + `glow`/`flash` + `thickness` + what
-  `trails` has accumulated + `bg_bright`) and a hard peak renders **flat white** with the structure
-  and the palette both gone. The mirror failure is over-driven motion (`force`, `burst`, `scale`)
-  flinging the picture out of frame so loud reads as *nothing*. Hold luminance nearly flat and spend
-  peak energy on structure — the full principle, with the numbers that worked, is the first section
-  of `references/craft.md`. This one binding habit is worth more than every other footgun here.
+- **The additive ceiling is the single biggest one.** Every scene draws *additively*, so luminance
+  terms stack (`brightness` + `glow`/`flash` + `thickness` + what `trails` has accumulated +
+  `bg_bright`) and a hard peak renders as a **wash** with the structure gone. Since Plan 0045 the
+  composite is linear light with an engine tonemap, so a peak *rolls off* with its colour intact
+  rather than clipping to flat white — softer, and still the wrong place to spend the music's
+  energy. The mirror failure is over-driven motion (`force`, `burst`, `scale`) flinging the picture
+  out of frame so loud reads as *nothing*. Hold luminance nearly flat and spend peak energy on
+  structure — the full principle, with what changed at Plan 0045 and the numbers that worked, is the
+  first section of `references/craft.md`. This one binding habit is worth more than every other
+  footgun here. (What over-range light *is* now good for: `bloom_amount` finds it — see
+  `references/craft.md`'s composite section.)
 - **Presets now dissolve into each other (Plan 0023 / ADR-0024) — a preset is no longer judged
   alone.** Every switch is a ~1 s blend whose kind rotates deterministically through crossfade,
   **add/burn**, luma-dissolve and wipe, and rotation walks the `presets/` **filename sort**, so your

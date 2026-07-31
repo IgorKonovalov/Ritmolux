@@ -8,16 +8,31 @@ quiet, or between beats. None of it is enforced by the engine; it's judgment, ve
 ## First: the additive ceiling — spend peak energy on structure, not luminance
 
 **Every scene draws additively.** Particles, line segments, field samples and the feedback buffer all
-*add* light into the frame, and the frame clips per channel at 1.0. Luminance terms therefore stack:
-`brightness` + `glow`/`flash` + stroke `thickness` + whatever `trails` has accumulated + `bg_bright`.
-Push past the ceiling and the picture does not get brighter — it goes **flat white**. Colour dies with
-it (every channel pinned at 1.0 is white, whatever the palette said), and the structure that made the
-look vanishes at exactly the moment the music is most exciting.
+*add* light into the frame. Luminance terms therefore stack: `brightness` + `glow`/`flash` + stroke
+`thickness` + whatever `trails` has accumulated + `bg_bright`. Push past the point where the picture
+can absorb them and it stops getting brighter and starts getting **flatter** — the structure that made
+the look washes out at exactly the moment the music is most exciting.
+
+> **This rule changed shape at Plan 0045, and it is worth knowing which half moved.** The composite
+> used to clip per channel at 1.0: past the ceiling the frame went *flat white*, and colour died with
+> it, because every channel pinned at 1.0 is white whatever the palette said. It is now
+> floating-point linear light with an engine tonemap at the end, which **rolls off** instead —
+> identity below ~0.6, compressive above, and hue-preserving, because all three channels are scaled
+> by one factor taken from the brightest. So a hot core keeps its colour and stays readable inside,
+> and no amount of stacked light reaches pure white.
+>
+> What that means for authoring: **overshooting is now a soft loss of contrast rather than a cliff.**
+> The habit below is still the better-looking choice and still what the shipped library does — a peak
+> that is 20 % brighter than the rest of the frame reads as intense; one that is 300 % brighter reads
+> as a flash whatever the curve does with it — but it is a taste rule now, not a rescue. Two things
+> genuinely got easier: `glow` above 1 does something (the core carries the energy rather than only
+> widening a skirt), and over-range light is what `bloom_amount` finds, so a peak you used to have to
+> suppress is now something you can *spend*.
 
 This is the failure mode that broke most of an earlier version of this library, and it hides well:
 every binding looks reasonable in isolation and the quiet frame looks lovely. `brightness = "0.8 +
-clamp((bass + treb) * 6, 0, 1.1)"` reads like an ordinary gain-then-bound and renders a white
-rectangle. The gain is not the problem — the *destination* is.
+clamp((bass + treb) * 6, 0, 1.1)"` reads like an ordinary gain-then-bound and used to render a white
+rectangle; today it renders a washed-out one. The gain is not the problem — the *destination* is.
 
 **The habit that fixes it: hold luminance nearly flat, and spend the peak on structure.** A base
 around `0.7–0.9` plus a small clamped reactive term (a ceiling of ~`0.25`, not ~`1.0`) is plenty for
@@ -103,11 +118,23 @@ These are engine-wide and bindable, so treat them as instruments, not decoration
 - **`bg_*`** — a tinted, vignetted backdrop turns the sparse scenes (lines, swarm, attractor) and
   RD's voids from "shapes on black" into an atmosphere. No effect behind `fragment_field`.
 - **`trails`** — needs real motion to read; it turns a spinning curve into a light-painting. High
-  values plus a bright scene bloom out fast (it accumulates *into* the additive ceiling). It also
+  values plus a bright scene wash out fast (the accumulation stacks luminance the way everything else
+  does — see the ceiling note above, which the tonemap softened but did not remove). It also
   restarts from empty on a preset switch, so a look that *is* the accumulation takes a second to
   arrive after a dissolve — judge it a few beats in, not on the opening frames.
 - **`kaleido_*`** — instant symmetry on any scene; ride `kaleido_angle` on `time` so the fold turns
   rather than sits.
+- **`bloom_*`** (Plan 0045) — the reason to *have* an over-range peak instead of suppressing it.
+  `bloom_amount = 0` is off and free; the default `bloom_threshold = 1.0` means it finds exactly the
+  light the display could not have shown, so switching it on halos the hot spots and leaves the rest
+  alone. `bloom_radius` spreads the same energy wider without adding any, which makes it the better
+  build-up parameter of the two — a rising radius opens the frame up where a rising amount just
+  brightens it. This is the stage a beat belongs on if you want a hit to feel like light rather than
+  like a gain change.
+- **`exposure`** (Plan 0045) — one linear multiplier on the whole frame before the tonemap. The honest
+  way to make a finished preset brighter or darker without re-balancing every element against its own
+  background. Binding it to audio pumps the entire picture, which reads as the *camera* reacting; that
+  is occasionally what you want and usually not.
 - **`mirror_*`** (line scenes) — folds the *geometry*, so it builds true fractal structure rather
   than a pixel mirror. Costs segments: high order on a dense curve hits the cap.
 - **`ink_amount`** — the only route to a *dark-on-light* look, because the scenes draw additively.

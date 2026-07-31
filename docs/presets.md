@@ -133,19 +133,28 @@ that table is maintained alongside the presets and is the authoritative list.
 Beyond a system's own parameters, **every** preset may also bind the engine-wide
 compositing controls — the shared view transform (`zoom`, `pan_x`, `pan_y`), the
 background pass (`bg_*`), feedback `trails`, the screen-space kaleidoscope
-(`kaleido_*`), and the final ink-on-paper remap (`ink_*` / `paper_*`). Those are
-documented under [Engine-wide controls](../presets/README.md#engine-wide-controls-plan-0018).
+(`kaleido_*`), `bloom_*`, the frame `exposure`, and the final ink-on-paper remap
+(`ink_*` / `paper_*`). Those are documented under
+[Engine-wide controls](../presets/README.md#engine-wide-controls-plan-0018).
 
 They run in a fixed order, which is worth knowing when a look does not compose the
 way you expect:
 
 ```
-background -> scene -> post chain (trails -> kaleidoscope) -> [transition blend] -> ink -> present
+        |------------------ linear light, unbounded -------------------|  |-- 0..1 --|
+scene -> post chain (trails -> kaleidoscope -> bloom) OVER background -> [transition blend] -> tonemap/exposure -> ink -> present
 ```
 
 Everything up to and including the post chain is **per preset** — during a dissolve
-each side composites its own, independently. The blend and the ink remap are
-**engine-wide**: one pass each, over the frame both presets produced.
+each side composites its own backdrop and chain, independently. The blend, the
+tonemap and the ink remap are **engine-wide**: one pass each, over the frame both
+presets produced.
+
+**Everything left of the tonemap is floating-point linear light** (Plan 0045), so
+an additive accumulation is free to exceed 1.0 and no hand-off clips; the tonemap
+is the single place the frame becomes a displayable picture. That is why
+`bloom_threshold` can mean "brighter than the display could show" and why stacked
+strokes roll off with their colour intact instead of flattening to white.
 
 **The post chain renders at the render target's own resolution.** `trails` and
 `kaleido_*` used to run through a fixed 1280x720 grid, so composing either one
@@ -760,6 +769,16 @@ already name.
   ```
   Multiply the raw band up, then clamp so a loud passage can't blow the parameter
   out. Nearly every reactive binding is a variant of this.
+
+  On a **luminance** parameter — `brightness`, `glow`, `flash` — the clamp used to
+  be the difference between a peak and a flat white rectangle, because the frame
+  clipped per channel at 1.0. Since Plan 0045 the composite carries light past
+  1.0 and an engine tonemap rolls it off with the hue intact, so overshooting is a
+  soft loss of contrast rather than a cliff. Keep the clamp anyway: what it buys
+  now is that the peak stays *proportionate* to the rest of the frame, and it is
+  still the difference between a beat that reads as the music and one that reads
+  as a camera flash. See the additive-ceiling note in
+  [`presets/README.md`](../presets/README.md#linear-light-and-exposure-plan-0045).
 
 - **Baseline + reactive** — a resting value plus an audio-driven add:
   ```
