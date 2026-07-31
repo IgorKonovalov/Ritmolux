@@ -58,9 +58,31 @@ visible_depth = "select(mid + treb > 0.030, 7, select(mid + treb > 0.018, 6, sel
 # itself square to the frame. Any residual turn puts the tiling on a diagonal.
 rotation = "0"
 
-# The reveal now carries the per-beat motion that rotation used to. Deepened a
-# little to take that over: it sweeps further into the figure each beat.
-draw_progress = "clamp(0.45 + bar * 0.70 + clamp(onset * 0.6, 0, 0.18), 0, 1)"
+# The reveal carries the motion that rotation used to - and as of Plan 0045 it
+# carries it IN SILENCE TOO, which is the point of the `sin(time)` term.
+#
+# The whole reveal used to be audio-only: `0.45 + bar * 0.70`. With no music
+# that is a CONSTANT 0.45, and it was not alone - at silence `visible_depth`
+# sits on its bottom rung, `mirror_order` on its, and `zoom`, `thickness`,
+# `brightness`, `glow` and `trails` are all constant too. The entire preset was
+# animated by two thin terms, `scale`'s breath and the `hue` drift, and it
+# measured 0.0103 against the 0.01 animation floor - the closest to frozen in
+# the library. ADR-0055 (the backdrop leaving the post chain, so a fading trail
+# now lets the backdrop back in) cost it 0.0008 and it went under.
+#
+# Sweeping the reveal on time is the right fix rather than the convenient one:
+# it is what this preset already says its motion is, it changes WHICH SEGMENTS
+# EXIST rather than merely tinting them, and it adds no rotation - so the fold
+# stays axis-aligned and the tiling stays square to the frame. Both pinned
+# intents below survive untouched.
+#
+# 0.72 +/- 0.28 puts the trough at 0.44 - level with the 0.45 this used to rest
+# at, so its sparsest moment is the figure as it always looked - and the crest
+# at 1.00, with a mean of 0.72 well above the old resting value. The audio terms
+# still take it to a full 1.0 on a beat, so PEAK coverage is exactly what it
+# was: nothing is added to the additive ceiling (`cover` measures 0.915 already),
+# the resting state is simply no longer still.
+draw_progress = "clamp(0.72 + sin(time * 0.72) * 0.28 + bar * 0.30 + clamp(onset * 0.5, 0, 0.12), 0, 1)"
 
 # STROKE FALLOFF (Plan 0038). `glow` scales the line renderer's core-to-edge
 # term - it is the shader's per-segment falloff, NOT a bloom stage and NOT the
@@ -87,9 +109,17 @@ draw_progress = "clamp(0.45 + bar * 0.70 + clamp(onset * 0.6, 0, 0.18), 0, 1)"
 # enough that it cannot fatten a depth-7 frame into a blur.
 glow = "0.55 + clamp(bass * 5.0, 0, 0.26)"
 
-thickness  = "1.35 + clamp(mid * 30.0, 0, 0.85)"
+# Stroke weight breathes on its own slow cycle, a third rate again against
+# `scale` and `zoom`. On a figure that is nothing but line, weight is the one
+# thing that changes every lit pixel at once, and this preset needed a term that
+# does: it is a sparse drawing on a large static backdrop, so ~85% of the frame
+# cannot contribute motion at all. Kept small - the mid term above still owns
+# the audio response, and this only has to keep the strokes alive between beats.
+thickness  = "1.35 + sin(time * 0.53) * 0.22 + clamp(mid * 30.0, 0, 0.85)"
 brightness = "0.72 + clamp(mid * 12.0, 0, 0.16)"
-scale      = "0.82 + sin(time * 0.95) * 0.07 + bar * 0.05 + clamp(bass * 4.0, 0, 0.14)"
+# Breath deepened 0.07 -> 0.10. The second of the two terms that were carrying
+# this preset alone; now one of four time-scales rather than half the budget.
+scale      = "0.82 + sin(time * 0.95) * 0.10 + bar * 0.05 + clamp(bass * 4.0, 0, 0.14)"
 
 # COLOUR, and this is the "more colours" ask - within what the system allows.
 # `hue` is an offset into the line scenes' own cosine ramp and it is whole-figure:
@@ -104,7 +134,11 @@ scale      = "0.82 + sin(time * 0.95) * 0.07 + bar * 0.05 + clamp(bass * 4.0, 0,
 # measured mean so it actually contributes, and a per-beat half-sine nudges the
 # colour on the pulse. `mod(…, 1)` keeps the wrap clean - the ramp is cyclic, so
 # without it the value climbs forever and the smoothing below has to chase it.
-hue        = "mod(0.62 + time * 0.045 + clamp(treb * 18.0, 0, 0.28) + sin(bar * pi) * 0.05, 1)"
+# Drift raised again, 0.045 -> 0.075 (a full wheel in ~13 s rather than ~22 s).
+# The same argument as the doubling above - the figure travelling further and
+# faster through the ramp - and it is the one term that keeps moving when the
+# geometry is between breaths.
+hue        = "mod(0.62 + time * 0.075 + clamp(treb * 18.0, 0, 0.28) + sin(bar * pi) * 0.05, 1)"
 
 # GEOMETRY MIRROR - the source of the "several lines". Rotational copies of the
 # whole fractal, interleaving into a radial web, and MID drives the fold count
@@ -144,7 +178,11 @@ kaleido_order = "4"
 kaleido_angle = "0"
 
 
-zoom        = "1.05 + bar * 0.05 + clamp(bass * 4.0, 0, 0.14)"
+# A slow counter-breath against `scale`, at roughly half its rate and in its own
+# phase, so the tiling pushes and pulls through the fold rather than the whole
+# figure simply pulsing in step. Was audio-only, and therefore another constant
+# at silence.
+zoom        = "1.05 + sin(time * 0.41) * 0.05 + bar * 0.05 + clamp(bass * 4.0, 0, 0.14)"
 pan_y       = "-0.04 + cos(time * 0.0130) * 0.05"
 bg_hue      = "0.44 + sin(time * 0.0110) * 0.06"
 # Cap cut 0.13 -> 0.06 as well as gained. This is a full-frame wash sitting
