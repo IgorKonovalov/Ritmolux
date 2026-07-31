@@ -147,11 +147,16 @@ pub struct TierConfig {
     /// bandwidth roughly doubled with the format and the grid policy is shared.
     ///
     /// **Bloom adds to this only when a preset switches it on** (Plan 0045
-    /// Phase 4). Its pyramid is two textures per level, each level a quarter of
-    /// the last, so the whole thing converges to `2 * (1/4 + 1/16 + …) ≈ 2/3` of
-    /// one grid-sized texture — ~11 MB at this cap, on top of the ~66 MB per chain
-    /// above, and ~22 MB in the dual-live worst case. It is charged only against
-    /// presets that bind `bloom_amount`, since an inactive stage builds nothing.
+    /// Phase 4), and it is **two** allocations, not one. Its pyramid is two
+    /// textures per level, each level a quarter of the last, so the pyramid
+    /// converges to `2 * (1/4 + 1/16 + …) ≈ 2/3` of one grid-sized texture — ~11 MB
+    /// at this cap. On top of that the stage owns its own **grid-sized `bloom-src`
+    /// offscreen**, a full 16.6 MB at this cap, because a `PostStage` reads its
+    /// input from a texture it owns. So the stage costs **16.6 + ~11 ≈ 28 MB** on
+    /// top of the ~66 MB per chain above, and ~55 MB in the dual-live worst case —
+    /// which is what NFR §12's table charges and what the ~246 MB worst case there
+    /// is computed from. It is charged only against presets that bind
+    /// `bloom_amount`, since an inactive stage builds nothing.
     pub post_cap: (u32, u32),
 
     /// How many levels deep the bloom pyramid goes

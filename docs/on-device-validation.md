@@ -105,22 +105,27 @@ footprint so the vendor spread is on record.
       memory — and why the doubled float footprint is unmeasured rather than known-harmless.
       _(Plan 0033 Risks: "memory is a projection, not a measurement". Same mitigation as above — the
       cap is one constant.)_
-- [ ] **Bloom on the low-end box, 1080p — the stage no shipped preset switches on.** Plan 0045
-      Phase 4 added a bright-pass, a blur pyramid and a recombine as a third `PostStage`. It is
-      **off by default** (`bloom_amount = 0` skips the stage entirely — no offscreens, no pyramid,
-      no pipelines), and **nothing in the shipped library binds it**, so an ordinary run measures
-      none of it; the library gets bloom bindings in roadmap R6. That makes this the one item here
-      that needs a preset written for it: point `LMV_PRESET_DIR` at a scratch folder holding a copy
-      of a heavy preset with `bloom_amount = "1.0"` added, or capture through `shot --preset-file`.
-      When active the stage costs **4N passes** at `TierConfig::bloom_levels` (`Floor` = 4, `Rich` =
-      6) plus ~11 MB of pyramid at the floor cap. Report **(a)** whether fps holds ≥ 60 @ 1080p with
-      bloom active on top of `trails` + the fold, and **(b)** the p99 against the same preset with
-      `bloom_amount = 0`. **If it misses, the lever is `TierConfig::FLOOR.bloom_levels`** — a
-      capacity, not a look, so it is a smaller decision than the other levers on this page, but the
-      halo does visibly shorten. _(Plan 0045 Phase 6 measured the Rich side on the dev box's
-      discrete GPU on **shipped** presets only, and recorded that the float composite alone already
-      puts `attractor_leviathan`'s p99 at 19.0 ms there — past a 60 Hz frame, windowed. The bloom
-      half of that phase, and all of the floor-tier side, are still owed.)_
+- [ ] **Bloom on the low-end box, 1080p.** Plan 0045 Phase 4 added a bright-pass, a blur pyramid
+      and a recombine as a third `PostStage`. It is **off by default** (`bloom_amount = 0` skips
+      the stage entirely — no offscreens, no pyramid, no pipelines), so an ordinary run on most of
+      the library measures none of it. **Load `star_lantern`** — it is the shipped preset built
+      *for* this stage and binds all three params (`bloom_amount` around 0.95 rising on onset,
+      `bloom_threshold = 1.0`, `bloom_radius` around 2.15), so no scratch `LMV_PRESET_DIR` is
+      needed any more. When active the stage costs **4N passes** at `TierConfig::bloom_levels`
+      (`Floor` = 4, `Rich` = 6) plus its own grid-sized `bloom-src` offscreen and the pyramid —
+      **16.6 + ~11 ≈ 28 MB** at the floor cap (NFR §12). Report **(a)** whether fps holds ≥ 60 @
+      1080p with bloom active on top of `trails` + the fold, and **(b)** the p99 against the same
+      preset with `bloom_amount = 0`. **If it misses, the lever is
+      `TierConfig::FLOOR.bloom_levels`** — a capacity, not a look, so it is a smaller decision than
+      the other levers on this page, but the halo does visibly shorten.
+      _(Plan 0045 Phase 6 measured the **Rich** side on the dev box's discrete GPU. Bloom is
+      **not** what is expensive there: `star_lantern` runs **164 fps, p99 8.2 ms** windowed —
+      comfortably inside a 60 Hz frame — against `attractor_clifford`'s p99 19.9 ms and
+      `attractor_leviathan`'s 19.0 ms on the same run, neither of which binds bloom at all. So the
+      cost that puts the heaviest shipped preset past a 60 Hz frame at Rich is the float composite
+      plus the attractor, not this stage. **Still owed on this page:** the same `star_lantern` run
+      at **native fullscreen**, the **`Floor`-pinned** sanity pass, and all of the low-end-box
+      side.)_
 - [ ] **The reaction-diffusion present's reconstruction cost, on the low-end box, 1080p.** Plan 0033
       replaced the RD present's field sampling with a Catmull-Rom reconstruction to get the coral
       look. The present pass now calls `sample_v` **five** times per fragment, each at **nine**

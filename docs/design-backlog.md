@@ -204,6 +204,25 @@ the complaint is the fixed-grid problem, and only the `zoom > 1` half is this sa
 - **Verified against code:** yes. The composite is `background -> scene -> PostChain (trails ->
   kaleidoscope) -> [blend] -> ink -> present`; `core/src/render/` has no glow module. The line scenes
   offer `thickness` and `brightness` only.
+- **PROMOTED 2026-07-30 → [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) +
+  [Plan 0045](plans/done/0045-linear-light-and-bloom.md). ~~CLOSED 2026-07-31~~** — shipped as a
+  **screen-space `PostStage`** (the entry's first alternative, the universal one), third in the
+  chain after the fold, with bindable `bloom_amount` / `bloom_threshold` / `bloom_radius` and
+  `bloom_levels` per tier. Both of the entry's "two things to decide" were decided the way it
+  hoped: the stage is universal rather than per-scene, and it is sized to the render target, so it
+  inherits [0003](#0003--fixed-internal-resolutions-rd-at-256x256-trails-and-kaleidoscope-at-1280x720)'s
+  fix rather than the 720p problem. Its sequencing note also held —
+  [0010](#0010--the-kaleidoscope-fold-samples-outside-its-source-rectangle-and-clamps-leaving-edge-debris)
+  was decided first, in the same plan.
+  **What the entry did not anticipate, and it is the finding worth carrying:** a bloom stage is
+  only half the answer. The **additive ceiling this entry's second half measured is what would have
+  starved it** — a bright-pass over an already-clipped frame reads as haze, so the plan had to
+  convert the whole composite to linear light *first* and only then add the stage. The
+  consequence for authoring is that `bloom_threshold = 1.0` selects light that is genuinely over
+  range, so a preset written to the old keep-it-under-1.0 habit gets **nothing** from bloom. That
+  is now documented in `presets/README.md`'s bloom section, and `presets/star_lantern.toml` is the
+  worked example. The entry's `thickness`-vs-`brightness` finding survives intact and is the reason
+  `glow` is named as the cheapest fuel: it drives the core, not the width.
 
 What both presets do now is a lit, loosely-vignetted **backdrop** reading as an aura. It is a
 backdrop, not a halo: it does not follow the strokes. `trails` gives a real halo but costs the
@@ -397,6 +416,24 @@ regressions; **one of those was verified here and is not one** — see 0010.
   ("dense still has artifacts on corners", with a screenshot).
 - **Verified against code AND against the pre-Plan-0033 engine.** This entry's diagnosis is
   **corrected** from the one the lane filed.
+- **PROMOTED 2026-07-30 → [ADR-0047](adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) +
+  [Plan 0045](plans/done/0045-linear-light-and-bloom.md) Phases 1/2/2b. ~~CLOSED 2026-07-31~~** —
+  the fold now covers a **disc with a radial falloff** (the entry's third alternative), chosen from
+  a sixteen-image three-way sample set at 16:9 *and* portrait, per the user's
+  concrete-examples workflow. The edge debris is gone at every aspect, and the direct guard this
+  entry asked for exists — an assertion on the out-of-disc pixel statistic using a border-filling
+  fixture, so a future fold change cannot pass by consuming the drift budget the way this entry
+  warned `composite_kaleido.png` would. `swarm_dense`'s "pinned to dodge the defect" comment and
+  the false "six is the highest that stays clean" claim are both gone.
+  **Two things the sample set falsified, both worth reading before touching the fold again.**
+  This entry's model of the clamp alternative was wrong: a plain clamp draws a *sunburst of rays*,
+  not a flat ring, so the falloff's real job is fading rays a clamp still draws. And the falloff
+  faded to **black** rather than to the backdrop, because the backdrop was rendered *into* the
+  fold's own input — which is what [ADR-0055](adrs/0055-backdrop-leaves-the-post-chain.md) and
+  Phase 2b exist to fix.
+  **The disc itself then came back rejected in motion**, on grounds ADR-0047 already recorded as
+  its accepted cost. That is a new question, not this one reopening — see
+  [0037](#0037--the-fold-covers-a-disc-and-on-a-field-scene-that-reads-as-worse-than-the-defect-it-replaced).
 
 **The symptom.** Hard-edged geometric streaks in the frame corners at `kaleido_order = 6`, chevron
 debris on the left/right edges at `kaleido_order = 4`, clean only with the fold off (`order < 2`).
@@ -498,6 +535,16 @@ takes, do it in the same plan.
   Plan 0033 Phase 5 made `pan_*` genuinely usable there.
 - **Verified against code:** yes. `kaleidoscope.rs:69` centres the fold on `in.uv - vec2(0.5, 0.5)`,
   a hard screen centre. The stage is a `PostStage` and never sees the `ViewTransform`.
+- **PROMOTED 2026-07-30 → [ADR-0047](adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) +
+  [Plan 0045](plans/done/0045-linear-light-and-bloom.md) Phase 1. ~~CLOSED 2026-07-31~~** — shipped
+  as the entry's **first** fix shape, `kaleido_center_x` / `kaleido_center_y`, rather than the
+  second. Having the fold axis follow the `ViewTransform` was rejected explicitly in ADR-0047: it
+  couples a `PostStage` to scene state, which is the wrong direction across that seam. A bindable
+  pair gives the author the same result and more, since the centre can be driven independently of
+  the pan. The interaction this entry flagged with
+  [0010](#0010--the-kaleidoscope-fold-samples-outside-its-source-rectangle-and-clamps-leaving-edge-debris)
+  was handled the way it asked — 0010 was decided first, in the same plan, and the off-centre
+  case rides on the disc rather than on the old clamp.
 
 A translating `pan_x`/`pan_y` slides the folded rosette off centre and costs the composition its
 symmetry, because the source moves under a fold axis that does not. The lane shipped `reaction_reef`
@@ -1654,6 +1701,39 @@ visible, which is a fair description of a whole class of thing `Rich` will surfa
 turning `reseed` off to hide it would cost the preset its intended behaviour. Route after R1
 lands, since the linear composite changes what "too bright" means and may change the verdict on
 the slabs' visibility too.
+
+### Re-checked 2026-07-31 at Plan 0045's close. **Still open, and half one is not as closed as R1 promised.**
+
+R1 has landed, so the routing note above is satisfied and this entry is now takeable. What the
+re-check found, stated as what was and was not verified:
+
+- **The tonemap is doing its job at `Floor`.** A capture of this preset at 1280x800 renders a
+  saturated orange disc with its internal ribbon structure intact and **no white clipping** — the
+  roll-off is holding tone where the 8-bit additive composite used to flatten it. That is the
+  structural fix working.
+- **But "with headroom, 3x the deposit stops clipping" is not established, and Plan 0045 measured a
+  specific reason to doubt it.** Boundedness below 1.0 does not stop the sRGB byte rounding to
+  **255**, which takes a linear value of about **35** at the shipped `KNEE = 0.6` — and Phase 4b
+  measured that `attractor.toml` *already reaches that value at `Floor`* on the hardware adapter.
+  `Rich` triples the deposit into the same texels. So the disc's core may still read as flat white
+  at `Rich`, not because anything clips but because the display byte saturates. The tonemap moved
+  the ceiling; it did not remove one.
+- **This could not be settled from this session, and the reason is a gap worth naming.** The
+  discriminator both this entry and the check above want is a `Rich`-tier capture, and `shot` has
+  **no `--tier` flag** — headless capture is `Floor` by construction (ADR-0045), which is a
+  deliberate property that keeps baselines reproducible. The `--tier floor` / `--tier rich`
+  commands this entry calls "one command and the cheapest discriminator" **do not exist**; that
+  half of the entry was written against a capability the harness does not have. Settling either
+  half therefore needs the running app at `Rich`, which [Plan 0050](plans/0050-in-app-settings-and-a-browse-overlay-that-fits.md)'s
+  `[` / `]` tier swap makes an A/B in one sitting.
+- **Half two (the slabs) is untouched by Plan 0045.** It is a reseed-transient density problem in
+  the seed box, and nothing in the linear-light work addresses it. A tonemapped slab is less
+  opaque than a clipped one, so it may read as fainter, but the mechanism is unchanged.
+
+**Where it goes now:** the calibration answer (Plan 0044 Phase 4 — bring `attractor_particles`
+down to the value that holds) is **unblocked**, since the ceiling it was told to wait for has
+moved and settled. Run that before treating half one as a defect, and use the same run to
+discriminate half two.
 
 ---
 

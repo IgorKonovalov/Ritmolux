@@ -630,12 +630,37 @@ bloom on with nothing else and you get halos exactly where the frame used to
 clip, and nowhere else. That is usually what you want; reach for a lower
 threshold when you want the whole figure to glow rather than just its hot spots.
 
+**The consequence, and it is the thing that bites first: a preset authored to the
+old additive-ceiling habit gets *nothing* from this stage.** For years the
+guidance on this page was to keep light under the ceiling so it would not clip.
+Bloom's default threshold selects the light that is *over* range — so a preset
+that dutifully holds everything below 1.0 hands the bright-pass an empty frame,
+and the stage does exactly nothing. This is measured, not theoretical: a draft
+holding `brightness` under 1.0 with bloom switched on rendered **pixel-identical**
+to the same file at `bloom_amount = 0`. **Something in the frame must deliberately
+cross 1.0.** The cheapest fuel is `glow`, because it drives the stroke's *core*
+rather than its width — raising `thickness` instead spreads the same light over a
+larger quad and can move the peak the wrong way. `brightness` works too, and on
+the fullscreen scenes it is the only lever. Read `star_lantern.toml`'s header:
+that preset exists to be a worked example of this, and it records what the renders
+taught.
+
 ```toml
 [params]
 brightness      = "0.8 + clamp(bass * 2, 0, 1.2)"   # peaks over 1.0 on a hit
 bloom_amount    = "0.4 + clamp(onset * 2, 0, 0.9)"  # ...and the hit blooms
 bloom_radius    = "1.2"
 ```
+
+**Verifying a bloom preset from a still is harder than for any other stage, and
+`--set bass=1` will lie to you about it.** A held-high band is already an
+over-flattering stimulus (see `docs/capturing.md`), but the threshold makes it
+much worse here than elsewhere: at `bass = 1` the figure sits far over range and
+the halo is enormous, while on real material — where a bass *mean* is around
+0.007 against peaks near 0.19 — the frame may never cross the threshold at all.
+Every other stage degrades smoothly between those two worlds; this one is a
+cliff. Check a bloom preset with `--signal dynamic:<bpm>` or `--audio`, and treat
+a `--set` still as a look at the loudest single frame the preset will ever have.
 
 `bloom_amount` and `bloom_radius` are independent on purpose: raising the radius
 spreads the same energy wider rather than adding more, so a preset can ride the
