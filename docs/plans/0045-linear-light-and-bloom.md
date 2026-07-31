@@ -1,10 +1,19 @@
 # 0045 — Linear light: the HDR composite, the bloom stage, and the fold that had to be fixed first
 
-> **Status:** in-progress 2026-07-30 — Phase 1 landed; **Phase 2 (`human`) is owed next**
+> **Status:** in-progress 2026-07-31 — Phases 1-2 done (the fold is confirmed: **falloff-disc
+> ships**, [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) now carries an
+> Outcome). **Phase 2b (`dev`) is next and Phase 3 is gated on it** — Phase 2 surfaced that the
+> falloff fades to black rather than to the backdrop, whose cause is structural
+> ([ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md)). Phase 2's own cleanup
+> (delete the losing fold variants, the temporary `kaleido_domain` switch, and `docs/samples/`)
+> is **owed by `dev`** and folds into Phase 2b's commit.
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (linear-light + bloom + tonemap),
-> [0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) (fold domain),
+> [0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) (fold domain, **confirmed
+> 2026-07-31 with an Outcome**),
+> [0055](../adrs/0055-backdrop-leaves-the-post-chain.md) (the backdrop leaves the chain;
+> premultiplied alpha through the composite — added mid-plan by Phase 2),
 > [0045](../adrs/0045-quality-tiers-floor-and-rich.md) (tier values this plan consumes).
 > [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md) R1.
 
@@ -31,20 +40,39 @@ values.
 
 Per ADR-0046 (full linear-light conversion; engine-fixed tonemap; four bindable params;
 formats identical across tiers) and ADR-0047 (disc fold with radial falloff + bindable
-centre, confirmed against rendered samples). Rejected alternatives are recorded there.
+centre, confirmed against rendered samples 2026-07-31). Rejected alternatives are recorded
+there.
+
+**Added mid-plan by Phase 2:** ADR-0055 — the backdrop leaves the post chain and is
+composited underneath an alpha-carrying chain. This was not in the original scope; Phase 2's
+sample set exposed that ADR-0047's "the falloff lands on the backdrop" is false as shipped,
+and the cause is that the backdrop is rendered *into* the fold's own input. The user routed it
+here rather than to the backlog, and chose it as a phase inside this plan rather than a
+separate one.
 
 ## Architecture diagram
 
 ```mermaid
 flowchart LR
-    subgraph "linear light, Rgba16Float"
-        BG[background] --> SC[scene] --> TR[trails] --> KA["kaleidoscope<br/>(disc fold, ADR-0047)"] --> BL["bloom<br/>(new PostStage)"] --> XB[transition blend]
+    subgraph chain["PostChain — premultiplied alpha (ADR-0055)"]
+        SC[scene] --> TR[trails] --> KA["kaleidoscope<br/>(disc fold, ADR-0047)"] --> BL["bloom<br/>(new PostStage)"]
     end
-    XB --> TM["tonemap + exposure<br/>(engine-fixed curve)"]
-    subgraph "display-referred, 8-bit"
-        TM --> INK[ink] --> PR[present]
+    subgraph linear["linear light, Rgba16Float"]
+        BG["background (bg_*)<br/>no longer folded"] --> OV["composite<br/>(chain OVER backdrop)"]
+        OV --> XB[transition blend]
+        XB --> TM["tonemap + exposure<br/>(engine-fixed curve)"]
     end
+    subgraph display["display-referred, 8-bit"]
+        INK[ink] --> PR[present]
+    end
+    BL -->|"premultiplied alpha OVER"| OV
+    TM --> INK
 ```
+
+The backdrop sits **under** the chain rather than inside its input — that is Phase 2b's change
+(ADR-0055), and it is what makes the fold's falloff land on `bg_*` instead of on black. Both
+live chains composite their own backdrop before the transition blend, so a dissolve keeps each
+side's `bg_*`.
 
 ## Implementation phases
 
@@ -66,7 +94,7 @@ flowchart LR
   it); `swarm_dense.toml`'s "pinned to dodge the defect" comment is obsolete (left for the
   content lane to act on); the three-way sample set exists at both aspects.
 
-### Phase 2 — The user picks the fold treatment
+### Phase 2 — The user picks the fold treatment — **DONE 2026-07-31**
 - **Owner skill:** human
 - **What:** confirm or flip ADR-0047 from the rendered samples (falloff-disc vs hard disc
   vs wrap), at both aspects. **Stopping condition:** if the falloff-disc is rejected, stop
@@ -74,8 +102,46 @@ flowchart LR
   instead; do not proceed to Phase 3 with an unconfirmed fold.
 - **Done when:** the pick is recorded in ADR-0047 (Outcome note), the losing variants and
   the temporary switch are deleted, and the sample files are removed.
+- **Outcome:** **the falloff-disc is confirmed** — the stopping condition did not fire. The
+  pick and its reasoning are recorded in ADR-0047's Outcome section, together with two
+  findings the samples produced: this ADR's model of the plain-clamp alternative was wrong
+  (it draws a sunburst of rays, not a flat ring), and a fourth treatment (`vignette`) was
+  rendered and rejected. **The deletion half of the done-when is carried into Phase 2b** —
+  it is `dev` work in the `lmv-plan-0045` worktree, and doing it in the same commit as the
+  alpha restructure keeps one golden re-bless instead of two. A third finding — the falloff
+  fades to black rather than to the backdrop — is what Phase 2b exists to fix.
+
+### Phase 2b — The backdrop leaves the chain: premultiplied alpha through the composite
+- **Owner skill:** dev
+- **What:** implement [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md). The chain's
+  stage inputs clear **transparent**; each stage propagates alpha instead of forcing `1.0`
+  (for the kaleidoscope this is the fix — the falloff weight `w` multiplies **colour and
+  alpha together**, so it fades to transparent, not to black); `Background` renders into the
+  chain's **destination** rather than the first active stage's input, and the **last active**
+  stage's resolve blends `PREMULTIPLIED_ALPHA_BLENDING` over it instead of `REPLACE`
+  (intermediate resolves stay `REPLACE`); the trails accumulation decays alpha on the same
+  schedule as colour. The no-active-stage path is untouched. **Also do Phase 2's owed
+  cleanup in this commit:** delete the losing fold variants and the temporary
+  `kaleido_domain` switch (including its `presets/README.md` entry and the `Repeat`-sampler
+  branch), and `git rm -r docs/samples/`.
+- **Files touched:** `core/src/render/post.rs` (routing + the resolve blend),
+  `core/src/render/background.rs` (destination), `core/src/render/kaleidoscope.rs` (alpha in
+  the falloff; variant deletion), `core/src/render/trails.rs` (alpha decay),
+  `core/tests/composite.rs` + a new lit-backdrop fixture, affected `core/tests/golden/*`,
+  `presets/README.md`, `docs/samples/` (removed).
+- **Done when:** a capture at **`bg_bright > 0`** with the fold active shows the falloff
+  landing on the backdrop rather than darkening toward black — asserted, not eyeballed, since
+  this is the configuration the sixteen Phase 1 samples did not have and therefore could not
+  have caught; `bg_vignette` is no longer replicated into the fold's wedges (assert the
+  backdrop's radial darkening stays frame-centred while `kaleido_center_*` is moved off
+  centre); with every post stage inactive, existing baselines are **byte-identical** (the
+  untouched-path claim, proven the Plan 0038 way); `kaleido_domain` is gone from the code,
+  the params list and `presets/README.md`; `docs/samples/` is gone.
 
 ### Phase 3 — The float composite and the tonemap pass
+> **Gated on Phase 2b.** Do not start this phase until the alpha model is settled — a tonemap
+> on top of an alpha bug makes the alpha bug unreadable in a capture (ADR-0055, Notes).
+
 - **Owner skill:** dev
 - **What:** move scene targets, trails-composited, kaleido-src, blend snapshot/live and
   ink-src from the surface format to `Rgba16Float`; add the tonemap + exposure fullscreen
@@ -148,7 +214,16 @@ No new public structs; the C ABI stays v4. New named params (all ordinary bindab
 - **The golden re-bless is the dominant cost and the dominant risk.** Phase 3 moves every
   baseline once; the eyes-on-per-scene discipline is the mitigation, and the
   `LMV_BLESS`-rewrites-everything trap applies in every later phase too (restore unrelated
-  WARP-noise rewrites before staging — Plans 0033/0039/0040 all hit it).
+  WARP-noise rewrites before staging — Plans 0033/0039/0040 all hit it). **Phase 2b moves the
+  lit-backdrop subset a second time** — that overlap is accepted deliberately (ADR-0055's
+  third Negative) to keep the alpha restructure separately reviewable from the float
+  conversion.
+- **Phase 2b's defect class is invisible at the configuration we author at.** Alpha bugs in
+  the chain only show against a lit backdrop, and near-black backdrops are the norm across the
+  library — which is exactly why sixteen Phase 1 samples missed the black-fade in the first
+  place. The mitigation is that Phase 2b's done-when *requires* a `bg_bright > 0` fixture; do
+  not let it be satisfied by a capture on a dark preset. Same shape as ADR-0037's lesson: a
+  configuration where two things coincide cannot tell you which one the code used.
 - **Floor-tier bandwidth is unmeasured until on-device.** The float chain roughly doubles
   composite bandwidth; the named relief lever is the Floor post cap (post.rs docstring
   already prescribes lowering it). Phase 6 measures the Rich side; the Floor side on real

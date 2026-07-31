@@ -1840,3 +1840,35 @@ It cost a code read to establish that `beat_index` existed, and it is the differ
 value every beat is impossible" and "`hash(beat_index)`". Small, but it sits on the most-read line of
 the most-read authoring document. Flagging for the next close-ceremony doc sweep rather than
 proposing anything.
+
+---
+
+## 0036 — the kaleidoscope stops folding the backdrop; is a folded backdrop a look worth keeping?
+
+- **Raised:** 2026-07-31, from `architect`, while writing ADR-0055 for Plan 0045 Phase 2b.
+- **Verified against code:** yes — `post.rs` routes background + scene into the first active
+  stage's input, and `background.rs` paints a palette times a vertical gradient times a radial
+  `bg_vignette`.
+
+This is a **content question, not an open architectural one.** ADR-0055 is decided: the backdrop
+leaves the post chain and composites underneath it, which is what makes the fold's falloff land on
+`bg_*` instead of on black. A consequence of that decision is that the backdrop **stops being
+folded** — today the kaleidoscope replicates `bg_vignette`'s radial darkening into the wedge
+pattern, and after Phase 2b it will not.
+
+Nobody chose that behaviour; it fell out of the routing. But it has been shipping for as long as
+the fold and the backdrop have coexisted, so some presets in the library may be leaning on it
+without anyone having named it — a folded gradient does put tinted structure in the wedges that a
+flat underlay will not.
+
+**What is actually being asked:** after Phase 2b lands, does any preset that binds both `bg_bright`
+and `kaleido_*` look *worse*? The fold-binding presets are the population to check, and
+`swarm_dense` (which pins `kaleido_order = 1` to dodge the old defect and is due an un-pin anyway)
+is a natural first look.
+
+**If the answer is "we lost something",** the way back is **not** reverting the alpha model. It
+would be a bindable choice about *where* the backdrop composites — under the chain (the new
+default) or into its input (today's behaviour) — which is a small named param on an already-settled
+structure. Nobody should build that until a real preset is worse off.
+
+**Not deciding:** anything. ADR-0055 stands regardless of the answer here.
