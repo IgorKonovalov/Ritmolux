@@ -145,7 +145,27 @@ pub struct TierConfig {
     /// **This cap is the relief lever** if the float chain misses NFR §1 on a
     /// floor-tier iGPU: lower it rather than re-fixing the grids (ADR-0046), since
     /// bandwidth roughly doubled with the format and the grid policy is shared.
+    ///
+    /// **Bloom adds to this only when a preset switches it on** (Plan 0045
+    /// Phase 4). Its pyramid is two textures per level, each level a quarter of
+    /// the last, so the whole thing converges to `2 * (1/4 + 1/16 + …) ≈ 2/3` of
+    /// one grid-sized texture — ~11 MB at this cap, on top of the ~66 MB per chain
+    /// above, and ~22 MB in the dual-live worst case. It is charged only against
+    /// presets that bind `bloom_amount`, since an inactive stage builds nothing.
     pub post_cap: (u32, u32),
+
+    /// How many levels deep the bloom pyramid goes
+    /// ([`Bloom`](super::bloom::Bloom), ADR-0046).
+    ///
+    /// This is a **capacity**, not a look: each level doubles the halo's reach and
+    /// costs three passes at a quarter of the previous level's area, so the tail
+    /// is cheap in pixels and not free in passes. The floor runs four (a halo
+    /// reaching ~16 of the grid's texels at the default radius); rich runs six,
+    /// which is where the widest levels start to matter on a 1440p-class grid.
+    ///
+    /// [`level_sizes`](super::bloom) clamps this down on a small render target, so
+    /// a value here is an upper bound rather than a promise.
+    pub bloom_levels: u32,
 
     /// How many GPU-resident particles the attractor integrates and draws.
     ///
@@ -190,6 +210,7 @@ impl TierConfig {
     pub const FLOOR: Self = Self {
         tier: Tier::Floor,
         post_cap: (1920, 1080),
+        bloom_levels: 4,
         attractor_particles: 50_000,
         attractor_trail_cap: (2560, 1440),
         swarm_particles: 10_000,
@@ -207,6 +228,7 @@ impl TierConfig {
     pub const RICH: Self = Self {
         tier: Tier::Rich,
         post_cap: (2560, 1440),
+        bloom_levels: 6,
         attractor_particles: 150_000,
         attractor_trail_cap: (3840, 2160),
         swarm_particles: 30_000,
@@ -390,6 +412,7 @@ mod tests {
         let (floor, rich) = (TierConfig::FLOOR, TierConfig::RICH);
         assert!(rich.post_cap.0 >= floor.post_cap.0);
         assert!(rich.post_cap.1 >= floor.post_cap.1);
+        assert!(rich.bloom_levels >= floor.bloom_levels);
         assert!(rich.attractor_particles >= floor.attractor_particles);
         assert!(rich.attractor_trail_cap.0 >= floor.attractor_trail_cap.0);
         assert!(rich.attractor_trail_cap.1 >= floor.attractor_trail_cap.1);

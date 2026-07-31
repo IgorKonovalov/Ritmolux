@@ -24,6 +24,7 @@
 // (ADR-0031); the engine-wide passes stay outside it (ADR-0032) — `background`
 // is the pre-pass that owns the clear, `ink` the terminal tone remap.
 pub(crate) mod background;
+pub(crate) mod bloom;
 pub mod capture;
 pub mod context;
 pub mod feedback;

@@ -4,9 +4,11 @@
 //!
 //! # The order, and the skip rule
 //!
-//! The chain is `trails -> kaleidoscope -> destination`, built as a compile-time
-//! constant array in [`PostChain::new`]. That order is ADR-0018's product decision
-//! (feedback before the screen-space fold). This is **not** a render graph and
+//! The chain is `trails -> kaleidoscope -> bloom -> destination`, built as a
+//! compile-time constant array in [`PostChain::new`]. That order is ADR-0018's
+//! product decision (feedback before the screen-space fold) extended by ADR-0046
+//! (bloom last, so its bright-pass reads the finished HDR frame). This is **not**
+//! a render graph and
 //! **not** a registration point: nothing reorders the array at runtime, and the
 //! only way to add a stage is to add an array element and a [`PostStage`] impl.
 //!
@@ -93,13 +95,14 @@
     clippy::unreachable
 )]
 
+use super::bloom::Bloom;
 use super::kaleidoscope::Kaleidoscope;
 use super::trails::Trails;
 
 /// How many stages the chain holds. A compile-time constant, not a capacity:
 /// [`PostChain::new`] fills the array exactly, and [`Routing`] is sized from it so
 /// a frame's routing costs no allocation.
-pub(crate) const STAGE_COUNT: usize = 2;
+pub(crate) const STAGE_COUNT: usize = 3;
 
 /// Quantization step for each axis of a post stage's internal grid.
 ///
@@ -135,6 +138,7 @@ pub(crate) fn internal_grid_size(surface: (u32, u32), cap: (u32, u32)) -> (u32, 
 /// ADR-0018 ordering claim read as assertions rather than magic indices.
 pub(crate) const TRAILS: usize = 0;
 pub(crate) const KALEIDOSCOPE: usize = 1;
+pub(crate) const BLOOM: usize = 2;
 
 /// Each stage's declared parameter vocabulary, **in chain order** — the same
 /// consts the stages themselves match on, so there is no second copy to drift.
@@ -145,8 +149,11 @@ pub(crate) const KALEIDOSCOPE: usize = 1;
 /// answer is fixed the moment a preset is parsed, and a chained
 /// `set_param(&str, ..)` fallthrough inside the hot loop is a link every new
 /// stage would lengthen (Plan 0031 Phase 3).
-pub(crate) const STAGE_PARAMS: [&[&str]; STAGE_COUNT] =
-    [super::trails::PARAMS, super::kaleidoscope::PARAMS];
+pub(crate) const STAGE_PARAMS: [&[&str]; STAGE_COUNT] = [
+    super::trails::PARAMS,
+    super::kaleidoscope::PARAMS,
+    super::bloom::PARAMS,
+];
 
 /// The chain position that owns `name`, or `None` when no stage does. **Pure** —
 /// a lookup over the static vocabularies above, with no GPU and no chain
@@ -431,6 +438,12 @@ impl PostChain {
             stages: [
                 Box::new(Trails::new(device, surface_format, tier.post_cap)),
                 Box::new(Kaleidoscope::new(device, surface_format, tier.post_cap)),
+                Box::new(Bloom::new(
+                    device,
+                    surface_format,
+                    tier.post_cap,
+                    tier.bloom_levels,
+                )),
             ],
         };
         // The array above *is* the composite order, and the routing contract is
@@ -446,6 +459,11 @@ impl PostChain {
             chain.stage_names().get(KALEIDOSCOPE).copied(),
             Some("kaleidoscope"),
             "the screen-space fold runs after the feedback (ADR-0018)"
+        );
+        debug_assert_eq!(
+            chain.stage_names().get(BLOOM).copied(),
+            Some("bloom"),
+            "bloom is last, so its bright-pass sees the folded HDR frame (ADR-0046)"
         );
         // `STAGE_PARAMS` is what load-time route resolution reads, so its order
         // has to be this array's order — otherwise a resolved `Stage(i)` would
@@ -600,8 +618,8 @@ mod tests {
     #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
     use super::{
-        Fold, KALEIDOSCOPE, POST_GRID_STEP, PostChain, PostStage, Routing, STAGE_COUNT, TRAILS,
-        internal_grid_size, route,
+        BLOOM, Fold, KALEIDOSCOPE, POST_GRID_STEP, PostChain, PostStage, Routing, STAGE_COUNT,
+        TRAILS, internal_grid_size, route,
     };
     use crate::render::TierConfig;
     use crate::render::background::Background;
@@ -792,7 +810,7 @@ mod tests {
     /// folds. The passthrough every shipped preset takes today.
     #[test]
     fn no_active_stage_renders_the_scene_to_the_surface() {
-        let routing = route(&[false, false]);
+        let routing = route(&[false; STAGE_COUNT]);
         assert_eq!(
             routing.scene_stage(),
             None,
@@ -806,7 +824,7 @@ mod tests {
     /// a separate branch per stage.
     #[test]
     fn a_single_active_stage_resolves_to_the_surface() {
-        for stage in [TRAILS, KALEIDOSCOPE] {
+        for stage in [TRAILS, KALEIDOSCOPE, BLOOM] {
             let mut active = [false; STAGE_COUNT];
             active[stage] = true;
             let routing = route(&active);
@@ -823,15 +841,20 @@ mod tests {
         }
     }
 
-    /// Both active: trails folds into the kaleidoscope's input and the
-    /// kaleidoscope into the destination — ADR-0018's feedback-then-fold order.
+    /// All three active: trails folds into the kaleidoscope's input, the
+    /// kaleidoscope into bloom's, and bloom into the destination — ADR-0018's
+    /// feedback-then-fold order with ADR-0046's bloom-last on the end.
     #[test]
     fn all_active_stages_fold_in_composite_order() {
-        let routing = route(&[true, true]);
+        let routing = route(&[true; STAGE_COUNT]);
         assert_eq!(routing.scene_stage(), Some(TRAILS));
         assert_eq!(
             edges(&routing),
-            vec![(TRAILS, Some(KALEIDOSCOPE)), (KALEIDOSCOPE, None)]
+            vec![
+                (TRAILS, Some(KALEIDOSCOPE)),
+                (KALEIDOSCOPE, Some(BLOOM)),
+                (BLOOM, None),
+            ]
         );
     }
 
@@ -839,13 +862,26 @@ mod tests {
     /// renders **directly** into the kaleidoscope's input and the walk starts
     /// there, rather than the array position surviving as an empty slot. This is
     /// [`route`]'s compaction — the mechanism the old ladder answered with a nested
-    /// `else if`, and the one a third stage would exercise at more positions.
+    /// `else if`.
+    ///
+    /// The **middle**-stage skip is the case a two-stage chain could not express
+    /// at all: with trails and bloom on and the fold off, the walk has to jump
+    /// position 0 straight to position 2.
     #[test]
     fn a_skipped_stage_compacts_the_walk() {
-        let routing = route(&[false, true]);
+        let routing = route(&[false, true, false]);
         assert_eq!(routing.scene_stage(), Some(KALEIDOSCOPE));
         assert_eq!(routing.active_stages(), &[KALEIDOSCOPE]);
         assert_eq!(edges(&routing), vec![(KALEIDOSCOPE, None)]);
+
+        let skipped_middle = route(&[true, false, true]);
+        assert_eq!(skipped_middle.scene_stage(), Some(TRAILS));
+        assert_eq!(skipped_middle.active_stages(), &[TRAILS, BLOOM]);
+        assert_eq!(
+            edges(&skipped_middle),
+            vec![(TRAILS, Some(BLOOM)), (BLOOM, None)],
+            "trails must hand straight to bloom when the fold is off"
+        );
     }
 
     /// The invariant, over every combination: whatever runs, the last active stage
@@ -884,9 +920,10 @@ mod tests {
         let chain = PostChain::new(&ctx.device, ctx.surface_format(), &FLOOR);
         assert_eq!(
             chain.stage_names(),
-            ["trails", "kaleidoscope"],
+            ["trails", "kaleidoscope", "bloom"],
             "the chain is exactly the per-preset look; the engine-wide passes \
-             (background, blend, ink) are driven outside it (ADR-0032)"
+             (background, blend, tonemap, ink) are driven outside it \
+             (ADR-0032/0046)"
         );
     }
 
@@ -1030,6 +1067,7 @@ mod tests {
     struct Stages {
         trails: crate::render::trails::Trails,
         kaleido: crate::render::kaleidoscope::Kaleidoscope,
+        bloom: crate::render::bloom::Bloom,
     }
 
     /// Drive one `begin`/`resolve` frame through `stage` at `surface`, discarding
@@ -1068,10 +1106,17 @@ mod tests {
                 format,
                 FLOOR.post_cap,
             ),
+            bloom: crate::render::bloom::Bloom::new(
+                &ctx.device,
+                format,
+                FLOOR.post_cap,
+                FLOOR.bloom_levels,
+            ),
         };
-        // Both stages have to be active or `begin` is never reached.
+        // Every stage has to be active or `begin` is never reached.
         assert!(stages.trails.set_param("trails", 0.9));
         assert!(stages.kaleido.set_param("kaleido_order", 6.0));
+        assert!(stages.bloom.set_param("bloom_amount", 0.8));
 
         // Two sizes that the policy maps to *different* grids, so the compare has
         // something to see. (Sizes inside one 256 px step deliberately do not
@@ -1087,13 +1132,16 @@ mod tests {
         for _ in 0..5 {
             pump(&ctx, &mut stages.trails, small);
             pump(&ctx, &mut stages.kaleido, small);
+            pump(&ctx, &mut stages.bloom, small);
         }
         assert_eq!(stages.trails.build_count(), 1, "five frames, one build");
         assert_eq!(stages.kaleido.build_count(), 1, "five frames, one build");
+        assert_eq!(stages.bloom.build_count(), 1, "five frames, one build");
 
         for _ in 0..3 {
             pump(&ctx, &mut stages.trails, large);
             pump(&ctx, &mut stages.kaleido, large);
+            pump(&ctx, &mut stages.bloom, large);
         }
         assert_eq!(
             stages.trails.build_count(),
@@ -1102,6 +1150,11 @@ mod tests {
         );
         assert_eq!(
             stages.kaleido.build_count(),
+            2,
+            "a size change builds once more"
+        );
+        assert_eq!(
+            stages.bloom.build_count(),
             2,
             "a size change builds once more"
         );
@@ -1112,6 +1165,7 @@ mod tests {
         for _ in 0..3 {
             pump(&ctx, &mut stages.trails, small);
             pump(&ctx, &mut stages.kaleido, small);
+            pump(&ctx, &mut stages.bloom, small);
         }
         assert_eq!(
             stages.trails.build_count(),
@@ -1120,6 +1174,11 @@ mod tests {
         );
         assert_eq!(
             stages.kaleido.build_count(),
+            3,
+            "returning to a size rebuilds"
+        );
+        assert_eq!(
+            stages.bloom.build_count(),
             3,
             "returning to a size rebuilds"
         );
