@@ -1702,3 +1702,141 @@ Low and honest about it. Nobody has reported it, the two rates that dominate (44
 clean, and the failure is a coarser low end rather than anything broken. Worth taking the day
 someone runs the standalone on a 96 kHz interface and says the sub-bass reads mushy — at which
 point this entry is the starting measurement rather than a fresh investigation.
+
+---
+
+## Entries 0033-0035 — the 2026-07-30 `preset-author` batch (fifth), from two figurative requests
+
+The user asked for two looks that are **figurative** rather than generative, which is a class this
+library has never been asked for before:
+
+1. the Windows Solitaire win-cascade, with **hearts** instead of cards — red fill, black outline,
+   falling at a rate set by the BPM, arcing off in different directions and leaving a trail of
+   stamped copies;
+2. **small seven-, eight- and nine-pointed stars**, white-gold on black, twinkling and flashing on
+   bass and beat.
+
+Both were rendered as far as the current surface reaches before being reported. The two requests
+are independent in the user's mind and turned out to share **exactly one** root gap, which is why
+they are filed together. Neither look shipped; the drafts were discarded on the user's instruction.
+
+**What was already sufficient, and should be said first:** the *audio* half of "falls at a speed
+that depends on the BPM, a new one on every beat" needs nothing. `tempo` is BPM, and ADR-0050's
+clock — `beat_index`, `time_since_beat`, `beat_in_bar`, `bar_index`, `bar_phase` — supplies both the
+per-beat event and the phase to drive an arc from. The gap in both requests is entirely in **what
+can be drawn**, not in what can be heard.
+
+---
+
+## 0033 — every mark the engine can draw is a round additive blob or a stroked curve, so no *object* has a shape
+
+- **Raised:** 2026-07-30, from `preset-author`, by both requests above independently.
+- **Verified against code:** yes — `core/src/render/scenes/swarm.rs` (`fs_main`),
+  `core/src/render/scenes/particles/mod.rs`, `core/src/render/scenes/lines/*`,
+  `core/src/render/ink.rs`.
+
+The engine has **no shape vocabulary for an object**. There are exactly two mark-making models:
+
+- **Particles are one hardcoded round blob.** The swarm's fragment shader is three lines —
+  `let d = length(in.local); let falloff = max(0.0, 1.0 - d); let g = falloff * falloff;` — a radial
+  falloff with no shape input at all. The attractor's compute points are the same idea. There is no
+  glyph atlas, no SDF, no shape parameter, and nothing in `PARAMS` that could carry one.
+- **Line scenes stroke a generator's path.** `maurer_rose`, the L-system turtle, the Hankin
+  rosette, the spectrum comb. These *can* make a shape, but only one figure, centred, whole-frame,
+  and only as a **stroke** — there is no fill.
+
+**The second half is worse than the first: the pipeline is additive, so a dark mark cannot exist.**
+Every scene blends additively (`swarm.rs`: *"Additive: overlapping particles bloom brighter"*), which
+is a lightening model — black adds zero. A red-filled heart with a black outline is **three** tones
+(light ground, red body, black edge) and the only dark-on-light route in the engine is the ink stage,
+which is structurally **two**-poled: `mix(paper, ink, luminance)`.
+
+**Measured, not assumed.** I drew the cardioid `r = 1 - sin(theta)` through `parametric_curve`
+(`n = 1`, `phase = -pi`, `radial_offset = 1`) — a genuinely recognisable heart, and a useful data
+point that the *outline* is reachable today. Running the same figure at `ink_amount = 1` with white
+paper and black ink rendered the outline **grey, not black**: a thin anti-aliased stroke averages to
+mid luminance, so it lands halfway down the paper→ink ramp. The ink stage cannot produce a crisp dark
+contour around a light interior, because the contour is not where the luminance is.
+
+**The star half lands on the same gap.** Small 7/8/9-pointed stars scattered across the frame are not
+reachable: the swarm can put ten thousand small marks anywhere, but they are round; `parametric_curve`
+with `radial_offset = 1` gives exactly `n` lobes and can flip the count every beat
+(`n = "7 + floor(hash(beat_index) * 2.999)"`, which works and is rather nice) — but it is **one large
+centred figure**, and `mirror_order` replicates about the origin, so the copies land on each other
+rather than scattering. Rendered both; the starfield reads well as a starfield and not at all as
+*stars with points*.
+
+**Why this is not a preset problem.** There is no combination of existing params that gets closer.
+Whatever the answer is — a shape enum on the particle sprite, an SDF glyph, an author-supplied WGSL
+pass (already noted as absent in the skill's own gap list), a fill+stroke draw path outside the
+additive model — it is a change to how the engine draws, and the fill/outline half re-opens the
+additive-blending decision that everything else in the composite assumes.
+
+**Impact.** First time it has been asked for, but it is not an exotic ask: "a shower of *things*" is
+a mainstream visualizer idiom, and the request arrived twice in one session from one user. It is also
+the gap that most limits what this lane can offer, because the library is entirely non-figurative and
+nothing in the grammar hints that figurative is off the table.
+
+**Not deciding:** whether the engine *should* draw figurative objects at all, or which of the four
+routes above is right. Both are architect calls, and the additive-model question is ADR-shaped.
+
+---
+
+## 0034 — nothing in the engine spawns, throws, ages or individuates an object
+
+- **Raised:** 2026-07-30, from `preset-author`, by the Solitaire-cascade request.
+- **Verified against code:** yes — `core/src/render/scenes/swarm.rs` (`Particle`, `bounds`),
+  `core/src/render/scenes/particles/mod.rs` (`reseed`), `core/src/render/trails.rs`,
+  `core/src/preset/expr.rs` (`INDEX_SLOT`).
+
+Independent of what a mark *looks* like (0033), the engine has no model for an object with a life.
+Four missing pieces, each verified:
+
+- **No emitter and no lifetime.** `Particle` is `{ pos, vel, z }`. Nothing spawns, nothing dies.
+  The swarm's world is a **torus** — `bounds(aspect)` wraps every particle back into the frame — so a
+  particle categorically cannot fall out of shot, which is the entire motion of a cascade. The
+  attractor's `reseed` is the nearest thing to an event, and it re-scatters the *whole* cloud at once.
+- **No gravity and no ballistic integration.** Steering is a flow field plus a radial `burst`; there
+  is no constant acceleration vector and no way to express one. A parabola is not approximable — a
+  flow field can bend a path, but every particle in a region bends the same way, which is a current,
+  not a throw.
+- **No per-object state or per-object expressions.** A binding is evaluated **once per frame**; the
+  only per-element evaluation in the engine is `index`, and `INDEX_SLOT` is fed only by `spectrum`.
+  So `hash()` cannot give each object its own launch angle, spin, size or twinkle phase. This is what
+  makes the starfield blink *as one sheet* rather than as individual stars — the user asked for
+  "мигают" and got a field-wide flash, which is a different thing.
+- **No stamped trail.** What makes the Solitaire cascade read is that each card leaves **hard,
+  non-fading copies of itself** along its arc. `trails` is a fade-and-accumulate feedback over the
+  whole finished frame (max-decay), i.e. a smear. It cannot stamp, and it decays.
+
+**Relationship to 0033.** These are separable: an emitter that throws round blobs on parabolas is
+buildable without touching the additive model, and would already read as a shower. Worth noting for
+sequencing — 0034 alone is a smaller, safer piece of work than 0033, and it is the half that carries
+the *motion* the user described ("падает красиво по параболе в разных направлениях"). 0033 alone
+gives shaped marks that still cannot fall.
+
+**Adjacent, already filed:** the "no stateful expressions / beat-latched state" gap in the
+`preset-author` skill's own list is the grammar-side cousin of the per-object point here. If an
+emitter is built, it likely subsumes the motivating case.
+
+**Not deciding:** whether this is a new `SystemKind` (an emitter scene alongside `swarm`), an
+extension of `swarm`, or a general per-object expression facility. All three have real costs and the
+choice is architect's.
+
+---
+
+## 0035 — `presets/README.md` lists 10 expression variables; the code has 19
+
+- **Raised:** 2026-07-30, from `preset-author`, while checking `tempo` for the BPM binding.
+- **Verified against code:** yes — `VAR_NAMES` in `core/src/preset/expr.rs` has 19 entries.
+
+`presets/README.md` names `bass mid treb onset beat bar time tempo novelty index`. Missing from that
+line: the four `*_raw` escapes and — the ones that matter here — ADR-0050's beat clock
+(`beat_index`, `time_since_beat`, `beat_in_bar`, `bar_index`, `bar_phase`). `docs/presets.md`
+documents them correctly, so this is a one-line drift in the *roster* document, which is the one this
+lane is pointed at first.
+
+It cost a code read to establish that `beat_index` existed, and it is the difference between "a new
+value every beat is impossible" and "`hash(beat_index)`". Small, but it sits on the most-read line of
+the most-read authoring document. Flagging for the next close-ceremony doc sweep rather than
+proposing anything.
