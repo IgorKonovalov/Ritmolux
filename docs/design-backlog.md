@@ -1872,3 +1872,84 @@ default) or into its input (today's behaviour) — which is a small named param 
 structure. Nobody should build that until a real preset is worse off.
 
 **Not deciding:** anything. ADR-0055 stands regardless of the answer here.
+
+---
+
+## 0037 — the fold covers a disc, and on a field scene that reads as worse than the defect it replaced
+
+- **Raised:** 2026-07-31, from `architect`, at Plan 0045's Mode 4 review, from the user's own
+  screenshots of the running app.
+- **Verified against code:** yes — `kaleidoscope.rs` clamps the sample radius to `r_max` and fades
+  over `FALLOFF_BAND = 0.35`; nothing outside `1.35 r_max` is painted by the stage at any setting.
+- **Status:** **promoted immediately** — the user chose an ADR-0047 supplement plus its own plan.
+  This entry is the evidence, not an open question.
+
+ADR-0047 shipped the falloff-disc, confirmed at Plan 0045 Phase 2 from sixteen rendered stills.
+Seen in motion on real presets at Plan 0045's close, the user rejected two consequences:
+
+1. **The residual rays** around a centred figure (`attractor_leviathan`). ADR-0047's own Outcome
+   predicts these exactly — a plain clamp replicates the disc rim outward as a sunburst, the
+   falloff fades it, and on dense content the remainder "read as leftovers rather than as design".
+   The ADR bet they would read as a corona *on centred figures*. On this one they did not.
+2. **The disc's crop on a fullscreen field scene** (`fragment_kaleido`). The frame used to be
+   filled; it is now a disc with backdrop corners. ADR-0047's Negative names this ("on field
+   scenes the wrap alternative would have tiled *something* there") and accepts it for figures.
+
+**Neither has a preset-side answer, and that is the point.** The fold is a polar operation on a
+rectangular source, so the corners cannot be painted by it at any `zoom`/`scale`/`kaleido_*`. A lit
+`bg_*` makes the corners not-black, which is a palliative. So this is not content-lane feedback
+however it arrived.
+
+**What the supplement should reconsider:** ADR-0047 declined a per-preset treatment mode on the
+grounds that two address modes double the stage's pipelines against the documented WARP
+pipeline-count sensitivity. That declination was taken before a fourth treatment existed. Phase 1
+rendered `vignette` — the fade moved *inside* the disc, so no ray is ever drawn — and the Outcome
+records it as "the cleanest of the four on a border-filling field and the most costly on a figure".
+A treatment that is best on fields and worst on figures, in an engine whose presets are both, is
+the classic argument for a choice rather than a default. Weigh that against the pipeline-count
+cost, which Plan 0045 has since made more concrete: bloom added four pipelines and hit the WARP
+aliasing hazard twice while doing it.
+
+**Interview and render before deciding.** This project picks visual directions from side-by-side
+samples ([ADR-0047](adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md)'s own confirmation
+protocol), and the lesson from Phase 2 is that the sample set has to be taken **in the
+configuration the complaint came from** — in motion, on a field scene and a figure, at a lit
+backdrop, through the tonemap. Sixteen stills at `bg_bright = 0` confirmed a decision that two
+screenshots of the running app then reversed.
+
+---
+
+## 0038 — mid-tone-dominated presets lost ~8 % luminance to the tonemap knee, and the library has not been retuned
+
+- **Raised:** 2026-07-31, from `architect`, at Plan 0045's Mode 4 review.
+- **Verified against code:** yes — measured, not inferred (numbers below).
+- **For:** `preset-author`. This is genuinely content-lane work; the engine behaved as designed.
+
+The user's report was "clifford is really dim". Rendering `attractor_clifford` at an identical
+stimulus on `main` and on the Plan 0045 branch (640x360, 90 frames, hardware adapter):
+
+| preset | main | branch | |
+|---|---|---|---|
+| `attractor_clifford` | mean luma 82.54 | 75.91 | **-8.0 %** |
+| `attractor_leviathan` | mean luma 63.98 | 67.70 | **+5.8 %** |
+
+That is not drift. It is the tonemap knee's documented price, to the decimal: `tonemap.rs`'s
+`KNEE` docstring says a linear 0.8 mid-tone now presents at 0.733, which is -8.4 %. **The split is
+the whole story.** Clifford is a diffuse particle cloud living almost entirely in the mid range, so
+it pays the knee and collects none of the headroom above 1.0. Leviathan has genuinely over-range
+cores, so it gains. Plan 0045 chose to pay this on mid-tones rather than on highlights, deliberately
+and in writing — the consequence is simply that every preset shaped like Clifford now reads dimmer.
+
+**The lever already exists and is one line:** `exposure` (default 1.0) is a linear multiplier ahead
+of the tonemap, added by this same plan for exactly this. `exposure = "1.1"` restores Clifford's
+level without re-balancing a single element against its own background, which is what raising
+per-element `brightness` would force. The population to check is presets with no over-range peak —
+the attractor family, the softer `fragment_*`, `swarm_drift`.
+
+**A related record correction, since this is the entry about the luminance model.** This file's own
+`0034` section (the "why it works, mechanically" passage under the Supernova table, around line
+1561) still says "the frame clips per channel" in the present tense, and reasons from it. That
+premise retired with Plan 0045. The *conclusion* stands and is if anything stronger — geometry
+still has somewhere to go when luminance does not — but the mechanism is now a roll-off, not a
+clip. Per this file's append-only rule the passage is left standing; this paragraph is the
+correction.

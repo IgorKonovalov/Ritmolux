@@ -10,7 +10,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **in-progress 2026-07-31** — running in the `lmv-plan-0045` worktree on `plan-0045-linear-light`. Phase 1 landed (`6f282e7`); **Phase 2 (`human`) done** — the falloff-disc is confirmed, [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) carries an Outcome. **Phase 2b (`dev`) is next**, added mid-plan: [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md), the backdrop leaves the chain. **Phase 3 is gated on it.** Roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md)/[0055](../adrs/0055-backdrop-leaves-the-post-chain.md) | dev, human |
+| [0045](0045-linear-light-and-bloom.md) | Linear light: the HDR composite, the bloom stage, and the fold fix | **in-progress 2026-07-31** — **Phases 1-5 landed** in the `lmv-plan-0045` worktree (`6f282e7` … `96780e1`); Mode 4 review done, gate green on the branch (fmt + clippy + **384/384**), no blockers. **Two things block the close:** **Phase 4b (`dev`, added by the review)** — bloom's recombine drives premultiplied alpha above 1 and subtracts the backdrop under its own halos (measured: 1810 px, worst 45 bytes) — and **Phase 6 (`human`), half done**: frame times recorded for shipped presets, but nothing in the library binds `bloom_*`, so the phase's subject is unrun. The fold's disc coverage was rejected on sight and is routed to its **own ADR + plan** ([backlog 0037](../design-backlog.md)), not reopened here. Roadmap R1, [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)/[0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md)/[0055](../adrs/0055-backdrop-leaves-the-post-chain.md) | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **in-progress 2026-07-30** — Phases 1-5 (`dev`) landed and merged to `main` (`b06766b`), Mode 4 review done; **Phases 6-7 (`human`) owed**. Phase 6 is **no longer blocked** — [0049] built its instrument and closed | dev, human |
 | [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **draft 2026-07-30** — [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
@@ -40,14 +40,28 @@ ADR-0050's stopping condition needs is the mean of that column). Play 2-3 real t
 the normalized levels ride the music without pumping or going numb, record the lock rate, then
 Phase 7 → [0048] closes.
 
-**[0045] is already running, in the `lmv-plan-0045` worktree, and its next phase is `dev` work.**
-Phase 1 landed the disc fold; Phase 2 (`human`) confirmed the falloff on 2026-07-31. The plan then
-**grew a phase**: the sample set exposed that the falloff fades to *black* rather than to the
-backdrop, because `post.rs` renders the backdrop **into** the fold's own input — so the fold folds
-`bg_vignette` too. That is [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md), and **Phase 2b
-implements it before Phase 3 may start**. Two carried debts to know about: Phase 2's own cleanup
-(delete the losing fold variants, the temporary `kaleido_domain` switch, and `docs/samples/`) is
-`dev`'s and folds into Phase 2b's commit, and it must be done **in the worktree, not in `main`**.
+**[0045] is nearly done, in the `lmv-plan-0045` worktree, and what is left is one small `dev` phase
+plus one `human` measurement.** Phases 1-5 landed and the Mode 4 review passed with no blockers.
+Two carried debts, both recorded in the plan:
+
+- **Phase 4b (`dev`)** — the review measured a defect in Phase 4's own recombine: bloom sums alpha
+  as well as colour, so premultiplied alpha exceeds 1 where the scene is opaque, `OneMinusSrcAlpha`
+  goes negative, and the halo *subtracts* the backdrop underneath it. A clamp, plus the
+  lit-backdrop test that would have caught it — every bloom fixture runs `bg_bright = 0`, which is
+  verbatim the blind spot [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md)'s Negative
+  section names. Two cheap corrections ride along: `tonemap.rs`'s bind-layout uniqueness comment is
+  false (`attractor-decay` is byte-identical — no mis-render observed, but the comment is the
+  stated justification for the ordering), and `composite.rs`/`capturing.md` overstate the no-255
+  guard as a property of the curve when it is reachable at a linear ~35.
+- **Phase 6 (`human`)** — half done. See the plan for the shipped-preset frame times; the bloom
+  half needs probe presets from a scratch `LMV_PRESET_DIR`, since the library binds no `bloom_*`
+  until R6.
+
+**The fold came back with a rejection, and it is routed out rather than reopened.** Seen in motion,
+the user rejected the falloff-disc's residual rays and its crop on fullscreen field scenes — both
+already recorded as ADR-0047's *accepted cost*, so this is the bet not holding rather than a defect.
+Neither is reachable from a preset. It becomes an ADR-0047 supplement plus its own plan; the
+evidence and what the supplement should reconsider are in [backlog 0037](../design-backlog.md).
 
 It also got more urgent the day [0044] closed. [0044] **has landed and
 closed** (2026-07-30) — see Recently closed — which delivers roadmap R0 and, with it, the
