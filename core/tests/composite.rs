@@ -29,14 +29,23 @@
 //! the 1920x1080 and 2048x1152 this project is developed on. **Changing `WIDTH` /
 //! `HEIGHT` without redoing that arithmetic silently retires the test.**
 //!
-//! # `composite_kaleido.png` contains a known artifact on purpose
+//! # `composite_kaleido.png` pins design-backlog 0010's **fix**
 //!
-//! design-backlog 0010: the fold samples outside its rectangular source and the
-//! `ClampToEdge` sampler smears the border texel radially, so the corners carry
-//! hard-edged streaks. It dates from Plan 0018 Phase 7, no fold order avoids it,
-//! and it is out of scope here. The baseline pins it deliberately — see the
-//! fixture's header. When 0010 is fixed this baseline moves, and that is the fix
-//! landing rather than a regression.
+//! It used to pin the defect: the fold sampled outside its rectangular source and
+//! the `ClampToEdge` sampler smeared the border texel radially, so the corners
+//! carried hard-edged streaks. Plan 0045 Phase 1 / ADR-0047 clamped the sample
+//! radius to the largest disc the source contains and faded past it, and this
+//! baseline was re-blessed by hand at that change — see the fixture's header for
+//! what moved and by how much.
+//!
+//! # `composite_overlap.png` pins the composite's arithmetic, not its routing
+//!
+//! Plan 0045 Phase 3 made every intermediate linear-light `Rgba16Float` and put a
+//! tonemap at the surface boundary. The third fixture binds **no** post stage: it
+//! draws a dense additive rose whose self-crossings sum past 1.0, which the 8-bit
+//! chain clipped to flat white. Its guard is that no channel in the frame reaches
+//! 255 — a claim about the curve (`f(x) < 1` for every finite `x`), not a
+//! tolerance.
 
 use std::path::{Path, PathBuf};
 
@@ -58,9 +67,12 @@ const MAX_OUTLIER: u8 = 48;
 
 /// The frozen fixtures: baseline file stem, and the TOML compiled in.
 ///
-/// One per stage, which is the whole requirement — `trails` is the stage with
-/// cross-frame state, `kaleido_*` the one that computes geometry.
-const FIXTURES: [(&str, &str); 2] = [
+/// One per stage — `trails` is the stage with cross-frame state, `kaleido_*` the
+/// one that computes geometry — plus, since Plan 0045 Phase 3, one that binds no
+/// stage at all and exercises the composite's **arithmetic** instead: a dense
+/// additive rose whose self-crossings used to clip to flat white on the 8-bit
+/// intermediates and now roll off through the tonemap.
+const FIXTURES: [(&str, &str); 3] = [
     (
         "composite_trails",
         include_str!("fixtures/composite_trails.toml"),
@@ -69,7 +81,14 @@ const FIXTURES: [(&str, &str); 2] = [
         "composite_kaleido",
         include_str!("fixtures/composite_kaleido.toml"),
     ),
+    (
+        "composite_overlap",
+        include_str!("fixtures/composite_overlap.toml"),
+    ),
 ];
+
+/// The fixture whose whole point is that it no longer clips (Plan 0045 Phase 3).
+const OVERLAP: &str = "composite_overlap";
 
 fn golden_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -173,6 +192,25 @@ fn composite_stages_match_golden_baselines() {
             .capture_preset(&name, &frame, FRAMES)
             .expect("capture fixture");
         let path = golden_dir().join(format!("{stem}.png"));
+
+        // Checked ahead of the bless branch on purpose: a `LMV_BLESS` run must
+        // not be able to write a clipped baseline and call it the new truth.
+        if stem == OVERLAP {
+            let clipped = fresh
+                .rgba
+                .chunks_exact(4)
+                .flat_map(|px| px.iter().take(3))
+                .filter(|&&c| c == u8::MAX)
+                .count();
+            assert_eq!(
+                clipped, 0,
+                "{clipped} channels of {stem} reached 255. The tonemap's curve is \
+                 bounded strictly below 1 (ADR-0046), so a frame of stacked \
+                 additive strokes must roll off rather than flatten to white — \
+                 this fixture clipped a large region of its crossings before Plan \
+                 0045 Phase 3"
+            );
+        }
 
         if bless {
             encode(&fresh, &path);

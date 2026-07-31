@@ -1,0 +1,43 @@
+# COMPOSITE FIXTURE - do not tune; editing this invalidates the drift baseline.
+# Plan 0045 Phase 3. Unlike composite_trails/composite_kaleido this one binds no
+# post stage at all: what it exercises is the composite's ARITHMETIC, not its
+# routing.
+#
+# A Maurer rose is drawn additively (One + One), so every place the curve crosses
+# itself the two strokes SUM. At brightness 1.0 a single stroke peaks at ~1.0 and
+# a crossing at ~2.0 - which, on the 8-bit intermediates this plan retires,
+# clipped: both landed on 255 and the whole lattice of crossings read as one flat
+# white web. In linear light the crossing survives as 2.0 and the tonemap sends it
+# to 0.911 while the single stroke goes to 0.800, so the two are still
+# distinguishable at the surface.
+#
+# `n = 5, d = 43` is composite_trails' rose, kept deliberately: it is dense enough
+# that the crossings are everywhere rather than at a handful of points a capture
+# might miss. `spin = 0` freezes it, so the baseline is one figure rather than a
+# phase of an animation.
+#
+# THE GUARD IS THAT NOTHING IN THIS FRAME REACHES 255. That is not a tolerance
+# claim, it is a claim about the curve: f(x) < 1 for every finite x, so no amount
+# of stacked light can clip. Before this phase the same fixture clipped a large
+# region of its crossings to flat white.
+system = "parametric_curve"
+name   = "fixture_composite_overlap"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "5"
+d             = "43"
+samples       = "301"
+scale         = "0.78"
+spin          = "0"
+hue           = "0.12"
+thickness     = "2.5"
+brightness    = "1.0"
+draw_progress = "1"
+
+# A black backdrop on purpose: the only light in the frame is the additive line
+# art, so any value above 1.0 in the composite came from strokes overlapping and
+# from nothing else.
+bg_bright     = "0"

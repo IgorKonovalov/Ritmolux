@@ -144,20 +144,22 @@ fn variant_roster_reminder(system: SystemKind) {
     }
 }
 
-/// The parameter names any preset may bind regardless of its system: the four
+/// The parameter names any preset may bind regardless of its system: the five
 /// compositing stages that run around the scene (`bg_*`, `trails`, `kaleido_*`,
-/// `ink_*`/`paper_*`). Gathered from each stage's own declared vocabulary so
-/// there is no third copy to drift.
+/// `exposure`, `ink_*`/`paper_*`). Gathered from each stage's own declared
+/// vocabulary so there is no third copy to drift.
 ///
 /// "The renderer routes to" was true when this was written and is not any more:
-/// `trails` and `kaleido_*` are offered by the `PostChain` (ADR-0031) and
-/// `ink_*`/`paper_*` by the terminal ink pass (ADR-0032); only `bg_*` goes to a
-/// pass the renderer drives directly. The *names* are what this const is about,
-/// and those are unchanged — see `render::ParamRoute` for who actually owns each.
-pub const GLOBAL_PARAMS: [&[&str]; 4] = [
+/// `trails` and `kaleido_*` are offered by the `PostChain` (ADR-0031),
+/// `exposure` by the tonemap (ADR-0046) and `ink_*`/`paper_*` by the terminal ink
+/// pass (ADR-0032); only `bg_*` goes to a pass the renderer drives directly. The
+/// *names* are what this const is about — see `render::ParamRoute` for who
+/// actually owns each.
+pub const GLOBAL_PARAMS: [&[&str]; 5] = [
     crate::render::background::PARAMS,
     crate::render::trails::PARAMS,
     crate::render::kaleidoscope::PARAMS,
+    crate::render::tonemap::PARAMS,
     crate::render::ink::PARAMS,
 ];
 

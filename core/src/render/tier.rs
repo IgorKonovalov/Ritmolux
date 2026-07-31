@@ -110,14 +110,41 @@ pub struct TierConfig {
 
     /// Cap on a post stage's internal grid (ADR-0034), width then height.
     ///
-    /// The floor value is NFR §12 memory arithmetic. The trails accumulation is a
-    /// [`PingPongField`](super::feedback::PingPongField) of `Rgba16Float`
-    /// (8 bytes/texel, **two** textures), and Plan 0023's dual-live dissolve holds
-    /// two whole `PostChain`s at once, so the field pair is charged twice at the
-    /// peak. At 1920x1080 that is ~50 MB per chain and ~100 MB dual-live, against
-    /// NFR §12's ~350 MB soft ceiling that is mostly driver floor already; at
-    /// 2560x1440 it is ~88 MB and ~177 MB — which is exactly the trade ADR-0034
-    /// priced and declined at floor budgets, and which the rich tier now takes.
+    /// The floor value is NFR §12 memory arithmetic, **redone for the linear-light
+    /// composite** (Plan 0045 Phase 3 / ADR-0046). Every intermediate upstream of
+    /// the tonemap is now [`COMPOSITE_FORMAT`](super::COMPOSITE_FORMAT) — 8
+    /// bytes/texel, not 4 — so the stage offscreens that used to be charged at the
+    /// surface format doubled, while the trails accumulation
+    /// ([`PingPongField`](super::feedback::PingPongField), two textures) was
+    /// already float and did not move.
+    ///
+    /// Per chain, both stages live, at this cap (1920x1080, 8 bytes/texel =
+    /// 16.6 MB a texture):
+    ///
+    /// | buffer                     | before | after |
+    /// |----------------------------|--------|-------|
+    /// | trails composited          | 8.3    | 16.6  |
+    /// | trails accumulation (x2)   | 33.2   | 33.2  |
+    /// | kaleidoscope source        | 8.3    | 16.6  |
+    /// | **per chain**              | **50** | **66** |
+    ///
+    /// Plan 0023's dual-live dissolve holds two whole `PostChain`s, so the peak is
+    /// ~133 MB rather than ~100. Outside the chains the frame carries one more
+    /// surface-sized float buffer than it used to — the tonemap's input, 16.6 MB,
+    /// which is the one genuinely *new* allocation this plan adds — plus the
+    /// blend's snapshot/live pair at 16.6 MB each while a dissolve runs (was 8.3),
+    /// and ink's 8.3 MB input, which stays 8-bit because the tonemap hands it
+    /// display-referred pixels. Worst case — dual-live, both stages, ink on —
+    /// is ~191 MB against NFR §12's ~350 MB soft ceiling, which is mostly driver
+    /// floor already.
+    ///
+    /// At the rich cap (2560x1440) the same arithmetic is ~118 MB per chain and
+    /// ~236 MB dual-live, up from ~88 and ~177 — the trade ADR-0034 priced and
+    /// declined at floor budgets and the rich tier takes.
+    ///
+    /// **This cap is the relief lever** if the float chain misses NFR §1 on a
+    /// floor-tier iGPU: lower it rather than re-fixing the grids (ADR-0046), since
+    /// bandwidth roughly doubled with the format and the grid policy is shared.
     pub post_cap: (u32, u32),
 
     /// How many GPU-resident particles the attractor integrates and draws.

@@ -40,6 +40,7 @@ pub mod scenes;
 #[cfg(feature = "text")]
 pub mod text;
 pub mod tier;
+pub(crate) mod tonemap;
 pub(crate) mod trails;
 mod transition;
 
@@ -61,7 +62,29 @@ use text::TextLayer;
 #[cfg(feature = "text")]
 pub use text::TextRun;
 pub use tier::{Tier, TierConfig};
+use tonemap::Tonemap;
 use transition::{Blend, DEFAULT_DURATION_SECS, Mode, Transition, TransitionKind};
+
+/// The format **every intermediate upstream of the tonemap** carries: linear
+/// light, unbounded above 1.0 (ADR-0046, Plan 0045 Phase 3).
+///
+/// The scene targets, both post stages, the transition blend's two sides and the
+/// tonemap's own input are all this — the surface format stops at the tonemap,
+/// which is where the frame becomes display-referred. Before this plan every one
+/// of those intermediates ran at the surface's 8 bits, so an additive
+/// accumulation clipped per channel at each hand-off: the "additive ceiling"
+/// ADR-0046's Context catalogues, and the reason a bright-pass had nothing
+/// correct to bloom from.
+///
+/// `Rgba16Float` rather than 32-bit because it is the format
+/// [`PingPongField`](feedback::PingPongField) has shipped on since Plan 0014 —
+/// already proven blendable and filterable on both backends — and because half
+/// the bandwidth matters on the floor tier (`tier::TierConfig::post_cap`).
+///
+/// Note the arithmetic did **not** change: an 8-bit *sRGB* target already blends
+/// in linear space, so what this buys is headroom above 1.0 and precision, not a
+/// different colour model.
+pub(crate) const COMPOSITE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
 /// Assumed bytes-per-pixel for the swapchain GPU-byte estimate (the common
 /// 8-bit RGBA/BGRA surface formats). An approximation, per ADR-0008.
@@ -138,6 +161,10 @@ enum ParamRoute {
     /// The terminal engine-wide ink pass (`ink_*` / `paper_*`), outside the chain
     /// (ADR-0032).
     Ink,
+    /// The engine-wide exposure + tonemap pass (`exposure`), which sits between
+    /// the transition blend and ink and is the frame's linear/display boundary
+    /// (ADR-0046).
+    Tonemap,
     /// The active scene's named-parameter surface.
     Scene,
     /// No owner claimed the name — silently dropped at apply time, exactly as
@@ -152,16 +179,20 @@ enum ParamRoute {
 /// vocabularies plus the system's own, so it is decidable at load and testable
 /// without a GPU.
 ///
-/// The order is the composite order (ADR-0032) and matches the first-owner-wins
-/// fallthrough it replaces: the backdrop pre-pass, then the post chain, then the
-/// terminal ink pass, then the scene. The four namespaces are disjoint, so the
-/// order is a formality rather than a tie-break — but it is the documented one.
+/// The order is the composite order (ADR-0032/0046) and matches the
+/// first-owner-wins fallthrough it replaces: the backdrop pre-pass, then the post
+/// chain, then the tonemap, then the terminal ink pass, then the scene. The five
+/// namespaces are disjoint, so the order is a formality rather than a tie-break —
+/// but it is the documented one.
 fn resolve_route(name: &str, system: SystemKind) -> ParamRoute {
     if background::PARAMS.contains(&name) {
         return ParamRoute::Background;
     }
     if let Some(stage) = post::stage_for(name) {
         return ParamRoute::Stage(stage);
+    }
+    if tonemap::PARAMS.contains(&name) {
+        return ParamRoute::Tonemap;
     }
     if ink::PARAMS.contains(&name) {
         return ParamRoute::Ink;
@@ -400,11 +431,11 @@ impl SaltMode {
 /// and its scene. **Routing only** — nothing is encoded here, because the frame's
 /// destination is not known until ink's activity is (ADR-0032).
 ///
-/// `ink` is `None` for a dual-live dissolve's outgoing side: there is one
-/// engine-wide ink pass and it belongs to the active preset, whose crossfade the
-/// caller applies afterwards. An `ink_*` binding on that side is therefore
-/// dropped — the same no-op it was when it fell through to a scene that ignores
-/// unknown params.
+/// `terminal` is `None` for a dual-live dissolve's outgoing side: the tonemap and
+/// ink are each **one** engine-wide pass over the blended frame, and both belong
+/// to the active preset, whose crossfade the caller applies afterwards. An
+/// `exposure` or `ink_*` binding on that side is therefore dropped — the same
+/// no-op it was when it fell through to a scene that ignores unknown params.
 ///
 /// `routes` carries each binding's destination, resolved once at roster load
 /// ([`ParamRoute`]); it is positionally paired with `preset.params`, so a binding
@@ -415,7 +446,7 @@ fn evaluate_preset(
     routes: &[ParamRoute],
     scene: &mut Box<dyn Scene>,
     side: &mut CompositeSide,
-    ink: Option<&mut Ink>,
+    terminal: Option<Terminal<'_>>,
     smoother: &mut ParamSmoother,
     vars: &Variables<'_>,
     frame: &AnalysisFrame,
@@ -427,7 +458,7 @@ fn evaluate_preset(
     scene.advance(dt);
     side.reset_params();
     scene.reset_params();
-    let mut ink = ink;
+    let mut terminal = terminal;
     for (index, (binding, route)) in preset.params.iter().zip(routes).enumerate() {
         // A binding that names `index` is asking to be evaluated once per
         // element (Plan 0034 Phase 4). The test is a `bool` read decided at
@@ -465,9 +496,14 @@ fn evaluate_preset(
             ParamRoute::Stage(stage) => {
                 side.chain.set_stage_param(stage, &binding.name, value);
             }
+            ParamRoute::Tonemap => {
+                if let Some(terminal) = terminal.as_mut() {
+                    terminal.tonemap.set_param(&binding.name, value);
+                }
+            }
             ParamRoute::Ink => {
-                if let Some(ink) = ink.as_mut() {
-                    ink.set_param(&binding.name, value);
+                if let Some(terminal) = terminal.as_mut() {
+                    terminal.ink.set_param(&binding.name, value);
                 }
             }
             ParamRoute::Scene => {
@@ -512,6 +548,19 @@ fn composite_into(
         .resolve(&ctx.queue, encoder, target.routing, destination, surface)
 }
 
+/// The two engine-wide passes a preset's bindings reach **outside** the chain:
+/// the exposure/tonemap boundary (ADR-0046) and the terminal ink remap
+/// (ADR-0032).
+///
+/// Bundled because they are routed together and withheld together — a dual-live
+/// dissolve's outgoing side gets neither, each being one pass over the *blended*
+/// frame rather than one per side. A borrow pair rather than two more arguments
+/// on [`evaluate_preset`], which is already at the lint's limit.
+struct Terminal<'a> {
+    tonemap: &'a mut Tonemap,
+    ink: &'a mut Ink,
+}
+
 /// One preset's private composite: the background pre-pass it owns plus the post
 /// chain its look folds through.
 ///
@@ -532,6 +581,8 @@ struct CompositeSide {
 }
 
 impl CompositeSide {
+    /// `format` is [`COMPOSITE_FORMAT`], never the surface's: everything a side
+    /// paints lands upstream of the tonemap, in linear light (ADR-0046).
     fn new(device: &wgpu::Device, format: wgpu::TextureFormat, tier: &TierConfig) -> Self {
         Self {
             background: Background::new(device, format),
@@ -619,8 +670,13 @@ pub struct Renderer {
     /// blend of two per-preset composites. Skipped entirely at `ink_amount <= 0`,
     /// which is every preset that does not opt in.
     ink: Ink,
+    /// The exposure + tonemap pass (ADR-0046) — the frame's **linear/display
+    /// boundary**, between the transition blend and ink. Unlike every other pass
+    /// it never skips: it is the format seam, not a look, so an unbound preset
+    /// still runs it at `exposure = 1.0`.
+    tonemap: Tonemap,
     /// The two-input cross-preset blend pass (Plan 0023 / ADR-0032), between the
-    /// chain and ink. Holds no GPU resources between dissolves.
+    /// chain and the tonemap. Holds no GPU resources between dissolves.
     blend: Blend,
     /// The in-flight dissolve, if any. `None` is the ordinary frame path — chain
     /// straight into ink's input (or the surface), no blend encoded at all.
@@ -697,10 +753,15 @@ impl Renderer {
         // unpinned is `Rich` — the governor's job is to take that back, not to
         // hedge it here.
         let tier = TierConfig::for_tier(opts.tier.unwrap_or(Tier::Rich));
-        let scenes = crate::render::scenes::create_all(&ctx.device, ctx.surface_format(), &tier);
-        let side = CompositeSide::new(&ctx.device, ctx.surface_format(), &tier);
+        // Everything upstream of the tonemap is built against COMPOSITE_FORMAT,
+        // not the surface's (ADR-0046): the scenes, both composite sides and the
+        // blend all paint in linear light. Only the tonemap, ink, the overlay and
+        // the text layer write display-referred pixels.
+        let scenes = crate::render::scenes::create_all(&ctx.device, COMPOSITE_FORMAT, &tier);
+        let side = CompositeSide::new(&ctx.device, COMPOSITE_FORMAT, &tier);
+        let blend = Blend::new(&ctx.device, COMPOSITE_FORMAT);
+        let tonemap = Tonemap::new(&ctx.device, ctx.surface_format());
         let ink = Ink::new(&ctx.device, ctx.surface_format());
-        let blend = Blend::new(&ctx.device, ctx.surface_format());
         let overlay = Overlay::new(&ctx.device, ctx.surface_format());
         #[cfg(feature = "text")]
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
@@ -710,6 +771,7 @@ impl Renderer {
             side,
             incoming_side: None,
             ink,
+            tonemap,
             blend,
             transition: None,
             transitions_started: 0,
@@ -875,14 +937,14 @@ impl Renderer {
         self.tier = tier;
         self.cancel_transition();
         self.incoming_side = None;
-        self.side = CompositeSide::new(&self.ctx.device, self.ctx.surface_format(), &self.tier);
+        self.side = CompositeSide::new(&self.ctx.device, COMPOSITE_FORMAT, &self.tier);
         // The scenes carry tier capacities too — particle counts, the segment
         // buffer, the trail-grid cap — and those are sized at construction, so a
         // tier change means rebuilding them. Rebuilding also resets their
         // simulation state to its seed, which is the visible half of a demotion:
         // the attractor's cloud and the swarm restart rather than losing two
         // thirds of their points mid-flight.
-        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format(), &self.tier);
+        self.scenes = scenes::create_all(&self.ctx.device, COMPOSITE_FORMAT, &self.tier);
         self.configure_active_scene();
     }
 
@@ -980,7 +1042,7 @@ impl Renderer {
         // outgoing preset (see the field docs).
         self.incoming_side = Some(CompositeSide::new(
             &self.ctx.device,
-            self.ctx.surface_format(),
+            COMPOSITE_FORMAT,
             &self.tier,
         ));
     }
@@ -1394,6 +1456,7 @@ impl Renderer {
             side,
             incoming_side,
             ink,
+            tonemap,
             blend,
             transition,
             roster,
@@ -1449,11 +1512,14 @@ impl Renderer {
         // the outgoing preset's `hash()` for the second a dissolve lasts.
         let vars = Variables::from_frame(frame, *time);
 
-        // Fixed-order composite (ADR-0018/0028/0032): background (owns the clear)
-        // -> scene -> the per-preset post chain -> [blend] -> ink -> present. Where
-        // the scene draws and which chain stage folds into which is the chain's
-        // business, not the renderer's — see `post.rs` for the order and the skip
-        // rule. The blend and ink are engine-wide passes the renderer drives.
+        // Fixed-order composite (ADR-0018/0028/0032/0046): background (owns the
+        // clear) -> scene -> the per-preset post chain -> [blend] -> tonemap ->
+        // ink -> present. Everything left of the tonemap is linear light at
+        // `COMPOSITE_FORMAT`; everything right of it is display-referred at the
+        // surface's. Where the scene draws and which chain stage folds into which
+        // is the chain's business, not the renderer's — see `post.rs` for the
+        // order and the skip rule. The blend, the tonemap and ink are engine-wide
+        // passes the renderer drives.
         let surface = (width, height);
         let mut draw_calls = 0;
 
@@ -1476,8 +1542,9 @@ impl Renderer {
                 (outgoing, blend.snapshot_view(surface))
                 && let Some(out_scene) = scene_for_mut(scenes, outgoing.system)
             {
-                // No ink: the outgoing side's `ink_*` were held at the capture
-                // frame and are crossfaded by the single engine-wide pass below.
+                // No terminal: the outgoing side's `exposure`/`ink_*` were held at
+                // the capture frame and are crossfaded by the single engine-wide
+                // pass of each below.
                 let out_elements = element_prefix(outgoing, series_scratch.len());
                 evaluate_preset(
                     outgoing,
@@ -1511,6 +1578,7 @@ impl Renderer {
         let Some(scene) = scene_for_mut(scenes, preset.system) else {
             return draw_calls;
         };
+        tonemap.reset_params();
         ink.reset_params();
         let elements = element_prefix(preset, series_scratch.len());
         evaluate_preset(
@@ -1518,7 +1586,7 @@ impl Renderer {
             routes,
             scene,
             live_side,
-            Some(ink),
+            Some(Terminal { tonemap, ink }),
             param_smoother,
             &vars.with_salt(salt.of(preset)),
             frame,
@@ -1533,29 +1601,44 @@ impl Renderer {
         // exactly the outgoing look and `t = 1` exactly the incoming one, with no
         // snap at either end. On the capture frame the outgoing preset is still the
         // active one, so its values are already correct and nothing is held yet.
-        if let Some((from, t)) = transition
-            .as_ref()
-            .and_then(|tr| Some((tr.outgoing_ink()?, tr.progress())))
-        {
-            ink.crossfade_from(from, t);
+        if let Some(tr) = transition.as_ref() {
+            let t = tr.progress();
+            if let Some(from) = tr.outgoing_ink() {
+                ink.crossfade_from(from, t);
+            }
+            // `exposure` has the same problem for the same reason: one pass over a
+            // frame that is a mix of two presets cannot show two stops, so it shows
+            // the mix. Without this, a preset binding `exposure` would pop a stop
+            // on the single frame the roster flips.
+            if let Some(from) = tr.outgoing_exposure() {
+                tonemap.crossfade_from(from, t);
+            }
         }
 
-        // Ink is the terminal pass and lives outside the chain, so its input is
-        // resolved *first*: everything upstream targets that view, and ink then
-        // folds it into the surface. With ink off, the chain (or the blend) targets
-        // the surface directly.
+        // The display-referred tail is resolved *first*, outermost inwards, because
+        // each pass's input is the previous one's output and the outermost is the
+        // only one whose destination is known: ink folds into the surface, the
+        // tonemap folds into ink's input (or the surface, with ink off), and
+        // everything linear targets the tonemap's input.
         let ink_input = if ink.active() {
             ink.begin(surface)
         } else {
             None
         };
-        let terminal = ink_input.as_ref().unwrap_or(view);
+        let display = ink_input.as_ref().unwrap_or(view);
+
+        // The linear terminal: where the composite stops. Unlike ink this is never
+        // skipped — it is the format boundary (ADR-0046). If it somehow cannot
+        // build its target, fall through to `display` and take the old clipped
+        // 8-bit composite rather than dropping the frame.
+        let tonemap_input = tonemap.begin(surface);
+        let terminal = tonemap_input.as_ref().unwrap_or(display);
 
         // Where the active side resolves. While a dissolve runs the blend sits
-        // between the chain and ink, so it feeds one of the blend's two inputs: the
-        // outgoing target on the opening frame, the live target on every frame
-        // after. If the blend cannot build its targets, fall through to the terminal
-        // view — a cut, never a blend of undefined pixels.
+        // between the chain and the tonemap, so it feeds one of the blend's two
+        // inputs: the outgoing target on the opening frame, the live target on
+        // every frame after. If the blend cannot build its targets, fall through to
+        // the terminal view — a cut, never a blend of undefined pixels.
         let blend_input = match transition.as_ref() {
             Some(tr) if tr.needs_snapshot() => blend.snapshot_view(surface),
             Some(_) => blend.live_view(surface),
@@ -1565,19 +1648,23 @@ impl Renderer {
 
         draw_calls += composite_into(ctx, scene, live_side, encoder, destination, surface);
         if let (Some(tr), true) = (transition.as_ref(), blend_input.is_some()) {
-            // Mix the outgoing side with the live incoming one into ink's input (or
-            // the surface). At t = 0 this is the outgoing frame exactly, which is
-            // what lets the opening frame present through the same pass before the
-            // live side has ever been rendered into.
+            // Mix the outgoing side with the live incoming one into the tonemap's
+            // input. At t = 0 this is the outgoing frame exactly, which is what lets
+            // the opening frame present through the same pass before the live side
+            // has ever been rendered into.
             draw_calls += blend.resolve(&ctx.queue, encoder, terminal, tr.progress(), tr.kind());
+        }
+        if tonemap_input.is_some() {
+            draw_calls += tonemap.resolve(&ctx.queue, encoder, display);
         }
         if ink_input.is_some() {
             draw_calls += ink.resolve(&ctx.queue, encoder, view);
         }
 
-        // Hold the outgoing preset's evaluated ink params off the capture frame,
-        // where the roster still points at it — the one frame they exist.
+        // Hold the outgoing preset's evaluated terminal params off the capture
+        // frame, where the roster still points at it — the one frame they exist.
         let captured_ink = ink.params();
+        let captured_exposure = tonemap.exposure();
 
         // On-canvas text (browse overlay / HUD): a second pass that loads the
         // scene and composites the queued runs on top, in the same frame
@@ -1640,9 +1727,12 @@ impl Renderer {
         // frame composites the incoming preset through its own side; a dissolve that
         // has reached `t = 1` promotes that side and releases the blend's targets.
         // The borrows above all end here, so `self` is free again (NLL).
-        let advanced = transition
-            .as_mut()
-            .map(|tr| (tr.advance(dt, captured_ink), tr.finished()));
+        let advanced = transition.as_mut().map(|tr| {
+            (
+                tr.advance(dt, captured_ink, captured_exposure),
+                tr.finished(),
+            )
+        });
         if let Some((flip_to, finished)) = advanced {
             if let Some(index) = flip_to {
                 // Hand the outgoing preset's easing state to the outgoing side
@@ -1836,9 +1926,10 @@ impl Renderer {
         if !self.select_preset_by_name_now(name) {
             return Err(RenderError::UnknownPreset(name.to_string()));
         }
-        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format(), &self.tier);
+        self.scenes = scenes::create_all(&self.ctx.device, COMPOSITE_FORMAT, &self.tier);
         self.cancel_transition();
         self.side.reset_resources();
+        self.tonemap.reset_resources();
         self.ink.reset_resources();
         self.blend.reset_resources();
         self.time = 0.0;
@@ -1872,9 +1963,10 @@ impl Renderer {
         }
         let mut analyzer = crate::dsp::Analyzer::new(format).map_err(RenderError::AudioFormat)?;
 
-        self.scenes = scenes::create_all(&self.ctx.device, self.ctx.surface_format(), &self.tier);
+        self.scenes = scenes::create_all(&self.ctx.device, COMPOSITE_FORMAT, &self.tier);
         self.cancel_transition();
         self.side.reset_resources();
+        self.tonemap.reset_resources();
         self.ink.reset_resources();
         self.blend.reset_resources();
         self.time = 0.0;
