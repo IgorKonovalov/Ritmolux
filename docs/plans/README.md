@@ -10,10 +10,10 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
-| [0051](0051-the-scene-seam-emits-premultiplied-alpha.md) | The scene seam emits premultiplied alpha: the swarm and the strokes stop punching holes in the backdrop | **draft 2026-07-31** — [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md); a **live regression** caused by [0045] Phase 2b and reproduced on two draw seams, so it is the next thing a `dev` session should take. Three phases, two shader lines and one blend state, and it **provably moves no golden** | dev |
-| [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — ready for `dev` after [0045]; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
+| [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — **unblocked**: [0045] has landed and closed, so the linear-light pipeline this builds on exists; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **in-progress 2026-07-30** — Phases 1-5 (`dev`) landed and merged to `main` (`b06766b`), Mode 4 review done; **Phases 6-7 (`human`) owed**. Phase 6 is **no longer blocked** — [0049] built its instrument and closed | dev, human |
 | [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **draft 2026-07-30** — [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
+| [0051](0051-the-scene-seam-emits-premultiplied-alpha.md) | The scene seam emits premultiplied alpha: the swarm and the strokes stop punching holes in the backdrop | **draft 2026-07-31** — [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md); a **live regression** caused by [0045] Phase 2b and reproduced on two draw seams, so it is the next `dev` thing to take. Three phases, two shader lines and one blend state, and it **provably moves no golden** | dev |
 
 ## Recommended execution sequence
 
@@ -26,10 +26,12 @@ no C ABI change, and **no golden baseline may move**. So it neither blocks nor i
 - **It makes [0044]'s never-run Phase 4 cheap.** The `Rich` calibration is carried in
   `docs/on-device-validation.md` precisely because judging a tier means relaunching; with `[` / `]`
   it is an A/B on one machine in one sitting. [0050] Phase 6 item 3 asks for that measurement.
-- **It makes [backlog 0031](../design-backlog.md) easier to hit.** An operator switching to `Rich`
-  on `attractor_clifford` will see the reported white-out, because [0045] has not landed yet. That is
-  a known defect being made reachable, not a regression — but if the ordering matters to you, run
-  [0045] first and the two meet cleanly.
+- **It is now the only way to settle [backlog 0031](../design-backlog.md).** That coupling has
+  inverted since this was written: [0045] has landed, so an operator switching to `Rich` on
+  `attractor_clifford` is no longer walking into a known un-fixed defect — they are running the
+  measurement the entry needs. And **`shot` has no `--tier` flag** (headless capture is `Floor` by
+  construction, ADR-0045, deliberately), so the running app is the *only* instrument for any `Rich`
+  question. [0050] Phase 6 item 3 is where that lands.
 
 
 **[0048] Phase 6 is the next thing to run, and it is a `human` phase — [0049] has landed and
