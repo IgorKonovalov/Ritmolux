@@ -1,0 +1,67 @@
+# LIT-BACKDROP GUARD FIXTURE - do not tune (Plan 0051 Phase 2, ADR-0056).
+# It pins NO pixels and has no committed baseline. It belongs to
+# `a_lit_backdrop_survives_where_the_strokes_drew_nothing` in
+# `core/src/render/scenes/lines/renderer.rs`, which captures it THREE ways -
+# lit, dark, and backdrop-only - and asserts the backdrop arrives intact
+# wherever the strokes wrote no light. One shared renderer draws all four line
+# scenes (parametric, lsystem, star, spectrum), so one fixture guards the seam
+# for every one of them.
+#
+# THE STROKE IS DELIBERATELY FAT AND MUST STAY THAT WAY. The line renderer's
+# falloff is one-dimensional across the stroke, so its zero-colour region is the
+# two long edges - a rim whose width scales with `thickness`. At the shipped
+# widths (2 to 3) that rim is close to a hairline and a capture at those widths
+# CANNOT DISCRIMINATE THE FIX. `thickness = 9` is what makes the defect
+# measurable; "simplifying" it back to a shipped width retires this test
+# silently while leaving it green. Same trap `core/tests/kaleidoscope.rs`
+# documents about its non-zero `kaleido_angle`.
+#
+# The `bg_bright` and `draw_progress` lines are STRIPPED AND REWRITTEN per
+# capture - the test needs one scene at three configurations - but the values
+# below are the ones it reads back out of this file and captures at, so they are
+# live, not decorative.
+#
+# `bg_bright > 0` IS THE POINT. Every line fixture and every golden baseline
+# runs `bg_bright = 0`, where a black backdrop times any alpha is still black -
+# so the whole suite was structurally blind to a stroke emitting a constant
+# alpha 1 and rimming itself in black. Setting this back to 0 retires the test.
+#
+# `trails` IS ALSO NOT DECORATION. The defect only exists when a post stage is
+# active: with an empty chain the scene draws straight onto the backdrop and its
+# additive colour cannot remove light. With a stage, the scene draws into a
+# transparent-cleared offscreen and the chain resolves premultiplied OVER the
+# backdrop (ADR-0055), which is where alpha becomes load-bearing.
+#
+# The rest keeps the property readable:
+#  - `spin = 0` freezes the figure, so the trail history settles rather than
+#    smearing over the gaps between strokes.
+#  - `n`/`d`/`samples` draw a sparse open web rather than a dense rose: at
+#    `thickness = 9` a full-sample figure fills the frame and leaves no
+#    untouched backdrop to check.
+#  - `hue = 0.25` sits away from all three zeroes of the line scenes' cosine
+#    ramp, so no stroke pixel is black in all three channels at once. A fully
+#    black stroke would read as "nothing drawn here" while still covering the
+#    pixel, which is the one case the property deliberately does not claim.
+#  - `bg_vignette = 0` keeps the backdrop bright into the corners.
+system = "parametric_curve"
+name   = "fixture_lines_lit_backdrop"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "2"
+d             = "31"
+samples       = "24"
+scale         = "0.6"
+spin          = "0"
+hue           = "0.25"
+brightness    = "1.2"
+thickness     = "9"
+draw_progress = "1"
+
+trails = "0.25"
+
+bg_hue      = "0.55"
+bg_vignette = "0"
+bg_bright   = "0.55"

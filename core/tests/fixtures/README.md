@@ -127,29 +127,45 @@ moves the probes off the geometry and the test starts comparing two pieces of
 background (which it fails on, deliberately, rather than passing vacuously). The
 header says what each value is holding.
 
-## `swarm_lit_backdrop.toml` is a fifth guard, at a configuration nothing else here uses
+## The `*_lit_backdrop.toml` pair is a fifth guard, at a configuration nothing else here tests
 
-It belongs to `a_lit_backdrop_survives_where_the_swarm_drew_nothing` in
-`core/src/render/scenes/swarm.rs` (Plan 0051, ADR-0056). It pins **no pixels** and
-has no committed baseline; `LMV_BLESS` does not touch it. The test captures this
-one fixture three ways — lit backdrop, black backdrop, and backdrop with the
-scene contributing nothing — and asserts that wherever the scene wrote no light,
-the backdrop arrives intact in the **linear** composite, upstream of the tonemap.
+`swarm_lit_backdrop.toml` belongs to
+`a_lit_backdrop_survives_where_the_swarm_drew_nothing` in
+`core/src/render/scenes/swarm.rs`, and `lines_lit_backdrop.toml` to
+`a_lit_backdrop_survives_where_the_strokes_drew_nothing` in
+`core/src/render/scenes/lines/renderer.rs` (Plan 0051, ADR-0056) — one per
+**draw seam**, since those are the two pipelines that render directly into the
+post chain's input rather than presenting through an alpha-aware pass. The line
+one covers all four line scenes at once; they share the renderer.
 
-**`bg_bright > 0` is the whole point, and it is why this is a separate file
-rather than a re-parameterized existing one.** Every other fixture in this
-directory runs `bg_bright = 0`, which is the right call *for a baseline* — see
+They pin **no pixels** and have no committed baselines; `LMV_BLESS` does not
+touch them. Each test captures its fixture three ways — lit backdrop, black
+backdrop, and backdrop with the scene contributing nothing — and asserts that
+wherever the scene wrote no light, the backdrop arrives intact in the **linear**
+composite, upstream of the tonemap, where the bound is 0 rather than a tolerance.
+
+**`bg_bright > 0` is the whole point, and it is why these are separate files
+rather than re-parameterized existing ones.** Nearly every other fixture here
+runs `bg_bright = 0`, which is the right call *for a baseline* — see
 `composite_bloom.toml`'s own header for the reasoning. It is also why a scene
 emitting a constant alpha 1, holding the backdrop out of every pixel its quads
-covered, stayed invisible to this entire suite for as long as it shipped: on
-black, covering the backdrop and compositing over it are the same picture. The
-guard is additive test surface, not a variant of something already here.
+covered, stayed invisible to this whole suite for as long as it shipped: on
+black, covering the backdrop and compositing over it are the same picture.
 
-"Do not tune" applies for a third distinct reason. The header says what every
-value is holding — a lit backdrop, an **active post stage** (without one the
-scene draws straight onto the backdrop and the defect cannot exist at all), a
-sprite size sparse enough to leave untouched backdrop to check, and a palette
-with no fully-black colour. The test reads those preconditions back out of the
-file before it touches the GPU and reports the pixel counts either side, so an
-edit that quietly empties the region under test fails rather than passing on
-nothing.
+The exception is instructive. `composite_kaleido.toml` **does** run a lit
+backdrop, and it is a line scene, so it was the one baseline positioned to see
+the defect — and it still did not, because at its `thickness = 2.0` the dark rim
+is a hairline and a mean-drift gate cannot see one. It moved when the fix landed;
+its header records the numbers. A guard that asserts the property directly is
+what these two files are for.
+
+"Do not tune" applies for a third distinct reason here. Each header says what
+every value is holding — a lit backdrop, an **active post stage** (without one
+the scene draws straight onto the backdrop and the defect cannot exist at all),
+geometry sparse enough to leave untouched backdrop to check, a colour that is
+never black in all three channels at once, and — on the line fixture — a
+deliberately **fat stroke**, because the rim scales with `thickness` and a
+shipped width leaves the test green and blind. Each test reads those
+preconditions back out of its own file before it touches the GPU and reports the
+pixel counts either side, so an edit that quietly empties the region under test
+fails rather than passing on nothing.

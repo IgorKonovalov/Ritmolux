@@ -32,6 +32,31 @@
 # aspect, and which fails on the pre-fix shader with peak 199 and every one of
 # 6052 out-of-disc pixels lit.
 #
+# IT MOVED A SECOND TIME AT PLAN 0051, AND FOR A REASON WORTH READING. That plan
+# made the line renderer emit premultiplied alpha equal to its own coverage
+# (ADR-0056); before it, every stroke quad wrote a constant alpha 1, so the two
+# long edges of each stroke - where the across-the-stroke falloff reaches zero -
+# held the backdrop out of pixels they had painted no light into.
+#
+# The plan predicted NO baseline would move, on the argument that at
+# `bg_bright = 0` the resolve reduces to `src` whatever the alpha is. That
+# argument is correct. What was wrong was the survey around it: the plan asserted
+# every affected baseline runs `bg_bright = 0`, and THIS ONE DOES NOT - see the
+# lit-backdrop note below, which is the whole reason it exists. This fixture is a
+# line scene over a lit vignette, which is exactly the configuration the fix
+# changes, so it is the one baseline in the suite positioned to see it.
+#
+# THE DRIFT WAS mean 0.0009 / outlier 73, against 0.02 and 48 - i.e. the mean was
+# 22x UNDER tolerance and only the outlier gate fired, on a handful of pixels.
+# That is the shape ADR-0056's Notes predict: at this fixture's `thickness = 2.0`
+# the dark rim is close to a hairline. It is also why this baseline did not catch
+# the defect when it shipped - a mean-drift gate was never going to see it.
+#
+# WHAT MOVED, eyes-on at 640x400: the fine lattice inside the rosette was muddied
+# and greyed by each hairline stroke's black rim; it now reads clean, with the
+# green backdrop showing through between the strokes. The rosette's bright core
+# and the disc falloff are untouched.
+#
 # ADR-0047 IS STILL `proposed`. Plan 0045 Phase 2 confirms the treatment against
 # rendered samples, and if the user picks a different one this baseline moves ONE
 # MORE TIME. That move is also the decision landing, not a regression.
