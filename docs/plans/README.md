@@ -13,7 +13,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — **unblocked**: [0045] has landed and closed, so the linear-light pipeline this builds on exists; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **in-progress 2026-07-30** — Phases 1-5 (`dev`) landed and merged to `main` (`b06766b`), Mode 4 review done; **Phases 6-7 (`human`) owed**. Phase 6 is **no longer blocked** — [0049] built its instrument and closed | dev, human |
 | [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **draft 2026-07-30** — [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
-| [0051](0051-the-scene-seam-emits-premultiplied-alpha.md) | The scene seam emits premultiplied alpha: the swarm and the strokes stop punching holes in the backdrop | **approved 2026-08-01** — ready for `dev`, and it is the **next thing to take**: a **live regression** on the default path caused by [0045] Phase 2b, reproduced on two draw seams. [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md). Three phases, all `dev`, nothing gating: two shader lines and one blend state, and it **provably moves no golden** | dev |
 
 ## Recommended execution sequence
 
@@ -42,20 +41,19 @@ ADR-0050's stopping condition needs is the mean of that column). Play 2-3 real t
 the normalized levels ride the music without pumping or going numb, record the lock rate, then
 Phase 7 → [0048] closes.
 
-**[0051] is approved (2026-08-01) and is the next thing for `dev` to take.** All three phases are
-`dev`, nothing gates it, and it is a live regression on the default path rather than a feature — so
-it does not queue behind [0046] or [0050].
+**[0051] has landed and closed** (2026-08-01) — see Recently closed. It was what [0045] left
+behind: Phase 2b made the scene→chain seam's alpha load-bearing, and the two additive draw
+pipelines emitted a hard `1.0` alpha across their whole quad, punching a lit backdrop to black
+around every swarm sprite and every stroke. Both seams now emit alpha equal to their own coverage
+through one shared blend constant, with a lit-backdrop guard each
+([ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md), accepted).
 
-It is what [0045] left behind. **[0045] has landed and closed** (2026-07-31) — see Recently
-closed. Phase 2b made the scene→chain seam's alpha
-load-bearing, and two additive draw pipelines emit a hard `1.0` alpha across their whole quad, so a
-lit backdrop is punched to black around every swarm sprite and every stroke. It reproduces on
-unmodified presets from history and is visible live. Every swarm and line golden runs
-`bg_bright = 0`, where a black backdrop times any alpha is still black — so the entire regression
-suite is structurally blind to it, which is verbatim the blind spot
-[ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md)'s Negative section named.
-[ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) decides it; the fix is two
-shader lines and one blend state, and it **provably moves no golden**.
+**It leaves a live constraint for the content lane rather than a clean bill.** The sixteen affected
+presets sit at near-black `bg_bright` floors *because of* the defect, and raising them is now worth
+doing — but coverage-as-alpha means a figure occludes whatever it emits, so `bg_bright` has a new
+ceiling at the figure's dimmest luminance and past it the dim parts read as dark speckle.
+`presets/README.md` states it; [backlog 0040](../design-backlog.md) carries the look question of
+whether additive light should occlude at all.
 
 **The fold came back with a rejection, and it is routed out rather than reopened.** Seen in motion,
 the user rejected the falloff-disc's residual rays and its crop on fullscreen field scenes — both
@@ -280,6 +278,28 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 
 ## Recently closed
 
+- [0051 — the scene seam emits premultiplied alpha](done/0051-the-scene-seam-emits-premultiplied-alpha.md)
+  — **done 2026-08-01**, Mode 4 review **no blockers**, one `major` (an operator-doc gap, fixed at
+  close), four `minor`. Three `dev` phase commits **directly on `main`** rather than in a worktree
+  lane — a deliberate exception for a three-commit single-session fix, so there was no merge to
+  reconcile: `708b80b` the swarm seam plus the shared `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`
+  constant and its guard, `63dd501` the line seam and its guard, `1828ac3` the docs.
+  [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) is **accepted with an
+  Outcome section**. Gate at the close: fmt, clippy `-D warnings`, **388/388**.
+  **One baseline moved, and the plan predicted none would.** The no-op argument was sound; the
+  survey under it was not — `composite_kaleido.toml` runs `bg_bright = 0.55`, so it was the one
+  baseline positioned to see the fix. It moved at mean 0.0009 against a 0.02 tolerance with only
+  the outlier gate firing (73 against 48), and was re-blessed deliberately with the numbers and an
+  eyes-on description in the fixture header; every other baseline re-encoded byte-identical. The
+  lesson worth carrying: **that baseline could not have caught the defect either** — a mean-drift
+  gate cannot resolve a hairline rim, so covering the right configuration is not the same as being
+  able to see the defect at it.
+  Two follow-ups routed rather than built: **[backlog 0040](../design-backlog.md)** — coverage-as-
+  alpha darkens the backdrop wherever emitted light is dimmer than it, so `bg_bright` has a new
+  ceiling set by the figure's dimmest luminance (verified by rendering; `presets/README.md` states
+  it, and whether additive light should occlude at all is a look decision left open) — and
+  **[backlog 0041](../design-backlog.md)** — the line guard discriminates on ~5 pixels where the
+  swarm's gets 52 651, with a `glow = 0` fourth capture sketched as the stronger property.
 - [0045 — linear light: the HDR composite, the bloom stage, and the fold that had to be fixed
   first](done/0045-linear-light-and-bloom.md) — **done 2026-07-31**, passed two Mode 4 reviews
   (**no blockers**; one `major` routed out as [backlog 0039](../design-backlog.md)). Six `dev`
