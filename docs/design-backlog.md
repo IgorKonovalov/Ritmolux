@@ -305,7 +305,13 @@ of the perceived benefit for a fraction of that.
 
 ---
 
-## 0007 — `star_pattern` reads as a hollow ring, and discrete `variant` cannot be blended
+## ~~0007 — `star_pattern` reads as a hollow ring, and discrete `variant` cannot be blended~~
+
+- **PROMOTED 2026-08-01 → [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md) +
+  [Plan 0054](plans/0054-the-line-scenes-catch-up.md)** — the *smooth transition* ask is decided:
+  `variant` becomes a continuous contact angle with a hysteresis cache. **The interior "hollow
+  ring" half is NOT decided** and stays live; ADR-0060's Notes carry the lane's
+  `contact_angle_deg` sweep as the starting measurement. Notes below retained as the origin record.
 
 - **Raised:** 2026-07-26, from `preset-author`. The user's verdict: **"idea is interesting but looks
   poor"**, and separately "change between star rosette shapes should be smooth".
@@ -1308,7 +1314,13 @@ constant that should be a param, already plumbed, defaulting to the value it rep
 
 ---
 
-## 0026 — `lsystem` has no per-segment colour, and the asymmetry with `spectrum` looks unintentional
+## ~~0026 — `lsystem` has no per-segment colour, and the asymmetry with `spectrum` looks unintentional~~
+
+- **PROMOTED 2026-08-01 → [ADR-0059](adrs/0059-line-scenes-colour-along-their-generator-axis.md) +
+  [Plan 0054](plans/0054-the-line-scenes-catch-up.md)**, at wider scope than filed: reading the
+  code showed `spectrum` is the *only* line scene reaching `[palette]` at all, so all four
+  generators get the colour surface, each on its own axis (`lsystem` colours by **generation
+  depth**). Notes below retained as the origin record.
 
 - **Raised:** 2026-07-28, from `preset-author`. The user, on Arrowhead: *"we should introduce ether
   more lines, or glow or some more colors"*. The first two were authorable; the third was not.
@@ -1866,7 +1878,14 @@ routes above is right. Both are architect calls, and the additive-model question
 
 ---
 
-## 0034 — nothing in the engine spawns, throws, ages or individuates an object
+## ~~0034 — nothing in the engine spawns, throws, ages or individuates an object~~
+
+- **PROMOTED 2026-08-01 → [ADR-0057](adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md) +
+  [Plan 0052](plans/0052-the-emitter-objects-that-spawn-fall-and-die.md)** — a new
+  `SystemKind::Emitter` with analytic ballistics and seeded per-object individuation. The user
+  chose the new-scene shape over extending `swarm` or building a per-object expression facility.
+  **[0033](#0033) stays open** — this is the motion half; marks are still round additive blobs.
+  Notes below retained as the origin record.
 
 - **Raised:** 2026-07-30, from `preset-author`, by the Solitaire-cascade request.
 - **Verified against code:** yes — `core/src/render/scenes/swarm.rs` (`Particle`, `bounds`),
@@ -2008,6 +2027,10 @@ screenshots of the running app then reversed.
 - **Raised:** 2026-07-31, from `architect`, at Plan 0045's Mode 4 review.
 - **Verified against code:** yes — measured, not inferred (numbers below).
 - **For:** `preset-author`. This is genuinely content-lane work; the engine behaved as designed.
+- **ROUTED 2026-08-01 → `preset-author`, as a content pass rather than a plan.** The user's
+  call at the Plan 0051 close: this needs no engine change and no ADR, so it goes to the lane
+  directly. It pairs naturally with [0040](#0040) — both are retunes of the same shipped set
+  against a composite whose behaviour has changed under them.
 
 The user's report was "clifford is really dim". Rendering `attractor_clifford` at an identical
 stimulus on `main` and on the Plan 0045 branch (640x360, 90 frames, hardware adapter):
@@ -2040,7 +2063,14 @@ correction.
 
 ---
 
-## 0039 — four bind-group layouts in `core/src` are shared by pipelines that go live in the same frame, and only the tonemap's uniqueness is asserted
+## ~~0039 — four bind-group layouts in `core/src` are shared by pipelines that go live in the same frame, and only the tonemap's uniqueness is asserted~~
+
+- **PROMOTED 2026-08-01 → [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md) +
+  [Plan 0053](plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)** — the collision
+  property gets asserted, with an allowlist carrying dated hardware-vs-WARP evidence per pair.
+  **One correction to the entry below:** it cites the hazard as "ADR-0021 / Plan 0020's
+  documented hazard", and so do five code comments — ADR-0021 is the **shared palette system**.
+  The hazard had no record until ADR-0058. Notes below retained as the origin record.
 
 - **Raised:** 2026-07-31, from `architect`, at Plan 0045's second Mode 4 review (Phase 4b).
 - **Verified against code:** yes — the numbers below are the printout of a test that ships,
@@ -2129,7 +2159,12 @@ today — post-fix is brighter than pre-fix at every pixel — so this is a look
 Settling it wants rendered samples of the same preset under both semantics at a raised backdrop,
 per the concrete-examples workflow, not an argument.
 
-## 0041 — the line seam's lit-backdrop guard discriminates on ~5 pixels, and a stronger property is available
+## ~~0041 — the line seam's lit-backdrop guard discriminates on ~5 pixels, and a stronger property is available~~
+
+- **PROMOTED 2026-08-01 → [Plan 0053](plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)
+  Phase 4** — the `glow = 0` fourth capture sketched below is taken as written, plus the same
+  shape at `brightness = 0` for the swarm guard. No ADR: the property is a better test, not a
+  decision with a rejected alternative. Notes below retained as the origin record.
 
 - **Raised:** 2026-08-01, from `architect`, at Plan 0051's Mode 4 review.
 - **Verified against code:** yes — the guard was run against a reverted shader at review:
