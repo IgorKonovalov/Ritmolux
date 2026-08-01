@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0052** (ADRs are a separate sequence — next free there is **0057**.)
+**Next free number: 0055** (ADRs are a separate sequence — next free there is **0061**.)
 
 ## Active roster
 
@@ -13,6 +13,9 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — **unblocked**: [0045] has landed and closed, so the linear-light pipeline this builds on exists; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **in-progress 2026-07-30** — Phases 1-5 (`dev`) landed and merged to `main` (`b06766b`), Mode 4 review done; **Phases 6-7 (`human`) owed**. Phase 6 is **no longer blocked** — [0049] built its instrument and closed | dev, human |
 | [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **draft 2026-07-30** — [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
+| [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **draft 2026-08-01** — [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
+| [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **draft 2026-08-01** — [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
+| [0054](0054-the-line-scenes-catch-up.md) | The line scenes catch up: every one honours the palette, and the star stops cutting between shapes | **draft 2026-08-01** — [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md) + [ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md); closes [backlog 0026](../design-backlog.md) + [0007](../design-backlog.md). Two blocked content asks, both with the user's own verdict behind them | dev |
 
 ## Recommended execution sequence
 
@@ -54,6 +57,23 @@ doing — but coverage-as-alpha means a figure occludes whatever it emits, so `b
 ceiling at the figure's dimmest luminance and past it the dim parts read as dark speckle.
 `presets/README.md` states it; [backlog 0040](../design-backlog.md) carries the look question of
 whether additive light should occlude at all.
+
+**Three plans came out of the backlog on 2026-08-01, and they are independent of each other and of
+the render roadmap.** Take them in whatever order suits the session:
+
+- **[0052] is the one that adds capability.** A new scene idiom — the first since the attractor —
+  and the answer to a user request the engine could not express at all. Four `dev` phases, nothing
+  gating. It is also the largest of the three.
+- **[0053] is the one that protects everything else.** It moves no pixels; it makes the golden
+  suite able to notice a class of defect it currently blesses. **Its Phase 3 is `human`** and needs
+  a machine with a discrete GPU, so unlike the other two it will not close in one sitting — start
+  it when you have that machine to hand.
+- **[0054] unblocks the content lane.** Two asks that have been waiting on an ADR, one of them
+  since 2026-07-26 with your "invest, do not cut" verdict on it.
+
+**[0052] and [0053] touch each other in one place worth knowing:** the emitter adds a `[Uniform]`
+bind-group layout to the group [0053] asserts on. Whichever lands second inherits the other's list.
+Neither ordering is wrong.
 
 **The fold came back with a rejection, and it is routed out rather than reopened.** Seen in motion,
 the user rejected the falloff-disc's residual rays and its crop on fullscreen field scenes — both
