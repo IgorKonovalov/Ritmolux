@@ -3,10 +3,10 @@
 > **Status:** done (2026-07-25)
 > **Created:** 2026-07-25
 > **Owner skill(s):** dev
-> **Related ADRs:** [0030](../adrs/0030-scene-target-size-hot-path-hook.md) (the target-size hook this
-> plan makes cheap to respond to); [0028](../adrs/0028-final-stage-ink-tone-remap.md) (the ink stage
+> **Related ADRs:** [0030](../../adrs/0030-scene-target-size-hot-path-hook.md) (the target-size hook this
+> plan makes cheap to respond to); [0028](../../adrs/0028-final-stage-ink-tone-remap.md) (the ink stage
 > this plan tests and de-muddies). Cleans up findings from the Plan
-> [0027](done/0027-attractor-ink-and-crisp-trails.md) close review.
+> [0027](0027-attractor-ink-and-crisp-trails.md) close review.
 
 ## Close summary (Mode 4, 2026-07-25)
 

@@ -119,5 +119,5 @@ it is dynamic it has to reach the scene.
 - The cost of the attractor's *response* to a size change — a full `Resources` rebuild (shaders,
   pipelines, particle buffer, LUTs) inside `render`, which hitches badly during a live window drag —
   is a scene-implementation defect found in the Plan 0027 review and routed to
-  [Plan 0029](../plans/0029-attractor-resize-cost-and-ink-followups.md). It does not change this
+  [Plan 0029](../plans/done/0029-attractor-resize-cost-and-ink-followups.md). It does not change this
   decision.

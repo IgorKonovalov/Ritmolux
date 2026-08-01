@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-22
-> **Related plan(s):** [0011](../plans/0011-diagnostics-and-memory-trim.md) (implemented + closed 2026-07-22)
+> **Related plan(s):** [0011](../plans/done/0011-diagnostics-and-memory-trim.md) (implemented + closed 2026-07-22)
 
 ## Context
 

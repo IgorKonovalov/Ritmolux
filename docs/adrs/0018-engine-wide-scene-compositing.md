@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-23
-> **Related plan(s):** [0018-engine-wide-visual-enrichment](../plans/0018-engine-wide-visual-enrichment.md); builds on [0012](0012-stateful-feedback-render-system.md)/[0013](0013-c-abi-v4-render-dt.md) (Plan 0014's offscreen field + injected `dt`); extends [0002](0002-layered-preset-architecture.md) layer 2
+> **Related plan(s):** [0018-engine-wide-visual-enrichment](../plans/done/0018-engine-wide-visual-enrichment.md); builds on [0012](0012-stateful-feedback-render-system.md)/[0013](0013-c-abi-v4-render-dt.md) (Plan 0014's offscreen field + injected `dt`); extends [0002](0002-layered-preset-architecture.md) layer 2
 
 ## Context
 

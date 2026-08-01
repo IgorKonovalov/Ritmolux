@@ -3,7 +3,7 @@
 > **Status:** done
 > **Created:** 2026-07-25
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
+> **Related ADRs:** [0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
 
 ## TL;DR
 

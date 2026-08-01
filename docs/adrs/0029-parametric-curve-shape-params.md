@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-24
-> **Related plan(s):** [0028-parametric-curve-shape-params](../plans/0028-parametric-curve-shape-params.md)
+> **Related plan(s):** [0028-parametric-curve-shape-params](../plans/done/0028-parametric-curve-shape-params.md)
 
 ## Context
 

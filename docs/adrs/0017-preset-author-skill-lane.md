@@ -7,7 +7,7 @@
 > [ADR-0007](0007-line-geometry-generators.md) (the `[curve]`/`[generator]` config it also writes),
 > [Plan 0010](../plans/done/0010-line-geometry-scenes.md) (the schema whose settling was the deferral gate — now closed),
 > [Plan 0013](../plans/done/0013-headless-scene-capture.md) (the `shot` CLI this skill renders through),
-> [Plan 0015](../plans/0015-preset-dir-override-and-live-iteration.md) (tightens the edit-see-live loop; a soft, not hard, dependency)
+> [Plan 0015](../plans/done/0015-preset-dir-override-and-live-iteration.md) (tightens the edit-see-live loop; a soft, not hard, dependency)
 
 ## Context
 

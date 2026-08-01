@@ -11,8 +11,8 @@
 > `exposure` before ink, a bloom `PostStage` with `bloom_amount`/`bloom_threshold`/`bloom_radius`,
 > the disc fold with radial falloff and `kaleido_center_x/y`, and — added mid-plan — the backdrop
 > leaving the post chain so the chain composites premultiplied over it.
-> [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) and
-> [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md) are **accepted**; ADR-0047 was already
+> [ADR-0046](../../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) and
+> [ADR-0055](../../adrs/0055-backdrop-leaves-the-post-chain.md) are **accepted**; ADR-0047 was already
 > accepted with an Outcome. Closes design-backlog **0005**, **0010** and **0011**.
 >
 > **Phase 6's answer: bloom is not what is expensive.** `star_lantern` — which now ships and binds
@@ -20,7 +20,7 @@
 > is obsolete — runs **164 fps, p99 8.2 ms** Rich-pinned and windowed on the discrete GPU, against
 > `attractor_clifford` at 19.9 ms and `attractor_leviathan` at 19.0 ms, neither of which switches
 > the stage on. The fullscreen and `Floor`-pinned runs are carried to
-> [`docs/on-device-validation.md`](../on-device-validation.md), which never blocks a close.
+> [`docs/on-device-validation.md`](../../on-device-validation.md), which never blocks a close.
 >
 > **Out-of-list files, disclosed by `dev` and absorbed at the close** — all consequences of the
 > phases as written rather than scope creep: Phase 3 also touched `preset/schema.rs` (the four new
@@ -32,25 +32,25 @@
 >
 > **Two things routed out rather than reopened here.** The fold's disc coverage was rejected in
 > motion on grounds ADR-0047 already records as its accepted cost — [backlog
-> 0037](../design-backlog.md). And the WARP identical-layout collisions the Phase 4b enumeration
-> printed are [backlog 0039](../design-backlog.md).
+> 0037](../../design-backlog.md). And the WARP identical-layout collisions the Phase 4b enumeration
+> printed are [backlog 0039](../../design-backlog.md).
 >
 > **One defect this plan caused, found after the merge and routed to its own plan.** Phase 2b's
 > premultiplied composite made the scene→chain seam's alpha load-bearing, and two additive draw
 > pipelines emit a hard `1.0` alpha over the whole quad — so a lit backdrop is punched to black
 > around every sprite and stroke. That is ADR-0055's own first Negative bullet coming true at the
 > one seam this plan did not reach:
-> [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) +
-> [Plan 0051](0051-the-scene-seam-emits-premultiplied-alpha.md).
+> [ADR-0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) +
+> [Plan 0051](../0051-the-scene-seam-emits-premultiplied-alpha.md).
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (linear-light + bloom + tonemap),
-> [0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) (fold domain, **confirmed
+> **Related ADRs:** [0046](../../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (linear-light + bloom + tonemap),
+> [0047](../../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) (fold domain, **confirmed
 > 2026-07-31 with an Outcome**),
-> [0055](../adrs/0055-backdrop-leaves-the-post-chain.md) (the backdrop leaves the chain;
+> [0055](../../adrs/0055-backdrop-leaves-the-post-chain.md) (the backdrop leaves the chain;
 > premultiplied alpha through the composite — added mid-plan by Phase 2),
-> [0045](../adrs/0045-quality-tiers-floor-and-rich.md) (tier values this plan consumes).
-> [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md) R1.
+> [0045](../../adrs/0045-quality-tiers-floor-and-rich.md) (tier values this plan consumes).
+> [docs/roadmap-visual-richness.md](../../roadmap-visual-richness.md) R1.
 
 ## TL;DR
 
@@ -148,7 +148,7 @@ side's `bg_*`.
 
 ### Phase 2b — The backdrop leaves the chain: premultiplied alpha through the composite
 - **Owner skill:** dev
-- **What:** implement [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md). The chain's
+- **What:** implement [ADR-0055](../../adrs/0055-backdrop-leaves-the-post-chain.md). The chain's
   stage inputs clear **transparent**; each stage propagates alpha instead of forcing `1.0`
   (for the kaleidoscope this is the fix — the falloff weight `w` multiplies **colour and
   alpha together**, so it fades to transparent, not to black); `Background` renders into the
@@ -327,7 +327,7 @@ side's `bg_*`.
   stage. That is a number for the close to hold, and not yet a miss against NFR §1, which is a
   `Floor` requirement.
 
-  **Carried to [`docs/on-device-validation.md`](../on-device-validation.md)** rather than blocking
+  **Carried to [`docs/on-device-validation.md`](../../on-device-validation.md)** rather than blocking
   the close, since that page never blocks a plan: the same `star_lantern` run at **native
   fullscreen**, the **`Floor`-pinned** sanity pass, and the whole low-end-iGPU side. The bloom item
   on that page now names `star_lantern` instead of the scratch-directory workaround, and carries
@@ -336,7 +336,7 @@ side's `bg_*`.
   **One thing this run cannot settle, worth knowing before someone tries:** `shot` has **no
   `--tier` flag** — headless capture is `Floor` by construction (ADR-0045), deliberately, so that
   no baseline can be blessed at another tier. Every `Rich` question on this page therefore needs
-  the running app. [Plan 0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md)'s `[` / `]`
+  the running app. [Plan 0050](../0050-in-app-settings-and-a-browse-overlay-that-fits.md)'s `[` / `]`
   tier swap turns that from a relaunch into an A/B in one sitting.
 
 - **Visual result, 2026-07-31 — the fold's disc coverage is rejected, and it is routed out

@@ -10,9 +10,9 @@
 > See "Close" at the foot of this file.
 > **Owner skill(s):** dev
 > **Related ADRs:** none new — this plan carries out existing decisions. Touches code governed by
-> [ADR-0007](../adrs/0007-line-geometry-generators.md) (segment cap is never a silent cut),
-> [ADR-0019](../adrs/0019-eased-parameters.md) (render-layer easing), and
-> [ADR-0021](../adrs/0021-shared-palette-system.md) (baked palette). **Sequenced after
+> [ADR-0007](../../adrs/0007-line-geometry-generators.md) (segment cap is never a silent cut),
+> [ADR-0019](../../adrs/0019-eased-parameters.md) (render-layer easing), and
+> [ADR-0021](../../adrs/0021-shared-palette-system.md) (baked palette). **Sequenced after
 > [Plan 0030](0030-composite-chain-and-scene-keying.md)** — Phase 3 names its chain stages.
 
 ## TL;DR
@@ -397,7 +397,7 @@ pub struct RoseParams {
 - **Measure before optimizing further.** Every performance statement in the originating review was a
   reading of the code, not a profile. If frame time matters, the next step is p99 from the F3 overlay or
   a `shot`-driven measurement on the low-end iGPU (the standing
-  [on-device checklist](../on-device-validation.md)) — specifically the line scenes' per-frame resample
+  [on-device checklist](../../on-device-validation.md)) — specifically the line scenes' per-frame resample
   and the fixed-1280x720 trails/kaleidoscope grid on a 1080p+ display.
 - **Target-sized internal grids for trails / kaleidoscope / reaction-diffusion**, following the
   `PipelineResources` / `FieldResources` split Plan 0029 established for the attractor. Deferred

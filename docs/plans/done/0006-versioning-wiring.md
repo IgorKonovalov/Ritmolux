@@ -4,7 +4,7 @@
 > **Created:** 2026-07-21
 > **Closed:** 2026-07-21
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0005](../adrs/0005-versioning-and-release-cadence.md) (accepted at this close)
+> **Related ADRs:** [0005](../../adrs/0005-versioning-and-release-cadence.md) (accepted at this close)
 
 **Close summary (Mode 4, fresh session).** Phases 1-3 (`dev`) landed in commits ef5c4dd,
 1298e2b, 3616dfb; Phase 4 (`human`) confirmed at close — `cargo-release 1.1.3` is installed

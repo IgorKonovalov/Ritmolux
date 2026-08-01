@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-25
-> **Related plan(s):** [0032](../plans/0032-testing-strategy-e2e-coverage-and-pre-push.md)
+> **Related plan(s):** [0032](../plans/done/0032-testing-strategy-e2e-coverage-and-pre-push.md)
 
 ## Context
 

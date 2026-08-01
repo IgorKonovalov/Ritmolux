@@ -13,10 +13,10 @@
 > said "two flags" where ADR-0043 means three; corrected in place.
 > **Created:** 2026-07-29
 > **Owner skill(s):** dev
-> **Related ADRs:** [0043](../adrs/0043-reachability-reports-comparison-nodes.md) (this plan's
-> decision), [0042](../adrs/0042-reachability-measured-on-the-expression-tree.md) (the mechanism it
+> **Related ADRs:** [0043](../../adrs/0043-reachability-reports-comparison-nodes.md) (this plan's
+> decision), [0042](../../adrs/0042-reachability-measured-on-the-expression-tree.md) (the mechanism it
 > extends)
-> **Closes backlog:** [0028](../design-backlog.md)
+> **Closes backlog:** [0028](../../design-backlog.md)
 
 ## TL;DR
 
@@ -55,7 +55,7 @@ so the fix is instrumentation *and* reporting.
 
 ## Decision
 
-Per [ADR-0043](../adrs/0043-reachability-reports-comparison-nodes.md): record the six comparison
+Per [ADR-0043](../../adrs/0043-reachability-reports-comparison-nodes.md): record the six comparison
 operators as a two-valued observation exactly like a `select()` condition, and report one that never
 took both values **except where it is the direct condition of an enclosing `select()`** — that
 `select()` already reports it, and in better words.

@@ -17,11 +17,11 @@
 > forward as a `docs/on-device-validation.md` item rather than assumed.
 > **Created:** 2026-07-29
 > **Owner skill(s):** dev
-> **Related ADRs:** [0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) (this
-> plan's decision), [0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the aspect
-> rule being applied), [0030](../adrs/0030-scene-target-size-hot-path-hook.md) (the per-frame
+> **Related ADRs:** [0044](../../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) (this
+> plan's decision), [0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the aspect
+> rule being applied), [0030](../../adrs/0030-scene-target-size-hot-path-hook.md) (the per-frame
 > target-size hook this relies on)
-> **Closes backlog:** [0029](../design-backlog.md), and [0025](../design-backlog.md) in full
+> **Closes backlog:** [0029](../../design-backlog.md), and [0025](../../design-backlog.md) in full
 
 ## TL;DR
 
@@ -66,7 +66,7 @@ should be authored against the scene as it will be, not as it is.
 
 ## Decision
 
-Per [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md): a **2.5D** world.
+Per [ADR-0044](../../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md): a **2.5D** world.
 `Particle` gains one `z` in `0..1` driving sprite scale, a parallax offset against the shared view
 transform, and an atmospheric brightness fade, with **no z-sorting and no perspective projection** —
 additive blending is commutative, so the sort a 3D particle system normally needs buys nothing here.
@@ -116,10 +116,10 @@ flowchart TB
   aspect times a margin factor. The wrap must stay stable across a resize — recomputing bounds must
   not teleport every particle at once.
 - **Correction (made at close, 2026-07-30):** this phase originally said "via the existing per-frame
-  target-size hook", meaning [`Scene::set_target_size`](../adrs/0030-scene-target-size-hot-path-hook.md).
+  target-size hook", meaning [`Scene::set_target_size`](../../adrs/0030-scene-target-size-hot-path-hook.md).
   That was wrong and the implementation was right to ignore it. `set_target_size` receives the post
   chain's **internal grid** — quantized to a 256 px step and capped, i.e. a resolution, not a shape
-  ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) — and every swarm preset
+  ([ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) — and every swarm preset
   composes `trails`, so that is exactly the quantized case. The correct source is `Scene::render`'s
   `aspect` argument, which `core/src/render/post.rs:442` computes from the **surface**. The plan
   named the wrong hook for the rule it was invoking.

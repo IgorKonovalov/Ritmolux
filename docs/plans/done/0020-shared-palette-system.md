@@ -14,7 +14,7 @@
 > `core/tests/golden/reaction_diffusion.png` changed (fragment/swarm/attractor goldens byte-identical =
 > no-regression proof). **C ABI untouched, no new dependency.** Version **minor 0.9.0 -> 0.10.0** at close.
 > **Owner skill(s):** dev
-> **Related ADRs:** [0021](../adrs/0021-shared-palette-system.md) (supplements [0002](../adrs/0002-layered-preset-architecture.md))
+> **Related ADRs:** [0021](../../adrs/0021-shared-palette-system.md) (supplements [0002](../../adrs/0002-layered-preset-architecture.md))
 > **Scope note (2026-07-23):** extended to **all four** shader-colored scenes. The reaction-diffusion
 > and attractor scenes — deferred to a followup when this plan was first drafted — were folded into
 > scope (new **Phase 5**) at the user's direction, prompted by `preset-author`-lane evidence: authoring
@@ -49,7 +49,7 @@ them:
 
 Color is a missing axis of the preset surface, and it is duplicated per scene — every new scene
 re-duplicates it (RD and the attractor already have). See
-[ADR-0021](../adrs/0021-shared-palette-system.md) for the decision and the rejected alternatives.
+[ADR-0021](../../adrs/0021-shared-palette-system.md) for the decision and the rejected alternatives.
 
 ## Decision
 

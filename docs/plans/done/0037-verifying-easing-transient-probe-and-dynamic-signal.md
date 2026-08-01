@@ -6,17 +6,17 @@
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0039](../adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md)
-> (this plan's decision), [0035](../adrs/0035-asymmetric-attack-release-easing.md) (the capability it
-> makes checkable), [0019](../adrs/0019-eased-parameters.md) (the `[smoothing]` surface)
-> **Backlog entries closed:** [0013](../design-backlog.md), the unresolved half of
-> [0008](../design-backlog.md), plus [0012](../design-backlog.md) and [0014](../design-backlog.md) as
+> **Related ADRs:** [0039](../../adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md)
+> (this plan's decision), [0035](../../adrs/0035-asymmetric-attack-release-easing.md) (the capability it
+> makes checkable), [0019](../../adrs/0019-eased-parameters.md) (the `[smoothing]` surface)
+> **Backlog entries closed:** [0013](../../design-backlog.md), the unresolved half of
+> [0008](../../design-backlog.md), plus [0012](../../design-backlog.md) and [0014](../../design-backlog.md) as
 > documentation
 > **Amended 2026-07-27, after approval and after Plan 0034 closed.** Two additions, neither changing
 > the decision, the phase order, or ADR-0039: **Phase 1 done-when 5** pins that the new time-varying
 > stimulus must preserve the `spectrum` lighting `ca99cb1` just added to the very functions this
 > phase rewrites, and **Phase 4 done-when 4** picks up the empirical half of
-> [backlog 0015](../design-backlog.md) while the user is already measuring real audio. The plan's
+> [backlog 0015](../../design-backlog.md) while the user is already measuring real audio. The plan's
 > premise was **re-verified** against the post-0034 tree: `capture_preset` still takes a single
 > `&AnalysisFrame` (`core/src/render/mod.rs:1462`) and `--report` is still built on it
 > (`standalone/examples/shot.rs:654`), so "the report is identical for any easing constant" holds.
@@ -208,7 +208,7 @@ Each phase ships as its own commit. Phases 1-3 and 5 are `dev`; Phase 4 is the u
      **captured as a new backlog entry**, not fixed here — re-gaining the whole set is a content-lane
      pass with its own scope.
   4. **Opportunistic, while the meter is out** (added 2026-07-27): the same clips answer the
-     empirical half of [backlog 0015](../design-backlog.md) — the band axis is **half linear**, so
+     empirical half of [backlog 0015](../../design-backlog.md) — the band axis is **half linear**, so
      31 of the 64 bands are 23.4 Hz slices and the bottom two octaves, where kick and bass live, are
      the least-resolved part of the array. Note whether that is *audible as a limitation* when
      driving a `bin()` binding from the low end, or merely a documented curiosity. One or two
@@ -371,10 +371,10 @@ Real material peaks where a full-scale sine does (808 bass peak `0.190` against 
 the analyzer attenuates nothing) but its **mean** is `0.007`, about 25x lower. So percussive bindings
 calibrated against a synthesized tone are roughly right and **continuous ones are badly over-gained**,
 which `docs/capturing.md` now states with the full ladder from `--set 0.8` (~100x) down through
-`dynamic:110` (~6x). Routed to **[backlog 0020](../design-backlog.md)** rather than fixed, per the
+`dynamic:110` (~6x). Routed to **[backlog 0020](../../design-backlog.md)** rather than fixed, per the
 phase's own done-when 3. Done-when 4's opportunistic half came back **positive**: driving
 `Spectrum Comb` from the 808 clip collapses the whole kick-and-sub region into the first one or two
-elements, so **[backlog 0015](../design-backlog.md) is no longer documentation-only** and is now the
+elements, so **[backlog 0015](../../design-backlog.md) is no longer documentation-only** and is now the
 repo's next ADR-worthy design item.
 
 **One edit outside a phase's file list, disclosed in its commit rather than absorbed:** one line of
@@ -423,6 +423,6 @@ frames (~3.8 MB), a foot-gun at a 4K target.
 **⚠ Nothing new for the on-device pass.** This plan adds no per-frame work: the probe and the
 generator live entirely in the capture/`shot` path, and the app's render loop is untouched.
 
-**[ADR-0039](../adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md) accepted.**
+**[ADR-0039](../../adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md) accepted.**
 Version **minor 0.18.0 -> 0.19.0** (a feature plan: a new core capture primitive, a new measure, a
 new `--signal` kind, two new report columns).

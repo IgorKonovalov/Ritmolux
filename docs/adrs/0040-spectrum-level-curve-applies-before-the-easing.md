@@ -5,7 +5,7 @@
 > its stated mechanism is falsified and corrected there.**
 > Read the Outcome before quoting anything in Decision or Consequences about *even falls*.
 > **Date:** 2026-07-27
-> **Related plan(s):** [0038](../plans/0038-line-family-unreachable-levers.md)
+> **Related plan(s):** [0038](../plans/done/0038-line-family-unreachable-levers.md)
 > **Supplements:** [ADR-0036](0036-preset-reachable-spectrum.md) (the spectrum surface),
 > [ADR-0035](0035-asymmetric-attack-release-easing.md) (the `{ attack, release }` easing this orders
 > against), [ADR-0002](0002-layered-preset-architecture.md) (the expression layer)

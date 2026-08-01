@@ -13,19 +13,19 @@
 > probe on the asymmetric fall *only*, printing exactly the predicted `61`; deleting the
 > `Easing::step` finite check fails `a_non_finite_value_cannot_poison_a_smoother_permanently`.
 > **Backlog 0016, 0017, 0018 and 0019 all close here**;
-> [0021](../design-backlog.md), [0022](../design-backlog.md) and [0023](../design-backlog.md) route
-> onward, the last into [Plan 0039](../plans/0039-line-joins.md).
+> [0021](../../design-backlog.md), [0022](../../design-backlog.md) and [0023](../../design-backlog.md) route
+> onward, the last into [Plan 0039](0039-line-joins.md).
 > **Created:** 2026-07-27
 > **Approved:** 2026-07-27 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md) (this
+> **Related ADRs:** [0040](../../adrs/0040-spectrum-level-curve-applies-before-the-easing.md) (this
 > plan's decision — curve before easing, as a bindable exponent),
-> [0036](../adrs/0036-preset-reachable-spectrum.md) (the spectrum surface),
-> [0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the constraint on Phase 2),
-> [0035](../adrs/0035-asymmetric-attack-release-easing.md) (the easing Phase 3 orders against)
-> **Backlog entries closed:** [0016](../design-backlog.md), [0017](../design-backlog.md),
-> [0018](../design-backlog.md), [0019](../design-backlog.md)
-> **Amended 2026-07-27, after approval — [Plan 0037](done/0037-verifying-easing-transient-probe-and-dynamic-signal.md)
+> [0036](../../adrs/0036-preset-reachable-spectrum.md) (the spectrum surface),
+> [0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the constraint on Phase 2),
+> [0035](../../adrs/0035-asymmetric-attack-release-easing.md) (the easing Phase 3 orders against)
+> **Backlog entries closed:** [0016](../../design-backlog.md), [0017](../../design-backlog.md),
+> [0018](../../design-backlog.md), [0019](../../design-backlog.md)
+> **Amended 2026-07-27, after approval — [Plan 0037](0037-verifying-easing-transient-probe-and-dynamic-signal.md)
 > Phase 1 landed first (`ece3291`), which changes one done-when for the better.** This plan was
 > written assuming no transient probe existed, so Phase 3 could only pin ADR-0040's curve-vs-easing
 > ordering with a unit test on the pure per-element step. `capture_preset_over` and `step_response`
@@ -35,10 +35,10 @@
 > same phase order, same ADR. Note also that 0037's two `easing_*` fixtures are `parametric_curve`,
 > so **Phase 1's byte-identical-goldens claim now covers them too** — `glow` touches that scene.
 > **Amended again 2026-07-28, mid-plan, after Phase 3's done-when 6 measurement came back against
-> [ADR-0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md).** Phases 1–4 have
+> [ADR-0040](../../adrs/0040-spectrum-level-curve-applies-before-the-easing.md).** Phases 1–4 have
 > landed (`a1c67f4`, `f3945be`, `c9121fd`, `e31ae88`) and Phase 3 did what done-when 6 told it to:
 > it measured, found the ADR's justification falsified, retuned nothing, and routed to `architect`.
-> The ruling is **[ADR-0040's Outcome](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement)**:
+> The ruling is **[ADR-0040's Outcome](../../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement)**:
 > **the shipped ordering stands and no scene code changes**, but its stated rationale ("a perceptually
 > even fall") is wrong — both orderings are exponentials of identical shape, and the real difference
 > is that ease-then-curve would make the effective release `release / curve`. Two things follow, and
@@ -110,7 +110,7 @@ choice is *curve or easing, never both*.
 
 Bind all four, and add `log(x)` to the grammar so the shaping vocabulary is not scene-specific.
 
-Per [ADR-0040](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md): the level curve is a
+Per [ADR-0040](../../adrs/0040-spectrum-level-curve-applies-before-the-easing.md): the level curve is a
 **bindable exponent** (`curve`, default `1.0`), and it applies **before** the per-element easing, so
 the smoother operates in the displayed domain the way meter ballistics do. The rejected alternatives
 — easing first, a structural named-mode key, both together, and `log` alone — are recorded there.
@@ -118,7 +118,7 @@ the smoother operates in the displayed domain the way meter ballistics do. The r
 `span` and `baseline` are **bindable world-space parameters**, not a fit mode.
 
 > **The binding constraint, and it is not negotiable.** A scene that reads its render target's aspect
-> to size itself is exactly the [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)
+> to size itself is exactly the [ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)
 > trap, which has already shipped twice in this codebase (Plan 0029 on the attractor, Plan 0033 on
 > the composite). `span` sets a **world** span; the renderer's existing aspect handling maps it. The
 > honest consequence, which Phase 5 documents rather than hides: *"fill the width"* is therefore
@@ -288,7 +288,7 @@ table before and after its work.
      it.** The `curve`↔`scale` interaction is documented with the 5.8x figure from Phase 3: that one
      is real, it is an **amplitude** coupling, and it is the interaction an author hits first. The
      `curve`↔`[spectrum] smoothing` coupling is documented as
-     [ADR-0040's Outcome](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement)
+     [ADR-0040's Outcome](../../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement)
      **corrects** it: under the shipped ordering the smoother's state *is* the displayed quantity, so a
      fall's time constant is exactly `release` **for every value of `curve`** — the two knobs are
      independent in time. **Do not repeat "the same `release` looks different once a curve is
@@ -496,7 +496,7 @@ table before and after its work.
 
   > **RESOLVED 2026-07-28 — it was wrong, and this risk entry did its job.** Phase 3 measured, found
   > against the ADR, retuned nothing and routed to `architect`. The ruling is
-  > [ADR-0040's Outcome](../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement):
+  > [ADR-0040's Outcome](../../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement):
   > **the ordering stands, no scene code changes, and the justification is replaced** — both orderings
   > produce exponentials of identical shape, so neither is "more even"; the real difference is that
   > ease-then-curve would make the effective release `release / curve`, while the shipped order leaves

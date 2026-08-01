@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-23
-> **Related plan(s):** [0024-foobar-component-version-single-source](../plans/0024-foobar-component-version-single-source.md); supplements [ADR-0005](0005-versioning-and-release-cadence.md) (app versioning / one workspace version); revises the "plugin version remains independent" note from [Plan 0006](../plans/done/0006-versioning-wiring.md)
+> **Related plan(s):** [0024-foobar-component-version-single-source](../plans/done/0024-foobar-component-version-single-source.md); supplements [ADR-0005](0005-versioning-and-release-cadence.md) (app versioning / one workspace version); revises the "plugin version remains independent" note from [Plan 0006](../plans/done/0006-versioning-wiring.md)
 
 ## Context
 

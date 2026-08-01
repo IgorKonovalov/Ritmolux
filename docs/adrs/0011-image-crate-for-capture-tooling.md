@@ -2,7 +2,7 @@
 
 > **Status:** accepted (Plan 0013 closed 2026-07-22)
 > **Date:** 2026-07-22
-> **Related plan(s):** [0013](../plans/0013-headless-scene-capture.md)
+> **Related plan(s):** [0013](../plans/done/0013-headless-scene-capture.md)
 
 ## Context
 

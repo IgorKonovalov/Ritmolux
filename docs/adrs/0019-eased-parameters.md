@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-23
-> **Related plan(s):** [0018-engine-wide-visual-enrichment](../plans/0018-engine-wide-visual-enrichment.md); extends [0002](0002-layered-preset-architecture.md) layer 2; depends on Plan 0014's injected `dt`
+> **Related plan(s):** [0018-engine-wide-visual-enrichment](../plans/done/0018-engine-wide-visual-enrichment.md); extends [0002](0002-layered-preset-architecture.md) layer 2; depends on Plan 0014's injected `dt`
 
 ## Context
 

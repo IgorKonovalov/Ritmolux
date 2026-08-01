@@ -11,7 +11,7 @@
 > Phase 2 explicitly sanctions, chosen over a fixed `DROP_GATE_SECS` so it scales for custom dwell
 > configs. Version minor **0.8.0 -> 0.9.0** at close.
 > **Owner skill(s):** dev
-> **Related ADRs:** [0027-scene-rotation-constant-default-calmer-cadence](../adrs/0027-scene-rotation-constant-default-calmer-cadence.md); revises defaults from [Plan 0009](done/0009-live-performance-features.md)
+> **Related ADRs:** [0027-scene-rotation-constant-default-calmer-cadence](../../adrs/0027-scene-rotation-constant-default-calmer-cadence.md); revises defaults from [Plan 0009](0009-live-performance-features.md)
 
 ## TL;DR
 

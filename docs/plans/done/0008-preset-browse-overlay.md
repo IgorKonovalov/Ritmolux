@@ -8,10 +8,10 @@
 > glyphon confirmed absent from the default/plugin tree, present only in the standalone.
 > **Created:** 2026-07-22
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0009](../adrs/0009-glyphon-text-rendering.md) — adopt glyphon for
+> **Related ADRs:** [ADR-0009](../../adrs/0009-glyphon-text-rendering.md) — adopt glyphon for
 > standalone on-canvas text, feature-gated (proposed by this plan; accepted at close). Builds on
-> [ADR-0002](../adrs/0002-layered-preset-architecture.md) (the preset engine) and
-> [ADR-0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) (core owns raw GPU behind wgpu).
+> [ADR-0002](../../adrs/0002-layered-preset-architecture.md) (the preset engine) and
+> [ADR-0001](../../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) (core owns raw GPU behind wgpu).
 > Consumes Plan 0007's loading foundation.
 
 ## TL;DR
@@ -22,7 +22,7 @@ the fact. This plan gives the standalone an **in-app browse overlay**: press a k
 list of preset names appears over the running visual, arrow keys move a highlight, typing
 narrows the list, Enter jumps straight to that preset, Esc closes. It needs the codebase's first
 **text rendering** — adopted as **glyphon** behind a core `text` cargo feature
-([ADR-0009](../adrs/0009-glyphon-text-rendering.md)), rendered through a small reusable
+([ADR-0009](../../adrs/0009-glyphon-text-rendering.md)), rendered through a small reusable
 `render::text` seam so Plan 0009's live-show HUD can later draw through the same path. First
 user-visible behavior lands in Phase 1: the standalone draws the **active preset's name on the
 canvas** (not just the title bar). Standalone-only; the plugin stays cycle-only (no text over
@@ -50,7 +50,7 @@ Three things are missing today:
   modal state (open/closed, highlight, filter string) driving a picker.
 
 The user chose: **glyphon** for crisp scalable text (accepting its size cost, confined to the
-standalone via a feature gate — [ADR-0009](../adrs/0009-glyphon-text-rendering.md)); a
+standalone via a feature gate — [ADR-0009](../../adrs/0009-glyphon-text-rendering.md)); a
 **general** `render::text` seam reused by a future HUD, not a throwaway; **keyboard-only** input;
 and a **flat list with type-to-filter** (no grouping/thumbnails — Plan 0007's "filenames only"
 stance holds).

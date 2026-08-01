@@ -4,10 +4,10 @@
 > **Created:** 2026-07-25
 > **Approved:** 2026-07-25
 > **Owner skill(s):** dev
-> **Related ADRs:** [0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md) (this plan
+> **Related ADRs:** [0031](../../adrs/0031-post-stage-trait-instantiable-composite-chain.md) (this plan
 > implements it; accepted at this close); preserves
-> [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md)'s fixed order and
-> [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md)'s ink-is-last rule; **unblocks**
+> [ADR-0018](../../adrs/0018-engine-wide-scene-compositing.md)'s fixed order and
+> [ADR-0028](../../adrs/0028-final-stage-ink-tone-remap.md)'s ink-is-last rule; **unblocks**
 > [Plan 0023](0023-cross-preset-transitions.md)
 
 ## Close summary (Mode 4, 2026-07-25)
@@ -111,7 +111,7 @@ table.
 
 ## Decision
 
-Per [ADR-0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md): declare a crate-internal
+Per [ADR-0031](../../adrs/0031-post-stage-trait-instantiable-composite-chain.md): declare a crate-internal
 `PostStage` trait, hold the stages in a `PostChain` **value** in a compile-time constant order, and
 factor the routing adjacency out as a **pure function over the active flags** so the contract is
 testable without a GPU. The chain is a value (not a set of `Renderer` fields) specifically so a second

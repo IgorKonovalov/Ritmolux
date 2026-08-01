@@ -3,7 +3,7 @@
 > **Status:** accepted (2026-07-26, at Plan 0033's close — see **Outcome** below, which corrects two
 > claims this ADR made before the work was done)
 > **Date:** 2026-07-26
-> **Related plan(s):** [0033](../plans/0033-internal-resolution-and-preset-surface.md)
+> **Related plan(s):** [0033](../plans/done/0033-internal-resolution-and-preset-surface.md)
 > **Supplements:** [ADR-0012](0012-stateful-feedback-render-system.md) (the fixed internal grid),
 > [ADR-0018](0018-engine-wide-scene-compositing.md) (the composite),
 > [ADR-0031](0031-post-stage-trait-instantiable-composite-chain.md) (the `PostStage` seam)

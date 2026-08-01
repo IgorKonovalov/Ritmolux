@@ -8,14 +8,14 @@
 > `fmt --check` and `clippy --workspace --all-targets -D warnings` clean, `cargo nextest run
 > --workspace` **367/367, 0 skipped**, and `core/tests/golden/`, every preset `.toml`, `core/src/ffi.rs`
 > and every manifest **byte-untouched** (C ABI stays v4, `Scene` unchanged, no new dependency).
-> [ADR-0052](../adrs/0052-analysis-diagnostics-are-native-only.md) is **accepted with an Outcome
+> [ADR-0052](../../adrs/0052-analysis-diagnostics-are-native-only.md) is **accepted with an Outcome
 > section**. **Unblocks Plan 0048 Phase 6.** Phase 5 item 3's 96 kHz finding is recorded as
-> [design-backlog 0032](../design-backlog.md).
+> [design-backlog 0032](../../design-backlog.md).
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev
-> **Related ADRs:** [0052](../adrs/0052-analysis-diagnostics-are-native-only.md) (native-only, no ABI change);
-> [0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) (the gate this instrument observes);
-> [0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) (owns the fold Phase 1 touches).
+> **Related ADRs:** [0052](../../adrs/0052-analysis-diagnostics-are-native-only.md) (native-only, no ABI change);
+> [0050](../../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) (the gate this instrument observes);
+> [0047](../../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) (owns the fold Phase 1 touches).
 > **Blocks:** Plan 0048 Phase 6, which cannot run until Phases 2-4 land.
 
 ## TL;DR

@@ -8,13 +8,13 @@
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0034](../adrs/0034-internal-resolution-follows-the-target.md) (internal
-> resolution), [0035](../adrs/0035-asymmetric-attack-release-easing.md) (attack/release easing);
-> builds on [0012](../adrs/0012-stateful-feedback-render-system.md),
-> [0018](../adrs/0018-engine-wide-scene-compositing.md),
-> [0019](../adrs/0019-eased-parameters.md),
-> [0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md)
-> **Backlog entries closed:** [0003, 0004, 0006, 0008](../design-backlog.md)
+> **Related ADRs:** [0034](../../adrs/0034-internal-resolution-follows-the-target.md) (internal
+> resolution), [0035](../../adrs/0035-asymmetric-attack-release-easing.md) (attack/release easing);
+> builds on [0012](../../adrs/0012-stateful-feedback-render-system.md),
+> [0018](../../adrs/0018-engine-wide-scene-compositing.md),
+> [0019](../../adrs/0019-eased-parameters.md),
+> [0031](../../adrs/0031-post-stage-trait-instantiable-composite-chain.md)
+> **Backlog entries closed:** [0003, 0004, 0006, 0008](../../design-backlog.md)
 
 ## TL;DR
 
@@ -32,7 +32,7 @@ look like. The first user-visible behavior is a sharp Fern with its trails back 
 
 The `preset-author` lane rewrote all 35 shipped presets on 2026-07-26, iterating live with the user
 on a 2048x1152 fullscreen display, and handed back eleven findings (triaged into
-[`docs/design-backlog.md`](../design-backlog.md) entries 0002-0009, all re-verified against code at
+[`docs/design-backlog.md`](../../design-backlog.md) entries 0002-0009, all re-verified against code at
 intake). This plan takes the four that are ready to build. The user's own words drive it:
 
 - **"coral is broken."** `GRID = 256` in `render/scenes/reaction_diffusion.rs:48`, upscaled 8x at

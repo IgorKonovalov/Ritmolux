@@ -6,7 +6,7 @@ needs, with an audio-reactivity and implementation-cost note per technique. Sour
 2026-07-22 deep-research pass (fan-out web search + adversarial verification) plus a focused
 pass on walkers and *The Nature of Code*. Design decisions derived from this live in
 [ADR-0015](adrs/0015-gpu-compute-particle-idiom.md); the first plan it drives is
-[Plan 0016](plans/0016-gpu-compute-particle-scenes.md).
+[Plan 0016](plans/done/0016-gpu-compute-particle-scenes.md).
 
 Treat this as the backlog a future architect session shops from — pick a technique, check
 which idiom it needs, see whether that idiom exists yet, then interview + plan.

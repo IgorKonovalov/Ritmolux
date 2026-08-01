@@ -6,7 +6,7 @@
 > `MIN_SAMPLES` depends on `diag::RING` with nothing tying them), two minor.
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0045](../adrs/0045-quality-tiers-floor-and-rich.md) (tiers, **accepted**), [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md) R0
+> **Related ADRs:** [0045](../../adrs/0045-quality-tiers-floor-and-rich.md) (tiers, **accepted**), [docs/roadmap-visual-richness.md](../../roadmap-visual-richness.md) R0
 
 ## TL;DR
 
@@ -121,7 +121,7 @@ flowchart LR
   particles, 60k segments, 30k swarm particles, a 2560x1440 post cap, a 4K trail cap. The
   code says so itself (`core/src/render/tier.rs`, `RICH`: "**These are provisional
   multipliers, not measurements**"), and that comment stays true until this runs. Carried
-  forward to [`docs/on-device-validation.md`](../on-device-validation.md) rather than
+  forward to [`docs/on-device-validation.md`](../../on-device-validation.md) rather than
   holding the plan open, per that file's standing rule that hardware-gated checks never gate
   a close.
 

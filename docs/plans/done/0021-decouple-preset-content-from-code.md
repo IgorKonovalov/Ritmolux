@@ -4,7 +4,7 @@
 > **Created:** 2026-07-23
 > **Closed:** 2026-07-23
 > **Owner skill(s):** dev
-> **Related ADRs:** [0022](../adrs/0022-build-time-preset-embedding.md) (accepted)
+> **Related ADRs:** [0022](../../adrs/0022-build-time-preset-embedding.md) (accepted)
 >
 > **Close summary (Mode 4 review — no blockers, no majors, no minors, no nits):** Both phases
 > landed exactly as planned across three commits — `e1e4f1f` (Phase 1: `core/build.rs` generates
@@ -44,7 +44,7 @@ documents the ritual. The embedding itself is required (the C-ABI/foobar path re
 dir, ADR-0006), but the **hand-maintained list** is accidental — `include_str!` can't glob, so a build
 script is the standard fix. A smaller sibling: the `SystemKind` name mapping is duplicated in
 `schema.rs::from_name`, `shot.rs::parse_system`, and `shot.rs::system_name`. See
-[ADR-0022](../adrs/0022-build-time-preset-embedding.md) for the decision and rejected alternatives.
+[ADR-0022](../../adrs/0022-build-time-preset-embedding.md) for the decision and rejected alternatives.
 
 ## Decision
 

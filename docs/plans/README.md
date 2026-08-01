@@ -768,7 +768,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   [0021](../design-backlog.md) (an even fall is unreachable with a one-pole in any ordering),
   [0022](../design-backlog.md) (`--report`'s reactivity columns are structurally blind to a `curve`,
   because its stimuli are full-scale and `1^curve` is `1`), and [0023](../design-backlog.md), which
-  is already [Plan 0039](0039-line-joins.md) + [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md).
+  is already [Plan 0039](done/0039-line-joins.md) + [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md).
   Version **minor 0.19.0 → 0.20.0** (a feature plan).
 
 - [0037 — Verifying easing: a transient probe, a signal with dynamics, and the levels authors
@@ -1265,7 +1265,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   their `PARAMS` consts (those are `pub(crate)`, unreachable from an integration test), so a
   const-only edit to `background`/`trails`/`kaleidoscope`/`ink` can drift `is_known_param` away from
   `set_param` without failing — the seven per-system lists go through `param_names()` and are fully
-  guarded; (3) [Plan 0031](0031-composite-cleanup-and-debt.md)'s Phase 3 note still tells its
+  guarded; (3) [Plan 0031](done/0031-composite-cleanup-and-debt.md)'s Phase 3 note still tells its
   implementer that an unknown param "must keep today's behavior exactly: silently ignored" and that
   "making it a surfaced warning is Plan 0019's job" — true when drafted, stale now. **Nit:** the
   `preset-author` skill's own grammar reference is now a version behind (see the sequence note above);
@@ -1374,7 +1374,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 
 - [0027 — Attractor ink-on-paper (engine-wide final tone-remap) + crisp trails](done/0027-attractor-ink-and-crisp-trails.md) —
   **done 2026-07-25**, passed Mode 4 review (no blockers; two majors and four minors, all routed to
-  [Plan 0029](0029-attractor-resize-cost-and-ink-followups.md) or [ADR-0030](../adrs/0030-scene-target-size-hot-path-hook.md)
+  [Plan 0029](done/0029-attractor-resize-cost-and-ink-followups.md) or [ADR-0030](../adrs/0030-scene-target-size-hot-path-hook.md)
   rather than reworked). Three `dev` phase commits (`0e3b84a` ink stage, `5f79dc6` surface-sized trail
   field, `5daddfa` curated preset + docs). Delivers the "ink on paper" look the `preset-author` lane
   could not reach: `render/ink.rs` is a final, skippable composite stage that reads each pixel's
@@ -1980,10 +1980,10 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
      wgpu/naga graph, so a full-crate Miri job is impractical (>10 min). The ring IS verified
      UB-clean locally (`cargo +nightly miri test -p lmv-core --lib`, all 5 ring tests incl. the
      cross-thread SPSC case, 95 s); only the CI automation was outstanding. **→ Now
-     [Plan 0005](0005-miri-ring-extraction.md)** (draft): extract the ring into a zero-dep
+     [Plan 0005](done/0005-miri-ring-extraction.md)** (draft): extract the ring into a zero-dep
      `lmv-ring` crate and run Miri against it.
   2. **Scenes were per-frame render code outside the hot-path pragma set / guard scan.** **→
-     Folded into [Plan 0003](0003-generative-scenes-and-presets.md) Phase 0** (amendment):
+     Folded into [Plan 0003](done/0003-generative-scenes-and-presets.md) Phase 0** (amendment):
      relocate scenes under `core/src/render/scenes/` so the guard's existing recursive `render/`
      scan covers them structurally, and add the panic pragma to each — done before 0003 fills
      `scenes/` with heavy per-frame indexing.

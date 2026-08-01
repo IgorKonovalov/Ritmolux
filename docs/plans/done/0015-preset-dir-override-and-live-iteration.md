@@ -3,11 +3,11 @@
 > **Status:** done — closed 2026-07-25
 > **Created:** 2026-07-22
 > **Owner skill(s):** dev
-> **Related ADRs:** [0014](../adrs/0014-preset-dir-override-for-dev-iteration.md) (the override
-> mechanism + rejected alternatives), [0002](../adrs/0002-layered-preset-architecture.md) (the
+> **Related ADRs:** [0014](../../adrs/0014-preset-dir-override-for-dev-iteration.md) (the override
+> mechanism + rejected alternatives), [0002](../../adrs/0002-layered-preset-architecture.md) (the
 > preset layer being edited)
-> **Related plans:** [0007](done/0007-curated-preset-library.md) (seed-to-`%APPDATA%` + the
-> duplicated resolver this consolidates), [0013](done/0013-headless-scene-capture.md) (the `shot`
+> **Related plans:** [0007](0007-curated-preset-library.md) (seed-to-`%APPDATA%` + the
+> duplicated resolver this consolidates), [0013](0013-headless-scene-capture.md) (the `shot`
 > CLI these flags extend)
 
 ## TL;DR
@@ -41,7 +41,7 @@ work, not incidental cleanup.
 
 ## Decision
 
-Per [ADR-0014](../adrs/0014-preset-dir-override-for-dev-iteration.md): add an **`LMV_PRESET_DIR`**
+Per [ADR-0014](../../adrs/0014-preset-dir-override-for-dev-iteration.md): add an **`LMV_PRESET_DIR`**
 env var honored by both Rust frontends through a **shared resolver** extracted into a `standalone`
 library module (bin + example resolve identically). An override loads and (for the app)
 hot-reloads that directory and **skips seeding**. `shot` also gets **`--presets <dir>`** and

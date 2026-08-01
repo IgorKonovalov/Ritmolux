@@ -12,12 +12,12 @@
 > any other error) and run full assertions green on Windows WARP under nextest; clippy
 > `-D warnings --all-targets` clean with the production hot-path `#![deny(clippy::panic)]`
 > intact (the `clippy::panic` allow is scoped to the test module only). C ABI untouched
-> (still v3); config + `#[cfg(test)]`-only, no hot-path surface. [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md)
+> (still v3); config + `#[cfg(test)]`-only, no hot-path surface. [ADR-0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md)
 > now **accepted**. Followup owns removing the ignore when the text stack no longer pins
 > ttf-parser. See the review notes in the close conversation.
 > **Created:** 2026-07-23
 > **Owner skill(s):** dev
-> **Related ADRs:** [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md) (GPU-capture tests skip when no adapter); [0009](../adrs/0009-glyphon-text-rendering.md) (the text stack ttf-parser is load-bearing for)
+> **Related ADRs:** [0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md) (GPU-capture tests skip when no adapter); [0009](../../adrs/0009-glyphon-text-rendering.md) (the text stack ttf-parser is load-bearing for)
 
 ## TL;DR
 

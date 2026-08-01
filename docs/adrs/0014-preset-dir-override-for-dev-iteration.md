@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-07-25, at Plan 0015's close)
 > **Date:** 2026-07-22
-> **Related plan(s):** [0015](../plans/0015-preset-dir-override-and-live-iteration.md)
+> **Related plan(s):** [0015](../plans/done/0015-preset-dir-override-and-live-iteration.md)
 > **Related:** [ADR-0002](0002-layered-preset-architecture.md) (the preset layer being edited),
 > [Plan 0007](../plans/done/0007-curated-preset-library.md) (seed-to-`%APPDATA%` + the duplicated
 > per-OS resolver this consolidates), [Plan 0013](../plans/done/0013-headless-scene-capture.md)
