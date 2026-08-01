@@ -1,0 +1,57 @@
+# LIT-BACKDROP GUARD FIXTURE - do not tune (Plan 0051 Phase 1, ADR-0056).
+# It pins NO pixels and has no committed baseline. It belongs to
+# `a_lit_backdrop_survives_where_the_swarm_drew_nothing` in
+# `core/src/render/scenes/swarm.rs`, which captures it THREE ways - lit, dark,
+# and backdrop-only - and asserts the backdrop arrives intact wherever the scene
+# wrote no light.
+#
+# The `bg_bright` and `size` lines are STRIPPED AND REWRITTEN per capture - the
+# test needs one scene at three configurations - but the values below are the
+# ones it reads back out of this file and captures at, so they are live, not
+# decorative. Change one here and the test changes with it.
+#
+# `bg_bright > 0` IS THE POINT. Every other swarm fixture and every golden
+# baseline runs `bg_bright = 0`, where a black backdrop times any alpha is still
+# black - so the entire suite was structurally blind to a sprite emitting a
+# constant alpha 1 and punching black rectangles into the backdrop. Setting this
+# back to 0 retires the test silently.
+#
+# `trails` IS ALSO NOT DECORATION. The defect only exists when a post stage is
+# active: with an empty chain the scene draws straight onto the backdrop and its
+# additive colour cannot remove light. With a stage, the scene draws into a
+# transparent-cleared offscreen and the chain resolves premultiplied OVER the
+# backdrop (ADR-0055) - which is where alpha becomes load-bearing. Every shipped
+# swarm preset composes trails, so this is the shipped configuration.
+#
+# The rest is chosen to keep the property readable:
+#  - `force`/`spin`/`burst` at 0 so the seeded field freezes within a few frames
+#    and the trail history stops smearing over the gaps between sprites.
+#  - `size = 0.8` puts the sprite quads at roughly a fifth of the frame - dense
+#    enough that the corners are everywhere, sparse enough that they do not
+#    merge into one lit mass with no untouched backdrop left to check.
+#  - A single flat palette stop plus `hue_spread = 0`, so NO particle is black in
+#    all three channels. A genuinely black particle would read as "the scene drew
+#    nothing here" while still covering the pixel, which is the one case the
+#    property deliberately does not claim.
+#  - `bg_vignette = 0` keeps the backdrop bright into the corners, so the signal
+#    does not fade out exactly where the sprite corners are worst.
+system = "swarm"
+name   = "fixture_swarm_lit_backdrop"
+
+[palette]
+stops = [{ at = 0.0, color = "#ffcf80" }, { at = 1.0, color = "#ffcf80" }]
+
+[params]
+force      = "0"
+spin       = "0"
+burst      = "0"
+brightness = "1.5"
+size       = "0.8"
+hue_spread = "0"
+hue_center = "0.5"
+
+trails = "0.25"
+
+bg_hue      = "0.55"
+bg_vignette = "0"
+bg_bright   = "0.35"

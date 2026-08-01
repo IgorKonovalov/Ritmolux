@@ -1,6 +1,6 @@
 //! Shared wgpu descriptor boilerplate: bind-group-layout entries, the
-//! fullscreen-pass pipeline, the fullscreen-triangle vertex preludes, and the
-//! fixed-timestep accumulator.
+//! scene-seam blend state, the fullscreen-pass pipeline, the
+//! fullscreen-triangle vertex preludes, and the fixed-timestep accumulator.
 //!
 //! Nothing here decides anything — it is the repetition that had accumulated
 //! four copies of the bind-entry helpers, two `fullscreen_pipeline`
@@ -87,6 +87,67 @@ pub(crate) fn uniform(binding: u32, visibility: wgpu::ShaderStages) -> wgpu::Bin
         count: None,
     }
 }
+
+// ---------------------------------------------------------------------------
+// The scene-seam blend state (Plan 0051, ADR-0056)
+// ---------------------------------------------------------------------------
+
+/// Additive light whose alpha is the fragment's **own coverage**, accumulating by
+/// saturation rather than by summing. The blend state for every draw pipeline
+/// that renders **directly into the post chain's input** (ADR-0056).
+///
+/// Colour is `One` / `One` — additive and unbounded, which is what the
+/// linear-light composite exists for. Alpha is `One` / `OneMinusSrcAlpha`, i.e.
+/// premultiplied OVER, so stacked quads accumulate coverage as
+/// `a_out = a_src + a_dst * (1 - a_src)`: monotone, and bounded in `[0, 1]` **by
+/// construction**.
+///
+/// # The invariant a shader using this must keep
+///
+/// **Emit `vec4(colour * g, g)`** — premultiplied colour, and an alpha equal to
+/// the coverage that fragment actually has. A fragment that writes no light must
+/// write no coverage. The chain's last stage resolves
+/// `src.rgb + backdrop * (1 - src.a)` over the backdrop (ADR-0055), so a
+/// constant `1.0` alpha discards the backdrop across the **whole quad** —
+/// including everywhere the falloff is zero. Both call sites shipped exactly
+/// that: the swarm's radial falloff over a square sprite left four hard-edged
+/// `(0,0,0,1)` corners (~21 % of every sprite), and the line renderer's
+/// across-the-stroke falloff left two dark rims. Plan 0051 fixed both.
+///
+/// The invariant is *"alpha equals this fragment's coverage"*, **not** "alpha is
+/// never 1". A fullscreen field that covers every pixel correctly emits `1.0` —
+/// `scenes/fragment_field.rs` does, and it does not draw through this state.
+///
+/// # Why the alpha factor is not `One` / `One`
+///
+/// Summing alpha additively is what produced Plan 0045 Phase 4b's defect one
+/// stage downstream: source alpha exceeded 1, the blend's `1 - src.a` went
+/// negative, and the frame *subtracted* the backdrop under its own brightest
+/// regions. That needed an explicit clamp to repair. Here the saturation comes
+/// free from the blend state, so an out-of-range alpha at this seam is
+/// **unrepresentable** rather than clamped after the fact.
+///
+/// # What enforces it
+///
+/// Nothing structural — a third draw pipeline can emit a constant alpha exactly
+/// as these two did. The guard is a **lit-backdrop capture test per draw seam**
+/// (`bg_bright > 0`, asserting the backdrop arrives intact wherever the scene
+/// wrote no light), one beside each of the two call sites: `scenes/swarm.rs` and
+/// `scenes/lines/renderer.rs`. A new seam owes a third. At `bg_bright = 0` — the
+/// setting every golden baseline runs — the defect is invisible, which is why it
+/// shipped.
+pub(crate) const ADDITIVE_LIGHT_SATURATING_COVERAGE: wgpu::BlendState = wgpu::BlendState {
+    color: wgpu::BlendComponent {
+        src_factor: wgpu::BlendFactor::One,
+        dst_factor: wgpu::BlendFactor::One,
+        operation: wgpu::BlendOperation::Add,
+    },
+    alpha: wgpu::BlendComponent {
+        src_factor: wgpu::BlendFactor::One,
+        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+        operation: wgpu::BlendOperation::Add,
+    },
+};
 
 // ---------------------------------------------------------------------------
 // Fullscreen pass pipeline

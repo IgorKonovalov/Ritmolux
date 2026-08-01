@@ -20,6 +20,7 @@
 
 use super::{FALLBACK_DT, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
+use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 
 const SEED: u64 = 0x4C4D_565F_5357_524D; // "LMV_SWRM"
@@ -183,7 +184,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let d = length(in.local);
     let falloff = max(0.0, 1.0 - d);
     let g = falloff * falloff;
-    return vec4<f32>(in.color * g, 1.0);
+    // Premultiplied: colour AND alpha carry the same coverage `g`, so the four
+    // corners outside the inscribed disc write nothing at all rather than
+    // opaque black (ADR-0056). See `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`.
+    return vec4<f32>(in.color * g, g);
 }
 "#;
 
@@ -366,15 +370,9 @@ impl SwarmScene {
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: surface_format,
-                    // Additive: overlapping particles bloom brighter.
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent {
-                            src_factor: wgpu::BlendFactor::One,
-                            dst_factor: wgpu::BlendFactor::One,
-                            operation: wgpu::BlendOperation::Add,
-                        },
-                        alpha: wgpu::BlendComponent::OVER,
-                    }),
+                    // Additive light, saturating coverage (ADR-0056) — shared
+                    // with the line renderer so the two cannot drift.
+                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
@@ -692,9 +690,9 @@ impl Scene for SwarmScene {
 
 #[cfg(test)]
 mod tests {
-    // Test asserts index fixed-size arrays; allowed over the file's hot-path
-    // pragma — this is not the render path.
-    #![allow(clippy::indexing_slicing)]
+    // Tests index fixed-size arrays and panic on failure; allowed over the
+    // file's hot-path pragma — this is not the render path.
+    #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
     use super::{
         DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, DEPTH_PARALLAX_FAR,
@@ -1016,6 +1014,282 @@ mod tests {
         assert!(
             narrow < full * 0.25,
             "narrow band ({narrow:.4}) is far more coherent than the full wheel ({full:.4})"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // The sprite seam does not punch holes in the backdrop (Plan 0051 Phase 1)
+    // -----------------------------------------------------------------------
+
+    /// The lit-backdrop fixture this guard captures three ways. Its `bg_bright`
+    /// and `size` lines are **stripped and rewritten** per capture — one scene at
+    /// three configurations — so the numbers are read back out of the file rather
+    /// than restated here, and editing the fixture moves the test with it.
+    const LIT_FIXTURE: &str = include_str!("../../../tests/fixtures/swarm_lit_backdrop.toml");
+
+    /// The square capture size. Modest, because this reads back three whole float
+    /// frames; and an exact multiple of the post chain's 256 px grid step, so the
+    /// trails stage runs at the target size and its present is a 1:1 sample rather
+    /// than a resample that would blur the property being asserted.
+    const CAPTURE_SIZE: u32 = 256;
+
+    /// Frames per capture. `force`/`spin`/`burst` are all 0 in the fixture, so
+    /// this is long enough for the seeded initial velocities to damp out and the
+    /// trail history to settle onto a static field.
+    const CAPTURE_FRAMES: u32 = 40;
+
+    /// A backdrop channel this bright counts as *present* for the non-vacuity arm
+    /// below — well above the half-precision floor, well below the fixture's own
+    /// `bg_bright`.
+    const BACKDROP_PRESENT: f32 = 0.05;
+
+    /// The value of a top-level `key = "<number>"` line in [`LIT_FIXTURE`], or
+    /// `NaN` when it is absent. Used so the fixture stays the single statement of
+    /// what this test captures.
+    fn fixture_value(key: &str) -> f32 {
+        LIT_FIXTURE
+            .lines()
+            .find_map(|line| {
+                let rest = line.trim_start().strip_prefix(key)?;
+                let rest = rest.trim_start().strip_prefix('=')?;
+                rest.trim().trim_matches('"').parse::<f32>().ok()
+            })
+            .unwrap_or(f32::NAN)
+    }
+
+    /// Slack for half-precision rounding, the same shape `bloom.rs`'s guard uses.
+    /// The composite is `Rgba16Float`, so a value of magnitude `m` is stored to
+    /// roughly `m / 1024`, and the lit capture quantizes a different sum than the
+    /// backdrop-only one does.
+    ///
+    /// It is slack, not a tolerance: the property below is **exact** in real
+    /// arithmetic. Upstream of the tonemap the composite is a plain premultiplied
+    /// OVER, so where the scene wrote nothing the backdrop must arrive unchanged.
+    /// Measured on this fixture, the fixed shader's worst `|L - B|` is **0.0002**
+    /// and the pre-fix one's is **0.3467** — the backdrop's own brightness,
+    /// discarded outright — across 9594 channels. This sits ~1700x below the
+    /// defect and ~20x above the noise.
+    fn half_slack(value: f32) -> f32 {
+        (4.0 / 1024.0) * value.abs().max(1.0)
+    }
+
+    /// **Where the swarm drew no light, the backdrop arrives intact** — the guard
+    /// the scene→chain seam shipped without.
+    ///
+    /// `fs_main` used to return `vec4(in.color * g, 1.0)`: colour carried the
+    /// radial falloff, alpha was a literal constant. With the alpha blend at
+    /// `BlendComponent::OVER` and a source alpha of exactly 1, destination alpha
+    /// saturated to 1 across every sprite's **square** quad — including the four
+    /// corners outside the inscribed disc, about 21 % of each sprite, where the
+    /// shader wrote nothing at all. The chain's resolve computes
+    /// `src.rgb + backdrop * (1 - src.a)` (ADR-0055), so those corners discarded
+    /// the backdrop and rendered as black rectangular notches, dozens per frame.
+    /// See `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`.
+    ///
+    /// # Why this reads the linear composite and not the capture
+    ///
+    /// Same reason `bloom.rs`'s guard does: the capture's bytes are downstream of
+    /// the tonemap, which scales all three channels off the brightest one
+    /// (ADR-0046), so adding a backdrop under a stroke changes every channel by
+    /// design and no byte-level tolerance separates that from the defect.
+    /// Upstream of the tonemap there is no confound — it is a plain premultiplied
+    /// OVER — so the bound is **0** rather than a tolerance. That readback is
+    /// `pub(crate)`, which is why this test lives here and not in `core/tests/`.
+    ///
+    /// # Why it needed writing at all
+    ///
+    /// Every swarm fixture and every golden baseline runs `bg_bright = 0`, where
+    /// a black backdrop times any alpha is still black. The whole regression
+    /// suite was blind to this by construction, and so was the contact sheet.
+    /// That is verbatim the blind spot ADR-0055's first Negative bullet names —
+    /// the third instance of it, after the fold (Plan 0045 Phase 2b) and the
+    /// bloom recombine (Phase 4b), each of which got a guard of this shape.
+    #[test]
+    fn a_lit_backdrop_survives_where_the_swarm_drew_nothing() {
+        use crate::dsp::AnalysisFrame;
+        use crate::preset::Preset;
+        use crate::render::capture;
+        use crate::render::context::RenderError;
+        use crate::render::{HeadlessOptions, Renderer};
+
+        // --- Non-vacuity, before any GPU work: the fixture must still describe
+        // the configuration this guard exists for. ---
+        let backdrop = fixture_value("bg_bright");
+        let sprite = fixture_value("size");
+        let trails = fixture_value("trails");
+        assert!(
+            backdrop > 0.0,
+            "swarm_lit_backdrop.toml no longer ships a lit backdrop (bg_bright = \
+             {backdrop}); on black this whole comparison is black against black"
+        );
+        assert!(
+            sprite > 0.0,
+            "swarm_lit_backdrop.toml no longer draws sprites (size = {sprite})"
+        );
+        assert!(
+            trails > 0.0,
+            "swarm_lit_backdrop.toml no longer binds `trails` (= {trails}), so no \
+             post stage is active. With an empty chain the scene draws straight \
+             onto the backdrop and its additive colour cannot remove light — the \
+             defect is unrepresentable and this test proves nothing"
+        );
+
+        /// The linear composite the tonemap is about to map, at a given backdrop
+        /// brightness and sprite size.
+        ///
+        /// Builds and drops **one** renderer per call rather than holding three:
+        /// a second live device in a binary is what the software adapter falls
+        /// over on, and building GPU resources mid-run shifts what the trails
+        /// stage resolves to on WARP.
+        fn linear_composite(bg_bright: f32, size: f32) -> Option<Vec<f32>> {
+            let mut renderer = match Renderer::new_headless(HeadlessOptions {
+                width: CAPTURE_SIZE,
+                height: CAPTURE_SIZE,
+                prefer_software: true,
+            }) {
+                Ok(renderer) => renderer,
+                Err(RenderError::RequestAdapter(_)) => {
+                    eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                    return None;
+                }
+                Err(e) => panic!("headless renderer build failed: {e}"),
+            };
+            // Both keys live in `[params]`, which is the fixture's last table, so
+            // stripping them and appending the overrides keeps them in it.
+            let base: String = LIT_FIXTURE
+                .lines()
+                .filter(|line| {
+                    let line = line.trim_start();
+                    !line.starts_with("bg_bright") && !line.starts_with("size")
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            let toml = format!("{base}\nbg_bright = \"{bg_bright}\"\nsize = \"{size}\"\n");
+            let preset = Preset::from_toml_str(&toml)
+                .expect("the lit-backdrop swarm fixture parses with overrides");
+            let name = preset.name.clone();
+            renderer.set_presets(vec![preset]);
+
+            // Every binding is a constant, so the analysis frame only has to be
+            // well-formed — the swarm's `update` ignores it entirely.
+            let frame = AnalysisFrame::default();
+            renderer
+                .capture_preset(&name, &frame, CAPTURE_FRAMES)
+                .expect("capture the lit-backdrop swarm fixture");
+
+            let device = renderer.ctx.device.clone();
+            let queue = renderer.ctx.queue.clone();
+            let src = renderer
+                .tonemap
+                .src_texture()
+                .expect("the tonemap built its input while capturing")
+                .clone();
+            let (buffer, padded_bpr) =
+                capture::create_linear_readback(&device, CAPTURE_SIZE, CAPTURE_SIZE);
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("swarm-backdrop-readback"),
+            });
+            capture::record_copy(
+                &mut encoder,
+                &src,
+                &buffer,
+                padded_bpr,
+                CAPTURE_SIZE,
+                CAPTURE_SIZE,
+            );
+            queue.submit(std::iter::once(encoder.finish()));
+            Some(
+                capture::read_back_linear(&device, &buffer, CAPTURE_SIZE, CAPTURE_SIZE, padded_bpr)
+                    .expect("read back the linear composite"),
+            )
+        }
+
+        // `L`: the frame as shipped. `K`: the same scene over a black backdrop,
+        // which is what "the scene wrote no light here" is read off. `B`: the
+        // backdrop with the scene contributing nothing — zero-area sprite quads
+        // rasterize no fragments, so the chain resolves fully transparent and
+        // this is the backdrop alone, through the same pipeline as `L`.
+        let Some(lit) = linear_composite(backdrop, sprite) else {
+            return;
+        };
+        let Some(dark) = linear_composite(0.0, sprite) else {
+            return;
+        };
+        let Some(backdrop_only) = linear_composite(backdrop, 0.0) else {
+            return;
+        };
+        assert_eq!(dark.len(), lit.len(), "the captures differ in size");
+        assert_eq!(
+            dark.len(),
+            backdrop_only.len(),
+            "the captures differ in size"
+        );
+
+        let total = dark.len() / 4;
+        let (mut untouched, mut drawn, mut over_backdrop) = (0usize, 0usize, 0usize);
+        let (mut violations, mut worst) = (0usize, 0.0f32);
+        for (pixel, texel) in dark.chunks_exact(4).enumerate() {
+            if texel[0] != 0.0 || texel[1] != 0.0 || texel[2] != 0.0 {
+                drawn += 1;
+                continue; // the scene put light here; the property says nothing
+            }
+            untouched += 1;
+            let base = pixel * 4;
+            if backdrop_only[base..base + 3]
+                .iter()
+                .any(|&c| c > BACKDROP_PRESENT)
+            {
+                over_backdrop += 1;
+            }
+            for channel in 0..3 {
+                let l = lit[base + channel];
+                let b = backdrop_only[base + channel];
+                let diff = (l - b).abs();
+                if diff > worst {
+                    worst = diff;
+                }
+                if diff > half_slack(b) {
+                    violations += 1;
+                }
+            }
+        }
+        eprintln!(
+            "swarm lit backdrop at {CAPTURE_SIZE}x{CAPTURE_SIZE}: {untouched} of \
+             {total} pixels untouched by the scene ({over_backdrop} of those over \
+             a lit backdrop), {drawn} lit by it; worst |L - B| {worst:.4}"
+        );
+
+        // --- Non-vacuity: the region the property speaks about is a substantial
+        // part of the frame, the scene genuinely drew into the rest, and the
+        // backdrop genuinely reached the frame underneath. A fixture edit that
+        // quietly empties any of the three shows up here rather than passing. ---
+        assert!(
+            untouched * 4 > total,
+            "only {untouched} of {total} pixels are untouched by the scene — the \
+             fixture has filled the frame and the property covers almost nothing"
+        );
+        assert!(
+            drawn * 20 > total,
+            "only {drawn} of {total} pixels carry any scene light — the fixture \
+             has stopped drawing, so the sprite corners this guards are not in \
+             the frame"
+        );
+        assert!(
+            over_backdrop * 2 > untouched,
+            "only {over_backdrop} of the {untouched} untouched pixels sit over a \
+             backdrop brighter than {BACKDROP_PRESENT} — comparing black against \
+             black, which any alpha would pass"
+        );
+
+        // --- The property. ---
+        assert_eq!(
+            violations, 0,
+            "{violations} channels differ between the lit frame and the backdrop \
+             alone at pixels where the scene wrote NO light (worst {worst:.4}). \
+             Upstream of the tonemap this is a plain premultiplied OVER, so where \
+             nothing was drawn the backdrop must arrive intact — a difference \
+             here is a sprite emitting coverage it does not have, holding the \
+             backdrop out of pixels it never painted"
         );
     }
 }

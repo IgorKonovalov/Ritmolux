@@ -126,3 +126,30 @@ from `elements`, `span`, `baseline` and `thickness`, so changing any of them
 moves the probes off the geometry and the test starts comparing two pieces of
 background (which it fails on, deliberately, rather than passing vacuously). The
 header says what each value is holding.
+
+## `swarm_lit_backdrop.toml` is a fifth guard, at a configuration nothing else here uses
+
+It belongs to `a_lit_backdrop_survives_where_the_swarm_drew_nothing` in
+`core/src/render/scenes/swarm.rs` (Plan 0051, ADR-0056). It pins **no pixels** and
+has no committed baseline; `LMV_BLESS` does not touch it. The test captures this
+one fixture three ways — lit backdrop, black backdrop, and backdrop with the
+scene contributing nothing — and asserts that wherever the scene wrote no light,
+the backdrop arrives intact in the **linear** composite, upstream of the tonemap.
+
+**`bg_bright > 0` is the whole point, and it is why this is a separate file
+rather than a re-parameterized existing one.** Every other fixture in this
+directory runs `bg_bright = 0`, which is the right call *for a baseline* — see
+`composite_bloom.toml`'s own header for the reasoning. It is also why a scene
+emitting a constant alpha 1, holding the backdrop out of every pixel its quads
+covered, stayed invisible to this entire suite for as long as it shipped: on
+black, covering the backdrop and compositing over it are the same picture. The
+guard is additive test surface, not a variant of something already here.
+
+"Do not tune" applies for a third distinct reason. The header says what every
+value is holding — a lit backdrop, an **active post stage** (without one the
+scene draws straight onto the backdrop and the defect cannot exist at all), a
+sprite size sparse enough to leave untouched backdrop to check, and a palette
+with no fully-black colour. The test reads those preconditions back out of the
+file before it touches the GPU and reports the pixel counts either side, so an
+edit that quietly empties the region under test fails rather than passing on
+nothing.
