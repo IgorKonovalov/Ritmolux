@@ -27,7 +27,7 @@ colours shifted; they are being re-authored to exploit palettes.)
 
 This is the authoring counterpart to
 [ADR-0021](adrs/0021-shared-palette-system.md) and
-[Plan 0020](plans/0020-shared-palette-system.md). It documents **colour only** —
+[Plan 0020](plans/done/0020-shared-palette-system.md). It documents **colour only** —
 the systems, expression grammar, and file layout live in the main preset guide
 (`docs/presets.md`).
 
@@ -321,7 +321,7 @@ Low `color_span` over a warm custom gradient holds the whole field in one family
 
 - [ADR-0021 — Shared palette system](adrs/0021-shared-palette-system.md): the
   baked-LUT decision and the rejected alternatives.
-- [Plan 0020 — Shared palette system](plans/0020-shared-palette-system.md): the
+- [Plan 0020 — Shared palette system](plans/done/0020-shared-palette-system.md): the
   phased implementation.
 - `docs/presets.md`: the main preset authoring guide (systems, expressions, file
   layout).

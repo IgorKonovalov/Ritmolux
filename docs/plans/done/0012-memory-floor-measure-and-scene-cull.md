@@ -3,7 +3,7 @@
 > **Status:** done (2026-07-22)
 > **Created:** 2026-07-22
 > **Owner skill(s):** dev
-> **Related ADRs:** [0010](../adrs/0010-accept-gpu-driver-memory-floor.md) (accept the DX12/wgpu driver-stack floor; retarget NFR §12) — this plan resolves its open questions with numbers.
+> **Related ADRs:** [0010](../../adrs/0010-accept-gpu-driver-memory-floor.md) (accept the DX12/wgpu driver-stack floor; retarget NFR §12) — this plan resolves its open questions with numbers.
 > **Amended:** 2026-07-22 — Phase 2 recast from "clear-only render pass" to **construct-only**. A
 > feasibility check found `RenderContext` exposes only `new`/`resize`/`surface_format` publicly; its
 > `device`/`queue`/`surface` are `pub(crate)`, so an example compiling as a separate crate cannot encode

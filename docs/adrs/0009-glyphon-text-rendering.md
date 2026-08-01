@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-22
-> **Related plan(s):** [0008](../plans/0008-preset-browse-overlay.md) — the in-app preset
+> **Related plan(s):** [0008](../plans/done/0008-preset-browse-overlay.md) — the in-app preset
 > browse overlay (this ADR's first consumer). Extends [ADR-0001](0001-rust-core-wgpu-cabi-foobar-shim.md)
 > (core owns all raw GPU behind wgpu) and respects the NFR 4 dependency/size cap.
 

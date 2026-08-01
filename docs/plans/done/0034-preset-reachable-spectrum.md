@@ -4,11 +4,11 @@
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0036](../adrs/0036-preset-reachable-spectrum.md); supplements
-> [0002](../adrs/0002-layered-preset-architecture.md),
-> [0007](../adrs/0007-line-geometry-generators.md),
-> [0020](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md)
-> **Backlog entries closed:** [0002](../design-backlog.md)
+> **Related ADRs:** [0036](../../adrs/0036-preset-reachable-spectrum.md); supplements
+> [0002](../../adrs/0002-layered-preset-architecture.md),
+> [0007](../../adrs/0007-line-geometry-generators.md),
+> [0020](../../adrs/0020-preset-grammar-v2-branching-functions-tempo.md)
+> **Backlog entries closed:** [0002](../../design-backlog.md)
 > **Sequencing:** independent of [Plan 0033](0033-internal-resolution-and-preset-surface.md) — they
 > share no files. Either order works; 0033 is approved first.
 
@@ -25,7 +25,7 @@ two phases already satisfy both original asks and it is the only piece that chan
 
 ## Context & problem
 
-Backlog entry [0002](../design-backlog.md) is the most-requested capability of the `preset-author`
+Backlog entry [0002](../../design-backlog.md) is the most-requested capability of the `preset-author`
 lane's 2026-07-26 session, raised **twice, unprompted**: "a full spectrogram in several lines... 20-30
 points", and "morph the attractor shape from a full spectrogram with a lot of bars". The lane mapped
 the three available bands onto three separable structural levers as a workaround and reported the
@@ -288,7 +288,7 @@ pub enum SpectrumLayout { Bars, Polyline, RadialRing }
 - The waterfall spectrogram scene, on the same spectrum surface.
 - `bin_range(lo, hi)` if authors ask for band integration rather than point sampling.
 - A GPU-side spectrum texture, if and when a scene wants per-particle spectral response.
-- Backlog [0005](../design-backlog.md) (bloom) and [0007](../design-backlog.md) (`star_pattern`,
+- Backlog [0005](../../design-backlog.md) (bloom) and [0007](../../design-backlog.md) (`star_pattern`,
   decided *invest*) remain undesigned.
 
 ## Close — 2026-07-27
@@ -332,7 +332,7 @@ peaks around 500–800 Hz (band 30 is 0.55 semitones) and settles at ~1.7 semito
 bottom is the array's **coarsest** region musically, which is the opposite of what was written, and
 below the crossover the mapping **moves with the sample rate**. `4d41884` replaces the guidance in
 `docs/presets.md` and `presets/README.md` with a measured position table and the instruction to read
-it rather than compute from a curve. [ADR-0036](../adrs/0036-preset-reachable-spectrum.md) is
+it rather than compute from a curve. [ADR-0036](../../adrs/0036-preset-reachable-spectrum.md) is
 **accepted with an Outcome section** recording the correction (the ADR-0034 precedent).
 
 That error propagated once before it was caught: the content lane's first adoption pass (`037825d`)
@@ -365,9 +365,9 @@ hand-walked hue is therefore not identical to `hue_spread = 1`.
 `nextest --workspace` **251/251**; `core/tests/golden/` **byte-untouched**, so no baseline moved.
 
 **Two open items routed to the backlog rather than fixed here:**
-[0015](../design-backlog.md) — whether the half-linear axis is a defect to fix (a longer window,
+[0015](../../design-backlog.md) — whether the half-linear axis is a defect to fix (a longer window,
 or edges that respect the bin floor) or a characteristic to live with; **ADR-worthy if acted on**.
-[0016](../design-backlog.md) — the readout has no `span`/`width` param, so a full-width bar display,
+[0016](../../design-backlog.md) — the readout has no `span`/`width` param, so a full-width bar display,
 the most conventional form this scene has, is not authorable.
 
 Version **minor 0.17.1 → 0.18.0** at close (a feature plan).

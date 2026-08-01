@@ -18,7 +18,7 @@ surface moves (same rule the lanes apply to their own references).
 - **Raised:** 2026-07-24, from `preset-author` (authoring the "Chthonic Coral Oracle" coral preset).
 - **Verified against code:** yes — see the per-lever notes below.
 - **PROMOTED 2026-07-24 → [ADR-0026](adrs/0026-full-composite-coverage-fullscreen-scenes.md) +
-  [Plan 0025](plans/0025-full-composite-coverage.md)** (full-audit scope: background + view transform
+  [Plan 0025](plans/done/0025-full-composite-coverage.md)** (full-audit scope: background + view transform
   for reaction-diffusion *and* attractor, via alpha-present-over-backdrop). Notes retained below as the
   origin record.
 
@@ -76,7 +76,7 @@ recorded per entry. Ordered by how hard each blocked real authoring work, not by
   `bass mid treb onset beat bar time tempo novelty`. The FFT exists in the analyzer; **none of it is
   reachable from a preset.**
 - **PROMOTED 2026-07-26 → [ADR-0036](adrs/0036-preset-reachable-spectrum.md) +
-  [Plan 0034](plans/0034-preset-reachable-spectrum.md).** **Three verifications shrank this well below
+  [Plan 0034](plans/done/0034-preset-reachable-spectrum.md).** **Three verifications shrank this well below
   the estimate below**, and they are why the plan is three separable steps rather than one big one:
   (1) the spectrum already exists as a **normalized, log-spaced 64-band array** on `AnalysisFrame`
   (`dsp/mod.rs:32`, commented "Log-frequency bands exposed to scenes"), already consumed by
@@ -122,7 +122,7 @@ window.
   `TRAILS_W/H = 1280/720` (`render/trails.rs:45`), `KALEIDO_W/H = 1280/720`
   (`render/kaleidoscope.rs:40`). All three report through `PostStage::internal_size`.
 - **PROMOTED 2026-07-26 → [ADR-0034](adrs/0034-internal-resolution-follows-the-target.md) +
-  [Plan 0033](plans/0033-internal-resolution-and-preset-surface.md)** (Phases 3-4 the RD side,
+  [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md)** (Phases 3-4 the RD side,
   Phase 6 the post stages, Phase 7 the mirror-vs-kaleidoscope docs action). Notes retained below as
   the origin record.
 - **Not chemistry:** the lane swept `flow` across 0.45 / 0.70 / 1.00 and the blockiness is identical
@@ -173,7 +173,7 @@ have saved the lane the trades above.
   now pinned at `zoom = 0.99` with a whisper of pan, which costs the family its whole view-transform
   lever.
 - **PROMOTED 2026-07-26 → [ADR-0034](adrs/0034-internal-resolution-follows-the-target.md) +
-  [Plan 0033](plans/0033-internal-resolution-and-preset-surface.md) Phase 5.** Notes retained below
+  [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 5.** Notes retained below
   as the origin record.
 - **Verified against code — and the diagnosis is more specific than the report.** The present pass
   computes `uv = (in.uv - 0.5) * zoom + 0.5 + pan` (`reaction_diffusion.rs:226`), so `zoom > 1`
@@ -275,7 +275,7 @@ so decide 0010 first and let bloom be built against the settled answer.
 - **Raised:** 2026-07-26, from `preset-author`. The user: "pulse field reaction are way too fast and
   jarring, we should smoothen it up a lot - use some qubic bezziere function or something."
 - **PROMOTED 2026-07-26 → [ADR-0035](adrs/0035-asymmetric-attack-release-easing.md) +
-  [Plan 0033](plans/0033-internal-resolution-and-preset-surface.md) Phase 2.** Notes retained below
+  [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 2.** Notes retained below
   as the origin record.
 - **Verified against code:** yes. `[smoothing]` is one time constant per param, folded onto
   `Binding::tau` at load (`preset/schema.rs:270`), applied by `Smoother::smooth`
@@ -347,7 +347,7 @@ confidence in the *invest* decision and narrows the ask to the second half.
 ## 0008 — `shot` harness gaps that cost the content lane real iterations
 
 - **Raised:** 2026-07-26, from `preset-author`. All three verified.
-- **PROMOTED 2026-07-26 → [Plan 0033](plans/0033-internal-resolution-and-preset-surface.md) Phase 1**
+- **PROMOTED 2026-07-26 → [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 1**
   (no ADR — no rejected alternative worth remembering). **One item was answered rather than built:**
   the pulsing `--set` form is *not* being added. `apply_set` is a pure per-frame function with no
   frame index, and `shot --audio <clip.wav>` plus `--signal click:120` already produce transient
@@ -1654,7 +1654,7 @@ too high** — the number Plan 0044 Phase 4 was supposed to measure and did not.
 
 Two independent fixes are already queued, and this entry is not asking for a third:
 
-- **R1 / [Plan 0045](plans/0045-linear-light-and-bloom.md)** — the `Rgba16Float` linear composite
+- **R1 / [Plan 0045](plans/done/0045-linear-light-and-bloom.md)** — the `Rgba16Float` linear composite
   with a real tonemap is the *structural* answer: with headroom, 3x the deposit stops clipping and
   starts reading as brightness. This preset is a good acceptance case for that plan.
 - **Plan 0044 Phase 4** (carried to `on-device-validation.md`) — the *calibration* answer: measure,

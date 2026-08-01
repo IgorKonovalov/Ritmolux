@@ -4,7 +4,7 @@
 > **Date:** 2026-07-26
 > **Related:** [0035](0035-asymmetric-attack-release-easing.md) (the capability this makes checkable),
 > [0019](0019-eased-parameters.md) (the `[smoothing]` surface),
-> [0016](0016-warp-software-adapter-ci.md) (the determinism posture the harness holds to);
+> [0016](0016-gpu-tests-opt-in-ci-scope.md) (the determinism posture the harness holds to);
 > implemented by [Plan 0037](../plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md);
 > closes design-backlog 0013, the unresolved half of 0008
 

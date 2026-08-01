@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-23
-> **Related plan(s):** [0020](../plans/0020-shared-palette-system.md)
+> **Related plan(s):** [0020](../plans/done/0020-shared-palette-system.md)
 > **Supplements:** [ADR-0002](0002-layered-preset-architecture.md) (adds a color axis to the layer-1/2 preset surface)
 
 ## Context

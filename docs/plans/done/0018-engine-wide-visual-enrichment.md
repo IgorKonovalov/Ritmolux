@@ -3,7 +3,7 @@
 > **Status:** done — closed 2026-07-23; passed Mode 4 review (no blockers, no majors; three minor, two nits). Phase commits `bade3eb`..`52673e0`. Verified: mirror 2*pi/n symmetry + cap-overflow surfacing, one-pole step/converge/reset, smoothed + trailed capture determinism (NFR 6), golden re-bless, embedded-parse + animation across all presets, hygiene pragma on the three new render/ files.
 > **Created:** 2026-07-23
 > **Owner skill(s):** dev
-> **Related ADRs:** [0018-engine-wide-scene-compositing](../adrs/0018-engine-wide-scene-compositing.md), [0019-eased-parameters](../adrs/0019-eased-parameters.md); builds on Plan 0014 ([ADR-0012](../adrs/0012-stateful-feedback-render-system.md) `PingPongField` + [ADR-0013](../adrs/0013-c-abi-v4-render-dt.md) injected `dt`); extends [ADR-0002](../adrs/0002-layered-preset-architecture.md) layer 2
+> **Related ADRs:** [0018-engine-wide-scene-compositing](../../adrs/0018-engine-wide-scene-compositing.md), [0019-eased-parameters](../../adrs/0019-eased-parameters.md); builds on Plan 0014 ([ADR-0012](../../adrs/0012-stateful-feedback-render-system.md) `PingPongField` + [ADR-0013](../../adrs/0013-c-abi-v4-render-dt.md) injected `dt`); extends [ADR-0002](../../adrs/0002-layered-preset-architecture.md) layer 2
 
 ## TL;DR
 
@@ -12,8 +12,8 @@ shared **view transform** (zoom / pan), a **gradient/atmosphere background** beh
 frame-rate-independent **parameter easing** (so band- and beat-driven motion stops feeling rigid
 and fast), and **mirrors** — a true line-geometry fractal replication *and* a screen-space
 kaleidoscope. They land as a **fixed-order engine composite** (background -> scene+view -> trails
--> kaleidoscope -> present, [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md)) plus a
-**render-layer smoothing seam** ([ADR-0019](../adrs/0019-eased-parameters.md)), all audio-bindable
+-> kaleidoscope -> present, [ADR-0018](../../adrs/0018-engine-wide-scene-compositing.md)) plus a
+**render-layer smoothing seam** ([ADR-0019](../../adrs/0019-eased-parameters.md)), all audio-bindable
 as ADR-0002 named params. **Sequenced after Plan 0014** (reuses its offscreen/present +
 `PingPongField` + injected `dt`). First user-visible behavior: cycle to a rose and watch it zoom
 in/out (Phase 1).

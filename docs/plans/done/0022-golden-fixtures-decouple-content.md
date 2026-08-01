@@ -19,9 +19,9 @@
 > `docs/releasing.md`, a deliberate call).
 > **Created:** 2026-07-23
 > **Owner skill(s):** dev
-> **Related ADRs:** [0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (this plan's
-> decision); [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md) (golden runs WARP-only, skips on a
-> missing adapter); [0017](../adrs/0017-preset-author-skill-lane.md) (the content lane the coupling
+> **Related ADRs:** [0023](../../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (this plan's
+> decision); [0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md) (golden runs WARP-only, skips on a
+> missing adapter); [0017](../../adrs/0017-preset-author-skill-lane.md) (the content lane the coupling
 > was hurting)
 
 ## TL;DR
@@ -33,14 +33,14 @@ baselines to mean 0.15–0.25 vs a 0.02 tolerance). Repoint golden at **test-onl
 one per `SystemKind`**, authored as TOML under `core/tests/fixtures/` and keyed by an exhaustive
 match so a new system must add a fixture. Drop all golden pixel-pinning of shipped presets (they
 keep their behavioral floors in `sanity`/`reactivity`/`animation`) and delete the three shipped
-baselines. Per [ADR-0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md). Test-only, no
+baselines. Per [ADR-0023](../../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md). Test-only, no
 production/C-ABI/`ci.yml` change.
 
 ## Context & problem
 
 The golden test is meant to catch **unintended** rendering drift — a shader or scene-math change
 that silently perturbs output. But it compares against baselines rendered from presets in the
-shipped roster, looked up by name. The `preset-author` lane ([ADR-0017](../adrs/0017-preset-author-skill-lane.md))
+shipped roster, looked up by name. The `preset-author` lane ([ADR-0017](../../adrs/0017-preset-author-skill-lane.md))
 exists to tune that roster, so an *intended* tune reads as an engine regression and reds CI until a
 re-bless. Two things with opposite change cadences — stable engine rendering, churny content — are
 welded together, and the seam crosses lanes (a content author reds a `dev`-owned test).
@@ -55,7 +55,7 @@ The shipped presets are still guarded behaviorally: `sanity` (coverage + quadran
 `default_presets()` and survive content tuning by design. Only the pixel-exact guard was pointed at
 content it should not pin.
 
-See [ADR-0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) for the decision and the
+See [ADR-0023](../../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) for the decision and the
 rejected alternatives (keep golden on shipped presets; loose pin on shipped too; per-idiom
 fixtures; embedded consts / reuse `default_presets()`).
 

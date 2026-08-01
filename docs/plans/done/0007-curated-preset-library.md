@@ -18,10 +18,10 @@
 > (`standalone/src/main.rs`, `foo_lmv.cpp`) with no single source of truth — a rename silently
 > un-shares them; a cross-referencing comment is the follow-up.
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0006](../adrs/0006-c-abi-v2-preset-loading.md) — C ABI v2 preset
+> **Related ADRs:** [ADR-0006](../../adrs/0006-c-abi-v2-preset-loading.md) — C ABI v2 preset
 > loading (proposed by this plan; accepted at close). Builds on
-> [ADR-0002](../adrs/0002-layered-preset-architecture.md) (the preset engine) and extends
-> [ADR-0003](../adrs/0003-c-abi-v1-surface.md) (the v1 ABI).
+> [ADR-0002](../../adrs/0002-layered-preset-architecture.md) (the preset engine) and extends
+> [ADR-0003](../../adrs/0003-c-abi-v1-surface.md) (the v1 ABI).
 
 ## TL;DR
 
@@ -32,7 +32,7 @@ This plan makes the library real and portable: on first run each frontend **seed
 directory** with an embedded curated set (~8–12 hand-tuned presets), then loads and hot-reloads
 that directory; the standalone and the foobar plugin **share the same directory** so a preset
 edited once shows in both. foobar reaches parity through **one new C ABI function**
-(`lmv_load_presets`, ABI v2 — [ADR-0006](../adrs/0006-c-abi-v2-preset-loading.md)). First
+(`lmv_load_presets`, ABI v2 — [ADR-0006](../../adrs/0006-c-abi-v2-preset-loading.md)). First
 user-visible behavior lands in Phase 1: `cargo run -p standalone` from any working directory seeds
 `%APPDATA%\light-music-visualizer\presets` and renders from it. The **in-app browse overlay** the
 interview picked is a **separate follow-up plan** (it needs a new text-rendering stack); selection

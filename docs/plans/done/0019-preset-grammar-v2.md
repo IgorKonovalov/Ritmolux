@@ -13,7 +13,7 @@
 > **current** library (35 presets / 7 systems) rather than the plan's stale
 > 17-preset / 5-system wording.
 > **Owner skill(s):** dev
-> **Related ADRs:** [0020-preset-grammar-v2-branching-functions-tempo](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md), supplements [0002-layered-preset-architecture](../adrs/0002-layered-preset-architecture.md)
+> **Related ADRs:** [0020-preset-grammar-v2-branching-functions-tempo](../../adrs/0020-preset-grammar-v2-branching-functions-tempo.md), supplements [0002-layered-preset-architecture](../../adrs/0002-layered-preset-architecture.md)
 
 ## TL;DR
 
@@ -21,14 +21,14 @@ Grow the preset expression language additively so preset authors stop hitting wa
 
 ## Context & problem
 
-A grammar exploration (from the [`preset-author` lane](../adrs/0017-preset-author-skill-lane.md)) found the shipped expression surface narrower than the docs claim, and one real footgun:
+A grammar exploration (from the [`preset-author` lane](../../adrs/0017-preset-author-skill-lane.md)) found the shipped expression surface narrower than the docs claim, and one real footgun:
 
 - **No `cos`** (authors write `sin(x + 1.5708)`), no `sqrt`/`pow`/`smoothstep`/`mod`, no `pi`/`tau`, no comparisons or conditional.
 - **No `tempo`**, though `AnalysisFrame.bpm` already exists (`core/src/dsp/mod.rs:52`) and is deterministic (`dsp/tempo.rs`); `render/mod.rs:474` just never passes it into `Variables::new`.
 - **Unknown parameter names are silently ignored.** `schema.rs` compiles every bound name blindly into a `Binding`; each scene's `set_param` ends in `_ => {}` (`fragment_field.rs:218`, `swarm.rs:290`, the three `lines/*` scenes). So a typo (`warpp = "…"`) compiles and does nothing — while an unknown *system*/*function*/*variable* is already a hard load error. That inconsistency is the bug.
 - **`docs/presets.md` is stale**: "accurate as of 2026-07-22, 10-preset set", two systems — but `EMBEDDED` is `[(&str, &str); 17]` (`preset/mod.rs:24`) across five `SystemKind`s (`fragment_field`, `swarm`, `parametric_curve`, `lsystem`, `star_pattern`).
 
-The design decision — how far to expand, `select` vs ternary, warn vs reject, which variables — is recorded in [ADR-0020](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md). This plan implements it. The one hard constraint throughout is **hot-path safety** (`preset/expr.rs` carries the panic-denial pragma and `eval` runs per param per frame — every new operation must be total and allocation-free). **Backward compatibility is not yet a constraint** — the app is pre-1.0 (0.3.0) and in active development; preset-format stability begins at 1.0.0. The additions here happen to break no shipped preset (each was previously a compile error), but `dev` should feel free to pick the cleanest implementation rather than preserve any incidental current behavior for compatibility's sake.
+The design decision — how far to expand, `select` vs ternary, warn vs reject, which variables — is recorded in [ADR-0020](../../adrs/0020-preset-grammar-v2-branching-functions-tempo.md). This plan implements it. The one hard constraint throughout is **hot-path safety** (`preset/expr.rs` carries the panic-denial pragma and `eval` runs per param per frame — every new operation must be total and allocation-free). **Backward compatibility is not yet a constraint** — the app is pre-1.0 (0.3.0) and in active development; preset-format stability begins at 1.0.0. The additions here happen to break no shipped preset (each was previously a compile error), but `dev` should feel free to pick the cleanest implementation rather than preserve any incidental current behavior for compatibility's sake.
 
 ## Decision
 

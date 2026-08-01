@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-07-24, with Plan 0025 close)
 > **Date:** 2026-07-24
-> **Related plan(s):** [0025-full-composite-coverage](../plans/0025-full-composite-coverage.md); extends [0018-engine-wide-scene-compositing](0018-engine-wide-scene-compositing.md)
+> **Related plan(s):** [0025-full-composite-coverage](../plans/done/0025-full-composite-coverage.md); extends [0018-engine-wide-scene-compositing](0018-engine-wide-scene-compositing.md)
 
 ## Context
 

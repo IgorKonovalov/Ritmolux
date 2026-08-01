@@ -12,8 +12,8 @@
 > `--signal` path validates the whole audio pipeline with no asset. See the review notes below.
 > **Created:** 2026-07-22
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0011](../adrs/0011-image-crate-for-capture-tooling.md) (the `image`
-> dev-dependency), [0002](../adrs/0002-layered-preset-architecture.md) (scenes/presets are what's
+> **Related ADRs:** [0011](../../adrs/0011-image-crate-for-capture-tooling.md) (the `image`
+> dev-dependency), [0002](../../adrs/0002-layered-preset-architecture.md) (scenes/presets are what's
 > captured), [0008](0008-preset-browse-overlay.md) (overlaps on preset-by-name selection — Risks)
 
 ## TL;DR

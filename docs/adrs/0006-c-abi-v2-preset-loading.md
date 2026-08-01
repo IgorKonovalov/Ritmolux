@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-21 (accepted 2026-07-22 at Plan 0007 close)
-> **Related plan(s):** [0007](../plans/0007-curated-preset-library.md)
+> **Related plan(s):** [0007](../plans/done/0007-curated-preset-library.md)
 
 ## Context
 

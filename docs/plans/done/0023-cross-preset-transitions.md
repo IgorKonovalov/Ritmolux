@@ -60,19 +60,19 @@ per-call-site question. It touches neither extension seam, so it is not ADR-wort
 the rest of that dissolve fades up from black. Acceptable; worth a comment at the rebuild.
 
 Version **minor 0.15.1 -> 0.16.0** at close.
-> **Related ADRs:** [0024-cross-preset-transitions](../adrs/0024-cross-preset-transitions.md);
-> [ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md) (where the blend sits:
+> **Related ADRs:** [0024-cross-preset-transitions](../../adrs/0024-cross-preset-transitions.md);
+> [ADR-0032](../../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md) (where the blend sits:
 > ink leaves the chain, the blend goes between chain and ink — **this plan implements it**); builds on
-> [ADR-0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md) (the `PostChain` this plan
-> instantiates twice), [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md) (engine composite:
-> offscreen target + present pass, scenes stop clearing), [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md)
-> (ink remaps the *blended* frame) and Plan 0014 ([ADR-0012](../adrs/0012-stateful-feedback-render-system.md)
-> `PingPongField` + [ADR-0013](../adrs/0013-c-abi-v4-render-dt.md) injected `dt`); realizes the
-> "cross-preset blending" follow-up deferred by [Plan 0003](done/0003-generative-scenes-and-presets.md)
+> [ADR-0031](../../adrs/0031-post-stage-trait-instantiable-composite-chain.md) (the `PostChain` this plan
+> instantiates twice), [ADR-0018](../../adrs/0018-engine-wide-scene-compositing.md) (engine composite:
+> offscreen target + present pass, scenes stop clearing), [ADR-0028](../../adrs/0028-final-stage-ink-tone-remap.md)
+> (ink remaps the *blended* frame) and Plan 0014 ([ADR-0012](../../adrs/0012-stateful-feedback-render-system.md)
+> `PingPongField` + [ADR-0013](../../adrs/0013-c-abi-v4-render-dt.md) injected `dt`); realizes the
+> "cross-preset blending" follow-up deferred by [Plan 0003](0003-generative-scenes-and-presets.md)
 
 ## Revision note (2026-07-25)
 
-Revised after [Plan 0030](done/0030-composite-chain-and-scene-keying.md) landed, which is what this
+Revised after [Plan 0030](0030-composite-chain-and-scene-keying.md) landed, which is what this
 plan was sequenced behind. Three things changed and one was newly settled:
 
 - **"Allocate the second target (or generalize the Plan 0018 target into a reusable pair)" is gone.**
@@ -83,7 +83,7 @@ plan was sequenced behind. Three things changed and one was newly settled:
   answered structurally.** No stage assumes it is last: `route` derives the fold order from the active
   flags, and the last active stage always targets whatever destination the caller passed.
 - **Where the blend sits was a real open fork, and it is now decided** in
-  [ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md). ADR-0028 requires ink
+  [ADR-0032](../../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md). ADR-0028 requires ink
   to remap the *blended* frame, but ADR-0031's bound rules a two-input stage out of the one-input
   `PostStage` trait — and ink was inside the chain, so the per-side chains could not each end in ink.
   **Ink moves out of the chain** (a terminal engine post-pass, symmetric with `Background` as the
@@ -115,7 +115,7 @@ slideshow. The user asked for MilkDrop's continuous feel, where presets dissolve
 dissolve needs **two composited frames in one frame** plus a stage that mixes them by a factor `t` —
 neither of which exists today (one live scene, drawn straight to the swapchain).
 
-The interview settled the shape (see [ADR-0024](../adrs/0024-cross-preset-transitions.md)):
+The interview settled the shape (see [ADR-0024](../../adrs/0024-cross-preset-transitions.md)):
 
 - **A small transition library**, not just one crossfade — so the blend stage must **sample both
   inputs** (an alpha lerp is out; the additive line/particle families won't composite correctly).
@@ -138,7 +138,7 @@ time (Plan 0011 `FrameStats`) is under budget; else the snapshot is used. Policy
 Full rationale and the rejected alternatives (single-target alpha, always-dual-live, always-freeze, a
 `TransitionScene` wrapper, preset-declared-now) are in ADR-0024. The blend's **placement** — outside
 the `PostStage` trait, with ink relocated out of the chain to sit after it — is
-[ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md), which rejects widening
+[ADR-0032](../../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md), which rejects widening
 `PostStage` to two inputs, per-side inking, and a freeze-only path.
 
 ## Architecture diagram
@@ -182,7 +182,7 @@ goldens), the same shape as Plan 0030's phases, so it is a prerequisite rather t
 **Owner skill:** dev
 **Area:** core
 
-Per [ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md): remove `Ink` from
+Per [ADR-0032](../../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md): remove `Ink` from
 `PostChain`'s array and make it a terminal post-pass the renderer drives directly, symmetric with
 `Background` as the pre-pass. `STAGE_COUNT` becomes 2 and the chain holds trails + kaleidoscope.
 
@@ -324,7 +324,7 @@ Controls table (Space/preset-select now dissolve rather than cut) and `docs/pres
   surface -> text/overlay`, and `post.rs`'s module docs state the order and the skip rule directly.
 - **Blend granularity is settled, but the colour-space trap is real.** The blend mixes each preset's
   **own composited look** (its background, view, trails, kaleidoscope) *before* the engine-wide ink
-  remap — [ADR-0032](../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md). The old worry
+  remap — [ADR-0032](../../adrs/0032-ink-leaves-the-chain-blend-between-chain-and-ink.md). The old worry
   that "a kaleidoscope or trail stage may assume it is last" is answered structurally: no stage assumes
   anything about position, `route` derives the fold order from the active flags, and the last active
   stage targets whatever destination the caller passes. What replaces it is narrower and easier to get

@@ -4,7 +4,7 @@
 > **Created:** 2026-07-21
 > **Closed:** 2026-07-23
 > **Owner skill(s):** dev
-> **Related ADRs:** [0007-line-geometry-generators](../adrs/0007-line-geometry-generators.md) (accepted at close); extends [0002-layered-preset-architecture](../adrs/0002-layered-preset-architecture.md) layer 2
+> **Related ADRs:** [0007-line-geometry-generators](../../adrs/0007-line-geometry-generators.md) (accepted at close); extends [0002-layered-preset-architecture](../../adrs/0002-layered-preset-architecture.md) layer 2
 
 > **Close summary (2026-07-23, Mode 4 — no blockers, no majors).** All five phases
 > landed: `110eab7` (line renderer + static Maurer rose), `cd0e518` (parametric

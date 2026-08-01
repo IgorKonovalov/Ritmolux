@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-24
-> **Related plan(s):** [0026-calmer-scene-rotation](../plans/0026-calmer-scene-rotation.md); revises the defaults set by [Plan 0009](../plans/done/0009-live-performance-features.md) (`standalone/src/director.rs`, `config.rs`)
+> **Related plan(s):** [0026-calmer-scene-rotation](../plans/done/0026-calmer-scene-rotation.md); revises the defaults set by [Plan 0009](../plans/done/0009-live-performance-features.md) (`standalone/src/director.rs`, `config.rs`)
 
 ## Context
 
@@ -89,5 +89,5 @@ preserves the capability at zero ongoing cost.
 ## Notes
 - Standalone-only; no core/DSP/ABI impact. The director's determinism (pure function of injected `dt` +
   `AnalysisFrame`, NFR §6) is preserved — retuning constants doesn't touch that.
-- Exact softened-drop gate and the 20/90 defaults are set in [Plan 0026](../plans/0026-calmer-scene-rotation.md)
+- Exact softened-drop gate and the 20/90 defaults are set in [Plan 0026](../plans/done/0026-calmer-scene-rotation.md)
   and are on-device-tunable, not frozen here.

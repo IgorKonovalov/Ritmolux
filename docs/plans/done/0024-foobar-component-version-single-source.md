@@ -4,7 +4,7 @@
 > **Created:** 2026-07-23
 > **Closed:** 2026-07-23
 > **Owner skill(s):** dev
-> **Related ADRs:** [0025-foobar-component-version-single-sourced](../adrs/0025-foobar-component-version-single-sourced.md); supplements [ADR-0005](../adrs/0005-versioning-and-release-cadence.md); revises the "plugin version remains independent" note from [Plan 0006](done/0006-versioning-wiring.md)
+> **Related ADRs:** [0025-foobar-component-version-single-sourced](../../adrs/0025-foobar-component-version-single-sourced.md); supplements [ADR-0005](../../adrs/0005-versioning-and-release-cadence.md); revises the "plugin version remains independent" note from [Plan 0006](0006-versioning-wiring.md)
 
 ## Close summary (2026-07-23)
 
@@ -39,12 +39,12 @@ at `0.7.0`. Make the component version **track the workspace version** via a **g
 `plugin-foobar/build/foo_lmv_version.h` (`#define FOO_LMV_VERSION "X.Y.Z"`), which `foo_lmv.cpp`
 includes and hands to `DECLARE_COMPONENT_VERSION`. Then refresh the two stale description strings that
 still name the culled spectrum/pulse/starfield scenes. **Plugin + build-script + docs only; no core, no
-C ABI change** ([ADR-0025](../adrs/0025-foobar-component-version-single-sourced.md)).
+C ABI change** ([ADR-0025](../../adrs/0025-foobar-component-version-single-sourced.md)).
 
 ## Context & problem
 
 The component version is a compile-time string literal (`"0.1.0"`) that has gone stale — see
-[ADR-0025](../adrs/0025-foobar-component-version-single-sourced.md) for the full reasoning and the
+[ADR-0025](../../adrs/0025-foobar-component-version-single-sourced.md) for the full reasoning and the
 rejected alternatives (a `/D` cl define; a committed `version.h`; a hand-bumped independent version).
 Two facts fix the mechanism:
 

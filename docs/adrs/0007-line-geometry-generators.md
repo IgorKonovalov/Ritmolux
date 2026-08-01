@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-21
-> **Related plan(s):** [0010-line-geometry-scenes](../plans/0010-line-geometry-scenes.md)
+> **Related plan(s):** [0010-line-geometry-scenes](../plans/done/0010-line-geometry-scenes.md)
 
 ## Context
 

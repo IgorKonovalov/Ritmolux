@@ -3,7 +3,7 @@
 > **Status:** done
 > **Created:** 2026-07-22
 > **Owner skill(s):** dev
-> **Related ADRs:** [0015-gpu-compute-particle-idiom](../adrs/0015-gpu-compute-particle-idiom.md); extends [0002-layered-preset-architecture](../adrs/0002-layered-preset-architecture.md) layer 2; reuses [0012-stateful-feedback-render-system](../adrs/0012-stateful-feedback-render-system.md)'s `PingPongField`
+> **Related ADRs:** [0015-gpu-compute-particle-idiom](../../adrs/0015-gpu-compute-particle-idiom.md); extends [0002-layered-preset-architecture](../../adrs/0002-layered-preset-architecture.md) layer 2; reuses [0012-stateful-feedback-render-system](../../adrs/0012-stateful-feedback-render-system.md)'s `PingPongField`
 
 > **Closed 2026-07-23** — passed Mode 4 review (no blockers, no majors; two minor, three
 > nits). Five `dev` phase commits (`79b6cf0`, `937fdfb`, `9acc415`, `7ec850a`, `aa34d25`)
@@ -38,7 +38,7 @@ Add the engine's first **GPU compute-particle** scene family: a compute shader s
 storage buffer of particles through a strange-attractor map each frame, and a render pass
 draws them as additive point-sprites with fading trails. First user-visible behavior: a
 new preset renders a dense, glowing, slowly-morphing attractor (De Jong) point cloud that
-reacts to the music. This lands idiom B from [ADR-0015](../adrs/0015-gpu-compute-particle-idiom.md)
+reacts to the music. This lands idiom B from [ADR-0015](../../adrs/0015-gpu-compute-particle-idiom.md)
 and opens the path for curl-noise flow fields and fractal flames later. Core-only; **C ABI
 untouched**; both frontends inherit the scenes.
 
@@ -55,7 +55,7 @@ determinism riding the mechanisms the project already has.
 
 ## Decision
 
-Per [ADR-0015](../adrs/0015-gpu-compute-particle-idiom.md), build a compute-pipeline
+Per [ADR-0015](../../adrs/0015-gpu-compute-particle-idiom.md), build a compute-pipeline
 particle system in `core`: particle state in a `wgpu` storage buffer, stepped by a compute
 shader from injected real `dt`, drawn as additive point-sprites, trails via Plan 0014's
 `PingPongField`. Attractor coefficients and look scalars are ADR-0002 layer-2 named
@@ -138,7 +138,7 @@ skeleton — a visible animated attractor end-to-end — not plumbing.
   spread against its own sampled background, not tautological) — these structural metrics stay the
   cross-adapter behavioral assertion of record, since chaos-amplified FP divergence makes pixels
   differ across GPUs. Then add the particle system's **frozen golden fixture** per the post-Plan-0022
-  layout ([ADR-0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)): golden now renders one
+  layout ([ADR-0023](../../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)): golden now renders one
   do-not-tune fixture per `SystemKind` under `core/tests/fixtures/`, keyed by an exhaustive
   `match SystemKind` in `golden.rs::fixture`, and drift is a WARP-only pixel comparison (deterministic
   on that one adapter, so a seeded particle scene pins fine there). The new `SystemKind` variant this

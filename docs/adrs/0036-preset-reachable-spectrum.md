@@ -4,7 +4,7 @@
 > **Date:** 2026-07-26
 > **Accepted:** 2026-07-27 at the Plan 0034 close, **with the Outcome section below** correcting one
 > claim implementation falsified
-> **Related plan(s):** [0034](../plans/0034-preset-reachable-spectrum.md)
+> **Related plan(s):** [0034](../plans/done/0034-preset-reachable-spectrum.md)
 > **Supplements:** [ADR-0002](0002-layered-preset-architecture.md) (the expression layer),
 > [ADR-0020](0020-preset-grammar-v2-branching-functions-tempo.md) (grammar v2),
 > [ADR-0007](0007-line-geometry-generators.md) (line generators)

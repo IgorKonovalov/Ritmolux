@@ -4,7 +4,7 @@
 > **Created:** 2026-07-22
 > **Closed:** 2026-07-22 — passed Mode 4 review (no blockers, no majors; two nits noted below).
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0008](../adrs/0008-c-abi-v3-diagnostics.md) (C ABI v3: diagnostics query + overlay toggle) — **accepted** at close.
+> **Related ADRs:** [0008](../../adrs/0008-c-abi-v3-diagnostics.md) (C ABI v3: diagnostics query + overlay toggle) — **accepted** at close.
 
 ## Close summary (2026-07-22)
 
@@ -62,7 +62,7 @@ resource bytes, an on-screen overlay (frame-time sparkline + memory/GPU bars + a
 readout), and structured per-shell log files — then use it to land the cheap NFR §12 memory wins
 (compile wgpu with only the per-OS backend; trim the swapchain). Full parity across all three
 frontends: the core paints the overlay and computes the numbers, the standalone reaches it through
-the native Rust API, and the foobar plugin reaches it through a new **C ABI v3** ([ADR-0008](../adrs/0008-c-abi-v3-diagnostics.md)).
+the native Rust API, and the foobar plugin reaches it through a new **C ABI v3** ([ADR-0008](../../adrs/0008-c-abi-v3-diagnostics.md)).
 First user-visible behavior: the standalone title bar shows fps **and** p99 frame time sourced from
 the core's diagnostics, replacing the shell's ad-hoc fps counter.
 
@@ -170,7 +170,7 @@ plumbing.
   MB` digits. Off by default. `Renderer::render` invokes it after the scene submit when enabled, reading
   the Phase 1 snapshot. The bitmap font is a deliberately-scoped debug primitive (fixed ASCII glyph
   atlas) with **no new dependency** — deliberately *not* the glyphon renderer of the concurrent Plan
-  0008 / [ADR-0009](../adrs/0009-glyphon-text-rendering.md), which is feature-gated and standalone-scoped;
+  0008 / [ADR-0009](../../adrs/0009-glyphon-text-rendering.md), which is feature-gated and standalone-scoped;
   the core overlay must paint in the plugin too (all-three parity) and stay dependency-light (NFR §4),
   so it owns its digits.
 - **Files touched:** `core/src/render/overlay.rs` (new — carries the panic pragma; `render/` is already

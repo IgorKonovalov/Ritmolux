@@ -10,8 +10,8 @@
 > no C ABI change, no new dependency; `fmt`/`clippy`/`nextest` green (305 tests).
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev
-> **Related ADRs:** [0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md).
-> [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md) R5 (first, small half).
+> **Related ADRs:** [0051](../../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md).
+> [docs/roadmap-visual-richness.md](../../roadmap-visual-richness.md) R5 (first, small half).
 
 ## TL;DR
 

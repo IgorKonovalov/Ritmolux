@@ -743,7 +743,7 @@ genuine change exceeds it.
 > **Eyeballing the baseline is not enough on its own, and Plan 0045 is the
 > record of why.** The whole suite captures on WARP, which is documented to hand
 > a pipeline another live pipeline's resources
-> ([ADR-0021](adrs/0021-shared-palette-baked-lut.md) / Plan 0020, the tonemap in
+> ([ADR-0021](adrs/0021-shared-palette-system.md) / Plan 0020, the tonemap in
 > Phase 3, the bloom blur in Phase 4). A mis-rendered frame at these capture
 > sizes can look entirely plausible: Phase 4's bloom halo was 2:1 elongated in
 > one draft and smeared into a column of copies in another, and the 160x100

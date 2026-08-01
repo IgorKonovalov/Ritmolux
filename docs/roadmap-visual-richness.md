@@ -254,7 +254,7 @@ phrase, cellular fields that crack open on the bass.
 
 1. ~~**Run the approved roster first**: Plans 0042 → 0043~~ — **both closed 2026-07-30.**
 2. ~~**R0 + R1 next** — one interview covering both~~ — the interview ran, both ADRs and plans
-   landed, and **R0 is done** (Plan 0044). **R1 ([Plan 0045](plans/0045-linear-light-and-bloom.md))
+   landed, and **R0 is done** (Plan 0044). **R1 ([Plan 0045](plans/done/0045-linear-light-and-bloom.md))
    is now the one to run** — the largest single visible change available, and its bloom levels and
    `Floor` bandwidth relief hang off the `TierConfig` R0 just built.
 3. **R2 immediately after** ([Plan 0046](plans/0046-transformed-feedback.md) — it renders *into*

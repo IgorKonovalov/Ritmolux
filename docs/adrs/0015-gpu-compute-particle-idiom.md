@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-22
-> **Related plan(s):** [0016-gpu-compute-particle-scenes](../plans/0016-gpu-compute-particle-scenes.md)
+> **Related plan(s):** [0016-gpu-compute-particle-scenes](../plans/done/0016-gpu-compute-particle-scenes.md)
 
 ## Context
 

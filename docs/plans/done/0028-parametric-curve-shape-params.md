@@ -21,7 +21,7 @@
 > preset, motion 0.0078) and the untracked `rose_*` preset drafts in the working tree are not part
 > of this plan.
 > **Owner skill(s):** dev
-> **Related ADRs:** [0029-parametric-curve-shape-params](../adrs/0029-parametric-curve-shape-params.md), supplements [0007-line-geometry-generators](../adrs/0007-line-geometry-generators.md)
+> **Related ADRs:** [0029-parametric-curve-shape-params](../../adrs/0029-parametric-curve-shape-params.md), supplements [0007-line-geometry-generators](../../adrs/0007-line-geometry-generators.md)
 > **Sequencing:** land **after Plan 0020** (shared palette). This is a **priority** sequencing, not a technical dependency — 0028 touches only the Maurer sampler (`curves.rs`/`parametric.rs`) and 0020 only color/shaders, so they never rebase across each other; the user's call (2026-07-24) is to land the color axis first so preset-author gets both color and shape levers together when revising the rose drafts.
 
 ## TL;DR
@@ -51,7 +51,7 @@ reference (`github.com/IgorKonovalov/Maurer_Rose`) are unreachable because the s
   phase inside `sin(n·θ + phase)` reshapes the petal structure as it advances.
 
 The design fork (named params vs. new `CurveFamily` variants vs. a general superformula) and the
-zero-default backward-safety are recorded in [ADR-0029](../adrs/0029-parametric-curve-shape-params.md).
+zero-default backward-safety are recorded in [ADR-0029](../../adrs/0029-parametric-curve-shape-params.md).
 The hard constraint is **hot-path safety**: `curves.rs` and `parametric.rs` carry the panic-denial
 pragma and the sampler runs every frame — the additions must be total, allocation-free, and
 introduce no indexing/division (they are pure `f32` adds, so this holds trivially).

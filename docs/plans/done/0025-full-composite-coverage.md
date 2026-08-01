@@ -24,7 +24,7 @@
 > **minor 0.11.0 -> 0.12.0** at close.
 > **Created:** 2026-07-24
 > **Owner skill(s):** dev
-> **Related ADRs:** [0026-full-composite-coverage-fullscreen-scenes](../adrs/0026-full-composite-coverage-fullscreen-scenes.md); extends [ADR-0018](../adrs/0018-engine-wide-scene-compositing.md) (engine composite) and touches the same present shaders as [ADR-0021](../adrs/0021-shared-palette-system.md) / Plan 0020
+> **Related ADRs:** [0026-full-composite-coverage-fullscreen-scenes](../../adrs/0026-full-composite-coverage-fullscreen-scenes.md); extends [ADR-0018](../../adrs/0018-engine-wide-scene-compositing.md) (engine composite) and touches the same present shaders as [ADR-0021](../../adrs/0021-shared-palette-system.md) / Plan 0020
 
 ## TL;DR
 

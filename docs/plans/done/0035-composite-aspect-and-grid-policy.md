@@ -6,10 +6,10 @@
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev
-> **Related ADRs:** [0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the invariant);
-> corrects the aspect consequence of [0034](../adrs/0034-internal-resolution-follows-the-target.md);
-> re-establishes [0029](../plans/done/0029-attractor-resize-cost-and-ink-followups.md) Phase 5 on the
-> composite path; touches the [0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md)
+> **Related ADRs:** [0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the invariant);
+> corrects the aspect consequence of [0034](../../adrs/0034-internal-resolution-follows-the-target.md);
+> re-establishes [0029](0029-attractor-resize-cost-and-ink-followups.md) Phase 5 on the
+> composite path; touches the [0031](../../adrs/0031-post-stage-trait-instantiable-composite-chain.md)
 > `PostStage` seam
 > **Closes:** Plan 0033's close-review majors 1-3 and minors 2-4
 
@@ -353,5 +353,5 @@ reaction-diffusion reconstruction's ~45 texture fetches per fragment to
 `docs/on-device-validation.md`, with a failure routed to `architect` rather than to an automatic
 revert because reverting costs the coral look outright.
 
-[ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) **accepted** at this close.
+[ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) **accepted** at this close.
 Version **patch 0.17.0 -> 0.17.1** — a fix/coverage/refactor/docs plan, no feature.

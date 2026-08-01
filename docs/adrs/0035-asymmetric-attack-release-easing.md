@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-07-26, at Plan 0033's close)
 > **Date:** 2026-07-26
-> **Related plan(s):** [0033](../plans/0033-internal-resolution-and-preset-surface.md)
+> **Related plan(s):** [0033](../plans/done/0033-internal-resolution-and-preset-surface.md)
 > **Supplements:** [ADR-0019](0019-eased-parameters.md)
 
 ## Context

@@ -2,7 +2,7 @@
 
 > **Status:** accepted
 > **Date:** 2026-07-23
-> **Related plan(s):** [0021](../plans/0021-decouple-preset-content-from-code.md)
+> **Related plan(s):** [0021](../plans/done/0021-decouple-preset-content-from-code.md)
 
 ## Context
 

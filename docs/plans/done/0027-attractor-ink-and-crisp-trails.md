@@ -3,11 +3,11 @@
 > **Status:** done — closed 2026-07-25
 > **Created:** 2026-07-24
 > **Owner skill(s):** dev
-> **Related ADRs:** [0028](../adrs/0028-final-stage-ink-tone-remap.md) (accepted at close);
-> [0030](../adrs/0030-scene-target-size-hot-path-hook.md) (accepted at close — records the
+> **Related ADRs:** [0028](../../adrs/0028-final-stage-ink-tone-remap.md) (accepted at close);
+> [0030](../../adrs/0030-scene-target-size-hot-path-hook.md) (accepted at close — records the
 > `Scene` widening Phase 2 required, see the correction under *What this plan does NOT do*); extends
-> [0018](../adrs/0018-engine-wide-scene-compositing.md); coordinates with
-> [0024](../adrs/0024-cross-preset-transitions.md); sequenced after Plans
+> [0018](../../adrs/0018-engine-wide-scene-compositing.md); coordinates with
+> [0024](../../adrs/0024-cross-preset-transitions.md); sequenced after Plans
 > [0020](0020-shared-palette-system.md) and [0025](0025-full-composite-coverage.md).
 
 ## Outcome (closed 2026-07-25)
@@ -25,7 +25,7 @@ Two majors, both routed rather than reworked here:
 - **The `Scene`-trait widening Phase 2 needed was undocumented.** Ruled correct on the merits (no
   other channel carries the target size), but it is the third widening and the first on the hot path,
   after ADR-0007 bounded the trait at one optional method and ADR-0021 called `set_palette` "the
-  second and last". Recorded in [ADR-0030](../adrs/0030-scene-target-size-hot-path-hook.md), which
+  second and last". Recorded in [ADR-0030](../../adrs/0030-scene-target-size-hot-path-hook.md), which
   replaces the countdown with three conditions a future widening must meet.
 - **A size change rebuilds the attractor's entire GPU resource block inside `render`** — shaders and
   pipelines included, once per frame of a live window drag, clearing the trail each time. Routed to
@@ -57,7 +57,7 @@ The `preset-author` lane could not author a De Jong attractor as ink-on-paper (f
    background wash to white. "Black on white" is the inverse of the compositing model, unreachable by
    any color param. Plan 0025 gives a white *background* (alpha-present over the backdrop) and Plan
    0020 gives arbitrary stroke *colors*, but neither adds a **darkening** step, so neither yields dark
-   strokes. See [ADR-0028](../adrs/0028-final-stage-ink-tone-remap.md) for the full analysis.
+   strokes. See [ADR-0028](../../adrs/0028-final-stage-ink-tone-remap.md) for the full analysis.
 2. **Resolution.** Trails accumulate in a hardcoded `TRAIL_W = 640, TRAIL_H = 360` field, then upscale
    to the surface with linear filtering — that stretch is the softness. It is a `const`, not a param.
    (Same limitation the Plan 0016 close flagged as a minor, and Plan 0018 as a trails/kaleidoscope
@@ -190,7 +190,7 @@ struct InkUniform {
   "derived from the surface size" — scenes are `Box<dyn Scene>` and `Scene::render` receives only
   `aspect`, so no existing channel carried the size. Phase 2 added a default-no-op per-frame
   target-size hook with the user's approval; the decision and its budget are recorded in
-  [ADR-0030](../adrs/0030-scene-target-size-hot-path-hook.md). The C ABI is genuinely untouched.)*
+  [ADR-0030](../../adrs/0030-scene-target-size-hot-path-hook.md). The C ABI is genuinely untouched.)*
 - **Does not re-open Plans 0020/0025** — it sequences after them and composes with their output.
 
 ## Followups (after this lands)

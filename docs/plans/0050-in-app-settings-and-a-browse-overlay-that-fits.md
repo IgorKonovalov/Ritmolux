@@ -5,7 +5,7 @@
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md)
 > (runtime tier switching), supplementing [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md)
-> (quality tiers) and [ADR-0009](../adrs/0009-on-canvas-text-via-glyphon.md) (the on-canvas text seam)
+> (quality tiers) and [ADR-0009](../adrs/0009-glyphon-text-rendering.md) (the on-canvas text seam)
 
 ## TL;DR
 

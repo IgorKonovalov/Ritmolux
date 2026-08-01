@@ -12,8 +12,8 @@
 > is the accurate count.
 > **Created:** 2026-07-21
 > **Owner skill(s):** dev
-> **Related:** [Plan 0002](done/0002-rust-enforcement-tooling.md) — implements its **deferred
-> Phase 5** (the Miri UB job); [ADR-0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) (the
+> **Related:** [Plan 0002](0002-rust-enforcement-tooling.md) — implements its **deferred
+> Phase 5** (the Miri UB job); [ADR-0001](../../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) (the
 > layering this preserves — `lmv-ring` stays source-agnostic and GPU-free, like the rest of core).
 
 ## TL;DR
