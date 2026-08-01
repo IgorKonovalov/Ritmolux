@@ -492,6 +492,18 @@ composite over the backdrop instead of presenting opaque). The **fragment field*
 is the one full-screen scene that still draws opaquely, so `bg_*` has no visible
 effect there.
 
+**Since Plan 0051 the backdrop composites correctly under every scene, and a lit
+`bg_bright` is worth revisiting on anything in the `swarm_*` and line families.**
+Until then the swarm's sprites and the line renderer's strokes emitted a constant
+alpha across their whole quad while only their colour carried the falloff, so
+every sprite punched four black rectangular notches beside itself and every
+stroke drew itself a black rim — invisible at `bg_bright = 0`, and worse the
+fatter the stroke. Raising `thickness` against a lit backdrop therefore widened
+the rim as fast as it widened the glow, which is why several presets in these
+families sit at a near-black floor. That constraint is gone
+([ADR-0056](../docs/adrs/0056-additive-scenes-emit-premultiplied-alpha.md)); the
+values themselves were not re-tuned.
+
 ### Geometry mirror (line systems) — `mirror_order`, `mirror_reflect`
 
 Replicates a line scene's segments under N-fold rotational symmetry to build a
