@@ -2092,3 +2092,70 @@ allowlist half is probably the answer there and the assertion half for the rest.
 win while in the file: `bloom.rs`'s module docs make the same prose claim for its four layouts
 (bright, blur, up, mix) — the enumeration's printout shows it holds today, so asserting it costs
 four lines.
+
+---
+
+## Entries 0040-0041 — from the Plan 0051 Mode 4 review (2026-08-01)
+
+## 0040 — additive light occludes by geometry, so a dim figure over a lit backdrop reads as dark speckle
+
+- **Raised:** 2026-08-01, from `architect`, at Plan 0051's Mode 4 review.
+- **Verified against code:** yes — rendered. `swarm_storm` over `bg_bright = 0.35` at
+  `brightness = 0.02` renders as black specks on the backdrop; at the shipped-value backdrop the
+  same run's darkest pixel is (71,13,22) against a backdrop of (138,67,56).
+- **For:** `architect` (a look decision, ADR-worthy if taken), informed by `preset-author`.
+
+[ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md) made a scene emit alpha equal to
+its **coverage**, which fixed the black notches and rims. Its last Negative bullet left one thing
+open: coverage-as-alpha means a fragment occludes the backdrop **whatever light it emits**. The
+resolve is `c * g + bg * (1 - g)`, so a fragment darkens the backdrop wherever `c < bg`.
+
+At the shipped near-black floors this is unobservable — all sixteen affected presets sit between
+`bg_bright` 0.009 and 0.070. It matters because **the fix invites raising them**: the black rim was
+the reason the swarm and line families were floored (`lsystem_fern.toml:98-103` records the
+symptom, misattributing it to the lifted floor washing out the additive halo — a real effect, but
+the rim was contributing and the tradeoff has changed). An author acting on that invitation meets a
+new ceiling: `bg_bright` can rise only to the **dimmest emitted luminance in the figure**. Past it,
+the depth-parallaxed far particles and the `glow`-dimmed strokes stop fading out and start reading
+as dark speckle. `presets/README.md` now states this.
+
+**The open question is whether that is the right model.** An additive look arguably wants *no*
+occlusion — light adds, it does not cover — which would mean deriving the seam's alpha from
+something other than pure geometric coverage, or giving the scene a bindable choice between the two
+semantics. ADR-0056 rejected deriving coverage centrally from luminance (a legitimately dark
+covered pixel would go transparent, and it puts scene judgement in a shared pass); a per-scene or
+per-preset *opt-in* is a different proposal and is not covered by that rejection. Nothing is broken
+today — post-fix is brighter than pre-fix at every pixel — so this is a look decision, not a defect.
+Settling it wants rendered samples of the same preset under both semantics at a raised backdrop,
+per the concrete-examples workflow, not an argument.
+
+## 0041 — the line seam's lit-backdrop guard discriminates on ~5 pixels, and a stronger property is available
+
+- **Raised:** 2026-08-01, from `architect`, at Plan 0051's Mode 4 review.
+- **Verified against code:** yes — the guard was run against a reverted shader at review:
+  15 channels differ at worst `|L - B| = 0.4944`, against 52 651 untouched pixels on the swarm's
+  equivalent.
+- **For:** `dev`, on `architect`'s say-so. Test fidelity, not a shipping risk.
+
+`a_lit_backdrop_survives_where_the_strokes_drew_nothing` asserts over pixels where the scene wrote
+**exactly** zero. For the swarm that is a 2-D region — a radial falloff over a square quad leaves
+~21 % of every sprite identically zero. For the line the falloff is one-dimensional and *quadratic*,
+so the exactly-zero band is the outermost sub-pixel sliver of the quad and only a handful of sample
+points land in it. The magnitude is unambiguous and the guard is genuinely non-vacuous, but the
+margin is 5 pixels, and no choice of `samples`/`scale`/`thickness` widens it — it is geometry. The
+test reports `borders_geometry` (2 407) so the real discriminating region is at least visible.
+
+**Do not take "a lit backdrop never darkens the frame"** as the stronger property: it is false
+post-fix at the stroke core, where `g = 1` and the backdrop is correctly extinguished, so it needs a
+fixture-brightness precondition and is fragile.
+
+**The clean version is a fourth capture at `glow = 0`** — the stroke draws and emits nothing, so the
+frame is exactly `bg * (1 - a)`. Pre-fix the fully-extinguished set is the whole quad footprint
+(thousands of pixels); post-fix it is the centreline only (tens). Assert a count ratio against the
+footprint measured from the lit capture. That is a 2-D region with a three-orders-of-magnitude
+margin, no coverage recovery, and no tolerance — and it needs neither a shader change nor a new
+fixture, only one more call to the harness the test already has. The same shape would strengthen the
+swarm guard at `brightness = 0`.
+
+Deferred rather than built at Plan 0051's close because the two seams share one blend constant, so
+the swarm guard already covers the mechanism; this buys resolution at the quiet seam.

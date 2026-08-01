@@ -1,14 +1,20 @@
 # 0051 — The scene seam emits premultiplied alpha: the swarm and the strokes stop punching holes in the backdrop
 
-> **Status:** **in-progress** — approved 2026-08-01, ready for `dev`. All three phases are `dev`; there is no
-> `human` phase and nothing gates it, so it can be taken in one session.
+> **Status:** **done** — closed 2026-08-01. All three phases landed on `main` in one session
+> (`708b80b` swarm seam + shared blend constant + guard, `63dd501` line seam + guard, `1828ac3`
+> docs). Mode 4 review: no blockers, one major (an operator-doc gap, fixed at close), four minor.
+> Verified at review rather than taken on report — the gate is green (fmt, clippy `-D warnings`,
+> 388/388), both guards were re-run (`|L - B|` 0.0002 swarm / 0.0000 lines), the line guard's
+> non-vacuity was confirmed by reverting the shader (15 channels at 0.4944), and both user-visible
+> repros were re-rendered clean. **One baseline moved** against this plan's prediction — see the
+> amendment in Decision. Two follow-ups routed to `docs/design-backlog.md` (0040, 0041).
 > **Created:** 2026-07-31
 > **Owner skill(s):** dev
-> **Related ADRs:** [0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) (this plan's
-> decision), [0055](../adrs/0055-backdrop-leaves-the-post-chain.md) (the premultiplied chain whose
+> **Related ADRs:** [0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) (this plan's
+> decision), [0055](../../adrs/0055-backdrop-leaves-the-post-chain.md) (the premultiplied chain whose
 > first Negative bullet this is the third instance of),
-> [0026](../adrs/0026-full-composite-coverage-fullscreen-scenes.md) (the scene-seam convention
-> being completed). Follows [Plan 0045](done/0045-linear-light-and-bloom.md), which caused the
+> [0026](../../adrs/0026-full-composite-coverage-fullscreen-scenes.md) (the scene-seam convention
+> being completed). Follows [Plan 0045](0045-linear-light-and-bloom.md), which caused the
 > visibility.
 
 ## TL;DR
@@ -60,7 +66,7 @@ presets — at exactly the `bg_bright > 0` setting the library tests least and s
 
 ## Decision
 
-Per [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md): each affected fragment
+Per [ADR-0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md): each affected fragment
 shader emits premultiplied alpha equal to its own coverage, and the alpha blend component becomes
 `One` / `OneMinusSrcAlpha` so accumulation is `a + a_dst * (1 - a)` — monotone and bounded in
 `[0, 1]` **by construction**, which makes the over-1 alpha that caused Phase 4b's defect
@@ -78,6 +84,17 @@ anywhere in the chain — no pass un-premultiplies, and `post.rs:265` / `kaleido
 write down the argument — so at `bg_bright = 0` the resolve reduces to `src` in every channel
 whatever the alpha is. This is a behaviour change that is provably a no-op on the entire existing
 baseline set.
+
+> **Amendment (2026-08-01, at close): one baseline moved.** The argument above is sound. The
+> **survey** under it is not — the Context section's "every golden baseline for these scenes runs
+> `bg_bright = 0`" is false. `core/tests/fixtures/composite_kaleido.toml` runs `bg_bright = 0.55`
+> and is a line scene over a lit vignette, i.e. the one baseline positioned to see this fix. It
+> moved at mean 0.0009 against a 0.02 tolerance, with only the outlier gate firing (73 against 48),
+> and was re-blessed deliberately with the numbers and an eyes-on description recorded in the
+> fixture header. Every other baseline re-encoded byte-identical. Worth noting twice over: that
+> baseline could not have caught the defect when it shipped either, because a mean-drift gate
+> cannot resolve a hairline rim. See [ADR-0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)'s
+> Outcome section.
 
 ## Architecture diagram
 

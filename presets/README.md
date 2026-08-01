@@ -504,6 +504,23 @@ families sit at a near-black floor. That constraint is gone
 ([ADR-0056](../docs/adrs/0056-additive-scenes-emit-premultiplied-alpha.md)); the
 values themselves were not re-tuned.
 
+**The ceiling on `bg_bright` moved rather than disappeared, and the new one is
+worth knowing before you raise it.** A scene that draws into the chain occludes
+the backdrop by its **coverage**, whatever light it emits — the frame resolves
+`c * g + bg * (1 - g)`, so a fragment *darkens* the backdrop wherever its own
+light `c` is dimmer than the backdrop `bg`. Raise `bg_bright` past the **dimmest**
+emitted luminance in the figure and the dim parts stop fading out and start
+reading as dark speckle: on the swarm, the depth-parallaxed far particles go
+first; on a line scene, a stroke dimmed by `glow` or by a low-amplitude band.
+Rendered at `bg_bright = 0.35`, a swarm at `brightness = 0.02` is black specks on
+a lit field. So the working limit is the darkest part of the figure you still
+want visible, not a fixed number — sweep it and look, do not assume.
+
+None of this is worse than before: pre-fix the whole sprite quad held the
+backdrop out, so every value is brighter now than it was. The question of whether
+additive light should occlude *at all* is a look decision left open in ADR-0056
+and carried in [`docs/design-backlog.md`](../docs/design-backlog.md).
+
 ### Geometry mirror (line systems) — `mirror_order`, `mirror_reflect`
 
 Replicates a line scene's segments under N-fold rotational symmetry to build a
