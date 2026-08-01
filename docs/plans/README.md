@@ -13,7 +13,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — **unblocked**: [0045] has landed and closed, so the linear-light pipeline this builds on exists; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **in-progress 2026-07-30** — Phases 1-5 (`dev`) landed and merged to `main` (`b06766b`), Mode 4 review done; **Phases 6-7 (`human`) owed**. Phase 6 is **no longer blocked** — [0049] built its instrument and closed | dev, human |
 | [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **draft 2026-07-30** — [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
-| [0051](0051-the-scene-seam-emits-premultiplied-alpha.md) | The scene seam emits premultiplied alpha: the swarm and the strokes stop punching holes in the backdrop | **draft 2026-07-31** — [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md); a **live regression** caused by [0045] Phase 2b and reproduced on two draw seams, so it is the next `dev` thing to take. Three phases, two shader lines and one blend state, and it **provably moves no golden** | dev |
+| [0051](0051-the-scene-seam-emits-premultiplied-alpha.md) | The scene seam emits premultiplied alpha: the swarm and the strokes stop punching holes in the backdrop | **approved 2026-08-01** — ready for `dev`, and it is the **next thing to take**: a **live regression** on the default path caused by [0045] Phase 2b, reproduced on two draw seams. [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md). Three phases, all `dev`, nothing gating: two shader lines and one blend state, and it **provably moves no golden** | dev |
 
 ## Recommended execution sequence
 
@@ -42,8 +42,12 @@ ADR-0050's stopping condition needs is the mean of that column). Play 2-3 real t
 the normalized levels ride the music without pumping or going numb, record the lock rate, then
 Phase 7 → [0048] closes.
 
-**[0045] has landed and closed** (2026-07-31) — see Recently closed. **What it left behind is
-[0051], and that is the next `dev` thing to take.** Phase 2b made the scene→chain seam's alpha
+**[0051] is approved (2026-08-01) and is the next thing for `dev` to take.** All three phases are
+`dev`, nothing gates it, and it is a live regression on the default path rather than a feature — so
+it does not queue behind [0046] or [0050].
+
+It is what [0045] left behind. **[0045] has landed and closed** (2026-07-31) — see Recently
+closed. Phase 2b made the scene→chain seam's alpha
 load-bearing, and two additive draw pipelines emit a hard `1.0` alpha across their whole quad, so a
 lit backdrop is punched to black around every swarm sprite and every stroke. It reproduces on
 unmodified presets from history and is visible live. Every swarm and line golden runs

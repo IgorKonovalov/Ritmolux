@@ -1,6 +1,7 @@
 # 0051 — The scene seam emits premultiplied alpha: the swarm and the strokes stop punching holes in the backdrop
 
-> **Status:** draft
+> **Status:** **approved 2026-08-01** — ready for `dev`. All three phases are `dev`; there is no
+> `human` phase and nothing gates it, so it can be taken in one session.
 > **Created:** 2026-07-31
 > **Owner skill(s):** dev
 > **Related ADRs:** [0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) (this plan's
