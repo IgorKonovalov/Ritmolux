@@ -1,6 +1,7 @@
 # 0052 — The emitter: objects that spawn, fall on a parabola, and die
 
-> **Status:** **draft** — created 2026-08-01. All four phases are `dev`; nothing gates it.
+> **Status:** **approved 2026-08-02** — ready for `dev`. All four phases are `dev`; nothing gates
+> it, so it runs start-to-finish in one session.
 > **Created:** 2026-08-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)

@@ -1,7 +1,7 @@
 # 0054 — The line scenes catch up: every one honours the palette, and the star stops cutting between shapes
 
-> **Status:** **draft** — created 2026-08-01. All four phases are `dev`; nothing gates it, so it
-> can be taken in one session.
+> **Status:** **approved 2026-08-02** — ready for `dev`. All four phases are `dev`; nothing gates
+> it, so it can be taken in one session.
 > **Created:** 2026-08-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md) (the

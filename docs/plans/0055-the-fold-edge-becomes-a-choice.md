@@ -1,6 +1,8 @@
 # 0055 — The fold edge becomes a choice: five treatments behind one stepped param, decided in motion
 
-> **Status:** draft
+> **Status:** **approved 2026-08-02** — ready for `dev`. Four phases; Phase 2 is `human` (a live
+> in-motion A/B) and gates Phases 3-4, so this plan does **not** run start-to-finish in one
+> session. Phase 1 is self-contained and moves no golden.
 > **Created:** 2026-08-02
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)
