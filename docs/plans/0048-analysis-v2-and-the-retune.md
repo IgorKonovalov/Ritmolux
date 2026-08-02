@@ -1,6 +1,11 @@
 # 0048 — Analysis v2: the dual-resolution axis, normalized bands, phrase time, and the one retune that pays for all of it
 
-> **Status:** in-progress 2026-07-30 (parallel lane against the render queue except one named touch; see file fence)
+> **Status:** in-progress — Phases 1-5 (`dev`) landed and merged; **Phase 6 (`human`) ran
+> 2026-08-02** and its verdicts are recorded below (normalization passes, no constant moves; the
+> downbeat estimator does not mis-accent but locks ~3 % of audible time, routed to
+> [backlog 0042](../design-backlog.md)). **Phase 7 (`human`, the library retune) is what remains**,
+> with the layer-2 qualification Phase 6 leaves it. Parallel lane against the render queue except
+> one named touch; see file fence.
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (axis + normalization),
@@ -160,6 +165,61 @@ no `Scene` change.
   explicitly sequenced to coordinate, and it is small.
 - `--report`'s historical numbers all shift meaning; Phase 5's regeneration is load-bearing
   for every future backlog entry that quotes a level.
+
+## Phase 6 results (2026-08-02, `human`)
+
+Run on the shipped `v0.28.1` release build through WASAPI loopback, diagnostics overlay on,
+**8.8 minutes** logged at 1 Hz — 517 rows, **458 with signal** — against roughly half
+beat-driven 4/4 material (the Plan 0037 Phase 4 trap/808 clip and similar) and half sparse.
+Numbers below are from `diagnostics.log`, not from impressions.
+
+**Normalization: passes. No constant moves.** Levels ride the music across material and use
+their range without pumping or going numb, confirmed both by eye and by the log:
+
+| | mean | median | min | max |
+|---|---|---|---|---|
+| `bass` | 0.421 | 0.363 | 0.007 | 1.000 |
+| `mid` | 0.408 | 0.351 | 0.000 | 1.000 |
+| `treb` | 0.220 | 0.142 | 0.000 | 1.000 |
+| `onset` | 0.198 | 0.138 | 0.000 | 1.000 |
+
+Each band reaches full scale and returns to near zero, with medians well below the means —
+the distribution of a signal tracking musical shape rather than one pinned by an AGC at
+either end. The release constant, named in the plan's risks as the one most likely to move,
+**stays**.
+
+**The downbeat estimator does not mis-accent — and it also barely locks.** The stopping
+condition did **not** fire: no confidently-wrong bar line was observed. But
+`downbeat_locked` was true in **14 of 458 rows with signal, 3.1 %**, and given the half-and-half
+material that is roughly **6 % over the beat-driven half**. Confidence sat at **mean 0.030,
+median 0.000** against `CONFIDENCE_THRESHOLD = 0.25` (`core/src/dsp/downbeat.rs:55`), clearing
+the gate in **two of eighteen** 30-second windows and peaking at **0.516** — twice the gate, so
+the estimator can lock; it just rarely does.
+
+**The absence of a mis-accent is therefore weak evidence, and this record says so.** With the
+gate shut 97 % of the time there was little opportunity for one. The stopping condition is
+un-fired, not passed.
+
+**What follows, and what deliberately does not.** `beat_in_bar` / `bar_index` / `bar_phase`
+were in counter-derived fallback for essentially the whole session, which is ADR-0050's
+designed safe floor working as specified — the worst case is the counters-only option the
+interview declined. So this is a shortfall, not a defect, and **no constant is named for
+`dev` to move**. In particular, lowering `CONFIDENCE_THRESHOLD` to buy lock rate is the one
+change this result must *not* be read as recommending: ADR-0050 exists because a confidently
+wrong beat 1 is the failure an author cannot work around, and trading the gate for coverage
+inverts that. Whether to improve the estimator or re-price the gate is an **ADR-0050
+supplement** — architect work, routed to [design-backlog 0042](../design-backlog.md).
+
+**Phase 7 inherits a qualification.** Its brief says to adopt `beat_index`/`bar_phase` "where
+a preset's arc wants them". Layer 1 (`beat_index`, `time_since_beat`) is unconditional and
+fully available. Layer 2 (`beat_in_bar`, `bar_index`, `bar_phase`) is, on this evidence,
+fallback almost always — so a preset built on it gets counter-derived values, not tracked
+ones. The retune should lean on layer 1 and treat layer 2 as decorative until the estimator
+earns its gate.
+
+**Field note, incidental:** the governor demoted `rich → floor` at startup on this display.
+Unrelated to analysis, but it is the [0044] Phase 4 / [backlog 0031](../design-backlog.md)
+question showing itself unprompted.
 
 ## What this plan does NOT do
 
