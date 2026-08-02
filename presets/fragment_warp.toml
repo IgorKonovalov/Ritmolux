@@ -28,22 +28,22 @@ stops = [
 
 [params]
 # STRUCTURE - the warp is the star, and it is what rises with energy.
-warp  = "1.05 + sin(time * 0.071) * 0.18 + clamp(treb * 2.2, 0, 1.10) + beat * 0.22"
-zoom  = "1.85 + sin(time * 0.113) * 0.14 + clamp(bass * 1.2, 0, 0.65) + clamp(onset * 0.7, 0, 0.22)"
+warp  = "1.05 + sin(time * 0.071) * 0.18 + clamp(treb * 1.83, 0, 1.10) + beat * 0.22"
+zoom  = "1.85 + sin(time * 0.113) * 0.14 + clamp(bass * 0.765, 0, 0.65) + clamp(onset * 0.367, 0, 0.22)"
 pan_x = "sin(time * 0.037) * 0.30 + time * 0.010"
 pan_y = "cos(time * 0.029) * 0.24"
 
 # LUMINANCE - held near flat, deliberately. See the ceiling note above.
-glow  = "0.78 + clamp(mid * 0.55, 0, 0.16)"
-flash = "clamp(onset * 0.9, 0, 0.30)"
+glow  = "0.78 + clamp(mid * 0.188, 0, 0.16)"
+flash = "clamp(onset * 0.5, 0, 0.30)"
 
 # COLOUR - the widest window in the set (this is the deliberate full-spread
 # preset), racing on time, crossfading into a harder neon gradient on treble.
-hue          = "0.70 + time * 0.043 + clamp(mid * 0.9, 0, 0.22)"
-color_span   = "0.92 + clamp(treb * 0.8, 0, 0.30)"
-color_center = "sin(time * 0.053) * 0.16 + clamp(bass * 0.5, 0, 0.12)"
-saturation   = "1.10 + clamp(treb * 0.9, 0, 0.25)"
-palette_mix  = "clamp(treb * 1.7, 0, 0.65)"
+hue          = "0.70 + time * 0.043 + clamp(mid * 0.26, 0, 0.22)"
+color_span   = "0.92 + clamp(treb * 0.5, 0, 0.30)"
+color_center = "sin(time * 0.053) * 0.16 + clamp(bass * 0.141, 0, 0.12)"
+saturation   = "1.10 + clamp(treb * 0.417, 0, 0.25)"
+palette_mix  = "clamp(treb * 1.08, 0, 0.65)"
 
 # COMPOSITE - a fold that steps through three orders with the energy, turning
 # on the clock. No `bg_*`: the fragment field draws fullscreen-opaque, so the
@@ -58,13 +58,13 @@ palette_mix  = "clamp(treb * 1.7, 0, 0.65)"
 # `shot --signal dynamic:110`, which prints it on every run.
 #
 # Placed inside that distribution rather than scaled down proportionally: the
-# sum's mean is ~0.046, so 0.055 sits just above it (six-fold on the louder
+# sum's typical value is ~0.64 on the v2 scale, so 0.80 sits just above it (six-fold on the louder
 # passages) and 0.10 near the top (twelve only on real peaks). Proportional
 # rescaling would have put both BELOW the mean and left the fold on constantly,
 # which is the same bug wearing the opposite sign.
-kaleido_order = "select(bass + treb > 0.10, 12, select(bass + treb > 0.055, 6, 1))"
+kaleido_order = "select(bass + treb > 1.45, 12, select(bass + treb > 0.80, 6, 1))"
 kaleido_angle = "time * 0.17"
-trails        = "clamp(onset * 0.8, 0, 0.34)"
+trails        = "clamp(onset * 0.567, 0, 0.34)"
 
 [smoothing]
 warp          = { attack = 0.02, release = 0.22 }

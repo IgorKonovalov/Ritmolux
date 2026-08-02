@@ -26,8 +26,8 @@ family = "maurer_rose"
 n             = "5"
 d             = "97"
 samples       = "420"
-phase         = "sin(time * 0.02) * 0.24 + clamp(bass * 9.0, 0, 0.38)"
-radial_offset = "sin(time * 0.0123) * 0.10 + clamp(mid * 12.0, 0, 0.18)"
+phase         = "sin(time * 0.02) * 0.24 + clamp(bass * 0.447, 0, 0.38)"
+radial_offset = "sin(time * 0.0123) * 0.10 + clamp(mid * 0.212, 0, 0.18)"
 
 # NO SPIN. The camera is this preset's whole subject - it pumps and pushes
 # through the figure - and a rotating subject underneath a moving camera reads
@@ -35,15 +35,15 @@ radial_offset = "sin(time * 0.0123) * 0.10 + clamp(mid * 12.0, 0, 0.18)"
 # thing moving the frame, which is what a zoom preset wants. `pan_x`/`pan_y`
 # still drift the viewpoint across the figure, so it is not a static shot.
 spin          = "0"
-scale         = "0.72 + clamp(bass * 7.0, 0, 0.24)"
+scale         = "0.72 + clamp(bass * 0.282, 0, 0.24)"
 draw_progress = "1"
 
 # Caps trimmed as well as gained. At this zoom the mirror is filling the frame
 # with replicated chords, so the figure is denser on screen than its segment
 # count suggests and luminance headroom is tighter than it looks.
-thickness  = "0.95 + clamp(bass * 9.0, 0, 0.40) + beat * 0.155"
-brightness = "0.62 + clamp(bass * 3.5, 0, 0.13)"
-hue        = "mod(0.72 + time * 0.028 + clamp(treb * 20.0, 0, 0.28), 1)"
+thickness  = "0.95 + clamp(bass * 0.47, 0, 0.40) + beat * 0.155"
+brightness = "0.62 + clamp(bass * 0.153, 0, 0.13)"
+hue        = "mod(0.72 + time * 0.028 + clamp(treb * 0.467, 0, 0.28), 1)"
 
 mirror_order   = "4"
 mirror_reflect = "0"
@@ -60,17 +60,17 @@ mirror_reflect = "0"
 # that were written against `--set` values and never fired. Left exactly as is;
 # `standalone/tests/shot_cli.rs` uses this preset as its tempo-gated fixture.
 # The bass term beside it is gained to the measured mean like everything else.
-zoom  = "select(tempo > 130, 2.75, 2.15) + clamp(bass * 16.0, 0, 0.85) + bar * 0.18"
+zoom  = "select(tempo > 130, 2.75, 2.15) + clamp(bass * 1, 0, 0.85) + bar * 0.18"
 pan_x = "sin(time * 0.083) * 0.14"
 pan_y = "cos(time * 0.06) * 0.11"
 
 # COMPOSITE - a feedback long enough that the pump leaves a visible tunnel.
 bg_hue      = "0.18 + sin(time * 0.013) * 0.05"
-bg_bright   = "0.018 + clamp(mid * 2.2, 0, 0.013)"
+bg_bright   = "0.018 + clamp(mid * 0.0153, 0, 0.013)"
 bg_vignette = "0.80"
 
 # FEEDBACK - restored at native resolution (Plan 0033).
-trails = "0.62 + clamp(bass * 3.0, 0, 0.10)"
+trails = "0.62 + clamp(bass * 0.118, 0, 0.10)"
 
 [smoothing]
 # A punchy pump that still eases - the canonical use of a short constant. This

@@ -26,7 +26,7 @@ family = "maurer_rose"
 # SHAPE - a seven-petal curve, morphing under the sweep.
 #
 # THE GAINS, and they are the fix the whole rose family needed. `bass` measures
-# a mean of 0.040 on real material (`shot --signal dynamic:110`), so the old
+# a raw mean of 0.040 before ADR-0049 normalized it to ~0.42, so the old
 # `bass * 0.4` capped at 0.11 delivered a swing of 0.016 radians on `phase` -
 # about a hundredth of the sine term sitting next to it. Every rose in the set
 # was written that way, which is why they reacted so little AND why they all
@@ -38,15 +38,29 @@ family = "maurer_rose"
 # than how bright it is. That is the additive-ceiling discipline and it is also
 # just the more interesting reading of the music.
 n             = "7"
-d             = "131 + clamp(treb * 90.0, 0, 6.0)"
+# A PHRASE, NOT JUST A BEAT (Plan 0048, ADR-0050 Layer 1). `d` is the angle step
+# that decides what a Maurer rose IS - move it and the figure is a different
+# figure, not the same one louder. Everything else in this preset repeats on the
+# beat, so it had no structure longer than one: `mod(beat_index, 16)` steps `d`
+# through four values, each held for four beats, and the figure works through a
+# 16-beat phrase before returning. `d` eases at 0.42 s (below), so each step
+# arrives as a glide rather than a cut.
+#
+# `beat_index` is Layer 1 - a plain monotone counter off the beat tracker,
+# published unconditionally and exact. The bar variables (`bar_phase`,
+# `beat_in_bar`) would read more musically here, but Plan 0048 Phase 6 measured
+# the downbeat estimator confident on only ~3 % of real material, so they are
+# counter-derived almost always and a 4-beat group built on them is not reliably
+# aligned to the actual bar. This is a phrase, deliberately not a bar.
+d             = "131 + clamp(treb * 10, 0, 6.0) + floor(mod(beat_index, 16) / 4) * 3"
 samples       = "420"
-phase         = "sin(time * 0.0215) * 0.26 + clamp(bass * 9.0, 0, 0.42)"
-radial_offset = "sin(time * 0.0123) * 0.11 + clamp(mid * 14.0, 0, 0.20)"
+phase         = "sin(time * 0.0215) * 0.26 + clamp(bass * 0.494, 0, 0.42)"
+radial_offset = "sin(time * 0.0123) * 0.11 + clamp(mid * 0.235, 0, 0.20)"
 
 # THE REVEAL - the point of the preset. A floor of 0.35 keeps the figure
 # present; the bar ramp sweeps the leading edge round it once per beat, and a
 # hard onset briefly completes it.
-draw_progress = "clamp(0.35 + bar * 0.80 + clamp(onset * 0.8, 0, 0.25), 0, 1)"
+draw_progress = "clamp(0.35 + bar * 0.80 + clamp(onset * 0.417, 0, 0.25), 0, 1)"
 
 # MOTION - a slow turn under the sweep, so the two rates beat against each other.
 # NO SPIN. `spin` is angular velocity - the scene integrates `rotation = spin *
@@ -59,17 +73,17 @@ draw_progress = "clamp(0.35 + bar * 0.80 + clamp(onset * 0.8, 0, 0.25), 0, 1)"
 # seven-fold figure is near-indistinguishable from itself a moment later. Losing
 # the turn actually makes the sweep easier to see.
 spin  = "0"
-scale = "0.70 + beat * 0.043 + clamp(bass * 8.0, 0, 0.26)"
+scale = "0.70 + beat * 0.043 + clamp(bass * 0.306, 0, 0.26)"
 
 # STROKE - flat brightness; the reveal supplies the dynamics. Gained to the
 # measured means but the CAPS barely move: this preset draws seven mirrored
 # copies additively into a long feedback buffer, so luminance headroom is the
 # scarcest thing it has. Structure got the peak energy above.
-thickness  = "0.72 + clamp(bass * 7.0, 0, 0.28) + beat * 0.074"
-brightness = "0.46 + clamp(bass * 3.0, 0, 0.12)"
+thickness  = "0.72 + clamp(bass * 0.33, 0, 0.28) + beat * 0.074"
+brightness = "0.46 + clamp(bass * 0.141, 0, 0.12)"
 
 # COLOUR - a slow green-to-cyan journey, swept by treble.
-hue = "mod(0.35 + time * 0.030 + clamp(treb * 22.0, 0, 0.30) + bar * 0.05, 1)"
+hue = "mod(0.35 + time * 0.030 + clamp(treb * 0.5, 0, 0.30) + bar * 0.05, 1)"
 
 # GEOMETRY MIRROR - seven-fold to match the petal count, purely rotational.
 mirror_order   = "7"
@@ -77,15 +91,15 @@ mirror_reflect = "0"
 
 # VIEW + COMPOSITE - a long feedback, which is what makes the sweep legible:
 # the drawn part persists as the leading edge moves on.
-zoom        = "1.06 + bar * 0.06 + clamp(bass * 5.0, 0, 0.18)"
+zoom        = "1.06 + bar * 0.06 + clamp(bass * 0.212, 0, 0.18)"
 pan_x       = "sin(time * 0.021) * 0.045"
 pan_y       = "cos(time * 0.029) * 0.035"
 bg_hue      = "0.44 + sin(time * 0.011) * 0.05"
-bg_bright   = "0.018 + clamp(mid * 2.0, 0, 0.012)"
+bg_bright   = "0.018 + clamp(mid * 0.0141, 0, 0.012)"
 bg_vignette = "0.82"
 
 # FEEDBACK - restored (Plan 0033). Held back: a seven-fold mirror sweeps a lot of area per frame.
-trails = "0.55 + clamp(mid * 8.0, 0, 0.12)"
+trails = "0.55 + clamp(mid * 0.141, 0, 0.12)"
 
 [smoothing]
 # `draw_progress` is NOT smoothed - easing it would blur the leading edge into

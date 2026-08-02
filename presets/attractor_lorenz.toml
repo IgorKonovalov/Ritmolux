@@ -32,9 +32,9 @@ name = "ember"
 
 [params]
 # SHAPE - canonical Lorenz; `d` is unused by this family.
-a = "10.0 + sin(time * 0.0290) * 0.55 + clamp(mid * 1.6, 0, 0.85)"
-b = "28.0 + cos(time * 0.0217) * 1.30 + clamp(bass * 5.0, 0, 2.60)"
-c = "2.667 + sin(time * 0.0173) * 0.075 - clamp(treb * 0.30, 0, 0.060)"
+a = "10.0 + sin(time * 0.0290) * 0.55 + clamp(mid * 1, 0, 0.85)"
+b = "28.0 + cos(time * 0.0217) * 1.30 + clamp(bass * 3.06, 0, 2.60)"
+c = "2.667 + sin(time * 0.0173) * 0.075 - clamp(treb * 0.1, 0, 0.060)"
 
 # DENSITY - the family rule, plus a tempo split: the fast personality runs a
 # shorter exposure and a finer point, so quick material reads as a hard strobe
@@ -46,21 +46,21 @@ c = "2.667 + sin(time * 0.0173) * 0.075 - clamp(treb * 0.30, 0, 0.060)"
 # particles collapse onto a thin sheet, so ~17 accumulated frames (fade 0.94)
 # saturate the lobe cores to flat white no matter how fine the nib is; ~4
 # frames is what keeps the sheet reading as filaments.
-fade   = "select(tempo > 124, 0.680, 0.760) - clamp(bass * 0.10, 0, 0.045) - beat * 0.015"
-size   = "select(tempo > 124, 0.30, 0.40) - clamp(bass * 0.08, 0, 0.09) + beat * 0.05"
-# MEASURED. Read 0.48 and never fired - `onset` is raw spectral flux peaking at
+fade   = "select(tempo > 124, 0.680, 0.760) - clamp(bass * 0.053, 0, 0.045) - beat * 0.015"
+size   = "select(tempo > 124, 0.30, 0.40) - clamp(bass * 0.106, 0, 0.09) + beat * 0.05"
+# MEASURED. Read 0.48 and never fired - `onset` was then raw spectral flux peaking at
 # 0.016, not a 0..1 envelope. Rank preserved within the family.
-reseed = "onset > 0.010"
+reseed = "onset > 0.62"
 
 # COLOUR - the fast personality heats toward `ember` and widens; the slow one
 # stays a cool, cohesive single family.
 # The centre sits LOW in the gradient on purpose. Lorenz's sheet overlaps
 # additively, so the dense cores climb to white on their own - keeping the base
 # down in the night-blue is what leaves anywhere for them to climb to.
-hue_spread  = "select(tempo > 124, 0.30, 0.14) + clamp(treb * 0.7, 0, 0.14)"
-hue_center  = "0.20 + sin(time * 0.031) * 0.07 + clamp(bass * 0.8, 0, 0.16)"
-saturation  = "1.15 + clamp(mid * 1.4, 0, 0.32)"
-palette_mix = "select(tempo > 124, 0.55, 0.05) + clamp(bass * 0.6, 0, 0.15)"
+hue_spread  = "select(tempo > 124, 0.30, 0.14) + clamp(treb * 0.233, 0, 0.14)"
+hue_center  = "0.20 + sin(time * 0.031) * 0.07 + clamp(bass * 0.188, 0, 0.16)"
+saturation  = "1.15 + clamp(mid * 0.376, 0, 0.32)"
+palette_mix = "select(tempo > 124, 0.55, 0.05) + clamp(bass * 0.176, 0, 0.15)"
 
 # VIEW - the fast personality pushes in hard and pumps per beat; the slow one
 # sits back and breathes on the bar.
@@ -68,14 +68,14 @@ palette_mix = "select(tempo > 124, 0.55, 0.05) + clamp(bass * 0.6, 0, 0.15)"
 # density control: Lorenz collapses onto a thin sheet, so spreading it across
 # more pixels is what resolves filaments where a smaller nib just makes a
 # dimmer blob.
-zoom  = "select(tempo > 124, 1.85, 1.55) + bar * 0.16 + clamp(bass * 0.8, 0, 0.34)"
+zoom  = "select(tempo > 124, 1.85, 1.55) + bar * 0.16 + clamp(bass * 0.4, 0, 0.34)"
 pan_x = "-0.16 + sin(time * 0.039) * 0.08"
 pan_y = "cos(time * 0.028) * 0.06"
 
 # COMPOSITE - a cold backdrop that warms with the mix, and a two-fold screen
 # fold that only engages on the fast personality WITH real energy behind it.
-bg_hue        = "0.30 + clamp(bass * 0.5, 0, 0.10)"
-bg_bright     = "0.04 + clamp(mid * 0.35, 0, 0.045)"
+bg_hue        = "0.30 + clamp(bass * 0.118, 0, 0.10)"
+bg_bright     = "0.04 + clamp(mid * 0.053, 0, 0.045)"
 bg_vignette   = "0.88"
 # THE BAND HALF WAS DEAD BEHIND THE TEMPO HALF. `bass + treb > 0.38` cannot be
 # reached - the sum tops out near 0.138 - so this fold would not have engaged
@@ -83,7 +83,7 @@ bg_vignette   = "0.88"
 # the `tempo` half, which is legitimately one-sided under a single-BPM probe,
 # so the dead half hid behind the excusable one. 0.10 is the same near-peak
 # placement used by Warp Drive's top tier.
-kaleido_order = "select(min(tempo > 124, bass + treb > 0.10), 4, 1)"
+kaleido_order = "select(min(tempo > 124, bass + treb > 1.20), 4, 1)"
 kaleido_angle = "time * 0.11"
 
 [smoothing]

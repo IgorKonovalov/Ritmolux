@@ -13,35 +13,35 @@ family = "maurer_rose"
 [params]
 # THE SHAPE IS THE INSTRUMENT. Gains are against measured peaks (bass 0.106,
 # mid 0.019, treb 0.032) - that is why the multipliers look large.
-n = "4.0 + clamp(bass * 26.0, 0, 2.6) + sin(time * 0.019) * 1.2"
-d = "71.0 + clamp(mid * 700.0, 0, 16.0) + sin(time * 0.013) * 9.0"
-radial_offset = "clamp(bass * 2.4, 0, 0.22) * sin(time * 0.047)"
+n = "4.0 + clamp(bass * 3.06, 0, 2.6) + sin(time * 0.019) * 1.2"
+d = "71.0 + clamp(mid * 18.82, 0, 16.0) + sin(time * 0.013) * 9.0"
+radial_offset = "clamp(bass * 0.26, 0, 0.22) * sin(time * 0.047)"
 samples = "760"
 phase = "time * 0.041"
 
 # STROKE - thin and hot. Luminance stays nearly flat; peak energy went into the
 # shape numbers above, which is what keeps a loud frame legible instead of white.
-thickness  = "0.42 + clamp(bass * 2.2, 0, 0.30) + beat * 0.10"
-brightness = "0.34 + clamp(mid * 4.0, 0, 0.10)"
-glow       = "0.55 + clamp(treb * 3.0, 0, 0.16)"
-hue        = "0.55 + time * 0.021 + clamp(treb * 6.0, 0, 0.24) + bar * 0.05"
+thickness  = "0.42 + clamp(bass * 0.353, 0, 0.30) + beat * 0.10"
+brightness = "0.34 + clamp(mid * 0.118, 0, 0.10)"
+glow       = "0.55 + clamp(treb * 0.267, 0, 0.16)"
+hue        = "0.55 + time * 0.021 + clamp(treb * 0.4, 0, 0.24) + bar * 0.05"
 
-spin  = "0.075 + clamp(bass * 1.6, 0, 0.13)"
-scale = "0.86 + clamp(bass * 1.6, 0, 0.14) + sin(time * 0.029) * 0.05"
-draw_progress = "clamp(0.62 + bar * 0.46 + clamp(onset * 18.0, 0, 0.28), 0, 1)"
+spin  = "0.075 + clamp(bass * 0.153, 0, 0.13)"
+scale = "0.86 + clamp(bass * 0.165, 0, 0.14) + sin(time * 0.029) * 0.05"
+draw_progress = "clamp(0.62 + bar * 0.46 + clamp(onset * 0.467, 0, 0.28), 0, 1)"
 
 mirror_order   = "4"
 mirror_reflect = "1"
 
-zoom  = "1.04 + bar * 0.06 + clamp(bass * 2.2, 0, 0.14)"
+zoom  = "1.04 + bar * 0.06 + clamp(bass * 0.165, 0, 0.14)"
 pan_x = "sin(time * 0.0130) * 0.04"
 pan_y = "cos(time * 0.0170) * 0.03"
 
-kaleido_order = "select(bass + treb > 0.085, 6, 3)"
+kaleido_order = "select(bass + treb > 1.23, 6, 3)"
 kaleido_angle = "time * 0.085"
-trails        = "0.44 + clamp(mid * 4.0, 0, 0.10)"
+trails        = "0.44 + clamp(mid * 0.118, 0, 0.10)"
 bg_hue        = "0.72 + sin(time * 0.011) * 0.07"
-bg_bright     = "0.016 + clamp((bass + mid) * 0.12, 0, 0.020)"
+bg_bright     = "0.016 + clamp((bass + mid) * 0.0118, 0, 0.020)"
 bg_vignette   = "0.80"
 
 [smoothing]

@@ -73,11 +73,11 @@ name = "ice"
 # maze. This is also the most delicate regime of the four: the multipliers on
 # feed/kill are SMALL on purpose, because pushed too far it does not get
 # livelier, it goes uniform and the frame empties.
-feed   = "0.0235 + sin(time * 0.035) * 0.0012 + clamp(bass * 9.0, 0, 1) * 0.0016"
+feed   = "0.0235 + sin(time * 0.035) * 0.0012 + clamp(bass * 1.18, 0, 1) * 0.0016"
 # Centred and bounded, as everywhere in this family now - swinging both ways
 # about the base rather than only upward, and under ~0.0020 total excursion.
-kill   = "0.0540 + cos(time * 0.026) * 0.0006 + (sin(bar * pi) - 0.5) * 0.0008 + clamp(mid * 12.0, 0, 1) * 0.0007"
-flow   = "1.00 + clamp(treb * 14.0, 0, 1) * 0.30"
+kill   = "0.0540 + cos(time * 0.026) * 0.0006 + (sin(bar * pi) - 0.5) * 0.0008 + clamp(mid * 1.18, 0, 1) * 0.0007"
+flow   = "1.00 + clamp(treb * 1.67, 0, 1) * 0.30"
 inject = "beat"
 
 # THE FAST LEVERS - where the beat actually reads, since the chemistry takes
@@ -86,9 +86,9 @@ inject = "beat"
 # dark substrate the opposite holds: every extra iso-line is another bright mark,
 # so restraint is what keeps the fronds reading as separate glowing strands
 # rather than as glare.
-contour = "3.0 + sin(time * 0.51) * 1.6 + clamp(treb * 60.0, 0, 3.0) + beat * 1.4"
-hatch   = "2.6 + sin(time * 0.29) * 0.8 + clamp(mid * 30.0, 0, 1.4)"
-glow    = "0.62 + clamp((bass + mid) * 5.0, 0, 0.40)"
+contour = "3.0 + sin(time * 0.51) * 1.6 + clamp(treb * 5, 0, 3.0) + beat * 1.4"
+hatch   = "2.6 + sin(time * 0.29) * 0.8 + clamp(mid * 1.65, 0, 1.4)"
+glow    = "0.62 + clamp((bass + mid) * 0.235, 0, 0.40)"
 
 # VIEW - UNPINNED (Plan 0033), and this is the lever the family used to lack.
 # The Gray-Scott field is finite but TOROIDAL, and the present sampler now
@@ -97,7 +97,7 @@ glow    = "0.62 + clamp((bass + mid) * 5.0, 0, 0.40)"
 # Catmull-Rom reconstruction landed in the same plan, so it no longer reads as
 # angular pixel blobs), above 1.0 tiles. Keep zoom under ~1.3 - past that the
 # repeat becomes legible as wallpaper rather than as more field.
-zoom  = "0.74 + sin(time * 0.017) * 0.07 + clamp(bass * 3.0, 0, 0.14)"
+zoom  = "0.74 + sin(time * 0.017) * 0.07 + clamp(bass * 0.165, 0, 0.14)"
 pan_x = "time * -0.011 + sin(time * 0.010) * 0.05"
 pan_y = "cos(time * 0.008) * 0.045"
 
@@ -106,22 +106,22 @@ pan_y = "cos(time * 0.008) * 0.045"
 # remap reads; with no remap downstream, saturation in the source survives
 # straight into the fronds instead of being crushed, and a desaturated field
 # would simply print grey ones.
-color_span   = "0.88 + clamp(mid * 14.0, 0, 0.18)"
+color_span   = "0.88 + clamp(mid * 0.212, 0, 0.18)"
 color_center = "sin(time * 0.44) * 0.07"
-saturation   = "0.95 + clamp(treb * 12.0, 0, 0.22)"
-palette_mix  = "clamp(bass * 10.0, 0, 0.45)"
+saturation   = "0.95 + clamp(treb * 0.367, 0, 0.22)"
+palette_mix  = "clamp(bass * 0.53, 0, 0.45)"
 
 # BACKDROP - carrying here where the ink version had none. Against a white page
 # a background pass is invisible; against a dark one it is the only thing giving
 # the frame depth behind the fronds.
 bg_hue      = "0.60 + sin(time * 0.009) * 0.04"
-bg_bright   = "0.016 + clamp(mid * 2.0, 0, 0.010)"
+bg_bright   = "0.016 + clamp(mid * 0.0118, 0, 0.010)"
 bg_vignette = "0.70"
 
 # FEEDBACK - the ink version ran none, since a print does not smear. On a dark
 # field a short tail reads as the fronds having grown INTO where they are, which
 # suits a chemistry whose whole point is that it never settles.
-trails = "0.44 + clamp(mid * 8.0, 0, 0.12)"
+trails = "0.44 + clamp(mid * 0.141, 0, 0.12)"
 
 [smoothing]
 contour     = { attack = 0.02, release = 0.34 }

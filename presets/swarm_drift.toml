@@ -50,7 +50,7 @@ stops = [
 # punching on beats, which is exactly the slow nebula this preset is for. Storm
 # takes the transients, Flow takes the top end, Drift takes the middle.
 #
-# The gains are against MEASURED levels (`--signal dynamic:110`: mid mean 0.006,
+# The gains are against MEASURED levels (v2, normalized: mid typically ~0.41,
 # max 0.019), which is why the multipliers look enormous next to what was here.
 # They are not hot - they are simply the size a mid term has to be to reach its
 # own cap. The old `mid * 0.7` capped at 0.15 moved `spin` by about 0.004 on a
@@ -92,8 +92,8 @@ stops = [
 # documented in `swarm_dense.toml`: the three calm swarms used to sit within
 # 20 % of each other on every lever, so they read as one preset regardless of
 # which band drove them. Drift takes the large-sprite, near-frozen end.
-force = "1.20 + sin(time * 0.037) * 0.16 + cos(time * 0.023) * 0.10 + clamp(mid * 18.0, 0, 0.40)"
-spin  = "0.040 + sin(time * 0.019) * 0.010 + clamp(mid * 2.6, 0, 0.035)"
+force = "1.20 + sin(time * 0.037) * 0.16 + cos(time * 0.023) * 0.10 + clamp(mid * 0.47, 0, 0.40)"
+spin  = "0.040 + sin(time * 0.019) * 0.010 + clamp(mid * 0.041, 0, 0.035)"
 
 # STRUCTURE - `field_freq` is new in Plan 0043 and it is the lever this preset
 # had been missing. `spin` says how fast the streamlines are rewritten and Drift
@@ -111,10 +111,10 @@ spin  = "0.040 + sin(time * 0.019) * 0.010 + clamp(mid * 2.6, 0, 0.035)"
 # the field, so the nebula draws itself into visible channels as the pads swell
 # and relaxes back into a wash when they fall away. That is a structural response
 # to music, which this family could not express before.
-field_freq = "1.90 + sin(time * 0.029) * 0.42 + cos(time * 0.017) * 0.16 + clamp(mid * 26.0, 0, 0.55)"
+field_freq = "1.90 + sin(time * 0.029) * 0.42 + cos(time * 0.017) * 0.16 + clamp(mid * 0.65, 0, 0.55)"
 # Deliberately the weakest burst of the three: a transient here should ripple
 # through the cloud, not detonate inside it.
-burst = "clamp(beat * 0.5 + clamp(onset * 0.9, 0, 0.5), 0, 1.1)"
+burst = "clamp(beat * 0.5 + clamp(onset * 0.83, 0, 0.5), 0, 1.1)"
 
 # APPEARANCE - `size` goes back UP to 2.20, and the reasoning that had pulled it
 # down to ~1.05 needs correcting rather than deleting, because it was half
@@ -144,14 +144,14 @@ burst = "clamp(beat * 0.5 + clamp(onset * 0.9, 0, 0.5), 0, 1.1)"
 # moment; and each particle is now faded by its depth, which costs the far half
 # of the swarm roughly half its brightness. A file carried over unchanged reads
 # dimmer and sparser than it did, and the fix is here rather than in the engine.
-brightness = "0.96 + clamp(mid * 16.0, 0, 0.20)"
-size       = "2.55 + sin(time * 0.031) * 0.26 + clamp(mid * 14.0, 0, 0.35) + sin(bar * pi) * 0.16"
+brightness = "0.96 + clamp(mid * 0.235, 0, 0.20)"
+size       = "2.55 + sin(time * 0.031) * 0.26 + clamp(mid * 0.41, 0, 0.35) + sin(bar * pi) * 0.16"
 
 # COLOUR - the slowest hue journey in the set: a full slow wander through the
 # aurora band, crossfading into a violet-to-amber gradient over minutes.
-hue_spread  = "0.34 + sin(time * 0.017) * 0.10 + clamp(treb * 12.0, 0, 0.20)"
-hue_center  = "0.62 + sin(time * 0.0130) * 0.16 + clamp(mid * 18.0, 0, 0.14)"
-saturation  = "0.94 + clamp(treb * 16.0, 0, 0.24)"
+hue_spread  = "0.34 + sin(time * 0.017) * 0.10 + clamp(treb * 0.333, 0, 0.20)"
+hue_center  = "0.62 + sin(time * 0.0130) * 0.16 + clamp(mid * 0.165, 0, 0.14)"
+saturation  = "0.94 + clamp(treb * 0.4, 0, 0.24)"
 palette_mix = "0.5 + sin(time * 0.0091) * 0.45"
 
 # VIEW - a very slow wander, and since Plan 0043 it is a REAL parallax rather
@@ -175,7 +175,7 @@ palette_mix = "0.5 + sin(time * 0.0091) * 0.45"
 # base sits at 1.04 with a 0.05 swing rather than being pulled back further.
 # Trading pan for zoom is the move if a future edit wants genuine empty space -
 # at pan 0.10 the same expression clears down to about 0.94.
-zoom  = "1.04 + sin(time * 0.021) * 0.05 + bar * 0.04 + clamp(bass * 4.0, 0, 0.12)"
+zoom  = "1.04 + sin(time * 0.021) * 0.05 + bar * 0.04 + clamp(bass * 0.141, 0, 0.12)"
 pan_x = "sin(time * 0.0170) * 0.16"
 pan_y = "cos(time * 0.0113) * 0.11"
 
@@ -184,9 +184,9 @@ pan_y = "cos(time * 0.0113) * 0.11"
 # Lengthened. Persistence is what draws each bird's flight PATH rather than its
 # position, and on a coherent field those paths are parallel - which is most of
 # what makes a flock legible as a flock in a still frame.
-trails      = "0.86 + clamp(mid * 6.0, 0, 0.06)"
+trails      = "0.86 + clamp(mid * 0.0706, 0, 0.06)"
 bg_hue      = "0.17 + sin(time * 0.0083) * 0.06"
-bg_bright   = "0.012 + clamp(mid * 2.0, 0, 0.010)"
+bg_bright   = "0.012 + clamp(mid * 0.0118, 0, 0.010)"
 bg_vignette = "0.68"
 
 [smoothing]

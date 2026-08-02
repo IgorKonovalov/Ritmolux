@@ -21,28 +21,29 @@ stops = [
 [params]
 # STRUCTURE carries all the peak energy. `zoom` is INVERTED here - higher shows
 # MORE field, so a drop reads as finer, busier cells rather than a brighter blur.
-warp  = "1.55 + sin(time * 0.089) * 0.30 + clamp(treb * 9.0, 0, 1.30) + beat * 0.30"
-zoom  = "2.40 + sin(time * 0.127) * 0.22 + clamp(bass * 5.5, 0, 0.90) + clamp(onset * 9.0, 0, 0.30)"
+warp  = "1.55 + sin(time * 0.089) * 0.30 + clamp(treb * 2.17, 0, 1.30) + beat * 0.30"
+zoom  = "2.40 + sin(time * 0.127) * 0.22 + clamp(bass * 1.06, 0, 0.90) + clamp(onset * 0.5, 0, 0.30)"
 pan_x = "sin(time * 0.043) * 0.35 + time * 0.017"
 pan_y = "cos(time * 0.031) * 0.28"
 
 # LUMINANCE held nearly flat - the additive ceiling is what erases a look like
 # this, and the fold below stacks brightness on top of whatever is here.
-glow  = "0.74 + clamp(mid * 5.0, 0, 0.14)"
-flash = "clamp(onset * 8.0, 0, 0.22)"
+glow  = "0.74 + clamp(mid * 0.165, 0, 0.14)"
+flash = "clamp(onset * 0.367, 0, 0.22)"
 
 # COLOUR - the widest window the scene allows, racing on the clock.
-hue          = "0.20 + time * 0.061 + clamp(mid * 8.0, 0, 0.20)"
-color_span   = "1.00 + clamp(treb * 7.0, 0, 0.28)"
-color_center = "sin(time * 0.049) * 0.22 + clamp(bass * 1.6, 0, 0.14)"
-saturation   = "1.25 + clamp(treb * 8.0, 0, 0.24)"
-palette_mix  = "0.35 + sin(time * 0.0170) * 0.35 + clamp(treb * 6.0, 0, 0.22)"
+hue          = "0.20 + time * 0.061 + clamp(mid * 0.235, 0, 0.20)"
+color_span   = "1.00 + clamp(treb * 0.467, 0, 0.28)"
+color_center = "sin(time * 0.049) * 0.22 + clamp(bass * 0.165, 0, 0.14)"
+saturation   = "1.25 + clamp(treb * 0.4, 0, 0.24)"
+palette_mix  = "0.35 + sin(time * 0.0170) * 0.35 + clamp(treb * 0.367, 0, 0.22)"
 
-# THE FOLD - three orders, thresholds against measured levels (bass+treb peaks
-# near 0.138, mean 0.046).
-kaleido_order = "select(bass + treb > 0.095, 16, select(bass + treb > 0.055, 8, 3))"
+# THE FOLD - three orders. The thresholds sit where they always did as a
+# fraction of the range; ADR-0049 changed what that range is (bass+treb now
+# spans 0..2 with a typical near 0.64, where it used to peak at 0.138).
+kaleido_order = "select(bass + treb > 1.38, 16, select(bass + treb > 0.80, 8, 3))"
 kaleido_angle = "time * 0.145"
-trails        = "0.42 + clamp(onset * 12.0, 0, 0.26)"
+trails        = "0.42 + clamp(onset * 0.433, 0, 0.26)"
 
 [smoothing]
 warp          = { attack = 0.02, release = 0.26 }
