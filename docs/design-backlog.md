@@ -2258,3 +2258,121 @@ instead.
 layer 2 as decorative — recorded in that plan's Phase 6 results. **Do not re-measure by ear**: the
 1 Hz `downbeat_locked` column is the instrument, and a targeted pass on known-4/4 material only
 would sharpen the 6 % figure the half-and-half split leaves approximate.
+
+---
+
+## Entries 0043-0045 — the 2026-08-02 `preset-author` batch (sixth), from Plan 0048 Phase 7 (the library retune)
+
+## 0043 — every reactivity instrument we have diffs against **silence**, so a binding saturated just above the noise floor reads as maximally reactive
+
+- **Raised:** 2026-08-02, from `preset-author`, running [Plan 0048](plans/0048-analysis-v2-and-the-retune.md)
+  Phase 7.
+- **Verified against code:** yes — `core/tests/reactivity.rs`, and the two per-band blocks in
+  `--report` (`standalone/examples/shot.rs`).
+- **Cost when it bit:** it hid ~79 % of the retune's actual work list behind a green suite and a
+  clean report, and 14 shipped presets were audio-static for the whole window between ADR-0049
+  landing and Phase 7 running.
+
+**What happened.** ADR-0049 multiplied the four headline levels by 16-96x. Every gain in the
+library was written against the old raw magnitudes, so `clamp(mid * 16.0, 0, 0.30)` — which used to
+deliver a fifth of its cap — now reaches that cap at `mid = 0.019` and holds it for anything above
+a whisper. Measured across the shipped set, **263 of 332 clamped band terms were pinned at the
+real-music median**, and **14 presets had no live audio term at all**: Rose Web, Rose Zoom, Rose
+Trails, Rose Overflow, all five `reaction_diffusion`, all three `spectrum`, Cathedral, Leviathan.
+
+**Every gate stayed green through all of it**, and so did `--report`:
+
+| instrument | what it compares | what a pinned binding looks like to it |
+|---|---|---|
+| `reactivity.rs` (HARD gate) | band driven vs **silence** | fully reactive |
+| `--report` per-band columns | band driven vs **silence** | fully reactive |
+| `--report` realistic block | realistic vs full scale | *identical to the block above* |
+| `anim` | frame-to-frame **in silence** | unchanged — nothing audio-driven runs |
+| reachability | which way a **comparison** went | blind; a gain holds no comparison |
+
+The realistic block is the one designed to catch level problems, and it did fire — quietly. Its
+documented reading, "realistic close to full scale = a binding already saturating at low input"
+([capturing.md](capturing.md)), was true for most of the library at once, which reads as an
+unremarkable table rather than as an alarm.
+
+**The blind spot is structural, not a tuning miss.** A silence-relative differential answers "does
+this preset respond to sound at all". It cannot answer "does it respond across the range music
+actually occupies", and after normalization the second question is the whole game — the first one a
+binary switch passes trivially.
+
+**What found it instead**, and what a fix would formalize: the same contact sheet rendered at three
+excitations (0.12 / 0.42 / 1.0) and compared *to each other*. Quiet and typical were pixel-identical
+across all 14. That is a change to how existing frames are compared, not new machinery.
+
+**What a design here would weigh:**
+
+- **A mid-scale rung in the reactivity gate.** Drive each band to ~0.4 as well as 1.0 and require
+  the two frames to differ *from each other*, not merely from silence. Catches saturation directly,
+  and is the smallest change that would have caught this.
+- **A ceiling-occupancy statistic in `--report`.** The walker already records how close each
+  `clamp()` came to its bound — that is where `ceils` comes from. The mirror, what fraction of hops
+  a clamp spent *at* its bound, falls out of the same walk, and a term pinned 90 % of the time is
+  exactly this defect, named per binding instead of inferred from a table.
+- **Leave it and rely on the ladder.** Cheapest; documents the three-level sheet as the standing
+  audit move rather than automating it. Weakest, because nothing then runs in CI.
+
+**Note the mirror-image history.** Plans 0041/0042 spent themselves closing the failure where a
+*threshold* sat above anything music produced. This is the same class one level down — a *gain*
+below anything music produces — and the instruments that closed the first were never extended to it.
+
+## 0044 — Phase 1's axis rebuild silently re-pointed every sub-crossover `bin()` probe in the library, and three preset headers plus `docs/presets.md` still teach the axis it replaced
+
+- **Raised:** 2026-08-02, from `preset-author`, running Plan 0048 Phase 7.
+- **Verified against code:** yes — `core/src/dsp/fft.rs:94` lays every band edge on
+  `BAND_LO_HZ * ratio^(k/64)`, with the long window feeding everything below the ~246 Hz crossover,
+  so the axis is now genuinely logarithmic end to end.
+
+**The content half is fixed in the Phase 7 commit; the doc half is not, and it is architect's.**
+
+Before Plan 0048 every band was floored at one FFT bin (23.4 Hz at 48 kHz), which bound the bottom
+half of the axis *linear* and made a log-curve fit up to **2.9x wrong** below ~750 Hz. That fact is
+written, in capitals, into three preset headers and a `[!WARNING]` block in
+[presets.md](presets.md) — all of them telling the next author **not** to compute a position from
+`35 * 514.3^x`. Phase 1 made that formula exactly right, and every one of those warnings now says
+the opposite of the truth.
+
+The consequence for content was silent and real: **every probe below the crossover dropped about an
+octave and a half.** `fragment_aurora`'s colour idea is a contrast between air and low-mid, chosen
+explicitly so that *loudness* cannot move it. Its low probe was `bin(0.14)` for ~246 Hz; on the
+rebuilt axis that position reads **~84 Hz** — a kick probe, which would have lurched the curtain
+green on every bass hit. `attractor_dejong`'s header even names 65 Hz as the mistake a log fit once
+made, and 65 Hz is precisely what its `bin(0.10)` now reads. Seven positions across three presets
+were moved back onto the frequencies their authors named; the four above the crossover never moved.
+
+**The general hazard, which is the part worth a decision:** a DSP change can re-point every `bin()`
+in the library without failing anything. `bin(0.14)` is still a valid expression, still returns a
+number, still renders. No gate compares a probe against the frequency its author intended, because
+nothing records that intent anywhere a machine can read — it lives in a comment.
+
+**What a design here would weigh:**
+
+- **A frequency-addressed companion**, e.g. `bin_hz(246)`, so a preset states the intent it actually
+  has and survives any future axis change. Interacts with the deferred `bin_range(lo, hi)` in Plan
+  0048's followups — both are the same request: address the spectrum by what you mean.
+- **A golden assertion on the axis map.** Pin the Hz of a handful of `x` positions in a test, so a
+  layout change fails loudly and whoever makes it knows to sweep the library.
+- **Nothing, plus a doc rule** that an axis change is a preset-sweep event, the way a C ABI change
+  is an ADR event.
+
+**Immediate, and small:** [presets.md](presets.md)'s axis `[!WARNING]` block and its measured
+position table describe the pre-Phase-1 axis and want regenerating — Phase 5 regenerated the *level*
+tables and did not reach this one. The same file still says `onset` "is raw spectral flux with a
+peak near `0.016`" in its reachability section, which ADR-0049 retired.
+
+## 0045 — `docs/analysis-v2-before-flags.md` has served its purpose and asks to be deleted
+
+- **Raised:** 2026-08-02, from `preset-author`, running Plan 0048 Phase 7.
+
+The file's own closing line is "Delete this file once its Group 2 list is empty." It is: all nine
+band-threshold flags are retuned, and `--report` is down from 26 to **17 flags, every one of them
+the standing `tempo` single-BPM false positive** that the file's Group 1 documents as correct
+behaviour rather than work.
+
+Left in place by this lane rather than deleted, because two docs link to it
+([presets.md](presets.md) and [capturing.md](capturing.md)) and this repo keeps its
+cross-references resolving. Retiring it is a three-file edit and belongs with the Plan 0048 close.
