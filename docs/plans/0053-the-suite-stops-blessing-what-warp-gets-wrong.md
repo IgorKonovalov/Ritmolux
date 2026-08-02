@@ -1,8 +1,8 @@
 # 0053 — The suite stops blessing what WARP gets wrong, and two guards start biting
 
-> **Status:** **draft** — created 2026-08-01. Four phases; Phase 3 is `human` (it needs a discrete
-> GPU) and gates Phase 4's allowlist entries, so this plan does **not** run start-to-finish in one
-> session.
+> **Status:** **approved 2026-08-02** — ready for `dev`. Four phases; Phase 3 is `human` (it needs
+> a discrete GPU) and gates Phase 4's allowlist entries, so this plan does **not** run
+> start-to-finish in one session — start it when that machine is to hand.
 > **Created:** 2026-08-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md) (this

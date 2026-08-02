@@ -1,6 +1,7 @@
 # 0050 — In-app settings, live quality, and a browse overlay that fits
 
-> **Status:** draft
+> **Status:** **approved 2026-08-02** — ready for `dev`. Orthogonal to the render roadmap and
+> takeable any time; its Phase 6 also carries the `Rich` calibration [0044] never ran.
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md)
