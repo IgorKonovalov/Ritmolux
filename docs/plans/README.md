@@ -24,8 +24,8 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 decision.** What separates them now is only what each needs to *run*: [0052] and [0054] close in
 one session; [0050] closes in one plus a measurement; [0053] and [0055] each carry a `human` phase
 that gates later phases, so they stop mid-plan by construction — [0053] until a discrete GPU is to
-hand, [0055] until the live A/B is judged. [0048]'s owed phases are `human` and are the shortest
-thing on this list. Taking [0052] or [0054] first keeps a session unblocked end to end.
+hand, [0055] until the live A/B is judged. [0048] now owes only Phase 7, the `preset-author`
+library retune. Taking [0052] or [0054] first keeps a session unblocked end to end.
 
 **[0050] is orthogonal to everything below and can be taken whenever the user wants the app to be
 operable.** It touches one new `core` entry point (`Renderer::set_tier`, plus an `active_index`
@@ -44,13 +44,20 @@ no C ABI change, and **no golden baseline may move**. So it neither blocks nor i
   question. [0050] Phase 6 item 3 is where that lands.
 
 
-**[0048] Phase 6 is the next thing to run, and it is a `human` phase — [0049] has landed and
-closed** (see Recently closed), so the instrument it was waiting on exists: press `F3` and the panel
-shows four level meters and a `LOCK`/`FREE` row with the estimator's confidence, while the 1 Hz
-`diagnostics.log` carries the same six as columns (`downbeat_locked` is `0`/`1`, so the **lock rate**
-ADR-0050's stopping condition needs is the mean of that column). Play 2-3 real tracks, judge whether
-the normalized levels ride the music without pumping or going numb, record the lock rate, then
-Phase 7 → [0048] closes.
+**[0048] Phase 6 has run (2026-08-02), and [0048] Phase 7 is now the only thing between that plan
+and its close.** The instrument [0049] built did its job: 8.8 minutes logged at 1 Hz gave a verdict
+the session's own impressions did not. **Normalization passes** — all four levels span their range
+with medians well under their means, so the release constant the plan flagged as most likely to move
+**stays**. **The downbeat estimator does not mis-accent, and also barely locks**: `downbeat_locked`
+true in 14 of 458 audible rows (**3.1 %**, roughly 6 % over the beat-driven half), confidence mean
+0.030 against a 0.25 gate. That is ADR-0050's designed safe floor working, not a defect — but it
+means the stopping condition is **un-fired rather than passed**, since a shut gate gives a
+mis-accent little opportunity, and it qualifies Phase 7: **lean on layer 1** (`beat_index`,
+`time_since_beat`, unconditional) and **treat layer 2 as decorative** (`beat_in_bar`, `bar_index`,
+`bar_phase`, fallback almost always). The estimator question is routed to
+[backlog 0042](../design-backlog.md) as an ADR-0050 supplement, which is explicitly **not** an
+argument for lowering the gate. Phase 7 is the `preset-author` lane's library retune — the largest
+content pass since the library rewrite.
 
 **[0051] has landed and closed** (2026-08-01) — see Recently closed. It was what [0045] left
 behind: Phase 2b made the scene→chain seam's alpha load-bearing, and the two additive draw
@@ -159,9 +166,11 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.28.0`** — bumped at [0045]'s close (a feature plan: the linear-light composite,
-the tonemap, the bloom stage and the fold redesign) per
-[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Nothing is owed until the next close.
+**Version is at `0.28.1`**, tag `v0.28.1` — **patch**, bumped at [0051]'s close (a fix-only plan:
+the two additive draw seams emitting premultiplied alpha) per
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). The `0.28.0` before it was [0045]'s
+close (a feature plan: the linear-light composite, the tonemap, the bloom stage and the fold
+redesign). Nothing is owed until the next close.
 **Note the close order was disturbed and it is worth not repeating:** the plan branch was
 fast-forwarded into `main` *before* the bump, so ADR-0053's steps 1-2 (merge `main` into the branch,
 re-run the gate there) were moot and the bump and tag landed on `main` directly. That works, but it

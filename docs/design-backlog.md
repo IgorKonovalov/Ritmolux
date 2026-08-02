@@ -2208,3 +2208,53 @@ swarm guard at `brightness = 0`.
 
 Deferred rather than built at Plan 0051's close because the two seams share one blend constant, so
 the swarm guard already covers the mechanism; this buys resolution at the quiet seam.
+
+---
+
+## 0042 — the downbeat estimator locks on ~3 % of audible time, so the gated bar variables are almost always fallback
+
+- **Raised:** 2026-08-02, from `architect`, running [Plan 0048](plans/0048-analysis-v2-and-the-retune.md)
+  Phase 6 (`human`) with the user.
+- **Measured, not impressionistic:** 8.8 minutes through the live app on the `v0.28.1` release
+  build, 517 log rows at 1 Hz, **458 with signal**, roughly half beat-driven 4/4 (the Plan 0037
+  Phase 4 trap/808 material) and half sparse.
+
+`downbeat_locked` was true in **14 of 458 audible rows — 3.1 %**, which over the beat-driven half
+is roughly **6 %**. `downbeat_confidence` sat at **mean 0.030, median 0.000** against
+`CONFIDENCE_THRESHOLD = 0.25` (`core/src/dsp/downbeat.rs:55`), clearing the gate in **two of
+eighteen** 30-second windows and peaking at **0.516** — twice the gate. So the estimator is
+capable of locking and rarely does.
+
+**This is a shortfall, not a defect, and the distinction is load-bearing.**
+[ADR-0050](adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) designed the gate so
+that failing to lock degrades to the counters-only option the interview declined — the safe floor,
+working exactly as specified. Nothing is broken. What is true is that `beat_in_bar`, `bar_index` and
+`bar_phase` were counter-derived for essentially the whole session, so a preset binding them today
+is binding the fallback.
+
+**The stopping condition did not fire, and the record should not be read as it passing.** No
+confidently-wrong bar line was observed — but with the gate shut 97 % of the time there was little
+opportunity for one. The mis-accent question is *untested*, not *answered*.
+
+**Do not read this as an argument for lowering `CONFIDENCE_THRESHOLD`.** That is the one change the
+measurement must not be taken to recommend: ADR-0050 exists because a confidently wrong beat 1 is
+the failure an author cannot work around, and buying lock rate with the gate inverts the trade the
+ADR was written to make. If the gate moves at all it moves *after* the estimator improves, not
+instead.
+
+**What a design here would weigh** (ADR-0050 supplement territory, and it wants an interview):
+
+- **Improve the accent model.** The estimator folds accents into a 4/4 hypothesis; whether the
+  weakness is the accent feature, the fold, or the confidence measure itself is unknown and is the
+  first thing to find out. Nothing here has been diagnosed — only the outcome measured.
+- **Re-price the confidence measure without moving the gate.** If confidence is systematically
+  under-reading a correct alignment, the fix is the measure, not the threshold, and the gate keeps
+  its meaning.
+- **Accept it and say so in the authoring docs.** Cheapest, and honest: layer 1 (`beat_index`,
+  `time_since_beat`) is unconditional and reliable; layer 2 is decorative until further notice.
+  `presets/README.md` currently offers both without distinguishing their availability.
+
+**Blocks nothing, qualifies one thing.** Plan 0048 Phase 7's retune should lean on layer 1 and treat
+layer 2 as decorative — recorded in that plan's Phase 6 results. **Do not re-measure by ear**: the
+1 Hz `downbeat_locked` column is the instrument, and a targeted pass on known-4/4 material only
+would sharpen the 6 % figure the half-and-half split leaves approximate.
