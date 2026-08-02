@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0055** (ADRs are a separate sequence — next free there is **0061**.)
+**Next free number: 0056** (ADRs are a separate sequence — next free there is **0062**.)
 
 ## Active roster
 
@@ -16,6 +16,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **draft 2026-08-01** — [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **draft 2026-08-01** — [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
 | [0054](0054-the-line-scenes-catch-up.md) | The line scenes catch up: every one honours the palette, and the star stops cutting between shapes | **draft 2026-08-01** — [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md) + [ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md); closes [backlog 0026](../design-backlog.md) + [0007](../design-backlog.md). Two blocked content asks, both with the user's own verdict behind them | dev |
+| [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **draft 2026-08-02** — [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
 
 ## Recommended execution sequence
 
@@ -75,11 +76,19 @@ the render roadmap.** Take them in whatever order suits the session:
 bind-group layout to the group [0053] asserts on. Whichever lands second inherits the other's list.
 Neither ordering is wrong.
 
-**The fold came back with a rejection, and it is routed out rather than reopened.** Seen in motion,
-the user rejected the falloff-disc's residual rays and its crop on fullscreen field scenes — both
-already recorded as ADR-0047's *accepted cost*, so this is the bet not holding rather than a defect.
-Neither is reachable from a preset. It becomes an ADR-0047 supplement plus its own plan; the
-evidence and what the supplement should reconsider are in [backlog 0037](../design-backlog.md).
+**The fold came back with a rejection, and [0055] is now that plan.** Seen in motion, the user
+rejected the falloff-disc's residual rays and its crop on fullscreen field scenes — both already
+recorded as ADR-0047's *accepted cost*, so this is the bet not holding rather than a defect, and
+neither is reachable from a preset. [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)
+is the supplement: the out-of-disc region becomes a **per-preset choice** rather than one answer
+for everyone, because the treatment cleanest on a field is the one that crops the figure's corona.
+Two things about it are worth knowing before sequencing it. **ADR-0047's stated reason for
+declining that choice does not survive contact** — it was about *address modes* doubling the
+stage's pipelines, and three of the four candidates are pure radius maps, so they are a uniform
+branch in one pipeline. And the scope is larger than "corner debris" suggests: the corner sits at
+`0.5*sqrt(aspect²+1)` = **2.04x `r_max`** at 16:9, so **55.8 % of the frame** is what this decides.
+It touches [0053] in one place — if the `tile` candidate survives the A/B it adds a second sampler
+to the kaleidoscope's bind-group layout, which is a shape ADR-0058's allowlist reasons about.
 
 **[0044]'s Phase 4 (`human`, the `Rich` calibration) is now unblocked, and it is the thing to run
 next on the tier axis.** It was told to wait for [0045], because measuring against an 8-bit
