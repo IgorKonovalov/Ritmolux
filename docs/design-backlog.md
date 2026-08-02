@@ -1978,14 +1978,28 @@ structure. Nobody should build that until a real preset is worse off.
 
 ---
 
-## 0037 — the fold covers a disc, and on a field scene that reads as worse than the defect it replaced
+## ~~0037 — the fold covers a disc, and on a field scene that reads as worse than the defect it replaced~~
 
 - **Raised:** 2026-07-31, from `architect`, at Plan 0045's Mode 4 review, from the user's own
   screenshots of the running app.
 - **Verified against code:** yes — `kaleidoscope.rs` clamps the sample radius to `r_max` and fades
   over `FALLOFF_BAND = 0.35`; nothing outside `1.35 r_max` is painted by the stage at any setting.
-- **Status:** **promoted immediately** — the user chose an ADR-0047 supplement plus its own plan.
-  This entry is the evidence, not an open question.
+- **PROMOTED 2026-08-02 → [ADR-0061](adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)
+  + [Plan 0055](plans/0055-the-fold-edge-becomes-a-choice.md)** — the supplement takes the shape this
+  entry argued for and one step further: rather than picking a better single treatment, **what
+  happens outside the disc becomes a per-preset choice** (`kaleido_edge`), because the entry's own
+  evidence is that a field and a figure want different answers. Five candidates ship behind one
+  stepped selector in **one** pipeline and a `human` phase A/Bs them live.
+  **Two things this entry got right and one it under-stated.** Right: the `vignette` reconsideration
+  it asked for is in the roster, and ADR-0047's pipeline-count declination does not survive contact
+  — that objection was about *address modes*, and three of four candidates are pure radius maps, so
+  they are a uniform branch rather than a second pipeline. Under-stated: the scope. The corner sits
+  at `0.5*sqrt(aspect²+1)` = **2.04x `r_max`** at 16:9, so **55.8 % of the frame** is what one
+  treatment was deciding — this is not corner debris, it is most of the picture.
+  **A candidate neither this entry nor ADR-0047 named is now the most interesting one:** `mirror`,
+  which *reflects* the radius instead of clamping it, so past the disc the frame is a mirrored
+  continuation of its interior — no ray (the content is real) and no crop (the corners are filled),
+  which is what a physical kaleidoscope does. Notes retained below as the origin record.
 
 ADR-0047 shipped the falloff-disc, confirmed at Plan 0045 Phase 2 from sixteen rendered stills.
 Seen in motion on real presets at Plan 0045's close, the user rejected two consequences:
