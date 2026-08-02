@@ -35,14 +35,14 @@ samples       = "1600"
 # just its petal shape. The other survivors morph mostly through `phase`. This
 # is the open, airy one, and the only member of the five that is not a disc.
 #
-# Gains against measured levels (bass mean 0.040, mid 0.006): the old
+# Gains against measured levels (v2: bass typically ~0.42, mid ~0.41): the old
 # `bass * 0.4` capped at 0.087 moved the radius by 0.016 on a real mix, which is
 # invisible against a sine term of 0.20 sitting beside it.
-phase         = "sin(time * 0.052) * 0.46 + clamp(mid * 16.0, 0, 0.30)"
+phase         = "sin(time * 0.052) * 0.46 + clamp(mid * 0.353, 0, 0.30)"
 # Treble reshapes the web rather than lighting it (Plan 0045 review: this
 # preset read treb 0.000 - every binding rode `mid`). `radial_offset` is the
 # rose's own geometry, so the top end changes what the figure IS.
-radial_offset = "0.18 + sin(time * 0.0093) * 0.20 + clamp(bass * 11.0, 0, 0.40) + clamp(treb * 9.0, 0, 0.22)"
+radial_offset = "0.18 + sin(time * 0.0093) * 0.20 + clamp(bass * 0.47, 0, 0.40) + clamp(treb * 0.367, 0, 0.22)"
 
 # NO SPIN - `spin` is angular velocity, so anything nonzero is a permanent turn.
 #
@@ -54,43 +54,44 @@ radial_offset = "0.18 + sin(time * 0.0093) * 0.20 + clamp(bass * 11.0, 0, 0.40) 
 # rigid rotation slides the whole interference pattern past the eye unchanged,
 # while a phase advance reshapes it. The rate is raised to take over.
 spin          = "0"
-scale         = "0.76 + bar * 0.05 + clamp(mid * 12.0, 0, 0.24)"
+scale         = "0.76 + bar * 0.05 + clamp(mid * 0.282, 0, 0.24)"
 draw_progress = "1"
 
 # STROKE - the thinnest in the set. A thick stroke at this chord count fills
 # solid and destroys the moire that is the entire preset.
-thickness  = "0.95 + clamp(mid * 20.0, 0, 0.45) + clamp(treb * 12.0, 0, 0.30)"
-brightness = "0.70 + clamp(mid * 8.0, 0, 0.16)"
+thickness  = "0.95 + clamp(mid * 0.53, 0, 0.45) + clamp(treb * 0.5, 0, 0.30)"
+brightness = "0.70 + clamp(mid * 0.188, 0, 0.16)"
 
 # COLOUR - cool steel blues, sweeping slowly.
-hue = "mod(0.05 + time * 0.022 + clamp(mid * 18.0, 0, 0.26) + sin(time * 0.041) * 0.05, 1)"
+hue = "mod(0.05 + time * 0.022 + clamp(mid * 0.306, 0, 0.26) + sin(time * 0.041) * 0.05, 1)"
 
 # GEOMETRY MIRROR - modest, because the chord count is already carrying the
 # density. Reflection on a hard onset rather than every beat.
 #
 # The note this comment used to carry was wrong, and worth correcting rather
 # than deleting: `onset > 0.40` was not "reachable but rare", it was DEAD, and
-# so was the 0.18 that replaced it. `onset` is raw spectral flux, not a
-# normalized 0..1 envelope - it peaks at 0.016 on music-like material (mean
-# 0.002), so this web has never once reflected. A bare comparison is not a
-# `select` condition, so `--report` reachability cannot see this shape at all;
-# it was found by sweeping thresholds against the measured band table
-# (`LOW_LEVELS` in standalone/examples/shot.rs). 0.007 is what "genuine hits"
-# actually costs.
-mirror_order   = "select(mid > 0.011, 6, 4)"
-mirror_reflect = "onset > 0.007"
+# so was the 0.18 that replaced it. `onset` WAS raw spectral flux, peaking at
+# 0.016 on music-like material, so this web never once reflected, and 0.007 was
+# what "genuine hits" cost on that scale. ADR-0049 has since made `onset` the
+# normalized 0..1 envelope the original 0.40 assumed it already was - so the
+# threshold is back up at 0.44, and this time the variable underneath it means
+# what the number reads. A bare comparison is not a `select` condition, so
+# `--report` reachability still cannot see this shape; it is checked by hand
+# against the level table in docs/presets.md.
+mirror_order   = "select(mid > 0.58, 6, 4)"
+mirror_reflect = "onset > 0.44"
 
 # VIEW + COMPOSITE - pushed in slightly so the lattice runs off the frame edge,
 # over a cold backdrop, with a long feedback that thickens the weave.
-zoom        = "1.10 + bar * 0.05 + clamp(bass * 4.5, 0, 0.16)"
+zoom        = "1.10 + bar * 0.05 + clamp(bass * 0.188, 0, 0.16)"
 pan_x       = "sin(time * 0.017) * 0.06"
 pan_y       = "cos(time * 0.0113) * 0.05"
 bg_hue      = "0.30 + sin(time * 0.009) * 0.05"
-bg_bright   = "0.018 + clamp(mid * 2.0, 0, 0.012)"
+bg_bright   = "0.018 + clamp(mid * 0.0141, 0, 0.012)"
 bg_vignette = "0.84"
 
 # FEEDBACK - restored (Plan 0033) but the SHORTEST in the set. 6400 segments at the highest brightness here: a longer tail fills the weave solid and erases the moire that is the whole preset.
-trails = "0.30 + clamp(mid * 6.0, 0, 0.08)"
+trails = "0.30 + clamp(mid * 0.094, 0, 0.08)"
 
 [smoothing]
 # Constants cut by roughly two thirds, same as the rest of the family. Gains and

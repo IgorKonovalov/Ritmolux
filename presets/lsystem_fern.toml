@@ -41,12 +41,12 @@ seed      = 1
 # frozen at depth 4 and never grew at all, which is the entire point of it. The
 # band table lives in `LOW_LEVELS` in standalone/examples/shot.rs.
 #
-# Placed inside that distribution: the sum's mean is ~0.046, so 0.050 carries
+# Placed inside that distribution: the sum's typical value is ~0.71, so 0.80 carries
 # depth 5 through the louder passages and 0.095 reaches depth 6 only near the
 # peak. The 1.2 s constant below matters to the choice - a gate crossed only at
 # transient peaks barely moves a value eased that long, so the first tier is set
 # to be crossed for SUSTAINED stretches rather than on spikes.
-visible_depth = "select(bass + mid > 0.095, 6, select(bass + mid > 0.050, 5, 4))"
+visible_depth = "select(bass + mid > 1.52, 6, select(bass + mid > 0.80, 5, 4))"
 
 # MOTION - a steady turn plus a slow sway, both in radians and both
 # audio-independent. `rotation` is an ANGLE, so a band term on it is a
@@ -54,7 +54,7 @@ visible_depth = "select(bass + mid > 0.095, 6, select(bass + mid > 0.050, 5, 4))
 rotation = "0.26 * time + sin(time * 0.037) * 0.30"
 
 # THE REVEAL - the plant draws itself on across each beat, never fully erasing.
-draw_progress = "clamp(0.55 + bar * 0.60 + clamp(onset * 0.7, 0, 0.20), 0, 1)"
+draw_progress = "clamp(0.55 + bar * 0.60 + clamp(onset * 0.333, 0, 0.20), 0, 1)"
 
 # STROKE - THE GLOW. There is no `glow` param on a line scene (only
 # fragment_field and reaction_diffusion have one) and no bloom stage in the
@@ -75,15 +75,15 @@ draw_progress = "clamp(0.55 + bar * 0.60 + clamp(onset * 0.7, 0, 0.20), 0, 1)"
 # around a core. Glow wants a THIN, very bright core - brightness carries the
 # intensity, thickness only sets how far the halo reaches past it. 1.9 with a
 # 1.55 multiplier is sharp and hot; 4.0 was a blur.
-thickness  = "1.90 + clamp(bass * 1.3, 0, 0.90)"
-brightness = "1.55 + clamp(bass * 0.70, 0, 0.35)"
-scale      = "0.68 + clamp(mid * 0.30, 0, 0.14) + clamp(bass * 0.35, 0, 0.16)"
+thickness  = "1.90 + clamp(bass * 1.06, 0, 0.90)"
+brightness = "1.55 + clamp(bass * 0.41, 0, 0.35)"
+scale      = "0.68 + clamp(mid * 0.165, 0, 0.14) + clamp(bass * 0.188, 0, 0.16)"
 # THE GLOW COLOUR. On a line scene there is no separate glow tint - the stroke
 # colour IS the glow colour, so this one param sets both. 0.46 lands near-white
 # with a faint green cast, which is the hottest-reading point on the cosine
 # ramp: a filament rather than a coloured line. Note the ramp is NOT a standard
 # hue wheel - 0.30 is cyan, 0.62 is gold, 0.82 is rose. Sweep it, do not assume.
-hue        = "0.46 + time * 0.023 + clamp(treb * 0.8, 0, 0.28) + bar * 0.04"
+hue        = "0.46 + time * 0.023 + clamp(treb * 0.467, 0, 0.28) + bar * 0.04"
 
 # GEOMETRY MIRROR - the thicket. Five-fold, no reflection: a reflected fern
 # reads as a mirrored plant rather than a grown one.
@@ -91,7 +91,7 @@ mirror_order   = "5"
 mirror_reflect = "0"
 
 # VIEW + COMPOSITE - an off-centre camera so the growth has somewhere to go.
-zoom        = "1.10 + bar * 0.06 + clamp(bass * 0.35, 0, 0.15)"
+zoom        = "1.10 + bar * 0.06 + clamp(bass * 0.176, 0, 0.15)"
 pan_x       = "sin(time * 0.0170) * 0.05"
 pan_y       = "cos(time * 0.0130) * 0.04"
 
@@ -102,13 +102,13 @@ pan_y       = "cos(time * 0.0130) * 0.04"
 # brighter. Dropping the floor and deepening the vignette is what gives the
 # halo somewhere to fall off into; the stroke values above only work over this.
 bg_hue      = "0.55 + sin(time * 0.0091) * 0.05"
-bg_bright   = "0.012 + clamp((bass + mid) * 0.08, 0, 0.016)"
+bg_bright   = "0.012 + clamp((bass + mid) * 0.0094, 0, 0.016)"
 bg_vignette = "0.88"
 
 # FEEDBACK - restored (Plan 0033); the preset whose afterglow the old 720p grid
 # cost. Long, because a glow that persists between the draw_progress reveals is
 # most of what makes the thicket read as lit rather than as stroked.
-trails = "0.72 + clamp(bass * 0.20, 0, 0.10)"
+trails = "0.72 + clamp(bass * 0.118, 0, 0.10)"
 
 [smoothing]
 # A long constant on the depth so a generation appears as a swell, not a pop.

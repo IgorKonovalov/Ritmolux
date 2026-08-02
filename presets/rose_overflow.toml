@@ -29,31 +29,31 @@ family = "maurer_rose"
 # blows up. Eased below so it morphs through the intermediate webs.
 #
 # `n` steps 2 -> 5 across the low end, and this was the WORST-calibrated
-# expression in the family: `bass * 7` against a measured bass mean of 0.040
+# expression in the family: `bass * 7` against a raw bass mean of 0.040
 # gives 0.28, so `floor(2 + ...)` returned 2 essentially always and the petal
 # count - the preset's headline mechanism - never stepped at all. At x60 the
 # mean lands mid-ladder and a peak reaches the top of it.
-n             = "floor(2 + clamp(bass * 60.0, 0, 3.72))"
+n             = "floor(2 + clamp(bass * 4.38, 0, 3.72))"
 d             = "97"
 samples       = "3200"
-phase         = "sin(time * 0.0175) * 0.30 + clamp(mid * 12.0, 0, 0.22)"
+phase         = "sin(time * 0.0175) * 0.30 + clamp(mid * 0.26, 0, 0.22)"
 
 # THE BLOWOUT - the two levers that pump together, and this preset is where the
 # family's peak energy is SUPPOSED to go: it spends loud passages on sheer
 # geometric size rather than on luminance, which is why it can be driven this
 # hard without clipping. It already measured the most reactive rose in the set;
 # the gains here just make it reach its own caps on real audio.
-radial_offset = "0.10 + clamp(bass * 12.0, 0, 0.53) + beat * 0.074"
-scale         = "1.35 + clamp(bass * 34.0, 0, 1.49)"
+radial_offset = "0.10 + clamp(bass * 0.624, 0, 0.53) + beat * 0.074"
+scale         = "1.35 + clamp(bass * 1.75, 0, 1.49)"
 
 spin          = "0.06 + sin(time * 0.011) * 0.02"
 draw_progress = "1"
 
 # STROKE - very thin. Thousands of chords at any real weight is a solid blob,
 # and at peak this figure is denser still. Caps stay tight for that reason.
-thickness  = "0.62 + clamp(treb * 18.0, 0, 0.32)"
-brightness = "0.52 + clamp(bass * 3.0, 0, 0.12)"
-hue        = "mod(0.60 + time * 0.024 + clamp(mid * 16.0, 0, 0.24), 1)"
+thickness  = "0.62 + clamp(treb * 0.533, 0, 0.32)"
+brightness = "0.52 + clamp(bass * 0.141, 0, 0.12)"
+hue        = "mod(0.60 + time * 0.024 + clamp(mid * 0.282, 0, 0.24), 1)"
 
 mirror_order   = "1"
 mirror_reflect = "0"
@@ -63,14 +63,14 @@ mirror_reflect = "0"
 # The pull-back matters more now that `scale` actually reaches its cap: with the
 # gain fixed, a peak really does blow the figure past the frame, and this is
 # what keeps some structure on screen when it does.
-zoom        = "1.00 - clamp(bass * 4.5, 0, 0.18) + bar * 0.05"
+zoom        = "1.00 - clamp(bass * 0.212, 0, 0.18) + bar * 0.05"
 pan_x       = "sin(time * 0.017) * 0.05"
 bg_hue      = "0.28 + sin(time * 0.009) * 0.05"
-bg_bright   = "0.016 + clamp(mid * 2.0, 0, 0.012)"
+bg_bright   = "0.016 + clamp(mid * 0.0141, 0, 0.012)"
 bg_vignette = "0.84"
 
 # FEEDBACK - restored (Plan 0033). The slowest spin in the set, so a long tail stays legible.
-trails = "0.62 + clamp(treb * 12.0, 0, 0.10)"
+trails = "0.62 + clamp(treb * 0.167, 0, 0.10)"
 
 [smoothing]
 # The blowout surges out and eases back like a real pump.

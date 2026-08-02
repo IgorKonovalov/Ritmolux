@@ -48,13 +48,13 @@ pan_x = "sin(time * 0.027) * 0.20"
 pan_y = "cos(time * 0.019) * 0.15"
 
 glow  = "0.68 + sin(bar * pi) * 0.18 + mid * 0.30"
-flash = "sin(bar * pi) * 0.26 + clamp(onset * 0.7, 0, 0.18)"
+flash = "sin(bar * pi) * 0.26 + clamp(onset * 0.3, 0, 0.18)"
 
 hue          = "0.55 + time * 0.023 + treb * 0.30"
 color_span   = "0.66 + treb * 0.45"
 color_center = "sin(time * 0.037) * 0.12 + sin(bar * pi) * 0.08"
 saturation   = "1.05 + mid * 0.40"
-palette_mix  = "clamp(treb * 1.5, 0, 0.55)"
+palette_mix  = "clamp(treb * 0.92, 0, 0.55)"
 
 trails = "0.44 + bass * 0.35"
 

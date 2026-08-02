@@ -16,15 +16,17 @@
 # effectively morphed in three dimensions instead of four. Each coefficient now
 # adds its own narrow probe on the log spectrum, which is what de-correlates
 # them:
-#   a ~ 190 Hz (bass body)   d ~ 400 Hz (low-mid)
-#   b ~ 880 Hz (midrange)    c ~ 5.1 kHz (presence)
+#   a ~ 189 Hz (bass body)   d ~ 399 Hz (low-mid)
+#   b ~ 899 Hz (midrange)    c ~ 5.2 kHz (presence)
 #
-# DO NOT compute those frequencies from a formula if you move a position - read
-# them off the table in docs/presets.md. The band axis is HALF LINEAR: the edges
-# start on a log curve but every band is floored at one FFT bin (23.4 Hz at
-# 48 kHz), which binds up to ~750 Hz, so 31 of the 64 bands are linear slices. A
-# log-curve fit is up to 2.9x wrong down here - an earlier revision of this
-# header used one and put `a` at 65 Hz when it is really ~190.
+# THE TWO LOW POSITIONS MOVED IN PLAN 0048, and this header used to warn against
+# exactly the formula that is now correct. The old axis floored every band at one
+# FFT bin (23.4 Hz at 48 kHz), which bound it linear up to ~750 Hz and made a
+# log fit up to 2.9x wrong there; ADR-0049's long window feeds the bands below
+# the ~246 Hz crossover, so the edges are `35 * 514.3^x` end to end. `a` was
+# `bin(0.10)` for ~190 Hz and that position now reads 65 Hz - the very number
+# this header once called the mistake - so it is `bin(0.27)`; `d` moved 0.24 ->
+# 0.39 for the same reason. `b` and `c` sit above the crossover and did not move.
 #
 # THE BAND TERM STAYS UNDERNEATH, deliberately, and the split is about 40/60 of
 # the original gain with the clamp ceilings unchanged. Two reasons. A bin is
@@ -63,29 +65,31 @@ name = "ice"
 # SHAPE - slow incommensurate drift plus a gentle spectral bend. Chaotic maps
 # punish big jumps, so every audio term is small and clamped. Four coefficients,
 # four separate frequency regions - see the header.
-a = "1.641 + sin(time * 0.0370) * 0.070 + clamp(bass * 0.16 + bin(0.10) * 0.28, 0, 0.085)"
-b = "1.902 - sin(time * 0.0289) * 0.055 - clamp(mid * 0.14 + bin(0.52) * 0.25, 0, 0.070)"
-c = "0.316 + sin(time * 0.0228) * 0.090 + clamp(treb * 0.12 + bin(0.80) * 0.21, 0, 0.055)"
-d = "1.525 + cos(time * 0.0190) * 0.075 - clamp(bass * 0.10 + bin(0.24) * 0.18, 0, 0.050)"
+a = "1.641 + sin(time * 0.0370) * 0.070 + clamp(bass * 0.062 + bin(0.27) * 0.108, 0, 0.085)"
+b = "1.902 - sin(time * 0.0289) * 0.055 - clamp(mid * 0.0505 + bin(0.52) * 0.09, 0, 0.070)"
+c = "0.316 + sin(time * 0.0228) * 0.090 + clamp(treb * 0.049 + bin(0.80) * 0.0856, 0, 0.055)"
+d = "1.525 + cos(time * 0.0190) * 0.075 - clamp(bass * 0.036 + bin(0.39) * 0.065, 0, 0.050)"
 
 # DENSITY - the inversion fix. Loud = shorter trails and finer points. The base
 # values are deliberately low: at the Plan 0027 surface-sized grid, `fade` much
 # above ~0.92 with `size` near 1 saturates the accumulation into a white blot.
-fade   = "0.905 - clamp(bass * 0.16, 0, 0.055) - beat * 0.020"
-size   = "0.58 - clamp((bass + mid) * 0.15, 0, 0.17) + beat * 0.08"
-# MEASURED. Read 0.42 and never fired - `onset` is raw spectral flux peaking at
-# 0.016, not a 0..1 envelope. The most eager reseed in the family, as before.
-reseed = "onset > 0.008"
+fade   = "0.905 - clamp(bass * 0.065, 0, 0.055) - beat * 0.020"
+size   = "0.58 - clamp((bass + mid) * 0.1, 0, 0.17) + beat * 0.08"
+# MEASURED. Read 0.42 and never fired, because `onset` was then raw spectral
+# flux peaking at 0.016 rather than the 0..1 envelope that number assumed.
+# ADR-0049 made it one, so the threshold is a real fraction again. Still the
+# most eager reseed in the family.
+reseed = "onset > 0.50"
 
 # COLOUR - a narrow window that slides, not a rainbow. palette_mix finally earns
 # its keep: the gradient cools toward `ice` as treble opens.
-hue_spread  = "0.20 + clamp(mid * 1.2, 0, 0.30)"
-hue_center  = "0.34 + sin(time * 0.043) * 0.12 + clamp(bass * 1.1, 0, 0.26)"
-saturation  = "1.05 + clamp(treb * 1.5, 0, 0.35)"
-palette_mix = "0.14 + sin(time * 0.021) * 0.14 + clamp(mid * 0.7, 0, 0.18)"
+hue_spread  = "0.20 + clamp(mid * 0.353, 0, 0.30)"
+hue_center  = "0.34 + sin(time * 0.043) * 0.12 + clamp(bass * 0.306, 0, 0.26)"
+saturation  = "1.05 + clamp(treb * 0.583, 0, 0.35)"
+palette_mix = "0.14 + sin(time * 0.021) * 0.14 + clamp(mid * 0.212, 0, 0.18)"
 
 # VIEW - a slow breathing push-in with a lazy drift, so the cloud never sits still.
-zoom  = "1.06 + bar * 0.10 + clamp(bass * 0.5, 0, 0.22)"
+zoom  = "1.06 + bar * 0.10 + clamp(bass * 0.26, 0, 0.22)"
 pan_x = "sin(time * 0.051) * 0.06"
 pan_y = "cos(time * 0.037) * 0.05"
 
@@ -94,16 +98,16 @@ pan_y = "cos(time * 0.037) * 0.05"
 # indexes the shared COSINE palette, not the [palette] table above - ~0.25 is
 # the deep indigo that sits under this gradient; 0.6 would read green.
 bg_hue        = "0.25 + sin(time * 0.017) * 0.05"
-bg_bright     = "0.06 + clamp(mid * 0.5, 0, 0.07)"
+bg_bright     = "0.06 + clamp(mid * 0.082, 0, 0.07)"
 bg_vignette   = "0.80"
 # THE THRESHOLD IS MEASURED, NOT GUESSED. This read 0.34 until Plan 0041's
 # reachability check proved the branch dead: written against `--set bass=1`
 # magnitudes, but on music-like material `bass` peaks at 0.106 and `mid` at
 # 0.019, so `bass + mid` tops out near 0.125 and the symmetry never arrived on
-# any section. 0.070 sits well above the sum's ~0.046 mean, which keeps the
+# any section. 1.12 sits well above the sum's ~0.71 typical value, which keeps the
 # "loud sections only" intent above intact instead of leaving it on constantly.
 # Band table: `LOW_LEVELS` in standalone/examples/shot.rs.
-kaleido_order = "select(bass + mid > 0.070, 5, 1)"
+kaleido_order = "select(bass + mid > 1.12, 5, 1)"
 kaleido_angle = "time * 0.07"
 
 [smoothing]

@@ -83,7 +83,7 @@ stops = [
 # 0.0320 / 0.0565 settles into. The negative space is a property of the
 # chemistry, which is why it holds up over minutes instead of being a framing
 # trick that the field grows out of.
-feed   = "0.0220 + sin(time * 0.041) * 0.0014 + clamp(bass * 9.0, 0, 1) * 0.0020"
+feed   = "0.0220 + sin(time * 0.041) * 0.0014 + clamp(bass * 1.18, 0, 1) * 0.0020"
 
 # `kill` TAKES THE BEAT, and this is the "more dynamics" half. Gray-Scott has an
 # attractor: left at fixed parameters it develops for twenty seconds and then
@@ -108,8 +108,8 @@ feed   = "0.0220 + sin(time * 0.041) * 0.0014 + clamp(bass * 9.0, 0, 1) * 0.0020
 # measured `cover 0.949`, a full-frame maze with no negative space at all, which
 # missed the point of the regime even though the chemistry was healthy. Raising
 # k with a modest feed is what actually opens the substrate.
-kill   = "0.0570 + cos(time * 0.029) * 0.0006 + (sin(bar * pi) - 0.5) * 0.0010 + clamp(mid * 12.0, 0, 1) * 0.0007"
-flow   = "1.00 + clamp(treb * 18.0, 0, 1) * 0.35"
+kill   = "0.0570 + cos(time * 0.029) * 0.0006 + (sin(bar * pi) - 0.5) * 0.0010 + clamp(mid * 1.18, 0, 1) * 0.0007"
+flow   = "1.00 + clamp(treb * 1.67, 0, 1) * 0.35"
 inject = "beat"
 
 # THE FAST LEVERS - this is where the beat actually reads.
@@ -125,9 +125,9 @@ inject = "beat"
 # is what opens the gaps between the spots) but the swing around it does not -
 # 1.8 on a base of 3.0 is a larger proportional breath than the 2.2 on 5.0 it
 # replaces.
-contour = "3.0 + sin(time * 0.55) * 1.8 + clamp(treb * 60.0, 0, 3.0) + beat * 1.2"
-hatch   = "2.6 + sin(time * 0.31) * 0.8 + clamp(mid * 40.0, 0, 1.6)"
-glow    = "0.62 + clamp((bass + mid) * 6.0, 0, 0.55)"
+contour = "3.0 + sin(time * 0.55) * 1.8 + clamp(treb * 5, 0, 3.0) + beat * 1.2"
+hatch   = "2.6 + sin(time * 0.31) * 0.8 + clamp(mid * 1.88, 0, 1.6)"
+glow    = "0.62 + clamp((bass + mid) * 0.324, 0, 0.55)"
 
 # VIEW - UNPINNED (Plan 0033), and this is the lever the family used to lack.
 # The Gray-Scott field is finite but TOROIDAL, and the present sampler now
@@ -141,19 +141,19 @@ glow    = "0.62 + clamp((bass + mid) * 6.0, 0, 0.55)"
 # the field - so going under 1 makes the cells larger and fewer in frame, which
 # is the framing half of the negative-space work. The chemistry supplies the
 # gaps; this decides how big they read.
-zoom  = "0.78 + sin(time * 0.021) * 0.08 + clamp(bass * 3.5, 0, 0.16)"
+zoom  = "0.78 + sin(time * 0.021) * 0.08 + clamp(bass * 0.188, 0, 0.16)"
 pan_x = "time * 0.016 + sin(time * 0.013) * 0.06"
 pan_y = "cos(time * 0.0091) * 0.05"
 
 # COLOUR - teal body, crossfading toward a violet variant over minutes.
-color_span   = "0.90 + clamp(mid * 20.0, 0, 0.20)"
+color_span   = "0.90 + clamp(mid * 0.235, 0, 0.20)"
 color_center = "sin(time * 0.47) * 0.11"
-saturation   = "0.95 + clamp(treb * 40.0, 0, 0.50)"
+saturation   = "0.95 + clamp(treb * 0.83, 0, 0.50)"
 palette_mix  = "0.35 + sin(time * 0.0077) * 0.32"
 
 # COMPOSITE - the backdrop shows through the field's voids (Plan 0025).
 bg_hue      = "0.36 + sin(time * 0.0110) * 0.05"
-bg_bright   = "0.022 + clamp(mid * 2.5, 0, 0.014)"
+bg_bright   = "0.022 + clamp(mid * 0.0165, 0, 0.014)"
 bg_vignette = "0.72"
 
 [smoothing]

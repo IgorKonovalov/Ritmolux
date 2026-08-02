@@ -74,9 +74,9 @@ rotation = "sin(time * 0.9) * 0.135"
 # guessing them is what got this preset wrong once already. `shot --signal`
 # prints what it measured, and for `dynamic:110`:
 #
-#   bass  min 0.004  mean 0.040  max 0.106
-#   mid   min 0.000  mean 0.006  max 0.019
-#   treb  min 0.000  mean 0.006  max 0.032
+#   bass  min 0.035  mean 0.661  max 1.000   (raw, pre-ADR-0049: mean 0.040)
+#   mid   min 0.031  mean 0.575  max 1.000   (raw: mean 0.006)
+#   treb  min 0.002  mean 0.281  max 1.000   (raw: mean 0.006)
 #
 # The top of the spectrum runs about SEVEN TIMES quieter than the bottom on real
 # material. That spread is the thing this readout exists to show, and it is also
@@ -110,7 +110,7 @@ rotation = "sin(time * 0.9) * 0.135"
 # too little" looks like on a comb.
 #
 # At 0.55 the same 0.006 becomes 0.060, a 4.6x lift rather than 2.2x, and the
-# bass mean 0.040 becomes 0.170. That pulls the two ends from 6.6:1 apart to
+# a raw bass mean of 0.040 becomes 0.170. That pulled the two ends from 6.6:1 apart to
 # 2.8:1 - firmer compression than before, and it has to be, because the spread
 # is what was burying the top of the readout.
 #
@@ -145,7 +145,7 @@ span  = "1.72"
 # suggests. Scaling it the full 1.7x was tried and read as blurry and upscaled:
 # 0.12 world units of stroke against a 0.132 slot is 91 % fill and mostly soft
 # skirt. `glow` below tightens the core instead, which is the cheaper lever.
-thickness  = "13 + clamp(bass * 45.0, 0, 3.5)"
+thickness  = "13 + clamp(bass * 4.12, 0, 3.5)"
 
 # STROKE SHARPNESS. `glow` scales the renderer's core-to-edge falloff, and below
 # 1.0 it tightens the stroke toward its core. It matters more here than on the
@@ -156,13 +156,13 @@ glow       = "0.75"
 # Gain raised ~30x to match the measured mid mean of 0.006, but the CAP is cut
 # 0.34 -> 0.26. Reactivity was the fault, not headroom: on an additive renderer
 # a comb whose bars are already tall does not also want a big luminance swing.
-brightness = "0.72 + clamp(mid * 40.0, 0, 0.26)"
+brightness = "0.72 + clamp(mid * 0.306, 0, 0.26)"
 
 # COLOUR - a slow full rotation of the wheel (~40 s), pushed forward a little by
 # the top end. The whole comb is one hue in this preset; colouring each element
 # by its own position along the axis is a Phase 3 lever, and the point of THIS
 # preset is the geometry.
-hue = "mod(time * 0.09 + clamp(treb * 22.0, 0, 0.14), 1)"
+hue = "mod(time * 0.09 + clamp(treb * 0.233, 0, 0.14), 1)"
 
 # CAMERA - the second half of the silent-audio motion, and it does more work than
 # its size suggests. The zoom scales world coordinates about the frame centre, so
@@ -170,13 +170,13 @@ hue = "mod(time * 0.09 + clamp(treb * 22.0, 0, 0.14), 1)"
 # near the middle: the whole readout stretches and gathers rather than just
 # growing. At this element spacing that is on the order of a stroke width, which
 # is exactly the scale at which a change actually reads.
-zoom  = "1.05 + sin(time * 1.1) * 0.125 + clamp(bass * 4.0, 0, 0.10)"
+zoom  = "1.05 + sin(time * 1.1) * 0.125 + clamp(bass * 0.118, 0, 0.10)"
 # A slight lift so the comb sits off the bottom edge rather than on it.
 pan_y = "0.06 + sin(time * 0.17) * 0.03"
 
 # BACKDROP - dim and cool, so the comb is the only bright thing.
 bg_hue      = "0.58 + sin(time * 0.011) * 0.05"
-bg_bright   = "0.022 + clamp(mid * 2.5, 0, 0.012)"
+bg_bright   = "0.022 + clamp(mid * 0.0141, 0, 0.012)"
 bg_vignette = "0.75"
 
 [smoothing]

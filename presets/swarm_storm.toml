@@ -56,12 +56,12 @@ name = "mono"
 # something startles it, and it is a far better reading of a drum than an
 # explosion was. It is still the highest field rate of the five - Storm is the
 # restless one - but it is now in the range where a formation exists to disrupt.
-force = "select(tempo > 132, 1.62, 1.42) + clamp(bass * 6.0, 0, 0.34) + bar * 0.14"
-spin  = "select(tempo > 132, 0.175, 0.135) + clamp(mid * 4.0, 0, 0.07) + clamp(onset * 0.85, 0, 0.16)"
+force = "select(tempo > 132, 1.62, 1.42) + clamp(bass * 0.4, 0, 0.34) + bar * 0.14"
+spin  = "select(tempo > 132, 0.175, 0.135) + clamp(mid * 0.082, 0, 0.07) + clamp(onset * 0.267, 0, 0.16)"
 # Kept, and the largest of the five, but a fraction of what it was: Storm is
 # allowed a real scatter on the beat where the others are not. 3.4 tore the
 # formation to the frame edges and left the middle empty.
-burst = "clamp(beat * 0.85 + clamp(onset * 1.6, 0, 0.75), 0, 1.35)"
+burst = "clamp(beat * 0.85 + clamp(onset * 1.25, 0, 0.75), 0, 1.35)"
 
 # STRUCTURE - `field_freq` (Plan 0043), and Storm uses it the way it already uses
 # `spin`: as something a TRANSIENT KICKS. Drift breathes its field scale slowly
@@ -76,7 +76,7 @@ burst = "clamp(beat * 0.85 + clamp(onset * 1.6, 0, 0.75), 0, 1.35)"
 # and it relaxes back to broad churn as the release constant unwinds. The driving
 # personality above 132 BPM runs finer at rest, so fast material reads as busier
 # structure and not merely as faster structure.
-field_freq = "select(tempo > 132, 3.35, 2.85) + clamp(onset * 7.0, 0, 1.50) + clamp(bass * 6.0, 0, 0.45)"
+field_freq = "select(tempo > 132, 3.35, 2.85) + clamp(onset * 2.5, 0, 1.50) + clamp(bass * 0.53, 0, 0.45)"
 
 # APPEARANCE - flat brightness. This is the preset that most wants to be pushed
 # and most punishes it: a firestorm rendered additively at brightness 1.9 (what
@@ -88,21 +88,21 @@ field_freq = "select(tempo > 132, 3.35, 2.85) + clamp(onset * 7.0, 0, 1.50) + cl
 # the wrap seam can, and the depth fade dims the far half. Restoring that is not
 # the same as pushing past the ceiling, and 1.02 is still well under the 1.9 that
 # renders a white rectangle.
-brightness = "1.18 + clamp(bass * 5.0, 0, 0.22)"
+brightness = "1.18 + clamp(bass * 0.26, 0, 0.22)"
 # Raised for legibility (Plan 0045 review): at 1.20 the storm read as a dark
 # red haze at both of its tempo personalities, so neither branch was really
 # being seen.
-size       = "1.95 - clamp(mid * 10.0, 0, 0.22) + beat * 0.34 + clamp(onset * 1.1, 0, 0.26)"
+size       = "1.95 - clamp(mid * 0.26, 0, 0.22) + beat * 0.34 + clamp(onset * 0.433, 0, 0.26)"
 
 # COLOUR - wide and hot on the rolling personality; the driving one desaturates
 # toward `mono`, so hard sections read as smoke and sparks rather than fire.
-hue_spread  = "select(tempo > 132, 0.52, 0.66) + clamp(treb * 14.0, 0, 0.16)"
-hue_center  = "0.46 + clamp(bass * 8.0, 0, 0.24) + clamp(onset * 1.2, 0, 0.14)"
-saturation  = "1.05 + clamp(bass * 6.0, 0, 0.24)"
-palette_mix = "select(tempo > 132, 0.45, 0.08) + clamp(mid * 12.0, 0, 0.18)"
+hue_spread  = "select(tempo > 132, 0.52, 0.66) + clamp(treb * 0.267, 0, 0.16)"
+hue_center  = "0.46 + clamp(bass * 0.282, 0, 0.24) + clamp(onset * 0.233, 0, 0.14)"
+saturation  = "1.05 + clamp(bass * 0.282, 0, 0.24)"
+palette_mix = "select(tempo > 132, 0.45, 0.08) + clamp(mid * 0.212, 0, 0.18)"
 
 # VIEW - the driving personality sits closer in and pumps harder per bar.
-zoom  = "select(tempo > 132, 1.28, 1.08) + bar * 0.14 + clamp(bass * 5.0, 0, 0.24)"
+zoom  = "select(tempo > 132, 1.28, 1.08) + bar * 0.14 + clamp(bass * 0.282, 0, 0.24)"
 pan_x = "sin(time * 0.057) * 0.09"
 pan_y = "cos(time * 0.041) * 0.07"
 
@@ -110,15 +110,15 @@ pan_y = "cos(time * 0.041) * 0.07"
 # personality is ALSO carrying real energy (a two-term comparison via `min`).
 #
 # The `min` idiom is right and stays; the THRESHOLD inside it was not. Measured,
-# `bass + mid` means about 0.046, so `> 0.40` never returned 1 and the fold half
+# `bass + mid` meant about 0.046 raw, so `> 0.40` never returned 1 and the fold half
 # of that conjunction was permanently false - the preset ran unfolded no matter
 # what the tempo was. 0.055 sits just above the mean, so the fold now engages on
 # genuinely energetic passages of fast material, which is what was intended.
-trails        = "select(tempo > 132, 0.40, 0.60) + clamp(mid * 10.0, 0, 0.16)"
-kaleido_order = "select(min(tempo > 132, bass + mid > 0.055), 3, 1)"
+trails        = "select(tempo > 132, 0.40, 0.60) + clamp(mid * 0.188, 0, 0.16)"
+kaleido_order = "select(min(tempo > 132, bass + mid > 0.88), 3, 1)"
 kaleido_angle = "time * 0.13"
-bg_hue        = "0.965 + clamp(bass * 3.0, 0, 0.030)"
-bg_bright     = "0.009 + clamp(mid * 2.5, 0, 0.014)"
+bg_hue        = "0.965 + clamp(bass * 0.0353, 0, 0.030)"
+bg_bright     = "0.009 + clamp(mid * 0.0165, 0, 0.014)"
 bg_vignette   = "0.82"
 
 [smoothing]

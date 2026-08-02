@@ -33,7 +33,7 @@ seed      = 1
 # triples the segment count, so this is the widest structural range in the set.
 #
 # AND IT NEVER LEFT THE BOTTOM RUNG. Measured with `shot --signal dynamic:110`,
-# mid and treb both mean 0.006, so `mid + treb` means about 0.012 and peaks near
+# mid and treb now mean 0.41 and 0.22, so `mid + treb` is typically ~0.63 and reaches
 # 0.051. Against thresholds of 0.50, 0.28 and 0.10 not one gate could return 1:
 # this preset drew depth 4 - the coarsest, sparsest version of the figure - for
 # its entire existence. "Boring" was not a matter of taste; the widest
@@ -43,7 +43,7 @@ seed      = 1
 # material still resolves past the coarse form, 0.018 is normal, and 0.030 is a
 # genuine peak. The fractal now actually subdivides, which is the one thing this
 # preset is for.
-visible_depth = "select(mid + treb > 0.030, 7, select(mid + treb > 0.018, 6, select(mid + treb > 0.008, 5, 4)))"
+visible_depth = "select(mid + treb > 1.18, 7, select(mid + treb > 0.71, 6, select(mid + treb > 0.31, 5, 4)))"
 
 # NO ROTATION. This used to turn at 0.88 rad/s continuously, and the argument
 # for it was that a large near-symmetric figure needs a brisk turn or it reads
@@ -82,7 +82,7 @@ rotation = "0"
 # still take it to a full 1.0 on a beat, so PEAK coverage is exactly what it
 # was: nothing is added to the additive ceiling (`cover` measures 0.915 already),
 # the resting state is simply no longer still.
-draw_progress = "clamp(0.72 + sin(time * 0.72) * 0.28 + bar * 0.30 + clamp(onset * 0.5, 0, 0.12), 0, 1)"
+draw_progress = "clamp(0.72 + sin(time * 0.72) * 0.28 + bar * 0.30 + clamp(onset * 0.2, 0, 0.12), 0, 1)"
 
 # STROKE FALLOFF (Plan 0038). `glow` scales the line renderer's core-to-edge
 # term - it is the shader's per-segment falloff, NOT a bloom stage and NOT the
@@ -107,7 +107,7 @@ draw_progress = "clamp(0.72 + sin(time * 0.72) * 0.28 + bar * 0.30 + clamp(onset
 # this preset is sparse at depth 4 and very dense at depth 7. So the falloff
 # rides `bass` upward to give the sparse figure some body, and the cap is small
 # enough that it cannot fatten a depth-7 frame into a blur.
-glow = "0.55 + clamp(bass * 5.0, 0, 0.26)"
+glow = "0.55 + clamp(bass * 0.306, 0, 0.26)"
 
 # Stroke weight breathes on its own slow cycle, a third rate again against
 # `scale` and `zoom`. On a figure that is nothing but line, weight is the one
@@ -115,11 +115,11 @@ glow = "0.55 + clamp(bass * 5.0, 0, 0.26)"
 # does: it is a sparse drawing on a large static backdrop, so ~85% of the frame
 # cannot contribute motion at all. Kept small - the mid term above still owns
 # the audio response, and this only has to keep the strokes alive between beats.
-thickness  = "1.35 + sin(time * 0.53) * 0.22 + clamp(mid * 30.0, 0, 0.85)"
-brightness = "0.72 + clamp(mid * 12.0, 0, 0.16)"
+thickness  = "1.35 + sin(time * 0.53) * 0.22 + clamp(mid * 1, 0, 0.85)"
+brightness = "0.72 + clamp(mid * 0.188, 0, 0.16)"
 # Breath deepened 0.07 -> 0.10. The second of the two terms that were carrying
 # this preset alone; now one of four time-scales rather than half the budget.
-scale      = "0.82 + sin(time * 0.95) * 0.10 + bar * 0.05 + clamp(bass * 4.0, 0, 0.14)"
+scale      = "0.82 + sin(time * 0.95) * 0.10 + bar * 0.05 + clamp(bass * 0.165, 0, 0.14)"
 
 # COLOUR, and this is the "more colours" ask - within what the system allows.
 # `hue` is an offset into the line scenes' own cosine ramp and it is whole-figure:
@@ -138,7 +138,7 @@ scale      = "0.82 + sin(time * 0.95) * 0.10 + bar * 0.05 + clamp(bass * 4.0, 0,
 # The same argument as the doubling above - the figure travelling further and
 # faster through the ramp - and it is the one term that keeps moving when the
 # geometry is between breaths.
-hue        = "mod(0.62 + time * 0.075 + clamp(treb * 18.0, 0, 0.28) + sin(bar * pi) * 0.05, 1)"
+hue        = "mod(0.62 + time * 0.075 + clamp(treb * 0.467, 0, 0.28) + sin(bar * pi) * 0.05, 1)"
 
 # GEOMETRY MIRROR - the source of the "several lines". Rotational copies of the
 # whole fractal, interleaving into a radial web, and MID drives the fold count
@@ -148,7 +148,7 @@ hue        = "mod(0.62 + time * 0.075 + clamp(treb * 18.0, 0, 0.28) + sin(bar * 
 # 0.006 and peaks at 0.019, so `mid > 0.22` and `mid > 0.08` BOTH never fired
 # and the mirror was frozen at four copies. Recalibrated, and the top rung
 # raised 8 -> 10 now that it can actually be reached.
-mirror_order   = "select(mid > 0.012, 10, select(mid > 0.005, 7, 4))"
+mirror_order   = "select(mid > 0.63, 10, select(mid > 0.26, 7, 4))"
 mirror_reflect = "0"
 
 # THE SCREEN FOLD, newly bound - and there was already a `kaleido_order` entry
@@ -182,18 +182,18 @@ kaleido_angle = "0"
 # phase, so the tiling pushes and pulls through the fold rather than the whole
 # figure simply pulsing in step. Was audio-only, and therefore another constant
 # at silence.
-zoom        = "1.05 + sin(time * 0.41) * 0.05 + bar * 0.05 + clamp(bass * 4.0, 0, 0.14)"
+zoom        = "1.05 + sin(time * 0.41) * 0.05 + bar * 0.05 + clamp(bass * 0.165, 0, 0.14)"
 pan_y       = "-0.04 + cos(time * 0.0130) * 0.05"
 bg_hue      = "0.44 + sin(time * 0.0110) * 0.06"
 # Cap cut 0.13 -> 0.06 as well as gained. This is a full-frame wash sitting
 # under a figure that now reaches depth 7 across ten mirror copies and a screen
 # fold; the backdrop is the one luminance term with nothing to gain from a big
 # swing, and it is the cheapest thing to take headroom from.
-bg_bright   = "0.070 + clamp((bass + mid) * 1.2, 0, 0.06)"
+bg_bright   = "0.070 + clamp((bass + mid) * 0.0353, 0, 0.06)"
 bg_vignette = "0.52"
 
 # FEEDBACK - restored (Plan 0033), held short: rotation is 0.88 rad/s, the fastest sweep of the two L-systems.
-trails = "0.52 + clamp(mid * 9.0, 0, 0.12)"
+trails = "0.52 + clamp(mid * 0.141, 0, 0.12)"
 
 [smoothing]
 visible_depth = 1.1

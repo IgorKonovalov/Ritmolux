@@ -33,27 +33,27 @@ family = "de_jong"
 # SHAPE - four incommensurate slow sines (periods ~200/260/330/410 s) so the
 # drawing is redrawn continuously and never repeats, with a small clamped band
 # term on top. Chaotic maps cut rather than morph if you shove them.
-a = "1.641 + sin(time * 0.0314) * 0.075 + clamp(bass * 0.35, 0, 0.080)"
-b = "1.902 + cos(time * 0.0241) * 0.065 + clamp(mid * 0.32, 0, 0.070)"
-c = "0.316 + sin(time * 0.0190) * 0.085 + clamp(treb * 0.28, 0, 0.055)"
-d = "1.525 + cos(time * 0.0153) * 0.070 - clamp(bass * 0.22, 0, 0.045)"
+a = "1.641 + sin(time * 0.0314) * 0.075 + clamp(bass * 0.094, 0, 0.080)"
+b = "1.902 + cos(time * 0.0241) * 0.065 + clamp(mid * 0.082, 0, 0.070)"
+c = "0.316 + sin(time * 0.0190) * 0.085 + clamp(treb * 0.092, 0, 0.055)"
+d = "1.525 + cos(time * 0.0153) * 0.070 - clamp(bass * 0.053, 0, 0.045)"
 
 # THE NIB. Fine on purpose - the trail grid is surface-sized (Plan 0027 Phase
 # 2), so a point that looked right on the old soft 640x360 field blots here.
 # Note the sign: the nib gets FINER as the mix gets louder, so a drop sharpens
 # the hatching. The beat adds the only positive term - a single wet stroke.
-size = "0.60 - clamp((bass + mid) * 0.14, 0, 0.16) + beat * 0.14"
+size = "0.60 - clamp((bass + mid) * 0.094, 0, 0.16) + beat * 0.14"
 
 # TRAIL LENGTH - the ink has to accumulate before it reads as a drawn line, but
 # this is the knob that blots. Ceiling 0.89, and it falls under bass.
-fade = "0.885 - clamp(bass * 0.13, 0, 0.040)"
+fade = "0.885 - clamp(bass * 0.047, 0, 0.040)"
 
 # A hard transient re-scatters the cloud; it blooms through the standing trails
 # and dries back as the fade catches up. Gated above `beat` so quiet passages
 # keep one continuous drawing instead of being wiped every bar.
-# MEASURED. Read 0.45 and never fired - `onset` is raw spectral flux peaking at
+# MEASURED. Read 0.45 and never fired - `onset` was then raw spectral flux peaking at
 # 0.016, not a 0..1 envelope. Rank preserved within the family.
-reseed = "onset > 0.009"
+reseed = "onset > 0.56"
 
 # Nearly neutral. The remap discards hue anyway, and a desaturated source keeps
 # the luminance ramp - and so the ink density - honest across the frame.
@@ -63,7 +63,7 @@ hue_center = "0.5"
 
 # VIEW - a slow drift and a per-bar breath, so the composition reframes over a
 # track rather than sitting dead centre for the whole show.
-zoom  = "1.12 + bar * 0.07 + clamp(bass * 0.40, 0, 0.18)"
+zoom  = "1.12 + bar * 0.07 + clamp(bass * 0.212, 0, 0.18)"
 pan_x = "sin(time * 0.0230) * 0.07"
 pan_y = "cos(time * 0.0170) * 0.055"
 

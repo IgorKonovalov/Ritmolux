@@ -27,35 +27,35 @@ name = "ember"
 # THE COEFFICIENTS ARE THE INSTRUMENT. Each is a slow independent wander with a
 # band term on top, so the attractor is always mid-transformation and never
 # settles into the one shape a static preset shows.
-a = "-2.10 + sin(time * 0.0170) * 0.38 + clamp(bass * 3.6, 0, 0.34)"
-b = "-2.34 + cos(time * 0.0130) * 0.34 + clamp(mid * 16.0, 0, 0.30)"
-c = "1.28 + sin(time * 0.0091) * 0.42 + clamp(treb * 9.0, 0, 0.26)"
-d = "1.96 + cos(time * 0.0110) * 0.36 + clamp(bass * 2.8, 0, 0.24)"
+a = "-2.10 + sin(time * 0.0170) * 0.38 + clamp(bass * 0.4, 0, 0.34)"
+b = "-2.34 + cos(time * 0.0130) * 0.34 + clamp(mid * 0.353, 0, 0.30)"
+c = "1.28 + sin(time * 0.0091) * 0.42 + clamp(treb * 0.433, 0, 0.26)"
+d = "1.96 + cos(time * 0.0110) * 0.36 + clamp(bass * 0.282, 0, 0.24)"
 
 # EXPOSURE - short, so the sheet stays filamentary. A long fade saturates the
 # dense cores to flat white and erases the structure the coefficients just built.
-fade   = "0.855 - clamp(bass * 0.30, 0, 0.075) - beat * 0.020"
-size   = "0.52 - clamp((bass + treb) * 0.55, 0, 0.16) + beat * 0.12"
-reseed = "onset > 0.011"
+fade   = "0.855 - clamp(bass * 0.088, 0, 0.075) - beat * 0.020"
+size   = "0.52 - clamp((bass + treb) * 0.11, 0, 0.16) + beat * 0.12"
+reseed = "onset > 0.69"
 
-hue_center  = "0.30 + sin(time * 0.021) * 0.16 + clamp(bass * 2.2, 0, 0.20)"
+hue_center  = "0.30 + sin(time * 0.021) * 0.16 + clamp(bass * 0.235, 0, 0.20)"
 # Held NARROW deliberately. Widening this to 0.62 was tried and reverted: the
 # palette pale end floods in and the creature goes chalk-white, losing the
 # saturated cyan that makes it read as lit from within rather than drawn.
-hue_spread  = "0.34 + clamp(treb * 8.0, 0, 0.30)"
-saturation  = "1.15 + clamp(mid * 14.0, 0, 0.24)"
-palette_mix = "clamp(treb * 10.0, 0, 0.40) + sin(time * 0.0083) * 0.25"
+hue_spread  = "0.34 + clamp(treb * 0.5, 0, 0.30)"
+saturation  = "1.15 + clamp(mid * 0.282, 0, 0.24)"
+palette_mix = "clamp(treb * 0.67, 0, 0.40) + sin(time * 0.0083) * 0.25"
 
-zoom  = "1.12 + bar * 0.06 + clamp(bass * 2.4, 0, 0.18)"
+zoom  = "1.12 + bar * 0.06 + clamp(bass * 0.212, 0, 0.18)"
 pan_x = "sin(time * 0.023) * 0.06"
 pan_y = "cos(time * 0.031) * 0.05"
 
 bg_hue        = "0.58 + sin(time * 0.013) * 0.06"
-bg_bright     = "0.022 + clamp(mid * 2.0, 0, 0.020)"
+bg_bright     = "0.022 + clamp(mid * 0.0235, 0, 0.020)"
 bg_vignette   = "0.82"
-kaleido_order = "select(bass + mid > 0.070, 6, 1)"
+kaleido_order = "select(bass + mid > 1.12, 6, 1)"
 kaleido_angle = "time * 0.055"
-trails        = "0.46 + clamp(onset * 10.0, 0, 0.22)"
+trails        = "0.46 + clamp(onset * 0.367, 0, 0.22)"
 
 [smoothing]
 a             = 0.55

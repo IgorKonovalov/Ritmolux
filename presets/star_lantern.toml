@@ -67,14 +67,14 @@ rotation = "0.62 * time + noise(time * 0.07) * 1.4"
 # so radial draw order is the motion that actually reads - in silence as much
 # as under audio. It rests near-complete and opens the ring on an onset rather
 # than sweeping from nothing, so a still frame is never a broken figure.
-draw_progress = "clamp(0.93 + sin(time * 0.75) * 0.07 + bar * 0.05 + clamp(onset * 1.2, 0, 0.08), 0, 1)"
+draw_progress = "clamp(0.93 + sin(time * 0.75) * 0.07 + bar * 0.05 + clamp(onset * 0.133, 0, 0.08), 0, 1)"
 
 # BOUNDED, and the app is what caught it. In a 1280x720 `shot` still this
 # read fine, because a still samples one instant; live, the terms sum to a
 # 0.35..0.89 swing - two and a half times - and the rosette walked off the
 # frame on every bass peak. The halo needs margin around the figure or it
 # has nowhere to fall, so the range is now 0.34..0.64.
-scale = "0.40 + sin(time * 0.31) * 0.06 + bar * 0.04 + clamp(bass * 3.0, 0, 0.14)"
+scale = "0.40 + sin(time * 0.31) * 0.06 + bar * 0.04 + clamp(bass * 0.165, 0, 0.14)"
 
 # LUMINANCE: the FIELD stays in range, the CORE does not.
 #
@@ -87,18 +87,18 @@ scale = "0.40 + sin(time * 0.31) * 0.06 + bar * 0.04 + clamp(bass * 3.0, 0, 0.14
 # only modulate it. What keeps this from being a blown frame is that the lit
 # area is a thin stroke on a near-black field: the tonemap rolls the core off
 # with its hue intact, and the backdrop is still 0.01.
-brightness = "1.10 + clamp(mid * 1.6, 0, 0.30)"
+brightness = "1.10 + clamp(mid * 0.353, 0, 0.30)"
 # BOUNDED for the same reason as `scale`, and caught the same way - live, in
 # the app, with music playing. At the old range this summed past 7 on a
 # bass peak and the twelve points merged into a smooth doughnut: the
 # rosette stopped being a rosette exactly when the music got interesting.
 # 2.6..4.5 keeps the lacing legible at both ends.
-thickness  = "2.60 + clamp(bass * 4.0, 0, 1.10) + clamp(treb * 3.0, 0, 0.50) + beat * 0.30"
+thickness  = "2.60 + clamp(bass * 1.29, 0, 1.10) + clamp(treb * 0.83, 0, 0.50) + beat * 0.30"
 
 # `glow` is the fuel. Above 1 it saturates the stroke's core instead of
 # widening a skirt, which is exactly the over-range light the bright-pass is
 # looking for. Rests hot, goes hotter on an onset.
-glow = "2.90 + clamp(onset * 2.1, 0, 0.95) + beat * 0.20"
+glow = "2.90 + clamp(onset * 1.58, 0, 0.95) + beat * 0.20"
 
 # Golden amber into warm orange-red, and it OSCILLATES rather than drifts.
 #
@@ -109,7 +109,7 @@ glow = "2.90 + clamp(onset * 2.1, 0, 0.95) + beat * 0.20"
 # ramp's wrap at 1.0: `mod` takes it cleanly round to crimson rather than
 # jumping, so the loud frame came out red instead of amber. This one is bounded
 # 0.80..0.94 and never reaches the wrap.
-hue = "0.84 + sin(time * 0.021) * 0.04 + clamp(treb * 0.3, 0, 0.06)"
+hue = "0.84 + sin(time * 0.021) * 0.04 + clamp(treb * 0.1, 0, 0.06)"
 
 # --- the bloom stage, which is what this preset is for --------------------
 #
@@ -117,26 +117,26 @@ hue = "0.84 + sin(time * 0.021) * 0.04 + clamp(treb * 0.3, 0, 0.06)"
 # a wider radius spreads the same energy further instead of adding more - so
 # the bar phase opens the halo across the bar without the frame brightening as
 # it goes, and the onset lands as a hit of light rather than a gain change.
-bloom_amount    = "0.95 + clamp(onset * 8.0, 0, 2.10) + clamp(mid * 2.0, 0, 0.55)"
+bloom_amount    = "0.95 + clamp(onset * 3.5, 0, 2.10) + clamp(mid * 0.65, 0, 0.55)"
 # Left at the shipped default on purpose. This is the number that makes the
 # preset mean something: at 1.0 only the over-range core blooms, so the halo
 # tracks the light and not the figure. Drop it toward 0.5 and the whole
 # rosette glows, which is prettier for one frame and mush in motion.
 bloom_threshold = "1.0"
-bloom_radius    = "2.15 + bar * 1.05 + clamp(treb * 5.0, 0, 0.90) + clamp(bass * 1.6, 0, 0.45)"
+bloom_radius    = "2.15 + bar * 1.05 + clamp(treb * 1.5, 0, 0.90) + clamp(bass * 0.53, 0, 0.45)"
 
 # --- the room the lantern hangs in ---------------------------------------
-zoom        = "1.02 + bar * 0.04 + clamp(bass * 0.26, 0, 0.10)"
+zoom        = "1.02 + bar * 0.04 + clamp(bass * 0.118, 0, 0.10)"
 pan_y       = "sin(time * 0.013) * 0.035"
 bg_hue      = "0.30 + sin(time * 0.008) * 0.04"
 # Nearly black, with a deep vignette. The halo IS the light in this frame; a
 # lifted backdrop would compete with it and flatten the whole point.
-bg_bright   = "0.010 + clamp(mid * 0.05, 0, 0.008)"
+bg_bright   = "0.010 + clamp(mid * 0.0094, 0, 0.008)"
 bg_vignette = "0.92"
 
 # Short. A long tail closes the ring into a solid annulus and buries the cores
 # the halo is coming from.
-trails = "0.42 + clamp(mid * 0.30, 0, 0.14)"
+trails = "0.42 + clamp(mid * 0.165, 0, 0.14)"
 
 [smoothing]
 rotation      = 0.20
