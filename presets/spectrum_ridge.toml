@@ -65,9 +65,33 @@ base  = "0.12 + sin(time * 1.3) * 0.12"
 # measured the lowest reactivity in the whole library. At 0.55 the same mean
 # reaches 0.060 and the top half of the ridge has relief.
 #
-# `scale` comes down 4.50 -> 3.20 to pay for it, since the curve now hands back
-# far more height than it used to.
-scale = "3.20"
+# AND THEN 3.20 -> 0.60, WHICH IS A DIFFERENT AND MUCH LARGER CORRECTION. Every
+# number in the history above was tuned on the PRE-ADR-0049 raw band scale, where
+# a loud element read about 0.1. ADR-0049 normalized the bands to 0..1, so the
+# same `scale` was suddenly multiplying a value roughly five times larger and the
+# contour left the frame.
+#
+# Measured rather than reasoned: at 3.20 a fully-driven element sits at
+# `base + 3.20` = about 3.3 world units against a visible half-height of 1.0, so
+# the ridge was drawn more than three frame-heights off the top. Rendered under
+# `--signal noise:7` the frame came back EMPTY except the vignette; under
+# `--signal dynamic:110` only the near-vertical connecting segments crossed the
+# frame edges and the peaks were never visible at all. This preset has been
+# drawing itself off-screen since the analysis change.
+#
+# 0.60 puts a fully-driven contour at `base + 0.60` = about 0.84, just inside the
+# frame, so the figure stays whole at any level the music can reach - and a
+# typical passage (curved to ~0.5) lands near 0.42, which is the mirrored pair
+# filling the middle of the frame with real relief in the tail. Picked from a
+# rendered sweep of 0.55 / 0.80 / 1.10: 1.10 clipped the tallest peaks off the
+# top edge, 0.55 flattened the top end, and 0.80 looked best on music but still
+# overshot when every band is driven at once.
+#
+# The lesson is the one design-backlog 0046 records: a preset written against
+# one meaning of a variable is not valid content after that meaning changes, and
+# nothing in the harness measured this because `sanity` renders at a size and a
+# stimulus where an off-frame figure still leaves a lit vignette behind.
+scale = "0.60"
 curve = "0.55"
 
 # WIDTH, AND THE SILENT-AUDIO MOTION. `span` is a world half-width, and 1.72
@@ -112,8 +136,16 @@ rotation = "sin(time * 0.9) * 0.40 + clamp(bass * 0.118, 0, 0.10)"
 # to the highest, so the low end and the top end are different colours and you
 # can see WHERE in the spectrum a peak is without counting positions. This is the
 # lever the comb deliberately leaves at zero.
+#
+# 0.75 -> 1.00 at the same pass as `scale`. With the contour finally IN frame the
+# spread is worth spending in full: the whole aurora ramp now runs across the
+# axis, so the low end is deep green and the top end violet, and a peak's
+# position is readable at a glance. It also buys the frame real tonal structure
+# under a flat spectrum, which is the case `core/tests/sanity.rs` renders - a
+# straight contour of one colour is a blot, the same line under a full ramp is
+# not.
 hue        = "mod(0.10 + time * 0.02, 1)"
-hue_spread = "0.75"
+hue_spread = "1.00"
 saturation = "0.95"
 
 # STROKE - and the constraint that set it is GONE. This param used to be pinned

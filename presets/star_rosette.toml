@@ -28,34 +28,35 @@ contact_angle_deg = 20
 # fixed 1280x720, so `trails` no longer costs this preset its sharpness.
 
 [params]
-# THE STRUCTURAL SWAP - cycles 0 -> 1 -> 2 on a slow ~50 s clock.
+# THE STRUCTURAL MORPH - a continuous sweep through the contact angle and back,
+# ~95 s for the round trip.
 #
-# THE ENGINE LIMIT THIS WAS BUILT AROUND IS GONE (Plan 0054 / ADR-0060). What
-# used to be here: "`variant` selects one of three PRECOMPUTED geometries by
-# index, so there is nothing to interpolate between - smoothing it only spends
-# time on fractional indices that `floor` collapses back to the same three
-# shapes. Blending two variants would be engine work, not preset content. What
-# IS available is making the cut RARE and hiding it under `draw_progress`."
+# THIS IS NOW A TRIANGLE WAVE, and that is the whole change. `variant` became a
+# continuous contact angle at Plan 0054 / ADR-0060, but this file went on
+# `floor`ing it into the same three rosettes the old index selected, so none of
+# the morph was visible. Removing the `floor` alone is NOT the fix and the reason
+# is worth keeping: `mod(x, 3)` is a SAWTOOTH, so a bare removal would sweep
+# 0 -> 2 smoothly and then SNAP 2 -> 0 at every wrap - one hard cut per cycle,
+# which is worse than the three soft ones it replaced.
 #
-# That is no longer true: `variant` is a continuous contact angle, fractional
-# values are real rosettes, and `[smoothing]` on it now morphs. THIS FILE STILL
-# `floor`s IT, deliberately: Plan 0054 explicitly does not re-tune shipped
-# presets, and a bare `floor` removal would be worse than the cut it replaces -
-# `mod(..., 3)` is a sawtooth, so dropping the floor turns one slow morph into a
-# hard 2 -> 0 snap at every wrap. Composing a continuous sweep (a triangle wave
-# over 0..2, eased) is a `preset-author` pass, and it is the obvious next one for
-# this file.
+#   2 * abs(mod(phase, 2) - 1)
 #
-# The cycle stays ~50 s, and `draw_progress` below still re-draws the figure
-# continuously so the swap lands mid-redraw.
-# SLOWED, and the audio term deliberately declawed. Two separate changes:
-#   - the clock went 0.06 -> 0.021, so a variant holds for ~48 s instead of ~17.
-#   - the bass term was `clamp(bass * 3.0, 0, 1.0)` - a full 1.0, i.e. enough to
-#     push the index a WHOLE variant forward and let it fall back as the level
-#     moved. That is not a morph, it is a flicker between two geometries driven
-#     by the low end, and it is most of what read as restless. Capped at 0.35 it
-#     can nudge the phase of the cycle without ever crossing a boundary alone.
-variant = "floor(mod(time * 0.021 + clamp(bass * 0.41, 0, 0.35), 3))"
+# is the triangle over 0..2: it walks up to 2, turns, and walks back to 0 with no
+# discontinuity anywhere. The `0.5 +` offset starts the figure at variant 1, this
+# preset's own `contact_angle_deg = 20`, so a cold start shows the shape the
+# `[generator]` block names rather than an extreme.
+#
+# THE CLOCK IS UNCHANGED at 0.021. Under `mod(..., 2)` that is 2/0.021 = ~95 s
+# for a full there-and-back, i.e. ~48 s in each direction - exactly the pacing
+# the old comment claimed ("a variant holds for ~48 s") and never delivered,
+# because a held index is not a morph. Answers the user's "easier, slower".
+#
+# THE BASS TERM SURVIVES BUT NOW NEEDS THE EASING BELOW. It was capped at 0.35 so
+# it could "nudge the phase of the cycle without ever crossing a boundary alone" -
+# reasoning that belonged to a floor. With no floor there are no boundaries and
+# every wobble in the low end reaches the geometry directly, so the smoothing
+# constant on `variant` is doing real work here rather than rounding a corner.
+variant = "2 * abs(mod(0.5 + time * 0.021 + clamp(bass * 0.41, 0, 0.35), 2) - 1)"
 
 # MOTION - a brisk, steady, AUDIO-INDEPENDENT turn in radians. `rotation` is an
 # angle, so a band term on it is a positional jump rather than a speed change,
@@ -116,10 +117,13 @@ trails = "0.34 + clamp(mid * 0.082, 0, 0.07)"
 
 [smoothing]
 mirror_order  = 2.5
-# `variant` is not smoothed HERE, but it now can be: since ADR-0060 easing it
-# walks a continuous contact angle and morphs the figure. It stays unsmoothed
-# only because the `floor` above still quantizes it - drop that first (see the
-# note beside it), then a smoothing constant is what makes the morph read.
+# `variant` IS smoothed now, and this constant is load-bearing rather than
+# cosmetic. Two jobs: it rounds the triangle's velocity reversal at 0 and 2, and
+# - the one that matters - it low-passes the `bass` term the expression adds
+# straight onto the contact angle. 1.5 s is long against the low end's wobble and
+# short against a ~48 s sweep, so the morph arrives intact and the shiver does
+# not. Without it the rosette's lacing twitches on every kick.
+variant       = 1.5
 rotation      = 0.18
 thickness     = { attack = 0.02, release = 0.34 }
 scale         = 0.55

@@ -85,6 +85,29 @@ scale      = "0.68 + clamp(mid * 0.165, 0, 0.14) + clamp(bass * 0.188, 0, 0.16)"
 # hue wheel - 0.30 is cyan, 0.62 is gold, 0.82 is rose. Sweep it, do not assume.
 hue        = "0.46 + time * 0.023 + clamp(treb * 0.467, 0, 0.28) + bar * 0.04"
 
+# COLOUR BY GENERATION - the thing this preset was asking for and could not have
+# until Plan 0054 / ADR-0059. `hue_spread` walks the palette along the L-system's
+# GENERATION DEPTH: 0 on the trunk, one more for every open bracket. So the old
+# stems sit at `hue` and each newer generation of growth is further along the
+# ramp, which is what makes a branching figure read as GROWTH rather than as
+# wire - the user's framing when design-backlog 0026 was raised.
+#
+# 0.40 was picked from a rendered sweep of 0.20 / 0.40 / 0.65, not from theory.
+# 0.20 leaves the whole thicket one gold family - the separation is there but you
+# have to look for it. 0.65 pushes the outer growth into magenta and the figure
+# reads as fireworks rather than a plant. 0.40 puts pale green-white stems under
+# warm gold-and-rose new growth, which is a plant.
+#
+# It rides ON TOP of the `hue` drift above, so the whole gradient walks the ramp
+# together and the generational relationship holds at every point in the drift.
+#
+# The divisor is the figure's OWN deepest generation, not `visible_depth` - this
+# grammar opens two branches per rewrite, so it reaches generation 11 by depth 6
+# (ADR-0059's Outcome). That means the spread stays calibrated as
+# `visible_depth` grows on the low end, instead of the gradient compressing every
+# time the plant adds an iteration.
+hue_spread = "0.40"
+
 # GEOMETRY MIRROR - the thicket. Five-fold, no reflection: a reflected fern
 # reads as a mirrored plant rather than a grown one.
 mirror_order   = "5"
