@@ -51,12 +51,14 @@
 
 ## Known gaps / honest nulls
 
-- **Nothing crosses the whole seam in a test.** Miri proves the ring's `unsafe`, and the DSP
-  tests prove determinism, but no test drives PCM through `audio::intake` → the real drain policy
-  → `Analyzer` → `Renderer`. The standalone's drain loop is therefore uncovered. That end-to-end
-  tier is [Plan 0032](../plans/0032-testing-strategy-e2e-coverage-and-pre-push.md) Phase 1
-  ([ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)) — until it
-  lands, the ring-to-pixels claim above is architecture, not assertion.
+- ~~**Nothing crosses the whole seam in a test.**~~ **Closed** by
+  [Plan 0032](../plans/done/0032-testing-strategy-e2e-coverage-and-pre-push.md) Phase 1
+  ([ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)):
+  `core/tests/chain.rs` pushes synthetic PCM into a real `audio::intake` pair in
+  capture-callback-sized bursts, drains it through `pop_samples`, feeds a real `Analyzer` and
+  renders — so the ring-to-pixels claim above is assertion, not architecture. What that suite
+  still does **not** cover is the **standalone's own** drain loop, which is shell code outside
+  `core`.
 - This spec does not contract the *tempo estimator's accuracy* (how close BPM is to ground
   truth) — only its **determinism**. Better tempo tracking is a named later roadmap item.
 - The overflow/underrun policy is stated behaviorally here; the exact capacity (~100 ms at
