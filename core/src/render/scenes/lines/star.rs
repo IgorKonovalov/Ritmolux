@@ -1,9 +1,42 @@
-//! Star-pattern scene: a Hankin star rosette built and cached at preset load
-//! (ADR-0007 generator build model), cheap to animate. `configure` precomputes
-//! a small set of **contact-angle variants** off the hot path; per frame the
-//! scene picks the active variant and applies a rotate/scale/colour/draw-on
-//! transform (allocation-free). A beat can swap the active variant for a
-//! structural accent; continuous params drive rotation, hue, and draw-on.
+//! Star-pattern scene: a Hankin star rosette built from a **continuous contact
+//! angle** and cached (ADR-0007 generator build model), cheap to animate. Per
+//! frame the scene resolves `variant` to an angle, reuses the cached rosette
+//! unless the request has moved more than one step, and applies a
+//! rotate/scale/colour/draw-on transform (allocation-free).
+//!
+//! ## `variant` is a contact angle, not an index (ADR-0060)
+//!
+//! It used to `floor` into one of three precomputed rosettes, so `[smoothing]`
+//! on it spent its time on fractional values a floor threw away and the change
+//! read as a stutter — design-backlog 0007's "change between star rosette shapes
+//! should be smooth". Now `variant` maps linearly onto a contact-angle offset:
+//! `0`, `1` and `2` land on exactly the `-24 / 0 / +24` degree offsets the three
+//! cached variants used to hold, so **a preset binding integers draws exactly
+//! what it drew before**, while a fractional value is a real rosette in between.
+//!
+//! The cache stays, keyed on the built angle with **hysteresis**: a request more
+//! than [`STEP_DEG`] from the built angle rebuilds, anything nearer reuses. That
+//! is what keeps generator work off the hot path (ADR-0007) now that a bound
+//! param can reach it.
+//!
+//! **The step is measured, not assumed** (ADR-0060 leaves the number to the
+//! plan). At `0.1` degrees:
+//!
+//! - *Invisible in motion.* The worst case is the sharpest reachable rosette:
+//!   a 12-fold star at an 11-degree contact angle moves a vertex 11.0 px per
+//!   degree at 1080p, so one step is **1.14 px** there and 0.67 / 0.25 px at the
+//!   20 / 55-degree angles the two shipped presets use — under a stroke that is
+//!   itself several pixels of glow wide.
+//! - *Cannot rebuild every frame.* The full `variant` range is 48 degrees of
+//!   contact angle, i.e. 480 steps, so a sweep slower than 8 s at 60 fps rebuilds
+//!   on a fraction of its frames. Both shipped presets sweep in ~45 s, which is
+//!   about one rebuild every six frames.
+//! - *And a rebuild fits the frame anyway.* Measured at the loader's maximum
+//!   order (`n = 12`, so `2n = 24` segments): **0.34 us**, 0.002% of a 16.7 ms
+//!   frame. A hypothetical rosette filled to the floor tier's whole
+//!   20 000-segment cap (`n = 10 000`, unreachable from the preset surface, whose
+//!   tilings stop at 12) costs 282 us — 1.7% of a frame — so even the ceiling
+//!   this scene cannot reach is inside budget.
 //!
 //! ## The colour axis: **radius from the rosette centre** (ADR-0059)
 //!
@@ -67,12 +100,23 @@ use crate::render::palette::Palette;
 /// Maps `thickness` to an NDC-y half-width (see the parametric scene).
 const WIDTH_SCALE: f32 = 0.003;
 
-/// Contact-angle offsets (degrees) for the precomputed variants a beat swaps
-/// between — a pointier and a blunter star around the preset's base angle.
-const VARIANT_OFFSETS_DEG: [f32; 3] = [-24.0, 0.0, 24.0];
+/// How far (degrees of contact angle) `variant` reaches either side of the
+/// preset's base angle — a pointier star at `0`, a blunter one at `2`. This is
+/// the span the three precomputed variants used to sit at (`-24 / 0 / +24`), kept
+/// so a preset binding integers is unchanged (ADR-0060).
+const VARIANT_SPAN_DEG: f32 = 24.0;
+/// The `variant` value that means "the preset's own `contact_angle_deg`" — the
+/// middle of the range, and this scene's default.
+const VARIANT_CENTER: f32 = 1.0;
 /// Contact angle is clamped to this range for a sensible star.
 const CONTACT_MIN_DEG: f32 = 8.0;
 const CONTACT_MAX_DEG: f32 = 80.0;
+
+/// The rebuild hysteresis: a requested contact angle further than this from the
+/// built one rebuilds the rosette, anything nearer reuses it. See the module
+/// docs for the measurement behind the number — it is the resolution of the
+/// morph, not a shape (the ADR-0037 habit).
+const STEP_DEG: f32 = 0.1;
 
 const DEFAULT_VARIANT: f32 = 1.0;
 const DEFAULT_ROTATION: f32 = 0.0;
@@ -101,14 +145,15 @@ const DEFAULT_MIRROR_REFLECT: f32 = 0.0;
 pub struct StarPatternScene {
     /// The single line renderer, shared with the other line scenes (ADR-0007).
     renderer: Rc<RefCell<LineRenderer>>,
-    /// One cached rosette per contact-angle variant, built in `configure`.
-    cached: Vec<Vec<SegmentInstance>>,
-    /// Each cached rosette's per-segment **normalized radius** (ADR-0059's
-    /// colour axis), index-aligned with [`cached`](Self::cached). A load-time
-    /// quantity: `transform_cached`'s rotate and uniform scale leave a
-    /// normalized radius unchanged, so nothing per frame can move it.
-    cached_radii: Vec<Vec<f32>>,
-    /// Per-segment stroke colour for the active rosette, rebuilt each frame into
+    /// The one cached rosette, with the contact angle it was built at
+    /// (ADR-0060). Rebuilt only when `variant` walks it more than
+    /// [`STEP_DEG`] away.
+    cache: RosetteCache,
+    /// The preset's `[generator] contact_angle_deg` and star order, from
+    /// `configure`. `variant` offsets the angle around this.
+    order: u32,
+    base_contact_deg: f32,
+    /// Per-segment stroke colour for the cached rosette, rebuilt each frame into
     /// a buffer sized at build time so the fill allocates nothing.
     colors: Vec<[f32; 3]>,
     /// Reused per-frame draw buffer — the mirrored geometry actually rendered.
@@ -153,8 +198,9 @@ impl StarPatternScene {
     pub fn new(renderer: Rc<RefCell<LineRenderer>>, max_segments: usize) -> Self {
         Self {
             renderer,
-            cached: Vec::new(),
-            cached_radii: Vec::new(),
+            cache: RosetteCache::default(),
+            order: 0,
+            base_contact_deg: 0.0,
             colors: Vec::new(),
             draw_buf: Vec::with_capacity(max_segments),
             single_buf: Vec::with_capacity(max_segments),
@@ -183,27 +229,108 @@ impl StarPatternScene {
         }
     }
 
-    /// Build + cache one rosette per contact-angle variant, with its radial
-    /// colour axis. Off the hot path.
-    fn build(&mut self, n: u32, contact_angle_deg: f32) {
-        self.cached.clear();
-        self.cached_radii.clear();
-        let mut widest = 0usize;
-        for offset in VARIANT_OFFSETS_DEG {
-            let ang = (contact_angle_deg + offset)
-                .clamp(CONTACT_MIN_DEG, CONTACT_MAX_DEG)
-                .to_radians();
-            let mut segs = Vec::new();
-            hankin::star_rosette(n, ang, &mut segs);
-            turtle::normalize_fit(&mut segs, 0.9);
-            let mut radii = Vec::new();
-            normalized_radii(&segs, &mut radii);
-            widest = widest.max(segs.len());
-            self.cached.push(segs);
-            self.cached_radii.push(radii);
+    /// Ask the cache for the rosette this frame's `variant` names, rebuilding
+    /// only if the request has walked more than one step, and keep the colour
+    /// buffer sized to it.
+    fn refresh(&mut self) {
+        self.cache.request(
+            self.order,
+            contact_angle_deg(self.base_contact_deg, self.variant),
+        );
+        // A rebuild at the same order keeps the same `2n` segments, so this
+        // fires on a preset switch and never on a morph.
+        if self.colors.len() != self.cache.segments.len() {
+            self.colors.clear();
+            self.colors.resize(self.cache.segments.len(), [0.0; 3]);
         }
-        self.colors.clear();
-        self.colors.resize(widest, [0.0; 3]);
+    }
+}
+
+/// The contact angle (degrees) a `variant` asks for, around the preset's
+/// `[generator] contact_angle_deg`.
+///
+/// `variant` keeps the `0..2` range it has always had and 0 / 1 / 2 land exactly
+/// on the `-24 / 0 / +24` degree offsets the three precomputed variants used to
+/// hold, so a preset binding integers draws exactly what it drew before
+/// (ADR-0060). What is new is that everything between them is a real rosette.
+///
+/// **Total**, because it runs per frame from an author expression: a non-finite
+/// `variant` falls back to the centre rather than reaching the construction, and
+/// the result is clamped to the range that makes a sensible star.
+pub(crate) fn contact_angle_deg(base_deg: f32, variant: f32) -> f32 {
+    let v = if variant.is_finite() {
+        variant.clamp(0.0, 2.0)
+    } else {
+        VARIANT_CENTER
+    };
+    let angle = base_deg + (v - VARIANT_CENTER) * VARIANT_SPAN_DEG;
+    if angle.is_finite() {
+        angle.clamp(CONTACT_MIN_DEG, CONTACT_MAX_DEG)
+    } else {
+        CONTACT_MIN_DEG
+    }
+}
+
+/// The single cached rosette and the contact angle it was built at (ADR-0060).
+///
+/// The cache key is the **built angle plus a hysteresis band**, not a quantized
+/// bucket: a request rebuilds when it is further than [`STEP_DEG`] from what is
+/// held, and the rebuild targets the request itself. That is what bounds the
+/// rebuild count of a sweep by *distance travelled / step* rather than by frame
+/// count — and it is why a `variant` dithering inside one band never rebuilds at
+/// all, which a bucket key would do on every crossing.
+#[derive(Default)]
+pub(crate) struct RosetteCache {
+    /// The star order the held rosette was built for. `0` means "nothing built".
+    order: u32,
+    /// The contact angle (degrees) it was built at.
+    built_deg: f32,
+    /// The rosette, fit-normalized, positions only.
+    segments: Vec<SegmentInstance>,
+    /// Its per-segment normalized radius — ADR-0059's colour axis. A load-time
+    /// quantity: `transform_cached`'s rotate and uniform scale leave a
+    /// *normalized* radius unchanged, so nothing per frame can move it.
+    radii: Vec<f32>,
+    /// How many times this cache has built a rosette. Not used by the render
+    /// path; it is the observable the rebuild-rate test asserts on, because
+    /// "does not rebuild every frame" is otherwise invisible from outside.
+    rebuilds: u64,
+}
+
+impl RosetteCache {
+    /// Ensure the cache holds an `order`-fold rosette within [`STEP_DEG`] of
+    /// `angle_deg`, rebuilding if not. Returns `true` if it rebuilt.
+    ///
+    /// A rebuild reuses the buffers, so the steady state allocates nothing; the
+    /// first build for an order grows them to `2 * order` and they stay.
+    pub(crate) fn request(&mut self, order: u32, angle_deg: f32) -> bool {
+        let held = self.order == order && (angle_deg - self.built_deg).abs() <= STEP_DEG;
+        if held {
+            return false;
+        }
+        self.order = order;
+        self.built_deg = angle_deg;
+        self.rebuilds = self.rebuilds.saturating_add(1);
+        hankin::star_rosette(order, angle_deg.to_radians(), &mut self.segments);
+        turtle::normalize_fit(&mut self.segments, 0.9);
+        normalized_radii(&self.segments, &mut self.radii);
+        true
+    }
+
+    /// Drop whatever is held, so the next [`request`](Self::request) rebuilds.
+    /// Called when a preset switch changes the construction under the cache.
+    pub(crate) fn invalidate(&mut self) {
+        self.order = 0;
+        self.segments.clear();
+        self.radii.clear();
+    }
+
+    /// How many rosettes this cache has built. Test-only on purpose: nothing on
+    /// the render path needs it, and "does not rebuild every frame" is the one
+    /// claim of ADR-0060's hysteresis that is invisible from outside.
+    #[cfg(test)]
+    pub(crate) fn rebuilds(&self) -> u64 {
+        self.rebuilds
     }
 }
 
@@ -329,13 +456,20 @@ impl Scene for StarPatternScene {
     }
 
     fn configure(&mut self, cfg: &GeneratorConfig) -> Option<CapOverflow> {
-        // Build + cache the star variants off the hot path. Other config
-        // variants belong to sibling line scenes and are ignored.
+        // Record the construction and build the first rosette off the hot path.
+        // Other config variants belong to sibling line scenes and are ignored.
         match cfg {
             GeneratorConfig::Star {
                 order,
                 contact_angle_deg,
-            } => self.build(*order, *contact_angle_deg),
+            } => {
+                self.order = *order;
+                self.base_contact_deg = *contact_angle_deg;
+                // The previous preset's rosette is not this preset's, whatever
+                // angle it happens to sit at.
+                self.cache.invalidate();
+                self.refresh();
+            }
             GeneratorConfig::Curve { .. }
             | GeneratorConfig::LSystem { .. }
             | GeneratorConfig::Particles { .. }
@@ -351,19 +485,18 @@ impl Scene for StarPatternScene {
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {
-        let variants = self.cached.len();
-        if variants == 0 {
+        // `variant` is a contact angle now (ADR-0060). The cache reuses its
+        // rosette unless the request has walked more than one `STEP_DEG`, which
+        // is what keeps generator work off the hot path now that a bound param
+        // can reach it.
+        self.refresh();
+        if self.cache.segments.is_empty() {
             self.draw_buf.clear();
             return;
         }
-        let idx = (self.variant.max(0.0) as usize).min(variants.saturating_sub(1));
-        let Some(base) = self.cached.get(idx) else {
-            self.draw_buf.clear();
-            return;
-        };
 
         // The radial colour ramp (ADR-0059). One sample per segment, into a
-        // buffer sized at build time. The radii are load-time values because a
+        // buffer sized at build time. The radii are build-time values because a
         // rotate plus a uniform scale leaves a normalized radius unchanged.
         let ramp = ColorRamp {
             hue: self.hue,
@@ -372,16 +505,14 @@ impl Scene for StarPatternScene {
             saturation: self.saturation,
             brightness: self.brightness,
         };
-        if let Some(radii) = self.cached_radii.get(idx) {
-            for (slot, &u) in self.colors.iter_mut().zip(radii) {
-                *slot = ramp.at(&self.palette, u);
-            }
+        for (slot, &u) in self.colors.iter_mut().zip(&self.cache.radii) {
+            *slot = ramp.at(&self.palette, u);
         }
         let inner = self.colors.first().copied().unwrap_or([1.0; 3]);
 
         let width = (self.thickness * WIDTH_SCALE).max(0.0005);
         transform_cached(
-            base,
+            &self.cache.segments,
             self.rotation,
             self.scale,
             inner,
@@ -543,6 +674,175 @@ mod tests {
                 lo / hi
             );
         }
+    }
+
+    /// The angle a variant asks for, at the golden fixture's base angle.
+    const BASE: f32 = 35.0;
+
+    fn geometry_at(variant: f32) -> Vec<SegmentInstance> {
+        let mut cache = RosetteCache::default();
+        cache.request(12, contact_angle_deg(BASE, variant));
+        cache.segments.clone()
+    }
+
+    fn differs(a: &[SegmentInstance], b: &[SegmentInstance]) -> bool {
+        a.len() != b.len()
+            || a.iter().zip(b).any(|(x, y)| {
+                (x.a[0] - y.a[0]).abs() > 1e-4
+                    || (x.a[1] - y.a[1]).abs() > 1e-4
+                    || (x.b[0] - y.b[0]).abs() > 1e-4
+                    || (x.b[1] - y.b[1]).abs() > 1e-4
+            })
+    }
+
+    /// **Plan 0054 Phase 3 done-when 1 (ADR-0060): intermediate `variant` values
+    /// produce intermediate geometry.** Under the old `floor` into three cached
+    /// rosettes the middle frame was *identical* to one of the ends, which is
+    /// exactly what makes this non-vacuous — the assertion that would have failed
+    /// before is the one that the halfway figure differs from **both**.
+    #[test]
+    fn a_half_variant_is_a_real_rosette_between_the_two_ends() {
+        let lo = geometry_at(0.0);
+        let mid = geometry_at(0.5);
+        let hi = geometry_at(1.0);
+
+        assert!(differs(&lo, &hi), "the two ends must differ at all");
+        assert!(
+            differs(&mid, &lo),
+            "variant 0.5 collapsed onto variant 0 — this is the floor, back again"
+        );
+        assert!(
+            differs(&mid, &hi),
+            "variant 0.5 collapsed onto variant 1 — this is the floor, back again"
+        );
+
+        // And it really is *between* them, not merely different: the petal tip
+        // radius is monotone in the contact angle, so the middle figure's inner
+        // radius sits between the two ends'.
+        let inner = |segs: &[SegmentInstance]| {
+            segs.iter().fold(f32::INFINITY, |acc, s| {
+                acc.min((s.a[0].powi(2) + s.a[1].powi(2)).sqrt())
+                    .min((s.b[0].powi(2) + s.b[1].powi(2)).sqrt())
+            })
+        };
+        let (a, b, c) = (inner(&lo), inner(&mid), inner(&hi));
+        assert!(a < b && b < c, "inner radii must be ordered: {a} {b} {c}");
+    }
+
+    /// The compatibility claim ADR-0060's "the precomputed-variant vocabulary
+    /// disappears" was worried about, and the reason no baseline moved: `variant`
+    /// 0 / 1 / 2 still name the `-24 / 0 / +24` degree offsets the three cached
+    /// rosettes held, so a preset binding integers draws what it always drew.
+    #[test]
+    fn the_integer_variants_are_the_angles_the_cache_used_to_hold() {
+        for (variant, offset) in [(0.0f32, -24.0f32), (1.0, 0.0), (2.0, 24.0)] {
+            let want = (BASE + offset).clamp(CONTACT_MIN_DEG, CONTACT_MAX_DEG);
+            assert!(
+                (contact_angle_deg(BASE, variant) - want).abs() < 1e-5,
+                "variant {variant} must still mean {want} degrees"
+            );
+        }
+        // Out of range clamps to the ends rather than running off, as the old
+        // `min(variants - 1)` index clamp did.
+        assert_eq!(contact_angle_deg(BASE, -3.0), contact_angle_deg(BASE, 0.0));
+        assert_eq!(contact_angle_deg(BASE, 9.0), contact_angle_deg(BASE, 2.0));
+        // Total over what an expression can actually produce.
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let a = contact_angle_deg(BASE, bad);
+            assert!(
+                a.is_finite() && (CONTACT_MIN_DEG..=CONTACT_MAX_DEG).contains(&a),
+                "variant {bad} produced {a}"
+            );
+        }
+    }
+
+    /// **Plan 0054 Phase 3 done-when 2: a swept `variant` does not rebuild every
+    /// frame.** The bound is *distance travelled / step*, not the frame count —
+    /// which is the whole content of the hysteresis, and the thing that keeps
+    /// ADR-0007's off-hot-path guarantee once a bound param can reach the
+    /// generator.
+    #[test]
+    fn a_swept_variant_rebuilds_per_step_not_per_frame() {
+        const FRAMES: usize = 2_000;
+        let mut cache = RosetteCache::default();
+
+        for frame in 0..FRAMES {
+            let variant = 2.0 * frame as f32 / (FRAMES - 1) as f32;
+            cache.request(12, contact_angle_deg(BASE, variant));
+        }
+
+        // The sweep covers the whole variant range: 2 * VARIANT_SPAN_DEG degrees
+        // of contact angle. `+ 2` for the initial build and the final partial
+        // step.
+        let travelled = 2.0 * VARIANT_SPAN_DEG;
+        let bound = (travelled / STEP_DEG) as u64 + 2;
+        assert!(
+            cache.rebuilds() <= bound,
+            "{} rebuilds over a {travelled}-degree sweep exceeds the {bound} the \
+             {STEP_DEG}-degree step allows",
+            cache.rebuilds()
+        );
+        assert!(
+            cache.rebuilds() < FRAMES as u64 / 2,
+            "{} rebuilds over {FRAMES} frames is tracking the frame rate, not \
+             the step",
+            cache.rebuilds()
+        );
+
+        // The other half of hysteresis, and the half a quantized-bucket key
+        // would get wrong: a `variant` dithering inside one step never rebuilds
+        // after the first, however many frames it runs for.
+        let mut steady = RosetteCache::default();
+        steady.request(12, contact_angle_deg(BASE, 1.0));
+        let after_first = steady.rebuilds();
+        for frame in 0..600 {
+            // +/- 0.002 of a variant unit is +/- 0.048 degrees, just under half
+            // a step — the band a quantized-bucket key would rebuild across on
+            // every crossing.
+            let jitter = if frame % 2 == 0 { 0.002 } else { -0.002 };
+            steady.request(12, contact_angle_deg(BASE, 1.0 + jitter));
+        }
+        assert_eq!(
+            steady.rebuilds(),
+            after_first,
+            "a variant jittering inside one step must never rebuild"
+        );
+    }
+
+    /// The rebuild is bounded work, and this pins the number the frame-budget
+    /// measurement in the module docs rests on: a rosette is `2n` segments, and
+    /// the loader's whole tiling vocabulary stops at `n = 12`. So the rebuild
+    /// this scene can actually be asked for is 24 segments — three orders of
+    /// magnitude under the floor tier's 20 000-segment cap.
+    #[test]
+    fn the_reachable_rebuild_is_two_dozen_segments() {
+        let mut widest = 0usize;
+        for name in ["square", "hexagon", "octagon", "dodecagon"] {
+            let order = hankin::tiling_order(name).unwrap_or(0);
+            let mut cache = RosetteCache::default();
+            cache.request(order, contact_angle_deg(BASE, 1.0));
+            assert_eq!(cache.segments.len(), 2 * order as usize, "{name}");
+            widest = widest.max(cache.segments.len());
+        }
+        assert_eq!(widest, 24, "the loader's largest tiling is 12-fold");
+        assert!(widest * 800 < crate::render::TierConfig::FLOOR.max_segments);
+    }
+
+    /// A rebuild reuses its buffers, so a sweeping `variant` allocates nothing
+    /// after the first build for an order — the ADR-0007 property the cache
+    /// exists to keep.
+    #[test]
+    fn rebuilding_reuses_the_cache_buffers() {
+        let mut cache = RosetteCache::default();
+        cache.request(12, contact_angle_deg(BASE, 0.0));
+        let (segs, radii) = (cache.segments.capacity(), cache.radii.capacity());
+        for frame in 0..200 {
+            let variant = 2.0 * frame as f32 / 199.0;
+            cache.request(12, contact_angle_deg(BASE, variant));
+        }
+        assert!(cache.rebuilds() > 1, "the sweep must actually rebuild");
+        assert_eq!(cache.segments.capacity(), segs, "segments reallocated");
+        assert_eq!(cache.radii.capacity(), radii, "radii reallocated");
     }
 
     /// The degenerate guard is a *spread* floor, not a radius floor: a figure
