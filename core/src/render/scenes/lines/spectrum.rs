@@ -27,12 +27,16 @@
 //!   symmetric, the same near-no-op the Hankin star has); on bars and polyline
 //!   it is genuinely transformative, because those figures are not centred.
 //! - `[palette]` / `[palette_b]` / `palette_mix` / `hue` / `hue_spread` /
-//!   `saturation` — the colour surface (ADR-0021), sampled on the CPU. This is
-//!   the **first line scene to honor the palette**; the others still colour from
-//!   the built-in cosine. It matters here because colouring elements along their
-//!   own axis is what turns a frequency readout into a look. The default
-//!   `spectrum` palette is that same cosine, so an author who sets no `[palette]`
-//!   sees the engine's usual colour language.
+//!   `saturation` — the colour surface (ADR-0021), sampled on the CPU. This was
+//!   the **first line scene to honor the palette**, and since Plan 0054
+//!   (ADR-0059) it is the pattern the other three follow: each walks
+//!   `hue_spread` along the axis its own generator makes meaningful — path
+//!   position on [`parametric`](super::parametric), generation depth on
+//!   [`lsystem`](super::lsystem), radius on [`star`](super::star) — and this
+//!   scene's is **band index**, unchanged. It mattered here first because
+//!   colouring elements along their own axis is what turns a frequency readout
+//!   into a look. The default `spectrum` palette is the engine cosine, so an
+//!   author who sets no `[palette]` sees the usual colour language.
 //! - `thickness` / `brightness` / `scale` / `base` — ordinary stroke styling.
 //! - `curve` — the level-shaping exponent (ADR-0040, Plan 0038 Phase 3), applied
 //!   to the downsampled level **before** the per-element smoother so the easing

@@ -119,16 +119,22 @@ Every built-in system is addressable from a preset. Their **named parameters, de
 and per-system notes are tabulated in [`presets/README.md`](../presets/README.md#systems-and-their-named-parameters)** —
 that table is maintained alongside the presets and is the authoritative list.
 
-| `system = ` | What it draws | Curated presets |
-|-------------|---------------|-----------------|
-| `fragment_field` | A fullscreen domain-warped light field (fragment shader). | 7 |
-| `swarm` | ~10k CPU-simulated particles on an evolving flow field. | 5 |
-| `parametric_curve` | A sampled line curve — the Maurer rose (ADR-0007). | 11 |
-| `lsystem` | An L-system turtle figure, precomputed per depth (ADR-0007). | 2 |
-| `star_pattern` | A Hankin star pattern over a regular tiling (ADR-0007). | 1 |
-| `reaction_diffusion` | A Gray-Scott reaction-diffusion field (ADR-0012). | 4 |
-| `attractor` | GPU compute particles iterating a strange attractor (ADR-0015). | 5 |
-| `spectrum` | The log-spaced band array as N elements — bars, a contour, or a ring (ADR-0036). | 3 |
+| `system = ` | What it draws |
+|-------------|---------------|
+| `fragment_field` | A fullscreen domain-warped light field (fragment shader). |
+| `swarm` | ~10k CPU-simulated particles on an evolving flow field. |
+| `parametric_curve` | A sampled line curve — the Maurer rose (ADR-0007). |
+| `lsystem` | An L-system turtle figure, precomputed per depth (ADR-0007). |
+| `star_pattern` | A Hankin star pattern over a regular tiling (ADR-0007). |
+| `reaction_diffusion` | A Gray-Scott reaction-diffusion field (ADR-0012). |
+| `attractor` | GPU compute particles iterating a strange attractor (ADR-0015). |
+| `spectrum` | The log-spaced band array as N elements — bars, a contour, or a ring (ADR-0036). |
+
+This table used to carry a per-system count of curated presets. It is gone rather than
+corrected: at the Plan 0054 close six of its eight numbers were wrong (`parametric_curve`
+read 11 against 6 actual, `swarm` 5 against 3, `attractor` 5 against 6), because a count
+re-drifts every time a preset is added and nothing fails when it does. `presets/` is the
+list; `ls presets/*.toml` is the count.
 
 Beyond a system's own parameters, **every** preset may also bind the engine-wide
 compositing controls — the shared view transform (`zoom`, `pan_x`, `pan_y`), the

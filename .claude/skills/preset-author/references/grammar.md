@@ -91,7 +91,8 @@ negative outside a `select`) becomes broken geometry, not an error. You clamp; t
   `de_jong`).
 - **`[palette]` / `[palette_b]`** — a built-in `name` (`spectrum|ember|ice|mono|aurora`) **or**
   custom `stops` (≥2, each `at` in `0..=1` and ascending, colour `#rrggbb` or `[r,g,b]` floats).
-  Setting both, or neither, is a load error. **Silently inert on the three line scenes.**
+  Setting both, or neither, is a load error. Reaches **every** scene since Plan 0054 / ADR-0059 —
+  it used to be silently inert on the three generator line scenes.
 - **`[smoothing]`** — `param = seconds`, non-negative and finite; `0` means instant. Runs on real
   elapsed time (identical at any refresh rate) and resets on a preset switch.
 

@@ -1,6 +1,21 @@
 # GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
 # Minimal Hankin star: a static 12-fold rosette, fully drawn and unrotated, so
 # the generated star geometry is a stable drift target.
+#
+# PLAN 0054 EXPECTED THIS BASELINE TO MOVE AND IT DID NOT - recorded here
+# because a baseline that survives a behaviour change needs its reason written
+# down as much as one that moves does (the Plan 0051 ceremony).
+#
+# ADR-0060 turned `variant` from a floor into three cached rosettes into a
+# continuous contact angle. The mapping chosen keeps 0 / 1 / 2 on exactly the
+# -24 / 0 / +24 degree offsets those three cached variants held, so the
+# `variant = "0"` below still asks for 35 - 24 = 11 degrees: the same rosette,
+# vertex for vertex. Plan 0054 Phase 2 also moved this scene's colour from the
+# analytic cosine to ADR-0021's 256-entry bake of that same cosine, worth at
+# most one 8-bit level per channel.
+#
+# The golden was therefore re-run WITHOUT `LMV_BLESS` and passed. Nothing was
+# blessed and no PNG under tests/golden/ was rewritten during Plan 0054.
 system = "star_pattern"
 name   = "fixture_star_pattern"
 

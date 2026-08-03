@@ -1,8 +1,10 @@
 # ADR-0060 — `star_pattern` builds its rosette at a continuous contact angle, so `variant` interpolates instead of cutting
 
-> **Status:** proposed
+> **Status:** **accepted** — implemented by [Plan 0054](../plans/done/0054-the-line-scenes-catch-up.md),
+> closed 2026-08-03. **Carries an Outcome section**: the cache key is not the quantized one this
+> ADR describes, and no golden baseline moved.
 > **Date:** 2026-08-01
-> **Related plan(s):** [0054](../plans/0054-the-line-scenes-catch-up.md)
+> **Related plan(s):** [0054](../plans/done/0054-the-line-scenes-catch-up.md)
 > **Supplements:** [0007](0007-line-geometry-generators.md) (the generator config surface this
 > changes), [0059](0059-line-scenes-colour-along-their-generator-axis.md) (the colour half of the
 > same plan).
@@ -127,6 +129,54 @@ Simplest correct thing: the angle is continuous, so build the rosette each frame
 angle. **Rejected on ADR-0007's own rule** — generator work stays off the hot path — and because
 the cost is unmeasured. The hysteresis cache gets the same visual result while keeping the
 guarantee.
+
+## Outcome (Plan 0054, closed 2026-08-03)
+
+`variant` is a continuous contact angle, `[smoothing]` on it morphs, and the scene keeps ADR-0007's
+off-hot-path guarantee. Four things the implementation settled that this ADR left open or stated
+loosely:
+
+**The cache key is the built angle plus a hysteresis band, not the "quantized key" above.** A
+request further than `STEP_DEG` from what is held rebuilds, and the rebuild targets *the request
+itself* rather than a bucket centre. Both halves of the bound follow from that: a sweep's rebuild
+count is *distance travelled / step* rather than frame count, and — the half a bucket key gets
+wrong — a `variant` dithering inside one band never rebuilds at all, where a bucket key rebuilds on
+every crossing. Both are asserted.
+
+**The step is 0.1 degrees, measured from both constraints this ADR delegated to the plan.**
+*Invisible in motion*: the worst case is the sharpest reachable rosette, a 12-fold star at an
+11-degree contact angle, which moves a vertex 11.0 px per degree at 1080p — so one step is **1.14 px**
+there and 0.67 / 0.25 px at the 20 / 55-degree angles the two shipped presets use, under a stroke
+that is itself several pixels of glow wide. At 1 degree the same worst case is 11 px, plainly
+visible. *Cannot rebuild every frame*: the full `variant` range is 48 degrees, i.e. 480 steps, so a
+sweep slower than 8 s at 60 fps rebuilds on a fraction of its frames; both shipped presets sweep in
+~45 s, about one rebuild every six frames. *And the rebuild fits regardless*: **0.34 us** at the
+loader's maximum order (`n = 12`, so `2n = 24` segments), 0.002 % of a 16.7 ms frame. The plan asked
+for the measurement at `TierConfig::max_segments` and this scene **cannot reach it** — the tiling
+vocabulary stops at 12-fold and a rosette is `2n` segments, so 24 is the ceiling, pinned by a test.
+Measured at the unreachable cap anyway for the record: 281.6 us, 1.7 % of a frame.
+
+**No golden baseline moved, and the plan expected two to.** The mapping keeps the old vocabulary —
+`variant` 0 / 1 / 2 land on exactly the `-24 / 0 / +24` degree offsets the three cached rosettes
+held — so the fixture's `variant = "0"` still asks for 35 − 24 = 11 degrees: the same rosette, vertex
+for vertex. The suite was re-run without `LMV_BLESS` and passed; the fixture header now records why a
+baseline *survived* a behaviour change, which is the Plan 0051 ceremony in its did-not-move form. The
+plan's Risks section also conflated the two shipped presets with the single per-system golden — there
+is one `star_pattern.png`.
+
+**One consequence for the real-time reading, not visible in this ADR's text.** `hankin::star_rosette`
+is now reachable from `Scene::update` rather than only from `configure`. Its module docs said "a
+build-time step … off the hot path" and its panic pragma called itself precautionary; both were
+corrected at the close. The construction was already written panic-free and the hysteresis bounds the
+rate, so the property holds — but it now holds *because* of the cache rather than by position in the
+lifecycle, and a future edit there is a hot-path edit.
+
+**The two shipped presets are deliberately not re-tuned**, per the plan's own scope, so neither yet
+demonstrates the morph: both drive `mod(..., 3)`, a sawtooth, and a bare `floor` removal would
+replace one slow swap with a hard `2 -> 0` snap at every wrap. Re-authoring the sweep as a triangle
+wave over `0..2` with a smoothing constant is a `preset-author` pass — [backlog 0051](../design-backlog.md).
+What did change in both files is the documentation: each carried a long comment asserting the engine
+limit this ADR removes.
 
 ## Notes
 
