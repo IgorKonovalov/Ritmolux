@@ -6,6 +6,137 @@
 //! case-insensitive substring filter, and [`OverlayAction::Select`] always
 //! carries the **absolute** roster index so a filtered pick stays correct.
 
+use std::borrow::Cow;
+
+// ---------------------------------------------------------------------------
+// List geometry (device px)
+// ---------------------------------------------------------------------------
+//
+// These live here rather than in `main.rs` because [`layout`] is the thing that
+// reasons about them, and a layout function reading its constants from its caller
+// is a layout function that cannot be unit-tested. `main.rs` draws with the same
+// values, imported from here, so the pixels and the arithmetic cannot drift.
+
+/// Left inset of the first column, and the header's.
+pub const LIST_INSET: f32 = 16.0;
+/// Top of the filter-echo header; the rows start one `ROW_H` below it.
+pub const LIST_TOP: f32 = 64.0;
+/// Row pitch.
+pub const ROW_H: f32 = 30.0;
+/// Row font size.
+pub const ROW_SIZE: f32 = 22.0;
+
+/// Top of the first row — the header occupies the band above it.
+pub const ROWS_TOP: f32 = LIST_TOP + ROW_H;
+
+/// **Column width is an estimate, not a measurement**, and deliberately.
+///
+/// glyphon shapes a proportional system font and `core` exposes no
+/// text-measurement API; adding one to place a list is out of proportion to the
+/// problem ([ADR-0009](../../docs/adrs/0009-glyphon-text-rendering.md) would need
+/// a supplement). So the width is derived from the font size and a character
+/// budget, and [`fit`] truncates a name that overruns the budget — which makes an
+/// **under**estimate cosmetic rather than a collision, and an overestimate merely
+/// wasted horizontal space.
+///
+/// `0.62` is a conservative advance-per-character ratio for a proportional face
+/// at this size: real lowercase Latin averages nearer `0.5`, and the roster's
+/// names are mixed case with spaces.
+const CHAR_W: f32 = ROW_SIZE * 0.62;
+/// Characters a column reserves, including the two-character `"> "` marker.
+const COL_CHARS: usize = 26;
+/// Characters of the **name** a column can show before [`fit`] truncates it. The
+/// longest shipped preset name is 15, so truncation never fires on the embedded
+/// set; it exists for a custom `LMV_PRESET_DIR`.
+pub const NAME_CHARS: usize = COL_CHARS - 2;
+/// Gap between columns, so two full-width names do not touch.
+const COL_GUTTER: f32 = 24.0;
+/// Horizontal pitch between columns.
+pub const COL_W: f32 = CHAR_W * COL_CHARS as f32 + COL_GUTTER;
+
+/// A name shortened to fit one column, with an ASCII ellipsis.
+///
+/// Borrowed when it already fits, which is every shipped preset — so the common
+/// case allocates nothing beyond what the caller was doing anyway. ASCII `...`
+/// rather than `…` because the overlay's font coverage is not something this
+/// module can check.
+pub fn fit(name: &str) -> Cow<'_, str> {
+    if name.chars().count() <= NAME_CHARS {
+        return Cow::Borrowed(name);
+    }
+    let keep = NAME_CHARS.saturating_sub(3);
+    let mut out: String = name.chars().take(keep).collect();
+    out.push_str("...");
+    Cow::Owned(out)
+}
+
+/// How the visible rows are placed on screen: a column-major flow, as many
+/// columns as fit, scrolled by whole columns when even those cannot hold the
+/// roster.
+///
+/// A **pure function of `(visible_len, highlight, width, height)`** — no window,
+/// no roster — so the whole thing is unit-testable and the eyes-on check confirms
+/// pixels rather than logic.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ListLayout {
+    /// Columns actually drawn: what the roster needs, capped by what fits.
+    pub cols: usize,
+    /// Rows in one full column — today's vertical arithmetic, unchanged.
+    pub rows_per_col: usize,
+    /// Scroll offset in whole columns. `0` whenever the roster fits, which is
+    /// every case the shipped set reaches at a normal window size.
+    pub col_scroll: usize,
+    /// Rows this layout was built for, so [`place`](Self::place) is **total**:
+    /// a row past the end answers `None` rather than a grid cell that exists on
+    /// screen but holds nothing.
+    pub len: usize,
+}
+
+impl ListLayout {
+    /// Where visible row `row` is drawn, as `(column on screen, row within that
+    /// column)` — or `None` when there is no such row, or it is scrolled off.
+    pub fn place(&self, row: usize) -> Option<(usize, usize)> {
+        if self.rows_per_col == 0 || row >= self.len {
+            return None;
+        }
+        let col = row / self.rows_per_col;
+        if col < self.col_scroll || col >= self.col_scroll + self.cols {
+            return None;
+        }
+        Some((col - self.col_scroll, row % self.rows_per_col))
+    }
+}
+
+/// Lay out `visible_len` rows in a surface of `width` x `height` device px, with
+/// `highlight` the row that must stay on screen.
+///
+/// Vertical arithmetic is exactly what the single-column list already used
+/// (`floor((height - ROWS_TOP) / ROW_H)`, at least one row), so a change to
+/// `ROW_H` or `LIST_TOP` moves the pinned numbers in the tests deliberately.
+/// Horizontal is new: the roster asks for `ceil(len / rows_per_col)` columns and
+/// gets however many fit, and scrolling survives as the fallback for the case
+/// where the columns still cannot hold it.
+pub fn layout(visible_len: usize, highlight: usize, width: f32, height: f32) -> ListLayout {
+    let rows_per_col = (((height - ROWS_TOP) / ROW_H).floor().max(1.0)) as usize;
+    let needed = visible_len.div_ceil(rows_per_col).max(1);
+    let fits = (((width - LIST_INSET) / COL_W).floor().max(1.0)) as usize;
+    let cols = needed.min(fits);
+
+    // Window the columns so the highlighted one is on screen, pinned to the right
+    // edge when scrolling (the same shape the single-column scroll had).
+    let hl_col = highlight / rows_per_col;
+    let col_scroll = hl_col
+        .saturating_sub(cols.saturating_sub(1))
+        .min(needed.saturating_sub(cols));
+
+    ListLayout {
+        cols,
+        rows_per_col,
+        col_scroll,
+        len: visible_len,
+    }
+}
+
 /// A key the overlay reacts to, decoded from the platform's input upstream so
 /// this module stays free of winit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,6 +147,10 @@ pub enum OverlayKey {
     Up,
     /// Move the highlight down one row, **wrapping** past the last row to the top.
     Down,
+    /// Move one column left, **clamped** at the first column.
+    Left,
+    /// Move one column right, **clamped** at the last column.
+    Right,
     /// Commit the highlighted preset and close.
     Enter,
     /// Close without selecting.
@@ -36,7 +171,10 @@ impl OverlayKey {
     /// repeatedly. A nav key only moves a cursor, so there is nothing expensive
     /// to repeat and no throttle is needed.
     pub fn is_nav(self) -> bool {
-        matches!(self, OverlayKey::Up | OverlayKey::Down)
+        matches!(
+            self,
+            OverlayKey::Up | OverlayKey::Down | OverlayKey::Left | OverlayKey::Right
+        )
     }
 }
 
@@ -127,7 +265,13 @@ impl OverlayState {
     /// `active` is passed in rather than held, which is what keeps this module
     /// roster-free and window-free: the shell reads it off the renderer, and this
     /// state machine never learns what a preset is.
-    pub fn handle_key(&mut self, key: OverlayKey, names: &[&str], active: usize) -> OverlayAction {
+    pub fn handle_key(
+        &mut self,
+        key: OverlayKey,
+        names: &[&str],
+        active: usize,
+        layout: &ListLayout,
+    ) -> OverlayAction {
         // Toggle works regardless of open state; opening starts a fresh query.
         if key == OverlayKey::Toggle {
             self.open = !self.open;
@@ -155,6 +299,14 @@ impl OverlayState {
             }
             OverlayKey::Down => {
                 self.step(true, names);
+                OverlayAction::Redraw
+            }
+            OverlayKey::Left => {
+                self.step_col(false, names, layout);
+                OverlayAction::Redraw
+            }
+            OverlayKey::Right => {
+                self.step_col(true, names, layout);
                 OverlayAction::Redraw
             }
             OverlayKey::Enter => {
@@ -216,11 +368,43 @@ impl OverlayState {
             self.highlight - 1
         };
     }
+
+    /// Move the highlight one **column**, clamped at both edges.
+    ///
+    /// Clamped rather than wrapped, unlike the vertical: vertical wrap is what
+    /// the user asked for and matches `Space`, while horizontal wrap in a
+    /// column-major grid teleports you a whole roster away. `Down` already
+    /// continues at the top of the next column for free — that is what
+    /// column-major *is* — so the arrows are not redundant with each other.
+    ///
+    /// A ragged final column keeps the move rather than refusing it: stepping
+    /// right onto a row the short column does not have lands on its last row,
+    /// which is what every list widget does and what stops `Right` feeling
+    /// broken on exactly the column the shipped roster produces.
+    fn step_col(&mut self, right: bool, names: &[&str], layout: &ListLayout) {
+        let len = self.visible(names).len();
+        let rpc = layout.rows_per_col;
+        if len == 0 || rpc == 0 {
+            return;
+        }
+        let col = self.highlight / rpc;
+        let row = self.highlight % rpc;
+        if right {
+            let first = (col + 1) * rpc;
+            // No next column at all: stay put.
+            if first < len {
+                self.highlight = (first + row).min(len - 1);
+            }
+        } else if col > 0 {
+            // The column to the left is always full, so this row exists.
+            self.highlight = (col - 1) * rpc + row;
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{OverlayAction, OverlayKey, OverlayState};
+    use super::{ListLayout, NAME_CHARS, OverlayAction, OverlayKey, OverlayState, fit, layout};
 
     const NAMES: [&str; 4] = ["alpha", "bravo", "charlie", "delta"];
 
@@ -232,21 +416,202 @@ mod tests {
     /// active and only care about navigation, so they open on row 0 as they did.
     const FIRST: usize = 0;
 
+    /// A layout tall enough that every test roster above is one column, so the
+    /// vertical-navigation tests are unaffected by column flow — `Left`/`Right`
+    /// are the only keys that read it.
+    const WIDE: ListLayout = ListLayout {
+        cols: 1,
+        rows_per_col: 1000,
+        col_scroll: 0,
+        len: 1000,
+    };
+
+    /// The display this project is built and demoed on, and the one the roster
+    /// already overflowed at.
+    const HD: (f32, f32) = (1920.0, 1080.0);
+    /// A 1440p display, where the same roster fits one column.
+    const QHD: (f32, f32) = (2560.0, 1440.0);
+    /// The shipped roster's size at the time this was written. Pinned as a
+    /// *number* rather than read from the library, because the arithmetic below
+    /// is the claim — the library growing must not silently retire it.
+    const SHIPPED: usize = 34;
+
+    /// **The numbers the plan pinned**, and they are this file's constants'
+    /// arithmetic rather than an implementation's output: a change to `ROW_H` or
+    /// `LIST_TOP` fails this deliberately.
+    #[test]
+    fn the_shipped_roster_flows_into_two_columns_at_1080p_and_one_at_1440p() {
+        let (w, h) = HD;
+        let l = layout(SHIPPED, 0, w, h);
+        assert_eq!(
+            l.rows_per_col, 32,
+            "floor((1080 - 94) / 30) = 32 — the arithmetic the single-column list already used"
+        );
+        assert_eq!(l.cols, 2, "34 rows into 32-row columns needs 2");
+        assert_eq!(l.col_scroll, 0, "it fits, so nothing scrolls");
+        assert!(
+            l.cols * l.rows_per_col >= SHIPPED,
+            "the whole roster must be on screen at once — that is the point"
+        );
+
+        // The second column holds exactly the 2 rows that used to be past the fold.
+        assert_eq!(l.place(31), Some((0, 31)), "last row of column 1");
+        assert_eq!(l.place(32), Some((1, 0)), "first row of column 2");
+        assert_eq!(l.place(33), Some((1, 1)));
+        assert_eq!(l.place(34), None, "one past the roster is not placed");
+
+        // Taller display: 44 rows per column is already >= 34, so one column.
+        let (w, h) = QHD;
+        let l = layout(SHIPPED, 0, w, h);
+        assert_eq!(l.rows_per_col, 44, "floor((1440 - 94) / 30) = 44");
+        assert_eq!(l.cols, 1);
+        assert_eq!(l.place(33), Some((0, 33)));
+    }
+
+    /// `Right` crosses a column at the same row; `Right` off the last column does
+    /// not move. Both on a roster whose columns are **full**, so "the same row"
+    /// is exact rather than approximately.
+    #[test]
+    fn right_steps_one_column_and_clamps_at_the_last() {
+        let n: Vec<&str> = (0..20).map(|_| "x").collect();
+        let l = ListLayout {
+            cols: 2,
+            rows_per_col: 10,
+            col_scroll: 0,
+            len: 20,
+        };
+        let mut s = OverlayState::new();
+        s.handle_key(OverlayKey::Toggle, &n, 9, &l); // last row of column 1
+
+        assert_eq!(s.highlight(), 9);
+        s.handle_key(OverlayKey::Right, &n, 9, &l);
+        assert_eq!(
+            s.highlight(),
+            19,
+            "Right did not land in column 2, same row"
+        );
+
+        // Off the last column: no move.
+        s.handle_key(OverlayKey::Right, &n, 9, &l);
+        assert_eq!(s.highlight(), 19, "Right off the last column moved");
+
+        // And back.
+        s.handle_key(OverlayKey::Left, &n, 9, &l);
+        assert_eq!(s.highlight(), 9);
+        s.handle_key(OverlayKey::Left, &n, 9, &l);
+        assert_eq!(s.highlight(), 9, "Left off the first column moved");
+    }
+
+    /// A ragged last column — the shape the shipped roster actually produces
+    /// (32 + 2) — keeps the move instead of refusing it, landing on the short
+    /// column's last row.
+    #[test]
+    fn right_into_a_short_column_lands_on_its_last_row() {
+        let n: Vec<&str> = (0..SHIPPED).map(|_| "x").collect();
+        let (w, h) = HD;
+        let l = layout(SHIPPED, 0, w, h);
+        let mut s = OverlayState::new();
+        s.handle_key(OverlayKey::Toggle, &n, 20, &l);
+        assert_eq!(s.highlight(), 20);
+
+        // Column 2 has only rows 32 and 33; row 20 of it does not exist.
+        s.handle_key(OverlayKey::Right, &n, 20, &l);
+        assert_eq!(
+            s.highlight(),
+            33,
+            "Right into the short column should land on its last row, not refuse"
+        );
+        // Left returns into column 1, which is full, so the row exists.
+        s.handle_key(OverlayKey::Left, &n, 20, &l);
+        assert_eq!(s.highlight(), 1);
+    }
+
+    /// **Scrolling survives as the fallback.** When even the columns that fit
+    /// cannot hold the roster, the list scrolls by *whole columns* and the
+    /// highlighted row is always on screen.
+    #[test]
+    fn a_roster_too_big_for_its_columns_scrolls_by_whole_columns() {
+        // A small window: few rows per column, and only room for two columns.
+        let (w, h) = (900.0, 274.0); // floor((274 - 94) / 30) = 6 rows
+        let len = 60; // 10 columns needed
+        let l0 = layout(len, 0, w, h);
+        assert_eq!(l0.rows_per_col, 6);
+        assert!(
+            l0.cols < len.div_ceil(l0.rows_per_col),
+            "precondition: the roster must NOT fit, or this tests nothing"
+        );
+        assert_eq!(
+            l0.col_scroll, 0,
+            "no scroll while the highlight is on screen"
+        );
+
+        // Every row is reachable and on screen when it is the highlight — the
+        // property that matters, checked exhaustively rather than at a few spots.
+        for hl in 0..len {
+            let l = layout(len, hl, w, h);
+            assert!(
+                l.place(hl).is_some(),
+                "highlight {hl} scrolled off screen (scroll {}, cols {})",
+                l.col_scroll,
+                l.cols
+            );
+            // Scrolling is in whole columns: the leftmost drawn row is a column
+            // boundary, so no column is ever half-shown.
+            assert_eq!(l.place(l.col_scroll * l.rows_per_col), Some((0, 0)));
+        }
+
+        // At the far end the last column is flush with the right edge rather than
+        // scrolled past it.
+        let l = layout(len, len - 1, w, h);
+        assert_eq!(l.col_scroll, len.div_ceil(l.rows_per_col) - l.cols);
+    }
+
+    /// A window too short for even one row still yields a usable layout rather
+    /// than a division by zero or an empty screen.
+    #[test]
+    fn a_degenerate_window_still_lays_out_one_row_in_one_column() {
+        for (w, h) in [(1920.0, 0.0), (1920.0, 94.0), (0.0, 1080.0), (10.0, 10.0)] {
+            let l = layout(SHIPPED, 0, w, h);
+            assert!(l.rows_per_col >= 1, "{w}x{h} produced no rows");
+            assert!(l.cols >= 1, "{w}x{h} produced no columns");
+            assert_eq!(l.place(0), Some((0, 0)), "{w}x{h} could not place row 0");
+        }
+    }
+
+    /// Truncation is cosmetic and only fires past the budget, so no shipped name
+    /// is ever shortened.
+    #[test]
+    fn a_name_is_only_shortened_past_the_column_budget() {
+        assert_eq!(fit("Spectrum Corona"), "Spectrum Corona");
+        let exact: String = "a".repeat(NAME_CHARS);
+        assert_eq!(fit(&exact), exact, "a name that exactly fits is untouched");
+
+        let long: String = "a".repeat(NAME_CHARS + 10);
+        let cut = fit(&long);
+        assert_eq!(cut.chars().count(), NAME_CHARS);
+        assert!(cut.ends_with("..."));
+
+        // Multi-byte: counted in characters, so this must not panic or split a
+        // code point.
+        let wide: String = "é".repeat(NAME_CHARS + 5);
+        assert_eq!(fit(&wide).chars().count(), NAME_CHARS);
+    }
+
     #[test]
     fn nav_keys_are_inert_while_closed() {
         let mut s = OverlayState::new();
         let n = names();
         // A closed overlay ignores nav keys so the shell's Space-cycle still runs.
         assert_eq!(
-            s.handle_key(OverlayKey::Down, &n, FIRST),
+            s.handle_key(OverlayKey::Down, &n, FIRST, &WIDE),
             OverlayAction::None
         );
         assert_eq!(
-            s.handle_key(OverlayKey::Enter, &n, FIRST),
+            s.handle_key(OverlayKey::Enter, &n, FIRST, &WIDE),
             OverlayAction::None
         );
         assert_eq!(
-            s.handle_key(OverlayKey::Escape, &n, FIRST),
+            s.handle_key(OverlayKey::Escape, &n, FIRST, &WIDE),
             OverlayAction::None
         );
         assert!(!s.is_open());
@@ -257,24 +622,24 @@ mod tests {
         let mut s = OverlayState::new();
         let n = names();
         assert_eq!(
-            s.handle_key(OverlayKey::Toggle, &n, FIRST),
+            s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE),
             OverlayAction::Redraw
         );
         assert!(s.is_open());
         assert_eq!(s.highlight(), 0);
         assert_eq!(
-            s.handle_key(OverlayKey::Down, &n, FIRST),
+            s.handle_key(OverlayKey::Down, &n, FIRST, &WIDE),
             OverlayAction::Redraw
         );
         assert_eq!(s.highlight(), 1);
         assert_eq!(
-            s.handle_key(OverlayKey::Down, &n, FIRST),
+            s.handle_key(OverlayKey::Down, &n, FIRST, &WIDE),
             OverlayAction::Redraw
         );
         assert_eq!(s.highlight(), 2); // the third row
         // Enter selects the third preset's absolute index and closes.
         assert_eq!(
-            s.handle_key(OverlayKey::Enter, &n, FIRST),
+            s.handle_key(OverlayKey::Enter, &n, FIRST, &WIDE),
             OverlayAction::Select(2)
         );
         assert!(!s.is_open());
@@ -284,9 +649,9 @@ mod tests {
     fn escape_closes_without_selecting() {
         let mut s = OverlayState::new();
         let n = names();
-        s.handle_key(OverlayKey::Toggle, &n, FIRST);
+        s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
         assert_eq!(
-            s.handle_key(OverlayKey::Escape, &n, FIRST),
+            s.handle_key(OverlayKey::Escape, &n, FIRST, &WIDE),
             OverlayAction::Close
         );
         assert!(!s.is_open());
@@ -305,7 +670,7 @@ mod tests {
         let n: Vec<&str> = (0..10).map(|_| "x").collect();
         let mut s = OverlayState::new();
         assert_eq!(
-            s.handle_key(OverlayKey::Toggle, &n, 7),
+            s.handle_key(OverlayKey::Toggle, &n, 7, &WIDE),
             OverlayAction::Redraw
         );
         assert_eq!(
@@ -314,13 +679,13 @@ mod tests {
             "opened on row 0 instead of the active row"
         );
         assert_eq!(
-            s.handle_key(OverlayKey::Enter, &n, 7),
+            s.handle_key(OverlayKey::Enter, &n, 7, &WIDE),
             OverlayAction::Select(7)
         );
 
         // ...and it is genuinely reading `active` rather than remembering the
         // last highlight: a second open on a different active lands elsewhere.
-        s.handle_key(OverlayKey::Toggle, &n, 2);
+        s.handle_key(OverlayKey::Toggle, &n, 2, &WIDE);
         assert_eq!(s.highlight(), 2);
     }
 
@@ -331,20 +696,20 @@ mod tests {
         let n = names();
         let mut s = OverlayState::new();
         // Past the end of the roster (a stale index from a shrunk hot-reload).
-        s.handle_key(OverlayKey::Toggle, &n, 99);
+        s.handle_key(OverlayKey::Toggle, &n, 99, &WIDE);
         assert_eq!(s.highlight(), 0);
         assert!(s.visible(&n).len() > s.highlight());
 
         // An empty roster has no row to land on at all.
         let mut s = OverlayState::new();
-        s.handle_key(OverlayKey::Toggle, &[], 3);
+        s.handle_key(OverlayKey::Toggle, &[], 3, &WIDE);
         assert_eq!(s.highlight(), 0);
         assert!(s.visible(&[]).is_empty());
 
         // And a filter narrowing the list under an open overlay still re-clamps
         // through the existing path, which open-on-active must not have broken.
         let mut s = OverlayState::new();
-        s.handle_key(OverlayKey::Toggle, &n, 3);
+        s.handle_key(OverlayKey::Toggle, &n, 3, &WIDE);
         assert_eq!(s.highlight(), 3);
         s.on_roster_changed(&["alpha", "bravo"]);
         assert_eq!(s.highlight(), 1);
@@ -360,23 +725,23 @@ mod tests {
     fn the_highlight_wraps_at_both_ends() {
         let mut s = OverlayState::new();
         let n = names();
-        s.handle_key(OverlayKey::Toggle, &n, FIRST);
+        s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
 
         // Down off the last row lands on the first.
         for _ in 0..3 {
-            s.handle_key(OverlayKey::Down, &n, FIRST);
+            s.handle_key(OverlayKey::Down, &n, FIRST, &WIDE);
         }
         assert_eq!(s.highlight(), 3, "precondition: sitting on the last row");
-        s.handle_key(OverlayKey::Down, &n, FIRST);
+        s.handle_key(OverlayKey::Down, &n, FIRST, &WIDE);
         assert_eq!(s.highlight(), 0, "Down off the last row did not wrap");
 
         // Up off the first row lands on the last.
-        s.handle_key(OverlayKey::Up, &n, FIRST);
+        s.handle_key(OverlayKey::Up, &n, FIRST, &WIDE);
         assert_eq!(s.highlight(), 3, "Up off row 0 did not wrap");
 
         // A full lap returns to where it started, so the wrap is not off by one.
         for _ in 0..4 {
-            s.handle_key(OverlayKey::Down, &n, FIRST);
+            s.handle_key(OverlayKey::Down, &n, FIRST, &WIDE);
         }
         assert_eq!(s.highlight(), 3);
     }
@@ -387,13 +752,13 @@ mod tests {
     fn a_single_row_list_wraps_onto_itself() {
         let mut s = OverlayState::new();
         let n = vec!["only"];
-        s.handle_key(OverlayKey::Toggle, &n, FIRST);
+        s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
         for key in [OverlayKey::Down, OverlayKey::Up, OverlayKey::Down] {
-            s.handle_key(key, &n, FIRST);
+            s.handle_key(key, &n, FIRST, &WIDE);
             assert_eq!(s.highlight(), 0);
         }
         assert_eq!(
-            s.handle_key(OverlayKey::Enter, &n, FIRST),
+            s.handle_key(OverlayKey::Enter, &n, FIRST, &WIDE),
             OverlayAction::Select(0)
         );
     }
@@ -418,7 +783,7 @@ mod tests {
 
     fn type_str(s: &mut OverlayState, text: &str, names: &[&str]) {
         for c in text.chars() {
-            s.handle_key(OverlayKey::Char(c), names, FIRST);
+            s.handle_key(OverlayKey::Char(c), names, FIRST, &WIDE);
         }
     }
 
@@ -427,14 +792,14 @@ mod tests {
         let mut s = OverlayState::new();
         // "warp" sits at absolute index 2 and is capitalized.
         let n = vec!["Aurora", "Ember", "Warp", "Glacier"];
-        s.handle_key(OverlayKey::Toggle, &n, FIRST);
+        s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
         // Lowercase "war" matches "Warp" case-insensitively, nothing else.
         type_str(&mut s, "war", &n);
         let visible = s.visible(&n);
         assert_eq!(visible, [(2, "Warp")]);
         // Enter must carry Warp's ABSOLUTE index (2), not its filtered row (0).
         assert_eq!(
-            s.handle_key(OverlayKey::Enter, &n, FIRST),
+            s.handle_key(OverlayKey::Enter, &n, FIRST, &WIDE),
             OverlayAction::Select(2)
         );
     }
@@ -443,10 +808,10 @@ mod tests {
     fn backspace_widens_the_filtered_list() {
         let mut s = OverlayState::new();
         let n = vec!["alpha", "altair", "beta"];
-        s.handle_key(OverlayKey::Toggle, &n, FIRST);
+        s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
         type_str(&mut s, "alt", &n);
         assert_eq!(s.visible(&n).len(), 1); // only "altair"
-        s.handle_key(OverlayKey::Backspace, &n, FIRST); // -> "al"
+        s.handle_key(OverlayKey::Backspace, &n, FIRST, &WIDE); // -> "al"
         assert_eq!(s.visible(&n).len(), 2); // "alpha" + "altair" restored
     }
 
@@ -454,12 +819,12 @@ mod tests {
     fn no_match_filter_yields_an_empty_list_not_a_stale_one() {
         let mut s = OverlayState::new();
         let n = names();
-        s.handle_key(OverlayKey::Toggle, &n, FIRST);
+        s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE);
         type_str(&mut s, "zzz", &n);
         assert!(s.visible(&n).is_empty());
         // Enter on an empty list closes without selecting.
         assert_eq!(
-            s.handle_key(OverlayKey::Enter, &n, FIRST),
+            s.handle_key(OverlayKey::Enter, &n, FIRST, &WIDE),
             OverlayAction::Close
         );
     }
@@ -468,11 +833,11 @@ mod tests {
     fn reopening_clears_the_prior_filter() {
         let mut s = OverlayState::new();
         let n = names();
-        s.handle_key(OverlayKey::Toggle, &n, FIRST); // open
+        s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE); // open
         type_str(&mut s, "zzz", &n); // filters to nothing
         assert!(s.visible(&n).is_empty());
-        s.handle_key(OverlayKey::Toggle, &n, FIRST); // close
-        s.handle_key(OverlayKey::Toggle, &n, FIRST); // reopen -> fresh query
+        s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE); // close
+        s.handle_key(OverlayKey::Toggle, &n, FIRST, &WIDE); // reopen -> fresh query
         assert_eq!(s.filter(), "");
         assert_eq!(s.visible(&n).len(), 4);
     }
@@ -481,9 +846,9 @@ mod tests {
     fn roster_change_reclamps_the_highlight_and_keeps_open() {
         let mut s = OverlayState::new();
         let big = vec!["a", "b", "c", "d"];
-        s.handle_key(OverlayKey::Toggle, &big, FIRST);
+        s.handle_key(OverlayKey::Toggle, &big, FIRST, &WIDE);
         for _ in 0..3 {
-            s.handle_key(OverlayKey::Down, &big, FIRST);
+            s.handle_key(OverlayKey::Down, &big, FIRST, &WIDE);
         }
         assert_eq!(s.highlight(), 3);
         // A hot-reload shrinks the roster under the open overlay.
