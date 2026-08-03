@@ -1,11 +1,23 @@
 # 0048 — Analysis v2: the dual-resolution axis, normalized bands, phrase time, and the one retune that pays for all of it
 
-> **Status:** in-progress — Phases 1-5 (`dev`) landed and merged; **Phase 6 (`human`) ran
-> 2026-08-02** and its verdicts are recorded below (normalization passes, no constant moves; the
-> downbeat estimator does not mis-accent but locks ~3 % of audible time, routed to
-> [backlog 0042](../design-backlog.md)). **Phase 7 (`human`, the library retune) is what remains**,
-> with the layer-2 qualification Phase 6 leaves it. Parallel lane against the render queue except
-> one named touch; see file fence.
+> **Status:** done — closed 2026-08-03 after a Mode 4 review with **no blockers**. All seven
+> phases ran: `bfd892b` the dual-resolution axis (8192-sample long window, crossover derived at
+> band 20 / 246.2 Hz), `ef3b772` normalization with the `*_raw` escapes, `910a6d1` the shared
+> `Variables::from_frame`, `81b21d5` ADR-0050 Layer 1, `7a06676` the gated downbeat estimator,
+> `909ae4a` the harness/docs recalibration, `0fb26d4` Phase 6's verdicts (recorded below),
+> `80c5dff` Phase 7's library retune (368 gains, 36 thresholds, 7 `bin()` positions), `bea5c1e`
+> the lane's backlog notes, `fc698cd` the axis-block regeneration that finally met Phase 5's
+> done-when. [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) and
+> [ADR-0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) are
+> **accepted, each with an Outcome section**. Gate at the close: `fmt --check` clean, `clippy
+> --workspace --all-targets -D warnings` clean, `nextest --workspace` **388/388, 0 skipped**;
+> reachability **17 flags, all the standing `tempo` false positive, 0 genuinely dead**.
+> **Delivers the large half of roadmap R5** (normalization, phrase time, and the axis), and
+> spawns three successors: [ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)
+> + [ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md) + [Plan
+> 0056](0056-clamp-occupancy-and-the-axis-anchor.md), and
+> [backlog 0042](../design-backlog.md) on the estimator's lock rate. See "Close review" at the
+> foot of this file.
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (axis + normalization),
@@ -232,8 +244,91 @@ question showing itself unprompted.
 
 ## Followups (after this lands)
 
-- Revisit `bin_range(lo, hi)` against the resolved axis.
+- ~~Revisit `bin_range(lo, hi)` against the resolved axis.~~ **Designed** —
+  [ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md) folds it in beside `bin_hz`,
+  and Phase 4 of [Plan 0056](0056-clamp-occupancy-and-the-axis-anchor.md) builds it.
 - ADR-0050 Alternative B (novelty/section signal) once bar time has proven itself in
-  content.
+  content. **Not yet earned** — Phase 6 measured bar time at a 3.1 % lock rate, so the
+  precondition is unmet; [backlog 0042](../design-backlog.md) comes first.
 - The `--report` ceiling-check threshold minor from Plan 0041's review, if the regenerated
-  tables touch that code anyway.
+  tables touch that code anyway. **Still open**, and now adjacent to
+  [ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md), which touches the
+  same walk.
+
+## Close review (Mode 4, 2026-08-03)
+
+**Verdict: no blockers, no majors.** Every phase landed with its done-when met, both ADRs
+earned an Outcome section, and the two things the closing session was told to check — the
+version bump and Phase 5's unmet done-when — are handled here (the latter having already been
+repaired by `fc698cd`). Four minors, all doc bookkeeping, all fixed in the close commit.
+
+**Verified at review rather than taken on trust.** `fmt --check` clean; `clippy --workspace
+--all-targets -D warnings` clean; `cargo nextest run --workspace` **388/388, 0 skipped**.
+Reachability re-run on the *versioned* library (`LMV_PRESET_DIR=./presets` — the default run
+silently reports on the seeded `%APPDATA%` copy, which is pre-retune and reads a misleading
+zero): **17 flags, and every one is a `tempo` comparison** — nine on Storm at `> 132`, seven on
+Lorenz at `> 124`, one on Rose Zoom at `> 130`, all against a single 110 BPM probe. **Zero
+genuinely dead gates**, which is Phase 7's done-when proved rather than reported. `core/src/ffi.rs`
+and `core/include/` are byte-untouched across all seven phases, so **the C ABI stays v4**;
+`Scene` is unchanged; no new dependency; nothing in the plan's diff derives an `aspect` from
+anything; every added `expect` is in test code; and `core/tests/hygiene.rs` scans `core/src/dsp`
+recursively, so `gain.rs` and `downbeat.rs` were covered by the panic-pragma guard on arrival
+(both carry it).
+
+**The tests were opened, not trusted.** Three properties are worth naming because they are the
+kind most closes skip. `raw_levels_are_bit_identical_to_the_pre_normalization_build` pins four
+literals **measured against `92579ef`**, the commit before the plan — a fact about the old code
+this code must match, which is the only form of "unchanged" worth asserting.
+`analysis_is_deterministic` **destructures** `AnalysisFrame`, so adding a field stops the file
+compiling until it is covered — added precisely because the normalizers and the beat clock are
+the kind of state that makes analysis history-dependent behind a passing spot check. And
+`the_downbeat_estimator_locks_onto_a_kick_pattern_in_real_audio` drives generated *audio* rather
+than idealized accent numbers, with the accent offset to beat 2 so an always-zero tracker fails,
+and the unaccented counter-case in the same test.
+
+**Phase 1 deviated from its own done-when, disclosed and counter-asserted — the right way to do
+it.** The done-when asked that no band above the crossover move by more than rounding; that is
+false as written, because v1's collapse fix-up forced each collapsed edge to `previous + 1` and
+overshot the log curve until band 32. Bands 20-31 therefore move, and *that movement is the
+defect being removed*. `above_the_chain_every_edge_is_bit_identical_to_v1` asserts identity from
+band 32 up **plus** the counter-assertion that 20-31 did move, without which it would pass just
+as well if the crossover had swallowed the axis.
+
+**The finding worth carrying is the one lens 4 asks for: what could the development
+configuration not see?** Nothing in this project could see the retune's actual work list. The
+before-record named 9 broken gates; Phase 7 found 368 mis-scaled terms, **263 of 332 clamped band
+terms pinned at the real-music median**, and **14 presets with no live audio term at all** — all
+behind a green suite. Every reactivity instrument we own diffs a driven band against *silence*,
+where a binding that saturates just above the noise floor scores perfectly. Reachability could
+not help either: it watches forks, and a gain contains none. Same shape on the axis: Phase 1
+re-pointed every sub-crossover `bin()` probe by about an octave and a half, and `fft.rs`'s lookup
+test checks the layout function against the edge table that moved *with* it — internal
+consistency with no external anchor. Both are now designed out
+([ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md),
+[ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md),
+[Plan 0056](0056-clamp-occupancy-and-the-axis-anchor.md)).
+
+### Minors, all fixed in the close commit
+
+1. **`presets/README.md`'s variable roster still listed 10 of 19** — the exact drift
+   [backlog 0035](../design-backlog.md) raised on 2026-07-30 and asked to ride on the next close
+   sweep, on the most-read line of the document the `preset-author` lane is pointed at first. Now
+   carries all 19 in `VAR_NAMES` order, with ADR-0050's two layers and the Phase 6 lock-rate
+   qualification. Backlog 0035 struck.
+2. **`docs/specs/0002-ring-determinism.md` still read "DSP unchanged since Plan 0003"**, and its
+   determinism invariant — "the same input **window** MUST produce the same analysis frame" —
+   went false the moment normalization and the beat clock landed. Determinism is intact and
+   tested; its *unit* moved from the window to the **stream**. Reconciled, with the distinction
+   stated (history-dependence is the contract; ambient nondeterminism is still forbidden), and
+   the stale "until Plan 0032 lands" gap closed.
+3. **`docs/roadmap-visual-richness.md` R5 did not know this landed** — normalization, phrase time
+   and the band axis are three of its seven bullets. Struck with what actually shipped, including
+   that phrase time landed as a *capability* whose *tracking* is still owed. Sequencing item 2
+   also still called R1 "the one to run" after Plan 0045 closed; corrected to R2.
+4. **The 64-band array's normalization rule was recorded only in a commit message.** Phase 2's
+   done-when says the array normalizes "the same way (one rule, no per-surface exceptions)"; the
+   implementation uses **one peak shared across all 64 bands**, which is the right call (per-band
+   would drive leakage to 1.0 and destroy `bin(hi) - bin(lo)` as a contrast) but leaves `bin()`
+   at ~0.089 against the scalars' 0.28-0.66 — two calibrations, a milder form of exactly what
+   Alternative C was rejected for. The authoring docs say so; ADR-0049 did not. Now in its
+   Outcome.

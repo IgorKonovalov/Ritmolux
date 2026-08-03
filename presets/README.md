@@ -51,11 +51,18 @@ Each `[params]` value is a pure expression evaluated every frame. A malformed
 expression (or structural config) makes the whole preset fail to load with a
 surfaced error — the engine keeps the last good preset, never crashes (NFR 10).
 
-- **Variables:** `bass mid treb onset beat bar time tempo novelty index`
-  (`beat` is 0/1; `bar` is the 0..1 beat phase; `time` is seconds; `tempo` is
+- **Variables** (19): `bass mid treb onset beat bar time tempo novelty
+  bass_raw mid_raw treb_raw onset_raw beat_index time_since_beat beat_in_bar
+  bar_index bar_phase index`. `beat` is 0/1; `bar` is the 0..1 **beat** phase
+  despite the name (`bar_phase` is the real one); `time` is seconds; `tempo` is
   **BPM**, not a 0..1 band; `novelty` is an experimental track-change transient;
   `index` is the element's own 0..1 position in a per-element binding, and `0`
-  everywhere else).
+  everywhere else. The four `*_raw` escapes carry the pre-v2 absolute magnitudes
+  (see below). The five musical-time variables are ADR-0050's: `beat_index` and
+  `time_since_beat` are always tracked; `beat_in_bar`, `bar_index` and `bar_phase`
+  come from a **gated** downbeat estimator and are counter-derived whenever it is
+  not confident — which, measured on real music, is most of the time, so build an
+  arc on `beat_index` and treat the bar trio as decorative.
 - **Functions:** `sin cos abs floor sqrt log min max pow mod clamp lerp
   smoothstep select bin hash noise` (17). `log` is the **natural** log; `bin(x)`
   reads the spectrum at a normalized position; `hash`/`noise` are the seeded

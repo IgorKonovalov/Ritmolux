@@ -1,6 +1,6 @@
 # ADR-0049 — Analysis v2: a dual-resolution low end makes the band axis truly logarithmic, and `bass`/`mid`/`treb` become normalized (with `*_raw` escapes)
 
-> **Status:** proposed
+> **Status:** accepted (Plan 0048, closed 2026-08-03 — see the Outcome section)
 > **Date:** 2026-07-30
 > **Related plan(s):** 0048-analysis-v2-and-the-retune (R5 of [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md))
 > **Supersedes in part:** the axis description in [ADR-0036's Outcome](0036-preset-reachable-spectrum.md); **resolves:** design-backlog 0015 and the structural half of 0020.
@@ -97,3 +97,42 @@ ADR-0019 and ADR-0035 each defended; the analysis layer is where input-history s
 
 The retune is sequenced *after* both semantic changes so it happens once — the lesson Plans
 0041→0042 paid for ("fix the measurement, then do the content once instead of twice").
+
+## Outcome (added 2026-08-03 at Plan 0048's close)
+
+The decision shipped as written. Four things a future reader needs that the text above does
+not say.
+
+**The window is 8192, and the choice was a measurement rather than a judgement.** The ADR left
+"4096 or 8192" to the plan; 4096 was measured to resolve **nothing** the short window did not
+(chain drag cancels the finer bins), and 16384 was rejected on 171 ms of group delay. The
+crossover is likewise *derived*, not chosen — the first band whose width reaches one
+short-window bin, band 20 at 246.2 Hz, which lands within 2 % of the independently chosen
+`BASS_HI_HZ` of 250. Per-hop analysis cost went 17.2 µs → 31.5 µs, about 0.30 % of the hop, so
+NFR §3 keeps ~34x headroom and the beat-to-reaction budget does not move at all.
+
+**One Consequences bullet was optimistic, and the price arrived where nobody was looking.**
+"The whole class of dead-gate defects stops being writable" is true of *thresholds* and false
+of *gains*. Multiplying the four levels by 16-96x turned the library's gains into ceilings
+reached just above the noise floor: Phase 7 measured **263 of 332 clamped band terms pinned at
+the real-music median** and **14 presets with no live audio term at all** — behind a green
+suite, because every reactivity instrument we own diffs a driven band against *silence*, where
+a saturated binding scores perfectly. That is the mirror of the failure Plans 0041/0042 were
+spent closing, and it is now [ADR-0062](0062-clamp-occupancy-is-the-saturation-instrument.md) /
+[Plan 0056](../plans/0056-clamp-occupancy-and-the-axis-anchor.md).
+
+**The 64-band array normalizes against one peak shared by all 64 bands**, not per band. The
+plan asked for "one rule, no per-surface exceptions" and this is the rule applied — per-band
+normalization would have driven four-bands-out leakage to 1.0 as its own maximum and destroyed
+`bin(hi) - bin(lo)` as a contrast. The consequence, which authors do hit: a single band only
+reads 1.000 when it *is* the loudest, so `bin()` has a typical value of ~0.089 against the
+scalars' 0.28-0.66, and a threshold tuned on `bass` is roughly **7x too high** for `bin()`.
+Two calibrations survive after all — a milder form of what Alternative C was rejected for.
+Stated in `presets/README.md` and `docs/presets.md`.
+
+**The axis rebuild silently re-pointed every `bin()` probe below the crossover**, by about an
+octave and a half, and nothing could have noticed: reachability watches forks, and `fft.rs`'s
+lookup test checks the layout function against the edge table that moved *with* it. The Negative
+bullet above anticipated "the eight `bin()` presets also shift positions" and Phase 7 did retune
+seven of them — but the coupling was invisible to every instrument, which is why
+[ADR-0063](0063-address-the-spectrum-by-frequency.md) makes a preset name frequencies in Hz.
