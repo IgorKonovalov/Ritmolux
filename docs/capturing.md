@@ -45,8 +45,19 @@ Two reasons, and both are load-bearing:
   trail grid on a CPU rasterizer.
 
 `--tier rich` is the deliberate opt-in, for spot-checking that the raised budgets
-actually render. Use it to *look*, not to bless: a rich capture must never be
-written into `core/tests/golden/`.
+actually render.
+
+> **A `Rich` capture is an instrument, and never a baseline**
+> ([ADR-0064](adrs/0064-a-capture-may-pin-the-rich-tier.md)). Use it to *look*, not
+> to bless: a rich capture must never be written into `core/tests/golden/`. The
+> reason is dated rather than principled — `TierConfig::RICH`'s values are the
+> provisional ones Plan 0044 shipped and its Phase 4 calibration has never run, so
+> every `Rich` baseline would be a re-bless waiting on a number nobody has measured
+> yet. Revisit after that calibration, not before.
+
+Omitting the flag is exactly `--tier floor`, byte for byte — verified at Plan 0057
+Phase 1 rather than assumed, since "the default is the old behaviour" is the kind
+of claim that quietly stops being true.
 
 > The consequence ADR-0045 names and accepts: rich-tier regressions are caught only
 > by those spot checks and by on-device runs, not by the suite. That is a real hole,
@@ -91,7 +102,8 @@ Flags:
 | `--signal <kind:param>` | synth-audio filmstrip (see below) |
 | `--audio <clip.wav>` | filmstrip from a 16-bit PCM WAV |
 | `--strip <N>` | frames tiled along the audio (default 8) |
-| `--tier floor\|rich` | quality tier to capture at (default `floor` — see below) |
+| `--at <hop>,...` | explicit filmstrip hops, beating `--strip`'s even spacing — [how to capture a transient](#aiming-a-capture-at-a-transient) |
+| `--tier floor\|rich` | quality tier to capture at (default `floor` — see above) |
 
 Bad arguments and unknown presets exit non-zero with a message.
 
@@ -117,28 +129,94 @@ cargo run -p standalone --example shot -- --preset "Pulse Field" \
 ```
 
 **Trap 2 — `--set` band magnitudes are not real levels.** `--set bass=0.8` writes
-`0.8` onto the frame, but a band that arrives through the analyzer is normalized,
-and it does not get anywhere near there. Measured through this very harness: a
-**full-scale 60 Hz sine** (`--signal bass:60`) reads `bass ≈ 0.19`, and a **120
-BPM click track** peaks at `bass ≈ 0.011`. A gain tuned to look right at
-`bass=0.8` is roughly four times too weak on the loudest pure tone the harness
-can synthesize, and the preset barely moves on real music.
+`0.8` onto the frame; a band that arrives through the analyzer comes in through
+the normalizer instead, and *what `0.8` means* differs between the two.
 
-So every `--signal` / `--audio` filmstrip now **prints the levels it measured**,
-and those are the numbers to calibrate a gain against:
+> This trap used to be stated as a magnitude gap — a full-scale 60 Hz sine reads
+> `bass ≈ 0.19` and a 120 BPM click track peaks at `bass ≈ 0.011`, so `--set
+> bass=0.8` is four to seventy times too hot. **Those figures are raw-scale and
+> [ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)
+> retired them**; they now describe `bass_raw`, and the table in
+> [what real material actually produces](#what-real-material-actually-produces)
+> is where they live. On the normalized scale the same sine reads `1.000`, because
+> a steady tone *is* its own recent peak.
+>
+> The trap survives the rescaling, in a different shape: a normalized band is a
+> fraction of the material's own peak, so `--set bass=0.8` claims "80 % of peak,
+> held forever", which no music does. The number is no longer wrong by two orders
+> of magnitude — it is wrong about *time*.
+
+So every `--signal` / `--audio` filmstrip **prints the levels it measured**, and
+those are the numbers to calibrate a gain against (here, `--signal bass:60`):
 
 ```
-audio levels over 367 analysis hops (past warm-up) — calibrate gains against these, not against --set magnitudes:
-  band       min     mean      max
-  bass     0.187    0.187    0.187
-  mid      0.000    0.000    0.000
-  treb     0.000    0.000    0.000
+audio levels over 355 analysis hops (past warm-up) — calibrate gains against these, not against --set magnitudes:
+  signal      min     mean      max
+  bass      1.000    1.000    1.000
+  mid       0.000    0.000    0.000
+  treb      0.000    0.000    0.000
+  onset     0.006    0.405    1.000
+  onset peaks at 1.000 on hop 20 — the shipped attractor reseed gates run 0.50 to 0.75
 ```
 
 `--audio <clip.wav>` on real material is the one that answers "what does my music
 actually produce"; `--signal` answers it for a known synthetic tone. Use `--set`
 to ask "does this binding do anything at all", not to decide how much of it to
 apply.
+
+**`onset` is in that table since Plan 0057**, and it is not a band. It is there
+because a whole class of binding — every shipped attractor's `reseed`, every
+beat-latched accent — is gated on it, and whether a given stimulus ever *crossed*
+such a gate was not answerable from a capture. The peak hop is printed beside it
+because that hop is the argument to [`--at`](#aiming-a-capture-at-a-transient).
+
+### Aiming a capture at a transient
+
+`--strip N` samples the clip at N **evenly spaced** hops. That is the right
+question for "what does this look like over the clip" and the wrong one for "what
+does the frame the gate fired on look like" — and the two get confused because a
+strip *looks* thorough.
+
+The arithmetic: under `--signal click:120`, `onset` crosses `0.75` on **7 hops out
+of 375**. An evenly-spaced strip of 8 lands on one of them by luck, and when it
+misses, the capture shows a preset whose reseed never fired — which is
+indistinguishable from a preset whose reseed does not work.
+
+So the level table names the peak hop and `--at` takes it:
+
+```bash
+# 1. What does this clip do, and where?  -> "onset peaks at 1.000 on hop 46"
+cargo run -p standalone --example shot -- --preset-file presets/attractor_ink.toml \
+  --signal click:120 --strip 8 --out over-the-clip.png
+
+# 2. Now capture the transient itself, and the frames either side of it
+cargo run -p standalone --example shot -- --preset-file presets/attractor_ink.toml \
+  --signal click:120 --at 44,46,48,54 --tier rich --out the-reseed.png
+```
+
+Hops are indices from hop 0 of the clip — the same numbering the level table
+reports. Order is yours (a before/after pair reads left to right), duplicates are
+an error, and a hop past the end of the clip is an error rather than a silently
+missing tile.
+
+> **`--signal click:120` reaches every shipped reseed gate, and always did.**
+> [ADR-0066](adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md)
+> and [design-backlog 0050](design-backlog.md) both state the opposite — that the
+> synthesized clip's `onset` never clears `0.56`, let alone `attractor_clifford`'s
+> `0.75`. That was true on the **raw** onset scale and was invalidated by
+> [ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)'s peak
+> normalization, whose attack is *instant*: an isolated transient reads `1.000` on
+> the hop it arrives, whatever its absolute magnitude. Measured at Plan 0057
+> Phase 1, `click:120` produces **7 clean rising edges over `0.75`**, one per beat.
+> The gate was never the problem; **aiming** at it was.
+
+Which kind to reach for, for a gate rather than a level:
+
+| kind | `onset` min / mean / max | as a reseed stimulus |
+|---|---|---|
+| `click:<bpm>` | 0.000 / 0.033 / 1.000 | **the one to use** — 7 isolated edges over `0.75`, one per beat |
+| `dynamic:<bpm>` | 0.001 / 0.153 / 1.000 | 12 edges, in amongst real band dynamics |
+| `noise:<seed>` | 0.826 / 0.953 / 1.000 | **wrong** — pinned above every gate, so an edge-triggered binding fires once and never again, exactly as `--set onset=1` does |
 
 **Trap 3 — `--set` leaves the 64-band spectrum silent, so `bin(x)` reads `0`.**
 `--set` writes the analysis frame's *scalars*; there is no key for the log-band
@@ -562,6 +640,10 @@ cargo run -p standalone --example shot -- --report --json > report.json
 # Beat filmstrip from a synthesized click track (no asset needed)
 cargo run -p standalone --example shot -- --preset "Pulse Field" \
   --signal click:120 --strip 8 --out click.png
+
+# The frame a reseed actually fired on, at the tier the app starts in
+cargo run -p standalone --example shot -- --preset-file presets/attractor_ink.toml \
+  --signal click:120 --at 44,46,48,54 --tier rich --out reseed.png
 
 # ...or from the one synthesized kind with dynamics
 cargo run -p standalone --example shot -- --preset "Pulse Field" \

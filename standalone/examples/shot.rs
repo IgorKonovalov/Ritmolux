@@ -30,7 +30,11 @@
 //!   --signal <kind:param>    synth audio filmstrip (click:120, dynamic:110, ...)
 //!   --audio <clip.wav>       filmstrip from a 16-bit PCM WAV
 //!   --strip <N>              frames tiled along the audio (default 8)
-//!   --tier floor|rich        quality tier to capture at (default floor)
+//!   --at <hop>,...           explicit filmstrip hops, beating --strip's even
+//!                            spacing — the only way to aim a capture at a
+//!                            transient (the level table names the onset peak)
+//!   --tier floor|rich        quality tier to capture at (default floor).
+//!                            A Rich capture is an instrument, never a baseline
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
 //! `--presets`, the `LMV_PRESET_DIR` override, the per-user preset directory,
@@ -53,7 +57,9 @@ use lmv_core::render::metrics::{
     struct_diff,
 };
 use lmv_core::render::{CaptureImage, HeadlessOptions, Renderer, Tier};
-use standalone::shot::args::{BandLevels, apply_set, band_levels, parse_size, synth_signal};
+use standalone::shot::args::{
+    BandLevels, apply_set, band_levels, parse_hops, parse_size, synth_signal,
+};
 use standalone::shot::film::{FILMSTRIP_WARMUP, StripLayout, filmstrip_indices, filmstrip_layout};
 use standalone::shot::glyph::{GLYPH_ADVANCE, GLYPH_COLS, glyph_for};
 use standalone::shot::json::{json_matrix, json_string, json_transient, num};
@@ -96,6 +102,10 @@ struct Args {
     signal: Option<String>,
     audio: Option<PathBuf>,
     strip: u32,
+    /// `--at <hop>,...`: explicit filmstrip hop indices, overriding `--strip`'s
+    /// even spacing. The only way to aim a capture at a *transient* — see
+    /// [`parse_hops`].
+    at: Option<Vec<u32>>,
     /// `--tier floor|rich`: the quality tier to capture at. **Floor by default**
     /// — a capture is a pure function of its inputs (NFR §6) and every golden
     /// baseline is blessed at the floor, so raising it is an explicit act. There
@@ -122,6 +132,7 @@ impl Default for Args {
             signal: None,
             audio: None,
             strip: 8,
+            at: None,
             tier: Tier::Floor,
         }
     }
@@ -166,6 +177,7 @@ fn parse_args() -> Result<Args, String> {
                     .filter(|n| *n >= 1)
                     .ok_or("--strip expects a positive integer")?;
             }
+            "--at" => args.at = Some(parse_hops(&next_value(&mut it, "--at")?)?),
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -216,7 +228,11 @@ fn print_usage() {
                                     treble:10000 noise:7 chord dynamic:110\n\
                                     (needs --out)\n\
          --audio <clip.wav>         filmstrip from a 16-bit PCM WAV (needs --out)\n\
-         --strip <N>                frames tiled along the audio (default 8)"
+         --strip <N>                frames tiled along the audio (default 8)\n\
+         --at <hop>,...             explicit filmstrip hops (beats --strip) -\n\
+                                    aim at the transient the level table names\n\
+         --tier floor|rich          quality tier to capture at (default floor)\n\
+                                    rich is an INSTRUMENT, never a baseline"
     );
 }
 
@@ -469,7 +485,22 @@ fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), Strin
         .ok_or("no preset available to render")?;
 
     let mut r = renderer(args.width, args.height, presets, args.tier)?;
-    let at = filmstrip_indices(pcm.len(), format, args.strip)?;
+    // Explicit hops beat the even spacing. Validated against the clip here rather
+    // than in the parser: a hop past the end is silently *not captured* by
+    // `capture_audio` (it only records indices it reaches), which would shorten
+    // the strip without saying why.
+    let at = match &args.at {
+        Some(hops) => {
+            let total = pcm.len() / (HOP_SIZE * format.channels.max(1) as usize);
+            if let Some(past) = hops.iter().find(|h| **h as usize >= total) {
+                return Err(format!(
+                    "--at {past}: the clip is only {total} analysis hops long"
+                ));
+            }
+            hops.clone()
+        }
+        None => filmstrip_indices(pcm.len(), format, args.strip)?,
+    };
     let frames = r
         .capture_audio(&name, &pcm, format, &at)
         .map_err(|e| format!("capture audio: {e}"))?;
@@ -490,23 +521,35 @@ fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), Strin
 
 /// Report what the analyzer derived from this clip, so "what does real material
 /// actually produce" is answered with numbers instead of a guess.
+///
+/// `onset` sits in the table beside the three bands (Plan 0057 Phase 1) because
+/// every shipped attractor gates its `reseed` on it, and whether a given
+/// `--signal` kind ever crosses such a gate was previously unanswerable from a
+/// capture. The peak hop is printed with it so `--strip` can be aimed at the
+/// frame the gate fires on.
 fn print_band_levels(levels: &BandLevels) {
     println!(
         "audio levels over {} analysis hops (past warm-up) — calibrate gains against these, \
          not against --set magnitudes:",
         levels.hops
     );
-    println!("  {:<5} {:>8} {:>8} {:>8}", "band", "min", "mean", "max");
+    println!("  {:<6} {:>8} {:>8} {:>8}", "signal", "min", "mean", "max");
     for (name, band) in [
         ("bass", levels.bass),
         ("mid", levels.mid),
         ("treb", levels.treb),
+        ("onset", levels.onset),
     ] {
         println!(
-            "  {name:<5} {:>8.3} {:>8.3} {:>8.3}",
+            "  {name:<6} {:>8.3} {:>8.3} {:>8.3}",
             band.min, band.mean, band.max
         );
     }
+    println!(
+        "  onset peaks at {:.3} on hop {} — the shipped attractor reseed gates run \
+         0.50 to 0.75",
+        levels.onset.max, levels.onset_peak_hop
+    );
 }
 
 /// Read a 16-bit-PCM WAV off disk. The parse itself is
