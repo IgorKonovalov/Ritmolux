@@ -81,27 +81,59 @@ const MIN_QUADRANTS: u8 = 2;
 ///
 /// **Measured, from the shipped library's own values.**
 /// `every_preset_draws_a_real_shape` prints the whole distribution on every run.
-/// Re-measured after `Spectrum Ridge` was repaired and left [`KNOWN_FLAT`]:
+/// **Re-measured under ADR-0067** (backdrop suppressed, compared against
+/// [`BLACK`]), because removing the backdrop changes which pixels are counted at
+/// all — and it changed this statistic more than it changed any other:
 ///
 /// ```text
-/// 0.8655  Spectrum Ridge      0.6438  De Jong
-/// 0.8300  Rose Trails         0.4923  Coral Head
-/// 0.7645  Rose Web            0.4518  Coral Bloom
-/// 0.6588  Coral               0.4453  Leviathan
+///          this measurement        previously (corner-sampled)
+/// 0.8839   Rose Web                0.8655  Spectrum Ridge
+/// 0.7211   Rose Trails             0.8300  Rose Trails
+/// 0.6755   Ink on Paper            0.7645  Rose Web
+/// 0.4249   Cathedral               0.6588  Coral
+/// 0.4107   Aurora                  0.6438  De Jong
+/// 0.3604   Supernova               0.4923  Coral Head
+/// 0.3147   Leviathan               0.4518  Coral Bloom
+/// 0.3014   Rose Overflow           0.4453  Leviathan
 /// ```
 ///
-/// Everything else is below `0.45`. The deliberately flattened fixture reads
-/// `0.98`, so `0.90` still sits between the library and the fixture — but the
-/// margin above is now **`0.035`**, not the comfortable gap this constant was
-/// first set with, and the top three are structural rather than accidental: a
-/// polyline of near-equal values *is* a straight line, and a trails-heavy line
-/// look is mostly faint tail at one level. Under [`loud`] every band is driven to
-/// `1.0` at once, which is the worst possible stimulus for exactly those shapes.
+/// **The value did not move and the two numbers behind it did.** Read the
+/// columns against each other rather than down:
+///
+/// - `Spectrum Ridge` fell `0.8655` → **`0.1916`**, off the table entirely. It
+///   was never a flat *preset*; it was a lit `bg_vignette` measured as if it were
+///   one, which is [`KNOWN_FLAT`]'s note and the whole of ADR-0067's case. `Coral`
+///   (`0.6588` → `0.2681`) and `De Jong` (`0.6438` → `0.2606`) were the same
+///   error at lower amplitude.
+/// - `Rose Web` went the other way, `0.7645` → `0.8839`, and now tops the
+///   distribution. Nothing about the preset changed. The vignette had been
+///   contributing a broad spread of mid-tones that diluted the share sitting in
+///   any one band; with it gone, what is left is the figure, and a web of
+///   near-equal-brightness strokes genuinely has very little tonal structure.
+///   The number is worse because it is now honest.
+///
+/// **So the plan's question — does re-measuring widen the `0.035` margin — is
+/// answered no, and it is a finding rather than a reason to move the constant.**
+/// The margin above the library is now **`0.0161`** (`0.90` over `Rose Web`'s
+/// `0.8839`), narrower than before. Below, the deliberately flattened fixture
+/// reads `0.9815`, so `0.90` still separates the library from the fixture, but it
+/// sits `0.0161` above one and `0.0915` below the other — not a midpoint.
+/// `0.90` is left where it is because the margin narrowed for a *real* reason:
+/// the top of the distribution is now an actual figure with an actual tonal
+/// problem, and a preset drifting over the ceiling is a preset to route, not a
+/// constant to nudge.
+///
+/// The top three are structural rather than accidental — a trails-heavy line
+/// look is mostly faint tail at one level, a web is mostly stroke, and
+/// `Ink on Paper` is a deliberate two-tone ink remap. Under [`loud`] every band
+/// is driven to `1.0` at once, which is the worst possible stimulus for exactly
+/// those shapes.
 ///
 /// So do not read a pass here as headroom. A measured constant with a shelf
 /// life: re-measure when the library changes materially, and if the top of the
-/// distribution keeps climbing, the thing to question is whether a flat-spectrum
-/// stimulus can fairly judge a spectrum readout — not whether to nudge `0.90`.
+/// distribution keeps climbing, the thing to question is whether an all-bands-up
+/// stimulus can fairly judge a figure made of near-equal strokes — not whether to
+/// nudge `0.90`.
 const MAX_TONAL_FLATNESS: f32 = 0.90;
 
 /// Shipped presets that are flat **today**, tracked rather than gated.
@@ -122,25 +154,99 @@ const MAX_TONAL_FLATNESS: f32 = 0.90;
 /// the preset. See [design-backlog 0053](../../docs/design-backlog.md): neither
 /// `coverage` nor `quadrant_spread` can distinguish a vignette from a figure, so
 /// this statistic convicted the right preset for the wrong reason.
+///
+/// Plan 0058 settled that reading with a number: under the ADR-0067 measurement
+/// the repaired `Spectrum Ridge` reads **`0.1916`**, not `0.8655`. Almost all of
+/// what this list was once tracking was the backdrop. The list stays **empty** —
+/// Phase 1's change put no preset back over the ceiling, and if one ever goes
+/// over, that is a defect to route, not an entry to re-add.
 const KNOWN_FLAT: &[&str] = &[];
 
-/// Per-system minimum lit fraction. The full-screen field must fill most of the
-/// frame; the sparse swarm need only paint a small but real footprint.
+/// The most the lowest-scoring preset in a system may sit above that system's
+/// floor before the floor has stopped doing anything (Plan 0058 Phase 2).
+///
+/// The old floors were `0.01` for six of the eight systems against a library
+/// whose sparsest member now measures `0.1189` — a factor of **11.9**, and on
+/// the two systems above it a factor of 24 to 84. Nothing could fail them except
+/// a literally black frame, which is why they survived a preset drawn entirely
+/// off-frame. A floor is only a floor if the content is somewhere near it.
+///
+/// Enforced by [`report_coverage_distribution`], which is the mechanism that
+/// gives this paragraph a shelf life instead of a good intention. It fires when
+/// the *lowest* preset in a system rises well clear of the floor — retuning or
+/// retiring the sparsest member of a family — and the fix is to re-measure that
+/// floor from the distribution the gate prints, never to leave the slack in.
+const MAX_FLOOR_SLACK: f32 = 2.2;
+
+/// Per-system minimum lit fraction, **measured from the shipped library** under
+/// the ADR-0067 measurement (backdrop suppressed, compared against [`BLACK`]).
+///
+/// Each floor is set at half its system's lowest shipped preset, so the gap is a
+/// factor of ~2 everywhere and [`MAX_FLOOR_SLACK`] holds it there. The full
+/// distribution is printed by `every_preset_draws_a_real_shape` on every run;
+/// the lowest member and the resulting factor per system:
+///
+/// ```text
+/// system              floor   lowest preset            factor
+/// fragment_field      0.50    0.9926  Kaleido Field      1.99
+/// swarm               0.42    0.8407  Storm              2.00
+/// parametric_curve    0.33    0.6722  Rose Trails        2.04
+/// lsystem             0.32    0.6413  Fern Grow          2.00
+/// star_pattern        0.34    0.6908  Star Lantern       2.03
+/// reaction_diffusion  0.07    0.1420  Coral              2.03
+/// attractor           0.12    0.2461  De Jong            2.05
+/// spectrum            0.06    0.1189  Spectrum Ridge     1.98
+/// ```
+///
+/// **These numbers replace floors that could not be failed.** Under the old
+/// corner-sampled measurement the same six sparse systems all read `0.01` and
+/// `bg_vignette` cleared that on its own; the pre-repair `spectrum_ridge` scored
+/// `0.5421` while drawing nothing at all
+/// (`the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one`). Re-deriving
+/// them was not optional bookkeeping — a floor derived from inflated numbers is
+/// not a floor (ADR-0067).
+///
+/// **What the factor of 2 costs, stated rather than discovered.** This is
+/// deliberately the sensitive end of the range, unlike
+/// [`SATURATED_OCCUPANCY`](lmv_core::preset::SATURATED_OCCUPANCY), which took a
+/// wide margin because a HARD gate that fires on good content buys exemptions.
+/// The difference is what "wrong" looks like on each side: an over-driven clamp
+/// is a *number* that stopped moving and a generous threshold still catches it,
+/// whereas an off-frame figure is a *picture that is not there*, and the sparsest
+/// legitimate content in this library still paints twice the floor. A new preset
+/// that fails one of these has drawn less than half of what the thinnest shipped
+/// member of its own family draws, which is worth a look even when it turns out
+/// to be fine.
+///
+/// Three families vary internally by 3-5x (`attractor` 0.2461-1.0000, `spectrum`
+/// 0.1189-0.5541, `reaction_diffusion` 0.1420-0.4427), so their floors sit over
+/// the most movement and are the ones most likely to need a re-measure. The
+/// response to a legitimately sparser new preset is to re-derive that system's
+/// floor from the printed distribution, and to say in the commit which preset
+/// moved the minimum — not to nudge a constant back until the run goes green.
 fn coverage_floor(system: SystemKind) -> f32 {
     match system {
-        // Full-screen field fills most of the frame.
-        SystemKind::FragmentField => 0.30,
+        // Full-screen field: every shipped member is above 0.99, so the spread
+        // is 0.0074 wide and anything near this floor is a broken field.
+        SystemKind::FragmentField => 0.50,
+        // A dense point cloud that fills the frame far more than "sparse points"
+        // suggested — the old 0.01 was 84x below the thinnest of the three.
+        SystemKind::Swarm => 0.42,
+        // Line art. The trails-heavy looks score lowest because a faint tail is
+        // still lit; Rose Trails at 0.6722 sets this one.
+        SystemKind::ParametricCurve => 0.33,
+        SystemKind::LSystem => 0.32,
+        SystemKind::StarPattern => 0.34,
         // Reaction-diffusion paints a real pattern across the frame, but the
         // present maps only the sparse V species, so the lit fraction is modest.
-        SystemKind::ReactionDiffusion => 0.03,
-        // Sparse line art / point swarm / attractor cloud / spectrum comb: a
-        // small but real footprint.
-        SystemKind::Swarm
-        | SystemKind::ParametricCurve
-        | SystemKind::LSystem
-        | SystemKind::StarPattern
-        | SystemKind::Attractor
-        | SystemKind::Spectrum => 0.01,
+        SystemKind::ReactionDiffusion => 0.07,
+        // The attractor cloud is the widest-spread family: De Jong's filigree at
+        // 0.2461 against two members that saturate the frame.
+        SystemKind::Attractor => 0.12,
+        // The sparsest system in the library, and the one this plan exists
+        // because of. Spectrum Ridge sets it at 0.1189 — *after* its repair; the
+        // version that shipped broken scores 0.0000 here.
+        SystemKind::Spectrum => 0.06,
     }
 }
 
@@ -258,6 +364,7 @@ fn every_preset_draws_a_real_shape() {
 
     let mut failures = Vec::new();
     let mut flatness = Vec::new();
+    let mut by_system: Vec<(SystemKind, f32, String)> = Vec::new();
     for (name, system) in &meta {
         let (name, system) = (name.as_str(), *system);
         let img = renderer
@@ -274,6 +381,7 @@ fn every_preset_draws_a_real_shape() {
         );
         let known_flat = KNOWN_FLAT.contains(&name);
         flatness.push((flat, name.to_string(), known_flat));
+        by_system.push((system, cov, name.to_string()));
         if cov < floor {
             failures.push(format!("{name} blank: coverage {cov:.4} < {floor:.2}"));
         }
@@ -302,8 +410,11 @@ fn every_preset_draws_a_real_shape() {
         }
     }
 
-    // The distribution the threshold above is set from, printed on every run so
-    // the next re-measurement does not need a special one.
+    // The two distributions every constant in this file is set from, printed on
+    // every run so the next re-measurement does not need a special one — and, for
+    // the coverage floors, checked rather than only printed.
+    failures.extend(report_coverage_distribution(&by_system));
+
     flatness.sort_by(|a, b| b.0.total_cmp(&a.0));
     println!("flattest presets (share of lit pixels in one luminance band):");
     for (flat, name, known) in flatness.iter().take(8) {
@@ -315,6 +426,67 @@ fn every_preset_draws_a_real_shape() {
         failures.is_empty(),
         "these presets failed shape sanity: {failures:#?}"
     );
+}
+
+/// Print each system's coverage distribution against its floor, lowest first,
+/// with the factor between the floor and that system's lowest preset — and
+/// return a failure for every floor that factor has left behind.
+///
+/// **The floors are only floors while the content is near them** (Plan 0058
+/// Phase 2). This is what stops the re-derivation in [`coverage_floor`] from
+/// decaying back into the state it replaced. The old `0.01` did not start out
+/// useless — it stopped being useful as the library grew denser and nothing was
+/// watching, and by the time a preset drew nothing at all the floor was 11.9x
+/// below the sparsest thing that could fail it. A comment saying "re-measure when
+/// the library changes materially" did not survive that; this does, because it
+/// fails the build.
+///
+/// It cannot fire on a *new sparse* preset — that case fails the coverage floor
+/// itself, loudly and by name. It fires only when the sparsest member of a family
+/// is retuned upward or retired, which is exactly when a re-measure is owed.
+///
+/// It runs off the captures the caller already took. A second sweep would be 35
+/// more WARP renders to recompute numbers that are already in hand.
+fn report_coverage_distribution(by_system: &[(SystemKind, f32, String)]) -> Vec<String> {
+    let mut slack = Vec::new();
+    println!("coverage by system (floor, then every preset lowest-first):");
+    for system in SystemKind::ALL {
+        let mut rows: Vec<(f32, &str)> = by_system
+            .iter()
+            .filter(|(s, ..)| *s == system)
+            .map(|(_, cov, name)| (*cov, name.as_str()))
+            .collect();
+        if rows.is_empty() {
+            continue;
+        }
+        rows.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let floor = coverage_floor(system);
+        let (lowest, lowest_name) = rows[0];
+        let factor = lowest / floor;
+        println!(
+            "  {:<18} floor {floor:.2}  lowest {lowest:.4} ({lowest_name}) — factor \
+             {factor:.2} (max {MAX_FLOOR_SLACK:.1})",
+            system_name(system),
+        );
+        let listed: Vec<String> = rows
+            .iter()
+            .map(|(cov, name)| format!("{cov:.4} {name}"))
+            .collect();
+        println!("      {}", listed.join("  |  "));
+
+        if factor > MAX_FLOOR_SLACK {
+            slack.push(format!(
+                "{}: the floor {floor:.2} sits {factor:.2}x below the system's lowest preset \
+                 ({lowest_name} at {lowest:.4}), over the {MAX_FLOOR_SLACK:.1}x this file \
+                 allows — nothing this system draws comes near the floor, so it would pass \
+                 an empty frame the way the pre-ADR-0067 floors did. Re-measure it from the \
+                 distribution printed above and say in the commit which preset moved the \
+                 minimum",
+                system_name(system),
+            ));
+        }
+    }
+    slack
 }
 
 /// A line scene driven far past the additive ceiling: strokes wide enough to
