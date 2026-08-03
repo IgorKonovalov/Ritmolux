@@ -7,22 +7,22 @@
 > `909ae4a` the harness/docs recalibration, `0fb26d4` Phase 6's verdicts (recorded below),
 > `80c5dff` Phase 7's library retune (368 gains, 36 thresholds, 7 `bin()` positions), `bea5c1e`
 > the lane's backlog notes, `fc698cd` the axis-block regeneration that finally met Phase 5's
-> done-when. [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) and
-> [ADR-0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) are
+> done-when. [ADR-0049](../../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) and
+> [ADR-0050](../../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) are
 > **accepted, each with an Outcome section**. Gate at the close: `fmt --check` clean, `clippy
 > --workspace --all-targets -D warnings` clean, `nextest --workspace` **388/388, 0 skipped**;
 > reachability **17 flags, all the standing `tempo` false positive, 0 genuinely dead**.
 > **Delivers the large half of roadmap R5** (normalization, phrase time, and the axis), and
-> spawns three successors: [ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)
-> + [ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md) + [Plan
-> 0056](0056-clamp-occupancy-and-the-axis-anchor.md), and
-> [backlog 0042](../design-backlog.md) on the estimator's lock rate. See "Close review" at the
+> spawns three successors: [ADR-0062](../../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)
+> + [ADR-0063](../../adrs/0063-address-the-spectrum-by-frequency.md) + [Plan
+> 0056](../0056-clamp-occupancy-and-the-axis-anchor.md), and
+> [backlog 0042](../../design-backlog.md) on the estimator's lock rate. See "Close review" at the
 > foot of this file.
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (axis + normalization),
-> [0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) (phrase time).
-> [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md) R5 (the large half). Runs after Plan 0047.
+> **Related ADRs:** [0049](../../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (axis + normalization),
+> [0050](../../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) (phrase time).
+> [docs/roadmap-visual-richness.md](../../roadmap-visual-richness.md) R5 (the large half). Runs after Plan 0047.
 
 ## TL;DR
 
@@ -220,7 +220,7 @@ interview declined. So this is a shortfall, not a defect, and **no constant is n
 change this result must *not* be read as recommending: ADR-0050 exists because a confidently
 wrong beat 1 is the failure an author cannot work around, and trading the gate for coverage
 inverts that. Whether to improve the estimator or re-price the gate is an **ADR-0050
-supplement** — architect work, routed to [design-backlog 0042](../design-backlog.md).
+supplement** — architect work, routed to [design-backlog 0042](../../design-backlog.md).
 
 **Phase 7 inherits a qualification.** Its brief says to adopt `beat_index`/`bar_phase` "where
 a preset's arc wants them". Layer 1 (`beat_index`, `time_since_beat`) is unconditional and
@@ -230,7 +230,7 @@ ones. The retune should lean on layer 1 and treat layer 2 as decorative until th
 earns its gate.
 
 **Field note, incidental:** the governor demoted `rich → floor` at startup on this display.
-Unrelated to analysis, but it is the [0044] Phase 4 / [backlog 0031](../design-backlog.md)
+Unrelated to analysis, but it is the [0044] Phase 4 / [backlog 0031](../../design-backlog.md)
 question showing itself unprompted.
 
 ## What this plan does NOT do
@@ -245,14 +245,14 @@ question showing itself unprompted.
 ## Followups (after this lands)
 
 - ~~Revisit `bin_range(lo, hi)` against the resolved axis.~~ **Designed** —
-  [ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md) folds it in beside `bin_hz`,
-  and Phase 4 of [Plan 0056](0056-clamp-occupancy-and-the-axis-anchor.md) builds it.
+  [ADR-0063](../../adrs/0063-address-the-spectrum-by-frequency.md) folds it in beside `bin_hz`,
+  and Phase 4 of [Plan 0056](../0056-clamp-occupancy-and-the-axis-anchor.md) builds it.
 - ADR-0050 Alternative B (novelty/section signal) once bar time has proven itself in
   content. **Not yet earned** — Phase 6 measured bar time at a 3.1 % lock rate, so the
-  precondition is unmet; [backlog 0042](../design-backlog.md) comes first.
+  precondition is unmet; [backlog 0042](../../design-backlog.md) comes first.
 - The `--report` ceiling-check threshold minor from Plan 0041's review, if the regenerated
   tables touch that code anyway. **Still open**, and now adjacent to
-  [ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md), which touches the
+  [ADR-0062](../../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md), which touches the
   same walk.
 
 ## Close review (Mode 4, 2026-08-03)
@@ -304,14 +304,14 @@ not help either: it watches forks, and a gain contains none. Same shape on the a
 re-pointed every sub-crossover `bin()` probe by about an octave and a half, and `fft.rs`'s lookup
 test checks the layout function against the edge table that moved *with* it — internal
 consistency with no external anchor. Both are now designed out
-([ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md),
-[ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md),
-[Plan 0056](0056-clamp-occupancy-and-the-axis-anchor.md)).
+([ADR-0062](../../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md),
+[ADR-0063](../../adrs/0063-address-the-spectrum-by-frequency.md),
+[Plan 0056](../0056-clamp-occupancy-and-the-axis-anchor.md)).
 
 ### Minors, all fixed in the close commit
 
 1. **`presets/README.md`'s variable roster still listed 10 of 19** — the exact drift
-   [backlog 0035](../design-backlog.md) raised on 2026-07-30 and asked to ride on the next close
+   [backlog 0035](../../design-backlog.md) raised on 2026-07-30 and asked to ride on the next close
    sweep, on the most-read line of the document the `preset-author` lane is pointed at first. Now
    carries all 19 in `VAR_NAMES` order, with ADR-0050's two layers and the Phase 6 lock-rate
    qualification. Backlog 0035 struck.
