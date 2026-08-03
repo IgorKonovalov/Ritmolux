@@ -2403,3 +2403,90 @@ behaviour rather than work.
 Left in place by this lane rather than deleted, because two docs link to it
 ([presets.md](presets.md) and [capturing.md](capturing.md)) and this repo keeps its
 cross-references resolving. Retiring it is a three-file edit and belongs with the Plan 0048 close.
+
+---
+
+## Entry 0046 — from the Plan 0048 close, on the user's first live look at the retuned library
+
+## 0046 — the retune's gain rule is direction-blind, so the six presets whose idiom *subtracts* light came out ~25 % darker
+
+- **Raised:** 2026-08-03, from `architect`, after the user ran the app on the retuned library and
+  reported "strange attractors are very dim". Nothing else in the set was named.
+- **Verified against code and by rendering:** yes — measurements below, reproduced at
+  `LMV_PRESET_DIR=./presets` on `2c6b5c1`.
+- **Cost when it bit:** the first user-visible regression from Plan 0048's Phase 7, found by eye on
+  the first live run, on the family that is 19 of the library's 22 subtractive audio terms.
+
+**The measurement.** Same engine, same excitation (`--set bass=mid=treb=onset=0.42`, the
+real-music typical), 240 frames, pre-retune preset file against post-retune:
+
+| preset | pre mean | post mean | delta | pre coverage | post coverage |
+|---|---|---|---|---|---|
+| `attractor_clifford` | 78.66 | 61.04 | **−22 %** | 47.9 % | 40.9 % |
+| `attractor_dejong` | 50.29 | 38.84 | **−23 %** | 59.1 % | 37.4 % |
+| `attractor_lorenz` | 49.91 | 36.99 | **−26 %** | 51.7 % | 33.5 % |
+| `attractor_leviathan` | 64.39 | 59.51 | −8 % | 64.2 % | 47.3 % |
+
+**The cause is the rule, not a slip in applying it.** Phase 7 re-derived every clamped gain as
+`G' = C / P`, `P = 0.85` for `bass`/`mid`, so a typical passage lands at about half the cap. That
+is right for a term that **adds** light. The attractor family's stated idiom is the inverse —
+`# PEAK BUYS STRUCTURE`, in the header of every file: `fade` and `size` *fall* as the track hits,
+and `trails` rises instead, so a drop stretches the exposure rather than blowing the accumulation
+to white. For a **subtractive** term, "half the cap at typical" means half the *darkening* applied
+constantly, where before it was applied essentially never.
+
+Worked, on `attractor_clifford` at typical:
+
+|  | pre (raw `bass` 0.040) | post (normalized `bass` 0.42) |
+|---|---|---|
+| `fade` subtrahend | `0.040 × 0.18` = 0.0072 — **12 % of its 0.060 cap** | `0.42 × 0.0706` = 0.0297 — **49 % of cap** |
+| resulting `fade` | 0.8778 | 0.8553 |
+| steady-state accumulation `1/(1−fade)` | 8.18 | 6.91 — **−15 %** |
+| `size` | 0.6126 | 0.5406 |
+| point area ∝ `size²` | — | **−22 %** |
+
+`0.85 × 0.78 ≈ 0.66`, against a measured mean drop of 0.78 — same order, the gap being backdrop and
+the tonemap's compression. So the mechanism accounts for the measurement.
+
+**Nothing could have caught it, and this is the third instance of that same sentence in one plan.**
+The retune's own acceptance checks were reachability (blind to gains), the reactivity gates (diff
+against silence), and a *loud* contact sheet checked for blowout — which was correctly unchanged,
+because at the peak these terms hit the same caps they always did. No instrument in this project
+measures a preset's **absolute luminance against its own previous self**. ADR-0062's occupancy
+statistic will not catch it either: these clamps are *not* pinned, which is exactly the healthy
+reading.
+
+**Note the near-miss in the record.** ADR-0062's rejected Alternative B names this family's
+inversion explicitly — "the attractor family lowers `fade` and `size` on energy by design, 'peak
+buys structure'; this codebase has no house direction for 'louder'" — as a reason a
+response-slope assertion would fail *correct* presets. The inversion was known. What was not
+connected is that a **uniform** gain rule is direction-blind, so the same `P` that half-engages a
+brightening term at typical also half-engages a darkening one.
+
+**What a design here would weigh:**
+
+- **Direction-aware `P` in the retune rule.** A subtractive term wants its typical engagement near
+  the *low* end of its cap, not the middle — the authored look is the undarkened one and the cap
+  is headroom for the drop. Cheapest, and it is a `preset-author` pass over 22 terms in 9 files,
+  not engine work.
+- **Re-anchor per preset by eye against the pre-retune render.** Most faithful to each author's
+  intent, least systematic, and it gives up the property that made Phase 7 defensible — that the
+  retune was a derivation rather than a taste pass.
+- **A luminance-drift check in the harness.** The general instrument: capture each preset at
+  typical and compare mean luminance against a stored figure, flagging a move past some band. It
+  would have caught this and would catch the next content-wide pass too. Costs a second baseline
+  set and the judgement of what band is a defect rather than an intent.
+- **Accept it.** Defensible only if the darker family is judged better; the user's first reaction
+  says otherwise, so this is listed for completeness.
+
+**Scope, measured:** 22 subtractive audio terms in 9 presets, and **19 of them are the six
+`attractor_*` files** (`dejong` 4, `clifford` 4, `thomas` 3, `lorenz` 3, `ink` 3, `leviathan` 2).
+The other three are one each in `swarm_storm`, `swarm_dense`, `rose_overflow`. So the fix is
+narrow and its blast radius is one family.
+
+**One confound to keep separate, not part of this entry.** The live session the report came from
+ran at **`Floor`** — the governor demoted it, as it did in Phase 6 — and `Rich` triples the
+attractor particle count. So the observed dimness is the sum of this defect and a tier the user
+did not choose. The numbers above are `Floor`-only on both sides (`shot` is `Floor` by
+construction, ADR-0045), so they isolate the preset change; the tier half is
+[backlog 0031](design-backlog.md) and Plan 0044's never-run Phase 4.
