@@ -55,7 +55,15 @@ contact_angle_deg = 55
 #
 # The variant swap is slow (~44 s) and audio-independent. `star_rosette`
 # learned this the hard way: a band term large enough to cross a variant
-# boundary is not a morph, it is a flicker between two precomputed geometries.
+# boundary is not a morph, it is a flicker between two geometries.
+#
+# SINCE PLAN 0054 / ADR-0060 `variant` IS A CONTINUOUS CONTACT ANGLE, so a
+# fractional value is a real rosette and `[smoothing]` on it morphs rather than
+# stuttering across a `floor`. 0, 1 and 2 still name the three rosettes this file
+# has always drawn, so nothing here changes. The `floor` stays for now because
+# `mod(..., 3)` is a sawtooth - dropping it alone would turn one slow swap into a
+# hard 2 -> 0 snap at every wrap - and re-authoring the sweep as a triangle wave
+# is a `preset-author` pass, not an engine one.
 variant = "floor(mod(time * 0.023, 3))"
 
 # A slow turn plus a genuine wander. `noise` is one call where the older files
