@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0059** (ADRs are a separate sequence — next free there is **0068**.)
+**Next free number: 0060** (ADRs are a separate sequence — next free there is **0070**.)
 
 ## Active roster
 
@@ -15,10 +15,11 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **approved 2026-08-02** — ready for `dev`; [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
+| [0059](0059-lorenz-finds-its-plane.md) | Lorenz finds its plane, and the attractor can trade samples for curves (per-family projection basis, `[particles] density`, the continuous-flow streak) | **draft 2026-08-03** — successor to [0057], whose Phase 4 diagnosed this and stopped by its own instruction; [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) + [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md); closes [backlog 0048](../design-backlog.md). **No golden baseline moves** (checked in advance: the fixture runs De Jong, and no fixture declares `[particles]`). **Phase 4 is `human`** — the one content pass, and it **may route back to `architect`** if `density` + `fade` cannot hold a curve | dev, human |
 
 ## Recommended execution sequence
 
-**Every plan in the roster is approved as of 2026-08-03 — nothing is waiting on a design
+**Every plan in the roster but [0059] is approved as of 2026-08-03 — nothing is waiting on a design
 decision.** What separates them now is only what each needs to *run*: [0052] closes in one session;
 [0050] closes in one plus a measurement; [0053] and [0055] each carry a `human` phase that gates
 later phases, so they stop mid-plan by construction — [0053] until a discrete GPU is to hand, [0055]
@@ -26,20 +27,30 @@ until the live A/B is judged. Taking [0052] first keeps a session unblocked end 
 (**[0054], [0056], [0057] and [0058] have all landed and closed** on 2026-08-03 — see Recently
 closed.)
 
-**The one thing this roster does not yet contain is the successor [0057] routed to `architect`.**
-[0057] Phase 4 confirmed that the Lorenz family renders the wrong plane — the shared 3-D draw
-branch uses `y` as the vertical and rotates `x` against `z`, so the rest view is x–y and the quarter
-turn is z–y, while the butterfly lives in **x–z**. That is a projection *convention* with rejected
-alternatives (a per-family basis, a preset-facing parameter, re-centring Lorenz's coefficients), so
-Phase 5 was deliberately not written and the plan closed without it, exactly as its own Risks
-section allowed. **What is owed: one ADR and one plan**, and the plan carries two things beyond the
-basis — the `attractor_lorenz` re-tune [0057] Phase 6 withheld on purpose (judging a figure about to
-change shape is judging nothing), and the **stipple** finding, which a basis fix alone will not
-clear. Corrected to x–z the silhouette is right and the figure still reads as speckle rather than as
-the banded wings of the iconic plot, because the scene draws 50 000 *independent samples of the
-invariant measure* where the plot's legibility comes from following **one trajectory** as a
-continuous curve. The levers are `fade` and the particle count — content and capacity, not geometry
-— and [0057] Phase 2 has just returned 3x of headroom to spend on them.
+**[0059] is the successor [0057] routed to `architect`, and it was designed at the same close.**
+[0057] Phase 4 confirmed the Lorenz family renders the wrong plane — the shared 3-D draw branch uses
+`y` as the vertical and rotates `x` against `z`, so the rest view is x–y and the quarter turn z–y,
+while the butterfly lives in **x–z**. That is a projection *convention* with rejected alternatives,
+so Phase 5 was deliberately not written and the plan closed without it, exactly as its own Risks
+section allowed. [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) takes the
+basis per-family in code.
+
+**The design interview corrected two of its own premises, which is worth knowing before reading
+[0059].** Phase 4 handed over the observation that a basis fix alone leaves the figure reading as
+**stipple**, and named `fade` and the particle count as the levers. Doing the arithmetic at design
+time sharpened both halves. A `prev → current` streak is worth **~1.8x a point's footprint** — mean
+Lorenz speed ~60 world units/s, so a 60 Hz frame travels ~1.0 world unit → ~0.022 NDC at
+`projection()` scale `0.022`, against a `0.012` point diameter, which independently reproduces Phase
+4's measured ~1.2 diameters. **So the streak closes the beading and is not a trace**, and
+subdividing it into the four Euler sub-steps the compute already discards buys nothing, because at
+1.8 diameters a chord and its curve are the same line. Trace length can only come from persistence,
+persistence needs **sparsity**, and the second named lever *did not exist*: `[particles]` accepted
+only `family`. [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) takes
+both as one decision, and what makes a count key safe is one plan old —
+[ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) divides the
+deposit by the count drawn, so before [0057] a `density` key would have been an exposure key wearing
+a structural name. [0059] Phase 4 is the single content pass, carrying the `attractor_lorenz` re-tune
+[0057] Phase 6 withheld on purpose.
 
 **Both of the harness gaps that made [0057] and [0058] necessary are now closed, and the shape they
 had in common is worth carrying.** Each defect shipped behind a green suite because **nothing in

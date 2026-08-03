@@ -2593,7 +2593,24 @@ since both are "the frame looks alive to our instruments and is not".
 
 ## ~~0048 — the `lorenz` attractor family renders as a dust cloud, and no preset key reaches the scatter~~
 
-- **PROMOTED 2026-08-03 → [Plan 0057](plans/0057-the-attractors-compute-path.md) Phases 4-5** — no
+- **DIAGNOSED AND RE-PROMOTED 2026-08-03 → [ADR-0068](adrs/0068-the-projection-basis-is-a-per-family-property.md)
+  + [ADR-0069](adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) +
+  [Plan 0059](plans/0059-lorenz-finds-its-plane.md).** The diagnosis below was right and this entry's
+  own three candidates were all wrong — [Plan 0057](plans/done/0057-the-attractors-compute-path.md)
+  Phase 4 confirmed the shared 3-D **view basis** by discriminating capture and ruled out
+  integration and an un-converged seed by measurement (the cloud fills 5.89 % of its own bounding
+  volume, stable from 60 through 240 to 600 frames, where an un-converged seed box reads ~26 %). It
+  then stopped, by its own instruction, because a shared convention changing for one family is a
+  decision rather than a constant. **Two things the entry could not have known, both from doing the
+  arithmetic at design time.** A basis fix alone leaves the figure reading as *stipple*, because the
+  scene draws 50 000 independent samples of the invariant measure where the iconic plot follows one
+  trajectory as a curve. And **this entry's ask — "no preset key reaches the scatter" — turns out to
+  be half right for the wrong reason**: the key worth having is not a seed spread but a **`density`**
+  that trades sample count for trace length, and it only became *safe* to expose one plan ago, when
+  [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) made the particle
+  count stop being the frame's brightness. Notes below retained as the origin record.
+
+- **PROMOTED 2026-08-03 → [Plan 0057](plans/done/0057-the-attractors-compute-path.md) Phases 4-5** — no
   ADR yet, deliberately. The phase is a **diagnosis before a fix**, because the leading hypothesis
   is not one of the three this entry named: the draw shader's 3-D branch uses **`y` as the
   vertical** and rotates `x` against `z` (`particles/mod.rs:355-360`), so the view is x-y at rest
