@@ -28,9 +28,25 @@
 //! changes — `golden`, `distinctness`, `reactivity` and `shot` all keep the
 //! shipped composite, backdrop included.
 //!
-//! Coverage floors are per-system: `fragment_field` fills the frame, while the
-//! `swarm` is sparse points, so a single broad floor would be either tautological
-//! for one or impossible for the other.
+//! Coverage floors stay per-system, because the systems still differ by an order
+//! of magnitude in how much they paint — `fragment_field` fills the frame while
+//! `spectrum` draws a contour — so a single broad floor would be either
+//! tautological for one or impossible for the other. **The floors themselves were
+//! all re-derived in Plan 0058 Phase 2**, since every one of them had been
+//! measured through a backdrop. They are set at half each system's lowest shipped
+//! preset and [`MAX_FLOOR_SLACK`] keeps them there; the old note that the `swarm`
+//! is "sparse points" was measurement folklore, and it measures `0.84`.
+//!
+//! **Plan 0058 Phase 3 adds a second excitation.** Every question above is asked
+//! of one fully-driven frame, which cannot see a figure that is fine at rehearsal
+//! level and gone at the top of its range.
+//! [`a_louder_frame_is_reported_against_a_quieter_one`] captures the library at
+//! [`MODERATE`] as well as [`LOUD`] and reports the ratio between them. It is a
+//! **report, not a gate** — the measurement in its doc comment is the argument,
+//! and the short version is that no threshold on that axis convicts any of the
+//! three known defective configurations while the nearest content to one is the
+//! attractor family's deliberate idiom. The second capture does buy one gate:
+//! [`MODERATE_MIN_COVERAGE`], that a preset is a picture at a realistic level.
 //!
 //! **Plan 0056 Phase 5 adds a third question: does the shape have an interior?**
 //! "Not blank, not a dot" is satisfied completely by a fully saturated
@@ -281,26 +297,45 @@ fn headless() -> Option<Renderer> {
     }
 }
 
-/// A sustained "loud" frame: every band up and a beat, so any audio-gated
-/// brightness reaches its lit state.
+/// A sustained frame with every level driven to `level` and a beat, so any
+/// audio-gated brightness reaches its lit state.
 ///
-/// "Every band up" now includes the `spectrum` array itself (Plan 0034 Phase 2).
-/// A frame with `bass = mid = treb = 1.0` and 64 silent log-bands is not a frame
+/// "Every band up" includes the `spectrum` array itself (Plan 0034 Phase 2). A
+/// frame with `bass = mid = treb = 1.0` and 64 silent log-bands is not a frame
 /// any audio could produce, and under it a spectrum readout would correctly draw
 /// almost nothing — the floor would be measuring the fixture, not the scene. No
 /// pre-0034 scene reads `spectrum`, so every other preset's capture is
 /// unchanged.
-fn loud() -> AnalysisFrame {
+///
+/// `beat` and `bar` are held **constant** across levels (Plan 0058 Phase 3): the
+/// excitation ratio has to vary one thing, and a beat-latched figure that appears
+/// only on the beat would otherwise swamp the level's own contribution.
+fn excited(level: f32) -> AnalysisFrame {
     AnalysisFrame {
-        bass: 1.0,
-        mid: 1.0,
-        treb: 1.0,
-        onset: 1.0,
+        bass: level,
+        mid: level,
+        treb: level,
+        onset: level,
         beat: true,
         bar: 0.5,
-        spectrum: [1.0; lmv_core::dsp::SPECTRUM_BINS],
+        spectrum: [level; lmv_core::dsp::SPECTRUM_BINS],
         ..Default::default()
     }
+}
+
+/// The two excitations Phase 3 compares, and the drive every other test here
+/// uses ([`LOUD`], the fully-driven frame this file has always rendered).
+const LOUD: f32 = 1.0;
+/// A realistic mid-track level rather than a whisper. Low enough that a
+/// world-space param driven past the frame at [`LOUD`] is still comfortably
+/// inside it here, high enough that every audio-gated brightness is already lit
+/// — the comparison must isolate *how far* a figure is driven, not whether it
+/// switched on at all.
+const MODERATE: f32 = 0.4;
+
+/// A sustained "loud" frame: every band up and a beat.
+fn loud() -> AnalysisFrame {
+    excited(LOUD)
 }
 
 /// Drop the preset's backdrop bindings so the capture renders the scene over the
@@ -685,4 +720,178 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
         "the old gate's score must be dominated by the backdrop, not by the scene: \
          old {old_cov:.4} vs new {cov:.4}"
     );
+
+    // (3) Phase 3's second excitation, on the same fixture. The defect is total
+    // rather than level-dependent: the contour is already off frame at MODERATE,
+    // which is why the excitation *ratio* cannot see it (0/0) and why
+    // MODERATE_MIN_COVERAGE is the check that does.
+    let quiet = renderer
+        .capture_preset(name, &excited(MODERATE), FRAMES)
+        .expect("capture the pre-repair ridge at moderate excitation");
+    let mid_cov = coverage(&quiet, BLACK, EPS);
+    println!(
+        "[pre-repair ridge] at excitation {MODERATE}: coverage={mid_cov:.4} \
+         (min {MODERATE_MIN_COVERAGE:.2}), ratio {:.4}",
+        ratio_of(cov, mid_cov)
+    );
+    assert!(
+        mid_cov < MODERATE_MIN_COVERAGE,
+        "the pre-repair ridge is off frame at a realistic level too, so it must fail the \
+         moderate-excitation sentinel: coverage {mid_cov:.4} >= {MODERATE_MIN_COVERAGE:.2}"
+    );
+}
+
+/// The least coverage a preset may paint at [`MODERATE`] and still be a picture
+/// at a realistic level (Plan 0058 Phase 3). A **sentinel, not a floor** — one
+/// number across all eight systems, deliberately unlike [`coverage_floor`].
+///
+/// The per-system floors were measured at [`LOUD`] and belong there. This asks a
+/// cruder question that needs no per-system calibration: *is the figure in the
+/// frame at all when the music is merely playing?* Measured the same way
+/// regardless — the library's lowest coverage at `MODERATE` is `0.0891`
+/// (`Spectrum Ridge`), so `0.04` sits a factor of `2.23` below it, matching
+/// [`MAX_FLOOR_SLACK`]'s ceremony.
+///
+/// **Non-vacuous, and by the case that motivated the plan**: the pre-repair
+/// `spectrum_ridge` scores `0.0000` here as well as at `LOUD`, asserted in
+/// [`the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one`].
+///
+/// It is not redundant with the `LOUD` floors, though the overlap is worth being
+/// honest about. A figure driven *off* frame fails at `LOUD` and is caught there.
+/// What only this can catch is the inverse: a look that is in frame when driven
+/// hard and **absent at the level music actually occupies** — a threshold sitting
+/// above the material, which is ADR-0062's saturation defect pointed the other
+/// way. No shipped preset is in that state, so this is a guard rather than a
+/// conviction today. `Rose Draw` is the closest thing to it and is legitimate:
+/// `0.1403` at `MODERATE` against `0.9180` at `LOUD`, because at `0.4` the curve
+/// is still being drawn.
+const MODERATE_MIN_COVERAGE: f32 = 0.04;
+
+/// **Plan 0058 Phase 3 — "more audio must not mean less picture", measured.**
+///
+/// Captures every preset at [`MODERATE`] and [`LOUD`] and reports
+/// `coverage(loud) / coverage(moderate)` — a ratio against the preset's own
+/// quieter frame, because the scenes differ by an order of magnitude in how much
+/// they paint and an absolute floor could not compare them.
+///
+/// # This ships as a report, not as a gate, and the measurement is why
+///
+/// The plan authorized either outcome and left the choice to the numbers
+/// (Risks). They came back like this — the whole library, plus the pre-repair
+/// ridge as a control:
+///
+/// ```text
+///  ratio   cov@0.4  cov@1.0  preset
+///  0.8552   0.2878   0.2461  De Jong          <- lowest legitimate
+///  0.9568   0.3164   0.3027  Leviathan
+///  0.9935   1.0000   0.9935  Warp Drive
+///  ...      (25 presets between 0.99 and 1.11)
+///  1.0514   0.3866   0.4065  Spectrum Corona  <- over-scaled, scale = 5.20
+///  1.0891   0.5088   0.5541  Spectrum Comb    <- over-scaled, scale = 3.80
+///  1.3350   0.0891   0.1189  Spectrum Ridge   (repaired)
+///  1.9753   0.4047   0.7995  Star Rosette
+///  6.5429   0.1403   0.9180  Rose Draw        <- highest
+///     inf   0.0000   0.0000  Spectrum Ridge (pre-repair)
+/// ```
+///
+/// **No threshold on this axis convicts anything it was built for.** Three known
+/// defective configurations exist and the ratio reaches none of them:
+///
+/// - **`Spectrum Comb` does not fail. It scores `1.0891` — it draws *more* when
+///   loud.** The plan named it the live candidate and asked for this stated
+///   plainly if it came back clean, so: a comb roots every bar on a shared
+///   baseline, and clipping the tips off the tallest bars costs a rounding error
+///   of coverage while the body of the figure stays exactly where it was. The
+///   layout the check was designed around is the layout it cannot see.
+/// - **`Spectrum Corona` is the same at `1.0514`**, for the same reason.
+/// - **The pre-repair ridge is `0/0`, undefined.** Its contour is already off
+///   frame at `MODERATE` (`scale = 3.20` puts a driven element ~1.9 world units
+///   up at level `0.4`, against a half-height of `1.0`), so there is no
+///   moderate-excitation picture to compare the loud one against. A ratio needs a
+///   denominator and a total defect does not have one.
+///
+/// Meanwhile the only content anywhere near a plausible threshold is **correct**:
+/// `De Jong` at `0.8552` and `Leviathan` at `0.9568` are the attractor family's
+/// deliberate *peak buys structure* idiom, which ADR-0062's Alternatives records
+/// as real and as the reason a directional assertion was rejected there too. A
+/// gate at `0.80` would sit `0.055` from `De Jong` — tight enough that a retune
+/// trips it — while catching none of the three cases above. That trade is
+/// strictly negative: every unit of sensitivity buys risk of convicting the
+/// attractor idiom and zero demonstrated detection.
+///
+/// So the ratio is printed, watched, and not enforced. What *is* enforced here is
+/// [`MODERATE_MIN_COVERAGE`], the one property the second capture supports: a
+/// preset must be a picture at a realistic level, not only when fully driven.
+///
+/// **What this means for the class the plan was aiming at.** The over-scale
+/// defect is real and this instrument does not reach it — pixel coverage is the
+/// wrong measure for a figure whose *tips* leave the frame, because tips are
+/// almost no pixels. ADR-0067 already names the successor: an in-frame **geometry
+/// fraction**, rejected there as the primary mechanism but explicitly kept as the
+/// supplement for the line and spectrum families. This measurement is the
+/// evidence that it is now wanted.
+#[test]
+fn a_louder_frame_is_reported_against_a_quieter_one() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let (presets, meta) = sanity_roster();
+    renderer.set_presets(presets);
+    let (mid_frame, loud_frame) = (excited(MODERATE), excited(LOUD));
+
+    let mut rows: Vec<(f32, f32, f32, String)> = Vec::new();
+    let mut failures = Vec::new();
+    for (name, _system) in &meta {
+        let mid_cov = coverage(
+            &renderer
+                .capture_preset(name, &mid_frame, FRAMES)
+                .expect("capture at moderate excitation"),
+            BLACK,
+            EPS,
+        );
+        let loud_cov = coverage(
+            &renderer
+                .capture_preset(name, &loud_frame, FRAMES)
+                .expect("capture at loud excitation"),
+            BLACK,
+            EPS,
+        );
+        rows.push((ratio_of(loud_cov, mid_cov), mid_cov, loud_cov, name.clone()));
+
+        if mid_cov < MODERATE_MIN_COVERAGE {
+            failures.push(format!(
+                "{name} is not a picture at a realistic level: coverage {mid_cov:.4} at \
+                 excitation {MODERATE} is under {MODERATE_MIN_COVERAGE:.2} (it draws \
+                 {loud_cov:.4} at {LOUD}). Either a threshold in this preset sits above the \
+                 level music occupies, or a world-space param has already carried the figure \
+                 out of frame by {MODERATE}"
+            ));
+        }
+    }
+
+    rows.sort_by(|a, b| a.0.total_cmp(&b.0));
+    println!(
+        "excitation ratio — coverage at {LOUD} over coverage at {MODERATE} (a report, not a \
+         gate; this test's doc comment says why):"
+    );
+    println!("     ratio  cov@{MODERATE}  cov@{LOUD}  preset");
+    for (ratio, mid_cov, loud_cov, name) in &rows {
+        println!("  {ratio:>8.4}   {mid_cov:.4}   {loud_cov:.4}  {name}");
+    }
+
+    assert!(
+        failures.is_empty(),
+        "these presets draw nothing at a realistic level: {failures:#?}"
+    );
+}
+
+/// `loud / moderate`, or infinity when the preset painted nothing at moderate —
+/// a total defect has no denominator, which is itself a finding rather than a
+/// division to guard against.
+fn ratio_of(loud_cov: f32, mid_cov: f32) -> f32 {
+    if mid_cov > 0.0 {
+        loud_cov / mid_cov
+    } else {
+        f32::INFINITY
+    }
 }
