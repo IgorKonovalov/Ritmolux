@@ -404,38 +404,52 @@ outside `0..1` clamps, and a `NaN` argument reads the lowest band. It never
 errors and never rejects a preset at load.
 
 > [!WARNING]
-> **`bin(x)` is a narrow probe, not a region average, and `x` is nowhere near
-> linear in Hz. Do not compute a position from a formula — read it off this
-> table.** The band edges are laid out on a log curve from 35 Hz to 18 kHz
-> (`core/src/dsp/fft.rs`), but every band is then forced to be at least one FFT
-> bin wide, and at a 2048-point window that floor is **23.4 Hz** — coarser than
-> the log curve asks for all the way up to ~750 Hz. So the array has **two
-> regimes**, and half of it is not log-spaced at all.
+> **`bin(x)` is a narrow probe, not a region average.** One call sees about two
+> of the 64 bands, so a handful of calls **spot-samples** a region rather than
+> integrating it. That part has never changed. What did change is the axis
+> underneath it — see the table, and note that **this page said the opposite
+> until Plan 0048**.
 >
-> Measured at 48 kHz:
+> The band edges are laid out on a log curve from 35 Hz to 18 kHz
+> (`core/src/dsp/fft.rs`, `edges_hz[k] = 35 × (18000/35)^(k/64)`), and since
+> [ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) a
+> second, longer analysis window feeds every band below the **246 Hz crossover**,
+> so no band is starved and **the curve is the truth end to end**. Before that,
+> each band was floored at one FFT bin (23.4 Hz at 48 kHz), which bound the
+> bottom half of the axis *linear* — the regime this page used to describe, and
+> which no longer exists.
+>
+> Derived from `fft.rs`'s edge formula and `expr.rs`'s `bin()`, which places the
+> probe at band-space position `x × 63` and interpolates — so what it listens to
+> is the centre of that interpolation, not of one band:
 >
 > | `x` | lands on | band width there |
 > |-----|----------|------------------|
-> | `0.00` | ~35 Hz | 23 Hz — **a full octave** |
-> | `0.10` | ~176 Hz | 23 Hz (~2.3 semitones) |
-> | `0.25` | ~410 Hz | 23 Hz (~1.0 semitone) |
-> | `0.50` | ~832 Hz | ~30 Hz — the finest point on the axis |
-> | `0.75` | ~3.6 kHz | ~250 Hz (~1.7 semitones) |
-> | `0.90` | ~9.6 kHz | ~900 Hz (~1.7 semitones) |
-> | `1.00` | ~17 kHz | ~1.7 kHz (~1.7 semitones) |
+> | `0.00` | ~37 Hz | 4 Hz (1.8 semitones) |
+> | `0.10` | ~68 Hz | 7 Hz (1.8 semitones) |
+> | `0.20` | ~126 Hz | 13 Hz (1.8 semitones) |
+> | `0.31` | ~247 Hz | 25 Hz (1.8 semitones) — the crossover sits here |
+> | `0.41` | ~457 Hz | 47 Hz (1.8 semitones) |
+> | `0.50` | ~794 Hz | 81 Hz (1.8 semitones) |
+> | `0.75` | ~3.7 kHz | 378 Hz (1.8 semitones) |
+> | `0.84` | ~6.4 kHz | 657 Hz (1.8 semitones) |
+> | `1.00` | ~17.1 kHz | 1.8 kHz (1.8 semitones) |
 >
-> - **Below `x ≈ 0.48` (~750 Hz) the axis is *linear*, not logarithmic** — 31 of
->   the 64 bands are one FFT bin each. A curve fitted to the log edges
->   (`35 × 514.3^x`) is accurate above the crossover and **up to 2.9× wrong
->   below it**: it puts `bin(0.14)` at 84 Hz when the real answer is ~246 Hz.
-> - **The bottom is musically the *coarsest* part of the array, not the finest.**
->   Band 0 spans 23–47 Hz — an entire octave in one number. Resolution is best
->   around 500–800 Hz and settles at ~1.7 semitones above 1 kHz.
-> - **`bin(0.02)` is not "the kick".** It is a ~23 Hz sliver of sub. Sweep the
->   value while listening rather than computing it.
-> - **This mapping moves with the sample rate** below the crossover, since the
->   FFT bin width is `sample_rate / 2048`. The log half is stable; the linear
->   half is not.
+> - **Every band is 1.8 semitones wide, everywhere.** That uniformity *is* the
+>   axis being genuinely logarithmic, and it is what the second window bought.
+>   The old array's bottom was its coarsest region — band 0 spanned a full octave
+>   in one number — and that is simply no longer the case.
+> - **`35 × 514.3^x` is now accurate across the whole axis**, to within a few per
+>   cent. The old warning that it is "up to 2.9× wrong below the crossover" was
+>   true of the old layout and is false of this one. The residual is the `x × 63`
+>   step and the half-band interpolation offset; if you need better than ~5 %,
+>   read the table rather than the formula.
+> - **The mapping no longer moves with the sample rate.** `hi = min(18 kHz,
+>   sr × 0.45)`, so at 44.1, 48 and 96 kHz the edges are identical. (What *does*
+>   still vary with rate is the resolution behind the low bands, since both
+>   windows are sized in samples — [design-backlog 0032](design-backlog.md).)
+> - **`bin(0.02)` is still not "the kick".** It is a ~1.7-semitone sliver near
+>   40 Hz. Sweep the value while listening rather than assuming.
 >
 > **Averaging a few calls does not integrate a region — it spot-samples one.**
 > Measured against a 6.5 kHz tone: `bin(0.84)` reads `0.094` while `bin(0.82)`
@@ -631,10 +645,9 @@ Two traps remain, and they are the mirror image of the old one.
 **A threshold can now be too LOW.** The old failure was a gate above anything
 music produced, so it never fired. On the v2 scale the commoner failure is a gate
 *below* the typical level, which fires always — the `else` branch becomes dead code
-instead of the `then`. Nine bindings across the shipped library are in exactly this
-state, catalogued in
-[analysis-v2-before-flags.md](analysis-v2-before-flags.md); every one is a
-threshold written for raw levels that normalized values now clear constantly.
+instead of the `then`. Nine bindings across the shipped library were in exactly
+that state after ADR-0049 landed, every one a threshold written for raw levels
+that normalized values then cleared constantly; Plan 0048 Phase 7 retuned them.
 
 **`bin(x)` is not on the scalars' scale.** The band array normalizes against one
 peak shared by all 64 bands — which is what keeps `bin(hi) - bin(lo)` a meaningful
@@ -706,22 +719,28 @@ bars first), but if you write `mod(bar_index, 8)` for an 8-bar arc, know that a
 lock landing mid-phrase can repeat or drop one bar of it. That is the deliberate
 trade: a repeated bar is a much softer failure than a downbeat on the wrong beat,
 which is the whole reason the gate exists.
-They no longer do: `--report`'s reachability check walks every expression and
-names any comparison that only ever took one value, any `select()` whose
-condition never went both ways, and any `clamp()` ceiling the value never
-reached
+#### Check the gate you just wrote
+
+`--report`'s reachability check walks every expression and names any comparison
+that only ever took one value, any `select()` whose condition never went both
+ways, and any `clamp()` ceiling the value never reached
 ([capturing.md](capturing.md#reachability-gates-the-probe-never-drove-both-ways)).
 Run it before you ship a gate.
 
 That covers the bare-comparison form too, which is the one this page tells you to
 write: `reseed = "onset > 0.55"` holds no `select()`, and a threshold nothing
 crosses makes it a boolean param stuck at `0` forever. It reports as a `COMP`
-line ([ADR-0043](adrs/0043-reachability-reports-comparison-nodes.md)) — worth
-knowing, because `onset` is raw spectral flux with a peak near `0.016`, so a
-threshold that looks conservative on a `0..1` reading is usually unreachable.
+line ([ADR-0043](adrs/0043-reachability-reports-comparison-nodes.md)).
 
-The same arithmetic applies to a `clamp()` ceiling: `clamp(bass * 0.1, 0, 0.5)`
-reads as a parameter spanning half a unit and delivers about `0.01`.
+**What it cannot see is a gain.** A comparison is a fork the walker can watch; a
+`clamp(bass * 16, 0, 0.3)` is not, and after ADR-0049 a multiplier written for
+the old raw magnitudes drives its ceiling from just above silence and holds it
+there — a binding that reads as a constant while every gate stays green. The
+whole shipped library was in that state when Plan 0048 Phase 7 measured it, so
+this is the failure to expect, not a hypothetical. Until `--report` grows the
+occupancy column that names it, the check is by hand: a term reaches its cap at
+`ceiling / multiplier`, and if that number is below the typical level in the
+table above, the term is a constant.
 
 ### Decibels
 
