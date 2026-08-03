@@ -313,10 +313,17 @@ off, and note that an embedded preset must survive the behavioral gates (`sanity
   new file on today's build" measures the defect rather than the intent. To see an authored look,
   feed the old file the **values it was written against**. This cost a full session on 2026-08-03
   and produced a retracted backlog entry — see design-backlog 0046.
-- **`Rich` and `Floor` are not a look-neutral switch for the attractor family.**
-  `attractor_particles` is 50 000 at `Floor` and 150 000 at `Rich`, and that family's luminance *is*
-  its particle count. `shot` is `Floor` by construction (ADR-0045), so **no headless capture can
-  tell you how an attractor preset reads at `Rich`** — use the running app with `--tier rich`.
+- **`Rich` and `Floor` ARE look-neutral for the attractor family now, and `shot` can prove it.**
+  Both halves of the warning that used to live here are retired. `shot --tier floor|rich` exists
+  (Plan 0044 Phase 3, `Renderer::new_headless_tiered`) — it was absent only from `--help`, which is
+  how several documents came to assert it did not exist. And `attractor_particles` is still 50 000 at
+  `Floor` against 150 000 at `Rich`, but [ADR-0065](../../../docs/adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md)
+  (Plan 0057 Phase 2) normalizes the additive deposit by particle count, so the tier buys **less shot
+  noise in the same picture** rather than three stops of brightness. Verified 2026-08-03: a preset
+  rendered at both tiers matches in luminance, with `rich` only smoother. **A `Rich` capture is an
+  instrument and never a baseline** (ADR-0064) — the `Rich` multipliers are still the provisional
+  values Plan 0044 shipped, its Phase 4 calibration having never run. The running app is still the
+  better instrument for a *judgement in motion*; it is no longer the only one for a measurement.
 - **`tempo` is BPM.** Using it raw blows out any parameter.
 - **`zoom` is inverted between families.** On line/swarm/attractor, `zoom > 1` moves the camera *in*;
   on `fragment_field` and `reaction_diffusion` a higher `zoom` shows *more* of the field. Deliberate
