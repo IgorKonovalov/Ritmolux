@@ -1,6 +1,10 @@
 # ADR-0063 — A preset addresses the spectrum by frequency, not by array position
 
-**Status:** proposed
+**Status:** **accepted** — but only its *immediate half* is built.
+[Plan 0056](../plans/done/0056-clamp-occupancy-and-the-axis-anchor.md) Phase 4 landed the external
+axis anchor (closed 2026-08-03); **`bin_hz()` / `bin_range()` are not implemented** and remain a
+followup plan with no number yet. **Carries an Outcome section**, including the two shipped probes
+the anchor confirmed damaged.
 **Date:** 2026-08-03
 **Related:** [ADR-0036](0036-preset-reachable-spectrum.md) (`bin(x)`, and the deferred
 `bin_range`), [ADR-0049](0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (the axis
@@ -106,3 +110,35 @@ and it removes positional addressing that `index`-driven `spectrum` bindings leg
 **Per-preset declared band edges** — let a preset define its own array. Rejected as far too much
 surface for the problem: it moves DSP configuration into content, multiplies what the analyzer must
 support per frame, and no request has ever asked for it.
+
+## Outcome (Plan 0056 Phase 4, 2026-08-03) — the anchor only
+
+**Half of this ADR is built.** The immediate half — the external axis anchor — landed as
+`bin_positions_resolve_to_the_frequencies_the_presets_were_written_against` in `core/src/dsp/fft.rs`.
+The grammar half, `bin_hz()` and `bin_range()`, is **not implemented** and is a followup plan.
+
+The anchor is eight literals, measured on 2026-08-03 and written down rather than computed from the
+layout function — which is the whole point, since a test that re-derives from the thing that moved
+cannot notice that it moved. Its helper reads `edges_hz` deliberately: the helper *must* move with
+the layout, and it is the right-hand column that must not.
+
+```text
+bin(0.00)     36.7 Hz      bin(0.31)    246.9 Hz
+bin(0.10)     67.9 Hz      bin(0.50)    793.7 Hz
+bin(0.14)     86.9 Hz      bin(0.84)   6413.2 Hz
+bin(0.20)    125.6 Hz      bin(1.00)  17143.2 Hz
+```
+
+**Two of those corroborate this ADR's own damage claim to within its rounding.**
+`attractor_dejong`'s `bin(0.10)` now reads **67.9 Hz** — the ~65 Hz its own header names as the
+mistake an earlier revision made. `fragment_aurora`'s `bin(0.14)`, chosen for the ~246 Hz low-mid
+precisely so loudness could not move the curtain, now reads **86.9 Hz**, a kick probe. The position
+that actually reads that low-mid today is `bin(0.31)`.
+
+The test's comment states what a failure means, because a failure there is not a bug: the axis was
+relaid, and the obligation it creates is a **content sweep**. Every `bin()` in `presets/` has to be
+re-checked against the frequency its author's comment named, and the literals are updated *after*
+that sweep, not instead of it.
+
+**The two shipped probes above are still mis-pointed.** The anchor makes the next re-band noticeable;
+it does not repair the damage the last one did. That repair is content work and is unclaimed.

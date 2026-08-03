@@ -1,16 +1,29 @@
 # 0056 — Clamp occupancy: the instrument that would have caught a saturated library, plus the axis anchor
 
-> **Status:** in-progress 2026-08-03 — `dev` implementing
+> **Status:** **done** — closed 2026-08-03. All five `dev` phases landed on the
+> `plan-0056-clamp-occupancy` worktree branch: `a704d30` occupancy on the walk, `f607915` the `occ`
+> column and `SAT` lines, `3430cdc` the HARD gate with its measured threshold, `d389c96` the axis
+> anchor, `9b07ede` the tonal-flatness statistic in `sanity`. Mode 4 review: **no blockers, no
+> majors**; three minors, all fixed in the close commit.
+> [ADR-0062](../../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) is **accepted with an
+> Outcome section** (implemented in full);
+> [ADR-0063](../../adrs/0063-address-the-spectrum-by-frequency.md) is **accepted with an Outcome
+> section but only half built** — the anchor landed, `bin_hz()` / `bin_range()` did not and are a
+> followup plan. Verified at review, after merging `main` (which carried [Plan 0054]) into the
+> branch: fmt clean, clippy `-D warnings` clean, **417/417, 0 skipped**, and **no golden baseline
+> moved** — the plan's "no pixels move" claim, proved rather than asserted. **Both thresholds are
+> measured, and both measurements are recorded on their own constants.** One follow-up routed to
+> [design-backlog 0052](../../design-backlog.md).
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev
-> **Related ADRs:** [0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) (occupancy
-> as a gate — this plan implements it), [0063](../adrs/0063-address-the-spectrum-by-frequency.md)
+> **Related ADRs:** [0062](../../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) (occupancy
+> as a gate — this plan implements it), [0063](../../adrs/0063-address-the-spectrum-by-frequency.md)
 > (Phase 4 only: the external axis anchor, which is that ADR's cheap immediate half).
-> Follows [Plan 0048](done/0048-analysis-v2-and-the-retune.md), whose Phase 7 found the gap.
+> Follows [Plan 0048](0048-analysis-v2-and-the-retune.md), whose Phase 7 found the gap.
 > **Phase 5 was added at approval (2026-08-03)**, folding in the second half of
-> [backlog 0047](../design-backlog.md) — the `sanity` gate passing a fully saturated frame. Same
+> [backlog 0047](../../design-backlog.md) — the `sanity` gate passing a fully saturated frame. Same
 > class of defect as occupancy, same plan: an instrument that reports a picture is alive when it is
-> not. [Plan 0057](0057-the-attractors-compute-path.md) Phase 6 consumes its statistic, so this
+> not. [Plan 0057](../0057-the-attractors-compute-path.md) Phase 6 consumes its statistic, so this
 > plan runs first.
 
 ## TL;DR
@@ -184,9 +197,9 @@ exempt = ["fade"]   # this clamp is a safety rail; pinning at peak is the design
   if occupancy proves to miss a real case.
 - **No preset retune.** Plan 0048 Phase 7 did that; this plan builds the instrument that would have
   caught it, and the library is expected to pass on arrival. The attractor family's retune is
-  [Plan 0057](0057-the-attractors-compute-path.md) Phase 6, which uses Phase 5's statistic.
-- **No `Rich`-tier capture in any gate.** [Plan 0057](0057-the-attractors-compute-path.md) Phase 1
-  makes one possible ([ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md)); whether the
+  [Plan 0057](../0057-the-attractors-compute-path.md) Phase 6, which uses Phase 5's statistic.
+- **No `Rich`-tier capture in any gate.** [Plan 0057](../0057-the-attractors-compute-path.md) Phase 1
+  makes one possible ([ADR-0064](../../adrs/0064-a-capture-may-pin-the-rich-tier.md)); whether the
   `sanity` gate should also run there is a question for after Phase 5's measurement answers what a
   `Floor` frame can and cannot see.
 - **No change to reachability's existing findings.** `GATE`, `COMP` and the ceiling-never-approached

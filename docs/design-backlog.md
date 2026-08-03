@@ -2757,3 +2757,40 @@ rosette leaves the inner 60 % of its disc empty at `star_rosette`'s angle and 87
 `star_lantern`'s, both now pinned as tests against `sin(a)/sin(pi/n + a)` — is the user's actual
 "looks poor" verdict, and it is generator design work rather than content. A smooth morph between
 three hollow rings is still three hollow rings.
+
+---
+
+## Entry 0052 — from the Plan 0056 close (2026-08-03), found by the gate the plan built
+
+## 0052 — `Spectrum Ridge` has no tonal structure at all: it is the one shipped preset the new flat-frame gate convicts
+
+- **Raised:** 2026-08-03, by [Plan 0056](plans/done/0056-clamp-occupancy-and-the-axis-anchor.md)
+  Phase 5 — the first thing the tonal-flatness statistic found when it was pointed at the shipped
+  library.
+- **Verified against code:** yes — measured, and the preset's own header already names the
+  mechanism.
+- **Lane:** `preset-author`. No engine work.
+
+`core/tests/sanity.rs` now measures **tonal flatness**: the share of a frame's lit pixels sitting
+inside one of 16 narrow luminance bands. `coverage` asks *is something there* and `quadrant_spread`
+asks *is it more than a dot*; a fully saturated single-tone mass answers yes to both and is still a
+blot, and this is the third question.
+
+**`Spectrum Ridge` measures `1.000`** — every lit pixel in one luminance band. It is listed in
+`KNOWN_FLAT` and tracked rather than gated on, because Plan 0056 was explicitly test-and-harness
+only and repairing a preset is content work.
+
+**It is not the fixture being degenerate**, which was the first thing checked: its two siblings draw
+the *same* all-bands-at-1.0 data under the identical stimulus and read `0.31` and `0.44`. It is one
+preset saturating, by the mechanism its own header already records — *two haloed strokes at the same
+spot add on an additive renderer*, the mirrored-contour convergence Plan 0039's Phase 5 note warned
+about when it brought `glow` down for the same reason.
+
+**The `KNOWN_FLAT` entry is asserted to still be flat.** When this is repaired the test fails and
+tells you to delete the line, rather than leaving a stale exemption behind — so this entry closes
+itself once someone does the work.
+
+**One number worth carrying past the fix:** the threshold is `0.90`, and past `Spectrum Ridge` the
+library's highest is `0.830` (`Rose Trails`), then `0.765` (`Rose Web`) — both trails-heavy line
+looks where most lit pixels are faint tail at one level. That is not much headroom, so a content
+pass that raises `trails` on a line preset should re-run `sanity` rather than assume.

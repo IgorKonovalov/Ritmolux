@@ -738,15 +738,24 @@ write: `reseed = "onset > 0.55"` holds no `select()`, and a threshold nothing
 crosses makes it a boolean param stuck at `0` forever. It reports as a `COMP`
 line ([ADR-0043](adrs/0043-reachability-reports-comparison-nodes.md)).
 
-**What it cannot see is a gain.** A comparison is a fork the walker can watch; a
-`clamp(bass * 16, 0, 0.3)` is not, and after ADR-0049 a multiplier written for
-the old raw magnitudes drives its ceiling from just above silence and holds it
-there — a binding that reads as a constant while every gate stays green. The
-whole shipped library was in that state when Plan 0048 Phase 7 measured it, so
-this is the failure to expect, not a hypothetical. Until `--report` grows the
-occupancy column that names it, the check is by hand: a term reaches its cap at
-`ceiling / multiplier`, and if that number is below the typical level in the
-table above, the term is a constant.
+**Reachability cannot see a gain — a second statistic does.** A comparison is a
+fork the walker can watch; a `clamp(bass * 16, 0, 0.3)` is not, and after ADR-0049
+a multiplier written for the old raw magnitudes drives its ceiling from just above
+silence and holds it there — a binding that reads as a constant while every gate
+stays green. The whole shipped library was in that state when Plan 0048 Phase 7
+measured it, so this is the failure to expect, not a hypothetical.
+
+Since Plan 0056 the same traversal also records **occupancy** — the fraction of
+hops a `clamp()` spends *at* its upper bound — which is the mirror of the
+`ceils` finding and the more serious of the two
+([ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)).
+`--report`'s `occ` column names the binding, and `core/tests/saturation.rs` is a
+**HARD** gate at occupancy `0.9`; a clamp that is genuinely meant to pin declares
+`[occupancy] exempt = [...]`, which silences the gate and not the diagnostic. The
+arithmetic is still worth doing while you compose, because the gate is deliberately
+high: a term reaches its cap at `ceiling / multiplier`, and if that number is below
+the typical level in the table above the term is a constant long before occupancy
+`0.9` convicts it.
 
 ### Decibels
 
