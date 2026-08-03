@@ -504,10 +504,34 @@ impl AppState {
         } else {
             "manual"
         };
+        // The tier is in the title because `[` / `]` move it live now (ADR-0054),
+        // so it has to be visible without opening F3 to read the confirmation.
+        let tier = self.renderer.tier().as_str();
         self.window.set_title(&format!(
-            "{APP_TITLE} — {preset} [{system}] {rotate} — {:.0} fps  p99 {:.1} ms",
+            "{APP_TITLE} — {preset} [{system}] {rotate} {tier} — {:.0} fps  p99 {:.1} ms",
             m.fps, m.frame_ms_p99
         ));
+    }
+
+    /// Swap the quality tier on the running renderer (`[` / `]`, ADR-0054).
+    ///
+    /// **Inert when the tier is already the one asked for**, because the core's
+    /// entry point rebuilds unconditionally: without this guard, holding `[` at
+    /// the floor would restart the trails on every repeat for no change. The two
+    /// keys are a switch, and a switch at its end stop does nothing.
+    ///
+    /// The core clears its demotion latch on an explicit change, so this clears
+    /// the shell's "already announced" latch alongside — otherwise a later real
+    /// demotion would be silent, which ADR-0045 rules out.
+    fn swap_tier(&mut self, tier: Tier) {
+        if self.renderer.tier() == tier {
+            return;
+        }
+        self.renderer.set_tier(tier);
+        self.reported_demotion = false;
+        eprintln!("quality tier: {} (pinned)", self.renderer.tier().as_str());
+        self.update_title();
+        self.window.request_redraw();
     }
 
     /// Build this frame's on-canvas text and hand it to the renderer: always the
@@ -641,6 +665,10 @@ impl AppState {
             }
             KeyCode::KeyF => self.toggle_fullscreen(),
             KeyCode::KeyD => self.cycle_display(),
+            // Quality, live (ADR-0054). `[` down a tier, `]` up — the bracket
+            // pair reads as a range with the floor on the left.
+            KeyCode::BracketLeft => self.swap_tier(Tier::Floor),
+            KeyCode::BracketRight => self.swap_tier(Tier::Rich),
             _ => {}
         }
     }

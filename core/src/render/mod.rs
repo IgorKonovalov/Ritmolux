@@ -878,6 +878,49 @@ impl Renderer {
         self.tier.tier
     }
 
+    /// **Change the quality tier on the running renderer** (ADR-0054).
+    ///
+    /// Rebuilds the tier-dependent GPU resources — the scene roster and the
+    /// composite side — against the new [`TierConfig`], on the existing
+    /// [`RenderContext`]. The device, queue, surface, preset roster, active
+    /// preset, engine clock, text layer and diagnostics all survive, so the
+    /// operator stays on the preset they were watching. A dissolve in flight is
+    /// dropped: its two sides are GPU state built at the outgoing tier.
+    ///
+    /// The visible cost is one re-accumulation of everything that accumulates —
+    /// trails, reaction-diffusion state, the attractor's deposit. That is the
+    /// correct affordance rather than a defect: the operator asked for this and
+    /// can see that it happened.
+    ///
+    /// **A no-op on a surface-less (headless) context**, so ADR-0045's
+    /// by-construction guarantee that a capture is `Tier::Floor` survives a
+    /// public mutator existing on this type at all. The condition is
+    /// [`tier::tier_change_permitted`], which is a value rather than a comment.
+    ///
+    /// An explicit call **pins** the tier and **clears the governor's demotion
+    /// latch**. The latch means "the governor took a decision the operator did
+    /// not ask for, and must be told about it"; once the operator has asked for
+    /// something, that history is spent. ADR-0045 says the latch is never
+    /// cleared — ADR-0054 narrows that to "never cleared *by the governor*", and
+    /// is the correction of record.
+    pub fn set_tier(&mut self, tier: Tier) {
+        if !tier::tier_change_permitted(self.ctx.surface.is_some()) {
+            return;
+        }
+        self.tier_pinned = true;
+        self.tier_demoted = false;
+        // The same rebuild the governor's demotion runs, reused rather than
+        // open-coded: a tier-sized resource added to a new scene is then covered
+        // by construction instead of by remembering two call sites.
+        self.apply_tier(TierConfig::for_tier(tier));
+    }
+
+    /// The active preset's index in the roster — what the browse overlay opens
+    /// on, and what a caller checks a tier rebuild against.
+    pub fn active_index(&self) -> usize {
+        self.roster.active
+    }
+
     /// Whether the frame-time governor demoted this session's tier.
     ///
     /// The frontend reports the **transition**, so a demotion is announced once
