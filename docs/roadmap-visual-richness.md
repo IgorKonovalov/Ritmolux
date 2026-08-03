@@ -226,18 +226,38 @@ Small, separable, each closing a named wall:
   NFR §6-compliant; retires the four-incommensurate-sines workaround.~~ **Landed** —
   Plan [0047](plans/done/0047-expression-randomness.md) / ADR-0051, 2026-07-30, with
   `seed = "random"` on top (per-run variety in the live app, pinned on every capture path).
-- **Normalized band variables** (auto-gain-controlled `bass_n`/`mid_n`/`treb_n` or a
+- ~~**Normalized band variables** (auto-gain-controlled `bass_n`/`mid_n`/`treb_n` or a
   `norm(x)` form) — structurally kills the 6-100x mis-gain class of defect instead of
-  re-tuning it away preset by preset (the largest observed source of dead mechanisms).
-- **Phrase time**: `beat_index`, a bar/phrase counter, `time_since_beat` — what "make the
-  drop land" and "every 4th beat" need; decide `novelty`'s graduation or replacement here.
+  re-tuning it away preset by preset (the largest observed source of dead mechanisms).~~
+  **Landed** — Plan [0048](plans/done/0048-analysis-v2-and-the-retune.md) / ADR-0049,
+  2026-08-03. Shipped as *semantic replacement* rather than parallel `*_n` names: `bass`,
+  `mid`, `treb` and `onset` **are** the normalized values, with `*_raw` escapes.
+- ~~**Phrase time**: `beat_index`, a bar/phrase counter, `time_since_beat` — what "make the
+  drop land" and "every 4th beat" need; decide `novelty`'s graduation or replacement here.~~
+  **Landed in two layers** — Plan [0048](plans/done/0048-analysis-v2-and-the-retune.md) /
+  ADR-0050. `beat_index` and `time_since_beat` are unconditional; `beat_in_bar` / `bar_index`
+  / `bar_phase` ride a confidence-gated downbeat estimator that, measured over 8.8 minutes of
+  real music, locks ~3 % of the time and is otherwise counter-derived — so the *capability*
+  landed and the *tracking* is still owed ([backlog 0042](design-backlog.md)). `novelty`'s
+  graduation was **deferred**, not decided (ADR-0050 Alternative B).
 - **Slew-release smoothing form** (backlog 0021's shape) — the even fall, no new state.
 - **Per-segment colour on the line family** (backlog 0026) + `[palette]` adoption on the
-  three scenes that still ignore it — ends whole-figure-hue.
+  three scenes that still ignore it — ends whole-figure-hue. *Designed:
+  [Plan 0054](plans/0054-the-line-scenes-catch-up.md) / ADR-0059, approved, not yet built.*
 - **Bindable structural tables where cheap**: `elements`, `angle_deg`, `contact_angle_deg`,
   a real geometry lerp for `star_pattern` variants (backlog 0007, user-requested).
-- The half-linear band axis (backlog 0015, already flagged as the next ADR) rides in this
-  theme.
+  *Designed: [Plan 0054](plans/0054-the-line-scenes-catch-up.md) / ADR-0060.*
+- ~~The half-linear band axis (backlog 0015, already flagged as the next ADR) rides in this
+  theme.~~ **Landed** — Plan [0048](plans/done/0048-analysis-v2-and-the-retune.md) /
+  ADR-0049: a second 8192-sample window feeds every band below the ~246 Hz crossover, so all
+  64 bands are 1.8 semitones wide and the mapping no longer moves with the sample rate.
+  What remains on that axis is *addressing* it — a preset still names a position, not a
+  frequency ([ADR-0063](adrs/0063-address-the-spectrum-by-frequency.md)).
+
+**R5 is substantially delivered**: the two largest items (normalization, phrase time) and the
+axis all landed with Plan 0048, on top of Plan 0047's seeded randomness. The three open items
+are the line-family colour work (designed as Plan 0054), the bindable structural tables (same
+plan), and the slew-release smoothing form (still parked, awaiting an author want).
 
 ### R6 — the content renaissance
 
@@ -253,14 +273,16 @@ phrase, cellular fields that crack open on the bass.
 ## Sequencing and the first three moves
 
 1. ~~**Run the approved roster first**: Plans 0042 → 0043~~ — **both closed 2026-07-30.**
-2. ~~**R0 + R1 next** — one interview covering both~~ — the interview ran, both ADRs and plans
-   landed, and **R0 is done** (Plan 0044). **R1 ([Plan 0045](plans/done/0045-linear-light-and-bloom.md))
-   is now the one to run** — the largest single visible change available, and its bloom levels and
-   `Floor` bandwidth relief hang off the `TierConfig` R0 just built.
-3. **R2 immediately after** ([Plan 0046](plans/0046-transformed-feedback.md) — it renders *into*
-   the R1 pipeline), with 0010/0011 folded in.
+2. ~~**R0 + R1 next** — one interview covering both~~ — **both are done**: R0 by
+   [Plan 0044](plans/done/0044-quality-tiers.md) (2026-07-30) and R1 by
+   [Plan 0045](plans/done/0045-linear-light-and-bloom.md) (2026-07-31), with
+   [Plan 0051](plans/done/0051-the-scene-seam-emits-premultiplied-alpha.md) closing the alpha
+   seam R1 made load-bearing.
+3. **R2 is now the one to run** ([Plan 0046](plans/0046-transformed-feedback.md) — it renders
+   *into* the R1 pipeline, and is unblocked now that R1 has landed), with 0010/0011 folded in.
 
-R4 items 1-2 and the R5 grammar items are small enough to interleave whenever a gap opens.
+R4 items 1-2 are small enough to interleave whenever a gap opens; **R5 is substantially
+delivered** (Plans 0047 + 0048) and its remainder is [Plan 0054](plans/0054-the-line-scenes-catch-up.md).
 
 **What this roadmap deliberately does not do:** reopen ADR-0001 (the Rust/wgpu/C-ABI chassis
 is an asset); take ADR-0002's author-WGSL escape hatch (revisit only if R1-R5 prove

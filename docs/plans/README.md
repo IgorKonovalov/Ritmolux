@@ -11,7 +11,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — **unblocked**: [0045] has landed and closed, so the linear-light pipeline this builds on exists; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
-| [0048](0048-analysis-v2-and-the-retune.md) | Analysis v2: dual-resolution axis, normalized bands, phrase time, one library retune | **all phases landed 2026-08-02** — **owes only the Mode 4 close review** (fresh session). Phase 6 verdicts are in the plan; Phase 7 (`preset-author`) retuned 368 gains, 36 thresholds and 7 `bin()` positions across all 35 presets (`80c5dff`), taking reachability 26 → 17 flags with **zero non-`tempo`** remaining. The close owes the version bump and should check **Phase 5's done-when**, which this session found unmet (see [0056]) | dev, human |
 | [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **approved 2026-08-02** — ready for `dev`; [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
 | [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **approved 2026-08-02** — ready for `dev`; [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
@@ -22,11 +21,12 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 ## Recommended execution sequence
 
 **Every plan in the roster is approved as of 2026-08-02 — nothing is waiting on a design
-decision.** What separates them now is only what each needs to *run*: [0052] and [0054] close in
-one session; [0050] closes in one plus a measurement; [0053] and [0055] each carry a `human` phase
-that gates later phases, so they stop mid-plan by construction — [0053] until a discrete GPU is to
-hand, [0055] until the live A/B is judged. [0048] now owes only Phase 7, the `preset-author`
-library retune. Taking [0052] or [0054] first keeps a session unblocked end to end.
+decision** (except [0056], which is a fresh draft and wants the user's "go"). What separates them
+now is only what each needs to *run*: [0052] and [0054] close in one session; [0050] closes in one
+plus a measurement; [0053] and [0055] each carry a `human` phase that gates later phases, so they
+stop mid-plan by construction — [0053] until a discrete GPU is to hand, [0055] until the live A/B
+is judged. **[0048] has landed and closed** (2026-08-03; see Recently closed), which is what put
+[0056] on the roster. Taking [0052] or [0054] first keeps a session unblocked end to end.
 
 **[0050] is orthogonal to everything below and can be taken whenever the user wants the app to be
 operable.** It touches one new `core` entry point (`Renderer::set_tier`, plus an `active_index`
@@ -45,20 +45,22 @@ no C ABI change, and **no golden baseline may move**. So it neither blocks nor i
   question. [0050] Phase 6 item 3 is where that lands.
 
 
-**[0048] Phase 6 has run (2026-08-02), and [0048] Phase 7 is now the only thing between that plan
-and its close.** The instrument [0049] built did its job: 8.8 minutes logged at 1 Hz gave a verdict
-the session's own impressions did not. **Normalization passes** — all four levels span their range
-with medians well under their means, so the release constant the plan flagged as most likely to move
-**stays**. **The downbeat estimator does not mis-accent, and also barely locks**: `downbeat_locked`
-true in 14 of 458 audible rows (**3.1 %**, roughly 6 % over the beat-driven half), confidence mean
-0.030 against a 0.25 gate. That is ADR-0050's designed safe floor working, not a defect — but it
-means the stopping condition is **un-fired rather than passed**, since a shut gate gives a
-mis-accent little opportunity, and it qualifies Phase 7: **lean on layer 1** (`beat_index`,
-`time_since_beat`, unconditional) and **treat layer 2 as decorative** (`beat_in_bar`, `bar_index`,
-`bar_phase`, fallback almost always). The estimator question is routed to
-[backlog 0042](../design-backlog.md) as an ADR-0050 supplement, which is explicitly **not** an
-argument for lowering the gate. Phase 7 is the `preset-author` lane's library retune — the largest
-content pass since the library rewrite.
+**[0048] has landed and closed** (2026-08-03) — the analysis surface is v2 and the whole library
+was retuned onto it. See Recently closed for the full record. Two things every later plan and every
+content session inherits, so they are stated here rather than only there:
+
+- **Build a musical arc on `beat_index` / `time_since_beat`, not on the bar trio.** Phase 6's
+  8.8-minute measurement put the downbeat estimator's lock rate at **3.1 % of audible time**
+  (confidence mean 0.030 against a 0.25 gate), so `beat_in_bar` / `bar_index` / `bar_phase` are
+  counter-derived nearly always. That is ADR-0050's designed safe floor, not a defect — and
+  **lowering the gate to buy lock rate is the one reading it must not support**. The estimator
+  question is [backlog 0042](../design-backlog.md), an owed ADR-0050 supplement.
+- **A gain can be dead the same way a threshold can, and nothing in this project could see it.**
+  The retune found **263 of 332** clamped band terms pinned at the real-music median and **14
+  presets with no live audio term at all**, all behind a green suite, because every reactivity
+  instrument we own diffs a driven band against *silence*. [0056] builds the instrument
+  ([ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)); until it lands, do
+  the `C / G` division by hand — `presets/README.md` carries the rule.
 
 **[0051] has landed and closed** (2026-08-01) — see Recently closed. It was what [0045] left
 behind: Phase 2b made the scene→chain seam's alpha load-bearing, and the two additive draw
@@ -167,21 +169,29 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.28.1`**, tag `v0.28.1` — **patch**, bumped at [0051]'s close (a fix-only plan:
-the two additive draw seams emitting premultiplied alpha) per
-[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). The `0.28.0` before it was [0045]'s
-close (a feature plan: the linear-light composite, the tonemap, the bloom stage and the fold
-redesign). Nothing is owed until the next close.
-**Note the close order was disturbed and it is worth not repeating:** the plan branch was
+**Version is at `0.29.0`**, tag `v0.29.0` — **minor**, bumped at [0048]'s close (a feature plan:
+the dual-resolution band axis, normalized levels with `*_raw` escapes, the beat/bar clock, and the
+library retune onto all of it) per
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). The `0.28.1` before it was [0051]'s
+close (a fix-only plan: the two additive draw seams emitting premultiplied alpha), and `0.28.0`
+was [0045]'s (the linear-light composite, the tonemap, the bloom stage and the fold redesign).
+Nothing is owed until the next close.
+**[0048] landed on `main` directly rather than through a worktree lane** — the `plan-0048-analysis-v2`
+branch was fast-forwarded in as each phase went, so at close time there was nothing to merge back
+and ADR-0053's steps 1-2 were again moot; the gate was re-run on `main` before the bump instead.
+**Note the same close order was disturbed at [0051] and it is worth not repeating:** the plan branch was
 fast-forwarded into `main` *before* the bump, so ADR-0053's steps 1-2 (merge `main` into the branch,
 re-run the gate there) were moot and the bump and tag landed on `main` directly. That works, but it
 gives up the property ADR-0053 exists for — the version being chosen and tagged on the commit that
 *becomes* main's tip, with the gate having run on the merged combination first.
 
-**The next ADR is design-backlog 0015** — the band axis is half linear, and Plan 0037 Phase 4's
-listening test turned it from a documented curiosity into a **user-confirmed real limitation**: on
-every 808 hit the whole kick-and-sub region collapses into one or two elements. It is undesigned, it
-is breaking for the eight presets that reach `bin()`, and it wants an interview before a draft.
+~~**The next ADR is design-backlog 0015** — the band axis is half linear~~ — **done.**
+[ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) and [0048] closed it
+on 2026-08-03: a second 8192-sample window feeds every band below the ~246 Hz crossover, so all 64
+bands are 1.8 semitones wide, the mapping no longer moves with the sample rate, and the 808 no
+longer collapses the kick-and-sub region. What is left on that axis is *addressing* it — a preset
+still names a position rather than a frequency
+([ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md), Phase 4 of [0056]).
 
 **[0033]'s Phase 8 (`human`) is open and independent** — the aesthetic re-tune on the user's
 2048x1152 display: run the `preset-author` lane over the four `reaction_*` presets (now free of the
@@ -324,6 +334,55 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0048 — analysis v2: the dual-resolution axis, normalized bands, phrase time, and the one retune
+  that pays for all of it](done/0048-analysis-v2-and-the-retune.md) — **done 2026-08-03**, Mode 4
+  review **no blockers, no majors**; four minors, all doc bookkeeping, all fixed in the close
+  commit. Five `dev` phase commits plus the Phase 3 refactor, on the `plan-0048-analysis-v2` branch
+  fast-forwarded into `main` as it went: `bfd892b` the dual-resolution axis, `ef3b772` normalization
+  + the `*_raw` escapes, `910a6d1` the shared `Variables::from_frame`, `81b21d5` ADR-0050 Layer 1,
+  `7a06676` the gated downbeat estimator, `909ae4a` the harness/docs recalibration. Then the two
+  `human` phases: `0fb26d4` Phase 6's verdicts, and `80c5dff` + `bea5c1e` + `fc698cd` Phase 7's
+  library retune, its backlog notes and the axis-block regeneration.
+  [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) and
+  [ADR-0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) are **accepted,
+  each with an Outcome section**. **Delivers the large half of roadmap R5** and closes design-backlog
+  **0015**, **0020**'s structural half and **0035**.
+  Gate at the close on `main`: fmt clean, clippy `-D warnings` clean, **388/388, 0 skipped**;
+  reachability re-run on the versioned library at **17 flags, every one a `tempo` comparison under
+  the single 110 BPM probe, 0 genuinely dead**. C ABI **stays v4** (`core/src/ffi.rs` byte-untouched
+  across all seven phases), `Scene` unchanged, no new dependency.
+  **The finding worth carrying is that nothing in this project could see the retune's real work
+  list.** Phase 5's before-record named **9** broken gates — everything `--report`'s walker can
+  structurally see, since it watches forks. Phase 7 found **368** mis-scaled terms: **263 of 332**
+  clamped band terms pinned at the real-music median, and **14 presets with no live audio term at
+  all** (Rose Web/Zoom/Trails/Overflow, all five `reaction_diffusion`, all three `spectrum`,
+  Cathedral, Leviathan) — every one of them behind a **green suite and a clean report**, because
+  every reactivity instrument we own diffs a driven band against *silence*, where a binding that
+  saturates just above the noise floor scores perfectly. What exposed it was a contact sheet at
+  three excitations compared *to each other*: quiet and typical were pixel-identical across all 14.
+  That is now [ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) / [0056].
+  **The same shape appeared on the axis.** Phase 1 silently re-pointed every sub-crossover `bin()`
+  probe by about an octave and a half, and no instrument could notice: reachability watches forks,
+  and `fft.rs`'s lookup test checks the layout function against the edge table that moved *with* it
+  — internal consistency with no external anchor. Now
+  [ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md) (`bin_hz` / `bin_range`) plus [0056]
+  Phase 4's external anchor.
+  **Phase 6 is the honest half.** Normalization **passes** and the release constant the plan flagged
+  as most likely to move **stays** — all four levels span their range with medians well under their
+  means. The downbeat estimator **does not mis-accent and also barely locks**: 3.1 % of audible
+  rows, confidence mean 0.030 against a 0.25 gate. The stopping condition is therefore **un-fired
+  rather than passed**, which the plan says outright. Build arcs on Layer 1; treat Layer 2 as
+  decorative ([backlog 0042](../design-backlog.md)).
+  **Phase 1 deviated from its own done-when and did it the right way:** "no band above the crossover
+  moves by more than rounding" was false as written (v1's collapse fix-up overshot the log curve
+  until band 32), so bands 20-31 move and *that movement is the defect being removed* — asserted
+  with a counter-assertion that they did move, without which the test would pass if the crossover
+  had swallowed the axis.
+  **One hazard for anyone re-running the acceptance instrument:** a bare `--report` reads the seeded
+  `%APPDATA%` copy, which is pre-retune, and prints a *cleaner* number than the truth. Run it as
+  `LMV_PRESET_DIR=./presets`.
+  Version **minor 0.28.1 → 0.29.0** (a feature plan).
 
 - [0051 — the scene seam emits premultiplied alpha](done/0051-the-scene-seam-emits-premultiplied-alpha.md)
   — **done 2026-08-01**, Mode 4 review **no blockers**, one `major` (an operator-doc gap, fixed at

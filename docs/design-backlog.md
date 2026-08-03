@@ -1928,7 +1928,13 @@ choice is architect's.
 
 ---
 
-## 0035 — `presets/README.md` lists 10 expression variables; the code has 19
+## ~~0035 — `presets/README.md` lists 10 expression variables; the code has 19~~
+
+- **FIXED 2026-08-03, at Plan 0048's close** — the doc sweep this entry asked to ride on. The
+  roster line now carries all 19 in `VAR_NAMES` order, with the `*_raw` escapes pointed at the
+  scale section below it and the five musical-time variables split into ADR-0050's two layers,
+  including the Phase 6 measurement that makes `beat_index` the one to build an arc on. Notes
+  retained below as the origin record.
 
 - **Raised:** 2026-07-30, from `preset-author`, while checking `tempo` for the BPM binding.
 - **Verified against code:** yes — `VAR_NAMES` in `core/src/preset/expr.rs` has 19 entries.
@@ -2213,7 +2219,7 @@ the swarm guard already covers the mechanism; this buys resolution at the quiet 
 
 ## 0042 — the downbeat estimator locks on ~3 % of audible time, so the gated bar variables are almost always fallback
 
-- **Raised:** 2026-08-02, from `architect`, running [Plan 0048](plans/0048-analysis-v2-and-the-retune.md)
+- **Raised:** 2026-08-02, from `architect`, running [Plan 0048](plans/done/0048-analysis-v2-and-the-retune.md)
   Phase 6 (`human`) with the user.
 - **Measured, not impressionistic:** 8.8 minutes through the live app on the `v0.28.1` release
   build, 517 log rows at 1 Hz, **458 with signal**, roughly half beat-driven 4/4 (the Plan 0037
@@ -2272,7 +2278,7 @@ would sharpen the 6 % figure the half-and-half split leaves approximate.
   where occupancy names the binding, and costs another render pass per band. Notes retained below
   as the origin record.
 
-- **Raised:** 2026-08-02, from `preset-author`, running [Plan 0048](plans/0048-analysis-v2-and-the-retune.md)
+- **Raised:** 2026-08-02, from `preset-author`, running [Plan 0048](plans/done/0048-analysis-v2-and-the-retune.md)
   Phase 7.
 - **Verified against code:** yes — `core/tests/reactivity.rs`, and the two per-band blocks in
   `--report` (`standalone/examples/shot.rs`).

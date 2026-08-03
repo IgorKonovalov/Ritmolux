@@ -2,8 +2,8 @@
 
 > **Subsystem:** The lock-free SPSC ring buffer that decouples audio from render, and the pure-function DSP that consumes it (FFT/spectrum, onset, tempo/beat).
 > **Source:** `lmv-ring/` (the SPSC ring itself, a zero-dependency workspace member), `core/src/audio.rs` (format validation + the re-exported producer/consumer handles), `core/src/dsp/` (analysis).
-> **Reconciled-through:** Plan 0005 (ring extracted to `lmv-ring`, Miri gate live in CI); DSP unchanged since Plan 0003 (bass/mid/treb + deterministic tempo). Reconciled 2026-07-25.
-> **Governing ADRs:** [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) (core owns DSP + the audio/render split); CLAUDE.md non-negotiables; Plan 0005 (Miri UB gate).
+> **Reconciled-through:** Plan 0005 (ring extracted to `lmv-ring`, Miri gate live in CI); Plan 0032 (the ring→analyzer→renderer seam now has a test); Plan 0048 (analysis v2 — the dual-resolution axis, running normalization, and the beat/downbeat clock, which is what moved the determinism invariant below from *window* to *stream*). Reconciled 2026-08-03.
+> **Governing ADRs:** [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) (core owns DSP + the audio/render split); [0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (normalization is analysis-layer state); [0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) (the beat clock and the gated bar trio); CLAUDE.md non-negotiables; Plan 0005 (Miri UB gate).
 
 ## Invariants
 
@@ -17,10 +17,17 @@
   It lives in `lmv-ring` — a workspace member with **no dependencies**, so Miri can interpret its
   `unsafe` without compiling the wgpu/naga graph — and the CI `miri` job proves it on every push.
   (Plan 0005, `.github/workflows/ci.yml`)
-- DSP analysis (FFT bins, onset envelope, tempo/BPM estimate, bass/mid/treb bands) MUST be a
-  **pure function of its input window**: no wall-clock reads, no unseeded randomness. The same
-  input window MUST produce the same analysis frame. (CLAUDE.md "determinism where it's
-  testable")
+- DSP analysis (FFT bins, onset envelope, tempo/BPM estimate, the band axis, the normalized
+  levels, the beat/bar clock) MUST be a **pure function of the input stream**: no wall-clock
+  reads, no unseeded randomness, no ambient state. The same sequence of hops fed to a freshly
+  constructed `Analyzer` MUST produce a bit-identical sequence of analysis frames. (CLAUDE.md
+  "determinism where it's testable")
+- **The unit of determinism is the stream, not the window** (Plan 0048 / ADR-0049 + ADR-0050).
+  The spectrum, `*_raw` and BPM still resolve from their window, but `bass`/`mid`/`treb`/`onset`
+  divide by a running peak, and `beat_index`/`bar_index` count, so the *same* window read at two
+  points in a stream legitimately yields different frames. History-dependence is the contract
+  here; ambient nondeterminism is still forbidden, and the distinction is what
+  `analysis_is_deterministic` asserts by running the whole signal through two fresh analyzers.
 - Any visual jitter or randomness, when wanted, MUST be **explicitly seeded** so a scene is
   reproducible from its seed. (CLAUDE.md)
 - Sample rate, channel count, and buffer size MUST be validated once where audio enters the

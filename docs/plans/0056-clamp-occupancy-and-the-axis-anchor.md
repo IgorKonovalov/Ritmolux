@@ -6,7 +6,7 @@
 > **Related ADRs:** [0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) (occupancy
 > as a gate — this plan implements it), [0063](../adrs/0063-address-the-spectrum-by-frequency.md)
 > (Phase 4 only: the external axis anchor, which is that ADR's cheap immediate half).
-> Follows [Plan 0048](0048-analysis-v2-and-the-retune.md), whose Phase 7 found the gap.
+> Follows [Plan 0048](done/0048-analysis-v2-and-the-retune.md), whose Phase 7 found the gap.
 
 ## TL;DR
 

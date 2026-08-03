@@ -1,6 +1,7 @@
 # ADR-0050 — Downbeat and phrase tracking: bar-aware time variables, gated by a measured confidence with a deterministic counter fallback
 
-> **Status:** proposed
+> **Status:** accepted (Plan 0048, closed 2026-08-03 — see the Outcome section; the lock-rate
+> question it raises is [backlog 0042](../design-backlog.md), an owed supplement)
 > **Date:** 2026-07-30
 > **Related plan(s):** 0048-analysis-v2-and-the-retune (R5)
 > **Supplements:** the beat/tempo tracker (Plan 0001 lineage), ADR-0020 (`tempo`), ADR-0036 (the analysis surface presets reach)
@@ -75,3 +76,38 @@ around. The gate is the design.
 Test strategy pinned now: synthesized click patterns with an accent every 4th beat must
 lock to the accented alignment (all four rotations); an unaccented pattern must stay in
 fallback; a mid-stream alignment flip must take several bars (hysteresis), not one frame.
+
+## Outcome (added 2026-08-03 at Plan 0048's close)
+
+The design shipped as written, all three pinned tests exist, and the Negative section's own
+first bullet is what happened.
+
+**The gate never opened wrong, and it also barely opened.** Plan 0048 Phase 6 logged 8.8
+minutes of real music at 1 Hz — 458 rows with signal, roughly half beat-driven 4/4. No
+confidently-wrong bar line was observed, so the plan's stopping condition did not fire. But
+`downbeat_locked` was true in **14 of 458 rows (3.1 %)**, confidence sat at **mean 0.030,
+median 0.000** against `CONFIDENCE_THRESHOLD = 0.25`, and the gate cleared in **two of eighteen**
+30-second windows — peaking at 0.516, so the estimator *can* lock and simply rarely does.
+
+**So the "never locks wrong" claim is un-falsified rather than confirmed**, and this record says
+so plainly: with the gate shut 97 % of the time there was little opportunity for a mis-accent.
+Layer 2 is, on this evidence, "a fancy counter in practice" — the risk this ADR named. That is
+the designed safe floor working, not a defect: the worst case is exactly Alternative A, the
+option the interview declined.
+
+**What this must not be read as recommending.** Lowering `CONFIDENCE_THRESHOLD` to buy lock rate
+inverts the reason this ADR exists. Whether to improve the *estimator* or re-price the *gate* is
+a supplement to this ADR, not an edit to it — routed to [backlog 0042](../design-backlog.md).
+
+**One design property earned more than it promised.** Locked and unlocked output come from one
+formula differing only in whether the alignment is the estimate or `0`, so the fallback is not a
+separate code path that can rot — and `bar_index` is `(beat_index - alignment) / 4`, which means
+a lock can make it repeat or skip exactly one bar. That is documented at all three authoring
+sites rather than papered over with a second counter (Plan 0049's Phase 5 item 4 weighed and
+declined the counter: it would need history-dependent state on the determinism-sensitive path to
+buy immunity from the soft failure this gate already prefers).
+
+**Content guidance that follows:** build arcs on Layer 1 (`beat_index`, `time_since_beat`,
+unconditional) and treat Layer 2 (`beat_in_bar`, `bar_index`, `bar_phase`) as decorative until
+the estimator earns its gate. Plan 0048 Phase 7's retune was run under exactly that
+qualification.
