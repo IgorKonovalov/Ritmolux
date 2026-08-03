@@ -8,6 +8,17 @@
 # and `size` fall as the track hits, and it is `trails` that rises instead, so a
 # drop stretches the exposure rather than blowing the accumulation to white.
 #
+# THAT LAST CLAUSE WAS NOT TRUE, AND THE FIX IS THE 2026-08-03 PASS. The
+# densities below were authored so the accumulation sat AT the tonemap knee, not
+# under it, which meant every bit of the attractor's density structure
+# compressed into one output tone: a flat salmon disc with the filigree gone.
+# At the `rich` tier it is three times worse, because 3x the particles deposit
+# into the same texels and nothing normalizes for count. `fade` 0.885 -> 0.50,
+# `size` 0.62 -> 0.28 and `trails` 0.62 -> 0.20 put the bulk of the figure back
+# UNDER 1.0, so only the densest filaments cross it - and `bloom_threshold`
+# 0.9 picks out exactly those. Do not raise these back without re-rendering at
+# BOTH tiers: `shot` is floor-only, so multiply `exposure` by 3 to see `rich`.
+#
 # Shape: the Clifford coefficients drift on four slow incommensurate sines with
 # a small clamped SPECTRUM term - a chaotic map cuts rather than morphs if you
 # shove it, so every term here is deliberately tiny. As on De Jong, each
@@ -50,6 +61,13 @@ stops = [
 name = "mono"
 
 [params]
+# GLOW - the figure is authored to sit UNDER the tonemap knee, so only the
+# densest filaments cross 1.0 and bloom picks out exactly those. Authoring
+# at the ceiling instead is what made this preset a flat mass at `rich`,
+# where 3x the particles deposit into the same texels (design-backlog 0047).
+bloom_amount    = "1.5"
+bloom_threshold = "0.9"
+bloom_radius    = "1.4"
 # SHAPE - canonical Clifford (-1.4, 1.6, 1.0, 0.7) plus small slow drift, each
 # coefficient bent by its own frequency region rather than by a shared band.
 a = "-1.40 + sin(time * 0.0331) * 0.085 - clamp(bass * 0.051 + bin(0.20) * 0.089, 0, 0.070)"
@@ -58,9 +76,10 @@ c = "1.00 + sin(time * 0.0194) * 0.095 + clamp(treb * 0.044 + bin(0.80) * 0.079,
 d = "0.70 + cos(time * 0.0151) * 0.090 - clamp(bass * 0.0327 + bin(0.41) * 0.057, 0, 0.045)"
 
 # DENSITY - low base, falling further at peak. The exposure comes from `trails`
-# below, not from letting the accumulation grid saturate.
-fade   = "0.885 - clamp(bass * 0.0706, 0, 0.060) - beat * 0.020"
-size   = "0.62 - clamp((bass + treb) * 0.124, 0, 0.18) + beat * 0.10"
+# below, not from letting the accumulation grid saturate. Re-derived 2026-08-03:
+# the old baselines DID let it saturate - see the header.
+fade   = "0.50 - clamp(bass * 0.0706, 0, 0.060) - beat * 0.020"
+size   = "0.28 - clamp((bass + treb) * 0.056, 0, 0.08) + beat * 0.05"
 # RESEED IS A MEASURED THRESHOLD. This read 0.55 and therefore never fired
 # once: `onset` WAS raw spectral flux, not a normalized envelope, and it peaked
 # at 0.016 on music-like material (mean 0.002) - so every attractor in this
@@ -75,7 +94,7 @@ reseed = "onset > 0.75"
 # COLOUR - a hot but narrow window; treble slides the centre toward white-hot.
 hue_spread  = "0.16 + clamp(treb * 0.367, 0, 0.22)"
 hue_center  = "0.42 + sin(time * 0.037) * 0.10 + clamp(bass * 0.33, 0, 0.28) + clamp((bin(0.84) - bin(0.31)) * 0.8, -0.12, 0.12)"
-saturation  = "1.10 + clamp(bass * 0.353, 0, 0.30)"
+saturation  = "1.35 + clamp(bass * 0.353, 0, 0.30)"
 palette_mix = "clamp(mid * 0.47, 0, 0.40)"
 
 # VIEW - a slow counter-rotating drift so the smear never runs in one direction.
@@ -83,11 +102,13 @@ zoom  = "1.10 + bar * 0.12 + clamp(bass * 0.235, 0, 0.20)"
 pan_x = "cos(time * 0.043) * 0.09"
 pan_y = "sin(time * 0.061) * 0.07"
 
-# COMPOSITE - the long exposure, over a warm vignetted backdrop. `trails` is the
-# one thing here that RISES with energy: loud stretches the stroke.
-trails      = "0.62 + clamp((bass + mid) * 0.165, 0, 0.28)"
+# COMPOSITE - the long exposure, over a near-black vignetted backdrop. `trails`
+# is the one thing here that RISES with energy: loud stretches the stroke. The
+# backdrop came down with the figure: at `bg_bright` 0.07 the dark half of the
+# frame was a visible warm haze competing with the filaments.
+trails      = "0.20 + clamp((bass + mid) * 0.106, 0, 0.18)"
 bg_hue      = "0.02 + sin(time * 0.013) * 0.04"
-bg_bright   = "0.07 + clamp(mid * 0.0706, 0, 0.06)"
+bg_bright   = "0.010 + clamp(mid * 0.0294, 0, 0.025)"
 bg_vignette = "0.85"
 
 [smoothing]

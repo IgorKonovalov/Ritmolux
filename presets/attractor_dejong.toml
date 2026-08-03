@@ -62,6 +62,13 @@ stops = [
 name = "ice"
 
 [params]
+# GLOW - the figure is authored to sit UNDER the tonemap knee, so only the
+# densest filaments cross 1.0 and bloom picks out exactly those. Authoring
+# at the ceiling instead is what made this preset a flat mass at `rich`,
+# where 3x the particles deposit into the same texels (design-backlog 0047).
+bloom_amount    = "1.4"
+bloom_threshold = "0.9"
+bloom_radius    = "1.3"
 # SHAPE - slow incommensurate drift plus a gentle spectral bend. Chaotic maps
 # punish big jumps, so every audio term is small and clamped. Four coefficients,
 # four separate frequency regions - see the header.
@@ -73,8 +80,8 @@ d = "1.525 + cos(time * 0.0190) * 0.075 - clamp(bass * 0.036 + bin(0.39) * 0.065
 # DENSITY - the inversion fix. Loud = shorter trails and finer points. The base
 # values are deliberately low: at the Plan 0027 surface-sized grid, `fade` much
 # above ~0.92 with `size` near 1 saturates the accumulation into a white blot.
-fade   = "0.905 - clamp(bass * 0.065, 0, 0.055) - beat * 0.020"
-size   = "0.58 - clamp((bass + mid) * 0.1, 0, 0.17) + beat * 0.08"
+fade   = "0.55 - clamp(bass * 0.065, 0, 0.055) - beat * 0.020"
+size   = "0.28 - clamp((bass + mid) * 0.048, 0, 0.08) + beat * 0.04"
 # MEASURED. Read 0.42 and never fired, because `onset` was then raw spectral
 # flux peaking at 0.016 rather than the 0..1 envelope that number assumed.
 # ADR-0049 made it one, so the threshold is a real fraction again. Still the
@@ -85,7 +92,7 @@ reseed = "onset > 0.50"
 # its keep: the gradient cools toward `ice` as treble opens.
 hue_spread  = "0.20 + clamp(mid * 0.353, 0, 0.30)"
 hue_center  = "0.34 + sin(time * 0.043) * 0.12 + clamp(bass * 0.306, 0, 0.26)"
-saturation  = "1.05 + clamp(treb * 0.583, 0, 0.35)"
+saturation  = "1.30 + clamp(treb * 0.583, 0, 0.35)"
 palette_mix = "0.14 + sin(time * 0.021) * 0.14 + clamp(mid * 0.212, 0, 0.18)"
 
 # VIEW - a slow breathing push-in with a lazy drift, so the cloud never sits still.
@@ -98,7 +105,7 @@ pan_y = "cos(time * 0.037) * 0.05"
 # indexes the shared COSINE palette, not the [palette] table above - ~0.25 is
 # the deep indigo that sits under this gradient; 0.6 would read green.
 bg_hue        = "0.25 + sin(time * 0.017) * 0.05"
-bg_bright     = "0.06 + clamp(mid * 0.082, 0, 0.07)"
+bg_bright     = "0.012 + clamp(mid * 0.0294, 0, 0.025)"
 bg_vignette   = "0.80"
 # THE THRESHOLD IS MEASURED, NOT GUESSED. This read 0.34 until Plan 0041's
 # reachability check proved the branch dead: written against `--set bass=1`
