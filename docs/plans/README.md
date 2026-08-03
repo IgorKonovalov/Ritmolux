@@ -14,7 +14,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **approved 2026-08-02** — ready for `dev`; [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
 | [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **approved 2026-08-02** — ready for `dev`; [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
-| [0054](0054-the-line-scenes-catch-up.md) | The line scenes catch up: every one honours the palette, and the star stops cutting between shapes | **approved 2026-08-02** — ready for `dev`; [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md) + [ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md); closes [backlog 0026](../design-backlog.md) + [0007](../design-backlog.md). Two blocked content asks, both with the user's own verdict behind them | dev |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
 | [0056](0056-clamp-occupancy-and-the-axis-anchor.md) | Clamp occupancy: the instrument that would have caught a saturated library, plus the axis anchor and the flat-frame check | **approved 2026-08-03** — ready for `dev`; [ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) + [ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md) (Phase 4 only); closes [backlog 0043](../design-backlog.md), the guard half of [0044](../design-backlog.md) and the second half of [0047](../design-backlog.md). **Phase 5 added at approval**: the tonal-flatness statistic in the `sanity` gate. Test-and-harness work only — **no pixels move, no golden moves, no scene or DSP is touched**. Both thresholds are **measured, not asserted**. **Run before [0057]**, whose content phase uses Phase 5's statistic | dev |
 | [0057](0057-the-attractors-compute-path.md) | The attractor's compute path: the deposit, the reseed, the butterfly, and one retune | **approved 2026-08-03** — ready for `dev`; [ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md) + [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) + [ADR-0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md); closes [backlog 0047](../design-backlog.md) (first half), [0048](../design-backlog.md), [0050](../design-backlog.md) and the mechanism half of [0031](../design-backlog.md). **No golden baseline moves anywhere in the plan** (checked in advance, not hoped for). **Phase 4 may route back to `architect`** by design, and **Phase 6 is `human`** — so it does not close in one session | dev, human |
@@ -22,11 +21,12 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 ## Recommended execution sequence
 
 **Every plan in the roster is approved as of 2026-08-03 — nothing is waiting on a design
-decision.** What separates them now is only what each needs to *run*: [0052], [0054] and [0056]
-close in one session; [0050] closes in one plus a measurement; [0053], [0055] and [0057] each carry
-a `human` phase that gates later phases, so they stop mid-plan by construction — [0053] until a
-discrete GPU is to hand, [0055] until the live A/B is judged, [0057] until the content pass runs.
-Taking [0052], [0054] or [0056] first keeps a session unblocked end to end.
+decision.** What separates them now is only what each needs to *run*: [0052] and [0056] close in one
+session; [0050] closes in one plus a measurement; [0053], [0055] and [0057] each carry a `human`
+phase that gates later phases, so they stop mid-plan by construction — [0053] until a discrete GPU
+is to hand, [0055] until the live A/B is judged, [0057] until the content pass runs. Taking [0052]
+or [0056] first keeps a session unblocked end to end. (**[0054] has landed and closed** on
+2026-08-03 — see Recently closed.)
 
 **[0056] then [0057] is the one ordering in this roster that is not free.** Three defects raised on
 2026-08-03 are one subsystem — the attractor's compute path deposits light without normalizing for
@@ -112,8 +112,11 @@ fourth, is described under the fold heading below):
   suite able to notice a class of defect it currently blesses. **Its Phase 3 is `human`** and needs
   a machine with a discrete GPU, so unlike the other two it will not close in one sitting — start
   it when you have that machine to hand.
-- **[0054] unblocks the content lane.** Two asks that have been waiting on an ADR, one of them
-  since 2026-07-26 with your "invest, do not cut" verdict on it.
+- **[0054] unblocked the content lane, and has landed and closed** (2026-08-03). Two asks that had
+  been waiting on an ADR, one of them since 2026-07-26 with your "invest, do not cut" verdict on it.
+  See Recently closed — and note that the *content* half is now owed:
+  [backlog 0051](../design-backlog.md), because both shipped `star_*` presets still `floor` a
+  sawtooth and so demonstrate none of the morph the plan built.
 
 **[0052] and [0053] touch each other in one place worth knowing:** the emitter adds a `[Uniform]`
 bind-group layout to the group [0053] asserts on. Whichever lands second inherits the other's list.
@@ -194,13 +197,18 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.29.0`**, tag `v0.29.0` — **minor**, bumped at [0048]'s close (a feature plan:
-the dual-resolution band axis, normalized levels with `*_raw` escapes, the beat/bar clock, and the
-library retune onto all of it) per
-[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). The `0.28.1` before it was [0051]'s
-close (a fix-only plan: the two additive draw seams emitting premultiplied alpha), and `0.28.0`
-was [0045]'s (the linear-light composite, the tonemap, the bloom stage and the fold redesign).
+**Version is at `0.30.0`**, tag `v0.30.0` — **minor**, bumped at [0054]'s close (a feature plan:
+the palette surface reaching all four line scenes on their own generator axes, plus `variant` as a
+continuous contact angle) per [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). The
+`0.29.0` before it was [0048]'s close (the dual-resolution band axis, normalized levels with
+`*_raw` escapes, the beat/bar clock, and the library retune onto all of it), `0.28.1` was [0051]'s
+(a fix-only plan: the two additive draw seams emitting premultiplied alpha), and `0.28.0` was
+[0045]'s (the linear-light composite, the tonemap, the bloom stage and the fold redesign).
 Nothing is owed until the next close.
+**[0054] closed through a worktree lane in ADR-0053's intended order**, unlike the three closes
+before it: `main` was merged into `plan-0054-line-scenes` first (already up to date), the whole gate
+re-run there, and the bump and `v0.30.0` tag written **on the branch** so they land on the commit
+that becomes `main`'s tip. `main` was then fast-forwarded from the main checkout.
 **[0048] landed on `main` directly rather than through a worktree lane** — the `plan-0048-analysis-v2`
 branch was fast-forwarded in as each phase went, so at close time there was nothing to merge back
 and ADR-0053's steps 1-2 were again moot; the gate was re-run on `main` before the bump instead.
@@ -359,6 +367,67 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0054 — the line scenes catch up: every one honours the palette, and the star stops cutting
+  between shapes](done/0054-the-line-scenes-catch-up.md) — **done 2026-08-03**, Mode 4 review **no
+  blockers, no majors**; three minors, all fixed in the close commit. Four `dev` phase commits on
+  the `plan-0054-line-scenes` worktree branch: `e03598f` the L-system's generation-depth colour,
+  `86bba60` the parametric curve's path axis plus the star's measured-flat radial one, `4df5d21`
+  `variant` as a continuous contact angle, `9362793` the docs.
+  [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md) and
+  [ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md) are **accepted, each with an
+  Outcome section**. Closes design-backlog **0026** and the *transition* half of **0007**.
+  Gate at the close, after merging `main` into the branch: fmt clean, clippy `-D warnings` clean,
+  **405/405, 0 skipped**. C ABI **stays v4**, `Scene` unchanged (`set_palette` already existed), no
+  new dependency.
+  **No golden baseline moved anywhere in the plan, and the plan predicted two would.** That is the
+  headline, because it is the *reason* that matters: ADR-0060 kept the old vocabulary, so `variant`
+  0 / 1 / 2 still name the `-24 / 0 / +24` degree offsets the three cached rosettes held and the
+  fixture's `variant = "0"` asks for the same 11-degree rosette, vertex for vertex. The suite was
+  re-run without `LMV_BLESS` and passed; the fixture header now records why a baseline **survived** a
+  behaviour change — the Plan 0051 ceremony in its did-not-move form, which is the half that was
+  missing from it. The colour half is likewise a behavioural superset but **not bit-exact**, bounded
+  at one 8-bit level on 0.02-0.72 % of pixels by ADR-0021's LUT bake of the same cosine, and that was
+  **stated rather than blessed through**.
+  **Two ADR claims moved under measurement, and both were the ADR's fault rather than the code's.**
+  The `lsystem` ramp normalizes over the figure's own deepest generation, **not** `visible_depth` as
+  ADR-0059 wrote: `lsystem_fern` opens two branches per rewrite, so it reaches generation **11** over
+  six depths and the ADR's divisor would have clamped five sixths of the figure at the palette's far
+  end. And `star_pattern`'s radial axis is not "narrow" but **identically flat** — `2n` congruent
+  segments about a centred origin, measured spread **1.2e-7** — so `hue_spread` is exactly the
+  identity there. It ships anyway (the palette itself is a real gain for that scene) with the
+  inertness in the module docs, in `presets/README.md`'s axis table, and in **a test that fails when
+  the interior work lands**, which is the good failure. The interior itself stays open: the rosette
+  empties the inner **60 %** of its disc at `star_rosette`'s angle and **87 %** at `star_lantern`'s,
+  now pinned against the closed form `sin(a)/sin(pi/n + a)`. `lsystem_arrowhead` has no brackets and
+  therefore one generation, so it gains the palette and no ramp — worth knowing, since backlog 0026
+  was raised against Arrowhead specifically.
+  **The step is 0.1 degrees and every constraint behind it is a number**, not a judgement: 1.14 px of
+  worst-case vertex motion at 1080p on the sharpest reachable rosette, 480 steps across the `variant`
+  range against a ~45 s shipped sweep, and a **0.34 us** rebuild at the reachable `n = 12`. The plan
+  asked for the cost at `TierConfig::max_segments` and the honest answer is that this scene **cannot
+  reach it** — the tiling vocabulary stops at 12-fold and a rosette is `2n` segments, so 24 is the
+  ceiling, pinned by a test; measured at the unreachable cap anyway (282 us, 1.7 % of a frame).
+  **One real-time consequence to carry:** `hankin::star_rosette` now runs from `Scene::update`, not
+  only from `configure`. It was already panic-free and the hysteresis bounds the rate, but the
+  property now holds *because of the cache* rather than by position in the lifecycle — its module
+  docs and pragma comment said "off the hot path" and were corrected at the close.
+  **Phase 4 went beyond its own file list, correctly.** It swept four files under
+  `.claude/skills/preset-author/` that all asserted "`[palette]` is silently inert on the line
+  scenes" — one of them carrying it as a filed engine gap. The done-when is "**no doc** says a line
+  scene cannot reach `[palette]`", and leaving the content lane's own reference saying the opposite
+  would have kept the capability unusable by the lane the request came from.
+  **Two minors fixed at the close beyond the plan's list:** the `hankin.rs` hot-path docs above, and
+  `docs/presets.md`'s "Curated presets" column, which was wrong in **six of eight** rows
+  (`parametric_curve` read 11 against 6 actual). The column is deleted rather than corrected — a
+  count re-drifts on every preset added and nothing fails when it does, which is this file's own
+  count-free-phrasing rule applied where it had not been.
+  **One follow-up routed rather than built:** [backlog 0051](../design-backlog.md) — both shipped
+  `star_*` presets still `floor` a `mod(..., 3)` sawtooth, deliberately, because a bare `floor`
+  removal turns one slow swap into a hard `2 -> 0` snap at every wrap. So the shipped library
+  demonstrates **none** of the morph this plan built; the composition that does is a triangle wave
+  over `0..2` with a smoothing constant, and it is a `preset-author` pass.
+  Version **minor 0.29.0 → 0.30.0** (a feature plan).
 
 - [0048 — analysis v2: the dual-resolution axis, normalized bands, phrase time, and the one retune
   that pays for all of it](done/0048-analysis-v2-and-the-retune.md) — **done 2026-08-03**, Mode 4

@@ -31,7 +31,33 @@ use super::renderer::{JOINED_A, JOINED_B, SegmentInstance};
 /// `max_segments` are dropped and counted (the ADR-0007 cap is never silent):
 /// the returned `usize` is how many draw steps were dropped.
 pub fn walk(s: &str, angle: f32, max_segments: usize, out: &mut Vec<SegmentInstance>) -> usize {
+    // The depth side-channel is build-time scratch the caller did not ask for.
+    let mut depths = Vec::new();
+    walk_with_depths(s, angle, max_segments, out, &mut depths)
+}
+
+/// [`walk`], plus the **generation depth** of every emitted segment written into
+/// `depths` (cleared first) — the branch-nesting level the turtle drew it at
+/// ([ADR-0059](../../../../../docs/adrs/0059-line-scenes-colour-along-their-generator-axis.md)'s
+/// `lsystem` colour axis). Depth `0` is the trunk; each unclosed `[` is one more
+/// generation, so a segment's depth is how many branch pushes are still open
+/// above it.
+///
+/// **`depths` is index-aligned with `out` by construction**, which is the whole
+/// reason it is produced here rather than by a second pass over the string: both
+/// are pushed in the same branch, under the same cap, so a segment dropped at the
+/// cap drops its depth with it. A separate scanner would have to re-derive which
+/// characters draw, and would silently desynchronise the moment the turtle's
+/// vocabulary changed.
+pub fn walk_with_depths(
+    s: &str,
+    angle: f32,
+    max_segments: usize,
+    out: &mut Vec<SegmentInstance>,
+    depths: &mut Vec<u32>,
+) -> usize {
     out.clear();
+    depths.clear();
 
     // Start at the origin pointing up; the whole figure is fit-normalized after.
     let step = 1.0_f32;
@@ -61,6 +87,8 @@ pub fn walk(s: &str, angle: f32, max_segments: usize, out: &mut Vec<SegmentInsta
                         joined |= JOINED_A;
                     }
                     run = Some(out.len());
+                    // Generation depth = how many branch pushes are still open.
+                    depths.push(stack.len() as u32);
                     out.push(SegmentInstance {
                         a: [x, y],
                         b: [nx, ny],
@@ -211,6 +239,42 @@ mod tests {
             vec![JOINED_B, JOINED_A],
             "the kept prefix keeps its own joint and claims none past the cap"
         );
+    }
+
+    /// Plan 0054 Phase 1 (ADR-0059). The `lsystem` colour axis is **generation
+    /// depth**, not traversal order, and this is where the two are told apart:
+    /// the depth channel has to say "this segment is on a second-generation
+    /// branch" for segments that are far apart in the walk.
+    #[test]
+    fn the_depth_channel_reports_branch_generation_not_traversal_order() {
+        let mut out = Vec::new();
+        let mut depths = Vec::new();
+
+        // Trunk, a branch, more trunk, a second branch carrying a sub-branch.
+        walk_with_depths("F[+F]F[+F[-F]]F", FRAC_PI_2, 100, &mut out, &mut depths);
+        assert_eq!(out.len(), 6, "three trunk, two branch, one sub-branch");
+        assert_eq!(
+            depths,
+            vec![0, 1, 0, 1, 2, 0],
+            "depth counts open branch pushes, so the two first-generation \
+             branches share a depth despite sitting at opposite ends of the walk"
+        );
+
+        // A grammar with no branches has exactly one generation — a real
+        // property of such a figure (the Sierpinski arrowhead is one), not a
+        // defect: every segment of it sits at the same recursion level.
+        out.clear();
+        depths.clear();
+        walk_with_depths("F+F-F+F", FRAC_PI_2, 100, &mut out, &mut depths);
+        assert_eq!(depths, vec![0; 4], "no brackets, one generation");
+
+        // The two channels stay index-aligned through the cap: a segment that
+        // was never emitted contributes no depth either.
+        out.clear();
+        depths.clear();
+        let dropped = walk_with_depths("F[+FFFF]F", FRAC_PI_2, 3, &mut out, &mut depths);
+        assert_eq!((out.len(), depths.len(), dropped), (3, 3, 3));
+        assert_eq!(depths, vec![0, 1, 1]);
     }
 
     #[test]

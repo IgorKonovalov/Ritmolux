@@ -1,8 +1,10 @@
 # ADR-0059 — Every line scene honours the palette and colours along its own generator's axis
 
-> **Status:** proposed
+> **Status:** **accepted** — implemented by [Plan 0054](../plans/done/0054-the-line-scenes-catch-up.md),
+> closed 2026-08-03. **Carries an Outcome section**: the divisor and one axis's usefulness both
+> moved under measurement.
 > **Date:** 2026-08-01
-> **Related plan(s):** [0054](../plans/0054-the-line-scenes-catch-up.md)
+> **Related plan(s):** [0054](../plans/done/0054-the-line-scenes-catch-up.md)
 > **Supplements:** [0021](0021-shared-palette-system.md) (the palette surface this extends to four
 > more scenes), [0036](0036-preset-reachable-spectrum.md) (the per-element series channel and the
 > precedent for colouring along an axis), [0007](0007-line-geometry-generators.md) (the generators
@@ -118,6 +120,55 @@ author. **Rejected as surface for its own sake.** It triples the documentation o
 colour behaviour to serve a preference nobody has expressed yet, and a param whose legal values
 differ per scene is exactly the kind of thing the loader's typo check (ADR-0020) cannot help with.
 The axis is one line to change per generator if the lane asks.
+
+## Outcome (Plan 0054, closed 2026-08-03)
+
+The decision holds — all four line scenes reach `[palette]` / `[palette_b]` / `palette_mix` /
+`hue_spread` / `saturation`, each on the axis named above, and the colour half lives once in a
+shared `ColorRamp` in `lines/mod.rs` rather than as the "four similar-but-not-identical loops"
+this ADR's own Consequences warned would drift. Two things this ADR got wrong, both corrected by
+measurement rather than by argument:
+
+**The `lsystem` divisor is not `visible_depth`.** This ADR says the ramp normalizes over it; the
+implementation normalizes over the **built figure's own deepest generation**, and the ADR is wrong
+in both directions. A grammar can open more than one branch per rewrite — `lsystem_fern`'s
+`X -> F+[[X]-X]-F[-FX]+X` opens two, so its deepest generation runs 1, 3, 5, 7, 9, **11** across
+`visible_depth` 1..6, and dividing by 6 would clamp five sixths of the figure at the palette's far
+end. A bracket-free grammar has deepest generation **0** at every depth, so there is no range for
+`visible_depth` to describe at all. Normalizing over the figure's own maximum makes `hue_spread = 1`
+span the palette exactly once whatever the branching factor, and it is a **load-time** quantity, so
+an eased `visible_depth` cannot sweep the divisor through fractional values mid-fall — the
+[smoothing-sweeps-through-invalid-values](0049-analysis-v2-dual-resolution-axis-normalized-bands.md)
+hazard, avoided by construction.
+
+**The `star_pattern` radial axis is not "narrow" — it is identically flat, and that is a stronger
+result than this ADR anticipated.** A Hankin rosette is `2n` *congruent* segments about a centre
+`normalize_fit` leaves at the origin (every tiling order the loader accepts — 4, 6, 8, 12 — is even,
+so the bounding box is centred), so every segment occupies the *same* radial interval and one colour
+per segment has nothing to tell them apart. Measured across both shipped presets and all three
+variants of each: the spread of segment radii is **1.2e-7**, f32 noise rather than a range. The
+normalization therefore collapses to `u = 0` for the whole figure, making `hue_spread` exactly the
+identity on this scene rather than a hidden constant hue shift. The surface ships anyway — `[palette]`
+/ `saturation` / `palette_mix` are real gains there, and the ramp comes alive on its own the day a
+construction puts segments at different radii — with the inertness stated in the module docs, in
+`presets/README.md`'s axis table, and in a test that **fails when the interior work lands**, which is
+the good failure. The figure's own radial extent is a different quantity and is the one
+[backlog 0007](../design-backlog.md) reported: `star_rosette`'s 12-fold/20-degree rosette lives
+between radius 0.54 and 0.90, emptying the inner **60 %** of the disc, and `star_lantern`'s
+55-degree variant empties **87 %** — both pinned against the closed form `sin(a)/sin(pi/n + a)`.
+That is the interior question and no colour axis can answer it.
+
+**`lsystem_arrowhead` gains nothing from `hue_spread`, and that is reported rather than papered
+over.** Its rules contain no brackets, so all seven of its depths sit at generation 0 — a property
+of a Sierpinski arrowhead, not a gap in the axis. It does gain the palette. Worth knowing because
+[backlog 0026](../design-backlog.md) was raised against Arrowhead specifically.
+
+**The superset claim holds behaviourally and is not bit-exact, which was stated rather than blessed
+through.** The golden suite ran without `LMV_BLESS` and drifted nowhere; exact byte comparison of
+512x512 90-frame captures across all shipped `lsystem_*` / `rose_*` / `curve_*` / `star_*` presets
+bounds the difference at **one 8-bit level** on 0.021 % to 0.724 % of pixels. The cause is not this
+change: it is ADR-0021's 256-entry LUT bake of the same iq cosine replacing the analytic call, the
+identical approximation `spectrum`, `fragment_field` and `swarm` already ship.
 
 ## Notes
 

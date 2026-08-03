@@ -4,12 +4,14 @@
 # non-dividing order produces a quasi-periodic interference pattern that neither
 # tool reaches alone.
 #
-# `variant` selects between the precomputed contact-angle variants (0..2,
-# clamped), which is a genuine STRUCTURAL swap rather than a transform - the
-# star's interior lacing changes shape. The old preset drove it with
-# `floor(2.99 * beat)`, which only ever produced 0 or 2 because `beat` is a
-# 0/1 gate; here it cycles all three off the bar phase and the low end, so every
-# variant actually gets shown.
+# `variant` is a CONTINUOUS contact angle (0..2, clamped) since Plan 0054 /
+# ADR-0060 - a genuine STRUCTURAL morph rather than a transform, because the
+# star's interior lacing changes shape with the angle. 0, 1 and 2 still name the
+# same three rosettes they did when it was an index, so this file is unchanged;
+# what is new is that everything between them is a real figure too. The old
+# preset drove it with `floor(2.99 * beat)`, which only ever produced 0 or 2
+# because `beat` is a 0/1 gate; here it cycles off the bar phase and the low end,
+# so every variant actually gets shown.
 #
 # The old `brightness = 0.5 + 0.5 * sin(time * 4)` strobe is gone.
 system = "star_pattern"
@@ -28,15 +30,24 @@ contact_angle_deg = 20
 [params]
 # THE STRUCTURAL SWAP - cycles 0 -> 1 -> 2 on a slow ~50 s clock.
 #
-# THIS SWAP CANNOT BE MADE SMOOTH from a preset, and it is worth knowing why:
-# `variant` selects one of three PRECOMPUTED contact-angle geometries by index,
-# so there is nothing to interpolate between - putting it in the smoothing table
-# only spends time on fractional indices that `floor` collapses back to the same
-# three shapes, which reads as a stutter rather than a morph. Blending two star
-# variants would be engine work (a real geometry lerp), not preset content.
-# What IS available is making the cut RARE and hiding it: the cycle here is
-# ~50 s, and `draw_progress` below re-draws the figure continuously so the swap
-# tends to land mid-redraw rather than as a visible snap of a static shape.
+# THE ENGINE LIMIT THIS WAS BUILT AROUND IS GONE (Plan 0054 / ADR-0060). What
+# used to be here: "`variant` selects one of three PRECOMPUTED geometries by
+# index, so there is nothing to interpolate between - smoothing it only spends
+# time on fractional indices that `floor` collapses back to the same three
+# shapes. Blending two variants would be engine work, not preset content. What
+# IS available is making the cut RARE and hiding it under `draw_progress`."
+#
+# That is no longer true: `variant` is a continuous contact angle, fractional
+# values are real rosettes, and `[smoothing]` on it now morphs. THIS FILE STILL
+# `floor`s IT, deliberately: Plan 0054 explicitly does not re-tune shipped
+# presets, and a bare `floor` removal would be worse than the cut it replaces -
+# `mod(..., 3)` is a sawtooth, so dropping the floor turns one slow morph into a
+# hard 2 -> 0 snap at every wrap. Composing a continuous sweep (a triangle wave
+# over 0..2, eased) is a `preset-author` pass, and it is the obvious next one for
+# this file.
+#
+# The cycle stays ~50 s, and `draw_progress` below still re-draws the figure
+# continuously so the swap lands mid-redraw.
 # SLOWED, and the audio term deliberately declawed. Two separate changes:
 #   - the clock went 0.06 -> 0.021, so a variant holds for ~48 s instead of ~17.
 #   - the bass term was `clamp(bass * 3.0, 0, 1.0)` - a full 1.0, i.e. enough to
@@ -44,7 +55,6 @@ contact_angle_deg = 20
 #     moved. That is not a morph, it is a flicker between two geometries driven
 #     by the low end, and it is most of what read as restless. Capped at 0.35 it
 #     can nudge the phase of the cycle without ever crossing a boundary alone.
-# The cut itself still cannot be made smooth from here - see the note above.
 variant = "floor(mod(time * 0.021 + clamp(bass * 0.41, 0, 0.35), 3))"
 
 # MOTION - a brisk, steady, AUDIO-INDEPENDENT turn in radians. `rotation` is an
@@ -106,8 +116,10 @@ trails = "0.34 + clamp(mid * 0.082, 0, 0.07)"
 
 [smoothing]
 mirror_order  = 2.5
-# `variant` is NOT smoothed - it indexes a precomputed geometry, so easing it
-# would just spend time on the in-between integers rather than blending shapes.
+# `variant` is not smoothed HERE, but it now can be: since ADR-0060 easing it
+# walks a continuous contact angle and morphs the figure. It stays unsmoothed
+# only because the `floor` above still quantizes it - drop that first (see the
+# note beside it), then a smoothing constant is what makes the morph read.
 rotation      = 0.18
 thickness     = { attack = 0.02, release = 0.34 }
 scale         = 0.55

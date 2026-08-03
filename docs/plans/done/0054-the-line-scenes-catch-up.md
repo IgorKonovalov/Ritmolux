@@ -1,15 +1,24 @@
 # 0054 — The line scenes catch up: every one honours the palette, and the star stops cutting between shapes
 
-> **Status:** **approved 2026-08-02** — ready for `dev`. All four phases are `dev`; nothing gates
-> it, so it can be taken in one session.
+> **Status:** **done** — closed 2026-08-03. All four `dev` phases landed on the
+> `plan-0054-line-scenes` worktree branch: `e03598f` the L-system's generation-depth colour,
+> `86bba60` the parametric curve's path axis plus the star's measured-flat radial one, `4df5d21`
+> `variant` as a continuous contact angle, `9362793` the docs. Mode 4 review: **no blockers, no
+> majors**; three minors, all fixed in the close commit.
+> [ADR-0059](../../adrs/0059-line-scenes-colour-along-their-generator-axis.md) and
+> [ADR-0060](../../adrs/0060-star-pattern-variants-interpolate.md) are **accepted, each with an
+> Outcome section**. Verified at review rather than taken on report: fmt clean, clippy `-D warnings`
+> clean, **405/405, 0 skipped**, and **no golden baseline moved anywhere in the plan** — including
+> the two the Risks section below predicted would, for the reason recorded in ADR-0060's Outcome.
+> One follow-up routed to [design-backlog 0051](../../design-backlog.md).
 > **Created:** 2026-08-01
 > **Owner skill(s):** dev
-> **Related ADRs:** [0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md) (the
-> colour half), [0060](../adrs/0060-star-pattern-variants-interpolate.md) (the geometry half),
-> [0021](../adrs/0021-shared-palette-system.md) (the palette surface being extended),
-> [0036](../adrs/0036-preset-reachable-spectrum.md) (the per-element channel both reuse),
-> [0007](../adrs/0007-line-geometry-generators.md) (the generators).
-> Closes [design-backlog 0026](../design-backlog.md) and [0007](../design-backlog.md).
+> **Related ADRs:** [0059](../../adrs/0059-line-scenes-colour-along-their-generator-axis.md) (the
+> colour half), [0060](../../adrs/0060-star-pattern-variants-interpolate.md) (the geometry half),
+> [0021](../../adrs/0021-shared-palette-system.md) (the palette surface being extended),
+> [0036](../../adrs/0036-preset-reachable-spectrum.md) (the per-element channel both reuse),
+> [0007](../../adrs/0007-line-geometry-generators.md) (the generators).
+> Closes [design-backlog 0026](../../design-backlog.md) and [0007](../../design-backlog.md).
 
 ## TL;DR
 
@@ -26,7 +35,7 @@ shape smoothly.
 
 Two blocked content asks in one subsystem, both with the user's own words behind them.
 
-**[Design-backlog 0026](../design-backlog.md) — `lsystem` has no per-segment colour.** The lane
+**[Design-backlog 0026](../../design-backlog.md) — `lsystem` has no per-segment colour.** The lane
 filed it as an asymmetry with `spectrum` that "looks unintentional"; the user's framing on
 Arrowhead was that a flat hue makes a branching figure read as wire rather than growth. Reading the
 code widened it: `spectrum.rs`'s module docs say it is **"the first line scene to honor the
@@ -34,7 +43,7 @@ palette; the others still colour from the built-in cosine"**. So three scenes re
 `[palette]`, `[palette_b]`, `palette_mix`, `hue_spread` nor `saturation`. `lsystem::PARAMS` has
 `hue` and nothing else.
 
-**[Design-backlog 0007](../design-backlog.md) — `star_pattern` cuts between shapes.** The user's
+**[Design-backlog 0007](../../design-backlog.md) — `star_pattern` cuts between shapes.** The user's
 verdict was "idea is interesting but looks poor", and separately "change between star rosette
 shapes should be smooth". `star.rs` precomputes one rosette per contact-angle offset and picks with
 `idx = (variant.max(0.0) as usize).min(variants - 1)` — a floor into a small array. `[smoothing]`
@@ -49,13 +58,13 @@ value.
 
 ## Decision
 
-Per [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md): **every line scene
+Per [ADR-0059](../../adrs/0059-line-scenes-colour-along-their-generator-axis.md): **every line scene
 honours the palette, and each generator declares the axis its `hue_spread` walks** —
 `parametric_curve` position along the traced path, `lsystem` **generation depth**, `star_pattern`
 radius from centre, `spectrum` band index (unchanged). `hue_spread = 0` collapses each to today's
 flat `hue`, so this is a strict superset and no shipped preset moves.
 
-Per [ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md): **`star_pattern` builds its
+Per [ADR-0060](../../adrs/0060-star-pattern-variants-interpolate.md): **`star_pattern` builds its
 rosette from a continuous contact angle**, cached on a quantized key with hysteresis, so `variant`
 becomes a real morph. Rejected there: cross-fading two cached variants (a dissolve, and on an
 additive pipeline the overlap goes *brighter* exactly where the transition should hide),
@@ -230,6 +239,6 @@ No `Scene` trait change, no C ABI change (stays v4), no new dependency.
 
 - A `preset-author` pass on the `lsystem` and `rose_*` families, which now have a colour axis they
   did not have — the fern-as-growth reading is the motivating case.
-- The `star_pattern` interior question ([design-backlog 0007](../design-backlog.md)'s second half),
+- The `star_pattern` interior question ([design-backlog 0007](../../design-backlog.md)'s second half),
   which decides whether the scene is good rather than whether it transitions well.
 - If the lane asks for a path-position axis on `lsystem`, reopen ADR-0059's axis choice.

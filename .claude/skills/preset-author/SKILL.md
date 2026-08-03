@@ -321,7 +321,10 @@ off, and note that an embedded preset must survive the behavioral gates (`sanity
 - **`zoom` is inverted between families.** On line/swarm/attractor, `zoom > 1` moves the camera *in*;
   on `fragment_field` and `reaction_diffusion` a higher `zoom` shows *more* of the field. Deliberate
   and documented — check which family you're in.
-- **`[palette]` is silently inert on the line scenes.** They colour through their own cosine `hue`.
+- **`[palette]` now reaches every scene, line scenes included** (Plan 0054 / ADR-0059) — it used to
+  be silently inert on them. Each line scene walks `hue_spread` along its own axis: path position,
+  generation depth, radius, band index. Two axes are genuinely flat and the docs say so — a
+  bracket-free grammar has one generation, and `star_pattern`'s radius has no spread.
 - **A partial `ink_amount` is a transition, not a resting value** — it blends toward a near-black
   source and greys the paper. Pick `0` or `1`, or travel between them.
 - **Division can yield NaN/Inf**, which flows straight into the scene as broken geometry — avoid

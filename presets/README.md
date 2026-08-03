@@ -192,9 +192,9 @@ preset folder — so while you are editing a file it re-rolls on each save.
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `swarm`           | `force` `spin` `burst` `field_freq` `hue` `brightness` `size` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
-| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
-| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
-| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
+| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
+| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
+| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
@@ -318,11 +318,12 @@ instead of along the whole point.
   `reaction_diffusion`**, which is a term inside those shaders; the name is shared,
   the meaning is not, and a value that reads well on one will not transfer.
   Also **not** a post-process bloom — there is no bloom stage in the engine.
-- `hue` — offset into the line scenes' own cosine ramp (add `time * k` for a slow
-  drift). **It is not a hue wheel**, and on these three scenes it is the *only*
-  colour control — `[palette]` is inert here. The measured swatch table is in
+- `hue` — where the figure sits in the palette (add `time * k` for a slow drift).
+  With no `[palette]` that palette is the line scenes' own cosine ramp, and **it
+  is not a hue wheel**. The measured swatch table is in
   [`docs/preset-palettes.md`](../docs/preset-palettes.md#the-line-scenes-cosine-ramp--what-hue-actually-looks-like);
   read it rather than guessing, because a guess costs a render round-trip.
+  `hue` is no longer the only colour control — see the colour axes below.
 - `scale` — overall size in the frame; `draw_progress` in `0..1` reveals the
   figure from the start (a line-draw-on; ride it on `bar` for a per-beat redraw).
 - `parametric_curve`: `n`/`d` are the rose parameters, `spin` is angular velocity
@@ -336,10 +337,93 @@ instead of along the whole point.
   clips). Bind them to `bass`/`bar`/`beat` for an audio-driven shape morph.
 - `lsystem`: `visible_depth` picks which precomputed iteration is shown — drive
   it off a band/beat to *grow* the structure (e.g. `4 + floor(2 * bass)`);
-  `rotation` is an angle in radians, so multiply by `time` yourself.
-- `star_pattern`: `variant` selects one of the precomputed contact-angle variants
-  (0..2, clamped) — swap it on a beat for a structural accent
-  (e.g. `floor(2.99 * beat)`); `rotation` is an angle in radians.
+  `rotation` is an angle in radians, so multiply by `time` yourself. Its
+  `hue_spread` walks the palette by **generation depth** — see
+  [the colour axes](#the-line-scenes-colour-axes--what-hue_spread-walks) below.
+- `star_pattern`: `variant` is a **continuous contact angle** in `0..2` (clamped),
+  not an index — see [below](#star_pattern-variant--a-continuous-contact-angle);
+  `rotation` is an angle in radians. Its `hue_spread` axis is radius, and it is
+  inert on the current rosette — see
+  [the colour axes](#the-line-scenes-colour-axes--what-hue_spread-walks).
+
+#### `star_pattern` `variant` — a continuous contact angle
+
+Since Plan 0054 / [ADR-0060](../docs/adrs/0060-star-pattern-variants-interpolate.md)
+`variant` sweeps the Hankin construction's **contact angle** rather than indexing
+one of three precomputed rosettes. `0` is 24° below the `[generator]
+contact_angle_deg` (a sharper star), `1` is the base angle, `2` is 24° above (a
+blunter one), the whole thing clamped into the 8–80° range that makes a sensible
+figure. Values outside `0..2` clamp to the ends.
+
+**`0`, `1` and `2` still name the same three rosettes they always did**, so an
+existing preset is unchanged. What is new is everything between them:
+
+- **`[smoothing]` on `variant` now morphs** instead of stuttering. Easing it used
+  to spend its time on fractional values a `floor` threw away, which is why both
+  shipped star presets `floor` it and why their comments told you not to smooth
+  it. That advice is now backwards.
+- **A `floor` around `mod(…, 3)` is no longer the way to drive it.** The shipped
+  presets still carry one, and removing it *alone* would be worse than the cut it
+  replaces — a sawtooth snaps 2 → 0 at every wrap. Drive it with something
+  continuous and closed instead: a triangle wave (`1 + sin(time * 0.14)` is the
+  cheapest one), or a band term easing between two angles.
+- **The morph is quantized to 0.1° of contact angle**, so the figure rebuilds only
+  when the request has walked that far. That is 480 steps across the whole
+  `variant` range and at most a 1.1 px jump at 1080p on the sharpest rosette — a
+  resolution, not a shape. A `variant` jittering inside one step does not rebuild
+  at all.
+
+#### The line scenes' colour axes — what `hue_spread` walks
+
+Every line scene honours `[palette]` / `[palette_b]` / `palette_mix` /
+`hue_spread` / `saturation`
+([ADR-0059](../docs/adrs/0059-line-scenes-colour-along-their-generator-axis.md)),
+sampled on the CPU per segment. `hue` places the whole figure in the palette;
+`hue_spread` says how far the palette travels **across** the figure, and each
+generator walks the axis its own construction makes meaningful. **The axis is a
+property of the scene, not a parameter you pick** — this table is the thing you
+cannot infer from the param names:
+
+| System | `hue_spread` walks | `0` is | `1` is |
+|--------|--------------------|--------|--------|
+| `parametric_curve` | **position along the traced path** — chord `0` is the walk's first | one flat `hue` | first chord at `hue`, last a full palette away |
+| `lsystem` | **generation depth** — branch nesting, `0` on the trunk and one more per open `[` | one flat `hue` | trunk at `hue`, deepest twigs a full palette away |
+| `star_pattern` | **radius from the rosette centre** — but see the warning below: **inert today** | one flat `hue` | one flat `hue` (no radial spread to walk) |
+| `spectrum` | **band index** — element `0` is the bottom of the spectrum | one flat `hue` | low band at `hue`, top band a full palette away |
+
+`hue_spread = 0` is the default on every one of them and reproduces exactly the
+single flat colour these scenes drew before the palette reached them, so adding
+a `[palette]` to an existing preset changes its colours and adding nothing
+changes nothing.
+
+**On `lsystem` the axis is the figure's own, so a grammar without branches has
+nothing to ramp along.** `lsystem_fern` reaches generation 11 at
+`visible_depth = 6`; `lsystem_arrowhead` has no `[` in its rules at all, so every
+segment of it sits at generation 0 and `hue_spread` is a no-op there however
+large. That is a property of a Sierpinski arrowhead — every segment genuinely is
+at the same recursion level — not a missing feature. Such a preset still reaches
+`[palette]`; what it cannot reach is a ramp. The ramp is normalized over the
+**figure's own** deepest generation, so `hue_spread = 1` spans the palette once
+whatever the grammar's branching factor and whichever depth is visible.
+
+**On `parametric_curve` the divisor is `samples`, not the revealed prefix.** So a
+`draw_progress` riding `bar` *draws the gradient on* — a half-revealed curve shows
+the palette's first half — rather than re-tinting every chord it already drew.
+
+> **`hue_spread` does nothing on `star_pattern` today, and that is measured.** A
+> Hankin rosette is `2n` congruent segments about the frame centre, so every one
+> of them occupies the *same* radial interval: the spread of segment radii across
+> the whole figure measures `1.2e-7` (f32 noise) at every tiling order and every
+> contact angle, including both shipped presets and all their variants. There is
+> no range for a radial ramp to walk, so the ramp collapses to the flat `hue`
+> rather than sweeping on noise. What `star_pattern` *does* gain is `[palette]`
+> itself — the rosette can be an ember or an ice figure instead of a point on the
+> built-in cosine — plus `saturation` and `palette_mix`. What is empty is the
+> rosette's **interior**: at `star_rosette`'s 12-fold / 20° the strokes live
+> between radius 0.54 and 0.90, so the inner 60% of the disc is bare, and
+> `star_lantern`'s 55° variant empties 87% of it. That is the open half of
+> design-backlog 0007 and it is a generator question, not a colour one; the ramp
+> comes alive by itself the day a construction puts segments at different radii.
 
 ### `spectrum` — the frequency-axis readout (Plan 0034)
 
@@ -841,10 +925,14 @@ picks it; a `[palette_b]` + bindable `palette_mix` crossfades between two. Colou
 modulation (`saturation`, `color_span`/`color_center`, `hue_spread`/`hue_center`,
 `palette_mix`) is normal audio-bindable `[params]`. All defaults reproduce each
 scene's prior look (`[palette]`-less = the classic `spectrum` cosine), so a preset
-that sets none is unchanged. The **other three** line scenes (`parametric_curve`,
-`lsystem`, `star_pattern`) use their own cosine `hue` and ignore palettes — see
-[the swatch table](../docs/preset-palettes.md#the-line-scenes-cosine-ramp--what-hue-actually-looks-like)
-for what its values actually look like.
+that sets none is unchanged. **Since Plan 0054 / ADR-0059 the other three line
+scenes join them** — `parametric_curve`, `lsystem` and `star_pattern` all sample
+the same LUT on the CPU, each walking `hue_spread` along its own generator's axis
+(see [the colour axes](#the-line-scenes-colour-axes--what-hue_spread-walks); the
+star's is inert until its interior is redesigned). With no `[palette]` that LUT is
+the line scenes' familiar cosine — [the swatch
+table](../docs/preset-palettes.md#the-line-scenes-cosine-ramp--what-hue-actually-looks-like)
+is what its `hue` values actually look like.
 
 ```toml
 [palette]
