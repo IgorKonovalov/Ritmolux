@@ -1,6 +1,6 @@
 # 0056 — Clamp occupancy: the instrument that would have caught a saturated library, plus the axis anchor
 
-> **Status:** approved 2026-08-03 — ready for `dev`
+> **Status:** in-progress 2026-08-03 — `dev` implementing
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev
 > **Related ADRs:** [0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) (occupancy
