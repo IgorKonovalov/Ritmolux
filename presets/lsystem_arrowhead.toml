@@ -121,12 +121,25 @@ brightness = "0.72 + clamp(mid * 0.188, 0, 0.16)"
 # this preset alone; now one of four time-scales rather than half the budget.
 scale      = "0.82 + sin(time * 0.95) * 0.10 + bar * 0.05 + clamp(bass * 0.165, 0, 0.14)"
 
-# COLOUR, and this is the "more colours" ask - within what the system allows.
-# `hue` is an offset into the line scenes' own cosine ramp and it is whole-figure:
-# `lsystem` has no `hue_spread`, and `[palette]` is inert on the line scenes, so
-# there is NO way from a preset to give one branch a different colour from
-# another. Per-segment colour on an L-system is an engine gap, not an authoring
-# choice - it is written up for architect rather than worked around here.
+# COLOUR, and this is the "more colours" ask.
+#
+# THE ENGINE GAP THIS WAS WRITTEN AROUND IS GONE (Plan 0054 / ADR-0059). What
+# used to be here: "`lsystem` has no `hue_spread`, and `[palette]` is inert on
+# the line scenes, so there is NO way from a preset to give one branch a
+# different colour from another. Per-segment colour on an L-system is an engine
+# gap." That was design-backlog 0026, raised from this file, and it is closed:
+# `lsystem` now reaches `[palette]` / `[palette_b]` / `palette_mix` /
+# `hue_spread` / `saturation`, with `hue_spread` walking GENERATION DEPTH.
+#
+# THIS PRESET STILL CANNOT USE `hue_spread`, and the reason is the figure rather
+# than the engine: a Sierpinski arrowhead's rules contain no brackets, so every
+# segment sits at generation 0 and there is no depth axis to ramp along. Measured
+# and pinned by a test. What this file CAN now take is `[palette]` itself - a
+# named palette or custom stops instead of a point on the built-in cosine - and
+# that is an open `preset-author` pass, not something this plan did.
+#
+# `hue` below is an offset into the default palette (which is that same cosine,
+# so the swatch numbers still hold) and it is whole-figure.
 #
 # What is available is the whole figure travelling further and faster through the
 # ramp, so it is no longer the fixed orange it sat at. The drift rate doubles

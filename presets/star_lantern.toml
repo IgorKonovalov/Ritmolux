@@ -34,9 +34,11 @@
 # records: a rotationally symmetric figure mirrored about its own centre lands
 # back on itself.
 #
-# COLOUR was picked from a rendered sweep, not from theory. The line scenes
-# ignore `[palette]` and colour through their own cosine ramp, which is NOT a
-# hue wheel (design-backlog 0014): measured on this figure, 0.00 is crimson,
+# COLOUR was picked from a rendered sweep, not from theory. Since Plan 0054 /
+# ADR-0059 this scene DOES reach `[palette]`; with none set it falls back to the
+# engine's own cosine ramp, which is what the numbers below were measured on and
+# is still what this file draws. That ramp is NOT a hue wheel
+# (design-backlog 0014): measured on this figure, 0.00 is crimson,
 # 0.20 violet, 0.32 blue, 0.55 mint, 0.72 chartreuse, 0.88 amber. The window
 # below is bounded 0.80..0.94 - golden amber into warm orange - and the
 # backdrop sits at the far side of the ramp (`bg_hue = 0.30`, indigo) so the
