@@ -1,6 +1,6 @@
 # 0057 — The attractor's compute path: the deposit, the reseed, the butterfly, and one retune
 
-> **Status:** approved 2026-08-03 — ready for `dev`
+> **Status:** in-progress 2026-08-03
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md) (Phase 1 — `shot --tier`),
