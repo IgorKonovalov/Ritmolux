@@ -1187,9 +1187,32 @@ Two attractor params behave unlike anything else in the set:
   1/60 s, applied frame-rate-independently. `0` clears every frame (no trails);
   values near `1` smear toward permanence — high `fade` plus `ink_amount` is the
   documented "blot" trap (the page fills in solid).
-- `reseed` is **edge-triggered**, not a level: the cloud re-scatters once when the
-  bound expression rises past `0.5`, so `reseed = "beat"` re-scatters on each beat
-  instead of every frame the flag is held.
+- `reseed` is **edge-triggered**, not a level: it fires once when the bound
+  expression rises past `0.5`, so `reseed = "beat"` fires on each beat instead of
+  every frame the flag is held. What it fires is a **disturbance**: every particle
+  is kicked a bounded distance from wherever it currently is, and the map's own
+  mixing pulls it back onto the figure over the next few frames. The figure is
+  shaken; it is not erased.
+
+  > **It used to re-scatter, and "re-scatter" was generous**
+  > ([ADR-0066](../docs/adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md)).
+  > A reseed *replaced* the cloud with a uniform fill of an axis-aligned box sized
+  > to the family's native extent — so it read as a burst of flat speckle with hard
+  > straight edges, followed by a visible convergence back onto the attractor. That
+  > is what a user reported on `attractor_ink`, and `Rich` tripled the particles
+  > into the same rectangle. Measured under the new behaviour, 0 % of the cloud
+  > ends up off the figure where the old re-fill put 100 % of it.
+  >
+  > Two consequences for composing. **A reseed is now a smaller event than it was**,
+  > because a disturbance is smaller than a wipe — if you were leaning on the wipe
+  > as a structural beat, that is gone, and the jitter magnitude is the lever rather
+  > than returning to the box. And **the cloud no longer re-randomizes**: a full
+  > re-fill re-sampled the basin every time, so over a long session the population
+  > now stays the one it converged to. The map's own mixing is what explores the
+  > attractor anyway.
+
+  The seed box survives where it is correct — the initial fill and a family change,
+  the two places there is no existing cloud to disturb.
 
 ## Finding a starting point in this folder
 
