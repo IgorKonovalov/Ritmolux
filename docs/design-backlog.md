@@ -2722,3 +2722,38 @@ beyond this entry.
   choose *when* to reseed but nothing about what it looks like. Any of the above could be a key
   instead of a constant — though the defaults matter more here, since all six shipped presets would
   want the same answer.
+
+---
+
+## Entry 0051 — from the Plan 0054 Mode 4 review (2026-08-03)
+
+## 0051 — `variant` can morph now, and neither shipped `star_*` preset does, because both drive it with a sawtooth
+
+- **Raised:** 2026-08-03, from the [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md) close
+  review. Named in that plan's own Followups and in
+  [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md)'s Outcome; recorded here because this
+  file is where the content lane looks, and a capability nothing demonstrates is indistinguishable
+  from one that does not exist.
+- **Verified against code:** yes — `presets/star_rosette.toml` and `presets/star_lantern.toml`.
+- **Lane:** `preset-author`. No engine work.
+
+ADR-0060 turned `star_pattern`'s `variant` from a `floor` into three cached rosettes into a
+continuous contact angle, so a fractional value is a real intermediate figure and `[smoothing]` on it
+morphs. The user's ask behind it was "change between star rosette shapes should be smooth", re-raised
+as "can we make morphing between shapes easier, slower?".
+
+**Both shipped presets still `floor` it, and Plan 0054 left them that way on purpose.** Each drives
+`floor(mod(time * k, 3))` — a sawtooth — so removing the `floor` alone would replace one slow swap
+with a *hard* `2 -> 0` snap at every wrap, which is worse than what it replaces. The composition that
+actually delivers the morph is a **triangle wave over `0..2`** (up then back down, no wrap
+discontinuity) with a smoothing constant on `variant`, and that is content, not engine.
+
+Until someone writes it, the shipped library demonstrates none of the capability the plan was spent
+building, and the engine's own tests are the only thing that exercises it. Both files carry a comment
+at the binding pointing here.
+
+**Worth pairing with the interior question.** The other half of [0007](design-backlog.md) — the
+rosette leaves the inner 60 % of its disc empty at `star_rosette`'s angle and 87 % at
+`star_lantern`'s, both now pinned as tests against `sin(a)/sin(pi/n + a)` — is the user's actual
+"looks poor" verdict, and it is generator design work rather than content. A smooth morph between
+three hollow rings is still three hollow rings.
