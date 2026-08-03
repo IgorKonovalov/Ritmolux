@@ -2482,3 +2482,89 @@ Two smaller things worth keeping:
   happens again — it is what would have answered this in one command instead of a day.
 - **The `Rich`/`Floor` split is invisible to every automated check we have**, and one family's
   headline look depends on it 3:1. That is a bigger gap than the calibration ticket implies.
+
+---
+
+## Entries 0047-0048 — the 2026-08-03 `preset-author` batch (seventh), from the attractor ceiling pass
+
+## 0047 — `Rich` triples the attractor's light with nothing normalizing for it, so the tier is **not** look-neutral, and no automated check can see the difference
+
+- **Raised:** 2026-08-03, from `preset-author`, fixing four attractor presets the user reported as
+  "very dim" at `Rich` (they were saturated, not dim).
+- **Verified against code:** yes — `core/src/render/scenes/particles/mod.rs:387-393` and
+  `core/src/render/tier.rs:219,237`.
+- **Cost when it bit:** four shipped presets rendered as flat single-tone masses at the tier the
+  app **starts on**, through a green suite, until a user said so.
+
+**The mechanism.** `attractor_particles` is **50 000 at `Floor` and 150 000 at `Rich`**. The draw
+blends `One, One` and the fragment emits `in.color * g` with **no division by particle count**, so
+`Rich` deposits **three times the light** into the same accumulation texels. A preset authored at
+`Floor` — which is the house rule, `presets/README.md` says so — is three stops hot at `Rich`.
+
+**This contradicts a claim we make in two places.** ADR-0045 and `presets/README.md` both say
+`Rich` raises **capacity, not behavior**, and that "no expression, param or structural field
+changes meaning". For an *accumulating additive* scene, capacity **is** behavior: the same `fade`
+and `size` produce a different picture. The claim holds for every other family and fails for this
+one.
+
+**Nothing can catch it.** `shot` has no `--tier` and is `Floor` by construction, deliberately
+(ADR-0045), so **every golden baseline, every behavioral gate and every `--report` column describes
+a configuration the app does not start in**. The workaround found here is worth writing down
+wherever a future session will look: **multiplying `exposure` by 3 is equivalent to tripling the
+particle count**, because accumulation is linear and the tonemap is terminal. It reproduced the
+user's frame exactly.
+
+**What a design here would weigh:**
+
+- **Normalize the deposit by particle count** (scale by `FLOOR_PARTICLES / actual`). Makes the
+  claim true: `Rich` then buys *smoothness* — less shot noise in the same picture — instead of
+  brightness, which is what a capacity tier should buy. Cheapest and most honest. Note it would
+  move the look of every attractor preset once, so it wants the same care as a retune.
+- **Give `shot` a `--tier` flag.** Directly contradicts ADR-0045's reason for not having one
+  (a capture must be a pure function of its inputs), but a *pinned* `--tier rich` is still pure.
+  This is the only option that makes the difference **testable** rather than merely correct.
+- **Stop claiming tier is look-neutral** and document the 3x, leaving authors to hold headroom.
+  Free, and it is what the four presets fixed today already do — but it leaves the trap armed for
+  the next author.
+
+**A second, cheaper finding rides along.** The `sanity` gate renders **at silence** and asserts a
+real shape exists. It passed a fully saturated single-tone frame for as long as these presets have
+shipped. The statistic that exposed this — **the share of the lit figure sitting inside one narrow
+luminance band** — is four lines of code over a frame the gate already renders, and it is a
+general "the picture has no tonal structure" check, not an attractor-specific one. Worth folding
+into whichever plan takes the occupancy gate ([ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)),
+since both are "the frame looks alive to our instruments and is not".
+
+---
+
+## 0048 — the `lorenz` attractor family renders as a dust cloud, and no preset key reaches the scatter
+
+- **Raised:** 2026-08-03, from `preset-author`, in the same pass.
+- **Verified against code:** yes — `[particles]` accepts **only** `family`
+  (`core/src/preset/schema.rs`, and the table in `presets/README.md`).
+- **Cost when it bit:** one of the four attractor families cannot be made to read as its own
+  shape, so `attractor_lorenz` is carried by colour rather than by geometry.
+
+**What it looks like.** The Lorenz butterfly never resolves. A faint dense core sits inside a large
+diffuse halo of scattered points that does not converge — after 240 frames with no reseed firing,
+which is long past when the map should have settled onto the attractor. The other three families
+(`de_jong`, `clifford`, `thomas`) all resolve their structure cleanly under the same treatment,
+which is what makes this look like a property of this family's integration rather than of the
+preset.
+
+**Why the content lane cannot fix it.** Lowering density and backdrop (done today) improves the
+*contrast* of the core against the halo but does not reduce the halo — the scatter is where the
+particles **are**. `[particles]` exposes `family` and nothing else: no seed spread, no integration
+step, no settle time, no cull. The four bindable coefficients are `sigma`/`rho`/`beta` and moving
+them changes which attractor it is, not whether it has converged.
+
+**What a design here would weigh:** whether the Lorenz integration needs a different step size or
+a normalization the other three do not (it is the one *continuous* system in the set — the other
+three are discrete maps, so "one iteration per frame" means something different for it); whether
+the seed cloud should be given settle iterations before the first draw; or whether a `[particles]`
+key for the seed spread is the right escape. Sizing this needs someone who can read the compute
+shader, which is why it is here rather than fixed.
+
+**Related:** [0031](design-backlog.md) (the same family's reseed transient at `Rich`) and
+[0047](design-backlog.md) above — all three are the attractor's compute path being less controlled
+than the scenes around it.
