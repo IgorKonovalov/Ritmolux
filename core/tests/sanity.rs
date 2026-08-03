@@ -50,31 +50,48 @@ const MIN_QUADRANTS: u8 = 2;
 ///
 /// **Measured, from the shipped library's own values.**
 /// `every_preset_draws_a_real_shape` prints the whole distribution on every run.
-/// Today, past [`KNOWN_FLAT`], the highest is `0.830` (`Rose Trails`) and the
-/// next is `0.765` (`Rose Web`) — both trails-heavy line looks, where most lit
-/// pixels are faint tail sitting at one level. Everything else is at or below
-/// `0.66`. The deliberately flattened fixture below reads `0.98`. `0.90` sits
-/// between them with room on both sides.
+/// Re-measured after `Spectrum Ridge` was repaired and left [`KNOWN_FLAT`]:
 ///
-/// A measured constant, so it has a shelf life: re-measure when the library
-/// changes materially.
+/// ```text
+/// 0.8655  Spectrum Ridge      0.6438  De Jong
+/// 0.8300  Rose Trails         0.4923  Coral Head
+/// 0.7645  Rose Web            0.4518  Coral Bloom
+/// 0.6588  Coral               0.4453  Leviathan
+/// ```
+///
+/// Everything else is below `0.45`. The deliberately flattened fixture reads
+/// `0.98`, so `0.90` still sits between the library and the fixture — but the
+/// margin above is now **`0.035`**, not the comfortable gap this constant was
+/// first set with, and the top three are structural rather than accidental: a
+/// polyline of near-equal values *is* a straight line, and a trails-heavy line
+/// look is mostly faint tail at one level. Under [`loud`] every band is driven to
+/// `1.0` at once, which is the worst possible stimulus for exactly those shapes.
+///
+/// So do not read a pass here as headroom. A measured constant with a shelf
+/// life: re-measure when the library changes materially, and if the top of the
+/// distribution keeps climbing, the thing to question is whether a flat-spectrum
+/// stimulus can fairly judge a spectrum readout — not whether to nudge `0.90`.
 const MAX_TONAL_FLATNESS: f32 = 0.90;
 
 /// Shipped presets that are flat **today**, tracked rather than gated.
 ///
-/// A defect list, not a policy. `Spectrum Ridge` measures `1.000` here: under
-/// [`loud`] every one of its 40 elements is driven to full, so its mirrored
-/// contour is a straight line, and its own header already records the mechanism
-/// — "two haloed strokes at the same spot add on an additive renderer". Its two
-/// siblings drawing the *same data* read `0.31` and `0.44` under the identical
-/// fixture, so this is not the stimulus being degenerate; it is one preset
-/// saturating.
+/// A defect list, not a policy — and it is **empty**, which is the state to keep
+/// it in. An entry here is asserted to *still* be flat below, so a repaired
+/// preset fails this test and tells you to delete its line rather than leaving a
+/// stale exemption behind.
 ///
-/// Repairing it is preset-authoring work and Plan 0056 is explicitly
-/// test-and-harness only, so it is listed rather than fixed here. The entry is
-/// asserted to *still* be flat below: when the preset is repaired this test says
-/// to delete the line, rather than leaving a stale exemption behind.
-const KNOWN_FLAT: &[&str] = &["Spectrum Ridge"];
+/// Its one entry, `Spectrum Ridge`, was carried from Plan 0056 (which was
+/// test-and-harness only and so could not repair content) and removed when the
+/// preset was fixed: `1.000` → `0.8655`. Worth knowing what that repair actually
+/// was, because the list's original note had it wrong. The mechanism was not the
+/// additive stacking the preset's header describes — it was that `scale = 3.20`,
+/// tuned before ADR-0049 normalized the bands, put a driven element about 3.3
+/// world units up against a visible half-height of `1.0`. The contour was **off
+/// frame entirely**, and the `1.000` was the lit `bg_vignette` left behind, not
+/// the preset. See [design-backlog 0053](../../docs/design-backlog.md): neither
+/// `coverage` nor `quadrant_spread` can distinguish a vignette from a figure, so
+/// this statistic convicted the right preset for the wrong reason.
+const KNOWN_FLAT: &[&str] = &[];
 
 /// Per-system minimum lit fraction. The full-screen field must fill most of the
 /// frame; the sparse swarm need only paint a small but real footprint.
