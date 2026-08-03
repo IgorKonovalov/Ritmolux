@@ -1,6 +1,6 @@
 # ADR-0064 — A capture may pin the `Rich` tier: `shot --tier`
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-03) — see Outcome below: `shot --tier` already existed; what Plan 0057 Phase 1 built is `--at` and the `onset` row
 > **Date:** 2026-08-03
 > **Related plan(s):** [0057-the-attractors-compute-path](../plans/0057-the-attractors-compute-path.md) (Phase 1)
 > **Supplements:** [ADR-0045](0045-quality-tiers-floor-and-rich.md) — quality tiers
@@ -99,3 +99,35 @@ The defect that motivated this is fixed under [ADR-0065](0065-the-attractor-depo
 this ADR is about being able to see the next one. The two land in the same plan on purpose: the
 instrument goes in before the fix, so the fix's done-when is measurable rather than eyeballed —
 the sequencing [ADR-0049](0049-analysis-v2-dual-resolution-axis-normalized-bands.md) paid for.
+
+## Outcome (Plan 0057 Phase 1, 2026-08-03)
+
+**Accepted, and half of it was already built — this ADR's Context is wrong and the correction is
+the finding.** "There is no `--tier` flag and no other way to render `Rich` headlessly" was false
+when written. [Plan 0044](../plans/done/0044-quality-tiers.md) Phase 3 shipped
+`Renderer::new_headless_tiered` and `shot --tier floor|rich`, and `docs/capturing.md` documented
+both. The flag was absent only from `shot --help`, which is how four documents — this ADR, the
+plans index, `design-backlog` 0031 and 0047, and the `preset-author` skill's footgun list — came to
+assert a capability the repo had for four plans. Verified rather than rebuilt at Phase 1:
+`--tier rich` and `--tier floor` on `attractor_clifford` produce different frames, and omitting the
+flag is byte-identical to `--tier floor` (md5 `4278677a…` both ways, `871fbc38…` for rich).
+
+Everything the Decision asks for therefore holds as written, unchanged: `Renderer::new_headless`
+still takes no tier and still pins `Floor`, `shot` still ignores `LMV_TIER`, and no `Rich` golden
+exists. `docs/capturing.md` now carries the "instrument, never a baseline" sentence explicitly.
+
+**What Phase 1 actually built is the other instrument, and the premise there was also false.** The
+plan asked for a `--signal` kind whose onset crosses the shipped reseed gates, on
+[ADR-0066](0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md)'s claim that `click:120`
+never does. Measured: it crosses `0.75` on **7 hops out of 375**, one per beat — see that ADR's own
+Outcome. No generator was added. The real gap was **aiming**: `--strip N` samples evenly, so a strip
+of 8 lands on a reseed by luck, and a working reseed and a broken one render identically when it
+misses. So the filmstrip's level table gained an `onset` row naming the hop it peaked on, and `shot`
+gained `--at <hop>,...` to capture that hop. With both, `attractor_ink --tier rich --at 44,46,48,54`
+renders the speckled rectangle ADR-0066 describes, which no capture in this project could previously
+produce.
+
+**The lesson generalizes past this ADR.** A capability that exists but is missing from `--help`
+is, for practical purposes, a capability that does not exist: four documents reasoned from its
+absence and one of them (this ADR) proposed building it. The cheap guard is that a flag's help text
+is part of the flag.

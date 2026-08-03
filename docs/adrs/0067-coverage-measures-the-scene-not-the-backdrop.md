@@ -1,6 +1,6 @@
 # ADR-0067 — Coverage measures the scene, not the backdrop
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-03) — implemented in full; see Outcome, including why the stimulus-relative half shipped as a report
 > **Date:** 2026-08-03
 > **Related plan(s):** [0058](../plans/0058-the-gate-can-see-an-empty-frame.md)
 > **Supplements:** [ADR-0062](0062-clamp-occupancy-is-the-saturation-instrument.md) (the previous
@@ -113,3 +113,57 @@ arithmetically impossible to do honestly.** The backdrop's contribution varies p
 `bg_bright` and `bg_vignette`, so any floor high enough to catch an empty frame on one preset
 convicts a legitimately sparse figure on another. There is no single number, which is the tell that
 the measurement rather than the threshold is wrong.
+
+## Outcome (Plan 0058, 2026-08-03)
+
+**Accepted and implemented as decided.** `sanity`'s roster is transformed test-side by
+`without_backdrop`, which drops every `bg_*` binding, and `is_lit` compares against `BLACK`. No
+renderer API was widened and no render path was added — `background.rs` already defaults `bright`
+and `vignette` to `0.0`, so this is *not applying three bindings*. `golden`, `distinctness`,
+`reactivity` and `shot` keep the shipped composite. `sanity_roster` panics if the `bg_` prefix ever
+matches nothing, so a rename fails the gate instead of silently restoring the backdrop; it removes
+**72 bindings across 24 of 35 presets** today.
+
+**The non-vacuity check is a test, not a claim.**
+`the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one` freezes `spectrum_ridge` exactly as it
+shipped broken (`scale = 3.20`) and asserts **both** halves on one fixture: under the old
+corner-sampled measurement it scores coverage `0.5421` in all four quadrants; under the new one,
+`0.0000` in zero quadrants. The difference between those numbers is the vignette.
+
+**Every floor was invalidated at once and re-derived**, each at half its system's lowest preset. The
+old numbers sat 11.9x to 84x below the content they bounded, so nothing could fail them except a
+literally black frame. A floor is only a floor while the content is near it, so that is now a check
+rather than a comment: `report_coverage_distribution` fails when a system's lowest preset climbs
+past `MAX_FLOOR_SLACK` (2.2x) above its floor. **It fired for real within the day** — Plan 0057
+Phase 6's re-raise moved the attractor minimum from De Jong `0.2461` to Leviathan `0.3785`, and the
+gate failed the run with the number rather than letting it drift.
+
+**Two findings the plan asked for in advance and got.** The tonal-flatness re-measure answers "does
+this widen the margin" with a **no**: `Spectrum Ridge` fell `0.8655 -> 0.1916` (it was never flat —
+it was a lit vignette measured as one, which also retires
+[backlog 0052](../design-backlog.md)), but `Rose Web` went the other way, `0.7645 -> 0.8839`, with
+nothing about the preset changed. The vignette had been supplying mid-tones that diluted the share
+in any one band. Margin above the library narrowed from `0.035` to `0.0161`. `0.90` stays — it still
+separates the library from the `0.9815` fixture, and a preset drifting over it is a preset to route.
+
+And **the stimulus-relative check ships as a report, not a gate**, which this ADR's plan authorized
+either way and left to the measurement. `coverage(loud)/coverage(moderate)` reaches none of the
+three known-defective configurations: `Spectrum Comb` scores `1.0891` — it draws *more* when loud,
+because a comb roots every bar on a shared baseline and clipping the tips costs a rounding error of
+pixels; `Spectrum Corona` is `1.0514`; the pre-repair ridge is `0/0`, undefined, since it is already
+off frame at moderate. Meanwhile the only content near a plausible threshold is **correct**
+(De Jong `0.8552`, Leviathan `0.9568` — the attractor's *peak buys structure* idiom, which
+[ADR-0062](0062-clamp-occupancy-is-the-saturation-instrument.md) records as real). A gate at `0.80`
+would sit `0.055` from De Jong while catching nothing. What the second capture *does* support is
+enforced: `MODERATE_MIN_COVERAGE = 0.04` fails a preset that is not a picture at a realistic level.
+
+**So the class this ADR was aimed at is real and the pixel measure does not reach it**, and the
+successor is the one named in Alternatives: an **in-frame geometry fraction** for the line and
+spectrum families. Pixel coverage is the wrong measure for a figure whose *tips* leave the frame,
+because tips are almost no pixels. This measurement is the evidence it is now wanted —
+[backlog 0054](../design-backlog.md).
+
+One asymmetry worth knowing before reading a `1.0000`: `ink_amount` is a **terminal engine stage**,
+not a `bg_*` binding, so this ADR's suppression does not reach it. `Ink on Paper` therefore measures
+coverage `1.0000` as a measurement artifact rather than as a saturated figure; its tonal flatness
+(`0.6756`) is the statistic that describes it.

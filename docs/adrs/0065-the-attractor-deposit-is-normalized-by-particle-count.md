@@ -1,6 +1,6 @@
 # ADR-0065 — The attractor's additive deposit is normalized by particle count: a tier buys smoothness, not brightness
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-03) — implemented in full; see Outcome
 > **Date:** 2026-08-03
 > **Related plan(s):** [0057-the-attractors-compute-path](../plans/0057-the-attractors-compute-path.md) (Phase 2)
 > **Supplements:** [ADR-0045](0045-quality-tiers-floor-and-rich.md) — quality tiers
@@ -90,3 +90,41 @@ Discovered by `preset-author` on 2026-08-03 ([backlog 0047](../design-backlog.md
 four presets the user reported as "very dim" at `Rich`; the screenshot showed the opposite of dim.
 Verified against `core/src/render/scenes/particles/mod.rs:387-393` and
 `core/src/render/tier.rs:219,237`.
+
+## Outcome (Plan 0057 Phase 2, 2026-08-03)
+
+**Accepted, implemented as decided, and measured rather than asserted.**
+`particles::deposit_scale(active_count) = FLOOR_PARTICLES / active_count` is written into the draw
+uniform's `w.w` and applied in the **vertex** shader — the draw uniform is bound `VERTEX`-only, and
+since the fragment multiplies by a radial falloff and both are linear, that is identical to scaling
+the emitted fragment.
+
+Clifford at 1280x720 over 120 frames, mean display luminance over the whole frame:
+
+| tier | before | after |
+|---|---|---|
+| `Floor` | 10.337 | 10.337 |
+| `Rich` | 17.372 | 10.863 |
+
+The `Floor` capture is byte-identical before and after, which is the scalar being **exactly** `1.0`
+rather than approximately it — and that is why no golden baseline moved. The `Rich` gap closes from
+68 % hotter to 5 %; the residual is not a tolerance being spent but two samplings of the same
+distribution at different rates, read through a compressive tonemap. (The 1.68x measured is the 3x
+linear deposit after that roll-off, not a contradiction of this ADR's arithmetic.) At matched
+exposure the `Rich` frame is visibly smoother — finer speckle, more continuous internal arcs —
+which is what the tier now buys.
+
+The invariance is pinned on the **value**, not inferred from pixels:
+`the_deposit_scalar_is_exactly_one_at_the_floor_and_a_third_at_rich` asserts `1.0` at `Floor`, the
+tier table's own count ratio at `Rich`, and `count * scale` equal at both — written against
+`TierConfig` rather than a literal `1/3`, so Plan 0044 Phase 4's calibration will move the
+expectation with it instead of failing for the wrong reason.
+
+**Two consequences landed beyond the code.** ADR-0045's capacity-not-behaviour claim is reconciled
+where it is *stated* — `core/src/render/tier.rs`'s module header and `presets/README.md` both now
+say the claim was false for this family, why (for an accumulating additive scene, capacity **is**
+the picture), and the general form: **a count feeding an accumulating pass is a look value until
+something normalizes it.** And the four presets `00d99d0` had brought down to survive the 3x owed a
+re-raise, which Phase 6 paid — halfway rather than fully, because `00d99d0` also added a bloom stage
+sized to the lowered figure. Rendered rather than reasoned: a full revert puts Clifford's interior
+back to a flat salmon mass, the exact failure `00d99d0` fixed arriving by another route.

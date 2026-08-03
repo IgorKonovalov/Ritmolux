@@ -1,6 +1,6 @@
 # ADR-0066 — A reseed disturbs the cloud rather than replacing it
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-03) — implemented in full; see Outcome, including one claim of this ADR the measurement retired
 > **Date:** 2026-08-03
 > **Related plan(s):** [0057-the-attractors-compute-path](../plans/0057-the-attractors-compute-path.md) (Phase 3)
 
@@ -93,3 +93,57 @@ Raised by the user on 2026-08-03 against `attractor_ink` at `Rich`
 `core/src/render/scenes/particles/mod.rs:185-193` and `:1143-1155`. It sharpens
 [backlog 0031](../design-backlog.md), which recorded the transient's severity at `Rich` without the
 reason it is a rectangle.
+
+## Outcome (Plan 0057 Phases 3 and 6, 2026-08-03)
+
+**Accepted and implemented as decided, with one factual correction this ADR owes and two defects
+found on the way.**
+
+**The correction.** This ADR states that `--signal click:120`'s onset "never clears the shipped
+gates (the highest is `attractor_clifford`'s `onset > 0.75`)". That was true on the **raw** onset
+scale and was invalidated by [ADR-0049](0049-analysis-v2-dual-resolution-axis-normalized-bands.md)'s
+peak normalization, whose attack is instant — an isolated transient reads `1.000` on the hop it
+arrives, whatever its absolute magnitude. Measured at Plan 0057 Phase 1, `click:120` produces **7
+clean rising edges over `0.75`, one per beat**, out of 375 hops. The gate was never the problem;
+*aiming* at it was, which is what `shot --at` now solves
+([ADR-0064](0064-a-capture-may-pin-the-rich-tier.md)'s Outcome). `design-backlog` 0050 carried the
+same false claim.
+
+**The mechanism.** `JITTER_FRACTION = 0.06` of the family's own `seed_box` spread, so one constant
+serves a map bounded in `[-2, 2]` and a flow spanning `±26`. The kick is a compute dispatch, since
+the positions live on the GPU: it reuses the step pipeline in a `JITTER_MODE` rather than adding a
+second, and is dispatched **exactly once** on the reseed edge — a frame encodes `pending_steps` step
+dispatches, and folding the jitter into those would make the disturbance a function of frame timing.
+`seed_box` survives where it is correct: the initial fill and a family change.
+
+**Measured over the particle buffer, not the pixels**, because the claim is about where the points
+are and a frame diff cannot state it — the wipe moved the picture too. The instrument is voxel
+occupancy of the converged cloud, and the control is the behaviour being replaced, taken over the
+exact population the old re-fill produced via the unchanged `seed()`:
+
+> converged De Jong fills **1.7 %** of its own bounding volume (234 of 13824 cells).
+> Off the figure after a reseed: **jitter 0.0 %**, **old seed-box re-fill 100.0 %**.
+
+Bounding boxes are the wrong instrument and the first draft used them — every seed box is sized to
+the native extent, so De Jong converges to `±1.499` against a `±1.5` box. What a box cannot see is
+that an attractor is a *filigree*: a uniform re-fill is off the figure almost everywhere while
+staying entirely inside its extent.
+
+**Two defects found while building it, both worth carrying.** The jitter was first given its own
+uniform behind a second bind group sharing the compute layout; on WARP that aliases, so the step
+dispatch read the jitter slot, `count = 0`, and the cloud never moved — a plausible static box that
+moved the golden baseline and dropped three presets to ~0.000 in `animation`. This is exactly the
+class [ADR-0058](0058-bind-group-layout-collisions-carry-evidence.md) / Plan 0053 exists for, and it
+was caught by hand. Replaced with **one** bind group and a dynamic offset into one buffer, which has
+no aliasing surface. And the same aliasing made the new harness read an unstepped cloud, whose first
+response was a WARP skip asserting the attractor compute is a no-op there; the evidence was real and
+the conclusion was wrong. The skip is gone and the tests run on WARP with hardware's numbers.
+
+**Phase 6 judged the magnitude in motion, as this ADR asked, and found the *gate* was the real
+lever.** `JITTER_FRACTION` stands at `0.06`. What moved is the six presets' thresholds: every
+shipped `reseed` gate sat at 0.50–0.75 because firing often meant *erasing the drawing* often, so
+reluctance was protective. A disturbance is not destructive, so the same threshold now only
+withholds the accent. Re-measured against the onset means real material produces (0.033 `click:120`,
+0.153 `dynamic:110`, 0.391 `chord`; real music near 0.20), the band moved to 0.28–0.45 with rank
+preserved within the family — still above the typical level, so a quiet passage keeps one continuous
+drawing, which is what the gate was always for.
