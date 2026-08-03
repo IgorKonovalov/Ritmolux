@@ -12,6 +12,16 @@
 > [ADR-0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md)'s kick.
 > **Successor to [Plan 0057](done/0057-the-attractors-compute-path.md)**, whose Phase 4 diagnosed
 > this and stopped by its own instruction; closes [backlog 0048](../design-backlog.md).
+>
+> **Amended 2026-08-03, mid-Phase-1.** Phase 1's done-when asked for the butterfly "at a rest angle
+> *and* at a quarter turn". The second half is unsatisfiable in principle and the plan was wrong to
+> ask for it: the spin is a turntable about the vertical, so a quarter turn shows y–z whatever the
+> basis is, and the butterfly lives in exactly one plane. The old basis's quarter turn was z–y — the
+> *same plane transposed* — so that capture never discriminated a basis at all. The criterion is
+> restated below as the property it was proxying (a rigid rotation, not a shear), which is checkable,
+> and which the Phase 1 captures already satisfy. The consequence for the *look* — that Lorenz reads
+> as the butterfly for only part of the spin cycle — is a real question and moves to Phase 4, where
+> it can be judged in motion.
 
 ## TL;DR
 
@@ -103,12 +113,28 @@ flowchart TB
   `projection().1 == 3.0`.
 - **Files touched:** `core/src/render/scenes/particles/mod.rs`, `presets/README.md`.
 - **Done when:**
-  - **Lorenz reads as the butterfly at a rest angle *and* at a quarter turn.** The two-angle check is
-    the point: a basis fix that only works at one rotation is the same defect moved. Capture with
-    `SPIN_RATE` pinned to `0` for the rest frame, and describe both frames in the phase commit — the
-    rest view should show two lobes with the notch top and bottom centre. **This is a described
-    property, not a threshold**: nothing in the harness can score "looks like a butterfly", and
-    inventing a number for it would be inventing a measurement.
+  - **Lorenz reads as the butterfly at rest**, captured with `SPIN_RATE` pinned to `0` — two lobes
+    with the notch on the centre of the edge where they converge. **This is a described property, not
+    a threshold**: nothing in the harness can score "looks like a butterfly", and inventing a number
+    for it would be inventing a measurement.
+  - **The quarter turn shows that the spin is a rigid rotation about the vertical, not a shear.**
+    It cannot show the butterfly, and no basis can make it: a turntable spin about the vertical
+    necessarily leaves the butterfly's plane, and at 90° the view is y–z, which is a legitimately
+    low-structure projection of this attractor (`corr(x, y) = 0.87`, so y–z is x–z with the notch
+    smeared shut). What the second angle *does* discriminate is the failure the two-angle check was
+    written for — a half-applied basis, `bv` moved to `z` while `bh` is left on `z`, which renders
+    `(z, z)`: a diagonal streak. So capture the quarter turn and record two extents against the rest
+    frame:
+    - **the vertical extent is unchanged**, because `screen.y = dot(p, bv)` has no `θ` in it. Exactly
+      1.00, up to measurement noise on a bloomed capture.
+    - **the horizontal extent is the attractor's `y` span where the rest frame's was its `x` span** —
+      `50.7 / 37.4 = 1.36` from the ODE's own bounds, which are the bounds ADR-0068 read back off the
+      particle buffer. A half-applied basis gives `44.4 / 37.4 = 1.19` *and* a figure collapsed onto
+      a line, which is the visible half of the same check.
+
+    Both numbers are earned from the attractor's measured extents rather than picked, and both are
+    already satisfied by the Phase 1 captures: 686/501 = **1.37** horizontal, 695/685 = **1.01**
+    vertical.
   - **De Jong, Clifford and Thomas captures are byte-identical**, verified rather than reasoned.
     Thomas is the one to check — it is the other user of the 3-D branch, and its cyclic symmetry is
     why it does not *need* x–z, not a reason a change to it would be free.
@@ -196,6 +222,14 @@ flowchart TB
     routes back to `architect` with the captures rather than being worked around in content.
   - **No preset's identity changes**: no palette, family or coefficient base moves. This is a re-gain
     and a re-aim, not a re-design.
+  - **The spin's dwell gets a verdict**, added by the 2026-08-03 amendment. `SPIN_RATE = 0.18 rad/s`
+    turns Lorenz through a full revolution every 34.9 s, and the butterfly is only legible near 0°
+    and 180° — near 90° and 270° the view is y–z and has no notch, so a basis fix alone leaves the
+    preset reading as a cloud for a good part of every cycle. Judge it **in motion, with the streak
+    in hand**, because a banded trajectory may read as structure where a stipple of the same measure
+    does not. If it still reads as dead, the lever is the **spin** — a slower rate, or a sway that
+    dwells near the plane instead of a full turntable — and that is a per-family look decision that
+    routes back to `architect` as an ADR-0068 supplement, not something to work around in content.
 
 ## Data shapes
 
@@ -227,6 +261,10 @@ No `Scene` trait change, no C ABI change (stays v4), no new dependency, no new p
 - **`density` is a new way to be wrong**, and it is not independent of `fade` or the tier. The
   mitigation is documentation plus the fact that the tier caps the top; there is no gate that can
   tell a deliberate sparse look from an accidental one.
+- **A basis fixes one angle, and the scene rotates.** The butterfly is a property of the x–z plane,
+  so the spin carries the figure out of legibility and back twice per revolution; ADR-0068 buys the
+  shape, not the shape at every angle. Named here rather than left implicit because the plan's own
+  Phase 1 criterion originally assumed otherwise. Phase 4 decides whether it matters.
 - **`attractor_lorenz` has never been authored against its real figure**, so Phase 4's work on it is
   closer to first authoring than to a re-tune. Budget accordingly.
 - **No real-time hazard.** `density` is load-time and changes two integers; `prev` is written by the
@@ -248,5 +286,10 @@ No `Scene` trait change, no C ABI change (stays v4), no new dependency, no new p
 ## Followups (after this lands)
 
 - Re-check whether the streak wants a length normalization, with Phase 4's numbers.
+- **Whether the spin is a per-family property too**, if Phase 4 finds the y–z half of the turn reads
+  as dead. Today `SPIN_RATE` is one shared constant and the spin is always a full turntable about the
+  vertical; the candidates are a per-family rate and a bounded sway that dwells near the family's own
+  plane. It is an ADR-0068 supplement and it needs Phase 4's rendered case first — the same reason
+  ADR-0069 Alternative D waits.
 - Whether the swarm — the other GPU particle scene — has anything to gain from `density`. It has its
   own tier field and its own draw, and nobody has asked.
