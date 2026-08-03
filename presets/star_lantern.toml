@@ -59,14 +59,22 @@ contact_angle_deg = 55
 # learned this the hard way: a band term large enough to cross a variant
 # boundary is not a morph, it is a flicker between two geometries.
 #
-# SINCE PLAN 0054 / ADR-0060 `variant` IS A CONTINUOUS CONTACT ANGLE, so a
-# fractional value is a real rosette and `[smoothing]` on it morphs rather than
-# stuttering across a `floor`. 0, 1 and 2 still name the three rosettes this file
-# has always drawn, so nothing here changes. The `floor` stays for now because
-# `mod(..., 3)` is a sawtooth - dropping it alone would turn one slow swap into a
-# hard 2 -> 0 snap at every wrap - and re-authoring the sweep as a triangle wave
-# is a `preset-author` pass, not an engine one.
-variant = "floor(mod(time * 0.023, 3))"
+# A CONTINUOUS MORPH since Plan 0054 / ADR-0060, and a triangle wave is what
+# makes it one. `2 * abs(mod(phase, 2) - 1)` walks the contact angle up to 2,
+# turns, and walks back to 0 with no discontinuity - where the `floor(mod(..., 3))`
+# this replaces held three fixed rosettes, and where a bare `floor` removal would
+# have swept smoothly and then SNAPPED 2 -> 0 at every wrap, because `mod` is a
+# sawtooth. The `0.5 +` starts at variant 1, this file's own
+# `contact_angle_deg = 55`.
+#
+# The clock is unchanged at 0.023, which under `mod(..., 2)` is ~87 s for the
+# round trip - ~44 s each way, the pacing the old comment claimed.
+#
+# THE POINT ABOVE STILL STANDS and is why there is no band term here: an audio
+# term big enough to move the angle far is a flicker, not a morph. `star_rosette`
+# keeps a small one and pays for it with a 1.5 s ease; this file would rather
+# spend its audio on the halo.
+variant = "2 * abs(mod(0.5 + time * 0.023, 2) - 1)"
 
 # A slow turn plus a genuine wander. `noise` is one call where the older files
 # sum three detuned sines (Plan 0047); it is smooth over one unit of its
@@ -149,6 +157,10 @@ bg_vignette = "0.92"
 trails = "0.42 + clamp(mid * 0.165, 0, 0.14)"
 
 [smoothing]
+# Rounds the triangle's turn at 0 and 2. Shorter than `star_rosette`'s 1.5,
+# because there is no band term on `variant` here for it to also low-pass -
+# this one only has a corner to soften.
+variant       = 0.90
 rotation      = 0.20
 scale         = 0.60
 hue           = 0.45
