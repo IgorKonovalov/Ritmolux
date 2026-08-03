@@ -80,13 +80,26 @@ d = "1.525 + cos(time * 0.0190) * 0.075 - clamp(bass * 0.036 + bin(0.39) * 0.065
 # DENSITY - the inversion fix. Loud = shorter trails and finer points. The base
 # values are deliberately low: at the Plan 0027 surface-sized grid, `fade` much
 # above ~0.92 with `size` near 1 saturates the accumulation into a white blot.
-fade   = "0.55 - clamp(bass * 0.065, 0, 0.055) - beat * 0.020"
-size   = "0.28 - clamp((bass + mid) * 0.048, 0, 0.08) + beat * 0.04"
+# RE-RAISED HALFWAY, 2026-08-03 (Plan 0057 Phase 6), NOT reverted. These read
+# 0.905 / 0.58 until `00d99d0` cut them to 0.55 / 0.28 so the preset would
+# survive the `rich` tier, where 3x the particles deposited 3x the light into
+# the same texels. ADR-0065 (Phase 2) normalized the deposit by particle count,
+# so the compensation is owed back - but the same commit added the bloom stage
+# above, sized to the LOWERED figure, so restoring the old numbers stacks bloom
+# on a figure already at the knee. RENDERED, not reasoned: at 75% of the way
+# back the top crossing starts whitening out; at 50% the filaments stay
+# separated and the magenta holds. Verified at both tiers.
+fade   = "0.73 - clamp(bass * 0.065, 0, 0.055) - beat * 0.020"
+size   = "0.43 - clamp((bass + mid) * 0.074, 0, 0.125) + beat * 0.06"
 # MEASURED. Read 0.42 and never fired, because `onset` was then raw spectral
 # flux peaking at 0.016 rather than the 0..1 envelope that number assumed.
-# ADR-0049 made it one, so the threshold is a real fraction again. Still the
-# most eager reseed in the family.
-reseed = "onset > 0.50"
+# ADR-0049 made it one, so the threshold is a real fraction again. Then 0.50 -
+# but that was still calibrated against a reseed that WIPED the cloud, where
+# reluctance protected the drawing. Plan 0057 Phase 3 / ADR-0066 made it a
+# bounded in-place jitter, so a high gate now only withholds the accent.
+# Onset means measured 0.033 (click:120) / 0.153 (dynamic:110) / 0.391 (chord),
+# ~0.20 real music, all peaking at 1.000. Still the most eager of the six.
+reseed = "onset > 0.28"
 
 # COLOUR - a narrow window that slides, not a rainbow. palette_mix finally earns
 # its keep: the gradient cools toward `ice` as treble opens.

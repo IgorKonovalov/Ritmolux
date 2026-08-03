@@ -75,21 +75,45 @@ b = "1.60 + cos(time * 0.0257) * 0.080 + clamp(mid * 0.043 + bin(0.56) * 0.078, 
 c = "1.00 + sin(time * 0.0194) * 0.095 + clamp(treb * 0.044 + bin(0.80) * 0.079, 0, 0.050)"
 d = "0.70 + cos(time * 0.0151) * 0.090 - clamp(bass * 0.0327 + bin(0.41) * 0.057, 0, 0.045)"
 
-# DENSITY - low base, falling further at peak. The exposure comes from `trails`
-# below, not from letting the accumulation grid saturate. Re-derived 2026-08-03:
-# the old baselines DID let it saturate - see the header.
-fade   = "0.50 - clamp(bass * 0.0706, 0, 0.060) - beat * 0.020"
-size   = "0.28 - clamp((bass + treb) * 0.056, 0, 0.08) + beat * 0.05"
-# RESEED IS A MEASURED THRESHOLD. This read 0.55 and therefore never fired
-# once: `onset` WAS raw spectral flux, not a normalized envelope, and it peaked
-# at 0.016 on music-like material (mean 0.002) - so every attractor in this
-# family shipped with its reseed permanently off. Note the checker cannot catch
-# this shape: a bare comparison is not a `select` condition, so `--report`
-# reachability is blind to it. ADR-0049 has since made `onset` the normalized
-# 0..1 envelope the original 0.55 assumed, so the threshold is a real fraction
-# again: 0.75 is the most reluctant setting in the family, matching this
-# preset's original rank. Level table: docs/presets.md.
-reseed = "onset > 0.75"
+# DENSITY - moderate base, falling at peak. The exposure comes from `trails`
+# below, not from letting the accumulation grid saturate.
+#
+# RE-RAISED HALFWAY, 2026-08-03 (Plan 0057 Phase 6), NOT reverted. These read
+# 0.885 / 0.62 / trails 0.62 until `00d99d0` cut them to 0.50 / 0.28 / 0.20 so
+# the preset would survive the `rich` tier, where 3x the particles deposited 3x
+# the light into the same texels. ADR-0065 (Phase 2) normalized the deposit by
+# particle count, so that 3x is gone and the compensation is owed back.
+#
+# A FULL REVERT IS WRONG AND THIS WAS RENDERED, NOT REASONED. The same commit
+# also added the bloom stage above, sized to the LOWERED figure. Restoring the
+# old numbers puts the figure back over the tonemap knee with that bloom now
+# stacked on it: the bracket at 0.885 / 0.62 / 0.62 renders the dense interior
+# as a flat salmon mass with the filigree gone - the exact failure `00d99d0`
+# fixed, arriving by a different route. Halfway keeps the filaments separated
+# and still reads as present. Verified at BOTH tiers: floor and rich are the
+# same brightness here, rich only smoother, which is what ADR-0065 buys.
+fade   = "0.68 - clamp(bass * 0.0706, 0, 0.060) - beat * 0.020"
+size   = "0.44 - clamp((bass + treb) * 0.090, 0, 0.13) + beat * 0.075"
+# RESEED IS A MEASURED THRESHOLD, RE-DERIVED FOR A DISTURBANCE. This read 0.55
+# and therefore never fired once: `onset` WAS raw spectral flux, not a
+# normalized envelope, and it peaked at 0.016 on music-like material (mean
+# 0.002) - so every attractor in this family shipped with its reseed
+# permanently off. Note the checker cannot catch this shape: a bare comparison
+# is not a `select` condition, so `--report` reachability is blind to it.
+# ADR-0049 then made `onset` the normalized 0..1 envelope the original 0.55
+# assumed, and this was set to 0.75 - the most reluctant in the family.
+#
+# 0.75 WAS CALIBRATED AGAINST A WIPE. Until Plan 0057 Phase 3 a reseed REPLACED
+# the cloud with a uniform box, so a high gate was protective: firing often
+# meant erasing the drawing often. ADR-0066 made it a bounded in-place jitter,
+# so the event is no longer destructive and rarity buys nothing - it just means
+# the accent is absent. Reported live: "half the kicks are not accenting".
+# MEASURED onset means: 0.033 (click:120), 0.153 (dynamic:110), 0.391 (chord),
+# ~0.20 real music, against a 1.000 peak on all three. 0.45 still sits well
+# above the typical level - so a quiet passage keeps one continuous drawing,
+# which is what the gate was always for - while every real transient crosses it.
+# Rank preserved: still the most reluctant of the six.
+reseed = "onset > 0.45"
 
 # COLOUR - a hot but narrow window; treble slides the centre toward white-hot.
 hue_spread  = "0.16 + clamp(treb * 0.367, 0, 0.22)"
@@ -106,7 +130,7 @@ pan_y = "sin(time * 0.061) * 0.07"
 # is the one thing here that RISES with energy: loud stretches the stroke. The
 # backdrop came down with the figure: at `bg_bright` 0.07 the dark half of the
 # frame was a visible warm haze competing with the filaments.
-trails      = "0.20 + clamp((bass + mid) * 0.106, 0, 0.18)"
+trails      = "0.40 + clamp((bass + mid) * 0.135, 0, 0.23)"
 bg_hue      = "0.02 + sin(time * 0.013) * 0.04"
 bg_bright   = "0.010 + clamp(mid * 0.0294, 0, 0.025)"
 bg_vignette = "0.85"

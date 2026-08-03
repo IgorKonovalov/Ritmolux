@@ -56,8 +56,19 @@ c = "2.667 + sin(time * 0.0173) * 0.075 - clamp(treb * 0.1, 0, 0.060)"
 fade   = "select(tempo > 124, 0.55, 0.62) - clamp(bass * 0.053, 0, 0.045) - beat * 0.015"
 size   = "select(tempo > 124, 0.24, 0.30) - clamp(bass * 0.08, 0, 0.07) + beat * 0.04"
 # MEASURED. Read 0.48 and never fired - `onset` was then raw spectral flux peaking at
-# 0.016, not a 0..1 envelope. Rank preserved within the family.
-reseed = "onset > 0.62"
+# 0.016, not a 0..1 envelope. Then 0.62, chosen while a reseed still REPLACED
+# the cloud with a uniform box - the largest seed box in the set, so the
+# reluctance was most justified here. ADR-0066 (Plan 0057 Phase 3) made it a
+# bounded in-place jitter, so that justification is gone. Onset means measured
+# 0.033 (click:120) / 0.153 (dynamic:110) / 0.391 (chord), ~0.20 real music,
+# all against a 1.000 peak. Rank preserved within the family.
+#
+# NOTE the exposure below is NOT re-raised with the rest of the family. Plan
+# 0057 Phase 4 found this scene renders the wrong plane (the shared 3-D view
+# basis is x-y; the Lorenz butterfly is x-z) and routed the fix to an ADR, so
+# judging this preset's density now would be judging a figure that is about to
+# change shape. Re-author after the basis lands.
+reseed = "onset > 0.36"
 
 # COLOUR - the fast personality heats toward `ember` and widens; the slow one
 # stays a cool, cohesive single family.

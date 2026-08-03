@@ -41,9 +41,22 @@ d = "1.96 + cos(time * 0.0110) * 0.36 + clamp(bass * 0.282, 0, 0.24)"
 
 # EXPOSURE - short, so the sheet stays filamentary. A long fade saturates the
 # dense cores to flat white and erases the structure the coefficients just built.
-fade   = "0.52 - clamp(bass * 0.088, 0, 0.075) - beat * 0.020"
-size   = "0.26 - clamp((bass + treb) * 0.05, 0, 0.075) + beat * 0.06"
-reseed = "onset > 0.69"
+# RE-RAISED HALFWAY, 2026-08-03 (Plan 0057 Phase 6), NOT reverted. These read
+# 0.855 / 0.52 (and `trails` 0.46) until `00d99d0` cut them to 0.52 / 0.26 /
+# 0.18 so the preset would survive the `rich` tier, where 3x the particles
+# deposited 3x the light into the same texels. ADR-0065 (Phase 2) normalized
+# the deposit by particle count, so the compensation is owed back - but the
+# same commit added the bloom stage above, sized to the LOWERED figure.
+# RENDERED, not reasoned: at 75% of the way back the centre star whites out;
+# at 50% the cyan holds across the whole rosette. Verified at both tiers.
+fade   = "0.69 - clamp(bass * 0.088, 0, 0.075) - beat * 0.020"
+size   = "0.39 - clamp((bass + treb) * 0.080, 0, 0.118) + beat * 0.09"
+# Re-derived for a disturbance. 0.69 was set while a reseed still REPLACED the
+# cloud with a uniform box, so reluctance was protective; ADR-0066 (Plan 0057
+# Phase 3) made it a bounded in-place jitter, and the reluctance then only
+# costs accents. Onset means measured 0.033 (click:120) / 0.153 (dynamic:110) /
+# 0.391 (chord), ~0.20 real music, all against a 1.000 peak. Rank preserved.
+reseed = "onset > 0.40"
 
 hue_center  = "0.30 + sin(time * 0.021) * 0.16 + clamp(bass * 0.235, 0, 0.20)"
 # Held NARROW deliberately. Widening this to 0.62 was tried and reverted: the
@@ -78,7 +91,7 @@ bg_vignette   = "0.82"
 # `kaleido_angle` alone, which is continuous and safe to ease.
 kaleido_order = "6"
 kaleido_angle = "time * 0.055"
-trails        = "0.18 + clamp(onset * 0.233, 0, 0.14)"
+trails        = "0.32 + clamp(onset * 0.300, 0, 0.18)"
 
 [smoothing]
 a             = 0.55

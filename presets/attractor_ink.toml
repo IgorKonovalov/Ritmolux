@@ -48,12 +48,18 @@ size = "0.60 - clamp((bass + mid) * 0.094, 0, 0.16) + beat * 0.14"
 # this is the knob that blots. Ceiling 0.89, and it falls under bass.
 fade = "0.885 - clamp(bass * 0.047, 0, 0.040)"
 
-# A hard transient re-scatters the cloud; it blooms through the standing trails
-# and dries back as the fade catches up. Gated above `beat` so quiet passages
-# keep one continuous drawing instead of being wiped every bar.
-# MEASURED. Read 0.45 and never fired - `onset` was then raw spectral flux peaking at
-# 0.016, not a 0..1 envelope. Rank preserved within the family.
-reseed = "onset > 0.56"
+# A hard transient DISTURBS the cloud - it bulges through the standing trails
+# and settles back as the fade catches up. Gated above the typical level so
+# quiet passages keep one continuous drawing rather than being nudged nonstop.
+# MEASURED. Read 0.45 and never fired - `onset` was then raw spectral flux
+# peaking at 0.016, not a 0..1 envelope. Then 0.56, which was chosen while a
+# reseed still RE-SCATTERED the whole cloud (a wipe worth being reluctant
+# about); Plan 0057 Phase 3 / ADR-0066 made it a bounded in-place jitter, so
+# the reluctance now only costs accents. Onset means measured 0.033
+# (click:120) / 0.153 (dynamic:110) / 0.391 (chord), ~0.20 real music, all
+# against a 1.000 peak - so 0.32 is crossed by transients and not by the body
+# of a passage. Rank preserved within the family.
+reseed = "onset > 0.32"
 
 # Nearly neutral. The remap discards hue anyway, and a desaturated source keeps
 # the luminance ramp - and so the ink density - honest across the frame.
@@ -85,7 +91,20 @@ ink_bright   = "0.055"
 size = { attack = 0.02, release = 0.26 }
 fade = 0.25
 zoom = 0.18
-a    = 0.8
-b    = 0.8
-c    = 0.8
-d    = 0.8
+# THE SHAPE EASING, RE-DERIVED 2026-08-03. These read 0.8, which is why the
+# drawing did not visibly answer a drum hit: measured against the library,
+# this preset's transient columns were rise 19+ / fall 30+ where Fern Grow -
+# named by the user as reacting correctly - reads 6+ / 9+, the slowest pair in
+# the whole set. A hit's band energy lasts ~100 ms and an 0.8 s ease delivers
+# about 12% of the step in that window, so a term worth 4% of the coefficient
+# arrives as 0.5% and reads as nothing.
+#
+# 0.45 rather than something fast: the constraint in the header is real - a
+# chaotic map CUTS rather than morphs if a coefficient is moved abruptly - so
+# this buys response without letting the figure jump. The magnitudes above are
+# deliberately NOT raised in the same pass; speed and travel are separate
+# levers and moving both at once means neither can be judged.
+a    = 0.45
+b    = 0.45
+c    = 0.45
+d    = 0.45
