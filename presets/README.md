@@ -1058,6 +1058,69 @@ Reach for it when you can say in one sentence why the bound must hold; reach for
 the division otherwise. A name no `[params]` entry binds is inert and warns at
 load.
 
+## A world-space param is not bounded by its clamp — the frame is the bound
+
+The section above is about a band term that stops moving. This one is about a band
+term that moves too far, and it is the **opposite** failure with the same cause: a
+gain written against the wrong scale.
+
+`clamp(bass * 0.45, 0, 0.3)` cannot leave the frame. It is a *unitless* multiplier
+into brightness, or width, or a hue offset, and the `0.3` is a real ceiling. But
+some params are **world-space**: they multiply a band into a coordinate. `scale` on
+a `spectrum` readout is a world height per unit of band level; `span`, `baseline`,
+`size` on the attractor, and any `bin()`- or `index`-driven geometry are the same
+kind of quantity. Write
+
+```toml
+scale = "3.20"     # spectrum, [spectrum] layout = "polyline"
+```
+
+and a fully-driven element stands **3.2 world units** tall. The visible half-height
+is `1.0`. The figure is not clipped, not squashed and not dimmed — it is *outside
+the picture*, and there is no `clamp` anywhere in that line for a reviewer, a
+reachability walk or `--report`'s occupancy column to catch it on.
+
+**This shipped.** `spectrum_ridge` carried `scale = 3.20` from before
+[ADR-0049](../docs/adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)
+normalized the bands to `0..1`. Afterwards the same constant multiplied a value
+roughly five times larger, and the preset rendered as an **empty frame** under
+`--signal noise:7` for its entire life while every automated gate stayed green.
+The repair was `3.20 -> 0.60`, chosen so a fully-driven element lands just inside
+the frame.
+
+So when a band drives a coordinate, do the arithmetic in world units before you
+render anything:
+
+> **at the loudest the band can go, where does the element land?** If the answer is
+> past `1.0` vertically or past your `span` horizontally, the preset has an
+> invisible top end however good it looks at rehearsal level.
+
+Two things that will *not* save you, both learned the hard way:
+
+- **A `clamp` on the term does not make it safe** unless its upper bound is itself
+  in world units and inside the frame. `clamp(bass * 3.2, 0, 3.0)` is still off
+  frame; the clamp bounds the number, not the picture.
+- **Looking at it at a normal listening level does not save you either.** The
+  defect lives at the top of the range. `spectrum_comb` and `spectrum_corona`
+  clip their tallest bars off the top edge on every beat and still look fine,
+  because a comb roots each bar on a shared baseline and only the tips leave.
+
+Check it at the top of the range, not in the middle:
+
+```sh
+cargo run -p standalone --example shot -- --preset-file presets/yours.toml --signal noise:7
+```
+
+`core/tests/sanity.rs` catches the **total** case — a figure so far out that the
+frame comes back empty — and since Plan 0058 it measures the scene against black
+with the backdrop suppressed, so a `bg_vignette` can no longer stand in for a
+figure that is not there. It also prints a per-preset **excitation ratio**
+(coverage when fully driven over coverage at a moderate level) on every run. That
+ratio is a report rather than a gate, and the reason is worth knowing: a partial
+over-scale that clips only the tips costs almost no pixels, so the number comes
+back healthy. **Nothing automated will catch a tip that leaves the frame.** That
+one is yours to check.
+
 ## Structural config (line systems and the attractor)
 
 Declarative data the generator/sampler consumes once at load — **not**
