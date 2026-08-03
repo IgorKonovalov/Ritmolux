@@ -1644,9 +1644,32 @@ This entry is the record and the evidence; that file is where it changes behavio
 
 ---
 
-## 0031 — the Rich tier's 3x particle count makes the attractor reseed transient opaque, and `clifford` blows out
+## ~~0031 — the Rich tier's 3x particle count makes the attractor reseed transient opaque, and `clifford` blows out~~
 
-- **MECHANISM HALF TAKEN 2026-08-03 → [Plan 0057](plans/0057-the-attractors-compute-path.md)** —
+- **CLOSED 2026-08-03 at [Plan 0057](plans/done/0057-the-attractors-compute-path.md)'s close, on
+  measurement rather than on argument** — both halves, and the harness gap that kept it open. Half
+  one (too bright) is fixed at its cause: [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md)
+  divides the deposit by the particle count, and Clifford's mean display luminance at `Rich` went
+  `17.37 -> 10.86` against `Floor`'s `10.34`, with Phase 6 re-verifying the invariance at the
+  *raised* exposure the content pass restored. Half two (the hard-edged speckled slabs) is fixed by
+  [ADR-0066](adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md): the slabs were the
+  seed box, re-filled on every reseed. This entry could not reproduce them from four captures, and
+  the reason is now known — a reseed fires on 7 hops out of 375 under `click:120` and an
+  evenly-spaced `--strip 8` lands on one by luck. `shot --at` is the instrument that aims at it, and
+  `attractor_ink --tier rich --at 44,46,48,54` rendered the rectangle before the fix and does not
+  after.
+- **This entry's third bullet below was false when written, and the correction is the reusable
+  part.** It says `shot` has "**no `--tier` flag**" and that settling either half "needs the running
+  app". ~~True~~ — **false since [Plan 0044](plans/done/0044-quality-tiers.md) Phase 3**, which built
+  `Renderer::new_headless_tiered` and the flag; it was missing only from `shot --help`, and four
+  documents (this entry, [0047](design-backlog.md), ADR-0064 and the `preset-author` skill) reasoned
+  from its absence. A flag's help text is part of the flag.
+- **What it does *not* close: Plan 0044 Phase 4.** The `Rich` multipliers are still provisional, and
+  the calibration in [`on-device-validation.md`](on-device-validation.md) is still owed — it is a
+  frame-time measurement, and after ADR-0065 lowering `attractor_particles` no longer changes that
+  family's exposure. Notes below retained as the origin record.
+
+- **MECHANISM HALF TAKEN 2026-08-03 → [Plan 0057](plans/done/0057-the-attractors-compute-path.md)** —
   entry still **live** pending measurement, but both halves of its mechanism now have a fix
   designed. The 3x is removed at its cause by
   [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) (Phase 2), which is
@@ -2768,7 +2791,27 @@ three hollow rings is still three hollow rings.
 
 ## Entry 0052 — from the Plan 0056 close (2026-08-03), found by the gate the plan built
 
-## 0052 — `Spectrum Ridge` has no tonal structure at all: it is the one shipped preset the new flat-frame gate convicts
+## ~~0052 — `Spectrum Ridge` has no tonal structure at all: it is the one shipped preset the new flat-frame gate convicts~~
+
+- **RETIRED 2026-08-03 — the preset was never flat, and the statistic convicted the right preset
+  for the wrong reason.** The `1.000` was not a saturated figure: `scale = 3.20` had been tuned
+  before [ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) normalized the
+  bands, so the contour sat ~3.3 world units up against a visible half-height of `1.0` and was off
+  frame **entirely**. What the gate measured was the lit `bg_vignette` left behind. The preset was
+  repaired in `81190ac` (`3.20 -> 0.60`), `KNOWN_FLAT` emptied itself in `4d325fc` exactly as
+  designed — a repaired preset fails its own exemption and tells you to delete the line — and
+  [Plan 0058](plans/done/0058-the-gate-can-see-an-empty-frame.md) Phase 2 then re-measured it at
+  **`0.1916`** once the backdrop stopped counting as a figure
+  ([ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)). The mechanism this entry
+  named — two mirrored haloed strokes adding at their convergence — is real and is Plan 0039
+  Phase 5's finding, but it is not what produced this number.
+- **The one number worth carrying forward is the last bullet, and it got worse rather than
+  better.** Removing the backdrop cost the whole library a spread of mid-tones, so the flattest
+  shipped preset is now **`Rose Web` at `0.8839`** (up from `0.7645`) against the same `0.90`
+  ceiling — `0.0161` of margin, not `0.035`. Nothing about that preset changed; the number is worse
+  because it is honest. A content pass that raises `trails` on a line preset still owes a `sanity`
+  re-run, and the question if the top keeps climbing is whether a flat-spectrum stimulus can fairly
+  judge these shapes — not whether to nudge `0.90`. Notes below retained as the origin record.
 
 - **Raised:** 2026-08-03, by [Plan 0056](plans/done/0056-clamp-occupancy-and-the-axis-anchor.md)
   Phase 5 — the first thing the tonal-flatness statistic found when it was pointed at the shipped
@@ -2874,3 +2917,66 @@ still the "loud reads as less information" failure. **Left unchanged deliberatel
 more shipped presets was outside the 0051/0052 handoff, and the right factor should be decided
 together with whatever instrument comes out of finding two, so it can be verified rather than
 eyeballed.
+
+---
+
+## Entry 0054 — from the Plan 0058 close (2026-08-03), and the plan's own measurement is the argument
+
+## 0054 — pixel coverage cannot see a figure whose *tips* leave the frame, and an in-frame geometry fraction is the successor
+
+- **Raised:** 2026-08-03, at [Plan 0058](plans/done/0058-the-gate-can-see-an-empty-frame.md)'s
+  close. This is not a fresh idea —
+  [ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) named it in Alternatives,
+  rejected it as the *primary* mechanism and kept it explicitly as the supplement. What is new is
+  the evidence that it is now wanted, and the evidence is a measurement rather than an argument.
+- **Verified against code:** yes — measured through the instrument Plan 0058 Phase 3 built, printed
+  by `core/tests/sanity.rs` on every run.
+- **Lane:** `architect` → `dev`. Engine/harness work, no preset content.
+
+**What Plan 0058 established, and what it could not.** Phase 1 made `sanity` measure the scene
+against black instead of against a sampled corner pixel, which catches the **total** case — a figure
+so far out of frame that nothing is drawn. That is real and it is pinned by a frozen fixture. Phase 3
+then tried to catch the **partial** case with a stimulus-relative check: capture at two excitations
+and assert the louder frame does not draw less picture. It ships as a **report, not a gate**, and
+the numbers are why:
+
+```text
+ ratio   cov@0.4  cov@1.0  preset
+ 0.8552   0.2878   0.2461  De Jong          <- lowest legitimate (correct content)
+ 0.9568   0.3164   0.3027  Leviathan        <- correct content
+ 1.0514   0.3866   0.4065  Spectrum Corona  <- OVER-SCALED, scale = 5.20
+ 1.0891   0.5088   0.5541  Spectrum Comb    <- OVER-SCALED, scale = 3.80
+    inf   0.0000   0.0000  Spectrum Ridge (pre-repair)  <- 0/0, no denominator
+```
+
+**No threshold on this axis convicts anything it was built for.** The two over-scaled presets score
+*above* 1.0 — they draw more when loud — because a comb roots every bar on a shared baseline and a
+corona roots every spoke at a centre, so clipping the tips costs a rounding error of lit pixels
+while the body stays exactly where it was. Meanwhile the only content anywhere near a plausible
+threshold is correct: the attractor family's *peak buys structure* idiom, which
+[ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) already records as real. A
+gate at `0.80` would sit `0.055` from De Jong while catching none of the three known-defective
+configurations.
+
+**So the diagnosis is that the measure is wrong, not the threshold.** Tips are almost no pixels.
+Asking a pixel-coverage statistic about a figure that overshoots its frame is asking the wrong
+question, and no calibration of it will help.
+
+**What a design here would weigh.**
+
+- **The obvious mechanism, and its reach.** Line and spectrum scenes build a CPU segment list, so
+  "what share of the drawn geometry lands inside the render target" is computable without a GPU
+  readback for exactly the families most exposed. That is also its limit: `fragment_field`,
+  `reaction_diffusion` and the attractor draw no such list, so this cannot be an engine-wide gate —
+  it is a per-family instrument, which is a shape this project has not built before.
+- **Where it lives.** ADR-0067 declined it partly because it "needs a `Scene`-adjacent accessor",
+  and widening the `Scene` trait is ADR-0002 territory. Whether the fraction is computed inside the
+  scene, exposed through a diagnostic seam, or derived by the harness from the same generator config
+  a preset declares is the real decision, with rejected alternatives.
+- **The confirmation half already works and is worth keeping either way.** Repaired, the same ratio
+  moved `1.0891 -> 1.7196` (comb) and `1.0514 -> 1.6756` (corona). The check is blind as a
+  conviction and sharp as a confirmation — useful to a content pass verifying its own repair even
+  though it can never fail the build.
+- **Non-vacuity is already available.** `core/tests/sanity.rs` carries `pre_repair_spectrum_ridge`
+  as a frozen fixture, and `git show 2efb80e^:presets/spectrum_comb.toml` is the partial case. Any
+  instrument proposed here can be tested against both before it is trusted.

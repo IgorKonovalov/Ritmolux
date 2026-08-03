@@ -1,8 +1,20 @@
 # 0058 — The gate can see an empty frame, and "loud" has to mean more picture
 
-> **Status:** **in-progress** — `dev` is implementing Phases 1-3. Phases 1-3 are `dev` and run in one
-> session; **Phase 4 is `human`** (a `preset-author` re-scale) and is the only phase that moves a
-> pixel, so the plan stops there by construction.
+> **Status:** **done 2026-08-03** — all four phases landed, including the `human` Phase 4.
+> Phase commits: `96a914f` coverage measures the scene, `a0ce1c9` the floors are re-measured,
+> `8e79aa3` the excitation ratio ships as a report, `2efb80e` the comb and the corona come back
+> inside the frame.
+> Mode 4 review: **no blockers, no majors**; the minors were shared with [0057] and fixed in the
+> close commit. Gate on `main`: fmt clean, clippy `-D warnings` clean, **427/427, 0 skipped**.
+> **No golden baseline moved, and the plan predicted two would** — `core/tests/golden.rs` renders
+> frozen fixtures rather than the shipped presets (ADR-0023), precisely so an intended content tune
+> cannot trip the engine-drift alarm; `LMV_BLESS` was never run. C ABI stays **v4**, no new
+> dependency, nothing on the per-frame path.
+> Phase 3 came back with **report, not gate**, which the plan authorized in advance and left to the
+> measurement — see [ADR-0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)'s
+> Outcome, and [backlog 0054](../design-backlog.md) for the successor instrument that evidence now
+> argues for.
+> Closes [backlog 0053](../design-backlog.md) and retires [backlog 0052](../design-backlog.md).
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) (this

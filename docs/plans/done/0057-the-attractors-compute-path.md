@@ -1,6 +1,21 @@
 # 0057 — The attractor's compute path: the deposit, the reseed, the butterfly, and one retune
 
-> **Status:** in-progress 2026-08-03
+> **Status:** **done 2026-08-03** — Phases 1, 2, 3, 4 and 6 landed; **Phase 5 was deliberately not
+> written**, per Phase 4's own instruction to stop and route back to `architect` when the cause turns
+> out to be the shared 3-D view basis. It is. That fix is a decision with rejected alternatives and
+> owes an ADR, so it becomes a successor plan rather than holding this one open — the plan's Risks
+> section anticipated exactly this ("Phase 4 may stop the plan. By construction, and it is why Lorenz
+> is last: Phases 1-3 and 6 are complete work without it").
+> Phase commits: `8c95cf2` the two instruments, `4d77bff` the deposit, `5bb36c2` the reseed,
+> `9d717fc` the Lorenz diagnosis, `b2be2d3` the one content pass.
+> Mode 4 review: **no blockers, no majors**; three minors, all doc/bookkeeping, fixed in the close
+> commit. Gate on `main` after both lanes met: fmt clean, clippy `-D warnings` clean, **427/427,
+> 0 skipped**, and **no golden baseline moved anywhere in the plan** — proved by re-running the suite
+> without `LMV_BLESS`, as the Decision said it could be checked in advance. C ABI stays **v4**
+> (`core/src/ffi.rs` byte-untouched), no new dependency, nothing added to the audio path.
+> Closes [backlog 0031](../design-backlog.md) outright (both halves, on measurement),
+> [0047](../design-backlog.md) (first half), [0048](../design-backlog.md) → successor plan, and
+> [0050](../design-backlog.md).
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md) (Phase 1 — `shot --tier`),
@@ -214,6 +229,13 @@ so Phase 6's re-authoring of `attractor_lorenz` is load-bearing for this and sho
 *after* the basis decision, not before. Phase 2 has just returned 3x of headroom to spend on it.
 
 ### Phase 5 — Lorenz: the fix
+
+> **NOT RUN — routed to `architect` at this plan's close (2026-08-03), by Phase 4's own
+> instruction.** Phase 4 confirmed the cause is the shared 3-D view basis, which makes the fix a
+> convention change with rejected alternatives (per-family basis vs. a preset-facing parameter vs.
+> re-centring Lorenz's coefficients) rather than a constant. It carries forward to a successor plan
+> together with the `attractor_lorenz` re-tune Phase 6 deliberately withheld, and with the
+> **stipple** finding below, which a basis fix alone would not clear.
 
 - **Owner skill:** dev
 - **What:** apply the fix Phase 4 named. Gated on Phase 4, and on the ADR if Phase 4 routed back.

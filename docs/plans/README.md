@@ -15,65 +15,54 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **approved 2026-08-02** — ready for `dev`; [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
-| [0057](0057-the-attractors-compute-path.md) | The attractor's compute path: the deposit, the reseed, the butterfly, and one retune | **approved 2026-08-03** — ready for `dev`; [ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md) + [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) + [ADR-0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md); closes [backlog 0047](../design-backlog.md) (first half), [0048](../design-backlog.md), [0050](../design-backlog.md) and the mechanism half of [0031](../design-backlog.md). **No golden baseline moves anywhere in the plan** (checked in advance, not hoped for). **Phase 4 may route back to `architect`** by design, and **Phase 6 is `human`** — so it does not close in one session | dev, human |
-| [0058](0058-the-gate-can-see-an-empty-frame.md) | The gate can see an empty frame, and "loud" has to mean more picture (coverage measured against black, floors re-derived, a stimulus-relative collapse check) | **approved 2026-08-03** — ready for `dev`; [ADR-0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md); closes [backlog 0053](../design-backlog.md). `sanity`'s floor is **unfalsifiable for 24 of 35 presets** — the vignette clears it alone. **Phase 4 is `human`** (a `preset-author` re-scale of the two over-scaled spectrum presets) and is the only place pixels move | dev, human |
 
 ## Recommended execution sequence
 
 **Every plan in the roster is approved as of 2026-08-03 — nothing is waiting on a design
 decision.** What separates them now is only what each needs to *run*: [0052] closes in one session;
-[0050] closes in one plus a measurement; [0053], [0055] and [0057] each carry a `human` phase that
-gates later phases, so they stop mid-plan by construction — [0053] until a discrete GPU is to hand,
-[0055] until the live A/B is judged, [0057] until the content pass runs. Taking [0052] first keeps a
-session unblocked end to end. (**[0054] and [0056] have both landed and closed** on 2026-08-03 — see
-Recently closed.)
+[0050] closes in one plus a measurement; [0053] and [0055] each carry a `human` phase that gates
+later phases, so they stop mid-plan by construction — [0053] until a discrete GPU is to hand, [0055]
+until the live A/B is judged. Taking [0052] first keeps a session unblocked end to end.
+(**[0054], [0056], [0057] and [0058] have all landed and closed** on 2026-08-03 — see Recently
+closed.)
 
-**[0058] came out of the [0056] close and is orthogonal to everything.** It touches only
-`core/tests/sanity.rs` — no scene, no shader, no DSP, no preset until its `human` Phase 4 — so it
-collides with nothing in the roster and can ride alongside any lane.
+**The one thing this roster does not yet contain is the successor [0057] routed to `architect`.**
+[0057] Phase 4 confirmed that the Lorenz family renders the wrong plane — the shared 3-D draw
+branch uses `y` as the vertical and rotates `x` against `z`, so the rest view is x–y and the quarter
+turn is z–y, while the butterfly lives in **x–z**. That is a projection *convention* with rejected
+alternatives (a per-family basis, a preset-facing parameter, re-centring Lorenz's coefficients), so
+Phase 5 was deliberately not written and the plan closed without it, exactly as its own Risks
+section allowed. **What is owed: one ADR and one plan**, and the plan carries two things beyond the
+basis — the `attractor_lorenz` re-tune [0057] Phase 6 withheld on purpose (judging a figure about to
+change shape is judging nothing), and the **stipple** finding, which a basis fix alone will not
+clear. Corrected to x–z the silhouette is right and the figure still reads as speckle rather than as
+the banded wings of the iconic plot, because the scene draws 50 000 *independent samples of the
+invariant measure* where the plot's legibility comes from following **one trajectory** as a
+continuous curve. The levers are `fade` and the particle count — content and capacity, not geometry
+— and [0057] Phase 2 has just returned 3x of headroom to spend on them.
 
-**[0057] Phase 1(a) is already built, and this is a drift finding rather than a plan change.**
-`shot --tier floor|rich` exists and works (verified 2026-08-03), delivered by [0044] Phase 3 as
-`Renderer::new_headless_tiered` and documented in `docs/capturing.md` — it is absent only from
-`shot --help`, which is how four places in these documents came to assert it did not exist and how
-[ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md) came to propose a decision that had
-already been taken. **Check it before starting [0057]**: Phase 1's real remaining work is (b), the
-`--signal` kind whose onsets cross the shipped reseed gates, plus the `docs/capturing.md` sentence
-that a `Rich` capture is an instrument and never a baseline. ADR-0064 wants re-reading against the
-code before it is accepted.
+**Both of the harness gaps that made [0057] and [0058] necessary are now closed, and the shape they
+had in common is worth carrying.** Each defect shipped behind a green suite because **nothing in
+this project could render the configuration the defect occurs in** — no capture described the
+`Rich` tier the app starts on, no stimulus could express the transient a reseed *is*, and the
+`sanity` gate compared every pixel against a corner that `bg_vignette` guarantees is the frame's
+darkest. All three are instruments rather than fixes, all three went in **before** the fixes they
+enable, and all three then convicted something on the way: `--at` rendered the reseed rectangle,
+`--tier rich` measured the 3x, and the re-derived floors failed a run within the day when the
+content pass moved the attractor minimum. Note also what an instrument does *not* buy —
+[0058] Phase 3's stimulus-relative check reaches none of the three configurations it was designed
+for, and says so in its own test doc rather than being calibrated until it looked useful
+([backlog 0054](../design-backlog.md) is the successor).
 
-**[0057] is now unblocked and is the one with a live dependency behind it.** [0056] has landed, so
-[0057] Phase 6's content pass has the tonal-flatness statistic it was sequenced to wait for
-(`metrics::tonal_flatness`, threshold 0.90, distribution printed by `sanity` on every run). Note
-what that statistic cannot do for it: measured at the close, **none** of the four presets `00d99d0`
-repaired would have been caught by it — see Recently closed for why, and read that before treating
-it as the attractor instrument. It is a `Floor` statistic and the defect is a `Rich` one.
-
-**[0056] then [0057] was the one ordering in this roster that was not free, and [0056] has now
-landed**, so what follows is the standing rationale rather than a constraint. Three defects raised on
-2026-08-03 are one subsystem — the attractor's compute path deposits light without normalizing for
-particle count, reseeds by replacing the cloud with an axis-aligned box, and renders Lorenz as a
-dust cloud — and [0057] takes all three in one plan **because all three move the same six presets'
-look**. Commit `00d99d0` already retuned four of them *downward* to survive a 3x that [0057] Phase 2
-removes, so those four owe a re-raise; done as three plans that family gets retuned three times.
-[0057] Phase 6 is that single content pass, and it wants [0056] Phase 5's tonal-flatness statistic —
-which [0056] gained at approval, folding in [backlog 0047](../design-backlog.md)'s second half (the
-`sanity` gate passing a fully saturated frame). Measuring it by hand twice is exactly the waste the
-pairing exists to avoid.
-
-**The shared root of all three is that the harness cannot render the configuration each defect
-occurs in**, which is why all three shipped behind a green suite. ~~`shot` has no `--tier`~~ — **it does, see the correction below** — and `Renderer::new_headless`
-is `Floor` by construction, so no capture describes the tier the app *starts* on — even though
-[ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) names capture-level `Rich` spot checks as
-that tier's verification path. And `--set` holds a level constant, so no stimulus can express the
-transient a reseed *is*. [0057] Phase 1 builds both instruments before any fix
-([ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md)), which is the sequencing
-[ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) paid for. **A `Rich`
-capture is an instrument and never a baseline** — the `Rich` multipliers are still the provisional
-values Plan 0044 shipped, its Phase 4 calibration having never run. Note also that [0057] Phase 4
-**may route back to `architect`** by design: if the Lorenz dust cloud turns out to be the shared 3-D
-view basis (the plan's leading hypothesis, with the discriminating capture named), making that
-convention per-family is a decision with rejected alternatives and owes its own ADR.
+**Note for anyone reading an old capture claim: `shot --tier floor|rich` exists and always did.**
+Plan [0044] Phase 3 built it (`Renderer::new_headless_tiered`) and `docs/capturing.md` documented
+it; it was absent only from `shot --help`, which is how four documents — this file, two backlog
+entries, ADR-0064 and the `preset-author` skill — came to assert the capability did not exist, and
+how one ADR came to propose a decision that had already been taken. `Renderer::new_headless` still
+takes no tier and still pins `Floor`, so ADR-0045's compile-time property is intact. **A `Rich`
+capture is an instrument and never a baseline** — the `Rich` multipliers are still Plan 0044's
+provisional values, its Phase 4 calibration having never run. The running app remains the better
+instrument for a *judgement in motion*; it is no longer the only one for a measurement.
 
 **[0050] is orthogonal to everything below and can be taken whenever the user wants the app to be
 operable.** It touches one new `core` entry point (`Renderer::set_tier`, plus an `active_index`
@@ -219,8 +208,16 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.31.0`**, tag `v0.31.0` — **minor**, bumped at [0056]'s close per
-[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Minor rather than patch is a deliberate
+**Version is at `0.32.0`**, tag `v0.32.0` — **minor**, bumped at the joint [0057] + [0058] close per
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). **Two plans closed under one bump, and
+that is a deliberate call rather than a miss**, so the reasoning is here rather than only in a
+commit message: both lanes were already fast-forwarded into `main` as one merged tip before the
+review began, both were reviewed in a single Mode 4 pass against that tip, and no artifact exists at
+any version between them — a second tag would have differed from the first by the version line and
+nothing else. Minor is the right level for both taken together (an engine behaviour change, a new
+`shot` flag, two new HARD gates, and a content pass over eight presets). **The precedent to follow
+is still one bump per close**; what makes this one legitimate is that there was only one close.
+The `0.31.0` before it was [0056]'s close, where minor rather than patch was likewise a deliberate
 call on a plan that moves no pixels: it adds a **preset-facing surface** (the `[occupancy]` table),
 a new `--report` column plus a JSON key, and two HARD gates — capability, not a fix. The `0.30.0`
 before it was [0054]'s close (the palette surface reaching all four line scenes on their own
@@ -229,6 +226,15 @@ dual-resolution band axis, normalized levels with `*_raw` escapes, the beat/bar 
 library retune onto all of it), `0.28.1` was [0051]'s (a fix-only plan: the two additive draw seams
 emitting premultiplied alpha), and `0.28.0` was [0045]'s (the linear-light composite, the tonemap,
 the bloom stage and the fold redesign). Nothing is owed until the next close.
+**[0057] and [0058] ran as worktree lanes but did not close through ADR-0053's order, and it is
+worth naming so it is not read as the pattern.** Each lane merged `main` into its branch as it went
+(`a49057f` is [0058] taking [0057]'s four commits), and both branches were then fast-forwarded into
+`main` **before** the close — so ADR-0053 steps 1-2 were moot again and the two `human` content
+commits (`b2be2d3`, `2efb80e`) landed on `main` directly. The gate was therefore re-run on `main`
+before the bump instead: **427/427, 0 skipped**, on the combination. That works, and it gives up the
+property ADR-0053 exists for — the version being chosen and tagged on the commit that *becomes*
+main's tip. The same note was written at [0051]'s close and the habit did not take; the worktrees
+for both lanes should now be removed (`git worktree remove`, from outside them).
 **[0054] and [0056] both closed through worktree lanes in ADR-0053's intended order**, unlike the
 three closes before them — and [0056] is the first close where step 2 was not a formality. `main`
 was merged into each branch first; for [0056] that merge actually brought [0054]'s four line-scene
@@ -399,6 +405,139 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0058 — the gate can see an empty frame, and "loud" has to mean more
+  picture](done/0058-the-gate-can-see-an-empty-frame.md) — **done 2026-08-03**, Mode 4 review **no
+  blockers, no majors**. All four phases landed including the `human` Phase 4: `96a914f` coverage
+  measures the scene, `a0ce1c9` the floors are re-measured, `8e79aa3` the excitation ratio ships as
+  a report, `2efb80e` the comb and the corona come back inside the frame.
+  [ADR-0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) is **accepted with an
+  Outcome section**, implemented in full. Closes design-backlog **0053**, retires **0052**, raises
+  **0054**. Gate on `main`: fmt clean, clippy `-D warnings` clean, **427/427, 0 skipped**. C ABI
+  stays v4, no new dependency, nothing on the per-frame path.
+  **The gate it replaced could not be failed, and the number is the headline.** `is_lit` was handed
+  the frame's top-left pixel as its background reference, and `bg_vignette` guarantees that corner
+  is the frame's **minimum** — so on 24 of 35 shipped presets the backdrop cleared the 0.01 sparse
+  floor whatever the scene drew. Phase 1 drops every `bg_*` binding test-side and compares against
+  black; `sanity_roster` panics if the `bg_` prefix ever matches nothing, so a rename fails the gate
+  instead of silently restoring the backdrop. **No renderer API was widened** — `background.rs`
+  already defaults `bright`/`vignette` to `0.0`, so this is *not applying three bindings*, and
+  `golden`, `distinctness`, `reactivity` and `shot` are untouched.
+  **The non-vacuity check is a test rather than a claim, and it asserts both halves.**
+  `the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one` freezes `spectrum_ridge` exactly as
+  it shipped broken (`scale = 3.20`) and shows it **passing** the old corner-sampled gate (coverage
+  `0.5421`, all four quadrants) before showing it failing the new one (`0.0000`, zero quadrants).
+  Without the first half, "the new gate fails this" proves nothing about the old one.
+  **Every floor was invalidated at once and re-derived**, each at half its system's lowest preset —
+  the old numbers sat **11.9x to 84x** below the content they bounded. And because a floor is only a
+  floor while the content is near it, that is now a check rather than a comment:
+  `report_coverage_distribution` fails when a system's lowest preset climbs past `MAX_FLOOR_SLACK`
+  (2.2x). **It fired for real within the day** — [0057] Phase 6's re-raise moved the attractor
+  minimum from De Jong `0.2461` to Leviathan `0.3785` (slack 3.15x) and the gate failed the run with
+  the number rather than letting it drift; the floor was re-derived `0.12 -> 0.18` from the printed
+  distribution.
+  **Two findings the plan asked for in advance and got, both uncomfortable.** The tonal-flatness
+  re-measure answers "does removing the backdrop widen the 0.90 margin" with a **no**: `Spectrum
+  Ridge` fell `0.8655 -> 0.1916` (it was never flat — it was a lit vignette measured as one, which
+  retires backlog 0052), but `Rose Web` went the *other* way, `0.7645 -> 0.8839`, with nothing about
+  the preset changed, because the vignette had been supplying mid-tones that diluted the share in any
+  one band. Margin narrowed from `0.035` to `0.0161`. **`0.90` stays** — a preset drifting over it is
+  a preset to route, not a constant to nudge.
+  **And Phase 3 shipped as a report, not a gate, which is the finding worth carrying past this
+  plan.** The plan authorized either outcome and left it to the numbers. `coverage(loud) /
+  coverage(moderate)` reaches **none** of the three known-defective configurations: `Spectrum Comb`
+  scores `1.0891` — it draws *more* when loud, because a comb roots every bar on a shared baseline
+  and clipping the tips costs a rounding error of pixels; `Spectrum Corona` `1.0514`; the pre-repair
+  ridge is `0/0`, undefined, being already off frame at moderate. Meanwhile the only content near a
+  plausible threshold is **correct** (De Jong `0.8552`, Leviathan `0.9568` — the attractor's *peak
+  buys structure* idiom). A gate at `0.80` would sit `0.055` from De Jong while catching nothing. So
+  the ratio is printed and watched; what the second capture *does* support is enforced —
+  `MODERATE_MIN_COVERAGE = 0.04`, a factor 2.23 under the library's lowest moderate coverage, which
+  catches the inverse defect (in frame when driven hard, absent at the level music occupies). **Pixel
+  coverage is the wrong measure for a figure whose tips leave the frame**, and the successor
+  ADR-0067 already names — an in-frame geometry fraction — is [backlog 0054](../design-backlog.md).
+  **Phase 4's repair is measured with the geometry, not with a stimulus that could not fail it.**
+  `spectrum_comb` `3.80 -> 1.20`, `spectrum_corona` `5.20 -> 0.45`. The asymmetry is arithmetic
+  rather than error: the comb's bars stand on `baseline` (-0.85) against a half-height of 1.0, so
+  1.85 units are usable, while the corona spends most of its budget before the audio term gets any
+  (`radius` breathes to 0.53, `base` reaches 0.20) and a spoke 60 degrees above horizontal has
+  vertical extent `0.866 * tip` against a `zoom` reaching 1.10. **The stimulus is itself the
+  finding**: under `--signal noise:7` the corona sits in frame at *every* value from 0.25 to 0.85,
+  because white noise spreads energy across all elements and no single one takes the whole of
+  `scale`. Tonal material does. **A broadband stimulus is the wrong instrument for a radial
+  layout — it is the one that cannot fail it.**
+  **No golden baseline moved, and the plan predicted two would.** `core/tests/golden.rs` renders one
+  frozen fixture per `SystemKind`, deliberately *not* the shipped presets (ADR-0023), so an intended
+  content tune cannot trip the engine-drift alarm. `LMV_BLESS` was never run; running it would have
+  rewritten all 19 baselines to no purpose. Same shape as [0054]'s close.
+
+- [0057 — the attractor's compute path: the deposit, the reseed, the butterfly, and one
+  retune](done/0057-the-attractors-compute-path.md) — **done 2026-08-03**, Mode 4 review **no
+  blockers, no majors**; three minors, all doc bookkeeping, fixed in the close commit. Phase
+  commits: `8c95cf2` the two instruments, `4d77bff` the deposit, `5bb36c2` the reseed, `9d717fc` the
+  Lorenz diagnosis, `b2be2d3` the one content pass.
+  [ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md),
+  [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) and
+  [ADR-0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) are **accepted,
+  each with an Outcome section** — and **two of the three record a premise their own implementation
+  disproved**, which is the ceremony working rather than a defect. Closes design-backlog **0031**
+  outright (both halves, on measurement), **0047**'s first half and **0050**. Gate on `main`: fmt
+  clean, clippy `-D warnings` clean, **427/427, 0 skipped**, **no golden baseline moved anywhere in
+  the plan** — the Decision said that was checkable in advance, and it was checked by re-running the
+  suite without `LMV_BLESS`. C ABI stays v4 (`core/src/ffi.rs` byte-untouched), no new dependency,
+  nothing added to the audio path.
+  **Phase 5 was deliberately not written, and the plan closes without it.** Phase 4's own instruction
+  was to stop and route back to `architect` if the Lorenz dust cloud turned out to be the shared 3-D
+  view basis. It is — see the sequencing section above for what the successor owes, including the
+  **stipple** finding a basis fix alone will not clear.
+  **Phase 1 found both of its premises false, and that is the phase's real output.** `shot --tier`
+  already existed (Plan [0044] Phase 3, missing only from `--help`), so it was **verified rather than
+  rebuilt**: `--tier rich` and `--tier floor` differ on `attractor_clifford`, and omitting the flag
+  is byte-identical to `--tier floor`. And ADR-0066's claim that `--signal click:120` never clears
+  the shipped reseed gates was **retired by measurement** — it crosses `0.75` on **7 hops out of
+  375**, one per beat; the claim was true on the *raw* onset scale and ADR-0049's peak normalization,
+  whose attack is instant, invalidated it. So no generator was added. **The gap was aiming**: a
+  `--strip 8` samples evenly and lands on one of those 7 hops by luck, and when it misses, a working
+  reseed and a broken one render identically. Phase 1 shipped the `onset` row in the filmstrip level
+  table (naming the hop it peaked on) and `shot --at <hop>,...` to capture that hop. With both,
+  `attractor_ink --tier rich --at 44,46,48,54` renders the rectangle no capture in this project could
+  previously produce.
+  **Phase 2's invariance is asserted on the value, not inferred from pixels.** `deposit_scale =
+  FLOOR_PARTICLES / active_count`, applied in the *vertex* shader (the draw uniform is `VERTEX`-only;
+  the fragment's radial falloff is linear, so it is identical to scaling the emitted fragment).
+  Clifford at 1280x720: mean display luminance `Rich` `17.372 -> 10.863` against `Floor`'s `10.337`,
+  unchanged and **byte-identical** — which is the scalar being exactly `1.0` rather than
+  approximately it, and why no golden moved. The unit test is written against `TierConfig` rather
+  than a literal `1/3`, so Plan [0044] Phase 4's calibration will move the expectation with it.
+  **Phase 3 found a WARP bind-group aliasing defect of exactly the class [0053] exists for, and
+  refused the skip.** The jitter was first given its own uniform behind a second bind group sharing
+  the compute layout; on WARP that aliases, so the *step* dispatch read the jitter slot, `count = 0`,
+  and the cloud never moved — a plausible static box that **moved the golden baseline** and dropped
+  three presets to ~0.000 in `animation`. The first response was a WARP skip asserting the attractor
+  compute is a no-op there; the evidence was real and the conclusion was wrong. One bind group with a
+  dynamic offset into one buffer has no aliasing surface, and the tests now run on WARP with
+  hardware's numbers. **This is a hand-caught instance of what [0053] would gate.**
+  **Its measurement is over the particle buffer, with the replaced behaviour as the control.**
+  Converged De Jong fills **1.7 %** of its own bounding volume; off the figure after a reseed,
+  jitter **0.0 %** against the old seed-box re-fill's **100.0 %**. Bounding boxes are the wrong
+  instrument and the first draft used them — every seed box is sized to the native extent, so De Jong
+  converges to `±1.499` against a `±1.5` box. **An attractor is a filigree**: a uniform re-fill is
+  off the figure almost everywhere while staying entirely inside its extent.
+  **Phase 6's finding is that the reseed *gates* were calibrated against a different event.** They
+  sat at 0.50-0.75 because a reseed used to erase the drawing, so reluctance was protective; a
+  disturbance is not destructive, so the same threshold only withholds the accent. Re-measured
+  against what real material produces (onset means 0.033 / 0.153 / 0.391 across three stimuli; music
+  near 0.20), the band moved to 0.28-0.45 with rank preserved. **The re-raise is halfway and a full
+  revert is wrong**, rendered rather than reasoned: `00d99d0` did *two* things — it lowered three
+  presets *and* added a bloom stage sized to the lowered figure — so restoring the old numbers puts
+  Clifford's interior back to a flat salmon mass, the exact failure `00d99d0` fixed arriving by
+  another route. Flatness **fell** on all three (Clifford `0.2053 -> 0.1302`), so the figures gained
+  tonal structure, and reactivity at realistic levels roughly doubled.
+  **One thing Phase 6 changed that has not been judged**, and it says so: `attractor_ink` and
+  `attractor_thomas` had the slowest coefficient easing in the library (0.8 s and 1.0 s), so a 100 ms
+  hit arrived as ~0.5 % of a term worth 4 %. Lowered to 0.45 / 0.55, magnitudes deliberately **not**
+  raised in the same pass — speed and travel are separate levers. It does not show up in `--report`
+  (those cells carry the `+` marker) and **needs a judgement in motion it has not had**.
 
 - [0056 — clamp occupancy: the instrument that would have caught a saturated library, plus the axis
   anchor](done/0056-clamp-occupancy-and-the-axis-anchor.md) — **done 2026-08-03**, Mode 4 review

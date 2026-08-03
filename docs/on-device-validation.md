@@ -183,6 +183,16 @@ not run at the plan's close, so the rich tier currently ships numbers nobody has
       `swarm_particles` 30 000, `max_segments` 60 000 (`core/src/render/tier.rs`).
       **No number is invented upward to look good** — that was the phase's own rule, and it still
       binds. _(Plan 0044 Phase 4, carried forward at that plan's close 2026-07-30.)_
+      **Two things changed under this item at [Plan 0057](plans/done/0057-the-attractors-compute-path.md)'s
+      close (2026-08-03), and both make it cheaper rather than different.** It is still a frame-time
+      measurement and every field above is still provisional. But `attractor_particles` is no longer
+      a brightness: [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md)
+      divides the additive deposit by the count, so bringing that field down now costs shot-noise
+      smoothness and **not** exposure — a look consequence this escalation used to carry silently.
+      And the "how does it read at `Rich`" half of the question no longer needs the running app:
+      `shot --tier floor|rich` exists (it always did — Plan 0044 Phase 3 built it and only `--help`
+      omitted it), so a *measurement* is a capture. Keep the app for the frame-time run and for any
+      **judgement in motion**; that is what it is still better at.
 
 ## How to run
 
