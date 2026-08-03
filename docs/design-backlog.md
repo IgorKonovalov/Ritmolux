@@ -2568,3 +2568,50 @@ shader, which is why it is here rather than fixed.
 **Related:** [0031](design-backlog.md) (the same family's reseed transient at `Rich`) and
 [0047](design-backlog.md) above — all three are the attractor's compute path being less controlled
 than the scenes around it.
+
+---
+
+## 0049 — the fold's residual rays got a second rejection and a shipped instance, and they are avoidable from content
+
+- **Raised:** 2026-08-03, from `preset-author`, after the user saw them on `attractor_leviathan`
+  with the fold pinned on.
+- **This is NOT a new design.** [Plan 0055](plans/0055-the-fold-edge-becomes-a-choice.md) /
+  [ADR-0061](adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md) already design exactly
+  what the user asked for — "remove them and make it an optional parameter" is that plan's
+  `kaleido_edge` selector, verbatim. This entry exists to carry **three facts into its Phase 2**,
+  the `human` A/B that decides which treatments ship and which is the default.
+
+**1. The rays have now been rejected twice, independently.** ADR-0047 recorded them as an *accepted
+cost*; the 2026-08-02 in-motion review rejected them (which is why Plan 0055 exists); and the
+2026-08-03 session rejected them again on sight, unprompted, with the verdict that they "rarely
+work with a preset". **Plan 0055 Phase 1 ships today's falloff-disc as `kaleido_edge = 0`, the
+default, so that nothing moves on adoption.** That is the right way to land the phase, but Phase 2
+should treat "the current default survives" as the *unlikely* outcome rather than the neutral one.
+Phase 3 already has the machinery for a default change and its risk note prices it.
+
+**2. There is now a shipped preset that shows them permanently.** `attractor_leviathan` had its
+fold pinned on (the user's call: a leaf count that changes with the music reads as chaos), so what
+used to appear only while `bass + mid > 1.12` is now the resting state. Plan 0055 Phase 2 asks for
+the A/B to run on "a border-filling field" and one other scene — this preset is a *third* case
+worth including, because it is the one where the artifact is now always on screen.
+
+**3. The finding that changes how Phase 2 should be read: the rays are the DISC EDGE smeared
+radially outward, so their brightness is set by what the figure puts at that edge — and a preset
+can avoid them entirely.** Verified by rendering: at `zoom = 1.12` Leviathan's creature reached the
+inscribed radius and the frame grew a permanent starburst; at `0.72` (peak 0.86, inside the disc)
+there are **no rays at all**, with the rosette otherwise unchanged. Ruled out as causes on the way:
+`trails = 0` and `bloom_amount = 0` both leave them identical.
+
+Two consequences for the plan:
+
+- **"How bad is the current default" is not a property of the treatment alone — it is a property of
+  the treatment crossed with whether the scene fills its border.** A fullscreen field has no choice
+  and gets the worst of it; a centred figure can duck it entirely. If Phase 2 A/Bs only
+  border-filling scenes it will overstate the artifact, and if it A/Bs only centred ones it will
+  understate it. It already names both, which is right — this is the reason *why* it is right, and
+  it is worth stating in the verdict.
+- **There is a content rule here that is not written anywhere**, and it is cheap: *on a preset with
+  an active fold, keep the figure inside the inscribed disc or the edge smears outward as rays.*
+  It belongs in `presets/README.md`'s kaleidoscope section whenever Plan 0055 Phase 4 does its doc
+  pass — it is useful even after the edge becomes selectable, because it explains what the
+  treatments are treating.
