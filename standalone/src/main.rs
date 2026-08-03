@@ -608,10 +608,23 @@ impl AppState {
             return;
         };
 
-        if let Some(key) = decode_overlay_key(code) {
+        // **OS key repeat is honoured for modal navigation keys only** (Plan 0050
+        // Phase 2). The event loop used to drop every repeat before it got here,
+        // which is why holding an arrow in the browser did nothing. Widening that
+        // to "all keys" is what must not happen: a held `Space` would machine-gun
+        // preset switches through a ~1 s dissolve each, and a held `F` would
+        // thrash fullscreen. So the gate is here, where the key's role is known,
+        // rather than at the event site, where it is not.
+        let overlay_key = decode_overlay_key(code);
+        if event.repeat && !(self.browse.is_open() && overlay_key.is_some_and(OverlayKey::is_nav)) {
+            return;
+        }
+
+        if let Some(key) = overlay_key {
             let name_refs = self.roster_names();
             let refs: Vec<&str> = name_refs.iter().map(String::as_str).collect();
-            match self.browse.handle_key(key, &refs) {
+            let active = self.renderer.active_index();
+            match self.browse.handle_key(key, &refs, active) {
                 OverlayAction::None => return, // closed + non-toggle: let it fall away
                 OverlayAction::Redraw | OverlayAction::Close => {}
                 OverlayAction::Select(index) => {
@@ -629,12 +642,13 @@ impl AppState {
             if let Some(text) = &event.text {
                 let name_refs = self.roster_names();
                 let refs: Vec<&str> = name_refs.iter().map(String::as_str).collect();
+                let active = self.renderer.active_index();
                 let mut changed = false;
                 for c in text
                     .chars()
                     .filter(|c| !c.is_control() && !c.is_whitespace())
                 {
-                    self.browse.handle_key(OverlayKey::Char(c), &refs);
+                    self.browse.handle_key(OverlayKey::Char(c), &refs, active);
                     changed = true;
                 }
                 if changed {
@@ -884,9 +898,11 @@ impl ApplicationHandler for App {
                 button: MouseButton::Left,
                 ..
             } => state.handle_left_press(),
-            WindowEvent::KeyboardInput { event, .. }
-                if event.state == ElementState::Pressed && !event.repeat =>
-            {
+            // Repeats are **passed through** now and filtered inside `handle_key`,
+            // which is the only place that knows whether the key is a modal
+            // navigation key (Plan 0050 Phase 2). Dropping them here is what made
+            // holding an arrow in the browser do nothing.
+            WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
                 state.handle_key(&event);
             }
             _ => {}
