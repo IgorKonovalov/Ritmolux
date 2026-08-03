@@ -45,7 +45,8 @@ use std::path::{Path, PathBuf};
 use lmv_core::audio::AudioFormat;
 use lmv_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS};
 use lmv_core::preset::{
-    GateFlag, GateKind, Observations, Preset, SystemKind, Variables, default_presets, load_dir,
+    GateFlag, GateKind, Observations, Preset, SATURATED_OCCUPANCY, SystemKind, Variables,
+    default_presets, load_dir,
 };
 use lmv_core::render::metrics::{
     StepResponse, coverage, frame_diff, quadrant_spread, segment_settled, step_response,
@@ -1067,6 +1068,44 @@ fn reachability_pass(presets: &[Preset]) -> Result<Vec<(String, Vec<GateReport>)
 /// here, and `--json` carries every one.
 const CEILINGS_NAMED: usize = 3;
 
+/// The per-family saturation block: every `clamp()` that spent the run pinned
+/// at its upper bound, named one per line.
+///
+/// Named individually rather than summarized the way ceilings are, and the
+/// asymmetry is the point (ADR-0062). An unapproached ceiling is a shrug — the
+/// library trips over two hundred of them and every one only narrows a
+/// parameter's real range. A saturated one is a binding that has stopped
+/// reading the audio at all, it is a HARD failure in
+/// `core/tests/saturation.rs`, and there should be **none** here. A list that is
+/// ever long is a library-wide event, not a table to skim.
+fn print_saturation(fam: &FamilyReport) {
+    let saturated: Vec<(&str, &GateReport)> = fam
+        .presets
+        .iter()
+        .flat_map(|p| {
+            p.gates
+                .iter()
+                .filter(|g| is_saturated(g))
+                .map(move |g| (p.name.as_str(), g))
+        })
+        .collect();
+    if saturated.is_empty() {
+        println!(
+            "  no clamp sat at its upper bound past {:.0}% of the probe",
+            SATURATED_OCCUPANCY * 100.0
+        );
+        return;
+    }
+    println!(
+        "  a clamp pinned at its bound is a gain, not a limit: divide it until the \
+         bound is reached only on peaks. `core/tests/saturation.rs` fails on these \
+         unless the preset declares an [occupancy] exemption"
+    );
+    for (name, gate) in &saturated {
+        println!("{}", gate_line(name, gate));
+    }
+}
+
 /// The per-family ceiling line: how many `clamp()` upper bounds never bit, and
 /// the ones furthest from biting.
 fn print_ceiling_summary(fam: &FamilyReport) {
@@ -1213,21 +1252,23 @@ fn transient_cell(frames: u32, settled: bool) -> String {
     }
 }
 
-/// `(dead gates, unapproached ceilings)` for one preset. Counted apart because
-/// they are different claims: a one-sided `select()` or comparison means a
-/// branch of the preset has never rendered, while a `clamp()` short of its bound
-/// only means the ceiling is doing no work.
-fn gate_counts(p: &PresetReport) -> (usize, usize) {
-    let dead = p.gates.iter().filter(|g| is_dead_gate(g)).count();
-    // Counted by kind rather than as "everything that is not dead": a
-    // `Saturated` flag is a third claim again (ADR-0062) and must not be
-    // reported as an unapproached ceiling, which is its exact opposite.
-    let ceilings = p
-        .gates
-        .iter()
-        .filter(|g| matches!(g.flag.kind, GateKind::Clamp { .. }))
-        .count();
-    (dead, ceilings)
+/// `(dead gates, unapproached ceilings, saturated clamps)` for one preset.
+/// Counted apart because they are three different claims: a one-sided
+/// `select()` or comparison means a branch of the preset has never rendered, a
+/// `clamp()` short of its bound only means the ceiling is doing no work, and a
+/// `clamp()` **at** its bound throughout means the binding stopped being a
+/// function of the audio (ADR-0062).
+///
+/// Every count is by kind rather than by subtraction: "everything that is not a
+/// dead gate" was already a ceiling count only by coincidence, and adding a
+/// third kind would have made it report saturation as its exact opposite.
+fn gate_counts(p: &PresetReport) -> (usize, usize, usize) {
+    let count = |f: fn(&GateReport) -> bool| p.gates.iter().filter(|g| f(g)).count();
+    (
+        count(is_dead_gate),
+        count(|g| matches!(g.flag.kind, GateKind::Clamp { .. })),
+        count(is_saturated),
+    )
 }
 
 /// Whether this flag is a never-exercised gate rather than a decorative
@@ -1238,6 +1279,12 @@ fn is_dead_gate(gate: &GateReport) -> bool {
         gate.flag.kind,
         GateKind::Select { .. } | GateKind::Compare { .. }
     )
+}
+
+/// Whether this flag is a `clamp()` that spent the run pinned at its upper
+/// bound (ADR-0062) — the finding `core/tests/saturation.rs` gates on.
+fn is_saturated(gate: &GateReport) -> bool {
+    matches!(gate.flag.kind, GateKind::Saturated { .. })
 }
 
 fn loud_frame() -> AnalysisFrame {
@@ -1303,13 +1350,13 @@ fn print_text_report(source: &str, reports: &[FamilyReport], tier: Tier) {
              {onset_lo}) — read the *gap* against the columns above, not the value alone:"
         );
         println!(
-            "  {:<14} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7}",
-            "preset", "bass", "mid", "treb", "onset", "gates", "ceils"
+            "  {:<14} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5}",
+            "preset", "bass", "mid", "treb", "onset", "gates", "ceils", "occ"
         );
         for p in &fam.presets {
-            let (dead, ceilings) = gate_counts(p);
+            let (dead, ceilings, saturated) = gate_counts(p);
             println!(
-                "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7} {:>7}",
+                "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7} {:>7} {:>5}",
                 p.name,
                 p.reactivity_low[0],
                 p.reactivity_low[1],
@@ -1317,6 +1364,7 @@ fn print_text_report(source: &str, reports: &[FamilyReport], tier: Tier) {
                 p.reactivity_low[3],
                 dead,
                 ceilings,
+                saturated,
             );
         }
         let dead: Vec<(&str, &GateReport)> = fam
@@ -1341,6 +1389,7 @@ fn print_text_report(source: &str, reports: &[FamilyReport], tier: Tier) {
                 println!("{}", gate_line(name, gate));
             }
         }
+        print_saturation(fam);
         print_ceiling_summary(fam);
 
         let marked = fam
@@ -1447,11 +1496,12 @@ fn render_json(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
 /// observed under *this* stimulus" — a consumer that drops the provenance is
 /// reading the numbers as convictions.
 fn json_reachability(p: &PresetReport) -> String {
-    let (dead, ceilings) = gate_counts(p);
+    let (dead, ceilings, saturated) = gate_counts(p);
     let mut out = String::new();
     out.push_str(&format!(
         "{{\"probe\":{{\"signal\":\"dynamic\",\"bpm\":{},\"seconds\":{}}},\
-         \"dead_branches\":{dead},\"unapproached_ceilings\":{ceilings},\"gates\":[",
+         \"dead_branches\":{dead},\"unapproached_ceilings\":{ceilings},\
+         \"saturated_clamps\":{saturated},\"gates\":[",
         num(REACH_BPM),
         num(REACH_SECS),
     ));

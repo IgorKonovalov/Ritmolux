@@ -329,9 +329,9 @@ Under each family's table is a second block
 
 ```
   at realistic levels (bass 0.661 mid 0.575 treb 0.281 onset 0.145) — read the *gap* ...
-  preset            bass     mid    treb   onset   gates   ceils
-  Aurora           0.212   0.199   0.228   0.048       0       0
-  Ember            0.104   0.100   0.000   0.090       0       0
+  preset            bass     mid    treb   onset   gates   ceils   occ
+  Aurora           0.183   0.165   0.212   0.025       0       1     0
+  Ember            0.078   0.053   0.032   0.035       0       0     0
 ```
 
 > **The realistic levels changed meaning in Plan 0048.** They are now fractions of
@@ -372,8 +372,8 @@ came to its upper bound. A frame differential structurally cannot answer this �
 `select(c, 6, 8)` and `select(c, 6, 6)` diff identically, and neither names
 *which* gate.
 
-Three kinds of finding come out of that walk. The first two are named one per
-line underneath the table; the third is summarized:
+Four kinds of finding come out of that walk. Three are named one per line
+underneath the table; the ceilings are summarized:
 
 - **`GATE`** — a `select()` whose condition never went both ways. One branch of
   the preset has never rendered. Named with its source text, so the threshold to
@@ -388,6 +388,13 @@ line underneath the table; the third is summarized:
   the whole `min(...)`, and since a `tempo` gate is legitimately one-sided here
   (below), a reader would dismiss it — so each half is also reported on its own,
   and the excusable one can no longer launder the other.
+- **`SAT`** — a `clamp()` whose inner value sat **at** its upper bound for 90 %
+  or more of the probe
+  ([ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)). The
+  binding is a gain that has stopped being a function of the audio: it reads as
+  the constant its ceiling is, for anything above a whisper. Named one per line
+  with its occupancy, because unlike a decorative ceiling this is a **HARD**
+  failure — see [the saturation gate](#saturation-a-hard-gate-on-clamp-occupancy).
 - **clamp ceilings** — a `clamp()` upper bound the value never approached. The
   bound is decorative and the parameter's real range is narrower than it reads.
   These are **not** printed one per line: a single summary line per family gives
@@ -399,7 +406,18 @@ ran, which a `COMP` line cannot. So `GATE` and `COMP` never double-report the
 same finding.
 
 The `gates` column counts `GATE` + `COMP` together: both say a branch of the
-preset's behavior has never happened. `ceils` counts the ceilings.
+preset's behavior has never happened. `ceils` counts the ceilings, and `occ`
+counts the saturated clamps.
+
+**`ceils` and `occ` are opposite ends of one measurement**, taken on the same
+traversal from the same two numbers — a `clamp()`'s inner value and its upper
+bound. `ceils` asks how *close* the value ever came (its peak, as a fraction of
+the bound) and fires when the answer is "never near": the ceiling is decorative.
+`occ` asks how *long* the value stayed there (the fraction of hops at or above
+the bound) and fires when the answer is "always": the ceiling never released. A
+clamp can trip at most one of them, and the healthy state is neither — a bound
+reached on peaks and released in between. `occ` is by far the more serious of
+the two, which is why it is the one that is gated.
 
 **A flag is a suspect, not a conviction.** It says *this* stimulus never drove
 the gate both ways, which is a fact about the probe as much as about the preset.
@@ -412,8 +430,10 @@ The probe runs 12 s rather than the 4 s a `--signal` filmstrip synthesizes,
 because the tempo tracker needs about 4 s to lock. Under a short clip `tempo`
 reads a flat `0` and every `tempo` comparison flags for the wrong reason.
 
-This is advisory output. It is **not** a CI gate, and deliberately so — and as of
-Plan 0048 **both** of the reasons are live again.
+The `GATE` and `COMP` half of this is advisory output. It is **not** a CI gate,
+and deliberately so — and as of Plan 0048 **both** of the reasons are live again.
+(The `SAT` half *is* gated, for reasons that do not apply to it — see
+[below](#saturation-a-hard-gate-on-clamp-occupancy).)
 
 The instrument is one of them, and that has not changed: the `tempo` single-BPM
 false positive above accounts for 17 of the 26 flags the shipped set currently
@@ -430,11 +450,42 @@ levels then compared against normalized ones and never went false, so their
 ADR-0049 chose, and **Plan 0048 Phase 7 cleared it** — the library is back to
 zero genuinely dead gates, with the residual flags all `tempo` one-sidedness.
 
-**What the reachability walk still cannot see is a gain.** A comparison is a fork
-it can watch; `clamp(bass * 16, 0, 0.3)` is not. Phase 7 measured **263 of 332
-clamped band terms pinned at their ceiling**, and 14 presets with no live audio
-term at all, none of it visible here or to any gate — see
-[design-backlog 0043](design-backlog.md).
+**The walk used to be unable to see a gain, and now it can.** A comparison is a
+fork it can watch; `clamp(bass * 16, 0, 0.3)` is not — it has no `select()`, no
+comparison, nothing two-valued, and it is simply an arithmetic expression that
+has quietly become a constant. Plan 0048 Phase 7 measured **263 of 332 clamped
+band terms pinned at their ceiling**, and 14 presets with no live audio term at
+all, none of it visible to any instrument this project had. The `occ` column and
+the `SAT` lines are that instrument
+([ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)), and
+unlike the rest of the reachability block they are backed by a gate.
+
+#### Saturation: a HARD gate on clamp occupancy
+
+`core/tests/saturation.rs` runs the same walk over the embedded set and **fails
+the build** on any `clamp()` whose occupancy reaches the threshold. It is the one
+part of the reachability block that is not advisory, and the reason is the one
+Plan 0048 Phase 7 supplies: for the whole window between ADR-0049 landing and the
+retune, every automated signal was green and nobody had cause to run a report. An
+instrument that requires suspicion to fire does not address the failure that
+there was nothing to be suspicious of.
+
+The threshold is a **measured** constant (`SATURATED_OCCUPANCY`), taken from the
+retuned library's own distribution rather than reasoned to, and it therefore has
+a shelf life: re-measure it whenever the library changes materially.
+
+A `clamp()` that is *supposed* to pin — a safety rail whose job is to bind at
+peak — declares itself in the preset:
+
+```toml
+[occupancy]
+exempt = ["fade"]   # this clamp is a rail, not a gain: pinning is the design
+```
+
+An exemption silences the **gate**, not the diagnostic: the binding still shows
+up as a `SAT` line and in the `occ` count, so it stays visible in review. That is
+deliberate — an exemption is a place to hide, and the mitigation is that it is
+explicit, in the file, and still reported.
 
 ### Which preset library a shot uses
 
@@ -646,13 +697,14 @@ family/preset: per-band `reactivity` and `reactivity_low`, `animation`,
 `ratio`), `reachability`, the pairwise `pixel`/`shape` distinctness matrices, and
 `near_duplicates`.
 
-`reachability` carries `dead_branches` and `unapproached_ceilings` counts, the
-full `gates` list (each with `param`, `source`, `kind`, and either `always` or
-`peak_fraction_of_bound`), and a `probe` object naming the signal, BPM and
-duration they were observed under. `kind` is `"select"`, `"compare"` or
-`"clamp"` — matching the `GATE` / `COMP` / `CEIL` lines above — and
-`dead_branches` counts the first two together. Keep the provenance when you
-consume it: a flag only ever means *not observed under this stimulus*.
+`reachability` carries `dead_branches`, `unapproached_ceilings` and
+`saturated_clamps` counts, the full `gates` list (each with `param`, `source`,
+`kind`, and one of `always` / `peak_fraction_of_bound` / `occupancy`), and a
+`probe` object naming the signal, BPM and duration they were observed under.
+`kind` is `"select"`, `"compare"`, `"clamp"` or `"saturated"` — matching the
+`GATE` / `COMP` / `CEIL` / `SAT` lines above — and `dead_branches` counts the
+first two together. Keep the provenance when you consume it: a flag only ever
+means *not observed under this stimulus*.
 
 ## The `core/tests/` harness
 
