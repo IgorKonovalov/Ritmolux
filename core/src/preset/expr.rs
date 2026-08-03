@@ -1211,11 +1211,38 @@ pub struct GateFlag {
 /// spend pinned at the upper bound before the binding stops being a function of
 /// the audio and becomes a constant (ADR-0062).
 ///
-/// **A measured constant, not a principled one.** Plan 0056 Phase 3 took it from
-/// the retuned library's own distribution: across the whole shipped set the
-/// highest occupancy any binding reaches is well below this, and the gap is the
-/// margin. It has a shelf life — re-measure it whenever the library changes
-/// materially, and expect to move it rather than to bless a preset through it.
+/// **A measured constant, not a principled one.** Plan 0056 Phase 3 measured
+/// both sides of it — the library that passes, and the library that should not —
+/// over 339 clamped bindings each, on the 12 s `dynamic:110` probe:
+///
+/// ```text
+/// occupancy      today   pre-retune (80c5dff^)
+/// [0.00, 0.10)      29        6
+/// [0.10, 0.25)     171       11
+/// [0.25, 0.50)     138       22
+/// [0.50, 0.75)       1       51
+/// [0.75, 0.90)       0      104
+/// [0.90, 1.01)       0      145
+/// ```
+///
+/// The retuned library's highest is `0.609` (`Aurora.warp`) and its next is
+/// `0.444`, so `0.9` clears the measured maximum by `0.29` and the body of the
+/// distribution by twice that. The saturated library it exists to catch puts
+/// **145 bindings across 23 of 35 presets** above it — the gate would have failed
+/// the build the day ADR-0049 landed.
+///
+/// Two things this value is not. It is not the most *sensitive* threshold that
+/// still separates the two libraries: `0.75` would catch 249 of the 339
+/// pre-retune bindings rather than 145, but it would sit only `0.14` above a
+/// shipped, reviewed preset, and a HARD gate that fires on good content buys
+/// exemptions — which are the thing that dulls the instrument. And it does not
+/// see the *marginal* form of the defect: one binding pinned for 50-90 % of a
+/// track, in a preset with no severe case beside it, passes. What makes that
+/// acceptable is that the defect arrives in clusters — every affected preset in
+/// the pre-retune set carried a severe case too.
+///
+/// It has a shelf life. Re-measure it whenever the library changes materially,
+/// and expect to move it rather than to bless a preset through it.
 pub const SATURATED_OCCUPANCY: f32 = 0.9;
 
 /// The four structural findings [`Expr::flag_gates`] reports.

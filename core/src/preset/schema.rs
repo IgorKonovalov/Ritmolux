@@ -330,6 +330,22 @@ pub struct Preset {
     /// deliberately: `default_presets()` feeds both the live C-ABI path and the
     /// capture gates, so a decision taken at load would be wrong for one of them.
     pub pinned_salt: u32,
+    /// Parameters whose `clamp()` bounds are **meant** to pin, from an
+    /// `[occupancy] exempt = [...]` table (ADR-0062). Sorted and deduplicated at
+    /// load.
+    ///
+    /// A safety rail exists to bind at peak, and the saturation gate would
+    /// otherwise convict it of the defect it was written to prevent. The
+    /// exemption silences `core/tests/saturation.rs`, and **only** that: the
+    /// binding still appears in `--report`'s `occ` count and `SAT` lines,
+    /// because an exemption is a place to hide and the one mitigation available
+    /// is that it stays visible.
+    ///
+    /// A preset-level table naming params rather than a per-expression
+    /// annotation, deliberately: the grammar stays a pure expression language
+    /// (ADR-0020), and this is metadata *about* a binding rather than part of
+    /// it. Harness-only — nothing per-frame reads it.
+    pub occupancy_exempt: Vec<String>,
     /// Non-fatal problems found while loading — today, bindings naming a
     /// parameter this system does not consume (ADR-0020). The preset loaded and
     /// its good bindings apply; these are surfaced so a typo stops failing
@@ -449,6 +465,22 @@ impl Preset {
         let palette = raw.palette.map(RawPalette::into_config).transpose()?;
         let palette_b = raw.palette_b.map(RawPalette::into_config).transpose()?;
 
+        // Saturation exemptions (ADR-0062). A name this preset does not bind is
+        // a warning for the same reason a `[smoothing]` entry naming one is: it
+        // silences nothing, so a typo here would leave the author believing a
+        // gate was exempted while the gate goes on failing on the real name.
+        let mut occupancy_exempt = raw.occupancy.unwrap_or_default().exempt;
+        occupancy_exempt.sort();
+        occupancy_exempt.dedup();
+        for name in &occupancy_exempt {
+            if !params.iter().any(|b| &b.name == name) {
+                warnings.push(format!(
+                    "[occupancy] exempt entry '{name}' is inert: this preset binds no such \
+                     parameter"
+                ));
+            }
+        }
+
         Ok(Preset {
             name,
             system,
@@ -458,6 +490,7 @@ impl Preset {
             palette_b,
             salt,
             pinned_salt,
+            occupancy_exempt,
             warnings,
         })
     }
@@ -576,6 +609,19 @@ struct RawPreset {
     /// target for a bindable `palette_mix`. Same shape as `[palette]`.
     #[serde(default)]
     palette_b: Option<RawPalette>,
+    /// The optional `[occupancy]` table (ADR-0062): params whose `clamp()`
+    /// bounds are meant to pin, exempted from the saturation gate. Absent means
+    /// every clamp in this preset is held to it.
+    #[serde(default)]
+    occupancy: Option<RawOccupancy>,
+}
+
+/// The `[occupancy]` table, before validation.
+#[derive(Debug, Default, Deserialize)]
+struct RawOccupancy {
+    /// Parameter names whose clamps may sit at their bound.
+    #[serde(default)]
+    exempt: Vec<String>,
 }
 
 /// One `[smoothing]` entry, before validation: today's scalar, or ADR-0035's
