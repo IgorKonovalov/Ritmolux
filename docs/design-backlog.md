@@ -1646,6 +1646,17 @@ This entry is the record and the evidence; that file is where it changes behavio
 
 ## 0031 — the Rich tier's 3x particle count makes the attractor reseed transient opaque, and `clifford` blows out
 
+- **MECHANISM HALF TAKEN 2026-08-03 → [Plan 0057](plans/0057-the-attractors-compute-path.md)** —
+  entry still **live** pending measurement, but both halves of its mechanism now have a fix
+  designed. The 3x is removed at its cause by
+  [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) (Phase 2), which is
+  the lever this entry's own re-check at Plan 0045's close identified — "the lever is the particle
+  count, not the curve" — and the opaque *rectangle* is removed by
+  [ADR-0066](adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) (Phase 3), whose
+  entry [0050](design-backlog.md) supplied the reason it is a rectangle at all. Re-check this entry
+  after Plan 0057 Phase 6, on a `--tier rich` capture rather than on argument — the flag that makes
+  that possible is Phase 1.
+
 - **Raised:** 2026-07-30, from the **user**, running the standalone at the `Rich` tier the day
   Plan 0044 landed: *"clifford is too bright and has artifacts"*, with a screenshot.
 - **Verified against code:** partly — see the split below. One half is reproduced by capture, the
@@ -2487,7 +2498,21 @@ Two smaller things worth keeping:
 
 ## Entries 0047-0048 — the 2026-08-03 `preset-author` batch (seventh), from the attractor ceiling pass
 
-## 0047 — `Rich` triples the attractor's light with nothing normalizing for it, so the tier is **not** look-neutral, and no automated check can see the difference
+## ~~0047 — `Rich` triples the attractor's light with nothing normalizing for it, so the tier is **not** look-neutral, and no automated check can see the difference~~
+
+- **PROMOTED 2026-08-03 → [ADR-0064](adrs/0064-a-capture-may-pin-the-rich-tier.md) +
+  [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) +
+  [Plan 0057](plans/0057-the-attractors-compute-path.md)** — both halves are taken, and they went to
+  different places. The **deposit** is normalized by particle count (Plan 0057 Phase 2), which was
+  this entry's first and cheapest option; the **`shot --tier` flag** is taken too rather than
+  rejected as the entry expected, because a *pinned* tier is an input and ADR-0045 already named
+  capture-level `Rich` spot checks as that tier's verification path (Plan 0057 Phase 1). The third
+  option — document the 3x and leave the trap armed — is rejected in ADR-0065's Alternative A.
+  **The second finding (the `sanity` gate passing a saturated frame) went to
+  [Plan 0056](plans/0056-clamp-occupancy-and-the-axis-anchor.md) Phase 5**, as this entry suggested,
+  where it is a general flat-frame check rather than an attractor-specific one — with the honest
+  question attached: `sanity` renders at `Floor` and at silence, so the phase must state which of
+  these four presets it would actually have caught. Notes below retained as the origin record.
 
 - **Raised:** 2026-08-03, from `preset-author`, fixing four attractor presets the user reported as
   "very dim" at `Rich` (they were saturated, not dim).
@@ -2537,7 +2562,19 @@ since both are "the frame looks alive to our instruments and is not".
 
 ---
 
-## 0048 — the `lorenz` attractor family renders as a dust cloud, and no preset key reaches the scatter
+## ~~0048 — the `lorenz` attractor family renders as a dust cloud, and no preset key reaches the scatter~~
+
+- **PROMOTED 2026-08-03 → [Plan 0057](plans/0057-the-attractors-compute-path.md) Phases 4-5** — no
+  ADR yet, deliberately. The phase is a **diagnosis before a fix**, because the leading hypothesis
+  is not one of the three this entry named: the draw shader's 3-D branch uses **`y` as the
+  vertical** and rotates `x` against `z` (`particles/mod.rs:355-360`), so the view is x-y at rest
+  and z-y at a quarter turn — and the Lorenz butterfly lives in the **x-z** plane. The x-y
+  projection of Lorenz is a dense core inside a diffuse cloud, which is this entry's description
+  verbatim. Lorenz is the only family it can be wrong for: the discrete maps never take the branch,
+  and Thomas is cyclically symmetric. If that is the cause, the fix is a shared-convention change
+  and **Phase 4 routes back to `architect`** for the ADR. The entry's own candidates (integration
+  step, settle iterations, a seed-spread key) are carried as secondary hypotheses with the estimates
+  that make them unlikely. Notes below retained as the origin record.
 
 - **Raised:** 2026-08-03, from `preset-author`, in the same pass.
 - **Verified against code:** yes — `[particles]` accepts **only** `family`
@@ -2618,7 +2655,18 @@ Two consequences for the plan:
 
 ---
 
-## 0050 — the attractor reseed scatters into an axis-aligned BOX, so every reseed flashes a speckled rectangle across the frame
+## ~~0050 — the attractor reseed scatters into an axis-aligned BOX, so every reseed flashes a speckled rectangle across the frame~~
+
+- **PROMOTED 2026-08-03 → [ADR-0066](adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) +
+  [Plan 0057](plans/0057-the-attractors-compute-path.md) Phase 3** — the first of this entry's four
+  options is taken: a reseed **perturbs the cloud in place** rather than re-filling `seed_box`, so
+  no rectangle exists at any tier and there is no convergence transient to wait out. Shaping the
+  volume and fading the box in are both rejected in ADR-0066 for the same reason — they treat the
+  hard edge and keep the wipe, which is the half `Rich` makes worse; the `[particles]` key is
+  rejected because all six shipped presets want the same answer, so the default *is* the decision.
+  **The second finding — that nothing in the harness can render the frame — is Plan 0057 Phase 1's
+  second instrument**, a `--signal` kind whose onsets clear the highest shipped gate
+  (`attractor_clifford`'s `onset > 0.75`). Notes below retained as the origin record.
 
 - **Raised:** 2026-08-03, from the user, on `attractor_ink` at `Rich`: "a square artifact that breaks
   the flow... it's blinking sometimes". Seen on **all** attractors.
