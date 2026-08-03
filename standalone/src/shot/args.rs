@@ -81,6 +81,37 @@ fn whole(v: f32) -> u32 {
     }
 }
 
+/// Parse `--at <hop>[,<hop>...]` into explicit filmstrip hop indices.
+///
+/// **The instrument Plan 0057 Phase 1 actually needed.** `--strip N` samples the
+/// clip at N *evenly spaced* hops, which is right for "what does this look like
+/// over the clip" and useless for "what does the frame the gate fired on look
+/// like": a shipped attractor's `reseed` crosses its threshold on 7 hops out of
+/// 375 under `click:120`, so an evenly-spaced strip lands on one by luck. The
+/// filmstrip's level table prints the hop `onset` peaked at; this is how that
+/// number gets used.
+///
+/// Indices are analysis-hop indices from hop 0 of the clip — the same numbering
+/// [`filmstrip_indices`](super::film::filmstrip_indices) produces and the level
+/// table reports. Order is preserved and duplicates are rejected, since a
+/// repeated tile is a strip that silently shows one frame twice.
+pub fn parse_hops(spec: &str) -> Result<Vec<u32>, String> {
+    let mut out: Vec<u32> = Vec::new();
+    for part in spec.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+        let hop: u32 = part
+            .parse()
+            .map_err(|_| format!("--at expects hop indices, got `{part}`"))?;
+        if out.contains(&hop) {
+            return Err(format!("--at: hop {hop} listed twice"));
+        }
+        out.push(hop);
+    }
+    if out.is_empty() {
+        return Err("--at needs at least one hop index".to_string());
+    }
+    Ok(out)
+}
+
 /// One numeric `--signal` parameter (a BPM, a frequency), named in the error.
 pub fn parse_param(param: &str, what: &str) -> Result<f32, String> {
     param
@@ -150,6 +181,16 @@ pub struct BandLevels {
     pub mid: BandStats,
     /// Treble band (~4-18 kHz).
     pub treb: BandStats,
+    /// Normalized onset envelope — **not a band**, and reported here for the
+    /// reason the three above are (Plan 0057 Phase 1): every shipped attractor
+    /// gates its `reseed` on `onset > <threshold>`, the highest being `0.75`, and
+    /// until this row existed there was no way to see whether a `--signal` kind
+    /// ever crossed one. Four documents asserted `click:120` did not; only the
+    /// table can settle it.
+    pub onset: BandStats,
+    /// Hop index (within the measured, past-warm-up window) where `onset` peaked.
+    /// The frame a reseed-gated preset fires on, so a `--strip` can be aimed at it.
+    pub onset_peak_hop: usize,
 }
 
 /// Run `pcm` through a fresh [`Analyzer`] and summarize what `bass`/`mid`/`treb`
@@ -168,6 +209,7 @@ pub fn band_levels(pcm: &[f32], format: AudioFormat) -> Result<BandLevels, Strin
     let mut bass = Vec::new();
     let mut mid = Vec::new();
     let mut treb = Vec::new();
+    let mut onset = Vec::new();
     for (index, hop) in pcm.chunks(hop_samples).enumerate() {
         analyzer.push_interleaved(hop);
         let frame = analyzer.take_frame();
@@ -177,16 +219,35 @@ pub fn band_levels(pcm: &[f32], format: AudioFormat) -> Result<BandLevels, Strin
         bass.push(frame.bass);
         mid.push(frame.mid);
         treb.push(frame.treb);
+        onset.push(frame.onset);
     }
     if bass.is_empty() {
         return Err("audio too short to measure band levels".to_string());
     }
+    // The **absolute** hop index, so it names a frame `--strip`/`filmstrip_indices`
+    // can be aimed at: those count from hop 0 of the clip, not from the window.
+    let onset_peak_hop = FILMSTRIP_WARMUP + peak_index(&onset);
     Ok(BandLevels {
         hops: bass.len(),
         bass: band_stats(&bass),
         mid: band_stats(&mid),
         treb: band_stats(&treb),
+        onset: band_stats(&onset),
+        onset_peak_hop,
     })
+}
+
+/// Index of the largest value in `values` (first one wins), or `0` when empty.
+fn peak_index(values: &[f32]) -> usize {
+    let mut best = 0usize;
+    let mut best_v = f32::NEG_INFINITY;
+    for (i, &v) in values.iter().enumerate() {
+        if v > best_v {
+            best_v = v;
+            best = i;
+        }
+    }
+    best
 }
 
 /// Min / mean / max of `values`; all zero for an empty slice so this is total.
@@ -337,6 +398,77 @@ mod tests {
             assert!(band.min <= band.mean && band.mean <= band.max, "{band:?}");
             assert!(band.min.is_finite() && band.max.is_finite(), "{band:?}");
         }
+    }
+
+    #[test]
+    fn parse_hops_takes_a_list_and_rejects_what_would_silently_shorten_a_strip() {
+        assert_eq!(parse_hops("46"), Ok(vec![46]));
+        assert_eq!(parse_hops("46,94,141"), Ok(vec![46, 94, 141]));
+        // Whitespace and a trailing comma are tolerated, as `--set`'s are.
+        assert_eq!(parse_hops(" 46 , 94 ,"), Ok(vec![46, 94]));
+        // Order is the caller's, not sorted: a strip reads left to right, and an
+        // author asking for before/after a transient means that order.
+        assert_eq!(parse_hops("94,46"), Ok(vec![94, 46]));
+
+        // A duplicate would tile the same frame twice and read as a frozen visual.
+        let err = parse_hops("46,46").expect_err("duplicate hop");
+        assert!(err.contains("listed twice"), "got {err}");
+        assert!(parse_hops("").is_err(), "an empty spec captures nothing");
+        assert!(parse_hops(",").is_err(), "and so does a bare separator");
+        assert!(parse_hops("-3").is_err(), "hops are indices, not offsets");
+        assert!(parse_hops("4.5").is_err(), "hops are whole");
+        assert!(parse_hops("first").is_err(), "not a number");
+    }
+
+    /// The measurement Plan 0057 Phase 1 turns on: the level table has to report
+    /// `onset`, and it has to report the hop it peaked on, because that hop is
+    /// the argument to `--at`.
+    ///
+    /// It also records the finding that phase produced. ADR-0066 states that
+    /// "`--signal click:120`'s onset never clears the shipped gates (the highest
+    /// is `attractor_clifford`'s `onset > 0.75`)". That was true on the **raw**
+    /// onset scale and was invalidated by ADR-0049's peak normalization, whose
+    /// attack is instant: an isolated transient reads `1.000` on the hop it
+    /// arrives, whatever its magnitude. So the gates were reachable all along and
+    /// nothing could see it.
+    #[test]
+    fn a_click_tracks_onset_clears_every_shipped_reseed_gate() {
+        let (pcm, format) = synth_signal("click:120").expect("a 120 BPM click");
+        let levels = band_levels(&pcm, format).expect("4 s is plenty of hops");
+
+        assert!(
+            levels.onset.max > 0.75,
+            "the highest shipped reseed gate is 0.75; click:120 peaks at {}",
+            levels.onset.max
+        );
+        // ...and the peak is a *transient*, not a held level. A held onset is the
+        // failure mode `--set onset=1` already has: an edge-triggered reseed fires
+        // once and never again. `noise:7` reads above 0.75 on 359 of 375 hops, so
+        // "some kind reaches 1.0" is not on its own the property wanted here.
+        assert!(
+            levels.onset.mean < 0.25,
+            "the click's onset must be peaky, not held: mean {}",
+            levels.onset.mean
+        );
+        // The peak hop is a real index into the clip, so `--at` can take it.
+        let total = pcm.len() / (HOP_SIZE * format.channels as usize);
+        assert!(
+            levels.onset_peak_hop >= FILMSTRIP_WARMUP && levels.onset_peak_hop < total,
+            "peak hop {} outside the measured window (warm-up {FILMSTRIP_WARMUP}, {total} hops)",
+            levels.onset_peak_hop
+        );
+
+        // The counter-case, so this is not asserting a property of any signal:
+        // a steady tone's onset does not stay high, and `noise` is the kind whose
+        // onset is *pinned* — which is why it is the wrong reseed stimulus.
+        let (noisy, format) = synth_signal("noise:7").expect("seeded noise");
+        let noisy = band_levels(&noisy, format).expect("plenty of hops");
+        assert!(
+            noisy.onset.min > 0.75,
+            "noise:7's onset is expected to sit above every gate ({}), which is \
+             the held-high case a reseed cannot edge-trigger on twice",
+            noisy.onset.min
+        );
     }
 
     /// Too little audio is an error, not a division by zero or a bogus mean.

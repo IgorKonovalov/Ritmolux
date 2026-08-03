@@ -16,7 +16,8 @@
 //! Every knob is an ADR-0002 layer-2 named parameter — the attractor
 //! coefficients (`a`,`b`,`c`,`d`), look scalars (`size`,`hue`,`fade`), and a
 //! beat-driven `reseed` — so a preset steers the cloud's shape and a beat
-//! re-scatters it. All randomness is the seeded initial scatter (NFR 6): the
+//! disturbs it. All randomness is the seeded initial scatter plus the reseed's
+//! deterministic per-particle kick (NFR 6): the
 //! point cloud is a pure function of the seed and the fixed-`dt` step sequence,
 //! so a capture reproduces bit-for-bit on one adapter.
 //!
@@ -182,6 +183,11 @@ impl AttractorFamily {
     /// trajectory, so the cloud clumps instead of filling the shape. The discrete
     /// 2D maps converge from any small box, so theirs is the historical ~[-1.5,1.5]
     /// (kept identical so their seeded look is unchanged; `z` is unused there).
+    ///
+    /// **Used for the initial fill and a family change only** (ADR-0066). A
+    /// `reseed` no longer re-fills it — see [`Self::jitter_extent`] — because
+    /// re-filling replaced the cloud with a uniform axis-aligned rectangle, which
+    /// is what a reseed visibly was.
     fn seed_box(self) -> ([f32; 3], [f32; 3]) {
         match self {
             AttractorFamily::DeJong | AttractorFamily::Clifford => {
@@ -190,6 +196,32 @@ impl AttractorFamily {
             AttractorFamily::Thomas => ([4.5, 4.5, 4.5], [0.0, 0.0, 0.0]),
             AttractorFamily::Lorenz => ([20.0, 26.0, 24.0], [0.0, 0.0, 25.0]),
         }
+    }
+
+    /// Half-extent of the per-axis kick a `reseed` applies to each particle
+    /// **where it already is** (ADR-0066), in the family's own world units.
+    ///
+    /// Family-relative by construction: it is [`JITTER_FRACTION`] of the family's
+    /// own [`seed_box`](Self::seed_box) spread, which is itself sized to the
+    /// attractor's native extent. So one constant serves a map bounded in
+    /// `[-2, 2]` and a flow spanning `±26` without a per-family number to keep in
+    /// step.
+    ///
+    /// **The magnitude is a look constant with no principled value.** It is large
+    /// enough that the disturbance reads and small enough that the points stay on
+    /// the figure — a chaotic flow separates jittered neighbours within a few
+    /// iterations anyway, which is what makes a small kick sufficient. Plan 0057
+    /// Phase 6 is where it is judged in motion, at both tiers; ADR-0066 records
+    /// that if the disturbance reads too subtle, *this* is the lever and returning
+    /// to the box is not.
+    fn jitter_extent(self) -> [f32; 3] {
+        // Destructured rather than indexed: this file denies `indexing_slicing`.
+        let ([sx, sy, sz], _) = self.seed_box();
+        [
+            sx * JITTER_FRACTION,
+            sy * JITTER_FRACTION,
+            sz * JITTER_FRACTION,
+        ]
     }
 }
 
@@ -221,9 +253,45 @@ const DEFAULT_FADE: f32 = 0.94;
 /// Base point half-size in world units (before the `size` multiplier), matching
 /// the swarm's small-glowing-point scale.
 const POINT_BASE: f32 = 0.006;
-/// `reseed` rises past this to re-scatter the cloud once (edge-triggered, so a
-/// sustained beat flag doesn't re-scatter every frame).
+/// `reseed` rises past this to disturb the cloud once (edge-triggered, so a
+/// sustained beat flag doesn't disturb it every frame).
 const RESEED_THRESHOLD: f32 = 0.5;
+
+/// Fraction of a family's own seed-box spread that one `reseed` kick spans
+/// (ADR-0066). See [`AttractorFamily::jitter_extent`] for why this is one
+/// constant rather than a per-family number, and why its value is provisional.
+const JITTER_FRACTION: f32 = 0.06;
+
+/// The compute shader's family selector value meaning **jitter, do not step**.
+/// One past the real families, so adding a family is still a matter of extending
+/// [`AttractorFamily`] and its `shader_id`.
+const JITTER_MODE: u32 = 4;
+
+/// Per-particle weight of the additive deposit, so the **total** light laid into
+/// the accumulation each frame is invariant to the particle count (ADR-0065).
+///
+/// The draw blends `One, One` into a linear accumulation and everything
+/// downstream to the tonemap is linear, so without this the figure moves up by
+/// exactly the count ratio: `attractor_particles` is 50 000 at `Floor` and
+/// 150 000 at `Rich`, and `Rich` therefore rendered the same preset **three stops
+/// hot**. ADR-0045 and `presets/README.md` both promise a tier changes capacity
+/// and not behavior; for an accumulating additive scene that was false, because
+/// capacity *is* the picture.
+///
+/// So a tier now buys what a capacity tier should buy — the same figure sampled
+/// three times as densely at a third the weight each, i.e. **less shot noise in
+/// the same picture** rather than more light.
+///
+/// At `Floor` the factor is exactly `1.0` by construction, which is why no golden
+/// baseline moves and why that is assertable on the value rather than inferred
+/// from pixels. A future tier with a count *below* `Floor` would put this above
+/// `1.0` and amplify shot noise instead of reducing it — bounded and predictable,
+/// but worth knowing before a third tier is added.
+pub fn deposit_scale(active_count: u32) -> f32 {
+    // `max(1)` rather than a branch: a zero-particle scene draws nothing, so the
+    // value is unobservable, and a division by zero here would reach the shader.
+    crate::render::TierConfig::FLOOR.attractor_particles as f32 / active_count.max(1) as f32
+}
 
 /// Compute step: iterate every particle through the selected attractor map once.
 /// Discrete maps (De Jong, Clifford) iterate directly; continuous flows (Thomas,
@@ -238,16 +306,53 @@ struct Particle {
 
 struct Step {
     coeffs: vec4<f32>, // discrete: a,b,c,d; Lorenz: sigma,rho,beta; Thomas: b
+                       //   family 4 (jitter): xyz half-extent of the kick
     dt: f32,           // fixed sub-step seconds (for continuous families)
-    family: u32,       // 0 De Jong, 1 Clifford, 2 Thomas, 3 Lorenz
+    family: u32,       // 0 De Jong, 1 Clifford, 2 Thomas, 3 Lorenz, 4 jitter
     count: u32,        // active particle count
-    pad: u32,
+    salt: u32,         // jitter only: which reseed this is
 }
 @group(0) @binding(1) var<uniform> step: Step;
 
 // Euler sub-steps per frame for the continuous (ODE) families, so a stiff flow
 // (Lorenz) stays stable at the frame dt without a per-family clock.
 const ODE_SUBSTEPS: i32 = 4;
+
+// A reseed's per-particle offset (ADR-0066). Deterministic: a pure function of
+// the particle's own fixed seed and the reseed counter, so the cloud stays a pure
+// function of its seed and step sequence, and two runs from the same seed produce
+// identical positions after a reseed.
+//
+// Salted by the counter rather than by the seed alone, so successive reseeds kick
+// a given particle in different directions. With the seed alone every reseed
+// would apply the same displacement field, which over a session is a rigid
+// pattern rather than a disturbance.
+// One round of a bit-mixer (the lowbias32 constants), so a small change in the
+// input decorrelates the output.
+fn mix32(v: u32) -> u32 {
+    var h = v;
+    h = h ^ (h >> 16u);
+    h = h * 0x7FEB352Du;
+    h = h ^ (h >> 15u);
+    h = h * 0x846CA68Bu;
+    h = h ^ (h >> 16u);
+    return h;
+}
+
+// The top 24 bits as a signed unit fraction in [-1, 1).
+fn unit(h: u32) -> f32 {
+    return f32(h >> 8u) / 16777216.0 * 2.0 - 1.0;
+}
+
+// Unrolled rather than looped over a dynamically-indexed vector: WGSL permits
+// that only for addressable storage and the backends disagree about the rest, so
+// three named rounds is the portable spelling.
+fn hash3(seed: f32, salt: u32) -> vec3<f32> {
+    let h0 = mix32(bitcast<u32>(seed) ^ (salt * 0x9E3779B9u));
+    let h1 = mix32(h0);
+    let h2 = mix32(h1);
+    return vec3<f32>(unit(h0), unit(h1), unit(h2));
+}
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -260,6 +365,15 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let c = step.coeffs.z;
     let d = step.coeffs.w;
     var p = particles[i].pos;
+
+    if (step.family == 4u) {
+        // A reseed: disturb the cloud where it is, rather than replacing it with
+        // a uniform fill of the seed box (ADR-0066). The points stay on the
+        // attractor, so no axis-aligned rectangle exists at any moment, and the
+        // map's own mixing spreads the kick within a few iterations.
+        particles[i].pos = p + hash3(particles[i].seed, step.salt) * step.coeffs.xyz;
+        return;
+    }
 
     if (step.family == 0u) {
         // De Jong: x' = sin(a*y) - cos(b*x), y' = sin(c*x) - cos(d*y).
@@ -296,7 +410,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 const DRAW_SHADER: &str = r#"
 struct Draw {
     // v: x aspect, y point half-size (world), z hue offset, w spin (radians)
-    // w: x world scale, y dim (2 or 3), z z-center to subtract (3D), w unused
+    // w: x world scale, y dim (2 or 3), z z-center to subtract (3D),
+    //    w deposit scale (ADR-0065: FLOOR_PARTICLES / active_count)
     // u: x hue_spread, y hue_center, z palette_mix, w saturation
     // x: x zoom, yz pan (view transform, ADR-0018), w unused
     v: vec4<f32>,
@@ -377,10 +492,17 @@ fn vs_main(
     let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
     let col = apply_saturation(mix(ca, cb, clamp(palette_mix, 0.0, 1.0)), saturation);
 
+    // Normalize the additive deposit by the particle count (ADR-0065), so total
+    // light per frame is invariant to the tier. Applied here rather than in the
+    // fragment shader because the draw uniform is bound VERTEX-only; the fragment
+    // multiplies this by its own radial falloff, and both are linear, so the
+    // result is identical to scaling the emitted fragment.
+    let deposit = draw.w.w;
+
     var out: VsOut;
     out.pos = vec4<f32>(ndc, 0.0, 1.0);
     out.local = corner;
-    out.color = col;
+    out.color = col * deposit;
     return out;
 }
 
@@ -441,6 +563,12 @@ struct Particle {
 
 /// Compute step uniform (per frame): the attractor coefficients, the fixed
 /// sub-step `dt`, the selected family, and the active particle count.
+///
+/// The same layout drives the one-shot **jitter** dispatch (ADR-0066), where
+/// `family` is [`JITTER_MODE`], `coeffs.xyz` is the kick's half-extent and `salt`
+/// is the reseed counter. One struct and one pipeline rather than a second of
+/// each: the jitter reads and writes the same storage buffer through the same
+/// bind-group layout, so only the uniform's contents differ.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct StepUniform {
@@ -448,11 +576,14 @@ struct StepUniform {
     dt: f32,
     family: u32,
     count: u32,
-    pad: u32,
+    /// Which reseed this is, for the jitter dispatch. Zero (and unread) on a
+    /// stepping dispatch — it was the struct's explicit padding word.
+    salt: u32,
 }
 
 /// Draw uniform (per frame). `v`: x aspect, y point half-size, z hue offset, w
-/// spin. `w`: x world scale, y projection dim (2 or 3), z z-centre (3D), w unused.
+/// spin. `w`: x world scale, y projection dim (2 or 3), z z-centre (3D),
+/// w [`deposit_scale`] (ADR-0065).
 /// `u`: x hue_spread, y hue_center, z palette_mix, w saturation (ADR-0021).
 /// `x`: x zoom, yz pan (view transform, ADR-0018), w unused.
 #[repr(C)]
@@ -493,6 +624,14 @@ struct PipelineResources {
     present_pipeline: wgpu::RenderPipeline,
     particles: wgpu::Buffer,
     step_uniform: wgpu::Buffer,
+    /// Byte stride between the step slot and the jitter slot in `step_uniform`,
+    /// rounded up to the adapter's dynamic-offset alignment.
+    ///
+    /// Two slots rather than one written twice, because a frame encodes
+    /// `pending_steps` step dispatches against one binding: folding the jitter into
+    /// the step slot would apply it once per sub-step, making the disturbance a
+    /// function of the frame's timing and breaking determinism.
+    step_stride: u32,
     draw_uniform: wgpu::Buffer,
     decay_uniform: wgpu::Buffer,
     compute_bg: wgpu::BindGroup,
@@ -583,16 +722,34 @@ impl PipelineResources {
         // Particle storage buffer: written by the compute step (STORAGE), read by
         // the draw pass as an instance vertex buffer (VERTEX), seeded once from
         // the CPU (COPY_DST). One buffer, two roles — no CPU round-trip.
+        //
+        // `COPY_SRC` is there for [`read_positions`], the reseed test's readback
+        // (Plan 0057 Phase 3). Carried unconditionally rather than behind
+        // `cfg(test)` so the test exercises the buffer the app actually allocates;
+        // a usage flag costs nothing that is not used, and a test running against a
+        // differently-configured resource is a test of something else.
         let particles = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("attractor-particles"),
             size: (count as usize * std::mem::size_of::<Particle>()) as u64,
             usage: wgpu::BufferUsages::STORAGE
                 | wgpu::BufferUsages::VERTEX
-                | wgpu::BufferUsages::COPY_DST,
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
+        // Two slots in ONE buffer, selected per dispatch by a dynamic offset.
+        //
+        // **Not two buffers behind two bind groups**, which is what this was first
+        // written as and which does not survive the software adapter: a second bind
+        // group sharing a live pipeline's layout gets aliased on WARP, so the step
+        // dispatch read the *jitter* slot — all zeros, so `count = 0`, so every
+        // invocation returned and the cloud never moved. It rendered a plausible
+        // static box, moved the golden baseline, and dropped three presets to
+        // ~0.000 in `animation`. One layout and one bind group has no aliasing
+        // surface to get wrong.
+        let step_stride = uniform_stride(device);
         let step_uniform =
-            uniform_buffer(device, "attractor-step-uniform", size_of::<StepUniform>());
+            uniform_buffer(device, "attractor-step-uniform", (step_stride * 2) as usize);
         let draw_uniform =
             uniform_buffer(device, "attractor-draw-uniform", size_of::<DrawUniform>());
         let decay_uniform =
@@ -603,7 +760,17 @@ impl PipelineResources {
             label: Some("attractor-compute-layout"),
             entries: &[
                 storage_entry(0),
-                gpu::uniform(1, wgpu::ShaderStages::COMPUTE),
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        // The step slot and the jitter slot, one dispatch each.
+                        has_dynamic_offset: true,
+                        min_binding_size: wgpu::BufferSize::new(size_of::<StepUniform>() as u64),
+                    },
+                    count: None,
+                },
             ],
         });
         let compute_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -616,7 +783,13 @@ impl PipelineResources {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: step_uniform.as_entire_binding(),
+                    // A window the size of one `StepUniform`, not the whole
+                    // buffer: the dynamic offset slides it between the two slots.
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &step_uniform,
+                        offset: 0,
+                        size: wgpu::BufferSize::new(size_of::<StepUniform>() as u64),
+                    }),
                 },
             ],
         });
@@ -794,6 +967,7 @@ impl PipelineResources {
             present_pipeline,
             particles,
             step_uniform,
+            step_stride,
             draw_uniform,
             decay_uniform,
             compute_bg,
@@ -887,6 +1061,16 @@ impl FieldResources {
     }
 }
 
+/// Byte stride between two dynamically-offset slots of a `StepUniform`, rounded
+/// up to the adapter's `min_uniform_buffer_offset_alignment` (256 on the default
+/// limits). Read from the device rather than hardcoded: a dynamic offset that is
+/// not a multiple of it is a validation error, and the limit is the adapter's to
+/// state.
+fn uniform_stride(device: &wgpu::Device) -> u32 {
+    let align = device.limits().min_uniform_buffer_offset_alignment.max(1);
+    size_of::<StepUniform>().next_multiple_of(align as usize) as u32
+}
+
 fn uniform_buffer(device: &wgpu::Device, label: &str, size: usize) -> wgpu::Buffer {
     device.create_buffer(&wgpu::BufferDescriptor {
         label: Some(label),
@@ -976,12 +1160,21 @@ pub struct AttractorScene {
     /// The deterministic seeded scatter, uploaded on the first frame after a
     /// (re)build so a rebuilt scene restarts identically (capture determinism).
     seed_particles: Vec<Particle>,
-    /// Re-upload the seed scatter next render. Set on first build and by a
-    /// `reseed` rising edge (a beat re-scatters the cloud, blooming through the
-    /// trails). The seed is fixed, so a re-scatter stays deterministic.
+    /// Re-upload the seed scatter next render. Set on first build and on a family
+    /// change — the two places there is no existing cloud to disturb. A `reseed`
+    /// no longer sets it (ADR-0066); see [`Self::pending_jitter`].
     needs_upload: bool,
+    /// A `reseed` rising edge is pending: the next render encodes **one** jitter
+    /// dispatch before its steps, kicking each particle where it already is.
+    /// A bool rather than a count, because two reseeds inside one frame are one
+    /// disturbance — the parameter is edge-triggered, not integrated.
+    pending_jitter: bool,
+    /// How many reseeds have fired. Salts the jitter hash so successive reseeds
+    /// kick a particle in different directions, and advances only on the edge —
+    /// so it is a function of the input sequence and the cloud stays reproducible.
+    reseed_count: u32,
     /// Clear the trail field to black next render. Set only on first build (not on
-    /// reseed, so a beat's re-scatter blooms over the existing trails).
+    /// reseed, so a beat's disturbance blooms over the existing trails).
     needs_clear: bool,
     /// Fixed-timestep accumulator: unspent injected `dt`, drained one
     /// [`FIXED_STEP`] at a time into compute steps.
@@ -1021,7 +1214,7 @@ pub struct AttractorScene {
     palette: Palette,
     palette_dirty: bool,
     /// This frame's `reseed` level (bound to a beat/onset expression); its rising
-    /// edge re-scatters the cloud.
+    /// edge disturbs the cloud in place (ADR-0066).
     reseed: f32,
     /// Previous frame's `reseed`, for rising-edge detection.
     prev_reseed: f32,
@@ -1049,6 +1242,8 @@ impl AttractorScene {
             trail_h: TRAIL_FALLBACK_H,
             seed_particles,
             needs_upload: true,
+            pending_jitter: false,
+            reseed_count: 0,
             needs_clear: true,
             fixed_step: gpu::FixedStep::new(FIXED_STEP, MAX_SUBSTEPS),
             pending_steps: 0,
@@ -1138,6 +1333,57 @@ impl AttractorScene {
         };
         self.res = Some(res);
         self.needs_clear = true;
+    }
+
+    /// Read every live particle position back off the GPU.
+    ///
+    /// **A test instrument** (Plan 0057 Phase 3), not a render path: it blocks on a
+    /// buffer map, which the frame loop must never do. It exists because the
+    /// property ADR-0066 changes is a property of *the cloud*, and a pixel
+    /// differential cannot state it — "the reseed no longer puts particles outside
+    /// the attractor's extent" is a claim about positions, and a frame diff would
+    /// only say the picture moved, which the wipe also did.
+    ///
+    /// `None` before the first render, when there are no GPU resources yet.
+    #[cfg(test)]
+    fn read_positions(&self, queue: &wgpu::Queue) -> Option<Vec<[f32; 3]>> {
+        let res = self.res.as_ref()?;
+        let size = (self.particle_count as usize * std::mem::size_of::<Particle>()) as u64;
+        let staging = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("attractor-particle-readback"),
+            size,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("attractor-particle-readback"),
+            });
+        encoder.copy_buffer_to_buffer(&res.pipelines.particles, 0, &staging, 0, size);
+        queue.submit(std::iter::once(encoder.finish()));
+
+        // The same idiom as `capture::read_back`, which is the readback this
+        // project already trusts.
+        let slice = staging.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |res| {
+            let _ = tx.send(res);
+        });
+        self.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .expect("particle readback poll");
+        rx.recv()
+            .expect("particle readback callback")
+            .expect("particle readback map");
+
+        let out = {
+            let mapped = slice.get_mapped_range().expect("particle readback range");
+            let particles: &[Particle] = bytemuck::cast_slice(&mapped);
+            particles.iter().map(|p| p.pos).collect()
+        };
+        staging.unmap();
+        Some(out)
     }
 
     fn seed(family: AttractorFamily, count: u32) -> Vec<Particle> {
@@ -1261,19 +1507,27 @@ impl Scene for AttractorScene {
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {
-        // Rising-edge detect on `reseed` (a beat/onset expression): re-scatter the
-        // cloud once. Edge-triggered so a sustained flag doesn't re-scatter every
-        // frame; deterministic because the seed is fixed. The trail field is kept
-        // (only particles re-upload), so the re-scatter blooms through the trails.
+        // Rising-edge detect on `reseed` (a beat/onset expression): **disturb** the
+        // cloud once, where it is (ADR-0066). Edge-triggered so a sustained flag
+        // doesn't disturb it every frame; deterministic because the kick is a pure
+        // function of each particle's fixed seed and the reseed counter. The trail
+        // field is kept, so the disturbance blooms through the trails.
+        //
+        // This used to re-upload the seed scatter, which did not scatter the cloud
+        // — it *replaced* it, with a uniform fill of an axis-aligned box that then
+        // took a visible number of iterations to converge back onto the attractor.
+        // Every shipped preset header describes reseed as a percussive accent; the
+        // wipe is what it actually was.
         if self.reseed >= RESEED_THRESHOLD && self.prev_reseed < RESEED_THRESHOLD {
-            self.needs_upload = true;
+            self.pending_jitter = true;
+            self.reseed_count = self.reseed_count.wrapping_add(1);
         }
         self.prev_reseed = self.reseed;
     }
 
     /// Select the attractor family from the preset's `[particles]` table (ADR-0007
     /// `configure`, off the hot path). Reuses the shared [`GeneratorConfig`] enum
-    /// rather than a new trait method. A family change re-scatters and clears the
+    /// rather than a new trait method. A family change re-seeds and clears the
     /// trail so the new attractor forms cleanly rather than iterating the old
     /// family's points. Never truncates, so it never reports a [`CapOverflow`].
     fn configure(
@@ -1318,6 +1572,8 @@ impl Scene for AttractorScene {
             res,
             seed_particles,
             needs_upload,
+            pending_jitter,
+            reseed_count,
             needs_clear,
             pending_steps,
             dt,
@@ -1375,6 +1631,19 @@ impl Scene for AttractorScene {
                 zoom: *zoom,
                 pan: [*pan_x, *pan_y],
             },
+        );
+        // Before the steps, and only on the frame a `reseed` edge landed: kick each
+        // particle where it is. Ahead of the steps so the map immediately begins
+        // pulling the disturbed points back onto the attractor within the same
+        // frame, which is what makes the disturbance read as the figure being
+        // shaken rather than as a separate layer of noise over it.
+        encode_jitter(
+            queue,
+            encoder,
+            pipelines,
+            *family,
+            reseed_count,
+            pending_jitter,
         );
         encode_steps(encoder, pipelines, *pending_steps);
         encode_trail_pass(encoder, pipelines, grid);
@@ -1445,8 +1714,10 @@ fn flush_deferred_uploads(
         grid.clear_field(encoder);
         *needs_clear = false;
     }
-    // (Re)upload the seeded scatter — on first build, and each time a `reseed`
-    // rising edge re-scatters the cloud (the trail field is kept).
+    // (Re)upload the seeded scatter — on first build and on a family change. A
+    // `reseed` no longer comes through here: it disturbs the live cloud on the GPU
+    // instead (ADR-0066), because re-uploading this array *replaced* the cloud with
+    // a uniform box rather than scattering it.
     if *needs_upload {
         queue.write_buffer(
             &pipelines.particles,
@@ -1468,10 +1739,14 @@ fn upload_uniforms(queue: &wgpu::Queue, pipelines: &PipelineResources, inputs: &
             dt: FIXED_STEP,
             family: inputs.family.shader_id(),
             count: pipelines.count,
-            pad: 0,
+            salt: 0,
         }),
     );
     let (scale, dim, z_center) = inputs.family.projection();
+    // Off the buffer that was actually allocated, not off the tier: the count the
+    // draw instances is `pipelines.count`, and normalizing against anything else
+    // would be a claim about a different draw call.
+    let deposit = deposit_scale(pipelines.count);
     queue.write_buffer(
         &pipelines.draw_uniform,
         0,
@@ -1490,7 +1765,7 @@ fn upload_uniforms(queue: &wgpu::Queue, pipelines: &PipelineResources, inputs: &
                 inputs.hue,
                 inputs.time * SPIN_RATE,
             ],
-            w: [scale, dim, z_center, 0.0],
+            w: [scale, dim, z_center, deposit],
             u: [
                 inputs.hue_spread,
                 inputs.hue_center,
@@ -1516,6 +1791,51 @@ fn upload_uniforms(queue: &wgpu::Queue, pipelines: &PipelineResources, inputs: &
     );
 }
 
+/// The one-shot reseed disturbance (ADR-0066): **one** dispatch of the compute
+/// pipeline in [`JITTER_MODE`], kicking every particle by a bounded family-relative
+/// offset derived from its own seed and the reseed counter.
+///
+/// Exactly one dispatch, whatever the frame's `pending_steps` is, which is why it
+/// carries its own uniform: the disturbance a preset asked for must not be a
+/// function of how many fixed steps this frame happened to owe.
+///
+/// Nothing at all is encoded when no edge is pending — a `reseed` that never fires
+/// costs one boolean test per frame.
+fn encode_jitter(
+    queue: &wgpu::Queue,
+    encoder: &mut wgpu::CommandEncoder,
+    pipelines: &PipelineResources,
+    family: AttractorFamily,
+    reseed_count: &u32,
+    pending_jitter: &mut bool,
+) {
+    if !*pending_jitter {
+        return;
+    }
+    *pending_jitter = false;
+
+    let [jx, jy, jz] = family.jitter_extent();
+    queue.write_buffer(
+        &pipelines.step_uniform,
+        u64::from(pipelines.step_stride),
+        bytemuck::bytes_of(&StepUniform {
+            coeffs: [jx, jy, jz, 0.0],
+            dt: FIXED_STEP,
+            family: JITTER_MODE,
+            count: pipelines.count,
+            salt: *reseed_count,
+        }),
+    );
+
+    let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+        label: Some("attractor-jitter-pass"),
+        timestamp_writes: None,
+    });
+    pass.set_pipeline(&pipelines.compute_pipeline);
+    pass.set_bind_group(0, &pipelines.compute_bg, &[pipelines.step_stride]);
+    pass.dispatch_workgroups(pipelines.count.div_ceil(WORKGROUP), 1, 1);
+}
+
 /// Step the particles: one compute dispatch per scheduled sub-step. wgpu inserts
 /// the storage-to-vertex barrier before the draw pass that follows.
 fn encode_steps(
@@ -1530,7 +1850,7 @@ fn encode_steps(
             timestamp_writes: None,
         });
         pass.set_pipeline(&pipelines.compute_pipeline);
-        pass.set_bind_group(0, &pipelines.compute_bg, &[]);
+        pass.set_bind_group(0, &pipelines.compute_bg, &[0]);
         pass.dispatch_workgroups(groups, 1, 1);
     }
 }
@@ -1609,4 +1929,473 @@ fn encode_present(
     pass.set_pipeline(&pipelines.present_pipeline);
     pass.set_bind_group(0, present_bg, &[]);
     pass.draw(0..3, 0..1);
+}
+
+#[cfg(test)]
+mod tests {
+    // Tests panic on failure; allowed over the file's hot-path pragma — this is
+    // not the render path.
+    #![allow(clippy::panic, clippy::expect_used)]
+
+    use super::{AttractorFamily, AttractorScene, FIXED_STEP, Particle, Scene, deposit_scale};
+    use crate::dsp::AnalysisFrame;
+    use crate::render::context::RenderContext;
+    use crate::render::{Tier, TierConfig};
+
+    /// ADR-0065's invariance, asserted **on the scalar** rather than inferred from
+    /// pixels — which is the whole reason the decision is expressible as one.
+    ///
+    /// The `Floor` half is why no golden baseline moves: `1.0` is not a tolerance
+    /// or a near-miss, it is exact, so every baseline blessed at the floor renders
+    /// the same arithmetic it always did.
+    #[test]
+    fn the_deposit_scalar_is_exactly_one_at_the_floor_and_a_third_at_rich() {
+        let floor = TierConfig::for_tier(Tier::Floor).attractor_particles;
+        let rich = TierConfig::for_tier(Tier::Rich).attractor_particles;
+
+        assert_eq!(
+            deposit_scale(floor),
+            1.0,
+            "the floor factor must be exactly 1.0 — every golden is blessed there"
+        );
+        // 50 000 / 150 000 at the shipped counts. Asserted against the ratio the
+        // tier table actually holds rather than a literal 1/3, so a re-calibrated
+        // `Rich` (Plan 0044 Phase 4 has never run) changes this test's expectation
+        // with it instead of failing for the wrong reason.
+        let expected = floor as f32 / rich as f32;
+        assert_eq!(deposit_scale(rich), expected);
+        assert!(
+            (deposit_scale(rich) - 1.0 / 3.0).abs() < 1e-6,
+            "at the counts shipped today that ratio is 1/3, got {}",
+            deposit_scale(rich)
+        );
+
+        // Non-vacuity: the two tiers must actually differ, or the assertions above
+        // hold for a table where nothing is normalized at all.
+        assert!(
+            rich > floor,
+            "the rich tier is meant to raise the count ({rich} vs {floor})"
+        );
+
+        // Total deposited light is what is invariant, and that is the product.
+        // Stated directly because it is the property, and the scalar is only the
+        // means: three times the samples at a third the weight is the same light.
+        let total = |count: u32| count as f32 * deposit_scale(count);
+        assert_eq!(total(floor), total(rich));
+    }
+
+    /// A zero-particle scene draws nothing, so the factor is unobservable — but it
+    /// must not be an infinity on its way to a shader uniform.
+    #[test]
+    fn the_deposit_scalar_survives_a_degenerate_count() {
+        assert!(deposit_scale(0).is_finite());
+        // And it is still monotone the right way round: fewer particles, more
+        // weight each, which is what keeps the total constant.
+        assert!(deposit_scale(25_000) > deposit_scale(50_000));
+        assert!(deposit_scale(50_000) > deposit_scale(100_000));
+    }
+
+    // -----------------------------------------------------------------------
+    // The reseed (Plan 0057 Phase 3 / ADR-0066)
+    // -----------------------------------------------------------------------
+
+    /// Particles for the reseed tests. Small: the property is about *where* the
+    /// points are, not how many, and a WARP dispatch of 50 000 buys nothing here.
+    const TEST_PARTICLES: u32 = 4_096;
+    /// Frames run before a reseed, so the cloud has converged onto the attractor
+    /// and its measured extent is the attractor's rather than the seed box's.
+    const CONVERGE_FRAMES: u32 = 120;
+
+    /// A scene driven straight, with no `Renderer`: this is a claim about the
+    /// particle buffer, and going through a renderer would only add ways for the
+    /// capture path to be what is under test.
+    struct Harness {
+        ctx: RenderContext,
+        scene: AttractorScene,
+        target: wgpu::TextureView,
+    }
+
+    impl Harness {
+        /// `None` on a runner with no GPU adapter at all (ADR-0016). **Software
+        /// adapters run this**, like the rest of the differential suite.
+        ///
+        /// An earlier draft skipped WARP, on the evidence that the compute
+        /// dispatch there had no effect — the particle buffer came back
+        /// bit-identical to the seeded scatter after 120 frames, with the right
+        /// group count, the right uniform, and no validation error. That evidence
+        /// was real and the conclusion was wrong: the cause was this scene's own
+        /// second bind group aliasing the first on WARP (see
+        /// `PipelineResources::build`), so the step dispatch read a zeroed uniform
+        /// and returned on `count = 0`. Fixing that fixed the adapter. **A skip
+        /// added to route around a symptom would have hidden the defect and left
+        /// this test green and vacuous on CI**, which is the shape the skip was
+        /// about to take.
+        fn new(family: AttractorFamily) -> Option<Self> {
+            let ctx = match RenderContext::new_headless(64, 64, true) {
+                Ok(ctx) => ctx,
+                Err(crate::render::RenderError::RequestAdapter(_)) => {
+                    eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                    return None;
+                }
+                Err(e) => panic!("headless context build failed: {e}"),
+            };
+            // COMPOSITE_FORMAT, not the surface's: every scene upstream of the
+            // tonemap is built against it, and a mismatch here fails render-pass
+            // validation on submit, which discards the WHOLE command buffer -
+            // compute dispatches included. The first draft of this harness used
+            // `surface_format()` and read back a cloud that had never stepped.
+            let mut scene = AttractorScene::new(
+                &ctx.device,
+                crate::render::COMPOSITE_FORMAT,
+                TEST_PARTICLES,
+                TierConfig::FLOOR.attractor_trail_cap,
+            );
+            scene.configure(&crate::render::scenes::lines::GeneratorConfig::Particles { family });
+            scene.set_target_size(64, 64);
+            let target = ctx
+                .device
+                .create_texture(&wgpu::TextureDescriptor {
+                    label: Some("attractor-test-target"),
+                    size: wgpu::Extent3d {
+                        width: 64,
+                        height: 64,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: crate::render::COMPOSITE_FORMAT,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    view_formats: &[],
+                })
+                .create_view(&wgpu::TextureViewDescriptor::default());
+            Some(Self { ctx, scene, target })
+        }
+
+        /// Advance and render `frames` frames at the fixed capture `dt`.
+        fn run(&mut self, frames: u32) {
+            for _ in 0..frames {
+                self.scene.advance(FIXED_STEP);
+                self.scene.update(&AnalysisFrame::default());
+                let mut encoder = self
+                    .ctx
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                self.scene
+                    .render(&self.ctx.queue, &mut encoder, &self.target, 1.0);
+                self.ctx.queue.submit(std::iter::once(encoder.finish()));
+            }
+        }
+
+        /// Drive one `reseed` rising edge and render the frame it lands on.
+        fn reseed(&mut self) {
+            self.scene.set_param("reseed", 1.0);
+            self.run(1);
+            self.scene.set_param("reseed", 0.0);
+        }
+
+        fn positions(&self) -> Vec<[f32; 3]> {
+            self.scene
+                .read_positions(&self.ctx.queue)
+                .expect("resources exist after a render")
+        }
+    }
+
+    /// Per-axis min/max over a position set.
+    fn extent(points: &[[f32; 3]]) -> ([f32; 3], [f32; 3]) {
+        let mut lo = [f32::INFINITY; 3];
+        let mut hi = [f32::NEG_INFINITY; 3];
+        for p in points {
+            for k in 0..3 {
+                let (Some(l), Some(h), Some(v)) = (lo.get_mut(k), hi.get_mut(k), p.get(k)) else {
+                    continue;
+                };
+                *l = l.min(*v);
+                *h = h.max(*v);
+            }
+        }
+        (lo, hi)
+    }
+
+    /// Cells per axis in the occupancy grid below.
+    const OCCUPANCY_CELLS: i32 = 24;
+
+    /// The region a converged cloud actually occupies, as a set of voxels over its
+    /// own bounding box.
+    ///
+    /// **The bounding box is the wrong instrument and measuring it is how the first
+    /// draft of this test went wrong.** Every family's `seed_box` is sized to the
+    /// attractor's native extent, so the two boxes agree to within a percent —
+    /// measured, De Jong converges to `±1.499` against a `±1.5` box and Lorenz's x
+    /// to `±19.99` against `±20`. What the box cannot see is that an attractor is a
+    /// *filigree*: it occupies a small fraction of its own bounding volume, and a
+    /// uniform re-fill of that volume is off the figure almost everywhere while
+    /// staying entirely inside its extent. Occupancy is the measure that separates
+    /// them, and it is what ADR-0066 means by "the points stay on the attractor".
+    struct Occupancy {
+        cells: std::collections::HashSet<(i32, i32, i32)>,
+        lo: [f32; 3],
+        scale: [f32; 3],
+    }
+
+    impl Occupancy {
+        fn of(points: &[[f32; 3]]) -> Self {
+            let (lo, hi) = extent(points);
+            let mut scale = [1.0f32; 3];
+            for k in 0..3 {
+                let (Some(s), Some(&l), Some(&h)) = (scale.get_mut(k), lo.get(k), hi.get(k)) else {
+                    continue;
+                };
+                *s = OCCUPANCY_CELLS as f32 / (h - l).max(f32::EPSILON);
+            }
+            let mut me = Self {
+                cells: std::collections::HashSet::new(),
+                lo,
+                scale,
+            };
+            for p in points {
+                me.cells.insert(me.cell(p));
+            }
+            me
+        }
+
+        fn cell(&self, p: &[f32; 3]) -> (i32, i32, i32) {
+            let at = |k: usize| -> i32 {
+                let (Some(&v), Some(&l), Some(&s)) = (p.get(k), self.lo.get(k), self.scale.get(k))
+                else {
+                    return 0;
+                };
+                ((v - l) * s).floor() as i32
+            };
+            (at(0), at(1), at(2))
+        }
+
+        /// Fraction of `points` landing more than one cell away from anything the
+        /// converged cloud occupied.
+        ///
+        /// **The one-cell dilation is the unit of the measurement, not slack.** The
+        /// kick is `0.09` in a figure spanning `3.0` over 24 cells, so it is 0.72
+        /// of a cell — a disturbed point routinely lands in the *neighbouring*
+        /// cell, and on a figure this sparse a neighbouring cell is usually empty.
+        /// Counting that as "off the attractor" would measure the grid's phase
+        /// rather than the behaviour. Beyond one cell is a displacement the kick
+        /// cannot produce.
+        ///
+        /// It costs the instrument nothing it needs: the figure occupies ~1.6 % of
+        /// its bounding volume, so even dilated it is a small part of the box and a
+        /// uniform re-fill still reads overwhelmingly outside — which the test
+        /// asserts rather than assumes.
+        fn fraction_outside(&self, points: &[[f32; 3]]) -> f32 {
+            if points.is_empty() {
+                return 0.0;
+            }
+            let near = |p: &[f32; 3]| {
+                let (cx, cy, cz) = self.cell(p);
+                for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        for dz in -1..=1 {
+                            if self.cells.contains(&(cx + dx, cy + dy, cz + dz)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
+            };
+            let out = points.iter().filter(|p| !near(p)).count();
+            out as f32 / points.len() as f32
+        }
+
+        /// Fraction of the bounding box's cells the cloud actually occupies — the
+        /// number that makes the filigree claim concrete.
+        fn filled(&self) -> f32 {
+            let total = OCCUPANCY_CELLS.pow(3) as f32;
+            self.cells.len() as f32 / total
+        }
+    }
+
+    /// **The Phase 3 done-when, over the particle buffer rather than the pixels.**
+    ///
+    /// Two directions, and both are load-bearing. A reseed must not throw particles
+    /// outside the attractor's own converged extent — which is exactly what
+    /// re-filling `seed_box` did, since the box is sized to the family's *native*
+    /// extent and much of its volume is off the figure. And the positions must
+    /// actually *change*, because a reseed that quietly did nothing would satisfy
+    /// the first half perfectly.
+    ///
+    /// **The control is the behaviour this replaces.** Rather than argue about a
+    /// threshold, the same measurement is taken over the exact population the old
+    /// re-fill would have produced — `AttractorScene::seed`, unchanged and still
+    /// used for the initial fill — so the test states the two behaviours' readings
+    /// side by side and asserts they are far apart in the right direction.
+    #[test]
+    fn a_reseed_disturbs_the_cloud_without_leaving_the_attractor() {
+        // De Jong: the family the artifact was reported on (`attractor_ink`).
+        const FAMILY: AttractorFamily = AttractorFamily::DeJong;
+        let Some(mut h) = Harness::new(FAMILY) else {
+            return;
+        };
+        h.run(CONVERGE_FRAMES);
+        let before = h.positions();
+        let occupied = Occupancy::of(&before);
+
+        // The premise, asserted rather than assumed: the attractor must be a
+        // filigree inside its own bounding box, or "off the figure" and "outside
+        // the box" would name the same region and a re-fill would pass this test.
+        let filled = occupied.filled();
+        println!(
+            "converged cloud fills {:.1}% of its own bounding volume ({} of {} cells)",
+            filled * 100.0,
+            occupied.cells.len(),
+            OCCUPANCY_CELLS.pow(3)
+        );
+        assert!(
+            filled < 0.5,
+            "the converged cloud fills {filled:.3} of its bounding box — it is not \
+             sparse enough for occupancy to distinguish a re-fill from a jitter"
+        );
+
+        h.reseed();
+        let after = h.positions();
+        assert_eq!(after.len(), before.len(), "the population size is fixed");
+
+        // Direction 1 — the positions actually changed. A reseed that quietly did
+        // nothing would satisfy direction 2 perfectly.
+        let moved = before
+            .iter()
+            .zip(after.iter())
+            .filter(|(a, b)| a != b)
+            .count();
+        assert!(
+            moved * 10 > before.len() * 9,
+            "a reseed must disturb essentially the whole cloud, moved {moved} of {}",
+            before.len()
+        );
+
+        // Direction 2 — and the cloud is still on the attractor. Measured against
+        // the old behaviour under the identical instrument.
+        let jittered_outside = occupied.fraction_outside(&after);
+        let refilled: Vec<[f32; 3]> = AttractorScene::seed(FAMILY, TEST_PARTICLES)
+            .iter()
+            .map(|p| p.pos)
+            .collect();
+        let refill_outside = occupied.fraction_outside(&refilled);
+        println!(
+            "off the figure after a reseed: jitter {:.1}%, the old seed-box re-fill \
+             {:.1}%",
+            jittered_outside * 100.0,
+            refill_outside * 100.0
+        );
+
+        // These read **0.0 % and 100.0 %** as measured, so the bounds below are not
+        // thresholds chosen to admit the result: the two behaviours sit at opposite
+        // ends of the instrument, and the margins exist for adapter variation
+        // rather than for the claim.
+        assert!(
+            jittered_outside < 0.02,
+            "a reseed put {:.1}% of the cloud off the attractor; the kick is ±{:?} \
+             in a figure spanning {:?}",
+            jittered_outside * 100.0,
+            FAMILY.jitter_extent(),
+            extent(&before)
+        );
+        // Non-vacuity, and the half that makes this a test of ADR-0066 rather than
+        // of arithmetic: the instrument must be able to see the behaviour that was
+        // replaced, or the assertion above is satisfied by any measurement at all.
+        assert!(
+            refill_outside > 0.9,
+            "the seed-box re-fill reads only {:.1}% off the figure — this instrument \
+             cannot see the behaviour ADR-0066 replaced, so it proves nothing about \
+             the one that replaced it",
+            refill_outside * 100.0
+        );
+    }
+
+    /// Determinism (`particles/mod.rs`'s pure-function-of-seed-and-step-sequence
+    /// claim, NFR §6): two runs of the same input sequence produce **identical**
+    /// positions after a reseed. The jitter is the one thing here that could have
+    /// broken it, since it is the only per-particle randomness applied after init.
+    #[test]
+    fn a_reseed_is_reproducible_from_the_same_seed() {
+        let run = || -> Option<Vec<[f32; 3]>> {
+            let mut h = Harness::new(AttractorFamily::DeJong)?;
+            h.run(30);
+            h.reseed();
+            h.run(3);
+            Some(h.positions())
+        };
+        let (Some(a), Some(b)) = (run(), run()) else {
+            return;
+        };
+        assert_eq!(a, b, "the cloud after a reseed is not reproducible");
+
+        // ...and the reseed is genuinely doing something, so the equality above is
+        // not two identical no-ops agreeing.
+        let Some(mut h) = Harness::new(AttractorFamily::DeJong) else {
+            return;
+        };
+        h.run(30);
+        let unreseeded = {
+            h.run(4);
+            h.positions()
+        };
+        assert_ne!(
+            a, unreseeded,
+            "a reseeded run and an unreseeded one are identical — the jitter did nothing"
+        );
+    }
+
+    /// Successive reseeds must kick a given particle *differently*. Salting the
+    /// hash with the particle's seed alone would apply one fixed displacement field
+    /// every time, which over a session is a rigid pattern rather than a
+    /// disturbance — and it is invisible in a single-reseed test.
+    #[test]
+    fn successive_reseeds_kick_in_different_directions() {
+        let Some(mut h) = Harness::new(AttractorFamily::DeJong) else {
+            return;
+        };
+        h.run(60);
+        let base = h.positions();
+        h.reseed();
+        let first: Vec<[f32; 3]> = h.positions();
+
+        // The displacement the first reseed applied, per particle. Includes the
+        // frame's own step, which is common to both reseeds and so cancels in the
+        // comparison below.
+        let delta = |from: &[[f32; 3]], to: &[[f32; 3]]| -> Vec<[f32; 3]> {
+            from.iter()
+                .zip(to.iter())
+                .map(|(a, b)| {
+                    [
+                        b.first().unwrap_or(&0.0) - a.first().unwrap_or(&0.0),
+                        b.get(1).unwrap_or(&0.0) - a.get(1).unwrap_or(&0.0),
+                        b.get(2).unwrap_or(&0.0) - a.get(2).unwrap_or(&0.0),
+                    ]
+                })
+                .collect()
+        };
+        let d1 = delta(&base, &first);
+
+        let second_base = h.positions();
+        h.reseed();
+        let d2 = delta(&second_base, &h.positions());
+
+        let identical = d1.iter().zip(d2.iter()).filter(|(a, b)| a == b).count();
+        assert!(
+            identical * 10 < d1.len(),
+            "two reseeds applied the same displacement to {identical} of {} particles — \
+             the hash is not salted by the reseed counter",
+            d1.len()
+        );
+    }
+
+    /// The `Particle` layout the storage buffer and the vertex attributes both
+    /// assume: a tight 16-byte std430 stride, with the seed packed into the vec3's
+    /// trailing slot. The readback above casts raw bytes to this, so a change here
+    /// silently reinterprets every position.
+    #[test]
+    fn the_particle_layout_is_a_tight_sixteen_bytes() {
+        assert_eq!(std::mem::size_of::<Particle>(), 16);
+        assert_eq!(std::mem::align_of::<Particle>(), 4);
+    }
 }
