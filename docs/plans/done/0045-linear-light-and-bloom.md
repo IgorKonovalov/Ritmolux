@@ -41,7 +41,7 @@
 > around every sprite and stroke. That is ADR-0055's own first Negative bullet coming true at the
 > one seam this plan did not reach:
 > [ADR-0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) +
-> [Plan 0051](../0051-the-scene-seam-emits-premultiplied-alpha.md).
+> [Plan 0051](0051-the-scene-seam-emits-premultiplied-alpha.md).
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0046](../../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (linear-light + bloom + tonemap),
