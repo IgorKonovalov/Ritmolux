@@ -746,7 +746,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 |------|------|---------|
 | `reactivity` | HARD | every preset moves for at least one band (bass/mid/treb/onset); prints the per-band vector so a dead single binding — e.g. treble — is visible |
 | `animation` | HARD | every preset changes between frame N and N+k at fixed audio (not frozen) |
-| `sanity` | HARD | every preset lights a minimum coverage and spans ≥2 quadrants **against its own background** (not blank, not a dot) |
+| `sanity` | HARD | every preset lights a minimum coverage, spans ≥2 quadrants **against its own background** (not blank, not a dot), and has some **tonal structure** — no more than 90 % of its lit pixels inside one of 16 luminance bands (not a blot). The third check is Plan 0056 Phase 5: a saturated single-tone mass satisfies the first two completely, which is how four attractor presets shipped flat. Threshold measured from the library's own distribution, printed on every run. `Spectrum Ridge` is listed in `KNOWN_FLAT` — it measures `1.000` today, and the test says so rather than gating on it |
 | `beat` | HARD | a 120 BPM click track through the **real** DSP makes a beat-accent preset render differently on-beat vs off-beat; a zeroed beat binding does not |
 | `distinctness` | ADVISORY | prints per-family pixel + shape pairwise matrices and flags near-duplicate geometry; never asserts |
 | `golden` | HARD (tolerance) | one **frozen fixture per system** matches its committed baseline PNG within a mean + max-outlier tolerance ([ADR-0023](adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)) |
