@@ -2263,7 +2263,14 @@ would sharpen the 6 % figure the half-and-half split leaves approximate.
 
 ## Entries 0043-0045 — the 2026-08-02 `preset-author` batch (sixth), from Plan 0048 Phase 7 (the library retune)
 
-## 0043 — every reactivity instrument we have diffs against **silence**, so a binding saturated just above the noise floor reads as maximally reactive
+## ~~0043 — every reactivity instrument we have diffs against **silence**, so a binding saturated just above the noise floor reads as maximally reactive~~
+
+- **PROMOTED 2026-08-03 → [ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) +
+  [Plan 0056](plans/0056-clamp-occupancy-and-the-axis-anchor.md)** (occupancy recorded on the
+  existing walk, printed in `--report`, and enforced as a HARD gate). The ADR takes the entry's
+  second option and **rejects its first**: a mid-scale rung in the reactivity gate names the preset
+  where occupancy names the binding, and costs another render pass per band. Notes retained below
+  as the origin record.
 
 - **Raised:** 2026-08-02, from `preset-author`, running [Plan 0048](plans/0048-analysis-v2-and-the-retune.md)
   Phase 7.
@@ -2320,7 +2327,17 @@ across all 14. That is a change to how existing frames are compared, not new mac
 *threshold* sat above anything music produced. This is the same class one level down — a *gain*
 below anything music produces — and the instruments that closed the first were never extended to it.
 
-## 0044 — Phase 1's axis rebuild silently re-pointed every sub-crossover `bin()` probe in the library, and three preset headers plus `docs/presets.md` still teach the axis it replaced
+## ~~0044 — Phase 1's axis rebuild silently re-pointed every sub-crossover `bin()` probe in the library, and three preset headers plus `docs/presets.md` still teach the axis it replaced~~
+
+- **PROMOTED 2026-08-03 → [ADR-0063](adrs/0063-address-the-spectrum-by-frequency.md)** (`bin_hz` /
+  `bin_range`, folding in the `bin_range` ADR-0036 deferred), with the external axis anchor landing
+  as [Plan 0056](plans/0056-clamp-occupancy-and-the-axis-anchor.md) Phase 4. **The doc half is
+  done** — `docs/presets.md`'s axis block was regenerated from `fft.rs` + `expr.rs` and the stale
+  `onset` line removed. Two corrections the regeneration produced, both sharper than this entry:
+  every band is now **1.8 semitones wide everywhere** (the old "two regimes" and "the bottom is the
+  coarsest region" are both simply gone), and the mapping is now **sample-rate independent** at
+  44.1 / 48 / 96 kHz, retiring the old "this moves with the sample rate" warning. The seven
+  retuned probe positions check out at 0-5 % of their authors' targets. Notes retained below.
 
 - **Raised:** 2026-08-02, from `preset-author`, running Plan 0048 Phase 7.
 - **Verified against code:** yes — `core/src/dsp/fft.rs:94` lays every band edge on
@@ -2364,7 +2381,11 @@ position table describe the pre-Phase-1 axis and want regenerating — Phase 5 r
 tables and did not reach this one. The same file still says `onset` "is raw spectral flux with a
 peak near `0.016`" in its reachability section, which ADR-0049 retired.
 
-## 0045 — `docs/analysis-v2-before-flags.md` has served its purpose and asks to be deleted
+## ~~0045 — `docs/analysis-v2-before-flags.md` has served its purpose and asks to be deleted~~
+
+- **DONE 2026-08-03.** File removed and all inbound links rewritten. There were **three**, not two:
+  `docs/presets.md`, `docs/capturing.md`, and `presets/README.md` — the third sits outside `docs/`
+  and the entry's grep missed it.
 
 - **Raised:** 2026-08-02, from `preset-author`, running Plan 0048 Phase 7.
 
