@@ -2615,3 +2615,62 @@ Two consequences for the plan:
   It belongs in `presets/README.md`'s kaleidoscope section whenever Plan 0055 Phase 4 does its doc
   pass — it is useful even after the edge becomes selectable, because it explains what the
   treatments are treating.
+
+---
+
+## 0050 — the attractor reseed scatters into an axis-aligned BOX, so every reseed flashes a speckled rectangle across the frame
+
+- **Raised:** 2026-08-03, from the user, on `attractor_ink` at `Rich`: "a square artifact that breaks
+  the flow... it's blinking sometimes". Seen on **all** attractors.
+- **Verified against code:** yes — `core/src/render/scenes/particles/mod.rs:185-193` (`seed_box`)
+  and `:1143-1155` (`seed`).
+- **Sharpens [0031](design-backlog.md)**, which already records "the `Rich` tier's 3x particle
+  count makes the attractor reseed transient opaque". This entry supplies the part that entry did
+  not have: **why it is a rectangle**, and why it is getting worse.
+
+**The mechanism.** `seed_box` returns axis-aligned half-extents per family — `±1.5` in x and y for
+De Jong and Clifford, `±4.5` for Thomas, `±(20, 26)` for Lorenz — and `seed()` fills every particle
+uniformly inside it. So a reseed does not "scatter" the cloud, it **replaces it with a uniform
+rectangle**, which stays a rectangle until the map has iterated enough times to pull the points onto
+the attractor. What the user sees is that rectangle's interior: flat random speckle, hard
+axis-aligned edges, fading over some frames.
+
+**The geometry corroborates it.** The box is *square* in world space and the vertex shader divides x
+by the target's aspect, so on a 16:9 display the square must project **taller than wide** — which is
+the proportion in the report. Nothing else in the pipeline produces an axis-aligned rectangle: the
+trail grid rounds **up** and presents as a normalized stretch (ADR-0037), so it cannot leave an edge
+inside the frame.
+
+**Why it is newly visible, which is the part worth knowing.** The reseed gates were **dead** for most
+of this project's life — every attractor shipped with `reseed` written against raw levels it could
+not reach ("never fired once", `attractor_clifford.toml`'s own header). Plan 0041's content re-gain
+(`e9a1c3c`, 2026-07-29) made them fire for the first time, and Plan 0048's retune rescaled them onto
+the normalized axis. So the artifact is **as old as the scene and as new as the gate working**: the
+user's instinct that it is unrelated to recent work is right about the mechanism and wrong about the
+exposure. `Rich` then triples the particle count into the same rectangle, which is [0031](design-backlog.md).
+
+**It has no headless reproduction, and that is a second finding.** `--set` holds a level constant, so
+a held `onset = 1` reseeds *every* frame and averages into no visible box — the artifact is a
+**transient** and `--set` cannot express one. A `--signal click:120` filmstrip does not catch it
+either, because the synthesized clip's `onset` never clears the shipped `0.56` gate. So **nothing in
+the harness can currently render the frame the user is complaining about**, which is why no gate or
+baseline has ever seen it. Anything designed here should come with a way to capture a reseed frame —
+a `--signal` whose onsets actually cross the shipped thresholds would do it, and would be useful well
+beyond this entry.
+
+**What a design here would weigh:**
+
+- **Seed onto the attractor instead of into a box.** Keep a pool of on-attractor points (the current
+  cloud is one) and reseed by jittering positions rather than replacing them, so a reseed reads as
+  the figure being *disturbed* rather than erased. Most faithful to what the presets ask for — every
+  header describes reseed as a percussive accent, not a wipe.
+- **Fade the reseed in over N frames**, so the box is never fully opaque. Cheapest, and it directly
+  targets [0031](design-backlog.md)'s "opaque at `Rich`" wording — but it leaves a rectangle,
+  just a fainter one.
+- **Shape the seed volume** (a disc/gaussian rather than a box). Removes the *hard edge*, which is
+  what makes it read as an artifact rather than as texture, and is a few lines in `seed`. Does not
+  fix the wipe.
+- **Give the content lane control.** `[particles]` currently accepts only `family`, so a preset can
+  choose *when* to reseed but nothing about what it looks like. Any of the above could be a key
+  instead of a constant — though the defaults matter more here, since all six shipped presets would
+  want the same answer.
