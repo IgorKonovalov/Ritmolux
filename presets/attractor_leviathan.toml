@@ -60,7 +60,16 @@ pan_y = "cos(time * 0.031) * 0.05"
 bg_hue        = "0.58 + sin(time * 0.013) * 0.06"
 bg_bright     = "0.008 + clamp(mid * 0.0176, 0, 0.015)"
 bg_vignette   = "0.82"
-kaleido_order = "select(bass + mid > 1.12, 6, 1)"
+# THE FOLD IS PINNED AT SIX AND IS THIS PRESET'S ALONE (2026-08-03). It used to
+# snap between 1 and 6 leaves on `bass + mid`, and so did De Jong on the same
+# family and the same threshold - two problems in one binding. A leaf count that
+# changes with the music reads as chaos rather than as response (the user's
+# call), and `kaleido_order` is a STEPPED parameter, so easing it swept the
+# value through fractional wedge counts that cannot divide the circle. Pinning
+# it fixes both at once and lets the header's "cathedral of itself" be the
+# resting state instead of a rare peak event. Motion now comes from
+# `kaleido_angle` alone, which is continuous and safe to ease.
+kaleido_order = "6"
 kaleido_angle = "time * 0.055"
 trails        = "0.18 + clamp(onset * 0.233, 0, 0.14)"
 
@@ -75,6 +84,5 @@ zoom          = 0.16
 hue_center    = 0.40
 hue_spread    = 0.50
 palette_mix   = 0.70
-kaleido_order = 1.2
 trails        = 0.45
 bg_bright     = 0.40
