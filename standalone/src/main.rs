@@ -7,6 +7,7 @@ mod diaglog;
 mod director;
 mod overlay;
 mod rss;
+mod settings;
 mod soak;
 
 use std::path::{Path, PathBuf};
@@ -20,6 +21,7 @@ use lmv_core::audio::{AudioFormat, SampleConsumer};
 use lmv_core::dsp::Analyzer;
 use lmv_core::render::{CapOverflow, Renderer, RendererOptions, TextRun, Tier};
 use overlay::{LIST_INSET, LIST_TOP, OverlayAction, OverlayKey, OverlayState, ROW_H, ROW_SIZE};
+use settings::{SettingsAction, SettingsKey, SettingsState, SettingsView, TierState};
 use soak::SoakLog;
 use standalone::{
     APP_DIR_NAME, PRESET_DIR_ENV, PresetDir, preset_data_root, resolve_preset_dir, resolve_tier,
@@ -85,6 +87,16 @@ struct AppState {
     overlay_on: bool,
     /// The preset browse overlay's modal state (Tab toggles; Plan 0008).
     browse: OverlayState,
+    /// The settings modal's state (`S` toggles; Plan 0050 Phase 4). A second,
+    /// independent pure state machine — see [`settings`] for why it is not the
+    /// same one.
+    settings: SettingsState,
+    /// Whether the tier is pinned rather than engine-resolved — seeded from the
+    /// launch pin (`--tier` / `LMV_TIER` / `[quality] tier`) and set by any
+    /// explicit change. Tracked here rather than read off the renderer because
+    /// the core exposes the *demotion* latch but not the pin, and widening the
+    /// core's surface to render one menu suffix is the wrong trade.
+    tier_pinned: bool,
     /// ~1 Hz structured diagnostics logger (render thread only).
     diag_log: DiagLog,
     /// Preset directory watched for hot-reload, with its last-seen signature
@@ -220,6 +232,8 @@ impl AppState {
             title_tick: 0,
             overlay_on: false,
             browse: OverlayState::new(),
+            settings: SettingsState::new(),
+            tier_pinned: tier.is_some(),
             diag_log: DiagLog::new(resolve_log_path()),
             preset_dir,
             preset_sig,
@@ -510,25 +524,148 @@ impl AppState {
         ));
     }
 
-    /// Swap the quality tier on the running renderer (`[` / `]`, ADR-0054).
+    /// Swap the quality tier on the running renderer (`[` / `]` and the settings
+    /// menu's Quality row, ADR-0054).
     ///
-    /// **Inert when the tier is already the one asked for**, because the core's
-    /// entry point rebuilds unconditionally: without this guard, holding `[` at
-    /// the floor would restart the trails on every repeat for no change. The two
-    /// keys are a switch, and a switch at its end stop does nothing.
+    /// Asking for the tier it is already on still **pins** it and still persists
+    /// the choice — that is the operator stating an intent — but skips the
+    /// rebuild, because the core's entry point rebuilds unconditionally and
+    /// restarting the trails for no change is a worse answer than doing nothing.
     ///
     /// The core clears its demotion latch on an explicit change, so this clears
     /// the shell's "already announced" latch alongside — otherwise a later real
     /// demotion would be silent, which ADR-0045 rules out.
+    ///
+    /// `--tier` and `LMV_TIER` still win at the next launch; this writes the
+    /// `[quality] tier` they override, so the documented precedence is unchanged.
     fn swap_tier(&mut self, tier: Tier) {
-        if self.renderer.tier() == tier {
-            return;
+        self.tier_pinned = true;
+        self.config.quality.tier = match tier {
+            Tier::Floor => config::TierChoice::Floor,
+            Tier::Rich => config::TierChoice::Rich,
+        };
+        self.save_config();
+        if self.renderer.tier() != tier {
+            self.renderer.set_tier(tier);
+            self.reported_demotion = false;
+            eprintln!("quality tier: {} (pinned)", self.renderer.tier().as_str());
         }
-        self.renderer.set_tier(tier);
-        self.reported_demotion = false;
-        eprintln!("quality tier: {} (pinned)", self.renderer.tier().as_str());
         self.update_title();
         self.window.request_redraw();
+    }
+
+    /// Toggle auto-rotate and **persist it** — the one path for both the `A`
+    /// hotkey and the settings row.
+    ///
+    /// The hotkey used to change the director and print to stderr without
+    /// writing `[rotate] auto`, unlike `F` and `D` which both persist. That left
+    /// the two controls able to disagree: set it with `A`, restart, and the
+    /// config's value came back. One path is what makes that impossible rather
+    /// than merely fixed.
+    fn toggle_auto_rotate(&mut self) {
+        let on = self.director.toggle_auto();
+        self.config.rotate.auto = on;
+        self.save_config();
+        eprintln!("auto-rotate {}", if on { "on" } else { "off" });
+        self.update_title();
+        self.window.request_redraw();
+    }
+
+    /// Toggle the diagnostics overlay (`F3` and the settings row).
+    ///
+    /// **Deliberately not persisted.** It is a debugging state, and a live show
+    /// that comes up with the overlay painted because someone pressed `F3` last
+    /// week is a worse default than pressing `F3` again.
+    fn toggle_diagnostics(&mut self) {
+        self.overlay_on = !self.overlay_on;
+        self.renderer.set_overlay(self.overlay_on);
+        self.window.request_redraw();
+    }
+
+    /// The live values the settings rows show, gathered fresh each time they are
+    /// drawn or edited — which is what lets [`SettingsState`] hold none of them.
+    fn settings_view(&self) -> SettingsView {
+        let monitors: Vec<MonitorHandle> = self.window.available_monitors().collect();
+        let display_name = monitors
+            .get(self.display_index)
+            .and_then(MonitorHandle::name)
+            .or_else(|| self.config.output.display_name.clone())
+            .unwrap_or_else(|| "unknown".to_owned());
+        SettingsView {
+            tier: self.renderer.tier(),
+            // Demotion wins over the pin: the governor only demotes an *unpinned*
+            // session, so the two cannot both be true, and reporting a demotion
+            // is the case ADR-0045 will not let go silent.
+            tier_state: if self.renderer.tier_demoted() {
+                TierState::Demoted
+            } else if self.tier_pinned {
+                TierState::Pinned
+            } else {
+                TierState::Auto
+            },
+            auto_rotate: self.director.auto_enabled(),
+            min_dwell_secs: self.config.rotate.min_dwell_secs,
+            max_dwell_secs: self.config.rotate.max_dwell_secs,
+            fullscreen: self.window.fullscreen().is_some(),
+            display_index: self.display_index,
+            display_count: monitors.len(),
+            display_name,
+            diagnostics: self.overlay_on,
+            preset_dir: self.preset_dir.display().to_string(),
+        }
+    }
+
+    /// Carry out what the settings modal asked for. The modal decides *what*
+    /// changes; every effect — the renderer, the window, the director, the config
+    /// file — happens here.
+    fn apply_settings_action(&mut self, action: SettingsAction) {
+        match action {
+            SettingsAction::None => return,
+            SettingsAction::Redraw | SettingsAction::Close => {}
+            SettingsAction::OpenBrowse => {
+                self.settings.close();
+                self.open_browse();
+            }
+            SettingsAction::SetTier(tier) => self.swap_tier(tier),
+            SettingsAction::ToggleAuto => self.toggle_auto_rotate(),
+            SettingsAction::SetDwell { min_secs, max_secs } => {
+                self.config.rotate.min_dwell_secs = min_secs;
+                self.config.rotate.max_dwell_secs = max_secs;
+                // The live director, not a rebuilt one: a rebuild would reset the
+                // dwell clock under the operator's hand.
+                self.director.set_dwell_bounds(min_secs, max_secs);
+                self.save_config();
+            }
+            SettingsAction::ToggleFullscreen => self.toggle_fullscreen(),
+            SettingsAction::CycleDisplay => self.cycle_display(),
+            SettingsAction::ToggleDiagnostics => self.toggle_diagnostics(),
+        }
+        self.window.request_redraw();
+    }
+
+    /// Open the browse overlay on the active preset, as `Tab` does.
+    fn open_browse(&mut self) {
+        let names = self.roster_names();
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let active = self.renderer.active_index();
+        let layout = self.list_layout(refs.len());
+        self.browse
+            .handle_key(OverlayKey::Toggle, &refs, active, &layout);
+    }
+
+    /// Which modal owns the keyboard and the canvas, if either.
+    ///
+    /// **One place, consulted by both routing and drawing.** Two `is_open()`
+    /// calls kept in agreement by hand is how a key gets routed to the modal that
+    /// is not on screen and silently swallowed.
+    fn modal(&self) -> Option<Modal> {
+        if self.settings.is_open() {
+            Some(Modal::Settings)
+        } else if self.browse.is_open() {
+            Some(Modal::Browse)
+        } else {
+            None
+        }
     }
 
     /// Build this frame's on-canvas text and hand it to the renderer: always the
@@ -558,7 +695,25 @@ impl AppState {
         texts.push(self.renderer.preset_name().to_owned());
         meta.push((NAME_INSET, NAME_INSET, NAME_SIZE, NAME_COLOR));
 
-        if self.browse.is_open() {
+        if self.modal() == Some(Modal::Settings) {
+            let view = self.settings_view();
+            texts.push("settings  -  up/down  left/right  esc".to_owned());
+            meta.push((LIST_INSET, LIST_TOP, ROW_SIZE, HEADER_COLOR));
+
+            // One column, always: eight rows fit any window this app opens in,
+            // and a settings menu that reflowed would move a row out from under
+            // the operator's hand mid-edit.
+            for (row, (label, value)) in self.settings.lines(&view).into_iter().enumerate() {
+                let y = overlay::ROWS_TOP + row as f32 * ROW_H;
+                let (marker, color) = if row == self.settings.row() {
+                    ("> ", ROW_HL_COLOR)
+                } else {
+                    ("  ", ROW_COLOR)
+                };
+                texts.push(format!("{marker}{label:<14}{value}"));
+                meta.push((LIST_INSET, y, ROW_SIZE, color));
+            }
+        } else if self.modal() == Some(Modal::Browse) {
             let names = self.roster_names();
             let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
             let visible = self.browse.visible(&name_refs);
@@ -617,6 +772,27 @@ impl AppState {
         let PhysicalKey::Code(code) = event.physical_key else {
             return;
         };
+
+        // --- the settings modal owns the keyboard while it is open ---
+        if self.modal() == Some(Modal::Settings) {
+            // `Tab` hands over rather than stacking: one modal at a time.
+            if code == KeyCode::Tab && !event.repeat {
+                self.apply_settings_action(SettingsAction::OpenBrowse);
+                return;
+            }
+            // Anything the modal does not own is swallowed, so `Space` cannot
+            // cycle a preset out from under an open menu.
+            let Some(key) = decode_settings_key(code) else {
+                return;
+            };
+            if event.repeat && !key.is_nav() {
+                return;
+            }
+            let view = self.settings_view();
+            let action = self.settings.handle_key(key, &view);
+            self.apply_settings_action(action);
+            return;
+        }
 
         // **OS key repeat is honoured for modal navigation keys only** (Plan 0050
         // Phase 2). The event loop used to drop every repeat before it got here,
@@ -679,16 +855,15 @@ impl AppState {
                 self.renderer.cycle_preset();
                 self.on_preset_switched();
             }
-            KeyCode::KeyA => {
-                let on = self.director.toggle_auto();
-                eprintln!("auto-rotate {}", if on { "on" } else { "off" });
-                self.update_title();
-                self.window.request_redraw();
-            }
-            KeyCode::F3 => {
-                self.overlay_on = !self.overlay_on;
-                self.renderer.set_overlay(self.overlay_on);
-                self.window.request_redraw();
+            KeyCode::KeyA => self.toggle_auto_rotate(),
+            KeyCode::F3 => self.toggle_diagnostics(),
+            // `S` opens settings only out here — while the browser is open it is
+            // a filter character, and the branch above returns before reaching
+            // this match.
+            KeyCode::KeyS => {
+                let view = self.settings_view();
+                let action = self.settings.handle_key(SettingsKey::Toggle, &view);
+                self.apply_settings_action(action);
             }
             KeyCode::KeyF => self.toggle_fullscreen(),
             KeyCode::KeyD => self.cycle_display(),
@@ -709,7 +884,9 @@ impl AppState {
         reason = "double-click timing is shell input handling; core analysis stays clock-free"
     )]
     fn handle_left_press(&mut self) {
-        if self.browse.is_open() {
+        // Suppressed under **either** modal, through the one accessor — the
+        // second one was the easy thing to forget.
+        if self.modal().is_some() {
             return;
         }
         let now = Instant::now();
@@ -729,6 +906,27 @@ impl AppState {
     fn roster_names(&self) -> Vec<String> {
         self.renderer.preset_names().map(str::to_owned).collect()
     }
+}
+
+/// Which modal, if any, currently owns the keyboard and the canvas.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Modal {
+    Browse,
+    Settings,
+}
+
+/// Map a physical key to the settings modal's abstract key, or `None` for keys
+/// the modal does not own (which are then swallowed while it is open).
+fn decode_settings_key(code: KeyCode) -> Option<SettingsKey> {
+    Some(match code {
+        KeyCode::KeyS => SettingsKey::Toggle,
+        KeyCode::ArrowUp => SettingsKey::Up,
+        KeyCode::ArrowDown => SettingsKey::Down,
+        KeyCode::ArrowLeft => SettingsKey::Left,
+        KeyCode::ArrowRight => SettingsKey::Right,
+        KeyCode::Escape => SettingsKey::Escape,
+        _ => return None,
+    })
 }
 
 /// Map a physical key to the overlay's abstract key, or `None` for keys the

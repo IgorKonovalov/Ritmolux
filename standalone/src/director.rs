@@ -92,6 +92,20 @@ impl Director {
         self.auto
     }
 
+    /// Re-set the dwell clamps on a **running** director (Plan 0050 Phase 4's
+    /// settings rows), clamping `max >= min` exactly as `from_config` does.
+    ///
+    /// Deliberately preserves the running dwell clock and the auto flag. Rebuilding
+    /// the whole director from the edited config would be one line shorter and
+    /// would reset the timer under the operator's hand — so a nudge to the max
+    /// dwell would restart the countdown, which is the opposite of what nudging a
+    /// timer means. A dwell already past a freshly-lowered cap simply rotates on
+    /// the next `advance`, which is the correct reading of "the cap moved".
+    pub fn set_dwell_bounds(&mut self, min_secs: u32, max_secs: u32) {
+        self.min_dwell = min_secs as f32;
+        self.max_dwell = (max_secs as f32).max(self.min_dwell);
+    }
+
     /// Advance the timer by `dt` seconds against this frame's analysis and
     /// decide whether to rotate. Returns `Some(reason)` exactly on the frames a
     /// rotation should happen (the caller then calls `Renderer::cycle_preset`);
@@ -379,6 +393,49 @@ mod tests {
             d.advance(1.0, &frame_nov(1.0, 1.0)),
             Some(Rotation::AutoTimer)
         );
+    }
+
+    /// **A live dwell edit does not restart the clock** (Plan 0050 Phase 4). The
+    /// settings menu changes these bounds while the show runs, and re-deriving a
+    /// whole `Director` from the edited config — the obvious implementation —
+    /// would reset the timer under the operator every time they nudged a number.
+    #[test]
+    fn setting_dwell_bounds_keeps_the_running_clock_and_the_auto_flag() {
+        let mut d = director(true, 20, 90);
+        let steady = frame(1.0);
+        for _ in 0..50 {
+            assert_eq!(d.advance(1.0, &steady), None);
+        }
+
+        // 50 s are on the clock. Lower the cap to 60 s: the remaining wait must
+        // be 10 s, not a fresh 60.
+        d.set_dwell_bounds(20, 60);
+        assert!(
+            d.auto_enabled(),
+            "the auto flag was collateral of a dwell edit"
+        );
+        for step in 1..10 {
+            assert_eq!(
+                d.advance(1.0, &steady),
+                None,
+                "the dwell clock restarted (rotated at {step}s after the edit)"
+            );
+        }
+        assert_eq!(
+            d.advance(1.0, &steady),
+            Some(Rotation::AutoTimer),
+            "50 s already elapsed + 10 s should reach the new 60 s cap"
+        );
+
+        // And it clamps the same way the constructor does, so the menu cannot
+        // invert the pair even if a caller hands it a bad one.
+        let mut d = director(true, 20, 90);
+        d.set_dwell_bounds(30, 5);
+        let steady = frame(1.0);
+        for _ in 1..30 {
+            assert_eq!(d.advance(1.0, &steady), None);
+        }
+        assert_eq!(d.advance(1.0, &steady), Some(Rotation::AutoTimer));
     }
 
     #[test]
