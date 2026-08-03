@@ -1,6 +1,8 @@
 # 0058 — The gate can see an empty frame, and "loud" has to mean more picture
 
-> **Status:** draft 2026-08-03 — awaiting the user's go
+> **Status:** **approved 2026-08-03** — ready for `dev`. Phases 1-3 are `dev` and run in one
+> session; **Phase 4 is `human`** (a `preset-author` re-scale) and is the only phase that moves a
+> pixel, so the plan stops there by construction.
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) (this
