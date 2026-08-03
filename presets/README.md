@@ -913,6 +913,58 @@ instant hit with a slow decay. A scalar entry is exactly
 > should *hit* (`burst`, `mirror_reflect`, `thickness` on a beat); leave
 > continuous params symmetric.
 
+## A clamp is a limit, not a gain — the `[occupancy]` table
+
+`core/tests/saturation.rs` is a **HARD gate**: it walks every shipped preset's
+expressions over 12 s of `dynamic:110` and fails the build on any `clamp()` whose
+inner value sits **at** its upper bound for 90 % or more of the hops
+([ADR-0062](../docs/adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)).
+
+That number is called **occupancy**, and it names the one defect nothing else
+here can see. Write
+
+```toml
+warp = "clamp(bass * 16, 0, 0.3)"
+```
+
+and the ceiling is reached at `bass = 0.019` — below the quietest hop of any real
+material. The binding is not a parameter any more; it is the constant `0.3` with
+a brief flicker near silence. Every reactivity instrument in this project scores
+it as **perfectly reactive**, because they all compare a driven band against
+*silence*, and against silence a binary switch is maximally responsive. Plan 0048
+Phase 7 measured what that costs: 263 of 332 clamped band terms in exactly this
+state, 14 presets with no live audio term at all, behind a fully green suite.
+
+The fix is always the same arithmetic: **divide the gain until the bound is
+reached only on peaks.** With `bass` averaging `0.661`, `clamp(bass * 0.45, 0,
+0.3)` reaches the ceiling around `bass = 0.67` — on hits, and nowhere else. The
+failure message states the level the ceiling is already reached at, so you can do
+the division from the failure alone.
+
+Check before you commit — `occ` is the column, and there is a `SAT` line per
+finding:
+
+```sh
+cargo run -p standalone --example shot -- --report --presets presets
+```
+
+The healthy library sits well under the threshold: across 339 clamped bindings
+the highest occupancy is `0.61` and the next is `0.44`.
+
+**If the pin is the design**, say so in the preset. A safety rail that exists to
+bind at peak is not this defect:
+
+```toml
+[occupancy]
+exempt = ["fade"]   # this clamp is a rail, not a gain: pinning is intended
+```
+
+An exemption silences the **gate** and nothing else — the binding still appears
+in `--report`'s `occ` count and its `SAT` line, so it stays visible in review.
+Reach for it when you can say in one sentence why the bound must hold; reach for
+the division otherwise. A name no `[params]` entry binds is inert and warns at
+load.
+
 ## Structural config (line systems and the attractor)
 
 Declarative data the generator/sampler consumes once at load — **not**
