@@ -91,10 +91,21 @@ ink-on-paper remap (`ink_amount`, `paper_*`, `ink_*`). Line systems also take th
 
 **The expression grammar** (every `[params]` value is a quoted string, even a bare number):
 
-- **Variables (10):** `bass mid treb onset beat bar time tempo novelty index`. Bands read *small*;
-  `beat` is a `0`/`1` gate; `bar` is the `0..1` beat phase; **`tempo` is BPM, not `0..1`** — scale it
-  (`tempo / 180`) or compare it (`tempo > 128`); `novelty` is experimental. **`index` is not audio** —
-  it is the per-element position (Plan 0034), see below.
+- **Variables (19):** `bass mid treb onset beat bar time tempo novelty bass_raw mid_raw treb_raw
+  onset_raw beat_index time_since_beat beat_in_bar bar_index bar_phase index`.
+  **Since ADR-0049 (Plan 0048) `bass`/`mid`/`treb`/`onset` really are `0..1`** — each is a fraction
+  of its own slowly-decaying recent peak, so `> 0.5` means "loud for this track" on any track at any
+  gain. Real-music means are about `0.42 / 0.41 / 0.22 / 0.20`. **The old "bands read small" habit is
+  retired**, and the commoner mistake is now the opposite: a threshold *below* the typical level,
+  which fires always. `beat` is a `0`/`1` gate; `bar` is the `0..1` **beat** phase despite the name
+  (`bar_phase` is the real one); **`tempo` is BPM, not `0..1`** — scale it (`tempo / 180`) or compare
+  it (`tempo > 128`); `novelty` is experimental. The four `*_raw` escapes carry the pre-v2 absolute
+  magnitudes (means `0.040 / 0.006 / 0.006 / 0.002`) — reach for them only when a look genuinely
+  wants absolute loudness. `beat_index` and `time_since_beat` are always tracked; `beat_in_bar`,
+  `bar_index` and `bar_phase` ride a **gated** downbeat estimator measured at a ~3 % lock rate on
+  real music, so they are counter-derived nearly always — **build an arc on `beat_index` and treat
+  the bar trio as decorative**. **`index` is not audio** — it is the per-element position (Plan
+  0034), see below.
 - **Constants:** `pi`, `tau`.
 - **Functions (17):** `sin cos abs floor sqrt log min max pow mod clamp lerp smoothstep select bin
   hash noise`. `mod` is floored (`mod(-0.2, 1.0)` is `0.8` — cyclic hue never jumps); `select`
@@ -120,13 +131,19 @@ ink-on-paper remap (`ink_amount`, `paper_*`, `ink_*`). Line systems also take th
     for *selectivity* and `bass`/`mid`/`treb` when you want a region *integrated* (those are true
     means). Both together is usually right — a band scalar for the body, a `bin()` term for the edge.
     Gains transfer between them unchanged.
-  - **DO NOT COMPUTE A POSITION FROM A FORMULA — read the table in `docs/presets.md`.** The axis is
-    **half linear**: band edges start on a log curve from 35 Hz to 18 kHz, but every band is floored
-    at one FFT bin (23.4 Hz at 48 kHz), which binds up to ~750 Hz — so **31 of the 64 bands are
-    linear**. A curve fitted to the log edges is up to **2.9x wrong** below the crossover
-    (it puts `bin(0.14)` at 84 Hz; the real answer is ~246 Hz). The bottom is the array's musically
-    **coarsest** region — band 0 is a full octave — not its finest, and below the crossover the
-    mapping **moves with the sample rate**.
+  - **The axis is genuinely logarithmic end to end since ADR-0049 (Plan 0048)** — a second
+    8192-sample window feeds every band below the ~246 Hz crossover, so `35 * 514.3^x` is now
+    accurate across the whole array, **every band is 1.8 semitones wide everywhere**, and the
+    mapping **no longer moves with the sample rate** (44.1 / 48 / 96 kHz give identical edges).
+    The old warnings this file used to carry — half-linear below ~750 Hz, a fit up to 2.9x wrong,
+    the bottom being the coarsest region — are all **retired**. Still prefer the table in
+    `docs/presets.md` over arithmetic, because the probe interpolates and sits at band-space
+    `x * 63`, but a formula is no longer a trap.
+  - **`bin(x)` addresses by POSITION, not frequency**, and that has already bitten once: Plan 0048's
+    axis rebuild silently moved every sub-crossover probe by about an octave and a half, and nothing
+    in the project could notice. Until `bin_hz` lands
+    ([ADR-0063](../../../docs/adrs/0063-address-the-spectrum-by-frequency.md)), **write the Hz you
+    mean in a comment beside the position** so the next axis change has something to check against.
 - **`index` makes one binding per-element.** On `spectrum`, a binding whose text names `index` is
   evaluated once per element with `index` at that element's `0..1` position, so
   `thickness = "0.01 + bin(index) * 0.05"` thickens each element by its own band. Five params vary
@@ -141,9 +158,15 @@ ink-on-paper remap (`ink_amount`, `paper_*`, `ink_*`). Line systems also take th
 not an expression) so band/beat motion eases instead of snapping; `[palette]` / `[palette_b]` +
 bindable `palette_mix` set colour on the four shader-coloured scenes.
 
-**The two things to internalise:** bands read small, so almost every binding is **gain-then-bound**
-— `clamp(bass * 14, 0, 1.8)` — over a **baseline**: `0.4 + clamp(...)`, never bare reactive. And the
-bound matters most on **luminance**: the scenes draw additively, so a big reactive term on
+**The two things to internalise:** almost every binding is still **gain-then-bound** —
+`clamp(bass * G, 0, C)` — over a **baseline**: `0.4 + clamp(...)`, never bare reactive. But since
+ADR-0049 the bands are `0..1`, so pick `G` **from the cap, not by feel**: a clamped term reaches its
+ceiling at `C / G`, and the house rule out of Plan 0048's retune is `G = C / 0.85` for `bass`/`mid`
+and `C / 0.60` for `treb`/`onset`, which puts a typical passage near half the cap and a peak at it.
+**A gain can be dead the same way a threshold can** — if `C / G` sits below the typical level the
+term is a constant no matter how reactive it reads, and **nothing in the harness checks this yet**
+(Plan 0048 found 263 of 332 clamped band terms in that state at once). Do the division by hand.
+And the bound matters most on **luminance**: the scenes draw additively, so a big reactive term on
 `brightness`/`glow`/`flash`/`thickness` clips the peak to white and erases the look. Peak energy
 belongs on structure — see the additive ceiling in the footguns.
 
@@ -281,7 +304,19 @@ off, and note that an embedded preset must survive the behavioral gates (`sanity
   out as two straight lines — that is the stimulus, not the preset). `--report` and the contact
   sheets are **fine** since `ca99cb1`: their frames now light the log-band slice each named band
   summarises, mirroring `reactivity.rs`. **Verify anything spectral with `--signal`.**
-- **Bands read small.** Un-gained `bass` barely moves the look; gain-then-clamp or it looks dead.
+- **The band scale inverted at ADR-0049.** Bands are now `0..1` with real-music means around
+  `0.42 / 0.41 / 0.22 / 0.20`, so the old failure (a threshold above anything music produces, never
+  firing) has been replaced by its mirror: a threshold *below* the typical level, firing always.
+  Put a threshold between the mean and the max of what it reads.
+- **A pre-change preset rendered on the post-change engine is not a baseline.** After any semantic
+  change to what a variable means, old content evaluates saturated by construction, so "old file vs
+  new file on today's build" measures the defect rather than the intent. To see an authored look,
+  feed the old file the **values it was written against**. This cost a full session on 2026-08-03
+  and produced a retracted backlog entry — see design-backlog 0046.
+- **`Rich` and `Floor` are not a look-neutral switch for the attractor family.**
+  `attractor_particles` is 50 000 at `Floor` and 150 000 at `Rich`, and that family's luminance *is*
+  its particle count. `shot` is `Floor` by construction (ADR-0045), so **no headless capture can
+  tell you how an attractor preset reads at `Rich`** — use the running app with `--tier rich`.
 - **`tempo` is BPM.** Using it raw blows out any parameter.
 - **`zoom` is inverted between families.** On line/swarm/attractor, `zoom > 1` moves the camera *in*;
   on `fragment_field` and `reaction_diffusion` a higher `zoom` shows *more* of the field. Deliberate
