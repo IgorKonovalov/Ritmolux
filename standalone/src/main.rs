@@ -19,7 +19,7 @@ use director::Director;
 use lmv_core::audio::{AudioFormat, SampleConsumer};
 use lmv_core::dsp::Analyzer;
 use lmv_core::render::{CapOverflow, Renderer, RendererOptions, TextRun, Tier};
-use overlay::{OverlayAction, OverlayKey, OverlayState};
+use overlay::{LIST_INSET, LIST_TOP, OverlayAction, OverlayKey, OverlayState, ROW_H, ROW_SIZE};
 use soak::SoakLog;
 use standalone::{
     APP_DIR_NAME, PRESET_DIR_ENV, PresetDir, preset_data_root, resolve_preset_dir, resolve_tier,
@@ -62,12 +62,9 @@ const NAME_INSET: f32 = 16.0;
 const NAME_SIZE: f32 = 28.0;
 const NAME_COLOR: [f32; 4] = [0.9, 0.95, 1.0, 1.0];
 
-/// Browse-overlay list layout (device px) and row colors. The list starts below
-/// the name label; each row is `ROW_H` tall; the highlighted row is brighter.
-const LIST_INSET: f32 = 16.0;
-const LIST_TOP: f32 = 64.0;
-const ROW_H: f32 = 30.0;
-const ROW_SIZE: f32 = 22.0;
+/// Browse-overlay row colors. The **geometry** (insets, pitch, font size, column
+/// width) lives in [`overlay`] beside the pure layout function that reasons about
+/// it, so the pixels drawn here and the arithmetic tested there cannot drift.
 const ROW_COLOR: [f32; 4] = [0.72, 0.78, 0.88, 0.95];
 const ROW_HL_COLOR: [f32; 4] = [1.0, 0.88, 0.35, 1.0];
 /// The filter-echo header sits above the list; dimmer than the rows.
@@ -539,6 +536,20 @@ impl AppState {
     /// — the scrolled roster with the highlighted row distinct. Strings are
     /// owned locally so the renderer's `queue_text` (which copies them) needs no
     /// live borrow of the roster.
+    /// The browse list's layout for `visible_len` rows at the window's current
+    /// size — the one place the shell turns a window into
+    /// [`overlay::ListLayout`], so the drawing and the `Left`/`Right` keys can
+    /// never disagree about where a row is.
+    fn list_layout(&self, visible_len: usize) -> overlay::ListLayout {
+        let size = self.window.inner_size();
+        overlay::layout(
+            visible_len,
+            self.browse.highlight(),
+            size.width as f32,
+            size.height as f32,
+        )
+    }
+
     fn queue_frame_text(&mut self) {
         let mut texts: Vec<String> = Vec::new();
         // (x, y, size, color) parallel to `texts`.
@@ -556,31 +567,30 @@ impl AppState {
             // Header echoes the filter query (or a hint) above the list, so the
             // user sees what they've typed as it narrows the roster.
             let header = if self.browse.filter().is_empty() {
-                "type to filter  -  up/down  enter  esc".to_owned()
+                "type to filter  -  arrows  enter  esc".to_owned()
             } else {
                 format!("filter: {}", self.browse.filter())
             };
             texts.push(header);
             meta.push((LIST_INSET, LIST_TOP, ROW_SIZE, HEADER_COLOR));
 
-            // A scroll window keeps the highlight on screen when the list is
-            // taller than the canvas (rows start one row below the header).
-            let rows_top = LIST_TOP + ROW_H;
-            let height = self.window.inner_size().height as f32;
-            let max_rows = (((height - rows_top) / ROW_H).floor() as usize).max(1);
-            let scroll = highlight
-                .saturating_sub(max_rows.saturating_sub(1))
-                .min(visible.len().saturating_sub(max_rows));
-
-            for (row, &(_abs, name)) in visible.iter().enumerate().skip(scroll).take(max_rows) {
-                let y = rows_top + (row - scroll) as f32 * ROW_H;
+            // Column-major flow (Plan 0050 Phase 3): every placement decision is
+            // the pure `layout`, so this loop only turns `(column, row)` into
+            // pixels. Rows the layout scrolls off answer `None` and are skipped.
+            let layout = self.list_layout(visible.len());
+            for (row, &(_abs, name)) in visible.iter().enumerate() {
+                let Some((col, r)) = layout.place(row) else {
+                    continue;
+                };
+                let x = LIST_INSET + col as f32 * overlay::COL_W;
+                let y = overlay::ROWS_TOP + r as f32 * ROW_H;
                 let (marker, color) = if row == highlight {
                     ("> ", ROW_HL_COLOR)
                 } else {
                     ("  ", ROW_COLOR)
                 };
-                texts.push(format!("{marker}{name}"));
-                meta.push((LIST_INSET, y, ROW_SIZE, color));
+                texts.push(format!("{marker}{}", overlay::fit(name)));
+                meta.push((x, y, ROW_SIZE, color));
             }
         }
 
@@ -624,7 +634,8 @@ impl AppState {
             let name_refs = self.roster_names();
             let refs: Vec<&str> = name_refs.iter().map(String::as_str).collect();
             let active = self.renderer.active_index();
-            match self.browse.handle_key(key, &refs, active) {
+            let layout = self.list_layout(self.browse.visible(&refs).len());
+            match self.browse.handle_key(key, &refs, active, &layout) {
                 OverlayAction::None => return, // closed + non-toggle: let it fall away
                 OverlayAction::Redraw | OverlayAction::Close => {}
                 OverlayAction::Select(index) => {
@@ -643,12 +654,14 @@ impl AppState {
                 let name_refs = self.roster_names();
                 let refs: Vec<&str> = name_refs.iter().map(String::as_str).collect();
                 let active = self.renderer.active_index();
+                let layout = self.list_layout(self.browse.visible(&refs).len());
                 let mut changed = false;
                 for c in text
                     .chars()
                     .filter(|c| !c.is_control() && !c.is_whitespace())
                 {
-                    self.browse.handle_key(OverlayKey::Char(c), &refs, active);
+                    self.browse
+                        .handle_key(OverlayKey::Char(c), &refs, active, &layout);
                     changed = true;
                 }
                 if changed {
@@ -725,6 +738,8 @@ fn decode_overlay_key(code: KeyCode) -> Option<OverlayKey> {
         KeyCode::Tab => OverlayKey::Toggle,
         KeyCode::ArrowUp => OverlayKey::Up,
         KeyCode::ArrowDown => OverlayKey::Down,
+        KeyCode::ArrowLeft => OverlayKey::Left,
+        KeyCode::ArrowRight => OverlayKey::Right,
         KeyCode::Enter | KeyCode::NumpadEnter => OverlayKey::Enter,
         KeyCode::Escape => OverlayKey::Escape,
         KeyCode::Backspace => OverlayKey::Backspace,
