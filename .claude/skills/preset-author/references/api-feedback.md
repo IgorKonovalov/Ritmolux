@@ -57,7 +57,9 @@ filing it as new.
 **Scenes / vocabulary**
 - **One curve family** (`maurer_rose`). Superformula, harmonograph, epicycloid are catalogued
   (`docs/generative-techniques-catalogue.md`) and cheap, but not built.
-- **Four star tilings** (4/6/8/12) and three contact-angle variants.
+- **Four star tilings** (4/6/8/12). `variant` is a **continuous** contact angle since Plan 0054
+  (ADR-0060) — fractional values are real rosettes and `[smoothing]` on it morphs. The rosette's
+  **interior** is still empty at every angle, which is the open half of design-backlog 0007.
 - **No author-supplied shader/WGSL pass** — you cannot write a look the built-in scenes can't draw.
 - **Particle/segment counts are not preset-settable**: the attractor's particle count is fixed
   (`samples` on the curve is, but the swarm's and attractor's populations are not).
@@ -67,8 +69,12 @@ filing it as new.
 - The composite order is **fixed**, not a graph — no reordering, no per-stage routing, no
   multi-scene compositing (two scenes at once).
 - **`mirror_*` is line-only**; the screen-space kaleidoscope is the general tool.
-- **`[palette]` is silently inert on the three line scenes** — they colour through their own cosine
-  `hue`, and nothing warns you. (Known footgun, filed at Plan 0020's close.)
+- ~~**`[palette]` is silently inert on the three line scenes**~~ — **fixed by Plan 0054 /
+  ADR-0059.** Every scene now reaches `[palette]`, `[palette_b]`, `palette_mix`, `hue_spread` and
+  `saturation`. Each line scene walks `hue_spread` along its own axis (path position / generation
+  depth / radius / band index) — the table is in `presets/README.md`. Two live limits: a
+  bracket-free grammar (`lsystem_arrowhead`) has one generation, and `star_pattern`'s radial ramp
+  is measurably flat until its interior is redesigned.
 - Palette interpolation is plain RGB (no OKLab / perceptual blending yet).
 
 **Transitions**

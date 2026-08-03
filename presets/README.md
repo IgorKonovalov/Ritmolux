@@ -340,9 +340,38 @@ instead of along the whole point.
   `rotation` is an angle in radians, so multiply by `time` yourself. Its
   `hue_spread` walks the palette by **generation depth** — see
   [the colour axes](#the-line-scenes-colour-axes--what-hue_spread-walks) below.
-- `star_pattern`: `variant` selects one of the precomputed contact-angle variants
-  (0..2, clamped) — swap it on a beat for a structural accent
-  (e.g. `floor(2.99 * beat)`); `rotation` is an angle in radians.
+- `star_pattern`: `variant` is a **continuous contact angle** in `0..2` (clamped),
+  not an index — see [below](#star_pattern-variant--a-continuous-contact-angle);
+  `rotation` is an angle in radians. Its `hue_spread` axis is radius, and it is
+  inert on the current rosette — see
+  [the colour axes](#the-line-scenes-colour-axes--what-hue_spread-walks).
+
+#### `star_pattern` `variant` — a continuous contact angle
+
+Since Plan 0054 / [ADR-0060](../docs/adrs/0060-star-pattern-variants-interpolate.md)
+`variant` sweeps the Hankin construction's **contact angle** rather than indexing
+one of three precomputed rosettes. `0` is 24° below the `[generator]
+contact_angle_deg` (a sharper star), `1` is the base angle, `2` is 24° above (a
+blunter one), the whole thing clamped into the 8–80° range that makes a sensible
+figure. Values outside `0..2` clamp to the ends.
+
+**`0`, `1` and `2` still name the same three rosettes they always did**, so an
+existing preset is unchanged. What is new is everything between them:
+
+- **`[smoothing]` on `variant` now morphs** instead of stuttering. Easing it used
+  to spend its time on fractional values a `floor` threw away, which is why both
+  shipped star presets `floor` it and why their comments told you not to smooth
+  it. That advice is now backwards.
+- **A `floor` around `mod(…, 3)` is no longer the way to drive it.** The shipped
+  presets still carry one, and removing it *alone* would be worse than the cut it
+  replaces — a sawtooth snaps 2 → 0 at every wrap. Drive it with something
+  continuous and closed instead: a triangle wave (`1 + sin(time * 0.14)` is the
+  cheapest one), or a band term easing between two angles.
+- **The morph is quantized to 0.1° of contact angle**, so the figure rebuilds only
+  when the request has walked that far. That is 480 steps across the whole
+  `variant` range and at most a 1.1 px jump at 1080p on the sharpest rosette — a
+  resolution, not a shape. A `variant` jittering inside one step does not rebuild
+  at all.
 
 #### The line scenes' colour axes — what `hue_spread` walks
 

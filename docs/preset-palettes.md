@@ -9,15 +9,17 @@ palette is a gradient baked once at load into a lookup table that the four
 - `reaction_diffusion`
 - `attractor`
 
-`spectrum` samples the same LUT too, but **on the CPU, once per element** rather
-than per pixel or per particle — see
-[Spectrum — colour along the frequency axis](#spectrum--colour-along-the-frequency-axis).
+**All four line scenes** sample the same LUT too, but **on the CPU, once per
+segment** rather than per pixel or per particle:
 
-The other three line scenes (`parametric_curve` / `lsystem` / `star_pattern`)
-colour through their own cosine `hue` offset and do **not** use this palette
-surface — a `[palette]` table in one of those presets is inert, and `hue` is the
-only colour control they have. See
-[the line scenes' cosine ramp](#the-line-scenes-cosine-ramp--what-hue-actually-looks-like).
+- `spectrum` — see [Spectrum — colour along the frequency axis](#spectrum--colour-along-the-frequency-axis).
+- `parametric_curve`, `lsystem` and `star_pattern` joined it in Plan 0054
+  ([ADR-0059](adrs/0059-line-scenes-colour-along-their-generator-axis.md)) — see
+  [The line scenes — colour along the generator's axis](#the-line-scenes--colour-along-the-generators-axis).
+
+So **every** scene reaches `[palette]`. Before Plan 0054 those three did not, and
+`hue` was the only colour control they had; a note anywhere still saying a
+`[palette]` table is inert on a line scene is stale.
 
 A preset that declares no `[palette]` gets the default **`spectrum`** palette —
 the exact iq cosine the scenes used before this system existed — so every shipped
@@ -204,17 +206,68 @@ Three notes specific to this scene:
   colour rather than a closed loop. Use `hue_spread` for a ring, and `index` when
   you want the ends to be the ends.
 
+### The line scenes — colour along the generator's axis
+
+Plan 0054 ([ADR-0059](adrs/0059-line-scenes-colour-along-their-generator-axis.md))
+gave `parametric_curve`, `lsystem` and `star_pattern` the same surface `spectrum`
+had: `[palette]`, `[palette_b]`, `palette_mix`, `hue_spread` and `saturation`,
+sampled on the CPU per segment. The arithmetic is `spectrum`'s exactly —
+
+```
+hue + hue_spread * u
+```
+
+then crossfade by `palette_mix`, desaturate by `saturation`, scale by
+`brightness`. What differs per scene is **`u`**, and it is a property of the
+generator rather than something a preset picks:
+
+| System | `u` is | Notes |
+|--------|--------|-------|
+| `parametric_curve` | position along the traced path, `i / (samples - 1)` | Normalized over the **full** curve, so `draw_progress` draws the gradient on rather than re-tinting the chords already drawn. |
+| `lsystem` | generation depth over the figure's deepest generation | Branch nesting: `0` on the trunk, one more per open `[`. Normalized over the **built figure's own** maximum, not `visible_depth`. |
+| `star_pattern` | normalized radius from the rosette centre | **Inert today** — see below. |
+| `spectrum` | band index, `i / n` | The original; unchanged. |
+
+`hue_spread = 0` is the default everywhere and reproduces exactly the single flat
+`hue` these scenes drew before, so adding the surface moved no shipped preset.
+
+Two honest limits, both measured rather than estimated:
+
+- **A grammar without branches has one generation.** `lsystem_arrowhead`'s rules
+  (`F -> G-F-G`, `G -> F+G+F`) contain no brackets, so every segment of it sits at
+  generation 0 at all seven of its depths and `hue_spread` does nothing there
+  however large. That is a property of a Sierpinski arrowhead, not a gap: every
+  segment genuinely *is* at the same recursion level. `lsystem_fern` by contrast
+  reaches generation 11 at `visible_depth = 6`, which is why the divisor is the
+  figure's own maximum — dividing by 6 there would clamp most of the plant at the
+  palette's far end.
+- **`hue_spread` does nothing on `star_pattern`.** A Hankin rosette is `2n`
+  *congruent* segments about the frame centre, so every one of them occupies the
+  same radial interval; the spread of segment radii measures `1.2e-7` (f32 noise)
+  at every tiling order and contact angle. There is no range to walk, and the
+  normalization collapses to `u = 0` rather than sweeping on noise. The scene
+  still gains `[palette]`, `saturation` and `palette_mix`, which are real. What is
+  empty is the rosette's *interior* — at `star_rosette`'s 12-fold / 20° the
+  strokes live between radius 0.54 and 0.90, so the inner 60% of the disc is bare,
+  and `star_lantern`'s 55° variant empties 87% of it. That is a generator
+  question, still open; the ramp comes alive by itself the day a construction puts
+  segments at different radii.
+
 ---
 
 ## The line scenes' cosine ramp — what `hue` actually looks like
 
-`parametric_curve`, `lsystem` and `star_pattern` ignore `[palette]` entirely.
-They colour through a fixed cosine ramp (`core/src/render/scenes/lines/mod.rs`),
-so `hue` is their **only** colour control — and it is **not a hue wheel**. The
-three channels are cosines at the same frequency with different phases, which
-means the ramp walks a fixed loop through colour space rather than rotating
-through hues at an even rate. Guessing a value costs a render round-trip; this
-table is so you do not have to.
+This is the **default** palette — what a line scene colours through when its
+preset declares no `[palette]`. It is the `spectrum` gradient, i.e. the same iq
+cosine the engine has always used, and it is **not a hue wheel**. The three
+channels are cosines at the same frequency with different phases, which means the
+ramp walks a fixed loop through colour space rather than rotating through hues at
+an even rate. Guessing a value costs a render round-trip; this table is so you do
+not have to.
+
+(Until Plan 0054 this was the *only* thing `parametric_curve`, `lsystem` and
+`star_pattern` could colour through. It is now their default rather than their
+ceiling — set a `[palette]` and these swatches stop applying.)
 
 Swatches are the ramp at `brightness = 1`, sRGB, computed from the shader's own
 arithmetic and confirmed against rendered strokes:

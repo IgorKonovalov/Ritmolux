@@ -11,10 +11,14 @@
 **Param lifecycle:** each frame the renderer resets every param to its default, then applies the
 preset's bindings. **Any param you don't bind keeps its default** — you only write what you drive.
 
-**Colour split:** `fragment_field`, `swarm`, `reaction_diffusion` and `attractor` colour through
-the shared **palette LUT** (`[palette]`, `saturation`, and either `color_span`/`color_center` or
-`hue_spread`/`hue_center`). The three **line** scenes colour through their own cosine `hue` and
-**ignore `[palette]` silently** — see `docs/preset-palettes.md`.
+**Colour:** **every** scene colours through the shared **palette LUT** — `[palette]`,
+`[palette_b]`, `palette_mix`, `saturation`, plus either `color_span`/`color_center` (fragment,
+reaction-diffusion) or `hue_spread` (+ `hue_center` on swarm/attractor). The shader scenes sample
+it per pixel or per particle; the four **line** scenes sample it on the CPU per segment. Since
+Plan 0054 / ADR-0059 each line scene walks `hue_spread` along **its own generator's axis** — path
+position (`parametric_curve`), generation depth (`lsystem`), radius (`star_pattern`, currently
+flat — see below), band index (`spectrum`). `hue_spread = 0` everywhere is one flat `hue`, which is
+what these scenes drew before. See `docs/preset-palettes.md` and `presets/README.md`'s axis table.
 
 **Every scene also takes** the shared view transform (`zoom`, `pan_x`, `pan_y`) and the engine
 stages `bg_hue`/`bg_bright`/`bg_vignette`, `trails`,
@@ -64,7 +68,10 @@ life comes through the bindings. Draws **opaquely**, so `bg_*` has no visible ef
 | `radial_offset` | `0.0` | `-1 – 1` | added to the radius — opens the rose into spiral/annular/rosette forms. Nonzero pushes `r` past `[-1,1]`; large values blow past the frame (intended, the renderer clips). |
 | `samples` | `361.0` | `120 – 720` | chord count; capped by `MAX_SEGMENTS`. |
 | `thickness` | `2.0` | `1 – 5` | stroke weight. |
-| `hue` | `0.6` | `0 – 1` (+drift) | cosine palette offset. |
+| `hue` | `0.6` | `0 – 1` (+drift) | where the figure sits in the palette. |
+| `hue_spread` | `0.0` | `0 – 1` | walks the palette **along the traced path** — first chord to last. Normalized over `samples`, so `draw_progress` draws the gradient on. |
+| `saturation` | `1.0` | `0 – 2` | shared chroma modulation. |
+| `palette_mix` | `0.0` | `0 – 1` | A/B crossfade with `[palette_b]`. |
 | `spin` | `0.1` | `0 – 1` | angular velocity (`rotation = spin * time`). |
 | `scale` | `0.9` | `0.6 – 1.0` | size in frame. |
 | `brightness` | `1.0` | `0.8 – 1.6` | multiplier. |
@@ -79,12 +86,21 @@ life comes through the bindings. Draws **opaquely**, so `bg_*` has no visible ef
 | `visible_depth` | `1.0` | `1 – max_depth` | which cached iteration draws — the signature move: `4 + floor(2 * bass)` grows the plant on a swell. |
 | `rotation` | `0.0` | radians | **absolute angle**, not a rate — multiply by `time` yourself. |
 | `draw_progress` | `1.0` | `0 – 1` | draw-on reveal. |
-| `hue` | `0.3` | `0 – 1` (+drift) | cosine offset. |
+| `hue` | `0.3` | `0 – 1` (+drift) | where the figure sits in the palette. |
+| `hue_spread` | `0.0` | `0 – 1` | walks the palette by **generation depth** — trunk to deepest twig. The fern-as-growth lever. |
+| `saturation` | `1.0` | `0 – 2` | shared chroma modulation. |
+| `palette_mix` | `0.0` | `0 – 1` | A/B crossfade with `[palette_b]`. |
 | `thickness` | `1.8` | `1 – 4` | stroke weight. |
 | `scale` | `1.0` | `0.7 – 1.0` | size. |
 | `brightness` | `1.0` | `0.8 – 1.6` | multiplier. |
 
 Only depths up to `max_depth` are built, so `visible_depth` is clamped to what exists.
+
+**`hue_spread` needs a grammar with branches.** Generation depth is bracket nesting, so a rule set
+with no `[` (`lsystem_arrowhead`'s `F -> G-F-G`, `G -> F+G+F`) has exactly one generation and the
+ramp is flat there however large `hue_spread` gets — a property of that figure, not a gap. A
+branching grammar (`lsystem_fern` reaches generation 11 at `visible_depth = 6`) ramps across its
+whole depth, because the divisor is the built figure's own deepest generation.
 
 ## `star_pattern` — Hankin star rosette
 *Symmetric, architectural, mandala.* `[generator]` **required** (`tiling` 4/6/8/12,
@@ -92,13 +108,27 @@ Only depths up to `max_depth` are built, so `visible_depth` is clamped to what e
 
 | Param | Default | Typical | Controls / natural driver |
 |-------|---------|---------|---------------------------|
-| `variant` | `1.0` | `0 – 2` | precomputed contact-angle variant (pointy↔blunt). `floor(2.99 * beat)` snaps it on the beat. |
+| `variant` | `1.0` | `0 – 2` | **continuous** contact angle (pointy↔blunt), ±24° around `contact_angle_deg`. `0`/`1`/`2` are the three shapes it used to index; everything between is a real rosette. Sweep it with something closed — `1 + sin(time * 0.14)` — and ease it in `[smoothing]`. |
 | `rotation` | `0.0` | radians | absolute angle. |
 | `draw_progress` | `1.0` | `0 – 1` | draw-on reveal. |
-| `hue` | `0.5` | `0 – 1` (+drift) | cosine offset. |
+| `hue` | `0.5` | `0 – 1` (+drift) | where the figure sits in the palette. |
+| `hue_spread` | `0.0` | — | radius axis, **inert** on this rosette (see below). |
+| `saturation` | `1.0` | `0 – 2` | shared chroma modulation. |
+| `palette_mix` | `0.0` | `0 – 1` | A/B crossfade with `[palette_b]`. |
 | `thickness` | `2.0` | `2 – 6` | stroke weight. |
 | `scale` | `1.0` | `0.8 – 1.0` | size. |
 | `brightness` | `1.0` | `0.8 – 1.6` | multiplier. |
+
+**Two things measured, so you don't re-derive them.** (1) `hue_spread` does nothing here: the
+rosette is `2n` congruent segments about the frame centre, so every segment sits at the same
+radius (spread `1.2e-7`) and there is no range to walk. `[palette]` itself works — reach for that.
+(2) The interior is empty at every contact angle: at 12-fold / 20° the strokes live between radius
+0.54 and 0.90, so 60% of the disc is bare, and 87% at 55°. That is design-backlog 0007's open half;
+don't try to fill it from a preset.
+
+**A `floor` around `mod(…, 3)` is the old idiom and is now wrong** — the floor was there because
+`variant` used to index. Removing it alone is worse (a sawtooth snaps 2 → 0 at the wrap); replace
+the whole driver with a triangle or sine sweep. The two shipped presets still carry the old form.
 
 ## `reaction_diffusion` — Gray-Scott field
 *Coral, maze, mitosis — slow, organic, alive.* A running simulation: parameters steer a **regime**,
