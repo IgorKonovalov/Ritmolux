@@ -105,6 +105,54 @@ pub fn quadrant_spread(img: &CaptureImage, bg: [u8; 4], eps: u8) -> u8 {
     hit.iter().filter(|&&b| b).count() as u8
 }
 
+/// Luminance buckets [`tonal_flatness`] histograms into. 16 over the 0..255
+/// range makes each bucket 16 levels wide — narrow enough that a figure with any
+/// modelling at all spreads across several, wide enough that dithering and
+/// 8-bit quantization do not split one tone in two.
+pub const TONE_BANDS: usize = 16;
+
+/// Share of the **lit** figure whose luminance falls inside the single most
+/// populated narrow luminance band (`0.0..=1.0`) — "does this picture have any
+/// tonal structure".
+///
+/// `coverage` and `quadrant_spread` answer *is something there* and *is it more
+/// than a dot*, and a fully saturated single-tone mass satisfies both: it is a
+/// real shape, of the right size, in every quadrant. This asks the question they
+/// cannot — whether the shape has any interior. A figure with falloff, depth or
+/// modelling spreads across several buckets; one driven past the tonemap knee
+/// collapses into one and reads near `1.0`.
+///
+/// Measured over lit pixels only, against the frame's own sampled background,
+/// for the same reason `coverage` is: a sparse figure on a wide ground would
+/// otherwise report the *background's* flatness, which is total by construction
+/// and says nothing about the scene.
+///
+/// `0.0` for a frame with no lit pixels at all — an empty picture makes no claim
+/// here, and `coverage` is the metric that already convicts it.
+pub fn tonal_flatness(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
+    let mut buckets = [0u64; TONE_BANDS];
+    let mut lit: u64 = 0;
+    for px in img.rgba.chunks_exact(4) {
+        if !is_lit(px, bg, eps) {
+            continue;
+        }
+        lit += 1;
+        // The same weights `downscale_gray` uses, so "luminance" means one thing
+        // across this module.
+        let luma = 0.299 * px.first().copied().unwrap_or(0) as f32
+            + 0.587 * px.get(1).copied().unwrap_or(0) as f32
+            + 0.114 * px.get(2).copied().unwrap_or(0) as f32;
+        let bucket = ((luma / 256.0) * TONE_BANDS as f32) as usize;
+        if let Some(slot) = buckets.get_mut(bucket.min(TONE_BANDS - 1)) {
+            *slot += 1;
+        }
+    }
+    if lit == 0 {
+        return 0.0;
+    }
+    buckets.iter().copied().max().unwrap_or(0) as f32 / lit as f32
+}
+
 // ---------------------------------------------------------------------------
 // Step response — how fast the frame reaches its new steady state (Plan 0037)
 // ---------------------------------------------------------------------------
