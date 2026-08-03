@@ -193,6 +193,16 @@ not run at the plan's close, so the rich tier currently ships numbers nobody has
       `shot --tier floor|rich` exists (it always did — Plan 0044 Phase 3 built it and only `--help`
       omitted it), so a *measurement* is a capture. Keep the app for the frame-time run and for any
       **judgement in motion**; that is what it is still better at.
+      **And since [Plan 0050](plans/0050-in-app-settings-and-a-browse-overlay-that-fits.md) the
+      frame-time run is an A/B in one sitting rather than two launches.** `[` and `]` swap the tier
+      on the running renderer, and the settings menu (`S`) shows which tier is live and whether it
+      is `(auto)`, `(pinned)` or `(demoted)`. So the loop per preset is: hold on the preset with the
+      `F3` overlay up, read p99 at one tier, press the other bracket, let the trails re-accumulate,
+      read p99 again. An in-app change **pins** the tier, so the governor cannot demote inside the
+      measurement — the reason `--tier` was required for this before. It also writes
+      `[quality] tier`, so remember to set it back (or pass `--tier`, which still wins at launch)
+      before running anything that assumes the default. Plan 0050's own Phase 6 item 3 asks for
+      exactly this measurement; whichever runs first satisfies both.
 
 ## How to run
 

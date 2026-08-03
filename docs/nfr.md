@@ -8,9 +8,13 @@ contradicts this file is a plan bug — surface it, don't guess.
 
 - **Model:** the engine ships two named **quality tiers**, `Floor` and `Rich`
   ([ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md)), carried as a `TierConfig` of capacity
-  values (particle counts, segment budget, internal-grid caps) resolved **once at renderer
-  construction**. A tier changes *how much* the engine draws, never *what* — so the same preset
-  reads the same on both, at different budgets.
+  values (particle counts, segment budget, internal-grid caps) resolved **at renderer
+  construction** and, since [ADR-0054](adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md),
+  re-resolvable on the live context by an explicit `Renderer::set_tier` (the standalone's `[` / `]`
+  and its settings menu). The values are capacities read at resource-construction time, so a change
+  rebuilds GPU resources and costs one visible re-accumulation of trails and feedback; nothing
+  branches on the tier per frame. A tier changes *how much* the engine draws, never *what* — so the
+  same preset reads the same on both, at different budgets.
 - **Selection:** unpinned resolves `Rich`, and a **frame-time governor** demotes it to `Floor` on a
   sustained miss of the display's refresh budget — **once per session, one way**, reported in the
   diagnostics overlay and on stderr, never silently. There is no auto-promotion: a demotion is
@@ -18,7 +22,10 @@ contradicts this file is a plan bug — surface it, don't guess.
   neither (ADR-0045 Alternatives A/B).
 - **Pinning:** `--tier floor|rich`, `LMV_TIER`, or `config.toml`'s `[quality] tier`, in that
   precedence. A pin is honoured in both directions and the governor never touches it — which is
-  the escape hatch for a capable machine that a transient stall demoted.
+  the escape hatch for a capable machine that a transient stall demoted. An **in-app** change also
+  pins, and clears the governor's demotion latch: ADR-0045's "the latch is never cleared" narrows
+  to "never cleared *by the governor*" (ADR-0054). It writes `[quality] tier`, so the launch
+  precedence above is unchanged.
 - **Floor:** ≥ 60 fps at 1080p on the baseline hardware (below) at the `Floor` tier, whose values
   are exactly the pre-tier engine's. The floor commitment is unchanged by tiering: the governor
   means a mispredicted rich budget degrades to a known-good state instead of stuttering.
@@ -27,7 +34,9 @@ contradicts this file is a plan bug — surface it, don't guess.
 - **Background cost:** when the window is minimized or fully occluded, rendering throttles to
   near-zero GPU; DSP may keep running so visuals resume in sync.
 - **Captures pin `Floor`.** Headless capture is floor-tier by construction (`Renderer::new_headless`
-  cannot produce another tier), so every golden baseline stays byte-reproducible on the WARP
+  cannot produce another tier, and `set_tier` is a **no-op on a surface-less context** — the guard
+  ADR-0054 adds so the runtime switch cannot reopen this), so every golden baseline stays
+  byte-reproducible on the WARP
   software adapter and the suite's cost does not scale with the rich tier. `Rich` is covered by
   capture-level spot checks plus the on-device checklist — a real QA gap, named rather than solved
   (ADR-0045 Consequences). See [capturing.md](capturing.md).

@@ -102,10 +102,21 @@ one, so you always land where you asked.
 |-----------|-------------------------------------------------------------|
 | `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
-| `Tab`     | Open/close the preset browser (`↑`/`↓` navigate, type to filter the list, `Enter` select — also dissolves, `Esc` close) |
+| `Tab`     | Open/close the preset browser — opens on the preset you're watching. `↑`/`↓` walk the list and wrap at both ends, `←`/`→` step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
+| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics. `↑`/`↓` pick a row, `←`/`→` change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
+| `[` / `]` | Drop / raise the quality tier live — pins it for the session and persists the choice |
 | `F`       | Toggle fullscreen                                           |
 | `D`       | Cycle to the next display/monitor                           |
 | `F3`      | Toggle the diagnostics overlay                              |
+
+The browser lays the roster out in **as many columns as the window fits**, so a
+library taller than the screen is visible at once rather than scrolled past. When
+even the columns can't hold it, the list scrolls by whole columns and keeps the
+highlighted preset on screen.
+
+Both menus are modal and only one is open at a time: `S` opens settings when the
+browser is closed (while it's open, `s` is a filter character), and `Tab` from
+settings hands over to the browser.
 
 ### Flags & environment
 
@@ -116,6 +127,11 @@ one, so you always land where you asked.
   starts on `rich` and a frame-time governor demotes it to `floor` once if the display's frame
   budget is not being held (announced on stderr and marked with a `*` in the `F3` overlay). A pin
   is never demoted, so this is also how you keep `rich` on a machine a transient stall demoted.
+  **The tier also moves while the app is running** — `[` / `]`, or the settings menu's Quality
+  row. An in-app change **pins** the tier for the session (so the governor stops touching it) and
+  writes it to `config.toml`'s `[quality] tier`. `--tier` and `LMV_TIER` still win at the next
+  launch, so the precedence below is unchanged. Expect a brief re-accumulation of trails and
+  feedback when it switches: the tier sizes GPU resources, so changing it rebuilds them.
 - `LMV_PRESET_DIR=<dir>` — point the app at a custom preset folder instead of the seeded per-user
   directory; edits to `*.toml` there hot-reload live.
 - `LMV_TIER=floor|rich` — the same pin as `--tier`, for a one-off run. Precedence is
