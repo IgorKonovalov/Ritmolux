@@ -24,6 +24,13 @@ stops = [
 name = "ember"
 
 [params]
+# GLOW - the figure is authored to sit UNDER the tonemap knee, so only the
+# densest filaments cross 1.0 and bloom picks out exactly those. Authoring
+# at the ceiling instead is what made this preset a flat mass at `rich`,
+# where 3x the particles deposit into the same texels (design-backlog 0047).
+bloom_amount    = "1.4"
+bloom_threshold = "0.9"
+bloom_radius    = "1.4"
 # THE COEFFICIENTS ARE THE INSTRUMENT. Each is a slow independent wander with a
 # band term on top, so the attractor is always mid-transformation and never
 # settles into the one shape a static preset shows.
@@ -34,8 +41,8 @@ d = "1.96 + cos(time * 0.0110) * 0.36 + clamp(bass * 0.282, 0, 0.24)"
 
 # EXPOSURE - short, so the sheet stays filamentary. A long fade saturates the
 # dense cores to flat white and erases the structure the coefficients just built.
-fade   = "0.855 - clamp(bass * 0.088, 0, 0.075) - beat * 0.020"
-size   = "0.52 - clamp((bass + treb) * 0.11, 0, 0.16) + beat * 0.12"
+fade   = "0.52 - clamp(bass * 0.088, 0, 0.075) - beat * 0.020"
+size   = "0.26 - clamp((bass + treb) * 0.05, 0, 0.075) + beat * 0.06"
 reseed = "onset > 0.69"
 
 hue_center  = "0.30 + sin(time * 0.021) * 0.16 + clamp(bass * 0.235, 0, 0.20)"
@@ -51,11 +58,11 @@ pan_x = "sin(time * 0.023) * 0.06"
 pan_y = "cos(time * 0.031) * 0.05"
 
 bg_hue        = "0.58 + sin(time * 0.013) * 0.06"
-bg_bright     = "0.022 + clamp(mid * 0.0235, 0, 0.020)"
+bg_bright     = "0.008 + clamp(mid * 0.0176, 0, 0.015)"
 bg_vignette   = "0.82"
 kaleido_order = "select(bass + mid > 1.12, 6, 1)"
 kaleido_angle = "time * 0.055"
-trails        = "0.46 + clamp(onset * 0.367, 0, 0.22)"
+trails        = "0.18 + clamp(onset * 0.233, 0, 0.14)"
 
 [smoothing]
 a             = 0.55
