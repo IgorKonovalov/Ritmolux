@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0058** (ADRs are a separate sequence — next free there is **0067**.)
+**Next free number: 0059** (ADRs are a separate sequence — next free there is **0068**.)
 
 ## Active roster
 
@@ -16,6 +16,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
 | [0057](0057-the-attractors-compute-path.md) | The attractor's compute path: the deposit, the reseed, the butterfly, and one retune | **approved 2026-08-03** — ready for `dev`; [ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md) + [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) + [ADR-0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md); closes [backlog 0047](../design-backlog.md) (first half), [0048](../design-backlog.md), [0050](../design-backlog.md) and the mechanism half of [0031](../design-backlog.md). **No golden baseline moves anywhere in the plan** (checked in advance, not hoped for). **Phase 4 may route back to `architect`** by design, and **Phase 6 is `human`** — so it does not close in one session | dev, human |
+| [0058](0058-the-gate-can-see-an-empty-frame.md) | The gate can see an empty frame, and "loud" has to mean more picture (coverage measured against black, floors re-derived, a stimulus-relative collapse check) | **draft 2026-08-03** — awaiting the user's go; [ADR-0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md); closes [backlog 0053](../design-backlog.md). `sanity`'s floor is **unfalsifiable for 24 of 35 presets** — the vignette clears it alone. **Phase 4 is `human`** (a `preset-author` re-scale of the two over-scaled spectrum presets) and is the only place pixels move | dev, human |
 
 ## Recommended execution sequence
 
@@ -26,6 +27,20 @@ gates later phases, so they stop mid-plan by construction — [0053] until a dis
 [0055] until the live A/B is judged, [0057] until the content pass runs. Taking [0052] first keeps a
 session unblocked end to end. (**[0054] and [0056] have both landed and closed** on 2026-08-03 — see
 Recently closed.)
+
+**[0058] came out of the [0056] close and is orthogonal to everything.** It touches only
+`core/tests/sanity.rs` — no scene, no shader, no DSP, no preset until its `human` Phase 4 — so it
+collides with nothing in the roster and can ride alongside any lane.
+
+**[0057] Phase 1(a) is already built, and this is a drift finding rather than a plan change.**
+`shot --tier floor|rich` exists and works (verified 2026-08-03), delivered by [0044] Phase 3 as
+`Renderer::new_headless_tiered` and documented in `docs/capturing.md` — it is absent only from
+`shot --help`, which is how four places in these documents came to assert it did not exist and how
+[ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md) came to propose a decision that had
+already been taken. **Check it before starting [0057]**: Phase 1's real remaining work is (b), the
+`--signal` kind whose onsets cross the shipped reseed gates, plus the `docs/capturing.md` sentence
+that a `Rich` capture is an instrument and never a baseline. ADR-0064 wants re-reading against the
+code before it is accepted.
 
 **[0057] is now unblocked and is the one with a live dependency behind it.** [0056] has landed, so
 [0057] Phase 6's content pass has the tonal-flatness statistic it was sequenced to wait for
@@ -47,8 +62,8 @@ which [0056] gained at approval, folding in [backlog 0047](../design-backlog.md)
 pairing exists to avoid.
 
 **The shared root of all three is that the harness cannot render the configuration each defect
-occurs in**, which is why all three shipped behind a green suite. `shot` has no `--tier` and is
-`Floor` by construction, so no capture describes the tier the app *starts* on — even though
+occurs in**, which is why all three shipped behind a green suite. ~~`shot` has no `--tier`~~ — **it does, see the correction below** — and `Renderer::new_headless`
+is `Floor` by construction, so no capture describes the tier the app *starts* on — even though
 [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) names capture-level `Rich` spot checks as
 that tier's verification path. And `--set` holds a level constant, so no stimulus can express the
 transient a reseed *is*. [0057] Phase 1 builds both instruments before any fix
@@ -72,9 +87,9 @@ no C ABI change, and **no golden baseline may move**. So it neither blocks nor i
 - **It is now the only way to settle [backlog 0031](../design-backlog.md).** That coupling has
   inverted since this was written: [0045] has landed, so an operator switching to `Rich` on
   `attractor_clifford` is no longer walking into a known un-fixed defect — they are running the
-  measurement the entry needs. And **`shot` has no `--tier` flag** (headless capture is `Floor` by
-  construction, ADR-0045, deliberately), so the running app is the *only* instrument for any `Rich`
-  question. [0050] Phase 6 item 3 is where that lands.
+  measurement the entry needs. ~~And `shot` has no `--tier` flag, so the running app is the only instrument for any `Rich`
+  question.~~ **False since Plan 0044 Phase 3** — **`shot` DOES have `--tier floor|rich`** (verified 2026-08-03: `--tier rich` on `attractor_clifford` renders visibly denser). Plan 0044 Phase 3 built it — `Renderer::new_headless_tiered` — and `docs/capturing.md` documents it; it is missing only from `shot --help`, which is how these documents came to assert it did not exist. `Renderer::new_headless` still pins `Floor`, so ADR-0045's compile-time property holds. The running app is still better for a
+  *judgement*, because you can A/B it live; it is no longer the only instrument. [0050] Phase 6 item 3 is where that lands.
 
 
 **[0048] has landed and closed** (2026-08-03) — the analysis surface is v2 and the whole library
@@ -151,10 +166,10 @@ settled. **[backlog 0031](../design-backlog.md)** — `attractor_clifford` blowi
 **half** closed, not closed: the tonemap holds tone at `Floor` with no clipping, but boundedness
 below 1.0 does not stop the sRGB byte rounding to 255, which takes a linear value of about 35 at
 the shipped knee — and `attractor.toml` already reaches that at `Floor` on hardware. `Rich` triples
-the deposit into the same texels. So the lever is the particle count, not the curve. Note the
-harness limit that re-check also surfaced: **`shot` has no `--tier` flag** — headless capture is
-`Floor` by construction (ADR-0045), deliberately — so every `Rich` question needs the running app,
-which is what [0050]'s `[` / `]` swap is for.
+the deposit into the same texels. So the lever is the particle count, not the curve. ~~Note the harness limit that
+re-check also surfaced: `shot` has no `--tier` flag, so every `Rich` question needs the running
+app.~~ **That limit was never real** — **`shot` DOES have `--tier floor|rich`** (verified 2026-08-03: `--tier rich` on `attractor_clifford` renders visibly denser). Plan 0044 Phase 3 built it — `Renderer::new_headless_tiered` — and `docs/capturing.md` documents it; it is missing only from `shot --help`, which is how these documents came to assert it did not exist. `Renderer::new_headless` still pins `Floor`, so ADR-0045's compile-time property holds, so this calibration can be run from captures
+today. [0050]'s `[` / `]` swap remains the better way to *judge* it live.
 
 **[0043] has landed and closed** — the swarm's wrap seam is off-screen, its domain has the render
 target's shape, and every particle carries a depth. See Recently closed. Two things later work
