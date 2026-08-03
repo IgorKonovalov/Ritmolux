@@ -2794,3 +2794,70 @@ itself once someone does the work.
 library's highest is `0.830` (`Rose Trails`), then `0.765` (`Rose Web`) — both trails-heavy line
 looks where most lit pixels are faint tail at one level. That is not much headroom, so a content
 pass that raises `trails` on a line preset should re-run `sanity` rather than assume.
+
+---
+
+## Entry 0053 — from the `preset-author` pass on 0051/0052 (2026-08-03)
+
+## 0053 — Plan 0048's retune rescaled the band GAINS but not the world-space params those bands multiply, and no instrument can see the result
+
+- **Raised:** 2026-08-03, from `preset-author`, while repairing `spectrum_ridge` for
+  [0052](design-backlog.md).
+- **Verified against code and by rendering:** yes — measured under `--signal noise:7` and
+  `--signal dynamic:110`, and against `core/tests/sanity.rs`'s own numbers.
+- **Two findings, and the second is the durable one.**
+
+### One — a shipped preset had been drawing itself off-screen since ADR-0049
+
+`spectrum_ridge` ran `scale = 3.20`. `scale` multiplies the element level to produce a **world**
+height, and every value in that file's long tuning history was chosen when a loud band read about
+`0.1`. ADR-0049 normalized the bands to `0..1`, so the same constant was suddenly multiplying a
+value roughly **five times larger**: a fully-driven element sat at about **3.3 world units against a
+visible half-height of 1.0**.
+
+Rendered, that is not a subtle mis-tune. Under `--signal noise:7` the frame came back **empty except
+the vignette**. Under `--signal dynamic:110` only the near-vertical connecting segments crossed the
+frame edges; the peaks were never visible at all. Repaired here to `0.60` (Plan 0054/0056 close
+pass), which puts a fully-driven contour just inside the frame.
+
+**Plan 0048 Phase 7's retune was a real and careful pass and it did not cover this class.** It
+rescaled `clamp(band * G, 0, C)` **gains** — the terms whose job is to bound a band. A `scale` that
+multiplies a band into a world coordinate is the same arithmetic exposure with none of the shape the
+retune searched for: no `clamp`, no ceiling, nothing for occupancy (ADR-0062) or reachability to
+observe. **`bin()`-driven and `index`-driven world quantities are in the same position.**
+
+### Two — no instrument in this project can see a figure that has left the frame
+
+This is the part worth designing against. `coverage` and `quadrant_spread` measure lit pixels
+**against a sampled background**, and `bg_vignette` makes the backdrop a smooth bright-centred
+gradient. So a frame containing **nothing but the vignette** scores as a large, well-spread, lit
+figure. `spectrum_ridge` passed `sanity` for its whole broken life on exactly that, and its
+`tonal_flatness = 1.000` — the number [0052](design-backlog.md) was raised about — **was the
+vignette**, not the preset. Repairing the preset moved coverage to `0.63` of genuinely drawn figure.
+
+So the flat-frame statistic did its job by accident: it convicted the right preset for the wrong
+reason. Worth knowing before it is trusted as an attractor instrument.
+
+**What a fix might be** (all cheap, none obviously best):
+- **An in-frame fraction.** What share of the scene's own drawn geometry lands inside the render
+  target. Line and spectrum scenes already build a CPU segment list, so this is measurable without a
+  readback for exactly the scenes most exposed to it.
+- **Sample the background from the frame's own corners *and* discount a radially symmetric
+  gradient**, so a vignette cannot be mistaken for a figure.
+- **Render one `sanity` frame at `bg_bright = 0`.** Crudest and probably most effective: with no
+  backdrop, an off-frame figure scores a coverage of zero and the existing floor catches it.
+
+### The two siblings are over-scaled by the same factor and their layout is hiding it
+
+`spectrum_comb` still runs `scale = 3.80` and `spectrum_corona` `scale = 5.20`, and **both score
+well** (coverage 0.76 / 0.80, flatness 0.31 / 0.44). Rendered, the reason is layout, not health: a
+comb roots every bar on a baseline and a corona roots every spoke at a centre, so an overshoot
+**clips the tips** and leaves the body of the figure in frame and legible. A `polyline` has no root —
+every vertex sits at the level — so the identical overshoot removes the entire figure.
+
+Measured under `dynamic:110`, the comb's tall bars run off the top edge on every peak, which means
+the loudest part of the readout is the part you cannot see. That is milder than the ridge and it is
+still the "loud reads as less information" failure. **Left unchanged deliberately** — re-tuning two
+more shipped presets was outside the 0051/0052 handoff, and the right factor should be decided
+together with whatever instrument comes out of finding two, so it can be verified rather than
+eyeballed.
