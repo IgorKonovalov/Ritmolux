@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0057** (ADRs are a separate sequence — next free there is **0064**.)
+**Next free number: 0058** (ADRs are a separate sequence — next free there is **0067**.)
 
 ## Active roster
 
@@ -16,17 +16,42 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
 | [0054](0054-the-line-scenes-catch-up.md) | The line scenes catch up: every one honours the palette, and the star stops cutting between shapes | **approved 2026-08-02** — ready for `dev`; [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md) + [ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md); closes [backlog 0026](../design-backlog.md) + [0007](../design-backlog.md). Two blocked content asks, both with the user's own verdict behind them | dev |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
-| [0056](0056-clamp-occupancy-and-the-axis-anchor.md) | Clamp occupancy: the instrument that would have caught a saturated library, plus the axis anchor | **draft 2026-08-03** — [ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) + [ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md) (Phase 4 only); closes [backlog 0043](../design-backlog.md) + the guard half of [0044](../design-backlog.md). Test-and-harness work only — **no pixels move, no golden moves, no scene or DSP is touched**, and the retuned library is expected to pass on arrival. Phase 3's threshold is **measured, not asserted** | dev |
+| [0056](0056-clamp-occupancy-and-the-axis-anchor.md) | Clamp occupancy: the instrument that would have caught a saturated library, plus the axis anchor and the flat-frame check | **approved 2026-08-03** — ready for `dev`; [ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) + [ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md) (Phase 4 only); closes [backlog 0043](../design-backlog.md), the guard half of [0044](../design-backlog.md) and the second half of [0047](../design-backlog.md). **Phase 5 added at approval**: the tonal-flatness statistic in the `sanity` gate. Test-and-harness work only — **no pixels move, no golden moves, no scene or DSP is touched**. Both thresholds are **measured, not asserted**. **Run before [0057]**, whose content phase uses Phase 5's statistic | dev |
+| [0057](0057-the-attractors-compute-path.md) | The attractor's compute path: the deposit, the reseed, the butterfly, and one retune | **approved 2026-08-03** — ready for `dev`; [ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md) + [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) + [ADR-0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md); closes [backlog 0047](../design-backlog.md) (first half), [0048](../design-backlog.md), [0050](../design-backlog.md) and the mechanism half of [0031](../design-backlog.md). **No golden baseline moves anywhere in the plan** (checked in advance, not hoped for). **Phase 4 may route back to `architect`** by design, and **Phase 6 is `human`** — so it does not close in one session | dev, human |
 
 ## Recommended execution sequence
 
-**Every plan in the roster is approved as of 2026-08-02 — nothing is waiting on a design
-decision** (except [0056], which is a fresh draft and wants the user's "go"). What separates them
-now is only what each needs to *run*: [0052] and [0054] close in one session; [0050] closes in one
-plus a measurement; [0053] and [0055] each carry a `human` phase that gates later phases, so they
-stop mid-plan by construction — [0053] until a discrete GPU is to hand, [0055] until the live A/B
-is judged. **[0048] has landed and closed** (2026-08-03; see Recently closed), which is what put
-[0056] on the roster. Taking [0052] or [0054] first keeps a session unblocked end to end.
+**Every plan in the roster is approved as of 2026-08-03 — nothing is waiting on a design
+decision.** What separates them now is only what each needs to *run*: [0052], [0054] and [0056]
+close in one session; [0050] closes in one plus a measurement; [0053], [0055] and [0057] each carry
+a `human` phase that gates later phases, so they stop mid-plan by construction — [0053] until a
+discrete GPU is to hand, [0055] until the live A/B is judged, [0057] until the content pass runs.
+Taking [0052], [0054] or [0056] first keeps a session unblocked end to end.
+
+**[0056] then [0057] is the one ordering in this roster that is not free.** Three defects raised on
+2026-08-03 are one subsystem — the attractor's compute path deposits light without normalizing for
+particle count, reseeds by replacing the cloud with an axis-aligned box, and renders Lorenz as a
+dust cloud — and [0057] takes all three in one plan **because all three move the same six presets'
+look**. Commit `00d99d0` already retuned four of them *downward* to survive a 3x that [0057] Phase 2
+removes, so those four owe a re-raise; done as three plans that family gets retuned three times.
+[0057] Phase 6 is that single content pass, and it wants [0056] Phase 5's tonal-flatness statistic —
+which [0056] gained at approval, folding in [backlog 0047](../design-backlog.md)'s second half (the
+`sanity` gate passing a fully saturated frame). Measuring it by hand twice is exactly the waste the
+pairing exists to avoid.
+
+**The shared root of all three is that the harness cannot render the configuration each defect
+occurs in**, which is why all three shipped behind a green suite. `shot` has no `--tier` and is
+`Floor` by construction, so no capture describes the tier the app *starts* on — even though
+[ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) names capture-level `Rich` spot checks as
+that tier's verification path. And `--set` holds a level constant, so no stimulus can express the
+transient a reseed *is*. [0057] Phase 1 builds both instruments before any fix
+([ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md)), which is the sequencing
+[ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) paid for. **A `Rich`
+capture is an instrument and never a baseline** — the `Rich` multipliers are still the provisional
+values Plan 0044 shipped, its Phase 4 calibration having never run. Note also that [0057] Phase 4
+**may route back to `architect`** by design: if the Lorenz dust cloud turns out to be the shared 3-D
+view basis (the plan's leading hypothesis, with the discriminating capture named), making that
+convention per-family is a decision with rejected alternatives and owes its own ADR.
 
 **[0050] is orthogonal to everything below and can be taken whenever the user wants the app to be
 operable.** It touches one new `core` entry point (`Renderer::set_tier`, plus an `active_index`

@@ -1,12 +1,17 @@
 # 0056 — Clamp occupancy: the instrument that would have caught a saturated library, plus the axis anchor
 
-> **Status:** draft
+> **Status:** approved 2026-08-03 — ready for `dev`
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev
 > **Related ADRs:** [0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) (occupancy
 > as a gate — this plan implements it), [0063](../adrs/0063-address-the-spectrum-by-frequency.md)
 > (Phase 4 only: the external axis anchor, which is that ADR's cheap immediate half).
 > Follows [Plan 0048](done/0048-analysis-v2-and-the-retune.md), whose Phase 7 found the gap.
+> **Phase 5 was added at approval (2026-08-03)**, folding in the second half of
+> [backlog 0047](../design-backlog.md) — the `sanity` gate passing a fully saturated frame. Same
+> class of defect as occupancy, same plan: an instrument that reports a picture is alive when it is
+> not. [Plan 0057](0057-the-attractors-compute-path.md) Phase 6 consumes its statistic, so this
+> plan runs first.
 
 ## TL;DR
 
@@ -111,6 +116,25 @@ flowchart LR
   the thing that moved. A comment on the test says what a failure means: the axis was relaid and
   every `bin()` in `presets/` needs re-checking against the frequency its author named.
 
+### Phase 5 — The `sanity` gate notices a flat frame
+
+- **Owner skill:** dev
+- **What:** the tonal-flatness statistic — the share of the lit figure sitting inside one narrow
+  luminance band — computed over the frame `sanity` already renders, and reported per preset.
+  Backlog 0047's second half. It is a general "the picture has no tonal structure" check, not an
+  attractor-specific one: the gate currently asserts a real shape exists and a fully saturated
+  single-tone mass satisfies that, which is how four attractor presets shipped flat behind it.
+- **Files touched:** `core/tests/sanity.rs`, and wherever the shared capture-statistics helpers
+  live.
+- **Done when:** the statistic is recorded for **every** shipped preset and the distribution is in
+  the phase commit, exactly as Phase 3 does for occupancy. A deliberately flattened fixture — the
+  cheapest being a preset driven above the tonemap knee — is reported as flat, and the shipped
+  library's own values are what set the threshold. **State explicitly which of the four presets
+  `00d99d0` repaired this gate would have caught**, given that `sanity` renders at `Floor` and at
+  silence while the reported saturation was at `Rich`: if the honest answer is *none of them*, that
+  is a finding worth surfacing, the statistic still belongs in the gate for the cases it does
+  reach, and it says something about where the next instrument goes.
+
 ## Data shapes
 
 ```rust
@@ -159,7 +183,12 @@ exempt = ["fade"]   # this clamp is a safety rail; pinning at peak is the design
 - **No mid-scale rung in `core/tests/reactivity.rs`.** Rejected in ADR-0062, and revisitable only
   if occupancy proves to miss a real case.
 - **No preset retune.** Plan 0048 Phase 7 did that; this plan builds the instrument that would have
-  caught it, and the library is expected to pass on arrival.
+  caught it, and the library is expected to pass on arrival. The attractor family's retune is
+  [Plan 0057](0057-the-attractors-compute-path.md) Phase 6, which uses Phase 5's statistic.
+- **No `Rich`-tier capture in any gate.** [Plan 0057](0057-the-attractors-compute-path.md) Phase 1
+  makes one possible ([ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md)); whether the
+  `sanity` gate should also run there is a question for after Phase 5's measurement answers what a
+  `Floor` frame can and cannot see.
 - **No change to reachability's existing findings.** `GATE`, `COMP` and the ceiling-never-approached
   `ceils` behave exactly as they do today.
 
