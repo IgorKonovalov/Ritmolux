@@ -4,11 +4,29 @@
 //! fraction of the frame (`coverage`) and spreads across at least two quadrants
 //! (`quadrant_spread`) — "not blank, not a dot".
 //!
-//! The background is sampled from a corner pixel, **not** assumed to be black:
-//! `fragment_field` clears to black but `swarm` clears to a dark blue, so a
-//! fixed black background would score every swarm frame as fully lit (a
-//! tautology — Plan 0013 Risks). Measuring foreground against the frame's own
-//! background makes a blank frame score 0 whatever colour it cleared to.
+//! **Plan 0058 / [ADR-0067]: the capture measures the scene, not the backdrop.**
+//! This gate used to sample the background from pixel (0, 0) — the frame's own
+//! corner — on the Plan 0013 reasoning that a scene which clears to a dark blue
+//! would otherwise score as fully lit. That reasoning was correct for a
+//! per-scene clear and became wrong the day the backdrop moved into an engine
+//! pre-pass ([ADR-0018](../../docs/adrs/0018-background-pre-pass.md)):
+//! `bg_vignette` darkens the frame toward its edges, so on any preset that binds
+//! one **the corner is the darkest pixel in the image** and nearly every pixel
+//! toward the centre differs from it by more than [`EPS`]. The backdrop read as
+//! a large, well-spread, lit figure. 24 of the 35 shipped presets bind
+//! `bg_vignette`, and the sparse-system floor is 0.01, so for most of the
+//! library the floor was satisfied by the backdrop alone whatever the scene did
+//! — an unfalsifiable gate, which `spectrum_ridge` proved by shipping a contour
+//! drawn 3.3 world units off the top of a frame of half-height 1.0 and passing.
+//!
+//! So the roster this gate renders has its `bg_*` bindings **removed**
+//! ([`without_backdrop`]) and `is_lit` compares against [`BLACK`]. The
+//! background stage already defaults `bright` and `vignette` to `0.0`
+//! (`core/src/render/background.rs`), so this is *not applying three bindings*
+//! rather than a new render path: the pass renders the plain black clear it
+//! renders for any preset that never mentions `bg_*`. Nothing outside this file
+//! changes — `golden`, `distinctness`, `reactivity` and `shot` all keep the
+//! shipped composite, backdrop included.
 //!
 //! Coverage floors are per-system: `fragment_field` fills the frame, while the
 //! `swarm` is sparse points, so a single broad floor would be either tautological
@@ -26,16 +44,29 @@ use lmv_core::{
     dsp::AnalysisFrame,
     preset::{Preset, SystemKind, default_presets},
     render::{
-        CaptureImage, HeadlessOptions, RenderError, Renderer,
+        HeadlessOptions, RenderError, Renderer,
         metrics::{TONE_BANDS, coverage, quadrant_spread, tonal_flatness},
     },
 };
 
 const SIZE: u32 = 96;
 const FRAMES: u32 = 30;
-/// A pixel counts as lit if any RGB channel differs from the sampled background
-/// by more than this (shrugs off dark near-background dithering).
+/// A pixel counts as lit if any RGB channel differs from [`BLACK`] by more than
+/// this (shrugs off dark near-black dithering).
 const EPS: u8 = 10;
+/// What the scene is measured against (ADR-0067). Not a sampled pixel: the
+/// backdrop is suppressed for this capture, so every lit pixel is light the
+/// **scene** put there. Alpha is never compared — [`is_lit`] takes the first
+/// three channels — but the frames come back opaque, so 255 is the honest value.
+///
+/// [`is_lit`]: lmv_core::render::metrics
+const BLACK: [u8; 4] = [0, 0, 0, 255];
+/// The prefix every background-stage parameter carries (`bg_hue`, `bg_bright`,
+/// `bg_vignette` — `core/src/render/background.rs`'s `PARAMS`, which is
+/// `pub(crate)` and so not nameable from an integration test).
+/// [`sanity_roster`] asserts the prefix still matches something, so a rename
+/// fails this gate rather than silently restoring the backdrop.
+const BG_PREFIX: &str = "bg_";
 /// Minimum lit quadrants — a dot in one corner fails.
 const MIN_QUADRANTS: u8 = 2;
 
@@ -166,15 +197,54 @@ fn loud() -> AnalysisFrame {
     }
 }
 
-/// The top-left pixel, taken as the scene's background colour (the clear colour
-/// each built-in scene paints its corners with).
-fn background(img: &CaptureImage) -> [u8; 4] {
-    [
-        img.rgba.first().copied().unwrap_or(0),
-        img.rgba.get(1).copied().unwrap_or(0),
-        img.rgba.get(2).copied().unwrap_or(0),
-        img.rgba.get(3).copied().unwrap_or(255),
-    ]
+/// Drop the preset's backdrop bindings so the capture renders the scene over the
+/// background stage's default black (ADR-0067).
+///
+/// A **test-side** transform on purpose: the renderer's capture surface is not
+/// widened, no engine flag is added, and every other caller keeps the shipped
+/// composite. Removing the bindings is enough because the stage's own defaults
+/// are `bright = 0.0` / `vignette = 0.0`, and at `bg_bright <= 0` the pass is a
+/// plain black clear that does not even build its gradient pipeline.
+fn without_backdrop(mut preset: Preset) -> Preset {
+    preset.params.retain(|b| !b.name.starts_with(BG_PREFIX));
+    preset
+}
+
+/// The shipped library with its backdrops suppressed, plus the `(name, system)`
+/// of each preset in roster order.
+///
+/// Panics if the transform matched nothing. That is the guard on the guard: if
+/// the background params are ever renamed off `bg_`, this file would quietly go
+/// back to measuring vignettes and every floor below would go back to being
+/// unfalsifiable, with a green suite the whole way.
+fn sanity_roster() -> (Vec<Preset>, Vec<(String, SystemKind)>) {
+    let mut stripped = 0usize;
+    let mut with_backdrop = 0usize;
+    let presets: Vec<Preset> = default_presets()
+        .into_iter()
+        .map(|p| {
+            let before = p.params.len();
+            let p = without_backdrop(p);
+            let removed = before - p.params.len();
+            stripped += removed;
+            with_backdrop += usize::from(removed > 0);
+            p
+        })
+        .collect();
+    assert!(
+        stripped > 0,
+        "no `{BG_PREFIX}*` binding was found in any of the {} shipped presets — the \
+         backdrop suppression this gate rests on (ADR-0067) has become a no-op, so \
+         `coverage` is measuring the backdrop again",
+        presets.len()
+    );
+    println!(
+        "backdrop suppressed: {stripped} {BG_PREFIX}* binding(s) removed across \
+         {with_backdrop}/{} presets",
+        presets.len()
+    );
+    let meta = presets.iter().map(|p| (p.name.clone(), p.system)).collect();
+    (presets, meta)
 }
 
 #[test]
@@ -183,45 +253,41 @@ fn every_preset_draws_a_real_shape() {
         return;
     };
     let frame = loud();
+    let (presets, meta) = sanity_roster();
+    renderer.set_presets(presets);
 
     let mut failures = Vec::new();
     let mut flatness = Vec::new();
-    for preset in default_presets() {
+    for (name, system) in &meta {
+        let (name, system) = (name.as_str(), *system);
         let img = renderer
-            .capture_preset(&preset.name, &frame, FRAMES)
+            .capture_preset(name, &frame, FRAMES)
             .expect("capture preset");
-        let bg = background(&img);
-        let cov = coverage(&img, bg, EPS);
-        let spread = quadrant_spread(&img, bg, EPS);
-        let flat = tonal_flatness(&img, bg, EPS);
-        let floor = coverage_floor(preset.system);
+        let cov = coverage(&img, BLACK, EPS);
+        let spread = quadrant_spread(&img, BLACK, EPS);
+        let flat = tonal_flatness(&img, BLACK, EPS);
+        let floor = coverage_floor(system);
         println!(
-            "[{}] {:<12} coverage={cov:.4} (floor {floor:.2}) quadrants={spread} \
+            "[{}] {name:<12} coverage={cov:.4} (floor {floor:.2}) quadrants={spread} \
              flatness={flat:.4} (max {MAX_TONAL_FLATNESS:.2})",
-            system_name(preset.system),
-            preset.name,
+            system_name(system),
         );
-        let known_flat = KNOWN_FLAT.contains(&preset.name.as_str());
-        flatness.push((flat, preset.name.clone(), known_flat));
+        let known_flat = KNOWN_FLAT.contains(&name);
+        flatness.push((flat, name.to_string(), known_flat));
         if cov < floor {
-            failures.push(format!(
-                "{} blank: coverage {cov:.4} < {floor:.2}",
-                preset.name
-            ));
+            failures.push(format!("{name} blank: coverage {cov:.4} < {floor:.2}"));
         }
         if spread < MIN_QUADRANTS {
             failures.push(format!(
-                "{} is a dot: {spread} quadrant(s) < {MIN_QUADRANTS}",
-                preset.name
+                "{name} is a dot: {spread} quadrant(s) < {MIN_QUADRANTS}"
             ));
         }
         if flat > MAX_TONAL_FLATNESS && !known_flat {
             failures.push(format!(
-                "{} is flat: {:.1}% of its lit pixels sit in one of {TONE_BANDS} luminance \
+                "{name} is flat: {:.1}% of its lit pixels sit in one of {TONE_BANDS} luminance \
                  bands (max {:.0}%) — a real shape with no interior, which coverage and \
                  spread both score as healthy. Lower the drive, the glow or the \
                  accumulation until the figure has falloff again",
-                preset.name,
                 flat * 100.0,
                 MAX_TONAL_FLATNESS * 100.0,
             ));
@@ -230,9 +296,8 @@ fn every_preset_draws_a_real_shape() {
         // named here would silently exempt whatever it becomes next.
         if known_flat && flat <= MAX_TONAL_FLATNESS {
             failures.push(format!(
-                "{} is listed in KNOWN_FLAT but now measures {flat:.4}, under the \
-                 {MAX_TONAL_FLATNESS:.2} ceiling — it was repaired, so delete the entry",
-                preset.name
+                "{name} is listed in KNOWN_FLAT but now measures {flat:.4}, under the \
+                 {MAX_TONAL_FLATNESS:.2} ceiling — it was repaired, so delete the entry"
             ));
         }
     }
@@ -283,15 +348,14 @@ fn a_frame_with_no_tonal_structure_is_reported_flat() {
     let Some(mut renderer) = headless() else {
         return;
     };
-    renderer.set_presets(vec![blown_out()]);
+    renderer.set_presets(vec![without_backdrop(blown_out())]);
     let img = renderer
         .capture_preset("Blown Out", &loud(), FRAMES)
         .expect("capture the flat fixture");
-    let bg = background(&img);
 
-    let cov = coverage(&img, bg, EPS);
-    let spread = quadrant_spread(&img, bg, EPS);
-    let flat = tonal_flatness(&img, bg, EPS);
+    let cov = coverage(&img, BLACK, EPS);
+    let spread = quadrant_spread(&img, BLACK, EPS);
+    let flat = tonal_flatness(&img, BLACK, EPS);
     println!("[blown out] coverage={cov:.4} quadrants={spread} flatness={flat:.4}");
 
     // The fixture has to pass the two existing checks, or it demonstrates
@@ -307,5 +371,146 @@ fn a_frame_with_no_tonal_structure_is_reported_flat() {
     assert!(
         flat > MAX_TONAL_FLATNESS,
         "a figure stacked past the additive ceiling must read flat, got {flat:.4}"
+    );
+}
+
+/// **`spectrum_ridge` exactly as it shipped broken**, recovered from
+/// `git show 81190ac^:presets/spectrum_ridge.toml` — every table and every
+/// binding byte-for-byte, comments stripped and the `name` suffixed so the
+/// output reads clearly. Nothing here is tunable: this is the defect, frozen.
+///
+/// `scale = 3.20` is the whole of it. Tuned before
+/// [ADR-0049](../../docs/adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)
+/// normalized the bands to `0..1`, it afterwards multiplied a value roughly five
+/// times larger, putting a driven element about **3.3 world units** up against a
+/// visible half-height of `1.0`. Under [`loud`] the contour is off frame
+/// entirely and the composite comes back empty except for `bg_vignette`.
+fn pre_repair_spectrum_ridge() -> Preset {
+    Preset::from_toml_str(
+        r#"
+system = "spectrum"
+name   = "Spectrum Ridge (pre-repair)"
+
+[spectrum]
+elements = 40
+layout   = "polyline"
+smoothing = { attack = 0.04, release = 0.34 }
+
+[palette]
+name = "aurora"
+
+[params]
+base  = "0.12 + sin(time * 1.3) * 0.12"
+scale = "3.20"
+curve = "0.55"
+span  = "1.72 + sin(time * 0.31) * 0.16"
+mirror_order   = "1"
+mirror_reflect = "1"
+baseline       = "0"
+rotation = "sin(time * 0.9) * 0.40 + clamp(bass * 0.118, 0, 0.10)"
+hue        = "mod(0.10 + time * 0.02, 1)"
+hue_spread = "0.75"
+saturation = "0.95"
+thickness  = "7.40 + clamp(mid * 3.06, 0, 2.6)"
+glow       = "1.12 + clamp(bass * 0.235, 0, 0.20)"
+brightness = "0.80 + clamp(bass * 0.212, 0, 0.18)"
+zoom  = "1.00 + sin(time * 0.23) * 0.05"
+pan_y = "0.02"
+bg_hue      = "0.44 + sin(time * 0.008) * 0.05"
+bg_bright   = "0.020 + clamp(treb * 0.0233, 0, 0.014)"
+bg_vignette = "0.80"
+trails = "0.66 + clamp(bass * 0.118, 0, 0.10)"
+
+[smoothing]
+rotation   = 0.20
+thickness  = { attack = 0.03, release = 0.30 }
+brightness = { attack = 0.04, release = 0.26 }
+glow       = { attack = 0.05, release = 0.55 }
+hue        = 0.40
+zoom       = 0.25
+bg_bright  = 0.40
+trails     = 0.50
+"#,
+    )
+    .expect("the pre-repair ridge parses")
+}
+
+/// **The non-vacuity check for ADR-0067, and the point of Plan 0058 Phase 1.**
+///
+/// A gate that cannot fail the defect that motivated it has not been built, so
+/// this asserts both halves of the claim on one fixture:
+///
+/// 1. Under the **old** measurement — the shipped composite, background sampled
+///    from pixel (0, 0) — the pre-repair ridge clears the coverage floor and
+///    spreads across every quadrant. That is not a re-enactment for colour; it
+///    is what let the defect ship, and without it "the new gate fails this"
+///    proves nothing about the old one.
+/// 2. Under the **new** measurement — backdrop suppressed, compared against
+///    black — the same preset scores essentially nothing and fails its floor.
+///
+/// The gap between the two numbers *is* the vignette. Both captures use the same
+/// stimulus, size and frame count, so nothing but the backdrop differs.
+#[test]
+fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let frame = loud();
+    let floor = coverage_floor(SystemKind::Spectrum);
+    let name = "Spectrum Ridge (pre-repair)";
+
+    // The historical sampler, reproduced here rather than kept in the file: the
+    // frame's own top-left pixel as the background reference.
+    fn corner(img: &lmv_core::render::CaptureImage) -> [u8; 4] {
+        [
+            img.rgba.first().copied().unwrap_or(0),
+            img.rgba.get(1).copied().unwrap_or(0),
+            img.rgba.get(2).copied().unwrap_or(0),
+            img.rgba.get(3).copied().unwrap_or(255),
+        ]
+    }
+
+    // (1) The old gate, backdrop and all.
+    renderer.set_presets(vec![pre_repair_spectrum_ridge()]);
+    let shipped = renderer
+        .capture_preset(name, &frame, FRAMES)
+        .expect("capture the pre-repair ridge with its backdrop");
+    let bg = corner(&shipped);
+    let old_cov = coverage(&shipped, bg, EPS);
+    let old_spread = quadrant_spread(&shipped, bg, EPS);
+    println!(
+        "[pre-repair ridge] old gate: bg={bg:?} coverage={old_cov:.4} (floor {floor:.2}) \
+         quadrants={old_spread}"
+    );
+    assert!(
+        old_cov >= floor,
+        "the pre-repair ridge must PASS the old corner-sampled gate, or this test proves \
+         nothing about why the defect shipped: coverage {old_cov:.4} < {floor:.2}"
+    );
+    assert!(
+        old_spread >= MIN_QUADRANTS,
+        "the pre-repair ridge must pass the old spread floor too: {old_spread} quadrant(s)"
+    );
+
+    // (2) The new gate: same preset, backdrop suppressed, measured against black.
+    renderer.set_presets(vec![without_backdrop(pre_repair_spectrum_ridge())]);
+    let scene = renderer
+        .capture_preset(name, &frame, FRAMES)
+        .expect("capture the pre-repair ridge without its backdrop");
+    let cov = coverage(&scene, BLACK, EPS);
+    let spread = quadrant_spread(&scene, BLACK, EPS);
+    println!(
+        "[pre-repair ridge] new gate: coverage={cov:.4} (floor {floor:.2}) quadrants={spread}"
+    );
+    assert!(
+        cov < floor,
+        "a contour drawn 3.3 world units off a frame of half-height 1.0 must FAIL the \
+         coverage floor once the vignette stops counting as a figure: coverage {cov:.4} \
+         >= {floor:.2}"
+    );
+    assert!(
+        old_cov > cov * 10.0,
+        "the old gate's score must be dominated by the backdrop, not by the scene: \
+         old {old_cov:.4} vs new {cov:.4}"
     );
 }
