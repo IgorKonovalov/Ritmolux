@@ -2532,9 +2532,15 @@ changes meaning". For an *accumulating additive* scene, capacity **is** behavior
 and `size` produce a different picture. The claim holds for every other family and fails for this
 one.
 
-**Nothing can catch it.** `shot` has no `--tier` and is `Floor` by construction, deliberately
-(ADR-0045), so **every golden baseline, every behavioral gate and every `--report` column describes
-a configuration the app does not start in**. The workaround found here is worth writing down
+**Nothing can catch it.** ~~`shot` has no `--tier` and is `Floor` by construction, deliberately
+(ADR-0045)~~ — **corrected 2026-08-03: `shot --tier floor|rich` exists and works**, built by Plan
+0044 Phase 3 (`Renderer::new_headless_tiered`) and documented in `docs/capturing.md`; it is absent
+only from `shot --help`, which is how four places across these documents came to claim otherwise.
+What remains true is the half that matters here: **every golden baseline and every behavioral gate
+still runs at `Floor`**, because `Renderer::new_headless` pins it and nothing opts those paths into
+`Rich` — so they all describe a configuration the app does not start in, and a `Rich` capture is
+available as an *instrument* but is not wired into any gate. The workaround found here is worth
+writing down
 wherever a future session will look: **multiplying `exposure` by 3 is equivalent to tripling the
 particle count**, because accumulation is linear and the tonemap is terminal. It reproduced the
 user's frame exactly.
@@ -2799,7 +2805,14 @@ pass that raises `trails` on a line preset should re-run `sanity` rather than as
 
 ## Entry 0053 — from the `preset-author` pass on 0051/0052 (2026-08-03)
 
-## 0053 — Plan 0048's retune rescaled the band GAINS but not the world-space params those bands multiply, and no instrument can see the result
+## ~~0053 — Plan 0048's retune rescaled the band GAINS but not the world-space params those bands multiply, and no instrument can see the result~~
+
+- **PROMOTED 2026-08-03 → [ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) +
+  [Plan 0058](plans/0058-the-gate-can-see-an-empty-frame.md)** — coverage is measured against
+  black rather than a sampled corner, every floor is re-derived, and Phase 3 takes the general
+  form of the second finding (more audio must not draw less picture) so no per-param audit is
+  needed. The `spectrum_comb` / `spectrum_corona` re-scale is that plan's Phase 4. Notes below
+  retained as the origin record.
 
 - **Raised:** 2026-08-03, from `preset-author`, while repairing `spectrum_ridge` for
   [0052](design-backlog.md).
