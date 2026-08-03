@@ -87,7 +87,38 @@ radius = "0.34 + sin(time * 0.27) * 0.05 + clamp(bass * 0.165, 0, 0.14)"
 # says so at load rather than ignoring the entry, and the easing that DOES apply
 # to a spectrum readout is [spectrum] smoothing above.
 base  = "0.09 + index * 0.04 + sin(time * 1.1) * 0.07"
-scale = "5.20"
+
+# 5.20 -> 0.45, THE SAME CORRECTION `spectrum_ridge` TOOK in 81190ac
+# (3.20 -> 0.60) and `spectrum_comb` alongside this one. Every number in the
+# history below was chosen on the PRE-ADR-0049 raw band scale, where a loud
+# element read about 0.1. ADR-0049 normalized the bands to 0..1, so the same
+# `scale` multiplied a value roughly five times larger and the spokes left the
+# frame entirely: rendered under `--signal noise:7` at 5.20 the corona is a
+# starburst running off all four edges with no tip visible anywhere, so the
+# ring - the whole figure - is gone.
+#
+# WHY THIS PRESET'S BUDGET IS THE TIGHTEST IN THE SET, which is worth stating
+# because the number looks alarmingly small next to the comb's 1.20. A spoke
+# starts at the ring, so its tip is `radius + base + curve(level) * scale`,
+# and the first two are already large here: `radius` breathes to 0.53 under
+# bass and `base` reaches 0.20 at index 1. That is ~0.73 of the budget spent
+# before the audio term gets any. A spoke pointing 60 degrees above horizontal
+# has vertical extent 0.866 * tip, and `zoom` reaches 1.10, so the effective
+# half-height is 0.91 and the tip must stay under ~1.05 - which leaves about
+# 0.32 to 0.50 for `scale`.
+#
+# THE SWEEP, and the stimulus that decided it. Under `noise:7` every value from
+# 0.25 to 0.85 sits in frame, because white noise spreads energy across all 44
+# spokes evenly - that stimulus cannot fail this preset. Under `chord`, which
+# drives a FEW bands to 1.0, the three long spokes at 10-11 o'clock exit the
+# TOP edge at 0.85, 0.70 AND 0.55; only at 0.45 are their tips clearly inside.
+# `dynamic:110` agrees. A broadband stimulus is the wrong instrument for a
+# radial layout and that is the transferable lesson here.
+#
+# The dynamic range survives the cut: against a resting `base` of ~0.15 a
+# fully-driven spoke is still about 3x its rest length, and at this value the
+# ring reads as rays rather than the studs the header above fought.
+scale = "0.45"
 
 # THE LEVEL CURVE now does most of what that `index` tilt was hand-rolling.
 # Lengthening the high spokes at rest tilted the figure back toward a circle, but
@@ -108,6 +139,13 @@ scale = "5.20"
 # ring was permanently at its stubby resting length. At 0.58 the same mean gives
 # 0.051, and with `scale` up 4.0 -> 5.2 that is a spoke that actually extends.
 # Fixing the reactivity and fixing the upscaled look are the same edit here.
+#
+# READ THE TWO PARAGRAPHS ABOVE AS HISTORY, not as current values. Every
+# `scale` figure in them (2.4, 4.0, 5.2) and both band means (0.006, 0.040) are
+# on the PRE-ADR-0049 raw scale, and `scale` is now 0.45 for the reasons given
+# beside it. The CURVE reasoning survives the rescale unchanged - it is about
+# the ratio between a quiet element and a loud one, which normalization did not
+# alter - which is why 0.58 stands while the magnitudes around it did not.
 curve = "0.58"
 
 # COLOUR AROUND THE RING. A full `hue_spread` walks the palette once round the
