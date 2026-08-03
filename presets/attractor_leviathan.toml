@@ -53,7 +53,14 @@ hue_spread  = "0.34 + clamp(treb * 0.5, 0, 0.30)"
 saturation  = "1.15 + clamp(mid * 0.282, 0, 0.24)"
 palette_mix = "clamp(treb * 0.67, 0, 0.40) + sin(time * 0.0083) * 0.25"
 
-zoom  = "1.12 + bar * 0.06 + clamp(bass * 0.212, 0, 0.18)"
+# ZOOM IS A FOLD CONSTRAINT HERE, NOT A TASTE (2026-08-03). The fold's residual
+# rays are the DISC EDGE smeared radially outward, so they are only as bright as
+# whatever the figure puts at that edge. At zoom 1.12 the creature reached the
+# edge and the frame grew a permanent starburst; pulled inside the disc it
+# produces none, verified by rendering. Peak zoom here is 0.72+0.04+0.10 = 0.86,
+# deliberately under the inscribed radius. Raising this back re-lights the rays.
+# The general fix is a per-preset edge treatment - Plan 0055, approved, not built.
+zoom  = "0.72 + bar * 0.04 + clamp(bass * 0.12, 0, 0.10)"
 pan_x = "sin(time * 0.023) * 0.06"
 pan_y = "cos(time * 0.031) * 0.05"
 
