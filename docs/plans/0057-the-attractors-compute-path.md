@@ -173,6 +173,46 @@ flowchart TB
   ADR, and `dev` does not write ADRs. Any other cause is a constant or a per-family value and
   Phase 5 takes it directly.
 
+#### FINDING (dev, 2026-08-03) — the cause is the shared 3-D view basis. **The plan stops here.**
+
+**The leading hypothesis is confirmed, and the two alternatives are ruled out by measurement
+rather than by the estimates that deprioritized them.**
+
+*Ruled out first — the cloud is converged, so this is not integration.* Read back off the particle
+buffer through Phase 3's new `read_positions`, Lorenz occupies **5.89 % of its own bounding volume,
+stable from 60 through 240 to 600 frames**, at `x ∈ [-18.0, 19.2]`, `y ∈ [-25.3, 25.4]`,
+`z ∈ [4.4, 47.3]` — the classic attractor's bounds. An un-converged seed box reads ~26 % (the
+seeded scatter's own figure, measured the same way). Forward-Euler thickening and un-converged
+corners would both show as a fill fraction that shrinks with frame count; it does not move.
+
+*The discriminating capture.* Rendered with `SPIN_RATE` pinned to `0` so the capture is the **rest
+basis** rather than the 41° the spin reaches by frame 240 — without that pin neither view is the
+one being reasoned about, which is why the first attempt at this capture was unreadable.
+
+| basis | rest view | what it renders |
+|---|---|---|
+| shipped: `vec2(cx*cs + cz*sn, center.y)` | x–y | a hard **X / bowtie** — the two lobes seen edge-on, crossing. This is the reported "dense core inside a diffuse cloud", verbatim |
+| swapped: `vec2(cx*cs + cy*sn, center.z - zc)` | x–z | the **butterfly silhouette** — two lobes, the notch top and bottom centre, and the two fixed-point cores visible as vertical streaks at low gain |
+
+So the shared 3-D projection uses `y` as the vertical and rotates `x` against `z`
+(`particles/mod.rs:355-360`): the rest view is x–y and the quarter turn is z–y. **The Lorenz
+butterfly lives in x–z, and neither shipped view is it.** Thomas is unaffected because it is
+cyclically symmetric, and De Jong and Clifford never take the branch.
+
+**Routing back to `architect`, per this phase's own instruction.** Making the projection basis
+per-family is a decision with rejected alternatives (per-family basis vs. a preset-facing
+parameter vs. re-centring Lorenz's coefficients) and owes an ADR. **Phase 5 is not written.**
+
+**One thing the ADR should know, because a basis fix alone will not clear Phase 5's done-when.**
+Corrected to x–z, the figure has the right *silhouette* but still reads as **stipple** rather than
+as the banded wings of the iconic plot. That is not a second defect: the scene draws 50 000
+**independent samples of the attractor's invariant measure**, whereas the legibility of a Lorenz
+plot comes from following *one trajectory* as a continuous curve. Spread over the projected wing
+area at 640x360 that is under one point per pixel. The levers that would buy the banding back are
+`fade` (longer per-particle streaks) and the particle count — content and capacity, not geometry —
+so Phase 6's re-authoring of `attractor_lorenz` is load-bearing for this and should be sequenced
+*after* the basis decision, not before. Phase 2 has just returned 3x of headroom to spend on it.
+
 ### Phase 5 — Lorenz: the fix
 
 - **Owner skill:** dev
