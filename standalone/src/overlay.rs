@@ -12,9 +12,9 @@
 pub enum OverlayKey {
     /// Open the overlay when closed, close it when open.
     Toggle,
-    /// Move the highlight up one row (clamped at the top).
+    /// Move the highlight up one row, **wrapping** past the top to the last row.
     Up,
-    /// Move the highlight down one row (clamped at the bottom).
+    /// Move the highlight down one row, **wrapping** past the last row to the top.
     Down,
     /// Commit the highlighted preset and close.
     Enter,
@@ -24,6 +24,20 @@ pub enum OverlayKey {
     Char(char),
     /// Delete the last character of the filter query.
     Backspace,
+}
+
+impl OverlayKey {
+    /// Whether this key only moves the highlight — the set the shell honours OS
+    /// **key repeat** for (Plan 0050 Phase 2).
+    ///
+    /// Deliberately narrow. Repeat reaches nothing else, because holding `Space`
+    /// would machine-gun preset switches through a ~1 s dissolve each, holding
+    /// `Toggle` would strobe the modal, and holding `Enter` would commit
+    /// repeatedly. A nav key only moves a cursor, so there is nothing expensive
+    /// to repeat and no throttle is needed.
+    pub fn is_nav(self) -> bool {
+        matches!(self, OverlayKey::Up | OverlayKey::Down)
+    }
 }
 
 /// What the shell should do after a key is fed to the overlay.
@@ -107,14 +121,25 @@ impl OverlayState {
     }
 
     /// Feed one key; mutate state and report what the shell should do. `names`
-    /// is the current roster in order.
-    pub fn handle_key(&mut self, key: OverlayKey, names: &[&str]) -> OverlayAction {
+    /// is the current roster in order, `active` the **absolute** roster index of
+    /// the preset currently playing — the row a fresh open highlights.
+    ///
+    /// `active` is passed in rather than held, which is what keeps this module
+    /// roster-free and window-free: the shell reads it off the renderer, and this
+    /// state machine never learns what a preset is.
+    pub fn handle_key(&mut self, key: OverlayKey, names: &[&str], active: usize) -> OverlayAction {
         // Toggle works regardless of open state; opening starts a fresh query.
         if key == OverlayKey::Toggle {
             self.open = !self.open;
             if self.open {
-                self.highlight = 0;
                 self.filter.clear();
+                // Open **where the show is**, not at row 0. With the filter just
+                // cleared the visible list is the whole roster, so this is a
+                // lookup rather than a special case — and it falls back to the
+                // top when `active` names no visible row (an empty roster, or an
+                // index past its end), which is what keeps the highlight inside
+                // the list the same way `on_roster_changed` does.
+                self.highlight = self.row_of(active, names).unwrap_or(0);
             }
             return OverlayAction::Redraw;
         }
@@ -160,7 +185,18 @@ impl OverlayState {
         }
     }
 
-    /// Move the highlight one row, clamped to the visible list (no wrap).
+    /// The visible row showing absolute roster index `abs`, or `None` when the
+    /// filter hides it (or the index is past the roster's end).
+    fn row_of(&self, abs: usize, names: &[&str]) -> Option<usize> {
+        self.visible(names).iter().position(|&(i, _)| i == abs)
+    }
+
+    /// Move the highlight one row, **wrapping** at both ends.
+    ///
+    /// Wrap rather than clamp so the browser agrees with `Space`, whose
+    /// `Roster::next_index` has cycled since it was written — a list that stops
+    /// dead at row 0 while the key beside it cycles is two different mental
+    /// models of the same roster.
     fn step(&mut self, down: bool, names: &[&str]) {
         let len = self.visible(names).len();
         if len == 0 {
@@ -169,9 +205,15 @@ impl OverlayState {
         }
         let last = len - 1;
         self.highlight = if down {
-            (self.highlight + 1).min(last)
+            if self.highlight >= last {
+                0
+            } else {
+                self.highlight + 1
+            }
+        } else if self.highlight == 0 {
+            last
         } else {
-            self.highlight.saturating_sub(1)
+            self.highlight - 1
         };
     }
 }
@@ -186,14 +228,27 @@ mod tests {
         NAMES.to_vec()
     }
 
+    /// The roster's first preset is active. Most tests below predate open-on-
+    /// active and only care about navigation, so they open on row 0 as they did.
+    const FIRST: usize = 0;
+
     #[test]
     fn nav_keys_are_inert_while_closed() {
         let mut s = OverlayState::new();
         let n = names();
         // A closed overlay ignores nav keys so the shell's Space-cycle still runs.
-        assert_eq!(s.handle_key(OverlayKey::Down, &n), OverlayAction::None);
-        assert_eq!(s.handle_key(OverlayKey::Enter, &n), OverlayAction::None);
-        assert_eq!(s.handle_key(OverlayKey::Escape, &n), OverlayAction::None);
+        assert_eq!(
+            s.handle_key(OverlayKey::Down, &n, FIRST),
+            OverlayAction::None
+        );
+        assert_eq!(
+            s.handle_key(OverlayKey::Enter, &n, FIRST),
+            OverlayAction::None
+        );
+        assert_eq!(
+            s.handle_key(OverlayKey::Escape, &n, FIRST),
+            OverlayAction::None
+        );
         assert!(!s.is_open());
     }
 
@@ -201,16 +256,25 @@ mod tests {
     fn open_navigate_and_select_emits_the_absolute_index() {
         let mut s = OverlayState::new();
         let n = names();
-        assert_eq!(s.handle_key(OverlayKey::Toggle, &n), OverlayAction::Redraw);
+        assert_eq!(
+            s.handle_key(OverlayKey::Toggle, &n, FIRST),
+            OverlayAction::Redraw
+        );
         assert!(s.is_open());
         assert_eq!(s.highlight(), 0);
-        assert_eq!(s.handle_key(OverlayKey::Down, &n), OverlayAction::Redraw);
+        assert_eq!(
+            s.handle_key(OverlayKey::Down, &n, FIRST),
+            OverlayAction::Redraw
+        );
         assert_eq!(s.highlight(), 1);
-        assert_eq!(s.handle_key(OverlayKey::Down, &n), OverlayAction::Redraw);
+        assert_eq!(
+            s.handle_key(OverlayKey::Down, &n, FIRST),
+            OverlayAction::Redraw
+        );
         assert_eq!(s.highlight(), 2); // the third row
         // Enter selects the third preset's absolute index and closes.
         assert_eq!(
-            s.handle_key(OverlayKey::Enter, &n),
+            s.handle_key(OverlayKey::Enter, &n, FIRST),
             OverlayAction::Select(2)
         );
         assert!(!s.is_open());
@@ -220,38 +284,141 @@ mod tests {
     fn escape_closes_without_selecting() {
         let mut s = OverlayState::new();
         let n = names();
-        s.handle_key(OverlayKey::Toggle, &n);
-        assert_eq!(s.handle_key(OverlayKey::Escape, &n), OverlayAction::Close);
+        s.handle_key(OverlayKey::Toggle, &n, FIRST);
+        assert_eq!(
+            s.handle_key(OverlayKey::Escape, &n, FIRST),
+            OverlayAction::Close
+        );
         assert!(!s.is_open());
     }
 
+    /// **The browser opens where the show is** (Plan 0050 Phase 2). It used to
+    /// open on row 0, which loses your place in a roster the size of the shipped
+    /// one every time `Tab` is pressed.
+    ///
+    /// The second half is the one that makes this a behaviour rather than a
+    /// cursor position: `Enter` straight after opening must re-select the preset
+    /// already playing, so `Tab`-`Enter` is a no-op instead of a jump to the
+    /// first preset in the list.
     #[test]
-    fn down_clamps_at_the_last_row_no_wrap() {
+    fn opening_highlights_the_active_preset_and_enter_reselects_it() {
+        let n: Vec<&str> = (0..10).map(|_| "x").collect();
+        let mut s = OverlayState::new();
+        assert_eq!(
+            s.handle_key(OverlayKey::Toggle, &n, 7),
+            OverlayAction::Redraw
+        );
+        assert_eq!(
+            s.highlight(),
+            7,
+            "opened on row 0 instead of the active row"
+        );
+        assert_eq!(
+            s.handle_key(OverlayKey::Enter, &n, 7),
+            OverlayAction::Select(7)
+        );
+
+        // ...and it is genuinely reading `active` rather than remembering the
+        // last highlight: a second open on a different active lands elsewhere.
+        s.handle_key(OverlayKey::Toggle, &n, 2);
+        assert_eq!(s.highlight(), 2);
+    }
+
+    /// Opening can never leave the highlight outside the visible list — the same
+    /// invariant `on_roster_changed` keeps, now that a second path sets it.
+    #[test]
+    fn opening_on_an_unreachable_active_index_falls_back_into_the_list() {
+        let n = names();
+        let mut s = OverlayState::new();
+        // Past the end of the roster (a stale index from a shrunk hot-reload).
+        s.handle_key(OverlayKey::Toggle, &n, 99);
+        assert_eq!(s.highlight(), 0);
+        assert!(s.visible(&n).len() > s.highlight());
+
+        // An empty roster has no row to land on at all.
+        let mut s = OverlayState::new();
+        s.handle_key(OverlayKey::Toggle, &[], 3);
+        assert_eq!(s.highlight(), 0);
+        assert!(s.visible(&[]).is_empty());
+
+        // And a filter narrowing the list under an open overlay still re-clamps
+        // through the existing path, which open-on-active must not have broken.
+        let mut s = OverlayState::new();
+        s.handle_key(OverlayKey::Toggle, &n, 3);
+        assert_eq!(s.highlight(), 3);
+        s.on_roster_changed(&["alpha", "bravo"]);
+        assert_eq!(s.highlight(), 1);
+    }
+
+    /// Wrap, both ends. **Replaces the two tests that asserted the clamp** — a
+    /// wrap with no test is the same as no wrap.
+    ///
+    /// It wraps because `Space` does: `Roster::next_index` has always cycled, and
+    /// a browser that stops dead where the key beside it cycles is two mental
+    /// models of one roster.
+    #[test]
+    fn the_highlight_wraps_at_both_ends() {
         let mut s = OverlayState::new();
         let n = names();
-        s.handle_key(OverlayKey::Toggle, &n);
-        for _ in 0..10 {
-            s.handle_key(OverlayKey::Down, &n);
+        s.handle_key(OverlayKey::Toggle, &n, FIRST);
+
+        // Down off the last row lands on the first.
+        for _ in 0..3 {
+            s.handle_key(OverlayKey::Down, &n, FIRST);
         }
-        assert_eq!(s.highlight(), 3); // last index, never wraps to 0
+        assert_eq!(s.highlight(), 3, "precondition: sitting on the last row");
+        s.handle_key(OverlayKey::Down, &n, FIRST);
+        assert_eq!(s.highlight(), 0, "Down off the last row did not wrap");
+
+        // Up off the first row lands on the last.
+        s.handle_key(OverlayKey::Up, &n, FIRST);
+        assert_eq!(s.highlight(), 3, "Up off row 0 did not wrap");
+
+        // A full lap returns to where it started, so the wrap is not off by one.
+        for _ in 0..4 {
+            s.handle_key(OverlayKey::Down, &n, FIRST);
+        }
+        assert_eq!(s.highlight(), 3);
+    }
+
+    /// A one-row list wraps onto itself rather than going out of range — the
+    /// degenerate case a `len - 1` wrap gets wrong.
+    #[test]
+    fn a_single_row_list_wraps_onto_itself() {
+        let mut s = OverlayState::new();
+        let n = vec!["only"];
+        s.handle_key(OverlayKey::Toggle, &n, FIRST);
+        for key in [OverlayKey::Down, OverlayKey::Up, OverlayKey::Down] {
+            s.handle_key(key, &n, FIRST);
+            assert_eq!(s.highlight(), 0);
+        }
         assert_eq!(
-            s.handle_key(OverlayKey::Enter, &n),
-            OverlayAction::Select(3)
+            s.handle_key(OverlayKey::Enter, &n, FIRST),
+            OverlayAction::Select(0)
         );
     }
 
+    /// Only the highlight-moving keys are repeatable (Plan 0050 Phase 2). The
+    /// shell gates OS key repeat on this, so a key slipping into the `true` set
+    /// is a preset switch or a fullscreen toggle firing 30 times a second.
     #[test]
-    fn up_clamps_at_the_top() {
-        let mut s = OverlayState::new();
-        let n = names();
-        s.handle_key(OverlayKey::Toggle, &n);
-        s.handle_key(OverlayKey::Up, &n); // already at the top
-        assert_eq!(s.highlight(), 0);
+    fn only_navigation_keys_accept_key_repeat() {
+        assert!(OverlayKey::Up.is_nav());
+        assert!(OverlayKey::Down.is_nav());
+        for key in [
+            OverlayKey::Toggle,
+            OverlayKey::Enter,
+            OverlayKey::Escape,
+            OverlayKey::Backspace,
+            OverlayKey::Char('a'),
+        ] {
+            assert!(!key.is_nav(), "{key:?} must not be honoured on key repeat");
+        }
     }
 
     fn type_str(s: &mut OverlayState, text: &str, names: &[&str]) {
         for c in text.chars() {
-            s.handle_key(OverlayKey::Char(c), names);
+            s.handle_key(OverlayKey::Char(c), names, FIRST);
         }
     }
 
@@ -260,14 +427,14 @@ mod tests {
         let mut s = OverlayState::new();
         // "warp" sits at absolute index 2 and is capitalized.
         let n = vec!["Aurora", "Ember", "Warp", "Glacier"];
-        s.handle_key(OverlayKey::Toggle, &n);
+        s.handle_key(OverlayKey::Toggle, &n, FIRST);
         // Lowercase "war" matches "Warp" case-insensitively, nothing else.
         type_str(&mut s, "war", &n);
         let visible = s.visible(&n);
         assert_eq!(visible, [(2, "Warp")]);
         // Enter must carry Warp's ABSOLUTE index (2), not its filtered row (0).
         assert_eq!(
-            s.handle_key(OverlayKey::Enter, &n),
+            s.handle_key(OverlayKey::Enter, &n, FIRST),
             OverlayAction::Select(2)
         );
     }
@@ -276,10 +443,10 @@ mod tests {
     fn backspace_widens_the_filtered_list() {
         let mut s = OverlayState::new();
         let n = vec!["alpha", "altair", "beta"];
-        s.handle_key(OverlayKey::Toggle, &n);
+        s.handle_key(OverlayKey::Toggle, &n, FIRST);
         type_str(&mut s, "alt", &n);
         assert_eq!(s.visible(&n).len(), 1); // only "altair"
-        s.handle_key(OverlayKey::Backspace, &n); // -> "al"
+        s.handle_key(OverlayKey::Backspace, &n, FIRST); // -> "al"
         assert_eq!(s.visible(&n).len(), 2); // "alpha" + "altair" restored
     }
 
@@ -287,22 +454,25 @@ mod tests {
     fn no_match_filter_yields_an_empty_list_not_a_stale_one() {
         let mut s = OverlayState::new();
         let n = names();
-        s.handle_key(OverlayKey::Toggle, &n);
+        s.handle_key(OverlayKey::Toggle, &n, FIRST);
         type_str(&mut s, "zzz", &n);
         assert!(s.visible(&n).is_empty());
         // Enter on an empty list closes without selecting.
-        assert_eq!(s.handle_key(OverlayKey::Enter, &n), OverlayAction::Close);
+        assert_eq!(
+            s.handle_key(OverlayKey::Enter, &n, FIRST),
+            OverlayAction::Close
+        );
     }
 
     #[test]
     fn reopening_clears_the_prior_filter() {
         let mut s = OverlayState::new();
         let n = names();
-        s.handle_key(OverlayKey::Toggle, &n); // open
+        s.handle_key(OverlayKey::Toggle, &n, FIRST); // open
         type_str(&mut s, "zzz", &n); // filters to nothing
         assert!(s.visible(&n).is_empty());
-        s.handle_key(OverlayKey::Toggle, &n); // close
-        s.handle_key(OverlayKey::Toggle, &n); // reopen -> fresh query
+        s.handle_key(OverlayKey::Toggle, &n, FIRST); // close
+        s.handle_key(OverlayKey::Toggle, &n, FIRST); // reopen -> fresh query
         assert_eq!(s.filter(), "");
         assert_eq!(s.visible(&n).len(), 4);
     }
@@ -311,9 +481,9 @@ mod tests {
     fn roster_change_reclamps_the_highlight_and_keeps_open() {
         let mut s = OverlayState::new();
         let big = vec!["a", "b", "c", "d"];
-        s.handle_key(OverlayKey::Toggle, &big);
+        s.handle_key(OverlayKey::Toggle, &big, FIRST);
         for _ in 0..3 {
-            s.handle_key(OverlayKey::Down, &big);
+            s.handle_key(OverlayKey::Down, &big, FIRST);
         }
         assert_eq!(s.highlight(), 3);
         // A hot-reload shrinks the roster under the open overlay.
