@@ -422,14 +422,19 @@ would be tuned to noise. The precondition remains a multi-BPM probe or an explic
 `tempo` exemption
 ([ADR-0043](adrs/0043-reachability-reports-comparison-nodes.md)).
 
-The library is the other, and it regressed on purpose. Plan 0042's re-audit
-measured **0 genuinely dead gates**, and that held until ADR-0049 changed what a
-band level means. Nine bindings written against raw levels now compare against
-normalized ones and never go false, so their `else` branches are dead. That is the
-priced cost of the one-time retune ADR-0049 chose, the flags are catalogued in
-[analysis-v2-before-flags.md](analysis-v2-before-flags.md), and clearing them is
-Plan 0048's Phase 7. **Until that lands, a non-zero Group 2 count is expected
-rather than news.**
+The library is the other, and it regressed on purpose before being put back.
+Plan 0042's re-audit measured **0 genuinely dead gates**, and that held until
+ADR-0049 changed what a band level means: nine bindings written against raw
+levels then compared against normalized ones and never went false, so their
+`else` branches were dead. That was the priced cost of the one-time retune
+ADR-0049 chose, and **Plan 0048 Phase 7 cleared it** — the library is back to
+zero genuinely dead gates, with the residual flags all `tempo` one-sidedness.
+
+**What the reachability walk still cannot see is a gain.** A comparison is a fork
+it can watch; `clamp(bass * 16, 0, 0.3)` is not. Phase 7 measured **263 of 332
+clamped band terms pinned at their ceiling**, and 14 presets with no live audio
+term at all, none of it visible here or to any gate — see
+[design-backlog 0043](design-backlog.md).
 
 ### Which preset library a shot uses
 

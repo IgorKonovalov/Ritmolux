@@ -124,12 +124,18 @@ in
   `select(bass + mid > 1.5, 12, 6)` is a live gate while `select(bass + mid > 0.085,
   12, 6)` is the constant `12` and `> 2.4` is the constant `6`. Pre-v2 the
   low-threshold failure was rare because the levels were tiny; now it is the
-  commoner mistake, and it is what
-  [`../docs/analysis-v2-before-flags.md`](../docs/analysis-v2-before-flags.md)
-  catalogues across the un-retuned library.
+  commoner mistake, and it is the one Plan 0048 Phase 7 found in nine shipped
+  bindings and retuned.
 - **Calibrate a continuous parameter against the mean and a percussive one
   against the peak.** A zoom or a hue drift spends its life near the mean; a
   flash or a burst exists to fire on the hit.
+- **A GAIN can be wrong the same way, and nothing checks it.** `clamp(band * G,
+  0, C)` reaches its ceiling at `C / G`; if that is below the typical level, the
+  term is a constant no matter how reactive it reads. Phase 7 found **263 of 332**
+  clamped band terms in that state at once. Until `--report` grows the occupancy
+  column, do the division yourself. The rule that came out of the retune: pick
+  `G = C / 0.85` for `bass`/`mid` and `C / 0.60` for `treb`/`onset`, which puts a
+  typical passage near half the cap and a peak at it.
 
 `--report` now checks this for you: the second table reads at these levels, and
 its `gates` / `ceils` columns name any `select()` that never went both ways and
