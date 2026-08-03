@@ -30,6 +30,31 @@ tier value, so geometry that overflows and truncates at the floor's 20 000 may f
 at rich. Compose so the floor's cap is the one you tuned for, and treat the extra
 headroom as headroom.
 
+> **That claim was false for the `attractor` family until Plan 0057, and how it
+> was false is worth knowing** ([ADR-0065](../docs/adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md)).
+> The attractor draws its particles with an **additive** blend into a linear
+> accumulation, so 150 000 points at `Rich` deposited three times the light of
+> 50 000 at `Floor` into the same texels — same `fade`, same `size`, a picture
+> three stops hotter. For an accumulating scene, capacity *is* the picture; and no
+> capture in this project could render `Rich` to notice. Four shipped presets were
+> retuned **downward** to survive it (commit `00d99d0`), which is a compensation
+> for an engine defect carried in content.
+>
+> The deposit is now divided by the particle count, so the total light laid down
+> per frame is invariant. At `Floor` the factor is exactly `1.0` and nothing moves;
+> at `Rich` the same figure is drawn from three times the samples at a third the
+> weight each. **A tier now buys less shot noise in the same picture, which is what
+> a capacity tier was always supposed to buy.** Measured on `Clifford` at
+> 1280x720: mean display luminance `17.37` at `Rich` before the change, `10.86`
+> after, against `Floor`'s `10.34`.
+>
+> Two things follow for you. A preset can no longer buy brightness by running at
+> `Rich` — it never could on purpose, but it is what the shipped pictures did. And
+> anyone comparing a pre-Plan-0057 `Rich` screenshot will find the new one dimmer:
+> that is the fix, not a regression. Capture both tiers with
+> [`shot --tier`](../docs/capturing.md#captures-pin-the-floor-tier) rather than
+> reasoning about it.
+
 ## Skeleton
 
 ```toml

@@ -225,6 +225,32 @@ const POINT_BASE: f32 = 0.006;
 /// sustained beat flag doesn't re-scatter every frame).
 const RESEED_THRESHOLD: f32 = 0.5;
 
+/// Per-particle weight of the additive deposit, so the **total** light laid into
+/// the accumulation each frame is invariant to the particle count (ADR-0065).
+///
+/// The draw blends `One, One` into a linear accumulation and everything
+/// downstream to the tonemap is linear, so without this the figure moves up by
+/// exactly the count ratio: `attractor_particles` is 50 000 at `Floor` and
+/// 150 000 at `Rich`, and `Rich` therefore rendered the same preset **three stops
+/// hot**. ADR-0045 and `presets/README.md` both promise a tier changes capacity
+/// and not behavior; for an accumulating additive scene that was false, because
+/// capacity *is* the picture.
+///
+/// So a tier now buys what a capacity tier should buy — the same figure sampled
+/// three times as densely at a third the weight each, i.e. **less shot noise in
+/// the same picture** rather than more light.
+///
+/// At `Floor` the factor is exactly `1.0` by construction, which is why no golden
+/// baseline moves and why that is assertable on the value rather than inferred
+/// from pixels. A future tier with a count *below* `Floor` would put this above
+/// `1.0` and amplify shot noise instead of reducing it — bounded and predictable,
+/// but worth knowing before a third tier is added.
+pub fn deposit_scale(active_count: u32) -> f32 {
+    // `max(1)` rather than a branch: a zero-particle scene draws nothing, so the
+    // value is unobservable, and a division by zero here would reach the shader.
+    crate::render::TierConfig::FLOOR.attractor_particles as f32 / active_count.max(1) as f32
+}
+
 /// Compute step: iterate every particle through the selected attractor map once.
 /// Discrete maps (De Jong, Clifford) iterate directly; continuous flows (Thomas,
 /// Lorenz) Euler-integrate a few sub-steps of the fixed frame `dt`. Writes the
@@ -296,7 +322,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 const DRAW_SHADER: &str = r#"
 struct Draw {
     // v: x aspect, y point half-size (world), z hue offset, w spin (radians)
-    // w: x world scale, y dim (2 or 3), z z-center to subtract (3D), w unused
+    // w: x world scale, y dim (2 or 3), z z-center to subtract (3D),
+    //    w deposit scale (ADR-0065: FLOOR_PARTICLES / active_count)
     // u: x hue_spread, y hue_center, z palette_mix, w saturation
     // x: x zoom, yz pan (view transform, ADR-0018), w unused
     v: vec4<f32>,
@@ -377,10 +404,17 @@ fn vs_main(
     let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
     let col = apply_saturation(mix(ca, cb, clamp(palette_mix, 0.0, 1.0)), saturation);
 
+    // Normalize the additive deposit by the particle count (ADR-0065), so total
+    // light per frame is invariant to the tier. Applied here rather than in the
+    // fragment shader because the draw uniform is bound VERTEX-only; the fragment
+    // multiplies this by its own radial falloff, and both are linear, so the
+    // result is identical to scaling the emitted fragment.
+    let deposit = draw.w.w;
+
     var out: VsOut;
     out.pos = vec4<f32>(ndc, 0.0, 1.0);
     out.local = corner;
-    out.color = col;
+    out.color = col * deposit;
     return out;
 }
 
@@ -452,7 +486,8 @@ struct StepUniform {
 }
 
 /// Draw uniform (per frame). `v`: x aspect, y point half-size, z hue offset, w
-/// spin. `w`: x world scale, y projection dim (2 or 3), z z-centre (3D), w unused.
+/// spin. `w`: x world scale, y projection dim (2 or 3), z z-centre (3D),
+/// w [`deposit_scale`] (ADR-0065).
 /// `u`: x hue_spread, y hue_center, z palette_mix, w saturation (ADR-0021).
 /// `x`: x zoom, yz pan (view transform, ADR-0018), w unused.
 #[repr(C)]
@@ -1472,6 +1507,10 @@ fn upload_uniforms(queue: &wgpu::Queue, pipelines: &PipelineResources, inputs: &
         }),
     );
     let (scale, dim, z_center) = inputs.family.projection();
+    // Off the buffer that was actually allocated, not off the tier: the count the
+    // draw instances is `pipelines.count`, and normalizing against anything else
+    // would be a claim about a different draw call.
+    let deposit = deposit_scale(pipelines.count);
     queue.write_buffer(
         &pipelines.draw_uniform,
         0,
@@ -1490,7 +1529,7 @@ fn upload_uniforms(queue: &wgpu::Queue, pipelines: &PipelineResources, inputs: &
                 inputs.hue,
                 inputs.time * SPIN_RATE,
             ],
-            w: [scale, dim, z_center, 0.0],
+            w: [scale, dim, z_center, deposit],
             u: [
                 inputs.hue_spread,
                 inputs.hue_center,
@@ -1609,4 +1648,67 @@ fn encode_present(
     pass.set_pipeline(&pipelines.present_pipeline);
     pass.set_bind_group(0, present_bg, &[]);
     pass.draw(0..3, 0..1);
+}
+
+#[cfg(test)]
+mod tests {
+    // Tests panic on failure; allowed over the file's hot-path pragma — this is
+    // not the render path.
+    #![allow(clippy::panic, clippy::expect_used)]
+
+    use super::deposit_scale;
+    use crate::render::{Tier, TierConfig};
+
+    /// ADR-0065's invariance, asserted **on the scalar** rather than inferred from
+    /// pixels — which is the whole reason the decision is expressible as one.
+    ///
+    /// The `Floor` half is why no golden baseline moves: `1.0` is not a tolerance
+    /// or a near-miss, it is exact, so every baseline blessed at the floor renders
+    /// the same arithmetic it always did.
+    #[test]
+    fn the_deposit_scalar_is_exactly_one_at_the_floor_and_a_third_at_rich() {
+        let floor = TierConfig::for_tier(Tier::Floor).attractor_particles;
+        let rich = TierConfig::for_tier(Tier::Rich).attractor_particles;
+
+        assert_eq!(
+            deposit_scale(floor),
+            1.0,
+            "the floor factor must be exactly 1.0 — every golden is blessed there"
+        );
+        // 50 000 / 150 000 at the shipped counts. Asserted against the ratio the
+        // tier table actually holds rather than a literal 1/3, so a re-calibrated
+        // `Rich` (Plan 0044 Phase 4 has never run) changes this test's expectation
+        // with it instead of failing for the wrong reason.
+        let expected = floor as f32 / rich as f32;
+        assert_eq!(deposit_scale(rich), expected);
+        assert!(
+            (deposit_scale(rich) - 1.0 / 3.0).abs() < 1e-6,
+            "at the counts shipped today that ratio is 1/3, got {}",
+            deposit_scale(rich)
+        );
+
+        // Non-vacuity: the two tiers must actually differ, or the assertions above
+        // hold for a table where nothing is normalized at all.
+        assert!(
+            rich > floor,
+            "the rich tier is meant to raise the count ({rich} vs {floor})"
+        );
+
+        // Total deposited light is what is invariant, and that is the product.
+        // Stated directly because it is the property, and the scalar is only the
+        // means: three times the samples at a third the weight is the same light.
+        let total = |count: u32| count as f32 * deposit_scale(count);
+        assert_eq!(total(floor), total(rich));
+    }
+
+    /// A zero-particle scene draws nothing, so the factor is unobservable — but it
+    /// must not be an infinity on its way to a shader uniform.
+    #[test]
+    fn the_deposit_scalar_survives_a_degenerate_count() {
+        assert!(deposit_scale(0).is_finite());
+        // And it is still monotone the right way round: fewer particles, more
+        // weight each, which is what keeps the total constant.
+        assert!(deposit_scale(25_000) > deposit_scale(50_000));
+        assert!(deposit_scale(50_000) > deposit_scale(100_000));
+    }
 }
