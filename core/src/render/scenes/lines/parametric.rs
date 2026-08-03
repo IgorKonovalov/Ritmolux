@@ -3,6 +3,24 @@
 //! is hardcoded to one Maurer rose that gently rotates on the deterministic
 //! scene clock; Phase 2 makes the curve family and every named parameter
 //! preset-driven so audio can sweep it live.
+//!
+//! ## The colour axis: **position along the traced path** (ADR-0059)
+//!
+//! This scene honours `[palette]` / `[palette_b]` / `palette_mix` / `hue_spread`
+//! / `saturation` through the shared [`ColorRamp`], and the axis its generator
+//! makes meaningful is **how far along the walk a chord sits**: `0` at the first
+//! sampled point, `1` at the last. On a Maurer rose that is the drawn-stroke
+//! reading — the web is one continuous walk, so the ramp travels along it the way
+//! a pen would.
+//!
+//! **Normalized over `samples`, not over the revealed prefix.** `draw_progress`
+//! is a reveal, so a chord's place on the curve is a property of the curve; if
+//! the divisor were the drawn count, a per-beat `draw_progress` would drag every
+//! chord's colour with it and the figure would re-tint rather than draw itself
+//! on. Revealing half the curve therefore shows the palette's first half.
+//!
+//! `hue_spread = 0` collapses the ramp to the single `hue` this scene has always
+//! drawn, so the surface is a strict superset.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). `update`/`render` run every displayed frame.
@@ -20,10 +38,11 @@ use std::rc::Rc;
 use super::super::Scene;
 use super::renderer::{LineRenderer, SegmentInstance};
 use super::{
-    CapOverflow, CurveFamily, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, curves,
-    palette, replicate_mirror,
+    CapOverflow, ColorRamp, CurveFamily, GeneratorConfig, MirrorSpec, OverflowContext,
+    ViewTransform, curves, replicate_mirror,
 };
 use crate::dsp::AnalysisFrame;
+use crate::render::palette::Palette;
 
 /// Maps the `thickness` parameter (a small integer-ish stroke weight) to an
 /// NDC-y half-width; `thickness = 2` gives a comfortably thick projector line.
@@ -40,6 +59,12 @@ const DEFAULT_RADIAL_OFFSET: f32 = 0.0;
 const DEFAULT_SAMPLES: f32 = 361.0;
 const DEFAULT_THICKNESS: f32 = 2.0;
 const DEFAULT_HUE: f32 = 0.6;
+/// Colour surface (ADR-0021 / ADR-0059), all three at the value that reproduces
+/// the single flat `hue` this scene drew before the palette reached it: no ramp
+/// along the path, palette A alone, unmodified saturation.
+const DEFAULT_HUE_SPREAD: f32 = 0.0;
+const DEFAULT_SATURATION: f32 = 1.0;
+const DEFAULT_PALETTE_MIX: f32 = 0.0;
 const DEFAULT_SPIN: f32 = 0.1;
 const DEFAULT_SCALE: f32 = 0.9;
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
@@ -82,6 +107,10 @@ pub struct ParametricCurveScene {
     family: CurveFamily,
     /// Shared scene clock (seconds), set by the renderer each frame.
     time: f32,
+    /// The preset's baked colour LUT (ADR-0021), sampled on the CPU per chord.
+    /// Defaults to the engine cosine, which is the ramp this scene coloured
+    /// through before the palette reached it.
+    palette: Palette,
     n: f32,
     d: f32,
     phase: f32,
@@ -89,6 +118,9 @@ pub struct ParametricCurveScene {
     samples: f32,
     thickness: f32,
     hue: f32,
+    hue_spread: f32,
+    saturation: f32,
+    palette_mix: f32,
     spin: f32,
     scale: f32,
     brightness: f32,
@@ -113,6 +145,9 @@ impl ParametricCurveScene {
             mirror_overflow: None,
             family: CurveFamily::MaurerRose,
             time: 0.0,
+            // Replaced by the preset's palette on the next switch; the default
+            // is the engine cosine, so an unconfigured scene still colours.
+            palette: Palette::default_spectrum(),
             n: DEFAULT_N,
             d: DEFAULT_D,
             phase: DEFAULT_PHASE,
@@ -120,6 +155,9 @@ impl ParametricCurveScene {
             samples: DEFAULT_SAMPLES,
             thickness: DEFAULT_THICKNESS,
             hue: DEFAULT_HUE,
+            hue_spread: DEFAULT_HUE_SPREAD,
+            saturation: DEFAULT_SATURATION,
+            palette_mix: DEFAULT_PALETTE_MIX,
             spin: DEFAULT_SPIN,
             scale: DEFAULT_SCALE,
             brightness: DEFAULT_BRIGHTNESS,
@@ -134,6 +172,28 @@ impl ParametricCurveScene {
     }
 }
 
+/// Colour each chord by **how far along the traced path it sits** (ADR-0059's
+/// axis for this generator): chord `i` of a `samples`-point walk is at
+/// `i / (samples - 1)`, so the ramp runs from the walk's first point to its last.
+///
+/// `samples` is the **full** curve's chord count, not `segs.len()`. Those differ
+/// whenever `draw_progress` reveals a prefix, and the full count is the right
+/// divisor: a chord's place on the curve belongs to the curve, so a per-beat
+/// reveal draws the gradient on rather than re-tinting every chord it already
+/// drew. A degenerate `samples` (0 or 1) leaves the whole figure at `u = 0`,
+/// which is the flat `hue` — never a divide by zero.
+pub(crate) fn color_along_path(
+    segs: &mut [SegmentInstance],
+    palette: &Palette,
+    ramp: ColorRamp,
+    samples: usize,
+) {
+    let span = samples.saturating_sub(1).max(1) as f32;
+    for (i, seg) in segs.iter_mut().enumerate() {
+        seg.color = ramp.at(palette, i as f32 / span);
+    }
+}
+
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](crate::render::scenes::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
 pub const PARAMS: &[&str] = &[
@@ -144,6 +204,9 @@ pub const PARAMS: &[&str] = &[
     "samples",
     "thickness",
     "hue",
+    "hue_spread",
+    "saturation",
+    "palette_mix",
     "spin",
     "scale",
     "brightness",
@@ -173,6 +236,9 @@ impl Scene for ParametricCurveScene {
         self.samples = DEFAULT_SAMPLES;
         self.thickness = DEFAULT_THICKNESS;
         self.hue = DEFAULT_HUE;
+        self.hue_spread = DEFAULT_HUE_SPREAD;
+        self.saturation = DEFAULT_SATURATION;
+        self.palette_mix = DEFAULT_PALETTE_MIX;
         self.spin = DEFAULT_SPIN;
         self.scale = DEFAULT_SCALE;
         self.brightness = DEFAULT_BRIGHTNESS;
@@ -194,6 +260,9 @@ impl Scene for ParametricCurveScene {
             "samples" => self.samples = value,
             "thickness" => self.thickness = value,
             "hue" => self.hue = value,
+            "hue_spread" => self.hue_spread = value,
+            "saturation" => self.saturation = value,
+            "palette_mix" => self.palette_mix = value,
             "spin" => self.spin = value,
             "scale" => self.scale = value,
             "brightness" => self.brightness = value,
@@ -206,6 +275,10 @@ impl Scene for ParametricCurveScene {
             "mirror_reflect" => self.mirror_reflect = value,
             _ => {}
         }
+    }
+
+    fn set_palette(&mut self, palette: &Palette) {
+        self.palette = palette.clone();
     }
 
     fn configure(&mut self, cfg: &GeneratorConfig) -> Option<CapOverflow> {
@@ -239,12 +312,17 @@ impl Scene for ParametricCurveScene {
         // the clamp is a safety backstop, not a structural cut worth reporting.
         let samples = (self.samples.max(0.0) as usize).min(self.max_segments);
         let rotation = self.spin * self.time;
-        let base = palette(self.hue);
-        let color = [
-            base[0] * self.brightness,
-            base[1] * self.brightness,
-            base[2] * self.brightness,
-        ];
+        let ramp = ColorRamp {
+            hue: self.hue,
+            hue_spread: self.hue_spread,
+            palette_mix: self.palette_mix,
+            saturation: self.saturation,
+            brightness: self.brightness,
+        };
+        // The sampler paints the whole web in the walk's starting colour; the
+        // pass below walks it along the path. Keeping the sampler colour-agnostic
+        // is what leaves the curve maths free of any palette knowledge.
+        let color = ramp.at(&self.palette, 0.0);
         let width = (self.thickness * WIDTH_SCALE).max(0.0005);
 
         // Sample the single curve, then replicate it under the geometry mirror
@@ -267,6 +345,7 @@ impl Scene for ParametricCurveScene {
                 &mut self.single_buf,
             ),
         }
+        color_along_path(&mut self.single_buf, &self.palette, ramp, samples);
         let mirror = MirrorSpec::from_params(self.mirror_order, self.mirror_reflect);
         if mirror.is_identity() {
             // Identity spec: replication would copy the whole segment set into a
@@ -318,5 +397,130 @@ impl Scene for ParametricCurveScene {
             xform,
             &self.segments,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::indexing_slicing)]
+
+    use super::*;
+
+    const SAMPLES: usize = 240;
+
+    fn ramp(hue_spread: f32) -> ColorRamp {
+        ColorRamp {
+            hue: DEFAULT_HUE,
+            hue_spread,
+            palette_mix: DEFAULT_PALETTE_MIX,
+            saturation: DEFAULT_SATURATION,
+            brightness: DEFAULT_BRIGHTNESS,
+        }
+    }
+
+    fn curve(samples: usize, draw_progress: f32, hue_spread: f32) -> Vec<SegmentInstance> {
+        let mut out = Vec::with_capacity(samples + 1);
+        curves::maurer_rose(
+            curves::RoseParams {
+                n: DEFAULT_N,
+                d: DEFAULT_D,
+                phase: DEFAULT_PHASE,
+                radial_offset: DEFAULT_RADIAL_OFFSET,
+                samples,
+                scale: DEFAULT_SCALE,
+                rotation: 0.0,
+                draw_progress,
+                color: [0.0; 3],
+                width: 0.01,
+            },
+            &mut out,
+        );
+        color_along_path(
+            &mut out,
+            &Palette::default_spectrum(),
+            ramp(hue_spread),
+            samples,
+        );
+        out
+    }
+
+    /// Plan 0054 Phase 2 done-when 2 (ADR-0059). The claim is not "colours vary"
+    /// — it is that the ramp runs **along the direction of travel**, so the
+    /// walk's first chord and its last carry different colours and the walk
+    /// between them never doubles back on a colour it already used.
+    #[test]
+    fn the_spread_colours_the_curve_along_its_direction_of_travel() {
+        let swept = curve(SAMPLES, 1.0, 0.5);
+        assert_eq!(swept.len(), SAMPLES, "one chord per sample");
+        assert_ne!(
+            swept[0].color,
+            swept[SAMPLES - 1].color,
+            "the path's start and end must differ — that is the whole claim"
+        );
+
+        // Monotone along the walk. `hue_spread = 0.5` stays inside one traverse
+        // of the palette, so the ramp is a strictly advancing sample coordinate
+        // and no two chords may share a colour.
+        for k in 1..swept.len() {
+            assert_ne!(
+                swept[k].color,
+                swept[k - 1].color,
+                "chord {k} repeated chord {}'s colour, so the ramp is not \
+                 advancing along the path",
+                k - 1
+            );
+        }
+    }
+
+    /// The other half of the superset claim: `hue_spread = 0` is one flat colour
+    /// across the whole web — exactly what this scene drew before ADR-0059.
+    #[test]
+    fn zero_spread_is_one_flat_colour_along_the_whole_path() {
+        let flat = curve(SAMPLES, 1.0, 0.0);
+        for (k, seg) in flat.iter().enumerate() {
+            assert_eq!(seg.color, flat[0].color, "chord {k} must carry the one hue");
+        }
+    }
+
+    /// The divisor is the **full** curve, not the revealed prefix. A per-beat
+    /// `draw_progress` therefore draws the gradient on rather than re-tinting the
+    /// chords it already drew — which is what a reveal should look like, and the
+    /// bug the obvious `segs.len()` divisor would have shipped.
+    #[test]
+    fn the_reveal_draws_the_gradient_on_rather_than_re_tinting_it() {
+        let full = curve(SAMPLES, 1.0, 0.5);
+        let half = curve(SAMPLES, 0.5, 0.5);
+        assert!(
+            !half.is_empty() && half.len() < full.len(),
+            "the probe must actually reveal a prefix"
+        );
+        for (k, seg) in half.iter().enumerate() {
+            assert_eq!(
+                seg.color, full[k].color,
+                "chord {k} changed colour when the reveal shortened"
+            );
+        }
+        // ...and the revealed half really has only travelled part of the ramp.
+        assert_ne!(
+            half[half.len() - 1].color,
+            full[full.len() - 1].color,
+            "a half-drawn curve must not already show the ramp's far end"
+        );
+    }
+
+    /// Total over the degenerate sample counts an expression can produce: a
+    /// one-point or empty walk has no path to ramp along and must not divide by
+    /// zero on the render path.
+    #[test]
+    fn a_degenerate_sample_count_leaves_the_figure_flat() {
+        for samples in [0usize, 1, 2] {
+            let out = curve(samples, 1.0, 0.9);
+            for seg in &out {
+                assert!(
+                    seg.color.iter().all(|c| c.is_finite()),
+                    "samples = {samples} produced a non-finite colour"
+                );
+            }
+        }
     }
 }

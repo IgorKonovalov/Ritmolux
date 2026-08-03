@@ -107,6 +107,50 @@ impl CurveFamily {
     }
 }
 
+/// The colour surface every line scene shares
+/// ([ADR-0021](../../../../../docs/adrs/0021-shared-palette-system.md) /
+/// [ADR-0059](../../../../../docs/adrs/0059-line-scenes-colour-along-their-generator-axis.md)):
+/// `hue` places the whole figure in the baked palette and `hue_spread` says how
+/// far the palette travels **across** it.
+///
+/// The axis `u` walks is the one thing that differs per scene — generation depth
+/// on the L-system, path position on the parametric curve, radius on the star,
+/// band index on the spectrum readout — so the *colour* half lives here once
+/// rather than as four similar-but-not-identical loops that drift
+/// (ADR-0059's own stated risk). Each generator computes its `u` and asks.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ColorRamp {
+    /// Where the figure sits in the palette.
+    pub hue: f32,
+    /// How far the palette travels from `u = 0` to `u = 1`. `0` — every scene's
+    /// default — is the single flat `hue` the line scenes drew before the
+    /// palette reached them, which is what makes the surface a strict superset.
+    pub hue_spread: f32,
+    /// A/B crossfade position (`0` = palette A alone).
+    pub palette_mix: f32,
+    /// Shared saturation modulation, applied to the sampled colour.
+    pub saturation: f32,
+    /// Stroke brightness, folded in here because these scenes carry it in the
+    /// segment colour rather than as a separate uniform.
+    pub brightness: f32,
+}
+
+impl ColorRamp {
+    /// The stroke colour at normalized position `u` along the scene's own axis.
+    /// Allocation-free; runs per segment (or per generation) on the hot path.
+    pub(crate) fn at(self, pal: &crate::render::palette::Palette, u: f32) -> [f32; 3] {
+        let rgb = crate::render::palette::desaturate(
+            pal.sample(self.hue + self.hue_spread * u, self.palette_mix),
+            self.saturation,
+        );
+        [
+            rgb[0] * self.brightness,
+            rgb[1] * self.brightness,
+            rgb[2] * self.brightness,
+        ]
+    }
+}
+
 /// iq-style cosine palette (RGB phase-shifted), matching the swarm/fragment
 /// scenes so line art shares the engine's colour language.
 pub fn palette(t: f32) -> [f32; 3] {

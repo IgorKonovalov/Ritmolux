@@ -59,11 +59,11 @@ use std::rc::Rc;
 use super::super::Scene;
 use super::renderer::{LineRenderer, SegmentInstance};
 use super::{
-    CapOverflow, GeneratorConfig, MAX_LSYSTEM_DEPTH, MirrorSpec, OverflowContext, ViewTransform,
-    grammar, replicate_mirror, transform_cached, turtle,
+    CapOverflow, ColorRamp, GeneratorConfig, MAX_LSYSTEM_DEPTH, MirrorSpec, OverflowContext,
+    ViewTransform, grammar, replicate_mirror, transform_cached, turtle,
 };
 use crate::dsp::AnalysisFrame;
-use crate::render::palette::{Palette, desaturate};
+use crate::render::palette::Palette;
 
 /// Maps `thickness` to an NDC-y half-width (see the parametric scene).
 const WIDTH_SCALE: f32 = 0.003;
@@ -237,41 +237,25 @@ impl LSystemScene {
     }
 }
 
-/// This frame's inputs to the generation-depth colour ramp (ADR-0059) — the
-/// scalars [`fill_depth_colors`] needs, grouped so the two halves of the colour
-/// path stay pure functions the tests can call directly.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct DepthRamp {
-    pub hue: f32,
-    /// How far along the palette the deepest generation sits from the trunk.
-    /// `0` — the default — makes every generation `hue`, which is the single
-    /// flat colour this scene drew before the palette reached it.
-    pub hue_spread: f32,
-    pub palette_mix: f32,
-    pub saturation: f32,
-    pub brightness: f32,
-    /// The deepest generation present in the visible figure — the ramp's
-    /// divisor, so `hue_spread = 1` spans the palette exactly once whatever the
-    /// grammar's branching factor. A bracket-free figure has `0` here and
-    /// colours flat; see the module docs.
-    pub generations: u32,
-}
-
-/// Fill `out[g]` with generation `g`'s stroke colour. Allocation-free into a
-/// buffer sized at build time, and one palette sample **per generation** rather
-/// than per segment — every segment of a generation is the same colour by
-/// definition, and a figure has a couple of dozen generations against up to
-/// `max_segments` segments.
-pub(crate) fn fill_depth_colors(out: &mut [[f32; 3]], palette: &Palette, ramp: DepthRamp) {
-    let span = ramp.generations.max(1) as f32;
+/// Fill `out[g]` with generation `g`'s stroke colour, walking the shared
+/// [`ColorRamp`] over the depth axis. `generations` is the deepest generation in
+/// the visible figure — the ramp's divisor, so `hue_spread = 1` spans the palette
+/// exactly once whatever the grammar's branching factor. A bracket-free figure
+/// passes `0` here and colours flat; see the module docs.
+///
+/// Allocation-free into a buffer sized at build time, and one palette sample
+/// **per generation** rather than per segment — every segment of a generation is
+/// the same colour by definition, and a figure has a couple of dozen generations
+/// against up to `max_segments` segments.
+pub(crate) fn fill_depth_colors(
+    out: &mut [[f32; 3]],
+    palette: &Palette,
+    ramp: ColorRamp,
+    generations: u32,
+) {
+    let span = generations.max(1) as f32;
     for (generation, slot) in out.iter_mut().enumerate() {
-        let hue = ramp.hue + ramp.hue_spread * (generation as f32 / span);
-        let rgb = desaturate(palette.sample(hue, ramp.palette_mix), ramp.saturation);
-        *slot = [
-            rgb[0] * ramp.brightness,
-            rgb[1] * ramp.brightness,
-            rgb[2] * ramp.brightness,
-        ];
+        *slot = ramp.at(palette, generation as f32 / span);
     }
 }
 
@@ -422,14 +406,14 @@ impl Scene for LSystemScene {
         fill_depth_colors(
             &mut self.depth_colors,
             &self.palette,
-            DepthRamp {
+            ColorRamp {
                 hue: self.hue,
                 hue_spread: self.hue_spread,
                 palette_mix: self.palette_mix,
                 saturation: self.saturation,
                 brightness: self.brightness,
-                generations: self.cached_max_depth.get(idx).copied().unwrap_or(0),
             },
+            self.cached_max_depth.get(idx).copied().unwrap_or(0),
         );
         let trunk = self.depth_colors.first().copied().unwrap_or([1.0; 3]);
 
@@ -546,14 +530,14 @@ mod tests {
         fill_depth_colors(
             &mut colors,
             &Palette::default_spectrum(),
-            DepthRamp {
+            ColorRamp {
                 hue: DEFAULT_HUE,
                 hue_spread,
                 palette_mix: DEFAULT_PALETTE_MIX,
                 saturation: DEFAULT_SATURATION,
                 brightness: DEFAULT_BRIGHTNESS,
-                generations: deepest,
             },
+            deepest,
         );
         apply_depth_colors(&mut segs, &generations, &colors);
         (segs, generations)
@@ -649,14 +633,14 @@ mod tests {
         fill_depth_colors(
             &mut colors,
             &Palette::default_spectrum(),
-            DepthRamp {
+            ColorRamp {
                 hue: DEFAULT_HUE,
                 hue_spread: 0.6,
                 palette_mix: DEFAULT_PALETTE_MIX,
                 saturation: DEFAULT_SATURATION,
                 brightness: DEFAULT_BRIGHTNESS,
-                generations: deepest,
             },
+            deepest,
         );
         // Half the figure, exactly as `transform_cached` reveals it.
         let mut half = Vec::new();

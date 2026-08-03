@@ -192,9 +192,9 @@ preset folder — so while you are editing a file it re-rolls on each save.
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `swarm`           | `force` `spin` `burst` `field_freq` `hue` `brightness` `size` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
-| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
+| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
-| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` |
+| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
@@ -357,7 +357,9 @@ cannot infer from the param names:
 
 | System | `hue_spread` walks | `0` is | `1` is |
 |--------|--------------------|--------|--------|
+| `parametric_curve` | **position along the traced path** — chord `0` is the walk's first | one flat `hue` | first chord at `hue`, last a full palette away |
 | `lsystem` | **generation depth** — branch nesting, `0` on the trunk and one more per open `[` | one flat `hue` | trunk at `hue`, deepest twigs a full palette away |
+| `star_pattern` | **radius from the rosette centre** — but see the warning below: **inert today** | one flat `hue` | one flat `hue` (no radial spread to walk) |
 | `spectrum` | **band index** — element `0` is the bottom of the spectrum | one flat `hue` | low band at `hue`, top band a full palette away |
 
 `hue_spread = 0` is the default on every one of them and reproduces exactly the
@@ -374,6 +376,25 @@ at the same recursion level — not a missing feature. Such a preset still reach
 `[palette]`; what it cannot reach is a ramp. The ramp is normalized over the
 **figure's own** deepest generation, so `hue_spread = 1` spans the palette once
 whatever the grammar's branching factor and whichever depth is visible.
+
+**On `parametric_curve` the divisor is `samples`, not the revealed prefix.** So a
+`draw_progress` riding `bar` *draws the gradient on* — a half-revealed curve shows
+the palette's first half — rather than re-tinting every chord it already drew.
+
+> **`hue_spread` does nothing on `star_pattern` today, and that is measured.** A
+> Hankin rosette is `2n` congruent segments about the frame centre, so every one
+> of them occupies the *same* radial interval: the spread of segment radii across
+> the whole figure measures `1.2e-7` (f32 noise) at every tiling order and every
+> contact angle, including both shipped presets and all their variants. There is
+> no range for a radial ramp to walk, so the ramp collapses to the flat `hue`
+> rather than sweeping on noise. What `star_pattern` *does* gain is `[palette]`
+> itself — the rosette can be an ember or an ice figure instead of a point on the
+> built-in cosine — plus `saturation` and `palette_mix`. What is empty is the
+> rosette's **interior**: at `star_rosette`'s 12-fold / 20° the strokes live
+> between radius 0.54 and 0.90, so the inner 60% of the disc is bare, and
+> `star_lantern`'s 55° variant empties 87% of it. That is the open half of
+> design-backlog 0007 and it is a generator question, not a colour one; the ramp
+> comes alive by itself the day a construction puts segments at different radii.
 
 ### `spectrum` — the frequency-axis readout (Plan 0034)
 
@@ -875,13 +896,14 @@ picks it; a `[palette_b]` + bindable `palette_mix` crossfades between two. Colou
 modulation (`saturation`, `color_span`/`color_center`, `hue_spread`/`hue_center`,
 `palette_mix`) is normal audio-bindable `[params]`. All defaults reproduce each
 scene's prior look (`[palette]`-less = the classic `spectrum` cosine), so a preset
-that sets none is unchanged. `lsystem` samples the same LUT on the CPU too, one
-colour per **generation** (Plan 0054 / ADR-0059); the remaining two line scenes
-(`parametric_curve`, `star_pattern`) still use their own cosine `hue` — see
-[the swatch table](../docs/preset-palettes.md#the-line-scenes-cosine-ramp--what-hue-actually-looks-like)
-for what its values actually look like, and
-[the colour axes](#the-line-scenes-colour-axes--what-hue_spread-walks) for what
-`hue_spread` walks on each scene that has one.
+that sets none is unchanged. **Since Plan 0054 / ADR-0059 the other three line
+scenes join them** — `parametric_curve`, `lsystem` and `star_pattern` all sample
+the same LUT on the CPU, each walking `hue_spread` along its own generator's axis
+(see [the colour axes](#the-line-scenes-colour-axes--what-hue_spread-walks); the
+star's is inert until its interior is redesigned). With no `[palette]` that LUT is
+the line scenes' familiar cosine — [the swatch
+table](../docs/preset-palettes.md#the-line-scenes-cosine-ramp--what-hue-actually-looks-like)
+is what its `hue` values actually look like.
 
 ```toml
 [palette]
