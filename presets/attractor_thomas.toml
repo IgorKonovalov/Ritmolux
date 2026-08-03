@@ -60,7 +60,12 @@ size   = "0.78 - clamp((bass + mid) * 0.094, 0, 0.16) + clamp(treb * 0.167, 0, 0
 # quiet material it would hold the reseed on from startup and the cloud would
 # never accumulate. `beat` is 1 only on the hop a beat fires, so the pair is a
 # single-frame pulse.
-reseed = "max(onset > 0.69, min(beat, mod(beat_index, 24) == 0))"
+# The onset half re-derived for a disturbance: 0.69 was calibrated while a
+# reseed REPLACED the cloud, so reluctance protected the accumulation. ADR-0066
+# (Plan 0057 Phase 3) made it a bounded in-place jitter. Onset means measured
+# 0.033 (click:120) / 0.153 (dynamic:110) / 0.391 (chord), ~0.20 real music,
+# all against a 1.000 peak. The every-24th-beat pulse is unchanged.
+reseed = "max(onset > 0.40, min(beat, mod(beat_index, 24) == 0))"
 
 # COLOUR - near-neutral by design; the remap discards hue and a desaturated
 # source keeps the luminance ramp (and so the ink density) even.
@@ -84,7 +89,12 @@ ink_sat      = "0.92"
 ink_bright   = "0.13"
 
 [smoothing]
-a          = 1.0
+# Was 1.0 - the slowest shape ease in the family, and this preset's transient
+# pair (rise 19+ / fall 38+) was the slowest fall in the whole library. Same
+# re-derivation as attractor_ink: a ~100 ms hit moves a 1.0 s ease by about
+# 10% of its step, so the coefficient term never arrived. 0.55 keeps the
+# cyclic drift smooth without swallowing the transient.
+a          = 0.55
 fade       = 0.22
 size       = { attack = 0.03, release = 0.30 }
 zoom       = 0.18

@@ -210,9 +210,31 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// lsystem             0.32    0.6413  Fern Grow          2.00
 /// star_pattern        0.34    0.6908  Star Lantern       2.03
 /// reaction_diffusion  0.07    0.1420  Coral              2.03
-/// attractor           0.12    0.2461  De Jong            2.05
+/// attractor           0.18    0.3785  Leviathan          2.10
 /// spectrum            0.06    0.1189  Spectrum Ridge     1.98
 /// ```
+///
+/// **The attractor floor moved on 2026-08-03 and the mechanism above is why it
+/// was noticed rather than missed.** It was `0.12` against `0.2461` De Jong.
+/// Plan 0057 Phase 6 re-raised the exposure of Clifford, De Jong and Leviathan,
+/// undoing a compensation `00d99d0` had carried for a 3x deposit that ADR-0065
+/// removed, and the family's minimum rose to `0.3785`, moving from De Jong to
+/// **Leviathan**. That put the slack at `3.15x` and
+/// [`report_coverage_distribution`] failed the run with the number, which is
+/// exactly the shelf life this constant was given. The floor is re-derived
+/// from the printed distribution, not nudged until green. The family now reads
+/// `0.3785 Leviathan`, `0.4746 De Jong`, `0.5381 Lorenz`, `0.7817 Clifford`,
+/// `1.0000 Ink on Paper`, `1.0000 Thomas`.
+///
+/// Two of that six deserve a note, because a reader checking the arithmetic
+/// will trip on them. `Ink on Paper` and `Thomas` both read exactly `1.0000`,
+/// and for `Ink` that is a **measurement artifact rather than a saturated
+/// figure**: it sets `ink_amount = 1`, and the ink remap is a terminal engine
+/// stage, not a `bg_*` binding, so ADR-0067's backdrop suppression does not
+/// reach it - the whole frame is paper-white and every pixel differs from
+/// [`BLACK`]. Its tonal flatness (`0.6756`) is the statistic that actually
+/// describes it. `Lorenz` was deliberately left un-retuned pending Plan 0057
+/// Phase 5, so its `0.5381` is a pre-retune number and will move again.
 ///
 /// **These numbers replace floors that could not be failed.** Under the old
 /// corner-sampled measurement the same six sparse systems all read `0.01` and
@@ -256,9 +278,11 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // Reaction-diffusion paints a real pattern across the frame, but the
         // present maps only the sparse V species, so the lit fraction is modest.
         SystemKind::ReactionDiffusion => 0.07,
-        // The attractor cloud is the widest-spread family: De Jong's filigree at
-        // 0.2461 against two members that saturate the frame.
-        SystemKind::Attractor => 0.12,
+        // The attractor cloud is the widest-spread family: Leviathan's sheet at
+        // 0.3785 against two members that fill the frame. Raised from 0.12 at
+        // Plan 0057 Phase 6 — see the table above for why the minimum moved
+        // off De Jong.
+        SystemKind::Attractor => 0.18,
         // The sparsest system in the library, and the one this plan exists
         // because of. Spectrum Ridge sets it at 0.1189 — *after* its repair; the
         // version that shipped broken scores 0.0000 here.
