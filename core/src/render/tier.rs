@@ -15,6 +15,19 @@
 //! reaction-diffusion simulation grid, whose pattern scale moves with its
 //! resolution (ADR-0034) — deliberately does **not** live here.
 //!
+//! **That separation is a property of the consuming scene, not of this struct,
+//! and one scene broke it for four plans.** The attractor draws its particles
+//! with an *additive* blend into a linear accumulation, so
+//! [`attractor_particles`](TierConfig::attractor_particles) set the total light in
+//! the frame as directly as it set the sample count: `Rich` rendered every
+//! attractor preset three stops hot, behind a green suite, because no capture
+//! could pin `Rich` to see it. Fixed at its cause in Plan 0057 —
+//! [`deposit_scale`](super::scenes::particles::deposit_scale) divides the deposit
+//! by the count (ADR-0065), so the claim above holds again. The lesson
+//! generalizes: **a count feeding an accumulating pass is a look value until
+//! something normalizes it.** If a future field lands here for such a pass, that
+//! normalization is part of adding it.
+//!
 //! # Where the numbers come from
 //!
 //! [`TierConfig::FLOOR`] is the pre-tier engine, constant for constant: each
@@ -178,6 +191,12 @@ pub struct TierConfig {
     /// storage; the real ceiling is **additive-blend fill rate**, which is why the
     /// floor value was described as the number to validate against the 60 fps @
     /// 1080p floor (ADR-0015 Risks).
+    ///
+    /// This is a sample count and **not** a brightness, which it was until Plan
+    /// 0057: the additive draw now divides its deposit by this value
+    /// ([`deposit_scale`](super::scenes::particles::deposit_scale), ADR-0065), so
+    /// raising it buys a smoother figure rather than a brighter one. Changing it
+    /// changes shot noise and cost; it does not change exposure.
     pub attractor_particles: u32,
 
     /// Upper bound on each axis of the attractor's trail accumulation grid.
