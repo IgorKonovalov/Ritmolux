@@ -2406,87 +2406,79 @@ cross-references resolving. Retiring it is a three-file edit and belongs with th
 
 ---
 
-## Entry 0046 — from the Plan 0048 close, on the user's first live look at the retuned library
 
-## 0046 — the retune's gain rule is direction-blind, so the six presets whose idiom *subtracts* light came out ~25 % darker
+## Entry 0046 — from the Plan 0048 close, and then corrected by the lane it was handed to
+
+## ~~0046 — the retune's gain rule is direction-blind, so the six presets whose idiom *subtracts* light came out ~25 % darker~~
 
 - **Raised:** 2026-08-03, from `architect`, after the user ran the app on the retuned library and
-  reported "strange attractors are very dim". Nothing else in the set was named.
-- **Verified against code and by rendering:** yes — measurements below, reproduced at
-  `LMV_PRESET_DIR=./presets` on `2c6b5c1`.
-- **Cost when it bit:** the first user-visible regression from Plan 0048's Phase 7, found by eye on
-  the first live run, on the family that is 19 of the library's 22 subtractive audio terms.
+  reported "strange attractors are very dim".
+- **RETRACTED the same day, by `preset-author`, before any preset was edited.** The claim is
+  **false** and the fix it specified would have made the family worse. Kept in full rather than
+  deleted: the *reason* it was wrong is a trap that will catch the next person who audits a
+  semantic change, and it is the only durable thing here.
 
-**The measurement.** Same engine, same excitation (`--set bass=mid=treb=onset=0.42`, the
-real-music typical), 240 frames, pre-retune preset file against post-retune:
+**What the entry claimed:** that Phase 7's `G' = C / P` rule is direction-blind, over-engaging the
+22 subtractive terms, and that the six `attractor_*` presets consequently render ~25 % darker at
+typical excitation. It carried a measured table (clifford 78.7 → 61.0, dejong 50.3 → 38.8, lorenz
+49.9 → 37.0) and worked arithmetic through accumulation and point area.
 
-| preset | pre mean | post mean | delta | pre coverage | post coverage |
-|---|---|---|---|---|---|
-| `attractor_clifford` | 78.66 | 61.04 | **−22 %** | 47.9 % | 40.9 % |
-| `attractor_dejong` | 50.29 | 38.84 | **−23 %** | 59.1 % | 37.4 % |
-| `attractor_lorenz` | 49.91 | 36.99 | **−26 %** | 51.7 % | 33.5 % |
-| `attractor_leviathan` | 64.39 | 59.51 | −8 % | 64.2 % | 47.3 % |
+**THE BASELINE WAS NOT THE AUTHORED LOOK.** Every "pre" figure came from rendering the
+**pre-retune preset file on the post-retune engine**. On the v2 scale that file's gains are 16-96x
+too hot, so *every* clamp in it pins at its cap — which for the additive luminance terms
+(`trails`, `bg_bright`, `saturation`) means **maximum brightness**. The "regression" was the
+distance between a correct render and a saturated one. It measured the defect the retune fixed and
+read it as the standard to restore.
 
-**The cause is the rule, not a slip in applying it.** Phase 7 re-derived every clamped gain as
-`G' = C / P`, `P = 0.85` for `bass`/`mid`, so a typical passage lands at about half the cap. That
-is right for a term that **adds** light. The attractor family's stated idiom is the inverse —
-`# PEAK BUYS STRUCTURE`, in the header of every file: `fade` and `size` *fall* as the track hits,
-and `trails` rises instead, so a drop stretches the exposure rather than blowing the accumulation
-to white. For a **subtractive** term, "half the cap at typical" means half the *darkening* applied
-constantly, where before it was applied essentially never.
+**Fed each file the values it was authored against, at the same physical stimulus** (v1 file at the
+raw means `0.040 / 0.006 / 0.006 / 0.0016`, v2 file at the normalized means
+`0.661 / 0.575 / 0.281 / 0.145` — the same `dynamic:110` hop, each side seeing its own scale):
 
-Worked, on `attractor_clifford` at typical:
+| preset | authored (v1) | shipped (v2) | delta | coverage v1 → v2 |
+|---|---|---|---|---|
+| `attractor_clifford` | 50.8 | 68.5 | **+35 %** | 35.1 % → 44.4 % |
+| `attractor_dejong` | 33.9 | 45.0 | **+33 %** | 21.3 % → 53.2 % |
+| `attractor_lorenz` | 30.1 | 41.6 | **+38 %** | 25.8 % → 42.0 % |
+| `attractor_leviathan` | 64.7 | 60.6 | −6 % | 48.6 % → 64.2 % |
 
-|  | pre (raw `bass` 0.040) | post (normalized `bass` 0.42) |
-|---|---|---|
-| `fade` subtrahend | `0.040 × 0.18` = 0.0072 — **12 % of its 0.060 cap** | `0.42 × 0.0706` = 0.0297 — **49 % of cap** |
-| resulting `fade` | 0.8778 | 0.8553 |
-| steady-state accumulation `1/(1−fade)` | 8.18 | 6.91 — **−15 %** |
-| `size` | 0.6126 | 0.5406 |
-| point area ∝ `size²` | — | **−22 %** |
+The retune made this family **brighter and better-covered**, not darker.
 
-`0.85 × 0.78 ≈ 0.66`, against a measured mean drop of 0.78 — same order, the gap being backdrop and
-the tonemap's compression. So the mechanism accounts for the measurement.
+**The mechanism in the entry was also backwards.** Restoring `fade` + `size` to their v1 gains makes
+Clifford **darker by 4.6**, because on the v2 scale the old gain saturates the subtractive cap.
+Attributing the (spurious) 17.6 gap by restoring one group at a time: `zoom` +6.1, colour +3.7,
+`trails` +2.8, `bg_bright` +2.0, coefficients −0.9, and `fade` + `size` **−4.6**. The subtractive
+terms were the one group moving the *other* way.
 
-**Nothing could have caught it, and this is the third instance of that same sentence in one plan.**
-The retune's own acceptance checks were reachability (blind to gains), the reactivity gates (diff
-against silence), and a *loud* contact sheet checked for blowout — which was correctly unchanged,
-because at the peak these terms hit the same caps they always did. No instrument in this project
-measures a preset's **absolute luminance against its own previous self**. ADR-0062's occupancy
-statistic will not catch it either: these clamps are *not* pinned, which is exactly the healthy
-reading.
+**And the family is not dim in context.** The whole shipped library at the typical stimulus puts the
+four dark attractors at **41.6 / 45.0 / 60.6 / 68.5** against a median of ~57 — mid-pack. The genuinely
+dim presets are `spectrum_corona` (9.1), `star_lantern` (14.0) and `swarm_storm` (16.5), none of
+which the user flagged.
 
-**Note the near-miss in the record.** ADR-0062's rejected Alternative B names this family's
-inversion explicitly — "the attractor family lowers `fade` and `size` on energy by design, 'peak
-buys structure'; this codebase has no house direction for 'louder'" — as a reason a
-response-slope assertion would fail *correct* presets. The inversion was known. What was not
-connected is that a **uniform** gain rule is direction-blind, so the same `P` that half-engages a
-brightening term at typical also half-engages a darkening one.
+**The live cause is almost certainly the tier, which is why nothing here could see it.**
+`TierConfig` (`core/src/render/tier.rs:219,237`) sets `attractor_particles` to **50 000 at `Floor`
+and 150 000 at `Rich`** — exactly 3x. The attractor is the **only** family whose luminance *is* its
+particle count, because it accumulates additive points; every other family's look is independent of
+the capacity multipliers. The reporting session had the governor demote `rich → floor`, so the
+attractors alone lost two thirds of their emitters while the rest of the library was untouched —
+which is exactly the shape of the report ("more or less fine, but strange attractors are very dim").
+So this is **[backlog 0031](design-backlog.md) and Plan 0044's never-run `Rich` calibration**, not
+content work. **`shot` is `Floor` by construction (ADR-0045) and cannot test it** — the running app
+under `--tier rich` is the only instrument.
 
-**What a design here would weigh:**
+**The durable lesson, and the reason this entry survives its own retraction:**
 
-- **Direction-aware `P` in the retune rule.** A subtractive term wants its typical engagement near
-  the *low* end of its cap, not the middle — the authored look is the undarkened one and the cap
-  is headroom for the drop. Cheapest, and it is a `preset-author` pass over 22 terms in 9 files,
-  not engine work.
-- **Re-anchor per preset by eye against the pre-retune render.** Most faithful to each author's
-  intent, least systematic, and it gives up the property that made Phase 7 defensible — that the
-  retune was a derivation rather than a taste pass.
-- **A luminance-drift check in the harness.** The general instrument: capture each preset at
-  typical and compare mean luminance against a stored figure, flagging a move past some band. It
-  would have caught this and would catch the next content-wide pass too. Costs a second baseline
-  set and the judgement of what band is a defect rather than an intent.
-- **Accept it.** Defensible only if the darker family is judged better; the user's first reaction
-  says otherwise, so this is listed for completeness.
+> **A pre-change preset file rendered on the post-change engine is not a baseline.** After any
+> semantic change to what a variable *means*, the old content evaluates wrongly by construction —
+> usually saturated — so "old file vs new file on today's build" measures the defect, not the
+> intent. The authored look is only recoverable by feeding the old file the **values it was written
+> against**. Both this entry and the Plan 0048 close review made this mistake, in the same session,
+> having already written down that ADR-0049 changed what those variables mean.
 
-**Scope, measured:** 22 subtractive audio terms in 9 presets, and **19 of them are the six
-`attractor_*` files** (`dejong` 4, `clifford` 4, `thomas` 3, `lorenz` 3, `ink` 3, `leviathan` 2).
-The other three are one each in `swarm_storm`, `swarm_dense`, `rose_overflow`. So the fix is
-narrow and its blast radius is one family.
+Two smaller things worth keeping:
 
-**One confound to keep separate, not part of this entry.** The live session the report came from
-ran at **`Floor`** — the governor demoted it, as it did in Phase 6 — and `Rich` triples the
-attractor particle count. So the observed dimness is the sum of this defect and a tier the user
-did not choose. The numbers above are `Floor`-only on both sides (`shot` is `Floor` by
-construction, ADR-0045), so they isolate the preset change; the tier half is
-[backlog 0031](design-backlog.md) and Plan 0044's never-run Phase 4.
+- **We have no instrument for "did this preset's look change".** Everything measures reactivity
+  (against silence) or saturation. The absolute-luminance-at-matched-stimulus comparison used here
+  is ad hoc and lived in a scratch directory. Worth a harness home if a content-wide pass ever
+  happens again — it is what would have answered this in one command instead of a day.
+- **The `Rich`/`Floor` split is invisible to every automated check we have**, and one family's
+  headline look depends on it 3:1. That is a bigger gap than the calibration ticket implies.
