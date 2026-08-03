@@ -136,17 +136,22 @@ in
 - **Calibrate a continuous parameter against the mean and a percussive one
   against the peak.** A zoom or a hue drift spends its life near the mean; a
   flash or a burst exists to fire on the hit.
-- **A GAIN can be wrong the same way, and nothing checks it.** `clamp(band * G,
-  0, C)` reaches its ceiling at `C / G`; if that is below the typical level, the
-  term is a constant no matter how reactive it reads. Phase 7 found **263 of 332**
-  clamped band terms in that state at once. Until `--report` grows the occupancy
-  column, do the division yourself. The rule that came out of the retune: pick
-  `G = C / 0.85` for `bass`/`mid` and `C / 0.60` for `treb`/`onset`, which puts a
-  typical passage near half the cap and a peak at it.
+- **A GAIN can be wrong the same way.** `clamp(band * G, 0, C)` reaches its
+  ceiling at `C / G`; if that is below the typical level, the term is a constant
+  no matter how reactive it reads. Phase 7 found **263 of 332** clamped band terms
+  in that state at once. **This one is now checked** — `--report`'s `occ` column
+  names the binding and `core/tests/saturation.rs` fails the build on it (Plan
+  0056 / [ADR-0062](../docs/adrs/0062-clamp-occupancy-is-the-saturation-instrument.md),
+  and the `[occupancy]` table [below](#a-clamp-is-a-limit-not-a-gain--the-occupancy-table)).
+  Do the division while composing anyway: the gate fires at occupancy `0.9`, so a
+  term pinned for half a track passes it. The rule that came out of the retune:
+  pick `G = C / 0.85` for `bass`/`mid` and `C / 0.60` for `treb`/`onset`, which
+  puts a typical passage near half the cap and a peak at it.
 
-`--report` now checks this for you: the second table reads at these levels, and
-its `gates` / `ceils` columns name any `select()` that never went both ways and
-any `clamp()` ceiling the value never reached
+`--report` now checks all of this for you: the second table reads at these levels,
+and its `gates` / `ceils` / `occ` columns name any `select()` that never went both
+ways, any `clamp()` ceiling the value never reached, and any `clamp()` that never
+let its ceiling go
 ([`../docs/capturing.md`](../docs/capturing.md#reachability-gates-the-probe-never-drove-both-ways)).
 
 ### Seeded randomness — `hash`, `noise`, and `[generator] seed`

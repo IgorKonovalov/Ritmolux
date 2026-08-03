@@ -15,20 +15,27 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **approved 2026-08-02** — ready for `dev`; [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
-| [0056](0056-clamp-occupancy-and-the-axis-anchor.md) | Clamp occupancy: the instrument that would have caught a saturated library, plus the axis anchor and the flat-frame check | **approved 2026-08-03** — ready for `dev`; [ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) + [ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md) (Phase 4 only); closes [backlog 0043](../design-backlog.md), the guard half of [0044](../design-backlog.md) and the second half of [0047](../design-backlog.md). **Phase 5 added at approval**: the tonal-flatness statistic in the `sanity` gate. Test-and-harness work only — **no pixels move, no golden moves, no scene or DSP is touched**. Both thresholds are **measured, not asserted**. **Run before [0057]**, whose content phase uses Phase 5's statistic | dev |
 | [0057](0057-the-attractors-compute-path.md) | The attractor's compute path: the deposit, the reseed, the butterfly, and one retune | **approved 2026-08-03** — ready for `dev`; [ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md) + [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) + [ADR-0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md); closes [backlog 0047](../design-backlog.md) (first half), [0048](../design-backlog.md), [0050](../design-backlog.md) and the mechanism half of [0031](../design-backlog.md). **No golden baseline moves anywhere in the plan** (checked in advance, not hoped for). **Phase 4 may route back to `architect`** by design, and **Phase 6 is `human`** — so it does not close in one session | dev, human |
 
 ## Recommended execution sequence
 
 **Every plan in the roster is approved as of 2026-08-03 — nothing is waiting on a design
-decision.** What separates them now is only what each needs to *run*: [0052] and [0056] close in one
-session; [0050] closes in one plus a measurement; [0053], [0055] and [0057] each carry a `human`
-phase that gates later phases, so they stop mid-plan by construction — [0053] until a discrete GPU
-is to hand, [0055] until the live A/B is judged, [0057] until the content pass runs. Taking [0052]
-or [0056] first keeps a session unblocked end to end. (**[0054] has landed and closed** on
-2026-08-03 — see Recently closed.)
+decision.** What separates them now is only what each needs to *run*: [0052] closes in one session;
+[0050] closes in one plus a measurement; [0053], [0055] and [0057] each carry a `human` phase that
+gates later phases, so they stop mid-plan by construction — [0053] until a discrete GPU is to hand,
+[0055] until the live A/B is judged, [0057] until the content pass runs. Taking [0052] first keeps a
+session unblocked end to end. (**[0054] and [0056] have both landed and closed** on 2026-08-03 — see
+Recently closed.)
 
-**[0056] then [0057] is the one ordering in this roster that is not free.** Three defects raised on
+**[0057] is now unblocked and is the one with a live dependency behind it.** [0056] has landed, so
+[0057] Phase 6's content pass has the tonal-flatness statistic it was sequenced to wait for
+(`metrics::tonal_flatness`, threshold 0.90, distribution printed by `sanity` on every run). Note
+what that statistic cannot do for it: measured at the close, **none** of the four presets `00d99d0`
+repaired would have been caught by it — see Recently closed for why, and read that before treating
+it as the attractor instrument. It is a `Floor` statistic and the defect is a `Rich` one.
+
+**[0056] then [0057] was the one ordering in this roster that was not free, and [0056] has now
+landed**, so what follows is the standing rationale rather than a constraint. Three defects raised on
 2026-08-03 are one subsystem — the attractor's compute path deposits light without normalizing for
 particle count, reseeds by replacing the cloud with an axis-aligned box, and renders Lorenz as a
 dust cloud — and [0057] takes all three in one plan **because all three move the same six presets'
@@ -197,18 +204,28 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.30.0`**, tag `v0.30.0` — **minor**, bumped at [0054]'s close (a feature plan:
-the palette surface reaching all four line scenes on their own generator axes, plus `variant` as a
-continuous contact angle) per [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). The
-`0.29.0` before it was [0048]'s close (the dual-resolution band axis, normalized levels with
-`*_raw` escapes, the beat/bar clock, and the library retune onto all of it), `0.28.1` was [0051]'s
-(a fix-only plan: the two additive draw seams emitting premultiplied alpha), and `0.28.0` was
-[0045]'s (the linear-light composite, the tonemap, the bloom stage and the fold redesign).
-Nothing is owed until the next close.
-**[0054] closed through a worktree lane in ADR-0053's intended order**, unlike the three closes
-before it: `main` was merged into `plan-0054-line-scenes` first (already up to date), the whole gate
-re-run there, and the bump and `v0.30.0` tag written **on the branch** so they land on the commit
-that becomes `main`'s tip. `main` was then fast-forwarded from the main checkout.
+**Version is at `0.31.0`**, tag `v0.31.0` — **minor**, bumped at [0056]'s close per
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Minor rather than patch is a deliberate
+call on a plan that moves no pixels: it adds a **preset-facing surface** (the `[occupancy]` table),
+a new `--report` column plus a JSON key, and two HARD gates — capability, not a fix. The `0.30.0`
+before it was [0054]'s close (the palette surface reaching all four line scenes on their own
+generator axes, plus `variant` as a continuous contact angle), `0.29.0` was [0048]'s (the
+dual-resolution band axis, normalized levels with `*_raw` escapes, the beat/bar clock, and the
+library retune onto all of it), `0.28.1` was [0051]'s (a fix-only plan: the two additive draw seams
+emitting premultiplied alpha), and `0.28.0` was [0045]'s (the linear-light composite, the tonemap,
+the bloom stage and the fold redesign). Nothing is owed until the next close.
+**[0054] and [0056] both closed through worktree lanes in ADR-0053's intended order**, unlike the
+three closes before them — and [0056] is the first close where step 2 was not a formality. `main`
+was merged into each branch first; for [0056] that merge actually brought [0054]'s four line-scene
+commits, so the **417/417** gate run on the branch is the first and only run covering the
+combination. Each bump and tag was then written **on the branch**, landing on the commit that
+becomes `main`'s tip, and `main` was fast-forwarded from the main checkout.
+**Two lanes closed on one day, and the order mattered exactly once.** [0056]'s
+`MAX_TONAL_FLATNESS` was measured against the pre-[0054] library, and [0054] changed the colour path
+of four scenes — so the distribution was **re-measured after the merge** rather than assumed. It is
+unchanged to four decimals, because ADR-0021's LUT bake moves at most one 8-bit level and the tonal
+buckets are 16 levels wide. That re-measurement is also independent corroboration of [0054]'s own
+byte-identity claim.
 **[0048] landed on `main` directly rather than through a worktree lane** — the `plan-0048-analysis-v2`
 branch was fast-forwarded in as each phase went, so at close time there was nothing to merge back
 and ADR-0053's steps 1-2 were again moot; the gate was re-run on `main` before the bump instead.
@@ -367,6 +384,76 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0056 — clamp occupancy: the instrument that would have caught a saturated library, plus the axis
+  anchor](done/0056-clamp-occupancy-and-the-axis-anchor.md) — **done 2026-08-03**, Mode 4 review
+  **no blockers, no majors**; three minors, all doc bookkeeping, all fixed in the close commit.
+  Five `dev` phase commits on the `plan-0056-clamp-occupancy` worktree branch: `a704d30` occupancy
+  on the walk, `f607915` the `occ` column and `SAT` lines, `3430cdc` the HARD gate with its measured
+  threshold, `d389c96` the axis anchor, `9b07ede` the tonal-flatness statistic in `sanity`.
+  [ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) is **accepted with an
+  Outcome section**, implemented in full;
+  [ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md) is **accepted with an Outcome
+  section but only half built** — the anchor landed, `bin_hz()` / `bin_range()` did not and are an
+  unnumbered followup plan. Closes design-backlog **0043**, the guard half of **0044** and the
+  second half of **0047**. Gate at the close, after merging `main` (carrying [0054]) into the
+  branch: fmt clean, clippy `-D warnings` clean, **417/417, 0 skipped**, **no golden baseline
+  moved** — the plan's "no pixels move" claim proved rather than asserted. C ABI **stays v4**, no
+  new dependency, nothing on the per-frame path touched.
+  **Both thresholds are measured, and each measurement is recorded on its own constant** — which is
+  the plan's central discipline and the reason to read the constants rather than this summary.
+  **Occupancy: `0.9`, measured on both libraries**, 339 clamped bindings each — today's and the
+  pre-retune one at `80c5dff^` that Plan 0048 Phase 7 found saturated. Today's highest is `0.609`
+  (`Aurora.warp`), next `0.444`, nothing else above `0.45`; the pre-retune set puts **145 bindings
+  across 23 of 35 presets** above `0.9`. **So the answer to the plan's title is yes: the gate would
+  have failed the build the day ADR-0049 landed**, naming `Glacier.glow`, `Dense.force`,
+  `Storm.saturation` and 143 others, each with its own number. `0.75` would have caught 249 rather
+  than 145 and was **declined** — it sits `0.14` above a shipped, reviewed preset, and a HARD gate
+  that fires on good content buys exemptions, which are the thing that dulls the instrument.
+  **No shipped preset needed the exemption**, against the plan's own expectation, so `[occupancy]`
+  ships exercised only by fixtures.
+  **Phase 5's honest answer is the finding worth carrying, and the plan asked for it in advance.**
+  Of the four presets `00d99d0` repaired, **none** would have been caught by the new flat-frame
+  gate — measured at `00d99d0^` through the gate itself, not reasoned: Clifford `0.231`, De Jong
+  `0.444`, Leviathan `0.137`, Lorenz `0.256`, against a threshold this library's own distribution
+  could never put below `0.9`. The reason is the one the plan anticipated: that saturation is a
+  **`Rich`-tier** effect (150k particles into the same texels, `One/One` with no normalization) and
+  `sanity` renders at `Floor`. There is a sharper form of it in the numbers — today's post-repair De
+  Jong measures `0.644`, **higher** than its pre-repair `0.444`, so at `Floor` the repair made the
+  frame *flatter*. A `Floor` capture carries no information about the `Rich` defect in either
+  direction. The statistic is sound and the tier is wrong, which says unambiguously where the next
+  instrument goes: [0057] Phase 1 / [ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md).
+  **The gate does catch one thing nothing else does, and it is a shipped preset.** `Spectrum Ridge`
+  measures **`1.000`** — every lit pixel in one of 16 luminance bands. Not a degenerate fixture: its
+  two siblings draw the *same* all-bands-at-1.0 data and read `0.31` and `0.44`. It is listed in
+  `KNOWN_FLAT` and **asserted to still be flat**, so a repair tells you to delete the line rather
+  than leaving a stale exemption — the entry closes itself. Routed to
+  [backlog 0052](../design-backlog.md). Note the headroom while you are there: past it the library's
+  highest is `0.830` (`Rose Trails`) then `0.765` (`Rose Web`), both trails-heavy line looks, so a
+  content pass raising `trails` on a line preset should re-run `sanity` rather than assume.
+  **The flat fixture is an additive stack, not an exposure stop, and that correction is measured.**
+  The plan proposed driving a preset past the tonemap knee as the cheapest flat frame; sweeping
+  `exposure` 1 → 65536 moved flatness `0.43` → `0.26`, the **wrong way**, because past the knee the
+  background blows out with the figure and a background-relative metric correctly stops finding
+  anything lit. What works is what the shipped flat frames actually did: `glow 20`, `brightness 16`,
+  `thickness 44`, `trails 0.97` reads `0.98`.
+  **Phase 4's anchor corroborates ADR-0063's damage claim to within its own rounding.**
+  `attractor_dejong`'s `bin(0.10)` reads **67.9 Hz** — the ~65 Hz its header names as an earlier
+  revision's mistake — and `fragment_aurora`'s `bin(0.14)`, chosen for the ~246 Hz low-mid so that
+  loudness could *not* move the curtain, reads **86.9 Hz**, a kick probe. The position that reads
+  that low-mid today is `bin(0.31)`. **Both shipped probes are still mis-pointed**: an anchor makes
+  the next re-band noticeable, it does not repair the last one, and that repair is unclaimed content
+  work. The test's comment says outright that a failure there is not a bug but a **content sweep**,
+  and that the literals are updated *after* the sweep rather than instead of it.
+  **One correction `dev` made that the plan did not ask for:** `--report`'s `ceils` counted
+  "everything that is not a dead gate", which was a ceiling count only by coincidence — a third kind
+  would have made it report a saturated clamp as its exact opposite. Every count is now by kind.
+  **Three minors fixed at the close**, all the same shape: three places still taught the workaround
+  for the gap this plan closed. `presets/README.md` and `docs/presets.md` both said "until
+  `--report` grows the occupancy column, do the division by hand", and the plan's own file list
+  named neither. Both now point at the column and the gate — while keeping the arithmetic advice,
+  because the gate fires at `0.9` and a term pinned for half a track passes it.
+  Version **minor 0.30.0 → 0.31.0** (a preset-facing surface, a report column and two gates).
 
 - [0054 — the line scenes catch up: every one honours the palette, and the star stops cutting
   between shapes](done/0054-the-line-scenes-catch-up.md) — **done 2026-08-03**, Mode 4 review **no
