@@ -749,4 +749,75 @@ mod tests {
         // Below the axis clamps to band 0 rather than wrapping or panicking.
         assert_eq!(layout.band_for_freq(1.0), 0);
     }
+
+    /// The frequency a preset's `bin(x)` reads, in Hz.
+    ///
+    /// `bin(x)` addresses the band array by **normalized position**: it maps `x`
+    /// to `x * (SPECTRUM_BINS - 1)` and interpolates the two adjacent bands (see
+    /// `Variables::bin`). The frequency that lands on is the geometric centre of
+    /// the band at that position — geometric because the axis is logarithmic, so
+    /// the midpoint of a band in *pitch* is the square root of the product of
+    /// its edges, not their average.
+    ///
+    /// Reads `edges_hz` deliberately. This helper must move when the layout
+    /// moves; it is the literals below that must not.
+    fn bin_hz(layout: &BandLayout, x: f32) -> f32 {
+        #[allow(clippy::manual_clamp, reason = "mirrors Variables::bin's total form")]
+        let pos = x.max(0.0).min(1.0) * (SPECTRUM_BINS - 1) as f32;
+        let k = pos.floor() as usize;
+        let frac = pos - k as f32;
+        let centre = |k: usize| (layout.edges_hz[k] * layout.edges_hz[k + 1]).sqrt();
+        let a = centre(k.min(SPECTRUM_BINS - 1));
+        let b = centre((k + 1).min(SPECTRUM_BINS - 1));
+        // Interpolated in log space, matching the axis the two centres sit on.
+        a * (b / a).powf(frac)
+    }
+
+    /// The external anchor the axis had none of (ADR-0063).
+    ///
+    /// `band_for_freq_agrees_with_the_edge_table` above checks the lookup
+    /// function against the edge table — but Plan 0048 Phase 1 moved **both**,
+    /// together, and it passed through the rebuild unchanged. Two sources that
+    /// agree on every configuration we test cannot tell you which one the
+    /// *content* depended on. These literals can, because they are not derived
+    /// from either: they were measured on 2026-08-03 and written down.
+    ///
+    /// **If this test fails, nothing here is broken — the axis was relaid.** The
+    /// obligation it creates is a content sweep: every `bin()` position in
+    /// `presets/` now reads a different frequency than it did, and each one has
+    /// to be re-checked against the frequency its author's comment names. That
+    /// is exactly what went unnoticed in Plan 0048: `fragment_aurora`'s low
+    /// probe was `bin(0.14)` chosen for ~246 Hz, and the rebuilt axis turned it
+    /// into a ~84 Hz kick probe, inverting the one property the preset exists to
+    /// have. Update the literals **after** the sweep, not instead of it.
+    #[test]
+    fn bin_positions_resolve_to_the_frequencies_the_presets_were_written_against() {
+        let layout = BandLayout::new(48_000);
+        // (position, Hz) — measured, not computed. See the note above before
+        // touching the right-hand column.
+        let anchors = [
+            (0.00f32, 36.7f32),
+            // The two ADR-0063 names as the concrete damage: on the rebuilt axis
+            // `attractor_dejong`'s `bin(0.10)` came to read the ~65 Hz its own
+            // header calls out as the mistake, and `fragment_aurora`'s
+            // `bin(0.14)` — chosen for the ~246 Hz low-mid — became a kick probe.
+            (0.10, 67.9),
+            (0.14, 86.9),
+            (0.20, 125.6),
+            // The position that actually reads that ~246 Hz low-mid today.
+            (0.31, 246.9),
+            (0.50, 793.7),
+            (0.84, 6413.2),
+            (1.00, 17143.2),
+        ];
+        for (x, want) in anchors {
+            let got = bin_hz(&layout, x);
+            assert!(
+                (got / want - 1.0).abs() < 0.005,
+                "bin({x}) resolved to {got:.1} Hz, and this axis was pinned at {want:.1} Hz. \
+                 The layout moved: every bin() in presets/ needs re-checking against the \
+                 frequency its author named before these literals are updated"
+            );
+        }
+    }
 }
