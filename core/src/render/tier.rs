@@ -389,6 +389,27 @@ pub fn should_demote(
     sustained_miss(frame_secs, budget_secs)
 }
 
+/// **Whether a runtime tier change is allowed at all** (ADR-0054): only on a
+/// context that has a surface.
+///
+/// A surface-less context is exactly the headless capture path, and
+/// [ADR-0045](../../../docs/adrs/0045-quality-tiers-floor-and-rich.md)'s
+/// guarantee is that a capture is `Tier::Floor` **by construction** —
+/// `Renderer::new_headless` takes no tier argument, so no baseline can be blessed
+/// at another tier by forgetting a field. `Renderer::set_tier` is a public
+/// mutator on the very type the golden suite renders through, so it is the one
+/// hole that guarantee was shaped to exclude, and this predicate is what keeps it
+/// closed.
+///
+/// Pure, and separate from `set_tier`, deliberately. A `Renderer` **with** a
+/// surface cannot be constructed in CI — there is no window — so a test that only
+/// observed the headless no-op would pass equally well against a `set_tier` that
+/// did nothing at all. Expressed as a value-in/value-out function, both
+/// directions are assertable.
+pub fn tier_change_permitted(has_surface: bool) -> bool {
+    has_surface
+}
+
 /// The frame budget for a display running at `hz`, in seconds. Falls back to
 /// [`DEFAULT_DISPLAY_HZ`] for a value that is not a usable rate, so a frontend
 /// that cannot read its monitor still gets a governed session rather than an
@@ -407,7 +428,28 @@ mod tests {
     // Test asserts panic on failure; allowed here over the file's pragma.
     #![allow(clippy::panic)]
 
-    use super::{Tier, TierConfig};
+    use super::{Tier, TierConfig, tier_change_permitted};
+
+    /// The ADR-0054 guard, **both directions**.
+    ///
+    /// The refusal alone is the half that is easy to satisfy by accident: a
+    /// `set_tier` whose body were empty would also never leave a headless
+    /// renderer at `Floor`. The permit is what says the entry point does
+    /// something on the path it exists for — and that path (a `Renderer` holding
+    /// a real surface) cannot be built in CI, which is the whole reason the
+    /// condition is a value here rather than a branch buried in the mutator.
+    #[test]
+    fn a_tier_change_is_permitted_only_where_there_is_a_surface() {
+        assert!(
+            !tier_change_permitted(false),
+            "a surface-less context is the capture path — ADR-0045 pins it to Floor \
+             by construction, and this is the condition that keeps that true"
+        );
+        assert!(
+            tier_change_permitted(true),
+            "a surfaced context is the live app, which is the point of ADR-0054"
+        );
+    }
 
     /// A name round-trips, and an unknown name is rejected rather than defaulted
     /// — a typo in `LMV_TIER` must be a usage error, not a silent floor.
