@@ -1,6 +1,8 @@
 # 0059 — Lorenz finds its plane, and the attractor can trade samples for curves
 
-> **Status:** draft 2026-08-03
+> **Status:** **approved 2026-08-03** — ready for `dev`. Phases 1-3 are `dev` and run in one
+> session; **Phase 4 is `human`** (the one content pass) and **may route back to `architect`** if
+> `density` + `fade` cannot hold a legible curve, so the plan does not close in one sitting.
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) (Phase 1),

@@ -15,15 +15,23 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **approved 2026-08-02** — ready for `dev`; [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
-| [0059](0059-lorenz-finds-its-plane.md) | Lorenz finds its plane, and the attractor can trade samples for curves (per-family projection basis, `[particles] density`, the continuous-flow streak) | **draft 2026-08-03** — successor to [0057], whose Phase 4 diagnosed this and stopped by its own instruction; [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) + [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md); closes [backlog 0048](../design-backlog.md). **No golden baseline moves** (checked in advance: the fixture runs De Jong, and no fixture declares `[particles]`). **Phase 4 is `human`** — the one content pass, and it **may route back to `architect`** if `density` + `fade` cannot hold a curve | dev, human |
+| [0059](0059-lorenz-finds-its-plane.md) | Lorenz finds its plane, and the attractor can trade samples for curves (per-family projection basis, `[particles] density`, the continuous-flow streak) | **approved 2026-08-03** — ready for `dev`; successor to [0057], whose Phase 4 diagnosed this and stopped by its own instruction; [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) + [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md); closes [backlog 0048](../design-backlog.md). **No golden baseline moves** (checked in advance: the fixture runs De Jong, and no fixture declares `[particles]`). **Phase 4 is `human`** — the one content pass, and it **may route back to `architect`** if `density` + `fade` cannot hold a curve | dev, human |
 
 ## Recommended execution sequence
 
-**Every plan in the roster but [0059] is approved as of 2026-08-03 — nothing is waiting on a design
+**Every plan in the roster is approved as of 2026-08-03 — nothing is waiting on a design
 decision.** What separates them now is only what each needs to *run*: [0052] closes in one session;
-[0050] closes in one plus a measurement; [0053] and [0055] each carry a `human` phase that gates
-later phases, so they stop mid-plan by construction — [0053] until a discrete GPU is to hand, [0055]
-until the live A/B is judged. Taking [0052] first keeps a session unblocked end to end.
+[0050] closes in one plus a measurement; [0053], [0055] and [0059] each carry a `human` phase that
+gates later phases or the close, so they stop mid-plan by construction — [0053] until a discrete GPU
+is to hand, [0055] until the live A/B is judged, [0059] until the content pass runs. Taking [0052]
+first keeps a session unblocked end to end.
+
+**[0059] is the one to take if you want the attractor family finished**, and its first three phases
+are a clean `dev` session: they touch one scene module plus one schema key, move no golden baseline,
+and each has a done-when that is either a byte-identity check or a property asserted on a value.
+Note the one place it is *not* self-contained — Phase 4 may route back to `architect` if `density` +
+`fade` cannot hold a curve, which is ADR-0069's Alternative D waiting for a rendered case rather
+than an argument.
 (**[0054], [0056], [0057] and [0058] have all landed and closed** on 2026-08-03 — see Recently
 closed.)
 
