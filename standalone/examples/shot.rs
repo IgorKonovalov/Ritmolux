@@ -1078,7 +1078,9 @@ fn print_ceiling_summary(fam: &FamilyReport) {
                 GateKind::Clamp {
                     peak_fraction_of_bound,
                 } => Some((p.name.as_str(), g, peak_fraction_of_bound)),
-                GateKind::Select { .. } | GateKind::Compare { .. } => None,
+                GateKind::Select { .. } | GateKind::Compare { .. } | GateKind::Saturated { .. } => {
+                    None
+                }
             })
         })
         .collect();
@@ -1134,6 +1136,12 @@ fn gate_line(preset: &str, gate: &GateReport) -> String {
             gate.param,
             gate.flag.source,
             peak_fraction_of_bound * 100.0
+        ),
+        GateKind::Saturated { occupancy } => format!(
+            "  SAT  {preset}.{}: `{}` sat at its upper bound on {:.0}% of hops",
+            gate.param,
+            gate.flag.source,
+            occupancy * 100.0
         ),
     }
 }
@@ -1211,7 +1219,15 @@ fn transient_cell(frames: u32, settled: bool) -> String {
 /// only means the ceiling is doing no work.
 fn gate_counts(p: &PresetReport) -> (usize, usize) {
     let dead = p.gates.iter().filter(|g| is_dead_gate(g)).count();
-    (dead, p.gates.len() - dead)
+    // Counted by kind rather than as "everything that is not dead": a
+    // `Saturated` flag is a third claim again (ADR-0062) and must not be
+    // reported as an unapproached ceiling, which is its exact opposite.
+    let ceilings = p
+        .gates
+        .iter()
+        .filter(|g| matches!(g.flag.kind, GateKind::Clamp { .. }))
+        .count();
+    (dead, ceilings)
 }
 
 /// Whether this flag is a never-exercised gate rather than a decorative
@@ -1462,6 +1478,10 @@ fn json_reachability(p: &PresetReport) -> String {
             } => out.push_str(&format!(
                 "\"kind\":\"clamp\",\"peak_fraction_of_bound\":{}}}",
                 num(peak_fraction_of_bound)
+            )),
+            GateKind::Saturated { occupancy } => out.push_str(&format!(
+                "\"kind\":\"saturated\",\"occupancy\":{}}}",
+                num(occupancy)
             )),
         }
     }

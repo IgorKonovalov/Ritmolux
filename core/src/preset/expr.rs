@@ -869,8 +869,9 @@ impl Expr {
     ///
     /// Call it repeatedly with the *same* `obs` across a run of varying
     /// [`Variables`] — one `Observations` per expression. What accumulates is
-    /// which way each comparison and each `select()` condition went, and how
-    /// close each `clamp()` came to its upper bound;
+    /// which way each comparison and each `select()` condition went, and — for
+    /// each `clamp()` — both how close its inner value came to the upper bound
+    /// and how many hops it spent *at* that bound (ADR-0062);
     /// [`flag_gates`](Expr::flag_gates) reads the verdict back out.
     pub fn eval_probed(&self, vars: &Variables<'_>, obs: &mut Observations) -> f32 {
         self.root.probe(vars, obs, 0);
@@ -961,14 +962,28 @@ fn collect_flags(
             Node::Call(Func::Clamp, _),
             NodeObservation::Clamp {
                 peak_fraction_of_bound,
+                hops_at_bound,
+                hops,
             },
-        ) if peak_fraction_of_bound < 1.0 => {
-            out.push(GateFlag {
-                kind: GateKind::Clamp {
-                    peak_fraction_of_bound,
-                },
-                source: node.source(),
-            });
+        ) => {
+            // The two findings are mutually exclusive by construction: a peak
+            // below the bound means no hop reached it, so occupancy is `0`.
+            // Written as an `if`/`else if` anyway, so neither can ever be
+            // reported twice about one node.
+            let occupancy = occupancy_of(hops_at_bound, hops);
+            if peak_fraction_of_bound < 1.0 {
+                out.push(GateFlag {
+                    kind: GateKind::Clamp {
+                        peak_fraction_of_bound,
+                    },
+                    source: node.source(),
+                });
+            } else if occupancy >= SATURATED_OCCUPANCY {
+                out.push(GateFlag {
+                    kind: GateKind::Saturated { occupancy },
+                    source: node.source(),
+                });
+            }
         }
         _ => {}
     }
@@ -1072,31 +1087,52 @@ impl Observations {
         };
     }
 
-    /// Record how close `value` came to the clamp's upper bound `hi`.
+    /// Record how close `value` came to the clamp's upper bound `hi`, and
+    /// whether it reached it (ADR-0062).
     ///
-    /// A non-positive or non-finite bound is recorded as *reached*: "fraction of
-    /// the bound" means nothing there, and a false accusation is worse than a
-    /// missed one for an advisory check.
+    /// The two statistics are opposite ends of the same measurement and they
+    /// **err in opposite directions**, because they accuse of opposite things.
+    /// A non-positive or non-finite bound is recorded as *reached* for the peak
+    /// — "fraction of the bound" means nothing there, and the peak's finding is
+    /// "the ceiling never bit", which would be a false accusation. The same
+    /// bound counts as *not at bound* for occupancy, whose finding is "the
+    /// ceiling never released". Each declines to convict on a bound it cannot
+    /// read.
     fn record_clamp(&mut self, index: usize, value: f32, hi: f32) {
-        let fraction = if hi.is_finite() && hi > 0.0 {
-            value / hi
-        } else {
-            1.0
-        };
+        let usable = hi.is_finite() && hi > 0.0;
+        let fraction = if usable { value / hi } else { 1.0 };
+        // NaN compares false, so a NaN inner value never counts as pinned.
+        let at_bound = usable && value >= hi;
         let Some(slot) = self.slot(index) else {
             return;
         };
-        let previous = match *slot {
+        let (previous, was_at_bound, was_hops) = match *slot {
             NodeObservation::Clamp {
                 peak_fraction_of_bound,
-            } => peak_fraction_of_bound,
-            _ => f32::NEG_INFINITY,
+                hops_at_bound,
+                hops,
+            } => (peak_fraction_of_bound, hops_at_bound, hops),
+            _ => (f32::NEG_INFINITY, 0, 0),
         };
         *slot = NodeObservation::Clamp {
             // `max` returns the non-NaN operand, so a NaN inner value cannot
             // poison the peak.
             peak_fraction_of_bound: previous.max(fraction),
+            hops_at_bound: was_at_bound.saturating_add(u32::from(at_bound)),
+            hops: was_hops.saturating_add(1),
         };
+    }
+}
+
+/// Occupancy from the two counters: the fraction of evaluated hops a `clamp()`
+/// spent at its upper bound. A clamp no hop ever evaluated reports `0.0` rather
+/// than dividing by zero — an unreached node makes no claim, exactly as
+/// [`NodeObservation::Untouched`] does everywhere else in this file.
+fn occupancy_of(hops_at_bound: u32, hops: u32) -> f32 {
+    if hops == 0 {
+        0.0
+    } else {
+        hops_at_bound as f32 / hops as f32
     }
 }
 
@@ -1125,14 +1161,37 @@ pub enum NodeObservation {
         /// The comparison evaluated false at least once.
         saw_false: bool,
     },
-    /// A `clamp()`: the highest fraction of its upper bound the inner value
-    /// reached. Below `1.0` across a whole run means the bound never bit at this
-    /// stimulus — the ceiling is decorative and the parameter's real range is
-    /// narrower than the preset reads.
+    /// A `clamp()`: how close the inner value came to the upper bound, and how
+    /// long it sat there. The two are opposite ends of one measurement
+    /// (ADR-0062). A peak below `1.0` across a whole run means the bound never
+    /// bit at this stimulus — the ceiling is decorative and the parameter's real
+    /// range is narrower than the preset reads. An occupancy near `1.0` means
+    /// the opposite and worse thing: the bound bit and never let go, so the
+    /// binding is an arithmetic expression that has become a constant.
     Clamp {
         /// Peak of `value / upper_bound` over the run.
         peak_fraction_of_bound: f32,
+        /// Hops where the inner value reached the upper bound.
+        hops_at_bound: u32,
+        /// Hops this clamp was evaluated on at all — the denominator of
+        /// [`occupancy`](NodeObservation::occupancy).
+        hops: u32,
     },
+}
+
+impl NodeObservation {
+    /// The fraction of evaluated hops a `clamp()` spent at its upper bound;
+    /// `0.0` for anything that is not a clamp, and for a clamp no hop reached.
+    pub fn occupancy(self) -> f32 {
+        match self {
+            NodeObservation::Clamp {
+                hops_at_bound,
+                hops,
+                ..
+            } => occupancy_of(hops_at_bound, hops),
+            _ => 0.0,
+        }
+    }
 }
 
 /// A gate that a run never exercised, with the source text that names it.
@@ -1147,7 +1206,19 @@ pub struct GateFlag {
     pub source: String,
 }
 
-/// The three structural findings [`Expr::flag_gates`] reports.
+/// Occupancy at or above which a `clamp()` is reported as
+/// [`Saturated`](GateKind::Saturated) — the fraction of hops its inner value may
+/// spend pinned at the upper bound before the binding stops being a function of
+/// the audio and becomes a constant (ADR-0062).
+///
+/// **A measured constant, not a principled one.** Plan 0056 Phase 3 took it from
+/// the retuned library's own distribution: across the whole shipped set the
+/// highest occupancy any binding reaches is well below this, and the gap is the
+/// margin. It has a shelf life — re-measure it whenever the library changes
+/// materially, and expect to move it rather than to bless a preset through it.
+pub const SATURATED_OCCUPANCY: f32 = 0.9;
+
+/// The four structural findings [`Expr::flag_gates`] reports.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GateKind {
     /// A `select()` whose condition only ever went one way — so one branch is
@@ -1171,6 +1242,19 @@ pub enum GateKind {
     Clamp {
         /// Peak of `value / upper_bound` over the run.
         peak_fraction_of_bound: f32,
+    },
+    /// A `clamp()` whose inner value sat **at** its upper bound for at least
+    /// [`SATURATED_OCCUPANCY`] of the run (ADR-0062). The mirror of
+    /// [`Clamp`](Self::Clamp) and the more serious of the two: a decorative
+    /// ceiling only narrows a parameter's real range, while a ceiling that never
+    /// releases has turned the binding into a constant that no reachability
+    /// walk can see, because a gain contains no fork to observe.
+    ///
+    /// The number states its own fix. `0.97` on `clamp(mid * 16, 0, 0.3)` means
+    /// the ceiling is reached at `mid = 0.019`, so the gain is 16x too hot.
+    Saturated {
+        /// Fraction of evaluated hops spent at the upper bound.
+        occupancy: f32,
     },
 }
 
@@ -1592,6 +1676,176 @@ mod tests {
             with.values.get(INDEX_SLOT),
             Some(&0.0),
             "`index` sits after the raw block and must not be clipped by it"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Clamp occupancy (Plan 0056 Phase 1 / ADR-0062)
+    // -----------------------------------------------------------------------
+
+    /// `bass` at each of `levels`, everything else zero.
+    fn bass_at(level: f32) -> Variables<'static> {
+        Variables::new(level, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    }
+
+    /// Probe `src` over `levels` as `bass` and read back the root clamp's
+    /// observation. Every expression here is a bare `clamp(...)`, so the root is
+    /// node 0.
+    fn probe_bass(src: &str, levels: &[f32]) -> NodeObservation {
+        let e = compile(src).expect("compiles");
+        let mut obs = Observations::new();
+        for &level in levels {
+            e.eval_probed(&bass_at(level), &mut obs);
+        }
+        obs.node(0)
+    }
+
+    #[test]
+    fn a_clamp_above_its_ceiling_on_every_hop_is_fully_occupied() {
+        // The Plan 0048 Phase 7 defect in miniature: a gain written for raw
+        // levels, met with normalized ones. The ceiling is reached at
+        // `bass = 0.01875` and every level here is far above it.
+        let obs = probe_bass("clamp(bass * 16, 0, 0.3)", &[0.2, 0.4, 0.6, 0.8, 1.0]);
+        assert_eq!(obs.occupancy(), 1.0, "pinned on every hop: {obs:?}");
+        // The peak is a different statistic and must still read the peak.
+        match obs {
+            NodeObservation::Clamp {
+                peak_fraction_of_bound,
+                hops,
+                ..
+            } => {
+                assert_eq!(hops, 5, "one hop recorded per probed evaluation");
+                let expected = 1.0 * 16.0 / 0.3;
+                assert!(
+                    (peak_fraction_of_bound - expected).abs() < 1e-3,
+                    "peak should be {expected}, got {peak_fraction_of_bound}"
+                );
+            }
+            other => panic!("expected a clamp observation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_clamp_that_never_reaches_its_ceiling_is_unoccupied() {
+        // The mirror finding, and the one that already shipped: the bound is
+        // decorative. Occupancy must read `0.0` and the peak must be unchanged
+        // from what it read before occupancy existed.
+        let obs = probe_bass("clamp(bass * 0.001, 0, 0.5)", &[0.2, 0.4, 0.6, 0.8, 1.0]);
+        assert_eq!(obs.occupancy(), 0.0, "never at the bound: {obs:?}");
+        match obs {
+            NodeObservation::Clamp {
+                peak_fraction_of_bound,
+                hops_at_bound,
+                hops,
+            } => {
+                assert_eq!(hops_at_bound, 0);
+                assert_eq!(hops, 5);
+                let expected = 1.0 * 0.001 / 0.5;
+                assert!(
+                    (peak_fraction_of_bound - expected).abs() < 1e-6,
+                    "peak should be {expected}, got {peak_fraction_of_bound}"
+                );
+            }
+            other => panic!("expected a clamp observation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_clamp_that_crosses_part_way_reports_the_crossing_fraction() {
+        // The ceiling is reached at `bass = 0.65`, so exactly three of these ten
+        // levels (0.7, 0.8, 0.9) pin it — the statistic is the crossing
+        // fraction, not a boolean.
+        let levels: Vec<f32> = (0..10).map(|i| i as f32 / 10.0).collect();
+        let obs = probe_bass("clamp(bass, 0, 0.65)", &levels);
+        assert!(
+            (obs.occupancy() - 0.3).abs() < 1e-6,
+            "three of ten levels sit at or above 0.65: {obs:?}"
+        );
+    }
+
+    #[test]
+    fn a_clamp_evaluated_zero_times_reports_no_occupancy() {
+        // Two ways to reach zero hops, and neither may divide by zero: a node
+        // the run never touched at all, and a clamp sitting in a `select()`
+        // branch the run never took.
+        assert_eq!(NodeObservation::Untouched.occupancy(), 0.0);
+
+        let e = compile("select(bass > 0.5, clamp(bass * 99, 0, 0.1), 0)").expect("compiles");
+        let mut obs = Observations::new();
+        for level in [0.0, 0.1, 0.2] {
+            e.eval_probed(&bass_at(level), &mut obs);
+        }
+        // Node 0 is the `select`, 1..=3 its condition, 4 the clamp.
+        let clamp = obs
+            .nodes()
+            .iter()
+            .find(|n| matches!(n, NodeObservation::Clamp { .. }));
+        assert!(
+            clamp.is_none(),
+            "the `then` branch never ran, so its clamp recorded nothing: {clamp:?}"
+        );
+        assert!(
+            e.flag_gates(&obs)
+                .iter()
+                .all(|f| !matches!(f.kind, GateKind::Saturated { .. })),
+            "an unreached clamp makes no saturation claim"
+        );
+    }
+
+    #[test]
+    fn an_unreadable_upper_bound_accuses_neither_way() {
+        // A non-positive or non-finite bound means "fraction of the bound" is
+        // undefined. The peak treats it as reached (so it does not claim the
+        // ceiling was decorative); occupancy must treat it as *not* at bound
+        // (so it does not claim the ceiling never released). Both stay silent.
+        for src in ["clamp(bass, 0, 0)", "clamp(bass, 0, 0 - 1)"] {
+            let e = compile(src).expect("compiles");
+            let mut obs = Observations::new();
+            for level in [0.0, 0.5, 1.0] {
+                e.eval_probed(&bass_at(level), &mut obs);
+            }
+            assert_eq!(obs.node(0).occupancy(), 0.0, "`{src}` must not accuse");
+            assert!(
+                e.flag_gates(&obs).is_empty(),
+                "`{src}` produced a finding on a bound it cannot read"
+            );
+        }
+    }
+
+    #[test]
+    fn saturation_is_flagged_only_past_the_threshold() {
+        // The flag, not the statistic: a binding pinned on nearly every hop
+        // reports, and one pinned on half of them does not.
+        let pinned: Vec<f32> = (0..100).map(|i| 0.5 + i as f32 / 200.0).collect();
+        let e = compile("clamp(bass * 16, 0, 0.3)").expect("compiles");
+        let mut obs = Observations::new();
+        for &level in &pinned {
+            e.eval_probed(&bass_at(level), &mut obs);
+        }
+        match e.flag_gates(&obs).first().map(|f| f.kind) {
+            Some(GateKind::Saturated { occupancy }) => assert!(
+                occupancy >= SATURATED_OCCUPANCY,
+                "flagged at {occupancy}, below the threshold"
+            ),
+            other => panic!("expected a saturation flag, got {other:?}"),
+        }
+
+        // Half the hops at the bound: a binding that still varies, and must not
+        // be convicted of being a constant.
+        let half: Vec<f32> = (0..100)
+            .map(|i| if i % 2 == 0 { 0.0 } else { 1.0 })
+            .collect();
+        let mut obs = Observations::new();
+        for &level in &half {
+            e.eval_probed(&bass_at(level), &mut obs);
+        }
+        assert!(
+            (obs.node(0).occupancy() - 0.5).abs() < 1e-6,
+            "half the hops pinned"
+        );
+        assert!(
+            e.flag_gates(&obs).is_empty(),
+            "half-occupancy is a live binding, not a saturated one"
         );
     }
 }

@@ -16,7 +16,8 @@ pub mod schema;
 use std::path::{Path, PathBuf};
 
 pub use expr::{
-    Expr, ExprError, GateFlag, GateKind, NodeObservation, Observations, Variables, compile,
+    Expr, ExprError, GateFlag, GateKind, NodeObservation, Observations, SATURATED_OCCUPANCY,
+    Variables, compile,
 };
 pub use schema::{Binding, Easing, Preset, PresetError, SystemKind, is_known_param};
 
