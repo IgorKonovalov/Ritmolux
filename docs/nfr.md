@@ -116,10 +116,11 @@ contradicts this file is a plan bug — surface it, don't guess.
   is a backstop against silent erosion, not a quality measure. The Mode 4 review's
   "read the assertion body" step remains the actual quality gate.
 - **Local pre-push gate** (opt-in, per clone): `.githooks/pre-push`, enabled with
-  `git config core.hooksPath .githooks`. Runs the fast subset — `fmt`, `clippy`, and a narrowed
-  `nextest` — in **~28 s** warm, and prints the GPU-heavy suites it skipped. `cargo deny`,
-  doctests, Miri, and coverage stay in CI. An uninstalled clone silently has no gate; see the
-  README's developer section.
+  `git config core.hooksPath .githooks`. Runs the fast subset — a doc-link check, `fmt`, `clippy`,
+  and a narrowed `nextest` — in **~28 s** warm, and prints the GPU-heavy suites it skipped.
+  `cargo deny`, doctests, Miri, and coverage stay in CI. An uninstalled clone silently has no gate;
+  see the README's developer section. The doc-link step (`scripts/check-doc-links.mjs`, ~50 ms) is
+  the one with **no CI counterpart**, so it is gated only here until that changes.
 
 ## 8. Distribution (v1)
 
