@@ -812,3 +812,180 @@ search rather than a re-read of the library.
 judgement is content work and stays in the content lane. And the pins were right when they were
 written: none of the three is an error, which is the point. A correct workaround for a defect that no
 longer exists is invisible to every instrument this project has, because nothing is wrong.
+
+---
+
+## Entries 0061-0063 — from the Plan 0063 Phase 5 content pass (2026-08-04)
+
+The pass that judged ADR-0076's four new attractor levers in motion and re-tuned `attractor_lorenz`
+and `attractor_thomas` against them. The plan asked five questions; two of the answers needed no
+follow-up and are now in the two presets' headers, and three findings are design signal.
+
+**The two that needed nothing.** *Does perspective alone resolve the rotation, or does it need the
+haze?* — **perspective alone, decisively.** Rendered as a five-way at fixed audio: with `depth_fade`
+and `depth_hue` both on and `perspective` at 0, the butterfly is exactly as flat as it ever was —
+both wings the same size, a symmetric bowtie, the haze reading as an uneven exposure rather than as
+distance. Perspective alone reads as a solid at an angle immediately. The haze reinforces and cannot
+substitute, which is worth knowing because it is the cue that *sounds* like the depth cue. And *at
+what `density` does the no-occlusion limit bite?* — measured on the ladder 0.002 / 0.01 / 0.05 / 0.2
+/ 1.0 with all three cues on: **reads, reads, markedly weaker, gone, gone.** The usable ceiling for a
+preset that wants depth is about `0.01`; ADR-0044's warning is correct and the number is an order of
+magnitude below the full budget. Both shipped 3-D presets (0.002 and 0.02) sit at or inside it.
+
+---
+
+## 0061 — `perspective` moves the figure far more than it enlarges it, so the documented way to recover the framing does not work
+
+- **Raised:** 2026-08-04, from `preset-author`, during the Plan 0063 Phase 5 re-tune.
+- **Verified against code and by measurement:** yes, and the finding is larger than the documented
+  behaviour it corrects.
+
+[ADR-0076](adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md) and `presets/README.md`
+both describe one framing consequence of `perspective`: the magnification is applied before the view
+transform, so pushing it up makes the figure larger as well as deeper, and *"recovering the framing
+is a `zoom` edit"*.
+
+**That is true, and it is the small half.** The dominant effect is not that the figure grows — it is
+that the figure **moves**, by an amount that varies with the spin phase. The near side is magnified,
+so the projected centroid shifts toward whichever side is currently near; as the figure turns, that
+shift **orbits**. Measured peak-to-peak over four spin phases on a bare Lorenz at fixed audio,
+600 px square:
+
+| `perspective` | centre-x swing | widest span |
+|---|---|---|
+| 0.00 | 0.04 NDC | 522 px |
+| 0.15 | 0.11 NDC | 525 px |
+| 0.25 | 0.20 NDC | 529 px |
+| 0.40 | 0.37 NDC | 542 px |
+| 0.60 | 0.55 NDC | 555 px |
+
+The swing runs about **0.9 x `perspective`** in NDC. The size growth across that entire sweep is
+**6 %**. So the translation is roughly an order of magnitude more consequential for composition than
+the enlargement the docs name — and **a `zoom` edit cannot recover it**, because a zoom is a static
+scale and this is a phase-varying translation. All a zoom can do is shrink the figure until the orbit
+fits inside the frame, which is what both re-tuned presets now pay: `attractor_lorenz` went from a
+1.32 base to 1.16 and `attractor_thomas` from 1.14 to 1.02, and both lost real presence for it
+(Lorenz's `sanity` coverage now reads 0.2747 against a 0.18 floor — still passing, with less room
+than before).
+
+**The practical consequence is a ceiling nobody documented.** The clamp sits at `0.8` and the
+projection is optically fine there — it is a true perspective divide, straight lines stay straight,
+and the butterfly at 0.8 reads as a strong wide angle rather than as a fisheye. But past about
+**0.3** the figure visibly slides around the frame instead of turning in place, which is a worse
+artifact than the flatness the parameter was bought to fix. The usable range is roughly the bottom
+third of the legal one, and nothing says so.
+
+### What a fix would be
+
+Three options, in increasing cost, and this entry does not pick one:
+
+1. **Documentation only.** Correct the ADR's and README's framing note to say the effect is chiefly
+   translational, quote the ~0.9x law, and give the ~0.3 practical ceiling. Cheapest, and it stops
+   the next author rediscovering this with a zoom ladder.
+2. **Re-centre the projection on the figure's projected centroid.** Removes the orbit and keeps the
+   depth. This is **not** ADR-0076's already-noted followup — normalizing `m` by its value at
+   `d_n = 0` divides every magnification by `m(0) = 1` and so changes nothing at all about the orbit;
+   it only addresses the size growth. Re-centring is a different, larger change, and it needs a
+   decision about *what* to centre on: the particle centroid is a per-frame readback, which the frame
+   loop must not do, and a fixed per-family offset would be another table.
+3. **Accept and expose it** — a lever letting a preset trade orbit for off-centre framing.
+
+### Priority
+
+**Medium, and the documentation half is cheap enough to do without a plan.** Nothing is broken — the
+levers work and both presets ship using them — but the guidance that exists points an author at a fix
+that cannot work, and the parameter's legal range is three times its usable one.
+
+---
+
+## 0062 — `depth_hue` is a *lightness* cue on a lightness ramp, it wraps at the ends, and it is structurally dead under `ink_amount`
+
+- **Raised:** 2026-08-04, from `preset-author`, during the Plan 0063 Phase 5 re-tune.
+- **Verified by measurement:** yes, all three parts.
+
+ADR-0076 introduces `depth_hue` as the cue that makes distance read as **distance** rather than as
+dimness: *"a hue shift is what makes it read as distance — real atmospheric perspective moves colour
+as well as contrast."* That reasoning is sound and the parameter delivers it — **conditionally**, and
+all three conditions are invisible from the roster.
+
+**1. It needs a palette that travels in hue.** `depth_hue` shifts the per-particle *palette
+coordinate*, so what it does is whatever moving along that preset's ramp does. Rendered side by side
+at `perspective = 0.5`: against `attractor_lorenz`'s shipped night-blue -> teal -> mint ->
+solar-white ramp, a `depth_hue` of 0.4 reads as the near material getting **brighter** — a second
+contrast lever pointing the same way as `depth_fade`, not an independent cue. Against a
+constant-lightness hue-travel ramp (blue -> cyan -> gold -> orange -> rose) the identical figure at
+the identical value puts a clear **cool cyan on the far wing and warm gold on the near one**, which
+is the atmospheric reading the ADR describes. Both shipped 3-D presets use lightness ramps, because
+that is what an additive glow scene is normally tuned for — so the parameter is at its weakest on
+exactly the two presets it shipped for.
+
+**2. It wraps, and the wrap can make far material look near.** The offset is `+/- depth_hue/2` on a
+coordinate the LUT sampler **repeats**. `attractor_lorenz`'s `hue_center` runs as low as 0.13, so a
+`depth_hue` much above 0.26 sends the far end negative, wraps it to the top of the ramp, and lands
+the far material on the same bright mint as the near — the cue inverts into a collision. At
+`depth_hue = 1.0` with `hue_center = 0.20` both ends of the depth range sample the *same* coordinate
+(0.70, and -0.30 which wraps to 0.70).
+
+**3. It is dead under `ink_amount = 1`.** The terminal remap keys on luminance and discards hue, so a
+depth *tint* is exactly the cue an ink preset cannot show. This is the same trap the same file
+already records for `saturation` (`attractor_thomas`'s `a` binding carries that story). Not quite
+inert — that preset uses the `mono` palette, so shifting the coordinate moves lightness and the remap
+does see it — but measured at `depth_hue = 0.4` it moves 42 % of pixels by a **mean of 2/255 and a
+max of 42**, a rounding error against what `depth_fade` does deliberately on the same frame. It is
+left unbound there.
+
+### What a fix would be
+
+Documentation, chiefly — this is a parameter whose behaviour is entirely legitimate and entirely
+undiscoverable. `presets/README.md`'s new depth section and
+[`docs/preset-palettes.md`](preset-palettes.md) should say: `depth_hue` reads as a hue cue only on a
+ramp with hue travel at roughly constant lightness; on a dark->light ramp it duplicates `depth_fade`;
+keep it under `2 * min(hue_center, 1 - hue_center)` or it wraps; and it is inert under a duotone
+remap, like `saturation`. A clamp on the wrap would also be defensible, but the repeat is the LUT's
+documented behaviour everywhere else in the colour surface, so making this one parameter special is a
+decision rather than a fix.
+
+### Priority
+
+**Low-medium.** Nothing misbehaves; an author simply cannot find out which of three regimes they are
+in without rendering a ladder, which is what this pass did.
+
+---
+
+## 0063 — `spin`'s usable ceiling is set by `fade`, not by taste, and the pair is undocumented
+
+- **Raised:** 2026-08-04, from `preset-author`, during the Plan 0063 Phase 5 re-tune.
+- **Verified by measurement:** yes.
+
+`presets/README.md` documents `spin` as a rate multiplier on 0.18 rad/s and suggests **2-4** as
+"where the rotation starts being legible". On the two presets it exists for, 2-4 is at or past the
+point where the figure stops being legible at all — and the bound is not the spin, it is the
+**trail**.
+
+A frame of trail drawn while the figure turns is a frame of **rotational smear**. The accumulation
+stops being a trace of the trajectory and becomes a set of concentric arcs, which destroys precisely
+the volume `perspective` was added to buy. The ceiling is therefore a function of `fade`: with
+`fade = 0.932` (~15 frames) the rendered ladder 1 / 2 / 3 / 5 / 8 goes **crisp, crisp, softening,
+smeared, scribble**, so the usable peak is about **1.9**. `attractor_thomas` runs `fade = 0.955`
+(~22 frames) and its ceiling is correspondingly lower, about **1.3**. The arithmetic agrees: holding
+the smear under ~5 degrees needs `rate < 0.087 / (frames / 60)` rad/s.
+
+**The related half — a wide `spin` binding reads as instability, not as drive.** A `1 + bass * 5`
+range through `--signal dynamic:110` swings the figure through most of a revolution between
+transients and the depth reading never settles; it reads as tumbling. The *integration* ADR-0076
+specified is working and is what makes any of this usable — the figure accelerates rather than
+snapping to a new angle, which was the failure mode the ADR predicted for the multiply form — but the
+integration fixes the discontinuity, not the range. Both re-tuned presets use a narrow modulation
+(Lorenz 1.0-1.8, Thomas 1.0-1.3).
+
+### What a fix would be
+
+Documentation. `presets/README.md`'s depth section should say that `spin` and `fade` are one look:
+the smear mechanism, the two measured ceilings, and the rule that the ceiling falls as `fade` rises.
+The current "2-4 is where it becomes legible" should go — it is right for a trail-free scene and
+wrong for every attractor preset that ships.
+
+### Priority
+
+**Low**, and it is one paragraph. But the advice currently in the README points the wrong way, which
+is the same shape as 0061: guidance that actively costs an author a ladder.
