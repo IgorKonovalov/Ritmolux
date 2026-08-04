@@ -2997,3 +2997,49 @@ question, and no calibration of it will help.
 - **Non-vacuity is already available.** `core/tests/sanity.rs` carries `pre_repair_spectrum_ridge`
   as a frozen fixture, and `git show 2efb80e^:presets/spectrum_comb.toml` is the partial case. Any
   instrument proposed here can be tested against both before it is trusted.
+
+---
+
+## 0055 — the attractor's shape vocabulary is "breathe and bend", and the reference figures ask for more
+
+- **Raised:** 2026-08-04, by the user, watching the attractor family in the app after Plan 0059
+  Phases 1/1b/2/3 landed. Reference: a Google Images sweep for **`de jong strange attractor`**
+  (the query, not the session URL — the URL carries per-session tokens and will not resolve later).
+- **Verified against code:** yes — `core/src/render/scenes/particles/mod.rs`, and the four
+  coefficient bindings in each of the six `presets/attractor_*.toml`.
+- **Not a defect.** Everything below already works as designed. This is a capability question.
+
+**What exists today.** The attractor's shape *is* programmatically drivable: `a`/`b`/`c`/`d` are
+named bindable params carrying the family's coefficients, and all six shipped presets already
+steer them — slow incommensurate sines for drift plus clamped band terms on top. Plan 0059 added
+two more shape levers beside them: `[particles] density` (how many trajectories) and, on the
+continuous families, the `prev -> pos` segment that turns a sparse cloud into legible curves.
+
+**Where it stops.** These are **chaotic** maps, and `presets/README.md` already tells authors to
+move the coefficients "slowly and by a little" for a concrete reason: a nearby coefficient can have
+a *completely different* attractor, so past a small step the figure **cuts** rather than morphs.
+The vocabulary is therefore "breathe and bend around one figure", and the reference images the user
+is comparing against are a *gallery of different figures* — De Jong at widely separated coefficient
+tuples, each its own shape. Nothing in the current surface walks between them without cutting.
+
+**What a design here would weigh.**
+
+- **Is the ask variety-over-time or morph-between-figures?** They are different features. Variety
+  could be had by re-seeding to a new coefficient tuple on a section change and accepting the cut
+  (cheap, no engine work, possibly hidden by the existing dissolve). A genuine *morph* needs a path
+  through coefficient space along which the attractor stays recognisable, which is a real research
+  question and may not exist in general.
+- **A curated tuple roster is the cheap middle.** The reference galleries are, in effect, a list of
+  known-good `(a,b,c,d)` per family. A preset-facing roster — pick tuple N, or walk a named path
+  between two — buys most of the visual variety without solving continuous morphing. It also has a
+  clear rejected alternative (free coefficient binding, which is what exists and cuts), so it is
+  ADR-shaped.
+- **Cross-fading two attractors is the other shape**, and it is expensive in the way this engine
+  already understands: two particle buffers and two dispatches, against a scene that is already the
+  heaviest in the library. ADR-0024's cross-preset transition may make this unnecessary — a
+  dissolve between two attractor *presets* is a morph between two figures, at zero new engine cost.
+  Worth measuring before building anything.
+- **Watch the interaction with `density` and the streak.** Both landed in Plan 0059 and neither has
+  had a content pass yet (Phase 4). The reference look the user is pointing at is *sparse curves*,
+  which is exactly what those two levers exist to reach — so some of this gap may close in Phase 4
+  without any new capability. **Re-check this entry after Phase 4 before designing against it.**
