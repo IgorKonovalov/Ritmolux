@@ -177,6 +177,31 @@ impl AttractorFamily {
         }
     }
 
+    /// Which plane a 3D family is viewed in (ADR-0068).
+    ///
+    /// **Named outright per family, deliberately.** It is not derived from
+    /// [`projection`](Self::projection)'s `dim`, even though `dim == 3.0` selects
+    /// exactly the same two families today: `dim` and "wants a non-default basis"
+    /// agree on this roster of four and are not the same property, so keying one
+    /// off the other is ADR-0037's trap in another costume. A 2D family with a
+    /// preferred orientation, or a 3D family happy with x–y, would break the
+    /// coincidence silently. The match is exhaustive, so a fifth family has to
+    /// answer the question.
+    ///
+    /// Only the 3D branch of the draw shader reads it; the 2D families' value is
+    /// the default and is never consulted.
+    fn basis(self) -> Basis {
+        match self {
+            AttractorFamily::DeJong | AttractorFamily::Clifford | AttractorFamily::Thomas => {
+                Basis::XY
+            }
+            // The butterfly lives in x–z. Seen x–y it is the two lobes edge-on —
+            // a hard X, which is the "dense core inside a diffuse cloud" this
+            // preset shipped as (ADR-0068).
+            AttractorFamily::Lorenz => Basis::XZ,
+        }
+    }
+
     /// The seeded initial-scatter box: `(half-spread, centre)` per axis. Sized to
     /// the attractor's native extent so particles start spread **across** it —
     /// a box too small for a chaotic flow leaves every particle on nearly the same
@@ -222,6 +247,37 @@ impl AttractorFamily {
             sy * JITTER_FRACTION,
             sz * JITTER_FRACTION,
         ]
+    }
+}
+
+/// The plane a 3D attractor family is projected into (ADR-0068), as chosen by
+/// [`AttractorFamily::basis`].
+///
+/// The spin always rotates `x` against the *other* horizontal axis and leaves the
+/// vertical alone, so a basis is fully described by naming that pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Basis {
+    /// `x` horizontal, `y` vertical; the spin rotates `x` against `z`. The shared
+    /// convention every 3D family used before ADR-0068, and still every family's
+    /// answer but Lorenz's.
+    XY,
+    /// `x` horizontal, `z` vertical; the spin rotates `x` against `y`. Lorenz's
+    /// butterfly lies in this plane.
+    XZ,
+}
+
+impl Basis {
+    /// The two axis selectors the draw shader dots the centred position against:
+    /// `(the axis the spin rotates x against, the vertical axis)`.
+    ///
+    /// Masks rather than indices because WGSL will not dynamically index a
+    /// `vec3` outside addressable storage, and a `dot` against a one-hot vector
+    /// is branch-free — so the basis stays one pipeline and one draw call.
+    fn masks(self) -> ([f32; 3], [f32; 3]) {
+        match self {
+            Basis::XY => ([0.0, 0.0, 1.0], [0.0, 1.0, 0.0]),
+            Basis::XZ => ([0.0, 1.0, 0.0], [0.0, 0.0, 1.0]),
+        }
     }
 }
 
@@ -414,10 +470,14 @@ struct Draw {
     //    w deposit scale (ADR-0065: FLOOR_PARTICLES / active_count)
     // u: x hue_spread, y hue_center, z palette_mix, w saturation
     // x: x zoom, yz pan (view transform, ADR-0018), w unused
+    // bh: xyz the axis the spin rotates x against (ADR-0068), w unused
+    // bv: xyz the vertical axis (ADR-0068), w unused
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
     x: vec4<f32>,
+    bh: vec4<f32>,
+    bv: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> draw: Draw;
 // Shared gradient LUTs (ADR-0021): sampled per-particle in the vertex shader
@@ -468,10 +528,14 @@ fn vs_main(
         // 2D map: in-plane rotation.
         screen = vec2<f32>(center.x * cs - center.y * sn, center.x * sn + center.y * cs);
     } else {
-        // 3D flow: centre, rotate around the vertical axis, orthographic project.
-        let cx = center.x;
-        let cz = center.z - zc;
-        screen = vec2<f32>(cx * cs + cz * sn, center.y);
+        // 3D flow: centre on z, pick the viewing plane, rotate around the
+        // vertical axis, orthographic project. The plane is the family's own
+        // (ADR-0068), arriving as two one-hot axis selectors rather than as a
+        // second pipeline: `bh` is the axis the spin rotates `x` against, `bv`
+        // is the vertical. `bh = z, bv = y` reproduces the shared convention
+        // this replaced exactly; Lorenz ships `bh = y, bv = z`.
+        let p = vec3<f32>(center.x, center.y, center.z - zc);
+        screen = vec2<f32>(p.x * cs + dot(p, draw.bh.xyz) * sn, dot(p, draw.bv.xyz));
     }
     let world = screen * scl + corner * psize;
 
@@ -586,6 +650,8 @@ struct StepUniform {
 /// w [`deposit_scale`] (ADR-0065).
 /// `u`: x hue_spread, y hue_center, z palette_mix, w saturation (ADR-0021).
 /// `x`: x zoom, yz pan (view transform, ADR-0018), w unused.
+/// `bh`/`bv`: the 3D projection basis's two axis selectors (ADR-0068) — the axis
+/// the spin rotates `x` against, and the vertical. Read only on the 3D branch.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct DrawUniform {
@@ -593,6 +659,8 @@ struct DrawUniform {
     w: [f32; 4],
     u: [f32; 4],
     x: [f32; 4],
+    bh: [f32; 4],
+    bv: [f32; 4],
 }
 
 /// Decay uniform (per frame): x is the per-frame trail retention factor.
@@ -1743,6 +1811,7 @@ fn upload_uniforms(queue: &wgpu::Queue, pipelines: &PipelineResources, inputs: &
         }),
     );
     let (scale, dim, z_center) = inputs.family.projection();
+    let ([hx, hy, hz], [vx, vy, vz]) = inputs.family.basis().masks();
     // Off the buffer that was actually allocated, not off the tier: the count the
     // draw instances is `pipelines.count`, and normalizing against anything else
     // would be a claim about a different draw call.
@@ -1773,6 +1842,8 @@ fn upload_uniforms(queue: &wgpu::Queue, pipelines: &PipelineResources, inputs: &
                 inputs.saturation,
             ],
             x: [inputs.zoom, inputs.pan[0], inputs.pan[1], 0.0],
+            bh: [hx, hy, hz, 0.0],
+            bv: [vx, vy, vz, 0.0],
         }),
     );
     // Frame-rate-independent trail decay: retain `fade` per 1/60 s, raised to
@@ -1937,7 +2008,9 @@ mod tests {
     // not the render path.
     #![allow(clippy::panic, clippy::expect_used)]
 
-    use super::{AttractorFamily, AttractorScene, FIXED_STEP, Particle, Scene, deposit_scale};
+    use super::{
+        AttractorFamily, AttractorScene, Basis, FIXED_STEP, Particle, Scene, deposit_scale,
+    };
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderContext;
     use crate::render::{Tier, TierConfig};
@@ -1993,6 +2066,94 @@ mod tests {
         // weight each, which is what keeps the total constant.
         assert!(deposit_scale(25_000) > deposit_scale(50_000));
         assert!(deposit_scale(50_000) > deposit_scale(100_000));
+    }
+
+    // -----------------------------------------------------------------------
+    // The projection basis (Plan 0059 Phase 1 / ADR-0068)
+    // -----------------------------------------------------------------------
+
+    /// The basis, pinned per family against an explicit table.
+    ///
+    /// The **compiler** is what stops a fifth family being added without choosing
+    /// one — `basis()` matches exhaustively with no wildcard arm. This test pins
+    /// the values that match resolves to, so a silent flip of Lorenz back to the
+    /// shared convention fails here rather than in someone's eyes.
+    #[test]
+    fn the_projection_basis_is_pinned_per_family() {
+        let table = [
+            (AttractorFamily::DeJong, Basis::XY),
+            (AttractorFamily::Clifford, Basis::XY),
+            (AttractorFamily::Thomas, Basis::XY),
+            (AttractorFamily::Lorenz, Basis::XZ),
+        ];
+        for (family, expected) in table {
+            assert_eq!(
+                family.basis(),
+                expected,
+                "{family:?} must be viewed in {expected:?}"
+            );
+        }
+
+        // Non-vacuity: exactly one family departs from the shared convention, so
+        // the table above is not four copies of one answer.
+        let departures = table.iter().filter(|(_, b)| *b != Basis::XY).count();
+        assert_eq!(
+            departures, 1,
+            "ADR-0068 moves exactly one family's basis; {departures} differ from XY"
+        );
+
+        // And the departure is not derived from `dim`. Thomas is 3D and keeps
+        // x–y — which is the whole reason ADR-0068 Alternative C was declined,
+        // so it is asserted rather than left to the doc comment.
+        assert_eq!(AttractorFamily::Thomas.projection().1, 3.0);
+        assert_eq!(AttractorFamily::Thomas.basis(), Basis::XY);
+        assert_eq!(AttractorFamily::Lorenz.projection().1, 3.0);
+        assert_ne!(
+            AttractorFamily::Thomas.basis(),
+            AttractorFamily::Lorenz.basis(),
+            "two 3D families disagree about the basis, so `dim == 3.0` cannot decide it"
+        );
+    }
+
+    /// The masks the shader dots against, asserted as the geometry they encode.
+    ///
+    /// `XY` must reproduce the pre-ADR-0068 expression exactly — `cx*cs + cz*sn`
+    /// vertical `y` — because three families' captures have to stay
+    /// byte-identical, and that claim rests on these six numbers.
+    #[test]
+    fn the_basis_masks_select_the_axes_they_name() {
+        // A position with distinguishable components, so a mask that picks the
+        // wrong axis cannot agree by coincidence. Destructured rather than
+        // indexed — this file denies `indexing_slicing`.
+        let [px, py, pz] = [2.0f32, 3.0, 5.0];
+        let dot = |[mx, my, mz]: [f32; 3]| px * mx + py * my + pz * mz;
+
+        let (h, v) = Basis::XY.masks();
+        assert_eq!(dot(h), 5.0, "XY rotates x against z");
+        assert_eq!(dot(v), 3.0, "XY is vertical in y");
+
+        let (h, v) = Basis::XZ.masks();
+        assert_eq!(dot(h), 3.0, "XZ rotates x against y");
+        assert_eq!(dot(v), 5.0, "XZ is vertical in z");
+
+        // Each selector is one-hot and never picks x — the spin's first
+        // horizontal term is always `x`, so a mask with an x component would
+        // double-count it.
+        for basis in [Basis::XY, Basis::XZ] {
+            let (h, v) = basis.masks();
+            for m in [h, v] {
+                let [mx, ..] = m;
+                assert_eq!(mx, 0.0, "{basis:?} selector must not pick x: {m:?}");
+                assert_eq!(m.iter().filter(|c| **c != 0.0).count(), 1);
+                assert_eq!(m.iter().sum::<f32>(), 1.0);
+            }
+            // ...and the two selectors are different axes, or the projection
+            // collapses onto a line.
+            assert_ne!(
+                h, v,
+                "{basis:?} put the horizontal and vertical on one axis"
+            );
+        }
     }
 
     // -----------------------------------------------------------------------
