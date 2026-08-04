@@ -258,9 +258,9 @@ De Jong today. That asymmetry is deliberate; do not read it as an oversight.
 
 | Param | What it does | Range that means something |
 |---|---|---|
-| `perspective` | Near material grows and far material shrinks, position and point size together. Segments foreshorten, because both endpoints project independently. | `0` (orthographic, the default) .. `0.8` |
+| `perspective` | Near material grows and far material shrinks, position and point size together. Segments foreshorten, because both endpoints project independently. | `0` (orthographic, the default) .. **~`0.3` in practice**; the clamp is at `0.8` and the reason to stop short of it is below |
 | `depth_fade`  | Attenuates brightness with distance — the substitute for occlusion, which this scene does not do. `1` takes the far end to black. | `0` (off) .. `1` |
-| `depth_hue`   | Shifts the palette coordinate by `±depth_hue/2` across the depth range, so distance moves *colour* as well as contrast. | `0` (off) .. ~`0.4` before it reads as two figures |
+| `depth_hue`   | Shifts the palette coordinate by `±depth_hue/2` across the depth range, so distance moves *colour* as well as contrast — **on a ramp that travels in hue at roughly constant lightness.** On a dark-to-light ramp (which is what both shipped 3-D presets use) it duplicates `depth_fade` instead, and under `ink_amount = 1` it is structurally dead, like `saturation`. Measured at Plan 0063 Phase 5; [design-backlog 0062](../docs/design-backlog.md) | `0` (off) .. **`2 * min(hue_center, 1 - hue_center)`**, past which the offset wraps on the LUT's repeat sampler and far material lands on the near colour |
 | `spin`        | Rate multiplier on the display rotation. `1` is unchanged, `0` holds the figure still, negative reverses it. | any |
 
 Four things you cannot discover by binding them:
@@ -271,9 +271,33 @@ Four things you cannot discover by binding them:
   depth half-extent as a fraction of the camera distance, so the near-to-far
   magnification ratio is `(1 + p) / (1 - p)`: `0.5` gives 3:1, `0.8` gives 9:1,
   and the singularity would be at `1`.
-- **`perspective` fights `zoom`.** The magnification is applied *before* the view
-  transform, so raising it makes the figure **bigger** as well as deeper, and
-  recovering your framing is a `zoom` edit. It is not a focal length.
+- **`perspective` mostly MOVES the figure, and a `zoom` edit cannot recover
+  that.** The magnification is applied *before* the view transform, so raising it
+  does make the figure bigger — but that is the small half, and this entry used
+  to stop there. **Measured** at Plan 0063 Phase 5, peak-to-peak over four spin
+  phases on a bare Lorenz, 600 px square:
+
+  | `perspective` | centre-x swing | widest span |
+  |---|---|---|
+  | 0.00 | 0.04 NDC | 522 px |
+  | 0.15 | 0.11 NDC | 525 px |
+  | 0.25 | 0.20 NDC | 529 px |
+  | 0.40 | 0.37 NDC | 542 px |
+  | 0.60 | 0.55 NDC | 555 px |
+
+  The near side is magnified, so the projected centroid shifts toward whichever
+  side is currently near — and as the figure turns, that shift **orbits**. The
+  swing is about **0.9 x `perspective`** in NDC; the size growth across that
+  whole sweep is **6 %**. A `zoom` is a static scale, so it cannot recover a
+  phase-varying translation: all it can do is shrink the figure until the orbit
+  fits inside the frame, which is what both shipped 3-D presets pay for
+  (`attractor_lorenz` went 1.32 -> 1.16, `attractor_thomas` 1.14 -> 1.02).
+  **So the real ceiling is ~`0.3`, not the `0.8` clamp** — past that the figure
+  visibly slides around the frame instead of turning in place, which is a worse
+  artifact than the flatness `perspective` was bought to fix. The clamp is not
+  where the projection breaks; at `0.8` it is still a true perspective divide and
+  reads as a strong wide angle, not a fisheye. Fixing this properly is
+  [design-backlog 0061](../docs/design-backlog.md) and unowned.
 - **`spin` is a multiplier on 0.18 rad/s**, i.e. `spin = 1` is one revolution per
   **34.9 seconds**. That is slow enough that a viewer never accumulates motion
   evidence about which way a 3-D figure is turning, which is part of why they

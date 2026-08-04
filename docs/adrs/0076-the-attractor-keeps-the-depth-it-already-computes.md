@@ -1,8 +1,9 @@
 # ADR-0076 — The attractor keeps the depth it already computes
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-04, at [Plan 0063](../plans/done/0063-the-attractor-keeps-its-depth.md)'s
+> close — **with the Outcome section below**, which records what the content pass falsified)
 > **Date:** 2026-08-04
-> **Related plan(s):** [0063](../plans/0063-the-attractor-keeps-its-depth.md)
+> **Related plan(s):** [0063](../plans/done/0063-the-attractor-keeps-its-depth.md)
 
 ## Context
 
@@ -180,3 +181,69 @@ changed and why it matters.
 The 34.9-second revolution figure is `2π / 0.18`. It is quoted because it is the reason a viewer
 never accumulates enough motion evidence to disambiguate the rotation, and because a bindable `spin`
 is the cheapest way to test whether the slowness was itself part of the complaint.
+
+## Outcome (added at Plan 0063's close, 2026-08-04)
+
+The decision holds in full and every lever shipped at its designed default, so no existing capture
+moved. Phase 5's content pass — the `preset-author` re-tune of `attractor_lorenz` and
+`attractor_thomas` against real audio — confirmed the central claim by rendered ablation and
+**falsified one of the Negative bullets above.** Both are recorded here rather than by editing the
+body, per this project's append-only rule.
+
+**Confirmed: `perspective` is the cue, and the haze cannot substitute for it.** Rendered as a
+five-way at fixed audio, with `depth_fade` and `depth_hue` both on and `perspective` at `0`, the
+Lorenz butterfly is exactly as flat as before — both wings the same size, a symmetric bowtie, the
+haze reading as an uneven *exposure* rather than as distance. `perspective` alone reads as a solid
+at an angle immediately. This matters because the haze is the cue that *sounds* like the depth cue,
+and the ADR's own framing ("distance haze stands in for occlusion") could be read as putting more
+weight on it than it can carry. It reinforces; it does not substitute.
+
+**Falsified: "recovering the framing is a `zoom` edit."** The Negative bullet "`perspective`
+interacts with `zoom` in a way an author must learn" describes the effect as *enlargement*. That is
+true and it is the small half. Measured peak-to-peak over four spin phases on a bare Lorenz at fixed
+audio, 600 px square:
+
+| `perspective` | centre-x swing | widest span |
+|---|---|---|
+| 0.00 | 0.04 NDC | 522 px |
+| 0.15 | 0.11 NDC | 525 px |
+| 0.25 | 0.20 NDC | 529 px |
+| 0.40 | 0.37 NDC | 542 px |
+| 0.60 | 0.55 NDC | 555 px |
+
+The near side is magnified, so the projected centroid shifts toward whichever side is currently
+near — and as the figure turns, that shift **orbits**. The swing runs about **0.9 x `perspective`**
+in NDC; the size growth across that entire sweep is **6 %**. So the dominant consequence is a
+*phase-varying translation*, roughly an order of magnitude more consequential for composition than
+the enlargement this ADR names — and **a `zoom` cannot recover a translation**. All a zoom can do is
+shrink the figure until the orbit fits, which is what both re-tuned presets now pay (`attractor_lorenz`
+1.32 → 1.16, `attractor_thomas` 1.14 → 1.02, with Lorenz's `sanity` coverage down to 0.2747 against a
+0.18 floor).
+
+**The practical ceiling is therefore ~0.3, not the `0.8` clamp.** The clamp is not where the
+projection breaks: it is a true perspective divide, straight lines stay straight, and at `0.8` the
+butterfly reads as a strong wide angle rather than as a fisheye. What bounds it is the orbit. Past
+about `0.3` the figure visibly slides around the frame instead of turning in place, which is a worse
+artifact than the flatness the parameter was bought to fix. The usable range is roughly the bottom
+third of the legal one. `presets/README.md` was corrected at this close; the two structural remedies
+(re-centre the projection on the projected centroid, or expose the offset as a lever) are
+[design-backlog 0061](../design-backlog.md), unowned.
+
+Note that this is **not** the followup the plan already anticipated. Normalizing `m` by its value at
+`d_n = 0` divides every magnification by `m(0) = 1` and so changes nothing whatever about the orbit;
+it addresses only the size growth. The two are separate problems and the small one is the one that
+had a cheap fix.
+
+**Two smaller findings, both routed to the backlog rather than fixed here.** `depth_hue` delivers the
+atmospheric reading this ADR describes only on a palette that travels in *hue* at roughly constant
+lightness; on the dark→light ramps both shipped 3-D presets use it duplicates `depth_fade`, it wraps
+on the LUT's repeat sampler above `2 · min(hue_center, 1 − hue_center)`, and it is structurally dead
+under `ink_amount = 1` ([design-backlog 0062](../design-backlog.md)). And `spin`'s usable ceiling is
+set by `fade` — a frame of trail drawn while the figure turns is rotational smear, so the ceiling
+falls as the trail lengthens: ~1.9 at Lorenz's `fade = 0.932`, ~1.3 at Thomas's `0.955`
+([design-backlog 0063](../design-backlog.md)).
+
+**The no-occlusion limit was measured rather than guessed.** On the ladder `density` 0.002 / 0.01 /
+0.05 / 0.2 / 1.0 with all three cues live: reads, reads, markedly weaker, gone, gone. ADR-0044's
+warning is correct and the usable ceiling for a preset that wants depth is about `0.01` — an order of
+magnitude below the full particle budget. Both shipped 3-D presets sit at or inside it.
