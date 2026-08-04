@@ -210,7 +210,7 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// lsystem             0.32    0.6413  Fern Grow          2.00
 /// star_pattern        0.34    0.6908  Star Lantern       2.03
 /// reaction_diffusion  0.07    0.1420  Coral              2.03
-/// attractor           0.18    0.3785  Leviathan          2.10
+/// attractor           0.18    0.3442  Leviathan          1.91
 /// spectrum            0.06    0.1189  Spectrum Ridge     1.98
 /// ```
 ///
@@ -222,9 +222,28 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// **Leviathan**. That put the slack at `3.15x` and
 /// [`report_coverage_distribution`] failed the run with the number, which is
 /// exactly the shelf life this constant was given. The floor is re-derived
-/// from the printed distribution, not nudged until green. The family now reads
+/// from the printed distribution, not nudged until green. The family read
 /// `0.3785 Leviathan`, `0.4746 De Jong`, `0.5381 Lorenz`, `0.7817 Clifford`,
 /// `1.0000 Ink on Paper`, `1.0000 Thomas`.
+///
+/// **Every attractor number above fell on 2026-08-04 (Plan 0059 Phase 1b) and the
+/// floor did not have to move.** ADR-0070 stopped the trail sampling its own
+/// target mirrored, so each figure is one copy where it used to be `figure ∪
+/// mirror(figure)` — strictly less lit area, by 6-13 %. The family now reads
+/// `0.3442 Leviathan`, `0.4480 De Jong`, `0.5268 Lorenz`, `0.6831 Clifford`,
+/// `1.0000 Ink on Paper`, `1.0000 Thomas`, putting the slack at `1.91x`. It is
+/// recorded rather than acted on because the floor is still inside
+/// [`MAX_FLOOR_SLACK`], and Plan 0059 Phase 4 re-authors this whole family
+/// against the un-doubled figure — re-deriving the constant now would set it from
+/// exposure nobody has judged yet.
+///
+/// Reaction-diffusion is unchanged here **and that is a result, not an
+/// omission**: Phase 1b moved its three passes to the same prelude, which
+/// reversed the direction a positive `pan_y` scrolls the field and moved `Coral`
+/// to `0.1546` (slack `2.21x`, failing this gate by a hair). The phase restored
+/// the sign rather than re-measuring the floor, and `Coral` returned to `0.1420`
+/// exactly — which is the evidence that the reversal, not the un-mirroring, was
+/// what moved it.
 ///
 /// Two of that six deserve a note, because a reader checking the arithmetic
 /// will trip on them. `Ink on Paper` and `Thomas` both read exactly `1.0000`,

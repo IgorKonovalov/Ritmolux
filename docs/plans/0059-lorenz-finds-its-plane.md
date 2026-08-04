@@ -1,6 +1,7 @@
 # 0059 — Lorenz finds its plane, and the attractor can trade samples for curves
 
-> **Status:** **approved 2026-08-03** — ready for `dev`. Phases 1-3 are `dev` and run in one
+> **Status:** **in progress** — approved 2026-08-03; **Phases 1 and 1b landed 2026-08-04**, Phase 2
+> is next. Phases 1-3 are `dev` and run in one
 > session; **Phase 4 is `human`** (the one content pass) and **may route back to `architect`** if
 > `density` + `fade` cannot hold a legible curve, so the plan does not close in one sitting.
 > **Created:** 2026-08-03

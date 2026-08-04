@@ -777,13 +777,13 @@ impl PipelineResources {
         let decay_shader = gpu::fullscreen_shader(
             device,
             "attractor-decay-shader",
-            gpu::FULLSCREEN_VS_UV,
+            gpu::FULLSCREEN_VS_UV_FLIPPED,
             DECAY_SHADER,
         );
         let present_shader = gpu::fullscreen_shader(
             device,
             "attractor-present-shader",
-            gpu::FULLSCREEN_VS_UV,
+            gpu::FULLSCREEN_VS_UV_FLIPPED,
             PRESENT_SHADER,
         );
 
