@@ -115,12 +115,33 @@ held ~8 GB in `target/debug/incremental` and filled the disk mid-session), and `
 fails with `Permission denied` on Windows while any shell still has its working directory inside.
 
 
-**NO LANE IS LIVE (2026-08-04).** [0052] and [0055] have both closed and merged — see Recently
-closed. They ran in parallel because they share no files (0052 is `scenes/particles/`, 0055 is
-`post/kaleidoscope.rs`) and **that held**: neither touched the other's code, and the merged tip
-gated green in one run. The pair deliberately *not* run together was 0052 + [0053], which collide on
-the bind-group layout roster 0053 asserts on — **and both closed plans have now moved that roster**,
-so read both Recently-closed entries before starting [0053].
+**[0063] IS LIVE (2026-08-04), AND IT IS RUNNING IN THE MAIN CHECKOUT ON `main` — NOT IN A
+WORKTREE.** `git worktree list` shows only the main checkout, and `core/src/render/scenes/particles/mod.rs`
+carries several hundred uncommitted lines (`inv_depth_extent`, `DEFAULT_PERSPECTIVE`,
+`MAX_PERSPECTIVE`) — Phase 1, possibly reaching into Phase 2, of four `dev` phases. Its plan file's
+status line is flipped to `in-progress` in the working tree but not yet committed. **This is a
+deviation from [ADR-0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md), and its one practical
+consequence is that the main checkout's working tree is occupied**: a second lane cannot use it and
+must open its own worktree, and `cargo release` will refuse for whichever plan closes while the
+other is dirty (do the manual three-step bump then — never `--allow-dirty`, which is not
+pathspec-scoped).
+
+**A second, content-lane session is also live on `main`** — `859ec66` (the eleven fold-binding
+presets' edge treatments, [backlog 0058](../design-backlog.md)) and `f6c56dc` (`emitter_squall`) are
+`preset-author` commits landed directly. So `presets/*.toml` is contended too, though `0063` touches
+only `attractor_*` among them.
+
+**Precedent for running two at once: [0052] and [0055] did, and it held.** They shared no files
+(0052 is `scenes/particles/`, 0055 is `post/kaleidoscope.rs`); neither touched the other's code, and
+the merged tip gated green in one run. The pair deliberately *not* run together was 0052 + [0053],
+which collide on the bind-group layout roster 0053 asserts on — **and both closed plans have now
+moved that roster**, so read both Recently-closed entries before starting [0053].
+
+**Safe to open beside [0063] right now:** [0036] (packaging + a new workflow file; touches **no**
+Rust at all, so it cannot conflict even at the compile level), [0065] (line geometry) and [0070]
+(`swarm.rs` + `emitter.rs`). **Not safe:** [0062] and [0066], which both extend the same
+`PARAMS`/`set_param` pair in the file [0063] is rewriting — they are sequenced *after* it for
+exactly this reason.
 
 **[0055] PHASE 2'S VERDICT IS KEPT HERE PERMANENTLY, not because the lane is live but because it is
 a human judgement no commit can re-derive.** It was decided in the running app on 2026-08-04 against
