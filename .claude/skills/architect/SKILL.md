@@ -340,7 +340,28 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
 
 1. **Flip the plan `Status:` to `done`** (one-line summary: the phase commits, the Mode 4
    verdict, what was verified) and **`git mv` the file to `docs/plans/done/`**.
-2. **Accept any paired ADRs** (`proposed → accepted`) and refresh `docs/adrs/README.md`.
+1b. **Re-point every link the `git mv` just broke — both directions.** This step exists because it
+   was missed at *every* close from Plan 0050 through 0060 and left **74 broken relative links
+   across 23 files**, found only when someone asked whether anything was stale. Markdown link rot
+   degrades silently and only in a browser, so nothing surfaces it. Two directions, both mechanical:
+   - **Inbound** — anything naming the plan at its old path: ADRs' `**Related plan(s):**` headers,
+     `docs/design-backlog.md`, `docs/roadmap-visual-richness.md`, `docs/on-device-validation.md`,
+     sibling plans, and both READMEs. `../plans/NNNN-…` → `../plans/done/NNNN-…`; from inside
+     `docs/plans/`, `(NNNN-…)` → `(done/NNNN-…)`.
+   - **Outbound** — every `(../adrs/…)`, `(../design-backlog.md)`, `(../specs/…)` *inside the moved
+     plan*, which now resolves one directory too high: `../` → `../../`. Its links to
+     still-active sibling plans go the other way: `(NNNN-….md)` → `(../NNNN-….md)`.
+
+   Then **verify by re-audit rather than by inspection** — walk every `](relative)` under `docs/`
+   and assert the target exists. Two traps worth knowing: a bare `NNNN-*.md` link inside
+   `docs/adrs/` is identified by its **number**, not its slug, so a wrong filename is repairable by
+   number — *unless* the surrounding text says "Plan NNNN", in which case the number is a plan
+   number and the missing piece is the `../plans/` prefix, not the slug. Nothing enforces any of
+   this; a CI link checker would retire the step.
+2. **Accept any paired ADRs** (`proposed → accepted`) and refresh `docs/adrs/README.md`. An ADR is
+   append-only *once accepted* — but if the plan's implementation falsified something the ADR
+   recorded, accept it **with a dated `Outcome` section** (the ADR-0054 and ADR-0074 precedent)
+   rather than editing the body or leaving the stale claim standing.
 3. **Refresh `docs/plans/README.md`**: roster → recently-closed, execution order, next-free-number.
 4. **Bump the application version.** This is the step that chronically gets skipped (the version
    sat at `0.2.0` across five feature plans that each forgot it), so treat it as non-optional and
@@ -358,6 +379,20 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    The version lives once, in root `Cargo.toml` `[workspace.package].version`; both crates inherit
    it. This is a separate axis from the C ABI version (`LMV_ABI_VERSION`), which moves only on an
    `extern "C"` shape change (ADR-0003) — never couple the two.
+
+   **If a parallel lane is live, `cargo release` will refuse** — it aborts on *any* dirty file
+   ("uncommitted changes detected"), and at Plan 0060's close another session's three in-progress
+   files blocked it. **Do not reach for `--allow-dirty`:** cargo-release's commit step is not
+   pathspec-scoped, so it can sweep the other lane's work into a `chore: Release` commit, and this
+   project never rewrites history. Do the bump by hand instead — `release.toml` has no hooks and no
+   custom message, so these three steps are byte-identical to what the tool produces:
+
+   ```sh
+   # edit [workspace.package].version in root Cargo.toml
+   cargo update --workspace --offline      # moves only the workspace members in Cargo.lock
+   git commit -m "chore: Release" -- Cargo.toml Cargo.lock
+   git tag vX.Y.Z
+   ```
 
 ### Closing a plan that was built in a worktree
 
