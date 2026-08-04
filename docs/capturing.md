@@ -838,7 +838,8 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `attractor` | HARD | the first compute-particle scene: seed reproducibility + beat perturbation ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
 | `line_joints` | HARD (+ tolerance) | a **flagged joint stops leaving a hole** in the stroke ([ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)): against a purpose-built zigzag `polyline`, a vertex is not a local luminance minimum relative to the segment interiors either side of it. Threshold-free, and captured at **512x512** because the wedge it measures is a fraction of a stroke-width across. The same capture is then pinned to a committed baseline (Plan 0040), since the reported defect had no pixel guard anywhere; the relative claim runs **first, even under `LMV_BLESS`**, so the notch cannot be blessed back in. Bless with `--test line_joints`, which cannot reach the golden roster |
 | `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
-| lit-backdrop guards (**in-crate**, `--lib`) | HARD (exact) | one per **draw seam**: `swarm.rs`'s `a_lit_backdrop_survives_where_the_swarm_drew_nothing` and `lines/renderer.rs`'s `a_lit_backdrop_survives_where_the_strokes_drew_nothing` ([ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md)). Each captures `swarm_lit_backdrop.toml` / `lines_lit_backdrop.toml` three ways — lit backdrop, black backdrop, backdrop with the scene contributing nothing — and asserts that wherever the scene wrote no light the backdrop arrives **intact**. Bound **0** rather than a tolerance, because it reads the linear composite; see the section below |
+| lit-backdrop guards (**in-crate**, `--lib`) | HARD (exact) | one per **draw seam**, three of them: `swarm.rs`'s `a_lit_backdrop_survives_where_the_swarm_drew_nothing`, `lines/renderer.rs`'s `a_lit_backdrop_survives_where_the_strokes_drew_nothing`, and `emitter.rs`'s `a_lit_backdrop_survives_where_the_emitter_drew_nothing` ([ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md)). Each captures `swarm_lit_backdrop.toml` / `lines_lit_backdrop.toml` / `emitter_lit_backdrop.toml` three ways — lit backdrop, black backdrop, backdrop with the scene contributing nothing — and asserts that wherever the scene wrote no light the backdrop arrives **intact**. Bound **0** rather than a tolerance, because it reads the linear composite; see the section below |
+| emitter burst (**in-crate**, `--lib`) | HARD (relative) | the emitter is the first scene whose **population** varies, so `emitter.rs`'s `a_spawn_rate_on_onset_bursts_and_then_idles` drives `emitter_onset.toml` through `capture_preset_over` with a silent lead, a six-frame transient and a second of silence, and asserts the frame is dark before, lit after, and dark again by the end. `capture_preset` cannot ask this: it holds one analysis frame for every step, so it can show that a binding is live but never that the shower **empties** when the transient passes ([ADR-0057](adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)) |
 | `background_composite` | HARD (**hardware only**) | RD / attractor presents alpha-blend over the `bg_*` backdrop; **skipped** on a software adapter, which mis-renders that pipeline set |
 | `transition` | HARD | every switch path (cycle **and** select) renders intermediate blended frames as a ramp, reproducibly from the injected `dt`; each blend kind shows its own signature; a switch arriving mid-dissolve lands on the last index requested; a hot-reload mid-dissolve cancels cleanly; the heavy attractor ↔ reaction-diffusion pair dissolves on the freeze fallback (set `LMV_TRANSITION_STRIP=<dir>` to also dump filmstrips) |
 | `easing` | HARD | `[smoothing]` is observable: a scalar entry measures symmetric and an `{ attack, release }` pair does not, against purpose-built near-linear fixtures ([ADR-0039](adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md)). Also measures the `spectrum` `curve`↔easing **ordering** both ways round through one renderer — **every** frame count in the suite is gated on `segment_settled` first — the shared probe's window is 180 frames (3 s, 6 τ) because at 96 its own asymmetric arm was truncated, reading 61 where the settled answer is 69 |
@@ -953,6 +954,15 @@ rather than re-parameterized existing files, for the reason above:
   a lit, un-vignetted backdrop. It guards the sprite pipeline, whose radial
   falloff over a *square* quad left four hard-edged black corners (~21 % of every
   sprite).
+- **`core/tests/fixtures/emitter_lit_backdrop.toml`** — a sparse emitter shower
+  over the same lit backdrop, guarding the **third** draw seam (Plan 0052). It is
+  the one fixture of the three that **cannot be frozen**: an emitter whose objects
+  do not move has no picture at all, because its source line sits below the frame.
+  That costs nothing — the three captures vary only `bg_bright` and `size`, and
+  neither touches spawning or the path, so the object positions are identical
+  across all three. Demonstrated in both directions: reverting its fragment shader
+  to a constant alpha gives `worst |L - B|` **0.3345** with 13 330 of 136 617
+  compared channels violating, against **0.0002** and zero violations as shipped.
 - **`core/tests/fixtures/lines_lit_backdrop.toml`** — a sparse frozen rose at
   **`thickness = 9`**, guarding the shared line renderer and therefore all four
   line scenes at once. The fat stroke is load-bearing: the line falloff is
@@ -960,17 +970,17 @@ rather than re-parameterized existing files, for the reason above:
   `thickness`, and at shipped widths (2–3) that rim is close to a hairline a
   capture cannot discriminate. Narrowing it leaves the test green and blind.
 
-Both bind a post stage (`trails`), and that is not decoration either: with an
+All three bind a post stage (`trails`), and that is not decoration either: with an
 empty chain the scene draws straight onto the backdrop and its additive colour
 cannot remove light, so the defect is unrepresentable and the guard would prove
-nothing. Both tests read those preconditions back out of the fixture before they
-touch the GPU, and report the pixel counts either side of the property.
+nothing. All three tests read those preconditions back out of the fixture before
+they touch the GPU, and report the pixel counts either side of the property.
 
 They live **in `core/src/render/`, not in `core/tests/`**, for the same reason
 the bloom guard does: `capture::read_back_linear` is `pub(crate)`, and the
 assertion has to be made upstream of the tonemap where it is exact (see the
 previous section's second bullet for why a display-byte version cannot be
-written). Follow that precedent for a third draw seam.
+written). Follow that precedent for a **fourth** draw seam, if one is ever added.
 
 **One existing baseline was positioned to see this and did not.**
 `composite_kaleido.toml` is a line scene over a lit vignette — the exception to
