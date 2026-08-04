@@ -1,8 +1,8 @@
 # ADR-0057 — Objects that spawn, fall and die live in a new emitter scene, on analytic ballistics with seeded per-object individuation
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-04
 > **Date:** 2026-08-01
-> **Related plan(s):** [0052](../plans/0052-the-emitter-objects-that-spawn-fall-and-die.md)
+> **Related plan(s):** [0052](../plans/done/0052-the-emitter-objects-that-spawn-fall-and-die.md)
 > **Supplements:** [0007](0007-line-geometry-generators.md) (the scene-idiom split this adds a
 > fifth member to), [0036](0036-preset-reachable-spectrum.md) (the per-element channel this
 > deliberately does **not** use), [0044](0044-swarm-world-is-a-25d-torus-sized-from-the-target.md)

@@ -258,7 +258,7 @@ no preset-visible surface.
   *does* alias, the baseline committed in Phase 1 is a picture of the wrong thing — and Phase 3 is
   what finds out. Sequencing note: do not treat Phase 1's baseline as evidence of correctness; it is
   coverage, and Phase 3 is the check.
-- **[Plan 0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) adds a `[Uniform]` layout.**
+- **[Plan 0052](done/0052-the-emitter-objects-that-spawn-fall-and-die.md) adds a `[Uniform]` layout.**
   Whichever lands second inherits the other's list. Neither ordering is wrong; they should just not
   surprise each other.
 
@@ -276,5 +276,5 @@ no preset-visible surface.
 ## Followups (after this lands)
 
 - Re-measure allowlist entries when either pass changes; the entries carry dates for that reason.
-- If [Plan 0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) lands first, its emitter
+- If [Plan 0052](done/0052-the-emitter-objects-that-spawn-fall-and-die.md) lands first, its emitter
   layout joins the `[Uniform]` group and needs an entry or separation.

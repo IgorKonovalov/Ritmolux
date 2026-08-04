@@ -1080,6 +1080,10 @@ fn declared_params_match_set_param() {
             src.join("render/scenes/lines/spectrum.rs"),
             SystemKind::Spectrum.param_names(),
         ),
+        (
+            src.join("render/scenes/emitter.rs"),
+            SystemKind::Emitter.param_names(),
+        ),
         // The global compositing stages, declared the same way.
         (
             src.join("render/background.rs"),

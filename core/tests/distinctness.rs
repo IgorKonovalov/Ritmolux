@@ -86,6 +86,20 @@ fn report_family_distinctness() {
     };
     let frame = fixed_frame();
 
+    // THIS LIST IS CURATED, NOT EXHAUSTIVE, and the omissions are deliberate.
+    // It is a plain array rather than a match over `SystemKind`, so adding a
+    // scene does not force a decision here — which is exactly why the reasoning
+    // has to be written down instead of inferred from the absence.
+    //
+    // The report's unit is a PAIRWISE matrix within a family, so a family needs
+    // at least two shipped presets before it can say anything at all.
+    // `attractor` and `reaction_diffusion` have been absent since this test was
+    // written; `emitter` joins them at Plan 0052, which ships exactly one preset
+    // (`Sparks`) and would therefore print a 1x1 matrix of one preset against
+    // itself. That is left out for that reason — not lowered, not waived, and
+    // not because the scene was overlooked. **The moment a second preset lands
+    // in any of these three families, add it here**; the measurement becomes
+    // meaningful at two and the family is worth watching from then on.
     for (system, label) in [
         (SystemKind::FragmentField, "fragment_field"),
         (SystemKind::Swarm, "swarm"),

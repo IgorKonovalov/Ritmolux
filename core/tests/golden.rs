@@ -61,6 +61,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
         ),
         SystemKind::Attractor => ("attractor", include_str!("fixtures/attractor.toml")),
         SystemKind::Spectrum => ("spectrum", include_str!("fixtures/spectrum.toml")),
+        SystemKind::Emitter => ("emitter", include_str!("fixtures/emitter.toml")),
     }
 }
 

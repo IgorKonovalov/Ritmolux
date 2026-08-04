@@ -1,0 +1,112 @@
+# Sparks - the first emitter preset, and the first thing in the library whose
+# objects have a LIFE: each mark is thrown from a source line below the frame,
+# rides its own parabola, and falls out of shot for good (ADR-0057). Nothing
+# here wraps. That is the whole difference from the swarm, whose world is a
+# torus and whose population never changes.
+#
+# The scene is deliberately plain content - a shower, not a look. Building a
+# figure on this idiom is a `preset-author` pass and it is the obvious first one
+# to run now that the engine can do it (Plan 0052 followups).
+system = "emitter"
+name = "Sparks"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#2a0a02" },
+  { at = 0.32, color = "#c23f08" },
+  { at = 0.64, color = "#ff9a2e" },
+  { at = 0.88, color = "#ffd98a" },
+  { at = 1.00, color = "#fff6e2" },
+]
+
+[params]
+# THE SOURCE. `spawn_rate` is objects per second and it is the emitter's loudest
+# lever: the live population settles at roughly `spawn_rate * flight time`, so
+# this file runs a few hundred marks in flight. Bass thickens the shower rather
+# than brightening it, which is the reading the idiom wants - more THINGS, not
+# hotter ones.
+spawn_rate = "470 + clamp(bass * 330, 0, 280) + clamp(onset * 430, 0, 260)"
+
+# THE THROW. `launch_speed` against `gravity` is the whole geometry: a mark
+# launched at `v` reaches `v^2 / (2 * gravity)` above the source line before it
+# turns over, at `v / gravity` seconds. At 5.0 against 5.2 that is 2.40 world
+# units above a source sitting at -1.12, i.e. an apex at y = 1.28 - OFF the top
+# of a frame of half-height 1, deliberately. Every mark shares a launch speed, so
+# an apex inside the frame draws a hard horizontal ceiling where the population
+# piles up at the top of its arc; putting the crest off-frame hides the one
+# artifact a single-speed source has.
+#
+# BOTH NUMBERS ARE LARGER THAN THE PICTURE NEEDS, AND THAT IS DELIBERATE. This
+# is the first scene in the engine that starts EMPTY, and every behavioral gate
+# captures a short window - `reactivity` reads 24 frames, `animation` 24 and 48,
+# `sanity` 30, i.e. 0.4-0.5 s of scene time. A leisurely fountain is a third of a
+# frame of marks at 0.5 s and reads as a defect to a gate that has never met a
+# scene whose population is still filling. Tuned so the shower spans the frame
+# within ~0.4 s: at 0.5 s a mark has already climbed 1.85 world units, which puts
+# light in all four quadrants. Slow this down and the gates go with it.
+launch_speed = "5.0 + clamp(mid * 0.60, 0, 0.50)"
+gravity      = "5.2"
+launch_angle = "sin(time * 0.21) * 0.10"
+
+# LIFE AND WEIGHT. A mark fades in over the first twelfth of its life and out
+# toward the end, so retirement reads as a spark burning out rather than as a
+# pop. `lifetime` past the flight time is wasted pool: a mark launched at 4.6
+# falls past the retirement bound after ~2.0 s, so this is set just over it and
+# the fade-out lands as the arc leaves.
+lifetime = "2.0"
+size     = "1.45 + clamp(treb * 0.42, 0, 0.35)"
+
+# INDIVIDUATION - the distribution params (Plan 0052 Phase 2). Each says how
+# WIDE a per-object draw is; the object's seed picks within it, once, at spawn.
+# This is the whole answer to the report the emitter came from: a binding is
+# evaluated once per frame for the entire scene, so before this the only way to
+# make marks differ from each other was to have them BE different objects.
+#
+# `spread` is the launch-angle cone in radians and it is the one that changes the
+# geometry: at 0 every mark rides the same vertical parabola and the shower is a
+# column of beads. 0.62 rad is ~36 degrees, wide enough that the arcs visibly
+# cross and the crest stops being a hard ceiling.
+spread          = "0.62 + clamp(onset * 0.34, 0, 0.20)"
+size_spread     = "0.75"
+lifetime_spread = "0.5"
+
+# `spin` turns each mark at its own signed rate - the mark is a soft elongated
+# glint rather than a disc, so the rotation reads as a tumbling spark. `twinkle`
+# is the per-object brightness oscillation, and its RATE as well as its phase
+# comes off the seed, which is what makes the field steady while its members
+# blink. Both are cheap: neither touches the path.
+spin    = "0.55 + clamp(mid * 0.62, 0, 0.52)"
+twinkle = "0.42 + clamp(treb * 0.26, 0, 0.22)"
+
+# APPEARANCE. Additive, so this family punishes being pushed exactly the way the
+# swarm does; the population is what carries the frame.
+brightness = "1.08 + clamp(bass * 0.36, 0, 0.30)"
+hue        = "mod(0.02 + time * 0.011, 1)"
+hue_spread = "0.62 + clamp(treb * 0.24, 0, 0.20)"
+hue_center = "0.56"
+saturation = "1.02"
+
+# VIEW - a slow drift, no zoom pumping. The shower is already moving.
+zoom  = "1.02"
+pan_x = "sin(time * 0.043) * 0.05"
+
+# COMPOSITE. `trails` reads differently here than on the swarm and that is not a
+# defect: a decaying smear behind an object that LEAVES is a comet tail, where
+# behind a wrapping particle it is a current. Kept short so the arcs stay legible
+# as arcs.
+trails      = "0.20 + clamp(mid * 0.19, 0, 0.16)"
+bg_hue      = "0.07 + sin(time * 0.02) * 0.03"
+bg_bright   = "0.012 + clamp(treb * 0.0165, 0, 0.014)"
+bg_vignette = "0.74"
+
+[smoothing]
+# `spawn_rate` rides `onset`, so it gets the short attack a percussive driver
+# needs and a long release, which is what makes a hit read as a BURST that
+# thins out rather than as a step change in density.
+spawn_rate   = { attack = 0.04, release = 0.60 }
+launch_speed = { attack = 0.08, release = 0.45 }
+brightness   = { attack = 0.05, release = 0.30 }
+size         = { attack = 0.06, release = 0.40 }
+hue_spread   = 0.9
+trails       = 0.55
+bg_bright    = 0.30

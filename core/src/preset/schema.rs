@@ -41,6 +41,10 @@ pub enum SystemKind {
     /// above (it draws through the same shared renderer), driven by the analysis
     /// frame's log-spaced band array rather than by a generator.
     Spectrum,
+    /// The ballistic emitter — objects that spawn, fall on a parabola and die
+    /// ([ADR-0057](../../../docs/adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)).
+    /// The first scene whose population is not fixed.
+    Emitter,
 }
 
 impl SystemKind {
@@ -48,7 +52,7 @@ impl SystemKind {
     /// `variant_roster_reminder` below: a new variant fails the build there until
     /// this is bumped, and the length of [`ALL`](SystemKind::ALL) is typed from
     /// it, so bumping it without rostering the variant does not compile either.
-    pub const VARIANT_COUNT: usize = 8;
+    pub const VARIANT_COUNT: usize = 9;
 
     /// **The** roster of built-in systems — every [`SystemKind`], in the order the
     /// engine builds their scenes. The single place the variant list lives: the
@@ -66,6 +70,7 @@ impl SystemKind {
         SystemKind::ReactionDiffusion,
         SystemKind::Attractor,
         SystemKind::Spectrum,
+        SystemKind::Emitter,
     ];
 
     /// Parse a canonical system name (as written in a preset's `system = "..."`
@@ -83,6 +88,7 @@ impl SystemKind {
             "reaction_diffusion" => SystemKind::ReactionDiffusion,
             "attractor" => SystemKind::Attractor,
             "spectrum" => SystemKind::Spectrum,
+            "emitter" => SystemKind::Emitter,
             _ => return None,
         })
     }
@@ -100,6 +106,7 @@ impl SystemKind {
             SystemKind::ReactionDiffusion => "reaction_diffusion",
             SystemKind::Attractor => "attractor",
             SystemKind::Spectrum => "spectrum",
+            SystemKind::Emitter => "emitter",
         }
     }
 
@@ -121,6 +128,7 @@ impl SystemKind {
             SystemKind::ReactionDiffusion => scenes::reaction_diffusion::PARAMS,
             SystemKind::Attractor => scenes::particles::PARAMS,
             SystemKind::Spectrum => scenes::lines::spectrum::PARAMS,
+            SystemKind::Emitter => scenes::emitter::PARAMS,
         }
     }
 }
@@ -140,7 +148,8 @@ fn variant_roster_reminder(system: SystemKind) {
         | SystemKind::StarPattern
         | SystemKind::ReactionDiffusion
         | SystemKind::Attractor
-        | SystemKind::Spectrum => {}
+        | SystemKind::Spectrum
+        | SystemKind::Emitter => {}
     }
 }
 
@@ -571,7 +580,10 @@ fn build_config(
         })),
         // Reaction-diffusion drives its regime through named params (feed/kill/
         // flow), not a declarative structural table.
-        SystemKind::FragmentField | SystemKind::Swarm | SystemKind::ReactionDiffusion => Ok(None),
+        SystemKind::FragmentField
+        | SystemKind::Swarm
+        | SystemKind::ReactionDiffusion
+        | SystemKind::Emitter => Ok(None),
     }
 }
 

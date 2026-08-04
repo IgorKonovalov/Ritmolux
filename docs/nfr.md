@@ -202,7 +202,24 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   a portable absolute (a different GPU/driver has a different floor). Vendor spread (Intel iGPU) is a
   pending on-device capture — `docs/on-device-validation.md`.
 - **Our own Rust state stays <~1 MB** (ring buffer ~340 ms of f32, fixed DSP buffers, a few uniform
-  buffers) — unchanged; the target was never our allocations.
+  buffers) — unchanged; the target was never our allocations. The **emitter's object pool** (Plan
+  0052 / [ADR-0057](adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)) is the
+  newest entry here and it stays well inside that line. It is a **fixed** allocation, made once at
+  scene construction and never grown — spawning past it drops the spawn rather than reallocating,
+  which is the whole reason it is a pool — so this is a ceiling and not an average:
+
+  | | floor (2 000 objects) | rich (6 000) |
+  |---|---|---|
+  | CPU pool (`Object`, 40 B incl. padding) | 80 KB | 240 KB |
+  | free list (`u32`) | 8 KB | 24 KB |
+  | CPU instance mirror (28 B) | 56 KB | 168 KB |
+  | GPU instance buffer (28 B) | 56 KB | 168 KB |
+  | **total** | **~200 KB** | **~600 KB** |
+
+  Two orders of magnitude under the ~66 MB a single post chain costs, and the reason the tier's
+  `emitter_objects` was sized for headroom rather than trimmed: the pool is bounded by cost of
+  *drawing* the marks, not by the memory holding them. It adds **one** render pipeline, i.e. ~1 MB
+  by the Plan 0012 measurement above, which is the number that actually moves.
 - **The linear-light composite is the largest single addition since this section was written**
   (Plan 0045 / [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)). Every intermediate
   upstream of the tonemap moved from the surface format to `Rgba16Float` — 8 bytes a texel, not 4 — so
