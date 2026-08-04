@@ -76,6 +76,7 @@ cannot express them.
 | 0051 | `variant` can morph and neither `star_*` preset does | Closed by content: both presets now drive `variant` with a triangle wave (`star_rosette.toml:59`, `star_lantern.toml:77`). **Closed 2026-08-04 during a backlog sweep** |
 | 0052 | `Spectrum Ridge` has no tonal structure — **premise was false** | Retired 2026-08-03; the preset was never flat and the statistic convicted the right preset for the wrong reason |
 | 0053 | The retune rescaled band gains but not the world-space params | [ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) + [Plan 0058](plans/done/0058-the-gate-can-see-an-empty-frame.md) |
+| 0058 | Thirteen presets bind the fold and eleven had not chosen an edge treatment | Closed by content 2026-08-04, `859ec66` — all thirteen now name a `kaleido_edge`, the verdicts spread across all three treatments. **The entry named `attractor_dejong`, which binds no `kaleido_*` param; the thirteenth is `attractor_clifford`** — inherited from [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md)'s own scope bullet, corrected in both |
 
 ## Open entries
 
@@ -93,6 +94,38 @@ Both are real preset-authoring constraints imposed by the **test resolution** ra
 look. The failure mode is non-obvious and cost several iterations to diagnose. **Captured so the next
 author does not re-diagnose it** — the cheap resolution is a sentence in the authoring docs, not a
 change to the gate.
+
+### Update 2026-08-04 — the gate has now rejected a preset, and there is a number
+
+- **Raised by:** `preset-author`, landing `emitter_squall` (`f6c56dc`). The entry above was filed
+  explicitly *not* as an argument that the gate should change. This update does not make that
+  argument either, but it does retire the phrase "informational": the gate is now shaping shipped
+  content rather than only measuring it.
+- **ROUTED 2026-08-04 → [Plan 0067](plans/0067-the-curation-route.md) Phase 1d**, as a bounded
+  measurement rather than a redesign. The user's call, from the two options put to them: raise the
+  gate's resolution and re-baseline the floor if the measurement supports it, rather than design a
+  coverage-aware successor statistic.
+
+**The measurement, from the preset's own header.** Squall's second draft was the shipped geometry at
+**a fifth of the density** — "far better looking, individual parabolas, lots of dark" — and it
+failed: `anim` **0.005** against `ANIM_FLOOR = 0.01`, with three of four reactivity bands under
+0.02. The shipped density is the lowest that clears both with margin, measured rather than guessed:
+`anim` **0.018**, bands 0.025 / 0.018 / 0.032 / 0.023. So the gate did not reject a broken preset —
+it rejected the better-looking one of two, and the author raised density by 5x to pass.
+
+**One of the two cases is provably not a resolution problem, and the plan phase says so.** A figure
+invariant under rotation by `2*pi/k` produces an **identical image** under that rotation, so its
+whole-frame difference is zero at *every* resolution — Star Rosette's spinning ring cannot be
+rescued by rendering it larger. The thin-stroke / sparse case is the one where resolution plausibly
+helps, and even there it is not obvious: a mark smaller than a pixel at 96x96 is lost or aliased
+rather than area-averaged, so whether the statistic separates a sparse-but-moving frame from a
+static one is an empirical question. **That is why the phase measures a ladder before it moves a
+constant.** The non-vacuity probe is free: the rejected draft is the shipped `emitter_squall` with
+`spawn_rate` cut to a fifth.
+
+**What this does not become.** An argument that `ANIM_FLOOR` should be lowered. A floor that a
+genuinely static preset can clear is worth nothing, and the shipped Squall sits at 1.8x the current
+floor, so the headroom is not large enough to give away blind.
 
 ---
 
@@ -677,85 +710,105 @@ look they intend, and the workarounds are recorded in their headers. It is the o
 workarounds exist because one lever is doing a job it was not shaped for, and that the cost lands on
 the *next* author rather than on these two.
 
----
-
-## Entry 0058 — from Plan 0055 Phase 4 (2026-08-04), the content half of a decision the engine has now made
 
 ---
 
-## 0058 — thirteen presets bind the fold and eleven of them have not chosen an edge treatment, because until now there was nothing to choose
+## Entries 0059-0060 — from the `preset-author` handoff of 2026-08-04, after Squall and the fold-edge pass
 
-- **Raised:** 2026-08-04, at [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md) Phase 4. Not
-  a gap the content lane found — a gap the engine lane *created* on purpose and is handing over.
-- **Verified against code:** yes. `grep -l kaleido_order presets/*.toml` returns thirteen files, and
-  `grep -l '^kaleido_edge' presets/*.toml` returns two of them, so eleven ride the default. Anchor
-  that second grep — `swarm_dense` mentions `kaleido_edge` in a header comment without binding it,
-  so an unanchored match reports three.
-- **For:** `preset-author`. No engine change, no ADR. The capability exists and is documented; what
-  is missing is a per-preset judgement that only looking can supply.
+Five findings were handed over; three were record corrections (the `attractor_dejong` misnaming, the
+`distinctness` family list, the [0009](#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
+update above) and are resolved where they belong. These two are design.
 
-**What changed under them.** [ADR-0061](adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)
-made the region outside the fold's inscribed disc a per-preset choice, `kaleido_edge`, with three
-treatments: `falloff` (0, the fade ADR-0047 shipped), `tile` (1) and `squash` (2). Plan 0055 Phase
-2's live A/B made **`tile` the default**, so every fold-binding preset that says nothing has already
-moved from *cropping to a disc* to *filling its frame*. That is a real visual change to eleven
-shipped presets, applied by a default rather than by an author, and it is the reason this entry
-exists rather than being optional polish.
+---
 
-**Why the scope matters.** At 16:9 the frame's corner sits at 2.04x the disc radius, so **56 % of
-the frame** is what the treatment decides. This is not a corner detail on any of the thirteen.
+## 0059 — the backdrop is the one surface left that does not colour through the shared palette, and nothing says so
 
-**The eleven that have not been looked at:** `attractor_dejong`, `attractor_lorenz`,
-`curve_cathedral`, `fragment_glacier`, `fragment_supernova`, `fragment_warp`, `lsystem_arrowhead`,
-`reaction_reef`, `reaction_reliquary`, `swarm_storm` — plus `swarm_dense`, which is a special case
-below. All eleven currently ride the `tile` default without anyone having chosen it.
+- **PROMOTED 2026-08-04 → [ADR-0086](adrs/0086-the-backdrop-colours-through-the-preset-palette.md) +
+  [Plan 0072](plans/0072-the-backdrop-joins-the-palette.md)** — same day it was raised, because the
+  entry's own verification turned a documentation gap into a coherence gap. The doc half is not
+  waiting for the plan: `docs/preset-palettes.md` gains the backdrop now, describing today's
+  behaviour, and `presets/README.md`'s sentence is corrected.
+- **Raised:** 2026-08-04, from `preset-author` — as "`bg_hue` is undocumented anywhere", with a
+  measured six-row swatch table put in the preset's own header for want of a home.
+- **Verified against code:** yes, and the finding got larger under verification.
 
-**The two that have been judged, and they are your reference pair.** Plan 0055 Phase 2 put the whole
-roster in front of the user in the running app — in motion, over a lit backdrop, at 16:9 and at a
-non-16:9 window — on exactly one centred figure and one border-filling field. Both verdicts are
-**landed**, so they are shipped examples you can read rather than advice:
+**The reported half is true.** `docs/preset-palettes.md` — the document that owns the colour surface
+and carries a twenty-row swatch table for the line scenes' ramp — does not contain the string
+`bg_hue`. `presets/README.md` has one sentence.
 
-| preset | kind | verdict |
-|---|---|---|
-| `attractor_leviathan` | centred figure | **`tile`**, landed with a zoom raise (see below) |
-| `fragment_kaleido` | border-filling field | **`squash`**, landed |
+**That sentence is wrong, which is the larger half.** It reads: *"`bg_hue` offsets into the shared
+cosine palette."* There is no sharing. `core/src/render/background.rs:70` carries its **own copy** of
+the iq cosine inline in its WGSL — `d = vec3(0.10, 0.42, 0.62)` — and the pass binds one uniform and
+no LUT texture at all (`PARAMS` is `bg_hue`, `bg_bright`, `bg_vignette`; the bind group is
+`@group(0) @binding(0) var<uniform>` and nothing else). So:
 
-**That the two chose differently is the finding, not a detail.** It is the whole evidence for
-`kaleido_edge` existing at all, and it is the first question to ask of each preset below: is this a
-figure with space around it, or a field that fills its frame? The pair does not settle the other
-eleven — nobody has watched those — but it tells you what the axis is.
+- **`[palette]` does not reach the backdrop.** An `ember` preset draws an ember figure over a
+  *spectrum-cosine* backdrop. `attractor_clifford`'s crimson→ember→white-hot custom gradient does
+  not tint its own sky.
+- **Neither do `saturation` or `palette_mix`.** The A/B crossfade moves the scene and leaves the
+  backdrop where it was.
+- **The author's measured table is the ramp that is already documented.** `d = (0.10, 0.42, 0.62)`
+  is byte-identical to the built-in `spectrum` gradient (`palette.rs:109`) and to the line scenes'
+  hardcoded default (`lines/mod.rs:160`), so the six points measured for `bg_hue` land on the
+  existing twenty-row table (0.30 blue = `#57ABF8` cornflower, 0.45 teal = `#2BECFA` aqua, 0.85
+  amber = `#FCB118` amber). The right doc fix is therefore **one sentence pointing at that table**
+  plus the exclusion above — not a second table that can drift from it, which is how backlog 0014
+  got its colour names wrong.
 
-**What Leviathan's change tells you about the others.** Adopting a fill treatment there was **two
-edits, not one**. Its `zoom` had been pinned at base 0.72 with a header explaining that the pin was
-"a fold constraint, not a taste" — the figure was held inside the inscribed disc so it could not
-feed the fold's residual rays. A fill treatment removes that constraint entirely, and the preset
-only benefits from one if there is content out past `r_max` for it to act on, so the zoom went to
-1.80. **Expect the same shape elsewhere:** any preset whose scale, `zoom` or `glow` was tuned against
-a disc that crops is now tuned against a premise that no longer holds. Grep the fold-binding headers
-for language about the disc, the inscribed radius, or the rays before assuming a file only needs one
-line added.
+**Why it is the last one.** ADR-0021 unified the fragment field and swarm; Plan 0020 Phase 5 pulled
+reaction-diffusion onto `spectrum` and re-blessed its baseline; the attractor followed; Plan 0054 /
+ADR-0059 brought the four line families in. The backdrop was named in ADR-0021's *Context* — "ADR-0018
+adds a *background* colour (`bg_hue`), not a *scene* palette" — as a reason it was a different
+feature, and it has never been revisited since every other surface converged.
 
-**`swarm_dense` is the odd one and worth doing first.** It pins `kaleido_order = "1"` — the fold off
-— and its header documented that as a *mitigation for an engine artifact*: bright bars along the
-frame edges, which was design-backlog 0010's clamped-edge smear. That artifact was fixed engine-side
-by ADR-0047 a plan ago, so the dodge has been unnecessary since then and the comment was stale twice
-over. Phase 4 corrected the comment and **deliberately did not turn the fold back on**, because
-nobody has looked at this preset folded since the fix and that is a judgement for this lane. It is a
-sparse figure over a dark field, which is the case where the three treatments differ most.
+**Scope, measured before the ADR was written.** 26 of 37 shipped presets bind `bg_bright > 0`. Eleven
+declare no `[palette]`, so their gradient already *is* `spectrum` and they cannot move. Fifteen
+declare one and would re-tint. Every one of those fifteen sits at `bg_bright <= 0.039` including its
+audio term, so this is a dim wash rather than a repaint — but `bg_hue` values were picked as
+positions in the cosine, and the same number means a different colour in a custom gradient, so it is
+a re-tune and not a no-op. Plan 0072 owns that pass.
 
-**Pairs with [0038](#0038) and [0040](#0040)**, and the pairing is the argument for doing them
-together rather than in sequence: all three are retunes of the same shipped set against a composite
-that moved underneath it. 0038 is the tonemap knee's ~8 % luminance loss, 0040 is coverage-as-alpha
-making dim figures read as dark speckle over a lit backdrop — and a lit backdrop is exactly the
-configuration this entry's treatments are judged in, since under `falloff` the corners *are* the
-backdrop and under `tile`/`squash` they stop being it. Judging any one of the three at
-`bg_bright = 0` is what produced the confirmation failure ADR-0061's Notes records.
+---
 
-**How to judge it.** In the running app, in motion, over a **lit** backdrop, at 16:9 and at a
-window that is clearly not 16:9 — `LMV_PRESET_DIR` pointed at the repo's `presets/` makes an edit
-live in about 150 ms, so walking a preset through `kaleido_edge = 0 .. 2` is changing one integer
-and watching. The parameter roster and the per-treatment guidance are in
-[`presets/README.md`](../presets/README.md#screen-space-kaleidoscope--kaleido_order-kaleido_angle-kaleido_center_x-kaleido_center_y-kaleido_edge).
+## 0060 — an engine fix leaves its preset-side workarounds standing, and only a header comment remembers them
 
-**Not in scope.** Adding a fourth treatment. The roster is a closed set by ADR-0061; a look that
-needs a new edge behaviour is engine work and routes back through `architect`.
+- **Raised:** 2026-08-04, from `preset-author`, at the fold-edge content pass — as a *pattern*
+  rather than a defect, with two instances and a specific ask.
+- **ROUTED 2026-08-04 → [Plan 0067](plans/0067-the-curation-route.md) Phase 4**, which is already
+  installing a close-ceremony duty hooked to "this plan touched `presets/`". This is a second
+  trigger on the same step: "this plan fixed something a preset could have been framed around".
+- **Verified against code:** yes — both instances are readable in the shipped files today.
+
+**The pattern.** An engine defect gets worked around in **preset framing** — a zoom pinned, a fold
+switched off, a density cut. The workaround is recorded honestly, in the preset's header comment,
+because that is the only place it can be recorded. Then the engine defect is fixed by a later plan,
+and the workaround stays: it is not a bug, nothing fails, no gate fires, and the file still renders.
+The only artefact that knows the pin exists is a comment nobody has a reason to open.
+
+**Instance 1 — `attractor_leviathan`.** `zoom` pinned at base 0.72, with a header saying the pin was
+"a fold constraint, not a taste": the figure was held inside the fold's inscribed disc so it could not
+feed the falloff's residual rays. ADR-0061 made the edge a per-preset choice; the pin lifted to 1.80.
+**Two edits, not one** — the second only findable from the comment.
+
+**Instance 2 — `attractor_clifford`.** The identical shape, found second and only because Leviathan
+had taught the lane to look: framing cut from 1.10 base / 1.42 peak to 0.66 / 0.94 purely to keep the
+ribbon's tips off the frame edge, with the note ending *"the general fix is a per-preset edge
+treatment — Plan 0055, approved, not built."* It was built a plan later and the framing stayed cut,
+so the user's report was that the preset was too small to show any difference between the treatments
+— which was true, and was the pin talking.
+
+**A third, already recorded, which is what makes it a pattern rather than a coincidence.**
+`swarm_dense` pinned `kaleido_order = 1` (the fold off) to dodge backlog 0010's clamped-edge smear.
+ADR-0047 fixed that smear; the pin outlived it by a plan, and its comment was *stale twice over* by
+the time anyone read it. Three instances, three engine fixes, three files that kept paying.
+
+**The ask, and it is cheap.** When a plan fixes an engine defect, grep `presets/` for headers citing
+it before the plan closes. The workarounds are **greppable by construction** — this project's preset
+headers name the ADR, the plan, or the backlog entry they are dodging (`design-backlog 0010`,
+`Plan 0055, approved, not built`, `ADR-0065`), which is exactly what makes the sweep a one-line
+search rather than a re-read of the library.
+
+**What it is not.** A request that engine plans re-tune presets. The sweep's output is a *list* — the
+judgement is content work and stays in the content lane. And the pins were right when they were
+written: none of the three is an error, which is the point. A correct workaround for a defect that no
+longer exists is invisible to every instrument this project has, because nothing is wrong.

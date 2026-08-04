@@ -1,14 +1,23 @@
 # 0067 — The curation route: a gate worth trusting, and the preset that has been waiting six weeks
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing. Phases 1-2 are `dev`;
-> **Phase 3 is `human`** (the Coral Oracle pass — declining it is a successful outcome) and gates
-> Phase 4, so the plan does not close in one session. Phase 1 touches `core/tests/reactivity.rs`,
-> adjacent to [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md)'s CI and coverage
-> work — keep that seam clean if both are live. **Moves no pixels.**
+> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing. Phases 1, 1c, 1d and 2
+> are `dev`; **Phase 3 is `human`** (the Coral Oracle pass — declining it is a successful outcome)
+> and gates Phase 4, so the plan does not close in one session. Phase 1 touches
+> `core/tests/reactivity.rs`, adjacent to
+> [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md)'s CI and coverage work — keep
+> that seam clean if both are live. **Moves no pixels.**
 > **Created:** 2026-08-04
+> **Extended:** 2026-08-04 — Phases **1c** and **1d** and a second Phase 4 trigger, from the
+> `preset-author` handoff after `emitter_squall`. All three are about the same thing this plan is
+> already about: the instruments that authorize content. They are additive and independent; if the
+> plan is mid-flight, land them in any order.
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md), supplementing [0017](../adrs/0017-preset-author-skill-lane.md)
-> **Closes:** [design-backlog 0056](../design-backlog.md#0056--a-user-authored-preset-has-been-living-outside-the-repo-for-six-weeks-and-it-is-a-curation-candidate-the-boundary-has-no-route-for)
+> **Closes:** [design-backlog 0056](../design-backlog.md#0056--a-user-authored-preset-has-been-living-outside-the-repo-for-six-weeks-and-it-is-a-curation-candidate-the-boundary-has-no-route-for),
+> [0060](../design-backlog.md#0060--an-engine-fix-leaves-its-preset-side-workarounds-standing-and-only-a-header-comment-remembers-them)
+> (Phase 4's second trigger), and answers
+> [0009](../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
+> (Phase 1d)
 
 ## TL;DR
 
@@ -89,6 +98,79 @@ flowchart TD
 - **Note:** `reactivity` is the right one because it is the only gate whose *question* is about
   audio. The other four ask about the frame and are correct as they stand.
 
+### Phase 1c — The distinctness report covers the families that have presets
+
+- **Owner skill:** dev
+- **Why it is here:** added 2026-08-04 from the `preset-author` handoff after `emitter_squall`
+  landed. The report's family list is a hardcoded array in `core/tests/distinctness.rs:103` whose
+  comment says, in bold, *"the moment a second preset lands in any of these three families, add it
+  here"*. One has. The comment is doing its job; this phase is the response it asked for.
+- **The omission is larger than the note that raised it, and that is the finding.** The comment
+  justifies all three absences by preset count — a pairwise matrix needs two presets to say
+  anything. That premise is stale for two of the three by a wide margin:
+
+  | family | presets today | pairs the report has never measured |
+  |---|---|---|
+  | `emitter` | 2 | 1 |
+  | `reaction_diffusion` | 5 | 10 |
+  | `attractor` | 6 | **15** |
+
+  So the report covers six of nine families and silently omits the two largest outside
+  `fragment_field` — including the family that has had three plans of shape work
+  ([0057](done/0057-the-attractors-compute-path.md), [0059](done/0059-lorenz-finds-its-plane.md),
+  and 0063 in flight) and is the most likely in the library to have converged.
+- **What:** add `Emitter`, `Attractor` and `ReactionDiffusion` to the array. If a family cannot be
+  measured meaningfully by this instrument, **record why in the comment instead of leaving it out** —
+  the array's own docstring is explicit that the reasoning has to be written down rather than
+  inferred from an absence, and that is the property this phase preserves.
+- **Files touched:** `core/tests/distinctness.rs`.
+- **Done when:** the report prints a matrix for all nine families, or names in the comment the
+  mechanical reason a family is absent (not a count that is no longer true). The test is advisory
+  and asserts nothing, so "done" is the report being complete, not a threshold being met.
+- **Watch the cost.** The test renders every preset in every listed family for 60 frames at 128x128.
+  It captures 24 presets today; all nine families is 37, so this is roughly a **54 % increase** in
+  that test's work, on a suite CI already pays for preset sweeps in more than once per push
+  ([Plan 0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 4b measured it). If
+  the wall-clock grows materially, say so rather than absorbing it.
+- **Expect the attractor matrix to be the interesting one and do not act on it here.** Six presets
+  on one map family, several sharing a coefficient idiom, is exactly the configuration
+  `struct_diff` was built to flag. Anything it flags is a *content* finding for the lane, not a
+  reason to hold this phase.
+
+### Phase 1d — The animation gate is measured against the two designs it penalizes
+
+- **Owner skill:** dev
+- **Why it is here:** added 2026-08-04. `core/tests/animation.rs` renders at 96x96 and gates on a
+  whole-frame difference above `ANIM_FLOOR = 0.01`.
+  [Backlog 0009](../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
+  recorded in July that this penalizes two legitimate designs; it has now **rejected a shipped
+  preset's better-looking draft**. `emitter_squall`'s sparse version — the same geometry at a fifth
+  of the density, and the one the author preferred — scored `anim` **0.005** with three of four
+  reactivity bands under 0.02. The shipped density is 5x higher and scores 0.018. That is a gate
+  shaping content.
+- **What:** measure before moving anything. Render both of 0009's cases plus a genuinely static
+  control at a resolution ladder (96 / 192 / 384), and report what the statistic does.
+- **Do the arithmetic first, because half the question is already settled and the phase must not
+  pretend otherwise.** A figure invariant under rotation by `2*pi/k` produces an **identical image**
+  under that rotation, so its whole-frame difference is zero at *every* resolution: Star Rosette's
+  spinning ring is not a resolution problem and no ladder will rescue it. Only the thin-stroke /
+  sparse case is plausibly resolution-bound, and even there it is empirical rather than obvious — a
+  mark smaller than a pixel at 96x96 is lost or aliased rather than area-averaged, so whether the
+  statistic separates *sparse but moving* from *static* is the thing being measured.
+- **Files touched:** `core/tests/animation.rs`, and its floor constant only if the measurement
+  supports moving it.
+- **Done when:** the ladder is measured and one of two things is true — either a resolution is
+  chosen with the floor re-derived at it, with the sparse probe clearing it and the static control
+  still failing; or the measurement shows resolution does not separate them and the phase lands as a
+  recorded negative result plus a comment on the constant. **Both are successful outcomes.** State
+  the CI cost of whatever resolution is chosen: this gate sweeps the whole shipped set, and 384x384
+  is 16x the pixels of 96x96.
+- **The probes are free and both are non-vacuous.** The sparse case is `emitter_squall` with
+  `spawn_rate` cut to a fifth (its header records the failing numbers). The symmetric case is
+  `star_rosette` today. The static control is any preset with its bindings replaced by constants.
+- **Not in scope:** a coverage-aware successor statistic. That was the alternative and it was not
+  taken; if this phase's measurement is negative, *that* is when the design question is real.
+
 ### Phase 2 — The gate says what it can and cannot see
 
 - **Owner skill:** dev
@@ -127,6 +209,27 @@ flowchart TD
   curated preset. The architect's list states the trigger (the plan touched `presets/`) and the
   output (a one-line verdict in the close notes), because a duty with no trigger is the one this
   project has already proved gets skipped.
+
+**A second trigger on the same step, added 2026-08-04 from the `preset-author` handoff
+([backlog 0060](../design-backlog.md#0060--an-engine-fix-leaves-its-preset-side-workarounds-standing-and-only-a-header-comment-remembers-them)):**
+*this plan fixed something a preset could have been framed around.*
+
+- **What:** when a plan fixes an engine defect, grep `presets/` for headers citing it before the
+  plan closes, and list what turns up in the close notes. The output is a **list**, not a re-tune —
+  the judgement is content work and stays in the content lane.
+- **Why it earns a line in a checklist.** Three instances, three engine fixes, three files that kept
+  paying: `attractor_leviathan`'s `zoom` pinned at 0.72 to stay inside the fold's disc (lifted to
+  1.80 a plan after ADR-0061 made it unnecessary); `attractor_clifford`'s framing cut from 1.10/1.42
+  to 0.66/0.94 for the same reason, with a header that literally ended *"the general fix is a
+  per-preset edge treatment — Plan 0055, approved, not built"* and stayed cut after it was built;
+  and `swarm_dense`'s `kaleido_order = 1` dodging a smear ADR-0047 had already fixed, stale twice
+  over by the time anyone read it. **Every one was found by a human opening a comment.** No
+  instrument in this repo can see them, because nothing is wrong: a correct workaround for a defect
+  that no longer exists renders fine and passes every gate.
+- **It is a one-line search by construction.** This project's preset headers name the ADR, plan or
+  backlog entry they are dodging, so `grep -rn "ADR-00NN\|Plan 00NN\|design-backlog 00NN"
+  presets/*.toml` is the whole sweep. That property is worth stating in the skill text, because it
+  is what makes the duty cheap enough to keep.
 
 ## Risks & open questions
 

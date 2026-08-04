@@ -65,6 +65,32 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
     }
 }
 
+/// Fixtures that are **not** one per [`SystemKind`] and still pin a baseline
+/// here (Plan 0063 Phase 4).
+///
+/// The roster above is exhaustive over the enum and must stay that way —
+/// ADR-0023 rests on it, and [`systems_rosters_every_variant`] enforces it. This
+/// is the narrow escape hatch for a **second** fixture of a system already in
+/// the roster, for when the rostered one structurally cannot reach the code
+/// under test.
+///
+/// `attractor_depth` is the case that opened it, and the impossibility is by
+/// design rather than by accident: the roster's `attractor.toml` is **De Jong**,
+/// and ADR-0076 gives every 2-D family an inverse depth extent of exactly `0.0`
+/// — which is precisely what makes the perspective divide, the distance haze and
+/// the depth tint the identity there. No edit to that fixture could exercise a
+/// line of them. A 3-D family with all four levers off their defaults is the
+/// only thing in this suite that would catch a regression in them.
+///
+/// **Captured after the roster loop.** Every pre-existing baseline is therefore
+/// rendered from the device state it always was, so adding this moved none of
+/// them — which matters on WARP, where building GPU resources mid-run is
+/// documented to change what a later capture resolves to.
+const EXTRA_FIXTURES: [(&str, &str); 1] = [(
+    "attractor_depth",
+    include_str!("fixtures/attractor_depth.toml"),
+)];
+
 fn golden_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
@@ -160,8 +186,7 @@ fn scenes_match_golden_baselines() {
     std::fs::create_dir_all(golden_dir()).expect("create tests/golden");
 
     let mut failures = Vec::new();
-    for system in SystemKind::ALL {
-        let (stem, toml) = fixture(system);
+    let mut check = |renderer: &mut Renderer, stem: &str, toml: &str| {
         let preset = Preset::from_toml_str(toml)
             .unwrap_or_else(|e| panic!("golden fixture {stem}.toml is invalid: {e}"));
         let name = preset.name.clone();
@@ -175,7 +200,7 @@ fn scenes_match_golden_baselines() {
         if bless {
             encode(&fresh, &path);
             println!("blessed {}", path.display());
-            continue;
+            return;
         }
 
         assert!(
@@ -194,6 +219,15 @@ fn scenes_match_golden_baselines() {
                 "{stem}: mean {mean:.4} / outlier {outlier} exceeds tolerance"
             ));
         }
+    };
+
+    for system in SystemKind::ALL {
+        let (stem, toml) = fixture(system);
+        check(&mut renderer, stem, toml);
+    }
+    // After the roster, never interleaved with it — see [`EXTRA_FIXTURES`].
+    for (stem, toml) in EXTRA_FIXTURES {
+        check(&mut renderer, stem, toml);
     }
 
     assert!(
@@ -238,4 +272,17 @@ fn systems_rosters_every_variant() {
         SystemKind::VARIANT_COUNT,
         "every SystemKind variant must carry a drift fixture"
     );
+
+    // The off-roster fixtures are held to the same two conditions, and to one
+    // more that only applies to them: a stem colliding with a rostered system's
+    // would have the two silently overwrite each other's baseline.
+    for (stem, toml) in EXTRA_FIXTURES {
+        assert!(
+            !stems.contains(&stem),
+            "extra fixture {stem} collides with a rostered system's baseline file"
+        );
+        stems.push(stem);
+        Preset::from_toml_str(toml)
+            .unwrap_or_else(|e| panic!("extra fixture {stem}.toml is invalid: {e}"));
+    }
 }

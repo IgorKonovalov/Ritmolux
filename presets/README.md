@@ -226,7 +226,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
-| `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
+| `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `size` `size_spread` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` |
 
@@ -241,6 +241,50 @@ see [Colour — the palette surface](#colour--the-palette-surface-plan-0020).
 Every system additionally accepts the engine-stage params `bg_*`, `trails`,
 `kaleido_*`, `bloom_*`, `exposure`, and the final `ink_*`/`paper_*` remap
 documented there.
+
+### Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin` (Plan 0063)
+
+**Three of these four are inert on three of the four families**, the same way
+`a b c d` already carry family-specific meanings. `perspective`, `depth_fade` and
+`depth_hue` do something only on the **3-D families — `thomas` and `lorenz`.**
+On `de_jong`, `clifford` and any other flat figure they are *exactly* the
+identity: those maps have no third coordinate, so the engine hands the shader a
+depth extent of zero and every cue collapses to a no-op. Binding them there is
+not an error and produces no warning — it produces nothing at all.
+
+`spin` is the exception and reaches **all four**. The discrete maps rotate
+in-plane through the same angle, so an audio-driven `spin` is a real look on
+De Jong today. That asymmetry is deliberate; do not read it as an oversight.
+
+| Param | What it does | Range that means something |
+|---|---|---|
+| `perspective` | Near material grows and far material shrinks, position and point size together. Segments foreshorten, because both endpoints project independently. | `0` (orthographic, the default) .. `0.8` |
+| `depth_fade`  | Attenuates brightness with distance — the substitute for occlusion, which this scene does not do. `1` takes the far end to black. | `0` (off) .. `1` |
+| `depth_hue`   | Shifts the palette coordinate by `±depth_hue/2` across the depth range, so distance moves *colour* as well as contrast. | `0` (off) .. ~`0.4` before it reads as two figures |
+| `spin`        | Rate multiplier on the display rotation. `1` is unchanged, `0` holds the figure still, negative reverses it. | any |
+
+Four things you cannot discover by binding them:
+
+- **`perspective` is clamped at `0.8`, silently.** A preset asking for more gets
+  the ceiling, not a warning — the same undiscoverable-ceiling shape
+  `bloom_threshold` and `vigor` already carry. The number means the figure's
+  depth half-extent as a fraction of the camera distance, so the near-to-far
+  magnification ratio is `(1 + p) / (1 - p)`: `0.5` gives 3:1, `0.8` gives 9:1,
+  and the singularity would be at `1`.
+- **`perspective` fights `zoom`.** The magnification is applied *before* the view
+  transform, so raising it makes the figure **bigger** as well as deeper, and
+  recovering your framing is a `zoom` edit. It is not a focal length.
+- **`spin` is a multiplier on 0.18 rad/s**, i.e. `spin = 1` is one revolution per
+  **34.9 seconds**. That is slow enough that a viewer never accumulates motion
+  evidence about which way a 3-D figure is turning, which is part of why they
+  read as flat; `2`–`4` is where the rotation starts being legible. The phase is
+  integrated, so a `spin` bound to audio *accelerates* the figure rather than
+  snapping it to a new angle.
+- **The illusion has a density limit and haze does not remove it.** Nothing
+  occludes anything here — two strands crossing simply sum — so as
+  `[particles] density` rises the figure reads more and more as X-ray whatever
+  these are set to. If depth stops reading, lower `density` before raising
+  `perspective`.
 
 ### Attractor detail sharpness (Plan 0027)
 
@@ -694,8 +738,20 @@ and why those pins are now unnecessary.
 
 An audio-tintable gradient + vignette backdrop drawn *before* the scene, engine-
 wide. `bg_bright = 0` (the default) is a black backdrop; raise it to reveal the
-gradient. `bg_hue` offsets into the shared cosine palette; `bg_vignette` (0..1)
-darkens the corners. Visible wherever the scene leaves the frame unpainted: behind
+gradient. `bg_hue` offsets into a cosine ramp; `bg_vignette` (0..1)
+darkens the corners.
+
+**`bg_hue` does not read your `[palette]`, and this is the one place in the
+colour surface where that is true.** The background pass carries its own copy of
+the default `spectrum` cosine and binds no LUT, so `bg_hue` walks that ramp
+whatever gradient the preset declares, and `saturation` / `palette_mix` do not
+reach the backdrop at all. The upside is that the ramp is already tabulated:
+`bg_hue` `0.30` is cornflower blue, `0.45` aqua, `0.85` amber — the twenty-row
+swatch table in
+[`docs/preset-palettes.md`](../docs/preset-palettes.md#the-line-scenes-cosine-ramp--what-hue-actually-looks-like)
+is the same ramp. [ADR-0086](../docs/adrs/0086-the-backdrop-colours-through-the-preset-palette.md) /
+[Plan 0072](../docs/plans/0072-the-backdrop-joins-the-palette.md) change this; until they land,
+tune `bg_hue` against that table rather than against your own stops. Visible wherever the scene leaves the frame unpainted: behind
 the **sparse** scenes (lines, swarm, attractor) where the gaps show through, and —
 since Plan 0025 — in the **reaction-diffusion** field's voids (both scenes now
 composite over the backdrop instead of presenting opaque). The **fragment field**
