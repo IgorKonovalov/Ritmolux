@@ -2,7 +2,7 @@
 
 > **Subsystem:** The lock-free SPSC ring buffer that decouples audio from render, and the pure-function DSP that consumes it (FFT/spectrum, onset, tempo/beat).
 > **Source:** `lmv-ring/` (the SPSC ring itself, a zero-dependency workspace member), `core/src/audio.rs` (format validation + the re-exported producer/consumer handles), `core/src/dsp/` (analysis).
-> **Reconciled-through:** Plan 0005 (ring extracted to `lmv-ring`, Miri gate live in CI); Plan 0032 (the ring→analyzer→renderer seam now has a test); Plan 0048 (analysis v2 — the dual-resolution axis, running normalization, and the beat/downbeat clock, which is what moved the determinism invariant below from *window* to *stream*). Reconciled 2026-08-03.
+> **Reconciled-through:** Plan 0005 (ring extracted to `lmv-ring`, Miri gate live in CI); Plan 0032 (the ring→analyzer→renderer seam now has a test); Plan 0048 (analysis v2 — the dual-resolution axis, running normalization, and the beat/downbeat clock, which is what moved the determinism invariant below from *window* to *stream*); Plan 0060 (which scoped the bit-identity clause to one build on one machine, after a frozen-literal test read as though cross-architecture reproduction followed from it). Reconciled 2026-08-04.
 > **Governing ADRs:** [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) (core owns DSP + the audio/render split); [0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (normalization is analysis-layer state); [0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) (the beat clock and the gated bar trio); CLAUDE.md non-negotiables; Plan 0005 (Miri UB gate).
 
 ## Invariants
@@ -22,6 +22,7 @@
   reads, no unseeded randomness, no ambient state. The same sequence of hops fed to a freshly
   constructed `Analyzer` MUST produce a bit-identical sequence of analysis frames. (CLAUDE.md
   "determinism where it's testable")
+- **That bit-identity is scoped to one build on one machine** ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md), Plan 0060). It is exactly what `analysis_is_deterministic` asserts, and it asserts it by running both analyzers in a single process. Reproduction of the *same bits* across architectures, toolchains or optimization levels is deliberately **not** claimed: `f32::sin` lowers to the platform libm and `rustfft` dispatches NEON on aarch64 where it dispatches AVX/SSE on x86_64, so identical input legitimately lands tens of ULP apart — the `macos-26-arm64` runner reads within `2e-5` relative of the x86_64 `*_raw` levels. A test that freezes measured bits is therefore a measurement pinned to its architecture, not a consequence of this invariant.
 - **The unit of determinism is the stream, not the window** (Plan 0048 / ADR-0049 + ADR-0050).
   The spectrum, `*_raw` and BPM still resolve from their window, but `bass`/`mid`/`treb`/`onset`
   divide by a running peak, and `beat_index`/`bar_index` count, so the *same* window read at two
