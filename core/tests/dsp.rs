@@ -103,7 +103,7 @@ fn sine_energy_concentrates_in_expected_band() {
 }
 
 /// Plan 0048 Phase 2 done-when: `*_raw` reproduce the pre-ADR-0049 values
-/// **bit-exactly**.
+/// **bit-exactly** — on x86_64, which is where they were measured.
 ///
 /// The four literals below are not a re-derivation of this build's own output —
 /// they were measured by running this exact fixture against `92579ef`, the commit
@@ -115,6 +115,23 @@ fn sine_energy_concentrates_in_expected_band() {
 /// window there, and the raw levels come from the **short** window's magnitudes
 /// via `bands.rs`, which neither phase touched. The longer warm-up gate moves
 /// which hop publishes *first*, not what the window contains at hop 200.
+///
+/// **This is a measurement, not a property** ([ADR-0071]). Those bits belong to
+/// one configuration and cannot reproduce on another: the fixture builds its own
+/// input with `f32::sin`, which lowers to the platform libm, and `rustfft`
+/// dispatches NEON on aarch64 where it dispatches AVX/SSE here — two sets of
+/// rounding applied to two slightly different inputs. On `macos-26-arm64`
+/// `bass_raw` lands about 71 ULP away and always has. So the comparison names the
+/// architecture it came from and does not run outside it; elsewhere it prints
+/// every observed level with its relative error, in the [ADR-0016] skip-with-notice
+/// shape, so the configuration it declines to gate is still visible in the log.
+///
+/// The counter-assertion below — that normalization is not a no-op — needs no
+/// frozen number and runs **everywhere**, so the test is not vacuous where the
+/// bit comparison is pinned out.
+///
+/// [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
+/// [ADR-0016]: ../../docs/adrs/0016-gpu-tests-opt-in-ci-scope.md
 #[test]
 fn raw_levels_are_bit_identical_to_the_pre_normalization_build() {
     let mut analyzer = mono_analyzer();
@@ -137,17 +154,43 @@ fn raw_levels_are_bit_identical_to_the_pre_normalization_build() {
     }
     let frame = at_200.expect("the fixture is long enough to reach hop 200");
 
-    for (name, actual, expected) in [
+    // The reference reading, as `92579ef` produced it on x86_64.
+    let reference = [
         ("bass_raw", frame.bass_raw, 0x3865_9855u32),
         ("mid_raw", frame.mid_raw, 0x3bd5_81b5),
         ("treb_raw", frame.treb_raw, 0x35f3_1745),
         ("onset_raw", frame.onset_raw, 0x3486_5371),
-    ] {
-        assert_eq!(
-            actual.to_bits(),
-            expected,
-            "{name} = {actual} must reproduce the pre-ADR-0049 value bit-for-bit"
+    ];
+
+    if cfg!(target_arch = "x86_64") {
+        for (name, actual, expected) in reference {
+            assert_eq!(
+                actual.to_bits(),
+                expected,
+                "{name} = {actual} must reproduce the pre-ADR-0049 value bit-for-bit"
+            );
+        }
+    } else {
+        eprintln!(
+            "skipped: the frozen raw-level bits are a measurement taken on x86_64 \
+             against 92579ef and do not reproduce on {} (ADR-0071). Observed here:",
+            std::env::consts::ARCH
         );
+        // Printed in full rather than compared: reporting every level, not just the
+        // first divergent one, is the whole point of not asserting them here.
+        for (name, actual, expected) in reference {
+            let want = f32::from_bits(expected);
+            let rel = if want == 0.0 {
+                if actual == 0.0 { 0.0 } else { f32::INFINITY }
+            } else {
+                ((actual - want) / want).abs()
+            };
+            eprintln!(
+                "  {name}: observed 0x{:08x} = {actual:e}, reference 0x{expected:08x} = {want:e}, \
+                 relative error {rel:e}",
+                actual.to_bits()
+            );
+        }
     }
 
     // The counter-assertion that stops this from being a tautology: the

@@ -3172,6 +3172,15 @@ mod tests {
         )
     }
 
+    /// The mean per-channel difference `core/tests/golden.rs` calls cross-rasterizer
+    /// drift rather than signal (its `MEAN_TOL`, per [ADR-0023]). Reused here only as
+    /// a **lower bound on the control**: a denominator that sits inside the declared
+    /// noise band cannot calibrate anything above it. Mechanism-derived rather than
+    /// measured — the control peak reads `0.4078` on the local WARP, 20x this.
+    ///
+    /// [ADR-0023]: ../../docs/adrs/0023-golden-drift-guard-uses-frozen-fixtures.md
+    const NOISE_FLOOR: f32 = 0.02;
+
     /// **Both visuals animate through a dual-live dissolve.** Same presets, same
     /// `dt` sequence, same blend kind — only the fidelity differs, so any pixel
     /// difference is the outgoing side still rendering.
@@ -3179,6 +3188,23 @@ mod tests {
     /// The opening frame must be *identical* in both modes: it is the outgoing
     /// preset's own composite either way, before dual-live has anything extra to
     /// do. That pins the assertion to the dissolve rather than to a warm-up drift.
+    ///
+    /// **What is asserted is exact, not a threshold** ([ADR-0071]). A dual-live
+    /// dissolve that wrongly held the outgoing side would be doing precisely the
+    /// work freeze does, and this project's determinism contract makes that
+    /// byte-identical at *every* frame — the opening-frame `assert_eq!` above is the
+    /// demonstration that two separate runs do reproduce each other byte for byte.
+    /// So "the two modes differ somewhere in the window" needs no number, where the
+    /// floor it replaces (`frame_diff > 0.01`) was half of [`NOISE_FLOOR`] and so
+    /// was made inside the band this project already calls noise.
+    ///
+    /// The cost of an exact-zero claim is that it says nothing about **magnitude**;
+    /// the control series and the ratio printed below are what Plan 0060 Phase 3
+    /// calibrates that half against, from the runners' own readings rather than this
+    /// box's. Until then the control is asserted non-trivial, so a dissolve that is
+    /// not dissolving cannot satisfy the test by standing still.
+    ///
+    /// [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
     #[test]
     fn dual_live_keeps_the_outgoing_side_animating() {
         const FRAMES: usize = 40;
@@ -3194,11 +3220,52 @@ mod tests {
             "the opening frame is the outgoing composite in either mode"
         );
 
-        let mid = frame_diff(&frozen[FRAMES / 2], &live[FRAMES / 2]);
+        // Signal: what the fidelity changed. Control: what the dissolve does anyway,
+        // read on the same adapter in the same run, so the rasterizer cancels out of
+        // their ratio.
+        let signal: Vec<f32> = frozen
+            .iter()
+            .zip(live.iter())
+            .map(|(f, l)| frame_diff(f, l))
+            .collect();
+        let control: Vec<f32> = frozen.iter().map(|f| frame_diff(&frozen[0], f)).collect();
+        let peak = |series: &[f32]| series.iter().copied().fold(0.0f32, f32::max);
+        let peak_signal = peak(&signal);
+        let peak_control = peak(&control);
+        let mean_signal = signal.iter().sum::<f32>() / signal.len() as f32;
+
+        let series = |s: &[f32]| {
+            s.iter()
+                .map(|v| format!("{v:.4}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        eprintln!("dual-live vs freeze, {FRAMES} frames on this adapter (ADR-0071 report):");
+        eprintln!(
+            "  signal  frame_diff(frozen[i], live[i]):  {}",
+            series(&signal)
+        );
+        eprintln!("  signal  peak {peak_signal:.6}  mean {mean_signal:.6}");
+        eprintln!(
+            "  control frame_diff(frozen[0], frozen[i]): {}",
+            series(&control)
+        );
+        eprintln!("  control peak {peak_control:.6}");
+        eprintln!(
+            "  ratio   peak signal / peak control = {:.6}",
+            peak_signal / peak_control
+        );
+
         assert!(
-            mid > 0.01,
-            "mid-dissolve the outgoing side must still be moving, not held \
-             (freeze vs dual-live differ by only {mid})"
+            peak_signal > 0.0,
+            "over {FRAMES} frames dual-live never differed from freeze by a single \
+             byte, which is what holding the outgoing side would produce"
+        );
+        assert!(
+            peak_control > NOISE_FLOOR,
+            "the control is trivial (peak {peak_control} at or under the {NOISE_FLOOR} \
+             noise floor) — this dissolve is not dissolving, so it cannot calibrate \
+             the signal"
         );
     }
 
