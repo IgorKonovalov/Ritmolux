@@ -831,7 +831,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `sanity` | HARD | every preset lights a minimum coverage, spans ≥2 quadrants **against its own background** (not blank, not a dot), and has some **tonal structure** — no more than 90 % of its lit pixels inside one of 16 luminance bands (not a blot). The third check is Plan 0056 Phase 5: a saturated single-tone mass satisfies the first two completely, which is how four attractor presets shipped flat. Threshold measured from the library's own distribution, printed on every run. `Spectrum Ridge` is listed in `KNOWN_FLAT` — it measures `1.000` today, and the test says so rather than gating on it |
 | `beat` | HARD | a 120 BPM click track through the **real** DSP makes a beat-accent preset render differently on-beat vs off-beat; a zeroed beat binding does not |
 | `distinctness` | ADVISORY | prints per-family pixel + shape pairwise matrices and flags near-duplicate geometry; never asserts |
-| `golden` | HARD (tolerance) | one **frozen fixture per system** matches its committed baseline PNG within a mean + max-outlier tolerance ([ADR-0023](adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)) |
+| `golden` | HARD (tolerance) | one **frozen fixture per system**, plus the `EXTRA_FIXTURES` escape hatch below, matches its committed baseline PNG within a mean + max-outlier tolerance ([ADR-0023](adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)) |
 | `composite` | HARD (tolerance) | the **post stages**, one fixture each and never all at once — `trails`, `kaleido_*`, `bloom_*`, plus one that binds **no** stage and guards the composite's *arithmetic* (its assertion is that no channel of *that fixture* reaches 255 — a claim about the fixture, not a general property of the curve; see the re-bless note below). Captured at **160x100**, a size whose internal grid is *not* the target's shape, so an aspect error is visible ([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) |
 | `bloom` | HARD (relative) | the bloom stage's behaviour, beside its baseline rather than in it: halo **energy** rises with `bloom_amount`, halo **extent** rises with `bloom_radius`, the rich tier's deeper pyramid reaches further than the floor's, and the halo is **round**. Captured at **256x256** — square, and load-bearing: the roundness guard is what catches a separable kernel whose two passes step in different units, and it reads 1.001 today against 7.05 under the defect it was written for. No magic numbers: every assertion compares two captures of one fixture differing in one bound param |
 | `reaction_diffusion` | HARD | the first stateful-feedback scene: seed reproducibility, regime response ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
@@ -852,6 +852,20 @@ is a deliberately minimal preset per `SystemKind`, committed alongside
 *behaviorally* (`sanity` / `reactivity` / `animation`) so the `preset-author` lane can
 tune them freely without re-blessing pixels. A new `SystemKind` variant fails
 `golden.rs` to **compile** until its fixture exists (exhaustive match, no wildcard arm).
+
+**One narrow exception: `EXTRA_FIXTURES`** (Plan 0063). A *second* fixture for a system
+already in the roster, for when the rostered one structurally cannot reach the code under
+test. `attractor_depth.toml` opened it and is so far the only entry: the rostered
+`attractor.toml` is **De Jong**, and [ADR-0076](adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md)
+gives every 2-D family an inverse depth extent of exactly `0.0` — which is precisely what
+makes the perspective divide, the distance haze and the depth tint the identity there, so
+no edit to that fixture could execute a line of them. The list is **captured after the
+roster loop, never interleaved with it**, so every pre-existing baseline renders from the
+device state it always did (which matters on WARP, where building GPU resources mid-run
+changes what a later capture resolves to). `systems_rosters_every_variant` holds it to the
+roster's own two conditions plus one of its own: a stem colliding with a rostered system's
+would have the two silently overwrite each other's baseline. The roster stays exhaustive —
+ADR-0023 rests on that and this does not weaken it.
 
 `core::signal` (pure, zero-dep) synthesizes the test audio; `core::render::metrics`
 (pure) provides `frame_diff`, `struct_diff`, `coverage`, and `quadrant_spread`,

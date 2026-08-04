@@ -1,14 +1,26 @@
 # 0063 — The attractor keeps its depth: perspective, haze, and a spin you can drive
 
-> **Status:** **in-progress 2026-08-04** — Phases 1-4 are `dev` and nothing gates
-> them, so they run start-to-finish in one session; **Phase 5 is `human`** (a `preset-author` pass
-> over the two 3-D presets), so the plan does not close in that session.
+> **Status:** **done 2026-08-04** — all five phases landed. Phases 1-4 (`dev`): `1f0fc41` the depth
+> survives and pays for perspective, `6cd0d52` the two atmospheric cues, `c3c43d8` the integrated
+> `spin`, `6f27462` the `attractor_depth` golden fixture. Phase 5 (`human`, the `preset-author`
+> pass): `1855340` — both 3-D presets re-tuned, three findings routed to
+> [design-backlog](../../design-backlog.md) 0061-0063. Mode 4 review: **no blockers, one major, two
+> minor.** Verified: every one of the fourteen pre-existing golden baselines is byte-identical and
+> the new one is the only addition; the mirror-identity property test is dimensionless algebra on
+> the formula rather than a capture; the new fixture's sensitivity was *demonstrated* by
+> neutralizing each of the four levers in turn and re-measuring, which caught a first-draft
+> `depth_fade = 0.6` the guard would have slept through; the aspect still comes from the render
+> target, not the accumulation grid (ADR-0037). The major finding is that Phase 5's measurement
+> **falsified this plan's and ADR-0076's framing claim** — `perspective` chiefly *translates* the
+> figure (~0.9x in NDC, phase-varying) rather than enlarging it (6 % across the legal range), so
+> "recover the framing with a `zoom` edit" is advice that cannot work; ADR-0076 is accepted with a
+> dated Outcome section and `presets/README.md` is corrected at this close.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md) (this
-> plan's decision), [0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) (the
+> **Related ADRs:** [0076](../../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md) (this
+> plan's decision), [0044](../../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) (the
 > swarm's depth axis — the precedent this deliberately departs from),
-> [0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) (the per-family basis this
+> [0068](../../adrs/0068-the-projection-basis-is-a-per-family-property.md) (the per-family basis this
 > derives the depth axis from)
 
 ## TL;DR
@@ -53,7 +65,7 @@ blending changes, and the accumulation *is* the scene — the user's explicit ca
 seeded-`z` parallax model (strictly worse for the 3-D families since perspective derives size and
 parallax as one consistent term, and a lie the 2-D figures contradict), and volumetric raymarching
 (a different renderer for a different look, which trades away the glow). Full reasoning in
-[ADR-0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md).
+[ADR-0076](../../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md).
 
 ## Architecture diagram
 
@@ -227,7 +239,7 @@ impl AttractorFamily {
   correctly, but its width is uniform. A tapered capsule means the fragment's distance function
   interpolates a radius, which reworks ADR-0069's single-expression point/segment unification.
   Deliberately out of scope; a followup if Phase 5 wants it.
-- **[Plan 0062](0062-the-chaos-game-grows-a-fern.md) and [Plan 0061](0061-the-build-stops-paying-for-what-it-is-not-building.md)
+- **[Plan 0062](../0062-the-chaos-game-grows-a-fern.md) and [Plan 0061](../0061-the-build-stops-paying-for-what-it-is-not-building.md)
   both touch `particles/mod.rs`.** This plan edits `project()`, the vertex shader and `PARAMS` — 0062
   adds a family and a new `ifs.rs`, 0061 Phase 6 splits the file. All three overlap only in the
   family enum's method set, where each adds an arm or a method rather than changing one. Whichever

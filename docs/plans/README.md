@@ -15,8 +15,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | [0062](0062-the-chaos-game-grows-a-fern.md) | The chaos game grows a fern: an IFS family that morphs between figures (`AttractorFamily::Ifs`, five curated tables in SVD form, safe-by-construction morph + four levers) | **approved 2026-08-04** — ready for `dev`; designed from the user's Barnsley-fern question; [ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md). **The first half of a deliberate two-plan split** (the user's call at interview): this one lands the *figure* — the family, the roster, the morph, the levers — so a real fern can be judged in motion; the successor carries the **unfurl and the depth/per-map colour**, which are the same per-particle channel and are tuned against a figure already known to be right. Adds **no** render idiom, no `Scene` change, no C ABI change, no dependency — the `attractor` scene is already a GPU chaos game and this is a fifth family plus one shader branch. **Phase 7 is `human`** (a `preset-author` pass judging levers against real audio), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
 
-| [0063](0063-the-attractor-keeps-its-depth.md) | The attractor keeps its depth: perspective, haze, and a spin you can drive (`perspective`, `depth_fade`, `depth_hue`, `spin`) | **approved 2026-08-04** — ready for `dev`; designed from the user's "can we make strange attractors more 3D looking"; [ADR-0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md). The 3D families read flat because `project()` computes a view depth and **discards** it, leaving an orthographic projection whose rotation is perceptually bistable (the image at rotation pi is the exact x-mirror of the image at 0). Keeps the depth; spends it on perspective + two atmospheric cues; **no sorting, no occlusion** (the user's call — the accumulation is the scene). **The 2D families are untouched by arithmetic rather than by a default**, so `core/tests/fixtures/attractor.toml` (De Jong) cannot move. Also closes a gap the question surfaced: `SPIN_RATE` is a `const` no preset can reach, and every 3D attractor turns at one revolution per **34.9 s** forever. **Phase 5 is `human`** (a `preset-author` pass over the two 3D presets), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
-
 | [0064](0064-the-symmetry-stage-and-the-banded-palette.md) | The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour (`kaleido_radial`/`spiral`/`zoom`/`tile`/`inner`, `palette_steps`/`palette_contour`) | **approved 2026-08-04** — ready for `dev` **after [0055]**; from the user's five reference images; [ADR-0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) + [ADR-0078](../adrs/0078-banding-is-a-palette-coordinate-operation.md). Covers **three** of the five images, and applies to **every scene** because it is screen-space. The engine already has half the mechanism: periodicity in `theta` is the fold, periodicity in **`log r`** is the missing concentric self-similarity. **Both halves are one plan on purpose** — neither alone reproduces the references, and the user chose to decide the look from a rendered sample set that has to show the combination. **Phase 4 is `human`** (pick defaults and ranges from the grid) and gates Phases 5-6, so it does not close in one session. **Collides with [0055]** in `kaleidoscope.rs` — taking 0055 first is the cheaper order. Moves **no** existing golden baseline; adds one | dev, human |
 | [0065](0065-the-mandala-interior.md) | The mandala interior: `star_pattern` stops being hollow (a `rings` roster of motif / count / radius / scale / phase on `[generator]`) | **approved 2026-08-04** — ready for `dev`, gated by nothing; the fourth reference image; [ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md). **Closes the still-open half of [backlog 0034 → 0007](../design-backlog.md)** — the "hollow ring" finding with the user's standing *invest, do not cut* call on it, live since 2026-07-26 and never specified until the reference image arrived. Line geometry, so it **shares nothing** with [0055] or [0064] and can run in parallel with either. **Phase 3 is `human`** (pick the motif roster from a rendered grid) and gates Phases 4-6. Watch the `animation.rs` gate: a ring mandala is *more* rotationally symmetric than `star_rosette`, so spin alone will not pass it ([backlog 0009](../design-backlog.md)) — Phase 4 designs around it. Moves **no** golden baseline at all | dev, human |
 
@@ -39,9 +37,9 @@ preference, and a session may take any plan here.
 | # | Plan | Why here | Closes in one session? |
 |---|------|----------|------------------------|
 | 1 | [0069] | **The only plan in the roster that closes in one session** — no `human` phase at all. Protective, moves no pixels, and it replaces a measure Plan 0058 proved cannot work with one that can. Shares no file with anything live | **Yes** |
-| 2 | [0063] | **Soft constraint: better before [0062].** It adds `inv_depth_extent()` as an exhaustive match over `AttractorFamily`, so 0062 adding a fifth family is then **compiler-forced** to answer it. The reverse order relies on remembering | No — Phase 5 is `human` |
-| 3 | [0062] | Adjacent to 0063 in `particles/mod.rs`, so one session holds the file's context | No — Phase 7 is `human` |
-| 3b | [0066] | **Soft constraint: after [0062]/[0063].** All three add to `particles/mod.rs`, and this one adds a param to the same `PARAMS`/`set_param` pair they extend — taking it third means one rebase instead of two. Independent of them in every other respect | No — Phase 5 is `human`, terminal |
+| ~~2~~ | ~~[0063]~~ | **Closed 2026-08-04** — see Recently closed. Its soft constraint **has been discharged in the direction it wanted**: `inv_depth_extent()` now exists as an exhaustive match over `AttractorFamily`, so [0062] adding a fifth family is **compiler-forced** to answer it (with `0.0` — its IFS figures are 2-D) | — |
+| 2 | [0062] | Adjacent to the now-closed [0063] in `particles/mod.rs`, and it inherits that file with four new params, an `inv_depth_extent()` it must answer, and a `projection_mirror` test module mirroring the draw shader | No — Phase 7 is `human` |
+| 2b | [0066] | **Soft constraint: after [0062].** Both add to `particles/mod.rs`, and this one adds a param to the same `PARAMS`/`set_param` pair — which [0063] has already grown by four, so read that file before estimating. Independent of it in every other respect | No — Phase 5 is `human`, terminal |
 | 4 | [0065] | **Gated by nothing and shares no file with anything** — line geometry against a post chain and a particle scene. The safest parallel lane, and it can run *alongside* 1-3 rather than after them | No — Phase 3 is `human`, mid-plan |
 | 4 | [0064] | **Unblocked — [0055] has landed**, so the `kaleido_edge` branch it composes against is in place. Still deliberately after the attractor work rather than concurrent with it: its Phase 3 sample grid renders on `attractor_lorenz` as one of three sources, and [0063] changes what that source looks like. A look decision taken against a moving target is one that has to be retaken. **Read [0055]'s Recently-closed entry** — the fold's default is now `tile`, not the disc 0064 was drafted against | No — Phase 4 is `human`, mid-plan |
 | 5 | [0053] | Protective rather than additive; moves no pixels. Its `human` Phase 3 is runnable on this box after the 2026-08-04 premise correction. **Read BOTH [0052]'s and [0055]'s Recently-closed entries first** — each moved a bind-group layout 0053 asserts on, and neither moved in the direction 0053 predicted | No — Phase 3 is `human` |
@@ -56,10 +54,10 @@ preference, and a session may take any plan here.
 
 **[0069] is now the only plan in the roster that closes in one session** — every other one carries a
 `human` phase. That makes it the obvious pick for a session that wants a finished thing rather than
-a decision owed. **If you want the most visible change per session**, take [0063] then [0062], then
-[0066] while `particles/mod.rs` is still in context. **If a second lane is running in parallel**,
-give it [0065] or [0070]: line geometry and particle silhouettes respectively, and neither collides
-with anything.
+a decision owed. **If you want the most visible change per session**, take [0062] then [0066] while
+`particles/mod.rs` is still in context — [0063] was the first leg of that run and closed 2026-08-04.
+**If a second lane is running in parallel**, give it [0065] or [0070]: line geometry and particle
+silhouettes respectively, and neither collides with anything.
 
 ### The six plans added 2026-08-04, and why they exist
 
@@ -89,20 +87,21 @@ the rows above.
 
 ### What to take once [0052] and [0055] close (asked 2026-08-04, both lanes live)
 
-**[0063] then [0062], in one lane, sequentially — and [0065] in a second if you want two.** The
-reason is not novelty but **uninterrupted `dev` phases**, which is the scarce thing now that six of
-the ten plans carry a `human` phase:
+**Answered [0063] then [0062]; [0063] was taken the same day and closed, so what stands of this is
+[0062].** The reason was not novelty but **uninterrupted `dev` phases**, which is the scarce thing
+now that most plans here carry a `human` phase:
 
 | Plan | `dev` phases before the first stop | Where the `human` phase sits |
 |------|-----------------------------------|------------------------------|
-| [0063] | **4** (Phases 1-4) | **terminal** — Phase 5 is the content pass, all code done |
+| ~~[0063]~~ | ~~**4** (Phases 1-4)~~ | **closed 2026-08-04** — the shape held exactly: four `dev` phases in one session, then a terminal content pass |
 | [0062] | **6** (Phases 1-6) | **terminal** — Phase 7 is the content pass, all code done |
 | [0065] | 2 (Phases 1-2) | **mid-plan** — Phase 3 gates Phases 4-6 |
 | [0064] | 3 (Phases 1-3) | **mid-plan** — Phase 4 gates Phases 5-6 |
 
-So [0063] + [0062] is **ten `dev` phases with no mid-plan stop**, in one file's context, with the
-ordering compiler-enforced rather than remembered. Both then wait only on a content pass, which is
-the cheapest kind of `human` phase — the code is finished and reviewable either way.
+The pairing was **ten `dev` phases with no mid-plan stop**, in one file's context, with the ordering
+compiler-enforced rather than remembered. [0063]'s half is spent and it closed on the prediction:
+Phases 1-4 landed in one session and the terminal content pass was the only `human` stop. [0062]'s
+six remain, and it now inherits a `particles/mod.rs` that [0063] grew by roughly 950 lines.
 
 [0064] and [0065] are the opposite shape: each delivers a rendered sample grid in two or three
 phases and then **stops until judged**. That is not a defect — it is the workflow the user chose —
@@ -115,21 +114,23 @@ held ~8 GB in `target/debug/incremental` and filled the disk mid-session), and `
 fails with `Permission denied` on Windows while any shell still has its working directory inside.
 
 
-**[0063] IS LIVE (2026-08-04), AND IT IS RUNNING IN THE MAIN CHECKOUT ON `main` — NOT IN A
-WORKTREE.** `git worktree list` shows only the main checkout, and `core/src/render/scenes/particles/mod.rs`
-carries several hundred uncommitted lines (`inv_depth_extent`, `DEFAULT_PERSPECTIVE`,
-`MAX_PERSPECTIVE`) — Phase 1, possibly reaching into Phase 2, of four `dev` phases. Its plan file's
-status line is flipped to `in-progress` in the working tree but not yet committed. **This is a
-deviation from [ADR-0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md), and its one practical
-consequence is that the main checkout's working tree is occupied**: a second lane cannot use it and
-must open its own worktree, and `cargo release` will refuse for whichever plan closes while the
-other is dirty (do the manual three-step bump then — never `--allow-dirty`, which is not
-pathspec-scoped).
+**NO LANE IS LIVE AS OF 2026-08-04, LATE.** [0063] and [0036] both closed that day and `main` is at
+`v0.37.0`. The main checkout's working tree is free again, and `lmv-plan-0036`'s worktree is spent —
+**remove it before opening the next lane** (`git worktree remove`; on Windows it fails with
+`Permission denied` while any shell still has its working directory inside).
 
-**A second, content-lane session is also live on `main`** — `859ec66` (the eleven fold-binding
-presets' edge treatments, [backlog 0058](../design-backlog.md)) and `f6c56dc` (`emitter_squall`) are
-`preset-author` commits landed directly. So `presets/*.toml` is contended too, though `0063` touches
-only `attractor_*` among them.
+**What that day taught, kept because it will recur.** [0063] ran **in the main checkout on `main`,
+not in a worktree** — a deviation from [ADR-0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md),
+and its practical consequence was exactly the predicted one: the main working tree was occupied, so
+[0036] had to open its own lane, and the two closes had to be **sequenced rather than raced** —
+`cargo release` aborts on *any* dirty file, and two version bumps racing for one tag sequence is the
+failure this ordering avoids. [0036] closed first and took `v0.36.0`; [0063] closed second against
+what `main` had actually reached, not against its own base. A **third**, content-lane session was
+live on `main` the same day (`859ec66`, `f6c56dc`) and a parallel architect session committed
+`9d2de68` — which swept `presets/README.md` while [0063] Phase 4's copy of that sweep was still
+unstaged. Nothing was lost, but the phase commit does not contain the doc it promised, and only its
+commit message says where it went. **Three lanes on one branch is the condition under which that
+happens.**
 
 **Precedent for running two at once: [0052] and [0055] did, and it held.** They shared no files
 (0052 is `scenes/particles/`, 0055 is `post/kaleidoscope.rs`); neither touched the other's code, and
@@ -137,11 +138,10 @@ the merged tip gated green in one run. The pair deliberately *not* run together 
 which collide on the bind-group layout roster 0053 asserts on — **and both closed plans have now
 moved that roster**, so read both Recently-closed entries before starting [0053].
 
-**Safe to open beside [0063] right now:** [0036] (packaging + a new workflow file; touches **no**
-Rust at all, so it cannot conflict even at the compile level), [0065] (line geometry) and [0070]
-(`swarm.rs` + `emitter.rs`). **Not safe:** [0062] and [0066], which both extend the same
-`PARAMS`/`set_param` pair in the file [0063] is rewriting — they are sequenced *after* it for
-exactly this reason.
+**Which pairs are safe now:** [0065] (line geometry) and [0070] (`swarm.rs` + `emitter.rs`) collide
+with nothing and with each other. **Not safe as a pair:** [0062] and [0066], which both extend the
+same `PARAMS`/`set_param` pair in `particles/mod.rs` — a pair [0063] has already grown by four
+names. Sequence them.
 
 **[0055] PHASE 2'S VERDICT IS KEPT HERE PERMANENTLY, not because the lane is live but because it is
 a human judgement no commit can re-derive.** It was decided in the running app on 2026-08-04 against
@@ -807,6 +807,54 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0063 — The attractor keeps its depth](done/0063-the-attractor-keeps-its-depth.md) — **done
+  2026-08-04**, Mode 4 review **no blockers, one major, two minor**. Phase 1 `1f0fc41`, Phase 2
+  `6cd0d52`, Phase 3 `c3c43d8`, Phase 4 `6f27462`, the `human` Phase 5 content pass `1855340`. Ran
+  **in the main checkout on `main`, not in a worktree** — a deliberate ADR-0053 deviation, recorded
+  here because it shaped the whole day: it occupied the main working tree, so [0036] had to open its
+  own lane, and the two closes had to be sequenced rather than raced.
+  [ADR-0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md) is **accepted with an
+  Outcome section**. Full gate green (487 tests, 0 skipped) over both lanes' code.
+
+  **The three-D families stop being bistable, and the property is pinned as algebra rather than as a
+  picture.** `project()` computed the rotation's third output and discarded it, so the image at
+  rotation `pi` was the exact `x`-mirror of the image at `0` — textbook structure-from-motion
+  bistability, which is *why* Thomas and Lorenz read flat. The test asserts that identity and its
+  destruction directly on the formula (`perspective = 0` mirrors exactly; `0.5` provably does not;
+  a 2-D family is byte-identical at **every** perspective, stated as invariance because a 2-D map's
+  half turn is a point reflection and the mirror identity was never theirs). Dimensionless — it holds
+  on every adapter and resolution, which is the shape [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+  asks for.
+
+  **The new fixture's sensitivity was DEMONSTRATED, and the first draft failed the demonstration.**
+  `attractor_depth.toml` exists because the rostered `attractor.toml` is De Jong and therefore
+  structurally cannot execute one line of the new code. Each of the four levers was neutralized in
+  turn and the capture re-measured: at the drafted `depth_fade = 0.6` that row read mean 0.0091 /
+  outlier 48 against tolerances of 0.02 / 48 — **inside both**, so a regression that killed the fade
+  outright would have passed. At 0.95 it reads 0.0169 / 92 and fails decisively. The numbers are in
+  the fixture header so a later weakening has to face them. This is the standard a new guard should
+  be held to.
+
+  **⚠ The content pass FALSIFIED the plan's and the ADR's framing claim.** Both said `perspective`
+  enlarges the figure and "recovering the framing is a `zoom` edit". Measured over four spin phases:
+  the centroid **orbits** by ~`0.9 x perspective` in NDC while the figure's size grows **6 %** across
+  the entire legal range — so the dominant effect is a *phase-varying translation*, and a zoom (a
+  static scale) cannot recover one. The usable ceiling is **~0.3**, not the `0.8` clamp. ADR-0076
+  carries the measurement in its Outcome; `presets/README.md` was corrected at this close; the two
+  structural remedies are [backlog 0061](../design-backlog.md) and unowned. Both presets paid a zoom
+  cut for it (`attractor_lorenz` 1.32 -> 1.16, `attractor_thomas` 1.14 -> 1.02), and Lorenz's `sanity`
+  coverage is now 0.2747 against a 0.18 floor — still passing, with less room than before.
+
+  **Two minor items, both doc freshness, both fixed in the close commit.** `docs/capturing.md` still
+  described the golden roster as "one frozen fixture per system" after `EXTRA_FIXTURES` made that an
+  incomplete description (Phase 4 swept `core/tests/fixtures/README.md` but not this one), and
+  `presets/README.md`'s `depth_hue` row said nothing about the three regimes the content pass
+  measured ([backlog 0062](../design-backlog.md)): it is a *hue* cue only on a constant-lightness
+  hue-travel ramp, it wraps above `2 * min(hue_center, 1 - hue_center)`, and it is dead under
+  `ink_amount = 1`. One bookkeeping note, not a defect: Phase 4's `presets/README.md` sweep landed in
+  a **parallel session's** commit (`9d2de68`) rather than in the phase commit, which the dev commit
+  message says outright.
 
 - [0036 — macOS and Windows release artifacts](done/0036-macos-and-windows-release-artifacts.md) —
   **done 2026-08-04**, Mode 4 review **no blockers, one minor, one nit**. Phase 1 `0329adf` (+ fix
