@@ -3220,11 +3220,15 @@ mod tests {
     /// *through* trails accumulation — so the rasterizer does not cancel out of
     /// their ratio, and the CI signal lands under [`NOISE_FLOOR`] besides. A floor
     /// taken from either reading would be a measurement asserted universally, the
-    /// shape [ADR-0071] exists to forbid. The claim goes to hardware instead: Plan
-    /// 0053 Phase 3, where the allocation quirk does not exist and
-    /// `a_dual_live_dissolve_carries_the_outgoing_trail` already asserts a magnitude
-    /// about this same dissolve. The series below stay printed so the next time
-    /// these numbers move, the log says so.
+    /// shape [ADR-0071] exists to forbid. The claim goes to hardware instead —
+    /// [`a_dual_live_dissolve_moves_the_picture_against_its_own_progression`], which
+    /// takes these same two series on a non-software adapter, where the allocation
+    /// quirk does not exist and the ratio therefore does carry a floor. (That
+    /// deferral originally named Plan 0053 Phase 3, on the premise that no hardware
+    /// adapter was reachable from this suite; the premise was wrong — the gate is
+    /// `device_type == Cpu`, not "a discrete GPU" — so the measurement was taken here
+    /// instead.) The series below stay printed so the next time these numbers move,
+    /// the log says so.
     ///
     /// [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
     /// [ADR-0074]: ../../docs/adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md
@@ -3290,6 +3294,119 @@ mod tests {
             "the control is trivial (peak {peak_control} at or under the {NOISE_FLOOR} \
              noise floor) — this dissolve is not dissolving, so it cannot calibrate \
              the signal"
+        );
+    }
+
+    /// Half the ratio measured on this box (`0.036542`), rounded down. A held
+    /// outgoing side collapses the numerator to zero, so the floor only has to
+    /// separate the reading from nothing; half of it is the same margin
+    /// [`CARRIES`] takes against its own counterfactual.
+    ///
+    /// [`CARRIES`]: a_dual_live_dissolve_carries_the_outgoing_trail
+    const HW_RATIO_FLOOR: f32 = 0.018;
+
+    /// **The outgoing side keeps moving the picture, by a measured fraction of the
+    /// dissolve's own progression.** The magnitude half of
+    /// [`dual_live_keeps_the_outgoing_side_animating`], taken where it means
+    /// something: a **non-software** adapter, where `dissolve_at`'s allocation quirk
+    /// is absent and the opening frame is byte-identical to the ordinary frame it
+    /// replaces. So the numerator is the outgoing side animating and nothing else,
+    /// which is what the WARP sibling cannot say ([ADR-0074]).
+    ///
+    /// **This is a measurement, not a property** ([ADR-0071]). Taken 2026-08-04 on:
+    ///
+    /// | | |
+    /// |---|---|
+    /// | adapter | `AMD Radeon(TM) Graphics` (integrated, `0x1002:0x1638`) |
+    /// | driver | `30.0.13002.1001` |
+    /// | backend | DX12 |
+    ///
+    /// | statistic | this adapter | CI WARP 10.0.26100 | local WARP 10.0.19041 |
+    /// |---|---|---|---|
+    /// | peak signal | 0.009653 | 0.009683 | 0.109573 |
+    /// | peak control | 0.264172 | 0.264177 | 0.407826 |
+    /// | ratio | **0.036542** | 0.036654 | 0.268675 |
+    ///
+    /// **It did not land near the local WARP `0.268675`** — it landed on the CI WARP
+    /// reading, to three figures on the ratio and five on the control. That reframes
+    /// the 7.3x spread ADR-0074 recorded between two WARP builds: the newer build
+    /// agrees with hardware and the older local one is the outlier, rather than the
+    /// quantity being unstable in both directions. It does not reopen ADR-0074's
+    /// decision — a number that reproduces on two configurations is still a
+    /// measurement, not a portable floor — but it is the first evidence about *which*
+    /// WARP reading was anomalous, and it belongs to the open question that ADR-0074
+    /// left for Plan [0053].
+    ///
+    /// **The signal sits under [`NOISE_FLOOR`], and that is not the objection it
+    /// looks like.** That band is cross-*rasterizer* drift; this comparison is two
+    /// runs of the same code on the same adapter in the same process, which this
+    /// project's determinism contract makes byte-identical. The series is the proof:
+    /// it opens at exactly `0.0000` and climbs monotonically, which is an animation
+    /// accumulating, not noise.
+    ///
+    /// **CI never enforces this.** It skips on both runners — `windows-latest` offers
+    /// only WARP, `macos-latest` has no software Metal at all (ADR-0016) — so the
+    /// local gate and `.githooks/pre-push` are what run it.
+    ///
+    /// [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
+    /// [ADR-0074]: ../../docs/adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md
+    /// [0053]: ../../docs/plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md
+    #[test]
+    fn a_dual_live_dissolve_moves_the_picture_against_its_own_progression() {
+        const FRAMES: usize = 40;
+        let (Some(frozen), Some(live)) = (
+            dissolve_at(Mode::Freeze, FRAMES, WARMED, false),
+            dissolve_at(Mode::DualLive, FRAMES, WARMED, false),
+        ) else {
+            return; // no adapter, or only a software one
+        };
+
+        assert_eq!(
+            frozen[0].rgba, live[0].rgba,
+            "the opening frame is the outgoing composite in either mode"
+        );
+
+        let signal: Vec<f32> = frozen
+            .iter()
+            .zip(live.iter())
+            .map(|(f, l)| frame_diff(f, l))
+            .collect();
+        let control: Vec<f32> = frozen.iter().map(|f| frame_diff(&frozen[0], f)).collect();
+        let peak = |series: &[f32]| series.iter().copied().fold(0.0f32, f32::max);
+        let (peak_signal, peak_control) = (peak(&signal), peak(&control));
+        let mean_signal = signal.iter().sum::<f32>() / signal.len() as f32;
+        let ratio = peak_signal / peak_control;
+
+        let series = |s: &[f32]| {
+            s.iter()
+                .map(|v| format!("{v:.4}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        eprintln!("dual-live vs freeze on hardware, {FRAMES} frames (ADR-0071 report):");
+        eprintln!(
+            "  signal  frame_diff(frozen[i], live[i]):  {}",
+            series(&signal)
+        );
+        eprintln!("  signal  peak {peak_signal:.6}  mean {mean_signal:.6}");
+        eprintln!(
+            "  control frame_diff(frozen[0], frozen[i]): {}",
+            series(&control)
+        );
+        eprintln!("  control peak {peak_control:.6}");
+        eprintln!("  ratio   peak signal / peak control = {ratio:.6}");
+
+        assert!(
+            peak_control > NOISE_FLOOR,
+            "the control is trivial (peak {peak_control} at or under the {NOISE_FLOOR} \
+             noise floor) — this dissolve is not dissolving, so it cannot calibrate \
+             the signal"
+        );
+        assert!(
+            ratio > HW_RATIO_FLOOR,
+            "the outgoing side moved the picture by {ratio} of the dissolve's own \
+             progression, under the {HW_RATIO_FLOOR} this adapter was measured at — \
+             a held outgoing side is what produces a collapsing ratio"
         );
     }
 
