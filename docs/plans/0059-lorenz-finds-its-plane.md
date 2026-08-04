@@ -1,9 +1,13 @@
 # 0059 — Lorenz finds its plane, and the attractor can trade samples for curves
 
-> **Status:** **in progress** — approved 2026-08-03; **Phases 1 and 1b landed 2026-08-04**, Phase 2
-> is next. Phases 1-3 are `dev` and run in one
-> session; **Phase 4 is `human`** (the one content pass) and **may route back to `architect`** if
-> `density` + `fade` cannot hold a legible curve, so the plan does not close in one sitting.
+> **Status:** **in progress** — approved 2026-08-03; **all four `dev` phases have landed
+> 2026-08-04**: Phase 1 `357a17e`, Phase 1b `1c47de5`, Phase 2 `4fb4a81`, Phase 3 `642aec0`.
+> **Only Phase 4 remains** — the `human` content pass over all six attractor presets, which **may
+> route back to `architect`** if `density` + `fade` cannot hold a legible curve. Phases 1-3 were
+> reviewed against this plan on 2026-08-04 (Mode 4, no blockers, no majors) so that the close is one
+> step behind the content pass rather than two; the review's findings are recorded under each phase
+> below. **`f09f1fe` ("wip(presets): provisional attractor rebalance and a symmetry A/B") is
+> provisional work toward Phase 4 and is not inherited** — judge it as part of that pass.
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) (Phase 1),
@@ -218,9 +222,34 @@ flowchart TB
     it rather than assuming — compare the new capture against a vertical mirror of the old one and
     state the residual. If they are *not* near-mirrors, something beyond orientation moved and this
     phase stops.
+
+    **Architect correction, 2026-08-04 (asked for by `1c47de5` and owed to it).** This done-when
+    predicted the wrong outcome and would have stopped the phase for the wrong reason. The new
+    capture is **near-identical, not near-mirrored** — residual `5.84` against a `54.68` asymmetry
+    scale — and that is the *stronger* result, not a failure of the check. RD writes its init blobs
+    by `uv` and samples by `uv` in the present, so flipping both cancels end to end at the display,
+    and the sim addresses by `textureLoad` on `@builtin(position)` and never mirrored at all. The
+    plan reasoned as though RD had the attractor's defect; it had the same *prelude* without the
+    same *defect*, which is why ADR-0070 moves it for consistency rather than for repair. The
+    done-when's intent — that nothing beyond orientation moved — is satisfied more strongly than it
+    asked. The residual is the present's gradient term now aligning to the displayed image instead
+    of a mirrored one, which is the golden's mean `0.0050` / outlier `53`.
   - **RD's `pan_y` direction is recorded.** It reverses. Say so in the commit and state which way
     each of the four RD presets now drifts; a slow drift reversing is expected to read as neutral,
     and if any preset reads worse that is a followup, not a fix inside this phase.
+
+    **Amended by implementation, and the amendment is right.** ADR-0070 called the reversal neutral;
+    measured, it is not — `pan_y = +0.12` moved the field **up** 86 px before and **down** 86 px
+    after, while the attractor moves its figure up. So the flip would have broken a cross-scene
+    agreement that had always held and that nothing documents. `1c47de5` negates `pan.y` in the RD
+    present shader instead, restoring shipped behaviour for all four presets, and that is the right
+    call: this phase fixes a mirror, and silently inverting a bound param is not its job. It also
+    resolved a `report_coverage_distribution` failure — reversed, Coral moved to `0.1546` and put
+    the `0.07` floor at `2.21x` slack against a `2.2x` allowance; restored, Coral returns to
+    `0.1420` exactly, which is itself the evidence that the reversal and not the un-mirroring moved
+    it. **What the fix leaves behind is a finding, carried to Followups**: the convention it
+    preserves (`+pan_y` moves the picture up, on every scene) is now held by one negation in one
+    shader, is asserted nowhere for RD, and is stated in no operator doc.
   - `gpu.rs` no longer contains `FULLSCREEN_VS_UV`, and the surviving prelude's doc comment states
     the real rule — a pass that samples the target it writes addresses it in framebuffer space,
     by round-tripping `uv` or by `textureLoad` on `@builtin(position)`. **Do not rename**
@@ -241,6 +270,19 @@ flowchart TB
   - `density` is validated at load with a stated range and a named error, like every other structural
     key. **Pick the floor from the arithmetic, not by feel**: state what the smallest allowed value
     resolves to at both tiers and why a cloud that sparse is still a picture.
+
+    **The arithmetic was wrong and the captures corrected it (`4fb4a81`) — recorded because the
+    plan asked for the wrong instrument.** Reasoning from ADR-0065's `50_000 / active` weighting
+    gave a floor of `0.01` (500 particles at Floor), on the argument that anything sparser "must
+    clip to white before it reads as a curve". Rendered at `fade = 0.95` it does not: the trail
+    spreads a particle's deposit along its whole path rather than piling it on one texel, so
+    concentrating light into fewer particles buys *contrast against the background* instead of
+    clipping. Banding first appears near `0.01`, and `0.002` (100 particles) and `0.0005` (25)
+    resolve into visibly cleaner spiral traces. `0.01` would have fenced off exactly the territory
+    ADR-0069 exists to reach. The shipped floor is **`0.0005`** — 25 at Floor, 75 at Rich — with the
+    counts behind those captures pinned in a test so the doc cannot drift from the constant. The
+    general lesson for a later plan: *"pick it from the arithmetic"* is only sound when the
+    arithmetic models the whole path, and here it modelled deposit without modelling the trail.
   - **Total deposited light is invariant across `density`**, asserted on the value the way ADR-0065's
     scalar already is: `active_count * deposit_scale(active_count)` is constant. This is the property
     that makes the key structural rather than an exposure control, so it is asserted, not observed.
@@ -293,6 +335,26 @@ flowchart TB
   A/B from Phase 3; and the exposure shift the streak introduces on `attractor_thomas` as well as
   Lorenz.
 - **Files touched:** `presets/attractor_*.toml`.
+- **What Phases 1b-3 hand this pass, measured rather than estimated** (added 2026-08-04 at the
+  Phases 1-3 review, so the content lane does not have to re-derive it from three commit messages):
+  - **Exposure is up much more than the ADR predicted, on the two continuous families.** Mean frame
+    luminance before → after the streak: `thomas` `3.455 → 6.829` (**1.98x**), `lorenz`
+    `5.242 → 16.269` (**3.10x**); `de_jong` and `clifford` are unchanged to four figures, which is
+    the discrete branch proving it never fires. ADR-0069's headline "~1.8x" is a **footprint**
+    ratio; the quadratic falloff means integrated light is not proportional to bounding area, so the
+    photometric change runs ~1.7x past it. Budget the re-gain against `3.1x`, not `1.8x`.
+  - **Every attractor's coverage fell 6-13 %** at Phase 1b, because each figure is now one copy
+    rather than two — Leviathan `0.3785 → 0.3442`, family slack `1.91x` against the `2.2x`
+    allowance. Recorded in `sanity.rs` and deliberately **not** acted on: re-deriving the floor
+    before this pass would set it from exposure nobody has judged. Expect the floor conversation to
+    belong to this commit.
+  - **The reseed streak ships off and provisional.** `RESEED_DRAWS_STREAK = false` — the
+    conservative default, matching what the scene did before segments existed. It rides the jitter
+    dispatch's otherwise-unused `coeffs.w`, so the A/B is a constant flip and a rebuild, no shader
+    edit.
+  - **The sparse territory is newly reachable and newly worth reaching**: `density` bottoms at
+    `0.0005` (25 particles at Floor, 75 at Rich), and low density is only now useful on the flow
+    families, because before the segment a sparse cloud simply looked sparse.
 - **Done when:**
   - Each preset touched is judged at both tiers and the commit states which levers moved per preset.
     Tonal flatness and coverage are recorded before and after — both are printed by `sanity` on every
@@ -388,6 +450,15 @@ No `Scene` trait change, no C ABI change (stays v4), no new dependency, no new p
 - **Whether the `pan_y` gate generalizes** to every scene exposing `pan_*`. Phase 1b scopes it to
   the attractor, where the defect was; the same assertion would cover `reaction_diffusion`,
   `swarm` and the line scenes for the cost of more WARP captures. Nobody has asked yet.
+  **Raised from a general question to a specific one by Phase 1b** (Mode 4, 2026-08-04):
+  `reaction_diffusion` is no longer "another scene that could be covered", it is the scene whose
+  correct behaviour now rests on a **compensating negation** (`vec2(pp.c.y, -pp.c.z)` in the present
+  shader) that exists only because the prelude moved. Nothing asserts RD's `pan_y` direction, so a
+  future tidy-up can drop the negation and every gate stays green. Two cheap repairs, both worth
+  taking together: an RD `pan_y` centroid assertion in the shape of the attractor's, and one
+  sentence in `presets/README.md`'s *Shared view transform* section stating the convention
+  (`+pan_y` moves the picture up on every scene) — which it does not currently say, which is how
+  the agreement came to be undocumented in the first place.
 - Re-check whether the streak wants a length normalization, with Phase 4's numbers.
 - **Whether the spin is a per-family property too**, if Phase 4 finds the y–z half of the turn reads
   as dead. Today `SPIN_RATE` is one shared constant and the spin is always a full turntable about the

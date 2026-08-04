@@ -1,9 +1,14 @@
 # 0061 — The build stops paying for what it is not building, and the two oversized modules come apart
 
-> **Status:** draft
+> **Status:** draft — **Phase 4b's scoping half landed early and out of sequence** as `1c55476`
+> (2026-08-04, at the user's direct request); see the note on that phase for what it satisfies, the
+> one accepted deviation, and the coverage gap it opens until Phase 4 lands. Every other phase is
+> unstarted.
 > **Created:** 2026-08-04
 > **Amended:** 2026-08-04 — four phases added (1b, 2b, 4b, 9) covering CI wall time, after run
 > 30903871856 made the first green measurement available; [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md)
+> **Amended:** 2026-08-04 (second pass) — Phase 4b reconciled against `1c55476`, which implemented
+> it ahead of its sequence
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) (new, proposed),
 > [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) (new, proposed),
@@ -330,6 +335,35 @@ stops being an expectation.
   move, captured before and diffed after.
 
 ### Phase 4b — A shape claim stops sweeping the library (ADR-0073) (added 2026-08-04)
+
+> **LANDED EARLY, out of sequence, as `1c55476` (2026-08-04)** — at the user's direct request, in
+> the same window this plan was being written, and reconciled here rather than reverted. The change
+> is correct and the win is real (**85 s → 5.0 s** locally on the one test; the CI figure is Phase
+> 9's to read), so reverting a correct fix to satisfy a sequencing preference would cost the wall
+> clock and buy nothing. Two things follow, and the second is a live gap:
+>
+> - **One deviation, accepted.** The fixture library is a **scratch directory written by the test**
+>   (`tiny_report_library()`), not the checked-in `standalone/tests/fixtures/report/` this phase
+>   suggested. The phase said "e.g." and wanted a `README.md` saying what it is for and why it is
+>   small; the helper's doc comment carries exactly that, beside the assertion instead of two
+>   directories away. Equal or better, and it adds no files. **The done-when below is otherwise met
+>   in full**: three presets across two distinct `SystemKind`s, an added assertion that *both*
+>   families reached the map (so a future shrink cannot quietly turn the balance check into a
+>   single-object test), the three original assertions unchanged in wording and strength, the
+>   before/after wall time in the commit message, and `the_presets_flag_is_reported_as_the_source`
+>   still pointing at `presets/`.
+> - **The coverage gap this phase's sequencing existed to prevent is now open, and stays open until
+>   Phase 4 lands.** The reason 4b was sequenced after Phase 4 was never tidiness: Phase 4 moves the
+>   report machinery into `standalone/src/shot/report.rs` under `#[test]`s that actually run, and
+>   scoping the subprocess test *first* leaves the report generator's own logic proved only by a
+>   three-preset CLI invocation. That is exactly the state the tree is in. **Nothing renders every
+>   shipped preset through the real CLI any more** (ADR-0073's accepted cost) *and* nothing yet
+>   tests the generator in-process. Phase 4 closes it; until then, treat a `--report` change as
+>   under-covered.
+> - **Still owed from this phase:** the `--size` / `--frames` reduction, which `1c55476` did not
+>   take. It was written as "check, don't assume" and remains unchecked. It is worth having and is
+>   not a substitute for the scoping — take it with Phase 4.
+
 - **Owner skill:** dev
 - **What:** Scope `standalone/tests/shot_cli.rs`'s
   `the_json_report_is_well_formed_and_carries_its_top_level_keys` to a small fixture directory instead
