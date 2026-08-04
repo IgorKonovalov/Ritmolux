@@ -67,7 +67,7 @@ bindings, and the structural/palette/smoothing tables) and never engine Rust. It
 you as a plan, routed through `architect`.
 
 **Shipping a preset is no longer your code change.** Since
-[ADR-0022](../../../docs/adrs/0022-build-time-preset-embedding.md), `core/build.rs` globs
+[ADR-0022](../../../../docs/adrs/0022-build-time-preset-embedding.md), `core/build.rs` globs
 `presets/*.toml` and generates the `EMBEDDED` table — a `.toml` in `presets/` ships by existing.
 There is no array to edit, no length type, and no count to bump; the older instruction to edit
 `core/src/preset/mod.rs` and a count assert in `core/tests/preset.rs` describes a mechanism that no

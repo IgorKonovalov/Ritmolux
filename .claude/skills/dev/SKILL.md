@@ -24,7 +24,7 @@ Then wait. The reads below are task-grounded, not startup routines.
 
 - **`architect`** — writes plans, ADRs, diagrams, and the post-implementation review. You hand a
   plan back to it once you've finished the **last phase**.
-- **`preset-author`** — the content lane (added per [ADR-0017](../../docs/adrs/0017-preset-author-skill-lane.md)).
+- **`preset-author`** — the content lane (added per [ADR-0017](../../../docs/adrs/0017-preset-author-skill-lane.md)).
   Composes engine capability into visual looks (`.toml` presets, expression bindings, and the
   structural/palette/smoothing tables); never writes engine Rust. It touches **you** in two ways: it
   routes engine gaps back through `architect` (a look that needs a new scene/param/function is a
@@ -32,7 +32,7 @@ Then wait. The reads below are task-grounded, not startup routines.
   shipping.
 
   **Embedding is no longer a code change.** Per
-  [ADR-0022](../../docs/adrs/0022-build-time-preset-embedding.md), `core/build.rs` globs
+  [ADR-0022](../../../docs/adrs/0022-build-time-preset-embedding.md), `core/build.rs` globs
   `presets/*.toml` and emits the `EMBEDDED` table via `include_str!`. Dropping a `.toml` into
   `presets/` ships it — there is **no array to hand-edit, no length type, and no count assert to
   bump**. If you go looking for a literal array in `core/src/preset/mod.rs` you'll find a generated
