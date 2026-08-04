@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0062** (ADRs are a separate sequence — next free there is **0073**.)
+**Next free number: 0062** (ADRs are a separate sequence — next free there is **0074**.)
 
 ## Active roster
 
@@ -18,7 +18,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0059](0059-lorenz-finds-its-plane.md) | Lorenz finds its plane, and the attractor can trade samples for curves (per-family projection basis, the trail un-mirror, `[particles] density`, the continuous-flow streak) | **in progress** — **Phase 1 landed 2026-08-04 (`357a17e`)**; successor to [0057], whose Phase 4 diagnosed this and stopped by its own instruction; [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) + [ADR-0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md) + [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md); closes [backlog 0048](../design-backlog.md). **Amended 2026-08-04 with a new Phase 1b**: Phase 1's basis is correct and the picture was **still an X**, because the attractor trail samples its own target with the unflipped fullscreen prelude and renders `figure ∪ mirror(figure)` — older than this plan, invisible to every gate because the doubling conceals its own symptom. **The "no golden baseline moves" claim is withdrawn**: `attractor.png` and `reaction_diffusion.png` both move at Phase 1b (the four `composite_*` fixtures run `parametric_curve` and do not). **Phase 4 is `human`** — the one content pass, now covering **all six** attractor presets rather than mainly `attractor_lorenz`, since every one was authored against a doubled figure; it **may route back to `architect`** if `density` + `fade` cannot hold a curve | dev, human |
 
 | [0060](0060-a-test-number-states-a-property-or-names-its-machine.md) | A test number states a property, or names its machine (the two frozen numbers holding CI red: bit-exact `f32` literals pinned to x86_64, and the dual-live floor traded for a ratio against an in-run control) | **approved 2026-08-04** — ready for `dev`; [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md). **CI has been red since 2026-07-30** and this is the only plan that turns it green. **Phase 2 is `human`** (push, then read the two runners' printed numbers) and gates Phase 3, so it does not close in one session. Moves **no pixels**, no shipped code, no golden baseline | dev, human |
-| [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo, the `core-cabi` extraction, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04** — from the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md). **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. **Phase 6 is gated on [0059] being closed** (it edits `particles/mod.rs`); **Phase 8 is `human`** (needs VS Build Tools + the foobar SDK — CI has no plugin job) and is deliberately **last** so one `dev` session lands Phases 1-7. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
+| [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended the same day** — from the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. **Phase 6 is gated on [0059] being closed** (it edits `particles/mod.rs`); **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
 
 ## Recommended execution sequence
 
@@ -43,6 +43,35 @@ whose done-when names a line count needs re-deriving rather than satisfying if a
 already moved the file; and if [0060] has re-derived `COVERAGE_FLOOR` by then, [0061] Phase 2 moves the
 same number again for a different reason (it removes `ffi.rs` from the gated crate), so the two must
 not be read as competing for it.
+
+**[0061] was amended the same day with CI, and the amendment is the part that costs everyone else
+time while the plan waits at the back of the queue.** Run **30903871856** is the first green CI run
+since 2026-07-30 — and there is **no green baseline before it**, because the ~4-minute runs in the
+history are `nextest` fail-fast cancellations rather than fast full runs, so nothing here supports
+"CI got slower". What it shows is the shipped preset library rendered **three times per push**:
+`check (windows-latest)` and `coverage` running the same nine WARP sweep suites concurrently on two
+identical runners (≈ **1930 duplicated CPU-seconds**), plus one `standalone::shot_cli` test at
+**948.9 s** — **61 %** of `check`'s nextest wall clock, and the run's critical path — sweeping every
+preset through the CLI to assert that some JSON is balanced.
+[ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) takes both.
+
+Three things about it are worth knowing before sequencing. **The two halves are not
+interchangeable**: Phase 2b removes the duplication (a *cost* win, ≈ 1930 CPU-seconds) and Phase 4b
+removes the critical path (the *wall-time* win), and landing either alone leaves the other in place —
+after 2b alone, `shot_cli`'s 948.9 serial seconds sit within noise of `coverage`'s entire 932-second
+job. **Phase 4b is sequenced after Phase 4 on purpose**, because Phase 4 is what moves the report
+machinery into `standalone/src/shot/` under tests that actually run; scoping the subprocess test
+first would leave the generator proved only by a three-preset invocation. And **`COVERAGE_FLOOR` now
+has three plans pointed at it** — [0060] may re-derive it, [0061] Phase 2 moves it by removing
+`ffi.rs` from the gated crate, and Phase 2b makes the job carrying it load-bearing for correctness
+rather than only for the ratchet. None competes with the others; whoever writes it last says which
+they measured against.
+
+**If the CI wall time becomes intolerable before [0061] comes up, Phases 2b and 4b are separable** —
+they touch `.github/workflows/ci.yml`, `.githooks/pre-push` (a comment) and one test file, and share
+nothing with the rest of the plan. Pulling them into their own number is a smaller edit than
+re-planning; the reason they live here is thematic (the plan's title is exactly this finding), not
+technical.
 
 **Every other plan in the roster is approved as of 2026-08-04 — nothing is waiting on a design
 decision.** What separates them now is only what each needs to *run*: [0052] closes in one session;
