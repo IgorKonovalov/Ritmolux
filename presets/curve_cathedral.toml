@@ -38,6 +38,10 @@ pan_x = "sin(time * 0.0130) * 0.04"
 pan_y = "cos(time * 0.0170) * 0.03"
 
 kaleido_order = "select(bass + treb > 1.23, 6, 3)"
+# EDGE: squash (2), chosen in motion over the disc. The rose fills the frame
+# instead of sitting in a dark surround, and squash's inward compression keeps the
+# tracery continuous where tile would repeat it as wallpaper.
+kaleido_edge  = "2"
 kaleido_angle = "time * 0.085"
 trails        = "0.44 + clamp(mid * 0.118, 0, 0.10)"
 bg_hue        = "0.72 + sin(time * 0.011) * 0.07"

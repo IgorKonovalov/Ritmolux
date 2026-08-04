@@ -44,6 +44,10 @@ pan_x = "sin(time * 0.0130) * 0.10"
 pan_y = "cos(time * 0.0110) * 0.08"
 
 kaleido_order = "select(bass + mid > 1.20, 8, 4)"
+# EDGE: tile (1), chosen in motion over the disc. The ring keeps its central void
+# while the surrounding field fills with related filament, so it reads as a
+# reliquary set into a wall rather than one floating in black.
+kaleido_edge  = "1"
 kaleido_angle = "time * 0.065"
 trails        = "0.30 + clamp(onset * 0.3, 0, 0.18)"
 

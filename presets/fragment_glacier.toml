@@ -68,6 +68,10 @@ palette_mix  = "0.35 + sin(time * 0.0071) * 0.30"
 # 0.56 sits just under the typical sum, so a normal passage folds and a quiet
 # one relaxes back - the intent this line has carried since the beginning.
 kaleido_order = "select(bass + mid > 0.56, 6, 3)"
+# EDGE: tile (1), chosen in motion. A border-filling field, so the old crop was
+# exactly the rejected behaviour. The mirrored continuation gives the corners real
+# crystal structure; squash read softer and cloudier.
+kaleido_edge  = "1"
 kaleido_angle = "time * 0.031"
 trails        = "0.62 + clamp(mid * 0.188, 0, 0.16)"
 

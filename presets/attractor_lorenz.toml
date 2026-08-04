@@ -147,6 +147,10 @@ bg_vignette   = "0.88"
 # so the dead half hid behind the excusable one. 0.10 is the same near-peak
 # placement used by Warp Drive's top tier.
 kaleido_order = "select(min(tempo > 124, bass + treb > 1.20), 4, 1)"
+# EDGE: falloff (0), chosen in motion. The folded figure is small and centred over
+# an empty border, so a fill treatment has nothing real to carry outward - it
+# mirrors black. The fade keeps the jewel reading as a jewel.
+kaleido_edge  = "0"
 kaleido_angle = "time * 0.11"
 
 [smoothing]

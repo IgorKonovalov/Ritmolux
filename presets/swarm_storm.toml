@@ -116,6 +116,10 @@ pan_y = "cos(time * 0.041) * 0.07"
 # genuinely energetic passages of fast material, which is what was intended.
 trails        = "select(tempo > 132, 0.40, 0.60) + clamp(mid * 0.188, 0, 0.16)"
 kaleido_order = "select(min(tempo > 132, bass + mid > 0.88), 3, 1)"
+# EDGE: falloff (0), chosen in motion. A sparse figure over a near-black field is
+# the case where a fill treatment has least real content to mirror, and tile pasted
+# visibly duplicated spike clusters into the corners. The fade keeps them honest.
+kaleido_edge  = "0"
 kaleido_angle = "time * 0.13"
 bg_hue        = "0.965 + clamp(bass * 0.0353, 0, 0.030)"
 bg_bright     = "0.009 + clamp(mid * 0.0165, 0, 0.014)"

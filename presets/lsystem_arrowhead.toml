@@ -188,6 +188,10 @@ mirror_reflect = "0"
 # square top/bottom, left/right symmetry asked for. The audio drives the figure
 # INSIDE the tiling (depth, arms, reveal) rather than the tiling itself.
 kaleido_order = "4"
+# EDGE: tile (1), chosen in motion. A Sierpinski arrowhead is self-similar by
+# construction, so mirroring is the figure's own logic - and it keeps the teal
+# ground visible where squash flooded it magenta.
+kaleido_edge  = "1"
 kaleido_angle = "0"
 
 
