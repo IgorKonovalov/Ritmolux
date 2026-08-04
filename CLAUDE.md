@@ -51,13 +51,18 @@ standalone/          # Rust binary + lib — winit window, wgpu surface, loopbac
 plugin-foobar/       # C++ shim: foobar2000 SDK integration, links core's C ABI. Windows-first.
 presets/             # The curated preset library (*.toml) — build.rs globs and embeds it.
     └── README.md    #   THE per-system parameter roster + structural/palette/smoothing tables.
+packaging/           # What a `v*` tag ships (ADR-0038). macos/ holds bundle.sh — build both
+                     #   Apple targets, lipo, substitute the plist version, ad-hoc sign, zip AND
+                     #   verify — so packaging runs the same on a Mac as in CI, not CI-only magic.
+                     #   Plus the two READ-ME-FIRST.md a tester finds in the zip.
 docs/
 ├── nfr.md           # Quantified v1 non-functional requirements — the numbers behind every
 │                    #   "lightweight" / "real-time" / "stable frame rate" in the plans.
 ├── presets.md       # Preset authoring guide: THE expression-language reference.
 ├── preset-palettes.md  # The colour surface: palettes, custom stops, A/B crossfade.
 ├── capturing.md     # Headless `shot` CLI + the core/tests/ visual-QA harness.
-├── releasing.md     # How the version moves (one bump per plan close).
+├── releasing.md     # How the version moves (one bump per plan close) + the tag push that
+│                    #   builds and publishes the two release zips.
 ├── specs/           # NNNN-<subsystem>.md — living behavioral contracts (C ABI, ring/DSP).
 ├── adrs/            # NNNN-<slug>.md — architecture decisions + rejected alternatives. Append-only.
 │   └── README.md    #   ADR index

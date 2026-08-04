@@ -35,6 +35,46 @@ plan is a **patch** bump (`0.1.0 -> 0.1.1`), and a docs/chore-only plan legitima
 **no** bump (choose the level deliberately — this is not a missed step). Reaching `1.0.0` is
 a deliberate future act (freezing the C ABI and standalone behavior), never backed into.
 
+## Pushing the tag is what builds the artifacts
+
+`cargo-release` writes the tag; **pushing it is what produces downloadable builds.** The user
+pushes — the architect never does.
+
+```sh
+git push --follow-tags
+```
+
+That fires [`.github/workflows/release.yml`](../.github/workflows/release.yml)
+([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)), which builds the
+macOS and Windows standalone in parallel and, only if **both** are green, publishes a GitHub
+**prerelease** carrying two zips:
+
+```text
+light-music-visualizer-v<version>-macos-universal.zip    # universal .app, ad-hoc signed
+light-music-visualizer-v<version>-windows-x64.zip        # lmv.exe
+```
+
+Each also carries a reference copy of `presets/*.toml` and a `READ-ME-FIRST.txt`. If either
+build fails, the release job is **skipped** and no release exists — there is no half-published
+state. Re-running the same tag's workflow replaces the assets rather than failing.
+
+**A tag push is outward-facing.** Since ADR-0038 this is the last step of every close ceremony
+whose tag gets pushed, so every plan close now publishes a public prerelease whether or not that
+build was meant for anyone. `--prerelease` while in `0.x` softens the implication; it does not
+remove it. If a close should *not* publish, do not push the tag.
+
+**Editing anything under `.github/workflows/` needs the `workflow` OAuth scope** on the git
+credential. Without it the push is rejected with a scope error that names neither the file nor
+the fix:
+
+```sh
+gh auth refresh -s workflow
+```
+
+To rehearse the builds without publishing anything, run the workflow from the Actions tab
+(`workflow_dispatch`): it produces both zips as **run artifacts** and creates no release. Note
+that a `workflow_dispatch` is only offered once the workflow file exists on the default branch.
+
 ## What this does NOT touch
 
 - **The C ABI version** (`LMV_ABI_VERSION`, `core/src/ffi.rs`) is a **separate axis**
@@ -53,4 +93,11 @@ a deliberate future act (freezing the C ABI and standalone behavior), never back
 
 - The standalone window title (`env!("CARGO_PKG_VERSION")`, resolves to the workspace
   version).
-- The `vX.Y.Z` git tag and the GitHub release-zip name (NFR section 8).
+- The `vX.Y.Z` git tag and both release-zip names (NFR section 8).
+- The macOS bundle's `CFBundleShortVersionString` / `CFBundleVersion`, substituted into
+  `packaging/macos/Info.plist.in` at package time. `bundle.sh` asserts the plist and
+  `[workspace.package]` agree, so a drift fails the build rather than shipping.
+- The foobar component's `DECLARE_COMPONENT_VERSION`, via the generated
+  `build/foo_lmv_version.h` (ADR-0025).
+
+All four read the one string in root `Cargo.toml` — none is edited by hand.

@@ -124,9 +124,25 @@ contradicts this file is a plan bug — surface it, don't guess.
 
 ## 8. Distribution (v1)
 
-- **GitHub release zip**: unsigned standalone exe + a packaged `.fb2k-component` for the
-  plugin. No installer, no code signing in v1 (SmartScreen warning accepted). Signing, if
-  ever, is a later plan + human task.
+Delivered by `.github/workflows/release.yml` on a pushed `v*` tag
+([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)). Two zips, attached
+to a GitHub **prerelease** — a plain download URL, no account needed, because the repository
+is public.
+
+- **Windows**: `lmv.exe`, x64, **unsigned** (SmartScreen warning accepted).
+- **macOS**: a **universal** (arm64 + Intel) `LightMusicVisualizer.app`, **ad-hoc signed and
+  unnotarized**. Ad-hoc signing buys a stable code identity for the Screen Recording grant to
+  bind to; it is *not* Developer ID, so Gatekeeper still quarantines the download and the grant
+  does not survive a rebuild. Requires macOS 13+.
+- Both zips also carry a reference copy of `presets/*.toml` and a `READ-ME-FIRST.txt`.
+
+**Standalone only — CI does not ship a `.fb2k-component`.** The foobar2000 SDK is third-party,
+separately licensed and `.gitignore`'d, so no runner can build the shim; it stays a local
+`plugin-foobar/build.ps1` artifact. (This corrects the original v1 promise of a packaged
+component in the release zip.)
+
+No installer, no Developer ID signing, no notarization, no DMG in v1. Signing, if ever, is a
+later plan + human task.
 
 ## 9. Test hardware matrix (what the user has)
 
@@ -134,8 +150,14 @@ contradicts this file is a plan bug — surface it, don't guess.
 |---------|-----------|
 | Primary Windows dev box | Standalone Windows path, plugin, day-to-day dev |
 | Older Windows PC (iGPU) | The performance floor (§1) on baseline hardware (§2) |
-| Mac, macOS 13+ | macOS standalone path (Metal + ScreenCaptureKit) — build/test is a human-in-the-loop step |
 | foobar2000 (installed) | Plugin loading + `visualisation_stream` behavior |
+
+**There is no Mac in this matrix, and that is the point of §8's macOS artifact.** An earlier
+revision of this table listed a "Mac, macOS 13+" as available hardware; it is not, which is why
+the dev box cannot link a Mach-O binary and a macOS runner is the only build host
+(ADR-0038). The macOS standalone path — Metal through wgpu, ScreenCaptureKit capture, glyphon's
+font loading — is therefore validated by a **recipient**, not in-house, and until one reports
+back it has never executed on Apple hardware at all.
 
 ## 10. Live performance (added in the 2026-07-21 follow-up interview)
 
