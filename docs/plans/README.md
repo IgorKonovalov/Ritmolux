@@ -20,10 +20,34 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | [0063](0063-the-attractor-keeps-its-depth.md) | The attractor keeps its depth: perspective, haze, and a spin you can drive (`perspective`, `depth_fade`, `depth_hue`, `spin`) | **approved 2026-08-04** — ready for `dev`; designed from the user's "can we make strange attractors more 3D looking"; [ADR-0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md). The 3D families read flat because `project()` computes a view depth and **discards** it, leaving an orthographic projection whose rotation is perceptually bistable (the image at rotation pi is the exact x-mirror of the image at 0). Keeps the depth; spends it on perspective + two atmospheric cues; **no sorting, no occlusion** (the user's call — the accumulation is the scene). **The 2D families are untouched by arithmetic rather than by a default**, so `core/tests/fixtures/attractor.toml` (De Jong) cannot move. Also closes a gap the question surfaced: `SPIN_RATE` is a `const` no preset can reach, and every 3D attractor turns at one revolution per **34.9 s** forever. **Phase 5 is `human`** (a `preset-author` pass over the two 3D presets), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
 
-| [0064](0064-the-symmetry-stage-and-the-banded-palette.md) | The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour (`kaleido_radial`/`spiral`/`zoom`/`tile`/`inner`, `palette_steps`/`palette_contour`) | **draft 2026-08-04** — from the user's five reference images; [ADR-0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) + [ADR-0078](../adrs/0078-banding-is-a-palette-coordinate-operation.md). Covers **three** of the five images, and applies to **every scene** because it is screen-space. The engine already has half the mechanism: periodicity in `theta` is the fold, periodicity in **`log r`** is the missing concentric self-similarity. **Both halves are one plan on purpose** — neither alone reproduces the references, and the user chose to decide the look from a rendered sample set that has to show the combination. **Phase 4 is `human`** (pick defaults and ranges from the grid) and gates Phases 5-6, so it does not close in one session. **Collides with [0055]** in `kaleidoscope.rs` — taking 0055 first is the cheaper order. Moves **no** existing golden baseline; adds one | dev, human |
-| [0065](0065-the-mandala-interior.md) | The mandala interior: `star_pattern` stops being hollow (a `rings` roster of motif / count / radius / scale / phase on `[generator]`) | **draft 2026-08-04** — the fourth reference image; [ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md). **Closes the still-open half of [backlog 0034 → 0007](../design-backlog.md)** — the "hollow ring" finding with the user's standing *invest, do not cut* call on it, live since 2026-07-26 and never specified until the reference image arrived. Line geometry, so it **shares nothing** with [0055] or [0064] and can run in parallel with either. **Phase 3 is `human`** (pick the motif roster from a rendered grid) and gates Phases 4-6. Watch the `animation.rs` gate: a ring mandala is *more* rotationally symmetric than `star_rosette`, so spin alone will not pass it ([backlog 0009](../design-backlog.md)) — Phase 4 designs around it. Moves **no** golden baseline at all | dev, human |
+| [0064](0064-the-symmetry-stage-and-the-banded-palette.md) | The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour (`kaleido_radial`/`spiral`/`zoom`/`tile`/`inner`, `palette_steps`/`palette_contour`) | **approved 2026-08-04** — ready for `dev` **after [0055]**; from the user's five reference images; [ADR-0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) + [ADR-0078](../adrs/0078-banding-is-a-palette-coordinate-operation.md). Covers **three** of the five images, and applies to **every scene** because it is screen-space. The engine already has half the mechanism: periodicity in `theta` is the fold, periodicity in **`log r`** is the missing concentric self-similarity. **Both halves are one plan on purpose** — neither alone reproduces the references, and the user chose to decide the look from a rendered sample set that has to show the combination. **Phase 4 is `human`** (pick defaults and ranges from the grid) and gates Phases 5-6, so it does not close in one session. **Collides with [0055]** in `kaleidoscope.rs` — taking 0055 first is the cheaper order. Moves **no** existing golden baseline; adds one | dev, human |
+| [0065](0065-the-mandala-interior.md) | The mandala interior: `star_pattern` stops being hollow (a `rings` roster of motif / count / radius / scale / phase on `[generator]`) | **approved 2026-08-04** — ready for `dev`, gated by nothing; the fourth reference image; [ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md). **Closes the still-open half of [backlog 0034 → 0007](../design-backlog.md)** — the "hollow ring" finding with the user's standing *invest, do not cut* call on it, live since 2026-07-26 and never specified until the reference image arrived. Line geometry, so it **shares nothing** with [0055] or [0064] and can run in parallel with either. **Phase 3 is `human`** (pick the motif roster from a rendered grid) and gates Phases 4-6. Watch the `animation.rs` gate: a ring mandala is *more* rotationally symmetric than `star_rosette`, so spin alone will not pass it ([backlog 0009](../design-backlog.md)) — Phase 4 designs around it. Moves **no** golden baseline at all | dev, human |
 
 ## Recommended execution sequence
+
+### The order, as of 2026-08-04
+
+Everything below this list is the reasoning. **Only two orderings in the roster are real
+constraints**; the rest is preference, and a session may take any unblocked plan.
+
+| # | Plan | Why here | Closes in one session? |
+|---|------|----------|------------------------|
+| 1 | [0055] | **Hard constraint: must precede [0064].** Both live in `kaleidoscope.rs`; 0055 is smaller and older and branches on the *destination* radius, which 0064's composed map does not touch. Taking it second means rebasing onto a rewritten shader | No — Phase 2 is `human` (a live in-motion A/B) and gates Phases 3-4 |
+| 2 | [0063] | **Soft constraint: better before [0062].** It adds `inv_depth_extent()` as an exhaustive match over `AttractorFamily`, so 0062 adding a fifth family is then **compiler-forced** to answer it. The reverse order relies on remembering | No — Phase 5 is `human` |
+| 3 | [0062] | Adjacent to 0063 in `particles/mod.rs`, so one session holds the file's context | No — Phase 7 is `human` |
+| 4 | [0064] | Unblocked once 0055 has landed. Widest blast radius in the roster — screen-space, so every scene inherits it | No — Phase 4 is `human`, mid-plan |
+| 5 | [0065] | **Gated by nothing and shares no file with anything.** The safest parallel lane; can be pulled forward to any position | No — Phase 3 is `human`, mid-plan |
+| 6 | [0052] | Independent, four `dev` phases, nothing gating | **Yes** |
+| 7 | [0053] | Protective rather than additive; moves no pixels. Its `human` Phase 3 is runnable on this box after the 2026-08-04 premise correction | No — Phase 3 is `human` |
+| 8 | [0046] | Touches the attractor's feedback path, so it is cheaper after [0062]/[0063] have settled that file | — |
+| 9 | [0036] | Packaging only; touches no `core/`, `standalone/` or shader code. Take it whenever artifacts are wanted | No — Phase 4 needs a Mac |
+| 10 | [0061] | **Last, by the user's own instruction** | No — Phases 8-9 are `human` |
+
+**If you want one session that closes**, take [0052] — it is the only plan in the roster with no
+`human` phase. **If you want the most visible change per session**, take [0063] then [0062].
+**If a second lane is running in parallel**, give it [0065]: it is line geometry and collides with
+nothing.
+
 
 **TWO LANES ARE LIVE RIGHT NOW (2026-08-04), and neither is merged to `main`.** Read this before
 starting anything, because the roster rows above are the only place that says so:
@@ -148,9 +172,9 @@ finally took matched **CI WARP** to five figures and disagreed with **this box's
 suite blesses on, not the runner's. Nothing has looked at what else that moves.
 
 
-**[0061] goes last, by the user's own instruction.** (It is no longer the only `draft` — [0064] and
-[0065] joined it on 2026-08-04. All of them are unrelated to it and none inherits this "goes last".)
-It came
+**[0061] goes last, by the user's own instruction, and is the only `draft` in the roster.** (The four
+plans written on 2026-08-04 — [0062], [0063], [0064], [0065] — were all approved the same day; none
+is related to this one and none inherits its "goes last".) It came
 out of a whole-tree maintainability audit rather than a feature request, so nothing depends on it and
 it depends on nothing — the one dependency it had, [0059] being closed before its Phase 6 (which edits the same file), was **released 2026-08-04**. Two
 consequences worth carrying: its numbers are a **2026-08-04 snapshot of one machine**, so a phase
@@ -189,9 +213,9 @@ re-planning; the reason they live here is thematic (the plan's title is exactly 
 technical.
 
 **Every other plan in the roster is approved as of 2026-08-04 — nothing is waiting on a design
-decision**. [0062] and [0063] were both approved the day they were written; the three `draft`s —
-[0061], [0064] and [0065] — are all fully designed and waiting only on the user's go. What separates
-them now is only what each needs to *run*: [0052] closes in one session;
+decision**. [0062], [0063], [0064] and [0065] were all approved the day they were written, leaving
+[0061] as the only `draft`, and it is fully designed too. What separates them now is only what each
+needs to *run*: [0052] closes in one session;
 [0053] and [0055] each carry a `human` phase that gates later phases, so they stop mid-plan by
 construction — [0053] until a discrete GPU is to hand, [0055] until the live A/B is judged.
 Taking [0052] first keeps a session unblocked end to end.
