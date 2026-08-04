@@ -71,6 +71,83 @@ fn background(img: &CaptureImage) -> [u8; 4] {
     ]
 }
 
+/// The vertical position of the lit region's centre of mass, as a signed fraction
+/// of frame height away from the centre line. Negative is above centre (row index
+/// grows downward).
+fn lit_centroid_offset(img: &CaptureImage) -> f32 {
+    let bg = background(img);
+    let (mut sum_y, mut n) = (0f64, 0u64);
+    for (i, px) in img.rgba.chunks_exact(4).enumerate() {
+        let lit = px
+            .iter()
+            .zip(bg.iter())
+            .take(3)
+            .any(|(&c, &b)| c.abs_diff(b) > EPS);
+        if lit {
+            sum_y += f64::from(i as u32 / img.width);
+            n += 1;
+        }
+    }
+    assert!(n > 0, "no lit pixels to take a centroid of");
+    (sum_y / n as f64 / f64::from(img.height) - 0.5) as f32
+}
+
+/// Lit width per row, plus the figure's first and last lit row. The width is the
+/// span from leftmost to rightmost lit pixel, so a row's interior gaps do not
+/// reduce it — this measures the figure's silhouette, not its fill.
+fn lit_row_widths(img: &CaptureImage) -> (Vec<u32>, usize, usize) {
+    let bg = background(img);
+    let (w, h) = (img.width as usize, img.height as usize);
+    let (mut lo, mut hi) = (vec![u32::MAX; h], vec![0u32; h]);
+    for (i, px) in img.rgba.chunks_exact(4).enumerate() {
+        let lit = px
+            .iter()
+            .zip(bg.iter())
+            .take(3)
+            .any(|(&c, &b)| c.abs_diff(b) > EPS);
+        if !lit {
+            continue;
+        }
+        let (x, y) = ((i % w) as u32, i / w);
+        let l = lo.get_mut(y).expect("row within height");
+        *l = (*l).min(x);
+        let r = hi.get_mut(y).expect("row within height");
+        *r = (*r).max(x);
+    }
+    let widths: Vec<u32> = lo
+        .iter()
+        .zip(hi.iter())
+        .map(|(&l, &r)| if l == u32::MAX { 0 } else { r - l + 1 })
+        .collect();
+    let top = widths.iter().position(|&v| v > 0).expect("some lit row");
+    let bot = h
+        - 1
+        - widths
+            .iter()
+            .rev()
+            .position(|&v| v > 0)
+            .expect("some lit row");
+    (widths, top, bot)
+}
+
+/// A bare attractor preset for one family — no backdrop, no bloom, so the
+/// measured figure is the scene's own geometry. **Not the shipped preset**: those
+/// bind `bg_vignette`, which is itself a large, vertically symmetric lit region
+/// and swamps any shape statistic taken against a corner pixel (ADR-0067).
+fn attractor_bare_preset(name: &str, family: &str, extra: &str) -> Preset {
+    let toml = format!(
+        "system = \"attractor\"\nname = \"{name}\"\n[particles]\nfamily = \"{family}\"\n\
+         [params]\nsize = \"0.4\"\nfade = \"0.62\"\n{extra}"
+    );
+    Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name} preset parses: {e}"))
+}
+
+/// `pan_y` probe magnitude, in NDC. The frame spans 2 NDC units vertically, so a
+/// pan of `p` displaces the figure by `p/2` of frame height and the **separation**
+/// between `+p` and `-p` captures is `p` — which is why the assertion below reads
+/// against `PAN_PROBE` directly.
+const PAN_PROBE: f32 = 0.30;
+
 #[test]
 fn attractor_contract() {
     let Some(mut renderer) = headless() else {
@@ -181,6 +258,96 @@ fn attractor_contract() {
     assert_eq!(
         zoomed.rgba, zoomed_again.rgba,
         "zoomed attractor capture is not reproducible"
+    );
+
+    // --- `pan_y` moves the figure (Plan 0059 Phase 1b, ADR-0070) --------------
+    //
+    // The check above binds `pan_x`, and a horizontal pan is exactly the axis a
+    // *vertical* mirror leaves alone — which is why it passed for the whole life
+    // of the bug it could not see. The attractor's decay pass sampled the
+    // accumulation target with the unflipped fullscreen prelude while the draw
+    // pass wrote that same target in clip space, so the feedback re-read its own
+    // history mirrored and the steady state was `figure ∪ mirror(figure)`. A
+    // doubled figure is symmetric about the centre line **by construction**, so
+    // its centroid is pinned there no matter what `pan_y` says.
+    //
+    // Measured both ways at 96x96 rather than argued (the numbers are the reason
+    // for the threshold):
+    //
+    //   centroid(-0.30) - centroid(+0.30)   pre-fix 0.050   post-fix 0.300
+    //
+    // The geometric expectation is exactly `PAN_PROBE` — post-fix reproduces it
+    // to three decimals, and the defect delivers a sixth of it. Taking the
+    // **separation** between opposite pans rather than an absolute offset cancels
+    // the figure's own centroid, which is not at the centre line and should not
+    // have to be. 0.20 sits 4x above the broken value with 1.5x of headroom under
+    // the true one, which is the room the `EPS` cut and edge clipping need.
+    renderer.set_presets(vec![
+        attractor_view_preset("at_pan_up", &format!("pan_y = \"{PAN_PROBE}\"\n")),
+        attractor_view_preset("at_pan_down", &format!("pan_y = \"-{PAN_PROBE}\"\n")),
+    ]);
+    let up = renderer
+        .capture_preset("at_pan_up", &lively, 60)
+        .expect("capture at_pan_up");
+    let down = renderer
+        .capture_preset("at_pan_down", &lively, 60)
+        .expect("capture at_pan_down");
+    let (up_c, down_c) = (lit_centroid_offset(&up), lit_centroid_offset(&down));
+    let separation = down_c - up_c;
+    println!(
+        "pan_y centroid: +{PAN_PROBE} -> {up_c:+.4}, -{PAN_PROBE} -> {down_c:+.4}, \
+         separation {separation:.4} (geometry predicts {PAN_PROBE:.4})"
+    );
+    // Signed, not `abs()`: a chain with *both* flips wrong renders the figure
+    // upside down but un-mirrored, which would satisfy a magnitude test while
+    // moving the picture the wrong way. This fails on it.
+    assert!(
+        separation > 0.20,
+        "`pan_y` does not move the attractor: centroid separation between \
+         pan_y = +{PAN_PROBE} and -{PAN_PROBE} is {separation:.4}, against {PAN_PROBE:.2} from the \
+         geometry. Below ~0.05 the trail is mirroring itself and the doubled figure's centroid is \
+         pinned to the centre line (ADR-0070); a negative value means the vertical axis is inverted"
+    );
+
+    // --- Lorenz is the butterfly, not the bowtie (Plan 0059 Phase 1b) ---------
+    //
+    // Orientation asserted against the attractor's own data rather than taste:
+    // the particle buffer puts high `z` at the wing tips (|x| > 14 -> mean z 36.9;
+    // |x| < 2 -> 19.8), so viewed x-z with +z up the wings splay upward and the
+    // figure is **top-heavy** — wide wings above, a converging tail below. The
+    // spin cannot spoil this: it is a turntable about the vertical, so it changes
+    // the horizontal extent at every angle and the vertical profile at none.
+    //
+    // Measured, upper-half lit area / lower-half:  pre-fix 0.955   post-fix 1.467
+    //
+    // Pre-fix sits at 1.0 because the mirror doubling makes the figure symmetric
+    // by construction — so this discriminates all three states: doubled (~1.0),
+    // correctly oriented (>1.25), and both-flips-wrong (upside down, <1.0).
+    renderer.set_presets(vec![attractor_bare_preset("at_lorenz_bare", "lorenz", "")]);
+    let bare = renderer
+        .capture_preset("at_lorenz_bare", &lively, 90)
+        .expect("capture at_lorenz_bare");
+    let (widths, top, bot) = lit_row_widths(&bare);
+    let half = (bot - top) / 2;
+    let upper: u64 = widths
+        .get(top..top + half)
+        .expect("upper half within figure")
+        .iter()
+        .map(|&v| u64::from(v))
+        .sum();
+    let lower: u64 = widths
+        .get(bot - half..=bot)
+        .expect("lower half within figure")
+        .iter()
+        .map(|&v| u64::from(v))
+        .sum();
+    let top_heavy = upper as f32 / lower.max(1) as f32;
+    println!("Lorenz upper/lower lit area = {top_heavy:.3} (rows {top}..{bot})");
+    assert!(
+        top_heavy > 1.25,
+        "Lorenz is not top-heavy: upper/lower lit area {top_heavy:.3}. At ~1.0 the trail is \
+         mirroring itself and the butterfly is a symmetric bowtie (ADR-0070); below 1.0 the \
+         vertical axis is inverted and the wings are at the bottom"
     );
 }
 

@@ -8,7 +8,7 @@
 //! `render/scenes/` (Plan 0031 Phase 5). One home, so a wgpu API change is one
 //! edit and a new stage starts from the same shapes as the existing ones.
 //!
-//! # The three vertex preludes are not interchangeable
+//! # The two vertex preludes are not interchangeable
 //!
 //! Every fullscreen pass draws the same oversized triangle, but they disagree on
 //! what the fragment stage receives, and the disagreement is **load-bearing**:
@@ -17,15 +17,31 @@
 //!   for shaders that evaluate a field analytically rather than sampling a
 //!   texture (the backdrop, the fragment field).
 //! - [`FULLSCREEN_VS_UV_FLIPPED`] hands it texture coordinates with **Y flipped**,
-//!   for a pass sampling a texture some *other* pass rendered into with the
-//!   ordinary render-target orientation (the composite stages).
-//! - [`FULLSCREEN_VS_UV`] hands it texture coordinates **without** the flip, for
-//!   a pass sampling a field written by another pass using this same convention,
-//!   where the two flips would cancel (the reaction-diffusion and attractor
-//!   ping-pong chains).
+//!   for any pass that samples a texture — a composite stage reading what another
+//!   pass rendered, or a feedback pass re-reading the target it is writing.
+//!
+//! # A pass that samples the target it writes addresses it in framebuffer space
+//!
+//! Clip space is Y-up; `@builtin(position)` and texture space are Y-down. A
+//! fullscreen fragment at clip `p.y` writes framebuffer row `(1 - (p.y+1)/2)*H`,
+//! so the only `uv` that round-trips to that same row is the **flipped** one.
+//! There used to be a third prelude here, `FULLSCREEN_VS_UV`, handing over
+//! unflipped coordinates and justified as "for a ping-pong chain where every pass
+//! uses this convention, so the flips would cancel". They do not cancel, and no
+//! arrangement of neighbouring passes makes them: an unflipped read samples row
+//! `((p.y+1)/2)*H` while the fragment writes the opposite row, so the mirror is
+//! **complete within one pass**. It shipped in the attractor's decay pass, whose
+//! target the draw pass writes in clip space, and every attractor rendered as
+//! `figure ∪ mirror(figure)` for the life of the scene
+//! ([ADR-0070](../../../docs/adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md)).
+//!
+//! The alternative to a round-tripping `uv` is to skip `uv` entirely and address
+//! by `@builtin(position)` through `textureLoad`, which is exact — that is what
+//! reaction-diffusion's Gray-Scott step does, and it is why RD was the one user of
+//! the retired prelude that it never actually mirrored.
 //!
 //! Handing a shader the wrong one produces a vertically-mirrored effect. They are
-//! three constants rather than one with a flag precisely so a call site has to
+//! two constants rather than one with a flag precisely so a call site has to
 //! name which it means.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
@@ -252,6 +268,11 @@ fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
 /// Fullscreen triangle passing **texture** coordinates as `uv`, with **Y
 /// flipped** — clip space is Y-up, a render target's texture space is Y-down, so
 /// a pass sampling what another pass rendered needs this.
+///
+/// This is also the only correct choice for a **feedback** pass re-reading the
+/// target it writes: the flip is what makes `uv` round-trip to the fragment's own
+/// framebuffer row. See the module docs — the unflipped variant that used to sit
+/// below this one mirrored every such read and has been retired (ADR-0070).
 pub(crate) const FULLSCREEN_VS_UV_FLIPPED: &str = r#"
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
@@ -268,29 +289,6 @@ fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
     var out: VsOut;
     out.pos = vec4<f32>(p, 0.0, 1.0);
     out.uv = vec2<f32>(0.5 * p.x + 0.5, 0.5 - 0.5 * p.y);
-    return out;
-}
-"#;
-
-/// Fullscreen triangle passing texture coordinates as `uv` **without** the Y
-/// flip. For a ping-pong chain where every pass uses this convention, so the
-/// flips would cancel: reading and writing agree, and the field never appears
-/// inverted to itself.
-pub(crate) const FULLSCREEN_VS_UV: &str = r#"
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    var pts = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
-    );
-    let p = pts[vi];
-    var out: VsOut;
-    out.pos = vec4<f32>(p, 0.0, 1.0);
-    out.uv = p * 0.5 + vec2<f32>(0.5, 0.5);
     return out;
 }
 "#;

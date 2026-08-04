@@ -278,7 +278,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // untouched, so an unbound preset renders identically. Same shape fragment_field
     // uses for its field-space zoom/pan.
     let zoom = pp.c.x;
-    let pan = pp.c.yz;
+    // `pan.y` is negated because `in.uv` is now Y-flipped (ADR-0070): this pass
+    // moved from the retired unflipped prelude, which reversed the direction a
+    // positive `pan_y` scrolls the field. Every other scene applies pan in clip
+    // space, where +y is up, and all four RD presets were authored against that
+    // agreement — so the sign restores the shipped behaviour rather than changing
+    // it. Measured both ways: pan_y = +0.12 moves the field 86 px, up before this
+    // and down without this negation.
+    let pan = vec2<f32>(pp.c.y, -pp.c.z);
     let uv = (in.uv - vec2<f32>(0.5, 0.5)) * zoom + vec2<f32>(0.5, 0.5) + pan;
 
     let v = sample_v(uv);
@@ -396,14 +403,22 @@ struct Resources {
 impl Resources {
     /// Create every pipeline, buffer, bind group, and the ping-pong field.
     fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
-        let init_shader =
-            gpu::fullscreen_shader(device, "rd-init-shader", gpu::FULLSCREEN_VS_UV, INIT_SHADER);
-        let sim_shader =
-            gpu::fullscreen_shader(device, "rd-sim-shader", gpu::FULLSCREEN_VS_UV, SIM_SHADER);
+        let init_shader = gpu::fullscreen_shader(
+            device,
+            "rd-init-shader",
+            gpu::FULLSCREEN_VS_UV_FLIPPED,
+            INIT_SHADER,
+        );
+        let sim_shader = gpu::fullscreen_shader(
+            device,
+            "rd-sim-shader",
+            gpu::FULLSCREEN_VS_UV_FLIPPED,
+            SIM_SHADER,
+        );
         let present_shader = gpu::fullscreen_shader(
             device,
             "rd-present-shader",
-            gpu::FULLSCREEN_VS_UV,
+            gpu::FULLSCREEN_VS_UV_FLIPPED,
             PRESENT_SHADER,
         );
 
