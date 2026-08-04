@@ -27,10 +27,11 @@
 # disc clamp (no falloff) at mean 0.0189 - green, at 94% of the drift budget,
 # announcing nothing. The falloff is what lets this fixture see its own fix. It is
 # still not the direct guard 0010 asked for: that is
-# core/tests/kaleidoscope.rs::the_fold_paints_nothing_outside_its_disc, which
-# asserts the out-of-disc statistic on a border-filling fixture at a PORTRAIT
-# aspect, and which fails on the pre-fix shader with peak 199 and every one of
-# 6052 out-of-disc pixels lit.
+# core/tests/kaleidoscope.rs::the_falloff_treatment_paints_nothing_outside_its_disc
+# (renamed from `the_fold_paints_nothing_outside_its_disc` at Plan 0055 Phase 3 -
+# see the ADR-0061 note below), which asserts the out-of-disc statistic on a
+# border-filling fixture at a PORTRAIT aspect, and which fails on the pre-fix
+# shader with peak 199 and every one of 6052 out-of-disc pixels lit.
 #
 # IT MOVED A SECOND TIME AT PLAN 0051, AND FOR A REASON WORTH READING. That plan
 # made the line renderer emit premultiplied alpha equal to its own coverage
@@ -60,6 +61,31 @@
 # ADR-0047 IS STILL `proposed`. Plan 0045 Phase 2 confirms the treatment against
 # rendered samples, and if the user picks a different one this baseline moves ONE
 # MORE TIME. That move is also the decision landing, not a regression.
+#
+# THE FOLD'S EDGE IS NOW A CHOICE, AND THIS FIXTURE PINS THE DEFAULT ARM ONLY
+# (2026-08-04, Plan 0055 / ADR-0061). What happens outside the inscribed disc is a
+# per-preset selector, `kaleido_edge`, with three treatments: `falloff` (0, what
+# ADR-0047 shipped and what the paragraphs above describe), `tile` (1) and
+# `squash` (2). Plan 0055 Phase 2's live A/B made `tile` the DEFAULT, so this
+# fixture - which binds no `kaleido_edge` - now renders `tile` rather than the
+# treatment its history above is written about.
+#
+# THAT PREDICTED A THIRD MOVE. IT DID NOT HAPPEN, and the reason is the useful
+# part. This is a centred line figure over an empty border, so there is nothing
+# out past `r_max` for a fill treatment to bring in: mirroring empty content
+# outward produces empty content. Measured rather than argued - the fixture
+# rendered at 160x100 with `kaleido_edge` pinned to 0 and to 1 gives md5-IDENTICAL
+# PNGs, and the drift against the untouched baseline is mean 0.0000 / outlier 1.
+# It is the same fact core/tests/kaleidoscope.rs states when it explains why a
+# centred line figure cannot serve as ITS border-filling fixture.
+#
+# So this baseline is blind to the edge treatment by construction, and that is now
+# a documented property of it rather than an accident: it pins the fold's GEOMETRY
+# (wedge count, angle wrap, aspect correction) and pins nothing about the edge.
+# The edge is pinned by composite_kaleido_squash.png, which is the same stage on a
+# border-filling source at a non-default treatment. Keeping the two separable is
+# why there are two - a failure here is geometry, a failure there is the radius
+# map.
 #
 # There is no fold order that avoided the old defect: at order 2 every output
 # angle folds into the first quadrant and a corner radius still overruns the

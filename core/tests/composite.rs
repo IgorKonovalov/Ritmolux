@@ -87,7 +87,17 @@ const MAX_OUTLIER: u8 = 48;
 /// is the reason this file exists in the shape it does; a mega-composite fixture
 /// would put every stage's pipelines on the device at once and make any
 /// mis-render impossible to attribute.
-const FIXTURES: [(&str, &str); 4] = [
+///
+/// `composite_kaleido_squash` (Plan 0055 Phase 4) is the one pair here that
+/// shares a stage rather than owning one. That does not break the rule above —
+/// both bind the kaleidoscope and nothing else, so neither puts a pipeline on the
+/// device that the other does not. What the two separate is the fold's
+/// **geometry** from its **edge treatment**, which ADR-0061 made a per-preset
+/// choice: `composite_kaleido` is a centred figure over an empty border, so it
+/// renders identically under every treatment (measured at Phase 3 — its
+/// `kaleido_edge` pinned to 0 and to 1 gives md5-identical PNGs) and therefore
+/// cannot pin the edge at all. Its sibling's own header carries the rest.
+const FIXTURES: [(&str, &str); 5] = [
     (
         "composite_trails",
         include_str!("fixtures/composite_trails.toml"),
@@ -95,6 +105,10 @@ const FIXTURES: [(&str, &str); 4] = [
     (
         "composite_kaleido",
         include_str!("fixtures/composite_kaleido.toml"),
+    ),
+    (
+        "composite_kaleido_squash",
+        include_str!("fixtures/composite_kaleido_squash.toml"),
     ),
     (
         "composite_overlap",

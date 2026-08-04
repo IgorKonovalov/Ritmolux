@@ -146,24 +146,32 @@ pan_y = "cos(time * 0.025) * 0.05"
 # is the value that fills the frame while still reading as separate strokes;
 # past ~0.85 the dashes fuse and it becomes Flow's silk.
 trails        = "0.76 + clamp(mid * 0.118, 0, 0.10)"
-# THE SCREEN FOLD IS OFF, and this is a mitigation for an ENGINE artifact rather
-# than a taste decision - it is written up as feedback for architect.
+# THE SCREEN FOLD IS OFF, AND THE ENGINE ARTIFACT IT DODGED IS GONE (2026-08-04).
 #
-# At `kaleido_order = 6` this preset grew hard, bright, straight bars along the
-# left and right frame edges and bright wedges in the corners, in every frame.
-# An A/B with the identical file at order 1 is clean, so it is the fold and not
-# the swarm. The mechanism: the fold samples its source beyond the frame edge and
-# clamps to the edge texel, so any bright pixel sitting ON the border gets
-# replicated along the entire fold seam. A sparse particle field over a
-# near-black background is the worst case for that - the full-frame scenes
-# (fragment_field, reaction_diffusion) have no dark background for a smeared
-# edge texel to stand out against, which is why only this preset shows it.
+# The original note - kept in substance because it is the record of a real defect
+# - said this: at `kaleido_order = 6` the preset grew hard, bright, straight bars
+# along the left and right frame edges and bright wedges in the corners, in every
+# frame; an A/B at order 1 was clean, so it was the fold and not the swarm. The
+# mechanism was that the fold sampled its source beyond the frame edge and clamped
+# to the edge texel, so any bright pixel sitting ON the border was replicated along
+# the entire fold seam. A sparse particle field over a near-black background is the
+# worst case for that, which is why only this preset showed it.
 #
-# No preset-side lever fixes it: the artifact is in the sampling, not in what is
-# handed to it, and dimming the source enough to hide the bars also erases the
-# figure. So Dense runs unfolded. It loses nothing essential - ten thousand
-# particles in a tight hue window IS the preset - and the geometry mirror is not
-# an option here either, since `swarm` is not a line system.
+# THAT WAS design-backlog 0010, and it was fixed engine-side by ADR-0047 (Plan
+# 0045): the fold no longer reconstructs a coordinate outside its source at all.
+# Plan 0055 / ADR-0061 then made the out-of-disc region a per-preset choice
+# (`kaleido_edge`), so there are now two fill treatments as well as the fade. The
+# claim "no preset-side lever fixes it" has been false since ADR-0047 landed and
+# doubly so now.
+#
+# THE FOLD IS STILL OFF HERE, but as an unmade decision rather than a mitigation.
+# Nobody has looked at this preset folded since the fix - it was not one of the two
+# scenes Plan 0055's live A/B was judged on - and re-enabling it is a look to be
+# chosen in motion, not a change to make from a comment. Routed to `preset-author`
+# with the rest of the fold-binding library in design-backlog 0058. If it is turned
+# back on, `kaleido_edge` wants choosing at the same time: this is a sparse figure
+# over a dark field, which is exactly the case where `falloff` and a fill treatment
+# look most different.
 kaleido_order = "1"
 kaleido_angle = "time * 0.055"
 bg_hue        = "0.40 + sin(time * 0.013) * 0.05"
