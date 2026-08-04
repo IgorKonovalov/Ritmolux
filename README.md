@@ -59,6 +59,8 @@ lmv-ring/            # The lock-free SPSC ring, split out zero-dependency so Mir
 standalone/          # Rust binary + lib — winit window, wgpu surface, loopback capture, the shot example.
 plugin-foobar/       # C++ shim: foobar2000 SDK integration, links the core's C ABI. Windows-first.
 presets/             # The curated preset library (*.toml) — embedded at build time, seeded on first run.
+packaging/           # What a `v*` tag ships: macos/bundle.sh (build, lipo, sign, zip, verify) and the
+                     #   READ-ME-FIRST.md testers get in each zip. See ADR-0038.
 docs/
 ├── nfr.md           # Quantified v1 non-functional requirements (the numbers behind "lightweight").
 ├── presets.md       # Preset authoring guide: the expression language, loading, and where files live.
@@ -76,6 +78,29 @@ docs/
 
 The per-system parameter tables live in [`presets/README.md`](presets/README.md), beside the
 preset files they document.
+
+## Download
+
+Prebuilt standalone binaries are attached to each tag on the
+[Releases page](https://github.com/IgorKonovalov/light-music-visualizer/releases). Two zips per
+release, each carrying the app, a reference copy of the presets, and a `READ-ME-FIRST.txt`:
+
+| Zip | What's in it |
+|-----|--------------|
+| `…-macos-universal.zip` | `LightMusicVisualizer.app` — universal (Apple Silicon + Intel), **macOS 13+** |
+| `…-windows-x64.zip` | `lmv.exe` — Windows x64 |
+
+Both are **unsigned**, so each OS objects once. On Windows, SmartScreen says "Windows protected
+your PC" → More info → Run anyway. On macOS, the app is ad-hoc signed only, so either right-click
+it and choose **Open**, or strip the quarantine attribute first:
+
+```sh
+xattr -dr com.apple.quarantine LightMusicVisualizer.app
+```
+
+The macOS build then asks for the **Screen Recording** permission — that is the only first-party
+way to tap system audio — and needs a **relaunch** after you grant it. Releases are marked
+prerelease while the app is `0.x`. The `READ-ME-FIRST.txt` in each zip has the rest.
 
 ## Running the standalone app
 
@@ -264,12 +289,11 @@ OpenGL) recorded.
   one has been exercised on real hardware. A virtual device (BlackHole) remains the fallback if
   the SCK route disappoints — set it as the output and no capture code is needed. The foobar
   plugin sidesteps capture entirely, which is part of why plugin parity is valuable on Mac.
-- **There is no Mac build to download yet.** The dev box is Windows and cannot link a Mach-O
-  binary, so a macOS runner is the only build host. The tag-driven release that produces a
-  universal, ad-hoc-signed `.app` is designed and approved but not yet built — see
-  [ADR-0038](docs/adrs/0038-tag-driven-release-unsigned-universal-mac-app.md) and
-  [Plan 0036](docs/plans/0036-macos-and-windows-release-artifacts.md). Until it lands, running
-  on a Mac means `cargo run -p standalone --release` on that Mac.
+- **The Mac build is made by CI, not here.** The dev box is Windows and cannot link a Mach-O
+  binary, so a macOS runner is the only build host — which is why the `.app` arrives through a
+  tag-driven release rather than from anyone's machine
+  ([ADR-0038](docs/adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)). `packaging/macos/bundle.sh`
+  is checked in and runs standalone on any Mac, so that is not a permanent condition.
 - **wgpu targets differ per OS** — Metal on macOS, DX12/Vulkan on Windows. Scene code writes to
   wgpu and does not branch on the backend.
 
