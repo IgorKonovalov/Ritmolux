@@ -33,9 +33,9 @@ family = "de_jong"
 # SHAPE - four incommensurate slow sines (periods ~200/260/330/410 s) so the
 # drawing is redrawn continuously and never repeats, with a small clamped band
 # term on top. Chaotic maps cut rather than morph if you shove them.
-a = "1.641 + sin(time * 0.0314) * 0.075 + clamp(bass * 0.094, 0, 0.080)"
+a = "1.641 + sin(time * 0.0314) * 0.075 + clamp(bass * 0.175, 0, 0.140)"
 b = "1.902 + cos(time * 0.0241) * 0.065 + clamp(mid * 0.082, 0, 0.070)"
-c = "0.316 + sin(time * 0.0190) * 0.085 + clamp(treb * 0.092, 0, 0.055)"
+c = "0.316 + sin(time * 0.0190) * 0.085 + clamp(treb * 0.055, 0, 0.034)"
 d = "1.525 + cos(time * 0.0153) * 0.070 - clamp(bass * 0.053, 0, 0.045)"
 
 # THE NIB. Fine on purpose - the trail grid is surface-sized (Plan 0027 Phase
