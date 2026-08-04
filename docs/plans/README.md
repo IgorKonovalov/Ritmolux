@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0062** (ADRs are a separate sequence — next free there is **0075**.)
+**Next free number: 0063** (ADRs are a separate sequence — next free there is **0076**.)
 
 ## Active roster
 
@@ -16,6 +16,8 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
 | [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended twice the same day** — **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (at the user's direct request), reconciled into the plan rather than reverted: it meets 4b's done-when with one accepted deviation (a test-written scratch library rather than a checked-in `fixtures/report/`), and it **opens the coverage gap 4b's sequencing existed to prevent** — nothing renders every shipped preset through the real CLI any more *and* Phase 4 has not yet put the generator under in-process tests. Every other phase is unstarted. From the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Amended a third time with Phase 2c** (2026-08-04, at [0060]'s close): a `links` job on `ubuntu-latest` giving `scripts/check-doc-links.mjs` a CI counterpart, so the doc-link gate stops depending on an opt-in hook. Independent of 2b/4b, touches neither Windows job, seconds on the cheapest runner — it is here only because this plan owns every `ci.yml` edit in flight. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. ~~Phase 6 is gated on [0059] being closed~~ — **released 2026-08-04**, [0059] has closed, so Phase 6 (which edits `particles/mod.rs`) is unblocked; it also inherits [0059]’s close decision to **retire `RESEED_DRAWS_STREAK`**, which lives in that same file; **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
 
+| [0062](0062-the-chaos-game-grows-a-fern.md) | The chaos game grows a fern: an IFS family that morphs between figures (`AttractorFamily::Ifs`, five curated tables in SVD form, safe-by-construction morph + four levers) | **draft 2026-08-04** — designed from the user's Barnsley-fern question; [ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md). **The first half of a deliberate two-plan split** (the user's call at interview): this one lands the *figure* — the family, the roster, the morph, the levers — so a real fern can be judged in motion; the successor carries the **unfurl and the depth/per-map colour**, which are the same per-particle channel and are tuned against a figure already known to be right. Adds **no** render idiom, no `Scene` change, no C ABI change, no dependency — the `attractor` scene is already a GPU chaos game and this is a fifth family plus one shader branch. **Phase 7 is `human`** (a `preset-author` pass judging levers against real audio), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
+
 ## Recommended execution sequence
 
 **CI IS GREEN as of 2026-08-04** (run **30903871856**), after five consecutive red pushes from
@@ -23,6 +25,30 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 for the first time in a week: `cargo test --doc`, `clippy -D warnings` and `cargo fmt --check` all
 run and pass, and the **coverage ratchet reads 93.34 % against `COVERAGE_FLOOR = 88`**. No floor
 change is owed.
+
+**[0062] is new (2026-08-04) and is the only plan here that adds visual capability the engine does
+not have.** It came from a direct user question — can the Barnsley fern give this project something
+generative and organic at once — and the design interview turned it into something larger than one
+figure: an IFS is twenty-four affine coefficients, and **coefficients interpolate**, so this is the
+engine's first *continuous structural morph*. Every other structural choice in the codebase is
+discrete, which is exactly why [ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md) had to
+rescue `star_pattern`. Three things to know before sequencing it:
+
+- **It is cheap because the idiom already exists.** The `attractor` scene is a GPU chaos game
+  already; an IFS is one branch in its step shader and a fifth `AttractorFamily`. No new render
+  idiom, no `Scene` or C ABI change, no dependency, no existing golden baseline moved.
+- **It is the first half of a two-plan split the user chose at interview.** The successor carries
+  the unfurl and the depth/per-map colour — which turn out to be the *same* per-particle channel
+  (iteration depth since respawn is both the growth clock and the colour ramp), and `Particle`'s
+  free `pad` slot holds it without growing the struct. Sequencing them apart means the growth is
+  tuned against a figure already judged right, rather than two unknowns at once.
+- **It touches `particles/mod.rs`, which [0061] Phase 6 also edits.** Mitigated by construction —
+  everything of consequence goes in a new `particles/ifs.rs`, which is the direction 0061 Phase 6 is
+  heading anyway. Whichever lands second inherits the other's file; neither ordering is wrong.
+
+Its **Phase 7 is `human`** (a `preset-author` pass judging the four levers and five figures against
+real audio), so like [0053] and [0055] it stops before closing in one session — but unlike those
+two, Phases 1-6 are a full `dev` session of real capability with nothing gating them.
 
 **[0060] has landed and closed** (2026-08-04) — see Recently closed. Two lessons and one live
 question outlive it. **A ratio is a property only when numerator and denominator are the same kind
@@ -34,7 +60,8 @@ finally took matched **CI WARP** to five figures and disagreed with **this box's
 suite blesses on, not the runner's. Nothing has looked at what else that moves.
 
 
-**[0061] goes last, by the user's own instruction, and is the only `draft` in the roster.** It came
+**[0061] goes last, by the user's own instruction.** (It was the only `draft` in the roster until
+[0062] joined it on 2026-08-04; the two are unrelated and 0062 does not inherit its "goes last".) It came
 out of a whole-tree maintainability audit rather than a feature request, so nothing depends on it and
 it depends on nothing — the one dependency it had, [0059] being closed before its Phase 6 (which edits the same file), was **released 2026-08-04**. Two
 consequences worth carrying: its numbers are a **2026-08-04 snapshot of one machine**, so a phase
@@ -73,7 +100,8 @@ re-planning; the reason they live here is thematic (the plan's title is exactly 
 technical.
 
 **Every other plan in the roster is approved as of 2026-08-04 — nothing is waiting on a design
-decision.** What separates them now is only what each needs to *run*: [0052] closes in one session;
+decision** (the two `draft`s, [0061] and [0062], are fully designed and waiting only on the user's
+go). What separates the approved ones now is only what each needs to *run*: [0052] closes in one session;
 [0053] and [0055] each carry a `human` phase that gates later phases, so they stop mid-plan by
 construction — [0053] until a discrete GPU is to hand, [0055] until the live A/B is judged.
 Taking [0052] first keeps a session unblocked end to end.
