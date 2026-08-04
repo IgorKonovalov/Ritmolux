@@ -243,10 +243,10 @@ Small, separable, each closing a named wall:
 - **Slew-release smoothing form** (backlog 0021's shape) — the even fall, no new state.
 - **Per-segment colour on the line family** (backlog 0026) + `[palette]` adoption on the
   three scenes that still ignore it — ends whole-figure-hue. *Designed:
-  [Plan 0054](plans/0054-the-line-scenes-catch-up.md) / ADR-0059, approved, not yet built.*
+  [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md) / ADR-0059, approved, not yet built.*
 - **Bindable structural tables where cheap**: `elements`, `angle_deg`, `contact_angle_deg`,
   a real geometry lerp for `star_pattern` variants (backlog 0007, user-requested).
-  *Designed: [Plan 0054](plans/0054-the-line-scenes-catch-up.md) / ADR-0060.*
+  *Designed: [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md) / ADR-0060.*
 - ~~The half-linear band axis (backlog 0015, already flagged as the next ADR) rides in this
   theme.~~ **Landed** — Plan [0048](plans/done/0048-analysis-v2-and-the-retune.md) /
   ADR-0049: a second 8192-sample window feeds every band below the ~246 Hz crossover, so all
@@ -282,7 +282,7 @@ phrase, cellular fields that crack open on the bass.
    *into* the R1 pipeline, and is unblocked now that R1 has landed), with 0010/0011 folded in.
 
 R4 items 1-2 are small enough to interleave whenever a gap opens; **R5 is substantially
-delivered** (Plans 0047 + 0048) and its remainder is [Plan 0054](plans/0054-the-line-scenes-catch-up.md).
+delivered** (Plans 0047 + 0048) and its remainder is [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md).
 
 **What this roadmap deliberately does not do:** reopen ADR-0001 (the Rust/wgpu/C-ABI chassis
 is an asset); take ADR-0002's author-WGSL escape hatch (revisit only if R1-R5 prove

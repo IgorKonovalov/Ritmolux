@@ -17,7 +17,7 @@ instrumented binaries make the WARP suites slower."* That sentence had never bee
 measurement, because until 2026-08-04 there was no green CI run to measure. The five pushes since
 2026-07-30 all died inside `cargo nextest run`, and nextest's fail-fast cancellation made the red
 runs read as ~4 minutes — fast-looking runs that were not runs at all. Plan
-[0060](../plans/0060-a-test-number-states-a-property-or-names-its-machine.md) turned the gate green;
+[0060](../plans/done/0060-a-test-number-states-a-property-or-names-its-machine.md) turned the gate green;
 run **30903871856** is the first complete measurement this project has ever had of its own CI.
 
 | Job | Runner | Wall | Of which `nextest` |

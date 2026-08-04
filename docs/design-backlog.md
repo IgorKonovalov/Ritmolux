@@ -308,7 +308,7 @@ of the perceived benefit for a fraction of that.
 ## ~~0007 — `star_pattern` reads as a hollow ring, and discrete `variant` cannot be blended~~
 
 - **PROMOTED 2026-08-01 → [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md) +
-  [Plan 0054](plans/0054-the-line-scenes-catch-up.md)** — the *smooth transition* ask is decided:
+  [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md)** — the *smooth transition* ask is decided:
   `variant` becomes a continuous contact angle with a hysteresis cache. **The interior "hollow
   ring" half is NOT decided** and stays live; ADR-0060's Notes carry the lane's
   `contact_angle_deg` sweep as the starting measurement. Notes below retained as the origin record.
@@ -1317,7 +1317,7 @@ constant that should be a param, already plumbed, defaulting to the value it rep
 ## ~~0026 — `lsystem` has no per-segment colour, and the asymmetry with `spectrum` looks unintentional~~
 
 - **PROMOTED 2026-08-01 → [ADR-0059](adrs/0059-line-scenes-colour-along-their-generator-axis.md) +
-  [Plan 0054](plans/0054-the-line-scenes-catch-up.md)**, at wider scope than filed: reading the
+  [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md)**, at wider scope than filed: reading the
   code showed `spectrum` is the *only* line scene reaching `[palette]` at all, so all four
   generators get the colour surface, each on its own axis (`lsystem` colours by **generation
   depth**). Notes below retained as the origin record.
@@ -1770,7 +1770,7 @@ re-check found, stated as what was and was not verified:
   deliberate property that keeps baselines reproducible. The `--tier floor` / `--tier rich`
   commands this entry calls "one command and the cheapest discriminator" **do not exist**; that
   half of the entry was written against a capability the harness does not have. Settling either
-  half therefore needs the running app at `Rich`, which [Plan 0050](plans/0050-in-app-settings-and-a-browse-overlay-that-fits.md)'s
+  half therefore needs the running app at `Rich`, which [Plan 0050](plans/done/0050-in-app-settings-and-a-browse-overlay-that-fits.md)'s
   `[` / `]` tier swap makes an A/B in one sitting.
 - **Half two (the slabs) is untouched by Plan 0045.** It is a reseed-transient density problem in
   the seed box, and nothing in the linear-light work addresses it. A tonemapped slab is less
@@ -2306,7 +2306,7 @@ would sharpen the 6 % figure the half-and-half split leaves approximate.
 ## ~~0043 — every reactivity instrument we have diffs against **silence**, so a binding saturated just above the noise floor reads as maximally reactive~~
 
 - **PROMOTED 2026-08-03 → [ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) +
-  [Plan 0056](plans/0056-clamp-occupancy-and-the-axis-anchor.md)** (occupancy recorded on the
+  [Plan 0056](plans/done/0056-clamp-occupancy-and-the-axis-anchor.md)** (occupancy recorded on the
   existing walk, printed in `--report`, and enforced as a HARD gate). The ADR takes the entry's
   second option and **rejects its first**: a mid-scale rung in the reactivity gate names the preset
   where occupancy names the binding, and costs another render pass per band. Notes retained below
@@ -2371,7 +2371,7 @@ below anything music produces — and the instruments that closed the first were
 
 - **PROMOTED 2026-08-03 → [ADR-0063](adrs/0063-address-the-spectrum-by-frequency.md)** (`bin_hz` /
   `bin_range`, folding in the `bin_range` ADR-0036 deferred), with the external axis anchor landing
-  as [Plan 0056](plans/0056-clamp-occupancy-and-the-axis-anchor.md) Phase 4. **The doc half is
+  as [Plan 0056](plans/done/0056-clamp-occupancy-and-the-axis-anchor.md) Phase 4. **The doc half is
   done** — `docs/presets.md`'s axis block was regenerated from `fft.rs` + `expr.rs` and the stale
   `onset` line removed. Two corrections the regeneration produced, both sharper than this entry:
   every band is now **1.8 semitones wide everywhere** (the old "two regimes" and "the bottom is the
@@ -2525,14 +2525,14 @@ Two smaller things worth keeping:
 
 - **PROMOTED 2026-08-03 → [ADR-0064](adrs/0064-a-capture-may-pin-the-rich-tier.md) +
   [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) +
-  [Plan 0057](plans/0057-the-attractors-compute-path.md)** — both halves are taken, and they went to
+  [Plan 0057](plans/done/0057-the-attractors-compute-path.md)** — both halves are taken, and they went to
   different places. The **deposit** is normalized by particle count (Plan 0057 Phase 2), which was
   this entry's first and cheapest option; the **`shot --tier` flag** is taken too rather than
   rejected as the entry expected, because a *pinned* tier is an input and ADR-0045 already named
   capture-level `Rich` spot checks as that tier's verification path (Plan 0057 Phase 1). The third
   option — document the 3x and leave the trap armed — is rejected in ADR-0065's Alternative A.
   **The second finding (the `sanity` gate passing a saturated frame) went to
-  [Plan 0056](plans/0056-clamp-occupancy-and-the-axis-anchor.md) Phase 5**, as this entry suggested,
+  [Plan 0056](plans/done/0056-clamp-occupancy-and-the-axis-anchor.md) Phase 5**, as this entry suggested,
   where it is a general flat-frame check rather than an attractor-specific one — with the honest
   question attached: `sanity` renders at `Floor` and at silence, so the phase must state which of
   these four presets it would actually have caught. Notes below retained as the origin record.
@@ -2704,7 +2704,7 @@ Two consequences for the plan:
 ## ~~0050 — the attractor reseed scatters into an axis-aligned BOX, so every reseed flashes a speckled rectangle across the frame~~
 
 - **PROMOTED 2026-08-03 → [ADR-0066](adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) +
-  [Plan 0057](plans/0057-the-attractors-compute-path.md) Phase 3** — the first of this entry's four
+  [Plan 0057](plans/done/0057-the-attractors-compute-path.md) Phase 3** — the first of this entry's four
   options is taken: a reseed **perturbs the cloud in place** rather than re-filling `seed_box`, so
   no rectangle exists at any tier and there is no convergence transient to wait out. Shaping the
   volume and fading the box in are both rejected in ADR-0066 for the same reason — they treat the
@@ -2868,7 +2868,7 @@ pass that raises `trails` on a line preset should re-run `sanity` rather than as
 ## ~~0053 — Plan 0048's retune rescaled the band GAINS but not the world-space params those bands multiply, and no instrument can see the result~~
 
 - **PROMOTED 2026-08-03 → [ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) +
-  [Plan 0058](plans/0058-the-gate-can-see-an-empty-frame.md)** — coverage is measured against
+  [Plan 0058](plans/done/0058-the-gate-can-see-an-empty-frame.md)** — coverage is measured against
   black rather than a sampled corner, every floor is re-derived, and Phase 3 takes the general
   form of the second finding (more audio must not draw less picture) so no per-param audit is
   needed. The `spectrum_comb` / `spectrum_corona` re-scale is that plan's Phase 4. Notes below
@@ -3076,7 +3076,7 @@ shipped set does regime drift.
 **Two rot findings, both from the file rather than from a render.**
 
 - **`bar` is no longer a variable.** `kaleido_angle = "time * 0.06 + bar * 0.5"` was written against
-  the pre-[0048] grammar; since [ADR-0050](adrs/0050-beat-and-bar-clock.md) the trio is
+  the pre-[0048] grammar; since [ADR-0050](adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) the trio is
   `bar_index` / `bar_phase` / `beat_in_bar`. Expect a load-time unknown-name **warning** and a dead
   term, not a failure. Note also what [0048] Phase 6 measured — the downbeat estimator locks on
   **3.1 %** of audible time — so whatever this term becomes should be built on `beat_index` /

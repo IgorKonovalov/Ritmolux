@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-03) — implemented in full; see Outcome
 > **Date:** 2026-08-03
-> **Related plan(s):** [0057-the-attractors-compute-path](../plans/0057-the-attractors-compute-path.md) (Phase 2)
+> **Related plan(s):** [0057-the-attractors-compute-path](../plans/done/0057-the-attractors-compute-path.md) (Phase 2)
 > **Supplements:** [ADR-0045](0045-quality-tiers-floor-and-rich.md) — quality tiers
 
 ## Context

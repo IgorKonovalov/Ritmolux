@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-03) — implemented in full; see Outcome, including why the stimulus-relative half shipped as a report
 > **Date:** 2026-08-03
-> **Related plan(s):** [0058](../plans/0058-the-gate-can-see-an-empty-frame.md)
+> **Related plan(s):** [0058](../plans/done/0058-the-gate-can-see-an-empty-frame.md)
 > **Supplements:** [ADR-0062](0062-clamp-occupancy-is-the-saturation-instrument.md) (the previous
 > "an instrument reports a picture is alive when it is not" decision — same class, different layer),
 > [ADR-0049](0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (the normalization whose
@@ -95,14 +95,14 @@ median of the four corners, or fit and subtract the radial vignette. **Rejected 
 the symptom rather than the definition.** The defect is not that the reference pixel is badly
 chosen; it is that a lit backdrop is not a figure and no reference pixel makes it one. A fitted
 model would also have to keep pace with every future backdrop shape (`bg_hue` gradients today, and
-[Plan 0046](0046-transformed-feedback.md)'s transformed feedback will add more), and it degrades
+[Plan 0046](../plans/0046-transformed-feedback.md)'s transformed feedback will add more), and it degrades
 silently when it stops fitting — the exact failure mode being fixed.
 
 **An in-frame geometry fraction** — ask the scene what share of its geometry landed inside the
 render target. **Rejected as the primary mechanism, and it is the strongest of the three.** It names
 the actual defect ("the figure left the frame") instead of inferring it from pixels, and it would
 catch an off-frame figure even against a black backdrop. It loses on reach and on cost: it needs a
-new accessor on or beside the `Scene` trait — a seam [ADR-0002](0002-scene-trait.md) deliberately
+new accessor on or beside the `Scene` trait — a seam [ADR-0002](0002-layered-preset-architecture.md) deliberately
 keeps thin — and it only works for scenes that build a CPU-side geometry list. `fragment_field`,
 `reaction_diffusion` and `attractor` draw no segment list at all, and `attractor` is where the next
 instrument is already wanted ([backlog 0031](../design-backlog.md)). Worth revisiting as a

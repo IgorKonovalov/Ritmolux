@@ -13,17 +13,17 @@
 > 0 skipped**, and **no golden baseline moved anywhere in the plan** — proved by re-running the suite
 > without `LMV_BLESS`, as the Decision said it could be checked in advance. C ABI stays **v4**
 > (`core/src/ffi.rs` byte-untouched), no new dependency, nothing added to the audio path.
-> Closes [backlog 0031](../design-backlog.md) outright (both halves, on measurement),
-> [0047](../design-backlog.md) (first half), [0048](../design-backlog.md) → successor plan, and
-> [0050](../design-backlog.md).
+> Closes [backlog 0031](../../design-backlog.md) outright (both halves, on measurement),
+> [0047](../../design-backlog.md) (first half), [0048](../../design-backlog.md) → successor plan, and
+> [0050](../../design-backlog.md).
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md) (Phase 1 — `shot --tier`),
-> [0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) (Phase 2),
-> [0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) (Phase 3).
-> Supplements [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md).
-> Closes [backlog 0047](../design-backlog.md) (first half), [0048](../design-backlog.md),
-> [0050](../design-backlog.md), and the mechanism half of [0031](../design-backlog.md).
+> **Related ADRs:** [0064](../../adrs/0064-a-capture-may-pin-the-rich-tier.md) (Phase 1 — `shot --tier`),
+> [0065](../../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) (Phase 2),
+> [0066](../../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) (Phase 3).
+> Supplements [ADR-0045](../../adrs/0045-quality-tiers-floor-and-rich.md).
+> Closes [backlog 0047](../../design-backlog.md) (first half), [0048](../../design-backlog.md),
+> [0050](../../design-backlog.md), and the mechanism half of [0031](../../design-backlog.md).
 
 ## TL;DR
 
@@ -54,10 +54,10 @@ it is concrete rather than aesthetic:
   construction, so no capture in this project renders the configuration the app *starts* in; and
   `--set` holds a level constant, so no stimulus can express the transient a reseed is. Building
   those two instruments once serves all three fixes — and it is the sequencing
-  [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) paid for: fix the
+  [ADR-0049](../../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) paid for: fix the
   measurement, then do the content once.
 
-The fourth entry from that batch, [backlog 0049](../design-backlog.md), is deliberately **not**
+The fourth entry from that batch, [backlog 0049](../../design-backlog.md), is deliberately **not**
 here — it is Plan 0055's `kaleido_edge` A/B and already designed.
 
 ## Decision
@@ -303,7 +303,7 @@ let deposit_scale = FLOOR_PARTICLES as f32 / active_count as f32;
 - **No `Rich` golden baselines.** ADR-0064 declines them deliberately, pending Plan 0044 Phase 4.
 - **No tier calibration.** Plan 0044 Phase 4 stays open and on-device; this plan makes it cheaper
   to run, not done.
-- **No fold work.** [Backlog 0049](../design-backlog.md) — the fourth entry from the same batch —
+- **No fold work.** [Backlog 0049](../../design-backlog.md) — the fourth entry from the same batch —
   is Plan 0055's `kaleido_edge` A/B, already designed.
 - **No change to the reseed *gates*.** Plan 0048's retune set them; this changes what firing one
   looks like, not when it fires.
@@ -311,7 +311,7 @@ let deposit_scale = FLOOR_PARTICLES as f32 / active_count as f32;
 ## Followups (after this lands)
 
 - If Phase 4 routes back, the per-family view-basis ADR and its phase.
-- Re-check [backlog 0031](../design-backlog.md) — Phases 2 and 3 remove both halves of its
+- Re-check [backlog 0031](../../design-backlog.md) — Phases 2 and 3 remove both halves of its
   mechanism (the 3x and the box), so it should close on measurement rather than on argument.
 - Whether the swarm's additive draw has the same tier asymmetry. No one has reported it; ADR-0065
   is the shape of the answer if they do.

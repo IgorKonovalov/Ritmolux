@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-03) — see Outcome below: `shot --tier` already existed; what Plan 0057 Phase 1 built is `--at` and the `onset` row
 > **Date:** 2026-08-03
-> **Related plan(s):** [0057-the-attractors-compute-path](../plans/0057-the-attractors-compute-path.md) (Phase 1)
+> **Related plan(s):** [0057-the-attractors-compute-path](../plans/done/0057-the-attractors-compute-path.md) (Phase 1)
 > **Supplements:** [ADR-0045](0045-quality-tiers-floor-and-rich.md) — quality tiers
 
 ## Context

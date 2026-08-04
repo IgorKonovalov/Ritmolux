@@ -23,7 +23,7 @@
 > **Phase 5 was added at approval (2026-08-03)**, folding in the second half of
 > [backlog 0047](../../design-backlog.md) — the `sanity` gate passing a fully saturated frame. Same
 > class of defect as occupancy, same plan: an instrument that reports a picture is alive when it is
-> not. [Plan 0057](../0057-the-attractors-compute-path.md) Phase 6 consumes its statistic, so this
+> not. [Plan 0057](0057-the-attractors-compute-path.md) Phase 6 consumes its statistic, so this
 > plan runs first.
 
 ## TL;DR
@@ -197,8 +197,8 @@ exempt = ["fade"]   # this clamp is a safety rail; pinning at peak is the design
   if occupancy proves to miss a real case.
 - **No preset retune.** Plan 0048 Phase 7 did that; this plan builds the instrument that would have
   caught it, and the library is expected to pass on arrival. The attractor family's retune is
-  [Plan 0057](../0057-the-attractors-compute-path.md) Phase 6, which uses Phase 5's statistic.
-- **No `Rich`-tier capture in any gate.** [Plan 0057](../0057-the-attractors-compute-path.md) Phase 1
+  [Plan 0057](0057-the-attractors-compute-path.md) Phase 6, which uses Phase 5's statistic.
+- **No `Rich`-tier capture in any gate.** [Plan 0057](0057-the-attractors-compute-path.md) Phase 1
   makes one possible ([ADR-0064](../../adrs/0064-a-capture-may-pin-the-rich-tier.md)); whether the
   `sanity` gate should also run there is a question for after Phase 5's measurement answers what a
   `Floor` frame can and cannot see.

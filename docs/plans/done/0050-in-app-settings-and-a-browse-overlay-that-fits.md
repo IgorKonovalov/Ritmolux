@@ -13,9 +13,9 @@
 > Orthogonal to the render roadmap; it neither blocked nor was blocked by anything.
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md)
-> (runtime tier switching), supplementing [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md)
-> (quality tiers) and [ADR-0009](../adrs/0009-glyphon-text-rendering.md) (the on-canvas text seam)
+> **Related ADRs:** [ADR-0054](../../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md)
+> (runtime tier switching), supplementing [ADR-0045](../../adrs/0045-quality-tiers-floor-and-rich.md)
+> (quality tiers) and [ADR-0009](../../adrs/0009-glyphon-text-rendering.md) (the on-canvas text seam)
 
 ## TL;DR
 
@@ -73,7 +73,7 @@ action the operator asked for. Rejected: an in-place per-scene reconfigure prese
 much surface area to buy continuity across a deliberate action), a continuous quality scale (would
 supersede rather than supplement ADR-0045, and put the golden suite's `Floor` pin on a continuum),
 and restart-to-apply (does not answer the request — the point is to *see* the difference). That is
-[ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md).
+[ADR-0054](../../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md).
 
 **The settings overlay is a second, independent pure state machine** — `standalone/src/settings.rs`
 beside `standalone/src/overlay.rs`, same shape (window-free, its own key and action enums,
@@ -333,7 +333,7 @@ Each phase ships as its own commit. `dev` runs all phases in one session.
      Confirm the hitch is a brief re-accumulation and not a freeze, a hang or a device loss, and that
      it survives being done repeatedly and during a dissolve. Note which presets look worst through
      the transition. (Expect `attractor_clifford` to blow out on `Rich` — that is
-     [backlog 0031](../design-backlog.md), a known defect that Plan [0045] fixes, not a regression
+     [backlog 0031](../../design-backlog.md), a known defect that Plan [0045] fixes, not a regression
      from this plan.)
   2. **The columns read correctly at the real resolution.** `Tab` on the 2048x1152 display and at
      1080p: all 34 names legible, no overlap into the next column, the active preset obviously
@@ -375,7 +375,7 @@ behind it.
 
 **Where the remaining work lives, and why it does not block this close.** The per-preset p99 table
 is Plan 0044 Phase 4's, carried in
-[`docs/on-device-validation.md`](../on-device-validation.md), whose own status line says it **does
+[`docs/on-device-validation.md`](../../on-device-validation.md), whose own status line says it **does
 not block plan closes**. It is also now **coupled to Plan [0059] Phase 4**: `[particles] density`
 directly changes how many particles the attractor draws, so calibrating
 `TierConfig::RICH.attractor_particles` before the content pass would measure a target that is about

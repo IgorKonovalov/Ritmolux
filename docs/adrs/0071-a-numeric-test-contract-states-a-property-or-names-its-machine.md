@@ -2,7 +2,7 @@
 
 > **Status:** **accepted** (2026-08-04, at Plan 0060's close)
 > **Date:** 2026-08-04
-> **Related plan(s):** [0060](../plans/0060-a-test-number-states-a-property-or-names-its-machine.md)
+> **Related plan(s):** [0060](../plans/done/0060-a-test-number-states-a-property-or-names-its-machine.md)
 > **Supplements:** [0016](0016-gpu-tests-opt-in-ci-scope.md) (the skip-with-notice shape this
 > reuses), [0023](0023-golden-drift-guard-uses-frozen-fixtures.md) (whose `MEAN_TOL` is the
 > declared noise floor this ADR measures one threshold against),
