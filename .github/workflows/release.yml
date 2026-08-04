@@ -57,3 +57,144 @@ jobs:
           name: macos-universal
           path: target/dist/*.zip
           if-no-files-found: error
+
+  # The Windows standalone. Staged inline rather than through a packaging
+  # script: there is no bundle to assemble, no signing and no fusing - it is a
+  # copy of three things and a Compress-Archive.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Build, stage, zip and verify
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          cargo build --release -p standalone
+          if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
+
+          # Section-anchored, the same shape plugin-foobar/build.ps1 uses
+          # (ADR-0025). A naive first-`version =` match would read a member
+          # crate's line or a [profile] key.
+          $cargoToml = Get-Content -Raw Cargo.toml
+          if ($cargoToml -notmatch '\[workspace\.package\][^\[]*?\bversion\s*=\s*"([^"]+)"') {
+              throw "could not parse [workspace.package] version from Cargo.toml"
+          }
+          $version = $Matches[1]
+          $name = "light-music-visualizer-v$version-windows-x64"
+          $dist = "target/dist"
+          $stage = "$dist/$name"
+          $zip = "$dist/$name.zip"
+          Write-Host "version $version -> $name.zip"
+
+          if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
+          New-Item -ItemType Directory -Force "$stage/presets" | Out-Null
+          Copy-Item target/release/lmv.exe $stage
+          # *.toml only - presets/README.md is the authoring reference, not
+          # preset content, and the zip is for a tester rather than an author.
+          Copy-Item presets/*.toml "$stage/presets/"
+          Copy-Item packaging/windows/READ-ME-FIRST.md "$stage/READ-ME-FIRST.txt"
+
+          # -Path without a wildcard keeps the staging folder as the archive's
+          # single top-level entry, which is the layout Plan 0036 specifies.
+          Compress-Archive -Path $stage -DestinationPath $zip -Force
+
+          # Verify from the archive, not from the staging directory: what ships
+          # is what Compress-Archive wrote. Mirrors bundle.sh's bar.
+          # Needed on Windows PowerShell 5.1, already present on the pwsh 7 the
+          # runner uses - so a failure here is not one.
+          try { Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop } catch { }
+          $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip))
+          try { $entries = $archive.Entries | ForEach-Object { $_.FullName } }
+          finally { $archive.Dispose() }
+          # Compress-Archive writes backslash separators on Windows PowerShell
+          # 5.1 and forward slashes on pwsh 7. Normalize rather than depend on
+          # which one the runner image ships - a check that passes only on the
+          # host we happened to try it on is not a check.
+          $entries = $entries | ForEach-Object { $_.Replace('\', '/') }
+
+          foreach ($required in "$name/lmv.exe", "$name/READ-ME-FIRST.txt") {
+              if ($entries -notcontains $required) {
+                  throw "zip is missing $required"
+              }
+          }
+          Write-Host "    ok: zip top level holds lmv.exe and READ-ME-FIRST.txt"
+
+          $repoCount = (Get-ChildItem presets/*.toml).Count
+          $zipCount = ($entries | Where-Object { $_ -like "$name/presets/*.toml" }).Count
+          if ($zipCount -ne $repoCount) {
+              throw "zip carries $zipCount presets, repo has $repoCount"
+          }
+          Write-Host "    ok: presets/: $zipCount .toml files, matching the repo"
+
+          $md = $entries | Where-Object { $_ -like "*.md" }
+          if ($md) { throw "zip contains a .md file: $($md -join ' ')" }
+          Write-Host "    ok: no .md in the zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: target/dist/*.zip
+          if-no-files-found: error
+
+  # Publish. Gated on BOTH builds by `needs:`, so a failure on either platform
+  # leaves no Release at all rather than a half-published one - the release job
+  # is skipped, not merely red. Gated on the ref being a tag, so the
+  # workflow_dispatch dry-run path produces run artifacts and publishes nothing.
+  #
+  # Runs on ubuntu-latest: it only moves zips around, and `gh` is preinstalled
+  # on every runner image, so no pinned third-party release action is needed
+  # (NFR section 4 - every dependency is a cost to justify).
+  release:
+    needs: [macos, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Publish the prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          count=$(ls -1 assets/*.zip | wc -l)
+          if [ "$count" -ne 2 ]; then
+              echo "expected exactly 2 zips, found $count:" >&2
+              ls -1 assets/ >&2
+              exit 1
+          fi
+          ls -1 assets/*.zip
+
+          notes="Standalone builds of the ${TAG} tag.
+
+          - **macOS** (universal, arm64 + Intel, requires macOS 13+): unsigned and
+            ad-hoc signed only, so macOS quarantines it - right-click the app and
+            choose Open, or strip the quarantine attribute. It needs the Screen
+            Recording permission to hear system audio, and a relaunch after
+            granting it.
+          - **Windows** (x64): unsigned, so SmartScreen warns once - More info,
+            then Run anyway.
+
+          Each zip carries a READ-ME-FIRST.txt with the full steps, and a
+          reference copy of the presets. This is a prerelease while the app is
+          0.x."
+
+          # Re-running a workflow on an existing tag must not hard-fail:
+          # `gh release create` errors when the release already exists, so
+          # create it if absent and clobber the assets otherwise.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "release $TAG exists; replacing its assets"
+              gh release upload "$TAG" assets/*.zip --clobber
+          else
+              gh release create "$TAG" assets/*.zip \
+                  --prerelease \
+                  --title "$TAG" \
+                  --notes "$notes"
+          fi
