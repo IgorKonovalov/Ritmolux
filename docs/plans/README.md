@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0062** (ADRs are a separate sequence — next free there is **0075**.)
+**Next free number: 0066** (ADRs are a separate sequence — next free there is **0080**.)
 
 ## Active roster
 
@@ -11,18 +11,156 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — **unblocked**: [0045] has landed and closed, so the linear-light pipeline this builds on exists; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
-| [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **approved 2026-08-02** — ready for `dev`; [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
+| [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **IN PROGRESS 2026-08-04** — live lane, branch `plan-0052-emitter` in worktree `WORK/lmv-plan-0052` (ADR-0053). Phase 1 landed `2470a50`; Phases 2-4 running. Nothing on this row is merged to `main` yet. [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** and gates Phase 4. **Its "needs a discrete GPU" premise was corrected 2026-08-04 at [0060]'s close** — the gate is `device_type == Cpu`, not "discrete", and a real hardware measurement was taken on this box the same day (`ae4c215`), so try Phase 3 before deferring it. **[0060] also handed this plan a sharper question than it was written against**: the hardware dual-live reading matched **CI WARP** to five figures and disagreed with **this box's local WARP** by 1.54x on a sequence with no dual-live asymmetry — if that holds, the build the golden suite blesses on is the outlier ([ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) Outcome). Moves **no pixels** except one new baseline | dev, human |
-| [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
+| [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **IN PROGRESS 2026-08-04** — live lane, branch `plan-0055-fold-edge` in worktree `WORK/lmv-plan-0055` (ADR-0053). Phase 1 landed `5eac2d7` (464 tests, 0 skipped, every golden byte-identical); **the `human` Phase 2 A/B was run and judged 2026-08-04 — verdict recorded below**; Phases 3-4 running. Nothing on this row is merged to `main` yet. [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md) | dev, human |
 | [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended twice the same day** — **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (at the user's direct request), reconciled into the plan rather than reverted: it meets 4b's done-when with one accepted deviation (a test-written scratch library rather than a checked-in `fixtures/report/`), and it **opens the coverage gap 4b's sequencing existed to prevent** — nothing renders every shipped preset through the real CLI any more *and* Phase 4 has not yet put the generator under in-process tests. Every other phase is unstarted. From the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Amended a third time with Phase 2c** (2026-08-04, at [0060]'s close): a `links` job on `ubuntu-latest` giving `scripts/check-doc-links.mjs` a CI counterpart, so the doc-link gate stops depending on an opt-in hook. Independent of 2b/4b, touches neither Windows job, seconds on the cheapest runner — it is here only because this plan owns every `ci.yml` edit in flight. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. ~~Phase 6 is gated on [0059] being closed~~ — **released 2026-08-04**, [0059] has closed, so Phase 6 (which edits `particles/mod.rs`) is unblocked; it also inherits [0059]’s close decision to **retire `RESEED_DRAWS_STREAK`**, which lives in that same file; **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
 
+| [0062](0062-the-chaos-game-grows-a-fern.md) | The chaos game grows a fern: an IFS family that morphs between figures (`AttractorFamily::Ifs`, five curated tables in SVD form, safe-by-construction morph + four levers) | **approved 2026-08-04** — ready for `dev`; designed from the user's Barnsley-fern question; [ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md). **The first half of a deliberate two-plan split** (the user's call at interview): this one lands the *figure* — the family, the roster, the morph, the levers — so a real fern can be judged in motion; the successor carries the **unfurl and the depth/per-map colour**, which are the same per-particle channel and are tuned against a figure already known to be right. Adds **no** render idiom, no `Scene` change, no C ABI change, no dependency — the `attractor` scene is already a GPU chaos game and this is a fifth family plus one shader branch. **Phase 7 is `human`** (a `preset-author` pass judging levers against real audio), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
+
+| [0063](0063-the-attractor-keeps-its-depth.md) | The attractor keeps its depth: perspective, haze, and a spin you can drive (`perspective`, `depth_fade`, `depth_hue`, `spin`) | **approved 2026-08-04** — ready for `dev`; designed from the user's "can we make strange attractors more 3D looking"; [ADR-0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md). The 3D families read flat because `project()` computes a view depth and **discards** it, leaving an orthographic projection whose rotation is perceptually bistable (the image at rotation pi is the exact x-mirror of the image at 0). Keeps the depth; spends it on perspective + two atmospheric cues; **no sorting, no occlusion** (the user's call — the accumulation is the scene). **The 2D families are untouched by arithmetic rather than by a default**, so `core/tests/fixtures/attractor.toml` (De Jong) cannot move. Also closes a gap the question surfaced: `SPIN_RATE` is a `const` no preset can reach, and every 3D attractor turns at one revolution per **34.9 s** forever. **Phase 5 is `human`** (a `preset-author` pass over the two 3D presets), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
+
+| [0064](0064-the-symmetry-stage-and-the-banded-palette.md) | The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour (`kaleido_radial`/`spiral`/`zoom`/`tile`/`inner`, `palette_steps`/`palette_contour`) | **approved 2026-08-04** — ready for `dev` **after [0055]**; from the user's five reference images; [ADR-0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) + [ADR-0078](../adrs/0078-banding-is-a-palette-coordinate-operation.md). Covers **three** of the five images, and applies to **every scene** because it is screen-space. The engine already has half the mechanism: periodicity in `theta` is the fold, periodicity in **`log r`** is the missing concentric self-similarity. **Both halves are one plan on purpose** — neither alone reproduces the references, and the user chose to decide the look from a rendered sample set that has to show the combination. **Phase 4 is `human`** (pick defaults and ranges from the grid) and gates Phases 5-6, so it does not close in one session. **Collides with [0055]** in `kaleidoscope.rs` — taking 0055 first is the cheaper order. Moves **no** existing golden baseline; adds one | dev, human |
+| [0065](0065-the-mandala-interior.md) | The mandala interior: `star_pattern` stops being hollow (a `rings` roster of motif / count / radius / scale / phase on `[generator]`) | **approved 2026-08-04** — ready for `dev`, gated by nothing; the fourth reference image; [ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md). **Closes the still-open half of [backlog 0034 → 0007](../design-backlog.md)** — the "hollow ring" finding with the user's standing *invest, do not cut* call on it, live since 2026-07-26 and never specified until the reference image arrived. Line geometry, so it **shares nothing** with [0055] or [0064] and can run in parallel with either. **Phase 3 is `human`** (pick the motif roster from a rendered grid) and gates Phases 4-6. Watch the `animation.rs` gate: a ring mandala is *more* rotationally symmetric than `star_rosette`, so spin alone will not pass it ([backlog 0009](../design-backlog.md)) — Phase 4 designs around it. Moves **no** golden baseline at all | dev, human |
+
 ## Recommended execution sequence
+
+### The order, as of 2026-08-04
+
+Everything below this list is the reasoning. **Only two orderings in the roster are real
+constraints**; the rest is preference, and a session may take any unblocked plan.
+
+| # | Plan | Why here | Closes in one session? |
+|---|------|----------|------------------------|
+| 1 | [0055] | **Hard constraint: must precede [0064].** Both live in `kaleidoscope.rs`; 0055 is smaller and older and branches on the *destination* radius, which 0064's composed map does not touch. Taking it second means rebasing onto a rewritten shader | No — Phase 2 is `human` (a live in-motion A/B) and gates Phases 3-4 |
+| 2 | [0063] | **Soft constraint: better before [0062].** It adds `inv_depth_extent()` as an exhaustive match over `AttractorFamily`, so 0062 adding a fifth family is then **compiler-forced** to answer it. The reverse order relies on remembering | No — Phase 5 is `human` |
+| 3 | [0062] | Adjacent to 0063 in `particles/mod.rs`, so one session holds the file's context | No — Phase 7 is `human` |
+| 4 | [0064] | Unblocked once 0055 has landed. Widest blast radius in the roster — screen-space, so every scene inherits it | No — Phase 4 is `human`, mid-plan |
+| 5 | [0065] | **Gated by nothing and shares no file with anything.** The safest parallel lane; can be pulled forward to any position | No — Phase 3 is `human`, mid-plan |
+| 6 | [0052] | Independent, four `dev` phases, nothing gating | **Yes** |
+| 7 | [0053] | Protective rather than additive; moves no pixels. Its `human` Phase 3 is runnable on this box after the 2026-08-04 premise correction | No — Phase 3 is `human` |
+| 8 | [0046] | Touches the attractor's feedback path, so it is cheaper after [0062]/[0063] have settled that file | — |
+| 9 | [0036] | Packaging only; touches no `core/`, `standalone/` or shader code. Take it whenever artifacts are wanted | No — Phase 4 needs a Mac |
+| 10 | [0061] | **Last, by the user's own instruction** | No — Phases 8-9 are `human` |
+
+**If you want one session that closes**, take [0052] — it is the only plan in the roster with no
+`human` phase. **If you want the most visible change per session**, take [0063] then [0062].
+**If a second lane is running in parallel**, give it [0065]: it is line geometry and collides with
+nothing.
+
+
+**TWO LANES ARE LIVE RIGHT NOW (2026-08-04), and neither is merged to `main`.** Read this before
+starting anything, because the roster rows above are the only place that says so:
+
+| Lane | Branch | Worktree | State |
+|------|--------|----------|-------|
+| [0052] the emitter | `plan-0052-emitter` | `WORK/lmv-plan-0052` | Phase 1 `2470a50`; Phases 2-4 running |
+| [0055] the fold edge | `plan-0055-fold-edge` | `WORK/lmv-plan-0055` | Phase 1 `5eac2d7`; Phase 2 judged; Phases 3-4 running |
+
+They were chosen to run in parallel because they share no files — 0052 is `scenes/particles/`, 0055
+is `post/kaleidoscope.rs`. **The pair deliberately NOT run together was 0052 + [0053]**, which
+collide on the bind-group layout roster 0053 asserts on.
+
+**[0055] Phase 2's verdict, decided in the running app on 2026-08-04 against real audio, both test
+scenes, all five arms, at the user's judgement.** It is written here and not only on the branch,
+because it is a human decision that no test and no commit can re-derive:
+
+- **Ships: `falloff`, `tile`, `squash`.** `vignette` and `mirror` are deleted from the shader —
+  neither won on either scene. Survivors renumber contiguously **preserving relative order**:
+  `0` falloff, `1` tile, `2` squash.
+- **The default is `tile`, i.e. the new value `1` — deliberately not `0`.** Keeping `0 = falloff`
+  preserves the "0 is today's behaviour" association that existing preset comments and ADR-0047's
+  history already carry.
+- **Per-preset: `attractor_leviathan` → `tile`, `fragment_kaleido` → `squash`.** A centred figure
+  and a fullscreen field wanting *different* treatments is precisely ADR-0061's premise, and it
+  held — that is the finding that justifies a per-preset selector rather than one global answer.
+- **The baseline cost was accepted explicitly, having been stated first.** A non-`falloff` default
+  moves pixels for every fold-bearing preset that does not name a treatment, so
+  `composite_kaleido.png` and every fold-bearing baseline is re-blessed **by hand**, and the other
+  11 fold-bearing presets change look at Phase 3, *before* Phase 4's retune reaches them.
+- **One finding the A/B produced that Phase 4 owes an edit for:** `attractor_leviathan.toml` pins
+  `zoom` at base `0.72` under a comment reading "ZOOM IS A FOLD CONSTRAINT HERE, NOT A TASTE …
+  The general fix is a per-preset edge treatment - Plan 0055, approved, not built." **That
+  constraint is now lifted** — the A/B ran at base `1.80` precisely so there would be content past
+  `r_max`, and `tile` at that zoom is what was judged best. Leviathan's Phase 4 change is therefore
+  two edits, not one, and that comment must stop naming this plan as unbuilt.
 
 **CI IS GREEN as of 2026-08-04** (run **30903871856**), after five consecutive red pushes from
 2026-07-30. [0060] Phase 1 did it, and everything the red streak was hiding has now been evaluated
 for the first time in a week: `cargo test --doc`, `clippy -D warnings` and `cargo fmt --check` all
 run and pass, and the **coverage ratchet reads 93.34 % against `COVERAGE_FLOOR = 88`**. No floor
 change is owed.
+
+**[0062] is new (2026-08-04) and is the only plan here that adds visual capability the engine does
+not have.** It came from a direct user question — can the Barnsley fern give this project something
+generative and organic at once — and the design interview turned it into something larger than one
+figure: an IFS is twenty-four affine coefficients, and **coefficients interpolate**, so this is the
+engine's first *continuous structural morph*. Every other structural choice in the codebase is
+discrete, which is exactly why [ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md) had to
+rescue `star_pattern`. Three things to know before sequencing it:
+
+- **It is cheap because the idiom already exists.** The `attractor` scene is a GPU chaos game
+  already; an IFS is one branch in its step shader and a fifth `AttractorFamily`. No new render
+  idiom, no `Scene` or C ABI change, no dependency, no existing golden baseline moved.
+- **It is the first half of a two-plan split the user chose at interview.** The successor carries
+  the unfurl and the depth/per-map colour — which turn out to be the *same* per-particle channel
+  (iteration depth since respawn is both the growth clock and the colour ramp), and `Particle`'s
+  free `pad` slot holds it without growing the struct. Sequencing them apart means the growth is
+  tuned against a figure already judged right, rather than two unknowns at once.
+- **It touches `particles/mod.rs`, which [0061] Phase 6 also edits.** Mitigated by construction —
+  everything of consequence goes in a new `particles/ifs.rs`, which is the direction 0061 Phase 6 is
+  heading anyway. Whichever lands second inherits the other's file; neither ordering is wrong.
+
+Its **Phase 7 is `human`** (a `preset-author` pass judging the four levers and five figures against
+real audio), so like [0053] and [0055] it stops before closing in one session — but unlike those
+two, Phases 1-6 are a full `dev` session of real capability with nothing gating them.
+
+**[0063] is new the same day (2026-08-04) and is the other half of "the attractor gets better".**
+Also from a direct user question — can the strange attractors look more 3-D — and the answer turned
+out to be a **defect diagnosis rather than a feature request**: `project()` computes a view-space
+depth and throws it away, so the 3-D families render orthographically, and an orthographic
+projection of a rotating transparent structure is perceptually **bistable** (the image at rotation
+pi is the exact x-mirror of the image at 0). That is why they read flat, and it is why no amount of
+preset tuning has ever fixed it. Three things to know:
+
+- **It is small.** Four new params, one new fixture, no new idiom, no `Scene` or C ABI change, no
+  dependency. Five phases, the last `human`.
+- **It moves no existing golden baseline, and that is structural rather than a default.** The 2-D
+  families receive an inverse depth extent of exactly `0`, so every cue collapses to the identity
+  with no branch — and `core/tests/fixtures/attractor.toml` is **De Jong**, so it could not move
+  even if a default were wrong. It needs its own 3-D fixture, which Phase 4 adds.
+- **It overlaps [0062] and [0061] Phase 6 in one file** (`particles/mod.rs`) and in one place inside
+  it: the family enum's method set, where all three *add* rather than change. If [0062] lands
+  second it must give its IFS figures `inv_depth_extent() = 0.0` — they are 2-D — and its exhaustive
+  match will force it to notice. No ordering is wrong.
+
+**[0062] and [0063] together are the session worth taking if the goal is visible improvement**:
+one adds a figure family the engine cannot draw today, the other fixes why the figures it already
+draws look flat. Neither blocks the other and neither is blocked by anything.
+
+**[0064] and [0065] are the same day's third and fourth plans (2026-08-04), and they came from five
+reference images rather than from a sentence.** The user supplied pictures and asked for them; the
+design work was mostly *identifying* that the five images are four mechanisms, three of which turned
+out to be one. Read the two plans together with this:
+
+- **[0064] has the widest blast radius of anything in the roster.** It is screen-space, so *every*
+  scene inherits it at once — the fern, the attractor, the coral, all thirteen line presets. The
+  engine already has half of the mechanism: periodicity in `theta` is the fold `kaleidoscope.rs` does
+  today, and periodicity in **`log r`** — concentric self-similar rings — is the half that turns a
+  flat rosette into something that reads as fractal. It also yields an exactly seamless infinite zoom,
+  because a translation of one log period is the *identity* map rather than an approximation of it.
+- **[0064] collides with [0055], and [0055] should go first.** Both live in `kaleidoscope.rs`. 0055
+  is small, already approved, and its `kaleido_edge` branches on the **destination** radius, which
+  0064's composed map does not touch — so taking 0055 first costs nothing and taking it second means
+  rebasing onto a rewritten shader.
+- **[0065] shares nothing with either** and can run in parallel. It is line geometry, and it exists
+  because the fourth reference image is finally the *specification* for a backlog entry that has been
+  open with a standing "invest, do not cut" decision since 2026-07-26 — the decision was made and then
+  never spent, for want of anyone knowing what to spend it on.
+- **Both carry a `human` phase in the middle rather than at the end** ([0064] Phase 4, [0065] Phase
+  3), because the user chose to pick defaults and rosters from a rendered sample grid — the workflow
+  that decided the fold in [0045]. That is a deliberate cost: neither closes in one session, and both
+  stop with a `dev` session's work done and a decision owed.
 
 **[0060] has landed and closed** (2026-08-04) — see Recently closed. Two lessons and one live
 question outlive it. **A ratio is a property only when numerator and denominator are the same kind
@@ -34,7 +172,9 @@ finally took matched **CI WARP** to five figures and disagreed with **this box's
 suite blesses on, not the runner's. Nothing has looked at what else that moves.
 
 
-**[0061] goes last, by the user's own instruction, and is the only `draft` in the roster.** It came
+**[0061] goes last, by the user's own instruction, and is the only `draft` in the roster.** (The four
+plans written on 2026-08-04 — [0062], [0063], [0064], [0065] — were all approved the same day; none
+is related to this one and none inherits its "goes last".) It came
 out of a whole-tree maintainability audit rather than a feature request, so nothing depends on it and
 it depends on nothing — the one dependency it had, [0059] being closed before its Phase 6 (which edits the same file), was **released 2026-08-04**. Two
 consequences worth carrying: its numbers are a **2026-08-04 snapshot of one machine**, so a phase
@@ -73,7 +213,9 @@ re-planning; the reason they live here is thematic (the plan's title is exactly 
 technical.
 
 **Every other plan in the roster is approved as of 2026-08-04 — nothing is waiting on a design
-decision.** What separates them now is only what each needs to *run*: [0052] closes in one session;
+decision**. [0062], [0063], [0064] and [0065] were all approved the day they were written, leaving
+[0061] as the only `draft`, and it is fully designed too. What separates them now is only what each
+needs to *run*: [0052] closes in one session;
 [0053] and [0055] each carry a `human` phase that gates later phases, so they stop mid-plan by
 construction — [0053] until a discrete GPU is to hand, [0055] until the live A/B is judged.
 Taking [0052] first keeps a session unblocked end to end.
