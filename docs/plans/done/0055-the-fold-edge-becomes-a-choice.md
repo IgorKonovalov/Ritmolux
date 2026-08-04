@@ -51,11 +51,19 @@ Three facts set the scope, and all three are arithmetic rather than estimate:
 - The disc covers `π r_max²` of an `aspect x 1` frame, so **55.8 % of the frame lies outside it
   at 16:9**, and the same 55.8 % at 9:16 by symmetry. One treatment is deciding the majority of
   the picture.
-- **Thirteen shipped presets bind `kaleido_order`** — `attractor_dejong`, `attractor_leviathan`,
+- **Thirteen shipped presets bind `kaleido_order`** — `attractor_clifford`, `attractor_leviathan`,
   `attractor_lorenz`, `curve_cathedral`, `fragment_glacier`, `fragment_kaleido`,
   `fragment_supernova`, `fragment_warp`, `lsystem_arrowhead`, `reaction_reef`,
   `reaction_reliquary`, `swarm_dense`, `swarm_storm` — up from the eight design-backlog 0010
   listed. They span both cases the single treatment has to serve.
+
+  > **Correction, 2026-08-04, after Phase 4 landed.** This list shipped naming `attractor_dejong`
+  > where it should have said `attractor_clifford`, and design-backlog 0058 inherited the error.
+  > De Jong binds no `kaleido_*` param and never has; Clifford does, and it is the thirteenth. The
+  > **count** was right and one **name** in it was not, which is why nothing downstream noticed —
+  > a wrong name in a list of the right length reads as correct until someone opens the file.
+  > Found by `preset-author` working the Phase 4 content pass *off this list*. The check is one
+  > line and it disagreed with the plan: `grep -l kaleido_order presets/*.toml`.
 
 ADR-0047 declined a per-preset choice because "two address modes double the stage's pipelines"
 against the WARP pipeline-count sensitivity. That is true of address modes and false of the

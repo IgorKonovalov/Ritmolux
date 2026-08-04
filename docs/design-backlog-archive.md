@@ -2679,3 +2679,110 @@ still the "loud reads as less information" failure. **Left unchanged deliberatel
 more shipped presets was outside the 0051/0052 handoff, and the right factor should be decided
 together with whatever instrument comes out of finding two, so it can be verified rather than
 eyeballed.
+
+---
+
+## Entry 0058 — from Plan 0055 Phase 4 (2026-08-04), the content half of a decision the engine has now made
+
+**CLOSED 2026-08-04**, by content: `859ec66` (the eleven choose a treatment) and the Clifford
+reframing inside it. All thirteen fold-binding presets now name a `kaleido_edge` explicitly —
+`grep -l '^kaleido_edge' presets/*.toml` returns thirteen — and the verdicts are a genuine spread
+(`falloff` 2, `tile` 6, `squash` 5, counting the two Plan 0055 already judged), which is the
+evidence ADR-0061's premise was right: one treatment could not have served these.
+
+**The entry named the wrong preset, and the body below is left uncorrected as the record.** Its
+list of eleven says `attractor_dejong`. De Jong binds no `kaleido_*` param and never has; the
+thirteenth is **`attractor_clifford`**. The error was inherited from
+[Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md)'s own scope bullet, which carries the
+same correction. The **count** was right and one **name** in it was wrong, which is exactly why it
+survived: a wrong name in a list of the right length reads as correct until somebody opens the file.
+`preset-author` found it by working the pass off the list and running `grep -l kaleido_order
+presets/*.toml`.
+
+**`swarm_dense` was decided, and the fold went back on** — `kaleido_order = "3"`, `kaleido_edge = 1`.
+The pin at 1 (fold off) had been a mitigation for backlog 0010's clamped-edge smear, fixed engine-side
+a plan earlier; the entry asked for this to be judged rather than assumed, and it was.
+
+**Clifford is the second instance of the Leviathan pattern**, which is the pass's other finding and
+outlived this entry: a framing pinned to dodge an engine defect, kept after the defect was fixed,
+recoverable only by reading the preset's own header comment. That pattern is
+[live entry 0060](design-backlog.md#0060--an-engine-fix-leaves-its-preset-side-workarounds-standing-and-only-a-header-comment-remembers-them).
+
+---
+
+## 0058 — thirteen presets bind the fold and eleven of them have not chosen an edge treatment, because until now there was nothing to choose
+
+- **Raised:** 2026-08-04, at [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md) Phase 4. Not
+  a gap the content lane found — a gap the engine lane *created* on purpose and is handing over.
+- **Verified against code:** yes. `grep -l kaleido_order presets/*.toml` returns thirteen files, and
+  `grep -l '^kaleido_edge' presets/*.toml` returns two of them, so eleven ride the default. Anchor
+  that second grep — `swarm_dense` mentions `kaleido_edge` in a header comment without binding it,
+  so an unanchored match reports three.
+- **For:** `preset-author`. No engine change, no ADR. The capability exists and is documented; what
+  is missing is a per-preset judgement that only looking can supply.
+
+**What changed under them.** [ADR-0061](adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)
+made the region outside the fold's inscribed disc a per-preset choice, `kaleido_edge`, with three
+treatments: `falloff` (0, the fade ADR-0047 shipped), `tile` (1) and `squash` (2). Plan 0055 Phase
+2's live A/B made **`tile` the default**, so every fold-binding preset that says nothing has already
+moved from *cropping to a disc* to *filling its frame*. That is a real visual change to eleven
+shipped presets, applied by a default rather than by an author, and it is the reason this entry
+exists rather than being optional polish.
+
+**Why the scope matters.** At 16:9 the frame's corner sits at 2.04x the disc radius, so **56 % of
+the frame** is what the treatment decides. This is not a corner detail on any of the thirteen.
+
+**The eleven that have not been looked at:** `attractor_dejong`, `attractor_lorenz`,
+`curve_cathedral`, `fragment_glacier`, `fragment_supernova`, `fragment_warp`, `lsystem_arrowhead`,
+`reaction_reef`, `reaction_reliquary`, `swarm_storm` — plus `swarm_dense`, which is a special case
+below. All eleven currently ride the `tile` default without anyone having chosen it.
+
+**The two that have been judged, and they are your reference pair.** Plan 0055 Phase 2 put the whole
+roster in front of the user in the running app — in motion, over a lit backdrop, at 16:9 and at a
+non-16:9 window — on exactly one centred figure and one border-filling field. Both verdicts are
+**landed**, so they are shipped examples you can read rather than advice:
+
+| preset | kind | verdict |
+|---|---|---|
+| `attractor_leviathan` | centred figure | **`tile`**, landed with a zoom raise (see below) |
+| `fragment_kaleido` | border-filling field | **`squash`**, landed |
+
+**That the two chose differently is the finding, not a detail.** It is the whole evidence for
+`kaleido_edge` existing at all, and it is the first question to ask of each preset below: is this a
+figure with space around it, or a field that fills its frame? The pair does not settle the other
+eleven — nobody has watched those — but it tells you what the axis is.
+
+**What Leviathan's change tells you about the others.** Adopting a fill treatment there was **two
+edits, not one**. Its `zoom` had been pinned at base 0.72 with a header explaining that the pin was
+"a fold constraint, not a taste" — the figure was held inside the inscribed disc so it could not
+feed the fold's residual rays. A fill treatment removes that constraint entirely, and the preset
+only benefits from one if there is content out past `r_max` for it to act on, so the zoom went to
+1.80. **Expect the same shape elsewhere:** any preset whose scale, `zoom` or `glow` was tuned against
+a disc that crops is now tuned against a premise that no longer holds. Grep the fold-binding headers
+for language about the disc, the inscribed radius, or the rays before assuming a file only needs one
+line added.
+
+**`swarm_dense` is the odd one and worth doing first.** It pins `kaleido_order = "1"` — the fold off
+— and its header documented that as a *mitigation for an engine artifact*: bright bars along the
+frame edges, which was design-backlog 0010's clamped-edge smear. That artifact was fixed engine-side
+by ADR-0047 a plan ago, so the dodge has been unnecessary since then and the comment was stale twice
+over. Phase 4 corrected the comment and **deliberately did not turn the fold back on**, because
+nobody has looked at this preset folded since the fix and that is a judgement for this lane. It is a
+sparse figure over a dark field, which is the case where the three treatments differ most.
+
+**Pairs with [0038](#0038) and [0040](#0040)**, and the pairing is the argument for doing them
+together rather than in sequence: all three are retunes of the same shipped set against a composite
+that moved underneath it. 0038 is the tonemap knee's ~8 % luminance loss, 0040 is coverage-as-alpha
+making dim figures read as dark speckle over a lit backdrop — and a lit backdrop is exactly the
+configuration this entry's treatments are judged in, since under `falloff` the corners *are* the
+backdrop and under `tile`/`squash` they stop being it. Judging any one of the three at
+`bg_bright = 0` is what produced the confirmation failure ADR-0061's Notes records.
+
+**How to judge it.** In the running app, in motion, over a **lit** backdrop, at 16:9 and at a
+window that is clearly not 16:9 — `LMV_PRESET_DIR` pointed at the repo's `presets/` makes an edit
+live in about 150 ms, so walking a preset through `kaleido_edge = 0 .. 2` is changing one integer
+and watching. The parameter roster and the per-treatment guidance are in
+[`presets/README.md`](../presets/README.md#screen-space-kaleidoscope--kaleido_order-kaleido_angle-kaleido_center_x-kaleido_center_y-kaleido_edge).
+
+**Not in scope.** Adding a fourth treatment. The roster is a closed set by ADR-0061; a look that
+needs a new edge behaviour is engine work and routes back through `architect`.
