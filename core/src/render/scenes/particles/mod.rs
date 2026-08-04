@@ -348,10 +348,44 @@ impl Basis {
     }
 }
 
-/// Slow display rotation (rad/s) driven by the scene clock, so the cloud visibly
-/// turns even when the point set saturates its footprint — the animation
-/// liveness the differential tests require, independent of audio.
+/// Base display rotation (rad/s), so the cloud visibly turns even when the point
+/// set saturates its footprint — the animation liveness the differential tests
+/// require, independent of audio.
+///
+/// It is `2π / 0.18` = **one revolution per 34.9 seconds**, and until ADR-0076
+/// that was the *only* rate any attractor could turn at: no preset could reach
+/// the rotation of a 3D figure at all. The slowness is part of why the 3D
+/// families read as flat — a viewer never accumulates enough motion evidence to
+/// resolve which way the thing is turning. `spin` is a **multiplier** on this,
+/// so `1` is unchanged, `0` holds the figure still and negative reverses it.
 const SPIN_RATE: f32 = 0.18;
+
+/// `spin`'s default: exactly today's rate.
+const DEFAULT_SPIN: f32 = 1.0;
+
+/// One frame's contribution to the integrated spin, in **spin-scaled seconds**.
+///
+/// **The phase is integrated, and that is not a preference.** Computing it as
+/// `time · spin · SPIN_RATE` would let a `spin` bound to audio retroactively
+/// rescale *all* elapsed time on every frame: the figure would snap to a new
+/// angle whenever the binding moved, jerking rather than accelerating. A rate
+/// multiplier has to be integrated to be a rate at all.
+fn advance_spin(spin_time: f32, spin: f32, dt: f32) -> f32 {
+    spin_time + spin * dt
+}
+
+/// The rotation angle, in radians, for an accumulated spin-time.
+///
+/// **The multiply by [`SPIN_RATE`] is deferred to here rather than folded into
+/// [`advance_spin`], and the reason is arithmetic rather than taste.** At the
+/// default `spin = 1` the accumulator is then `Σ dt` term for term — bit-for-bit
+/// the same summation the renderer performs for its own clock — so `spin = 1`
+/// reproduces the pre-ADR-0076 `time * SPIN_RATE` *exactly*, and no golden
+/// baseline moves. Folding the rate in would sum `0.18 · dt` instead and drift
+/// in the last bits of every capture.
+fn spin_phase(spin_time: f32) -> f32 {
+    spin_time * SPIN_RATE
+}
 
 /// Parameter defaults — a calm idle look when nothing is bound.
 const DEFAULT_SIZE: f32 = 1.0;
@@ -1731,8 +1765,17 @@ pub struct AttractorScene {
     /// Real elapsed seconds for this frame, injected via `advance`, used to make
     /// the trail decay frame-rate-independent.
     dt: f32,
-    /// Shared scene clock (seconds), set by the renderer each frame.
-    time: f32,
+    /// The integrated spin, in **spin-scaled seconds** — advanced once per frame
+    /// in [`update`](Scene::update), where this frame's `spin` is already
+    /// resolved, and turned into radians by [`spin_phase`] at the uniform.
+    ///
+    /// **This scene no longer reads the shared clock at all**, which is why
+    /// `set_time` is gone: the display rotation was the only thing that used it,
+    /// and a rate multiplier has to be integrated rather than multiplied against
+    /// elapsed time (see [`advance_spin`]). Determinism is unaffected — the phase
+    /// is a pure function of the injected `dt` sequence, which captures pin at
+    /// 1/60 s, and it starts at zero on every rebuild.
+    spin_time: f32,
     /// The active attractor map, selected data-driven via `[particles]`
     /// (ADR-0007 `configure`); its default coefficients seed `a`..`d`.
     family: AttractorFamily,
@@ -1769,6 +1812,12 @@ pub struct AttractorScene {
     /// depth range. Both inert on the 2D families, like `perspective`.
     depth_fade: f32,
     depth_hue: f32,
+    /// Rate multiplier on [`SPIN_RATE`] (ADR-0076). Unlike the depth cues this is
+    /// **not** inert on the 2D families: the discrete maps rotate in-plane
+    /// through the same angle, so `spin` reaches all four families where
+    /// `perspective`, `depth_fade` and `depth_hue` reach two. That asymmetry is
+    /// deliberate — an in-plane spin is a real look on De Jong today.
+    spin: f32,
     /// The active baked palette pair; uploaded to the draw LUT textures when
     /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
     palette: Palette,
@@ -1812,7 +1861,7 @@ impl AttractorScene {
             fixed_step: gpu::FixedStep::new(FIXED_STEP, MAX_SUBSTEPS),
             pending_steps: 0,
             dt: FIXED_STEP,
-            time: 0.0,
+            spin_time: 0.0,
             family,
             a,
             b,
@@ -1831,6 +1880,7 @@ impl AttractorScene {
             perspective: DEFAULT_PERSPECTIVE,
             depth_fade: DEFAULT_DEPTH_FADE,
             depth_hue: DEFAULT_DEPTH_HUE,
+            spin: DEFAULT_SPIN,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
             reseed: 0.0,
@@ -2003,6 +2053,7 @@ pub const PARAMS: &[&str] = &[
     "perspective",
     "depth_fade",
     "depth_hue",
+    "spin",
 ];
 
 impl Scene for AttractorScene {
@@ -2030,9 +2081,9 @@ impl Scene for AttractorScene {
         self.trail_h = h;
     }
 
-    fn set_time(&mut self, time: f32) {
-        self.time = time;
-    }
+    // No `set_time`. The display rotation was this scene's only reader of the
+    // shared clock, and since ADR-0076 it is an integrated phase instead — so
+    // the trait's no-op default is the honest implementation.
 
     fn set_palette(&mut self, palette: &Palette) {
         // Uploaded to the draw LUT textures in `render` (deferred — resources build
@@ -2063,6 +2114,7 @@ impl Scene for AttractorScene {
         self.perspective = DEFAULT_PERSPECTIVE;
         self.depth_fade = DEFAULT_DEPTH_FADE;
         self.depth_hue = DEFAULT_DEPTH_HUE;
+        self.spin = DEFAULT_SPIN;
         self.reseed = 0.0;
     }
 
@@ -2085,12 +2137,20 @@ impl Scene for AttractorScene {
             "perspective" => self.perspective = value,
             "depth_fade" => self.depth_fade = value,
             "depth_hue" => self.depth_hue = value,
+            "spin" => self.spin = value,
             "reseed" => self.reseed = value,
             _ => {}
         }
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {
+        // Integrate the spin. **Here and not in `advance`**: the renderer calls
+        // `advance` before it routes this frame's bindings, so `self.spin` is
+        // last frame's value there and this frame's here. `self.dt` is the real
+        // elapsed seconds `advance` recorded, so the phase stays a pure function
+        // of the injected `dt` sequence.
+        self.spin_time = advance_spin(self.spin_time, self.spin, self.dt);
+
         // Rising-edge detect on `reseed` (a beat/onset expression): **disturb** the
         // cloud once, where it is (ADR-0066). Edge-triggered so a sustained flag
         // doesn't disturb it every frame; deterministic because the kick is a pure
@@ -2167,7 +2227,7 @@ impl Scene for AttractorScene {
             needs_clear,
             pending_steps,
             dt,
-            time,
+            spin_time,
             family,
             a,
             b,
@@ -2213,7 +2273,7 @@ impl Scene for AttractorScene {
                 aspect,
                 coeffs: [*a, *b, *c, *d],
                 family: *family,
-                time: *time,
+                spin_time: *spin_time,
                 dt: *dt,
                 size: *size,
                 hue: *hue,
@@ -2269,7 +2329,9 @@ struct UniformInputs {
     aspect: f32,
     coeffs: [f32; 4],
     family: AttractorFamily,
-    time: f32,
+    /// The integrated spin in spin-scaled seconds, not a wall clock — see
+    /// [`advance_spin`].
+    spin_time: f32,
     dt: f32,
     size: f32,
     hue: f32,
@@ -2374,7 +2436,7 @@ fn upload_uniforms(
                 inputs.aspect,
                 POINT_BASE * inputs.size,
                 inputs.hue,
-                inputs.time * SPIN_RATE,
+                spin_phase(inputs.spin_time),
             ],
             w: [scale, dim, z_center, deposit],
             u: [
@@ -2585,9 +2647,10 @@ mod tests {
     #![allow(clippy::panic, clippy::expect_used)]
 
     use super::{
-        AttractorFamily, AttractorScene, Basis, DEFAULT_DEPTH_FADE, DEFAULT_DEPTH_HUE, FIXED_STEP,
-        MAX_PERSPECTIVE, MIN_PARTICLE_DENSITY, Particle, RESEED_DRAWS_STREAK, Scene,
-        active_particles, deposit_scale, projection_mirror, streak_flag,
+        AttractorFamily, AttractorScene, Basis, DEFAULT_DEPTH_FADE, DEFAULT_DEPTH_HUE,
+        DEFAULT_SPIN, FIXED_STEP, MAX_PERSPECTIVE, MIN_PARTICLE_DENSITY, Particle,
+        RESEED_DRAWS_STREAK, SPIN_RATE, Scene, active_particles, advance_spin, deposit_scale,
+        projection_mirror, spin_phase, streak_flag,
     };
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderContext;
@@ -3048,6 +3111,178 @@ mod tests {
             (span - HUE).abs() < 1e-6,
             "the tint spans {span} across the depth range, not the {HUE} it was asked for"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // The spin (Plan 0063 Phase 3 / ADR-0076)
+    // -----------------------------------------------------------------------
+
+    /// A `spin` sequence that runs a while, then changes — a second of turning
+    /// at the shipped rate, then double, then a reversal, half a second each.
+    ///
+    /// **The length is the point.** The product form's error is proportional to
+    /// *elapsed* time, so a sequence that changes on frame 3 barely shows it; a
+    /// sequence that changes after a second of accumulated rotation shows it as
+    /// the figure jumping a fifth of a revolution between two frames.
+    fn spin_ramp() -> Vec<f32> {
+        let mut ramp = vec![1.0f32; 60];
+        ramp.extend(std::iter::repeat_n(2.0f32, 30));
+        ramp.extend(std::iter::repeat_n(-1.0f32, 30));
+        ramp
+    }
+
+    /// **The phase is the running sum, and provably not the product.**
+    ///
+    /// Under `time · spin · SPIN_RATE` a `spin` that changed between frames would
+    /// retroactively rescale *all* elapsed time, so the figure would snap to a
+    /// new angle rather than accelerate toward one. Both halves are asserted:
+    /// the integral matches term for term, and the product does not — computed
+    /// here rather than argued about.
+    #[test]
+    fn the_spin_phase_integrates_rather_than_multiplying() {
+        let dt = FIXED_STEP;
+        let mut spin_time = 0.0f32;
+        let mut running = 0.0f32;
+        let mut elapsed = 0.0f32;
+        let mut worst_integrated_step = 0.0f32;
+        let mut worst_multiplied_step = 0.0f32;
+        let mut prev_multiplied = 0.0f32;
+
+        let ramp = spin_ramp();
+        for spin in ramp.iter().copied() {
+            let before = spin_phase(spin_time);
+            spin_time = advance_spin(spin_time, spin, dt);
+            running += spin * SPIN_RATE * dt;
+            elapsed += dt;
+
+            // The integrated phase moves by at most one frame's worth of angle,
+            // whatever the binding did. That is what "accelerates" means.
+            worst_integrated_step =
+                worst_integrated_step.max((spin_phase(spin_time) - before).abs());
+
+            // The rejected form, evaluated alongside it.
+            let multiplied = elapsed * spin * SPIN_RATE;
+            worst_multiplied_step = worst_multiplied_step.max((multiplied - prev_multiplied).abs());
+            prev_multiplied = multiplied;
+        }
+
+        assert!(
+            (spin_phase(spin_time) - running).abs() < 1e-6,
+            "the phase is {} but the running sum of spin * SPIN_RATE * dt is {running}",
+            spin_phase(spin_time)
+        );
+
+        // ...and it is NOT the product. Not a near miss: the two disagree by more
+        // than the whole integrated phase.
+        let multiplied = elapsed * ramp.last().copied().unwrap_or(0.0) * SPIN_RATE;
+        println!(
+            "after {} frames: integrated {:.6} rad, multiplied {multiplied:.6} rad",
+            ramp.len(),
+            spin_phase(spin_time)
+        );
+        assert!(
+            (spin_phase(spin_time) - multiplied).abs() > spin_phase(spin_time).abs(),
+            "the integrated phase {} and the multiplied one {multiplied} agree — this test \
+             cannot tell the two formulations apart",
+            spin_phase(spin_time)
+        );
+
+        // The snap, stated as the thing a viewer would see. The largest angle one
+        // frame can honestly turn through is `max|spin| * SPIN_RATE * dt`; the
+        // integrated phase never exceeds it, and the product form leaps a large
+        // multiple of it the instant the binding moves — because it rescales a
+        // second of already-elapsed rotation.
+        let frame_angle = ramp.iter().fold(0.0f32, |m, s| m.max(s.abs())) * SPIN_RATE * dt;
+        println!(
+            "worst single-frame phase jump: integrated {worst_integrated_step:.6}, \
+             multiplied {worst_multiplied_step:.6} (one frame of rotation is {frame_angle:.6})"
+        );
+        assert!(
+            // A relative slack, because this compares two `f32` roundings of the
+            // same product, which differ in the last bits.
+            worst_integrated_step <= frame_angle * (1.0 + 1e-5),
+            "the integrated phase jumped {worst_integrated_step} in one frame, past the \
+             {frame_angle} a frame's rotation can be"
+        );
+        assert!(
+            worst_multiplied_step > frame_angle * 20.0,
+            "the multiplied form's worst jump is only {worst_multiplied_step} against a frame's \
+             {frame_angle} — this sequence does not exercise the retroactive rescale the \
+             integration exists to avoid"
+        );
+    }
+
+    /// `spin = 1` is **exactly** the rate this scene shipped with, and `spin = 0`
+    /// holds the figure still — the two ends the parameter is documented by.
+    ///
+    /// The exactness is the load-bearing half. At `spin = 1` the accumulator is
+    /// `Σ dt` term for term, which is bit-for-bit the renderer's own clock, so
+    /// the phase equals the `time * SPIN_RATE` it replaced and no golden baseline
+    /// moves. Deferring the `SPIN_RATE` multiply to [`spin_phase`] is what buys
+    /// that; summing `spin * SPIN_RATE * dt` would drift in the last bits.
+    #[test]
+    fn the_default_spin_reproduces_the_shipped_rate_exactly() {
+        let dt = FIXED_STEP;
+        let (mut spin_time, mut clock) = (0.0f32, 0.0f32);
+        for _ in 0..600 {
+            spin_time = advance_spin(spin_time, DEFAULT_SPIN, dt);
+            // The renderer's own accumulation, verbatim (`self.time += dt`).
+            clock += dt;
+            assert_eq!(
+                spin_phase(spin_time),
+                clock * SPIN_RATE,
+                "the integrated phase has drifted from the clock-multiplied one it replaced"
+            );
+        }
+        assert_eq!(DEFAULT_SPIN, 1.0);
+
+        // `spin = 0` holds the angle fixed, exactly, however long it runs.
+        let mut held = 0.0f32;
+        for _ in 0..600 {
+            held = advance_spin(held, 0.0, dt);
+        }
+        assert_eq!(spin_phase(held), 0.0, "spin = 0 must hold the figure still");
+
+        // ...and negative reverses it, rather than being clamped away.
+        let mut back = 0.0f32;
+        for _ in 0..60 {
+            back = advance_spin(back, -1.0, dt);
+        }
+        assert!(
+            spin_phase(back) < 0.0,
+            "a negative spin must turn the other way"
+        );
+    }
+
+    /// The scene is actually wired to the integration — asserted on the scene's
+    /// own accumulator across rendered frames, since the two tests above prove
+    /// the arithmetic and not that anything calls it.
+    #[test]
+    fn the_scene_integrates_the_spin_it_is_given() {
+        let Some(mut h) = Harness::new(AttractorFamily::Lorenz) else {
+            return;
+        };
+        // A held figure, across the 120 frames the plan names.
+        h.scene.set_param("spin", 0.0);
+        h.run(120);
+        assert_eq!(
+            spin_phase(h.scene.spin_time),
+            0.0,
+            "spin = 0 did not hold the projection angle across 120 frames"
+        );
+
+        // ...then let it turn, and the phase is exactly the frames it ran for.
+        h.scene.set_param("spin", 1.0);
+        h.run(60);
+        let mut expected = 0.0f32;
+        for _ in 0..60 {
+            expected = advance_spin(expected, 1.0, FIXED_STEP);
+        }
+        assert_eq!(
+            h.scene.spin_time, expected,
+            "the scene's accumulator is not the frame-by-frame integral of its `spin`"
+        );
+        assert!(spin_phase(h.scene.spin_time) > 0.0);
     }
 
     // -----------------------------------------------------------------------
