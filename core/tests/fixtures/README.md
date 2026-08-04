@@ -29,8 +29,10 @@ wildcard arm. To add one:
 
 1. Author `<system_name>.toml` here (mirror the header comment of the others).
 2. Add the variant's arm to `fixture()` in `golden.rs`. (There is no second list
-   to update: the roster iterated here is `SystemKind::ALL` itself, since Plan
-   0030 Phase 3 retired this file's duplicate `SYSTEMS` list.)
+   to update for a *new system*: the roster iterated here is `SystemKind::ALL`
+   itself, since Plan 0030 Phase 3 retired this file's duplicate `SYSTEMS` list.
+   `EXTRA_FIXTURES` — see below — is a different thing and is not part of adding
+   a scene.)
 3. Bless the baseline on Windows WARP:
    `LMV_BLESS=1 cargo test -p lmv-core --test golden`, then eyeball the new PNG
    under `core/tests/golden/` to confirm the scene actually drew.
@@ -44,6 +46,38 @@ Note that `golden.rs`'s harness frame carries a **populated `spectrum` array**
 (Plan 0034): a frame claiming `bass = 0.6` with 64 silent log-bands is not a
 frame any audio could produce, and the spectrum fixture would pin a baseline of
 nothing under it.
+
+## `attractor_depth.toml` is a *second* fixture of a rostered system
+
+It is read by `golden.rs` like the roster is, but it is not part of the roster —
+it lives in `EXTRA_FIXTURES`, a one-entry list captured **after** the
+`SystemKind::ALL` loop. That list is a narrow escape hatch, not a general
+second roster, and it exists for one situation: the rostered fixture of a system
+**structurally cannot reach** the code under test.
+
+That is the case here by design rather than by accident. The roster's
+`attractor.toml` is **De Jong**, and [ADR-0076](../../../docs/adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md)
+gives every 2-D family an inverse depth extent of exactly `0.0` — which is
+precisely the mechanism that makes the perspective divide, the distance haze and
+the depth tint the identity on a flat figure. No edit to `attractor.toml` could
+execute a line of them. So the depth cues get a 3-D fixture (Lorenz) with all
+four levers off their defaults.
+
+Two properties of it are worth knowing before touching either file:
+
+- **It is captured after the roster, deliberately.** Every pre-existing baseline
+  is therefore rendered from the device state it always was, and adding this
+  moved none of them — which matters on WARP, where building GPU resources
+  mid-run is documented to change what a later capture resolves to.
+- **Its sensitivity is measured, and the header records the numbers.** Each
+  lever was neutralized in turn and the capture re-measured; all four fail the
+  guard. The first draft's `depth_fade = 0.6` did **not** — it moved the capture
+  by mean 0.0091 and an outlier of exactly 48, inside both tolerances — so a
+  regression that killed the fade outright would have passed. If you weaken a
+  value there, re-run that check.
+
+`systems_rosters_every_variant` holds it to the same conditions as the roster
+(the TOML parses, and its stem cannot collide with a rostered baseline's).
 
 ## The `composite_*` fixtures are a different guard
 
