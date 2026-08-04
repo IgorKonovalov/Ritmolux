@@ -3,7 +3,7 @@
 > **Status:** proposed
 > **Date:** 2026-08-03
 > **Related plan(s):** [0059-lorenz-finds-its-plane](../plans/0059-lorenz-finds-its-plane.md) (Phase 1)
-> **Supplements:** [ADR-0007](0007-declarative-structural-config.md) — the `[particles]` family roster
+> **Supplements:** [ADR-0007](0007-line-geometry-generators.md) — the `[particles]` family roster
 > **Arises from:** [Plan 0057](../plans/done/0057-the-attractors-compute-path.md) Phase 4, which
 > diagnosed the cause and stopped by its own instruction
 

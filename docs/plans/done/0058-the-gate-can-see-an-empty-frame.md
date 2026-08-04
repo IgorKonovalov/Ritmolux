@@ -11,17 +11,17 @@
 > cannot trip the engine-drift alarm; `LMV_BLESS` was never run. C ABI stays **v4**, no new
 > dependency, nothing on the per-frame path.
 > Phase 3 came back with **report, not gate**, which the plan authorized in advance and left to the
-> measurement — see [ADR-0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)'s
-> Outcome, and [backlog 0054](../design-backlog.md) for the successor instrument that evidence now
+> measurement — see [ADR-0067](../../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)'s
+> Outcome, and [backlog 0054](../../design-backlog.md) for the successor instrument that evidence now
 > argues for.
-> Closes [backlog 0053](../design-backlog.md) and retires [backlog 0052](../design-backlog.md).
+> Closes [backlog 0053](../../design-backlog.md) and retires [backlog 0052](../../design-backlog.md).
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) (this
-> plan implements it), [0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) (the
-> same class one layer up), [0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)
+> **Related ADRs:** [0067](../../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) (this
+> plan implements it), [0062](../../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) (the
+> same class one layer up), [0049](../../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)
 > (the normalization whose blast radius this contains).
-> Closes [design-backlog 0053](../design-backlog.md).
+> Closes [design-backlog 0053](../../design-backlog.md).
 
 ## TL;DR
 
@@ -36,7 +36,7 @@ not draw **less** picture when the music gets louder. First visible behavior: th
 
 ## Context & problem
 
-[ADR-0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) carries the full case. The
+[ADR-0067](../../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) carries the full case. The
 mechanism in one line: `is_lit(px, bg, eps)` is shared by `coverage`, `quadrant_spread` and
 `tonal_flatness`, and `sanity` hands it the top-left pixel as `bg`.
 
@@ -46,7 +46,7 @@ the floors are low by design (0.01 for every sparse system), because sparse scen
 little. The two together mean the backdrop clears the bar on its own.
 
 The defect that exposed it is worth stating because it is a *class*, not an incident.
-[Plan 0048](done/0048-analysis-v2-and-the-retune.md) Phase 7 retuned the library onto the normalized
+[Plan 0048](0048-analysis-v2-and-the-retune.md) Phase 7 retuned the library onto the normalized
 band scale, and it searched for one shape: `clamp(band * G, 0, C)`, a gain with a ceiling. A
 **world-space** param that multiplies a band into a coordinate — `spectrum`'s `scale`, and any
 `bin()`- or `index`-driven geometry — has the same exposure with no `clamp` for that pass to find,
@@ -188,14 +188,14 @@ render path.
 - **Phase 1 may fail presets that are actually fine.** A scene drawing genuinely faint light over a
   lifted backdrop could sit under `eps = 10` against black. If that happens the answer is a measured
   `eps`, not a lowered floor — and it is a finding about the additive-alpha work
-  ([ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)), so surface it.
+  ([ADR-0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)), so surface it.
 - **Phase 3's threshold may not exist.** If the legitimate "tightens on a hit" presets overlap the
   over-scaled ones, there is no ratio that separates them and the check should ship as a **report**
   rather than a gate — the same call ADR-0062 made in reverse when it took the gate. Deciding that
   needs the measurement, so it is not pre-empted here.
 - **Phase 4 moves golden baselines**, the only pixels this plan moves anywhere.
 - **This plan does not make `sanity` see the `Rich` tier.** It renders at `Floor`, which is where
-  [Plan 0056](done/0056-clamp-occupancy-and-the-axis-anchor.md) Phase 5 found the flat-frame
+  [Plan 0056](0056-clamp-occupancy-and-the-axis-anchor.md) Phase 5 found the flat-frame
   statistic blind to the attractor saturation it was aimed at. Orthogonal, and noted so the two are
   not confused.
 
@@ -213,5 +213,5 @@ render path.
 
 - The in-frame geometry fraction as a supplement for CPU-geometry scenes, if Phase 3's measurement
   shows the pixel ratio cannot reach a comb's clipped tips.
-- Whether `sanity` should also run at `Rich` — [ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md)
+- Whether `sanity` should also run at `Rich` — [ADR-0064](../../adrs/0064-a-capture-may-pin-the-rich-tier.md)
   and `shot --tier` make it possible, and Plan 0056 Phase 5's measurement is the argument for it.

@@ -119,7 +119,7 @@ the real-music median** and **14 presets with no live audio term at all** — be
 suite, because every reactivity instrument we own diffs a driven band against *silence*, where
 a saturated binding scores perfectly. That is the mirror of the failure Plans 0041/0042 were
 spent closing, and it is now [ADR-0062](0062-clamp-occupancy-is-the-saturation-instrument.md) /
-[Plan 0056](../plans/0056-clamp-occupancy-and-the-axis-anchor.md).
+[Plan 0056](../plans/done/0056-clamp-occupancy-and-the-axis-anchor.md).
 
 **The 64-band array normalizes against one peak shared by all 64 bands**, not per band. The
 plan asked for "one rule, no per-surface exceptions" and this is the rule applied — per-band

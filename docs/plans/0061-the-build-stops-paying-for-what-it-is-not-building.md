@@ -84,7 +84,7 @@ that separately, which is the mechanism behind the disk-fill already recorded ag
 ### The same shape, on the build machine (added 2026-08-04)
 
 The audit measured the *local* build. Run **30903871856** — the first green CI run since 2026-07-30,
-made possible by Plan [0060](0060-a-test-number-states-a-property-or-names-its-machine.md) — made the
+made possible by Plan [0060](done/0060-a-test-number-states-a-property-or-names-its-machine.md) — made the
 CI side measurable for the first time, and it is the same finding twice.
 
 | Job | Runner | Wall |

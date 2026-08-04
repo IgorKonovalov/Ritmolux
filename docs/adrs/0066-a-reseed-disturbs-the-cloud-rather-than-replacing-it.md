@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-03) — implemented in full; see Outcome, including one claim of this ADR the measurement retired
 > **Date:** 2026-08-03
-> **Related plan(s):** [0057-the-attractors-compute-path](../plans/0057-the-attractors-compute-path.md) (Phase 3)
+> **Related plan(s):** [0057-the-attractors-compute-path](../plans/done/0057-the-attractors-compute-path.md) (Phase 3)
 
 ## Context
 

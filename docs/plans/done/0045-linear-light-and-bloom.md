@@ -336,7 +336,7 @@ side's `bg_*`.
   **One thing this run cannot settle, worth knowing before someone tries:** `shot` has **no
   `--tier` flag** — headless capture is `Floor` by construction (ADR-0045), deliberately, so that
   no baseline can be blessed at another tier. Every `Rich` question on this page therefore needs
-  the running app. [Plan 0050](../0050-in-app-settings-and-a-browse-overlay-that-fits.md)'s `[` / `]`
+  the running app. [Plan 0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md)'s `[` / `]`
   tier swap turns that from a relaunch into an A/B in one sitting.
 
 - **Visual result, 2026-07-31 — the fold's disc coverage is rejected, and it is routed out

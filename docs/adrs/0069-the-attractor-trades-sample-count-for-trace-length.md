@@ -5,7 +5,7 @@
 > **Related plan(s):** [0059-lorenz-finds-its-plane](../plans/0059-lorenz-finds-its-plane.md) (Phases 2–3)
 > **Depends on:** [ADR-0065](0065-the-attractor-deposit-is-normalized-by-particle-count.md) — the
 > normalization that makes a preset-chosen count safe
-> **Supplements:** [ADR-0007](0007-declarative-structural-config.md) (the `[particles]` table),
+> **Supplements:** [ADR-0007](0007-line-geometry-generators.md) (the `[particles]` table),
 > [ADR-0045](0045-quality-tiers-floor-and-rich.md) (the tier budget this fraction is *of*)
 
 ## Context

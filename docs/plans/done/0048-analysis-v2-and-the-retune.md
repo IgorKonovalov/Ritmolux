@@ -15,7 +15,7 @@
 > **Delivers the large half of roadmap R5** (normalization, phrase time, and the axis), and
 > spawns three successors: [ADR-0062](../../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)
 > + [ADR-0063](../../adrs/0063-address-the-spectrum-by-frequency.md) + [Plan
-> 0056](../0056-clamp-occupancy-and-the-axis-anchor.md), and
+> 0056](0056-clamp-occupancy-and-the-axis-anchor.md), and
 > [backlog 0042](../../design-backlog.md) on the estimator's lock rate. See "Close review" at the
 > foot of this file.
 > **Created:** 2026-07-30
@@ -246,7 +246,7 @@ question showing itself unprompted.
 
 - ~~Revisit `bin_range(lo, hi)` against the resolved axis.~~ **Designed** —
   [ADR-0063](../../adrs/0063-address-the-spectrum-by-frequency.md) folds it in beside `bin_hz`,
-  and Phase 4 of [Plan 0056](../0056-clamp-occupancy-and-the-axis-anchor.md) builds it.
+  and Phase 4 of [Plan 0056](0056-clamp-occupancy-and-the-axis-anchor.md) builds it.
 - ADR-0050 Alternative B (novelty/section signal) once bar time has proven itself in
   content. **Not yet earned** — Phase 6 measured bar time at a 3.1 % lock rate, so the
   precondition is unmet; [backlog 0042](../../design-backlog.md) comes first.
@@ -306,7 +306,7 @@ test checks the layout function against the edge table that moved *with* it — 
 consistency with no external anchor. Both are now designed out
 ([ADR-0062](../../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md),
 [ADR-0063](../../adrs/0063-address-the-spectrum-by-frequency.md),
-[Plan 0056](../0056-clamp-occupancy-and-the-axis-anchor.md)).
+[Plan 0056](0056-clamp-occupancy-and-the-axis-anchor.md)).
 
 ### Minors, all fixed in the close commit
 

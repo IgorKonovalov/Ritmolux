@@ -2,7 +2,7 @@
 
 > **Status:** **accepted** (2026-08-04, at Plan 0050's close)
 > **Date:** 2026-07-30
-> **Related plan(s):** [0050](../plans/0050-in-app-settings-and-a-browse-overlay-that-fits.md)
+> **Related plan(s):** [0050](../plans/done/0050-in-app-settings-and-a-browse-overlay-that-fits.md)
 > **Supplements:** [ADR-0045](0045-quality-tiers-floor-and-rich.md) (quality tiers), which said the
 > tier resolves once at construction. This ADR adds the one way it may move afterward.
 

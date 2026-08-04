@@ -8,7 +8,7 @@
 > hardware). **CI has been green since Phase 1** after five consecutive red pushes.
 > **Phase 3 was re-scoped mid-plan by the architect**, by this phase's own route-back clause: the
 > CI ratio came back at `0.036654`, under the `0.05` fallback the plan named in advance, so
-> [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) took
+> [ADR-0074](../../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) took
 > the decision — **no ratio floor on WARP**, the test demoted to a property-only smoke check that
 > says so in its own doc, and the magnitude claim moved to hardware. It was then measured **here**,
 > once ADR-0074's "hardware we do not have" premise turned out to be false.
@@ -16,20 +16,20 @@
 > for**: `0.036542` landed on the **CI WARP** reading, not the local one — matching to three figures
 > on the ratio and **five on the control**. So WARP 10.0.26100 behaves like hardware and **this
 > box's WARP 10.0.19041 is the outlier**, which inverts the mechanism ADR-0074 recorded and hands
-> Plan [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) a sharper question than the one
+> Plan [0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md) a sharper question than the one
 > it was given. Recorded in ADR-0074's **Outcome** section; see Followups.
 > **Verified at close:** `fmt` clean, `clippy -D warnings` clean, full `nextest` green on `main`,
 > both dual-live reports reproduced under `--no-capture`, no golden baseline moved, no shipped code
 > touched, C ABI unchanged at v4. Version bumped **patch** at this close.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> **Related ADRs:** [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > (this plan's decision),
-> [0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) (Phase 3's
-> re-scope, taken from Phase 2's readings), [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md) (the skip-with-notice
-> shape reused here), [0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (whose
+> [0074](../../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) (Phase 3's
+> re-scope, taken from Phase 2's readings), [0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md) (the skip-with-notice
+> shape reused here), [0023](../../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (whose
 > `MEAN_TOL` is the noise floor one threshold is measured against),
-> [0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (the raw levels one
+> [0049](../../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (the raw levels one
 > test defends).
 
 ## TL;DR
@@ -47,7 +47,7 @@ none — this plan moves no pixels and changes no shipped code.
 **Outcome, 2026-08-04.** Phases 1 and 2 did what they said: CI is green and the numbers are in.
 Phase 3's magnitude half **did not survive its own measurement** — the ratio moves 7.3x between two
 builds of the same software rasterizer, so it is not the portable quantity the design took it for.
-[ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) takes
+[ADR-0074](../../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) takes
 that decision: no floor, the WARP test demoted to a property-only smoke check that says so in its
 own doc, and the magnitude claim deferred to hardware. What this plan set out to do — stop two
 tests asserting a number that only exists on one machine — is done either way.
@@ -76,13 +76,13 @@ signal. This floor is half of that, and the healthy local reading is 2.25x it. T
 been made inside the band this project already declares to be noise.
 
 Neither number can be re-chosen here. The failing configurations exist only on the runners, and per
-Plan [0036](0036-macos-and-windows-release-artifacts.md) Phase 4 there is no Mac on this side at
+Plan [0036](../0036-macos-and-windows-release-artifacts.md) Phase 4 there is no Mac on this side at
 all. That is what shapes the phases below: the measurement has to come back from CI before the
 contract can be written.
 
 ## Decision
 
-Both tests are rewritten to [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)'s
+Both tests are rewritten to [ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)'s
 rule — state a property that holds on every configuration, or name the configuration the number
 came from and skip elsewhere — and the work is sequenced **instrument first**, the pattern Plans
 0057 and 0058 both used: land the thing that makes the numbers visible, read them, then set the
@@ -98,7 +98,7 @@ test hardware-only — its sibling's treatment — was considered and is kept as
 fallback if Phase 2's numbers show the ratio cannot survive WARP either.
 
 **The ratio did not survive, and the fallback was not taken as written**
-([ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md)). What
+([ADR-0074](../../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md)). What
 fails to travel is the **magnitude**, not the property — so the test stays on WARP with its
 property-form assertions, gains no floor, and the magnitude claim moves to hardware. The rejection
 of a per-target constant table stands and is if anything stronger: the two WARP builds measured
@@ -207,13 +207,13 @@ what Phase 3 records in the test's doc comment.
 `check (windows-latest)` and the instrumented `coverage` job printed `0.036654` **identically**, so
 the CI reading is stable rather than a noisy sample. `0.036654` is below the `0.05` fallback
 condition named in this plan's Risks, so Phase 3 routed back to `architect` as instructed —
-see [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md).
+see [ADR-0074](../../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md).
 
 **Coverage: 93.34 % lines against `COVERAGE_FLOOR = 88`** — the first evaluation since 2026-07-30,
 and it passes with 5.34 points of slack. The Risks entry that named this as a possible Phase 2
 finding is closed: no floor change is owed by this plan, and the followup it would have triggered
 is not needed. Note for whoever writes the floor next — Plan
-[0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2 moves the same number
+[0061](../0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2 moves the same number
 for a different reason (it removes `ffi.rs` from the gated crate), and this is the reading it moves
 from.
 
@@ -221,7 +221,7 @@ from.
 
 > **Re-scoped 2026-08-04 by the architect**, from Phase 2's readings and this phase's own
 > route-back clause. The render half no longer adds a floor;
-> [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) is the
+> [ADR-0074](../../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) is the
 > decision and the reasoning. The DSP and spec halves are **unchanged** — they were never dependent
 > on the ratio.
 
@@ -243,7 +243,7 @@ from.
   belongs in the test rather than only here. Record both readings and the 11.3x signal spread in
   the comment, and point at ADR-0074. Change no assertion **in the WARP test**.
   **Landed as `a324b21`, with one thing now stale in it.** That commit sent the magnitude claim to
-  Plan [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3, which was this plan's
+  Plan [0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3, which was this plan's
   instruction at the time and was superseded hours later when ADR-0074's premise was corrected. The
   pointer sits at `core/src/render/mod.rs:3223-3225` and is re-pointed by the hardware item below —
   **it is not a second thing to decide.**
@@ -313,7 +313,7 @@ numerator**, and every local capture — including every golden blessing — is 
 ADR-0074's decision is unchanged (a number reproducing on two configurations is still a measurement,
 not a portable floor), but its Context, one Negative bullet and Alternative A's rejection are all
 narrower than they read. Carried in ADR-0074's **Outcome** section and in Followups below.
-- **Running alongside Plan [0059](0059-lorenz-finds-its-plane.md), which is live in a parallel
+- **Running alongside Plan [0059](../0059-lorenz-finds-its-plane.md), which is live in a parallel
   session as of 2026-08-04.** No file is shared — that plan's Phase 4 is `presets/attractor_*.toml`
   and this one is `core/src/render/mod.rs`, `core/tests/dsp.rs` and `docs/specs/`. Three
   consequences, all mechanical:
@@ -328,7 +328,7 @@ narrower than they read. Carried in ADR-0074's **Outcome** section and in Follow
 - ~~**Route back to `architect` if:** Phase 2's ratio does not clear the fallback condition in Risks
   below.~~ **This fired.** The ratio came back at `0.036654`, under the `0.05` condition, and the
   decision was taken in
-  [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) rather
+  [ADR-0074](../../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) rather
   than by `dev`. The clause worked as designed and is left here as the record of it.
 
 ## Risks & open questions
@@ -380,7 +380,7 @@ narrower than they read. Carried in ADR-0074's **Outcome** section and in Follow
   work and this plan would only have hidden it behind a threshold.
 - **It does not add a per-target constant table**, which is ADR-0071's Alternative A.
 - **It does not revisit `MEAN_TOL`, the golden baselines, or the WARP-trust work in Plan
-  [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md).** 0053 owns whether WARP's output
+  [0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md).** 0053 owns whether WARP's output
   should be trusted at all; this plan only stops two thresholds from depending on which WARP ran.
   They touch in one place worth knowing: if 0053's Phase 3 hardware access materializes, the
   hardware-only fallback above becomes cheaper to accept.
@@ -409,7 +409,7 @@ narrower than they read. Carried in ADR-0074's **Outcome** section and in Follow
   outlier**, inflating the numerator. The consequence is larger than the original entry's, because
   the golden suite blesses on this box: a `frozen`-only sequence with no dual-live asymmetry in it
   renders 1.54x differently here than on either other configuration, and nothing has looked at what
-  else that moves. **This is Plan [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md)'s
+  else that moves. **This is Plan [0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md)'s
   question** — it owns whether WARP's output should be trusted at all — and it is now a sharper one
   than the plan was written against. Recorded in ADR-0074's Outcome section.
 - **`dissolve_at`'s doc comment states a machine-specific behaviour as a property of "the DX12 WARP

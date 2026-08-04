@@ -13,7 +13,7 @@
 > ratio spread, not on where a machine is — but the **disposition changes**: the magnitude claim is
 > measurable *today*, not deferred indefinitely to a `human` phase waiting on a box. The two
 > passages this affects are marked inline.
-> **Related plan(s):** [0060](../plans/0060-a-test-number-states-a-property-or-names-its-machine.md)
+> **Related plan(s):** [0060](../plans/done/0060-a-test-number-states-a-property-or-names-its-machine.md)
 > (Phase 3, which routed this decision here by its own instruction)
 > **Supplements:** [0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > (whose "property" form this narrows, and one of whose Positive consequences it withdraws),
