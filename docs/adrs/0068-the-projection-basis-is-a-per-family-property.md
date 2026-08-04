@@ -1,8 +1,8 @@
 # ADR-0068 — The 3-D projection basis is a per-family property: Lorenz renders x–z
 
-> **Status:** proposed
+> **Status:** **accepted** (2026-08-04, at Plan 0059’s close)
 > **Date:** 2026-08-03
-> **Related plan(s):** [0059-lorenz-finds-its-plane](../plans/0059-lorenz-finds-its-plane.md) (Phase 1)
+> **Related plan(s):** [0059-lorenz-finds-its-plane](../plans/done/0059-lorenz-finds-its-plane.md) (Phase 1)
 > **Supplements:** [ADR-0007](0007-line-geometry-generators.md) — the `[particles]` family roster
 > **Arises from:** [Plan 0057](../plans/done/0057-the-attractors-compute-path.md) Phase 4, which
 > diagnosed the cause and stopped by its own instruction

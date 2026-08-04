@@ -1,8 +1,8 @@
 # ADR-0070 — A feedback pass addresses its own target in framebuffer space
 
-> **Status:** proposed
+> **Status:** **accepted** (2026-08-04, at Plan 0059’s close)
 > **Date:** 2026-08-04
-> **Related plan(s):** [0059](../plans/0059-lorenz-finds-its-plane.md) (Phase 1b)
+> **Related plan(s):** [0059](../plans/done/0059-lorenz-finds-its-plane.md) (Phase 1b)
 
 ## Context
 

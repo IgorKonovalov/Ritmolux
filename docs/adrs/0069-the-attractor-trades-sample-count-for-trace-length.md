@@ -1,8 +1,10 @@
 # ADR-0069 — The attractor trades sample count for trace length: `[particles] density` and the continuous-flow streak
 
-> **Status:** proposed
+> **Status:** **accepted** (2026-08-04, at Plan 0059's close) — with an **Outcome** section at the
+> end. Phase 4 answered both questions this ADR deferred to it, and one answer **falsifies a
+> Consequence written here as shipped fact**. The decision is unchanged.
 > **Date:** 2026-08-03
-> **Related plan(s):** [0059-lorenz-finds-its-plane](../plans/0059-lorenz-finds-its-plane.md) (Phases 2–3)
+> **Related plan(s):** [0059-lorenz-finds-its-plane](../plans/done/0059-lorenz-finds-its-plane.md) (Phases 2–3)
 > **Depends on:** [ADR-0065](0065-the-attractor-deposit-is-normalized-by-particle-count.md) — the
 > normalization that makes a preset-chosen count safe
 > **Supplements:** [ADR-0007](0007-line-geometry-generators.md) (the `[particles]` table),
@@ -158,3 +160,49 @@ because a basis fix alone will not clear Phase 5's done-when" — together with 
 the levers are `fade` and the particle count, "content and capacity, not geometry". This ADR is that
 observation taken seriously: one of those two levers did not exist, and Phase 2 of the same plan is
 what made building it safe.
+
+## Outcome (added at Plan 0059's close, 2026-08-04)
+
+Phase 4 — the one content pass, `990fedc` — answered both questions this ADR routed to it. One
+answer settles an alternative; the other **falsifies a Consequence written here as shipped fact.**
+
+**`density` + `fade` holds a legible curve, so Alternative D does not get its case.** The
+alternative was rejected as *the wrong first step* rather than as wrong, on the explicit condition
+that *"if Plan 0059 Phase 4 finds `density` + `fade` cannot hold a curve, this is the successor and
+it will have a rendered case to argue from."* The ladder was rendered and went the other way:
+Lorenz at `density` 1.0 / 0.05 / 0.012 / 0.005 / 0.002 reads fog, fog, fuzz, curve, curve, and
+Thomas at 1.0 / 0.02 / 0.005 / 0.002 reads blot, drawing, sketch, scribble. The sparse preset the
+comparison was waiting for now ships (`attractor_lorenz` at `0.002`, `attractor_thomas` at `0.02`).
+Per-particle position history is therefore **not** owed a successor plan. It remains available if a
+future look wants per-particle persistence that does not fog when neighbours overlap — but it must
+now argue that from its own merits, not from this ADR's deferred condition.
+
+**"Both behaviours ship reachable" is false — the reseed streak cannot be A/B'd as wired, and this
+ADR should not have said it could.** The Consequence above states that the jitter-frame streak and
+its absence *"both ship reachable and Plan 0059 Phase 4 decides it in motion"*. They do not. Flipping
+`RESEED_DRAWS_STREAK` to `true` and rebuilding produces **byte-identical output** under three
+stimuli — a held `onset = 1` frame, a `click:120` filmstrip at the hops where onset peaks `1.000`,
+and a twelve-frame strip of a variant reseeding on every beat. Zero pixels differ.
+
+The cause is **frame order, not encoding**, and it is visible in the source:
+`encode_jitter` runs before `encode_steps` in the same frame
+(`core/src/render/scenes/particles/mod.rs`), deliberately and for a good reason its own comment
+gives — the map pulls the disturbed points back within the frame, so the kick reads as the figure
+being shaken rather than as a noise layer over it. But the jitter writes
+`particles[i].prev = select(kicked, origin, step.coeffs.w != 0.0)` and the ordinary step then writes
+`particles[i].prev = origin` unconditionally. On any frame with `pending_steps >= 1` — every frame,
+at the fixed 1/60 step — the streak's `prev` is overwritten before anything is drawn.
+
+**Nothing is broken and no preset is affected**: the shipped `false` is also what the scene does, so
+the look is exactly what every header describes. What is wrong is a promise. The decision taken at
+this close is to **retire the flag and the promise rather than reorder the dispatch**: moving the
+jitter after the steps would buy the A/B by spending a documented, deliberate ordering rationale on
+a look nobody has asked for. If the percussive whip is ever wanted, the mechanism is a **separate
+streak origin written by the jitter and read by the trail pass** — decoupled from `prev`, so the
+ordering survives — not a constant flip. That is engine work for a future plan; see Plan 0059's
+Followups.
+
+The general lesson is the one [ADR-0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+states for numbers, applied to a lever: **"both behaviours ship reachable" is a claim about the
+running system, and it was written from the diff rather than from a render.** One capture would have
+caught it, and the content pass that finally took one is where it surfaced.

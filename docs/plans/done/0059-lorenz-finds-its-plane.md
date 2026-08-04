@@ -1,23 +1,34 @@
 # 0059 — Lorenz finds its plane, and the attractor can trade samples for curves
 
-> **Status:** **in progress** — approved 2026-08-03; **all four `dev` phases have landed
-> 2026-08-04**: Phase 1 `357a17e`, Phase 1b `1c47de5`, Phase 2 `4fb4a81`, Phase 3 `642aec0`.
-> **Only Phase 4 remains** — the `human` content pass over all six attractor presets, which **may
-> route back to `architect`** if `density` + `fade` cannot hold a legible curve. Phases 1-3 were
-> reviewed against this plan on 2026-08-04 (Mode 4, no blockers, no majors) so that the close is one
-> step behind the content pass rather than two; the review's findings are recorded under each phase
-> below. **`f09f1fe` ("wip(presets): provisional attractor rebalance and a symmetry A/B") is
-> provisional work toward Phase 4 and is not inherited** — judge it as part of that pass.
+> **Status:** **done 2026-08-04** — all five phases landed: Phase 1 `357a17e`, Phase 1b `1c47de5`,
+> Phase 2 `4fb4a81`, Phase 3 `642aec0`, and the `human` Phase 4 content pass `990fedc`. Phases 1-3
+> were reviewed 2026-08-04 (Mode 4, no blockers, no majors); Phase 4 was reviewed at this close.
+> **`f09f1fe` was judged as part of Phase 4 rather than inherited**, exactly as this header
+> instructed: its bass rebalance on the three map presets carries unchanged, and its
+> `kaleido_order = 2` on `attractor_clifford` is **promoted from provisional to shipped** — with the
+> zoom peak pulled `1.42 → 0.94`, because the fold had arrived with the unfolded framing still under
+> it and the ribbon's tips were smearing the frame edge into a permanent starburst.
+> **Phase 4 answered all three questions this plan routed to it, and two answers went against what
+> the plan predicted** — see the Risks section, where each is now marked resolved:
+> **`density` + `fade` DOES hold a legible curve**, so
+> [ADR-0069](../../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) Alternative D does
+> not get its case; **the spin's dwell is fine and routes nothing**, so the ADR-0068 supplement is
+> closed unopened; and **the reseed-streak A/B cannot be run as wired**, which is the one finding
+> that changed a document rather than confirming one.
+> **Verified at close:** `fmt`, `clippy -D warnings`, the full `nextest` suite, and the doc-link
+> check all green on `main`; no C ABI change; the attractor family's coverage minimum is unmoved
+> (Leviathan `0.3442` against the `0.18` floor, 1.91x slack), so the floor conversation this plan
+> anticipated does not arise. Version bumped **minor** at this close.
 > **Created:** 2026-08-03
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) (Phase 1),
-> [0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md) (Phase 1b),
-> [0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) (Phases 2-3).
-> Depends on [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) —
+> **Related ADRs:** [0068](../../adrs/0068-the-projection-basis-is-a-per-family-property.md) (Phase 1),
+> [0070](../../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md) (Phase 1b),
+> [0069](../../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) (Phases 2-3).
+> Depends on [ADR-0065](../../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) —
 > the normalization that makes a preset-chosen count safe — and inherits
-> [ADR-0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md)'s kick.
-> **Successor to [Plan 0057](done/0057-the-attractors-compute-path.md)**, whose Phase 4 diagnosed
-> this and stopped by its own instruction; closes [backlog 0048](../design-backlog.md).
+> [ADR-0066](../../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md)'s kick.
+> **Successor to [Plan 0057](0057-the-attractors-compute-path.md)**, whose Phase 4 diagnosed
+> this and stopped by its own instruction; closes [backlog 0048](../../design-backlog.md).
 >
 > **Amended 2026-08-03, mid-Phase-1.** Phase 1's done-when asked for the butterfly "at a rest angle
 > *and* at a quarter turn". The second half is unsatisfiable in principle and the plan was wrong to
@@ -37,7 +48,7 @@
 > own history mirrored and the steady state is `figure ∪ mirror(figure)`. That is why the corrected
 > x–z plane still rendered as an X. It is older than this plan and older than ADR-0068 — the old
 > x–y basis doubled the same way. **New Phase 1b** takes it, per
-> [ADR-0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md), placed
+> [ADR-0070](../../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md), placed
 > before Phase 2 so that every capture Phases 2-4 judge is of a figure that will not change shape
 > again. Phases 2, 3 and 4 keep their numbers and their content. **Two golden baselines now move**
 > (`attractor.png`, `reaction_diffusion.png`), which contradicts this plan's original "no golden
@@ -397,9 +408,35 @@ No `Scene` trait change, no C ABI change (stays v4), no new dependency, no new p
 
 ## Risks & open questions
 
-- **Phase 4 may route back, and ADR-0069 names where.** If `density` + `fade` cannot hold a curve,
-  per-particle position history (Alternative D) is the successor — and it will then have the rendered
-  case it currently lacks, which is exactly why it was not taken first.
+- ~~**Phase 4 may route back, and ADR-0069 names where.** If `density` + `fade` cannot hold a curve,
+  per-particle position history (Alternative D) is the successor.~~ **RESOLVED 2026-08-04, the other
+  way: it holds.** Rendered ladders — Lorenz at `density` 1.0 / 0.05 / 0.012 / 0.005 / 0.002 reads
+  fog, fog, fuzz, curve, curve; Thomas at 1.0 / 0.02 / 0.005 / 0.002 reads blot, drawing, sketch,
+  scribble. **Alternative D does not get its case**: the sparse preset it was waiting to be compared
+  against now ships, and the comparison went against it. Recorded in ADR-0069's Outcome section; no
+  successor plan is owed.
+- **RESOLVED, and it is the finding that cost a document: the reseed-streak A/B cannot be run as
+  wired.** ADR-0069 shipped `RESEED_DRAWS_STREAK = false` promising that *"both behaviours ship
+  reachable and Plan 0059 Phase 4 decides it in motion"*. They do not. Flipping the constant and
+  rebuilding gives **byte-identical output** under three stimuli (a held `onset = 1` frame, a
+  `click:120` filmstrip at the hops where onset peaks `1.000`, and a twelve-frame strip of a variant
+  reseeding on every beat) — zero pixels differ. The cause is **frame order, not encoding**:
+  `encode_jitter` runs before `encode_steps` in the same frame, the jitter writes
+  `prev = select(kicked, origin, …)`, and the ordinary step then writes `prev = origin`
+  unconditionally — so on every frame at the fixed 1/60 step the streak's `prev` is overwritten
+  before anything is drawn. **Nothing renders wrongly** — the shipped `false` is what the scene does,
+  so every preset header is accurate. **Decision taken at this close: retire the flag and the
+  promise rather than reorder the dispatch.** The jitter-before-steps order has a good documented
+  reason (the map pulls the disturbed points back within the frame, so a kick reads as the figure
+  being shaken rather than as noise laid over it), and spending it to enable an A/B nobody has asked
+  for is the wrong trade. If the percussive whip is ever wanted, the mechanism is a **separate streak
+  origin** written by the jitter and read by the trail pass — not a constant flip. See Followups.
+- ~~**A basis fixes one angle, and the scene rotates** … Phase 4 decides whether it matters.~~
+  **RESOLVED: it does not.** Rendered at ~10 / 45 / 90 / 135 / 180 degrees, the trace keeps the y–z
+  half of the revolution legible as concentric banded rings where the old stipple read as a cloud.
+  This risk was written against the **fog** and does not survive the **trace** — the same change that
+  answered the first risk answered this one. The followup it fed ("whether the spin is a per-family
+  property too") is **closed unopened**.
 - **The streak's exposure shift is unnormalized on purpose.** A length normalization is a second
   constant with no measurement behind it, and speed-dependent brightness may be the correct rendering
   of a trajectory. If Phase 4 finds it unmanageable, that is the measurement the normalization needs.
@@ -460,10 +497,17 @@ No `Scene` trait change, no C ABI change (stays v4), no new dependency, no new p
   (`+pan_y` moves the picture up on every scene) — which it does not currently say, which is how
   the agreement came to be undocumented in the first place.
 - Re-check whether the streak wants a length normalization, with Phase 4's numbers.
-- **Whether the spin is a per-family property too**, if Phase 4 finds the y–z half of the turn reads
-  as dead. Today `SPIN_RATE` is one shared constant and the spin is always a full turntable about the
-  vertical; the candidates are a per-family rate and a bounded sway that dwells near the family's own
-  plane. It is an ADR-0068 supplement and it needs Phase 4's rendered case first — the same reason
-  ADR-0069 Alternative D waits.
+- ~~**Whether the spin is a per-family property too**, if Phase 4 finds the y–z half of the turn
+  reads as dead.~~ **Closed unopened 2026-08-04** — Phase 4 rendered the revolution and the y–z half
+  is legible as concentric banded rings. No ADR-0068 supplement is owed. (`SPIN_RATE` remains one
+  shared constant; if a *look* ever wants a per-family rate it can argue for it on its own merits,
+  but nothing is waiting on it.)
+- **Retire `RESEED_DRAWS_STREAK` and the promise attached to it** — `dev` work, small, and the
+  decision is already taken (see Risks). Remove the constant, its `coeffs.w` plumbing through the
+  jitter dispatch, the `streak_flag` call site that carries it, the `!RESEED_DRAWS_STREAK` assertion
+  that tests the shipped value, and the doc comment claiming a rebuild-and-flip A/B. **Do not
+  reorder `encode_jitter` past `encode_steps` to make the flag work** — that spends a documented
+  ordering rationale on a look nobody has asked for. If the whip is wanted later it needs a separate
+  streak origin decoupled from `prev`, which is a design question and an ADR, not a cleanup.
 - Whether the swarm — the other GPU particle scene — has anything to gain from `density`. It has its
   own tier field and its own draw, and nobody has asked.
