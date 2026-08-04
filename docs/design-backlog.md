@@ -3187,12 +3187,14 @@ the *next* author rather than on these two.
 
 ## Entry 0058 — from Plan 0055 Phase 4 (2026-08-04), the content half of a decision the engine has now made
 
-## 0058 — thirteen presets bind the fold and none of them chose an edge treatment, because until now there was nothing to choose
+## 0058 — thirteen presets bind the fold and eleven of them have not chosen an edge treatment, because until now there was nothing to choose
 
 - **Raised:** 2026-08-04, at [Plan 0055](plans/0055-the-fold-edge-becomes-a-choice.md) Phase 4. Not
   a gap the content lane found — a gap the engine lane *created* on purpose and is handing over.
-- **Verified against code:** yes. `grep kaleido_order presets/*.toml` returns thirteen files; two of
-  them now bind `kaleido_edge` and eleven do not.
+- **Verified against code:** yes. `grep -l kaleido_order presets/*.toml` returns thirteen files, and
+  `grep -l '^kaleido_edge' presets/*.toml` returns two of them, so eleven ride the default. Anchor
+  that second grep — `swarm_dense` mentions `kaleido_edge` in a header comment without binding it,
+  so an unanchored match reports three.
 - **For:** `preset-author`. No engine change, no ADR. The capability exists and is documented; what
   is missing is a per-preset judgement that only looking can supply.
 
@@ -3208,22 +3210,24 @@ exists rather than being optional polish.
 the frame** is what the treatment decides. This is not a corner detail on any of the thirteen.
 
 **The eleven that have not been looked at:** `attractor_dejong`, `attractor_lorenz`,
-`curve_cathedral`, `fragment_glacier`, `fragment_kaleido`, `fragment_supernova`, `fragment_warp`,
-`lsystem_arrowhead`, `reaction_reef`, `reaction_reliquary`, `swarm_storm`. Plus `swarm_dense`, which
-is a special case below.
+`curve_cathedral`, `fragment_glacier`, `fragment_supernova`, `fragment_warp`, `lsystem_arrowhead`,
+`reaction_reef`, `reaction_reliquary`, `swarm_storm` — plus `swarm_dense`, which is a special case
+below. All eleven currently ride the `tile` default without anyone having chosen it.
 
-**The two that have, and the starting recommendation they give you.** Plan 0055 Phase 2 judged the
-roster in the running app, in motion, over a lit backdrop, at 16:9 and at a non-16:9 window, on
-exactly one centred figure and one border-filling field:
+**The two that have been judged, and they are your reference pair.** Plan 0055 Phase 2 put the whole
+roster in front of the user in the running app — in motion, over a lit backdrop, at 16:9 and at a
+non-16:9 window — on exactly one centred figure and one border-filling field. Both verdicts are
+**landed**, so they are shipped examples you can read rather than advice:
 
 | preset | kind | verdict |
 |---|---|---|
-| `attractor_leviathan` | centred figure | **`tile`** — landed in Phase 4, together with a zoom raise |
-| `fragment_kaleido` | border-filling field | **`squash`** — *not* landed; it is yours |
+| `attractor_leviathan` | centred figure | **`tile`**, landed with a zoom raise (see below) |
+| `fragment_kaleido` | border-filling field | **`squash`**, landed |
 
-`fragment_kaleido` is deliberately left for this lane rather than applied from the verdict, because
-the A/B judged a treatment and not a tuned preset, and this file's `zoom`, `glow` and order ladder
-were all set against a cropping fold. Take `squash` as the starting point, not the finished answer.
+**That the two chose differently is the finding, not a detail.** It is the whole evidence for
+`kaleido_edge` existing at all, and it is the first question to ask of each preset below: is this a
+figure with space around it, or a field that fills its frame? The pair does not settle the other
+eleven — nobody has watched those — but it tells you what the axis is.
 
 **What Leviathan's change tells you about the others.** Adopting a fill treatment there was **two
 edits, not one**. Its `zoom` had been pinned at base 0.72 with a header explaining that the pin was

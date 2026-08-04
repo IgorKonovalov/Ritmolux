@@ -90,6 +90,23 @@ palette_mix  = "clamp(bass * 0.59, 0, 0.50)"
 # and quiet material drops to 6. The figure climbs the ladder either way.
 kaleido_order = "select(bass + mid + treb > 2.20, 24, select(bass + mid + treb > 1.43, 16, select(bass + mid + treb > 0.86, 10, 6)))"
 kaleido_angle = "time * 0.13"
+# THE EDGE TREATMENT, AND IT WAS WATCHED RATHER THAN REASONED TO (2026-08-04).
+# `2` is `squash`: outside the fold's inscribed disc the sample radius is
+# compressed asymptotically back into it, so the frame FILLS instead of cropping
+# to a disc with backdrop corners. This preset is a border-filling field and the
+# crop was the complaint against it.
+#
+# Chosen by the live A/B in Plan 0055 Phase 2 - the running app, in motion, over a
+# lit backdrop, at 16:9 and at a non-16:9 window, across every arm of the roster.
+# Not derived from the geometry, and it could not have been: `mirror` and
+# `vignette` both looked defensible on paper and lost here.
+#
+# THE CONTRAST WITH `attractor_leviathan` IS THE POINT, not a coincidence. That
+# preset is a centred figure and the same sitting chose `tile` for it. Two scenes,
+# two treatments, judged together - which is the evidence the whole per-preset
+# design rests on. If you ever find yourself wanting one value for both, that is
+# the question ADR-0061 already answered.
+kaleido_edge  = "2"
 trails        = "0.34 + clamp(bass * 0.26, 0, 0.22)"
 
 [smoothing]

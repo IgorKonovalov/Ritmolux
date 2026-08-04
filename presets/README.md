@@ -692,6 +692,14 @@ picture, and it is a choice per preset (ADR-0061).
 and the default are separate facts here, and a live A/B on a centred figure and a
 border-filling field chose differently on each.
 
+**Two shipped presets name a treatment, and they disagree on purpose.**
+`attractor_leviathan` (a centred figure) binds `tile`; `fragment_kaleido` (a
+border-filling field) binds `squash`. Both were judged in the running app in the
+same sitting, and both files carry a header comment beside the binding saying so.
+Read those two before choosing for a preset of your own — the contrast between
+them is the reason this parameter exists. Every other fold-binding preset rides
+the default for now.
+
 Which to pick is a question about your scene, and the honest answer is to look:
 
 - A **border-filling field** (a `fragment_field`, a `reaction_diffusion`) is the
