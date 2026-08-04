@@ -1,0 +1,64 @@
+# COMPOSITE FIXTURE - do not tune; editing this invalidates the drift baseline.
+# Plan 0055 Phase 4, the second kaleidoscope half. See composite_kaleido.toml for
+# the first, and composite_trails.toml for why these live outside the
+# per-SystemKind golden roster.
+#
+# THIS FIXTURE EXISTS BECAUSE composite_kaleido.png CANNOT SEE THE EDGE TREATMENT.
+#
+# ADR-0061 made what the fold does outside its inscribed disc a per-preset choice
+# - `kaleido_edge`, three treatments - and Plan 0055 Phase 2's live A/B made
+# `tile` the default. composite_kaleido.toml stays on that default and is the
+# right fixture for the fold's geometry, but it is a centred `parametric_curve`
+# figure over an empty border, and every treatment renders an empty border
+# identically. Measured at Phase 3: pinning its `kaleido_edge` to 0 and to 1
+# produces md5-identical PNGs. So it pins the fold, and pins nothing at all about
+# the edge.
+#
+# This one pins the edge. Two differences from its sibling, both load-bearing:
+#
+#   1. A BORDER-FILLING SOURCE. `fragment_field` paints the frame's border with
+#      high-frequency content, so there is something out past `r_max` for a
+#      treatment to act on. This is the same reason
+#      core/tests/kaleidoscope.rs reaches for `fragment_field` rather than a line
+#      figure for its out-of-disc guards, and it is stated there too.
+#
+#   2. A NON-DEFAULT TREATMENT. `kaleido_edge = 2` is `squash`, which compresses
+#      the sample radius asymptotically into the disc (`r_max * tanh(m)`) instead
+#      of clamping it. It fills the frame without a crop and without a ray, at the
+#      cost of bending geometry near the frame edge - and it is the treatment with
+#      no pixel baseline anywhere else in the suite. `falloff` would also have been
+#      a legal choice here; `squash` was taken because it is the one that would
+#      otherwise ship unpinned.
+#
+# WHAT THIS BASELINE IS SENSITIVE TO, so a future failure is attributable: the
+# radius map of the `squash` arm, the fold's aspect correction (ADR-0037 - this
+# capture is 160x100, so a fold about the internal grid's axis rather than the
+# render target's would skew every wedge), and the composite order around it. It
+# is NOT sensitive to the default treatment, deliberately: that is
+# composite_kaleido.png's job, and keeping the two separable is why there are two.
+#
+# THE `squash` FAR FIELD IS NEARLY FLAT ALONG A RAY, and that is the treatment
+# working rather than a smear. `tanh` saturates, so every large radius maps to
+# nearly the same sample radius. Phase 3 measured the consequence: `squash` reads
+# an out/in radial-structure ratio of 0.10 against a deliberately mis-wired
+# `tile`'s 0.06, which is why the anti-smear guard in core/tests/kaleidoscope.rs
+# is scoped to `tile` alone. If this baseline ever drifts toward *more* radial
+# structure out past the disc, the radius map is what changed.
+system = "fragment_field"
+name   = "fixture_composite_kaleido_squash"
+
+[params]
+# The source, held constant. Same values as the `fragment_field` golden fixture,
+# so any drift here is the fold's and not the field's.
+warp  = "0.5"
+hue   = "0.15"
+zoom  = "0.9"
+glow  = "0.7"
+flash = "0.2"
+
+# The stage under test. `kaleido_angle` is held at 0 for composite_kaleido.toml's
+# reason - the wedge boundaries then sit on the frame axes, so a mis-folded frame
+# is obvious by eye in the PNG rather than only in the drift number.
+kaleido_order = "6"
+kaleido_angle = "0"
+kaleido_edge  = "2"

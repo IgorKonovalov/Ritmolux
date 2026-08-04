@@ -667,34 +667,62 @@ moving shapes leave light trails. `trails = 0` (default) is off; `0 < trails < 1
 sets the per-frame decay (higher = longer trails). Best on a scene with real
 motion (a spinning curve, a drifting swarm).
 
-### Screen-space kaleidoscope — `kaleido_order`, `kaleido_angle`, `kaleido_center_x`, `kaleido_center_y`
+### Screen-space kaleidoscope — `kaleido_order`, `kaleido_angle`, `kaleido_center_x`, `kaleido_center_y`, `kaleido_edge`
 
 Folds the finished frame into `kaleido_order` mirrored wedges before present.
 `kaleido_order < 2` (default) is a passthrough; `>= 2` folds (clamped to 48).
 `kaleido_angle` (radians) rotates the fold — ride it on `time` for a turning
 kaleidoscope. Works on any scene.
 
-**The fold covers a disc, not the whole frame.** It is a polar operation on a
-rectangular picture, so it can only reach the largest circle the frame contains —
-radius half the **shorter** side, centred on the fold axis. Past that the picture
-fades out to the backdrop, and the corners are backdrop. That is a deliberate
-vignette (ADR-0047), and it replaces the hard streaks and chevron debris the fold
-used to leave out there, which were worst in a portrait window. Two consequences
-worth composing around:
+**The fold reaches a disc, and `kaleido_edge` decides what happens outside it.**
+The fold is a polar operation on a rectangular picture, so it can only reach the
+largest circle the frame contains — radius half the **shorter** side, centred on
+the fold axis. At 16:9 the frame's corner sits at 2.04x that radius and **56 % of
+the frame lies outside the disc**, so this is not corner trim: it is most of the
+picture, and it is a choice per preset (ADR-0061).
 
-- **The fold crops.** At 16:9 the disc is 56 % of the frame's width, so a figure
+| `kaleido_edge` | What it does outside the disc |
+|---|---|
+| `0` — `falloff` | Clamps the sample radius at the disc and **fades out** past it, so the corners are backdrop. ADR-0047's treatment, and the one every preset got before this param existed. Crops. |
+| **`1` — `tile`** (**default**) | Continues the picture past the disc by **mirroring the source at its own borders**, so the frame is filled with related content. No crop and no fade. |
+| `2` — `squash` | **Compresses** the radius asymptotically into the disc, 1:1 at the fold axis and approaching the rim at the corners. Fills the frame with no crop and no fade, at the cost of bending geometry near the frame edge — and, unlike a clamp, it pulls the disc's *interior* inward too. |
+
+**The default is `1`, not `0`.** A preset that binds nothing fills its frame.
+`0 = falloff` keeps the numbering tied to what ADR-0047 shipped — the numbering
+and the default are separate facts here, and a live A/B on a centred figure and a
+border-filling field chose differently on each.
+
+Which to pick is a question about your scene, and the honest answer is to look:
+
+- A **border-filling field** (a `fragment_field`, a `reaction_diffusion`) is the
+  case `falloff` visibly crops — a frame that filled before the fold becomes a
+  disc with backdrop corners. `tile` or `squash` is usually what you want.
+- A **centred figure** with real space around it may prefer `falloff`, whose fade
+  reads as a vignette, if the fill would only bring in more of a figure that is
+  already the whole subject.
+- `squash` and `tile` differ in what they do to the *interior*: `tile` leaves it
+  exactly as a clamp would, `squash` compresses all of it. On a figure whose scale
+  you have already tuned, `tile` is the one that does not move it.
+
+Consequences worth composing around whichever you choose:
+
+- **`falloff` crops.** At 16:9 the disc is 56 % of the frame's width, so a figure
   that filled the frame before the fold will not fill it after. Scale the figure
-  up (`scale`, `zoom`) if you want it to reach the disc's edge.
-- **The corners are the backdrop's**, so `bg_hue` / `bg_bright` / `bg_vignette`
-  now decide what the frame's edge looks like on any folded preset. They compose
-  with the fold instead of being overwritten by it.
+  up (`scale`, `zoom`) if you want it to reach the disc's edge — or pick a fill
+  treatment, which is what they exist for.
+- **Under `falloff` the corners are the backdrop's**, so `bg_hue` / `bg_bright` /
+  `bg_vignette` decide what the frame's edge looks like. Under `tile` and `squash`
+  the corners are the *scene's*, so the backdrop retreats to whatever the scene
+  leaves transparent.
 - **The backdrop is underneath the fold, not inside it** (ADR-0055). It is painted
   first and the folded scene composites over it, so `bg_vignette`'s darkening stays
   centred on the *frame* however you drive `kaleido_center_*`, and the backdrop is
   never chopped into the wedges. A lit backdrop is the way to give a folded preset
   a frame edge that is not black — and it is worth turning `bg_bright` up while
   composing a fold, because the disc's boundary is much easier to judge against a
-  lit corner than a dark one.
+  lit corner than a dark one. That is not a style note: sixteen confirmation
+  captures at `bg_bright = 0` once confirmed an edge treatment that two screenshots
+  of the running app then reversed.
 
 `kaleido_center_x` / `kaleido_center_y` place the fold axis in the frame, `0..1`
 in normalized screen coordinates, default `0.5` (the centre). This is what makes
@@ -710,6 +738,25 @@ fractional order), so the engine rounds to the nearest integer. Bind or smooth i
 however you like — an eased `kaleido_order` still eases, it just **snaps at each
 half-integer** instead of sweeping continuously. If you want a continuous
 kaleidoscopic motion, ride `kaleido_angle`; that one is fully smooth.
+
+**`kaleido_edge` is stepped too, and this stage is the only one with two such
+params.** It is rounded exactly like `kaleido_order` above and for a stricter
+reason: it is a *selector*, so its values are names rather than amounts and there
+is nothing between `tile` and `squash` to be halfway to. Bind it or ease it and
+the picture **snaps at the midpoint** — 1.4 is `tile`, 1.6 is `squash`. A binding
+that evaluates to a non-finite value falls back to the default rather than to a
+bound, so a broken expression lands on `tile`, not on `falloff`.
+
+Two things follow that are easy to get wrong:
+
+- **`[smoothing]` on `kaleido_edge` buys you nothing.** It delays the snap; it
+  does not soften it. If you want a treatment to change during a track, accept
+  that it is a cut.
+- **A *dissolve* between two presets with different treatments blends correctly**,
+  and that is a different mechanism — a dissolve cross-fades two finished frames,
+  so it is blending pictures rather than interpolating the selector. Two presets
+  that disagree about the edge cross-fade cleanly; one preset easing across the
+  boundary does not.
 
 ### Mirror or kaleidoscope? They are not the same cost
 

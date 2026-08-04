@@ -2040,6 +2040,27 @@ structure. Nobody should build that until a real preset is worse off.
   which *reflects* the radius instead of clamping it, so past the disc the frame is a mirrored
   continuation of its interior — no ray (the content is real) and no crop (the corners are filled),
   which is what a physical kaleidoscope does. Notes retained below as the origin record.
+- **CLOSED 2026-08-04 — [Plan 0055](plans/0055-the-fold-edge-becomes-a-choice.md) shipped it, and
+  the live A/B settled the roster.** `kaleido_edge` is a bindable stepped param selecting one of
+  three treatments inside one pipeline: `falloff` (0, ADR-0047's fade), `tile` (1) and `squash` (2).
+  **`tile` is the default**, so this entry's second rejection — the disc cropping a field scene — is
+  answered for every fold-binding preset without one of them having to opt in.
+  **The A/B falsified two of the five candidates, and one of them was this entry's own bet.**
+  `vignette` — the treatment this entry specifically asked the supplement to reconsider, on
+  ADR-0047's Outcome calling it "the cleanest of the four on a border-filling field" — **lost on
+  both scenes and was deleted.** So did `mirror`, the candidate the paragraph above calls the most
+  interesting one: reflecting the radius puts the *centre* of the figure back into the corners (at
+  16:9 a corner sits at `m = 2.04`, and `abs(2.04 - 2*round(1.02)) = 0.04`, so it samples from 0.04
+  `r_max`) — arithmetic this entry did not have when it was written. Judging in motion is what
+  separated them; neither would have been rejected from stills, which is the same lesson the entry's
+  own last paragraph teaches.
+  **What this entry got right stands:** a figure and a field want different answers. The verdict is
+  `tile` for `attractor_leviathan` and `squash` for `fragment_kaleido` — two scenes, two treatments,
+  which is the entire content of the argument for a choice.
+  **The library retune this creates is [0058](#0058)**, and one lesson from it belongs here:
+  adopting a fill treatment on Leviathan took two edits, because that preset's `zoom` had been
+  pinned under the inscribed radius *precisely to dodge the rays this entry reported*. Removing the
+  cause removed the reason for the workaround, and other fold-binding presets carry similar pins.
 
 ADR-0047 shipped the falloff-disc, confirmed at Plan 0045 Phase 2 from sixteen rendered stills.
 Seen in motion on real presets at Plan 0045's close, the user rejected two consequences:
@@ -3161,3 +3182,80 @@ was true until this commit and is now not.
 look they intend, and the workarounds are recorded in their headers. It is the observation that the
 workarounds exist because one lever is doing a job it was not shaped for, and that the cost lands on
 the *next* author rather than on these two.
+
+---
+
+## Entry 0058 — from Plan 0055 Phase 4 (2026-08-04), the content half of a decision the engine has now made
+
+## 0058 — thirteen presets bind the fold and none of them chose an edge treatment, because until now there was nothing to choose
+
+- **Raised:** 2026-08-04, at [Plan 0055](plans/0055-the-fold-edge-becomes-a-choice.md) Phase 4. Not
+  a gap the content lane found — a gap the engine lane *created* on purpose and is handing over.
+- **Verified against code:** yes. `grep kaleido_order presets/*.toml` returns thirteen files; two of
+  them now bind `kaleido_edge` and eleven do not.
+- **For:** `preset-author`. No engine change, no ADR. The capability exists and is documented; what
+  is missing is a per-preset judgement that only looking can supply.
+
+**What changed under them.** [ADR-0061](adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)
+made the region outside the fold's inscribed disc a per-preset choice, `kaleido_edge`, with three
+treatments: `falloff` (0, the fade ADR-0047 shipped), `tile` (1) and `squash` (2). Plan 0055 Phase
+2's live A/B made **`tile` the default**, so every fold-binding preset that says nothing has already
+moved from *cropping to a disc* to *filling its frame*. That is a real visual change to eleven
+shipped presets, applied by a default rather than by an author, and it is the reason this entry
+exists rather than being optional polish.
+
+**Why the scope matters.** At 16:9 the frame's corner sits at 2.04x the disc radius, so **56 % of
+the frame** is what the treatment decides. This is not a corner detail on any of the thirteen.
+
+**The eleven that have not been looked at:** `attractor_dejong`, `attractor_lorenz`,
+`curve_cathedral`, `fragment_glacier`, `fragment_kaleido`, `fragment_supernova`, `fragment_warp`,
+`lsystem_arrowhead`, `reaction_reef`, `reaction_reliquary`, `swarm_storm`. Plus `swarm_dense`, which
+is a special case below.
+
+**The two that have, and the starting recommendation they give you.** Plan 0055 Phase 2 judged the
+roster in the running app, in motion, over a lit backdrop, at 16:9 and at a non-16:9 window, on
+exactly one centred figure and one border-filling field:
+
+| preset | kind | verdict |
+|---|---|---|
+| `attractor_leviathan` | centred figure | **`tile`** — landed in Phase 4, together with a zoom raise |
+| `fragment_kaleido` | border-filling field | **`squash`** — *not* landed; it is yours |
+
+`fragment_kaleido` is deliberately left for this lane rather than applied from the verdict, because
+the A/B judged a treatment and not a tuned preset, and this file's `zoom`, `glow` and order ladder
+were all set against a cropping fold. Take `squash` as the starting point, not the finished answer.
+
+**What Leviathan's change tells you about the others.** Adopting a fill treatment there was **two
+edits, not one**. Its `zoom` had been pinned at base 0.72 with a header explaining that the pin was
+"a fold constraint, not a taste" — the figure was held inside the inscribed disc so it could not
+feed the fold's residual rays. A fill treatment removes that constraint entirely, and the preset
+only benefits from one if there is content out past `r_max` for it to act on, so the zoom went to
+1.80. **Expect the same shape elsewhere:** any preset whose scale, `zoom` or `glow` was tuned against
+a disc that crops is now tuned against a premise that no longer holds. Grep the fold-binding headers
+for language about the disc, the inscribed radius, or the rays before assuming a file only needs one
+line added.
+
+**`swarm_dense` is the odd one and worth doing first.** It pins `kaleido_order = "1"` — the fold off
+— and its header documented that as a *mitigation for an engine artifact*: bright bars along the
+frame edges, which was design-backlog 0010's clamped-edge smear. That artifact was fixed engine-side
+by ADR-0047 a plan ago, so the dodge has been unnecessary since then and the comment was stale twice
+over. Phase 4 corrected the comment and **deliberately did not turn the fold back on**, because
+nobody has looked at this preset folded since the fix and that is a judgement for this lane. It is a
+sparse figure over a dark field, which is the case where the three treatments differ most.
+
+**Pairs with [0038](#0038) and [0040](#0040)**, and the pairing is the argument for doing them
+together rather than in sequence: all three are retunes of the same shipped set against a composite
+that moved underneath it. 0038 is the tonemap knee's ~8 % luminance loss, 0040 is coverage-as-alpha
+making dim figures read as dark speckle over a lit backdrop — and a lit backdrop is exactly the
+configuration this entry's treatments are judged in, since under `falloff` the corners *are* the
+backdrop and under `tile`/`squash` they stop being it. Judging any one of the three at
+`bg_bright = 0` is what produced the confirmation failure ADR-0061's Notes records.
+
+**How to judge it.** In the running app, in motion, over a **lit** backdrop, at 16:9 and at a
+window that is clearly not 16:9 — `LMV_PRESET_DIR` pointed at the repo's `presets/` makes an edit
+live in about 150 ms, so walking a preset through `kaleido_edge = 0 .. 2` is changing one integer
+and watching. The parameter roster and the per-treatment guidance are in
+[`presets/README.md`](../presets/README.md#screen-space-kaleidoscope--kaleido_order-kaleido_angle-kaleido_center_x-kaleido_center_y-kaleido_edge).
+
+**Not in scope.** Adding a fourth treatment. The roster is a closed set by ADR-0061; a look that
+needs a new edge behaviour is engine work and routes back through `architect`.
