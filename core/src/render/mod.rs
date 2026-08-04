@@ -3181,30 +3181,53 @@ mod tests {
     /// [ADR-0023]: ../../docs/adrs/0023-golden-drift-guard-uses-frozen-fixtures.md
     const NOISE_FLOOR: f32 = 0.02;
 
-    /// **Both visuals animate through a dual-live dissolve.** Same presets, same
-    /// `dt` sequence, same blend kind — only the fidelity differs, so any pixel
-    /// difference is the outgoing side still rendering.
+    /// **A dual-live dissolve runs, and its picture is not freeze's.** Same
+    /// presets, same `dt` sequence, same blend kind — only the fidelity differs.
     ///
     /// The opening frame must be *identical* in both modes: it is the outgoing
     /// preset's own composite either way, before dual-live has anything extra to
     /// do. That pins the assertion to the dissolve rather than to a warm-up drift.
     ///
-    /// **What is asserted is exact, not a threshold** ([ADR-0071]). A dual-live
-    /// dissolve that wrongly held the outgoing side would be doing precisely the
-    /// work freeze does, and this project's determinism contract makes that
-    /// byte-identical at *every* frame — the opening-frame `assert_eq!` above is the
-    /// demonstration that two separate runs do reproduce each other byte for byte.
-    /// So "the two modes differ somewhere in the window" needs no number, where the
-    /// floor it replaces (`frame_diff > 0.01`) was half of [`NOISE_FLOOR`] and so
-    /// was made inside the band this project already calls noise.
+    /// **What is asserted is exact, not a threshold** ([ADR-0071]). This project's
+    /// determinism contract makes two runs of this code byte-identical — the
+    /// opening-frame `assert_eq!` above is the demonstration — so "the two modes
+    /// differ somewhere in the window" needs no number, where the floor it replaces
+    /// (`frame_diff > 0.01`) was half of [`NOISE_FLOOR`] and so was made inside the
+    /// band this project already calls noise.
     ///
-    /// The cost of an exact-zero claim is that it says nothing about **magnitude**;
-    /// the control series and the ratio printed below are what Plan 0060 Phase 3
-    /// calibrates that half against, from the runners' own readings rather than this
-    /// box's. Until then the control is asserted non-trivial, so a dissolve that is
-    /// not dissolving cannot satisfy the test by standing still.
+    /// **On a software adapter that is a smoke check, not a guard on the defect**
+    /// ([ADR-0074]). What it proves is that dual-live runs, that it produces a
+    /// different picture from freeze somewhere in the window, and that the dissolve
+    /// is dissolving. What it cannot prove is that the outgoing side is *live*:
+    /// `dissolve_at`'s own docstring records that on WARP, allocating the dissolve's
+    /// GPU resources mid-run resets what the trails feedback resolves to, and
+    /// dual-live allocates more than freeze does — so the two modes differ for that
+    /// reason alone, and an outgoing side that was genuinely held would still pass
+    /// here.
+    ///
+    /// The **magnitude** half is deliberately not calibrated from this statistic.
+    /// Plan 0060 Phase 2 read the printed ratio off both machines and it did not
+    /// travel:
+    ///
+    /// | statistic | local WARP 10.0.19041 | CI WARP 10.0.26100 | spread |
+    /// |---|---|---|---|
+    /// | peak signal | 0.109573 | 0.009683 | 11.3x |
+    /// | peak control | 0.407826 | 0.264177 | 1.54x |
+    /// | ratio | 0.268675 | 0.036654 | 7.3x |
+    ///
+    /// Signal and control are not the same kind of quantity — the control is the
+    /// dissolve's own progression, the signal is the outgoing side rendering
+    /// *through* trails accumulation — so the rasterizer does not cancel out of
+    /// their ratio, and the CI signal lands under [`NOISE_FLOOR`] besides. A floor
+    /// taken from either reading would be a measurement asserted universally, the
+    /// shape [ADR-0071] exists to forbid. The claim goes to hardware instead: Plan
+    /// 0053 Phase 3, where the allocation quirk does not exist and
+    /// `a_dual_live_dissolve_carries_the_outgoing_trail` already asserts a magnitude
+    /// about this same dissolve. The series below stay printed so the next time
+    /// these numbers move, the log says so.
     ///
     /// [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
+    /// [ADR-0074]: ../../docs/adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md
     #[test]
     fn dual_live_keeps_the_outgoing_side_animating() {
         const FRAMES: usize = 40;
@@ -3221,8 +3244,9 @@ mod tests {
         );
 
         // Signal: what the fidelity changed. Control: what the dissolve does anyway,
-        // read on the same adapter in the same run, so the rasterizer cancels out of
-        // their ratio.
+        // read on the same adapter in the same run. Both are reported and neither is
+        // thresholded — ADR-0074 is why their ratio is not the portable quantity it
+        // was taken for.
         let signal: Vec<f32> = frozen
             .iter()
             .zip(live.iter())

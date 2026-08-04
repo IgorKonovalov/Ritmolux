@@ -130,6 +130,24 @@ fn sine_energy_concentrates_in_expected_band() {
 /// frozen number and runs **everywhere**, so the test is not vacuous where the
 /// bit comparison is pinned out.
 ///
+/// **What the other architecture actually reads**, off `macos-26-arm64` on
+/// 2026-08-04 (Plan 0060 Phase 2, CI run 30903871856) — observed and printed
+/// there, never asserted:
+///
+/// | level | observed bits | relative error vs the x86_64 reference |
+/// |---|---|---|
+/// | `bass_raw` | `0x386597d6` | `8.44e-6` |
+/// | `mid_raw` | `0x3bd581b5` | bit-identical |
+/// | `treb_raw` | `0x35f3168e` | `1.15e-5` |
+/// | `onset_raw` | `0x348652cd` | `1.86e-5` |
+///
+/// All four sit within `2e-5` relative and one reproduces exactly. `onset_raw` is
+/// the one worth naming: at `2.5e-7` it is small enough that a difference-derived
+/// value could have lost relative precision by orders of magnitude, and it does
+/// not — 2.2x `bass_raw`'s divergence, the same order. None of this argues for a
+/// cross-architecture tolerance; it is recorded so the next reader knows the size
+/// of what the pin hides instead of inferring it from a skip.
+///
 /// [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
 /// [ADR-0016]: ../../docs/adrs/0016-gpu-tests-opt-in-ci-scope.md
 #[test]
