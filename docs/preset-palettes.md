@@ -255,6 +255,32 @@ Two honest limits, both measured rather than estimated:
 
 ---
 
+### The backdrop — `bg_hue`, and the one surface still outside the palette
+
+> **This section describes today's behaviour and is scheduled to change.**
+> [ADR-0086](adrs/0086-the-backdrop-colours-through-the-preset-palette.md) /
+> [Plan 0072](plans/0072-the-backdrop-joins-the-palette.md) bring the backdrop into the palette;
+> until that lands, what is below is what renders.
+
+The background pre-pass (`bg_hue`, `bg_bright`, `bg_vignette` — the full roster is in
+[`presets/README.md`](../presets/README.md)) draws a tinted gradient *under* the scene. **It does
+not read your `[palette]`.** `core/src/render/background.rs` carries its own copy of the default
+cosine and binds no LUT, so:
+
+- **`bg_hue` always walks the `spectrum` ramp**, whatever palette the preset declares. An `ember`
+  preset draws an ember figure over a spectrum-cosine sky.
+- **`saturation` and `palette_mix` do not reach the backdrop.** An A/B crossfade moves the figure
+  and leaves the sky where it was.
+- **`bg_hue` is therefore readable off the table below**, because that table *is* this ramp — the
+  backdrop's cosine and the line scenes' default are the same `d = (0.10, 0.42, 0.62)`. `bg_hue`
+  `0.30` is cornflower blue, `0.45` aqua, `0.85` amber, in every preset in the library.
+
+This is the only place in the colour surface where a preset's declared gradient does not apply, and
+it is an accident of ordering rather than a decision — the pass predates the shared palette module
+and nothing failed when the rest converged onto it.
+
+---
+
 ## The line scenes' cosine ramp — what `hue` actually looks like
 
 This is the **default** palette — what a line scene colours through when its
