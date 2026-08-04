@@ -1,6 +1,11 @@
 # 0066 — The level lever: the attractor gets a `brightness`, and bloom stops thresholding unexposed light
 
-> **Status:** draft
+> **Status:** **approved 2026-08-04** — ready for `dev`, **after [0062]/[0063]** if those are live
+> (all three add to `particles/mod.rs`, and this one extends the same `PARAMS`/`set_param` pair —
+> taking it third costs one rebase instead of two). Phases 1-4 are `dev` and nothing gates them, so
+> they run start-to-finish in one session; **Phase 5 is `human`** (a `preset-author` retune of
+> Lorenz and Thomas) and terminal, so the plan does not close in that session. **Moves no golden
+> baseline** — a moved baseline is a phase failure, not a re-bless.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0080](../adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md)

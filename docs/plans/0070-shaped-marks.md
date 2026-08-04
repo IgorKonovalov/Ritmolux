@@ -1,6 +1,11 @@
 # 0070 — Shaped marks: the particle sprite stops being a circle
 
-> **Status:** draft
+> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing. It touches `swarm.rs` and
+> `emitter.rs` and **collides with nothing else in the roster**, so it is a safe parallel lane
+> beside [0065](0065-the-mandala-interior.md). Phases 1-5 are `dev` and nothing gates them, so they
+> run start-to-finish in one session; **Phase 6 is `human`** (the starfield preset) and terminal.
+> Every existing golden baseline stays byte-identical — `disc` is the default and is the same three
+> lines it replaces; the plan adds one baseline.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0084](../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md)

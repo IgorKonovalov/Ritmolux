@@ -1,6 +1,10 @@
 # 0068 — Why the downbeat rarely locks: an instrument, an ablation, and a verdict
 
-> **Status:** draft
+> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing and sharing no file with
+> any other plan in the roster. Phases 1-2 are `dev` and run start-to-finish; **Phase 3 is `human`**
+> (a listening pass on known-4/4 material, reading the 1 Hz log rather than judging by ear) and
+> gates Phase 4, so the plan does not close in one session. **Ships a diagnosis and no fix, on
+> purpose** — the repair is a follow-on plan written against the named cause. **Moves no pixels.**
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0082](../adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md), supplementing [0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md)
