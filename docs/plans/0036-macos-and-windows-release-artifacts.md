@@ -5,6 +5,17 @@
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md) (this plan's decision), [0025](../adrs/0025-foobar-component-version-single-sourced.md) (version single-sourcing precedent), [0022](../adrs/0022-build-time-preset-embedding.md) (presets are embedded, not loaded from the zip)
+>
+> **Re-checked 2026-08-04, still valid, three notes for the implementer.** The user confirmed
+> there is **no Mac in reach** — a friend has one — so this plan is the route and its
+> open question at the bottom resolves to "no". `docs/nfr.md` §9's hardware matrix, which
+> lists a "Mac, macOS 13+" as hardware the user has, is **wrong**; correct it in Phase 3
+> alongside §8. Two citations have drifted since 2026-07-26: the silence-driven render path
+> is `standalone/src/main.rs:998` (the `ScreenCaptureKit capture unavailable ...; rendering
+> without audio` arm), not `:677`; and `README.md`'s macOS paragraph was rewritten on
+> 2026-08-04 (`f7035a2`) to say the capture path is implemented-but-unvalidated and to name
+> this plan as the missing piece — Phase 3's Download section lands **beside** that, and the
+> "no Mac build to download yet" bullet in Platform notes comes out when it does.
 
 ## TL;DR
 
