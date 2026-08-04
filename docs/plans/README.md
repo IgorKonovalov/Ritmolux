@@ -35,8 +35,8 @@ constraints**; the rest is preference, and a session may take any unblocked plan
 | 1 | [0055] | **Hard constraint: must precede [0064].** Both live in `kaleidoscope.rs`; 0055 is smaller and older and branches on the *destination* radius, which 0064's composed map does not touch. Taking it second means rebasing onto a rewritten shader | No — Phase 2 is `human` (a live in-motion A/B) and gates Phases 3-4 |
 | 2 | [0063] | **Soft constraint: better before [0062].** It adds `inv_depth_extent()` as an exhaustive match over `AttractorFamily`, so 0062 adding a fifth family is then **compiler-forced** to answer it. The reverse order relies on remembering | No — Phase 5 is `human` |
 | 3 | [0062] | Adjacent to 0063 in `particles/mod.rs`, so one session holds the file's context | No — Phase 7 is `human` |
-| 4 | [0064] | Unblocked once 0055 has landed. Widest blast radius in the roster — screen-space, so every scene inherits it | No — Phase 4 is `human`, mid-plan |
-| 5 | [0065] | **Gated by nothing and shares no file with anything.** The safest parallel lane; can be pulled forward to any position | No — Phase 3 is `human`, mid-plan |
+| 4 | [0065] | **Gated by nothing and shares no file with anything** — line geometry against a post chain and a particle scene. The safest parallel lane, and it can run *alongside* 2-3 rather than after them | No — Phase 3 is `human`, mid-plan |
+| 5 | [0064] | Unblocked once 0055 lands, but **deliberately after the attractor work rather than concurrent with it**: its Phase 3 sample grid renders on `attractor_lorenz` as one of three sources, and [0063] changes what that source looks like. A look decision taken against a moving target is one that has to be retaken | No — Phase 4 is `human`, mid-plan |
 | 6 | [0052] | Independent, four `dev` phases, nothing gating | **Yes** |
 | 7 | [0053] | Protective rather than additive; moves no pixels. Its `human` Phase 3 is runnable on this box after the 2026-08-04 premise correction | No — Phase 3 is `human` |
 | 8 | [0046] | Touches the attractor's feedback path, so it is cheaper after [0062]/[0063] have settled that file | — |
@@ -47,6 +47,33 @@ constraints**; the rest is preference, and a session may take any unblocked plan
 `human` phase. **If you want the most visible change per session**, take [0063] then [0062].
 **If a second lane is running in parallel**, give it [0065]: it is line geometry and collides with
 nothing.
+
+### What to take once [0052] and [0055] close (asked 2026-08-04, both lanes live)
+
+**[0063] then [0062], in one lane, sequentially — and [0065] in a second if you want two.** The
+reason is not novelty but **uninterrupted `dev` phases**, which is the scarce thing now that six of
+the ten plans carry a `human` phase:
+
+| Plan | `dev` phases before the first stop | Where the `human` phase sits |
+|------|-----------------------------------|------------------------------|
+| [0063] | **4** (Phases 1-4) | **terminal** — Phase 5 is the content pass, all code done |
+| [0062] | **6** (Phases 1-6) | **terminal** — Phase 7 is the content pass, all code done |
+| [0065] | 2 (Phases 1-2) | **mid-plan** — Phase 3 gates Phases 4-6 |
+| [0064] | 3 (Phases 1-3) | **mid-plan** — Phase 4 gates Phases 5-6 |
+
+So [0063] + [0062] is **ten `dev` phases with no mid-plan stop**, in one file's context, with the
+ordering compiler-enforced rather than remembered. Both then wait only on a content pass, which is
+the cheapest kind of `human` phase — the code is finished and reviewable either way.
+
+[0064] and [0065] are the opposite shape: each delivers a rendered sample grid in two or three
+phases and then **stops until judged**. That is not a defect — it is the workflow the user chose —
+but it means a session spent there ends with a decision owed rather than with code landed. Their
+one real advantage is that the two grids can be **judged in a single sitting**, so pairing them is
+worth more than taking either alone.
+
+**Remove the finished worktrees before opening new lanes.** Each carries its own `target/` (one lane
+held ~8 GB in `target/debug/incremental` and filled the disk mid-session), and `git worktree remove`
+fails with `Permission denied` on Windows while any shell still has its working directory inside.
 
 
 **TWO LANES ARE LIVE RIGHT NOW (2026-08-04), and neither is merged to `main`.** Read this before
