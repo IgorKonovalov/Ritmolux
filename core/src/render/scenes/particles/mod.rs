@@ -271,6 +271,50 @@ impl AttractorFamily {
             sz * JITTER_FRACTION,
         ]
     }
+
+    /// Reciprocal of the family's half-extent along the **view depth axis**, in
+    /// its own world units — and **exactly `0.0` for a 2D family** (ADR-0076).
+    ///
+    /// That zero is the whole mechanism by which the flat families opt out: it
+    /// makes `d_n` identically zero for every one of their particles, so the
+    /// perspective magnification is `1`, the haze multiplier is `1` and the hue
+    /// offset is `0`, with **no shader branch, no division and no way to reach a
+    /// `NaN`**. De Jong, Clifford and every IFS figure have no third coordinate
+    /// to project, and ADR-0076 Alternative B records why inventing one for them
+    /// is worse than leaving them alone.
+    ///
+    /// **Derived from [`seed_box`](Self::seed_box), not hand-written per family**
+    /// — the discipline [`jitter_extent`](Self::jitter_extent) already uses, so
+    /// there is no second table of magnitudes to keep in step. The depth is the
+    /// rotation's third output, and the rotation acts in the plane spanned by
+    /// `x` and the basis's horizontal axis ([`Basis::masks`]'s first selector),
+    /// so the depth swings through *those two* half-extents and the larger is
+    /// what normalizes it. That is **26** for Lorenz (basis XZ, so the plane is
+    /// `x`–`y`, half-extents 20 and 26) and **4.5** for Thomas (basis XY, plane
+    /// `x`–`z`).
+    ///
+    /// The match is exhaustive with no wildcard arm, so a fifth family has to
+    /// answer the question rather than inherit an answer.
+    fn inv_depth_extent(self) -> f32 {
+        // Destructured rather than indexed: this file denies `indexing_slicing`.
+        let ([sx, sy, sz], _) = self.seed_box();
+        let half = match self {
+            AttractorFamily::DeJong | AttractorFamily::Clifford => return 0.0,
+            AttractorFamily::Thomas | AttractorFamily::Lorenz => {
+                // Read off `basis()` rather than restated per family, so the two
+                // cannot disagree about which plane the spin turns in.
+                let partner = match self.basis() {
+                    Basis::XY => sz,
+                    Basis::XZ => sy,
+                };
+                sx.max(partner)
+            }
+        };
+        // A degenerate box would otherwise send an infinity to the shader. It
+        // cannot happen with the boxes above; it costs one compare not to rely
+        // on that.
+        if half > 0.0 { 1.0 / half } else { 0.0 }
+    }
 }
 
 /// The plane a 3D attractor family is projected into (ADR-0068), as chosen by
@@ -312,6 +356,21 @@ const SPIN_RATE: f32 = 0.18;
 /// Parameter defaults — a calm idle look when nothing is bound.
 const DEFAULT_SIZE: f32 = 1.0;
 const DEFAULT_HUE: f32 = 0.0;
+/// Depth-cue defaults (ADR-0076): **exactly the pre-ADR-0076 behaviour**. At
+/// `perspective = 0` the magnification is `1 / (1 - 0 * d_n)` = `1`, and a
+/// multiply by `1.0` is exact — so an unbound preset is byte-identical and no
+/// golden baseline moves.
+const DEFAULT_PERSPECTIVE: f32 = 0.0;
+/// Ceiling on `perspective`, applied silently where the uniform is packed.
+///
+/// `perspective` means **the figure's depth half-extent as a fraction of the
+/// camera distance**, so the near-to-far magnification ratio is
+/// `(1 + p) / (1 - p)`: `0.5` gives 3:1 and this value gives 9:1 (the far end at
+/// 0.556, the near end at 5.0). The singularity — a point reaching the camera
+/// plane — sits at exactly `1`, and this is well short of it. The arithmetic
+/// holds because `d_n` is clamped to `[-1, 1]` before it is used — see
+/// `depth_norm` in the draw shader for why that clamp is not decoration.
+const MAX_PERSPECTIVE: f32 = 0.8;
 // Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5). The per-particle
 // seed jitter occupies `hue_center + (seed - 0.5)*hue_spread`; the defaults
 // (`spread = 0.15`, `center = 0.075`) reduce to `seed*0.15` — the prior hardcoded
@@ -589,12 +648,16 @@ struct Draw {
     //    non-zero on a continuous family, so the quad spans prev -> pos)
     // bh: xyz the axis the spin rotates x against (ADR-0068), w unused
     // bv: xyz the vertical axis (ADR-0068), w unused
+    // d: x perspective, y depth_fade, z depth_hue, w the family's INVERSE depth
+    //    half-extent (ADR-0076) - exactly 0 for a 2D family, which is what
+    //    collapses every depth cue below to the identity with no branch
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
     x: vec4<f32>,
     bh: vec4<f32>,
     bv: vec4<f32>,
+    d: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> draw: Draw;
 // Shared gradient LUTs (ADR-0021): sampled per-particle in the vertex shader
@@ -622,22 +685,62 @@ fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
     return vec3<f32>(luma) + (c - vec3<f32>(luma)) * s;
 }
 
-// Project one attractor position to the pre-aspect "world" plane. Factored out
-// of the vertex body so a segment can project **both** its endpoints through the
-// identical path — two call sites that must not be allowed to drift apart.
-fn project(q: vec3<f32>, dim: f32, zc: f32, cs: f32, sn: f32) -> vec2<f32> {
+// Project one attractor position to the pre-aspect "world" plane, **keeping the
+// depth** the rotation produces: `xy` is the screen position, `z` is the view
+// depth (ADR-0076). Factored out of the vertex body so a segment can project
+// **both** its endpoints through the identical path — two call sites that must
+// not be allowed to drift apart.
+//
+// The depth used to be computed and thrown away, which is exactly why the 3D
+// families rendered flat: an orthographic projection of a rotating transparent
+// structure carries no information about the direction of rotation, because the
+// image at rotation pi is the exact x-mirror of the image at 0.
+//
+// **This function and the two below are the SOURCE**; `projection_mirror` in the
+// Rust body transcribes them for the property test, the same discipline
+// `apply_saturation` follows against `palette.rs::desaturate`. Edit here, then
+// edit there.
+fn project(q: vec3<f32>, dim: f32, zc: f32, cs: f32, sn: f32) -> vec3<f32> {
     if (dim < 2.5) {
-        // 2D map: in-plane rotation.
-        return vec2<f32>(q.x * cs - q.y * sn, q.x * sn + q.y * cs);
+        // 2D map: in-plane rotation. There is no third coordinate, so the depth
+        // is zero here as well as via `draw.d.w` - belt and braces, and neither
+        // is load-bearing alone.
+        return vec3<f32>(q.x * cs - q.y * sn, q.x * sn + q.y * cs, 0.0);
     }
     // 3D flow: centre on z, pick the viewing plane, rotate around the vertical
-    // axis, orthographic project. The plane is the family's own (ADR-0068),
-    // arriving as two one-hot axis selectors rather than as a second pipeline:
-    // `bh` is the axis the spin rotates `x` against, `bv` is the vertical.
-    // `bh = z, bv = y` reproduces the shared convention this replaced exactly;
-    // Lorenz ships `bh = y, bv = z`.
+    // axis, project. The plane is the family's own (ADR-0068), arriving as two
+    // one-hot axis selectors rather than as a second pipeline: `bh` is the axis
+    // the spin rotates `x` against, `bv` is the vertical. `bh = z, bv = y`
+    // reproduces the shared convention this replaced exactly; Lorenz ships
+    // `bh = y, bv = z`.
     let p = vec3<f32>(q.x, q.y, q.z - zc);
-    return vec2<f32>(p.x * cs + dot(p, draw.bh.xyz) * sn, dot(p, draw.bv.xyz));
+    let h = dot(p, draw.bh.xyz);
+    // The third term is the rotation's OTHER output - the exact partner of the
+    // horizontal one - so it costs a multiply-add rather than a second rotation.
+    return vec3<f32>(p.x * cs + h * sn, dot(p, draw.bv.xyz), -p.x * sn + h * cs);
+}
+
+// Depth in units of the family's own half-extent, clamped to [-1, 1].
+//
+// `draw.d.w` is an INVERSE extent and is exactly 0 for a 2D family, so this is
+// identically 0 there - no branch, no division, no NaN.
+//
+// **The clamp is not decoration.** A family's converged figure overruns its
+// `seed_box` (Lorenz reaches y = 25.4 against a 26 half-extent while its x
+// reaches 19.2, so the rotated depth reaches ~1.22), and an unclamped value at
+// the `perspective` ceiling would magnify by ~50x rather than the 5x ADR-0076
+// documents. Clamping is what makes the stated (1 + p) / (1 - p) ratio true and
+// keeps the divisor below bounded away from zero.
+fn depth_norm(depth: f32) -> f32 {
+    return clamp(depth * draw.d.w, -1.0, 1.0);
+}
+
+// The perspective magnification: near material grows, far material shrinks.
+// `perspective` is the figure's depth half-extent as a fraction of the camera
+// distance, clamped CPU-side to [0, 0.8], so the divisor stays in [0.2, 1.8].
+// At `perspective = 0` this is exactly 1.0 and every use of it is a no-op.
+fn magnify(dn: f32) -> f32 {
+    return 1.0 / (1.0 - draw.d.x * dn);
 }
 
 @vertex
@@ -667,9 +770,18 @@ fn vs_main(
     let cs = cos(rot);
     let sn = sin(rot);
     let streak = draw.x.w;
-    let screen = project(center, dim, zc, cs, sn);
+    let projected = project(center, dim, zc, cs, sn);
+    let screen = projected.xy;
+    // This particle's normalized depth, and the magnification it earns
+    // (ADR-0076). Both are exactly 0 and exactly 1 for a 2D family.
+    let dn = depth_norm(projected.z);
+    let mag = magnify(dn);
+    // Position AND sprite size take the same magnification, which is what makes
+    // size grading and parallax one mutually-consistent term rather than two
+    // hand-tuned constants (the swarm needed two; ADR-0076 Alternative B).
+    let sprite = psize * mag;
 
-    // The sprite. A point is a `psize` square about the projected position; a
+    // The sprite. A point is a `sprite` square about the projected position; a
     // segment is that square swept from `prev` to `pos` — a capsule (ADR-0069).
     //
     // Both are built in **world** space, before the single aspect division below.
@@ -681,8 +793,13 @@ fn vs_main(
     var local: vec2<f32>;
     var half_len = 0.0;
     if (streak != 0.0) {
-        let a = project(previous, dim, zc, cs, sn) * scl;
-        let b = screen * scl;
+        // **Both endpoints are magnified independently**, so a trace receding
+        // into the distance is drawn genuinely shorter - the strongest depth cue
+        // a curve has, and free, because the capsule already projects both ends.
+        let pp = project(previous, dim, zc, cs, sn);
+        let dn_prev = depth_norm(pp.z);
+        let a = pp.xy * scl * magnify(dn_prev);
+        let b = screen * scl * mag;
         let mid = (a + b) * 0.5;
         let axis = (b - a) * 0.5;
         let len = length(axis);
@@ -694,12 +811,17 @@ fn vs_main(
             dir = axis / len;
         }
         let nrm = vec2<f32>(-dir.y, dir.x);
-        half_len = len / psize;
-        // Extended by `psize` past each end so the round caps have room.
-        world = mid + dir * (corner.x * (len + psize)) + nrm * (corner.y * psize);
+        // The capsule's WIDTH is uniform and takes the midpoint's magnification.
+        // A tapered stroke would mean interpolating a radius in the fragment's
+        // distance function, which reworks ADR-0069's one-expression
+        // point/segment unification - deliberately out of scope (ADR-0076).
+        let wid = psize * magnify((dn + dn_prev) * 0.5);
+        half_len = len / wid;
+        // Extended by `wid` past each end so the round caps have room.
+        world = mid + dir * (corner.x * (len + wid)) + nrm * (corner.y * wid);
         local = vec2<f32>(corner.x * (half_len + 1.0), corner.y);
     } else {
-        world = screen * scl + corner * psize;
+        world = screen * scl * mag + corner * sprite;
         local = corner;
     }
 
@@ -747,6 +869,90 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     return vec4<f32>(in.color * g, 1.0);
 }
 "#;
+
+/// The CPU transcription of [`DRAW_SHADER`]'s depth projection (ADR-0076).
+///
+/// **The WGSL above is the source and this is the mirror** — the same discipline
+/// `apply_saturation` follows against `palette.rs::desaturate`, and `project()`
+/// up there names this module outright. If you edit one, edit the other.
+///
+/// It exists because the property this whole change rests on is *dimensionless
+/// algebra*, not a picture: under orthography the projection at rotation `π` is
+/// the exact `x`-mirror of the projection at `0`, and under perspective it is
+/// not, because `m(h) ≠ m(−h)` for any `h ≠ 0`. That holds on every machine,
+/// every adapter and every resolution. A capture-level check could only say the
+/// picture changed; this says *what* changed and why it matters.
+///
+/// Test-only: nothing on the render path projects on the CPU, and the point of
+/// the module is to be the thing the assertions run.
+#[cfg(test)]
+mod projection_mirror {
+    use super::AttractorFamily;
+
+    /// One projected particle: the pre-aspect "world" plane position, and the
+    /// view depth the rotation produces alongside it.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub(super) struct Projected {
+        pub(super) screen: [f32; 2],
+        pub(super) depth: f32,
+    }
+
+    /// Mirrors `project()` in [`DRAW_SHADER`](super::DRAW_SHADER).
+    ///
+    /// Takes `cs`/`sn` rather than an angle, exactly as the WGSL does — which is
+    /// also what lets a test state the mirror identity *exactly*: `cos` of an
+    /// `f32` `π` is not `−1` to the last bit, and the property ADR-0076 names is
+    /// about `cs = −1, sn = 0`.
+    pub(super) fn project(q: [f32; 3], family: AttractorFamily, cs: f32, sn: f32) -> Projected {
+        let (_, dim, zc) = family.projection();
+        let ([hx, hy, hz], [vx, vy, vz]) = family.basis().masks();
+        let [qx, qy, qz] = q;
+        if dim < 2.5 {
+            return Projected {
+                screen: [qx * cs - qy * sn, qx * sn + qy * cs],
+                depth: 0.0,
+            };
+        }
+        let [px, py, pz] = [qx, qy, qz - zc];
+        let h = px * hx + py * hy + pz * hz;
+        let v = px * vx + py * vy + pz * vz;
+        Projected {
+            screen: [px * cs + h * sn, v],
+            depth: -px * sn + h * cs,
+        }
+    }
+
+    /// Mirrors `depth_norm()` in [`DRAW_SHADER`](super::DRAW_SHADER).
+    pub(super) fn depth_norm(depth: f32, inv_extent: f32) -> f32 {
+        (depth * inv_extent).clamp(-1.0, 1.0)
+    }
+
+    /// Mirrors `magnify()` in [`DRAW_SHADER`](super::DRAW_SHADER).
+    pub(super) fn magnify(dn: f32, perspective: f32) -> f32 {
+        1.0 / (1.0 - perspective * dn)
+    }
+
+    /// The magnified world-space position of one particle — `project` composed
+    /// with the two above and the family's world scale, which is the composition
+    /// the vertex shader performs before the aspect division and the view
+    /// transform.
+    ///
+    /// The sprite's own corner offset is left off: it is a fixed square about
+    /// this point, so it cannot affect whether two projections are mirror images.
+    pub(super) fn world(
+        q: [f32; 3],
+        family: AttractorFamily,
+        cs: f32,
+        sn: f32,
+        perspective: f32,
+    ) -> [f32; 2] {
+        let (scl, _, _) = family.projection();
+        let p = project(q, family, cs, sn);
+        let m = magnify(depth_norm(p.depth, family.inv_depth_extent()), perspective);
+        let [sx, sy] = p.screen;
+        [sx * scl * m, sy * scl * m]
+    }
+}
 
 /// Decay pass: draw the previous accumulation back into the fresh target scaled
 /// by the per-frame retention factor `k`, laying down the faded trail before the
@@ -837,6 +1043,9 @@ struct StepUniform {
 /// (ADR-0069) — non-zero exactly when [`AttractorFamily::is_continuous`].
 /// `bh`/`bv`: the 3D projection basis's two axis selectors (ADR-0068) — the axis
 /// the spin rotates `x` against, and the vertical. Read only on the 3D branch.
+/// `d`: x `perspective`, y `depth_fade`, z `depth_hue`, w the family's
+/// **inverse** depth half-extent (ADR-0076) — `0` for a 2D family, which is what
+/// makes every depth cue the identity there without a shader branch.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct DrawUniform {
@@ -846,6 +1055,7 @@ struct DrawUniform {
     x: [f32; 4],
     bh: [f32; 4],
     bv: [f32; 4],
+    d: [f32; 4],
 }
 
 /// Decay uniform (per frame): x is the per-frame trail retention factor.
@@ -1480,6 +1690,11 @@ pub struct AttractorScene {
     zoom: f32,
     pan_x: f32,
     pan_y: f32,
+    /// Perspective strength (ADR-0076): the figure's depth half-extent as a
+    /// fraction of the camera distance, clamped to [`MAX_PERSPECTIVE`] where the
+    /// uniform is packed. `0` is the orthographic projection this scene shipped
+    /// with, and it is inert on the 2D families whatever it is set to.
+    perspective: f32,
     /// The active baked palette pair; uploaded to the draw LUT textures when
     /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
     palette: Palette,
@@ -1539,6 +1754,7 @@ impl AttractorScene {
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
+            perspective: DEFAULT_PERSPECTIVE,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
             reseed: 0.0,
@@ -1708,6 +1924,7 @@ pub const PARAMS: &[&str] = &[
     "pan_x",
     "pan_y",
     "reseed",
+    "perspective",
 ];
 
 impl Scene for AttractorScene {
@@ -1765,6 +1982,7 @@ impl Scene for AttractorScene {
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
+        self.perspective = DEFAULT_PERSPECTIVE;
         self.reseed = 0.0;
     }
 
@@ -1784,6 +2002,7 @@ impl Scene for AttractorScene {
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
+            "perspective" => self.perspective = value,
             "reseed" => self.reseed = value,
             _ => {}
         }
@@ -1882,6 +2101,7 @@ impl Scene for AttractorScene {
             zoom,
             pan_x,
             pan_y,
+            perspective,
             palette,
             palette_dirty,
             ..
@@ -1920,6 +2140,7 @@ impl Scene for AttractorScene {
                 palette_mix: *palette_mix,
                 zoom: *zoom,
                 pan: [*pan_x, *pan_y],
+                perspective: *perspective,
             },
         );
         // Before the steps, and only on the frame a `reseed` edge landed: kick each
@@ -1973,6 +2194,7 @@ struct UniformInputs {
     palette_mix: f32,
     zoom: f32,
     pan: [f32; 2],
+    perspective: f32,
 }
 
 /// The deferred one-shot uploads: the palette LUTs on a preset switch or fresh
@@ -2085,6 +2307,17 @@ fn upload_uniforms(
             ],
             bh: [hx, hy, hz, 0.0],
             bv: [vx, vy, vz, 0.0],
+            d: [
+                // Clamped here, silently, and not in the shader: this is the one
+                // place the value crosses into the GPU, so a preset asking for
+                // more gets the ceiling rather than a divisor approaching zero
+                // (ADR-0076). `presets/README.md` documents that it is silent.
+                inputs.perspective.clamp(0.0, MAX_PERSPECTIVE),
+                // The atmospheric cues, Phase 2's.
+                0.0,
+                0.0,
+                inputs.family.inv_depth_extent(),
+            ],
         }),
     );
     // Frame-rate-independent trail decay: retain `fade` per 1/60 s, raised to
@@ -2260,8 +2493,9 @@ mod tests {
     #![allow(clippy::panic, clippy::expect_used)]
 
     use super::{
-        AttractorFamily, AttractorScene, Basis, FIXED_STEP, MIN_PARTICLE_DENSITY, Particle,
-        RESEED_DRAWS_STREAK, Scene, active_particles, deposit_scale, streak_flag,
+        AttractorFamily, AttractorScene, Basis, FIXED_STEP, MAX_PERSPECTIVE, MIN_PARTICLE_DENSITY,
+        Particle, RESEED_DRAWS_STREAK, Scene, active_particles, deposit_scale, projection_mirror,
+        streak_flag,
     };
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderContext;
@@ -2406,6 +2640,223 @@ mod tests {
                 "{basis:?} put the horizontal and vertical on one axis"
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // The view depth (Plan 0063 Phase 1 / ADR-0076)
+    // -----------------------------------------------------------------------
+
+    /// The inverse depth extent, pinned per family against an explicit table.
+    ///
+    /// The compiler forces a fifth family to answer — the match is exhaustive.
+    /// This pins *what* it answers, and above all that the 2D families answer
+    /// **exactly zero**: every depth cue in the shader is the identity there by
+    /// arithmetic rather than by a branch, so a non-zero value here would give
+    /// De Jong and Clifford a depth they do not have.
+    #[test]
+    fn the_depth_extent_is_zero_for_every_flat_family() {
+        // The half-extents ADR-0076 quotes, as reciprocals — derived from
+        // `seed_box`, so this fails if that table moves without the ADR.
+        let table = [
+            (AttractorFamily::DeJong, 0.0),
+            (AttractorFamily::Clifford, 0.0),
+            (AttractorFamily::Thomas, 1.0 / 4.5),
+            (AttractorFamily::Lorenz, 1.0 / 26.0),
+        ];
+        for (family, expected) in table {
+            assert_eq!(
+                family.inv_depth_extent(),
+                expected,
+                "{family:?}'s inverse depth extent must be exactly {expected}"
+            );
+        }
+
+        // The flat families' zero is an *exact* zero, not a small number: the
+        // shader multiplies by it and clamps, so anything else is a depth.
+        for flat in [AttractorFamily::DeJong, AttractorFamily::Clifford] {
+            assert_eq!(flat.inv_depth_extent(), 0.0);
+            assert!(flat.inv_depth_extent().is_finite());
+        }
+        // Non-vacuity: the 3D families genuinely carry one, and the two differ —
+        // so this is a per-family derivation and not one shared constant.
+        assert!(AttractorFamily::Thomas.inv_depth_extent() > 0.0);
+        assert!(AttractorFamily::Lorenz.inv_depth_extent() > 0.0);
+        assert_ne!(
+            AttractorFamily::Thomas.inv_depth_extent(),
+            AttractorFamily::Lorenz.inv_depth_extent()
+        );
+    }
+
+    /// The identity every one of these assertions is stated against: the rest
+    /// rotation (`cs = 1, sn = 0`) and the half turn (`cs = -1, sn = 0`).
+    ///
+    /// Written as exact components rather than as `cos(0.0)` and `cos(PI)`,
+    /// because `f32::consts::PI` is not `π` and `cos` of it is `-1.0` with a
+    /// `sin` of `-8.7e-8` — near enough to look right and far enough to make an
+    /// *exact* equality fail for a reason that has nothing to do with the claim.
+    const REST: (f32, f32) = (1.0, 0.0);
+    const HALF_TURN: (f32, f32) = (-1.0, 0.0);
+
+    /// Positions on the two 3D figures, each with a genuinely non-zero depth at
+    /// rest (the depth at `cs = 1, sn = 0` is `dot(p, bh)`, so the component the
+    /// family's basis selects must not be zero).
+    fn depth_samples(family: AttractorFamily) -> [[f32; 3]; 4] {
+        match family {
+            // Lorenz: basis XZ, so `bh` is y and the depth at rest is `y`.
+            AttractorFamily::Lorenz => [
+                [10.0, 12.0, 30.0],
+                [-14.0, -20.0, 40.0],
+                [3.0, 25.0, 10.0],
+                [19.0, -5.0, 45.0],
+            ],
+            // Thomas: basis XY, so `bh` is z and the depth at rest is `z`.
+            _ => [
+                [2.0, -3.0, 1.5],
+                [-4.0, 1.0, -2.5],
+                [0.5, 3.5, 4.0],
+                [-1.5, -0.5, -3.5],
+            ],
+        }
+    }
+
+    /// **ADR-0076's diagnosis and its fix, as one dimensionless property.**
+    ///
+    /// Under orthography the projection at rotation `π` is the exact `x`-mirror
+    /// of the projection at `0` — at `cs = -1, sn = 0` the horizontal term
+    /// becomes `-p.x` and the vertical term is untouched. That is why a rotating
+    /// transparent structure carries no information about *which way* it is
+    /// turning, and with additive blending there is no occlusion to break the
+    /// tie either: the percept flips and settles on "flat".
+    ///
+    /// Under perspective it is not a mirror, because `m(h) != m(-h)` for any
+    /// `h != 0`. Both halves are asserted here, exactly, on the formula — a
+    /// capture could only report that the picture changed.
+    #[test]
+    fn perspective_breaks_the_orthographic_mirror() {
+        for family in [AttractorFamily::Lorenz, AttractorFamily::Thomas] {
+            for q in depth_samples(family) {
+                // The premise: this sample must actually have depth, or every
+                // assertion below is about `m(0) = m(0)`.
+                let rest = projection_mirror::project(q, family, REST.0, REST.1);
+                let dn = projection_mirror::depth_norm(rest.depth, family.inv_depth_extent());
+                assert!(
+                    dn.abs() > 0.05,
+                    "{family:?} sample {q:?} sits at depth {dn} — too near the view plane to \
+                     distinguish a perspective divide from an orthographic one"
+                );
+
+                // --- the flatness, pinned ---
+                let flat_rest = projection_mirror::world(q, family, REST.0, REST.1, 0.0);
+                let flat_half = projection_mirror::world(q, family, HALF_TURN.0, HALF_TURN.1, 0.0);
+                let ([rx, ry], [hx, hy]) = (flat_rest, flat_half);
+                assert_eq!(
+                    hx, -rx,
+                    "{family:?} sample {q:?}: at perspective 0 the half turn must be the exact \
+                     x-mirror of the rest pose"
+                );
+                assert_eq!(
+                    hy, ry,
+                    "{family:?} sample {q:?}: the vertical must not move"
+                );
+
+                // --- and the fix, pinned ---
+                const P: f32 = 0.5;
+                let deep_rest = projection_mirror::world(q, family, REST.0, REST.1, P);
+                let deep_half = projection_mirror::world(q, family, HALF_TURN.0, HALF_TURN.1, P);
+                let ([drx, dry], [dhx, dhy]) = (deep_rest, deep_half);
+                assert_ne!(
+                    dhx, -drx,
+                    "{family:?} sample {q:?}: at perspective {P} the half turn is STILL the \
+                     x-mirror of the rest pose — the depth is not reaching the magnification, so \
+                     the rotation is as ambiguous as it was"
+                );
+                // The vertical breaks too, and that is worth stating separately:
+                // the magnification scales the whole projected position, so a
+                // half turn moves the figure toward or away from the camera
+                // rather than merely flipping it.
+                assert_ne!(
+                    dhy, dry,
+                    "{family:?} sample {q:?}: the vertical is unchanged by the half turn under \
+                     perspective — the magnification is not being applied to it"
+                );
+            }
+        }
+    }
+
+    /// **The flat families are untouched at every `perspective`.**
+    ///
+    /// Stated as invariance rather than as the mirror identity above, and the
+    /// difference is not pedantry: a 2D map's projection is a full *in-plane*
+    /// rotation, so its half turn is a point reflection (both axes negated), not
+    /// an `x`-mirror — that identity was never true for them and is not what
+    /// this change is about. What must hold is that the depth machinery is
+    /// **exactly the identity** here, which is what `inv_depth_extent() == 0`
+    /// buys: same bits at every perspective, including the ceiling.
+    #[test]
+    fn perspective_is_exactly_inert_on_a_flat_family() {
+        for family in [AttractorFamily::DeJong, AttractorFamily::Clifford] {
+            for q in [
+                [1.2f32, -0.7, 0.0],
+                [-1.5, 1.4, 0.0],
+                [0.3, 0.9, 0.0],
+                // A stray `z`, which a 2D particle never has — but if one did,
+                // it must still not become a depth.
+                [0.8, -1.1, 5.0],
+            ] {
+                for (cs, sn) in [REST, HALF_TURN, (0.6, 0.8)] {
+                    let base = projection_mirror::world(q, family, cs, sn, 0.0);
+                    for p in [0.25, 0.5, MAX_PERSPECTIVE] {
+                        assert_eq!(
+                            projection_mirror::world(q, family, cs, sn, p),
+                            base,
+                            "{family:?} sample {q:?} moved at perspective {p} — a flat family \
+                             must have no depth to spend"
+                        );
+                    }
+                }
+                // ...and the in-plane rotation is what it always was: a half turn
+                // negates both axes exactly.
+                let ([rx, ry], [hx, hy]) = (
+                    projection_mirror::world(q, family, REST.0, REST.1, 0.0),
+                    projection_mirror::world(q, family, HALF_TURN.0, HALF_TURN.1, 0.0),
+                );
+                assert_eq!((hx, hy), (-rx, -ry));
+            }
+        }
+    }
+
+    /// The magnification's arithmetic, which is what makes `perspective` legible
+    /// rather than magic: it means the figure's depth half-extent as a fraction
+    /// of the camera distance, so the near-to-far ratio is `(1 + p) / (1 - p)`.
+    #[test]
+    fn the_magnification_matches_the_documented_ratio() {
+        for (p, expected) in [(0.0, 1.0), (0.5, 3.0), (MAX_PERSPECTIVE, 9.0)] {
+            let near = projection_mirror::magnify(1.0, p);
+            let far = projection_mirror::magnify(-1.0, p);
+            assert!(
+                (near / far - expected).abs() < 1e-5,
+                "perspective {p} gives a near/far ratio of {:.4}, not the documented {expected}",
+                near / far
+            );
+        }
+        // The two ends ADR-0076 quotes at the ceiling.
+        assert!((projection_mirror::magnify(1.0, MAX_PERSPECTIVE) - 5.0).abs() < 1e-5);
+        assert!((projection_mirror::magnify(-1.0, MAX_PERSPECTIVE) - 0.5556).abs() < 1e-3);
+
+        // At `perspective = 0` it is **exactly** 1.0 — not nearly. A multiply by
+        // exactly 1.0 is an identity in IEEE arithmetic, which is what makes the
+        // default byte-identical rather than merely close.
+        for dn in [-1.0f32, -0.37, 0.0, 0.42, 1.0] {
+            assert_eq!(projection_mirror::magnify(dn, 0.0), 1.0);
+        }
+
+        // The clamp keeps the divisor away from the singularity at `p = 1`: a
+        // converged figure overruns its seed box, so `d_n` before clamping
+        // reaches past 1 and an unclamped magnification would blow up.
+        assert_eq!(projection_mirror::depth_norm(100.0, 1.0 / 26.0), 1.0);
+        assert_eq!(projection_mirror::depth_norm(-100.0, 1.0 / 26.0), -1.0);
+        // A flat family's zero extent survives even an absurd depth.
+        assert_eq!(projection_mirror::depth_norm(1e30, 0.0), 0.0);
     }
 
     // -----------------------------------------------------------------------
