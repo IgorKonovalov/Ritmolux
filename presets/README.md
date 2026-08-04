@@ -1198,6 +1198,28 @@ alone at `0.19`; Lorenz `sigma/rho/beta` = `10 28 2.667`, `d` unused). Bind them
 to bands for a morphing cloud, but move them **slowly and by a little** — these
 are chaotic maps, and a large jump reads as a hard cut rather than a morph.
 
+**Each family is viewed in its own plane**, and it matters the moment you reach
+for `zoom` or `pan_*`, because those aim at the figure the plane produces:
+
+| Family     | Dimensions | Viewed in | The spin turns `x` against |
+|------------|------------|-----------|----------------------------|
+| `de_jong`  | 2-D map    | x–y       | — (in-plane rotation)      |
+| `clifford` | 2-D map    | x–y       | — (in-plane rotation)      |
+| `thomas`   | 3-D flow   | x–y       | `z`                        |
+| `lorenz`   | 3-D flow   | **x–z**   | `y`                        |
+
+Lorenz is the exception, and it is one deliberately: its butterfly *lives* in
+x–z, and viewed x–y the two lobes are edge-on — a hard X that reads as a dense
+core inside a diffuse cloud rather than as a figure
+([ADR-0068](../docs/adrs/0068-the-projection-basis-is-a-per-family-property.md)).
+Thomas is 3-D too and keeps x–y, so the plane is a **per-family property**, not
+something you can infer from the dimension count.
+
+One consequence to author around: the 3-D families spin as a turntable about the
+**vertical** axis, so a quarter turn necessarily leaves the family's own plane.
+Lorenz reads as the butterfly near 0° and 180° and as a low-structure cloud near
+90° and 270° — the plane buys the shape, not the shape at every angle.
+
 ### `[spectrum]` — for `spectrum`
 
 | Key         | Values                                | Notes                                                                                      |
