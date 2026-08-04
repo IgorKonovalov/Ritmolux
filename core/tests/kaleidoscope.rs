@@ -10,25 +10,38 @@
 //! the backdrop. That configuration cannot tell the two apart, which is why the
 //! defect survived sixteen confirmation captures.
 //!
-//! # The disc guard is a property of a **treatment**, not of the fold (ADR-0061)
+//! # The disc guard is a property of **one treatment**, not of the fold (ADR-0061)
 //!
-//! Since Plan 0055 Phase 1 the out-of-disc region is a per-preset choice —
-//! `kaleido_edge` picks one of five treatments — and three of them (`mirror`,
-//! `tile`, `squash`) paint out there **on purpose**. Read
-//! [`the_fold_paints_nothing_outside_its_disc`] as a property of the default
-//! treatment, `falloff`, and of `vignette`; it is not a rule about folding, and a
-//! fill treatment tripping it is that treatment working. Every capture in this
-//! file binds no `kaleido_edge`, so every one of them runs the default arm and the
-//! assertions below are unchanged in meaning.
+//! Since Plan 0055 the out-of-disc region is a per-preset choice: `kaleido_edge`
+//! picks `falloff` (0), `tile` (1) or `squash` (2), and **two of the three fill it
+//! on purpose**. So [`the_falloff_treatment_paints_nothing_outside_its_disc`] is a
+//! property of `falloff` alone. It is not a rule about folding, and a fill
+//! treatment "tripping" it is that treatment working.
 //!
-//! Plan 0055 Phase 3 re-scopes the guard once the live A/B has said which
-//! treatments survive, and gives each surviving fill treatment the property that
-//! is true of *it* — that the out-of-disc region is covered, and that it is not
-//! the radial smear of design-backlog 0010 (out-of-disc content must **vary along
-//! a ray**; the smear was constant along one). That is the only guard `tile` gets,
-//! because the disc guard cannot catch it: `tile` is supposed to paint out there,
-//! and what makes it safe rather than a rerun of the original defect is that its
-//! reads go through a `MirrorRepeat` sampler rather than the `ClampToEdge` one.
+//! **`falloff` is no longer the default, so every capture that asserts its
+//! properties binds [`EDGE_FALLOFF`] explicitly.** Phase 2's live A/B made `tile`
+//! the resting treatment; before that these tests got `falloff` by saying nothing,
+//! and leaving them silent would have quietly turned three domain assertions into
+//! assertions about a treatment that fills the frame by design. Anything here that
+//! does *not* pin the param is exercising the shipped default deliberately, and
+//! says so.
+//!
+//! The two fill treatments carry the properties that are true of *them*
+//! ([`the_fill_treatments_cover_the_out_of_disc_region_without_smearing`]): the
+//! region is **covered** — the crop is what the A/B rejected — and, for `tile`,
+//! what covers it is **not the radial smear**. Design-backlog 0010 replicated one
+//! border texel outward, *constant along each ray*, so the assertion is that
+//! out-of-disc content carries the interior's radial structure.
+//!
+//! That is the only guard `tile` can have, because the disc guard structurally
+//! cannot catch it: `tile` is supposed to paint out there, and what makes it safe
+//! rather than a rerun of the original defect is solely that its reads go through
+//! a `MirrorRepeat` sampler instead of the `ClampToEdge` one. Wire it to the wrong
+//! sampler and the disc guard stays green while the picture is the old defect.
+//! `tile` being the **default** is what makes that guard load-bearing rather than
+//! opt-in. `squash` is deliberately excluded from it — it cannot sample outside
+//! the source at all, and its far field is legitimately flat; that test's own
+//! header carries the measurement.
 //!
 //! # Why the disc guard lives here and not in `composite.rs`
 //!
@@ -101,6 +114,16 @@ const HEIGHT: u32 = 192;
 /// Enough frames for the static rose to be fully drawn; the fixture is
 /// time-independent, so this only has to clear the draw-in.
 const FRAMES: u32 = 30;
+
+/// `kaleido_edge` roster values (ADR-0061), named so a capture says which
+/// treatment it is asserting about instead of carrying a bare integer.
+///
+/// **[`EDGE_TILE`] is the default**, so binding nothing gets a frame-filling
+/// treatment. Every assertion here about the fold's *domain* pins
+/// [`EDGE_FALLOFF`], which is the only surviving treatment that has one.
+const EDGE_FALLOFF: u32 = 0;
+const EDGE_TILE: u32 = 1;
+const EDGE_SQUASH: u32 = 2;
 
 /// The frozen fixture, reused verbatim from the golden roster. Its `[params]`
 /// table is last, so appended `kaleido_*` lines land inside it.
@@ -370,16 +393,31 @@ fn beyond_disc(img: &CaptureImage, factor: f32) -> (u8, usize, usize) {
     (peak, lit, total)
 }
 
-/// The active fold reaches nothing outside its inscribed disc — the direct guard
-/// design-backlog 0010 asks for.
+/// Under the **`falloff` treatment** the fold reaches nothing outside its
+/// inscribed disc — the direct guard design-backlog 0010 asks for.
 ///
 /// Before ADR-0047 the fold reconstructed sample coordinates outside `[0, 1]` for
 /// every output pixel past the source's extent in the folded direction, and
 /// `ClampToEdge` smeared the border texel radially across all of them. Clamping the
 /// *sample* radius to `r_max` and fading past it means those pixels are not painted
 /// at all.
+///
+/// **Renamed at Plan 0055 Phase 3, and the rename is the point.** ADR-0061 made
+/// the out-of-disc region a per-preset choice, so "the fold paints nothing outside
+/// its disc" stopped being true of the fold and became true of one treatment —
+/// and then `tile`, which fills it, became the *default*. Under the old name a
+/// reader would take this for a rule and read `tile` as a regression. The capture
+/// below pins `kaleido_edge` for the same reason.
+///
+/// Verified still non-vacuous after the re-scoping rather than assumed: with the
+/// `falloff` arm's body temporarily replaced by the pre-ADR-0047 shader
+/// (`rs = r`, `w = 1`, read through the `ClampToEdge` sampler), this fails with
+/// **peak 199 and every one of 6052 out-of-disc pixels lit** — the same pair
+/// `composite_kaleido.toml`'s header recorded for the pre-fix shader, which is the
+/// corroboration that the re-scoping changed which treatment the test names and
+/// not what it can detect.
 #[test]
-fn the_fold_paints_nothing_outside_its_disc() {
+fn the_falloff_treatment_paints_nothing_outside_its_disc() {
     let Some(mut renderer) = headless(FIELD_W, FIELD_H) else {
         return;
     };
@@ -391,9 +429,13 @@ fn the_fold_paints_nothing_outside_its_disc() {
         bar: 0.25,
         ..Default::default()
     };
+    // `kaleido_edge` is pinned: `falloff` is the treatment this property belongs
+    // to and it is no longer what an unbound preset gets (module docs).
     let mut capture = |order: f32| {
-        let toml =
-            format!("{FIELD_FIXTURE}kaleido_order = \"{order}\"\nkaleido_angle = \"{ANGLE}\"\n");
+        let toml = format!(
+            "{FIELD_FIXTURE}kaleido_order = \"{order}\"\nkaleido_angle = \"{ANGLE}\"\n\
+             kaleido_edge = \"{EDGE_FALLOFF}\"\n"
+        );
         let preset = Preset::from_toml_str(&toml)
             .unwrap_or_else(|e| panic!("field fixture parses at order {order}: {e}"));
         renderer.set_presets(vec![preset]);
@@ -477,9 +519,12 @@ fn capture_folded(
     bg: &str,
     center: (f32, f32),
 ) -> CaptureImage {
+    // `falloff` pinned: both callers assert about the falloff and about what lies
+    // beyond the disc, neither of which the frame-filling default has.
     let toml = format!(
         "{FIELD_FIXTURE}kaleido_order = \"6\"\nkaleido_angle = \"{ANGLE}\"\n\
-         kaleido_center_x = \"{}\"\nkaleido_center_y = \"{}\"\n{bg}",
+         kaleido_center_x = \"{}\"\nkaleido_center_y = \"{}\"\n\
+         kaleido_edge = \"{EDGE_FALLOFF}\"\n{bg}",
         center.0, center.1
     );
     let preset = Preset::from_toml_str(&toml)
@@ -612,4 +657,217 @@ fn the_backdrop_is_not_folded_so_it_does_not_move_with_the_fold_axis() {
         "the two folds differ by at most {inner} per-channel over the whole frame — \
          the off-centre axis is too small a displacement to prove anything"
     );
+}
+
+// --- The fill treatments: covered, and (for `tile`) not the smear -------------
+//
+// Plan 0055 Phase 3. `tile` and `squash` deliberately break the disc guard above,
+// so they need the properties that are true of *them*. Both must COVER the
+// out-of-disc region — the crop is what the live A/B rejected, so coverage is the
+// claim — and `tile` additionally must not be design-backlog 0010 wearing a new
+// name.
+//
+// WHY ONLY `tile` GETS THE ANTI-SMEAR GUARD, which is the substantive finding of
+// this phase and not an omission:
+//
+//   `tile` is the only treatment that lets the reconstructed coordinate leave
+//   [0,1]. That is safe solely because it reads through a `MirrorRepeat` sampler;
+//   wire it to the `ClampToEdge` one and it is exactly the original defect, with
+//   the disc guard still green because `tile` is *supposed* to paint out there.
+//   Nothing else in the suite can catch that, so the guard below is load-bearing —
+//   the more so because `tile` is the default.
+//
+//   `squash` cannot be the smear by construction: `rs = r_max * tanh(m) < r_max`
+//   for every finite `m`, so it never hands an out-of-range coordinate to any
+//   sampler at all. That is asserted arithmetically, on the radius map, in
+//   `render/kaleidoscope.rs`'s `only_tile_lets_the_sample_radius_leave_the_disc`.
+//
+//   And it could not be asserted here even if it were wanted. MEASURED on this
+//   fixture: `squash` reads an out/in radial-structure ratio of 0.10, against a
+//   deliberately mis-wired `tile`'s 0.06. Its far field genuinely IS near-constant
+//   along a ray — that is what asymptotic compression means, since every large
+//   radius maps to nearly the same sample radius — so the statistic below cannot
+//   separate `squash` from a smear, and a bound that passed `squash` would pass
+//   the defect too. Better to say so than to ship a guard that looks like one.
+
+/// Rays sampled outward from the frame centre. Arbitrary; it only has to be enough
+/// that the mean is not dominated by one direction.
+const RAYS: usize = 64;
+
+/// Mean per-ray brightness **range** (max - min), over the samples between
+/// `from` and `to` in units of `r_max`, in 0..255. `to = INFINITY` means the frame
+/// edge.
+///
+/// **Constant along a ray reads exactly zero**, which is what makes this the
+/// measurement for the smear: `ClampToEdge` on an out-of-range coordinate returns
+/// the same border texel at every radius along a fixed direction, so a smeared
+/// region has no radial structure whatsoever. A mirrored continuation of real
+/// content does.
+fn along_ray_range(img: &CaptureImage, from: f32, to: f32) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    let disc = disc_radius(img.width, img.height);
+    let (cx, cy) = (w as f32 * 0.5, h as f32 * 0.5);
+    // Far enough to leave the frame from the centre in any direction.
+    let far = (disc * to).min((cx * cx + cy * cy).sqrt());
+
+    let mut sum = 0.0f64;
+    let mut rays = 0usize;
+    let mut samples: Vec<f32> = Vec::new();
+    for i in 0..RAYS {
+        let theta = std::f32::consts::TAU * i as f32 / RAYS as f32;
+        let (ct, st) = (theta.cos(), theta.sin());
+        samples.clear();
+        let mut r = disc * from;
+        while r <= far {
+            let (x, y) = (cx + ct * r, cy + st * r);
+            let (xi, yi) = (x as isize, y as isize);
+            if xi >= 0 && yi >= 0 && (xi as usize) < w && (yi as usize) < h {
+                let p = (yi as usize * w + xi as usize) * 4;
+                // Brightest channel, matching how `beyond_disc` reads a pixel.
+                let bright = img.rgba[p..p + 3].iter().copied().max().unwrap_or(0);
+                samples.push(bright as f32);
+            }
+            r += 1.0;
+        }
+        // A ray that barely clips a frame corner says nothing about radial
+        // structure; require a real run of samples.
+        if samples.len() < 8 {
+            continue;
+        }
+        let lo = samples.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = samples.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        sum += (hi - lo) as f64;
+        rays += 1;
+    }
+    assert!(
+        rays > 0,
+        "no ray had enough samples — the region is degenerate"
+    );
+    (sum / rays as f64) as f32
+}
+
+/// The in-disc band the out-of-disc structure is compared against. Starts off the
+/// convergence point, where every wedge meets and the radial gradient is the
+/// fold's own rather than the content's, and stops at `r_max`.
+const IN_DISC: (f32, f32) = (0.2, 1.0);
+
+/// How much of the interior's radial structure a genuine fill must carry out past
+/// the disc, as a fraction.
+///
+/// **Dimensionless on purpose** — it is the ratio of the same statistic measured on
+/// the same image, so the fixture's brightness, the palette and the rasterizer all
+/// cancel. That is what lets it be a property rather than a machine measurement
+/// (ADR-0071): a mirrored continuation resamples real interior content and keeps
+/// its radial structure; a clamped smear replicates one texel and has none.
+///
+/// The endpoints are measured, on this fixture, in the same run, and the bound sits
+/// between them with room on both sides: `tile` reads **0.35**, and the same `tile`
+/// with its `textureSample` deliberately re-pointed at the `ClampToEdge` sampler —
+/// which is precisely design-backlog 0010 — reads **0.06**. The interior readings
+/// are identical in the two, as they must be, since inside the disc `tile` never
+/// leaves `[0,1]` and the sampler cannot matter.
+const FILL_STRUCTURE: f32 = 0.15;
+
+/// Both surviving fill treatments **cover** the out-of-disc region, and `tile` —
+/// the default, and the only treatment that samples outside the source — fills it
+/// with content that carries the interior's radial structure rather than the flat
+/// radial smear of design-backlog 0010.
+///
+/// Portrait, for the disc guard's reason: the fold keeps each output pixel's
+/// radius, so what governs this region is `sqrt(1 + (long/short)^2)` — 2.28 here
+/// against 2.04 at 16:9. At 16:9 the region is corner debris; in a portrait window
+/// it is most of the picture, which is where the user hit the original defect.
+///
+/// The non-vacuity control is `falloff`, measured the same way in the same run: it
+/// paints nothing out there, so it reads zero coverage and zero structure. That is
+/// what makes the fill readings mean something, and it is measured rather than
+/// assumed.
+#[test]
+fn the_fill_treatments_cover_the_out_of_disc_region_without_smearing() {
+    let Some(mut renderer) = headless(FIELD_W, FIELD_H) else {
+        return;
+    };
+    let frame = AnalysisFrame {
+        bass: 0.6,
+        mid: 0.5,
+        treb: 0.6,
+        onset: 0.4,
+        bar: 0.25,
+        ..Default::default()
+    };
+    let mut capture = |edge: u32| {
+        let toml = format!(
+            "{FIELD_FIXTURE}kaleido_order = \"6\"\nkaleido_angle = \"{ANGLE}\"\n\
+             kaleido_edge = \"{edge}\"\n"
+        );
+        let preset = Preset::from_toml_str(&toml)
+            .unwrap_or_else(|e| panic!("field fixture parses at edge {edge}: {e}"));
+        renderer.set_presets(vec![preset]);
+        renderer
+            .capture_preset(FIELD_FIXTURE_NAME, &frame, FRAMES)
+            .unwrap_or_else(|e| panic!("capture field fixture at edge {edge}: {e}"))
+    };
+
+    // The control: the one surviving treatment that keeps its domain. Its
+    // out-of-disc region is empty, so both statistics must read zero on it.
+    let falloff = capture(EDGE_FALLOFF);
+    let (_, falloff_lit, region) = beyond_disc(&falloff, OUT_OF_DISC);
+    let falloff_out = along_ray_range(&falloff, OUT_OF_DISC, f32::INFINITY);
+    println!(
+        "beyond {OUT_OF_DISC}x r_max ({region} px of {FIELD_W}x{FIELD_H}): \
+         falloff {falloff_lit} of {region} lit, out-of-disc radial range {falloff_out:.2}"
+    );
+    assert!(
+        falloff_out <= EMPTY_TOL as f32 && falloff_lit * 8 < region,
+        "the falloff control is not empty out here ({falloff_lit} px lit, radial range \
+         {falloff_out:.2}) — it is the reference for what a crop looks like, so the fill \
+         readings below would mean nothing"
+    );
+
+    for (edge, name) in [(EDGE_TILE, "tile"), (EDGE_SQUASH, "squash")] {
+        let img = capture(edge);
+        let (peak, lit, _) = beyond_disc(&img, OUT_OF_DISC);
+        let out = along_ray_range(&img, OUT_OF_DISC, f32::INFINITY);
+        let inside = along_ray_range(&img, IN_DISC.0, IN_DISC.1);
+        println!(
+            "  {name} (kaleido_edge = {edge}): {lit} of {region} px lit, peak {peak}, \
+             radial range out {out:.2} / in {inside:.2} = {:.3}",
+            out / inside.max(f32::MIN_POSITIVE)
+        );
+
+        // --- Property 1, for both: COVERED. The crop is what the A/B rejected, so
+        // a fill treatment that leaves this region empty is not doing its job. ---
+        assert!(
+            lit * 2 > region,
+            "{name} left the out-of-disc region uncovered: only {lit} of {region} px lit \
+             beyond {OUT_OF_DISC}x r_max — it is cropping the way falloff does"
+        );
+
+        // --- Non-vacuity: the treatment must actually have reached the shader. ---
+        assert!(
+            beyond_disc_max_diff(&falloff, &img, OUT_OF_DISC) > EMPTY_TOL,
+            "{name} renders the out-of-disc region identically to falloff — the edge \
+             treatment is not reaching the shader, so coverage above proves nothing"
+        );
+
+        // --- Property 2, for `tile` ONLY: NOT THE SMEAR. See this section's
+        // header for why `squash` is excluded rather than overlooked — it cannot
+        // sample outside the source at all, and its far field is legitimately flat.
+        if edge == EDGE_TILE {
+            assert!(
+                inside > EMPTY_TOL as f32,
+                "the fixture has no radial structure inside the disc either \
+                 ({inside:.2}) — there is nothing for the fill to have carried out"
+            );
+            assert!(
+                out > inside * FILL_STRUCTURE,
+                "{name} fills the out-of-disc region with content carrying almost none of \
+                 the interior's radial structure (out {out:.2} against in {inside:.2}, \
+                 ratio {:.3}, floor {FILL_STRUCTURE}) — that is the flat ClampToEdge \
+                 smear of design-backlog 0010, which means this treatment is reading \
+                 through the wrong sampler",
+                out / inside.max(f32::MIN_POSITIVE)
+            );
+        }
+    }
 }
