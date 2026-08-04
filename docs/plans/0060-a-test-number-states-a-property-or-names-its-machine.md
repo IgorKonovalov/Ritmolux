@@ -3,10 +3,19 @@
 > **Status:** **in-progress 2026-08-04** — **Phases 1 and 2 are done.** Phase 1 landed (`1d56600`,
 > plus `31073f6` adding a `.config/nextest.toml` `success-output` override so the two reporting
 > tests stay audible on a green run) and **CI is green**; Phase 2's readings are recorded below.
-> **Phase 3 has been re-scoped by the architect** and is `dev`-ready: the ratio came back below the
-> fallback condition this plan named in advance, so Phase 3 routed back per its own instruction and
-> [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) takes
-> the decision — **no ratio floor is added**. Phase 3's other two items are unaffected.
+> **Phase 3 was re-scoped by the architect** and is now **three-quarters landed**. The ratio came
+> back below the fallback condition this plan named in advance, so Phase 3 routed back per its own
+> instruction and
+> [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) took
+> the decision — **no ratio floor is added**.
+> **`a324b21` landed the three documentation items** (the render doc demotion, the arm64 values, the
+> determinism spec's scoping sentence), adding, removing and loosening no assertion.
+> **One item remains, and it was added to this phase *after* `a324b21` landed**: the magnitude
+> claim measured on **hardware**, which ADR-0074 originally deferred to Plan 0053 Phase 3 on a
+> premise that turned out to be false — the dev box has a hardware adapter and the hardware-only
+> sibling runs here today. Two consequences for whoever takes it: it is the last thing between this
+> plan and its close, and **`a324b21`'s doc comment still points the magnitude claim at Plan 0053
+> Phase 3**, which that commit could not have known was superseded. Re-point it.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
@@ -267,7 +276,13 @@ from.
   — with **no assertion added, removed or loosened**, and the printed statistic set left intact;
   the DSP test's doc comment carries the four arm64 values; the determinism spec states the scope
   of its bit-identity clause; `fmt`, `clippy -D warnings` and the full `nextest` run are clean
-  locally, and no golden baseline moves.
+  locally, and no golden baseline moves. **Landed `a324b21`.**
+- **Done when (the hardware item, outstanding):** a second, hardware-only test asserts a ratio floor
+  from a reading taken on a **non-software** adapter, at most half of that reading; its doc comment
+  names the adapter and driver version in the ADR-0071 measurement shape, states that it skips on
+  both CI runners so CI never enforces it, and reports the observed hardware ratio against the local
+  WARP `0.268675`. The WARP test is **not** modified, and `a324b21`'s pointer at Plan 0053 Phase 3
+  is re-pointed at this test.
 - ~~**Route back to `architect` if:** Phase 2's ratio does not clear the fallback condition in Risks
   below.~~ **This fired.** The ratio came back at `0.036654`, under the `0.05` condition, and the
   decision was taken in
