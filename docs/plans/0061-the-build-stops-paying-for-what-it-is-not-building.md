@@ -9,6 +9,10 @@
 > 30903871856 made the first green measurement available; [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md)
 > **Amended:** 2026-08-04 (second pass) — Phase 4b reconciled against `1c55476`, which implemented
 > it ahead of its sequence
+> **Amended:** 2026-08-04 (third pass) — **Phase 2c added**: a CI counterpart for the doc-link
+> check. The checker and its pre-push step landed at Plan 0060's close (`06d198f`, `cdcd750`) after
+> 74 broken links were found across 23 files; the CI half comes here because this plan owns every
+> `ci.yml` edit in flight. Independent of 2b/4b and separable from them.
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) (new, proposed),
 > [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) (new, proposed),
@@ -41,6 +45,14 @@ GPU sweep one owner and Phase 4b takes the shape claim off the critical path (bo
 [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md)); Phase 1b tries dependency optimization in
 the same `[profile.dev]` table Phase 1 edits; Phase 9 reads the resulting run. **Neither CI phase
 works without the other** — see Phase 2b's note.
+
+**Amended again the same day with Phase 2c**, which is a different kind of CI cost: not wall time
+but a gate that does not exist. Plan [0060](done/0060-a-test-number-states-a-property-or-names-its-machine.md)'s
+close found **74 broken relative markdown links across 23 files**, accumulated over six consecutive
+closes because moving a plan into `plans/done/` breaks links in both directions and nothing checked.
+`scripts/check-doc-links.mjs` and its pre-push step exist now; Phase 2c adds the CI job, so the
+check stops depending on an opt-in hook. It is seconds on `ubuntu-latest`, touches neither Windows
+job, and is separable from 2b/4b.
 
 ## Context & problem
 
@@ -306,6 +318,39 @@ stops being an expectation.
   under `check`, within noise of `coverage`'s entire 932-second job. **Phase 4b is the half that moves
   the wall clock**; this is the half that stops paying twice. Neither is worth landing without the
   other, and Phase 9 measures them together.
+
+### Phase 2c — The doc-link check gets a CI counterpart (added 2026-08-04)
+- **Owner skill:** dev
+- **What:** Add a small `links` job so the doc-link check is enforced for everyone, rather than only
+  by an opt-in hook. `scripts/check-doc-links.mjs` and its `.githooks/pre-push` step already exist
+  (`06d198f`, `cdcd750`); this phase adds the CI half and retires the caveat those commits had to
+  write in four places.
+- **Files touched:** `.github/workflows/ci.yml`, `.githooks/pre-push` (comment only), `README.md`,
+  `docs/nfr.md`, `.claude/skills/architect/SKILL.md`
+- **Why it is here and not its own plan:** it is a `ci.yml` edit, and this plan already owns every
+  `ci.yml` edit in flight. **Sequenced after Phase 2b** for exactly the reason 2b is sequenced after
+  Phase 2 — three phases racing one file for no reason is avoidable. It shares *nothing else* with
+  2b/4b: it touches neither Windows job, adds no GPU work, and is separable if the wall-time phases
+  slip.
+- **Shape:** its **own job on `ubuntu-latest`**, beside `deny` — checkout, then
+  `node scripts/check-doc-links.mjs` (GitHub's ubuntu images ship Node, so no setup step). Seconds,
+  on the cheapest runner, and **nowhere near the Windows critical path**
+  [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) is fighting.
+  *Rejected: folding it into the existing `deny` job as a second step.* It saves one runner
+  spin-up and makes a red `deny` ambiguous between a supply-chain failure and a broken link —
+  buying seconds with exactly the diagnostic ambiguity ADR-0073 already lists as an accepted cost
+  elsewhere. Do not add another one for free.
+- **Done when:** a `links` job runs `node scripts/check-doc-links.mjs` on `ubuntu-latest` and is
+  green; **verified non-vacuously** by pushing a branch with one deliberately broken link and
+  confirming the job goes red naming `file:line` (then removing it) — a link checker that silently
+  passes is worse than none, and this repo has shipped a green-suite-blind-spot often enough to owe
+  the check. **And the four "no CI counterpart" caveats are removed**, because they become false the
+  moment this lands: `.githooks/pre-push`'s header note, the README's pre-push step table paragraph,
+  `docs/nfr.md`'s pre-push bullet, and the `architect` skill's step 1b. The hook keeps its
+  Node-absent skip — that is about the *hook*, not about CI.
+- **It adds a job name to the workflow, which Phase 9 reads.** A seconds-long ubuntu job cannot
+  threaten ADR-0073's *"`coverage` is the longest job"* property, so it does not complicate that
+  measurement — but Phase 9 should not be surprised by an unfamiliar job in the run.
 
 ### Phase 3 — Carve the capture and dissolve families out of `Renderer`
 - **Owner skill:** dev
