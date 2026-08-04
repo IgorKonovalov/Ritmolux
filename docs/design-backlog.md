@@ -3043,3 +3043,62 @@ tuples, each its own shape. Nothing in the current surface walks between them wi
   had a content pass yet (Phase 4). The reference look the user is pointing at is *sparse curves*,
   which is exactly what those two levers exist to reach — so some of this gap may close in Phase 4
   without any new capability. **Re-check this entry after Phase 4 before designing against it.**
+
+---
+
+## Entry 0056 — from the Plan 0050 close (2026-08-04), found while clearing a stale preset cache
+
+## 0056 — a user-authored preset has been living outside the repo for six weeks, and it is a curation candidate the boundary has no route for
+
+- **Raised:** 2026-08-04, by `architect`, checking whether a `%APPDATA%` preset cache was safe to
+  delete before clearing it at the user's request.
+- **Verified against code:** partly — the two defects below are read off the file against today's
+  grammar and are **not** rendered. Render it before acting.
+- **Not a defect in the engine.** This is a content-lifecycle gap plus two rot findings in one file.
+
+**What was found.** `%APPDATA%\light-music-visualizer\presets\chthonic_coral_oracle.toml` — "Chthonic
+Coral Oracle", a reaction-diffusion preset — has **never been tracked in git**. It survived the cache
+clear deliberately; the other 43 files were retired or stale shipped copies, all recoverable from
+`c11bbf9` / `de707cb`. It is the only non-shipped preset in the user's library.
+
+**It is not a stray.** This is the preset that raised [backlog 0001](#0001--reaction_diffusion-reaches-only-2-of-the-5-plan-0018-composite-levers)
+on 2026-07-24 — the entry that became [ADR-0026](adrs/0026-full-composite-coverage-fullscreen-scenes.md)
+and [Plan 0025](plans/done/0025-full-composite-coverage.md), i.e. the reason `reaction_diffusion`
+reaches the composite levers at all. The preset that motivated a whole plan then **never came back
+into the repo**, and the levers it asked for landed without the look that asked for them ever being
+shipped or re-checked.
+
+**Why it is a candidate.** It composes four things into one coherent idea — Pearson-regime drift on
+bass, beat-stamped `inject` growth, trails, and a bass-breathing kaleidoscopic fold — and documents
+its own drive map in the header more thoroughly than several shipped presets do. Nothing in the
+shipped set does regime drift.
+
+**Two rot findings, both from the file rather than from a render.**
+
+- **`bar` is no longer a variable.** `kaleido_angle = "time * 0.06 + bar * 0.5"` was written against
+  the pre-[0048] grammar; since [ADR-0050](adrs/0050-beat-and-bar-clock.md) the trio is
+  `bar_index` / `bar_phase` / `beat_in_bar`. Expect a load-time unknown-name **warning** and a dead
+  term, not a failure. Note also what [0048] Phase 6 measured — the downbeat estimator locks on
+  **3.1 %** of audible time — so whatever this term becomes should be built on `beat_index` /
+  `time_since_beat` rather than on the bar trio.
+- **`kaleido_order` is eased under `[smoothing]` at `tau = 2.0`.** That is the seam
+  `presets/README.md` records: an eased param is continuous even where its math needs an integer, so
+  a breathing wedge count sweeps through invalid values between them. Whether it reads as jitter or
+  as intended breathing is a **render** question, and this entry does not answer it.
+
+**What is actually being asked.** Not "ship this file". Two things:
+
+1. **A `preset-author` pass** to refresh it against the v2 grammar, judge it in motion, and decide
+   whether it earns a place — including whether the regime-drift idea is better carried by a new
+   preset than by restoring this one.
+2. **The route itself, which does not exist.** [ADR-0017](adrs/0017-preset-author-skill-lane.md) put
+   curation at "`dev` embeds a curated preset" because embedding meant editing Rust in two coupled
+   spots. [ADR-0022](adrs/0022-build-time-preset-embedding.md) removed that premise — `core/build.rs`
+   globs `presets/*.toml`, so shipping a preset is committing a `.toml`. The architect skill already
+   names this as an **owed ADR-0017 supplement**; this is the first concrete case waiting on it, and
+   it is a good one to decide against, because the file is a real candidate with real rot rather
+   than a hypothetical.
+
+**Do not fold this into Plan 0059 Phase 4.** That pass is the attractor family, judged against a
+figure that just changed shape; this is one reaction-diffusion preset and an unrelated boundary
+question. They share only the lane.
