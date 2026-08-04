@@ -65,6 +65,10 @@ docs/
 ├── preset-palettes.md  # The colour surface: built-in palettes, custom stops, the A/B crossfade.
 ├── capturing.md     # Headless capture + visual-QA harness: the shot CLI and the core/tests/ checks.
 ├── releasing.md     # The version-bump / release procedure (one bump per plan close).
+├── on-device-validation.md  # The manual checklist for what CI cannot run: real GPUs, live loopback.
+├── design-backlog.md  # Captured friction not yet promoted to an ADR or a plan (…-archive.md holds retired entries).
+├── roadmap-visual-richness.md  # The visual-capability roadmap the recent plans are sequenced against.
+├── generative-techniques-catalogue.md  # The technique survey behind the scene families.
 ├── adrs/            # Architecture Decision Records + rejected alternatives. Append-only.
 ├── specs/           # Living behavioral contracts per core subsystem (C ABI, ring/DSP determinism).
 └── plans/           # Phased implementation plans (what's in flight); done/ holds completed plans.
@@ -137,9 +141,15 @@ settings hands over to the browser.
 - `LMV_TIER=floor|rich` — the same pin as `--tier`, for a one-off run. Precedence is
   `--tier` > `LMV_TIER` > `config.toml`'s `[quality] tier` > auto.
 
-> **macOS:** loopback capture is not wired up yet (macOS has no WASAPI equivalent — it needs
-> ScreenCaptureKit or a virtual device like BlackHole, a later phase). The app builds and runs,
-> but "capture any app's audio" is Windows-first today. See **Platform notes** below.
+> **macOS:** loopback capture **is** implemented — `standalone/src/capture_mac.rs` taps system
+> audio through **ScreenCaptureKit**, so it needs **macOS 13+** and the **Screen Recording**
+> permission (SCK will not run an audio-only stream, so the capture carries a throwaway 2x2 px
+> stub video alongside the audio). Grant it, then **relaunch** — the app does not pick the
+> permission up mid-run. The caveat is that **this path has never run on Apple hardware**: CI
+> compiles it on `macos-latest` every push, but no runner can play audio or drive a real Metal
+> adapter, so the first live run is also its validation. A window with visuals but no reaction
+> to music means capture did not start, not a crash — launch from Terminal to see the reason.
+> See **Platform notes** below.
 
 ## Design principles
 
@@ -161,8 +171,8 @@ Visuals are driven by **presets** — small TOML files that bind a built-in
 rendering system's parameters to short expressions over the live audio analysis
 (no Rust, no rebuild). The whole curated set ships across every built-in system —
 fragment field, particle swarm, parametric curve, L-system, star pattern,
-reaction-diffusion, attractor, spectrum readout — seeded into a per-user directory
-that both the standalone app and the foobar plugin share.
+reaction-diffusion, attractor, spectrum readout, ballistic emitter — seeded into a
+per-user directory that both the standalone app and the foobar plugin share.
 
 See **[`docs/presets.md`](docs/presets.md)** for the authoring guide and the
 expression reference — grammar, variables, constants, functions, comparisons and
@@ -248,10 +258,18 @@ OpenGL) recorded.
 
 ## Platform notes
 
-- **Loopback capture is not symmetric.** Windows has first-class WASAPI loopback; macOS needs
-  ScreenCaptureKit (macOS 13+) or a virtual device (BlackHole). "Capture any app's audio" is
-  Windows-first; the Mac capture path is a later phase. The foobar plugin sidesteps capture
-  entirely, which is part of why plugin parity is valuable on Mac.
+- **Loopback capture is not symmetric.** Windows has first-class WASAPI loopback and needs no
+  permission; macOS has no equivalent, so the Mac path goes through **ScreenCaptureKit** (macOS
+  13+) and a user-granted Screen Recording permission. Both are implemented; only the Windows
+  one has been exercised on real hardware. A virtual device (BlackHole) remains the fallback if
+  the SCK route disappoints — set it as the output and no capture code is needed. The foobar
+  plugin sidesteps capture entirely, which is part of why plugin parity is valuable on Mac.
+- **There is no Mac build to download yet.** The dev box is Windows and cannot link a Mach-O
+  binary, so a macOS runner is the only build host. The tag-driven release that produces a
+  universal, ad-hoc-signed `.app` is designed and approved but not yet built — see
+  [ADR-0038](docs/adrs/0038-tag-driven-release-unsigned-universal-mac-app.md) and
+  [Plan 0036](docs/plans/0036-macos-and-windows-release-artifacts.md). Until it lands, running
+  on a Mac means `cargo run -p standalone --release` on that Mac.
 - **wgpu targets differ per OS** — Metal on macOS, DX12/Vulkan on Windows. Scene code writes to
   wgpu and does not branch on the backend.
 
