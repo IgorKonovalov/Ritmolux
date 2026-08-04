@@ -1,8 +1,10 @@
 # ADR-0061 — What the fold does outside its disc is a per-preset choice, selected by one stepped param inside a single pipeline
 
-> **Status:** proposed
+> **Status:** **accepted 2026-08-04, with an [Outcome](#outcome-2026-08-04-at-plan-0055s-close)
+> section** — the mechanism held; four claims in the body did not, and the Outcome records them
+> rather than editing the body.
 > **Date:** 2026-08-02
-> **Related plan(s):** 0055-the-fold-edge-becomes-a-choice
+> **Related plan(s):** [0055](../plans/done/0055-the-fold-edge-becomes-a-choice.md)
 > **Supplements:** [0047](0047-kaleidoscope-fold-domain-disc-with-falloff.md) (the fold domain),
 > [0018](0018-engine-wide-scene-compositing.md) (the stage), [0055](0055-backdrop-leaves-the-post-chain.md)
 > (what the falloff fades *to*). **Resolves:** design-backlog 0037.
@@ -179,3 +181,64 @@ for every candidate here: reconstructing a sample coordinate outside the source 
 `tile` comes closest — it lets the coordinate leave `[0,1]` — and is the one candidate whose
 address mode is *defined* for that, which is exactly why it needs the second sampler rather than
 the existing one.
+
+## Outcome (2026-08-04, at Plan 0055's close)
+
+The mechanism held exactly as designed — one param, one pipeline, one bind layout, a uniform
+branch. **What the rendering falsified was the prose around it**, in four places, and the body
+above is left standing rather than edited so the corrections read as what they are.
+
+**The roster reduced from five to three, and the ADR's most confident prediction lost.** Phase 2's
+live A/B — in the running app, in motion, over a lit backdrop, on both scenes, at both aspects —
+ships **`falloff` (0), `tile` (1), `squash` (2)**, renumbered contiguously preserving relative
+order. `vignette` and `mirror` are deleted from the shader. `mirror` was named above as "the one
+candidate that addresses both rejections at once" and as what a physical kaleidoscope does; it won
+on **neither** scene. It was the ADR's own new contribution to the roster, and building it was
+still the right call — that is what the A/B was for — but the argument for it did not survive
+contact with the picture.
+
+**"The falloff-disc remains the default" is false, and with it the "nothing moves on adoption"
+consequence.** The A/B chose **`tile` as the default**, deliberately not value `0`: keeping
+`0 = falloff` preserves the "0 is what ADR-0047 shipped" association that preset comments and the
+shader's own history carry, and the resting behaviour is then a *different* member of the roster.
+So a preset binding no `kaleido_edge` now **fills its frame** instead of cropping to a disc, and
+every fold-bearing baseline moved once, by hand, with the cost stated before the choice was taken
+rather than discovered after.
+
+**`squash` is not the identity below `r_max`.** The Decision table and Plan 0055's own prose both
+described `mirror` and `squash` as leaving the disc interior untouched. That is true of `mirror`
+alone (now deleted). `tanh(m) < m` for **every** `m > 0`, so `squash` compresses the *whole*
+interior, 1:1 only in the limit at the fold axis. It is a real cost — it is why a preset picks
+between `squash` and `tile` by eye — and it was invisible until the map was asserted on. The
+guarantee that actually matters, that `squash` never reconstructs a coordinate outside the source,
+is unaffected and is now asserted arithmetically.
+
+**A property assertion on `squash` has to stop at `m = 4`.** Strict monotonicity is asserted up to
+4 — comfortably past both ratios a real frame presents, 2.04 at 16:9 and 2.28 at portrait — and
+only *non-decreasing* beyond it, because past `m ≈ 7.6` consecutive `tanh` steps land within one
+f32 ulp and "asymptotic" stops being distinguishable from "constant" in the type. Asserting strict
+growth out there would assert a property of `f32` rather than of the map (ADR-0071).
+
+**Two predictions held.** The bind-layout change went in the predicted direction and further:
+`kaleido-bind-layout` is now `[Uniform, Texture, Sampler, Sampler]`, which **removes** its
+collision with `ink-bind-layout` rather than creating a new one — the table in
+[0058](0058-bind-group-layout-collisions-carry-evidence.md) is updated accordingly. And the disc
+guard was re-scoped to `the_falloff_treatment_paints_nothing_outside_its_disc` and **verified still
+non-vacuous** rather than assumed: against the pre-ADR-0047 shader it still fails with peak 199 and
+every one of 6052 out-of-disc pixels lit.
+
+**One re-bless that was predicted did not happen, for a reason worth keeping.**
+`composite_kaleido.png` is byte-identical under `tile` — measured, md5-identical, not assumed —
+because it is a centred figure over an **empty border**, and mirroring empty content outward yields
+empty content. That is now recorded in the fixture's header as a *property* of the fixture: it pins
+the fold's geometry and is structurally blind to the edge treatment, which is why
+`composite_kaleido_squash.png` exists to pin the radius map separately.
+
+**One done-when was met by a different instrument than the plan specified, deliberately.** Plan
+0055 Phase 3 asked each surviving fill treatment to carry an anti-smear property. Only `tile` has
+one, because only `tile` can *be* the smear: it is the sole treatment whose coordinate leaves
+`[0,1]`, and `squash` cannot reach an out-of-range coordinate at all (asserted arithmetically in
+`only_tile_lets_the_sample_radius_leave_the_disc`). The pixel statistic also cannot separate them —
+measured, `squash` reads 0.10 against a deliberately mis-wired `tile`'s 0.06, so a bound loose
+enough to pass `squash` would pass the defect. A guard that cannot fail is worse than a stated
+absence, and the absence is stated in the test file's section header.

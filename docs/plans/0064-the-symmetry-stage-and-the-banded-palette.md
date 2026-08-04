@@ -1,6 +1,6 @@
 # 0064 — The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, **after [Plan 0055](0055-the-fold-edge-becomes-a-choice.md)**.
+> **Status:** **approved 2026-08-04** — ready for `dev`, **after [Plan 0055](done/0055-the-fold-edge-becomes-a-choice.md)**.
 > Both live in `kaleidoscope.rs`; 0055 is smaller, older and branches on the *destination* radius,
 > which this plan's composed map does not touch, so taking it first costs nothing and taking it
 > second means rebasing onto a rewritten shader. Phases 1-3 are `dev` and run start-to-finish;
@@ -205,7 +205,7 @@ flowchart LR
 
 ## Risks & open questions
 
-- **[Plan 0055](0055-the-fold-edge-becomes-a-choice.md) is approved and lives in this shader.** One
+- **[Plan 0055](done/0055-the-fold-edge-becomes-a-choice.md) is approved and lives in this shader.** One
   of the two inherits the other's file. They touch different parts — 0055's `kaleido_edge` is a
   uniform branch on the **destination** radius, which the composed map does not touch — and 0055 is
   the smaller and older, so **taking 0055 first is the cheaper order**. Neither is wrong.

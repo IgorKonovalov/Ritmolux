@@ -82,7 +82,7 @@ Every new term defaults to the identity — `kaleido_radial = 1` (no repeat), `k
 
 ### Negative
 
-- **It collides with [Plan 0055](../plans/0055-the-fold-edge-becomes-a-choice.md), which is approved
+- **It collides with [Plan 0055](../plans/done/0055-the-fold-edge-becomes-a-choice.md), which is approved
   and lives in this shader.** One of the two inherits the other's file. This is a real sequencing
   cost and the mitigation is ordering, not cleverness: 0055 is small, already approved, and its
   `kaleido_edge` is a uniform branch on the *destination* radius, which the composed map does not

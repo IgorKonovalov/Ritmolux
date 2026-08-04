@@ -37,7 +37,7 @@ It asserts on the tonemap alone and **prints three collision groups it asserts n
 
 | shape | held by |
 |---|---|
-| `[Uniform, Texture, Sampler]` | `ink-bind-layout`, `kaleido-bind-layout` |
+| `[Uniform, Texture, Sampler]` | `ink-bind-layout`, ~~`kaleido-bind-layout`~~ (see below) |
 | `[Texture, Sampler]` | `attractor-present-layout`, `trails-present-bind-layout` |
 | `[Uniform]` | `background`, `disc`, `fragment-field-uniform`, `renderer.rs` (per-scene), `rd-init`, `swarm` |
 
@@ -45,6 +45,29 @@ The test's docstring calls these "older and deliberate". **Deliberate is a claim
 behind it** — and that is exactly the failure mode Phase 4b existed to retire, since the comment it
 replaced made the same kind of claim and was false: `attractor-decay` had held the tonemap's
 shipped shape all along.
+
+> **BOTH OF THE TABLE'S FIRST TWO GROUPS MOVED ON 2026-08-04, BEFORE THIS PLAN WAS BUILT.** Plans
+> [0052](../plans/done/0052-the-emitter-objects-that-spawn-fall-and-die.md) and
+> [0055](../plans/done/0055-the-fold-edge-becomes-a-choice.md) closed together and each changed a
+> layout this table records. The allowlist Plan 0053 Phase 1 writes must be derived from the code,
+> **not from the table above**:
+>
+> - **`kaleido-bind-layout` is now `[Uniform, Texture, Sampler, Sampler]`** — `tile`, which became
+>   the fold's default edge treatment, needs a `MirrorRepeat` sampler beside the existing
+>   `ClampToEdge` one ([ADR-0061](0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)). This
+>   **removes** the `[Uniform, Texture, Sampler]` collision with `ink-bind-layout` rather than adding
+>   one, which is the direction ADR-0061 predicted.
+> - **`emitter-bind-layout` is `[Uniform]` with `VERTEX_FRAGMENT` visibility and
+>   `min_binding_size = 16`, and is deliberately NOT a member of the plain `[Uniform]` group.**
+>   Plan 0052 predicted it would join that group. It was written that way first — byte-identical to
+>   `swarm`'s — and **that reproduced this ADR's own failure mode live**: on the local DX12 WARP
+>   build the *swarm* read the emitter's uniform, `golden` gave `swarm` mean 0.1803 with a max
+>   outlier of 175, and `sanity` returned different numbers run to run, while hardware rendered both
+>   correctly. Distinguishing the descriptor restored it to 0.0000. This is the **third** recorded
+>   instance of the mechanism and the **cheapest fix found so far** — a wider visibility mask and an
+>   explicit `min_binding_size`, both honest on their own terms. `core/src/render/scenes/emitter.rs`
+>   carries the evidence and says **do not "tidy" this back**; an allowlist that re-collides it
+>   would undo a fix, not record one.
 
 **One pair is live together on shipped content today.** `attractor_clifford.toml` and
 `attractor_leviathan.toml` bind `trails` on the attractor, which puts `attractor-present` and

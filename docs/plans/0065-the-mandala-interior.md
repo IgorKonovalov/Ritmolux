@@ -205,7 +205,7 @@ struct Ring {
   brightest. Phase 6 should watch `glow` and `thickness` together, not separately.
 - **Phase 3 is `human` and gates Phases 4-6**, so this plan does not close in one session by
   construction.
-- **[Plan 0055](0055-the-fold-edge-becomes-a-choice.md) and
+- **[Plan 0055](done/0055-the-fold-edge-becomes-a-choice.md) and
   [Plan 0064](0064-the-symmetry-stage-and-the-banded-palette.md) do not touch this file at all** —
   this plan is line-geometry work and shares nothing with the post chain. It can run in parallel with
   either.

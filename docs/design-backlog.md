@@ -2025,7 +2025,7 @@ structure. Nobody should build that until a real preset is worse off.
 - **Verified against code:** yes — `kaleidoscope.rs` clamps the sample radius to `r_max` and fades
   over `FALLOFF_BAND = 0.35`; nothing outside `1.35 r_max` is painted by the stage at any setting.
 - **PROMOTED 2026-08-02 → [ADR-0061](adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)
-  + [Plan 0055](plans/0055-the-fold-edge-becomes-a-choice.md)** — the supplement takes the shape this
+  + [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md)** — the supplement takes the shape this
   entry argued for and one step further: rather than picking a better single treatment, **what
   happens outside the disc becomes a per-preset choice** (`kaleido_edge`), because the entry's own
   evidence is that a field and a figure want different answers. Five candidates ship behind one
@@ -2040,7 +2040,7 @@ structure. Nobody should build that until a real preset is worse off.
   which *reflects* the radius instead of clamping it, so past the disc the frame is a mirrored
   continuation of its interior — no ray (the content is real) and no crop (the corners are filled),
   which is what a physical kaleidoscope does. Notes retained below as the origin record.
-- **CLOSED 2026-08-04 — [Plan 0055](plans/0055-the-fold-edge-becomes-a-choice.md) shipped it, and
+- **CLOSED 2026-08-04 — [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md) shipped it, and
   the live A/B settled the roster.** `kaleido_edge` is a bindable stepped param selecting one of
   three treatments inside one pipeline: `falloff` (0, ADR-0047's fade), `tile` (1) and `squash` (2).
   **`tile` is the default**, so this entry's second rejection — the disc cropping a field scene — is
@@ -2679,7 +2679,7 @@ than the scenes around it.
 
 - **Raised:** 2026-08-03, from `preset-author`, after the user saw them on `attractor_leviathan`
   with the fold pinned on.
-- **This is NOT a new design.** [Plan 0055](plans/0055-the-fold-edge-becomes-a-choice.md) /
+- **This is NOT a new design.** [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md) /
   [ADR-0061](adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md) already design exactly
   what the user asked for — "remove them and make it an optional parameter" is that plan's
   `kaleido_edge` selector, verbatim. This entry exists to carry **three facts into its Phase 2**,
@@ -3189,7 +3189,7 @@ the *next* author rather than on these two.
 
 ## 0058 — thirteen presets bind the fold and eleven of them have not chosen an edge treatment, because until now there was nothing to choose
 
-- **Raised:** 2026-08-04, at [Plan 0055](plans/0055-the-fold-edge-becomes-a-choice.md) Phase 4. Not
+- **Raised:** 2026-08-04, at [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md) Phase 4. Not
   a gap the content lane found — a gap the engine lane *created* on purpose and is handing over.
 - **Verified against code:** yes. `grep -l kaleido_order presets/*.toml` returns thirteen files, and
   `grep -l '^kaleido_edge' presets/*.toml` returns two of them, so eleven ride the default. Anchor
