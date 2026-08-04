@@ -119,11 +119,27 @@ palette_mix = "select(tempo > 124, 0.55, 0.05) + clamp(bass * 0.176, 0, 0.15)"
 
 # VIEW - the fast personality pushes in and pumps per beat; the slow one sits
 # back and breathes on the bar.
-# THE FRAMING IS A CAP, NOT A TASTE. The butterfly fills the frame edge to edge
-# at zoom ~1.55 and starts losing its wingtips past ~1.85, so the peak here is
-# held at 1.58 + 0.08 + 0.12 = 1.78. The old numbers (1.85 base, +0.50 of
-# reactive travel) were set against the doubled figure, which was half the size
-# it looks; on the real one they cropped the wings off on every loud passage.
+# THE FRAMING IS A CAP, NOT A TASTE, AND `perspective` MOVED THE CAP HARD.
+# The pre-0063 numbers (base 1.32/1.40, peaking 1.78) were correct for an
+# ORTHOGRAPHIC figure and are wrong for this one - not because perspective makes
+# the figure bigger, which is the small half of the effect, but because it makes
+# the figure SWING. See the depth block below for the measurement; the short
+# version is that the near side is magnified, so as the butterfly turns its
+# screen centroid orbits, and the frame has to hold the figure at every phase of
+# that orbit rather than at its widest pose.
+#
+# MEASURED at the loud frame across five spin phases, 800 px square. At the old
+# base with perspective live the figure ran off an edge at EVERY phase. At 1.16
+# the lit span runs 440..718 px depending on phase - and that 1.6x range is the
+# ORBIT plus the butterfly turning edge-on, not the figure changing size, which
+# is the whole reason a single zoom number cannot fix it.
+#
+# At the synthetic maximum (bass and bar both pinned at 1, which no music
+# sustains) the outermost trail ring still reaches the frame edge at the face-on
+# phase. That is what this preset did before Plan 0063 as well - the header above
+# says it fills the frame edge to edge - and the lobes themselves stay inside at
+# every phase. The base is fitted so the FIGURE is framed, not so the last faint
+# ring of trail is.
 # THE OFF-CENTRE PAN WENT WITH THE DOUBLED FIGURE TOO. `pan_x` sat at -0.16 and
 # `pan_y` swung a clean +/-0.06: against a figure that was its own mirror, both
 # were free, because whatever left one side arrived on the other. Against one
@@ -131,9 +147,80 @@ palette_mix = "select(tempo > 124, 0.55, 0.05) + clamp(bass * 0.176, 0, 0.15)"
 # empty, and a positive `pan_y` lifts the wingtips off the top. Centred in x,
 # biased slightly down in y so the widest row - the wing tips, which the
 # particle buffer puts at high `z` and so near the TOP - keeps its margin.
-zoom  = "select(tempo > 124, 1.40, 1.32) + bar * 0.08 + clamp(bass * 0.14, 0, 0.12)"
+# The base is down 0.33 from the pre-0063 value for the reason above.
+zoom  = "select(tempo > 124, 1.24, 1.16) + bar * 0.06 + clamp(bass * 0.082, 0, 0.07)"
 pan_x = "sin(time * 0.039) * 0.08"
 pan_y = "-0.05 + cos(time * 0.028) * 0.05"
+
+# DEPTH (Plan 0063 / ADR-0076) - the butterfly stops being a silhouette.
+#
+# `perspective` IS THE CUE AND THE OTHER TWO ARE REINFORCEMENT. Rendered side by
+# side at this density: with the haze and the tint on but perspective at 0, the
+# figure is exactly as flat as it ever was - both wings the same size, the whole
+# thing a symmetric bowtie, and the haze reading as an uneven exposure rather
+# than as distance. Turn perspective on alone and the near wing opens while the
+# far one compresses, and it reads as a solid at an angle immediately. Nothing
+# else in this block substitutes for it.
+#
+# THE RANGE IS 0.20..0.28 AND THE 0.80 CLAMP IS NOT WHAT BOUNDS IT. Two things
+# were measured here and the second is the one that set this number.
+#
+# The clamp is not where the projection breaks. It is a true perspective divide,
+# so straight lines stay straight; at 0.8 the butterfly reads as a strong wide
+# angle, not as a fisheye. Optically there is plenty of room.
+#
+# WHAT BOUNDS IT IS THE CENTROID ORBIT. The near side is magnified, so the
+# figure's screen centre shifts toward whichever side is currently near - and as
+# the spin turns, that shift ORBITS. Measured peak-to-peak over four phases on
+# the bare figure:
+#
+#     perspective   centre swing      widest span
+#     0.00          0.04 NDC          522 px
+#     0.15          0.11 NDC          525 px
+#     0.25          0.20 NDC          529 px
+#     0.40          0.37 NDC          542 px
+#     0.60          0.55 NDC          555 px
+#
+# The swing is about 0.9 x perspective in NDC and the size growth over the same
+# sweep is 6%. So the documented "perspective fights zoom, recover the framing
+# with a zoom edit" is the SMALL half of the story and the advice does not work
+# for the large half: a zoom cannot recover a translation that varies with the
+# spin phase, it can only shrink the figure until the swing fits. Past ~0.3 the
+# butterfly visibly slides around the frame instead of turning in place, which
+# is a worse artifact than the flatness it was bought to fix.
+perspective = "0.20 + clamp(bass * 0.094, 0, 0.08)"
+# THE HAZE IS THE OCCLUSION THIS SCENE DOES NOT DO. Nothing hides anything here -
+# two strands crossing simply sum - so the far wing is held down until it stops
+# competing with the near one. Rides `mid` so the body of the mix opens the
+# depth rather than the transients.
+depth_fade  = "0.55 + clamp(mid * 0.176, 0, 0.15)"
+# SMALL, AND NOT FOR THE REASON THE PARAMETER NAME SUGGESTS. This preset's ramp
+# runs night-blue -> teal -> mint -> solar-white, which is a LIGHTNESS ramp, so
+# shifting the palette coordinate with depth does not read as a hue cue here -
+# it reads as a second contrast lever pointing the same way as the fade. Proved
+# by rendering the identical figure against a constant-lightness hue-travel ramp,
+# where the same 0.4 puts a clear cool cyan on the far wing and warm gold on the
+# near one. Kept small and deliberately aligned with the fade: far material sinks
+# into the night-blue, near material climbs toward the mint.
+#
+# IT ALSO CANNOT GO MUCH HIGHER HERE. The offset is +/- depth_hue/2 on a
+# coordinate the LUT sampler REPEATS, and `hue_center` above sits as low as 0.13,
+# so a large value would send the far end negative, wrap it back to the top of
+# the ramp, and land the far material on the same bright mint as the near.
+depth_hue   = "0.12"
+# SPIN IS BOUNDED BY THE TRAIL, NOT BY TASTE. `fade` here holds ~10-15 frames,
+# and a frame of trail drawn while the figure turns is a frame of ROTATIONAL
+# SMEAR - so past a point the accumulation stops being a trace and becomes a set
+# of concentric arcs, which destroys exactly the volume `perspective` just
+# bought. Rendered at this fade the ladder 1 / 2 / 3 / 5 / 8 goes crisp, crisp,
+# softening, smeared, scribble. The peak here is 1.8.
+#
+# Bound wide it reads as TUMBLING rather than as being driven: a 1..6 range on
+# `bass` through real audio swings the figure through most of a revolution
+# between transients and the depth reading never settles. The integration means
+# it accelerates rather than snapping - that part is free - but the range has to
+# stay narrow enough that the eye keeps hold of the figure.
+spin        = "1.0 + clamp(bass * 0.94, 0, 0.80)"
 
 # COMPOSITE - a cold backdrop that warms with the mix, and a four-fold screen
 # fold that only engages on the fast personality WITH real energy behind it.
@@ -168,6 +255,15 @@ size          = { attack = 0.03, release = 0.30 }
 hue_spread    = 1.2
 palette_mix   = 1.5
 zoom          = 1.0
+# The depth levers all ease. `perspective` and `spin` are the two that must:
+# an unsmoothed perspective pumps the figure's size on every bass frame (it
+# scales the projection, so it moves the framing), and an unsmoothed spin steps
+# the angular RATE, which the integrator turns into a visible kink in the turn.
+# `depth_fade` is slower still - it is an exposure on half the figure, and the
+# eye reads a fast change in it as flicker rather than as distance.
+perspective   = 0.7
+depth_fade    = 1.1
+spin          = 0.8
 kaleido_order = 1.5
 hue_center    = 0.40
 bg_bright     = 0.4

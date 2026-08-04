@@ -105,9 +105,61 @@ hue_spread = "0.08"
 hue_center = "0.50"
 
 # VIEW - a slow turn so the lattice reads in depth; the page stays still.
-zoom  = "1.14 + bar * 0.08 + clamp(bass * 0.188, 0, 0.16)"
+# THE BASE DROPPED 0.18 TO PAY FOR `perspective` BELOW, and the reactive travel
+# is halved with it, because the two used to compound: `zoom` and `perspective`
+# both rise on bass and both enlarge the figure.
+#
+# What actually forces the cut is not the enlargement - see the depth block for
+# the measurement - it is that perspective makes the figure's screen centroid
+# ORBIT as it turns, so the frame must hold it at every phase rather than at its
+# widest pose. Rendered at the old 1.14 with perspective 0.55, the near loop ran
+# off the top-right and the left edge at once. MEASURED at the loud frame over
+# five phases at 800 px square, the lit span now runs 508..657 px of 800 - the
+# spread between phases is the orbit, and the knot is inside the frame at all of
+# them. As on the butterfly, the faintest strokes still reach the edge at the
+# synthetic maximum; the base is fitted to frame the drawing, not its lightest
+# hairline.
+zoom  = "1.02 + bar * 0.06 + clamp(bass * 0.118, 0, 0.10)"
 pan_x = "sin(time * 0.027) * 0.05"
 pan_y = "cos(time * 0.021) * 0.04"
+
+# DEPTH (Plan 0063 / ADR-0076) - the lattice becomes a knot you can read.
+#
+# `perspective` gives the loops a near and a far side, which is what a
+# cyclically-symmetric flow most needs: every strand of this figure crosses
+# every other one, and until now nothing said which crossing was in front.
+# Held to 0.18..0.24 - a shade under the butterfly's - for the framing reason
+# above, not because the cue is weaker here. The bound on both is the centroid
+# orbit rather than the 0.80 clamp: the swing runs about 0.9 x perspective in
+# NDC while the figure's own size grows only ~6% across the whole legal range,
+# so past ~0.3 a figure slides around the frame instead of turning in place.
+# Thomas is the tighter of the two because its knot already fills more of the
+# frame than the butterfly's silhouette does.
+perspective = "0.18 + clamp(bass * 0.071, 0, 0.06)"
+# THE HAZE IS THE ONE THAT PAYS OFF UNUSUALLY WELL ON THIS PRESET, and it is
+# worth saying why. The ink remap keys on LUMINANCE, so a far stroke that the
+# haze holds down does not merely dim - it falls further up the ink ramp and is
+# drawn in LIGHTER ink. That is aerial perspective as a pen-and-ink draughtsman
+# would do it: near strokes dark and firm, far ones faint. Nothing else in this
+# file turns a scene parameter into a drawing technique.
+depth_fade  = "0.50 + clamp(mid * 0.235, 0, 0.20)"
+#
+# `depth_hue` IS DELIBERATELY UNBOUND, AND IT IS THE SAME TRAP `saturation` FELL
+# INTO ON THIS FILE (see the `a` binding's comment). `ink_amount = "1"` collapses
+# the frame to two tones and the remap discards hue outright, so a depth TINT is
+# exactly the cue an ink preset cannot show. It is not quite inert - this palette
+# is `mono`, so shifting the coordinate moves lightness and the remap does see
+# that - but MEASURED at depth_hue = 0.4 it moves 42% of pixels by a mean of
+# 2/255 and a max of 42, which is a rounding error against what `depth_fade`
+# above does deliberately. Binding it would be a knob that looks live in the
+# roster and does nothing you can see. Left off; the finding is in the backlog.
+#
+# SPIN IS BOUNDED BY THE TRAIL and this preset has the longest one in the family.
+# `fade = 0.955` holds ~22 frames, so the figure smears into concentric arcs at a
+# LOWER rate than the butterfly does - the ceiling here is about 1.3 against its
+# 1.9. The push is correspondingly small; this is the slow attractor and it
+# should read as turning, not as being spun.
+spin        = "1.00 + clamp(bass * 0.35, 0, 0.30)"
 
 # THE DUOTONE - pale sea-green page, deep indigo ink. `ink_amount` rests at the
 # pole and never travels: a partial amount greys the page (see the header).
@@ -130,3 +182,10 @@ fade       = 0.22
 size       = { attack = 0.03, release = 0.30 }
 zoom       = 0.18
 saturation = 0.30
+# Slower than the butterfly's on both counts. The ink ramp turns a small
+# luminance change into a visible change of ink density, so an unsmoothed
+# `depth_fade` reads as the far half of the drawing flickering between two
+# weights - the same reason `a` here eases slower than the rest of the family.
+perspective = 0.9
+depth_fade  = 1.4
+spin        = 1.0
