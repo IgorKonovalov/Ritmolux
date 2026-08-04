@@ -1,0 +1,83 @@
+# Barnsley's fern - the engine's first iterated function system (ADR-0075,
+# Plan 0062). The same GPU chaos game the strange attractors run, with a
+# different step: four affine maps, one drawn at random per particle per step,
+# converging onto a figure rather than onto a filigree.
+#
+# WHAT IS DIFFERENT ABOUT AUTHORING THIS FAMILY. The `a` `b` `c` `d`
+# coefficients that steer De Jong and Clifford are INERT here - an IFS's shape
+# lives in its affine table, not in four scalars. The levers that reach the
+# figure (`morph`, `curl`, `vigor`, `lean`, `bias`) arrive in Plan 0062's later
+# phases; until then this preset drives the shared look surface only, which is
+# also the honest way to judge whether the figure itself is right.
+#
+# THE FIGURE IS FRAGILE IN ONE DIRECTION ONLY. It cannot diverge - the family is
+# built so a preset cannot reach a non-contractive table (ADR-0075) - but it CAN
+# be washed out, because a fern is mostly empty space and the trail field
+# accumulates. So `fade` and `size` sit low and FALL as the track hits, the same
+# inversion the De Jong preset shipped: peak buys structure, not brightness.
+system = "attractor"
+name = "Barnsley Fern"
+
+[particles]
+family = "fern"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#03140a" },
+  { at = 0.30, color = "#0d5c2c" },
+  { at = 0.62, color = "#4fbf4a" },
+  { at = 0.85, color = "#c8e86a" },
+  { at = 1.00, color = "#fff3c4" },
+]
+
+[palette_b]
+name = "ember"
+
+[params]
+# GLOW - the fronds are thin, so the figure is authored under the tonemap knee
+# and only the stem and the densest leaflet crossings bloom.
+bloom_amount    = "1.2"
+bloom_threshold = "0.92"
+bloom_radius    = "1.1"
+
+# DENSITY - low base, falling on energy. A fern's leaflets are separated by
+# roughly a point-width at this scale; raising `size` on a peak fuses them into
+# a green blob, which is the one way this figure reads as a mistake.
+fade = "0.86 - clamp(bass * 0.075, 0, 0.06) - beat * 0.025"
+size = "0.40 - clamp((bass + mid) * 0.070, 0, 0.11) + beat * 0.05"
+# A beat shakes the plant and it heals: the reseed kick is re-contracted at
+# 0.742 per step, so the disturbance is gone in ~10 steps (0.17 s). That is a
+# designed response rather than a tuned one - see ADR-0075.
+reseed = "onset > 0.30"
+
+# COLOUR - a narrow green band that warms toward the ember palette as the top
+# end opens, so the plant reads as lit rather than as tinted.
+hue_spread  = "0.16 + clamp(mid * 0.30, 0, 0.26)"
+hue_center  = "0.30 + sin(time * 0.039) * 0.10 + clamp(bass * 0.24, 0, 0.20)"
+saturation  = "1.15 + clamp(treb * 0.50, 0, 0.30)"
+palette_mix = "0.10 + sin(time * 0.023) * 0.10 + clamp(treb * 0.26, 0, 0.22)"
+
+# VIEW - a slow breathing push-in and a lazy sway. The fern is upright and
+# static in a way a strange attractor is not, so the view is what keeps it from
+# reading as a still image between beats.
+zoom  = "1.02 + bar * 0.07 + clamp(bass * 0.20, 0, 0.18)"
+pan_x = "sin(time * 0.047) * 0.05"
+pan_y = "cos(time * 0.031) * 0.04"
+# The in-plane spin reaches the 2-D families too (ADR-0076), and a fern that
+# rocks a couple of degrees either side of upright reads as wind. Held well
+# under a full turn: this plant is meant to sway, not to tumble.
+spin = "sin(time * 0.11) * 0.30"
+
+# COMPOSITE - a dim forest-floor atmosphere under the figure.
+bg_hue      = "0.36 + sin(time * 0.019) * 0.04"
+bg_bright   = "0.010 + clamp(mid * 0.026, 0, 0.022)"
+bg_vignette = "0.85"
+
+[smoothing]
+fade        = 0.18
+size        = { attack = 0.02, release = 0.24 }
+zoom        = 0.14
+spin        = 0.30
+hue_center  = 0.35
+palette_mix = 0.5
+bg_bright   = 0.4

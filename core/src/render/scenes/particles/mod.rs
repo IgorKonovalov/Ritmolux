@@ -52,7 +52,11 @@
     clippy::unreachable
 )]
 
+pub mod ifs;
+
 use crate::render::gpu;
+
+use ifs::{IfsFigure, IfsPacked};
 
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
@@ -115,6 +119,23 @@ const FIXED_STEP: f32 = 1.0 / 60.0;
 /// reaction-diffusion scene does). One step per frame is the norm at 60 fps.
 const MAX_SUBSTEPS: u32 = 6;
 
+/// Dynamically-offset slots in the step uniform buffer: one per possible
+/// sub-step, plus the jitter dispatch's.
+///
+/// **One slot per sub-step and not one slot reused**, because the IFS's map
+/// choice reads a per-step counter off this uniform (ADR-0075). A frame encodes
+/// its `pending_steps` dispatches into one command buffer, and a
+/// `queue.write_buffer` between two `encoder` calls does not interleave with them
+/// — it lands before the whole submission — so a single slot would hand every
+/// sub-step of a stalled frame the *same* step index, and a particle would apply
+/// the same map two or three times running. Harmless for the four map families,
+/// which do not read it; a quality loss precisely when the frame budget is
+/// already blown. Only `pending_steps` slots are written per frame, so the
+/// steady-state 60 fps cost is the one write it always was.
+const STEP_SLOTS: u32 = MAX_SUBSTEPS + 1;
+/// The jitter dispatch's slot — one past the sub-step slots.
+const JITTER_SLOT: u32 = MAX_SUBSTEPS;
+
 /// Which strange-attractor map the compute step iterates. Selected data-driven
 /// via the optional `[particles]` config table (ADR-0007 `configure` hook); the
 /// default is De Jong. Extend as follow-up plans add maps; unknown names are
@@ -129,18 +150,39 @@ pub enum AttractorFamily {
     Thomas,
     /// Lorenz — the 3D convection flow (the butterfly), projected to 2D.
     Lorenz,
+    /// An iterated function system (ADR-0075) — **not** a strange attractor: four
+    /// affine maps, one drawn at random per particle per step. The figure it
+    /// converges onto is the carried [`IfsFigure`]; see [`ifs`] for why the
+    /// parameterization is the interesting half.
+    Ifs(IfsFigure),
 }
 
 impl AttractorFamily {
     /// Parse a `[particles] family` name, or `None` if unknown.
+    ///
+    /// The IFS figures sit in the **same** namespace as the map families rather
+    /// than behind a `family = "ifs"` + `figure = "fern"` pair: a preset picks
+    /// one figure, the way it picks one map today, and `morph_to` names the other
+    /// end out of the identical vocabulary.
     pub fn from_name(name: &str) -> Option<Self> {
         Some(match name {
             "de_jong" => AttractorFamily::DeJong,
             "clifford" => AttractorFamily::Clifford,
             "thomas" => AttractorFamily::Thomas,
             "lorenz" => AttractorFamily::Lorenz,
-            _ => return None,
+            _ => AttractorFamily::Ifs(IfsFigure::from_name(name)?),
         })
+    }
+
+    /// The IFS figure this family draws, or `None` for the four map families.
+    ///
+    /// The `if let` every IFS-only code path funnels through, so "is this an
+    /// IFS" is asked in one spelling.
+    fn figure(self) -> Option<IfsFigure> {
+        match self {
+            AttractorFamily::Ifs(figure) => Some(figure),
+            _ => None,
+        }
     }
 
     /// The compute shader's family selector.
@@ -150,6 +192,9 @@ impl AttractorFamily {
             AttractorFamily::Clifford => 1,
             AttractorFamily::Thomas => 2,
             AttractorFamily::Lorenz => 3,
+            // Every figure is the same shader arm — the figure is data in the
+            // uniform's affine table, not a branch.
+            AttractorFamily::Ifs(_) => 4,
         }
     }
 
@@ -162,18 +207,32 @@ impl AttractorFamily {
             AttractorFamily::Clifford => [-1.4, 1.6, 1.0, 0.7],
             AttractorFamily::Thomas => [0.19, 0.0, 0.0, 0.0],
             AttractorFamily::Lorenz => [10.0, 28.0, 2.6667, 0.0],
+            // An IFS's shape lives in its affine table, not in four scalars, so
+            // `a`..`d` are inert here — the family's own levers are Phase 5's.
+            AttractorFamily::Ifs(_) => [0.0, 0.0, 0.0, 0.0],
         }
     }
 
-    /// Projection: (world scale, dim 2/3, z-centre to subtract). The scale fits
-    /// each attractor's native extent into the frame; 3D flows subtract a z-centre
-    /// so the spin pivots on the body.
-    fn projection(self) -> (f32, f32, f32) {
+    /// Projection: (world scale, dim 2/3, **world centre** to subtract). The
+    /// scale fits each attractor's native extent into the frame; the centre is
+    /// what the projection pivots and frames on.
+    ///
+    /// **The centre is three components, not a z-centre** (Plan 0062). It was
+    /// scalar while every family that needed one was a 3D flow centred on the
+    /// origin in `x` and `y`; the fern spans `y ∈ [0, 10]` and is not
+    /// origin-centred, so a 2D family needs the other two. The four map families
+    /// pass exactly the values they passed before — `[0,0,0]` and `[0,0,25]` —
+    /// and subtracting a zero is exact, so no capture moves.
+    fn projection(self) -> (f32, f32, [f32; 3]) {
         match self {
-            AttractorFamily::DeJong => (0.42, 2.0, 0.0),
-            AttractorFamily::Clifford => (0.42, 2.0, 0.0),
-            AttractorFamily::Thomas => (0.14, 3.0, 0.0),
-            AttractorFamily::Lorenz => (0.022, 3.0, 25.0),
+            AttractorFamily::DeJong => (0.42, 2.0, [0.0, 0.0, 0.0]),
+            AttractorFamily::Clifford => (0.42, 2.0, [0.0, 0.0, 0.0]),
+            AttractorFamily::Thomas => (0.14, 3.0, [0.0, 0.0, 0.0]),
+            AttractorFamily::Lorenz => (0.022, 3.0, [0.0, 0.0, 25.0]),
+            AttractorFamily::Ifs(figure) => {
+                let (scale, centre) = figure.frame();
+                (scale, 2.0, centre)
+            }
         }
     }
 
@@ -192,9 +251,12 @@ impl AttractorFamily {
     /// the default and is never consulted.
     fn basis(self) -> Basis {
         match self {
-            AttractorFamily::DeJong | AttractorFamily::Clifford | AttractorFamily::Thomas => {
-                Basis::XY
-            }
+            AttractorFamily::DeJong
+            | AttractorFamily::Clifford
+            | AttractorFamily::Thomas
+            // The IFS family is `dim = 2` and takes the default. A 3-D IFS is a
+            // real thing and a separate decision (ADR-0075).
+            | AttractorFamily::Ifs(_) => Basis::XY,
             // The butterfly lives in x–z. Seen x–y it is the two lobes edge-on —
             // a hard X, which is the "dense core inside a diffuse cloud" this
             // preset shipped as (ADR-0068).
@@ -220,7 +282,11 @@ impl AttractorFamily {
     /// geometry, drawn brightly.
     fn is_continuous(self) -> bool {
         match self {
-            AttractorFamily::DeJong | AttractorFamily::Clifford => false,
+            // An IFS is the extreme case of the discrete argument below: a
+            // particle applies a *randomly chosen* map each step, so successive
+            // points jump right across the figure and a segment between them is
+            // a bright chord over the whole fern.
+            AttractorFamily::DeJong | AttractorFamily::Clifford | AttractorFamily::Ifs(_) => false,
             AttractorFamily::Thomas | AttractorFamily::Lorenz => true,
         }
     }
@@ -243,6 +309,9 @@ impl AttractorFamily {
             }
             AttractorFamily::Thomas => ([4.5, 4.5, 4.5], [0.0, 0.0, 0.0]),
             AttractorFamily::Lorenz => ([20.0, 26.0, 24.0], [0.0, 0.0, 25.0]),
+            // The figure's own bounding box, so the fill lands *over* the
+            // attractor and contracts onto it — see [`IfsFigure::seed_box`].
+            AttractorFamily::Ifs(figure) => figure.seed_box(),
         }
     }
 
@@ -299,7 +368,11 @@ impl AttractorFamily {
         // Destructured rather than indexed: this file denies `indexing_slicing`.
         let ([sx, sy, sz], _) = self.seed_box();
         let half = match self {
-            AttractorFamily::DeJong | AttractorFamily::Clifford => return 0.0,
+            // Every IFS figure is `dim = 2` — it has no third coordinate to
+            // project, which is exactly the case this doc comment anticipated.
+            AttractorFamily::DeJong | AttractorFamily::Clifford | AttractorFamily::Ifs(_) => {
+                return 0.0;
+            }
             AttractorFamily::Thomas | AttractorFamily::Lorenz => {
                 // Read off `basis()` rather than restated per family, so the two
                 // cannot disagree about which plane the spin turns in.
@@ -450,7 +523,10 @@ const JITTER_FRACTION: f32 = 0.06;
 /// The compute shader's family selector value meaning **jitter, do not step**.
 /// One past the real families, so adding a family is still a matter of extending
 /// [`AttractorFamily`] and its `shader_id`.
-const JITTER_MODE: u32 = 4;
+///
+/// Moved from 4 to 5 by Plan 0062's IFS family, which is what this comment
+/// anticipated a fifth family would do.
+const JITTER_MODE: u32 = 5;
 
 /// Per-particle weight of the additive deposit, so the **total** light laid into
 /// the accumulation each frame is invariant to the particle count (ADR-0065).
@@ -560,12 +636,36 @@ struct Particle {
 
 struct Step {
     coeffs: vec4<f32>, // discrete: a,b,c,d; Lorenz: sigma,rho,beta; Thomas: b
-                       //   family 4 (jitter): xyz half-extent of the kick,
+                       //   family 5 (jitter): xyz half-extent of the kick,
                        //   w != 0 draws the kick as a streak (ADR-0069)
     dt: f32,           // fixed sub-step seconds (for continuous families)
-    family: u32,       // 0 De Jong, 1 Clifford, 2 Thomas, 3 Lorenz, 4 jitter
+    family: u32,       // 0 De Jong, 1 Clifford, 2 Thomas, 3 Lorenz, 4 IFS, 5 jitter
     count: u32,        // active particle count
     salt: u32,         // jitter only: which reseed this is
+    // Monotonic fixed-step counter, incremented once per compute step (ADR-0075).
+    // The IFS's map choice is drawn from it and the particle's own fixed seed, so
+    // the draw stays a pure function of the seed and the step sequence — and the
+    // step sequence is a pure function of accumulated injected dt, which captures
+    // pin at 1/60 s. Zero and unread on every other family.
+    step_index: u32,
+    // The vec4 alignment the affine table below requires. THREE SCALARS, not a
+    // `vec3<u32>`: a WGSL vec3 aligns to 16, which would push the table to offset
+    // 64 and the struct to 176 while the Rust side laid it out at 48 and 160.
+    _pad0: u32,
+    _pad1: u32,
+    _pad2: u32,
+    // The IFS's resolved affine table (family 4), CPU-side output of
+    // `ifs::resolve`. Four linear parts (a,b,c,d), four (e,f) translations packed
+    // two per row, and the cumulative probabilities a unit draw is compared
+    // against. Four named rows rather than an array: the map choice is an
+    // unrolled branch, for the reason `Basis::masks` uses one-hot selectors.
+    m0: vec4<f32>,
+    m1: vec4<f32>,
+    m2: vec4<f32>,
+    m3: vec4<f32>,
+    t01: vec4<f32>,
+    t23: vec4<f32>,
+    cumulative_p: vec4<f32>,
 }
 @group(0) @binding(1) var<uniform> step: Step;
 
@@ -599,6 +699,13 @@ fn unit(h: u32) -> f32 {
     return f32(h >> 8u) / 16777216.0 * 2.0 - 1.0;
 }
 
+// The same 24 bits as an UNSIGNED fraction in [0, 1) — the IFS's map draw, which
+// is compared against a cumulative probability table. It cannot reach 1.0, and
+// the fourth map is the `else` arm regardless, so no draw lands nowhere.
+fn unit01(h: u32) -> f32 {
+    return f32(h >> 8u) / 16777216.0;
+}
+
 // Unrolled rather than looped over a dynamically-indexed vector: WGSL permits
 // that only for addressable storage and the backends disagree about the rest, so
 // three named rounds is the portable spelling.
@@ -626,7 +733,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     // when someone reorders the writes.
     let origin = p;
 
-    if (step.family == 4u) {
+    if (step.family == 5u) {
         // A reseed: disturb the cloud where it is, rather than replacing it with
         // a uniform fill of the seed box (ADR-0066). The points stay on the
         // attractor, so no axis-aligned rectangle exists at any moment, and the
@@ -650,6 +757,29 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     } else if (step.family == 1u) {
         // Clifford: x' = sin(a*y) + c*cos(a*x), y' = sin(b*x) + d*cos(b*y).
         p = vec3<f32>(sin(a * p.y) + c * cos(a * p.x), sin(b * p.x) + d * cos(b * p.y), 0.0);
+    } else if (step.family == 4u) {
+        // Iterated function system (ADR-0075): draw one of four affine maps and
+        // apply it. The draw is salted by the step counter rather than by the
+        // reseed counter, so a particle picks a different map each step while
+        // staying a pure function of its own fixed seed and the step index.
+        let r = unit01(mix32(bitcast<u32>(particles[i].seed) ^ (step.step_index * 0x9E3779B9u)));
+        // Unrolled rather than a dynamically-indexed uniform array — WGSL permits
+        // that only for addressable storage and the backends disagree about the
+        // rest, the same reason `hash3` above is three named rounds.
+        var m = step.m3;
+        var t = step.t23.zw;
+        if (r < step.cumulative_p.x) {
+            m = step.m0;
+            t = step.t01.xy;
+        } else if (r < step.cumulative_p.y) {
+            m = step.m1;
+            t = step.t01.zw;
+        } else if (r < step.cumulative_p.z) {
+            m = step.m2;
+            t = step.t23.xy;
+        }
+        // x' = a*x + b*y + e,  y' = c*x + d*y + f. Two dimensional: z stays 0.
+        p = vec3<f32>(m.x * p.x + m.y * p.y + t.x, m.z * p.x + m.w * p.y + t.y, 0.0);
     } else if (step.family == 2u) {
         // Thomas cyclically-symmetric flow (b = dissipation). Lively speed-up so
         // the slow flow visibly moves each frame.
@@ -688,7 +818,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 const DRAW_SHADER: &str = r#"
 struct Draw {
     // v: x aspect, y point half-size (world), z hue offset, w spin (radians)
-    // w: x world scale, y dim (2 or 3), z z-center to subtract (3D),
+    // w: x world scale, y dim (2 or 3), z unused (was the z-center; Plan 0062
+    //    made the centre three components and moved it to `ctr`),
     //    w deposit scale (ADR-0065: FLOOR_PARTICLES / active_count)
     // u: x hue_spread, y hue_center, z palette_mix, w saturation
     // x: x zoom, yz pan (view transform, ADR-0018), w streak (ADR-0069:
@@ -698,6 +829,9 @@ struct Draw {
     // d: x perspective, y depth_fade, z depth_hue, w the family's INVERSE depth
     //    half-extent (ADR-0076) - exactly 0 for a 2D family, which is what
     //    collapses every depth cue below to the identity with no branch
+    // ctr: xyz the world centre subtracted before projection, w unused. The four
+    //    map families pass [0,0,0] or [0,0,25] - exactly what they passed when
+    //    this was the scalar `w.z` - and subtracting a zero is exact.
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
@@ -705,6 +839,7 @@ struct Draw {
     bh: vec4<f32>,
     bv: vec4<f32>,
     d: vec4<f32>,
+    ctr: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> draw: Draw;
 // Shared gradient LUTs (ADR-0021): sampled per-particle in the vertex shader
@@ -747,20 +882,25 @@ fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
 // Rust body transcribes them for the property test, the same discipline
 // `apply_saturation` follows against `palette.rs::desaturate`. Edit here, then
 // edit there.
-fn project(q: vec3<f32>, dim: f32, zc: f32, cs: f32, sn: f32) -> vec3<f32> {
+fn project(q: vec3<f32>, dim: f32, ctr: vec3<f32>, cs: f32, sn: f32) -> vec3<f32> {
     if (dim < 2.5) {
-        // 2D map: in-plane rotation. There is no third coordinate, so the depth
-        // is zero here as well as via `draw.d.w` - belt and braces, and neither
-        // is load-bearing alone.
-        return vec3<f32>(q.x * cs - q.y * sn, q.x * sn + q.y * cs, 0.0);
+        // 2D map: centre, then in-plane rotation. There is no third coordinate,
+        // so the depth is zero here as well as via `draw.d.w` - belt and braces,
+        // and neither is load-bearing alone.
+        //
+        // The centre is what lets a 2D figure sit off the origin (the fern spans
+        // y in [0, 10]); De Jong and Clifford pass [0,0,0], so this subtraction
+        // is exact and their captures are unchanged.
+        let c = q - ctr;
+        return vec3<f32>(c.x * cs - c.y * sn, c.x * sn + c.y * cs, 0.0);
     }
-    // 3D flow: centre on z, pick the viewing plane, rotate around the vertical
+    // 3D flow: centre, pick the viewing plane, rotate around the vertical
     // axis, project. The plane is the family's own (ADR-0068), arriving as two
     // one-hot axis selectors rather than as a second pipeline: `bh` is the axis
     // the spin rotates `x` against, `bv` is the vertical. `bh = z, bv = y`
     // reproduces the shared convention this replaced exactly; Lorenz ships
     // `bh = y, bv = z`.
-    let p = vec3<f32>(q.x, q.y, q.z - zc);
+    let p = q - ctr;
     let h = dot(p, draw.bh.xyz);
     // The third term is the rotation's OTHER output - the exact partner of the
     // horizontal one - so it costs a multiply-add rather than a second rotation.
@@ -830,7 +970,7 @@ fn vs_main(
     let rot = draw.v.w;
     let scl = draw.w.x;
     let dim = draw.w.y;
-    let zc = draw.w.z;
+    let ctr = draw.ctr.xyz;
     let hue_spread = draw.u.x;
     let hue_center = draw.u.y;
     let palette_mix = draw.u.z;
@@ -839,7 +979,7 @@ fn vs_main(
     let cs = cos(rot);
     let sn = sin(rot);
     let streak = draw.x.w;
-    let projected = project(center, dim, zc, cs, sn);
+    let projected = project(center, dim, ctr, cs, sn);
     let screen = projected.xy;
     // This particle's normalized depth, and the magnification it earns
     // (ADR-0076). Both are exactly 0 and exactly 1 for a 2D family.
@@ -865,7 +1005,7 @@ fn vs_main(
         // **Both endpoints are magnified independently**, so a trace receding
         // into the distance is drawn genuinely shorter - the strongest depth cue
         // a curve has, and free, because the capsule already projects both ends.
-        let pp = project(previous, dim, zc, cs, sn);
+        let pp = project(previous, dim, ctr, cs, sn);
         let dn_prev = depth_norm(pp.z);
         let a = pp.xy * scl * magnify(dn_prev);
         let b = screen * scl * mag;
@@ -982,16 +1122,16 @@ mod projection_mirror {
     /// `f32` `π` is not `−1` to the last bit, and the property ADR-0076 names is
     /// about `cs = −1, sn = 0`.
     pub(super) fn project(q: [f32; 3], family: AttractorFamily, cs: f32, sn: f32) -> Projected {
-        let (_, dim, zc) = family.projection();
+        let (_, dim, [cx, cy, cz]) = family.projection();
         let ([hx, hy, hz], [vx, vy, vz]) = family.basis().masks();
         let [qx, qy, qz] = q;
+        let [px, py, pz] = [qx - cx, qy - cy, qz - cz];
         if dim < 2.5 {
             return Projected {
-                screen: [qx * cs - qy * sn, qx * sn + qy * cs],
+                screen: [px * cs - py * sn, px * sn + py * cs],
                 depth: 0.0,
             };
         }
-        let [px, py, pz] = [qx, qy, qz - zc];
         let h = px * hx + py * hy + pz * hz;
         let v = px * vx + py * vy + pz * vz;
         Projected {
@@ -1123,6 +1263,13 @@ struct Particle {
 /// is the reseed counter. One struct and one pipeline rather than a second of
 /// each: the jitter reads and writes the same storage buffer through the same
 /// bind-group layout, so only the uniform's contents differ.
+///
+/// **160 bytes since Plan 0062**, up from 32, for every family including the four
+/// that ignore the new fields — negligible in bandwidth, and noted because it is
+/// a struct four families share. ADR-0075 predicted 144; the extra 16 is the
+/// alignment padding [`step_index`](Self::step_index) forces, because the scalar
+/// block ahead of the `vec4` table has to round up to a multiple of 16 and it was
+/// already exactly full.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct StepUniform {
@@ -1133,6 +1280,49 @@ struct StepUniform {
     /// Which reseed this is, for the jitter dispatch. Zero (and unread) on a
     /// stepping dispatch — it was the struct's explicit padding word.
     salt: u32,
+    /// The monotonic fixed-step counter the IFS draws its map choice from
+    /// (ADR-0075). Zero (and unread) on every other family, and on the jitter
+    /// dispatch — which keeps its own `salt` rather than sharing this.
+    step_index: u32,
+    /// Explicit, because the `vec4` table below is 16-byte aligned and the
+    /// scalars above are five words. `bytemuck::Pod` requires no implicit
+    /// padding, so this word must be named.
+    _pad: [u32; 3],
+    /// The IFS's resolved affine table — [`IfsPacked`] laid out flat. Zeroed for
+    /// the four map families, which never read it.
+    linear: [[f32; 4]; ifs::MAPS],
+    translate: [[f32; 4]; 2],
+    cumulative_p: [f32; 4],
+}
+
+impl StepUniform {
+    /// The IFS half of the uniform, as the four map families and the jitter
+    /// dispatch write it: all zeros, and unread.
+    const NO_IFS: IfsPacked = IfsPacked::ZERO;
+
+    /// Assemble one slot. The IFS payload is spread across three fields, so a
+    /// constructor is what keeps the three call sites from disagreeing about it.
+    fn new(
+        coeffs: [f32; 4],
+        family: u32,
+        count: u32,
+        salt: u32,
+        step_index: u32,
+        packed: IfsPacked,
+    ) -> Self {
+        Self {
+            coeffs,
+            dt: FIXED_STEP,
+            family,
+            count,
+            salt,
+            step_index,
+            _pad: [0; 3],
+            linear: packed.linear,
+            translate: packed.translate,
+            cumulative_p: packed.cumulative_p,
+        }
+    }
 }
 
 /// Draw uniform (per frame). `v`: x aspect, y point half-size, z hue offset, w
@@ -1146,6 +1336,7 @@ struct StepUniform {
 /// `d`: x `perspective`, y `depth_fade`, z `depth_hue`, w the family's
 /// **inverse** depth half-extent (ADR-0076) — `0` for a 2D family, which is what
 /// makes every depth cue the identity there without a shader branch.
+/// `ctr`: xyz the world centre subtracted before projection (Plan 0062), w unused.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct DrawUniform {
@@ -1156,6 +1347,7 @@ struct DrawUniform {
     bh: [f32; 4],
     bv: [f32; 4],
     d: [f32; 4],
+    ctr: [f32; 4],
 }
 
 /// Decay uniform (per frame): x is the per-frame trail retention factor.
@@ -1187,13 +1379,14 @@ struct PipelineResources {
     present_pipeline: wgpu::RenderPipeline,
     particles: wgpu::Buffer,
     step_uniform: wgpu::Buffer,
-    /// Byte stride between the step slot and the jitter slot in `step_uniform`,
-    /// rounded up to the adapter's dynamic-offset alignment.
+    /// Byte stride between two slots of `step_uniform`, rounded up to the
+    /// adapter's dynamic-offset alignment.
     ///
-    /// Two slots rather than one written twice, because a frame encodes
+    /// Separate slots rather than one written repeatedly, because a frame encodes
     /// `pending_steps` step dispatches against one binding: folding the jitter into
     /// the step slot would apply it once per sub-step, making the disturbance a
-    /// function of the frame's timing and breaking determinism.
+    /// function of the frame's timing and breaking determinism. [`STEP_SLOTS`] has
+    /// the same argument for the sub-steps themselves.
     step_stride: u32,
     draw_uniform: wgpu::Buffer,
     decay_uniform: wgpu::Buffer,
@@ -1304,7 +1497,8 @@ impl PipelineResources {
                 | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
-        // Two slots in ONE buffer, selected per dispatch by a dynamic offset.
+        // [`STEP_SLOTS`] slots in ONE buffer, selected per dispatch by a dynamic
+        // offset.
         //
         // **Not two buffers behind two bind groups**, which is what this was first
         // written as and which does not survive the software adapter: a second bind
@@ -1315,8 +1509,11 @@ impl PipelineResources {
         // ~0.000 in `animation`. One layout and one bind group has no aliasing
         // surface to get wrong.
         let step_stride = uniform_stride(device);
-        let step_uniform =
-            uniform_buffer(device, "attractor-step-uniform", (step_stride * 2) as usize);
+        let step_uniform = uniform_buffer(
+            device,
+            "attractor-step-uniform",
+            (step_stride * STEP_SLOTS) as usize,
+        );
         let draw_uniform =
             uniform_buffer(device, "attractor-draw-uniform", size_of::<DrawUniform>());
         let decay_uniform =
@@ -1332,7 +1529,7 @@ impl PipelineResources {
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
-                        // The step slot and the jitter slot, one dispatch each.
+                        // The sub-step slots and the jitter slot, one dispatch each.
                         has_dynamic_offset: true,
                         min_binding_size: wgpu::BufferSize::new(size_of::<StepUniform>() as u64),
                     },
@@ -1762,6 +1959,15 @@ pub struct AttractorScene {
     fixed_step: gpu::FixedStep,
     /// Steps `advance` scheduled for the next `render` to encode.
     pending_steps: u32,
+    /// The index of the **next** fixed step to run — the IFS's map-choice salt
+    /// (ADR-0075), advanced by the number of steps actually encoded.
+    ///
+    /// Determinism is preserved exactly: it is a pure function of the injected
+    /// `dt` sequence, which captures pin at 1/60 s, and it starts at zero on
+    /// every rebuild. It wraps rather than saturating — at 60 steps per second a
+    /// `u32` takes 2.3 years to go round, and the value's only job is to
+    /// decorrelate successive draws.
+    step_index: u32,
     /// Real elapsed seconds for this frame, injected via `advance`, used to make
     /// the trail decay frame-rate-independent.
     dt: f32,
@@ -1860,6 +2066,7 @@ impl AttractorScene {
             needs_clear: true,
             fixed_step: gpu::FixedStep::new(FIXED_STEP, MAX_SUBSTEPS),
             pending_steps: 0,
+            step_index: 0,
             dt: FIXED_STEP,
             spin_time: 0.0,
             family,
@@ -2226,6 +2433,7 @@ impl Scene for AttractorScene {
             reseed_count,
             needs_clear,
             pending_steps,
+            step_index,
             dt,
             spin_time,
             family,
@@ -2275,6 +2483,8 @@ impl Scene for AttractorScene {
                 family: *family,
                 spin_time: *spin_time,
                 dt: *dt,
+                pending_steps: *pending_steps,
+                step_index: *step_index,
                 size: *size,
                 hue: *hue,
                 fade: *fade,
@@ -2304,6 +2514,10 @@ impl Scene for AttractorScene {
             pending_jitter,
         );
         encode_steps(encoder, pipelines, *active_count, *pending_steps);
+        // Advanced by what was actually encoded, and here rather than in
+        // `advance`: the uniforms above are written against this frame's base
+        // index, so the counter cannot move before they are.
+        *step_index = step_index.wrapping_add((*pending_steps).min(MAX_SUBSTEPS));
         encode_trail_pass(encoder, pipelines, *active_count, grid);
         // Between the trail pass and the present, and nowhere else: the trail wrote
         // the write side, so the present must read it.
@@ -2333,6 +2547,10 @@ struct UniformInputs {
     /// [`advance_spin`].
     spin_time: f32,
     dt: f32,
+    /// How many fixed steps this frame will encode — one uniform slot each.
+    pending_steps: u32,
+    /// The index of the first of them (ADR-0075's map-choice salt).
+    step_index: u32,
     size: f32,
     hue: f32,
     fade: f32,
@@ -2393,27 +2611,38 @@ fn flush_deferred_uploads(
 
 /// This frame's three uniform buffers: the compute step's coefficients, the
 /// point draw's projection and colour, and the trail decay factor.
+///
+/// The step uniform is written **once per sub-step this frame owes**, into its
+/// own slot, so each dispatch carries its own `step_index` — see [`STEP_SLOTS`].
+/// At the steady 60 fps that is one write, exactly as before.
 fn upload_uniforms(
     queue: &wgpu::Queue,
     pipelines: &PipelineResources,
     active: u32,
     inputs: &UniformInputs,
 ) {
-    queue.write_buffer(
-        &pipelines.step_uniform,
-        0,
-        bytemuck::bytes_of(&StepUniform {
-            coeffs: inputs.coeffs,
-            dt: FIXED_STEP,
-            family: inputs.family.shader_id(),
-            // The **active** count, not the allocated one: this is the bound the
-            // compute step early-returns against, so it is what leaves the tail
-            // beyond `density` untouched (ADR-0069).
-            count: active,
-            salt: 0,
-        }),
-    );
-    let (scale, dim, z_center) = inputs.family.projection();
+    let packed = inputs
+        .family
+        .figure()
+        .map_or(StepUniform::NO_IFS, ifs::IfsFigure::packed);
+    for slot in 0..inputs.pending_steps.min(MAX_SUBSTEPS) {
+        queue.write_buffer(
+            &pipelines.step_uniform,
+            u64::from(pipelines.step_stride * slot),
+            bytemuck::bytes_of(&StepUniform::new(
+                inputs.coeffs,
+                inputs.family.shader_id(),
+                // The **active** count, not the allocated one: this is the bound
+                // the compute step early-returns against, so it is what leaves
+                // the tail beyond `density` untouched (ADR-0069).
+                active,
+                0,
+                inputs.step_index.wrapping_add(slot),
+                packed,
+            )),
+        );
+    }
+    let (scale, dim, centre) = inputs.family.projection();
     let ([hx, hy, hz], [vx, vy, vz]) = inputs.family.basis().masks();
     // Off the count actually drawn, not off the tier and not off the buffer that
     // was allocated: the draw below issues `active` instances, and normalizing
@@ -2438,7 +2667,9 @@ fn upload_uniforms(
                 inputs.hue,
                 spin_phase(inputs.spin_time),
             ],
-            w: [scale, dim, z_center, deposit],
+            // `w.z` is unused since Plan 0062 — the centre grew to three
+            // components and moved to `ctr` below.
+            w: [scale, dim, 0.0, deposit],
             u: [
                 inputs.hue_spread,
                 inputs.hue_center,
@@ -2472,6 +2703,7 @@ fn upload_uniforms(
                 inputs.depth_hue,
                 inputs.family.inv_depth_extent(),
             ],
+            ctr: [centre[0], centre[1], centre[2], 0.0],
         }),
     );
     // Frame-rate-independent trail decay: retain `fade` per 1/60 s, raised to
@@ -2515,19 +2747,23 @@ fn encode_jitter(
     *pending_jitter = false;
 
     let [jx, jy, jz] = family.jitter_extent();
+    let jitter_offset = pipelines.step_stride * JITTER_SLOT;
     queue.write_buffer(
         &pipelines.step_uniform,
-        u64::from(pipelines.step_stride),
-        bytemuck::bytes_of(&StepUniform {
-            coeffs: [jx, jy, jz, streak_flag(RESEED_DRAWS_STREAK)],
-            dt: FIXED_STEP,
-            family: JITTER_MODE,
+        u64::from(jitter_offset),
+        bytemuck::bytes_of(&StepUniform::new(
+            [jx, jy, jz, streak_flag(RESEED_DRAWS_STREAK)],
+            JITTER_MODE,
             // Active, like the step above — a reseed that kicked the inert tail
             // would move particles nothing draws, and would break the very
             // property that proves the tail is inert.
-            count: active,
-            salt: *reseed_count,
-        }),
+            active,
+            *reseed_count,
+            // The jitter is not a fixed step and draws no map — it keeps its own
+            // `salt` and leaves the step counter alone.
+            0,
+            StepUniform::NO_IFS,
+        )),
     );
 
     let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -2535,12 +2771,13 @@ fn encode_jitter(
         timestamp_writes: None,
     });
     pass.set_pipeline(&pipelines.compute_pipeline);
-    pass.set_bind_group(0, &pipelines.compute_bg, &[pipelines.step_stride]);
+    pass.set_bind_group(0, &pipelines.compute_bg, &[jitter_offset]);
     pass.dispatch_workgroups(active.div_ceil(WORKGROUP), 1, 1);
 }
 
-/// Step the particles: one compute dispatch per scheduled sub-step. wgpu inserts
-/// the storage-to-vertex barrier before the draw pass that follows.
+/// Step the particles: one compute dispatch per scheduled sub-step, each against
+/// **its own** uniform slot so it carries its own `step_index` ([`STEP_SLOTS`]).
+/// wgpu inserts the storage-to-vertex barrier before the draw pass that follows.
 fn encode_steps(
     encoder: &mut wgpu::CommandEncoder,
     pipelines: &PipelineResources,
@@ -2548,13 +2785,15 @@ fn encode_steps(
     pending_steps: u32,
 ) {
     let groups = active.div_ceil(WORKGROUP);
-    for _ in 0..pending_steps {
+    // `FixedStep` already clamps to `MAX_SUBSTEPS`; clamped again because a
+    // dispatch past the slots written above would read an undefined slot.
+    for slot in 0..pending_steps.min(MAX_SUBSTEPS) {
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("attractor-step-pass"),
             timestamp_writes: None,
         });
         pass.set_pipeline(&pipelines.compute_pipeline);
-        pass.set_bind_group(0, &pipelines.compute_bg, &[0]);
+        pass.set_bind_group(0, &pipelines.compute_bg, &[pipelines.step_stride * slot]);
         pass.dispatch_workgroups(groups, 1, 1);
     }
 }
@@ -2648,13 +2887,114 @@ mod tests {
 
     use super::{
         AttractorFamily, AttractorScene, Basis, DEFAULT_DEPTH_FADE, DEFAULT_DEPTH_HUE,
-        DEFAULT_SPIN, FIXED_STEP, MAX_PERSPECTIVE, MIN_PARTICLE_DENSITY, Particle,
-        RESEED_DRAWS_STREAK, SPIN_RATE, Scene, active_particles, advance_spin, deposit_scale,
-        projection_mirror, spin_phase, streak_flag,
+        DEFAULT_SPIN, FIXED_STEP, JITTER_MODE, MAX_PERSPECTIVE, MIN_PARTICLE_DENSITY, Particle,
+        RESEED_DRAWS_STREAK, SPIN_RATE, STEP_SLOTS, Scene, StepUniform, active_particles,
+        advance_spin, deposit_scale, ifs, projection_mirror, spin_phase, streak_flag,
     };
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderContext;
     use crate::render::{Tier, TierConfig};
+
+    // -----------------------------------------------------------------------
+    // The IFS family (Plan 0062 Phase 1 / ADR-0075)
+    // -----------------------------------------------------------------------
+
+    /// Every curated figure reaches the enum through the **same** `[particles]
+    /// family` key the map families use, and an unknown name is still rejected —
+    /// which is what makes it a load error rather than a silent De Jong.
+    #[test]
+    fn a_figure_name_selects_the_ifs_family() {
+        for figure in ifs::IfsFigure::ALL {
+            let name = match figure {
+                ifs::IfsFigure::Fern => "fern",
+            };
+            assert_eq!(
+                AttractorFamily::from_name(name),
+                Some(AttractorFamily::Ifs(figure)),
+                "'{name}' must select {figure:?}"
+            );
+        }
+        // The map families are untouched, and nothing else parses.
+        assert_eq!(
+            AttractorFamily::from_name("de_jong"),
+            Some(AttractorFamily::DeJong)
+        );
+        for unknown in ["ifs", "barnsley", "fern_", ""] {
+            assert_eq!(AttractorFamily::from_name(unknown), None);
+        }
+    }
+
+    /// **The jitter selector must not collide with a real family's**, and the IFS
+    /// is what moved it (from 4 to 5).
+    ///
+    /// This is the failure that would be invisible in a unit test and obvious
+    /// only in a render: a family sharing the jitter's id takes the jitter arm,
+    /// so the cloud is kicked every step and never iterates its map at all.
+    #[test]
+    fn the_jitter_selector_sits_past_every_family() {
+        let families = [
+            AttractorFamily::DeJong,
+            AttractorFamily::Clifford,
+            AttractorFamily::Thomas,
+            AttractorFamily::Lorenz,
+            AttractorFamily::Ifs(ifs::IfsFigure::Fern),
+        ];
+        for family in families {
+            assert!(
+                family.shader_id() < JITTER_MODE,
+                "{family:?} shares or exceeds the jitter selector {JITTER_MODE}"
+            );
+        }
+        // Every family is a distinct arm, or two of them draw the same figure.
+        let mut ids: Vec<u32> = families.iter().map(|f| f.shader_id()).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), families.len(), "two families share a shader id");
+        // ...and every figure is the *same* arm, because the figure is data.
+        for figure in ifs::IfsFigure::ALL {
+            assert_eq!(AttractorFamily::Ifs(figure).shader_id(), 4);
+        }
+    }
+
+    /// The step uniform's shape, pinned where ADR-0075 quotes it.
+    ///
+    /// A Rust/WGSL layout disagreement fails loudly at pipeline creation (wgpu
+    /// compares the struct size against `min_binding_size`), so this is not the
+    /// safety net — it is the record of *which* number the two agree on, and of
+    /// the one place the ADR's arithmetic was off: 160 rather than 144, because
+    /// `step_index` forced the scalar block up to the next multiple of 16.
+    #[test]
+    fn the_step_uniform_carries_the_ifs_table_in_one_binding() {
+        assert_eq!(size_of::<StepUniform>(), 160);
+        // A slot per possible sub-step plus the jitter's — the property
+        // `encode_steps` relies on when it offsets by the sub-step index.
+        assert_eq!(STEP_SLOTS, super::MAX_SUBSTEPS + 1);
+        assert_eq!(super::JITTER_SLOT, super::MAX_SUBSTEPS);
+    }
+
+    /// The IFS payload is inert for the four map families — asserted on the value
+    /// rather than left to the shader's family branch, because "they never read
+    /// it" is a claim about code that is easy to break.
+    #[test]
+    fn the_map_families_upload_no_affine_table() {
+        for family in [
+            AttractorFamily::DeJong,
+            AttractorFamily::Clifford,
+            AttractorFamily::Thomas,
+            AttractorFamily::Lorenz,
+        ] {
+            assert_eq!(family.figure(), None);
+        }
+        assert_eq!(
+            AttractorFamily::Ifs(ifs::IfsFigure::Fern).figure(),
+            Some(ifs::IfsFigure::Fern)
+        );
+        assert_eq!(StepUniform::NO_IFS, ifs::IfsPacked::ZERO);
+        // Zeroed means *every* cumulative entry is zero, so a stray dispatch on
+        // the IFS arm would pick the fourth map and apply an all-zero affine —
+        // a single point at the origin, not a second figure.
+        assert!(StepUniform::NO_IFS.cumulative_p.iter().all(|c| *c == 0.0));
+    }
 
     /// ADR-0065's invariance, asserted **on the scalar** rather than inferred from
     /// pixels — which is the whole reason the decision is expressible as one.
