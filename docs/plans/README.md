@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0061** (ADRs are a separate sequence — next free there is **0072**.)
+**Next free number: 0062** (ADRs are a separate sequence — next free there is **0073**.)
 
 ## Active roster
 
@@ -18,6 +18,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0059](0059-lorenz-finds-its-plane.md) | Lorenz finds its plane, and the attractor can trade samples for curves (per-family projection basis, the trail un-mirror, `[particles] density`, the continuous-flow streak) | **in progress** — **Phase 1 landed 2026-08-04 (`357a17e`)**; successor to [0057], whose Phase 4 diagnosed this and stopped by its own instruction; [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) + [ADR-0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md) + [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md); closes [backlog 0048](../design-backlog.md). **Amended 2026-08-04 with a new Phase 1b**: Phase 1's basis is correct and the picture was **still an X**, because the attractor trail samples its own target with the unflipped fullscreen prelude and renders `figure ∪ mirror(figure)` — older than this plan, invisible to every gate because the doubling conceals its own symptom. **The "no golden baseline moves" claim is withdrawn**: `attractor.png` and `reaction_diffusion.png` both move at Phase 1b (the four `composite_*` fixtures run `parametric_curve` and do not). **Phase 4 is `human`** — the one content pass, now covering **all six** attractor presets rather than mainly `attractor_lorenz`, since every one was authored against a doubled figure; it **may route back to `architect`** if `density` + `fade` cannot hold a curve | dev, human |
 
 | [0060](0060-a-test-number-states-a-property-or-names-its-machine.md) | A test number states a property, or names its machine (the two frozen numbers holding CI red: bit-exact `f32` literals pinned to x86_64, and the dual-live floor traded for a ratio against an in-run control) | **approved 2026-08-04** — ready for `dev`; [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md). **CI has been red since 2026-07-30** and this is the only plan that turns it green. **Phase 2 is `human`** (push, then read the two runners' printed numbers) and gates Phase 3, so it does not close in one session. Moves **no pixels**, no shipped code, no golden baseline | dev, human |
+| [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo, the `core-cabi` extraction, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04** — from the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md). **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. **Phase 6 is gated on [0059] being closed** (it edits `particles/mod.rs`); **Phase 8 is `human`** (needs VS Build Tools + the foobar SDK — CI has no plugin job) and is deliberately **last** so one `dev` session lands Phases 1-7. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
 
 ## Recommended execution sequence
 
@@ -34,7 +35,16 @@ instrument-first — Phase 1 makes the numbers visible and turns the gate green,
 reads them, Phase 3 writes the contract from what came back.
 
 
-**Every plan in the roster is approved as of 2026-08-04 — nothing is waiting on a design
+**[0061] goes last, by the user's own instruction, and is the only `draft` in the roster.** It came
+out of a whole-tree maintainability audit rather than a feature request, so nothing depends on it and
+it depends on nothing except [0059] being closed before its Phase 6 (which edits the same file). Two
+consequences worth carrying: its numbers are a **2026-08-04 snapshot of one machine**, so a phase
+whose done-when names a line count needs re-deriving rather than satisfying if an intervening plan has
+already moved the file; and if [0060] has re-derived `COVERAGE_FLOOR` by then, [0061] Phase 2 moves the
+same number again for a different reason (it removes `ffi.rs` from the gated crate), so the two must
+not be read as competing for it.
+
+**Every other plan in the roster is approved as of 2026-08-04 — nothing is waiting on a design
 decision.** What separates them now is only what each needs to *run*: [0052] closes in one session;
 [0050] closes in one plus a measurement; [0053], [0055] and [0059] each carry a `human` phase that
 gates later phases or the close, so they stop mid-plan by construction — [0053] until a discrete GPU
