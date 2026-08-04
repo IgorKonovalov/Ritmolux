@@ -1,6 +1,8 @@
 # 0063 — The attractor keeps its depth: perspective, haze, and a spin you can drive
 
-> **Status:** draft
+> **Status:** **approved 2026-08-04** — ready for `dev`. Phases 1-4 are `dev` and nothing gates
+> them, so they run start-to-finish in one session; **Phase 5 is `human`** (a `preset-author` pass
+> over the two 3-D presets), so the plan does not close in that session.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md) (this

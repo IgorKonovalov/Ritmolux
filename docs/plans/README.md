@@ -18,7 +18,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | [0062](0062-the-chaos-game-grows-a-fern.md) | The chaos game grows a fern: an IFS family that morphs between figures (`AttractorFamily::Ifs`, five curated tables in SVD form, safe-by-construction morph + four levers) | **approved 2026-08-04** — ready for `dev`; designed from the user's Barnsley-fern question; [ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md). **The first half of a deliberate two-plan split** (the user's call at interview): this one lands the *figure* — the family, the roster, the morph, the levers — so a real fern can be judged in motion; the successor carries the **unfurl and the depth/per-map colour**, which are the same per-particle channel and are tuned against a figure already known to be right. Adds **no** render idiom, no `Scene` change, no C ABI change, no dependency — the `attractor` scene is already a GPU chaos game and this is a fifth family plus one shader branch. **Phase 7 is `human`** (a `preset-author` pass judging levers against real audio), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
 
-| [0063](0063-the-attractor-keeps-its-depth.md) | The attractor keeps its depth: perspective, haze, and a spin you can drive (`perspective`, `depth_fade`, `depth_hue`, `spin`) | **draft 2026-08-04** — designed from the user's "can we make strange attractors more 3D looking"; [ADR-0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md). The 3D families read flat because `project()` computes a view depth and **discards** it, leaving an orthographic projection whose rotation is perceptually bistable (the image at rotation pi is the exact x-mirror of the image at 0). Keeps the depth; spends it on perspective + two atmospheric cues; **no sorting, no occlusion** (the user's call — the accumulation is the scene). **The 2D families are untouched by arithmetic rather than by a default**, so `core/tests/fixtures/attractor.toml` (De Jong) cannot move. Also closes a gap the question surfaced: `SPIN_RATE` is a `const` no preset can reach, and every 3D attractor turns at one revolution per **34.9 s** forever. **Phase 5 is `human`** (a `preset-author` pass over the two 3D presets), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
+| [0063](0063-the-attractor-keeps-its-depth.md) | The attractor keeps its depth: perspective, haze, and a spin you can drive (`perspective`, `depth_fade`, `depth_hue`, `spin`) | **approved 2026-08-04** — ready for `dev`; designed from the user's "can we make strange attractors more 3D looking"; [ADR-0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md). The 3D families read flat because `project()` computes a view depth and **discards** it, leaving an orthographic projection whose rotation is perceptually bistable (the image at rotation pi is the exact x-mirror of the image at 0). Keeps the depth; spends it on perspective + two atmospheric cues; **no sorting, no occlusion** (the user's call — the accumulation is the scene). **The 2D families are untouched by arithmetic rather than by a default**, so `core/tests/fixtures/attractor.toml` (De Jong) cannot move. Also closes a gap the question surfaced: `SPIN_RATE` is a `const` no preset can reach, and every 3D attractor turns at one revolution per **34.9 s** forever. **Phase 5 is `human`** (a `preset-author` pass over the two 3D presets), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
 
 ## Recommended execution sequence
 
@@ -121,9 +121,9 @@ finally took matched **CI WARP** to five figures and disagreed with **this box's
 suite blesses on, not the runner's. Nothing has looked at what else that moves.
 
 
-**[0061] goes last, by the user's own instruction.** ([0062] and [0063] were written the same day —
-0062 approved immediately, 0063 still `draft`; all three are unrelated and neither of the newer two
-inherits this "goes last".) It came
+**[0061] goes last, by the user's own instruction, and is the only `draft` in the roster.** ([0062]
+and [0063] were written and approved the same day; all three are unrelated and neither of the newer
+two inherits this "goes last".) It came
 out of a whole-tree maintainability audit rather than a feature request, so nothing depends on it and
 it depends on nothing — the one dependency it had, [0059] being closed before its Phase 6 (which edits the same file), was **released 2026-08-04**. Two
 consequences worth carrying: its numbers are a **2026-08-04 snapshot of one machine**, so a phase
@@ -162,9 +162,9 @@ re-planning; the reason they live here is thematic (the plan's title is exactly 
 technical.
 
 **Every other plan in the roster is approved as of 2026-08-04 — nothing is waiting on a design
-decision** — [0062] was approved the day it was written; the remaining `draft`s, [0061] and [0063],
-are both fully designed and waiting only on the user's go. What separates them now is only what each
-needs to *run*: [0052] closes in one session;
+decision** — [0062] and [0063] were both approved the day they were written, leaving [0061] as the
+only `draft`, and it is fully designed too. What separates them now is only what each needs to
+*run*: [0052] closes in one session;
 [0053] and [0055] each carry a `human` phase that gates later phases, so they stop mid-plan by
 construction — [0053] until a discrete GPU is to hand, [0055] until the live A/B is judged.
 Taking [0052] first keeps a session unblocked end to end.
