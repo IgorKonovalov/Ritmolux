@@ -1,6 +1,11 @@
 # 0071 — Light that adds without covering: `occlude`, decided from a sample set
 
-> **Status:** draft
+> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing. It touches `post.rs`'s
+> backdrop composite, which [0064](0064-the-symmetry-stage-and-the-banded-palette.md) does not (that
+> is the fold shader). Phases 1-2 are `dev` and end in a rendered grid; **Phase 3 is `human`** (the
+> user picks the default, in motion, over a **lit** backdrop — at `bg_bright = 0` the two models are
+> identical) and gates Phases 4-5, so the plan does not close in one session. **Moves no golden
+> baseline at the default `1.0`**; if Phase 3 moves the default, the re-bless is priced there first.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0085](../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md), supplementing [0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)

@@ -1,6 +1,10 @@
 # 0067 — The curation route: a gate worth trusting, and the preset that has been waiting six weeks
 
-> **Status:** draft
+> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing. Phases 1-2 are `dev`;
+> **Phase 3 is `human`** (the Coral Oracle pass — declining it is a successful outcome) and gates
+> Phase 4, so the plan does not close in one session. Phase 1 touches `core/tests/reactivity.rs`,
+> adjacent to [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md)'s CI and coverage
+> work — keep that seam clean if both are live. **Moves no pixels.**
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md), supplementing [0017](../adrs/0017-preset-author-skill-lane.md)

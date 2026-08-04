@@ -1,6 +1,9 @@
 # 0069 — The instrument that sees a figure leave the frame
 
-> **Status:** draft
+> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing and sharing no file with
+> any other plan in the roster. **The only plan in the roster with no `human` phase: all four phases
+> are `dev` and it closes in one session.** Protective rather than additive — it moves no pixels and
+> adds no golden baseline.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev
 > **Related ADRs:** [0083](../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md), supplementing [0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)
