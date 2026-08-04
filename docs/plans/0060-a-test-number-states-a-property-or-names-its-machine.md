@@ -1,6 +1,6 @@
 # 0060 — A test number states a property, or names its machine
 
-> **Status:** **approved 2026-08-04** — ready for `dev`. Three phases; Phase 2 is `human` (push
+> **Status:** **in-progress 2026-08-04** — Phase 1 landing. Three phases; Phase 2 is `human` (push
 > the Phase 1 commit, then hand back what the two runners printed) and gates Phase 3, so this plan
 > does **not** run start-to-finish in one session. Phase 1 alone turns CI green.
 > **Created:** 2026-08-04
