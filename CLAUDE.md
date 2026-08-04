@@ -68,12 +68,12 @@ docs/
 ├── skills/          # architect (designs docs/) + dev (all code) + preset-author (preset content)
 ├── settings.json    # Registers the block-broad-git-add PreToolUse hook
 └── hooks/           # block-broad-git-add.js — enforces explicit-path staging
-.githooks/           # Checked-in git hooks. pre-push runs the fast subset (fmt + clippy +
-                     #   a narrowed nextest, ~28 s). OPT-IN PER CLONE — nothing runs until
-                     #   `git config core.hooksPath .githooks`. See README + ADR-0033.
-scripts/             # Repo maintenance, run by hand. check-doc-links.mjs asserts every
-                     #   relative markdown link resolves — the architect close ceremony
-                     #   runs it, because moving a plan to plans/done/ breaks links both ways.
+.githooks/           # Checked-in git hooks. pre-push runs the fast subset (doc links + fmt +
+                     #   clippy + a narrowed nextest, ~28 s). OPT-IN PER CLONE — nothing runs
+                     #   until `git config core.hooksPath .githooks`. See README + ADR-0033.
+scripts/             # Repo maintenance. check-doc-links.mjs asserts every relative markdown
+                     #   link resolves; run by pre-push and by the architect close ceremony,
+                     #   because moving a plan to plans/done/ breaks links in both directions.
 ```
 
 ## How we work (canonical workflow)
