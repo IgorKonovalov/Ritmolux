@@ -10,7 +10,7 @@
 ## File shape
 
 ```toml
-system = "attractor"        # required — one of the seven; unknown rejects the file
+system = "attractor"        # required — one of the nine; unknown rejects the file
 name   = "Lorenz Drift"     # optional — display name, and what `--preset` matches
 
 [particles]                 # structural config: [curve] | [generator] | [particles]

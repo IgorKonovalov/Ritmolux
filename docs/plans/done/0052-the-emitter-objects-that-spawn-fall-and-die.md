@@ -1,16 +1,25 @@
 # 0052 — The emitter: objects that spawn, fall on a parabola, and die
 
-> **Status:** **in-progress 2026-08-04** — ready for `dev`. All four phases are `dev`; nothing gates
-> it, so it runs start-to-finish in one session.
+> **Status:** **done 2026-08-04** — all four phases landed (`2470a50`, `d155615`, `52a756c`,
+> `53a896e`) on lane `plan-0052-emitter`, closed together with [0055](../0055-the-fold-edge-becomes-a-choice.md)
+> against one merged tip. Mode 4 verdict: **landed cleanly, no blockers.** Verified independently of
+> the lane's own report — every named done-when's assertion body read, exactly one golden baseline
+> added (`emitter.png`) and none modified, and the post-merge gate green at **473 tests, 0 skipped**.
+> The plan's headline outcome is that it **reproduced design-backlog 0039 live**: an emitter
+> bind-group layout byte-identical to the swarm's made the *swarm* read the emitter's uniform on the
+> local DX12 WARP build, and distinguishing the descriptor fixed it — the third instance and the
+> cheapest fix found so far. Two open items carried out of the close: one non-reproducing
+> `STATUS_ACCESS_VIOLATION` in `sanity` under parallel threads during Phase 1, and `distinctness`
+> being structurally blind to a one-preset family.
 > **Created:** 2026-08-01
 > **Owner skill(s):** dev
-> **Related ADRs:** [0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)
-> (this plan's decision), [0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md)
+> **Related ADRs:** [0057](../../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)
+> (this plan's decision), [0044](../../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md)
 > (the torus this scene exists to not be),
-> [0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) (the seam invariant its sprite
+> [0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) (the seam invariant its sprite
 > pipeline inherits, and the guard it owes),
-> [0007](../adrs/0007-line-geometry-generators.md) (the scene-idiom split this joins).
-> Closes [design-backlog 0034](../design-backlog.md).
+> [0007](../../adrs/0007-line-geometry-generators.md) (the scene-idiom split this joins).
+> Closes [design-backlog 0034](../../design-backlog.md).
 
 ## TL;DR
 
@@ -24,7 +33,7 @@ each on its own parabola, falling out of shot and not coming back.
 
 ## Context & problem
 
-`preset-author` filed [design-backlog 0034](../design-backlog.md) after a user request for a
+`preset-author` filed [design-backlog 0034](../../design-backlog.md) after a user request for a
 Solitaire-style cascade — "падает красиво по параболе в разных направлениях". Four pieces are
 missing and all four were verified against code:
 
@@ -42,12 +51,12 @@ missing and all four were verified against code:
 
 The backlog notes this is the smaller and safer half of the figurative gap: an emitter throwing
 round blobs on parabolas needs no new shape vocabulary and no change to the additive model, and it
-carries the motion. [Design-backlog 0033](../design-backlog.md) — that marks have no *shape* —
+carries the motion. [Design-backlog 0033](../../design-backlog.md) — that marks have no *shape* —
 stays open and is explicitly not in scope here.
 
 ## Decision
 
-Per [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md): a **new
+Per [ADR-0057](../../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md): a **new
 `SystemKind::Emitter`** beside `swarm`, with **analytic** position and **seeded** per-object
 variation, drawing through the swarm's instanced-quad sprite pipeline on the shared
 `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE` blend state.
@@ -169,7 +178,7 @@ rather than re-derived.
 
   **Read the gates before assuming they fit.** This is the first scene whose object count starts at
   zero and varies during a capture; `animation.rs` renders at 96x96 and `ANIM_FLOOR` is a
-  whole-frame diff ([design-backlog 0009](../design-backlog.md)), and a sparse shower of small
+  whole-frame diff ([design-backlog 0009](../../design-backlog.md)), and a sparse shower of small
   marks is exactly the shape that measures near zero there. If a gate needs a fixture tuned to
   meet it honestly, tune the fixture; if a gate is structurally wrong for this scene, **stop and
   surface it** rather than lowering a floor.
@@ -244,14 +253,14 @@ grammar.
   the first content pass immediately wants swirl or drag, that is the ADR's stated price being
   paid, and the answer is a superseding ADR rather than sneaking an accumulator in.
 - **The new scene widens the WARP bind-group-layout collision surface** that
-  [design-backlog 0039](../design-backlog.md) and [Plan 0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md)
+  [design-backlog 0039](../../design-backlog.md) and [Plan 0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md)
   are about: an emitter uniform group shaped `[Uniform]` joins six existing ones. If 0053 lands
   first, its assertion will name this scene; if this lands first, 0053 inherits one more entry.
   Neither ordering is wrong — they should just not surprise each other.
 
 ## What this plan does NOT do
 
-- **No shape vocabulary.** Objects are round additive blobs. [Design-backlog 0033](../design-backlog.md)
+- **No shape vocabulary.** Objects are round additive blobs. [Design-backlog 0033](../../design-backlog.md)
   — that no mark has a shape, and that a dark mark cannot exist in an additive pipeline — stays
   open and is the larger half of the figurative gap.
 - **No stamped trail.** The Solitaire cascade's hard, non-fading copies along an arc need a
@@ -268,6 +277,6 @@ grammar.
 - Hand the emitter to `preset-author` for a look pass — this is the first genuinely new idiom since
   the attractor, and the lane asked for it.
 - A non-decaying **stamped** trail (ADR-0031 territory), if the cascade look wants it.
-- [Design-backlog 0033](../design-backlog.md) — shaped marks — with the emitter as the natural
+- [Design-backlog 0033](../../design-backlog.md) — shaped marks — with the emitter as the natural
   first consumer.
 - Revisit per-object expressions with a real workload to measure, rather than a hypothetical one.

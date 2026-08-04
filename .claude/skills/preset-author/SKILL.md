@@ -70,7 +70,7 @@ that "needs just a small code change" is not a preset, it's a routed request.
 
 ## The authoring surface in one screen
 
-**Eight systems** (`system = "…"`, the underscore name — distinct from a scene's display name):
+**Nine systems** (`system = "…"`, the underscore name — distinct from a scene's display name):
 
 | `system` | Look | Structural config |
 |----------|------|-------------------|
@@ -82,6 +82,7 @@ that "needs just a small code change" is not a preset, it's a routed request.
 | `reaction_diffusion` | Gray-Scott coral/maze field | none (regime lives in `feed`/`kill`/`flow`) |
 | `attractor` | GPU compute particles on a strange attractor | `[particles] family = …` (optional; defaults `de_jong`) |
 | `spectrum` | N elements off the log-spaced band array — bars, polyline or radial ring | `[spectrum]` (optional; `elements` 2..=64, `layout`, per-element `smoothing`) |
+| `emitter` | objects thrown from below that arc, twinkle and fall out of shot | none (the throw and the spreads are all `[params]`) |
 
 **Every** preset, whatever its system, may additionally bind the engine-wide composite: the shared
 view transform (`zoom`, `pan_x`, `pan_y`), the background pre-pass (`bg_*`), feedback `trails`, the
