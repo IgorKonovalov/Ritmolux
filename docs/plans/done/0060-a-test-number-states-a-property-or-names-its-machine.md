@@ -1,21 +1,26 @@
 # 0060 — A test number states a property, or names its machine
 
-> **Status:** **in-progress 2026-08-04** — **Phases 1 and 2 are done.** Phase 1 landed (`1d56600`,
-> plus `31073f6` adding a `.config/nextest.toml` `success-output` override so the two reporting
-> tests stay audible on a green run) and **CI is green**; Phase 2's readings are recorded below.
-> **Phase 3 was re-scoped by the architect** and is now **three-quarters landed**. The ratio came
-> back below the fallback condition this plan named in advance, so Phase 3 routed back per its own
-> instruction and
+> **Status:** **done 2026-08-04** — all three phases landed and the Mode 4 review found **no
+> blockers**. Phase 1 `1d56600` (both gates state what they can prove) plus `31073f6` (the
+> `.config/nextest.toml` `success-output` override, without which Phase 2 would have read nothing
+> off a green run); Phase 2 the `human` push, **CI green on all three jobs**, run **30903871856**;
+> Phase 3 `a324b21` (the three documentation items) and `ae4c215` (the magnitude claim, on
+> hardware). **CI has been green since Phase 1** after five consecutive red pushes.
+> **Phase 3 was re-scoped mid-plan by the architect**, by this phase's own route-back clause: the
+> CI ratio came back at `0.036654`, under the `0.05` fallback the plan named in advance, so
 > [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) took
-> the decision — **no ratio floor is added**.
-> **`a324b21` landed the three documentation items** (the render doc demotion, the arm64 values, the
-> determinism spec's scoping sentence), adding, removing and loosening no assertion.
-> **One item remains, and it was added to this phase *after* `a324b21` landed**: the magnitude
-> claim measured on **hardware**, which ADR-0074 originally deferred to Plan 0053 Phase 3 on a
-> premise that turned out to be false — the dev box has a hardware adapter and the hardware-only
-> sibling runs here today. Two consequences for whoever takes it: it is the last thing between this
-> plan and its close, and **`a324b21`'s doc comment still points the magnitude claim at Plan 0053
-> Phase 3**, which that commit could not have known was superseded. Re-point it.
+> the decision — **no ratio floor on WARP**, the test demoted to a property-only smoke check that
+> says so in its own doc, and the magnitude claim moved to hardware. It was then measured **here**,
+> once ADR-0074's "hardware we do not have" premise turned out to be false.
+> **The hardware reading is the plan's most durable finding, and it is not the one it went looking
+> for**: `0.036542` landed on the **CI WARP** reading, not the local one — matching to three figures
+> on the ratio and **five on the control**. So WARP 10.0.26100 behaves like hardware and **this
+> box's WARP 10.0.19041 is the outlier**, which inverts the mechanism ADR-0074 recorded and hands
+> Plan [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) a sharper question than the one
+> it was given. Recorded in ADR-0074's **Outcome** section; see Followups.
+> **Verified at close:** `fmt` clean, `clippy -D warnings` clean, full `nextest` green on `main`,
+> both dual-live reports reproduced under `--no-capture`, no golden baseline moved, no shipped code
+> touched, C ABI unchanged at v4. Version bumped **patch** at this close.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
@@ -280,12 +285,34 @@ from.
   the DSP test's doc comment carries the four arm64 values; the determinism spec states the scope
   of its bit-identity clause; `fmt`, `clippy -D warnings` and the full `nextest` run are clean
   locally, and no golden baseline moves. **Landed `a324b21`.**
-- **Done when (the hardware item, outstanding):** a second, hardware-only test asserts a ratio floor
-  from a reading taken on a **non-software** adapter, at most half of that reading; its doc comment
-  names the adapter and driver version in the ADR-0071 measurement shape, states that it skips on
-  both CI runners so CI never enforces it, and reports the observed hardware ratio against the local
-  WARP `0.268675`. The WARP test is **not** modified apart from that citation, and `a324b21`'s
-  pointer at Plan 0053 Phase 3 (`core/src/render/mod.rs:3223-3225`) is re-pointed at this test.
+- **Done when (the hardware item): landed `ae4c215`.** A second, hardware-only test
+  (`a_dual_live_dissolve_moves_the_picture_against_its_own_progression`) asserts a ratio floor of
+  `0.018` — half the `0.036542` measured on a **non-software** adapter, rounded down; its doc
+  comment names the adapter (`AMD Radeon(TM) Graphics`, integrated, `0x1002:0x1638`), driver
+  `30.0.13002.1001`, DX12, in the ADR-0071 measurement shape, states that it skips on both CI
+  runners so CI never enforces it, and tabulates the hardware reading against both WARP readings.
+  The WARP test is untouched apart from that citation, and `a324b21`'s pointer at Plan 0053 Phase 3
+  is re-pointed at the new test. Verified non-vacuous by mutation (both sides frozen collapses the
+  ratio to exactly `0.000000`), and reproduced at close under `--no-capture`.
+
+#### Phase 3's hardware reading — the finding it did not go looking for
+
+| statistic | this box's hardware | CI WARP 10.0.26100 | local WARP 10.0.19041 |
+|---|---|---|---|
+| peak signal | 0.009653 | 0.009683 | 0.109573 |
+| peak control | 0.264172 | 0.264177 | 0.407826 |
+| **ratio** | **0.036542** | **0.036654** | **0.268675** |
+
+The measurement was expected to land near the local WARP `0.268675` — the reading this box produces
+and the one ADR-0074 treated as the healthy reference when it sized Alternative A's headroom.
+**It landed on the CI reading instead**, matching to three significant figures on the ratio and five
+on the control. Two independent statistics reproducing that closely across a software rasterizer and
+a hardware DX12 adapter is not coincidence, and it inverts ADR-0074's recorded mechanism: the quirk
+is not the *newer* WARP costing more trail history, it is **this box's older WARP inflating the
+numerator**, and every local capture — including every golden blessing — is taken on that build.
+ADR-0074's decision is unchanged (a number reproducing on two configurations is still a measurement,
+not a portable floor), but its Context, one Negative bullet and Alternative A's rejection are all
+narrower than they read. Carried in ADR-0074's **Outcome** section and in Followups below.
 - **Running alongside Plan [0059](0059-lorenz-finds-its-plane.md), which is live in a parallel
   session as of 2026-08-04.** No file is shared — that plan's Phase 4 is `presets/attractor_*.toml`
   and this one is `core/src/render/mod.rs`, `core/tests/dsp.rs` and `docs/specs/`. Three
@@ -365,20 +392,34 @@ from.
 
 - ~~If Phase 2 shows the coverage ratchet failing on a number nobody has seen since 2026-07-30,
   that is its own small plan~~ — **not needed**, it read 93.34 % against 88.
-- ADR-0071's corollary (a threshold at or below the declared noise floor is not a property) is
-  worth a one-line check during Mode 4 review of any plan that adds a pixel-difference assertion.
-  Consider adding it to the architect skill's lens 4 at this plan's close. **Add ADR-0074's
-  corollary alongside it** — a ratio is a property only when numerator and denominator are the same
-  kind of quantity — since the review question is the same one asked one level deeper.
-- **The dual-live magnitude claim is owed on hardware**, at Plan
-  [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3, which is the `human` phase
-  that puts a discrete GPU in front of this suite. Carry it there rather than opening a number for
-  it: `a_dual_live_dissolve_carries_the_outgoing_trail` already runs there and already asserts a
-  magnitude, so the addition is small once the machine exists. If that hardware never materializes,
-  ADR-0074 Alternative C (re-posing the control as the outgoing preset's own un-dissolved motion) is
-  the successor.
-- **Two WARP builds disagree 11.3x on the dual-live signal**, and nothing explains it beyond
-  "`dissolve_at`'s allocation quirk costs more history on the newer build". If that is right, the
-  same artifact is present in every other WARP capture this suite takes and nobody has looked.
-  Recorded in ADR-0074's Negative section; it is a question for Plan 0053, which owns whether WARP's
-  output should be trusted at all.
+- ~~ADR-0071's corollary ... Consider adding it to the architect skill's lens 4 at this plan's
+  close. Add ADR-0074's corollary alongside it.~~ **Done at this close** — both corollaries are in
+  the `architect` skill's lens 4, phrased as the two questions to ask of any numeric assertion in a
+  diff.
+- ~~**The dual-live magnitude claim is owed on hardware**, at Plan 0053 Phase 3~~ — **paid here,
+  `ae4c215`.** The deferral rested on a premise that was false and cheap to check: the gate is
+  `Renderer::adapter_is_software()` (`device_type == Cpu`), not "a discrete GPU". Plan 0053 Phase 3
+  no longer owes this, and ADR-0074 Alternative C (re-posing the control as the outgoing preset's
+  own un-dissolved motion) is no longer a fallback against hardware never arriving — it is now only
+  a *better-posed* successor if anyone wants the WARP test to carry a magnitude after all.
+- **Two WARP builds disagree 11.3x on the dual-live signal, and the hardware reading says which one
+  is wrong.** This entry used to say nothing explained the spread beyond "the allocation quirk costs
+  more history on the newer build". `ae4c215` explains it the other way: hardware matches the
+  **newer** WARP to five figures on the control, so **10.0.19041 — this box's build — is the
+  outlier**, inflating the numerator. The consequence is larger than the original entry's, because
+  the golden suite blesses on this box: a `frozen`-only sequence with no dual-live asymmetry in it
+  renders 1.54x differently here than on either other configuration, and nothing has looked at what
+  else that moves. **This is Plan [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md)'s
+  question** — it owns whether WARP's output should be trusted at all — and it is now a sharper one
+  than the plan was written against. Recorded in ADR-0074's Outcome section.
+- **`dissolve_at`'s doc comment states a machine-specific behaviour as a property of "the DX12 WARP
+  rasterizer"** (`core/src/render/mod.rs`), and it is load-bearing: it is the stated reason
+  `a_dual_live_dissolve_carries_the_outgoing_trail` is hardware-only and the reason
+  `core/tests/background_composite.rs` skips. On the evidence above it is a property of one WARP
+  build. That is ADR-0071's own error one level down, in prose rather than in an assertion.
+  **Deliberately not edited from a single contrary reading** — one more configuration (a second
+  hardware adapter, or a newer local WARP) settles it, and Plan 0053 Phase 3 is where that happens.
+- **`0.018` cleared every reading taken so far**, including both WARP ones. ADR-0074 rejected it as
+  a universal floor and that rejection stands on its remaining leg, but the question is now open
+  rather than settled — see ADR-0074's Outcome. **Do not reopen it on a fourth sample from this
+  box**; reopen it on a configuration this project has not yet measured.

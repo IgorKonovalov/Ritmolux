@@ -1,8 +1,24 @@
 # 0053 — The suite stops blessing what WARP gets wrong, and two guards start biting
 
-> **Status:** **approved 2026-08-02** — ready for `dev`. Four phases; Phase 3 is `human` (it needs
-> a discrete GPU) and gates Phase 4's allowlist entries, so this plan does **not** run
-> start-to-finish in one session — start it when that machine is to hand.
+> **Status:** **approved 2026-08-02** — ready for `dev`. Four phases; Phase 3 is `human` and gates
+> Phase 4's allowlist entries.
+> **Premise correction, 2026-08-04 (at Plan [0060](done/0060-a-test-number-states-a-property-or-names-its-machine.md)'s
+> close): this plan is not blocked, and Phase 3 may be much cheaper than written.** The header said
+> Phase 3 "needs a discrete GPU" and that the plan does not run start-to-finish in one session.
+> **The dev box has a hardware adapter.** The gate every hardware-only check in this suite skips on
+> is `Renderer::adapter_is_software()` — `device_type == DeviceType::Cpu`
+> (`core/src/render/context.rs`) — **not** "discrete", and Plan 0060 Phase 3 took a real hardware
+> measurement here on 2026-08-04 (`ae4c215`) after verifying the hardware-only sibling runs and
+> passes on this box. Whether Phase 3's *specific* comparison is satisfiable on an integrated
+> adapter is a judgement for whoever takes it — but "wait for a machine we do not have" is not the
+> reason to defer it. Try it first.
+> **And Plan 0060 handed this plan a sharper question than it was written against**, in the same
+> commit: the hardware dual-live reading matched **CI WARP** to five figures on one statistic and
+> disagreed with **this box's local WARP** by 1.54x on a sequence with no dual-live asymmetry in it.
+> If that holds, the build the golden suite blesses on is the outlier. See
+> [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md)'s
+> Outcome section — it lands squarely in this plan's scope, which is whether WARP's output should be
+> trusted at all.
 > **Created:** 2026-08-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md) (this

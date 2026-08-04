@@ -12,10 +12,9 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — **unblocked**: [0045] has landed and closed, so the linear-light pipeline this builds on exists; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **approved 2026-08-02** — ready for `dev`; [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
-| [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
+| [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** and gates Phase 4. **Its "needs a discrete GPU" premise was corrected 2026-08-04 at [0060]'s close** — the gate is `device_type == Cpu`, not "discrete", and a real hardware measurement was taken on this box the same day (`ae4c215`), so try Phase 3 before deferring it. **[0060] also handed this plan a sharper question than it was written against**: the hardware dual-live reading matched **CI WARP** to five figures and disagreed with **this box's local WARP** by 1.54x on a sequence with no dual-live asymmetry — if that holds, the build the golden suite blesses on is the outlier ([ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) Outcome). Moves **no pixels** except one new baseline | dev, human |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
 | [0059](0059-lorenz-finds-its-plane.md) | Lorenz finds its plane, and the attractor can trade samples for curves (per-family projection basis, the trail un-mirror, `[particles] density`, the continuous-flow streak) | **in progress** — **all four `dev` phases landed 2026-08-04** (Phase 1 `357a17e`, Phase 1b `1c47de5`, Phase 2 `4fb4a81`, Phase 3 `642aec0`) and were **reviewed 2026-08-04** (Mode 4, no blockers, no majors). **Only Phase 4 remains — `human`**, the one content pass over all six attractor presets; `f09f1fe` is provisional work toward it and is judged *as part of* that pass, not inherited. Successor to [0057], whose Phase 4 diagnosed this and stopped by its own instruction; [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) + [ADR-0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md) + [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md); closes [backlog 0048](../design-backlog.md). **Amended 2026-08-04 with a new Phase 1b**: Phase 1's basis is correct and the picture was **still an X**, because the attractor trail samples its own target with the unflipped fullscreen prelude and renders `figure ∪ mirror(figure)` — older than this plan, invisible to every gate because the doubling conceals its own symptom. **The "no golden baseline moves" claim is withdrawn**: `attractor.png` and `reaction_diffusion.png` both move at Phase 1b (the four `composite_*` fixtures run `parametric_curve` and do not). **Phase 4 is `human`** — the one content pass, now covering **all six** attractor presets rather than mainly `attractor_lorenz`, since every one was authored against a doubled figure; it **may route back to `architect`** if `density` + `fade` cannot hold a curve | dev, human |
-| [0060](0060-a-test-number-states-a-property-or-names-its-machine.md) | A test number states a property, or names its machine (the two frozen numbers holding CI red: bit-exact `f32` literals pinned to x86_64, and the dual-live floor traded for a ratio against an in-run control) | **in progress** — **Phases 1 and 2 are done and CI IS GREEN** (`1d56600`, plus `31073f6` scoping a `.config/nextest.toml` `success-output` override to the two reporting tests so they stay audible on a green run; run **30903871856**). **Phase 3 was routed back to `architect` by its own clause and has been re-scoped**: the CI ratio came back at `0.036654`, under the `0.05` fallback the plan named in advance, so [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) takes the decision — **no ratio floor is added**, the WARP test is demoted to a property-only smoke check that says so in its own doc, and the magnitude claim defers to hardware at [0053] Phase 3. **Phase 3 is three-quarters landed**: `a324b21` took the three documentation items (arm64 values, the render doc demotion, the determinism spec's scoping sentence), adding, removing and loosening **no assertion**. **One item remains** — the magnitude claim measured on **hardware**, added to the phase after `a324b21` landed, once ADR-0074's "hardware we do not have" premise turned out to be false. It is the last thing between this plan and its close, and it must also re-point `a324b21`'s doc comment, which still sends the magnitude claim to [0053] Phase 3. [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md). Moves **no pixels**, no shipped code, no golden baseline | dev, human |
 | [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended twice the same day** — **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (at the user's direct request), reconciled into the plan rather than reverted: it meets 4b's done-when with one accepted deviation (a test-written scratch library rather than a checked-in `fixtures/report/`), and it **opens the coverage gap 4b's sequencing existed to prevent** — nothing renders every shipped preset through the real CLI any more *and* Phase 4 has not yet put the generator under in-process tests. Every other phase is unstarted. From the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. **Phase 6 is gated on [0059] being closed** (it edits `particles/mod.rs`); **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
 
 ## Recommended execution sequence
@@ -26,16 +25,14 @@ for the first time in a week: `cargo test --doc`, `clippy -D warnings` and `carg
 run and pass, and the **coverage ratchet reads 93.34 % against `COVERAGE_FLOOR = 88`**. No floor
 change is owed.
 
-**What [0060] has left is one `dev` doc pass, and it is small.** Phase 2 read both runners' numbers
-and Phase 3 was re-scoped by the architect on 2026-08-04, because the ratio the plan built its
-magnitude claim on **moved 7.3x between two builds of the same software rasterizer** (`0.268675`
-local against `0.036654` on CI WARP) — under the `0.05` fallback the plan had named in advance.
-[ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) takes
-it: no floor, the WARP test demoted to what it actually proves there, the magnitude claim deferred
-to hardware at [0053] Phase 3. **Two lessons worth carrying past that plan.** A ratio is a property
-only when numerator and denominator are the **same kind of quantity** — same run and same adapter
-are entry requirements, not proof; and *naming the fallback condition in advance* is what let a
-failed design decision cost one architect session instead of an argument.
+**[0060] has landed and closed** (2026-08-04) — see Recently closed. Two lessons and one live
+question outlive it. **A ratio is a property only when numerator and denominator are the same kind
+of quantity** (ADR-0074) — same run and same adapter are entry requirements, not proof; and *naming
+the fallback condition in advance* is what let a failed design decision cost one architect session
+instead of an argument. **The live question belongs to [0053]**: the hardware measurement Phase 3
+finally took matched **CI WARP** to five figures and disagreed with **this box's local WARP** by
+1.54x on a statistic with no dual-live asymmetry in it — so the outlier is the build the golden
+suite blesses on, not the runner's. Nothing has looked at what else that moves.
 
 
 **[0061] goes last, by the user's own instruction, and is the only `draft` in the roster.** It came
@@ -84,25 +81,22 @@ construction — [0053] until a discrete GPU is to hand, [0055] until the live A
 on exactly one `human` phase before its close ceremony. Taking [0052] first keeps a session
 unblocked end to end.
 
-**[0050] closed 2026-08-04 and took the version to `0.33.0`.** Two closes remain pending: [0059]
-needs Phase 4 (the content pass), and [0060] needs Phase 3 (a `dev` session — now slightly larger
-than a doc pass, see below) plus its close. Each owes its own bump —
-[ADR-0005](../adrs/0005-versioning-and-release-cadence.md), one per close, chosen at the close. On
-present shape: **minor** for [0059] (a new preset-facing structural key and an engine behaviour
-change) and **patch** for [0060] (test contracts and docs, no shipped code) — decided for real at
-each close, not here.
+**[0060] closed 2026-08-04 and took the version to `0.33.1`** — **patch**, per
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md): the plan rewrote two test contracts,
+added one, and moved three documents, and it changed **no shipped code, no pixel and no golden
+baseline**. One close remains pending: **[0059] needs Phase 4** (the `human` content pass), and it
+owes its own bump — **minor** on present shape (a new preset-facing structural key and an engine
+behaviour change), decided for real at that close and not here.
 
-**A premise correction that makes [0060] Phase 3 bigger and [0053] Phase 3 cheaper, found the same
-day.** ADR-0074 deferred the dual-live magnitude claim to "hardware this side does not have". **The
-dev box has hardware.** The gate these checks skip on is `Renderer::adapter_is_software()` —
-`device_type == DeviceType::Cpu` — **not** "a discrete GPU", and the hardware-only sibling
-`a_dual_live_dissolve_carries_the_outgoing_trail` **runs and passes here today** (verified with
-`--no-capture`: 7.68 s of real GPU work, no skip notice). So the clean magnitude measurement is one
-`software: false` away and [0060] Phase 3 now carries it, rather than it waiting on a `human` phase.
-The ADR's *decision* is unchanged — it rested on the 7.3x ratio spread, not on where a machine is.
-Worth carrying further than these two plans: **every hardware-gated check in this suite has been
-runnable on this box all along**, so a "needs a discrete GPU" note is worth testing before it is
-believed.
+**A premise correction that outlives both plans that found it.** ADR-0074 deferred the dual-live
+magnitude claim to "hardware this side does not have", and Plan [0053]'s header said its Phase 3
+"needs a discrete GPU". **The dev box has hardware.** The gate these checks skip on is
+`Renderer::adapter_is_software()` — `device_type == DeviceType::Cpu` — **not** "a discrete GPU",
+and the hardware-only sibling `a_dual_live_dissolve_carries_the_outgoing_trail` runs and passes
+here (7.68 s of real GPU work, no skip notice). [0060] Phase 3 then took the measurement here
+(`ae4c215`) rather than deferring it, and [0053]'s header has been corrected. Worth carrying
+further than these two plans: **every hardware-gated check in this suite has been runnable on this
+box all along**, so a "needs a discrete GPU" note is worth *testing* before it is believed.
 
 **[0059]'s engine work is finished and only the content pass is left.** All four `dev` phases landed
 2026-08-04 (`357a17e`, `1c47de5`, `4fb4a81`, `642aec0`) and were reviewed the same day: no blockers,
@@ -336,12 +330,20 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.33.0`**, tag `v0.33.0` — **minor**, bumped at [0050]'s close per
-[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Minor is the right level: the plan adds
+**Version is at `0.33.1`**, tag `v0.33.1` — **patch**, bumped at [0060]'s close per
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Patch rather than minor is a deliberate
+call on a plan whose whole content is test contracts and documents: it rewrote two numeric gates
+and added a third, moved `docs/specs/0002-ring-determinism.md` and a `.config/nextest.toml`
+override, and touched **no shipped code, no `core` entry point, no preset-facing surface, no pixel
+and no golden baseline**. It is also not "none" — the suite gained a real assertion (a hardware
+ratio floor) and lost a false one, which is a change to what this project promises about itself.
+Nothing is owed until the next close, which will be [0059]'s.
+
+The `0.33.0` before it was [0050]'s close — **minor**, per
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Minor was the right level: the plan adds
 a **new `core` entry point** (`Renderer::set_tier`, plus `active_index`), a whole operator surface
 (the `S` modal, the `[` / `]` swap, the column-flowed browser, key repeat), and a persisted setting
-path — capability, not a fix. It moves no pixels and no golden baseline. Nothing is owed until the
-next close, which will be [0059]'s.
+path — capability, not a fix. It moves no pixels and no golden baseline.
 
 The `0.32.0` before it was the joint [0057] + [0058] close — **minor**, per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). **Two plans closed under one bump, and
@@ -541,6 +543,44 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 
 ## Recently closed
 
+- [0060 — a test number states a property, or names its
+  machine](done/0060-a-test-number-states-a-property-or-names-its-machine.md) — **done 2026-08-04**,
+  Mode 4 review **no blockers**. Phase 1 `1d56600` + `31073f6`, Phase 2 the `human` push (CI run
+  **30903871856**, green on all three jobs), Phase 3 `a324b21` + `ae4c215`.
+  [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) and
+  [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) are
+  both **accepted**, 0074 with an **Outcome** section (see below). Gate on `main` before the bump:
+  `fmt` clean, `clippy -D warnings` clean, **459/459 nextest, 0 skipped**; no shipped code, no
+  pixel, no golden baseline, C ABI unchanged at v4.
+  **It ended five consecutive red CI pushes, and the shape of the defect is the durable part.** Two
+  tests froze a number that only existed on the machine that measured it: four bit-exact `f32`
+  literals taken on x86_64, which had **never once passed** on the arm64 runner and could not (the
+  fixture's own input comes from platform libm and `rustfft` dispatches NEON there); and a
+  pixel-difference floor of `0.01`, **half** the `0.02` this project already calls cross-rasterizer
+  noise. Both now state a property or name their machine and skip elsewhere, printing what they
+  observed — which is how Phase 2 could read the runners' numbers at all.
+  **The plan's own route-back clause fired, and that is the process finding.** Phase 3 was to set a
+  magnitude floor from the ratio Phase 1 built; the ratio came back **7.3x apart** between two
+  builds of one software rasterizer (`0.268675` local, `0.036654` on CI), under the `0.05` fallback
+  the plan had **named in advance**. So it cost one architect session and an ADR instead of an
+  argument. Worth repeating on any plan that has to read a number off a machine it does not own.
+  **The hardware measurement is the finding nobody went looking for.** Once ADR-0074's "hardware we
+  do not have" premise turned out to be false, Phase 3 took the clean reading here — and it landed
+  on the **CI WARP** number (`0.036542` against `0.036654`, matching to three figures on the ratio
+  and **five on the control**), not on the local one. So WARP 10.0.26100 behaves like hardware and
+  **this box's WARP 10.0.19041 is the outlier**, inflating the numerator — the opposite of the
+  mechanism ADR-0074 recorded. Its decision stands (a number reproducing on two configurations is
+  still a measurement), but its Context, one Negative bullet and Alternative A's rejection are all
+  narrower than they read, and the Outcome section says so. **The consequence belongs to [0053]**:
+  the golden suite blesses on the outlier build, and a `frozen`-only sequence with no dual-live
+  asymmetry in it renders 1.54x differently here than on either other configuration. Nothing has
+  looked at what else that moves.
+  **One more thing left standing on purpose.** `dissolve_at`'s doc comment attributes the trails
+  quirk to "the DX12 WARP rasterizer" and it is load-bearing — it is why the hardware-only sibling
+  is hardware-only and why `background_composite.rs` skips. On this evidence it is a property of one
+  WARP *build*, written as a property of WARP: ADR-0071's own error a level down, in prose. Not
+  edited from a single contrary reading; [0053] Phase 3 is where a second configuration settles it.
+  Both ADR corollaries are now in the `architect` skill's lens 4, as the plan's Followups asked.
 - [0050 — in-app settings, live quality, and a browse overlay that
   fits](done/0050-in-app-settings-and-a-browse-overlay-that-fits.md) — **done 2026-08-04**, Mode 4
   review **no blockers, no majors**. All six phases landed including the `human` Phase 6:
