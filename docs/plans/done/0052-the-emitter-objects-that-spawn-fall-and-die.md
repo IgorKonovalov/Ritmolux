@@ -1,7 +1,7 @@
 # 0052 — The emitter: objects that spawn, fall on a parabola, and die
 
 > **Status:** **done 2026-08-04** — all four phases landed (`2470a50`, `d155615`, `52a756c`,
-> `53a896e`) on lane `plan-0052-emitter`, closed together with [0055](../0055-the-fold-edge-becomes-a-choice.md)
+> `53a896e`) on lane `plan-0052-emitter`, closed together with [0055](0055-the-fold-edge-becomes-a-choice.md)
 > against one merged tip. Mode 4 verdict: **landed cleanly, no blockers.** Verified independently of
 > the lane's own report — every named done-when's assertion body read, exactly one golden baseline
 > added (`emitter.png`) and none modified, and the post-merge gate green at **473 tests, 0 skipped**.
