@@ -1093,6 +1093,7 @@ fn declared_params_match_set_param() {
                 "kaleido_angle",
                 "kaleido_center_x",
                 "kaleido_center_y",
+                "kaleido_edge",
             ],
         ),
         (
