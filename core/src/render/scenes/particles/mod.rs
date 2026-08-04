@@ -361,6 +361,19 @@ const DEFAULT_HUE: f32 = 0.0;
 /// multiply by `1.0` is exact — so an unbound preset is byte-identical and no
 /// golden baseline moves.
 const DEFAULT_PERSPECTIVE: f32 = 0.0;
+/// The two atmospheric cues, likewise inert at their defaults: `depth_fade = 0`
+/// leaves the brightness multiplier exactly `1`, and `depth_hue = 0` adds an
+/// exact `0` to the palette coordinate.
+///
+/// **They come as a pair on purpose.** Distance washing out contrast is the
+/// oldest depth cue there is (ADR-0044), but dimness alone is ambiguous with a
+/// thing simply *being dimmer*; a hue shift is what makes it read as **distance**,
+/// because real atmospheric perspective moves colour as well as contrast. They
+/// are also the substitute for the occlusion ADR-0076 declines to do: far
+/// material is attenuated until it stops competing with near material, which is
+/// what reads as depth for a diffuse cloud that cannot hide anything.
+const DEFAULT_DEPTH_FADE: f32 = 0.0;
+const DEFAULT_DEPTH_HUE: f32 = 0.0;
 /// Ceiling on `perspective`, applied silently where the uniform is packed.
 ///
 /// `perspective` means **the figure's depth half-extent as a fraction of the
@@ -743,6 +756,28 @@ fn magnify(dn: f32) -> f32 {
     return 1.0 / (1.0 - draw.d.x * dn);
 }
 
+// Depth remapped to [0, 1] with **1 nearest**, which is the sense both
+// atmospheric cues below are written in. `dn` is already clamped, so this needs
+// no clamp of its own.
+fn depth01(dn: f32) -> f32 {
+    return (dn + 1.0) * 0.5;
+}
+
+// Distance haze: brightness attenuated with distance, so `depth_fade = 1` takes
+// the far end to black and `0` is exactly 1.0 everywhere (ADR-0076).
+// `depth_fade` is clamped CPU-side to [0, 1] - past 1 this would go NEGATIVE,
+// and a negative deposit in an additive accumulation subtracts light.
+fn haze(dn: f32) -> f32 {
+    return 1.0 - draw.d.y * (1.0 - depth01(dn));
+}
+
+// Distance tint: a shift of +/- depth_hue/2 in the palette coordinate across the
+// depth range, centred so the mid-depth colour is the one the preset asked for.
+// Rides the existing LUT sample and needs no new machinery.
+fn depth_tint(dn: f32) -> f32 {
+    return draw.d.z * (depth01(dn) - 0.5);
+}
+
 @vertex
 fn vs_main(
     @builtin(vertex_index) vi: u32,
@@ -837,7 +872,12 @@ fn vs_main(
     // band `hue_center + (seed - 0.5)*hue_spread` (was a hardcoded `seed*0.15`),
     // plus the shared `hue`; both LUTs crossfade by `palette_mix` before
     // `saturation`. `textureSampleLevel` (LOD 0) — vertex stage has no derivatives.
-    let coord = hue + hue_center + (seed - 0.5) * hue_spread;
+    //
+    // The depth tint rides the same coordinate (ADR-0076). Taken from the
+    // particle's own `dn` - for a segment that is the head's, not the midpoint's:
+    // the colour follows where the particle IS, and the trail behind it already
+    // carries the shade it had when it was there.
+    let coord = hue + hue_center + (seed - 0.5) * hue_spread + depth_tint(dn);
     let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
     let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
     let col = apply_saturation(mix(ca, cb, clamp(palette_mix, 0.0, 1.0)), saturation);
@@ -853,7 +893,11 @@ fn vs_main(
     out.pos = vec4<f32>(ndc, 0.0, 1.0);
     out.local = local;
     out.half_len = half_len;
-    out.color = col * deposit;
+    // ...and the distance haze, which is the stand-in for the occlusion this
+    // scene deliberately does not do (ADR-0076). Applied to the emitted light,
+    // so the trail inherits the grading: a particle that was far and is now near
+    // leaves a dim streak behind a bright head.
+    out.color = col * deposit * haze(dn);
     return out;
 }
 
@@ -930,6 +974,28 @@ mod projection_mirror {
     /// Mirrors `magnify()` in [`DRAW_SHADER`](super::DRAW_SHADER).
     pub(super) fn magnify(dn: f32, perspective: f32) -> f32 {
         1.0 / (1.0 - perspective * dn)
+    }
+
+    /// Mirrors `depth01()` in [`DRAW_SHADER`](super::DRAW_SHADER).
+    pub(super) fn depth01(dn: f32) -> f32 {
+        (dn + 1.0) * 0.5
+    }
+
+    /// Mirrors `haze()` in [`DRAW_SHADER`](super::DRAW_SHADER) — the per-particle
+    /// brightness multiplier.
+    ///
+    /// This is where the fade is measurable at all. Which *screen region* holds
+    /// the far material depends on the spin phase, so a pixel-side assertion
+    /// would be measuring the clock; the multiplier is the thing the decision is
+    /// about.
+    pub(super) fn haze(dn: f32, depth_fade: f32) -> f32 {
+        1.0 - depth_fade * (1.0 - depth01(dn))
+    }
+
+    /// Mirrors `depth_tint()` in [`DRAW_SHADER`](super::DRAW_SHADER) — the shift
+    /// added to the per-particle palette coordinate.
+    pub(super) fn depth_tint(dn: f32, depth_hue: f32) -> f32 {
+        depth_hue * (depth01(dn) - 0.5)
     }
 
     /// The magnified world-space position of one particle — `project` composed
@@ -1695,6 +1761,14 @@ pub struct AttractorScene {
     /// uniform is packed. `0` is the orthographic projection this scene shipped
     /// with, and it is inert on the 2D families whatever it is set to.
     perspective: f32,
+    /// Atmospheric depth cues (ADR-0076), the substitute for occlusion:
+    /// `depth_fade` attenuates a particle's brightness with distance (clamped to
+    /// `[0, 1]` where the uniform is packed — past `1` the multiplier would go
+    /// negative and *subtract* light from the additive accumulation), and
+    /// `depth_hue` shifts its palette coordinate by `±depth_hue/2` across the
+    /// depth range. Both inert on the 2D families, like `perspective`.
+    depth_fade: f32,
+    depth_hue: f32,
     /// The active baked palette pair; uploaded to the draw LUT textures when
     /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
     palette: Palette,
@@ -1755,6 +1829,8 @@ impl AttractorScene {
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
             perspective: DEFAULT_PERSPECTIVE,
+            depth_fade: DEFAULT_DEPTH_FADE,
+            depth_hue: DEFAULT_DEPTH_HUE,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
             reseed: 0.0,
@@ -1925,6 +2001,8 @@ pub const PARAMS: &[&str] = &[
     "pan_y",
     "reseed",
     "perspective",
+    "depth_fade",
+    "depth_hue",
 ];
 
 impl Scene for AttractorScene {
@@ -1983,6 +2061,8 @@ impl Scene for AttractorScene {
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
         self.perspective = DEFAULT_PERSPECTIVE;
+        self.depth_fade = DEFAULT_DEPTH_FADE;
+        self.depth_hue = DEFAULT_DEPTH_HUE;
         self.reseed = 0.0;
     }
 
@@ -2003,6 +2083,8 @@ impl Scene for AttractorScene {
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
             "perspective" => self.perspective = value,
+            "depth_fade" => self.depth_fade = value,
+            "depth_hue" => self.depth_hue = value,
             "reseed" => self.reseed = value,
             _ => {}
         }
@@ -2102,6 +2184,8 @@ impl Scene for AttractorScene {
             pan_x,
             pan_y,
             perspective,
+            depth_fade,
+            depth_hue,
             palette,
             palette_dirty,
             ..
@@ -2141,6 +2225,8 @@ impl Scene for AttractorScene {
                 zoom: *zoom,
                 pan: [*pan_x, *pan_y],
                 perspective: *perspective,
+                depth_fade: *depth_fade,
+                depth_hue: *depth_hue,
             },
         );
         // Before the steps, and only on the frame a `reseed` edge landed: kick each
@@ -2195,6 +2281,8 @@ struct UniformInputs {
     zoom: f32,
     pan: [f32; 2],
     perspective: f32,
+    depth_fade: f32,
+    depth_hue: f32,
 }
 
 /// The deferred one-shot uploads: the palette LUTs on a preset switch or fresh
@@ -2313,9 +2401,13 @@ fn upload_uniforms(
                 // more gets the ceiling rather than a divisor approaching zero
                 // (ADR-0076). `presets/README.md` documents that it is silent.
                 inputs.perspective.clamp(0.0, MAX_PERSPECTIVE),
-                // The atmospheric cues, Phase 2's.
-                0.0,
-                0.0,
+                // Clamped for a harder reason than a ceiling: past `1` the haze
+                // multiplier goes negative, and negative light in an additive
+                // accumulation *subtracts* from whatever the trail already holds.
+                inputs.depth_fade.clamp(0.0, 1.0),
+                // Not clamped: the palette LUT sampler repeats, so any shift is
+                // a legitimate coordinate.
+                inputs.depth_hue,
                 inputs.family.inv_depth_extent(),
             ],
         }),
@@ -2493,9 +2585,9 @@ mod tests {
     #![allow(clippy::panic, clippy::expect_used)]
 
     use super::{
-        AttractorFamily, AttractorScene, Basis, FIXED_STEP, MAX_PERSPECTIVE, MIN_PARTICLE_DENSITY,
-        Particle, RESEED_DRAWS_STREAK, Scene, active_particles, deposit_scale, projection_mirror,
-        streak_flag,
+        AttractorFamily, AttractorScene, Basis, DEFAULT_DEPTH_FADE, DEFAULT_DEPTH_HUE, FIXED_STEP,
+        MAX_PERSPECTIVE, MIN_PARTICLE_DENSITY, Particle, RESEED_DRAWS_STREAK, Scene,
+        active_particles, deposit_scale, projection_mirror, streak_flag,
     };
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderContext;
@@ -2857,6 +2949,105 @@ mod tests {
         assert_eq!(projection_mirror::depth_norm(-100.0, 1.0 / 26.0), -1.0);
         // A flat family's zero extent survives even an absurd depth.
         assert_eq!(projection_mirror::depth_norm(1e30, 0.0), 0.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Atmosphere (Plan 0063 Phase 2 / ADR-0076)
+    // -----------------------------------------------------------------------
+
+    /// **Far material is dimmer than near material**, measured on the
+    /// per-particle multiplier across a sampled depth range.
+    ///
+    /// Not on pixels, and not because pixels are inconvenient: which screen
+    /// region holds the far material depends on the spin phase, so a frame's
+    /// "far half" is not a fixed set of columns and an assertion about one would
+    /// be reading the clock. The multiplier is where the decision lives.
+    #[test]
+    fn distance_dims_the_far_material() {
+        const FADE: f32 = 0.8;
+        const SAMPLES: usize = 33;
+
+        // Sample the depth range end to end. `dn = -1` is farthest, `+1` nearest.
+        let dn_at = |i: usize| i as f32 / (SAMPLES - 1) as f32 * 2.0 - 1.0;
+        let mean = |range: std::ops::Range<usize>| -> f32 {
+            let n = range.len() as f32;
+            range
+                .map(|i| projection_mirror::haze(dn_at(i), FADE))
+                .sum::<f32>()
+                / n
+        };
+        let far = mean(0..SAMPLES / 2);
+        let near = mean(SAMPLES / 2 + 1..SAMPLES);
+        println!("mean haze at depth_fade {FADE}: far half {far:.4}, near half {near:.4}");
+        assert!(
+            far < near * 0.8,
+            "the far half is not measurably dimmer than the near half ({far:.4} against \
+             {near:.4}) — `depth_fade` is not attenuating with distance"
+        );
+
+        // Monotone the whole way, not merely lower on average: a cue that
+        // brightened anywhere in the middle would still pass the halves test.
+        for i in 1..SAMPLES {
+            let (prev, now) = (
+                projection_mirror::haze(dn_at(i - 1), FADE),
+                projection_mirror::haze(dn_at(i), FADE),
+            );
+            assert!(
+                now > prev,
+                "haze is not monotone in depth: {prev:.5} at d_n {:.3}, {now:.5} at {:.3}",
+                dn_at(i - 1),
+                dn_at(i)
+            );
+        }
+
+        // The two ends the parameter is documented by: `depth_fade = 1` takes the
+        // far end to black and leaves the near end untouched.
+        assert_eq!(projection_mirror::haze(-1.0, 1.0), 0.0);
+        assert_eq!(projection_mirror::haze(1.0, 1.0), 1.0);
+        // Never negative anywhere in the clamped range — a negative deposit would
+        // subtract light from the additive accumulation.
+        for i in 0..SAMPLES {
+            assert!(projection_mirror::haze(dn_at(i), 1.0) >= 0.0);
+        }
+    }
+
+    /// Both cues are **exactly** the identity at their defaults, which is why no
+    /// existing capture moves. Exact, not approximate: `1.0 - 0.0 * x` is `1.0`
+    /// and a multiply by it is an IEEE identity, and `0.0 * x` added to a
+    /// coordinate leaves its bits alone.
+    #[test]
+    fn the_atmosphere_is_off_by_default() {
+        for dn in [-1.0f32, -0.5, 0.0, 0.25, 1.0] {
+            assert_eq!(projection_mirror::haze(dn, DEFAULT_DEPTH_FADE), 1.0);
+            assert_eq!(projection_mirror::depth_tint(dn, DEFAULT_DEPTH_HUE), 0.0);
+            // And on a flat family the cues are inert whatever they are set to,
+            // because `d_n` is identically zero there — so both land on the
+            // mid-depth value and no De Jong particle can be tinted or dimmed.
+            let flat =
+                projection_mirror::depth_norm(1e6, AttractorFamily::DeJong.inv_depth_extent());
+            assert_eq!(projection_mirror::haze(flat, 1.0), 0.5);
+            assert_eq!(projection_mirror::depth_tint(flat, 1.0), 0.0);
+        }
+        assert_eq!(DEFAULT_DEPTH_FADE, 0.0);
+        assert_eq!(DEFAULT_DEPTH_HUE, 0.0);
+    }
+
+    /// The hue shift spans `±depth_hue/2` across the depth range and is centred,
+    /// so the mid-depth colour is the one the preset asked for — a cue that
+    /// merely *tinted* the whole picture would be a `hue` offset with extra
+    /// steps.
+    #[test]
+    fn the_depth_tint_is_centred_and_spans_the_parameter() {
+        const HUE: f32 = 0.3;
+        assert!((projection_mirror::depth_tint(1.0, HUE) - HUE / 2.0).abs() < 1e-6);
+        assert!((projection_mirror::depth_tint(-1.0, HUE) + HUE / 2.0).abs() < 1e-6);
+        assert_eq!(projection_mirror::depth_tint(0.0, HUE), 0.0);
+        let span =
+            projection_mirror::depth_tint(1.0, HUE) - projection_mirror::depth_tint(-1.0, HUE);
+        assert!(
+            (span - HUE).abs() < 1e-6,
+            "the tint spans {span} across the depth range, not the {HUE} it was asked for"
+        );
     }
 
     // -----------------------------------------------------------------------
