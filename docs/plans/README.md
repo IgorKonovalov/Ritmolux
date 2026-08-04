@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0063** (ADRs are a separate sequence — next free there is **0076**.)
+**Next free number: 0064** (ADRs are a separate sequence — next free there is **0077**.)
 
 ## Active roster
 
@@ -17,6 +17,8 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended twice the same day** — **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (at the user's direct request), reconciled into the plan rather than reverted: it meets 4b's done-when with one accepted deviation (a test-written scratch library rather than a checked-in `fixtures/report/`), and it **opens the coverage gap 4b's sequencing existed to prevent** — nothing renders every shipped preset through the real CLI any more *and* Phase 4 has not yet put the generator under in-process tests. Every other phase is unstarted. From the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Amended a third time with Phase 2c** (2026-08-04, at [0060]'s close): a `links` job on `ubuntu-latest` giving `scripts/check-doc-links.mjs` a CI counterpart, so the doc-link gate stops depending on an opt-in hook. Independent of 2b/4b, touches neither Windows job, seconds on the cheapest runner — it is here only because this plan owns every `ci.yml` edit in flight. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. ~~Phase 6 is gated on [0059] being closed~~ — **released 2026-08-04**, [0059] has closed, so Phase 6 (which edits `particles/mod.rs`) is unblocked; it also inherits [0059]’s close decision to **retire `RESEED_DRAWS_STREAK`**, which lives in that same file; **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
 
 | [0062](0062-the-chaos-game-grows-a-fern.md) | The chaos game grows a fern: an IFS family that morphs between figures (`AttractorFamily::Ifs`, five curated tables in SVD form, safe-by-construction morph + four levers) | **approved 2026-08-04** — ready for `dev`; designed from the user's Barnsley-fern question; [ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md). **The first half of a deliberate two-plan split** (the user's call at interview): this one lands the *figure* — the family, the roster, the morph, the levers — so a real fern can be judged in motion; the successor carries the **unfurl and the depth/per-map colour**, which are the same per-particle channel and are tuned against a figure already known to be right. Adds **no** render idiom, no `Scene` change, no C ABI change, no dependency — the `attractor` scene is already a GPU chaos game and this is a fifth family plus one shader branch. **Phase 7 is `human`** (a `preset-author` pass judging levers against real audio), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
+
+| [0063](0063-the-attractor-keeps-its-depth.md) | The attractor keeps its depth: perspective, haze, and a spin you can drive (`perspective`, `depth_fade`, `depth_hue`, `spin`) | **draft 2026-08-04** — designed from the user's "can we make strange attractors more 3D looking"; [ADR-0076](../adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md). The 3D families read flat because `project()` computes a view depth and **discards** it, leaving an orthographic projection whose rotation is perceptually bistable (the image at rotation pi is the exact x-mirror of the image at 0). Keeps the depth; spends it on perspective + two atmospheric cues; **no sorting, no occlusion** (the user's call — the accumulation is the scene). **The 2D families are untouched by arithmetic rather than by a default**, so `core/tests/fixtures/attractor.toml` (De Jong) cannot move. Also closes a gap the question surfaced: `SPIN_RATE` is a `const` no preset can reach, and every 3D attractor turns at one revolution per **34.9 s** forever. **Phase 5 is `human`** (a `preset-author` pass over the two 3D presets), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
 
 ## Recommended execution sequence
 
@@ -86,6 +88,29 @@ Its **Phase 7 is `human`** (a `preset-author` pass judging the four levers and f
 real audio), so like [0053] and [0055] it stops before closing in one session — but unlike those
 two, Phases 1-6 are a full `dev` session of real capability with nothing gating them.
 
+**[0063] is new the same day (2026-08-04) and is the other half of "the attractor gets better".**
+Also from a direct user question — can the strange attractors look more 3-D — and the answer turned
+out to be a **defect diagnosis rather than a feature request**: `project()` computes a view-space
+depth and throws it away, so the 3-D families render orthographically, and an orthographic
+projection of a rotating transparent structure is perceptually **bistable** (the image at rotation
+pi is the exact x-mirror of the image at 0). That is why they read flat, and it is why no amount of
+preset tuning has ever fixed it. Three things to know:
+
+- **It is small.** Four new params, one new fixture, no new idiom, no `Scene` or C ABI change, no
+  dependency. Five phases, the last `human`.
+- **It moves no existing golden baseline, and that is structural rather than a default.** The 2-D
+  families receive an inverse depth extent of exactly `0`, so every cue collapses to the identity
+  with no branch — and `core/tests/fixtures/attractor.toml` is **De Jong**, so it could not move
+  even if a default were wrong. It needs its own 3-D fixture, which Phase 4 adds.
+- **It overlaps [0062] and [0061] Phase 6 in one file** (`particles/mod.rs`) and in one place inside
+  it: the family enum's method set, where all three *add* rather than change. If [0062] lands
+  second it must give its IFS figures `inv_depth_extent() = 0.0` — they are 2-D — and its exhaustive
+  match will force it to notice. No ordering is wrong.
+
+**[0062] and [0063] together are the session worth taking if the goal is visible improvement**:
+one adds a figure family the engine cannot draw today, the other fixes why the figures it already
+draws look flat. Neither blocks the other and neither is blocked by anything.
+
 **[0060] has landed and closed** (2026-08-04) — see Recently closed. Two lessons and one live
 question outlive it. **A ratio is a property only when numerator and denominator are the same kind
 of quantity** (ADR-0074) — same run and same adapter are entry requirements, not proof; and *naming
@@ -96,9 +121,9 @@ finally took matched **CI WARP** to five figures and disagreed with **this box's
 suite blesses on, not the runner's. Nothing has looked at what else that moves.
 
 
-**[0061] goes last, by the user's own instruction, and is the only `draft` in the roster.** ([0062]
-was written and approved the same day; the two are unrelated and 0062 does not inherit this "goes
-last".) It came
+**[0061] goes last, by the user's own instruction.** ([0062] and [0063] were written the same day —
+0062 approved immediately, 0063 still `draft`; all three are unrelated and neither of the newer two
+inherits this "goes last".) It came
 out of a whole-tree maintainability audit rather than a feature request, so nothing depends on it and
 it depends on nothing — the one dependency it had, [0059] being closed before its Phase 6 (which edits the same file), was **released 2026-08-04**. Two
 consequences worth carrying: its numbers are a **2026-08-04 snapshot of one machine**, so a phase
@@ -137,8 +162,9 @@ re-planning; the reason they live here is thematic (the plan's title is exactly 
 technical.
 
 **Every other plan in the roster is approved as of 2026-08-04 — nothing is waiting on a design
-decision** — [0062] was approved the day it was written, leaving [0061] as the only `draft`, and it
-is fully designed too. What separates them now is only what each needs to *run*: [0052] closes in one session;
+decision** — [0062] was approved the day it was written; the remaining `draft`s, [0061] and [0063],
+are both fully designed and waiting only on the user's go. What separates them now is only what each
+needs to *run*: [0052] closes in one session;
 [0053] and [0055] each carry a `human` phase that gates later phases, so they stop mid-plan by
 construction — [0053] until a discrete GPU is to hand, [0055] until the live A/B is judged.
 Taking [0052] first keeps a session unblocked end to end.
