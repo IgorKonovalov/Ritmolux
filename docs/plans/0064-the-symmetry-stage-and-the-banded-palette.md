@@ -1,6 +1,11 @@
 # 0064 — The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour
 
-> **Status:** draft
+> **Status:** **approved 2026-08-04** — ready for `dev`, **after [Plan 0055](0055-the-fold-edge-becomes-a-choice.md)**.
+> Both live in `kaleidoscope.rs`; 0055 is smaller, older and branches on the *destination* radius,
+> which this plan's composed map does not touch, so taking it first costs nothing and taking it
+> second means rebasing onto a rewritten shader. Phases 1-3 are `dev` and run start-to-finish;
+> **Phase 4 is `human`** (pick defaults and ranges from the rendered grid) and gates Phases 5-6, so
+> the plan does not close in one session.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) (the

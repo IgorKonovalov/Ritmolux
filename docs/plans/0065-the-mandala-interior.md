@@ -1,6 +1,9 @@
 # 0065 — The mandala interior: `star_pattern` stops being hollow
 
-> **Status:** draft
+> **Status:** **approved 2026-08-04** — ready for `dev`, and **gated by nothing**. It is line-geometry
+> work and shares no file with any other plan in the roster, so it is the safest parallel lane
+> available. Phases 1-2 are `dev` and run start-to-finish; **Phase 3 is `human`** (pick the motif
+> roster from the rendered grid) and gates Phases 4-6, so the plan does not close in one session.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
