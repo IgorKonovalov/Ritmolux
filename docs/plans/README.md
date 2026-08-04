@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0060** (ADRs are a separate sequence — next free there is **0071**.)
+**Next free number: 0061** (ADRs are a separate sequence — next free there is **0072**.)
 
 ## Active roster
 
@@ -17,9 +17,24 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
 | [0059](0059-lorenz-finds-its-plane.md) | Lorenz finds its plane, and the attractor can trade samples for curves (per-family projection basis, the trail un-mirror, `[particles] density`, the continuous-flow streak) | **in progress** — **Phase 1 landed 2026-08-04 (`357a17e`)**; successor to [0057], whose Phase 4 diagnosed this and stopped by its own instruction; [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) + [ADR-0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md) + [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md); closes [backlog 0048](../design-backlog.md). **Amended 2026-08-04 with a new Phase 1b**: Phase 1's basis is correct and the picture was **still an X**, because the attractor trail samples its own target with the unflipped fullscreen prelude and renders `figure ∪ mirror(figure)` — older than this plan, invisible to every gate because the doubling conceals its own symptom. **The "no golden baseline moves" claim is withdrawn**: `attractor.png` and `reaction_diffusion.png` both move at Phase 1b (the four `composite_*` fixtures run `parametric_curve` and do not). **Phase 4 is `human`** — the one content pass, now covering **all six** attractor presets rather than mainly `attractor_lorenz`, since every one was authored against a doubled figure; it **may route back to `architect`** if `density` + `fade` cannot hold a curve | dev, human |
 
+| [0060](0060-a-test-number-states-a-property-or-names-its-machine.md) | A test number states a property, or names its machine (the two frozen numbers holding CI red: bit-exact `f32` literals pinned to x86_64, and the dual-live floor traded for a ratio against an in-run control) | **approved 2026-08-04** — ready for `dev`; [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md). **CI has been red since 2026-07-30** and this is the only plan that turns it green. **Phase 2 is `human`** (push, then read the two runners' printed numbers) and gates Phase 3, so it does not close in one session. Moves **no pixels**, no shipped code, no golden baseline | dev, human |
+
 ## Recommended execution sequence
 
-**Every plan in the roster is approved as of 2026-08-03 — nothing is waiting on a design
+**CI is red and has been since 2026-07-30 — take [0060] before anything else.** Five consecutive
+pushes have failed, and every plan below merges into a `main` whose gate currently proves nothing
+past `cargo build`: `nextest` aborts the step, so `cargo test --doc`, `clippy -D warnings` and
+`cargo fmt --check` have not run in CI for five pushes (all three are clean at `4ab383c`, verified
+locally 2026-08-04 — but nothing in CI is saying so). The **coverage ratchet has not been evaluated
+either**, for the same reason, so `COVERAGE_FLOOR = 88` is currently unenforced. Note the shape
+before reading the plan: **neither replacement number can be chosen on this machine.** The arm64
+divergence and the CI-WARP reading exist only on the runners, and there is no Mac on this side
+(Plan [0036] Phase 4 has been waiting on one since 2026-07-26), which is why [0060] is sequenced
+instrument-first — Phase 1 makes the numbers visible and turns the gate green, Phase 2 pushes and
+reads them, Phase 3 writes the contract from what came back.
+
+
+**Every plan in the roster is approved as of 2026-08-04 — nothing is waiting on a design
 decision.** What separates them now is only what each needs to *run*: [0052] closes in one session;
 [0050] closes in one plus a measurement; [0053], [0055] and [0059] each carry a `human` phase that
 gates later phases or the close, so they stop mid-plan by construction — [0053] until a discrete GPU
