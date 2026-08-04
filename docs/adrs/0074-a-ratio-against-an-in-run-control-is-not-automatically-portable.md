@@ -2,6 +2,15 @@
 
 > **Status:** proposed
 > **Date:** 2026-08-04
+> **Corrected 2026-08-04, same day, before acceptance.** This ADR was written believing the
+> hardware its deferral depends on was not available on this side. **It is.** `dev` box, verified
+> by running `a_dual_live_dissolve_carries_the_outgoing_trail` — the hardware-only sibling — with
+> `--no-capture`: it **executes** (7.68 s of real GPU work) and prints no skip notice, so
+> `Renderer::adapter_is_software()` is `false` here and every hardware-gated check in this suite has
+> been runnable on this box all along. The **decision below is unchanged** — it rests on the 7.3x
+> ratio spread, not on where a machine is — but the **disposition changes**: the magnitude claim is
+> measurable *today*, not deferred indefinitely to a `human` phase waiting on a box. The two
+> passages this affects are marked inline.
 > **Related plan(s):** [0060](../plans/0060-a-test-number-states-a-property-or-names-its-machine.md)
 > (Phase 3, which routed this decision here by its own instruction)
 > **Supplements:** [0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
@@ -62,11 +71,23 @@ decision here rather than to `dev`. `0.036654` is below it.
 **`dual_live_keeps_the_outgoing_side_animating` keeps its property form on WARP and gains no
 magnitude floor, in CI or anywhere else.** The magnitude claim is not written from these numbers;
 it is deferred to hardware, where the allocation quirk that crippled the numerator does not exist.
-The occasion already exists on the roster: Plan
-[0053](../plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3 is the `human` phase
-that puts a discrete GPU in front of this suite, and its sibling
-`a_dual_live_dissolve_carries_the_outgoing_trail` is already hardware-only and already asserts a
-magnitude there (`CARRIES = 1.5`).
+Its sibling `a_dual_live_dissolve_carries_the_outgoing_trail` is already hardware-only and already
+asserts a magnitude there (`CARRIES = 1.5`), so the shape is established.
+
+**Corrected — the hardware is this box, and the claim is owed now rather than someday.** This
+paragraph originally sent the measurement to Plan
+[0053](../plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3, on the belief that
+a `human` phase gated on a machine we lacked was the next time real hardware would see this suite.
+That belief was wrong and cheap to check: the gate in the code is
+`Renderer::adapter_is_software()` — `device_type == DeviceType::Cpu`
+(`core/src/render/context.rs:148`) — not "discrete", and the sibling **runs and passes on the dev
+box today**. So the measurement is one `software: false` away in `dissolve_at`, and it is the
+*clean* one: on hardware the dissolve's opening frame is byte-identical to the ordinary frame it
+replaces, so the numerator is the outgoing side animating and nothing else. Plan 0060 Phase 3
+carries it. What such an assertion buys is bounded and should not be oversold — a hardware-only
+test **skips in CI on both runners** (WARP on Windows, no software Metal on macOS, ADR-0016), so it
+is enforced by the local gate and the pre-push hook, never by CI. That is the same bargain the
+sibling already makes.
 
 The test's doc comment is **demoted to what it actually proves on a software adapter**: that
 dual-live runs, that it produces a different picture from freeze somewhere in the window, and that
@@ -101,10 +122,16 @@ proof.
   reads.** This is the cost, it is larger than the fallback's headline suggests, and it is written
   here rather than inferred: on WARP the surviving assertions can pass with the outgoing side held.
   CI has smoke coverage of the dissolve, not a guard on the defect.
-- **The magnitude claim has no date.** It is deferred to a `human` phase gated on hardware this
+- ~~**The magnitude claim has no date.** It is deferred to a `human` phase gated on hardware this
   side does not have, and Plan 0053 Phase 3 has been waiting since 2026-08-02. If that hardware
-  never materializes, the claim is never restored — which is a decision to accept, not a plan step
-  to assume will run.
+  never materializes, the claim is never restored.~~ **Withdrawn the same day: the hardware is the
+  dev box.** The claim has a date and an owner — Plan 0060 Phase 3, `dev`. What survives of this
+  cost is smaller and different: the restored assertion will be **hardware-only, so CI never runs
+  it**. Between pushes, the dual-live magnitude is defended by the local gate alone.
+- **A hardware ratio measured on one box is a measurement, not a property**, and ADR-0071 obliges
+  it to say so and skip elsewhere — which is exactly the sibling's shape, and exactly what this ADR
+  refused to let the *WARP* number pretend otherwise about. The one thing it must not become is a
+  floor written from this box and asserted everywhere.
 - The two WARP readings are now a known, unexplained 11x apart on a statistic nothing asserts.
   That is recorded and not investigated; if the newer WARP is losing *more* trail history than the
   older one, the same artifact is silently present in every other WARP capture this suite takes.

@@ -79,7 +79,7 @@ footprint so the vendor spread is on record.
       floor is exactly the claim at risk, and no headless capture can speak to it: WARP timings say
       nothing about an iGPU's memory bandwidth.
       Load **`rose_trails`** — it binds `trails` around 0.78 and is the shipped preset that exercises
-      this path (`rose_kaleidoscope` and `fragment_kaleido` cover the fold). Let it settle with the
+      this path (`fragment_kaleido` covers the fold). Let it settle with the
       overlay on (`F3`), and report **(a)** whether fps holds ≥ 60 and **(b)** the p99 against the
       same preset with `trails = 0`. _(Plan 0033's stated main exposure, widened by Plan 0045. If it
       fails, lower `TierConfig::FLOOR.post_cap` in `core/src/render/tier.rs` — the constant moved
@@ -173,7 +173,7 @@ not run at the plan's close, so the rich tier currently ships numbers nobody has
 - [ ] **Calibrate `Rich` on the midrange discrete GPU, native fullscreen.** Run
       `lmv.exe --tier rich` (the pin, so the governor cannot demote mid-measurement) with the
       overlay on (`F3`), across the heaviest preset of each family: an `attractor_*`, a dense line
-      preset with mirror + fold (`rose_kaleidoscope`), `swarm_dense`, a `reaction_*`, and a
+      preset with mirror + fold (`fragment_kaleido`), `swarm_dense`, a `reaction_*`, and a
       `spectrum_*`. Report per preset **(a)** whether frame time holds the display's refresh rate
       and **(b)** the p99.
       **Escalation:** a miss is not a failure, it is the measurement — record which preset missed

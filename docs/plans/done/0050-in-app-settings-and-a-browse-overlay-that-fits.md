@@ -1,11 +1,16 @@
 # 0050 — In-app settings, live quality, and a browse overlay that fits
 
-> **Status:** **in-progress** — **all five `dev` phases have landed 2026-08-03/04**: Phase 1
-> `14cd9e2`, Phase 2 `bed0274`, Phase 3 `46b38f6`, Phase 4 `d81a24a`, Phase 5 `19096f1`.
-> **Only Phase 6 remains** — `human`, eyes on the machine, and it also carries the `Rich`
-> calibration [0044] Phase 4 never ran. Phases 1-5 were reviewed against this plan on 2026-08-04
-> (Mode 4, no blockers, no majors); the one design-note deviation is recorded under Phase 1 below.
-> Orthogonal to the render roadmap and takeable any time.
+> **Status:** **done 2026-08-04.** All six phases complete. Phase 1 `14cd9e2`, Phase 2 `bed0274`,
+> Phase 3 `46b38f6`, Phase 4 `d81a24a`, Phase 5 `19096f1`, and Phase 6 (`human`) run on the machine
+> 2026-08-04 — results recorded under that phase below.
+> Mode 4 review: **no blockers, no majors**; one wrong design note in Phase 1, which `dev` flagged
+> rather than implemented, and one stale preset name in `docs/on-device-validation.md` that Phase 6
+> tripped over and this close corrects. Gate on `main` before the bump: `fmt` clean, `clippy -D
+> warnings` clean, full `nextest` green.
+> **Phase 6 item 3 (the `Rich` calibration) is answered in outline, not as a per-preset table**, and
+> the table is deliberately deferred — see that phase for why it is coupled to [0059] Phase 4 and
+> why `docs/on-device-validation.md`, which carries it, does not block a close.
+> Orthogonal to the render roadmap; it neither blocked nor was blocked by anything.
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md)
@@ -336,6 +341,46 @@ Each phase ships as its own commit. `dev` runs all phases in one session.
   3. **The `Rich` calibration, now that it is cheap.** Plan 0044 Phase 4 never ran. With `[` / `]`
      it is an A/B on one machine in one session — record whether the shipped provisional `Rich`
      multipliers hold the frame budget, and route the answer back rather than tuning silently.
+
+#### Phase 6 results — run 2026-08-04
+
+**1. The tier swap is acceptable in the hand — PASS.** The hitch is a brief trails
+re-accumulation, not a freeze, hang or device loss. It survives being pressed repeatedly (15
+consecutive swaps in one session, every one logging `quality tier: <tier> (pinned)` — so the pin
+latches correctly and never falls back to `(auto)`), and it survives being pressed **during** a
+dissolve. **The preset that looks worst through the transition is `attractor_lorenz` at `Rich`.**
+
+**2. The columns read correctly — PASS.** Opens on the active preset, highlight obvious, holding an
+arrow walks at a comfortable rate, and the list reflows into columns without overlap when the window
+is shorter than the roster.
+
+**3. The `Rich` calibration — ANSWERED IN OUTLINE, NOT AS A TABLE.** The per-preset p99 sweep did
+not run: the instruction sheet in `docs/on-device-validation.md` names **`rose_kaleidoscope`**, a
+preset **retired in the 2026-07-28 library pass**, so the operator went looking for a preset that
+does not exist. `docs/design-backlog.md` had already caught that name once; the on-device doc was
+never swept. **Corrected in this close** to `fragment_kaleido`, the surviving fold preset.
+
+What the session *did* establish, unprompted and worth more than a missing row: **the shipped
+provisional `Rich` multipliers do not hold this display's frame budget.** The governor demoted
+`Rich → Floor` within seconds of startup, on the opening preset, before any input —
+
+```
+quality tier demoted to floor -- the rich tier did not hold this display's frame budget.
+```
+
+— which is Plan 0044's own question answered in the affirmative direction it feared, and it agrees
+with item 1's finding that `attractor_lorenz` at `Rich` is the worst thing on screen. **No field is
+tuned on this evidence**, per Phase 4's standing rule that no number moves without the measurement
+behind it.
+
+**Where the remaining work lives, and why it does not block this close.** The per-preset p99 table
+is Plan 0044 Phase 4's, carried in
+[`docs/on-device-validation.md`](../on-device-validation.md), whose own status line says it **does
+not block plan closes**. It is also now **coupled to Plan [0059] Phase 4**: `[particles] density`
+directly changes how many particles the attractor draws, so calibrating
+`TierConfig::RICH.attractor_particles` before the content pass would measure a target that is about
+to move — and the attractor is exactly where both signals above point. So the table is deliberately
+deferred to after [0059] closes, with the demotion recorded as its first data point.
 
 ## Data shapes
 
