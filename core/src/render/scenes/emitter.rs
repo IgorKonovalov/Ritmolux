@@ -1024,8 +1024,8 @@ mod tests {
     #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
     use super::{
-        Field, Object, RETIRE_MARGIN, SOURCE_Y, Spawn, bounds, build, exit_time, size_factor,
-        sprite_angle, twinkle_factor,
+        Field, Instance, Object, RETIRE_MARGIN, SOURCE_Y, Spawn, bounds, build, exit_time,
+        size_factor, sprite_angle, twinkle_factor,
     };
 
     /// A test aspect, and the retirement bound it gives.
@@ -1752,6 +1752,320 @@ mod tests {
             tail * 100.0 < peak,
             "the shower must idle again once the transient passes: tail \
              {tail:.4} against peak {peak:.4} — objects are not being retired"
+        );
+    }
+
+    /// **The pool's memory arithmetic, as NFR §12 states it.**
+    ///
+    /// That section's requirement is "state the cost of what we add", and a
+    /// per-tier table in a markdown file is exactly the kind of number that goes
+    /// quietly wrong when a field is added to a struct. These two sizes are what
+    /// the table multiplies by, so a change to either has to be a deliberate edit
+    /// to both.
+    #[test]
+    fn the_pool_costs_what_the_nfr_says_it_does() {
+        use std::mem::size_of;
+        assert_eq!(
+            size_of::<Object>(),
+            40,
+            "docs/nfr.md section 12 charges the emitter pool at 40 bytes an object"
+        );
+        assert_eq!(
+            size_of::<Instance>(),
+            28,
+            "docs/nfr.md section 12 charges the emitter's instance buffers at 28 bytes"
+        );
+        // The floor tier's total — both CPU copies, the free list, and the GPU
+        // buffer — against the ~200 KB the table quotes.
+        let floor = crate::render::TierConfig::FLOOR.emitter_objects;
+        let bytes = floor * (size_of::<Object>() + 4 + 2 * size_of::<Instance>());
+        assert!(
+            (190_000..210_000).contains(&bytes),
+            "the floor pool costs {bytes} bytes, not the ~200 KB docs/nfr.md quotes"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // The third draw seam does not punch holes in the backdrop
+    // (Plan 0052 Phase 4, ADR-0056)
+    // -----------------------------------------------------------------------
+
+    /// The lit-backdrop fixture this guard captures three ways. Its `bg_bright`
+    /// and `size` lines are **stripped and rewritten** per capture — one scene at
+    /// three configurations — so the numbers are read back out of the file rather
+    /// than restated here, and editing the fixture moves the test with it.
+    const LIT_FIXTURE: &str = include_str!("../../../tests/fixtures/emitter_lit_backdrop.toml");
+
+    /// The square capture size. Modest, because this reads back three whole float
+    /// frames; and an exact multiple of the post chain's 256 px grid step, so the
+    /// trails stage runs at the target size and its present is a 1:1 sample
+    /// rather than a resample that would blur the property being asserted.
+    const CAPTURE_SIZE: u32 = 256;
+
+    /// Frames per capture. Long enough for the population to fill (the fixture's
+    /// marks take ~0.5 s to cross the frame) and for the trail history to reach
+    /// its steady state.
+    const CAPTURE_FRAMES: u32 = 40;
+
+    /// A backdrop channel this bright counts as *present* for the non-vacuity arm
+    /// below — well above the half-precision floor, well below the fixture's own
+    /// `bg_bright`.
+    const BACKDROP_PRESENT: f32 = 0.05;
+
+    /// The value of a top-level `key = "<number>"` line in [`LIT_FIXTURE`], or
+    /// `NaN` when it is absent. Used so the fixture stays the single statement of
+    /// what this test captures.
+    fn fixture_value(key: &str) -> f32 {
+        LIT_FIXTURE
+            .lines()
+            .find_map(|line| {
+                let rest = line.trim_start().strip_prefix(key)?;
+                let rest = rest.trim_start().strip_prefix('=')?;
+                rest.trim().trim_matches('"').parse::<f32>().ok()
+            })
+            .unwrap_or(f32::NAN)
+    }
+
+    /// Slack for half-precision rounding, the same shape the swarm's guard uses.
+    /// The composite is `Rgba16Float`, so a value of magnitude `m` is stored to
+    /// roughly `m / 1024`, and the lit capture quantizes a different sum than the
+    /// backdrop-only one does.
+    ///
+    /// It is slack, not a tolerance: the property below is **exact** in real
+    /// arithmetic. Upstream of the tonemap the composite is a plain premultiplied
+    /// OVER, so where the scene wrote nothing the backdrop must arrive unchanged.
+    fn half_slack(value: f32) -> f32 {
+        (4.0 / 1024.0) * value.abs().max(1.0)
+    }
+
+    /// **Where the emitter drew no light, the backdrop arrives intact** — the
+    /// third of the per-seam guards [ADR-0056] requires, and the reason this
+    /// scene owed one at all: it inherits the swarm's sprite shader, which is the
+    /// one that shipped `vec4(in.color * g, 1.0)` and held the backdrop out of
+    /// the four corners of every square quad.
+    ///
+    /// # Both directions, measured
+    ///
+    /// The property alone is easy to satisfy by accident, so the failing
+    /// direction was demonstrated rather than assumed: reverting this file's
+    /// fragment shader to a constant alpha —
+    /// `return vec4<f32>(in.color * g, 1.0);` — and running this test unchanged
+    /// gives **`worst |L - B|` = 0.3345 with 13 330 of 136 617 compared channels
+    /// violating** — the backdrop's own brightness discarded outright. With the
+    /// premultiplied alpha the scene ships, the same capture reads **0.0002 with
+    /// zero violations**. That is ~1670x between the defect and the noise, on the
+    /// same fixture, on the same adapter, and it is why the property is asserted
+    /// at bound 0 rather than inside a tolerance.
+    ///
+    /// # Why this reads the linear composite and not the capture
+    ///
+    /// Same reason the swarm's and the bloom's guards do: the capture's bytes are
+    /// downstream of the tonemap, which scales all three channels off the
+    /// brightest one (ADR-0046), so adding a backdrop under a mark changes every
+    /// channel by design and no byte-level tolerance separates that from the
+    /// defect. Upstream of the tonemap there is no confound — it is a plain
+    /// premultiplied OVER — so the bound is **0** rather than a tolerance. That
+    /// readback is `pub(crate)`, which is why this test lives here and not in
+    /// `core/tests/`.
+    ///
+    /// [ADR-0056]: ../../../../docs/adrs/0056-additive-scenes-emit-premultiplied-alpha.md
+    #[test]
+    fn a_lit_backdrop_survives_where_the_emitter_drew_nothing() {
+        use crate::dsp::AnalysisFrame;
+        use crate::preset::Preset;
+        use crate::render::capture;
+        use crate::render::context::RenderError;
+        use crate::render::{HeadlessOptions, Renderer};
+
+        // --- Non-vacuity, before any GPU work: the fixture must still describe
+        // the configuration this guard exists for. ---
+        let backdrop = fixture_value("bg_bright");
+        let sprite = fixture_value("size");
+        let trails = fixture_value("trails");
+        let spawn = fixture_value("spawn_rate");
+        assert!(
+            backdrop > 0.0,
+            "emitter_lit_backdrop.toml no longer ships a lit backdrop (bg_bright \
+             = {backdrop}); on black this whole comparison is black against black"
+        );
+        assert!(
+            sprite > 0.0,
+            "emitter_lit_backdrop.toml no longer draws marks (size = {sprite})"
+        );
+        assert!(
+            spawn > 0.0,
+            "emitter_lit_backdrop.toml no longer emits (spawn_rate = {spawn}), so \
+             the frame is empty and the seam under test never runs"
+        );
+        assert!(
+            trails > 0.0,
+            "emitter_lit_backdrop.toml no longer binds `trails` (= {trails}), so \
+             no post stage is active. With an empty chain the scene draws \
+             straight onto the backdrop and its additive colour cannot remove \
+             light — the defect is unrepresentable and this test proves nothing"
+        );
+
+        /// The linear composite the tonemap is about to map, at a given backdrop
+        /// brightness and mark size.
+        ///
+        /// Builds and drops **one** renderer per call rather than holding three:
+        /// a second live device in a binary is what the software adapter falls
+        /// over on, and building GPU resources mid-run shifts what the trails
+        /// stage resolves to on WARP.
+        fn linear_composite(bg_bright: f32, size: f32) -> Option<Vec<f32>> {
+            let mut renderer = match Renderer::new_headless(HeadlessOptions {
+                width: CAPTURE_SIZE,
+                height: CAPTURE_SIZE,
+                prefer_software: true,
+            }) {
+                Ok(renderer) => renderer,
+                Err(RenderError::RequestAdapter(_)) => {
+                    eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                    return None;
+                }
+                Err(e) => panic!("headless renderer build failed: {e}"),
+            };
+            // Both keys live in `[params]`, which is the fixture's last table, so
+            // stripping them and appending the overrides keeps them in it.
+            let base: String = LIT_FIXTURE
+                .lines()
+                .filter(|line| {
+                    let line = line.trim_start();
+                    !line.starts_with("bg_bright") && !line.starts_with("size")
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            let toml = format!("{base}\nbg_bright = \"{bg_bright}\"\nsize = \"{size}\"\n");
+            let preset = Preset::from_toml_str(&toml)
+                .expect("the lit-backdrop emitter fixture parses with overrides");
+            let name = preset.name.clone();
+            renderer.set_presets(vec![preset]);
+
+            // Every binding is a constant, so the analysis frame only has to be
+            // well-formed — the emitter's `update` ignores it entirely.
+            let frame = AnalysisFrame::default();
+            renderer
+                .capture_preset(&name, &frame, CAPTURE_FRAMES)
+                .expect("capture the lit-backdrop emitter fixture");
+
+            let device = renderer.ctx.device.clone();
+            let queue = renderer.ctx.queue.clone();
+            let src = renderer
+                .tonemap
+                .src_texture()
+                .expect("the tonemap built its input while capturing")
+                .clone();
+            let (buffer, padded_bpr) =
+                capture::create_linear_readback(&device, CAPTURE_SIZE, CAPTURE_SIZE);
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("emitter-backdrop-readback"),
+            });
+            capture::record_copy(
+                &mut encoder,
+                &src,
+                &buffer,
+                padded_bpr,
+                CAPTURE_SIZE,
+                CAPTURE_SIZE,
+            );
+            queue.submit(std::iter::once(encoder.finish()));
+            Some(
+                capture::read_back_linear(&device, &buffer, CAPTURE_SIZE, CAPTURE_SIZE, padded_bpr)
+                    .expect("read back the linear composite"),
+            )
+        }
+
+        // `L`: the frame as shipped. `K`: the same scene over a black backdrop,
+        // which is what "the scene wrote no light here" is read off. `B`: the
+        // backdrop with the scene contributing nothing — zero-area sprite quads
+        // rasterize no fragments, so the chain resolves fully transparent and
+        // this is the backdrop alone, through the same pipeline as `L`.
+        let Some(lit) = linear_composite(backdrop, sprite) else {
+            return;
+        };
+        let Some(dark) = linear_composite(0.0, sprite) else {
+            return;
+        };
+        let Some(backdrop_only) = linear_composite(backdrop, 0.0) else {
+            return;
+        };
+        assert_eq!(dark.len(), lit.len(), "the captures differ in size");
+        assert_eq!(
+            dark.len(),
+            backdrop_only.len(),
+            "the captures differ in size"
+        );
+
+        let total = dark.len() / 4;
+        let (mut untouched, mut drawn, mut over_backdrop) = (0usize, 0usize, 0usize);
+        let (mut violations, mut worst, mut compared) = (0usize, 0.0f32, 0usize);
+        for (pixel, texel) in dark.chunks_exact(4).enumerate() {
+            if texel[0] != 0.0 || texel[1] != 0.0 || texel[2] != 0.0 {
+                drawn += 1;
+                continue; // the scene put light here; the property says nothing
+            }
+            untouched += 1;
+            let base = pixel * 4;
+            if backdrop_only
+                .get(base..base + 3)
+                .is_some_and(|t| t.iter().any(|&c| c > BACKDROP_PRESENT))
+            {
+                over_backdrop += 1;
+            }
+            for channel in 0..3 {
+                let (Some(&l), Some(&b)) =
+                    (lit.get(base + channel), backdrop_only.get(base + channel))
+                else {
+                    continue;
+                };
+                compared += 1;
+                let diff = (l - b).abs();
+                if diff > worst {
+                    worst = diff;
+                }
+                if diff > half_slack(b) {
+                    violations += 1;
+                }
+            }
+        }
+        eprintln!(
+            "emitter lit backdrop at {CAPTURE_SIZE}x{CAPTURE_SIZE}: {untouched} of \
+             {total} pixels untouched by the scene ({over_backdrop} of those over \
+             a lit backdrop), {drawn} lit by it; worst |L - B| {worst:.4} across \
+             {compared} channels"
+        );
+
+        // --- Non-vacuity: the region the property speaks about is a substantial
+        // part of the frame, the scene genuinely drew into the rest, and the
+        // backdrop genuinely reached the frame underneath. A fixture edit that
+        // quietly empties any of the three shows up here rather than passing. ---
+        assert!(
+            untouched * 4 > total,
+            "only {untouched} of {total} pixels are untouched by the scene — the \
+             fixture has filled the frame and the property covers almost nothing"
+        );
+        assert!(
+            drawn * 20 > total,
+            "only {drawn} of {total} pixels carry any scene light — the fixture \
+             has stopped drawing, so the sprite corners this guards are not in \
+             the frame"
+        );
+        assert!(
+            over_backdrop * 2 > untouched,
+            "only {over_backdrop} of the {untouched} untouched pixels sit over a \
+             backdrop brighter than {BACKDROP_PRESENT} — comparing black against \
+             black, which any alpha would pass"
+        );
+
+        // --- The property. ---
+        assert_eq!(
+            violations, 0,
+            "{violations} channels differ between the lit frame and the backdrop \
+             alone at pixels where the scene wrote NO light (worst {worst:.4}). \
+             Upstream of the tonemap this is a plain premultiplied OVER, so where \
+             nothing was drawn the backdrop must arrive intact — a difference \
+             here is a sprite emitting coverage it does not have, holding the \
+             backdrop out of pixels it never painted"
         );
     }
 }
