@@ -2595,7 +2595,7 @@ since both are "the frame looks alive to our instruments and is not".
 
 - **DIAGNOSED AND RE-PROMOTED 2026-08-03 → [ADR-0068](adrs/0068-the-projection-basis-is-a-per-family-property.md)
   + [ADR-0069](adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) +
-  [Plan 0059](plans/0059-lorenz-finds-its-plane.md).** The diagnosis below was right and this entry's
+  [Plan 0059](plans/done/0059-lorenz-finds-its-plane.md).** The diagnosis below was right and this entry's
   own three candidates were all wrong — [Plan 0057](plans/done/0057-the-attractors-compute-path.md)
   Phase 4 confirmed the shared 3-D **view basis** by discriminating capture and ruled out
   integration and an un-converged seed by measurement (the cloud fills 5.89 % of its own bounding
@@ -2698,6 +2698,18 @@ Two consequences for the plan:
   It belongs in `presets/README.md`'s kaleidoscope section whenever Plan 0055 Phase 4 does its doc
   pass — it is useful even after the edge becomes selectable, because it explains what the
   treatments are treating.
+
+**4. A third shipped instance, 2026-08-04 (Plan 0059 Phase 4, `990fedc`) — and it is evidence for
+how the content rule fails in practice.** `attractor_clifford` inherited `kaleido_order = 2` from
+`f09f1fe`, where the fold was added as a symmetry A/B **with the unfolded framing still under it**.
+The ribbon's tips therefore sat on the frame edge and smeared into a permanent starburst; pulling
+the zoom peak from `1.42` to `0.94` removed them, the same lever and the same direction as
+Leviathan's `1.12 → 0.72`. **Two data points now say the rays are avoidable from content.** But
+both also say they are avoidable *only if someone remembers to re-frame when the fold arrives* —
+in this case the person who added the fold and the person who found the rays were the same lane, one
+commit apart, and it still shipped provisionally. That sharpens the entry rather than softening it:
+a content rule nobody is prompted with is not a mitigation, which is an argument for Plan 0055's
+`kaleido_edge` doing the work rather than for the rule doing it.
 
 ---
 
@@ -3102,3 +3114,50 @@ shipped set does regime drift.
 **Do not fold this into Plan 0059 Phase 4.** That pass is the attractor family, judged against a
 figure that just changed shape; this is one reaction-diffusion preset and an unrelated boundary
 question. They share only the lane.
+
+---
+
+## Entry 0057 — from the Plan 0059 Phase 4 content pass (2026-08-04)
+
+## 0057 — a preset has no scene-local way to set a figure's level, so `exposure` gets used for it and two other stages disagree with that use
+
+- **Raised:** 2026-08-04, from `preset-author` (Plan [0059](plans/done/0059-lorenz-finds-its-plane.md)
+  Phase 4, `990fedc`). All three findings verified against code, with rendered evidence noted.
+- **One entry, not three.** These are one gap seen from three sides: there is no per-scene deposit
+  or intensity param, so a figure's level is spent on `exposure` — the one lever that is
+  engine-wide, interpolated across a dissolve, and measured *after* the stage that would want to
+  discriminate on it.
+- **Why it has no history:** `attractor_lorenz` and `attractor_thomas` are the **first two shipped
+  presets to bind `exposure` at all.** Nothing had a caller before, so nothing had a complaint.
+
+**1. `density` is exposure-neutral in total light only (ADR-0065), and the docs said otherwise.**
+Per texel it is not neutral: the same energy lands on `1/N` of the pixels, so a sparse preset needs
+a cut on the order of `trail frames / density`. The shipped values are `exposure = 0.03` on Lorenz at
+`density = 0.002` and `0.10` on Thomas at `0.02`, both picked off rendered ladders rather than
+derived. `presets/README.md`'s `[particles]` section told authors they could re-aim `density`
+*"without re-tuning `size`, `fade` or `exposure`"* — **true of the sum, false of the picture.**
+*Corrected at this close* rather than left for the entry's promotion, because it is wrong today and
+the next sparse preset would be misled by it.
+
+**2. The ADR-shaped half: should a scene have a local deposit / intensity param?** `exposure` is
+engine-wide and **crossfades across a preset dissolve** (`crossfade_from` in
+`core/src/render/tonemap.rs`, ADR-0032's seam), so an extreme per-preset value drags the ~1 s blend
+through a badly-exposed frame. Both new presets deliberately buy as much of their level as possible
+with `size` and `fade` first *because of this* — those are scene-local and blend as pixels. That is
+a workaround with a ceiling, and the question it poses is a real tradeoff with alternatives to
+reject: a per-scene param, versus normalizing `exposure` per-preset at the crossfade, versus
+declaring the current behaviour correct and documenting the workaround as the technique.
+
+**3. `bloom_threshold` is measured in pre-exposure units, so at these values it cannot discriminate
+at all.** Chain order is scene → post chain → tonemap, so the bright-pass reads the figure *before*
+`exposure` scales it, and `bloom.rs` clamps the threshold at `MAX_THRESHOLD = 8.0`. At
+`exposure = 0.03` the whole figure is over any threshold a preset can ask for. **Rendered: threshold
+`0.95` against `8.0` on Lorenz are near-indistinguishable.** Lorenz therefore ships it pinned at the
+ceiling, with its header saying to read the pair as *capped, not tuned*. **A threshold in
+pre-exposure linear units is only meaningful while every preset sits near `exposure = 1.0`** — which
+was true until this commit and is now not.
+
+**What this entry is not.** It is not a bug report: nothing renders wrongly, both presets ship the
+look they intend, and the workarounds are recorded in their headers. It is the observation that the
+workarounds exist because one lever is doing a job it was not shaped for, and that the cost lands on
+the *next* author rather than on these two.

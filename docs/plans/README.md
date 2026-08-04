@@ -14,8 +14,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **approved 2026-08-02** — ready for `dev`; [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** and gates Phase 4. **Its "needs a discrete GPU" premise was corrected 2026-08-04 at [0060]'s close** — the gate is `device_type == Cpu`, not "discrete", and a real hardware measurement was taken on this box the same day (`ae4c215`), so try Phase 3 before deferring it. **[0060] also handed this plan a sharper question than it was written against**: the hardware dual-live reading matched **CI WARP** to five figures and disagreed with **this box's local WARP** by 1.54x on a sequence with no dual-live asymmetry — if that holds, the build the golden suite blesses on is the outlier ([ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) Outcome). Moves **no pixels** except one new baseline | dev, human |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
-| [0059](0059-lorenz-finds-its-plane.md) | Lorenz finds its plane, and the attractor can trade samples for curves (per-family projection basis, the trail un-mirror, `[particles] density`, the continuous-flow streak) | **in progress** — **all four `dev` phases landed 2026-08-04** (Phase 1 `357a17e`, Phase 1b `1c47de5`, Phase 2 `4fb4a81`, Phase 3 `642aec0`) and were **reviewed 2026-08-04** (Mode 4, no blockers, no majors). **Only Phase 4 remains — `human`**, the one content pass over all six attractor presets; `f09f1fe` is provisional work toward it and is judged *as part of* that pass, not inherited. Successor to [0057], whose Phase 4 diagnosed this and stopped by its own instruction; [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) + [ADR-0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md) + [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md); closes [backlog 0048](../design-backlog.md). **Amended 2026-08-04 with a new Phase 1b**: Phase 1's basis is correct and the picture was **still an X**, because the attractor trail samples its own target with the unflipped fullscreen prelude and renders `figure ∪ mirror(figure)` — older than this plan, invisible to every gate because the doubling conceals its own symptom. **The "no golden baseline moves" claim is withdrawn**: `attractor.png` and `reaction_diffusion.png` both move at Phase 1b (the four `composite_*` fixtures run `parametric_curve` and do not). **Phase 4 is `human`** — the one content pass, now covering **all six** attractor presets rather than mainly `attractor_lorenz`, since every one was authored against a doubled figure; it **may route back to `architect`** if `density` + `fade` cannot hold a curve | dev, human |
-| [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended twice the same day** — **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (at the user's direct request), reconciled into the plan rather than reverted: it meets 4b's done-when with one accepted deviation (a test-written scratch library rather than a checked-in `fixtures/report/`), and it **opens the coverage gap 4b's sequencing existed to prevent** — nothing renders every shipped preset through the real CLI any more *and* Phase 4 has not yet put the generator under in-process tests. Every other phase is unstarted. From the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Amended a third time with Phase 2c** (2026-08-04, at [0060]'s close): a `links` job on `ubuntu-latest` giving `scripts/check-doc-links.mjs` a CI counterpart, so the doc-link gate stops depending on an opt-in hook. Independent of 2b/4b, touches neither Windows job, seconds on the cheapest runner — it is here only because this plan owns every `ci.yml` edit in flight. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. **Phase 6 is gated on [0059] being closed** (it edits `particles/mod.rs`); **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
+| [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended twice the same day** — **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (at the user's direct request), reconciled into the plan rather than reverted: it meets 4b's done-when with one accepted deviation (a test-written scratch library rather than a checked-in `fixtures/report/`), and it **opens the coverage gap 4b's sequencing existed to prevent** — nothing renders every shipped preset through the real CLI any more *and* Phase 4 has not yet put the generator under in-process tests. Every other phase is unstarted. From the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Amended a third time with Phase 2c** (2026-08-04, at [0060]'s close): a `links` job on `ubuntu-latest` giving `scripts/check-doc-links.mjs` a CI counterpart, so the doc-link gate stops depending on an opt-in hook. Independent of 2b/4b, touches neither Windows job, seconds on the cheapest runner — it is here only because this plan owns every `ci.yml` edit in flight. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. ~~Phase 6 is gated on [0059] being closed~~ — **released 2026-08-04**, [0059] has closed, so Phase 6 (which edits `particles/mod.rs`) is unblocked; it also inherits [0059]’s close decision to **retire `RESEED_DRAWS_STREAK`**, which lives in that same file; **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
 
 ## Recommended execution sequence
 
@@ -37,7 +36,7 @@ suite blesses on, not the runner's. Nothing has looked at what else that moves.
 
 **[0061] goes last, by the user's own instruction, and is the only `draft` in the roster.** It came
 out of a whole-tree maintainability audit rather than a feature request, so nothing depends on it and
-it depends on nothing except [0059] being closed before its Phase 6 (which edits the same file). Two
+it depends on nothing — the one dependency it had, [0059] being closed before its Phase 6 (which edits the same file), was **released 2026-08-04**. Two
 consequences worth carrying: its numbers are a **2026-08-04 snapshot of one machine**, so a phase
 whose done-when names a line count needs re-deriving rather than satisfying if an intervening plan has
 already moved the file; and if [0060] has re-derived `COVERAGE_FLOOR` by then, [0061] Phase 2 moves the
@@ -77,16 +76,13 @@ technical.
 decision.** What separates them now is only what each needs to *run*: [0052] closes in one session;
 [0053] and [0055] each carry a `human` phase that gates later phases, so they stop mid-plan by
 construction — [0053] until a discrete GPU is to hand, [0055] until the live A/B is judged.
-**[0050] and [0059] are past that point**: both are dev-complete and reviewed, and each is waiting
-on exactly one `human` phase before its close ceremony. Taking [0052] first keeps a session
-unblocked end to end.
+Taking [0052] first keeps a session unblocked end to end.
 
-**[0060] closed 2026-08-04 and took the version to `0.33.1`** — **patch**, per
-[ADR-0005](../adrs/0005-versioning-and-release-cadence.md): the plan rewrote two test contracts,
-added one, and moved three documents, and it changed **no shipped code, no pixel and no golden
-baseline**. One close remains pending: **[0059] needs Phase 4** (the `human` content pass), and it
-owes its own bump — **minor** on present shape (a new preset-facing structural key and an engine
-behaviour change), decided for real at that close and not here.
+**Nothing is waiting on a close any more.** [0050], [0060] and [0059] all closed on 2026-08-04, in
+that order, each with its own bump — `0.33.0` (minor), `0.33.1` (patch) and **`0.34.0` (minor)**.
+The roster above is four approved plans and one draft, and none of them is blocked by another
+plan's bookkeeping. **[0061] Phase 6's gate is released** by [0059]'s close — it edits
+`particles/mod.rs` and was waiting for exactly this.
 
 **A premise correction that outlives both plans that found it.** ADR-0074 deferred the dual-live
 magnitude claim to "hardware this side does not have", and Plan [0053]'s header said its Phase 3
@@ -98,14 +94,30 @@ here (7.68 s of real GPU work, no skip notice). [0060] Phase 3 then took the mea
 further than these two plans: **every hardware-gated check in this suite has been runnable on this
 box all along**, so a "needs a discrete GPU" note is worth *testing* before it is believed.
 
-**[0059]'s engine work is finished and only the content pass is left.** All four `dev` phases landed
-2026-08-04 (`357a17e`, `1c47de5`, `4fb4a81`, `642aec0`) and were reviewed the same day: no blockers,
-no majors. What remains is **Phase 4, `human`** — the one `preset-author` pass over all six attractor
-presets, which may still route back to `architect` if `density` + `fade` cannot hold a curve
-(ADR-0069's Alternative D, waiting for a rendered case rather than an argument). `f09f1fe` is
-provisional work toward that pass and is judged as part of it.
+**[0059] has landed and closed** (2026-08-04) — see Recently closed. **Its content pass answered
+all three questions the plan routed to it, and two answers went against what the plan predicted**,
+which is the part worth carrying:
 
-**Three numbers the content pass inherits, all measured**: the streak raises mean frame luminance
+- **`density` + `fade` holds a legible curve**, so ADR-0069's **Alternative D does not get its
+  case**. It was rejected as the wrong *first* step on the explicit condition that a rendered
+  comparison would decide it; the ladder was rendered (Lorenz reads fog/fog/fuzz/curve/curve down
+  `1.0 → 0.002`, Thomas blot/drawing/sketch/scribble) and it went the other way. Per-particle
+  position history is owed **no successor plan** and must argue from its own merits if it ever
+  returns.
+- **The reseed-streak A/B could never have been run**, and the flag's own doc plus ADR-0069 both
+  promised it could. Flipping `RESEED_DRAWS_STREAK` gives **byte-identical output** under three
+  stimuli, because `encode_jitter` runs before `encode_steps` and the ordinary step overwrites
+  `prev` unconditionally — so the streak is erased before anything is drawn, on every frame at the
+  fixed 1/60 step. Nothing renders wrongly (the shipped `false` *is* what the scene does), but the
+  claim was written from the diff rather than from a render. **Decision at close: retire the flag,
+  do not reorder the dispatch** — the jitter-before-steps order has a good documented reason, and a
+  whip would need a separate streak origin decoupled from `prev`, which is an ADR and not a cleanup.
+- **The spin's dwell is fine and routes nothing.** The "butterfly is only legible near 0 and 180"
+  risk was written against the *fog* and does not survive the *trace*; the y–z half of the
+  revolution reads as concentric banded rings. The ADR-0068 supplement it would have fed is
+  **closed unopened**.
+
+**Three numbers the content pass inherited, all measured**: the streak raises mean frame luminance
 **1.98x on Thomas and 3.10x on Lorenz** — ADR-0069's "~1.8x" is a *footprint* ratio and the
 photometric change runs ~1.7x past it; every attractor's coverage fell **6-13 %** now that each
 figure is one copy rather than two (Leviathan `0.3785 → 0.3442`, family slack `1.91x`), recorded in
@@ -330,14 +342,21 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.33.1`**, tag `v0.33.1` — **patch**, bumped at [0060]'s close per
+**Version is at `0.34.0`**, tag `v0.34.0` — **minor**, bumped at [0059]'s close per
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Minor is the right level: the plan adds
+a **new preset-facing structural key** (`[particles] density`), changes what the two continuous
+attractor families *draw* (a segment rather than a point), and corrects a feedback addressing bug
+that had every attractor rendering `figure ∪ mirror(figure)` for the life of the scene — capability
+and behaviour, not a fix. Two golden baselines moved deliberately. Nothing is owed until the next
+close.
+
+The `0.33.1` before it was [0060]'s close — **patch**, bumped per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Patch rather than minor is a deliberate
 call on a plan whose whole content is test contracts and documents: it rewrote two numeric gates
 and added a third, moved `docs/specs/0002-ring-determinism.md` and a `.config/nextest.toml`
 override, and touched **no shipped code, no `core` entry point, no preset-facing surface, no pixel
 and no golden baseline**. It is also not "none" — the suite gained a real assertion (a hardware
 ratio floor) and lost a false one, which is a change to what this project promises about itself.
-Nothing is owed until the next close, which will be [0059]'s.
 
 The `0.33.0` before it was [0050]'s close — **minor**, per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Minor was the right level: the plan adds
@@ -543,6 +562,44 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 
 ## Recently closed
 
+- [0059 — Lorenz finds its plane, and the attractor can trade samples for
+  curves](done/0059-lorenz-finds-its-plane.md) — **done 2026-08-04**, Mode 4 review **no blockers**.
+  Phase 1 `357a17e`, Phase 1b `1c47de5`, Phase 2 `4fb4a81`, Phase 3 `642aec0`, and the `human`
+  Phase 4 content pass `990fedc`.
+  [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md),
+  [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) (**with an Outcome
+  section**) and [ADR-0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md)
+  are all **accepted**. Closes [backlog 0048](../design-backlog.md); raises
+  [backlog 0057](../design-backlog.md) and adds a fourth finding to
+  [backlog 0049](../design-backlog.md).
+  **The plan set out to fix a projection basis and found something older and larger.** Phase 1
+  landed the correct x–z plane and **Lorenz still rendered as an X** — because the attractor's own
+  trail mirrors itself: the decay pass sampled the accumulation target with the unflipped fullscreen
+  prelude while the draw wrote it in clip space, so **every attractor has been rendering
+  `figure ∪ mirror(figure)` for the life of the scene**. Both Plan 0057 Phase 4 and ADR-0068 had
+  read the shipped X as "the two lobes edge-on" — a correct reading of the *wrong figure*. It
+  survived every gate because a mirror-symmetric output conceals its own symptom, and it was caught
+  by asking ADR-0037's question somewhere new: `pan_y` returns **two mirror copies** where a
+  translation can only return one. That diagnostic is now the gate (ADR-0070).
+  **Phase 4 was a first authoring, not a re-tune, and it answered three questions — two against the
+  plan's own prediction.** `density` + `fade` **holds** a legible curve, so ADR-0069's Alternative D
+  does not get its case and no successor is owed. The spin's dwell is fine, so the ADR-0068
+  supplement is **closed unopened** — that risk was written against the fog and does not survive the
+  trace. And **the reseed-streak A/B could never have been run**: flipping `RESEED_DRAWS_STREAK`
+  gives byte-identical output under three stimuli, because `encode_jitter` precedes `encode_steps`
+  and the step overwrites `prev` unconditionally. Nothing renders wrongly — but a claim about the
+  running system had been written from the diff. **Retire the flag; do not reorder the dispatch.**
+  **Two levers and one warning for the content lane.** Lorenz ships as a plotted trace
+  (`density = 0.002`, `exposure = 0.03`) and Thomas as a pen drawing (`0.02`, `0.10`) — the **first
+  two shipped presets to bind `exposure` at all**, which is why nothing had complained before that
+  `density` is exposure-neutral in *total light* and not per texel. `presets/README.md`'s claim that
+  you can re-aim `density` "without re-tuning `size`, `fade` or `exposure`" was **corrected at this
+  close**; the wider gap — no scene-local deposit param, `exposure` crossfading across a dissolve,
+  and `bloom_threshold` measured pre-exposure and clamped at `8.0` — is
+  [backlog 0057](../design-backlog.md).
+  **The coverage-floor conversation the plan expected did not arise**: the attractor family minimum
+  is still Leviathan at `0.3442` against the `0.18` floor (1.91x slack), because Leviathan is
+  untouched and nothing new sank below it.
 - [0060 — a test number states a property, or names its
   machine](done/0060-a-test-number-states-a-property-or-names-its-machine.md) — **done 2026-08-04**,
   Mode 4 review **no blockers**. Phase 1 `1d56600` + `31073f6`, Phase 2 the `human` push (CI run

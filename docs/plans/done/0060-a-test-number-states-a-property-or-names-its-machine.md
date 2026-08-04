@@ -313,7 +313,7 @@ numerator**, and every local capture — including every golden blessing — is 
 ADR-0074's decision is unchanged (a number reproducing on two configurations is still a measurement,
 not a portable floor), but its Context, one Negative bullet and Alternative A's rejection are all
 narrower than they read. Carried in ADR-0074's **Outcome** section and in Followups below.
-- **Running alongside Plan [0059](../0059-lorenz-finds-its-plane.md), which is live in a parallel
+- **Running alongside Plan [0059](0059-lorenz-finds-its-plane.md), which is live in a parallel
   session as of 2026-08-04.** No file is shared — that plan's Phase 4 is `presets/attractor_*.toml`
   and this one is `core/src/render/mod.rs`, `core/tests/dsp.rs` and `docs/specs/`. Three
   consequences, all mechanical:

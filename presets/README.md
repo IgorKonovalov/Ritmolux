@@ -1210,12 +1210,19 @@ simultaneous trails overlap into a solid. Drop to `0.02` or below and the same
 
 Two things worth knowing before you reach for it:
 
-- **Brightness does not change when you move it.** The engine divides each
-  particle's deposit by how many are drawn, so total light is invariant — a
-  sparser cloud is not a dimmer one, it is the same light in fewer, brighter
-  points. That is what makes `density` a structural choice rather than an
-  exposure control, and it means you can re-aim it without re-tuning `size`,
-  `fade` or `exposure`.
+- **Total light does not change when you move it — but the picture does.** The
+  engine divides each particle's deposit by how many are drawn, so the *sum* is
+  invariant: a sparser cloud is not a dimmer one. That is what makes `density` a
+  structural choice rather than an exposure control. **It is not a free re-aim,
+  though**, and the first two presets to go sparse both had to pay for it: the
+  same light landing on a fraction of the pixels is far brighter *per texel*, so
+  a sparse preset needs a cut on the order of `trail frames / density` to stay
+  off the tonemap shoulder. `attractor_lorenz` ships `exposure = 0.03` at
+  `density = 0.002`, and `attractor_thomas` `0.10` at `0.02` — both chosen off
+  rendered ladders, not derived. **Buy as much of that level as you can with
+  `size` and `fade` first**: those are scene-local and blend as pixels, where
+  `exposure` is engine-wide and crossfades across a preset dissolve, so an
+  extreme value drags the ~1 s transition through a badly-exposed frame.
 - **The tier caps the top, it does not set the value.** `density` is a fraction
   of whatever the current quality tier allows (50 000 at the standard tier,
   150 000 at the rich one), so `density = 0.02` is 1 000 points on one and 3 000
