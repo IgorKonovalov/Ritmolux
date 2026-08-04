@@ -202,6 +202,29 @@ impl AttractorFamily {
         }
     }
 
+    /// Whether this family's successive positions lie on **one trajectory**
+    /// (ADR-0069), so a segment drawn between them is a piece of that trajectory
+    /// rather than an invented chord.
+    ///
+    /// **Named per family, like [`basis`](Self::basis), and for the same reason.**
+    /// It agrees with `projection().1 == 3.0` on today's roster of four, and that
+    /// agreement is a **coincidence** — "is an ODE flow" and "is three
+    /// dimensional" are different properties. A 2-D flow would be continuous at
+    /// `dim == 2.0`, and a 3-D discrete map would be a 3-D family that must not
+    /// take the branch. Keying off `dim` is ADR-0037's trap in the costume
+    /// ADR-0068 Alternative C already declined once.
+    ///
+    /// The distinction is not cosmetic: a discrete map *replaces* its state each
+    /// iteration, so successive points are scattered across the whole figure and
+    /// a segment between them is a bright chord over the picture — meaningless
+    /// geometry, drawn brightly.
+    fn is_continuous(self) -> bool {
+        match self {
+            AttractorFamily::DeJong | AttractorFamily::Clifford => false,
+            AttractorFamily::Thomas | AttractorFamily::Lorenz => true,
+        }
+    }
+
     /// The seeded initial-scatter box: `(half-spread, centre)` per axis. Sized to
     /// the attractor's native extent so particles start spread **across** it —
     /// a box too small for a chaotic flow leaves every particle on nearly the same
@@ -349,6 +372,35 @@ pub fn deposit_scale(active_count: u32) -> f32 {
     crate::render::TierConfig::FLOOR.attractor_particles as f32 / active_count.max(1) as f32
 }
 
+/// Whether a **reseed's** kick is drawn as a streak (ADR-0069).
+///
+/// **Provisional, and Plan 0059 Phase 4 decides it — not this phase.** A jitter
+/// displaces a particle by far more than a step does (ADR-0069 measures roughly
+/// 15x a frame's travel), so drawing the segment renders a long stroke along a
+/// path the particle never traversed: arguably a legitimate "whip" on the beat,
+/// arguably a bright artifact laid over the figure. It cannot be settled by
+/// argument, only by watching a beat land.
+///
+/// Shipped `false` — the kick moves the particle and the *next* step's segment is
+/// the first one drawn. That is the conservative default: it is what the scene
+/// did before segments existed, so nothing about the reseed's look changes in
+/// this phase.
+///
+/// Flipping it is a one-constant edit and no shader change: it rides the jitter
+/// dispatch's otherwise-unused `coeffs.w`, so an A/B for the content pass is a
+/// rebuild rather than a shader rewrite.
+const RESEED_DRAWS_STREAK: bool = false;
+
+/// Encode a streak choice into the `f32` slot a uniform carries it in.
+///
+/// Trivial, and named anyway: both the draw uniform's `x.w` and the jitter
+/// dispatch's `coeffs.w` mean "non-zero draws a segment", and a shader comparing
+/// `!= 0.0` will read *any* stray value as yes. One helper is what keeps the two
+/// call sites agreeing, and gives the encoding somewhere to be tested.
+fn streak_flag(on: bool) -> f32 {
+    if on { 1.0 } else { 0.0 }
+}
+
 /// The smallest `[particles] density` a preset may ask for (ADR-0069).
 ///
 /// At this fraction the scene draws **25** particles at `Floor` (50 000) and
@@ -395,12 +447,15 @@ const STEP_SHADER: &str = r#"
 struct Particle {
     pos: vec3<f32>,
     seed: f32,
+    prev: vec3<f32>,
+    pad: f32,
 }
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
 
 struct Step {
     coeffs: vec4<f32>, // discrete: a,b,c,d; Lorenz: sigma,rho,beta; Thomas: b
-                       //   family 4 (jitter): xyz half-extent of the kick
+                       //   family 4 (jitter): xyz half-extent of the kick,
+                       //   w != 0 draws the kick as a streak (ADR-0069)
     dt: f32,           // fixed sub-step seconds (for continuous families)
     family: u32,       // 0 De Jong, 1 Clifford, 2 Thomas, 3 Lorenz, 4 jitter
     count: u32,        // active particle count
@@ -459,13 +514,27 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let c = step.coeffs.z;
     let d = step.coeffs.w;
     var p = particles[i].pos;
+    // Captured before any branch mutates `p`. The storage slot still holds this
+    // value until the write at the end, so reading it there would work too —
+    // but only by knowing that, which is exactly the kind of thing that breaks
+    // when someone reorders the writes.
+    let origin = p;
 
     if (step.family == 4u) {
         // A reseed: disturb the cloud where it is, rather than replacing it with
         // a uniform fill of the seed box (ADR-0066). The points stay on the
         // attractor, so no axis-aligned rectangle exists at any moment, and the
         // map's own mixing spreads the kick within a few iterations.
-        particles[i].pos = p + hash3(particles[i].seed, step.salt) * step.coeffs.xyz;
+        let kicked = p + hash3(particles[i].seed, step.salt) * step.coeffs.xyz;
+        // Whether the kick is *drawn* as a streak is Phase 4's call, not this
+        // phase's: a jitter displaces a particle by far more than a step does
+        // (ADR-0069 measures ~15x a frame's travel), so the segment would be a
+        // long stroke along a path the particle never traversed. `w` selects it,
+        // so an A/B is a constant flip and no shader edit.
+        //   w != 0 -> prev stays pre-kick, the streak is drawn
+        //   w == 0 -> prev follows the kick, so the segment has zero length
+        particles[i].prev = select(kicked, origin, step.coeffs.w != 0.0);
+        particles[i].pos = kicked;
         return;
     }
 
@@ -492,6 +561,15 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
     }
 
+    // The position this particle came from, for the continuous families' segment
+    // (ADR-0069). Written for every family — the *draw* decides whether to use
+    // it, so the buffer's contents stay one shape and a discrete map that took
+    // the branch by mistake is a visible chord rather than stale data.
+    //
+    // This is the position before the whole step, not before the last Euler
+    // sub-step: ADR-0069 rejected the sub-step polyline by measurement, and the
+    // segment is meant to span the frame's travel.
+    particles[i].prev = origin;
     particles[i].pos = p;
 }
 "#;
@@ -507,7 +585,8 @@ struct Draw {
     // w: x world scale, y dim (2 or 3), z z-center to subtract (3D),
     //    w deposit scale (ADR-0065: FLOOR_PARTICLES / active_count)
     // u: x hue_spread, y hue_center, z palette_mix, w saturation
-    // x: x zoom, yz pan (view transform, ADR-0018), w unused
+    // x: x zoom, yz pan (view transform, ADR-0018), w streak (ADR-0069:
+    //    non-zero on a continuous family, so the quad spans prev -> pos)
     // bh: xyz the axis the spin rotates x against (ADR-0068), w unused
     // bv: xyz the vertical axis (ADR-0068), w unused
     v: vec4<f32>,
@@ -526,8 +605,15 @@ struct Draw {
 
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
+    // Position within the sprite, in units of the point radius. For a point this
+    // is the corner itself; for a segment the quad is stretched along its axis
+    // and this is the coordinate in the segment's own frame.
     @location(0) local: vec2<f32>,
     @location(1) color: vec3<f32>,
+    // Half-length of the segment in the same units, so the fragment measures
+    // distance to a *capsule* rather than to a disc. Exactly 0 for a point,
+    // which makes the two cases one expression (ADR-0069).
+    @location(2) @interpolate(flat) half_len: f32,
 }
 
 // Shared `saturation` (mirrors core/src/render/palette.rs::desaturate verbatim).
@@ -536,11 +622,30 @@ fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
     return vec3<f32>(luma) + (c - vec3<f32>(luma)) * s;
 }
 
+// Project one attractor position to the pre-aspect "world" plane. Factored out
+// of the vertex body so a segment can project **both** its endpoints through the
+// identical path — two call sites that must not be allowed to drift apart.
+fn project(q: vec3<f32>, dim: f32, zc: f32, cs: f32, sn: f32) -> vec2<f32> {
+    if (dim < 2.5) {
+        // 2D map: in-plane rotation.
+        return vec2<f32>(q.x * cs - q.y * sn, q.x * sn + q.y * cs);
+    }
+    // 3D flow: centre on z, pick the viewing plane, rotate around the vertical
+    // axis, orthographic project. The plane is the family's own (ADR-0068),
+    // arriving as two one-hot axis selectors rather than as a second pipeline:
+    // `bh` is the axis the spin rotates `x` against, `bv` is the vertical.
+    // `bh = z, bv = y` reproduces the shared convention this replaced exactly;
+    // Lorenz ships `bh = y, bv = z`.
+    let p = vec3<f32>(q.x, q.y, q.z - zc);
+    return vec2<f32>(p.x * cs + dot(p, draw.bh.xyz) * sn, dot(p, draw.bv.xyz));
+}
+
 @vertex
 fn vs_main(
     @builtin(vertex_index) vi: u32,
     @location(0) center: vec3<f32>,
     @location(1) seed: f32,
+    @location(2) previous: vec3<f32>,
 ) -> VsOut {
     var corners = array<vec2<f32>, 6>(
         vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(0.0, 1.0),
@@ -561,21 +666,42 @@ fn vs_main(
 
     let cs = cos(rot);
     let sn = sin(rot);
-    var screen: vec2<f32>;
-    if (dim < 2.5) {
-        // 2D map: in-plane rotation.
-        screen = vec2<f32>(center.x * cs - center.y * sn, center.x * sn + center.y * cs);
+    let streak = draw.x.w;
+    let screen = project(center, dim, zc, cs, sn);
+
+    // The sprite. A point is a `psize` square about the projected position; a
+    // segment is that square swept from `prev` to `pos` — a capsule (ADR-0069).
+    //
+    // Both are built in **world** space, before the single aspect division below.
+    // That is deliberate and it is what keeps the stroke an even width: world `x`
+    // is what becomes NDC `x / aspect`, so equal world distances are equal
+    // *pixels* on both axes, and a capsule built here is round-ended on screen
+    // rather than sheared by the target's aspect (ADR-0037).
+    var world: vec2<f32>;
+    var local: vec2<f32>;
+    var half_len = 0.0;
+    if (streak != 0.0) {
+        let a = project(previous, dim, zc, cs, sn) * scl;
+        let b = screen * scl;
+        let mid = (a + b) * 0.5;
+        let axis = (b - a) * 0.5;
+        let len = length(axis);
+        // A stationary particle has no direction to orient by, and `normalize`
+        // of a zero vector is undefined — so fall back to the point's own frame,
+        // which is what a zero-length capsule is anyway.
+        var dir = vec2<f32>(1.0, 0.0);
+        if (len > 1e-9) {
+            dir = axis / len;
+        }
+        let nrm = vec2<f32>(-dir.y, dir.x);
+        half_len = len / psize;
+        // Extended by `psize` past each end so the round caps have room.
+        world = mid + dir * (corner.x * (len + psize)) + nrm * (corner.y * psize);
+        local = vec2<f32>(corner.x * (half_len + 1.0), corner.y);
     } else {
-        // 3D flow: centre on z, pick the viewing plane, rotate around the
-        // vertical axis, orthographic project. The plane is the family's own
-        // (ADR-0068), arriving as two one-hot axis selectors rather than as a
-        // second pipeline: `bh` is the axis the spin rotates `x` against, `bv`
-        // is the vertical. `bh = z, bv = y` reproduces the shared convention
-        // this replaced exactly; Lorenz ships `bh = y, bv = z`.
-        let p = vec3<f32>(center.x, center.y, center.z - zc);
-        screen = vec2<f32>(p.x * cs + dot(p, draw.bh.xyz) * sn, dot(p, draw.bv.xyz));
+        world = screen * scl + corner * psize;
+        local = corner;
     }
-    let world = screen * scl + corner * psize;
 
     // View transform (ADR-0018): project to NDC, then scale about the screen centre
     // by `zoom` and offset by `pan`. Default zoom = 1, pan = 0 is the identity, so an
@@ -603,14 +729,19 @@ fn vs_main(
 
     var out: VsOut;
     out.pos = vec4<f32>(ndc, 0.0, 1.0);
-    out.local = corner;
+    out.local = local;
+    out.half_len = half_len;
     out.color = col * deposit;
     return out;
 }
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let d = length(in.local);
+    // Distance to the segment from (-half_len, 0) to (+half_len, 0), in units of
+    // the point radius. At `half_len = 0` this is `length(in.local)` exactly —
+    // the point's own radial falloff, unchanged, which is what lets the discrete
+    // families keep byte-identical captures through one shader.
+    let d = length(vec2<f32>(max(abs(in.local.x) - in.half_len, 0.0), in.local.y));
     let falloff = max(0.0, 1.0 - d);
     let g = falloff * falloff;
     return vec4<f32>(in.color * g, 1.0);
@@ -652,15 +783,30 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 "#;
 
-/// One particle, GPU storage-buffer layout (std430). 16 bytes: a 3D attractor
-/// position (2D families keep `z = 0`) and a per-particle seed jitter set once at
-/// init. The `f32` packs into the `vec3`'s trailing slot (offset 12), so the
-/// std430 stride is a tight 16 — matching this `repr(C)` layout.
+/// One particle, GPU storage-buffer layout (std430). **32 bytes**: the current
+/// 3D attractor position (2D families keep `z = 0`), a per-particle seed jitter
+/// set once at init, and the position this particle held *before* the current
+/// step, which the continuous families draw a segment back to (ADR-0069).
+///
+/// Each `f32` packs into the preceding `vec3`'s trailing slot (offsets 12 and
+/// 28), so std430 lays this out as two tight 16-byte halves and the stride is 32
+/// — matching this `repr(C)` layout. **It used to be a tight 16**, and that note
+/// is corrected here rather than deleted because the packing argument is the same
+/// one, applied twice; `_pad` is the explicit name for the slot `seed` occupies
+/// in the first half.
+///
+/// The price of `prev` is one extra 16 bytes per particle, which at the tier
+/// budgets is **1.6 MB** at `Floor` (50 000) and **4.8 MB** at `Rich` (150 000),
+/// up from 0.8 MB and 2.4 MB. It is GPU storage, allocated once at build and
+/// never resized — `[particles] density` narrows what is *drawn*, not what is
+/// allocated (ADR-0069), so a sparse preset pays the full figure.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Particle {
     pos: [f32; 3],
     seed: f32,
+    prev: [f32; 3],
+    _pad: f32,
 }
 
 /// Compute step uniform (per frame): the attractor coefficients, the fixed
@@ -687,7 +833,8 @@ struct StepUniform {
 /// spin. `w`: x world scale, y projection dim (2 or 3), z z-centre (3D),
 /// w [`deposit_scale`] (ADR-0065).
 /// `u`: x hue_spread, y hue_center, z palette_mix, w saturation (ADR-0021).
-/// `x`: x zoom, yz pan (view transform, ADR-0018), w unused.
+/// `x`: x zoom, yz pan (view transform, ADR-0018), w the streak flag
+/// (ADR-0069) — non-zero exactly when [`AttractorFamily::is_continuous`].
 /// `bh`/`bv`: the 3D projection basis's two axis selectors (ADR-0068) — the axis
 /// the spin rotates `x` against, and the vertical. Read only on the 3D branch.
 #[repr(C)]
@@ -833,7 +980,7 @@ impl PipelineResources {
         // the draw pass as an instance vertex buffer (VERTEX), seeded once from
         // the CPU (COPY_DST). One buffer, two roles — no CPU round-trip.
         //
-        // `COPY_SRC` is there for [`read_positions`], the reseed test's readback
+        // `COPY_SRC` is there for [`read_particles`], the reseed test's readback
         // (Plan 0057 Phase 3). Carried unconditionally rather than behind
         // `cfg(test)` so the test exercises the buffer the app actually allocates;
         // a usage flag costs nothing that is not used, and a test running against a
@@ -993,6 +1140,7 @@ impl PipelineResources {
                     attributes: &wgpu::vertex_attr_array![
                         0 => Float32x3, // pos (z = 0 for 2D families)
                         1 => Float32,   // seed
+                        2 => Float32x3, // prev (ADR-0069; offset 16, see `Particle`)
                     ],
                 })],
             },
@@ -1473,7 +1621,7 @@ impl AttractorScene {
     ///
     /// `None` before the first render, when there are no GPU resources yet.
     #[cfg(test)]
-    fn read_positions(&self, queue: &wgpu::Queue) -> Option<Vec<[f32; 3]>> {
+    fn read_particles(&self, queue: &wgpu::Queue) -> Option<Vec<([f32; 3], [f32; 3])>> {
         let res = self.res.as_ref()?;
         let size = (self.particle_count as usize * std::mem::size_of::<Particle>()) as u64;
         let staging = self.device.create_buffer(&wgpu::BufferDescriptor {
@@ -1507,7 +1655,7 @@ impl AttractorScene {
         let out = {
             let mapped = slice.get_mapped_range().expect("particle readback range");
             let particles: &[Particle] = bytemuck::cast_slice(&mapped);
-            particles.iter().map(|p| p.pos).collect()
+            particles.iter().map(|p| (p.pos, p.prev)).collect()
         };
         staging.unmap();
         Some(out)
@@ -1524,11 +1672,19 @@ impl AttractorScene {
                 Particle {
                     pos: [x, y, 0.0],
                     seed,
+                    // Seeded equal to `pos`, so a particle that has not stepped
+                    // yet spans a zero-length segment and draws as the point it
+                    // would have drawn before ADR-0069. A zeroed `prev` would
+                    // instead streak every particle from the origin on the first
+                    // frame — a starburst that the trail would then keep.
+                    prev: [x, y, 0.0],
+                    _pad: 0.0,
                 }
             })
             .collect();
         for p in &mut particles {
             p.pos[2] = center[2] + rng.range(-spread[2], spread[2]);
+            p.prev[2] = p.pos[2];
         }
         particles
     }
@@ -1917,7 +2073,16 @@ fn upload_uniforms(
                 inputs.palette_mix,
                 inputs.saturation,
             ],
-            x: [inputs.zoom, inputs.pan[0], inputs.pan[1], 0.0],
+            x: [
+                inputs.zoom,
+                inputs.pan[0],
+                inputs.pan[1],
+                if inputs.family.is_continuous() {
+                    1.0
+                } else {
+                    0.0
+                },
+            ],
             bh: [hx, hy, hz, 0.0],
             bv: [vx, vy, vz, 0.0],
         }),
@@ -1967,7 +2132,7 @@ fn encode_jitter(
         &pipelines.step_uniform,
         u64::from(pipelines.step_stride),
         bytemuck::bytes_of(&StepUniform {
-            coeffs: [jx, jy, jz, 0.0],
+            coeffs: [jx, jy, jz, streak_flag(RESEED_DRAWS_STREAK)],
             dt: FIXED_STEP,
             family: JITTER_MODE,
             // Active, like the step above — a reseed that kicked the inert tail
@@ -2095,8 +2260,8 @@ mod tests {
     #![allow(clippy::panic, clippy::expect_used)]
 
     use super::{
-        AttractorFamily, AttractorScene, Basis, FIXED_STEP, MIN_PARTICLE_DENSITY, Particle, Scene,
-        active_particles, deposit_scale,
+        AttractorFamily, AttractorScene, Basis, FIXED_STEP, MIN_PARTICLE_DENSITY, Particle,
+        RESEED_DRAWS_STREAK, Scene, active_particles, deposit_scale, streak_flag,
     };
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderContext;
@@ -2239,6 +2404,125 @@ mod tests {
             assert_ne!(
                 h, v,
                 "{basis:?} put the horizontal and vertical on one axis"
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // The continuous-flow segment (Plan 0059 Phase 3 / ADR-0069)
+    // -----------------------------------------------------------------------
+
+    /// `is_continuous()` pinned per family against an explicit table.
+    ///
+    /// The compiler is what forces a fifth family to answer — the match is
+    /// exhaustive with no wildcard. This pins what it answers, and, crucially,
+    /// **records that its agreement with `dim == 3.0` is a coincidence of this
+    /// roster**. That is the same hazard ADR-0068 Alternative C declined for the
+    /// projection basis, and here the two properties happen to line up, which is
+    /// exactly the condition under which someone "simplifies" one into the other.
+    #[test]
+    fn continuity_is_pinned_per_family() {
+        let table = [
+            (AttractorFamily::DeJong, false),
+            (AttractorFamily::Clifford, false),
+            (AttractorFamily::Thomas, true),
+            (AttractorFamily::Lorenz, true),
+        ];
+        for (family, expected) in table {
+            assert_eq!(
+                family.is_continuous(),
+                expected,
+                "{family:?} continuity must be {expected}"
+            );
+        }
+
+        // Both answers are represented, so the table is not four copies of one.
+        assert!(table.iter().any(|(_, c)| *c));
+        assert!(table.iter().any(|(_, c)| !*c));
+
+        // On TODAY's roster `is_continuous()` and `dim == 3.0` agree everywhere.
+        // That is recorded as a coincidence, not relied on: the moment a 2-D flow
+        // or a 3-D map is added this loop stops holding, and the *correct* fix is
+        // to leave `is_continuous` alone. If this assertion ever fails, do not
+        // re-derive continuity from `dim` to make it pass.
+        for (family, continuous) in table {
+            assert_eq!(
+                family.projection().1 == 3.0,
+                continuous,
+                "{family:?}: the dim/continuity coincidence has broken, which is                  allowed - update this note, do NOT key `is_continuous` off `dim`"
+            );
+        }
+    }
+
+    /// **The segment's endpoints are this frame's `pos` and the previous frame's
+    /// `pos`** — asserted on the shader's inputs rather than on pixels, because
+    /// "is the stroke connected" is not measurable and "is there a gap" is.
+    ///
+    /// Zero gap by construction is what "the beading closes" means: if `prev`
+    /// after frame N is bit-identical to `pos` after frame N-1, consecutive
+    /// segments share an endpoint exactly and the stroke has no seams.
+    ///
+    /// One caveat this is honest about: the harness advances exactly one
+    /// [`FIXED_STEP`] per frame, so one compute step runs per frame. `prev` is the
+    /// position before the *step*, so under a variable `dt` that drains several
+    /// steps in a frame it is the last step's origin, not the frame's. The
+    /// shader-level contract is per step, and that is what is asserted here.
+    #[test]
+    fn a_segment_starts_where_the_last_one_ended() {
+        let Some(mut h) = Harness::new(AttractorFamily::Lorenz) else {
+            return;
+        };
+        // Past the seed, so the cloud is on the attractor and genuinely moving.
+        h.run(CONVERGE_FRAMES);
+        let before: Vec<[f32; 3]> = h.particles().into_iter().map(|(pos, _)| pos).collect();
+        h.run(1);
+        let after = h.particles();
+
+        let mut moved = 0usize;
+        for (i, ((pos, prev), was)) in after.iter().zip(before.iter()).enumerate() {
+            assert_eq!(
+                prev, was,
+                "particle {i}: this frame's segment starts at {prev:?}, but last                  frame ended at {was:?} - the stroke has a gap"
+            );
+            if pos != prev {
+                moved += 1;
+            }
+        }
+        // Non-vacuity: the particles actually advanced, so the equality above is
+        // a statement about a moving cloud and not about a stalled one.
+        assert!(
+            moved * 2 > after.len(),
+            "only {moved} of {} particles moved in a frame - a stalled cloud would              satisfy the endpoint check trivially",
+            after.len()
+        );
+    }
+
+    /// A discrete map never takes the segment branch, checked where it is decided
+    /// rather than in the pixels: the draw uniform's streak slot.
+    ///
+    /// The pixel-level version of this claim is the golden baseline plus the
+    /// byte-identity captures, which is where a chord across a De Jong's
+    /// scattered successive points would actually show up.
+    #[test]
+    fn only_continuous_families_ask_for_a_segment() {
+        // The value the draw uniform actually carries, per family — the shader
+        // tests `!= 0.0`, so this is the decision point.
+        assert_eq!(streak_flag(AttractorFamily::DeJong.is_continuous()), 0.0);
+        assert_eq!(streak_flag(AttractorFamily::Clifford.is_continuous()), 0.0);
+        assert_eq!(streak_flag(AttractorFamily::Thomas.is_continuous()), 1.0);
+        assert_eq!(streak_flag(AttractorFamily::Lorenz.is_continuous()), 1.0);
+
+        // The reseed streak ships suppressed and Plan 0059 Phase 4 decides it
+        // (ADR-0069). Pinned so the provisional default is a value someone chose
+        // rather than whatever a later edit last left it at.
+        #[expect(
+            clippy::assertions_on_constants,
+            reason = "the constancy is the point: this pins a provisional default                       that Phase 4 owns flipping"
+        )]
+        {
+            assert!(
+                !RESEED_DRAWS_STREAK,
+                "the reseed streak ships off; Plan 0059 Phase 4 owns flipping it"
             );
         }
     }
@@ -2457,8 +2741,14 @@ mod tests {
         }
 
         fn positions(&self) -> Vec<[f32; 3]> {
+            self.particles().into_iter().map(|(pos, _)| pos).collect()
+        }
+
+        /// `(pos, prev)` per particle — the pair ADR-0069's segment is drawn
+        /// between.
+        fn particles(&self) -> Vec<([f32; 3], [f32; 3])> {
             self.scene
-                .read_positions(&self.ctx.queue)
+                .read_particles(&self.ctx.queue)
                 .expect("resources exist after a render")
         }
     }
@@ -2752,12 +3042,36 @@ mod tests {
     }
 
     /// The `Particle` layout the storage buffer and the vertex attributes both
-    /// assume: a tight 16-byte std430 stride, with the seed packed into the vec3's
-    /// trailing slot. The readback above casts raw bytes to this, so a change here
-    /// silently reinterprets every position.
+    /// assume: **two** tight 16-byte std430 halves, stride 32, each `f32` packed
+    /// into the preceding `vec3`'s trailing slot. The readback above casts raw
+    /// bytes to this, so a change here silently reinterprets every position.
+    ///
+    /// It was a tight 16 until ADR-0069 added `prev`. The offsets matter beyond
+    /// the size: `vertex_attr_array!` lays its attributes out consecutively, so
+    /// `prev` is fetched from offset 16 and a padding change would feed the draw
+    /// someone else's bytes rather than fail to compile.
     #[test]
-    fn the_particle_layout_is_a_tight_sixteen_bytes() {
-        assert_eq!(std::mem::size_of::<Particle>(), 16);
+    fn the_particle_layout_is_two_tight_sixteens() {
+        assert_eq!(std::mem::size_of::<Particle>(), 32);
         assert_eq!(std::mem::align_of::<Particle>(), 4);
+
+        // The offsets the vertex layout hard-codes, measured rather than assumed.
+        let p = Particle {
+            pos: [0.0; 3],
+            seed: 0.0,
+            prev: [0.0; 3],
+            _pad: 0.0,
+        };
+        let base = std::ptr::from_ref(&p) as usize;
+        assert_eq!(std::ptr::from_ref(&p.pos) as usize - base, 0);
+        assert_eq!(std::ptr::from_ref(&p.seed) as usize - base, 12);
+        assert_eq!(std::ptr::from_ref(&p.prev) as usize - base, 16);
+
+        // The memory this costs, at both tier budgets — the number ADR-0069's
+        // price is quoted as, so it fails here if the struct grows again.
+        let floor = TierConfig::FLOOR.attractor_particles as usize;
+        let rich = TierConfig::RICH.attractor_particles as usize;
+        assert_eq!(floor * size_of::<Particle>(), 1_600_000);
+        assert_eq!(rich * size_of::<Particle>(), 4_800_000);
     }
 }

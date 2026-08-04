@@ -1224,6 +1224,30 @@ Two things worth knowing before you reach for it:
 It is structural: set once when the preset loads, and **not bindable** to audio.
 An eased particle count would re-decide the picture every frame.
 
+**The two flow families draw strokes, not dots.** `thomas` and `lorenz` integrate
+a trajectory, so each particle's position this frame is one step along a path
+from where it was last frame — and the engine draws that whole step as a short
+segment with rounded ends. `de_jong` and `clifford` are *maps*: each iteration
+throws the point somewhere else entirely on the figure, so a line between
+successive positions would be a bright chord across the picture rather than a
+piece of it. Those two keep drawing dots, and nothing you can set changes either
+choice — it is a property of the attractor, not a preference.
+
+What that means when you are tuning:
+
+- **On `lorenz` and `thomas`, low `density` is finally worth reaching for.** The
+  segments join end to end with no gap, so a sparse cloud reads as continuous
+  curves instead of a dotted line. This is the combination the table above calls
+  "curves", and before the segment existed you could not actually get there — a
+  sparse cloud just looked sparse.
+- **They are brighter than they used to be, and you may need to pull them back.**
+  A segment covers more of the frame than a dot, so the same preset now lays down
+  more light: measured on a plain figure, mean frame luminance went up **2.0x on
+  `thomas` and 3.1x on `lorenz`**. This is deliberately *not* compensated in the
+  engine — a faster-moving particle drawing a longer, brighter streak is arguably
+  the correct rendering of speed. If it is too hot for your look, the levers are
+  `exposure`, `size` and `fade`, in that order.
+
 The family sets the map **and** the meaning of the four bindable coefficients
 `a`/`b`/`c`/`d`, each of which defaults to that family's canonical value
 (De Jong `1.641 1.902 0.316 1.525`; Clifford `-1.4 1.6 1.0 0.7`; Thomas uses `a`
