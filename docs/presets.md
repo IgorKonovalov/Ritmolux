@@ -96,7 +96,8 @@ Rules:
   [When a preset is wrong](#when-a-preset-is-wrong).
 
 Beyond `[params]`, a preset may carry optional tables — `[curve]` / `[generator]`
-(structural config for the line systems), `[particles]` (attractor family),
+(structural config for the line systems), `[particles]` (attractor family and
+sample density),
 `[spectrum]` (the readout's element count, layout and per-element easing —
 summarised [below](#the-spectrum-table)), `[smoothing]` (per-parameter easing),
 and `[palette]` / `[palette_b]` (colour). All are documented in

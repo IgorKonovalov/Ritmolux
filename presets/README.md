@@ -1180,16 +1180,49 @@ character is an inert grammar variable.
 
 ### `[particles]` — for `attractor`
 
-| Key      | Values                                       | Notes                                             |
-|----------|----------------------------------------------|---------------------------------------------------|
-| `family` | `de_jong`, `clifford`, `thomas`, `lorenz`    | Which strange attractor the compute step iterates. Optional — absent means `de_jong`. |
+| Key       | Values                                       | Notes                                             |
+|-----------|----------------------------------------------|---------------------------------------------------|
+| `family`  | `de_jong`, `clifford`, `thomas`, `lorenz`    | Which strange attractor the compute step iterates. Optional — absent means `de_jong`. |
+| `density` | `0.0005` .. `1.0`                            | What fraction of the tier's particle budget to draw. Optional — absent means `1.0`, the whole budget. |
 
 ```toml
 system = "attractor"
 
 [particles]
 family = "lorenz"
+density = 0.02
 ```
+
+**`density` and `fade` are one look, not two settings.** `density` decides how
+many points you are drawing with; `fade` decides how long each one stays on
+screen. What you see is the product:
+
+| | low `fade` (short trail) | high `fade` (long trail) |
+|---|---|---|
+| **high `density`** | a crisp stipple — the attractor's *measure*, every point an independent sample | **fog** — so many overlapping trails that the figure fills in solid |
+| **low `density`** | a sparse scatter of dots, usually too thin to read | **curves** — few enough trajectories that you can follow each one, which is the classic plotted attractor |
+
+The bottom-right cell is the one `density` was added for. At `density = 1.0` the
+scene draws 50 000 independent samples of the attractor, and raising `fade` just
+makes a denser cloud — you cannot get a *trace* out of it, because 50 000
+simultaneous trails overlap into a solid. Drop to `0.02` or below and the same
+`fade` reads as banded spiral curves instead.
+
+Two things worth knowing before you reach for it:
+
+- **Brightness does not change when you move it.** The engine divides each
+  particle's deposit by how many are drawn, so total light is invariant — a
+  sparser cloud is not a dimmer one, it is the same light in fewer, brighter
+  points. That is what makes `density` a structural choice rather than an
+  exposure control, and it means you can re-aim it without re-tuning `size`,
+  `fade` or `exposure`.
+- **The tier caps the top, it does not set the value.** `density` is a fraction
+  of whatever the current quality tier allows (50 000 at the standard tier,
+  150 000 at the rich one), so `density = 0.02` is 1 000 points on one and 3 000
+  on the other. You are choosing a proportion, not a count.
+
+It is structural: set once when the preset loads, and **not bindable** to audio.
+An eased particle count would re-decide the picture every frame.
 
 The family sets the map **and** the meaning of the four bindable coefficients
 `a`/`b`/`c`/`d`, each of which defaults to that family's canonical value

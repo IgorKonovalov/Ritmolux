@@ -80,6 +80,12 @@ pub enum GeneratorConfig {
     Particles {
         /// The attractor family (De Jong, Clifford, Thomas, Lorenz).
         family: particles::AttractorFamily,
+        /// Fraction of the tier's particle budget actually drawn (ADR-0069),
+        /// validated at load into
+        /// [`MIN_PARTICLE_DENSITY`](particles::MIN_PARTICLE_DENSITY)`..=1.0`.
+        /// Structural, not bindable: an eased integer count would re-decide the
+        /// picture every frame. `1.0` is the whole budget and the default.
+        density: f32,
     },
     /// The spectrum readout's `[spectrum]` table (Plan 0034 / ADR-0036): how many
     /// elements the frequency axis is divided into, how they are laid out, and how
