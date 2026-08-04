@@ -352,12 +352,20 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
      plan*, which now resolves one directory too high: `../` → `../../`. Its links to
      still-active sibling plans go the other way: `(NNNN-….md)` → `(../NNNN-….md)`.
 
-   Then **verify by re-audit rather than by inspection** — walk every `](relative)` under `docs/`
-   and assert the target exists. Two traps worth knowing: a bare `NNNN-*.md` link inside
-   `docs/adrs/` is identified by its **number**, not its slug, so a wrong filename is repairable by
-   number — *unless* the surrounding text says "Plan NNNN", in which case the number is a plan
-   number and the missing piece is the `../plans/` prefix, not the slug. Nothing enforces any of
-   this; a CI link checker would retire the step.
+   **Verify by running the checker, not by inspection** — it is the whole point of the step, and it
+   covers `.claude/skills/**` as well as `docs/` (five broken links were hiding in the skills' own
+   references when it was first run):
+
+   ```sh
+   node scripts/check-doc-links.mjs      # exit 0 = every relative link resolves
+   ```
+
+   It prints `file:line -> target` for each break and repeats the repair rules above. Two traps it
+   cannot decide for you: a bare `NNNN-*.md` link inside `docs/adrs/` is identified by its
+   **number**, not its slug, so a wrong filename is repairable by number — *unless* the surrounding
+   prose says "Plan NNNN", in which case the number is a **plan** number and the missing piece is
+   the `../plans/` prefix rather than the filename. Guessing wrong here silently re-points a
+   citation at a different document.
 2. **Accept any paired ADRs** (`proposed → accepted`) and refresh `docs/adrs/README.md`. An ADR is
    append-only *once accepted* — but if the plan's implementation falsified something the ADR
    recorded, accept it **with a dated `Outcome` section** (the ADR-0054 and ADR-0074 precedent)
