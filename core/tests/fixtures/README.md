@@ -169,3 +169,26 @@ shipped width leaves the test green and blind. Each test reads those
 preconditions back out of its own file before it touches the GPU and reports the
 pixel counts either side, so an edit that quietly empties the region under test
 fails rather than passing on nothing.
+
+## `emitter_onset.toml` is a sixth guard, and it is driven by a *changing* stimulus
+
+It belongs to `a_spawn_rate_on_onset_bursts_and_then_idles` in
+`core/src/render/scenes/emitter.rs` (Plan 0052 Phase 3). It pins no pixels and
+has no baseline.
+
+Every other fixture here is captured through `capture_preset`, which holds **one**
+analysis frame for every warm-up step — the right primitive for a baseline, and
+structurally unable to ask this question. The emitter is the first scene whose
+*population* is not fixed, so "reacts to a transient" is only half the claim: the
+other half is that the frame **empties again** when the transient passes, which a
+sustained stimulus can never show. This fixture is therefore driven through
+`capture_preset_over` with a short silent lead, a six-frame hit, and a second of
+silence, and the test reads the whole response.
+
+Two of its values are load-bearing and neither is a look choice. `spawn_rate` has
+**no constant term** — every shipped preset carries a base rate so the frame is
+never empty, and with one here "idles between transients" would be a statement
+about that floor rather than about the scene. And it binds **no `trails`**: with a
+feedback stage on, the tail would decay the same way whether objects were retired
+or not, so the measurement would say nothing about lifetimes. `lifetime = 0.55`
+is 33 frames, comfortably inside the silent tail.

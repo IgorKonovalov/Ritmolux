@@ -1635,4 +1635,123 @@ mod tests {
             "the reproducibility capture drew nothing"
         );
     }
+
+    // -----------------------------------------------------------------------
+    // Audio (Plan 0052 Phase 3)
+    // -----------------------------------------------------------------------
+
+    /// **A `spawn_rate` bound to `onset` emits in bursts and idles between them**
+    /// — Phase 3's first done-when, and the one claim `capture_preset` cannot
+    /// make: holding one analysis frame for every step converges the response
+    /// before the pixels are read, so a *sustained* onset shows that the binding
+    /// is live but says nothing about what happens when it stops.
+    ///
+    /// So this drives `capture_preset_over` with a real time-varying stimulus —
+    /// three frames of transient, then a second of silence — and reads the whole
+    /// response. Three things have to hold and each rules out a different
+    /// mistake: the frame is dark before the hit (the source really is
+    /// `onset`-only), it lights up sharply after it (the binding reaches the
+    /// pool), and it goes dark again (objects are *retired*, which is what a
+    /// scene with lifetimes does and what the swarm cannot do at all).
+    ///
+    /// The fixture binds no `trails`, so the decay measured here is the
+    /// population emptying and not a feedback stage fading.
+    ///
+    /// Needs a GPU adapter, so it skips where there is none (ADR-0016).
+    #[test]
+    fn a_spawn_rate_on_onset_bursts_and_then_idles() {
+        use crate::dsp::AnalysisFrame;
+        use crate::preset::Preset;
+        use crate::render::CaptureImage;
+        use crate::render::context::RenderError;
+        use crate::render::{HeadlessOptions, Renderer};
+
+        const ONSET_FIXTURE: &str = include_str!("../../../tests/fixtures/emitter_onset.toml");
+        /// Frames of transient, then frames of silence. The tail is comfortably
+        /// longer than the fixture's 0.55 s lifetime (33 frames). Six frames is
+        /// a tenth of a second — still a transient, and enough marks that the
+        /// burst is a picture rather than a handful of dots.
+        const HIT: usize = 6;
+        const QUIET: usize = 60;
+        /// Frames of silence *before* the hit, so "dark before" is measured on
+        /// the same capture rather than assumed.
+        const LEAD: usize = 6;
+
+        let mut renderer = match Renderer::new_headless(HeadlessOptions {
+            width: 96,
+            height: 96,
+            prefer_software: true,
+        }) {
+            Ok(renderer) => renderer,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+            Err(e) => panic!("headless renderer build failed: {e}"),
+        };
+        let preset = Preset::from_toml_str(ONSET_FIXTURE).expect("the onset fixture parses");
+        let name = preset.name.clone();
+        renderer.set_presets(vec![preset]);
+
+        let silence = AnalysisFrame::default();
+        let transient = AnalysisFrame {
+            onset: 1.0,
+            beat: true,
+            ..Default::default()
+        };
+        let stimulus: Vec<AnalysisFrame> = std::iter::repeat_n(silence, LEAD)
+            .chain(std::iter::repeat_n(transient, HIT))
+            .chain(std::iter::repeat_n(silence, QUIET))
+            .collect();
+
+        let frames = renderer
+            .capture_preset_over(&name, &stimulus)
+            .expect("capture the onset burst");
+        assert_eq!(frames.len(), LEAD + HIT + QUIET);
+
+        /// Mean RGB level of a frame, 0..255.
+        fn level(img: &CaptureImage) -> f32 {
+            let sum: f32 = img
+                .rgba
+                .chunks_exact(4)
+                .map(|p| (p[0] as f32 + p[1] as f32 + p[2] as f32) / 3.0)
+                .sum();
+            sum / (img.rgba.len() / 4) as f32
+        }
+
+        let levels: Vec<f32> = frames.iter().map(level).collect();
+        let before = levels.get(..LEAD).map(|s| s.to_vec()).unwrap_or_default();
+        let after = levels
+            .get(LEAD + HIT..)
+            .map(|s| s.to_vec())
+            .unwrap_or_default();
+        let peak = after.iter().copied().fold(0.0f32, f32::max);
+        let lead_peak = before.iter().copied().fold(0.0f32, f32::max);
+        let tail = levels.last().copied().unwrap_or(0.0);
+        eprintln!(
+            "emitter onset burst: lead peak {lead_peak:.4}, burst peak {peak:.4}, \
+             tail {tail:.4} (of 255)"
+        );
+
+        // Dark before the hit. A hair above zero rather than exactly it: the
+        // capture is 8-bit and the fixture's palette is not black.
+        assert!(
+            lead_peak < 0.05,
+            "the frame must be empty before the transient — `spawn_rate` has no \
+             constant term, so anything here means the source is not `onset`: \
+             {lead_peak:.4}"
+        );
+        // A real burst, not a flicker.
+        assert!(
+            peak > 2.0,
+            "a transient must visibly fill the frame: peak {peak:.4}"
+        );
+        // ...and it empties again, by more than two orders of magnitude. This is
+        // the retirement half: a scene that only spawned would hold its peak.
+        assert!(
+            tail * 100.0 < peak,
+            "the shower must idle again once the transient passes: tail \
+             {tail:.4} against peak {peak:.4} — objects are not being retired"
+        );
+    }
 }
