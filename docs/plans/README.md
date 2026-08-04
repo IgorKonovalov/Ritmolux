@@ -3,7 +3,7 @@
 The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`.
 
-**Next free number: 0062** (ADRs are a separate sequence — next free there is **0074**.)
+**Next free number: 0062** (ADRs are a separate sequence — next free there is **0075**.)
 
 ## Active roster
 
@@ -11,28 +11,32 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — **unblocked**: [0045] has landed and closed, so the linear-light pipeline this builds on exists; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
-| [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **approved 2026-08-02** — ready for `dev`; [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
+| [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **in progress** — **all five `dev` phases landed 2026-08-03/04** (`14cd9e2`, `bed0274`, `46b38f6`, `d81a24a`, `19096f1`) and were **reviewed 2026-08-04** (Mode 4, no blockers, no majors). **Only Phase 6 remains — `human`, eyes on the machine**: the tier swap judged in the hand, the columns read at the real resolution, and the `Rich` calibration [0044] Phase 4 never ran. [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
 | [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **approved 2026-08-02** — ready for `dev`; [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
-| [0059](0059-lorenz-finds-its-plane.md) | Lorenz finds its plane, and the attractor can trade samples for curves (per-family projection basis, the trail un-mirror, `[particles] density`, the continuous-flow streak) | **in progress** — **Phase 1 landed 2026-08-04 (`357a17e`)**; successor to [0057], whose Phase 4 diagnosed this and stopped by its own instruction; [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) + [ADR-0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md) + [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md); closes [backlog 0048](../design-backlog.md). **Amended 2026-08-04 with a new Phase 1b**: Phase 1's basis is correct and the picture was **still an X**, because the attractor trail samples its own target with the unflipped fullscreen prelude and renders `figure ∪ mirror(figure)` — older than this plan, invisible to every gate because the doubling conceals its own symptom. **The "no golden baseline moves" claim is withdrawn**: `attractor.png` and `reaction_diffusion.png` both move at Phase 1b (the four `composite_*` fixtures run `parametric_curve` and do not). **Phase 4 is `human`** — the one content pass, now covering **all six** attractor presets rather than mainly `attractor_lorenz`, since every one was authored against a doubled figure; it **may route back to `architect`** if `density` + `fade` cannot hold a curve | dev, human |
-
-| [0060](0060-a-test-number-states-a-property-or-names-its-machine.md) | A test number states a property, or names its machine (the two frozen numbers holding CI red: bit-exact `f32` literals pinned to x86_64, and the dual-live floor traded for a ratio against an in-run control) | **approved 2026-08-04** — ready for `dev`; [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md). **CI has been red since 2026-07-30** and this is the only plan that turns it green. **Phase 2 is `human`** (push, then read the two runners' printed numbers) and gates Phase 3, so it does not close in one session. Moves **no pixels**, no shipped code, no golden baseline | dev, human |
-| [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended the same day** — from the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. **Phase 6 is gated on [0059] being closed** (it edits `particles/mod.rs`); **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
+| [0059](0059-lorenz-finds-its-plane.md) | Lorenz finds its plane, and the attractor can trade samples for curves (per-family projection basis, the trail un-mirror, `[particles] density`, the continuous-flow streak) | **in progress** — **all four `dev` phases landed 2026-08-04** (Phase 1 `357a17e`, Phase 1b `1c47de5`, Phase 2 `4fb4a81`, Phase 3 `642aec0`) and were **reviewed 2026-08-04** (Mode 4, no blockers, no majors). **Only Phase 4 remains — `human`**, the one content pass over all six attractor presets; `f09f1fe` is provisional work toward it and is judged *as part of* that pass, not inherited. Successor to [0057], whose Phase 4 diagnosed this and stopped by its own instruction; [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md) + [ADR-0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md) + [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md); closes [backlog 0048](../design-backlog.md). **Amended 2026-08-04 with a new Phase 1b**: Phase 1's basis is correct and the picture was **still an X**, because the attractor trail samples its own target with the unflipped fullscreen prelude and renders `figure ∪ mirror(figure)` — older than this plan, invisible to every gate because the doubling conceals its own symptom. **The "no golden baseline moves" claim is withdrawn**: `attractor.png` and `reaction_diffusion.png` both move at Phase 1b (the four `composite_*` fixtures run `parametric_curve` and do not). **Phase 4 is `human`** — the one content pass, now covering **all six** attractor presets rather than mainly `attractor_lorenz`, since every one was authored against a doubled figure; it **may route back to `architect`** if `density` + `fade` cannot hold a curve | dev, human |
+| [0060](0060-a-test-number-states-a-property-or-names-its-machine.md) | A test number states a property, or names its machine (the two frozen numbers holding CI red: bit-exact `f32` literals pinned to x86_64, and the dual-live floor traded for a ratio against an in-run control) | **in progress** — **Phases 1 and 2 are done and CI IS GREEN** (`1d56600`, plus `31073f6` scoping a `.config/nextest.toml` `success-output` override to the two reporting tests so they stay audible on a green run; run **30903871856**). **Phase 3 was routed back to `architect` by its own clause and has been re-scoped**: the CI ratio came back at `0.036654`, under the `0.05` fallback the plan named in advance, so [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) takes the decision — **no ratio floor is added**, the WARP test is demoted to a property-only smoke check that says so in its own doc, and the magnitude claim defers to hardware at [0053] Phase 3. Phase 3 is now **doc-only and `dev`-ready** (arm64 values, the render doc demotion, the determinism spec's scoping sentence); it adds, removes and loosens **no assertion**. [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md). Moves **no pixels**, no shipped code, no golden baseline | dev, human |
+| [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended twice the same day** — **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (at the user's direct request), reconciled into the plan rather than reverted: it meets 4b's done-when with one accepted deviation (a test-written scratch library rather than a checked-in `fixtures/report/`), and it **opens the coverage gap 4b's sequencing existed to prevent** — nothing renders every shipped preset through the real CLI any more *and* Phase 4 has not yet put the generator under in-process tests. Every other phase is unstarted. From the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. **Phase 6 is gated on [0059] being closed** (it edits `particles/mod.rs`); **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
 
 ## Recommended execution sequence
 
-**CI is red and has been since 2026-07-30 — take [0060] before anything else.** Five consecutive
-pushes have failed, and every plan below merges into a `main` whose gate currently proves nothing
-past `cargo build`: `nextest` aborts the step, so `cargo test --doc`, `clippy -D warnings` and
-`cargo fmt --check` have not run in CI for five pushes (all three are clean at `4ab383c`, verified
-locally 2026-08-04 — but nothing in CI is saying so). The **coverage ratchet has not been evaluated
-either**, for the same reason, so `COVERAGE_FLOOR = 88` is currently unenforced. Note the shape
-before reading the plan: **neither replacement number can be chosen on this machine.** The arm64
-divergence and the CI-WARP reading exist only on the runners, and there is no Mac on this side
-(Plan [0036] Phase 4 has been waiting on one since 2026-07-26), which is why [0060] is sequenced
-instrument-first — Phase 1 makes the numbers visible and turns the gate green, Phase 2 pushes and
-reads them, Phase 3 writes the contract from what came back.
+**CI IS GREEN as of 2026-08-04** (run **30903871856**), after five consecutive red pushes from
+2026-07-30. [0060] Phase 1 did it, and everything the red streak was hiding has now been evaluated
+for the first time in a week: `cargo test --doc`, `clippy -D warnings` and `cargo fmt --check` all
+run and pass, and the **coverage ratchet reads 93.34 % against `COVERAGE_FLOOR = 88`**. No floor
+change is owed.
+
+**What [0060] has left is one `dev` doc pass, and it is small.** Phase 2 read both runners' numbers
+and Phase 3 was re-scoped by the architect on 2026-08-04, because the ratio the plan built its
+magnitude claim on **moved 7.3x between two builds of the same software rasterizer** (`0.268675`
+local against `0.036654` on CI WARP) — under the `0.05` fallback the plan had named in advance.
+[ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) takes
+it: no floor, the WARP test demoted to what it actually proves there, the magnitude claim deferred
+to hardware at [0053] Phase 3. **Two lessons worth carrying past that plan.** A ratio is a property
+only when numerator and denominator are the **same kind of quantity** — same run and same adapter
+are entry requirements, not proof; and *naming the fallback condition in advance* is what let a
+failed design decision cost one architect session instead of an argument.
 
 
 **[0061] goes last, by the user's own instruction, and is the only `draft` in the roster.** It came
@@ -75,21 +79,41 @@ technical.
 
 **Every other plan in the roster is approved as of 2026-08-04 — nothing is waiting on a design
 decision.** What separates them now is only what each needs to *run*: [0052] closes in one session;
-[0050] closes in one plus a measurement; [0053], [0055] and [0059] each carry a `human` phase that
-gates later phases or the close, so they stop mid-plan by construction — [0053] until a discrete GPU
-is to hand, [0055] until the live A/B is judged, [0059] until the content pass runs. Taking [0052]
-first keeps a session unblocked end to end.
+[0053] and [0055] each carry a `human` phase that gates later phases, so they stop mid-plan by
+construction — [0053] until a discrete GPU is to hand, [0055] until the live A/B is judged.
+**[0050] and [0059] are past that point**: both are dev-complete and reviewed, and each is waiting
+on exactly one `human` phase before its close ceremony. Taking [0052] first keeps a session
+unblocked end to end.
 
-**[0059] is the one to take if you want the attractor family finished**, and **Phase 1 is already
-landed** (`357a17e`, 2026-08-04). What remains before the content pass is Phase 1b (the trail
-un-mirror, [ADR-0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md)),
-then Phases 2-3, still a clean `dev` session across one scene module, one shared prelude, one schema
-key. **The "move no golden baseline" property no longer holds** — Phase 1b re-blesses `attractor.png`
-and `reaction_diffusion.png` deliberately, and the other eleven must be checked untouched before
-blessing. Every other done-when is still a byte-identity check or a property asserted on a value.
-Note the one place it is *not* self-contained — Phase 4 may route back to `architect` if `density` +
-`fade` cannot hold a curve, which is ADR-0069's Alternative D waiting for a rendered case rather
-than an argument.
+**Three closes are pending and none of them is a `dev` session.** [0050] needs Phase 6 (eyes on the
+machine), [0059] needs Phase 4 (the content pass), and [0060] needs Phase 3 (a `dev` doc pass) plus
+its close. **The version is still `0.32.0`** and each close owes its own bump —
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md), one per close, chosen at the close. On
+present shape: **minor** for [0050] (an operator surface, a new core entry point), **minor** for
+[0059] (a new preset-facing structural key and an engine behaviour change), and **patch** for [0060]
+(test contracts and docs, no shipped code) — decided for real at each close, not here.
+
+**[0059]'s engine work is finished and only the content pass is left.** All four `dev` phases landed
+2026-08-04 (`357a17e`, `1c47de5`, `4fb4a81`, `642aec0`) and were reviewed the same day: no blockers,
+no majors. What remains is **Phase 4, `human`** — the one `preset-author` pass over all six attractor
+presets, which may still route back to `architect` if `density` + `fade` cannot hold a curve
+(ADR-0069's Alternative D, waiting for a rendered case rather than an argument). `f09f1fe` is
+provisional work toward that pass and is judged as part of it.
+
+**Three numbers the content pass inherits, all measured**: the streak raises mean frame luminance
+**1.98x on Thomas and 3.10x on Lorenz** — ADR-0069's "~1.8x" is a *footprint* ratio and the
+photometric change runs ~1.7x past it; every attractor's coverage fell **6-13 %** now that each
+figure is one copy rather than two (Leviathan `0.3785 → 0.3442`, family slack `1.91x`), recorded in
+`sanity.rs` and deliberately not acted on; and the reseed streak ships **off and provisional**
+behind one constant, for Phase 4 to A/B. Two golden baselines moved deliberately at Phase 1b
+(`attractor.png`, `reaction_diffusion.png`) and the other eleven were verified untouched — `LMV_BLESS`
+also rewrote three within-tolerance baselines and they were restored, which is the standing trap
+working as documented.
+
+**One finding from that review is carried and is not Phase 4's**: RD's correct `pan_y` direction now
+rests on a **compensating negation** in its present shader, added at Phase 1b to preserve a
+cross-scene convention (`+pan_y` moves the picture up) that nothing asserts for RD and no operator
+doc states. It is in [0059]'s Followups with the two cheap repairs named.
 (**[0054], [0056], [0057] and [0058] have all landed and closed** on 2026-08-03 — see Recently
 closed.)
 
@@ -154,8 +178,13 @@ capture is an instrument and never a baseline** — the `Rich` multipliers are s
 provisional values, its Phase 4 calibration having never run. The running app remains the better
 instrument for a *judgement in motion*; it is no longer the only one for a measurement.
 
-**[0050] is orthogonal to everything below and can be taken whenever the user wants the app to be
-operable.** It touches one new `core` entry point (`Renderer::set_tier`, plus an `active_index`
+**[0050] has landed its five `dev` phases and the app is now operable** (2026-08-04) — `[` / `]`
+swap the tier live, `S` opens a settings modal, and `Tab` opens the browser on the active preset,
+wraps, repeats and flows into columns. **Phase 6 (`human`) is what is left**, and it is the cheapest
+of the three pending human phases: press the brackets with music playing, `Tab` at 1080p and at
+2048x1152, and run the `Rich` calibration [0044] Phase 4 never ran — which is now an A/B in one
+sitting rather than a relaunch loop, and which `docs/on-device-validation.md` now spells out
+step by step. It touched one new `core` entry point (`Renderer::set_tier`, plus an `active_index`
 accessor) and is otherwise `standalone/` shell work — no scene, no shader, no DSP, no preset `.toml`,
 no C ABI change, and **no golden baseline may move**. So it neither blocks nor is blocked by [0045] /
 [0046]. Two couplings worth knowing before sequencing it:

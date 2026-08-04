@@ -1,7 +1,11 @@
 # 0050 — In-app settings, live quality, and a browse overlay that fits
 
-> **Status:** **in-progress 2026-08-03** — Orthogonal to the render roadmap and
-> takeable any time; its Phase 6 also carries the `Rich` calibration [0044] never ran.
+> **Status:** **in-progress** — **all five `dev` phases have landed 2026-08-03/04**: Phase 1
+> `14cd9e2`, Phase 2 `bed0274`, Phase 3 `46b38f6`, Phase 4 `d81a24a`, Phase 5 `19096f1`.
+> **Only Phase 6 remains** — `human`, eyes on the machine, and it also carries the `Rich`
+> calibration [0044] Phase 4 never ran. Phases 1-5 were reviewed against this plan on 2026-08-04
+> (Mode 4, no blockers, no majors); the one design-note deviation is recorded under Phase 1 below.
+> Orthogonal to the render roadmap and takeable any time.
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md)
@@ -142,6 +146,15 @@ Each phase ships as its own commit. `dev` runs all phases in one session.
     replaced), calls `configure_active_scene()`, and **re-applies the current surface size** — a
     freshly built scene has not been told how big the window is, and skipping this renders the new
     tier at the wrong resolution.
+
+    **That last clause is wrong, and `set_tier` correctly does not follow it** (`14cd9e2`, flagged
+    by `dev` for this review rather than added as a no-op — the right call). There is nothing stale
+    to re-apply: `core/src/render/mod.rs:543` calls `scene.set_target_size(...)` on the shared draw
+    path **every frame**, and every `PostStage` takes `surface` as an argument to `begin`/`fold`
+    rather than caching it at construction. Verified at review. The corroborating evidence the note
+    should have been checked against was already in the tree — the frame-time governor's
+    `apply_tier` has shipped without it since Plan 0044, which is also why `set_tier` reuses
+    `apply_tier` instead of open-coding the rebuild.
   - `tier_pinned = true` and `tier_demoted = false` on every explicit call (ADR-0054). The shell's
     `reported_demotion` latch resets alongside, or a later real demotion prints nothing.
   - The headless guard is `RenderContext::surface.is_none()` (`core/src/render/context.rs:76`).
