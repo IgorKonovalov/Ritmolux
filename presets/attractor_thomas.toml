@@ -1,8 +1,8 @@
-# Thomas - the cyclically-symmetric 3D flow, rebuilt as the set's COLOURED
-# DUOTONE. `attractor_ink` uses the final tone remap for black-on-white line
-# art; this one uses the same stage (ADR-0028) with both poles moved off
-# neutral - deep indigo ink on a pale sea-green page - which is a visual
-# register nothing else in the library occupies.
+# Thomas - the cyclically-symmetric 3D flow, drawn as a PEN DRAWING and still
+# the set's COLOURED DUOTONE. `attractor_ink` uses the final tone remap for
+# black-on-white line art; this one uses the same stage (ADR-0028) with both
+# poles moved off neutral - deep indigo ink on a pale sea-green page - which is
+# a visual register nothing else in the library occupies.
 #
 # Two consequences of the remap worth knowing before tuning this file:
 #   - it keys on LUMINANCE only, so the [palette] below does not set the colour
@@ -14,18 +14,50 @@
 #     source; at onset 0.8 that landed on 0.25 and turned the page a dirty
 #     grey - the exact trap this comment warns about. It rests at 1.
 #
-# The blot trap governs everything else: `fade` sets how many frames pile up
-# (~1/(1-fade)), so it stays low and falls further under bass.
+# RE-AUTHORED AT PLAN 0059 PHASE 4, AND THE PREVIOUS BALANCE IS GONE FOR TWO
+# MEASURED REASONS. Phase 3 gave the two continuous families a SEGMENT instead
+# of a point, which raised this preset's mean frame luminance 1.98x; Phase 1b
+# stopped the trail mirroring itself, so the figure it draws is one copy rather
+# than two. Against a luminance-keyed remap that combination is not a small
+# shift - the old densities put nearly the whole figure over the ink pole and
+# the drawing rendered as a solid indigo blot with the lattice inside it lost.
+#
+# THE ANSWER IS `density`, NOT A DIMMER (ADR-0069). At the full 50 000
+# particles the lattice is a fog whatever the exposure - the ink remap just
+# turns a bright fog into a dark one. At 0.02 - 1 000 particles at the floor
+# tier, 3 000 at rich - each trajectory is a separate stroke, the segment joins
+# its steps end to end, and ~25 frames of trail draw the loops as pen lines on
+# the page. RENDERED, not reasoned: 1.0 / 0.02 / 0.005 / 0.002 goes blot,
+# drawing, sketch, scribble.
+#
+# The blot trap still governs everything: `fade` sets how many frames pile up
+# (~1/(1-fade)), and on a sparse trace those frames are the LINE rather than
+# the density - so it runs long here and falls under bass.
 system = "attractor"
 name = "Thomas"
 
 [particles]
 family = "thomas"
+# The structural half of the drawing - see the header. Not an exposure control:
+# the deposit is normalized by count (ADR-0065), so total light is invariant
+# and only its distribution changes. That is also why `exposure` below is set
+# where it is - the same light on 1/50th of the pixels.
+density = 0.02
 
 [palette]
 name = "mono"
 
 [params]
+# EXPOSURE - the level the ink ramp reads. `density = 0.02` multiplies each
+# particle's deposit by 50 and the long `fade` accumulates ~25 frames of it, so
+# left at 1.0 every stroke is far over the tonemap knee, the whole luminance
+# ramp flattens to one value, and the remap paints a flat blot. 0.10 is where
+# the loops separate into lines with the page still white between them.
+# MEASURED on the ladder 1.0 / 0.2 / 0.05: blot, dark drawing, faint wash.
+# `exposure` is engine-wide and crossfades across a preset dissolve, so the
+# blend into this preset passes through a briefly darker page - a transition,
+# not a resting state.
+exposure = "0.10"
 # SHAPE - Thomas uses `a` alone (canonical 0.19). Small numbers matter here: the
 # lattice opens out below ~0.17 and knots up above ~0.21.
 # THE TREBLE BINDING MOVED HERE, and the reason is worth keeping. This preset
@@ -35,13 +67,12 @@ name = "mono"
 # the Thomas attractor's own constant: the top end now bends the trajectory.
 a = "0.190 + sin(time * 0.0233) * 0.014 - clamp(bass * 0.0235, 0, 0.020) + clamp(treb * 0.0267, 0, 0.016)"
 
-# DENSITY - the duotone needs MORE source density than the black-on-white
-# drawing does. The remap keys on luminance, so a too-faint source never reaches
-# the ink pole at all and the whole frame collapses onto the paper colour - the
-# failure mode this preset hit first. Denser than `attractor_ink`, still well
-# under the blot ceiling.
-fade   = "0.912 - clamp(bass * 0.053, 0, 0.045) - beat * 0.015"
-size   = "0.78 - clamp((bass + mid) * 0.094, 0, 0.16) + clamp(treb * 0.167, 0, 0.10) + beat * 0.08"
+# LINE LENGTH AND NIB. On a sparse trace `fade` is how much of each trajectory
+# is drawn, so it runs far longer than it did on the cloud - where the same
+# value would have been a blot, here it is the stroke. Bass shortens the line
+# and thins the nib: peak buys structure, not ink.
+fade   = "0.955 - clamp(bass * 0.035, 0, 0.030) - beat * 0.010"
+size   = "0.60 - clamp((bass + mid) * 0.070, 0, 0.120) + clamp(treb * 0.117, 0, 0.070) + beat * 0.060"
 # MEASURED. Read 0.50 and never fired - `onset` was then raw spectral flux peaking at
 # 0.016, not a 0..1 envelope. Rank preserved within the family.
 #
@@ -79,7 +110,7 @@ pan_x = "sin(time * 0.027) * 0.05"
 pan_y = "cos(time * 0.021) * 0.04"
 
 # THE DUOTONE - pale sea-green page, deep indigo ink. `ink_amount` rests at the
-# pole and dips only on a hard transient, flashing the glowing source through.
+# pole and never travels: a partial amount greys the page (see the header).
 ink_amount   = "1"
 paper_hue    = "0.44"
 paper_sat    = "0.10"

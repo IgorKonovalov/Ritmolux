@@ -1,15 +1,29 @@
-# Lorenz - the classic butterfly, rebuilt as the set's TWO-PERSONALITY preset.
-# This is the first shipped preset to use grammar v2's `tempo` variable and the
-# comparison operators (Plan 0019): `select(tempo > 124, ..., ...)` gives one
-# file a slow, wide, drifting reading for downtempo material and a tight,
-# fast-turning, hard-cut reading above ~124 BPM. Everything gated that way is
-# written so the UNWARMED case is the calm one - `tempo` is 0 until the tracker
-# locks, so a cold start reads as the slow personality and eases into the fast
-# one rather than snapping.
+# Lorenz - the classic butterfly, drawn as a PLOTTED TRACE rather than a cloud,
+# and still the set's TWO-PERSONALITY preset. `select(tempo > 124, ..., ...)`
+# gives one file a slow, wide, long-exposure reading for downtempo material and
+# a tight, short-trace, hard-turning one above ~124 BPM. Everything gated that
+# way is written so the UNWARMED case is the calm one - `tempo` is 0 until the
+# tracker locks, so a cold start reads as the slow personality and eases into
+# the fast one rather than snapping.
 #
-# Shape: sigma/rho/beta drift slowly around the canonical 10 / 28 / 2.667. Rho
-# is the lever that matters - it sets how violently the two lobes trade - so it
-# gets the biggest (still small) band term.
+# THIS PRESET WAS RE-AUTHORED AT PLAN 0059 PHASE 4, AND IT IS CLOSER TO A FIRST
+# AUTHORING THAN TO A RE-TUNE. Everything below the shape section was set
+# against a figure that did not exist: until Phase 1 the scene rendered x-y,
+# where the butterfly is edge-on and reads as a hard X, and until Phase 1b the
+# trail re-read its own history mirrored, so what was on screen was
+# `figure ∪ mirror(figure)` - twice the geometry at half the meaning. The
+# coefficients, the palette and the tempo split are the parts that survived.
+#
+# THE LOOK IS `density` + `fade`, AND THAT PAIR IS THE WHOLE POINT (ADR-0069).
+# At the full 50 000 particles this scene draws 50 000 independent samples of
+# the invariant measure: raising `fade` just piles them into a smooth fog, and
+# no exposure makes a fog into a figure. At 0.002 - 100 particles at the floor
+# tier, 300 at rich - each one is a trajectory you can follow, the segment
+# joins its steps end to end, and ~13 frames of trail resolve the two lobes
+# into the banded spirals the textbook plot shows. RENDERED, not reasoned: the
+# ladder 1.0 / 0.05 / 0.012 / 0.005 / 0.002 goes fog, fog, fuzz, curves,
+# curves, and only the bottom two read as a trace.
+#
 # Colour: a night-blue -> teal -> solar-white gradient, crossfading to `ember`
 # on the fast personality, so the butterfly literally heats up with the tempo.
 system = "attractor"
@@ -17,6 +31,12 @@ name = "Lorenz"
 
 [particles]
 family = "lorenz"
+# See the header. This is the structural half of the look, not a performance
+# dial - and it is NOT an exposure control: the engine divides each particle's
+# deposit by how many are drawn (ADR-0065), so total light is invariant. What
+# changes is WHERE that light lands - the same energy on 1/500th of the pixels,
+# which is why `exposure` below is what it is.
+density = 0.002
 
 [palette]
 stops = [
@@ -31,30 +51,47 @@ stops = [
 name = "ember"
 
 [params]
-# GLOW - the figure is authored to sit UNDER the tonemap knee, so only the
-# densest filaments cross 1.0 and bloom picks out exactly those. Authoring
-# at the ceiling instead is what made this preset a flat mass at `rich`,
-# where 3x the particles deposit into the same texels (design-backlog 0047).
-bloom_amount    = "1.2"
-bloom_threshold = "0.95"
+# EXPOSURE - the first shipped preset to bind it, and it is not a taste knob
+# here, it is arithmetic. `density = 0.002` multiplies each particle's deposit
+# by 500 (ADR-0065's invariance), and `fade ~ 0.93` accumulates ~14 frames of
+# it, so the trace sits some three orders of magnitude over the tonemap knee.
+# Left at 1.0 the whole figure lands on the shoulder's asymptote and renders as
+# one flat teal mass with the spirals gone - MEASURED: an exposure ladder from
+# 1.0 down to 0.0002 only starts resolving curves below ~0.004, and 0.03 with
+# the fine nib below is where the cores stay lit and the background stays
+# black. Two consequences to know before touching it:
+#   - `exposure` is ENGINE-WIDE and crossfades across a preset dissolve, so the
+#     ~1 s blend into this preset passes through a briefly over-exposed frame.
+#     That is why the level is bought as far as possible with `size` and `fade`
+#     first (both scene-local, both blended as pixels rather than as a scalar)
+#     and only the remainder with `exposure`.
+#   - `bloom_threshold` is measured BEFORE this multiplier and is clamped at 8,
+#     so at this exposure the bright-pass cannot be selective - the whole
+#     figure is over any threshold a preset can ask for. It is pinned at the
+#     ceiling with a small amount, which buys a halo on the densest crossings
+#     rather than the "only the filaments bloom" behaviour the rest of the
+#     family gets. Do not read the pair as tuned; read it as capped.
+exposure        = "0.03"
+bloom_amount    = "0.35"
+bloom_threshold = "8"
 bloom_radius    = "1.3"
-# SHAPE - canonical Lorenz; `d` is unused by this family.
+# SHAPE - canonical Lorenz; `d` is unused by this family. Unchanged by the
+# re-author: Phase 4 re-gains and re-aims, it does not re-design.
 a = "10.0 + sin(time * 0.0290) * 0.55 + clamp(mid * 1, 0, 0.85)"
 b = "28.0 + cos(time * 0.0217) * 1.30 + clamp(bass * 3.06, 0, 2.60)"
 c = "2.667 + sin(time * 0.0173) * 0.075 - clamp(treb * 0.1, 0, 0.060)"
 
-# DENSITY - the family rule, plus a tempo split: the fast personality runs a
-# shorter exposure and a finer point, so quick material reads as a hard strobe
-# of structure instead of a smear.
-# Lorenz concentrates its density into the lobe cores far harder than the 2D
-# maps do, so the nib runs much finer here than elsewhere in the family and the
-# exposure runs longer - that is what resolves the filaments instead of a blob.
-# Lorenz runs a MUCH shorter exposure than the 2D maps in this family. Its
-# particles collapse onto a thin sheet, so ~17 accumulated frames (fade 0.94)
-# saturate the lobe cores to flat white no matter how fine the nib is; ~4
-# frames is what keeps the sheet reading as filaments.
-fade   = "select(tempo > 124, 0.55, 0.62) - clamp(bass * 0.053, 0, 0.045) - beat * 0.015"
-size   = "select(tempo > 124, 0.24, 0.30) - clamp(bass * 0.08, 0, 0.07) + beat * 0.04"
+# TRACE LENGTH AND NIB. `fade` is how many frames of the trajectory stay on
+# screen (~1/(1-fade)), so on this preset it is literally how long the drawn
+# curve is: ~10 frames on the fast personality, ~15 on the slow one. Bass
+# SHORTENS it - peak buys structure, not brightness - and so does the beat.
+#
+# THE TEMPO SPLIT IS DELIBERATELY NOT ON `size` ANY MORE. `fade` and `size`
+# both multiply the deposited light, so gating both on tempo made the two
+# personalities differ in LEVEL as much as in character; the split now lives in
+# the trace length, the framing and the colour, and the nib is one value.
+fade   = "select(tempo > 124, 0.905, 0.932) - clamp(bass * 0.035, 0, 0.030) - beat * 0.010"
+size   = "0.105 - clamp(bass * 0.029, 0, 0.025) + beat * 0.020"
 # MEASURED. Read 0.48 and never fired - `onset` was then raw spectral flux peaking at
 # 0.016, not a 0..1 envelope. Then 0.62, chosen while a reseed still REPLACED
 # the cloud with a uniform box - the largest seed box in the set, so the
@@ -63,34 +100,42 @@ size   = "select(tempo > 124, 0.24, 0.30) - clamp(bass * 0.08, 0, 0.07) + beat *
 # 0.033 (click:120) / 0.153 (dynamic:110) / 0.391 (chord), ~0.20 real music,
 # all against a 1.000 peak. Rank preserved within the family.
 #
-# NOTE the exposure below is NOT re-raised with the rest of the family. Plan
-# 0057 Phase 4 found this scene renders the wrong plane (the shared 3-D view
-# basis is x-y; the Lorenz butterfly is x-z) and routed the fix to an ADR, so
-# judging this preset's density now would be judging a figure that is about to
-# change shape. Re-author after the basis lands.
+# ON A SPARSE TRACE A RESEED IS A MUCH LOUDER EVENT than it was on the cloud:
+# 100 trajectories jitter at once and every one of them is individually
+# visible, where in a 50 000-point fog the same kick moved nothing you could
+# point at. The threshold is unchanged (Plan 0059 does not move the reseed
+# gates) but it is now the preset's most conspicuous accent, not its subtlest.
 reseed = "onset > 0.36"
 
 # COLOUR - the fast personality heats toward `ember` and widens; the slow one
 # stays a cool, cohesive single family.
-# The centre sits LOW in the gradient on purpose. Lorenz's sheet overlaps
-# additively, so the dense cores climb to white on their own - keeping the base
-# down in the night-blue is what leaves anywhere for them to climb to.
+# The centre sits LOW in the gradient on purpose. The trace overlaps itself in
+# the lobe cores, so those climb the ramp on their own - keeping the base down
+# in the night-blue is what leaves anywhere for them to climb to.
 hue_spread  = "select(tempo > 124, 0.30, 0.14) + clamp(treb * 0.233, 0, 0.14)"
 hue_center  = "0.20 + sin(time * 0.031) * 0.07 + clamp(bass * 0.188, 0, 0.16)"
 saturation  = "1.15 + clamp(mid * 0.376, 0, 0.32)"
 palette_mix = "select(tempo > 124, 0.55, 0.05) + clamp(bass * 0.176, 0, 0.15)"
 
-# VIEW - the fast personality pushes in hard and pumps per beat; the slow one
-# sits back and breathes on the bar.
-# The zoom runs far higher than elsewhere in the family, and that is the real
-# density control: Lorenz collapses onto a thin sheet, so spreading it across
-# more pixels is what resolves filaments where a smaller nib just makes a
-# dimmer blob.
-zoom  = "select(tempo > 124, 1.85, 1.55) + bar * 0.16 + clamp(bass * 0.4, 0, 0.34)"
-pan_x = "-0.16 + sin(time * 0.039) * 0.08"
-pan_y = "cos(time * 0.028) * 0.06"
+# VIEW - the fast personality pushes in and pumps per beat; the slow one sits
+# back and breathes on the bar.
+# THE FRAMING IS A CAP, NOT A TASTE. The butterfly fills the frame edge to edge
+# at zoom ~1.55 and starts losing its wingtips past ~1.85, so the peak here is
+# held at 1.58 + 0.08 + 0.12 = 1.78. The old numbers (1.85 base, +0.50 of
+# reactive travel) were set against the doubled figure, which was half the size
+# it looks; on the real one they cropped the wings off on every loud passage.
+# THE OFF-CENTRE PAN WENT WITH THE DOUBLED FIGURE TOO. `pan_x` sat at -0.16 and
+# `pan_y` swung a clean +/-0.06: against a figure that was its own mirror, both
+# were free, because whatever left one side arrived on the other. Against one
+# butterfly, -0.16 parks it against the left edge with a third of the frame
+# empty, and a positive `pan_y` lifts the wingtips off the top. Centred in x,
+# biased slightly down in y so the widest row - the wing tips, which the
+# particle buffer puts at high `z` and so near the TOP - keeps its margin.
+zoom  = "select(tempo > 124, 1.40, 1.32) + bar * 0.08 + clamp(bass * 0.14, 0, 0.12)"
+pan_x = "sin(time * 0.039) * 0.08"
+pan_y = "-0.05 + cos(time * 0.028) * 0.05"
 
-# COMPOSITE - a cold backdrop that warms with the mix, and a two-fold screen
+# COMPOSITE - a cold backdrop that warms with the mix, and a four-fold screen
 # fold that only engages on the fast personality WITH real energy behind it.
 bg_hue        = "0.30 + clamp(bass * 0.118, 0, 0.10)"
 bg_bright     = "0.010 + clamp(mid * 0.0235, 0, 0.020)"
@@ -111,7 +156,11 @@ a             = 0.8
 b             = 0.8
 c             = 0.8
 fade          = 0.9
-size          = 0.9
+# WAS A FLAT 0.9 s, WHICH SWALLOWED THE BEAT TERM WHOLE. That value existed to
+# ease the tempo gate this param no longer carries; with the gate gone the nib
+# can use the family's asymmetric pair - a fast swell on the hit, a slow
+# release - which is what the `+ beat * 0.020` above was always for.
+size          = { attack = 0.03, release = 0.30 }
 hue_spread    = 1.2
 palette_mix   = 1.5
 zoom          = 1.0
