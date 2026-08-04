@@ -1,0 +1,32 @@
+# ONSET-BURST FIXTURE - do not tune (Plan 0052 Phase 3). It pins NO pixels and
+# has no committed baseline. It belongs to
+# `a_spawn_rate_on_onset_bursts_and_then_idles` in
+# `core/src/render/scenes/emitter.rs`, which drives it through a TIME-VARYING
+# stimulus - a transient, then silence - and asserts the frame lights up on the
+# hit and empties afterwards.
+#
+# `spawn_rate` has NO CONSTANT TERM, and that is the whole fixture. Every shipped
+# preset carries a base rate so the frame is never empty; here the source is
+# purely `onset`, so "idles between transients" is a statement about the scene
+# and not about a floor someone chose. The population is what carries the light,
+# which is the emitter's own idiom: a transient buys more THINGS, not hotter ones.
+#
+# NO `trails`. The decay this test measures has to be the POPULATION retiring,
+# not a feedback stage fading - with a stage on, the tail would read the same
+# whether objects died or not, and the test would prove nothing about lifetimes.
+#
+# `lifetime` is short on purpose: 0.55 s is 33 frames at the capture cadence, so
+# a burst is comfortably gone inside the silent tail the test appends.
+system = "emitter"
+name   = "fixture_emitter_onset"
+
+[params]
+spawn_rate   = "clamp(onset * 1400, 0, 1400)"
+gravity      = "5.2"
+launch_speed = "3.4"
+spread       = "0.9"
+lifetime     = "0.55"
+size         = "1.6"
+brightness   = "1.3"
+hue          = "0.1"
+hue_spread   = "0.5"

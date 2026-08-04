@@ -83,7 +83,7 @@ to satisfy a test.
 - **A new pass cannot quietly join a collision group.** Adding a `[Uniform]` layout today is
   invisible; after this it fails until someone either separates it or measures it. That is the
   property worth having, since the collision groups grow every time a stage is added — and
-  [Plan 0052](../plans/0052-the-emitter-objects-that-spawn-fall-and-die.md)'s emitter is about to
+  [Plan 0052](../plans/done/0052-the-emitter-objects-that-spawn-fall-and-die.md)'s emitter is about to
   add one.
 - **The riskiest pair gets covered where it actually ships.** `attractor-present` +
   `trails-present` is live on two shipped presets and no fixture renders it; the plan adds one.

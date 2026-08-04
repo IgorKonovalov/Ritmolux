@@ -29,6 +29,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::ReactionDiffusion => "reaction_diffusion",
         SystemKind::Attractor => "attractor",
         SystemKind::Spectrum => "spectrum",
+        SystemKind::Emitter => "emitter",
     }
 }
 

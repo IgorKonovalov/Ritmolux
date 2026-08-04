@@ -127,19 +127,29 @@ moves the probes off the geometry and the test starts comparing two pieces of
 background (which it fails on, deliberately, rather than passing vacuously). The
 header says what each value is holding.
 
-## The `*_lit_backdrop.toml` pair is a fifth guard, at a configuration nothing else here tests
+## The `*_lit_backdrop.toml` trio is a fifth guard, at a configuration nothing else here tests
 
 `swarm_lit_backdrop.toml` belongs to
 `a_lit_backdrop_survives_where_the_swarm_drew_nothing` in
-`core/src/render/scenes/swarm.rs`, and `lines_lit_backdrop.toml` to
+`core/src/render/scenes/swarm.rs`, `lines_lit_backdrop.toml` to
 `a_lit_backdrop_survives_where_the_strokes_drew_nothing` in
-`core/src/render/scenes/lines/renderer.rs` (Plan 0051, ADR-0056) — one per
-**draw seam**, since those are the two pipelines that render directly into the
-post chain's input rather than presenting through an alpha-aware pass. The line
-one covers all four line scenes at once; they share the renderer.
+`core/src/render/scenes/lines/renderer.rs` (Plan 0051, ADR-0056), and
+`emitter_lit_backdrop.toml` to
+`a_lit_backdrop_survives_where_the_emitter_drew_nothing` in
+`core/src/render/scenes/emitter.rs` (Plan 0052) — one per **draw seam**, since
+those are the three pipelines that render directly into the post chain's input
+rather than presenting through an alpha-aware pass. The line one covers all four
+line scenes at once; they share the renderer.
+
+**They are per-seam rather than global because nothing structurally forces a
+shader's colour and alpha to stay in step**, which is also why adding a fourth
+seam means adding a fourth fixture here. Each has been demonstrated in **both**
+directions against a deliberately reverted constant-alpha shader; the emitter's
+test records its two numbers (0.3345 against 0.0002 on the same capture) in its
+doc comment.
 
 They pin **no pixels** and have no committed baselines; `LMV_BLESS` does not
-touch them. Each test captures its fixture three ways — lit backdrop, black
+touch them. Each test captures its own fixture three ways — lit backdrop, black
 backdrop, and backdrop with the scene contributing nothing — and asserts that
 wherever the scene wrote no light, the backdrop arrives intact in the **linear**
 composite, upstream of the tonemap, where the bound is 0 rather than a tolerance.
@@ -165,7 +175,34 @@ the scene draws straight onto the backdrop and the defect cannot exist at all),
 geometry sparse enough to leave untouched backdrop to check, a colour that is
 never black in all three channels at once, and — on the line fixture — a
 deliberately **fat stroke**, because the rim scales with `thickness` and a
-shipped width leaves the test green and blind. Each test reads those
+shipped width leaves the test green and blind. The emitter's differs on one
+point and its header says so: it **cannot be frozen** the way the swarm's is,
+because an emitter whose objects do not move has no picture at all — its source
+line sits below the frame. It costs nothing, since the three captures vary only
+`bg_bright` and `size` and neither touches spawning or the path. Each test reads those
 preconditions back out of its own file before it touches the GPU and reports the
 pixel counts either side, so an edit that quietly empties the region under test
 fails rather than passing on nothing.
+
+## `emitter_onset.toml` is a sixth guard, and it is driven by a *changing* stimulus
+
+It belongs to `a_spawn_rate_on_onset_bursts_and_then_idles` in
+`core/src/render/scenes/emitter.rs` (Plan 0052 Phase 3). It pins no pixels and
+has no baseline.
+
+Every other fixture here is captured through `capture_preset`, which holds **one**
+analysis frame for every warm-up step — the right primitive for a baseline, and
+structurally unable to ask this question. The emitter is the first scene whose
+*population* is not fixed, so "reacts to a transient" is only half the claim: the
+other half is that the frame **empties again** when the transient passes, which a
+sustained stimulus can never show. This fixture is therefore driven through
+`capture_preset_over` with a short silent lead, a six-frame hit, and a second of
+silence, and the test reads the whole response.
+
+Two of its values are load-bearing and neither is a look choice. `spawn_rate` has
+**no constant term** — every shipped preset carries a base rate so the frame is
+never empty, and with one here "idles between transients" would be a statement
+about that floor rather than about the scene. And it binds **no `trails`**: with a
+feedback stage on, the tail would decay the same way whether objects were retired
+or not, so the measurement would say nothing about lifetimes. `lifetime = 0.55`
+is 33 frames, comfortably inside the silent tail.

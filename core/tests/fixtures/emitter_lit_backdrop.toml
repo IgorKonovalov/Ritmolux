@@ -1,0 +1,77 @@
+# LIT-BACKDROP GUARD FIXTURE - do not tune (Plan 0052 Phase 4, ADR-0056).
+# It pins NO pixels and has no committed baseline. It belongs to
+# `a_lit_backdrop_survives_where_the_emitter_drew_nothing` in
+# `core/src/render/scenes/emitter.rs`, which captures it THREE ways - lit, dark,
+# and backdrop-only - and asserts the backdrop arrives intact wherever the scene
+# wrote no light.
+#
+# THE EMITTER IS THE THIRD DRAW SEAM. ADR-0056 says a pipeline that renders
+# directly into the post chain's input rather than presenting through an
+# alpha-aware pass owes a guard of this shape, and names the two that already
+# exist (the swarm's sprites, the shared line renderer's strokes). This is the
+# third, and the sprite shader it inherits is exactly the one whose constant
+# alpha punched black rectangles into the backdrop.
+#
+# The `bg_bright` and `size` lines are STRIPPED AND REWRITTEN per capture - the
+# test needs one scene at three configurations - but the values below are the
+# ones it reads back out of this file and captures at, so they are live, not
+# decorative. Change one here and the test changes with it.
+#
+# `bg_bright > 0` IS THE POINT. Every other emitter fixture and the golden
+# baseline run `bg_bright = 0`, where a black backdrop times any alpha is still
+# black - so the suite would be structurally blind to a sprite emitting a
+# constant alpha 1.
+#
+# `trails` IS ALSO NOT DECORATION. The defect only exists when a post stage is
+# active: with an empty chain the scene draws straight onto the backdrop and its
+# additive colour cannot remove light. With a stage, the scene draws into a
+# transparent-cleared offscreen and the chain resolves premultiplied OVER the
+# backdrop (ADR-0055) - which is where alpha becomes load-bearing.
+#
+# UNLIKE THE SWARM'S TWIN, THIS FIXTURE CANNOT BE FROZEN. The swarm zeroes
+# `force`/`spin`/`burst` and lets its field settle; an emitter that does not move
+# does not exist - its objects are launched from a source line BELOW the frame,
+# so a zero launch speed leaves an empty picture rather than a still one. That
+# costs nothing here: the three captures differ only in `bg_bright` and `size`,
+# neither of which touches spawning or the path, so the object positions are
+# identical across all three and the comparison is still one scene.
+#
+# The rest is chosen to keep the property readable:
+#  - a low `spawn_rate` and a short `trails`, so the marks stay separated and a
+#    substantial fraction of the frame is backdrop the scene never touched;
+#  - `size = 2.2`, big enough that the sprite quads - and therefore the corners
+#    outside the inscribed glint, which is what this guards - are a real part of
+#    the frame;
+#  - a single flat palette stop plus `hue_spread = 0`, so NO object is black in
+#    all three channels. A genuinely black mark would read as "the scene drew
+#    nothing here" while still covering the pixel, which is the one case the
+#    property deliberately does not claim;
+#  - `spin = 0` and `twinkle = 0`, so nothing modulates a mark toward black;
+#  - `bg_vignette = 0` keeps the backdrop bright into the corners, so the signal
+#    does not fade out exactly where the sprite corners are worst.
+system = "emitter"
+name   = "fixture_emitter_lit_backdrop"
+
+[palette]
+stops = [{ at = 0.0, color = "#ffcf80" }, { at = 1.0, color = "#ffcf80" }]
+
+[params]
+spawn_rate   = "110"
+gravity      = "5.2"
+launch_speed = "4.5"
+launch_angle = "0"
+spread       = "0.85"
+lifetime     = "2.0"
+size         = "2.2"
+size_spread  = "0.4"
+spin         = "0"
+twinkle      = "0"
+brightness   = "1.2"
+hue_spread   = "0"
+hue_center   = "0.5"
+
+trails = "0.25"
+
+bg_hue      = "0.55"
+bg_vignette = "0"
+bg_bright   = "0.35"

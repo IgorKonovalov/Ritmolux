@@ -199,6 +199,64 @@ like a meter instead of strobing.
 
 ---
 
+## `emitter` — objects that spawn, fall, and die (Plan 0052)
+
+*The only system whose population is not fixed.* Every other scene draws the same number of things
+every frame. This one throws objects from a source line just below the frame, gives each its own
+parabola, and **retires** it when its life runs out or it leaves the frame. Nothing wraps — that is
+the whole difference from `swarm`, whose world is a torus and whose particles cannot leave
+([ADR-0057](../../../../docs/adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)).
+
+**The path is a closed form fixed at spawn** (`p0 + v0*t + 0.5*g*t²`). Two authoring consequences:
+there is **no mid-flight force** — no drag, no swirl, no steering — and easing `gravity` or
+`launch_speed` only changes objects thrown *after* the change, since the ones in the air keep the arc
+they launched on. There is also no `dt` in it, so the motion is identical on every device.
+
+| Param | Typical | Controls / natural driver |
+|-------|---------|---------------------------|
+| `spawn_rate` | `20 – 400` | objects a second — the density lever. Population settles near `spawn_rate * flight time`. The natural `onset` binding: bursts on transients, empties between them. |
+| `gravity` | `1 – 10` | downward acceleration, world units per second squared. |
+| `launch_speed` | `1 – 4` | speed at the source. |
+| `launch_angle` | radians | **clockwise from straight up**; `0` is vertical, `1.57` throws right. |
+| `lifetime` | seconds | how long an object lives if it has not left frame first. Past the flight time it is wasted pool. |
+
+**Do the crest arithmetic before tuning.** A mark launched at `v` against `g` turns over `v² / (2g)`
+world units above the source line at `y = -1.12`, and a frame is `|y| <= 1`. So a crest *inside* the
+frame draws a visible horizontal ceiling where the population piles up. `emitter_sparks.toml` puts
+its crest off-frame at `y = 1.28` deliberately.
+
+### Individuation — the spread params
+
+**A binding is evaluated once per frame for the whole scene**, so no expression can make one object
+differ from another. These are the answer: each sets how *wide* a per-object draw is, and the
+object's own seed picks within it, once, at spawn. The preset owns the distribution; the seed owns
+the member.
+
+| Param | What varies, per object |
+|-------|-------------------------|
+| `spread` | launch angle, within a cone of this width centred on `launch_angle`. At `0` the shower is a column of beads; open it and the arcs cross. |
+| `size_spread` | mark size, as a fraction either side of `size`. |
+| `lifetime_spread` | life, as a fraction either side of `lifetime`. |
+| `spin` | how fast the mark turns, radians a second — **signed** per object, so the field turns both ways. |
+| `twinkle` | a brightness oscillation whose **rate and phase both** come off the seed. |
+
+`twinkle` is the answer to "make the stars blink and they all flash together": because each object
+draws its own *rate*, the whole-frame brightness stays steady while every member swings. A shared
+rate flashes as one sheet whatever the phases are. The mark `spin` turns is a soft **elongated
+glint**, not a disc — a disc is rotationally symmetric, so `spin` on one would be invisible.
+
+### Walls (route to `architect`, do not work around)
+
+No per-object expressions — "every seventh object is gold" is not expressible; widen a spread
+instead. No collision or inter-object forces. No stamped trail: `trails` decays, so behind an object
+that *leaves* it reads as a comet tail rather than the hard copies a cascade wants — keep it short.
+And **no positionable source** — the line spans the frame width at `y = -1.12` and cannot be moved
+or narrowed, so a point fountain or an off-centre jet is engine feedback.
+
+Full parameter roster and defaults: [`presets/README.md`](../../../../presets/README.md).
+
+---
+
 ## Engine-wide stages (any system)
 
 | Param | Default | Note |

@@ -15,6 +15,7 @@
     clippy::unreachable
 )]
 
+pub mod emitter;
 pub mod fragment_field;
 pub mod lines;
 pub mod particles;
@@ -360,7 +361,8 @@ fn draws_through_shared_line_renderer(kind: SystemKind) -> bool {
         SystemKind::FragmentField
         | SystemKind::Swarm
         | SystemKind::ReactionDiffusion
-        | SystemKind::Attractor => false,
+        | SystemKind::Attractor
+        | SystemKind::Emitter => false,
     }
 }
 
@@ -411,6 +413,11 @@ fn create(
         SystemKind::Spectrum => Box::new(lines::SpectrumScene::new(
             line_renderer.clone(),
             tier.max_segments,
+        )),
+        SystemKind::Emitter => Box::new(emitter::EmitterScene::new(
+            device,
+            surface_format,
+            tier.emitter_objects,
         )),
     }
 }
@@ -467,6 +474,7 @@ mod tests {
             SystemKind::ReactionDiffusion => "reaction diffusion",
             SystemKind::Attractor => "attractor",
             SystemKind::Spectrum => "spectrum",
+            SystemKind::Emitter => "emitter",
         }
     }
 
@@ -556,6 +564,7 @@ mod tests {
             SystemKind::Swarm,
             SystemKind::ReactionDiffusion,
             SystemKind::Attractor,
+            SystemKind::Emitter,
         ];
         for (i, a) in independent.iter().enumerate() {
             for b in independent.iter().skip(i + 1).chain(lines.iter()) {

@@ -11,7 +11,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — **unblocked**: [0045] has landed and closed, so the linear-light pipeline this builds on exists; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
-| [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **IN PROGRESS 2026-08-04** — live lane, branch `plan-0052-emitter` in worktree `WORK/lmv-plan-0052` (ADR-0053). Phase 1 landed `2470a50`; Phases 2-4 running. Nothing on this row is merged to `main` yet. [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** and gates Phase 4. **Its "needs a discrete GPU" premise was corrected 2026-08-04 at [0060]'s close** — the gate is `device_type == Cpu`, not "discrete", and a real hardware measurement was taken on this box the same day (`ae4c215`), so try Phase 3 before deferring it. **[0060] also handed this plan a sharper question than it was written against**: the hardware dual-live reading matched **CI WARP** to five figures and disagreed with **this box's local WARP** by 1.54x on a sequence with no dual-live asymmetry — if that holds, the build the golden suite blesses on is the outlier ([ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) Outcome). Moves **no pixels** except one new baseline | dev, human |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **IN PROGRESS 2026-08-04** — live lane, branch `plan-0055-fold-edge` in worktree `WORK/lmv-plan-0055` (ADR-0053). Phase 1 landed `5eac2d7` (464 tests, 0 skipped, every golden byte-identical); **the `human` Phase 2 A/B was run and judged 2026-08-04 — verdict recorded below**; Phases 3-4 running. Nothing on this row is merged to `main` yet. [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md) | dev, human |
 | [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended twice the same day** — **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (at the user's direct request), reconciled into the plan rather than reverted: it meets 4b's done-when with one accepted deviation (a test-written scratch library rather than a checked-in `fixtures/report/`), and it **opens the coverage gap 4b's sequencing existed to prevent** — nothing renders every shipped preset through the real CLI any more *and* Phase 4 has not yet put the generator under in-process tests. Every other phase is unstarted. From the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Amended a third time with Phase 2c** (2026-08-04, at [0060]'s close): a `links` job on `ubuntu-latest` giving `scripts/check-doc-links.mjs` a CI counterpart, so the doc-link gate stops depending on an opt-in hook. Independent of 2b/4b, touches neither Windows job, seconds on the cheapest runner — it is here only because this plan owns every `ci.yml` edit in flight. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. ~~Phase 6 is gated on [0059] being closed~~ — **released 2026-08-04**, [0059] has closed, so Phase 6 (which edits `particles/mod.rs`) is unblocked; it also inherits [0059]’s close decision to **retire `RESEED_DRAWS_STREAK`**, which lives in that same file; **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
@@ -35,31 +34,58 @@ constraints**; the rest is preference, and a session may take any unblocked plan
 | 1 | [0055] | **Hard constraint: must precede [0064].** Both live in `kaleidoscope.rs`; 0055 is smaller and older and branches on the *destination* radius, which 0064's composed map does not touch. Taking it second means rebasing onto a rewritten shader | No — Phase 2 is `human` (a live in-motion A/B) and gates Phases 3-4 |
 | 2 | [0063] | **Soft constraint: better before [0062].** It adds `inv_depth_extent()` as an exhaustive match over `AttractorFamily`, so 0062 adding a fifth family is then **compiler-forced** to answer it. The reverse order relies on remembering | No — Phase 5 is `human` |
 | 3 | [0062] | Adjacent to 0063 in `particles/mod.rs`, so one session holds the file's context | No — Phase 7 is `human` |
-| 4 | [0064] | Unblocked once 0055 has landed. Widest blast radius in the roster — screen-space, so every scene inherits it | No — Phase 4 is `human`, mid-plan |
-| 5 | [0065] | **Gated by nothing and shares no file with anything.** The safest parallel lane; can be pulled forward to any position | No — Phase 3 is `human`, mid-plan |
-| 6 | [0052] | Independent, four `dev` phases, nothing gating | **Yes** |
-| 7 | [0053] | Protective rather than additive; moves no pixels. Its `human` Phase 3 is runnable on this box after the 2026-08-04 premise correction | No — Phase 3 is `human` |
-| 8 | [0046] | Touches the attractor's feedback path, so it is cheaper after [0062]/[0063] have settled that file | — |
-| 9 | [0036] | Packaging only; touches no `core/`, `standalone/` or shader code. Take it whenever artifacts are wanted | No — Phase 4 needs a Mac |
-| 10 | [0061] | **Last, by the user's own instruction** | No — Phases 8-9 are `human` |
+| 4 | [0065] | **Gated by nothing and shares no file with anything** — line geometry against a post chain and a particle scene. The safest parallel lane, and it can run *alongside* 2-3 rather than after them | No — Phase 3 is `human`, mid-plan |
+| 5 | [0064] | Unblocked once 0055 lands, but **deliberately after the attractor work rather than concurrent with it**: its Phase 3 sample grid renders on `attractor_lorenz` as one of three sources, and [0063] changes what that source looks like. A look decision taken against a moving target is one that has to be retaken | No — Phase 4 is `human`, mid-plan |
+| 6 | [0053] | Protective rather than additive; moves no pixels. Its `human` Phase 3 is runnable on this box after the 2026-08-04 premise correction. **Read [0052]'s Recently-closed entry first** — it moved the bind-group layout roster 0053 asserts on, and not in the direction 0053 predicted | No — Phase 3 is `human` |
+| 7 | [0046] | Touches the attractor's feedback path, so it is cheaper after [0062]/[0063] have settled that file | — |
+| 8 | [0036] | Packaging only; touches no `core/`, `standalone/` or shader code. Take it whenever artifacts are wanted | No — Phase 4 needs a Mac |
+| 9 | [0061] | **Last, by the user's own instruction** | No — Phases 8-9 are `human` |
 
-**If you want one session that closes**, take [0052] — it is the only plan in the roster with no
-`human` phase. **If you want the most visible change per session**, take [0063] then [0062].
-**If a second lane is running in parallel**, give it [0065]: it is line geometry and collides with
-nothing.
+**Every remaining plan in the roster carries a `human` phase**, so none of them closes in one
+session — [0052], which was the only one that did, has closed. **If you want the most visible change
+per session**, take [0063] then [0062]. **If a second lane is running in parallel**, give it [0065]:
+it is line geometry and collides with nothing.
+
+### What to take once [0052] and [0055] close (asked 2026-08-04, both lanes live)
+
+**[0063] then [0062], in one lane, sequentially — and [0065] in a second if you want two.** The
+reason is not novelty but **uninterrupted `dev` phases**, which is the scarce thing now that six of
+the ten plans carry a `human` phase:
+
+| Plan | `dev` phases before the first stop | Where the `human` phase sits |
+|------|-----------------------------------|------------------------------|
+| [0063] | **4** (Phases 1-4) | **terminal** — Phase 5 is the content pass, all code done |
+| [0062] | **6** (Phases 1-6) | **terminal** — Phase 7 is the content pass, all code done |
+| [0065] | 2 (Phases 1-2) | **mid-plan** — Phase 3 gates Phases 4-6 |
+| [0064] | 3 (Phases 1-3) | **mid-plan** — Phase 4 gates Phases 5-6 |
+
+So [0063] + [0062] is **ten `dev` phases with no mid-plan stop**, in one file's context, with the
+ordering compiler-enforced rather than remembered. Both then wait only on a content pass, which is
+the cheapest kind of `human` phase — the code is finished and reviewable either way.
+
+[0064] and [0065] are the opposite shape: each delivers a rendered sample grid in two or three
+phases and then **stops until judged**. That is not a defect — it is the workflow the user chose —
+but it means a session spent there ends with a decision owed rather than with code landed. Their
+one real advantage is that the two grids can be **judged in a single sitting**, so pairing them is
+worth more than taking either alone.
+
+**Remove the finished worktrees before opening new lanes.** Each carries its own `target/` (one lane
+held ~8 GB in `target/debug/incremental` and filled the disk mid-session), and `git worktree remove`
+fails with `Permission denied` on Windows while any shell still has its working directory inside.
 
 
-**TWO LANES ARE LIVE RIGHT NOW (2026-08-04), and neither is merged to `main`.** Read this before
-starting anything, because the roster rows above are the only place that says so:
+**ONE LANE IS STILL LIVE (2026-08-04) and is not yet merged to `main`.** Read this before starting
+anything, because the roster row above is the only other place that says so:
 
 | Lane | Branch | Worktree | State |
 |------|--------|----------|-------|
-| [0052] the emitter | `plan-0052-emitter` | `WORK/lmv-plan-0052` | Phase 1 `2470a50`; Phases 2-4 running |
-| [0055] the fold edge | `plan-0055-fold-edge` | `WORK/lmv-plan-0055` | Phase 1 `5eac2d7`; Phase 2 judged; Phases 3-4 running |
+| [0055] the fold edge | `plan-0055-fold-edge` | `WORK/lmv-plan-0055` | Phase 1 `5eac2d7`; Phase 2 judged; Phases 3-4 landed, closing |
 
-They were chosen to run in parallel because they share no files — 0052 is `scenes/particles/`, 0055
-is `post/kaleidoscope.rs`. **The pair deliberately NOT run together was 0052 + [0053]**, which
-collide on the bind-group layout roster 0053 asserts on.
+**[0052] has closed** — see Recently closed. The two ran in parallel because they share no files
+(0052 is `scenes/particles/`, 0055 is `post/kaleidoscope.rs`) and that held: neither touched the
+other's code. **The pair deliberately NOT run together was 0052 + [0053]**, which collide on the
+bind-group layout roster 0053 asserts on — and 0052 has now moved that roster, so read its
+Recently-closed entry before starting [0053].
 
 **[0055] Phase 2's verdict, decided in the running app on 2026-08-04 against real audio, both test
 scenes, all five arms, at the user's judgement.** It is written here and not only on the branch,
@@ -405,9 +431,18 @@ fourth, is described under the fold heading below):
   [backlog 0051](../design-backlog.md), because both shipped `star_*` presets still `floor` a
   sawtooth and so demonstrate none of the morph the plan built.
 
-**[0052] and [0053] touch each other in one place worth knowing:** the emitter adds a `[Uniform]`
-bind-group layout to the group [0053] asserts on. Whichever lands second inherits the other's list.
-Neither ordering is wrong.
+**[0052] HAS LANDED AND IT MOVED WHAT [0053] WAS WRITTEN AGAINST — read this before starting
+[0053].** The prediction was that the emitter would add a plain `[Uniform]` layout to the collision
+group [0053] asserts on. **It did not, and the reason is the whole point of [0053].** Written that
+way first — one `[Uniform]` entry, `VERTEX` visibility, `min_binding_size: None`, byte-identical to
+the swarm's — it made the *swarm* read the emitter's uniform on this box's DX12 WARP build
+(`golden` swarm 0.1803, outlier 175; `sanity` non-deterministic run to run). So `emitter-bind-layout`
+ships **deliberately distinguished**: `[Uniform]` with **`VERTEX_FRAGMENT` visibility and
+`min_binding_size = 16`**, which is *not* the plain `[Uniform]` shape and *not* a member of that
+collision group. `core/src/render/scenes/emitter.rs` carries the evidence and an explicit **do not
+"tidy" this back** note; [0053] must not undo it. This is the **third** live instance of
+[backlog 0039](../design-backlog.md) and the cheapest fix anyone has found for it, which is itself
+an input to [0053]'s design.
 
 **The fold came back with a rejection, and [0055] is now that plan.** Seen in motion, the user
 rejected the falloff-disc's residual rays and its crop on fullscreen field scenes — both already
@@ -704,6 +739,30 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 
 ## Recently closed
 
+- [0052 — The emitter: objects that spawn, fall on a parabola, and
+  die](done/0052-the-emitter-objects-that-spawn-fall-and-die.md) — **done 2026-08-04**, Mode 4 review
+  **no blockers**. Phase 1 `2470a50`, Phase 2 `d155615`, Phase 3 `52a756c`, Phase 4 `53a896e`, on
+  lane `plan-0052-emitter` (ADR-0053), **reviewed together with [0055] against one merged tip**.
+  [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md) is **accepted**.
+  Closes [backlog 0034](../design-backlog.md); [backlog 0033](../design-backlog.md) (shaped marks)
+  stays open. The **first genuinely new scene idiom since the attractor**, and the half of the
+  figurative gap that carries motion.
+  **Its largest finding was not the scene.** It reproduced [backlog 0039](../design-backlog.md)
+  live: an emitter bind-group layout written byte-identical to the swarm's — one `[Uniform]` entry,
+  `VERTEX` visibility, `min_binding_size: None` — made the **swarm** read the *emitter's* uniform on
+  this box's DX12 WARP build. `golden` came back with every other fixture at mean 0.0000 and `swarm`
+  at **0.1803** with a max outlier of **175**, and `sanity` gave the swarm presets different numbers
+  on each run. Merely *constructing* a seventh pipeline with the same layout shape was enough;
+  hardware renders both correctly, so a bless would have committed garbage as the swarm's baseline.
+  Distinguishing the descriptor — `VERTEX_FRAGMENT` visibility plus an explicit `min_binding_size`
+  — restored it to 0.0000. **This is the third instance and the cheapest fix found so far**, and it
+  is what [0053] now inherits.
+  **Two open items it did not close.** One `STATUS_ACCESS_VIOLATION` in `sanity` under parallel
+  threads during Phase 1, non-reproducing across four later full runs and **not dismissed as
+  noise** — if it recurs, it has a precedent now. And `distinctness` is **structurally blind** to
+  this scene: the report's unit is a pairwise matrix and the family ships one preset, so a 1x1
+  matrix would say nothing. It is left out rather than lowered or waived, and the reasoning now
+  lives in `core/tests/distinctness.rs` beside the curated family list.
 - [0059 — Lorenz finds its plane, and the attractor can trade samples for
   curves](done/0059-lorenz-finds-its-plane.md) — **done 2026-08-04**, Mode 4 review **no blockers**.
   Phase 1 `357a17e`, Phase 1b `1c47de5`, Phase 2 `4fb4a81`, Phase 3 `642aec0`, and the `human`
