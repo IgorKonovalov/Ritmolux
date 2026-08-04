@@ -10,6 +10,26 @@
 //! the backdrop. That configuration cannot tell the two apart, which is why the
 //! defect survived sixteen confirmation captures.
 //!
+//! # The disc guard is a property of a **treatment**, not of the fold (ADR-0061)
+//!
+//! Since Plan 0055 Phase 1 the out-of-disc region is a per-preset choice —
+//! `kaleido_edge` picks one of five treatments — and three of them (`mirror`,
+//! `tile`, `squash`) paint out there **on purpose**. Read
+//! [`the_fold_paints_nothing_outside_its_disc`] as a property of the default
+//! treatment, `falloff`, and of `vignette`; it is not a rule about folding, and a
+//! fill treatment tripping it is that treatment working. Every capture in this
+//! file binds no `kaleido_edge`, so every one of them runs the default arm and the
+//! assertions below are unchanged in meaning.
+//!
+//! Plan 0055 Phase 3 re-scopes the guard once the live A/B has said which
+//! treatments survive, and gives each surviving fill treatment the property that
+//! is true of *it* — that the out-of-disc region is covered, and that it is not
+//! the radial smear of design-backlog 0010 (out-of-disc content must **vary along
+//! a ray**; the smear was constant along one). That is the only guard `tile` gets,
+//! because the disc guard cannot catch it: `tile` is supposed to paint out there,
+//! and what makes it safe rather than a rerun of the original defect is that its
+//! reads go through a `MirrorRepeat` sampler rather than the `ClampToEdge` one.
+//!
 //! # Why the disc guard lives here and not in `composite.rs`
 //!
 //! Plan 0045 Phase 1 lists `core/tests/composite.rs` for it. That file pins two
