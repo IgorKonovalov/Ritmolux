@@ -9,7 +9,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | Plan | Title | Status | Owner skill(s) |
 |------|-------|--------|----------------|
-| [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev`; **re-checked 2026-08-04 and still valid**. The user confirmed **no Mac in reach** (a friend has one), which resolves the plan's own open question to "no" and makes this the **only** route to a Mac build. Two implementer notes added to the plan header: `docs/nfr.md` §9 wrongly lists a Mac as hardware the user has (correct it in Phase 3 with §8), and the `main.rs:677` citation has drifted to `:998`. Touches **no** `ci.yml` — [0061] owns every edit there — so it collides with nothing in the roster | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — **unblocked**: [0045] has landed and closed, so the linear-light pipeline this builds on exists; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** and gates Phase 4. **Its "needs a discrete GPU" premise was corrected 2026-08-04 at [0060]'s close** — the gate is `device_type == Cpu`, not "discrete", and a real hardware measurement was taken on this box the same day (`ae4c215`), so try Phase 3 before deferring it. **[0060] also handed this plan a sharper question than it was written against**: the hardware dual-live reading matched **CI WARP** to five figures and disagreed with **this box's local WARP** by 1.54x on a sequence with no dual-live asymmetry — if that holds, the build the golden suite blesses on is the outlier ([ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) Outcome). Moves **no pixels** except one new baseline | dev, human |
 | [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended twice the same day** — **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (at the user's direct request), reconciled into the plan rather than reverted: it meets 4b's done-when with one accepted deviation (a test-written scratch library rather than a checked-in `fixtures/report/`), and it **opens the coverage gap 4b's sequencing existed to prevent** — nothing renders every shipped preset through the real CLI any more *and* Phase 4 has not yet put the generator under in-process tests. Every other phase is unstarted. From the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Amended a third time with Phase 2c** (2026-08-04, at [0060]'s close): a `links` job on `ubuntu-latest` giving `scripts/check-doc-links.mjs` a CI counterpart, so the doc-link gate stops depending on an opt-in hook. Independent of 2b/4b, touches neither Windows job, seconds on the cheapest runner — it is here only because this plan owns every `ci.yml` edit in flight. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. ~~Phase 6 is gated on [0059] being closed~~ — **released 2026-08-04**, [0059] has closed, so Phase 6 (which edits `particles/mod.rs`) is unblocked; it also inherits [0059]’s close decision to **retire `RESEED_DRAWS_STREAK`**, which lives in that same file; **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
@@ -52,7 +51,7 @@ preference, and a session may take any plan here.
 | 9 | [0067] | The curation route. Its Phase 1 touches `core/tests/reactivity.rs`, adjacent to [0061]'s CI and coverage work — keep that seam clean if both are live | No — Phase 3 is `human` |
 | 10 | [0053] | Protective rather than additive; moves no pixels. Its `human` Phase 3 is runnable on this box after the 2026-08-04 premise correction. **Read BOTH [0052]'s and [0055]'s Recently-closed entries first** — each moved a bind-group layout 0053 asserts on, and neither moved in the direction 0053 predicted | No — Phase 3 is `human` |
 | 11 | [0046] | Touches the attractor's feedback path, so it is cheaper after [0062]/[0063] have settled that file | — |
-| 12 | [0036] | Packaging only; touches no `core/`, `standalone/` or shader code, and no `ci.yml`. **Promote it the moment a Mac build is actually wanted** — asked 2026-08-04, and with no Mac in the user's hands this workflow is the only thing that can produce one. Its Phases 1-3 are three uninterrupted `dev` phases | No — Phase 4 needs a friend with a Mac |
+| ~~12~~ | ~~[0036]~~ | **Closed 2026-08-04** — see Recently closed. Phases 1-3 shipped; Phase 4 is carried forward as a `human` follow-up, not a live plan | — |
 | 13 | [0061] | **Last, by the user's own instruction** | No — Phases 8-9 are `human` |
 
 **[0069] is now the only plan in the roster that closes in one session** — every other one carries a
@@ -808,6 +807,39 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0036 — macOS and Windows release artifacts](done/0036-macos-and-windows-release-artifacts.md) —
+  **done 2026-08-04**, Mode 4 review **no blockers, one minor, one nit**. Phase 1 `0329adf` (+ fix
+  `be031eb`), Phase 2 `cc7a43f`, Phase 3 `aa9dfec`, on lane `plan-0036-release-artifacts` (ADR-0053),
+  merged to `main` at `d081dfd` with the full gate green (487 tests) over both lanes' code.
+  [ADR-0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md) is **accepted**.
+  Approved 2026-07-26, sat unbuilt for nine days, and was taken the day the user asked whether a Mac
+  build was possible.
+
+  **⚠ Carried forward: Phase 4 (push the tag, send it, hear back — `human`) is NOT done.** The plan
+  closes without it **by its own design**: its Followups section says the friend's report retires the
+  Plan 0001 Phase 10 carry-forward "at a later close", so the report was always expected to outlive
+  this plan. It also resolves a circularity — Phase 4 needs a tag, and the tag is minted *by* this
+  close. Retire both carry-forwards together when the report lands.
+
+  **The build path is CI-verified; the publish path is not.** A `workflow_dispatch` dry run
+  (`30944179623`) went green on the first attempt: both jobs, and all seven of `bundle.sh`'s checks
+  executed against real Apple tooling — `lipo -archs` naming both architectures, `plutil -lint`,
+  `codesign --verify --strict`, the plist version equal to `[workspace.package]`, the zip's three
+  top-level entries, the preset count, and no `.md`. **But the `release` job has never run**, because
+  only a tag reaches it. `gh release create`, the exactly-two-assets guard and the `--clobber` re-run
+  path are unexecuted, so two of Phase 2's done-when criteria are open and **the first tag push is
+  their test**. The third — "a `workflow_dispatch` produces both run artifacts and creates no
+  release" — is discharged exactly as written.
+
+  **What the dev lane caught that no local check would have.** Two defects, both found by running
+  what could be run rather than by reading: `git commit -- <pathspec>` re-reads from the working
+  tree and silently discarded a `git update-index --chmod=+x`, landing `bundle.sh` at `100644` on a
+  clone with `core.filemode=false` — a `Permission denied` that would first have appeared on a
+  runner, on a tag push. And `Compress-Archive` writes backslash separators on Windows PowerShell
+  5.1 and forward slashes on pwsh 7, so the Windows verify compared against paths that could only
+  match on one of the two hosts. Both are the ADR-0037 shape one level out: a value that agrees on
+  the configuration you test at and disagrees elsewhere.
 
 - [0055 — The fold edge becomes a choice](done/0055-the-fold-edge-becomes-a-choice.md) — **done
   2026-08-04**, Mode 4 review **no blockers**. Phase 1 `5eac2d7`, the `human` Phase 2 A/B judged

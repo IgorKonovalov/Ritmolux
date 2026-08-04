@@ -76,7 +76,7 @@ signal. This floor is half of that, and the healthy local reading is 2.25x it. T
 been made inside the band this project already declares to be noise.
 
 Neither number can be re-chosen here. The failing configurations exist only on the runners, and per
-Plan [0036](../0036-macos-and-windows-release-artifacts.md) Phase 4 there is no Mac on this side at
+Plan [0036](0036-macos-and-windows-release-artifacts.md) Phase 4 there is no Mac on this side at
 all. That is what shapes the phases below: the measurement has to come back from CI before the
 contract can be written.
 

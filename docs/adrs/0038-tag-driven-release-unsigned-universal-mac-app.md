@@ -1,8 +1,8 @@
 # ADR-0038 — Distribution: a tag-driven GitHub Release carrying an unsigned, ad-hoc-signed universal macOS `.app`; standalone binaries only
 
-> **Status:** proposed
+> **Status:** accepted (Plan 0036, 2026-08-04)
 > **Date:** 2026-07-26
-> **Related plan(s):** [0036](../plans/0036-macos-and-windows-release-artifacts.md)
+> **Related plan(s):** [0036](../plans/done/0036-macos-and-windows-release-artifacts.md)
 
 ## Context
 
@@ -180,3 +180,29 @@ being public makes a Release asset a bare URL. Run artifacts are still produced,
 - First-execution-on-macOS surface beyond capture: Metal adapter selection through wgpu, and
   glyphon's `FontSystem::new()` (`core/src/render/text.rs:79`) loading the system font set for
   the F3 overlay.
+
+## Outcome (2026-08-04, at Plan 0036's close)
+
+The decision stands unchanged and no code contradicts it. Two of the recorded consequences met
+measurement for the first time, and **one of them is wrong**.
+
+- **"It doubles the Mac build time" — falsified, and in the useful direction.** On the first dry
+  run (`30944179623`, both caches cold), the `macos` job took **5m22s** building *two*
+  architectures with `lto = "fat"` and `codegen-units = 1`, while the single-architecture
+  `windows` job took **6m22s**. The universal build is not the slow one; it was the faster of the
+  two. The plan's matching risk ("the Mac job will be slow — accept the wall-clock") priced a cost
+  that did not arrive. Apple-silicon runners are the likeliest reason, but that is inference, not
+  measurement — what is measured is one run on the `macos-latest` and `windows-latest` images of
+  this date, and it should not be restated as a property of universal builds in general.
+- **"Roughly doubles the macOS download" — confirmed, on the artifact rather than the binary.**
+  The published zips are **6.33 MiB** (macOS universal) against **3.62 MiB** (Windows x64), a
+  factor of 1.75. Note these are *zips carrying the presets and the README*, not the bare
+  executables the "~7.6 MB" figure in Negative refers to; the two are not the same quantity, so
+  the ratio agreeing is weaker evidence than it looks.
+- **The build path is verified; the publish path is not.** Every check in
+  `packaging/macos/bundle.sh` ran against real Apple tooling and passed. The `release` job did
+  **not** run — a `workflow_dispatch` is gated out of it by design — so `gh release create`, the
+  two-asset guard and the `--clobber` re-run path remain unexecuted. The first pushed tag is their
+  first test.
+- **The stale citation in Notes:** the degraded-path `eprintln!` is now
+  `standalone/src/main.rs:998`, not `:677`. Left in place per the append-only rule; corrected here.
