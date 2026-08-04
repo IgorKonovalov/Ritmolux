@@ -43,35 +43,50 @@
 //! roster, inside **one** pipeline — every arm is a uniform branch on how `r` maps
 //! to a sample radius `rs` and an output weight `w` (`m = r / r_max`):
 //!
-//! | Value | Name | `rs` | `w` |
-//! |---|---|---|---|
-//! | 0 | `falloff` | `min(r, r_max)` | `1 - smoothstep(r_max, r_max*(1+band), r)` |
-//! | 1 | `vignette` | `min(r, r_max)` | `1 - smoothstep(r_max*(1-band), r_max, r)` |
-//! | 2 | `mirror` | `r_max * abs(m - 2*round(m/2))` | `1` |
-//! | 3 | `tile` | `r` (**`MirrorRepeat` sampler**) | `1` |
-//! | 4 | `squash` | `r_max * tanh(m)` | `1` |
+//! | Value | Name | `rs` | `w` | Reads through |
+//! |---|---|---|---|---|
+//! | 0 | `falloff` | `min(r, r_max)` | `1 - smoothstep(r_max, r_max*(1+band), r)` | `ClampToEdge` |
+//! | **1** | **`tile`** (default) | `r` | `1` | **`MirrorRepeat`** |
+//! | 2 | `squash` | `r_max * tanh(m)` | `1` | `ClampToEdge` |
 //!
-//! **0 is the default and is today's behaviour byte-for-byte**, so ADR-0047 is
-//! supplemented rather than superseded and nothing moves until an author opts in.
+//! Plan 0055 shipped five candidates and its Phase 2 A/B — in the running app, in
+//! motion, over a lit backdrop, on a centred figure and a border-filling field, at
+//! two aspects — deleted two of them. `vignette` (the fade moved inside the disc)
+//! and `mirror` (the radius reflected as a triangle wave) won on neither scene and
+//! are gone from the shader rather than left dead. The three that remain keep their
+//! **relative order** from that roster, which is why the numbering has a gap in its
+//! history but not in its values.
 //!
-//! Four of the five keep `rs` inside `[0, r_max]`, so they inherit ADR-0047's real
-//! guarantee unchanged — the design-backlog 0010 smear came from *reconstructing a
-//! coordinate outside the source* and handing it to `ClampToEdge`, and none of them
-//! does that. `tile` is the exception and the reason there is a second sampler: it
-//! is the one arm whose coordinate is *meant* to leave `[0,1]`, which is safe only
-//! because a `MirrorRepeat` sampler defines that read. Wired to the `ClampToEdge`
-//! sampler it would be the original defect under a new name.
+//! **The default is `tile` (1), not `falloff` (0)** — the one place this stage's
+//! numbering is deliberately not "0 is the default". Two separate facts, kept
+//! separate on purpose: `0 = falloff` preserves the "0 is what ADR-0047 shipped"
+//! association that preset comments and this file's own history carry, and the A/B
+//! then chose a *different* member of the roster as the resting behaviour. So a
+//! preset that binds no `kaleido_edge` **fills its frame** rather than cropping to
+//! a disc, and every fold-bearing golden baseline moved once, by hand, when that
+//! landed.
 //!
-//! **What `mirror` does at the corners is arithmetic, and it is not obvious.** At
-//! 16:9 the frame corner sits at `m = 2.04`, and `abs(2.04 - 2*round(1.02)) = 0.04`
-//! — so the corners sample from **0.04 `r_max`, right next to the fold axis**.
-//! `mirror` brings the *centre* of the figure back into the corners; it is a
-//! reflection of the disc, not a continuation outward of its rim.
+//! `falloff` and `squash` keep `rs` inside `[0, r_max]`, so they inherit ADR-0047's
+//! real guarantee unchanged — the design-backlog 0010 smear came from
+//! *reconstructing a coordinate outside the source* and handing it to
+//! `ClampToEdge`, and neither does that. **`tile` is the exception, and it is now
+//! the default**, which is the single most important thing to know about this
+//! stage: its coordinate is *meant* to leave `[0,1]`, and that is safe **only**
+//! because a `MirrorRepeat` sampler defines the read. Wired to the `ClampToEdge`
+//! sampler it is design-backlog 0010 under a new name, unguarded by the disc
+//! assertion (which `tile` is supposed to break) — see
+//! `core/tests/kaleidoscope.rs`, where the guard that does catch it is the
+//! ray-variance property.
+//!
+//! `squash` is **not** the identity inside the disc the way a clamp is: `tanh(m) <
+//! m` for every `m > 0`, so it compresses the whole interior, 1:1 only in the limit
+//! at the fold axis. That is the cost of its filling the frame without a crop or a
+//! ray, and it is why a preset picks between it and `tile` by eye.
 //!
 //! `kaleido_edge` is the stage's **second stepped param**. Like `kaleido_order` it
 //! is clamped and rounded on the CPU ([`fold_edge`]), for the [`fold_order`]
 //! reason: `[smoothing]` and preset dissolves both sweep a param *continuously*
-//! between two settings, and a selector swept through 2.5 is not a sixth treatment
+//! between two settings, and a selector swept through 1.5 is not a fourth treatment
 //! — it is an undefined one. Rounding in Rust keeps the shader's precondition
 //! visible in Rust.
 //!
@@ -133,12 +148,20 @@ const DEFAULT_CENTER: f32 = 0.5;
 /// read as a vignette rather than as a disc pasted on a rectangle.
 const FALLOFF_BAND: f32 = 0.35;
 
-/// `kaleido_edge` default — 0 = `falloff`, ADR-0047's shipped treatment, so an
-/// unbound preset renders exactly as it did before ADR-0061 (module docs).
-const DEFAULT_EDGE: f32 = 0.0;
-/// The last value the `kaleido_edge` roster defines (4 = `squash`). Values past it
+/// The first value the `kaleido_edge` roster defines (0 = `falloff`).
+const MIN_EDGE: f32 = 0.0;
+/// The last value the `kaleido_edge` roster defines (2 = `squash`). Values past it
 /// clamp here rather than selecting the shader's fall-through arm by accident.
-const MAX_EDGE: f32 = 4.0;
+const MAX_EDGE: f32 = 2.0;
+/// `kaleido_edge` default — **1 = `tile`**, the treatment Plan 0055's live A/B
+/// chose as the resting behaviour.
+///
+/// Deliberately not [`MIN_EDGE`]. `0 = falloff` keeps the roster's numbering tied
+/// to ADR-0047's shipped treatment, which is what this file's history and the
+/// preset comments refer to; which member of the roster is the *default* is a
+/// separate question and the A/B answered it differently. Reordering the roster to
+/// force the default to 0 would trade a readable history for a tidier constant.
+const DEFAULT_EDGE: f32 = 1.0;
 
 /// Below this order the fold is the identity passthrough (the stage is skipped).
 const MIN_ACTIVE_ORDER: f32 = 2.0;
@@ -194,18 +217,22 @@ fn fold_center(v: f32) -> f32 {
 /// whose values are *identities* rather than a quantity. `kaleido_edge` sits in
 /// the same `[smoothing]` and preset-dissolve machinery as everything else, and
 /// both of those interpolate a binding **continuously** from one setting to
-/// another: easing from `mirror` (2) to `squash` (4) passes through 2.5, 3.0, 3.5.
-/// Rounding here means the sweep *snaps* at each midpoint — `kaleido_order`'s
-/// documented cost, taken again knowingly — instead of the shader receiving a
-/// value no arm defines. Doing it in Rust rather than WGSL keeps that precondition
-/// visible on the CPU side, where the roster's bounds live.
+/// another: easing from `falloff` (0) to `squash` (2) passes through 0.5, 1.0,
+/// 1.5, so it visits `tile` on the way. Rounding here means the sweep *snaps* at
+/// each midpoint — `kaleido_order`'s documented cost, taken again knowingly —
+/// instead of the shader receiving a value no arm defines. Doing it in Rust rather
+/// than WGSL keeps that precondition visible on the CPU side, where the roster's
+/// bounds live.
 ///
 /// Non-finite falls back to the default rather than clamping (which is what
 /// `fold_order` does with an infinity): a selector has no "as far as you can go"
-/// reading, so a broken binding should land on the treatment that changes nothing.
+/// reading, so a broken binding should land on the resting treatment. Note that
+/// since the default is not the low bound, a clamp and the fallback are genuinely
+/// different answers here — an under-driven binding lands on `falloff` while a
+/// broken one lands on `tile`.
 fn fold_edge(v: f32) -> f32 {
     if v.is_finite() {
-        v.clamp(0.0, MAX_EDGE).round()
+        v.clamp(MIN_EDGE, MAX_EDGE).round()
     } else {
         DEFAULT_EDGE
     }
@@ -216,24 +243,24 @@ fn fold_edge(v: f32) -> f32 {
 ///
 /// **The shader below is the implementation; this is its CPU mirror**, and it
 /// exists so the properties that make each treatment what it claims can be
-/// asserted arithmetically rather than argued — that `falloff`, `vignette`,
-/// `mirror` and `squash` never reconstruct a coordinate outside the source, that
-/// `mirror` leaves the disc interior alone and reflects about `r_max`, and what
-/// `mirror` does at a 16:9 corner. The two are kept identical by inspection; the
-/// pixel-level guards on the shader itself are Plan 0055 Phase 3's, once the live
-/// A/B has said which arms survive. Weight `w` is not mirrored here: it is a plain
-/// `smoothstep` on the two arms that use it and carries no such property.
+/// asserted arithmetically rather than argued — that `falloff` and `squash` never
+/// reconstruct a coordinate outside the source, and that `tile` is the one arm
+/// that does. The two are kept identical by inspection. The *pixel-level* guards
+/// on the shader itself live in `core/tests/kaleidoscope.rs`, which is where
+/// `tile`'s real safety property is asserted: this function cannot see which
+/// sampler an arm reads through, and for `tile` the sampler is the whole
+/// guarantee.
+///
+/// Weight `w` is not mirrored here: it is a plain `smoothstep` on the one arm that
+/// uses it and carries no such property.
 #[cfg(test)]
 fn edge_sample_radius(edge: f32, m: f32) -> f32 {
     // Half-step comparisons and the same arm order as the shader, so the two are
     // one function written twice rather than two functions that agree on the
-    // roster's five values. `falloff` and `vignette` share the fall-through: they
-    // differ only in `w`.
-    if edge < 1.5 {
+    // roster's three values.
+    if edge < 0.5 {
         m.min(1.0)
-    } else if edge < 2.5 {
-        (m - 2.0 * (m * 0.5).round()).abs()
-    } else if edge < 3.5 {
+    } else if edge < 1.5 {
         m
     } else {
         m.tanh()
@@ -291,47 +318,37 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // What happens outside the disc is the preset's choice (ADR-0061). Every arm
     // is a map from `r` to a SAMPLE radius `rs` and an output weight `w`; the
     // branch is on a uniform-buffer value, so this is one pipeline, one bind
-    // layout, one pass, and — for four of the five arms — one fetch.
+    // layout, one pass, one fetch.
     //
-    // PRECONDITION: `u.c.w` is an integer in [0, 4] (`fold_edge` on the CPU side).
+    // PRECONDITION: `u.c.w` is an integer in [0, 2] (`fold_edge` on the CPU side).
     // The comparisons are half-step so a quantized value can only land on its own
-    // arm; the fall-through is `falloff`, the default and today's behaviour.
+    // arm; the fall-through is `squash`. Note the DEFAULT is 1 (`tile`), which is
+    // not the fall-through and not the first arm — see `DEFAULT_EDGE`.
     let edge = u.c.w;
-    // Fold a DISC (ADR-0047) is still what four of the five arms do. Clamping the
-    // SAMPLE radius — not the output pixel's — is what keeps every reconstructed
-    // coordinate inside [0,1]: beyond r_max the polar reconstruction used to land
-    // outside the source and `ClampToEdge` smeared the border texel radially into
-    // the streaks and chevrons of design-backlog 0010.
     var rs = min(r, r_max);
     var w = 1.0;
     if (edge < 0.5) {
-        // 0 `falloff` — past the disc, fade out rather than leaving a flat ring. A
-        // plain clamp does NOT leave one: the clamped sample still varies with
-        // angle, so the rim replicates outward as a sunburst of rays (ADR-0047's
-        // Outcome). This is what fades those rays.
+        // 0 `falloff` — ADR-0047's treatment. Clamping the SAMPLE radius, not the
+        // output pixel's, is what keeps every reconstructed coordinate inside
+        // [0,1]: beyond r_max the polar reconstruction used to land outside the
+        // source and `ClampToEdge` smeared the border texel radially into the
+        // streaks and chevrons of design-backlog 0010. Past the disc it fades out
+        // rather than leaving a flat ring — a plain clamp does NOT leave one, since
+        // the clamped sample still varies with angle, so the rim replicates outward
+        // as a sunburst of rays (ADR-0047's Outcome). This is what fades those.
         w = 1.0 - smoothstep(r_max, r_max * (1.0 + band), r);
     } else if (edge < 1.5) {
-        // 1 `vignette` — the same fade moved INSIDE the disc, so the rim is gone
-        // before r_max and no ray is drawn at all. Costs a rim of real content.
-        w = 1.0 - smoothstep(r_max * (1.0 - band), r_max, r);
-    } else if (edge < 2.5) {
-        // 2 `mirror` — reflect the radius instead of clamping it: a triangle wave
-        // in `m` of period 2, identity below r_max and folding back inward above
-        // it. Note `round` here is WGSL's (ties to even) against Rust's (ties away
-        // from zero) in `edge_sample_radius`; they differ only at odd `m`, where
-        // both give exactly 1, so the two agree everywhere on this map.
-        rs = r_max * abs(m - 2.0 * round(m * 0.5));
-    } else if (edge < 3.5) {
-        // 3 `tile` — leave the radius alone and let the MirrorRepeat sampler
-        // define the read. The ONLY arm that samples outside [0,1], and the reason
-        // `samp_tile` exists.
+        // 1 `tile`, THE DEFAULT — leave the radius alone and let the MirrorRepeat
+        // sampler define the read. The only arm that samples outside [0,1]; safe
+        // only because of that sampler, and the original defect if ever wired to
+        // `samp`.
         rs = r;
     } else {
-        // 4 `squash` — compress the radius asymptotically into the disc. 1:1 at
+        // 2 `squash` — compress the radius asymptotically into the disc. 1:1 at
         // the fold axis (tanh'(0) = 1) and approaching r_max at the corners, so it
-        // crops nothing and draws no ray, at the cost of bending geometry — and,
-        // unlike `mirror`, it is NOT the identity inside the disc: tanh(m) < m
-        // everywhere past the axis, so the whole interior is pulled inward.
+        // crops nothing and draws no ray, at the cost of bending geometry. NOT the
+        // identity inside the disc: tanh(m) < m everywhere past the axis, so the
+        // whole interior is pulled inward.
         rs = r_max * tanh(m);
     }
 
@@ -343,7 +360,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // flow — the branch is on a uniform-buffer value, which is what `textureSample`
     // requires. Only one executes per fragment.
     var col: vec4<f32>;
-    if (edge > 2.5 && edge < 3.5) {
+    if (edge > 0.5 && edge < 1.5) {
         col = textureSample(t_src, samp_tile, s_uv);
     } else {
         col = textureSample(t_src, samp, s_uv);
@@ -394,9 +411,9 @@ impl Resources {
             view_formats: &[],
         });
         let src_view = src.create_view(&wgpu::TextureViewDescriptor::default());
-        // Four of the five edge treatments clamp their sample radius to the
-        // inscribed disc, so they never sample outside [0,1] and this address mode
-        // is unreachable for them — it stays `ClampToEdge` as the defined fallback.
+        // `falloff` and `squash` keep their sample radius inside the inscribed
+        // disc, so they never sample outside [0,1] and this address mode is
+        // unreachable for them — it stays `ClampToEdge` as the defined fallback.
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("kaleido-sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -405,12 +422,15 @@ impl Resources {
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
-        // The fifth — `tile` (ADR-0061) — is the one whose coordinate leaves
+        // The third — `tile` (ADR-0061) — is the one whose coordinate leaves
         // `[0,1]` on purpose, and it is safe *only* because this sampler defines
         // what a read out there means. Reflecting rather than repeating is what
         // keeps the continuation continuous at the source border instead of
         // wrapping the far edge in. Built unconditionally so the layout shape does
-        // not depend on a param value; unbound presets never sample through it.
+        // not depend on a param value.
+        //
+        // Since Plan 0055 Phase 3 this is the sampler the DEFAULT reads through, so
+        // it is on the path of every fold-bearing preset rather than an opt-in.
         let sampler_tile = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("kaleido-sampler-tile"),
             address_mode_u: wgpu::AddressMode::MirrorRepeat,
@@ -432,10 +452,14 @@ impl Resources {
             SHADER,
         );
         // `[Uniform, Texture, Sampler, Sampler]` since ADR-0061 added `tile`'s
-        // second address mode. That is one entry longer than the
-        // `[Uniform, Texture, Sampler]` shape ADR-0058 records this layout under —
-        // a shape it shared with `ink-bind-layout` — so the fold is now the more
-        // distinctive of the two and that particular collision is off the list.
+        // second address mode. Re-derived after Plan 0055 Phase 3 deleted `mirror`
+        // and `vignette` rather than carried over: neither of those needed a
+        // sampler, `tile` survived, so the shape is unchanged from Phase 1.
+        //
+        // That is one entry longer than the `[Uniform, Texture, Sampler]` shape
+        // ADR-0058 records this layout under — a shape it shared with
+        // `ink-bind-layout` — so the fold is now the more distinctive of the two
+        // and that particular collision is off the list.
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("kaleido-bind-layout"),
             entries: &[
@@ -766,48 +790,54 @@ mod tests {
     /// reason in [`fold_edge`]'s docs.
     #[test]
     fn fold_edge_is_always_a_roster_value() {
-        for &raw in &[-9.0f32, 0.0, 0.4, 1.0, 2.2, 3.0, 3.9, 4.0, 4.4, 400.0] {
+        for &raw in &[-9.0f32, 0.0, 0.4, 1.0, 1.6, 2.0, 2.4, 400.0] {
             let e = fold_edge(raw);
             assert_eq!(e, e.round(), "fold_edge({raw}) = {e} is not an integer");
             assert!(
-                (DEFAULT_EDGE..=MAX_EDGE).contains(&e),
-                "fold_edge({raw}) = {e} is outside the roster [{DEFAULT_EDGE}, {MAX_EDGE}]"
+                (MIN_EDGE..=MAX_EDGE).contains(&e),
+                "fold_edge({raw}) = {e} is outside the roster [{MIN_EDGE}, {MAX_EDGE}]"
             );
         }
 
         // Nearest-integer, not truncation: an eased sweep from one treatment to
         // another must land on the step it is closest to, so it snaps at the
         // midpoint rather than lagging a whole treatment behind.
-        assert_eq!(fold_edge(2.4), 2.0);
-        assert_eq!(fold_edge(2.6), 3.0);
+        assert_eq!(fold_edge(0.4), MIN_EDGE);
         assert_eq!(fold_edge(0.6), 1.0);
+        assert_eq!(fold_edge(1.4), 1.0);
+        assert_eq!(fold_edge(1.6), MAX_EDGE);
 
-        // Out of range clamps into the roster rather than selecting the shader's
-        // fall-through arm by arithmetic accident.
-        assert_eq!(fold_edge(-1.0), DEFAULT_EDGE);
+        // Out of range clamps to the nearer BOUND, which is not the default —
+        // the distinction that only exists because the default is the roster's
+        // middle value. An under-driven binding lands on `falloff`, not on `tile`.
+        assert_eq!(fold_edge(-1.0), MIN_EDGE);
         assert_eq!(fold_edge(99.0), MAX_EDGE);
+        assert_ne!(
+            fold_edge(-1.0),
+            DEFAULT_EDGE,
+            "clamping and the non-finite fallback must stay distinguishable"
+        );
 
         // Non-finite falls back to the DEFAULT, not to a clamp bound: a selector
         // has no "as far as you can go" reading, so a broken binding lands on the
-        // treatment that changes nothing.
+        // resting treatment.
         assert_eq!(fold_edge(f32::NAN), DEFAULT_EDGE);
         assert_eq!(fold_edge(f32::INFINITY), DEFAULT_EDGE);
         assert_eq!(fold_edge(f32::NEG_INFINITY), DEFAULT_EDGE);
     }
 
-    /// Every treatment but `tile` keeps its **sample** radius inside the disc, so
-    /// none of them can reconstruct a coordinate outside the source — ADR-0047's
-    /// real guarantee, and the mechanism behind design-backlog 0010's smear.
+    /// `falloff` and `squash` keep their **sample** radius inside the disc, so
+    /// neither can reconstruct a coordinate outside the source — ADR-0047's real
+    /// guarantee, and the mechanism behind design-backlog 0010's smear. `tile` is
+    /// the deliberate exception, and the reason it needs its own sampler.
     ///
-    /// The sweep runs well past the 16:9 corner because that is where a plausible
-    /// mis-implementation shows: `mirror` written with `floor` in place of `round`
-    /// is the identity on `m` in `(1, 2)` and would sail past 1 here, while reading
-    /// correctly at every `m` below the rim.
+    /// The sweep runs well past the 16:9 corner because a mis-implementation that
+    /// only escapes far out would read correctly at every `m` below the rim.
     #[test]
     fn only_tile_lets_the_sample_radius_leave_the_disc() {
         let mut m = 0.0f32;
         while m <= 3.0 {
-            for edge in [0.0f32, 1.0, 2.0, 4.0] {
+            for edge in [MIN_EDGE, MAX_EDGE] {
                 let rs = edge_sample_radius(edge, m);
                 assert!(
                     (0.0..=1.0).contains(&rs),
@@ -817,105 +847,34 @@ mod tests {
             m += 0.01;
         }
 
-        // Non-vacuity, and the roster's one deliberate exception: `tile` is the arm
-        // whose coordinate leaves [0,1], which is why it — and only it — reads
-        // through the MirrorRepeat sampler.
+        // Non-vacuity, and the roster's one deliberate exception — which is also
+        // the DEFAULT, so this is the arm every unbound fold-bearing preset takes.
+        // Its safety is the MirrorRepeat sampler, which this function cannot see;
+        // the guard that can is the ray-variance property in
+        // `core/tests/kaleidoscope.rs`.
         let corner = corner_m(ASPECT_16_9);
         assert!(
-            edge_sample_radius(3.0, corner) > 1.0,
+            edge_sample_radius(DEFAULT_EDGE, corner) > 1.0,
             "tile no longer leaves the disc, so the check above distinguishes nothing"
-        );
-
-        // `falloff` and `vignette` differ only in their weight — the same clamped
-        // radius map underneath, which is why neither can fill a corner.
-        for &m in &[0.3f32, 1.0, corner] {
-            assert_eq!(
-                edge_sample_radius(0.0, m),
-                edge_sample_radius(1.0, m),
-                "falloff and vignette must share the clamped radius map"
-            );
-        }
-    }
-
-    /// `mirror` leaves the disc interior exactly as today's clamp does, and
-    /// **reflects** about the rim rather than stepping across it.
-    ///
-    /// The reflection identity `rs(1 - h) == rs(1 + h)` is the property; continuity
-    /// at `r_max` follows from it, since both sides tend to 1 as `h` shrinks. That
-    /// is what makes the treatment a seamless mirror instead of a visible ring. The
-    /// tolerance is f32 round-off in forming `1 +/- h`, not a tuned threshold — the
-    /// map itself is exact.
-    #[test]
-    fn mirror_is_the_identity_inside_the_disc_and_reflects_about_its_rim() {
-        const ROUNDOFF: f32 = 1e-6;
-
-        for &h in &[1e-4f32, 1e-3, 1e-2, 0.1, 0.25, 0.5, 0.9, 1.0] {
-            let inside = edge_sample_radius(2.0, 1.0 - h);
-            let outside = edge_sample_radius(2.0, 1.0 + h);
-
-            // Identity below r_max: inside the disc `mirror` is today's clamp, so
-            // adopting it changes nothing about what the wedges already show.
-            assert!(
-                (inside - (1.0 - h)).abs() <= ROUNDOFF,
-                "mirror is not the identity inside the disc: m = {} maps to {inside}",
-                1.0 - h
-            );
-            // ...and the same distance outside reads the same radius.
-            assert!(
-                (inside - outside).abs() <= ROUNDOFF,
-                "mirror does not reflect about r_max: m = {} reads {inside} but m = {} \
-                 reads {outside} — a step of {h} either side of the rim leaves a seam",
-                1.0 - h,
-                1.0 + h
-            );
-        }
-    }
-
-    /// What `mirror` does at a corner, which decides how it reads and is not
-    /// obvious: it brings the **fold axis** back into the corners, not a
-    /// continuation of the rim outward.
-    #[test]
-    fn mirror_brings_the_fold_axis_into_a_16_9_corner() {
-        let corner = corner_m(ASPECT_16_9);
-        // The arithmetic the module docs quote: sqrt((16/9)^2 + 1) = 2.04.
-        assert!(
-            (corner - 2.0397).abs() < 1e-3,
-            "the 16:9 corner is at {corner} r_max, not the documented 2.04"
-        );
-
-        // Past one full reflection: the triangle wave has period 2, so a corner at
-        // 2.04 lands 0.04 out from the axis rather than 0.04 in from the rim.
-        let rs = edge_sample_radius(2.0, corner);
-        assert!(
-            (rs - (corner - 2.0)).abs() <= 1e-6,
-            "mirror at the 16:9 corner reads {rs}, not the corner's distance past the \
-             second fold ({})",
-            corner - 2.0
-        );
-        assert!(
-            rs < 0.05,
-            "the 16:9 corner samples from {rs} r_max — the module docs' claim that \
-             mirror puts the centre of the figure in the corners rests on this being \
-             right next to the axis"
         );
     }
 
     /// `squash` is 1:1 **at the axis** and asymptotic to the rim — it never crops
     /// and never leaves the disc, at the cost of compressing the whole interior.
     ///
-    /// Note this is *not* the identity below `r_max` the way `mirror` is: Plan
-    /// 0055 Phase 1's done-when groups the two, but `tanh(m) < m` for every
-    /// `m > 0`, so `squash` pulls the disc's interior inward everywhere. The
-    /// formula is the one both the plan's roster table and ADR-0061's give; the
-    /// grouping in the prose is what does not hold, and ADR-0061's Outcome is where
-    /// that belongs. `mirror` alone is the "interior untouched" candidate.
+    /// Note this is *not* the identity below `r_max` the way a clamp is: Plan 0055
+    /// Phase 1's done-when grouped `squash` with the (since-deleted) `mirror` as
+    /// leaving the disc interior untouched, but `tanh(m) < m` for every `m > 0`, so
+    /// `squash` pulls the whole interior inward. The formula is the one both the
+    /// plan's roster table and ADR-0061's give; the grouping in the prose is what
+    /// does not hold, and ADR-0061's Outcome carries the correction.
     #[test]
     fn squash_is_one_to_one_at_the_axis_and_asymptotic_to_the_rim() {
         // 1:1 at the fold axis: tanh'(0) = 1, so the ratio tends to 1. At m = 1e-4
         // the series error is ~m^2/3, some four orders below this bound.
         let tiny = 1e-4f32;
         assert!(
-            (edge_sample_radius(4.0, tiny) / tiny - 1.0).abs() < 1e-5,
+            (edge_sample_radius(MAX_EDGE, tiny) / tiny - 1.0).abs() < 1e-5,
             "squash is not 1:1 at the fold axis"
         );
 
@@ -933,7 +892,7 @@ mod tests {
         let mut prev = 0.0f32;
         let mut m = 0.05f32;
         while m <= 8.0 {
-            let rs = edge_sample_radius(4.0, m);
+            let rs = edge_sample_radius(MAX_EDGE, m);
             assert!(rs < 1.0, "squash reached the rim at m = {m} (rs = {rs})");
             assert!(rs >= prev, "squash went backwards at m = {m}");
             prev = rs;
@@ -948,7 +907,7 @@ mod tests {
         let mut prev = 0.0f32;
         let mut m = 0.05f32;
         while m <= 4.0 {
-            let rs = edge_sample_radius(4.0, m);
+            let rs = edge_sample_radius(MAX_EDGE, m);
             assert!(
                 rs > prev,
                 "squash is not strictly monotone at m = {m}, which is inside the range \
@@ -960,7 +919,7 @@ mod tests {
 
         // ...and it is a compression of the interior, not the identity there.
         assert!(
-            edge_sample_radius(4.0, 0.5) < 0.5,
+            edge_sample_radius(MAX_EDGE, 0.5) < 0.5,
             "squash left the disc interior untouched — it is tanh, which compresses \
              everywhere past the axis"
         );
