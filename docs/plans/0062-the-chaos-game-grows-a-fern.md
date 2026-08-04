@@ -1,6 +1,8 @@
 # 0062 — The chaos game grows a fern: an IFS family that morphs between figures
 
-> **Status:** draft
+> **Status:** **approved 2026-08-04** — ready for `dev`. Phases 1-6 are `dev` and nothing gates
+> them, so they run start-to-finish in one session; **Phase 7 is `human`** (a `preset-author` pass
+> judging the levers against real audio), so the plan does not close in that session.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md)
