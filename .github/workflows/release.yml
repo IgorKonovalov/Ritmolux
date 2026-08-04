@@ -45,8 +45,13 @@ jobs:
       # flips architecture.
       - name: Install both Apple targets
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      # Invoked through `bash` rather than as ./packaging/macos/bundle.sh: this
+      # repo is developed on Windows with core.filemode=false, where the
+      # executable bit is easy to drop on a later edit. The bit IS set in the
+      # index, but the job must not be one `git commit -- <path>` away from
+      # Permission denied.
       - name: Build, bundle, sign, zip and verify
-        run: packaging/macos/bundle.sh
+        run: bash packaging/macos/bundle.sh
       - uses: actions/upload-artifact@v4
         with:
           name: macos-universal
