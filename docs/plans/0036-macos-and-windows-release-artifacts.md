@@ -1,6 +1,8 @@
 # 0036 — macOS and Windows release artifacts: a tag-driven Release with a universal `.app`
 
-> **Status:** approved
+> **Status:** **in-progress 2026-08-04** — Phases 1-3 are `dev` and run in one session on
+> `plan-0036-release-artifacts`; **Phase 4 is `human`** (push the tag, send the link), so the
+> plan does not close in that session.
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human

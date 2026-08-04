@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template for LightMusicVisualizer.app's Info.plist (Plan 0036, ADR-0038).
+
+  @VERSION@ is substituted by packaging/macos/bundle.sh from root Cargo.toml's
+  [workspace.package] version. There is deliberately no second version string
+  to keep in step (ADR-0025) - editing a literal version in here would be the
+  bug that ADR precedent exists to prevent.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+
+	<!-- The binary inside Contents/MacOS/. Matches bundle.sh's lipo output name. -->
+	<key>CFBundleExecutable</key>
+	<string>lmv</string>
+
+	<!--
+	  The identity TCC binds the Screen Recording grant to (ADR-0038 fact 2).
+	  Reverse-DNS under a domain the user controls: github.com/IgorKonovalov.
+	-->
+	<key>CFBundleIdentifier</key>
+	<string>io.github.igorkonovalov.light-music-visualizer</string>
+
+	<!--
+	  Two names on purpose. CFBundleName matches the .app directory name, which
+	  has no spaces so the README's Terminal one-liners stay copy-pasteable;
+	  CFBundleDisplayName is the pretty form, and it is the string the Screen
+	  Recording prompt shows the tester.
+	-->
+	<key>CFBundleName</key>
+	<string>LightMusicVisualizer</string>
+	<key>CFBundleDisplayName</key>
+	<string>Light Music Visualizer</string>
+
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@VERSION@</string>
+
+	<!--
+	  The ScreenCaptureKit floor (docs/nfr.md section 2). Below this the capture
+	  path in standalone/src/capture_mac.rs has no API to call.
+	-->
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+
+	<!-- Retina backing store; without it wgpu renders into a scaled-up 1x surface. -->
+	<key>NSHighResolutionCapable</key>
+	<true/>
+
+	<!--
+	  Screen Recording has no NS*UsageDescription key - the prompt copy is
+	  system-generated from CFBundleDisplayName. There is nothing to add here
+	  for it; see Plan 0036 Phase 1's note.
+	-->
+</dict>
+</plist>

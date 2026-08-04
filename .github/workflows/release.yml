@@ -1,0 +1,54 @@
+# Distribution artifacts (Plan 0036, ADR-0038).
+#
+# Deliberately NOT a job in ci.yml. That file is a per-push gate - every job in
+# it answers "is this push sound?" and is expected to run every time. A
+# release-profile, two-architecture, lto = "fat" build answers a different
+# question and takes minutes; a red packaging job there would read as a broken
+# gate (ADR-0038 Alternative E).
+#
+# Trigger: a pushed v* tag, which is what the close ceremony's `cargo release`
+# already writes (docs/releasing.md). workflow_dispatch builds the same
+# artifacts without publishing anything, for dry runs.
+#
+# NOTE: pushing changes to this file needs the `workflow` OAuth scope on the git
+# credential - `gh auth refresh -s workflow` if the push is rejected.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# Read-only by default; the release job widens it to contents: write for itself.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # The universal .app. See packaging/macos/bundle.sh - the build, lipo, plist
+  # substitution, ad-hoc signing, zipping AND the verification all live there,
+  # so a local run on a Mac is held to the same bar as this job.
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rustup on the runner auto-installs the toolchain pinned in
+      # rust-toolchain.toml; the second architecture is not part of that pin.
+      - uses: Swatinem/rust-cache@v2
+      # Both targets explicitly rather than a `targets` key in
+      # rust-toolchain.toml: that would cost every clone an extra target
+      # download for a CI-only need (NFR section 4). Adding the host target is
+      # a no-op, and naming it keeps the job correct if the runner image ever
+      # flips architecture.
+      - name: Install both Apple targets
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - name: Build, bundle, sign, zip and verify
+        run: packaging/macos/bundle.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: target/dist/*.zip
+          if-no-files-found: error
