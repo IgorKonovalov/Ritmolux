@@ -72,9 +72,9 @@ bloom_radius    = "1.3"
 # SHAPE - slow incommensurate drift plus a gentle spectral bend. Chaotic maps
 # punish big jumps, so every audio term is small and clamped. Four coefficients,
 # four separate frequency regions - see the header.
-a = "1.641 + sin(time * 0.0370) * 0.070 + clamp(bass * 0.062 + bin(0.27) * 0.108, 0, 0.085)"
+a = "1.641 + sin(time * 0.0370) * 0.070 + clamp(bass * 0.115 + bin(0.10) * 0.070, 0, 0.135)"
 b = "1.902 - sin(time * 0.0289) * 0.055 - clamp(mid * 0.0505 + bin(0.52) * 0.09, 0, 0.070)"
-c = "0.316 + sin(time * 0.0228) * 0.090 + clamp(treb * 0.049 + bin(0.80) * 0.0856, 0, 0.055)"
+c = "0.316 + sin(time * 0.0228) * 0.090 + clamp(treb * 0.030 + bin(0.80) * 0.045, 0, 0.034)"
 d = "1.525 + cos(time * 0.0190) * 0.075 - clamp(bass * 0.036 + bin(0.39) * 0.065, 0, 0.050)"
 
 # DENSITY - the inversion fix. Loud = shorter trails and finer points. The base

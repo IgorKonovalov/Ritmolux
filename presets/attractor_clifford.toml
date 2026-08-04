@@ -70,10 +70,16 @@ bloom_threshold = "0.9"
 bloom_radius    = "1.4"
 # SHAPE - canonical Clifford (-1.4, 1.6, 1.0, 0.7) plus small slow drift, each
 # coefficient bent by its own frequency region rather than by a shared band.
-a = "-1.40 + sin(time * 0.0331) * 0.085 - clamp(bass * 0.051 + bin(0.20) * 0.089, 0, 0.070)"
+a = "-1.40 + sin(time * 0.0331) * 0.085 - clamp(bass * 0.105 + bin(0.09) * 0.060, 0, 0.120)"
 b = "1.60 + cos(time * 0.0257) * 0.080 + clamp(mid * 0.043 + bin(0.56) * 0.078, 0, 0.060)"
-c = "1.00 + sin(time * 0.0194) * 0.095 + clamp(treb * 0.044 + bin(0.80) * 0.079, 0, 0.050)"
+c = "1.00 + sin(time * 0.0194) * 0.095 + clamp(treb * 0.030 + bin(0.80) * 0.048, 0, 0.034)"
 d = "0.70 + cos(time * 0.0151) * 0.090 - clamp(bass * 0.0327 + bin(0.41) * 0.057, 0, 0.045)"
+
+# SYMMETRY DEMO (temporary, 2026-08-04) - the true Clifford figure is
+# asymmetric; the vertical symmetry this preset used to show was the trail
+# mirroring itself (ADR-0070). This folds the finished frame into two mirrored
+# wedges on purpose, as an A/B against De Jong, which is left unfolded.
+kaleido_order = "2"
 
 # DENSITY - moderate base, falling at peak. The exposure comes from `trails`
 # below, not from letting the accumulation grid saturate.
