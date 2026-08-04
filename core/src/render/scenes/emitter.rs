@@ -92,6 +92,35 @@ const SOURCE_Y: f32 = -1.12;
 /// The sprite's world half-size at `size = 1`, before the per-object size draw.
 const BASE_SIZE: f32 = 0.019;
 
+/// The mark's minor axis as a fraction of its major one.
+///
+/// **This is what keeps `spin` from being a no-op, and it is not a shape
+/// vocabulary.** The fragment falloff is still the single radial function the
+/// swarm's is; this scales one axis of the distance it measures, so the mark is a
+/// soft elongated *glint* rather than a perfect disc. A perfect disc is
+/// rotationally symmetric, so rotating its quad would change nothing at all and
+/// `spin` would join the list of parameters that are documented and do nothing
+/// (the swarm's `hue` was one for four plans). One constant, one falloff — the
+/// question of whether the engine should draw genuinely *shaped* marks stays open
+/// in design-backlog 0033 and is explicitly not this plan's.
+///
+/// Sized so the elongation reads at a few pixels across without the mark
+/// becoming a streak: at 0.55 the long axis is not quite twice the short one.
+const GLINT_ANISO: f32 = 0.55;
+
+/// The per-object twinkle rate, in Hz, at the two ends of the seeded draw.
+///
+/// **The spread across objects is the point, not the values.** A field of
+/// oscillators that all share a rate flashes as one sheet however their phases
+/// are scattered — the sum of N sinusoids at one frequency is a sinusoid at that
+/// frequency. Drawing the *rate* per object as well is what makes the whole-frame
+/// mean steady while every member of it is not, which is the property Phase 2's
+/// last done-when asserts. The range is a little under two octaves: wide enough
+/// to decorrelate, narrow enough that no object reads as either frozen or
+/// strobing.
+const TWINKLE_FREQ_LO: f32 = 0.35;
+const TWINKLE_FREQ_HI: f32 = 1.6;
+
 /// Fraction of an object's life spent fading in. Short — the mark should be lit
 /// by the time it reaches the frame — but not zero, because a sprite switched on
 /// at full brightness inside the frame is a pop.
@@ -119,6 +148,17 @@ const DEFAULT_LAUNCH_ANGLE: f32 = 0.0;
 const DEFAULT_LIFETIME: f32 = 3.0;
 const DEFAULT_SIZE: f32 = 1.0;
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
+// The distribution params (Phase 2). Each says how *wide* a per-object draw is;
+// the seed picks within it. `spread` and the two `*_spread` widths default
+// non-zero because a population with no variation is the defect this phase
+// exists to fix — a shower launched on one angle is a column, not a shower.
+// `spin` and `twinkle` default off: both are motion a preset asks for.
+/// Full width of the launch-angle cone, radians (~31 degrees).
+const DEFAULT_SPREAD: f32 = 0.55;
+const DEFAULT_SIZE_SPREAD: f32 = 0.6;
+const DEFAULT_LIFETIME_SPREAD: f32 = 0.45;
+const DEFAULT_SPIN: f32 = 0.0;
+const DEFAULT_TWINKLE: f32 = 0.0;
 // Shared palette colour knobs (ADR-0021), same meaning as the swarm's.
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_HUE_SPREAD: f32 = 1.0;
@@ -129,7 +169,12 @@ const DEFAULT_PALETTE_MIX: f32 = 0.0;
 const DEFAULT_ZOOM: f32 = 1.0;
 const DEFAULT_PAN: f32 = 0.0;
 
+/// The WGSL, with `%ANISO%` substituted from [`GLINT_ANISO`] at module creation
+/// so the elongation exists in exactly one place — a second copy in the shader
+/// string is a constant that drifts silently the first time the Rust one moves.
 const SHADER: &str = r#"
+const ANISO: f32 = %ANISO%;
+
 struct Misc {
     // x: aspect, y: zoom, zw: pan (the shared ViewTransform, ADR-0018)
     v: vec4<f32>,
@@ -149,17 +194,25 @@ fn vs_main(
     @location(0) center: vec2<f32>,
     @location(1) size: f32,
     @location(2) color: vec3<f32>,
+    @location(3) angle: f32,
 ) -> VsOut {
     var corners = array<vec2<f32>, 6>(
         vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(0.0, 1.0),
         vec2<f32>(0.0, 1.0), vec2<f32>(1.0, 0.0), vec2<f32>(1.0, 1.0),
     );
     let c = corners[vi] * 2.0 - vec2<f32>(1.0, 1.0);
+    // The quad is rotated in world space and `local` is left un-rotated, so the
+    // elongated falloff below is written in the sprite's own frame and turns
+    // with it. `angle` is the CPU-resolved orientation: a seeded base plus
+    // `spin` times age.
+    let s = sin(angle);
+    let k = cos(angle);
+    let r = vec2<f32>(c.x * k - c.y * s, c.x * s + c.y * k);
     // Shared ViewTransform (ADR-0018): zoom about the frame centre, then pan;
-    // the sprite quad (c * size) keeps its on-screen size.
+    // the sprite quad (r * size) keeps its on-screen size.
     let zoom = misc.v.y;
     let pan = misc.v.zw;
-    let world = center * zoom + pan + c * size;
+    let world = center * zoom + pan + r * size;
     var out: VsOut;
     out.pos = vec4<f32>(world.x / misc.v.x, world.y, 0.0, 1.0);
     out.local = c;
@@ -169,7 +222,9 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let d = length(in.local);
+    // One radial falloff with one axis scaled: a soft elongated glint, which is
+    // what makes a rotation visible at all.
+    let d = length(vec2<f32>(in.local.x, in.local.y / ANISO));
     let falloff = max(0.0, 1.0 - d);
     let g = falloff * falloff;
     // Premultiplied: colour AND alpha carry the same coverage `g`, so the four
@@ -185,6 +240,10 @@ struct Instance {
     center: [f32; 2],
     size: f32,
     color: [f32; 3],
+    /// The sprite's orientation in radians, resolved on the CPU from the
+    /// object's seeded base angle and `spin` times its age (Plan 0052 Phase 2),
+    /// so the shader needs no per-object state and no spin constants.
+    angle: f32,
 }
 
 #[repr(C)]
@@ -393,7 +452,12 @@ fn unit(seed: u32, k: u32) -> f32 {
 mod channel {
     pub(super) const SOURCE_X: u32 = 0;
     pub(super) const ANGLE: u32 = 1;
+    pub(super) const SIZE: u32 = 2;
     pub(super) const LIFETIME: u32 = 3;
+    pub(super) const ORIENT: u32 = 4;
+    pub(super) const SPIN: u32 = 5;
+    pub(super) const TWINKLE_FREQ: u32 = 6;
+    pub(super) const TWINKLE_PHASE: u32 = 7;
     pub(super) const HUE: u32 = 8;
 }
 
@@ -490,6 +554,46 @@ fn envelope(u: f32) -> f32 {
     attack * remaining.sqrt()
 }
 
+/// **The per-object brightness multiplier** — the answer to the report this plan
+/// came from (ADR-0057 Notes: the user asked for stars that *blink* and got a
+/// field-wide flash, because a binding is evaluated once per frame for the whole
+/// scene).
+///
+/// Both the rate and the phase come off the object's seed, so no two objects
+/// share an oscillator and the field never flashes as one sheet. Exactly `1.0`
+/// at `twinkle <= 0`, which is what makes the population-varies assertion
+/// falsifiable in both directions.
+///
+/// Clamped at zero: `twinkle` is a preset expression and may exceed 1, and a
+/// negative multiplier would subtract light rather than removing it.
+fn twinkle_factor(seed: u32, time: f32, twinkle: f32) -> f32 {
+    if twinkle <= 0.0 {
+        return 1.0;
+    }
+    let freq =
+        TWINKLE_FREQ_LO + unit(seed, channel::TWINKLE_FREQ) * (TWINKLE_FREQ_HI - TWINKLE_FREQ_LO);
+    let phase = unit(seed, channel::TWINKLE_PHASE);
+    let wave = (std::f32::consts::TAU * (freq * time + phase)).sin();
+    (1.0 + twinkle * wave).max(0.0)
+}
+
+/// The sprite's orientation: a seeded base angle plus `spin` radians a second,
+/// signed per object so the field turns both ways.
+///
+/// The base exists at `spin = 0` too — a population of identically-oriented
+/// glints is the sheet this phase is about, and it costs nothing to scatter.
+fn sprite_angle(seed: u32, age: f32, spin: f32) -> f32 {
+    let base = unit(seed, channel::ORIENT) * std::f32::consts::TAU;
+    let rate = (unit(seed, channel::SPIN) * 2.0 - 1.0) * spin;
+    base + rate * age
+}
+
+/// The object's size multiplier within `size_spread`. `1.0` exactly at zero
+/// spread.
+fn size_factor(seed: u32, size_spread: f32) -> f32 {
+    (1.0 + (unit(seed, channel::SIZE) - 0.5) * size_spread).max(0.0)
+}
+
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
 pub const PARAMS: &[&str] = &[
@@ -497,8 +601,13 @@ pub const PARAMS: &[&str] = &[
     "gravity",
     "launch_speed",
     "launch_angle",
+    "spread",
     "lifetime",
+    "lifetime_spread",
     "size",
+    "size_spread",
+    "spin",
+    "twinkle",
     "brightness",
     "hue",
     "hue_spread",
@@ -531,8 +640,13 @@ pub struct EmitterScene {
     gravity: f32,
     launch_speed: f32,
     launch_angle: f32,
+    spread: f32,
     lifetime: f32,
+    lifetime_spread: f32,
     size: f32,
+    size_spread: f32,
+    spin: f32,
+    twinkle: f32,
     brightness: f32,
     /// The active baked palette (ADR-0021), sampled per object on the CPU.
     palette: Palette,
@@ -559,7 +673,11 @@ impl EmitterScene {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("emitter-shader"),
-            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+            source: wgpu::ShaderSource::Wgsl(
+                SHADER
+                    .replace("%ANISO%", &format!("{GLINT_ANISO:?}"))
+                    .into(),
+            ),
         });
         let instances = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("emitter-instances"),
@@ -637,6 +755,7 @@ impl EmitterScene {
                         0 => Float32x2,
                         1 => Float32,
                         2 => Float32x3,
+                        3 => Float32,
                     ],
                 })],
             },
@@ -671,6 +790,7 @@ impl EmitterScene {
                     center: [0.0, 0.0],
                     size: 0.0,
                     color: [0.0, 0.0, 0.0],
+                    angle: 0.0,
                 };
                 capacity
             ],
@@ -681,8 +801,13 @@ impl EmitterScene {
             gravity: DEFAULT_GRAVITY,
             launch_speed: DEFAULT_LAUNCH_SPEED,
             launch_angle: DEFAULT_LAUNCH_ANGLE,
+            spread: DEFAULT_SPREAD,
             lifetime: DEFAULT_LIFETIME,
+            lifetime_spread: DEFAULT_LIFETIME_SPREAD,
             size: DEFAULT_SIZE,
+            size_spread: DEFAULT_SIZE_SPREAD,
+            spin: DEFAULT_SPIN,
+            twinkle: DEFAULT_TWINKLE,
             brightness: DEFAULT_BRIGHTNESS,
             palette: Palette::default_spectrum(),
             hue: DEFAULT_HUE,
@@ -707,9 +832,11 @@ impl EmitterScene {
             gravity: finite(self.gravity, DEFAULT_GRAVITY),
             speed: finite(self.launch_speed, DEFAULT_LAUNCH_SPEED),
             angle: finite(self.launch_angle, DEFAULT_LAUNCH_ANGLE),
-            spread: 0.0,
+            spread: finite(self.spread, DEFAULT_SPREAD),
             lifetime: finite(self.lifetime, DEFAULT_LIFETIME).clamp(MIN_LIFETIME, MAX_LIFETIME),
-            lifetime_spread: 0.0,
+            // A width, so it is only meaningful as a magnitude; clamped at 1 so
+            // a preset cannot draw a negative lifetime out of the distribution.
+            lifetime_spread: finite(self.lifetime_spread, DEFAULT_LIFETIME_SPREAD).clamp(0.0, 1.0),
             source_half_width: self.aspect,
             bound,
         }
@@ -742,8 +869,13 @@ impl Scene for EmitterScene {
         self.gravity = DEFAULT_GRAVITY;
         self.launch_speed = DEFAULT_LAUNCH_SPEED;
         self.launch_angle = DEFAULT_LAUNCH_ANGLE;
+        self.spread = DEFAULT_SPREAD;
         self.lifetime = DEFAULT_LIFETIME;
+        self.lifetime_spread = DEFAULT_LIFETIME_SPREAD;
         self.size = DEFAULT_SIZE;
+        self.size_spread = DEFAULT_SIZE_SPREAD;
+        self.spin = DEFAULT_SPIN;
+        self.twinkle = DEFAULT_TWINKLE;
         self.brightness = DEFAULT_BRIGHTNESS;
         self.hue = DEFAULT_HUE;
         self.hue_spread = DEFAULT_HUE_SPREAD;
@@ -761,8 +893,13 @@ impl Scene for EmitterScene {
             "gravity" => self.gravity = value,
             "launch_speed" => self.launch_speed = value,
             "launch_angle" => self.launch_angle = value,
+            "spread" => self.spread = value,
             "lifetime" => self.lifetime = value,
+            "lifetime_spread" => self.lifetime_spread = value,
             "size" => self.size = value,
+            "size_spread" => self.size_spread = value,
+            "spin" => self.spin = value,
+            "twinkle" => self.twinkle = value,
             "brightness" => self.brightness = value,
             "hue" => self.hue = value,
             "hue_spread" => self.hue_spread = value,
@@ -783,6 +920,15 @@ impl Scene for EmitterScene {
 
         let size = finite(self.size, DEFAULT_SIZE) * BASE_SIZE;
         let brightness = finite(self.brightness, DEFAULT_BRIGHTNESS);
+        // The three appearance distributions, hoisted: read once, used for every
+        // live object. Unlike `spread` and `lifetime_spread` these are resolved
+        // at *draw* rather than at spawn, because they describe how an object
+        // looks rather than where it goes — so a preset easing one of them moves
+        // the whole population continuously instead of only the objects spawned
+        // since the change.
+        let size_spread = finite(self.size_spread, DEFAULT_SIZE_SPREAD).clamp(0.0, 2.0);
+        let spin = finite(self.spin, DEFAULT_SPIN);
+        let twinkle = finite(self.twinkle, DEFAULT_TWINKLE);
         let mut count = 0usize;
         // One pass over the pool, writing the live objects into the front of the
         // instance buffer. Iterating dead slots costs a branch; compacting is
@@ -796,7 +942,8 @@ impl Scene for EmitterScene {
                 break;
             };
             let pos = object.position(time);
-            let u = (time - object.t0) / object.lifetime;
+            let age = time - object.t0;
+            let u = age / object.lifetime;
             let coord = hue_coord(
                 self.hue_center,
                 self.hue_spread,
@@ -807,11 +954,12 @@ impl Scene for EmitterScene {
                 self.palette.sample(coord, self.palette_mix),
                 self.saturation,
             );
-            let bright = brightness * envelope(u);
+            let bright = brightness * envelope(u) * twinkle_factor(object.seed, time, twinkle);
             *slot = Instance {
                 center: pos,
-                size,
+                size: size * size_factor(object.seed, size_spread),
                 color: [base[0] * bright, base[1] * bright, base[2] * bright],
+                angle: sprite_angle(object.seed, age, spin),
             };
             count += 1;
         }
@@ -875,7 +1023,10 @@ mod tests {
     // file's hot-path pragma — this is not the render path.
     #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
-    use super::{Field, Object, RETIRE_MARGIN, SOURCE_Y, Spawn, bounds, build, exit_time};
+    use super::{
+        Field, Object, RETIRE_MARGIN, SOURCE_Y, Spawn, bounds, build, exit_time, size_factor,
+        sprite_angle, twinkle_factor,
+    };
 
     /// A test aspect, and the retirement bound it gives.
     const ASPECT: f32 = 16.0 / 9.0;
@@ -1234,5 +1385,254 @@ mod tests {
             );
             assert_eq!(a.p0[1], SOURCE_Y);
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Individuation (Plan 0052 Phase 2)
+    // -----------------------------------------------------------------------
+
+    /// Run a field to `time` and return the live objects' launch angles,
+    /// measured the way `build` writes them: clockwise from straight up.
+    fn live_launch_angles(cfg: &Spawn, time: f32) -> Vec<f32> {
+        let mut field = Field::new(4096);
+        let mut t = 0.0f32;
+        while t < time {
+            t += 1.0 / 60.0;
+            field.step(t, cfg);
+        }
+        field
+            .objects
+            .iter()
+            .filter(|o| o.alive)
+            .map(|o| o.v0[0].atan2(o.v0[1]))
+            .collect()
+    }
+
+    /// **Objects alive at the same instant differ from each other** — Phase 2's
+    /// first done-when — **and `spread = 0` collapses it exactly**, which is its
+    /// second and what makes the first non-vacuous in both directions.
+    ///
+    /// Stated as the property (the population varies, and stops varying when the
+    /// distribution is closed) rather than as a distribution statistic: this plan
+    /// measured neither the shape of the draw nor what a "correct" variance would
+    /// be, so pinning one would be inventing a number.
+    #[test]
+    fn objects_alive_at_one_instant_differ_and_a_zero_spread_collapses_them() {
+        const SPREAD: f32 = 0.8;
+        let open = Spawn {
+            spread: SPREAD,
+            ..cfg(200.0, 2.0, 1.9)
+        };
+        let closed = Spawn {
+            spread: 0.0,
+            ..open
+        };
+
+        let angles = live_launch_angles(&open, 1.5);
+        assert!(
+            angles.len() > 100,
+            "the population must be worth measuring: {} objects",
+            angles.len()
+        );
+        let lo = angles.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = angles.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        // The cone is `angle +/- spread/2` about the base, so the observed range
+        // cannot exceed `spread` — and with a few hundred draws it should very
+        // nearly fill it. Both directions, so a draw that ignored `spread` and a
+        // draw that overshot it both fail.
+        assert!(
+            hi - lo > SPREAD * 0.8,
+            "the live set must genuinely fan out: range {:.4} of a {SPREAD} cone",
+            hi - lo
+        );
+        assert!(
+            hi - lo <= SPREAD + 1e-5,
+            "no object may launch outside the cone: range {:.4}",
+            hi - lo
+        );
+
+        // Closed: every object on exactly the base angle, bit for bit. Not "within
+        // a tolerance" — the draw is multiplied by zero.
+        let collapsed = live_launch_angles(&closed, 1.5);
+        assert!(!collapsed.is_empty());
+        for angle in &collapsed {
+            assert_eq!(
+                *angle, 0.0,
+                "at spread = 0 every object launches on the base angle"
+            );
+        }
+
+        // The other two distributions collapse the same way, and open the same
+        // way — asserted on the pure functions, since they are resolved at draw.
+        let seeds: Vec<u32> = (0..512).map(unit_seed).collect();
+        for &s in &seeds {
+            assert_eq!(size_factor(s, 0.0), 1.0);
+            assert_eq!(twinkle_factor(s, 3.7, 0.0), 1.0);
+            assert_eq!(sprite_angle(s, 2.0, 0.0), sprite_angle(s, 5.0, 0.0));
+        }
+        let sizes: Vec<f32> = seeds.iter().map(|&s| size_factor(s, 0.7)).collect();
+        let twinkles: Vec<f32> = seeds.iter().map(|&s| twinkle_factor(s, 3.7, 0.8)).collect();
+        let spins: Vec<f32> = seeds
+            .iter()
+            .map(|&s| sprite_angle(s, 5.0, 1.0) - sprite_angle(s, 2.0, 1.0))
+            .collect();
+        for (label, series) in [("size", &sizes), ("twinkle", &twinkles), ("spin", &spins)] {
+            let lo = series.iter().copied().fold(f32::INFINITY, f32::min);
+            let hi = series.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+            assert!(
+                hi - lo > 1e-3,
+                "{label} must vary across the population: {lo} .. {hi}"
+            );
+        }
+    }
+
+    /// A spread of distinct seeds, mixed rather than sequential so the test does
+    /// not depend on `unit`'s behaviour on adjacent inputs.
+    fn unit_seed(i: u32) -> u32 {
+        i.wrapping_mul(2_654_435_761) ^ 0x9E37_79B9
+    }
+
+    /// **A twinkling field does not flash as one sheet** — Phase 2's last
+    /// done-when, and the whole point of drawing the twinkle *rate* per object
+    /// rather than only its phase.
+    ///
+    /// Dimensionless and self-normalizing: the whole-frame mean's swing over a
+    /// window, against the mean swing of its individual members over the same
+    /// window. A field whose members shared one rate would score ~1 however their
+    /// phases were scattered; independent rates make the mean nearly flat while
+    /// every member still swings its full amplitude. The factor asserted is 8x,
+    /// far inside the measured behaviour and far outside the failure it names.
+    #[test]
+    fn a_twinkling_field_does_not_flash_as_one_sheet() {
+        const TWINKLE: f32 = 0.9;
+        let seeds: Vec<u32> = (0..600).map(unit_seed).collect();
+        let times: Vec<f32> = (0..600).map(|i| i as f32 / 60.0).collect();
+
+        let swing = |series: &[f32]| {
+            let lo = series.iter().copied().fold(f32::INFINITY, f32::min);
+            let hi = series.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+            hi - lo
+        };
+
+        let field_mean: Vec<f32> = times
+            .iter()
+            .map(|&t| {
+                seeds
+                    .iter()
+                    .map(|&s| twinkle_factor(s, t, TWINKLE))
+                    .sum::<f32>()
+                    / seeds.len() as f32
+            })
+            .collect();
+        let member_swing: f32 = seeds
+            .iter()
+            .map(|&s| {
+                let series: Vec<f32> = times
+                    .iter()
+                    .map(|&t| twinkle_factor(s, t, TWINKLE))
+                    .collect();
+                swing(&series)
+            })
+            .sum::<f32>()
+            / seeds.len() as f32;
+        let field_swing = swing(&field_mean);
+
+        // Non-vacuity first: the members must actually be twinkling, or a field
+        // of frozen objects would pass trivially.
+        assert!(
+            member_swing > TWINKLE,
+            "each object must swing over the window: mean swing {member_swing:.4}"
+        );
+        assert!(
+            field_swing * 8.0 < member_swing,
+            "the whole-frame mean swings {field_swing:.4} against a member's \
+             {member_swing:.4} — the field is flashing as one sheet"
+        );
+    }
+
+    /// **The scene reads no clock** (NFR §6), asserted against the source rather
+    /// than inferred from a pair of captures that happened to agree.
+    ///
+    /// The reproducibility this plan claims is not "the seed is fixed" — it is
+    /// that the scene is a pure function of `(seed, scene time)`, and the one way
+    /// to break that without touching the seed is to reach for wall-clock time.
+    /// A capture comparison cannot see a clock read that is merely coarse.
+    #[test]
+    fn the_scene_reads_no_wall_clock() {
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/render/scenes/emitter.rs");
+        let text = std::fs::read_to_string(&path).expect("read the emitter source");
+        // Everything before the test module: the scene proper.
+        let scene = text
+            .split_once("#[cfg(test)]")
+            .map(|(before, _)| before)
+            .unwrap_or(&text);
+        for forbidden in ["Instant::now", "SystemTime", "elapsed()", "rand::"] {
+            assert!(
+                !scene.contains(forbidden),
+                "the emitter scene names `{forbidden}` — its whole determinism \
+                 claim is that a frame is a pure function of (seed, scene time)"
+            );
+        }
+    }
+
+    /// **The whole scene is reproducible**: two captures of the same preset at
+    /// the same scene times are byte-identical.
+    ///
+    /// End to end through the real renderer rather than through the pool, because
+    /// the claim covers the drawing too — the palette sample, the envelope, the
+    /// twinkle and the sprite orientation are all per-object functions of the
+    /// seed, and a stray frame counter in any of them would show up here.
+    ///
+    /// Needs a GPU adapter, so it skips where there is none (ADR-0016).
+    #[test]
+    fn two_captures_of_the_same_preset_are_byte_identical() {
+        use crate::dsp::AnalysisFrame;
+        use crate::preset::Preset;
+        use crate::render::context::RenderError;
+        use crate::render::{HeadlessOptions, Renderer};
+
+        const FIXTURE: &str = include_str!("../../../tests/fixtures/emitter.toml");
+
+        let mut renderer = match Renderer::new_headless(HeadlessOptions {
+            width: 96,
+            height: 96,
+            prefer_software: true,
+        }) {
+            Ok(renderer) => renderer,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+            Err(e) => panic!("headless renderer build failed: {e}"),
+        };
+        // Twinkle and spin on, so the reproducibility claim covers the two
+        // per-object quantities that vary *with time* and not only the ones fixed
+        // at spawn. Appended to the fixture's `[params]`, which is its last table.
+        let toml = format!("{FIXTURE}\ntwinkle = \"0.7\"\nspin = \"2.5\"\n");
+        let preset =
+            Preset::from_toml_str(&toml).expect("the emitter golden fixture parses with overrides");
+        let name = preset.name.clone();
+        renderer.set_presets(vec![preset]);
+
+        let frame = AnalysisFrame::default();
+        let a = renderer
+            .capture_preset(&name, &frame, 45)
+            .expect("first capture");
+        let b = renderer
+            .capture_preset(&name, &frame, 45)
+            .expect("second capture");
+        assert_eq!(
+            a.rgba, b.rgba,
+            "two captures at the same scene times must be byte-identical"
+        );
+        // ...and the capture is not blank, or the equality above is two black
+        // frames agreeing.
+        assert!(
+            a.rgba
+                .chunks_exact(4)
+                .any(|p| p[0] > 8 || p[1] > 8 || p[2] > 8),
+            "the reproducibility capture drew nothing"
+        );
     }
 }

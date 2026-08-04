@@ -228,6 +228,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
+| `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `size` `size_spread` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -307,6 +308,88 @@ off-screen, and the fade dims the far half — which is priced into the shipped
 presets' `size` and `brightness`. A swarm preset carried over from before Plan
 0043 will read dimmer and sparser than it used to; raise those two rather than
 assuming something broke.
+
+### `emitter` — objects that spawn, fall, and die (Plan 0052)
+
+The emitter is the only system whose **population is not fixed**. Every other
+scene draws the same number of things every frame; this one throws objects from a
+source line just below the frame, lets each ride its own parabola, and retires it
+when its life runs out or it falls out of shot. Nothing wraps — that is the whole
+difference from the `swarm`, whose world is a torus and whose particles
+categorically cannot leave
+([ADR-0057](../docs/adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)).
+
+**The path is fixed at spawn and it is a closed form**, `p0 + v0*t + 0.5*g*t²`.
+Two things follow for authoring. There is **no mid-flight force**: no drag, no
+swirl, no steering, and easing `gravity` or `launch_speed` changes only the
+objects thrown *after* the change — the ones already in the air keep the arc they
+were launched on. And the motion is exactly the same on every device, because
+there is no `dt` in it at all.
+
+#### The throw
+
+| param | what it does |
+|---|---|
+| `spawn_rate` | objects a second. The population settles at roughly `spawn_rate * flight time`, so this is the density lever |
+| `gravity` | downward acceleration, world units per second squared |
+| `launch_speed` | speed at the source, world units a second |
+| `launch_angle` | radians **clockwise from straight up**; `0` throws vertically, `1.57` throws to the right |
+| `lifetime` | seconds an object lives, if it has not left the frame first |
+
+The geometry is one line of arithmetic and it is worth doing before tuning: a mark
+launched at `v` against gravity `g` turns over after `v / g` seconds, `v² / (2g)`
+world units above the source line at `y = -1.12`. **A frame is `|y| <= 1`**, so
+`v² / (2g) - 1.12` is where the crest of the shower sits. Every object shares
+`launch_speed`, so a crest *inside* the frame draws a visible horizontal ceiling
+where the population piles up at the top of its arc; `emitter_sparks.toml` puts
+its crest at `y = 1.28`, off frame, for exactly that reason.
+
+`lifetime` past the flight time is wasted pool. An object that has left the frame
+is retired the moment it does, so the only thing a long `lifetime` buys is slots
+held by objects thrown straight up into a `gravity = 0` sky.
+
+#### Individuation — the distribution params
+
+**A binding is evaluated once per frame for the whole scene**, so no expression
+can make one object differ from another. That is what these are for: each says how
+*wide* a per-object draw is, and the object's own seed picks within it, once, at
+spawn. The preset controls the distribution; the seed controls the member.
+
+| param | what varies, per object |
+|---|---|
+| `spread` | launch angle, within a cone of this width in radians, centred on `launch_angle` |
+| `size_spread` | the mark's size, as a fraction either side of `size` |
+| `lifetime_spread` | how long it lives, as a fraction either side of `lifetime` |
+| `spin` | how fast the mark turns, in radians a second — signed per object, so the field turns both ways |
+| `twinkle` | a brightness oscillation whose **rate and phase both** come off the seed |
+
+`spread` is the one that changes the *geometry*. At `0` every object rides the
+same vertical parabola and the shower is a column of beads; open it and the arcs
+cross. Defaults are non-zero for `spread`, `size_spread` and `lifetime_spread` —
+a population with no variation is the defect this exists to fix.
+
+`twinkle` is the answer to "make the stars blink and they all flash together".
+Because each object draws its own *rate* as well as its own phase, the whole-frame
+brightness stays steady while every member of the field swings; a shared rate
+would flash as one sheet whatever the phases were.
+
+`spin` turns the mark. The mark is a soft **elongated glint** rather than a
+perfect disc — a disc is rotationally symmetric, so on one `spin` would be
+invisible. It is one fixed elongation on the same radial falloff, not a shape
+vocabulary; objects still have no *figure*.
+
+#### What it does not have
+
+No per-object expressions (`hash(index)`-style authoring is out of reach — widen
+a spread, but "every seventh object is gold" is not expressible), no collision or
+inter-object forces, no stamped trail. `trails` reads differently here than on the
+swarm and that is not a defect: a decaying smear behind an object that **leaves**
+is a comet tail, where behind a wrapping particle it is a current. Keep it short
+if the arcs should read as arcs.
+
+There is also no positionable source: the line spans the frame width at
+`y = -1.12` and cannot be moved or narrowed. A look that wants a point fountain
+or an off-centre jet is engine feedback, not a preset.
 
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 
