@@ -75,10 +75,13 @@ b = "1.60 + cos(time * 0.0257) * 0.080 + clamp(mid * 0.043 + bin(0.56) * 0.078, 
 c = "1.00 + sin(time * 0.0194) * 0.095 + clamp(treb * 0.030 + bin(0.80) * 0.048, 0, 0.034)"
 d = "0.70 + cos(time * 0.0151) * 0.090 - clamp(bass * 0.0327 + bin(0.41) * 0.057, 0, 0.045)"
 
-# SYMMETRY DEMO (temporary, 2026-08-04) - the true Clifford figure is
-# asymmetric; the vertical symmetry this preset used to show was the trail
-# mirroring itself (ADR-0070). This folds the finished frame into two mirrored
-# wedges on purpose, as an A/B against De Jong, which is left unfolded.
+# THE SYMMETRY IS KEPT (Plan 0059 Phase 4 judged it, 2026-08-04). The true
+# Clifford figure is asymmetric; the vertical symmetry this preset used to show
+# was the trail mirroring itself (ADR-0070). This folds the finished frame into
+# two mirrored wedges on purpose - it is NOT the old bug restored (that one
+# added a mirror on top of the figure; this replaces half the frame with a
+# reflection) - and it stands as the A/B against De Jong, which is left
+# unfolded. Accepted as the shipped look, no longer provisional.
 kaleido_order = "2"
 
 # DENSITY - moderate base, falling at peak. The exposure comes from `trails`
@@ -128,7 +131,29 @@ saturation  = "1.35 + clamp(bass * 0.353, 0, 0.30)"
 palette_mix = "clamp(mid * 0.47, 0, 0.40)"
 
 # VIEW - a slow counter-rotating drift so the smear never runs in one direction.
-zoom  = "1.10 + bar * 0.12 + clamp(bass * 0.235, 0, 0.20)"
+#
+# ZOOM IS A FOLD CONSTRAINT HERE, EXACTLY AS ON LEVIATHAN, and it became one the
+# moment `kaleido_order = 2` arrived. The fold's residual rays are the frame
+# EDGE smeared radially outward, so they only exist if the figure reaches an
+# edge - and this preset kept the unfolded framing (1.10 base, peak 1.42), which
+# put the ribbon's top and bottom tips right on it. The result was a permanent
+# vertical starburst above and below the figure, brighter than anything the
+# attractor draws. RENDERED, not reasoned, and measured on the EFFECTIVE zoom
+# rather than the base, which is the number that matters: a six-step ladder
+# grows its first rays near 0.98 and is clean at 0.94 and below - checked at
+# `bass = bar = 1`, the true corner, not at a realistic loud frame, because
+# `bar` reaches 1 on every beat. Peak here is 0.66 + 0.08 + 0.20 = 0.94.
+# Raising it re-lights the rays; the general fix is a per-preset edge
+# treatment - Plan 0055, approved, not built.
+#
+# THE CEILING IS ON THE PEAK, SO THE TRAVEL IS KEPT NEARLY WHOLE - 0.30 against
+# the original 0.32. That distinction is worth more than it looks: a first pass
+# here cut the base and the swing together, and took this preset's `--report`
+# bass column from 0.123 to 0.045 and its `anim` from 0.070 to 0.022 - a hand's
+# breadth off the 0.01 animation floor. A smaller figure moving the same
+# fraction moves fewer pixels, so on a folded preset the swing IS the
+# reactivity, and it is the peak that has to fit.
+zoom  = "0.66 + bar * 0.08 + clamp(bass * 0.235, 0, 0.20)"
 pan_x = "cos(time * 0.043) * 0.09"
 pan_y = "sin(time * 0.061) * 0.07"
 
