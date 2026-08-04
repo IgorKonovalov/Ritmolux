@@ -164,15 +164,25 @@ trails        = "0.76 + clamp(mid * 0.118, 0, 0.10)"
 # claim "no preset-side lever fixes it" has been false since ADR-0047 landed and
 # doubly so now.
 #
-# THE FOLD IS STILL OFF HERE, but as an unmade decision rather than a mitigation.
-# Nobody has looked at this preset folded since the fix - it was not one of the two
-# scenes Plan 0055's live A/B was judged on - and re-enabling it is a look to be
-# chosen in motion, not a change to make from a comment. Routed to `preset-author`
-# with the rest of the fold-binding library in design-backlog 0058. If it is turned
-# back on, `kaleido_edge` wants choosing at the same time: this is a sparse figure
-# over a dark field, which is exactly the case where `falloff` and a fill treatment
-# look most different.
-kaleido_order = "1"
+# THE FOLD IS BACK ON (2026-08-04, design-backlog 0058), and the decision the note
+# above routed to `preset-author` has been made by looking. The header of this file
+# has always described "a slowly-rotating mandala of itself"; `kaleido_order = "1"`
+# had been quietly defeating that claim ever since the dodge went in, so this is the
+# preset catching up with its own stated intent rather than a new direction.
+#
+# ORDER 3, NOT 6. The original defect was found at 6, and at that order the shoal's
+# churn is subordinated to the symmetry - it stops reading as a moving body. Three
+# wedges keep the flow legible while still closing the figure into a mandala.
+#
+# EDGE: tile (1). The prediction above was exactly right - a sparse figure over a
+# dark field IS where the treatments differ most, and all four were rendered to
+# check it. `falloff` reproduces the cropped disc the dodge existed to avoid, which
+# is the direct evidence the pin is obsolete rather than merely old. `squash` pulls
+# the shoal into a radial starburst and loses the drift. `tile` mirrors the streams
+# outward, so the corners carry real particles and the shoal reads as one larger
+# turning body.
+kaleido_order = "3"
+kaleido_edge  = "1"
 kaleido_angle = "time * 0.055"
 bg_hue        = "0.40 + sin(time * 0.013) * 0.05"
 bg_bright     = "0.011 + clamp(mid * 0.013, 0, 0.011)"

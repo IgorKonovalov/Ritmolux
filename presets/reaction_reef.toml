@@ -80,6 +80,10 @@ palette_mix  = "clamp(treb * 0.7, 0, 0.42)"
 # always a figure, climbing to twelve on real energy, with thresholds set from
 # the measurement rather than from `--set` magnitudes.
 kaleido_order = "select(bass + mid > 1.36, 12, select(bass + mid > 0.77, 8, 6))"
+# EDGE: tile (1), chosen in motion. The coral motifs repeat, so the mirrored
+# continuation reads as a larger reef; squash pushed disconnected pale shapes onto
+# the top and bottom edges.
+kaleido_edge  = "1"
 # ANGLE PINNED AT 0 - no rotation. A turning fold sweeps the wedge seams around
 # the frame, and on this scene that does two unwanted things at once: it spins
 # a field that is already busy, and it drags the seam through the CORNERS,

@@ -42,6 +42,10 @@ palette_mix  = "0.35 + sin(time * 0.0170) * 0.35 + clamp(treb * 0.367, 0, 0.22)"
 # fraction of the range; ADR-0049 changed what that range is (bass+treb now
 # spans 0..2 with a typical near 0.64, where it used to peak at 0.138).
 kaleido_order = "select(bass + treb > 1.38, 16, select(bass + treb > 0.80, 8, 3))"
+# EDGE: tile (1), chosen in motion. The mandala is already a repeating figure, so a
+# mirrored continuation reads as MORE mandala rather than as duplication - and it
+# keeps the central rosette legible where squash flattened it.
+kaleido_edge  = "1"
 kaleido_angle = "time * 0.145"
 trails        = "0.42 + clamp(onset * 0.433, 0, 0.26)"
 

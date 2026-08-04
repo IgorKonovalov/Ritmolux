@@ -63,6 +63,10 @@ palette_mix  = "clamp(treb * 1.08, 0, 0.65)"
 # rescaling would have put both BELOW the mean and left the fold on constantly,
 # which is the same bug wearing the opposite sign.
 kaleido_order = "select(bass + treb > 1.45, 12, select(bass + treb > 0.80, 6, 1))"
+# EDGE: squash (2), chosen in motion. The spokes radiate, so compressing the radius
+# extends them to the frame edge as one continuous starburst; tile broke them with
+# large mirrored lobes in the corners.
+kaleido_edge  = "2"
 kaleido_angle = "time * 0.17"
 trails        = "clamp(onset * 0.567, 0, 0.34)"
 

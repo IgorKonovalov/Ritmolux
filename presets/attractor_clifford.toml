@@ -83,6 +83,12 @@ d = "0.70 + cos(time * 0.0151) * 0.090 - clamp(bass * 0.0327 + bin(0.41) * 0.057
 # reflection) - and it stands as the A/B against De Jong, which is left
 # unfolded. Accepted as the shipped look, no longer provisional.
 kaleido_order = "2"
+# EDGE: squash (2), chosen in motion. This is the preset the choice matters most
+# on, because its framing was pinned to avoid `falloff`'s rays - see the ZOOM
+# note below, which is where the whole story is. `squash` lets the ribbon reach
+# the frame edge and past it: no rays, and no visible mirrored repeat of the
+# lens that `tile` puts in the left and right margins.
+kaleido_edge  = "2"
 
 # DENSITY - moderate base, falling at peak. The exposure comes from `trails`
 # below, not from letting the accumulation grid saturate.
@@ -132,28 +138,39 @@ palette_mix = "clamp(mid * 0.47, 0, 0.40)"
 
 # VIEW - a slow counter-rotating drift so the smear never runs in one direction.
 #
-# ZOOM IS A FOLD CONSTRAINT HERE, EXACTLY AS ON LEVIATHAN, and it became one the
-# moment `kaleido_order = 2` arrived. The fold's residual rays are the frame
-# EDGE smeared radially outward, so they only exist if the figure reaches an
-# edge - and this preset kept the unfolded framing (1.10 base, peak 1.42), which
-# put the ribbon's top and bottom tips right on it. The result was a permanent
-# vertical starburst above and below the figure, brighter than anything the
-# attractor draws. RENDERED, not reasoned, and measured on the EFFECTIVE zoom
-# rather than the base, which is the number that matters: a six-step ladder
-# grows its first rays near 0.98 and is clean at 0.94 and below - checked at
-# `bass = bar = 1`, the true corner, not at a realistic loud frame, because
-# `bar` reaches 1 on every beat. Peak here is 0.66 + 0.08 + 0.20 = 0.94.
-# Raising it re-lights the rays; the general fix is a per-preset edge
-# treatment - Plan 0055, approved, not built.
+# ZOOM WAS A FOLD CONSTRAINT HERE, EXACTLY AS ON LEVIATHAN. IT IS NOT ONE ANY
+# MORE, AND THE ORIGINAL FRAMING IS RESTORED (2026-08-04, design-backlog 0058).
 #
-# THE CEILING IS ON THE PEAK, SO THE TRAVEL IS KEPT NEARLY WHOLE - 0.30 against
-# the original 0.32. That distinction is worth more than it looks: a first pass
-# here cut the base and the swing together, and took this preset's `--report`
-# bass column from 0.123 to 0.045 and its `anim` from 0.070 to 0.022 - a hand's
-# breadth off the 0.01 animation floor. A smaller figure moving the same
-# fraction moves fewer pixels, so on a folded preset the swing IS the
-# reactivity, and it is the peak that has to fit.
-zoom  = "0.66 + bar * 0.08 + clamp(bass * 0.235, 0, 0.20)"
+# The record of why it was ever pinned, because it was a real defect: the
+# falloff disc's residual rays are the frame EDGE smeared radially outward, so
+# they only exist if the figure reaches an edge - and this preset kept the
+# unfolded framing (1.10 base, peak 1.42), which put the ribbon's top and bottom
+# tips right on it. The result was a permanent vertical starburst above and
+# below the figure, brighter than anything the attractor draws. So the peak was
+# cut to 0.94, measured on the EFFECTIVE zoom rather than the base: a six-step
+# ladder grew its first rays near 0.98 and was clean at 0.94 and below, checked
+# at `bass = bar = 1`, the true corner, because `bar` reaches 1 on every beat.
+# That note ended "the general fix is a per-preset edge treatment - Plan 0055,
+# approved, not built."
+#
+# PLAN 0055 IS BUILT, AND THIS PRESET NOW PICKS `squash`. The rays are a
+# property of `falloff` alone; `squash` compresses the radius asymptotically
+# into the disc, so the figure can reach the frame edge - and past it - without
+# any edge texel being replicated outward. RENDERED, not reasoned: at the
+# restored 1.10/1.42, `falloff` shows exactly the pale horizontal streaks this
+# note describes, `tile` fills but repeats the ribbon's lens as visible
+# wallpaper, and `squash` carries the wings into the corners with real texture
+# and no seam. Judged in motion as well as in stills.
+#
+# THE TRAVEL IS UNCHANGED AT 0.32, which is the original. The reason to say so:
+# a first pass at the pin cut the base and the swing together and took this
+# preset's `--report` bass column from 0.123 to 0.045 and its `anim` from 0.070
+# to 0.022 - a hand's breadth off the 0.01 animation floor. A smaller figure
+# moving the same fraction moves fewer pixels, so on a folded preset the swing
+# IS the reactivity. The gain follows the house rule for a bass term,
+# `G = C / 0.85` = 0.24 / 0.85, so a typical passage sits near half the ceiling
+# and a loud one reaches it.
+zoom  = "1.10 + bar * 0.08 + clamp(bass * 0.282, 0, 0.24)"
 pan_x = "cos(time * 0.043) * 0.09"
 pan_y = "sin(time * 0.061) * 0.07"
 
