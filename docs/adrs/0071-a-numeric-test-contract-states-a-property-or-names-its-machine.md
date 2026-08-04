@@ -1,6 +1,6 @@
 # ADR-0071 — A numeric test contract states a property, or names the machine it was measured on
 
-> **Status:** proposed
+> **Status:** **accepted** (2026-08-04, at Plan 0060's close)
 > **Date:** 2026-08-04
 > **Related plan(s):** [0060](../plans/0060-a-test-number-states-a-property-or-names-its-machine.md)
 > **Supplements:** [0016](0016-gpu-tests-opt-in-ci-scope.md) (the skip-with-notice shape this

@@ -1,6 +1,8 @@
 # ADR-0074 — A ratio against an in-run control is not automatically portable
 
-> **Status:** proposed
+> **Status:** **accepted** (2026-08-04, at Plan 0060's close) — with an **Outcome** section at the
+> end, because the hardware measurement this ADR called for came back the same day and inverted one
+> of the premises recorded below. The decision is unchanged; see Outcome for what is not.
 > **Date:** 2026-08-04
 > **Corrected 2026-08-04, same day, before acceptance.** This ADR was written believing the
 > hardware its deferral depends on was not available on this side. **It is.** `dev` box, verified
@@ -192,3 +194,65 @@ Two of Plan 0060's other predictions resolved in the same run and are recorded w
 than here: `onset_raw`'s arm64 divergence is `1.86e-5` relative — 2.2x `bass_raw`'s, not the orders
 of magnitude the plan flagged as possible — and the coverage ratchet evaluated for the first time
 since 2026-07-30 at **93.34 %** against `COVERAGE_FLOOR = 88`.
+
+## Outcome (added at Plan 0060's close, 2026-08-04)
+
+The hardware reading this ADR called for was taken hours later, on the same day, in `ae4c215`
+(`a_dual_live_dissolve_moves_the_picture_against_its_own_progression`, floor `0.018`). **The
+decision above stands and no assertion changes.** But the third reading is not the confirmation the
+ADR expected — it falsifies the mechanism recorded in Context, and the correction matters more than
+the number.
+
+| statistic | hardware (AMD Radeon integrated, DX12) | CI WARP 10.0.26100 | local WARP 10.0.19041 |
+|---|---|---|---|
+| peak signal | 0.009653 | 0.009683 | 0.109573 |
+| peak control | 0.264172 | 0.264177 | 0.407826 |
+| **ratio** | **0.036542** | **0.036654** | **0.268675** |
+
+**The hardware adapter agrees with CI WARP, not with the local one** — to three significant figures
+on the ratio and **five on the control**. Two independent statistics reproducing that closely across
+a software rasterizer and a hardware DX12 adapter is not coincidence.
+
+**So the Context section has the direction backwards.** It attributes the 11.3x signal spread to
+`dissolve_at`'s allocation quirk "costing more history on the newer build". The evidence says the
+opposite: WARP 10.0.26100 behaves like hardware, and **WARP 10.0.19041 — this box's build, the one
+every local capture is taken on — is the outlier**, exhibiting the quirk in the *inflating*
+direction. The conclusion that survives is narrower and still sufficient: the numerator is
+contaminated on at least one rasterizer build, so the ratio is not portable across builds. What does
+not survive is the claim about *which* build, and that claim was doing work.
+
+**Two things follow, both for Plan [0053](../plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md),
+which owns whether WARP's output should be trusted at all.**
+
+- The Negative bullet above — *"if the newer WARP is losing more trail history than the older one,
+  the same artifact is silently present in every other WARP capture this suite takes"* — points at
+  the wrong build, and the corrected version is sharper rather than milder. The golden suite blesses
+  on **this box**, on 10.0.19041, the build that disagrees with hardware by 1.54x on a statistic
+  (the control) that involves no dual-live asymmetry at all. That is a `frozen`-only sequence
+  rendering measurably differently here than on either of the other two configurations, and nothing
+  has looked at what else it moves.
+- `dissolve_at`'s doc comment (`core/src/render/mod.rs`) states the quirk as a property of *"the DX12
+  WARP rasterizer"*, and it is load-bearing — it is the stated reason
+  `a_dual_live_dissolve_carries_the_outgoing_trail` is hardware-only and the reason
+  `core/tests/background_composite.rs` skips. On this evidence it is a property of one WARP build,
+  written as a property of WARP: [ADR-0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)'s
+  own error, one level down, in prose instead of an assertion. Left standing deliberately rather
+  than edited from a single contrary reading — a second hardware or newer-WARP configuration would
+  settle it, and Plan 0053 Phase 3 is where that happens.
+
+**Alternative A is weaker than it reads, and this is the honest place to say so.** It rejected the
+`0.018` floor as "a coin flip on the next runner image" and as calibrated against a numerator
+beneath `MEAN_TOL`. The shipped hardware test takes **exactly that floor**, `0.018`, against a
+numerator of `0.0097` — answering the second objection with a determinism argument (two runs of the
+same code on the same adapter in one process, opening at exactly `0.0000` and climbing
+monotonically) that is *available on hardware because the opening frame is byte-identical there*.
+All three readings clear `0.018`. The rejection still stands on its remaining leg — a quantity that
+moves 7.3x across two builds of one rasterizer should not carry a floor asserted everywhere — but
+**"would `0.018` in fact hold in CI" is now an open question with three data points behind it, not a
+settled no.** It is not reopened here: doing so on one further sample would repeat the mistake this
+ADR exists to record. It is reopened by a fourth configuration, or by Plan 0053 establishing which
+WARP build to believe.
+
+**And one of this ADR's Positive bullets is now false as written.** *"The magnitude claim lands
+where it can be trusted, on the machine that already owes this suite a visit"* — it landed on the
+dev box the same day, per the correction in the header. Plan 0053 Phase 3 no longer owes it.

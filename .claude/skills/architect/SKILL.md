@@ -277,6 +277,24 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   adapter — no test at that configuration can tell you which source the code actually used. Find the
   configuration where the two disagree and ask whether anything probes it. If nothing does, that is
   the finding, whether or not you can also name the bug.
+- **A numeric assertion states a property, or names the machine it was measured on** (ADR-0071,
+  from Plan 0060 — five consecutive red CI pushes from two tests with this one shape). A *property*
+  holds on every configuration CI runs: dimensionless, exact, or with a tolerance derived from the
+  mechanism. A *measurement* is a frozen number that names its configuration and **does not run
+  outside it**, skipping with a printed notice in ADR-0016's shape and printing what it observed
+  instead. A frozen number asserted universally is neither. Two corollaries, both load-bearing, both
+  worth one line on any diff that adds or moves a numeric assertion:
+  - **A threshold at or below this project's own declared noise floor for the same quantity is not
+    a property.** `golden.rs` calls a `0.02` mean channel difference rasterizer drift, so an
+    assertion on that statistic below `0.02` measures the noise. (The dual-live floor was `0.01`.)
+  - **A ratio is a property only when numerator and denominator are the same kind of quantity**
+    (ADR-0074). Same run and same adapter are the *entry requirements*, not the proof — the
+    dual-live ratio was built on exactly those and still moved 7.3x between two builds of one
+    software rasterizer, because the two terms responded to the machine differently.
+  The same question applies to **prose**, and it is the one this rule keeps catching a level down:
+  a doc comment that attributes a behaviour to "the DX12 WARP rasterizer" when it was seen on one
+  build of it is the identical error, unasserted. Grep the diff for numeric literals in `assert*`
+  and for driver/adapter/platform names in comments.
 
 ### 5. Design integrity — classic principles
 The rules above are mostly mechanical (Plan 0002's gates catch many). This lens is the part no
