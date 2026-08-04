@@ -1,6 +1,6 @@
 # ADR-0054 — A runtime quality-tier change rebuilds the engine's GPU resources on the live context
 
-> **Status:** proposed
+> **Status:** **accepted** (2026-08-04, at Plan 0050's close)
 > **Date:** 2026-07-30
 > **Related plan(s):** [0050](../plans/0050-in-app-settings-and-a-browse-overlay-that-fits.md)
 > **Supplements:** [ADR-0045](0045-quality-tiers-floor-and-rich.md) (quality tiers), which said the
@@ -137,3 +137,25 @@ adapter — the config write is the same either way.
   particle count blows `attractor_clifford` out to white against the un-fixed additive ceiling. Plan
   [0045] is the structural fix; until it lands, an operator switching to `Rich` on that preset will
   see the reported defect on purpose rather than by surprise.
+
+## Outcome (added at Plan 0050's close, 2026-08-04)
+
+Implemented as designed in `14cd9e2`, and **operated** on 2026-08-04 in Plan 0050's Phase 6.
+
+- **The core decision held under use.** The hitch is a brief trails re-accumulation, not a freeze, a
+  hang or a device loss; it survives repeated swaps (15 consecutive in one session) and survives
+  being pressed *during* a dissolve — which is the case this ADR reasoned about when it said a
+  dissolve cannot survive its own chains being replaced, and where the design clears
+  `incoming_side` and `transition` rather than trying to keep them.
+- **The pin latches.** Every explicit change logged `(pinned)`, never falling back to `(auto)`, so
+  the governor cannot demote inside an operator's measurement. That property is what makes the
+  live switch a usable *instrument* and not only a convenience.
+- **One design note in the plan was wrong and the implementation was right to refuse it.** The plan
+  told `set_tier` to re-apply the current surface size; there is nothing stale to re-apply, because
+  `render/mod.rs` calls `scene.set_target_size(...)` on the shared draw path every frame and every
+  `PostStage` takes `surface` as an argument. `dev` flagged it rather than adding a no-op.
+- **The first thing the live switch measured was `Rich` failing.** On the dev box the governor
+  demoted `Rich → Floor` within seconds of startup, before any input. That is Plan 0044 Phase 4's
+  unrun calibration answering itself the moment an instrument existed to hear it — this ADR's
+  Positive claim that a tier is a *look* decision best judged on the machine, discharged on its
+  first outing.

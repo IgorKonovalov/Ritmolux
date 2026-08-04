@@ -213,8 +213,9 @@ from.
 
 - **Owner skill:** dev
 - **What:** Write down what Phase 2 measured, in the three places a future reader will look: the
-  render test's doc comment, the DSP test's doc comment, and the determinism spec. **No new
-  assertion is added by this phase.**
+  render test's doc comment, the DSP test's doc comment, and the determinism spec — **and take the
+  magnitude claim on hardware**, which turns out to be available on the dev box rather than gated
+  on a `human` phase.
 - **Files touched:** `core/src/render/mod.rs`, `core/tests/dsp.rs`,
   `docs/specs/0002-ring-determinism.md`
 - **Detail — render.** ~~Add the ratio floor.~~ **No ratio floor.** The ratio moved 7.3x between
@@ -227,8 +228,29 @@ from.
   plan's own Risks section says the allocation quirk lets a held outgoing side through, and that
   belongs in the test rather than only here. Record both readings and the 11.3x signal spread in
   the comment, and point at ADR-0074 and at Plan
-  [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3, which is where the
-  magnitude claim goes when hardware is to hand. Change no assertion.
+  [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3. Change no assertion **in
+  the WARP test**.
+- **Detail — the magnitude claim, on hardware (added 2026-08-04, after the deferral's premise
+  turned out to be false).** The gate these checks skip on is
+  `Renderer::adapter_is_software()` — `device_type == DeviceType::Cpu`
+  (`core/src/render/context.rs:148`) — **not** "a discrete GPU", and the hardware-only sibling
+  `a_dual_live_dissolve_carries_the_outgoing_trail` **runs and passes on the dev box today**
+  (verified 2026-08-04 with `cargo nextest run ... --no-capture`: 7.68 s of real GPU work, no skip
+  notice). So the clean measurement is available here and now:
+  - Take the same signal/control statistics through `dissolve_at(..., software = false)`, i.e. a
+    **second, hardware-only** test beside the WARP one rather than a change to it — the WARP test
+    keeps its property form and its printed report, per ADR-0074.
+  - **On hardware the confound is gone**: `dissolve_at`'s own docs record that the opening frame is
+    byte-identical to the ordinary frame it replaces, so the numerator is the outgoing side
+    animating and nothing else. That is why this reading is worth a floor where the WARP one is not.
+  - **Report the reading before choosing the floor**, and choose it as at most half of it. If the
+    hardware ratio lands near the local WARP `0.269`, say so; if it lands somewhere else entirely,
+    that is itself the finding and is worth a sentence in the doc comment.
+  - It **skips in CI on both runners** (WARP on Windows, no software Metal on macOS — ADR-0016), so
+    it is enforced by the local gate and `.githooks/pre-push`, never by CI. Say that in the test's
+    doc rather than letting a future reader assume CI is watching it.
+  - **One box is a measurement, not a property.** Name the adapter and the driver version in the
+    doc comment, in the ADR-0071 shape. Do not write it as a universal floor.
 - **Detail — DSP.** Record the arm64 observations in the test's doc comment as
   observed-but-not-asserted, with their relative errors, so the next reader knows the size of the
   divergence rather than inferring it from a skip. The four values are in the Phase 2 measurements

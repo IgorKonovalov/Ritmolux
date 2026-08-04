@@ -11,7 +11,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 |------|-------|--------|----------------|
 | [0036](0036-macos-and-windows-release-artifacts.md) | macOS and Windows release artifacts: a tag-driven Release with a universal `.app` | **approved 2026-07-26** — ready for `dev` | dev, human |
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move (`fb_*` affine + curated warp, `max`/`add` deposit, trails **and** attractor) | **approved 2026-07-30** — **unblocked**: [0045] has landed and closed, so the linear-light pipeline this builds on exists; roadmap R2, [ADR-0048](../adrs/0048-transformed-feedback.md) | dev, human |
-| [0050](0050-in-app-settings-and-a-browse-overlay-that-fits.md) | In-app settings, live quality, and a browse overlay that fits (`[`/`]` tier swap, an `S` settings modal, browse opens on the active preset + wraps + repeats + flows into columns) | **in progress** — **all five `dev` phases landed 2026-08-03/04** (`14cd9e2`, `bed0274`, `46b38f6`, `d81a24a`, `19096f1`) and were **reviewed 2026-08-04** (Mode 4, no blockers, no majors). **Only Phase 6 remains — `human`, eyes on the machine**: the tier swap judged in the hand, the columns read at the real resolution, and the `Rich` calibration [0044] Phase 4 never ran. [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md); **orthogonal to the render roadmap**, takeable any time | dev, human |
 | [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) | The emitter: objects that spawn, fall on a parabola, and die (`SystemKind::Emitter`, analytic ballistics, seeded per-object individuation) | **approved 2026-08-02** — ready for `dev`; [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md); closes [backlog 0034](../design-backlog.md). The **first genuinely new scene idiom since the attractor**, and the half of the figurative gap that carries motion; [backlog 0033](../design-backlog.md) (shaped marks) stays open | dev |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** (needs a discrete GPU) and gates Phase 4, so it does not run in one session. Moves **no pixels** except one new baseline | dev, human |
 | [0055](0055-the-fold-edge-becomes-a-choice.md) | The fold edge becomes a choice: five treatments behind one stepped `kaleido_edge`, decided in motion | **approved 2026-08-02** — ready for `dev`; [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md), supplementing [ADR-0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md); closes [backlog 0037](../design-backlog.md). **Phase 2 is `human`** (a live in-motion A/B) and gates Phases 3-4, so it does not close in one session. Phase 1 moves **no golden** — the default is today's behaviour | dev, human |
@@ -85,13 +84,25 @@ construction — [0053] until a discrete GPU is to hand, [0055] until the live A
 on exactly one `human` phase before its close ceremony. Taking [0052] first keeps a session
 unblocked end to end.
 
-**Three closes are pending and none of them is a `dev` session.** [0050] needs Phase 6 (eyes on the
-machine), [0059] needs Phase 4 (the content pass), and [0060] needs Phase 3 (a `dev` doc pass) plus
-its close. **The version is still `0.32.0`** and each close owes its own bump —
+**[0050] closed 2026-08-04 and took the version to `0.33.0`.** Two closes remain pending: [0059]
+needs Phase 4 (the content pass), and [0060] needs Phase 3 (a `dev` session — now slightly larger
+than a doc pass, see below) plus its close. Each owes its own bump —
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md), one per close, chosen at the close. On
-present shape: **minor** for [0050] (an operator surface, a new core entry point), **minor** for
-[0059] (a new preset-facing structural key and an engine behaviour change), and **patch** for [0060]
-(test contracts and docs, no shipped code) — decided for real at each close, not here.
+present shape: **minor** for [0059] (a new preset-facing structural key and an engine behaviour
+change) and **patch** for [0060] (test contracts and docs, no shipped code) — decided for real at
+each close, not here.
+
+**A premise correction that makes [0060] Phase 3 bigger and [0053] Phase 3 cheaper, found the same
+day.** ADR-0074 deferred the dual-live magnitude claim to "hardware this side does not have". **The
+dev box has hardware.** The gate these checks skip on is `Renderer::adapter_is_software()` —
+`device_type == DeviceType::Cpu` — **not** "a discrete GPU", and the hardware-only sibling
+`a_dual_live_dissolve_carries_the_outgoing_trail` **runs and passes here today** (verified with
+`--no-capture`: 7.68 s of real GPU work, no skip notice). So the clean magnitude measurement is one
+`software: false` away and [0060] Phase 3 now carries it, rather than it waiting on a `human` phase.
+The ADR's *decision* is unchanged — it rested on the 7.3x ratio spread, not on where a machine is.
+Worth carrying further than these two plans: **every hardware-gated check in this suite has been
+runnable on this box all along**, so a "needs a discrete GPU" note is worth testing before it is
+believed.
 
 **[0059]'s engine work is finished and only the content pass is left.** All four `dev` phases landed
 2026-08-04 (`357a17e`, `1c47de5`, `4fb4a81`, `642aec0`) and were reviewed the same day: no blockers,
@@ -178,13 +189,11 @@ capture is an instrument and never a baseline** — the `Rich` multipliers are s
 provisional values, its Phase 4 calibration having never run. The running app remains the better
 instrument for a *judgement in motion*; it is no longer the only one for a measurement.
 
-**[0050] has landed its five `dev` phases and the app is now operable** (2026-08-04) — `[` / `]`
-swap the tier live, `S` opens a settings modal, and `Tab` opens the browser on the active preset,
-wraps, repeats and flows into columns. **Phase 6 (`human`) is what is left**, and it is the cheapest
-of the three pending human phases: press the brackets with music playing, `Tab` at 1080p and at
-2048x1152, and run the `Rich` calibration [0044] Phase 4 never ran — which is now an A/B in one
-sitting rather than a relaunch loop, and which `docs/on-device-validation.md` now spells out
-step by step. It touched one new `core` entry point (`Renderer::set_tier`, plus an `active_index`
+**[0050] has landed and closed** (2026-08-04) — the app is operable: `[` / `]` swap the tier live,
+`S` opens a settings modal, and `Tab` opens the browser on the active preset, wraps, repeats and
+flows into columns. See Recently closed for the full record, including the two things Phase 6 found
+that no test could (the `Rich` demotion at startup, and a retired preset name in the on-device
+checklist). It touched one new `core` entry point (`Renderer::set_tier`, plus an `active_index`
 accessor) and is otherwise `standalone/` shell work — no scene, no shader, no DSP, no preset `.toml`,
 no C ABI change, and **no golden baseline may move**. So it neither blocks nor is blocked by [0045] /
 [0046]. Two couplings worth knowing before sequencing it:
@@ -327,7 +336,14 @@ two mirrored contours converge and their halos sum, so the *quietest* part of th
 rendering as its brightest until `glow` came down. Worth knowing before raising a stroke param on any
 mirrored line preset.
 
-**Version is at `0.32.0`**, tag `v0.32.0` — **minor**, bumped at the joint [0057] + [0058] close per
+**Version is at `0.33.0`**, tag `v0.33.0` — **minor**, bumped at [0050]'s close per
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md). Minor is the right level: the plan adds
+a **new `core` entry point** (`Renderer::set_tier`, plus `active_index`), a whole operator surface
+(the `S` modal, the `[` / `]` swap, the column-flowed browser, key repeat), and a persisted setting
+path — capability, not a fix. It moves no pixels and no golden baseline. Nothing is owed until the
+next close, which will be [0059]'s.
+
+The `0.32.0` before it was the joint [0057] + [0058] close — **minor**, per
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md). **Two plans closed under one bump, and
 that is a deliberate call rather than a miss**, so the reasoning is here rather than only in a
 commit message: both lanes were already fast-forwarded into `main` as one merged tip before the
@@ -524,6 +540,64 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0050 — in-app settings, live quality, and a browse overlay that
+  fits](done/0050-in-app-settings-and-a-browse-overlay-that-fits.md) — **done 2026-08-04**, Mode 4
+  review **no blockers, no majors**. All six phases landed including the `human` Phase 6:
+  `14cd9e2` `Renderer::set_tier` + the `[` / `]` swap, `bed0274` the browser opens where you are and
+  wraps and repeats, `46b38f6` the list flows into columns, `d81a24a` the settings modal on `S`,
+  `19096f1` the operator docs, and the eyes-on pass on 2026-08-04.
+  [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md) is **accepted with
+  an Outcome section**. Gate on `main` before the bump: `fmt` clean, `clippy -D warnings` clean, full
+  `nextest` green. C ABI stays v4 (the tier deliberately does **not** reach it), no new dependency,
+  no golden baseline moved.
+  **The app has an operator surface for the first time.** Five write-only hotkeys were the whole
+  control surface; `A` printed to a stderr nobody watches during a show and did not even persist,
+  and the dwell bounds were reachable only by editing TOML. Now `S` lists Quality, Auto-rotate, Min
+  and Max dwell, Fullscreen, Display, Diagnostics and the resolved preset directory, every row
+  applying immediately and persisting through the `Config::save` that already existed. Diagnostics
+  is deliberately **session-only** — a live show coming up with the overlay painted because someone
+  pressed `F3` last week is a worse default than pressing `F3` again.
+  **`settings.rs` is a second pure state machine beside `overlay.rs`, not a generalization of it**,
+  and the reasoning is worth keeping: the two modals' rows *mean* different things —
+  pick-one-and-close over a filtered roster against edit-a-value-in-place over a fixed list — so
+  merging would rewrite a green module to share ten lines of up/down/wrap. Where they should agree
+  they do, and **that agreement is asserted rather than inherited**.
+  **The list arithmetic was the whole problem and it is now a pure function.** At `ROW_H = 30` from
+  `y = 94` a 1080p window holds 32 rows against a 35-preset roster, so the display this project is
+  built on already scrolled presets out of sight while 1904 px of unused width sat beside a
+  15-character longest name. `overlay::layout(...)` decides columns, rows per column and the
+  whole-column scroll offset with no window and no roster, so the unit tests are the real check and
+  the eyes-on pass confirms pixels rather than logic. `COL_W` is an **estimate that says so** —
+  glyphon shapes a proportional font and `core` exposes no measurement API, so a name past the
+  budget truncates with an ellipsis, which makes an underestimate cosmetic rather than a collision.
+  **Key repeat is filtered one level down, where the key's role is known** — honoured only for a
+  modal navigation key while a modal is open. Widening it would make a held `Space` machine-gun
+  preset switches through a ~1 s dissolve each.
+  **Phase 6 found the thing the plan was written to find, and it found it before any input.** The
+  governor demoted `Rich → Floor` within seconds of startup: the shipped provisional `Rich`
+  multipliers do not hold this display's frame budget, which is Plan [0044] Phase 4's unrun question
+  answering itself the moment an instrument existed to hear it. It agrees with the session's other
+  finding — `attractor_lorenz` at `Rich` is the worst thing on screen through a transition. **No
+  field was tuned on it**, per that phase's own rule.
+  **What Phase 6 did *not* deliver, and why that is not a hole:** the per-preset p99 table. Its
+  instruction sheet in `docs/on-device-validation.md` named **`rose_kaleidoscope`**, retired in the
+  2026-07-28 library pass, so the operator went looking for a preset that does not exist —
+  `docs/design-backlog.md` had caught that name once and the on-device doc was never swept.
+  Corrected here to `fragment_kaleido`. The table itself belongs to Plan [0044] Phase 4, carried in
+  a checklist whose own status line says it **does not block plan closes**, and it is now **coupled
+  to [0059] Phase 4**: `[particles] density` changes how many particles the attractor draws, so
+  calibrating `RICH.attractor_particles` before the content pass measures a target about to move —
+  and the attractor is exactly where both of Phase 6's signals point. Deferred deliberately, with
+  the demotion recorded as its first data point.
+  **One design note in the plan was wrong and `dev` refused it rather than implementing it.**
+  `set_tier` was told to re-apply the current surface size; there is nothing stale to re-apply,
+  because `render/mod.rs:543` calls `scene.set_target_size(...)` on the shared draw path every frame
+  and every `PostStage` takes `surface` as an argument. The corroborating evidence was already in
+  the tree — the governor's `apply_tier` has shipped without it since [0044].
+  **The doc sweep discharged its negative half as evidence, not as a claim:** `presets/README.md`,
+  `docs/presets.md` and `docs/preset-palettes.md` were confirmed *not* to need sweeping by grepping
+  the four code phases' diff for a `[params]` name, rather than by assumption.
 
 - [0058 — the gate can see an empty frame, and "loud" has to mean more
   picture](done/0058-the-gate-can-see-an-empty-frame.md) — **done 2026-08-03**, Mode 4 review **no
