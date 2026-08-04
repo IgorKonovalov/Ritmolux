@@ -306,6 +306,13 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // because of. Spectrum Ridge sets it at 0.1189 — *after* its repair; the
         // version that shipped broken scores 0.0000 here.
         SystemKind::Spectrum => 0.06,
+        // A shower of small marks over an otherwise empty frame — sparse by
+        // idiom, like the spectrum readout and unlike the swarm's dense cloud.
+        // Measured from `Sparks`, the family's only shipped member (Plan 0052),
+        // and set at half of it like every floor above. When a second emitter
+        // preset lands this is the number to re-derive from the distribution
+        // this test prints.
+        SystemKind::Emitter => 0.25,
     }
 }
 
@@ -319,6 +326,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::ReactionDiffusion => "reaction_diffusion",
         SystemKind::Attractor => "attractor",
         SystemKind::Spectrum => "spectrum",
+        SystemKind::Emitter => "emitter",
     }
 }
 

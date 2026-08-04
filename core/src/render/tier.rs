@@ -217,6 +217,29 @@ pub struct TierConfig {
     /// floor value, and that routes back through `architect`.
     pub swarm_particles: usize,
 
+    /// How many objects the emitter's pool holds
+    /// ([ADR-0057](../../../docs/adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)).
+    ///
+    /// Unlike every other count here this is a **ceiling on a varying
+    /// population**, not the population: the emitter spawns and retires, so a
+    /// preset's `spawn_rate * lifetime` decides how many objects are actually
+    /// alive and this decides how many *can* be. Spawns past it are dropped
+    /// rather than queued or allocated for — that is the phase's whole real-time
+    /// hazard — so raising it does not brighten a preset that never reaches it,
+    /// and lowering it below one that does thins the shower rather than changing
+    /// its motion.
+    ///
+    /// Not an accumulating count in the sense the module docs warn about: each
+    /// object is one sprite drawn once per frame, so the light in the frame is
+    /// `population * brightness` and the population is a preset's own arithmetic.
+    /// The tier only says where that arithmetic is cut off.
+    ///
+    /// The floor holds a shipped preset's shower with room to spare (the emitter
+    /// family runs a few hundred objects live); rich triples it for the denser
+    /// looks a discrete GPU can carry. Cheap either way — see NFR §12: the pool
+    /// and its instance buffer are well under a megabyte at both tiers.
+    pub emitter_objects: usize,
+
     /// Ceiling on the segment count a line scene may draw in one frame, after
     /// generation and mirror replication.
     ///
@@ -238,6 +261,7 @@ impl TierConfig {
         attractor_particles: 50_000,
         attractor_trail_cap: (2560, 1440),
         swarm_particles: 10_000,
+        emitter_objects: 2_000,
         max_segments: 20_000,
     };
 
@@ -256,6 +280,7 @@ impl TierConfig {
         attractor_particles: 150_000,
         attractor_trail_cap: (3840, 2160),
         swarm_particles: 30_000,
+        emitter_objects: 6_000,
         max_segments: 60_000,
     };
 
@@ -483,6 +508,7 @@ mod tests {
         assert!(rich.attractor_trail_cap.0 >= floor.attractor_trail_cap.0);
         assert!(rich.attractor_trail_cap.1 >= floor.attractor_trail_cap.1);
         assert!(rich.swarm_particles >= floor.swarm_particles);
+        assert!(rich.emitter_objects >= floor.emitter_objects);
         assert!(rich.max_segments >= floor.max_segments);
     }
 

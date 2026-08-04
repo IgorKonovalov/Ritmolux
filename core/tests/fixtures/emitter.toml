@@ -1,0 +1,18 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+# Minimal emitter with constant params. Spawn instants come off the scene clock
+# and every per-object quantity comes off a seeded draw (NFR 6), so a
+# constant-driven capture reproduces exactly - the scene holds no accumulator and
+# reads no wall clock (ADR-0057).
+system = "emitter"
+name   = "fixture_emitter"
+
+[params]
+spawn_rate   = "400"
+gravity      = "5.2"
+launch_speed = "4.7"
+launch_angle = "0"
+lifetime     = "2.0"
+size         = "1.4"
+brightness   = "1.1"
+hue          = "0.15"
+hue_spread   = "0.7"

@@ -1,6 +1,6 @@
 # 0052 — The emitter: objects that spawn, fall on a parabola, and die
 
-> **Status:** **approved 2026-08-02** — ready for `dev`. All four phases are `dev`; nothing gates
+> **Status:** **in-progress 2026-08-04** — ready for `dev`. All four phases are `dev`; nothing gates
 > it, so it runs start-to-finish in one session.
 > **Created:** 2026-08-01
 > **Owner skill(s):** dev
