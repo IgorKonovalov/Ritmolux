@@ -1,12 +1,19 @@
 # 0036 — macOS and Windows release artifacts: a tag-driven Release with a universal `.app`
 
-> **Status:** **in-progress 2026-08-04** — Phases 1-3 are `dev` and run in one session on
-> `plan-0036-release-artifacts`; **Phase 4 is `human`** (push the tag, send the link), so the
-> plan does not close in that session.
+> **Status:** **done 2026-08-04** — Phases 1-3 shipped on lane `plan-0036-release-artifacts`
+> (Phase 1 `0329adf` + fix `be031eb`, Phase 2 `cc7a43f`, Phase 3 `aa9dfec`), merged to `main` at
+> `d081dfd` with the full gate green over both live lanes' code. Mode 4 review: **no blockers,
+> one minor, one nit**. A `workflow_dispatch` dry run (`30944179623`) went green on the first
+> attempt and every check in `packaging/macos/bundle.sh` executed against real Apple tooling.
+> **Phase 4 (`human`) is NOT done and is carried forward** — see the plans index. It closes here
+> by this plan's own design: its Followups section always expected the friend's report to retire
+> the Plan 0001 Phase 10 carry-forward "at a later close", and Phase 4 needs the tag that this
+> close mints. **The `release` job remains unexecuted** — only a tag reaches it — so two of
+> Phase 2's done-when criteria are open and the first pushed tag is their test.
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md) (this plan's decision), [0025](../adrs/0025-foobar-component-version-single-sourced.md) (version single-sourcing precedent), [0022](../adrs/0022-build-time-preset-embedding.md) (presets are embedded, not loaded from the zip)
+> **Related ADRs:** [0038](../../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md) (this plan's decision), [0025](../../adrs/0025-foobar-component-version-single-sourced.md) (version single-sourcing precedent), [0022](../../adrs/0022-build-time-preset-embedding.md) (presets are embedded, not loaded from the zip)
 >
 > **Re-checked 2026-08-04, still valid, three notes for the implementer.** The user confirmed
 > there is **no Mac in reach** — a friend has one — so this plan is the route and its
@@ -36,7 +43,7 @@ The user wants to send a friend a runnable Mac build. Today that is impossible: 
 no packaging directory anywhere in the tree. Distribution is roadmap item 5 and has never been
 designed.
 
-Three constraints, established in [ADR-0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md):
+Three constraints, established in [ADR-0038](../../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md):
 the dev box is Windows and cannot link a Mach-O binary, so a macOS runner is the only build host;
 ScreenCaptureKit's Screen Recording grant attaches to the launching process, so a loose binary
 hands the permission to Terminal and a `.app` bundle is what makes the grant land on us; and the
