@@ -130,6 +130,7 @@ that table is maintained alongside the presets and is the authoritative list.
 | `reaction_diffusion` | A Gray-Scott reaction-diffusion field (ADR-0012). |
 | `attractor` | GPU compute particles iterating a strange attractor (ADR-0015). |
 | `spectrum` | The log-spaced band array as N elements — bars, a contour, or a ring (ADR-0036). |
+| `emitter` | Objects that spawn, ride their own parabola, and die — the only system whose population varies (ADR-0057). |
 
 This table used to carry a per-system count of curated presets. It is gone rather than
 corrected: at the Plan 0054 close six of its eight numbers were wrong (`parametric_curve`

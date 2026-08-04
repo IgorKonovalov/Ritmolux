@@ -1915,7 +1915,7 @@ routes above is right. Both are architect calls, and the additive-model question
 ## ~~0034 — nothing in the engine spawns, throws, ages or individuates an object~~
 
 - **PROMOTED 2026-08-01 → [ADR-0057](adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md) +
-  [Plan 0052](plans/0052-the-emitter-objects-that-spawn-fall-and-die.md)** — a new
+  [Plan 0052](plans/done/0052-the-emitter-objects-that-spawn-fall-and-die.md)** — a new
   `SystemKind::Emitter` with analytic ballistics and seeded per-object individuation. The user
   chose the new-scene shape over extending `swarm` or building a per-object expression facility.
   **[0033](#0033) stays open** — this is the motion half; marks are still round additive blobs.
