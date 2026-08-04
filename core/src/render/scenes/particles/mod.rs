@@ -349,6 +349,44 @@ pub fn deposit_scale(active_count: u32) -> f32 {
     crate::render::TierConfig::FLOOR.attractor_particles as f32 / active_count.max(1) as f32
 }
 
+/// The smallest `[particles] density` a preset may ask for (ADR-0069).
+///
+/// At this fraction the scene draws **25** particles at `Floor` (50 000) and
+/// **75** at `Rich` (150 000) — and that is deliberately far sparser than it
+/// first looks like it should be, because **the sparse end is the point of the
+/// key rather than its degenerate edge**.
+///
+/// **This value is set from rendered captures, and the first arithmetic argument
+/// for it was wrong.** The reasoning that picked `0.01` (500 particles) ran:
+/// [ADR-0065] holds total light invariant by weighting each particle
+/// `50 000 / active`, so a hundredth of the budget already concentrates a hundred
+/// particles' worth of light into every point, and an order of magnitude below
+/// that must clip to white before it reads as a curve. Rendered at `fade = 0.95`,
+/// it does not. The banding first appears around `0.01`, and at `0.002` (100
+/// particles) and `0.0005` (25) the Lorenz lobes resolve into visibly *cleaner*
+/// spiral traces. The prediction missed that the trail spreads each particle's
+/// deposit along its whole path rather than piling it on one texel, so
+/// concentrating light into fewer particles buys contrast against the background
+/// instead of clipping.
+///
+/// So the floor is not protecting a look — it is rejecting a mis-typed magnitude.
+/// `0.0005` is the sparsest fraction that has actually been captured rendering
+/// as the attractor; below it a preset is asking for single-digit trajectories,
+/// which is a few orbits rather than a figure. `active_particles` separately
+/// guarantees at least one particle, so nothing here can produce an empty draw.
+///
+/// [ADR-0065]: ../../../../docs/adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md
+pub const MIN_PARTICLE_DENSITY: f32 = 0.0005;
+
+/// Resolve a validated `density` against a tier's particle budget.
+///
+/// Rounds rather than truncates, and floors at one particle: `density` is already
+/// range-checked at load, so this cannot be handed a zero, but a scene that drew
+/// zero instances would silently render nothing rather than fail.
+fn active_particles(budget: u32, density: f32) -> u32 {
+    ((budget as f32 * density).round() as u32).clamp(1, budget)
+}
+
 /// Compute step: iterate every particle through the selected attractor map once.
 /// Discrete maps (De Jong, Clifford) iterate directly; continuous flows (Thomas,
 /// Lorenz) Euler-integrate a few sub-steps of the fixed frame `dt`. Writes the
@@ -717,9 +755,13 @@ struct PipelineResources {
     field_sampler: wgpu::Sampler,
     /// How many particles the buffer above holds — the active tier's
     /// [`attractor_particles`](crate::render::TierConfig::attractor_particles),
-    /// fixed for the life of these resources. Carried here rather than read from a
-    /// constant so the compute dispatch, the instance draw and the step uniform
-    /// all take the count from the buffer that was actually allocated.
+    /// fixed for the life of these resources.
+    ///
+    /// Since ADR-0069 the dispatch, the instance draw and the step uniform take
+    /// the **active** count instead (`round(budget * density)`), which is a
+    /// different and smaller number. This one survives as the allocation bound:
+    /// the draw clamps its instance range to it, so no arithmetic on `density`
+    /// can fetch a vertex past the end of the buffer.
     count: u32,
 }
 
@@ -1225,6 +1267,19 @@ pub struct AttractorScene {
     /// Fixed for the life of the scene: the storage buffer and the seeded scatter
     /// are both sized to it, and a tier change rebuilds the scene.
     particle_count: u32,
+    /// How many of [`particle_count`](Self::particle_count) are actually stepped
+    /// and drawn — `round(particle_count * density)` (ADR-0069).
+    ///
+    /// **Nothing is reallocated when this moves.** The storage buffer, the seeded
+    /// scatter and every bind group stay sized to `particle_count`; this only
+    /// narrows the dispatch, the draw's instance count, and the `count` the step
+    /// shader early-returns against. Particles beyond it keep their seeded
+    /// positions untouched for the life of the preset — asserted directly, since
+    /// "rebuilds nothing" is otherwise a claim about code that is easy to break.
+    active_count: u32,
+    /// Fraction of the tier budget the loaded preset asked for, from
+    /// `[particles] density`. Structural: set in `configure`, never per frame.
+    density: f32,
     /// The deterministic seeded scatter, uploaded on the first frame after a
     /// (re)build so a rebuilt scene restarts identically (capture determinism).
     seed_particles: Vec<Particle>,
@@ -1306,6 +1361,10 @@ impl AttractorScene {
             res: None,
             trail_cap,
             particle_count,
+            // The whole budget until a `[particles] density` says otherwise, so a
+            // preset that never mentions the key is byte-identical to before it.
+            active_count: particle_count,
+            density: 1.0,
             trail_w: TRAIL_FALLBACK_W,
             trail_h: TRAIL_FALLBACK_H,
             seed_particles,
@@ -1602,20 +1661,25 @@ impl Scene for AttractorScene {
         &mut self,
         cfg: &super::lines::GeneratorConfig,
     ) -> Option<super::lines::CapOverflow> {
-        if let super::lines::GeneratorConfig::Particles { family } = cfg
-            && *family != self.family
-        {
-            self.family = *family;
-            let [a, b, c, d] = family.default_coeffs();
-            self.a = a;
-            self.b = b;
-            self.c = c;
-            self.d = d;
-            // Re-seed with the new family's box (its scale differs) and clear the
-            // trail so the new attractor forms cleanly.
-            self.seed_particles = Self::seed(*family, self.particle_count);
-            self.needs_upload = true;
-            self.needs_clear = true;
+        if let super::lines::GeneratorConfig::Particles { family, density } = cfg {
+            // `density` is resolved unconditionally, not behind the family guard:
+            // two presets can share a family and differ only in how much of it
+            // they draw, and `configure` runs on every preset switch.
+            self.density = *density;
+            self.active_count = active_particles(self.particle_count, *density);
+            if *family != self.family {
+                self.family = *family;
+                let [a, b, c, d] = family.default_coeffs();
+                self.a = a;
+                self.b = b;
+                self.c = c;
+                self.d = d;
+                // Re-seed with the new family's box (its scale differs) and clear
+                // the trail so the new attractor forms cleanly.
+                self.seed_particles = Self::seed(*family, self.particle_count);
+                self.needs_upload = true;
+                self.needs_clear = true;
+            }
         }
         None
     }
@@ -1638,6 +1702,7 @@ impl Scene for AttractorScene {
         self.rebuild_if_stale();
         let Self {
             res,
+            active_count,
             seed_particles,
             needs_upload,
             pending_jitter,
@@ -1683,6 +1748,7 @@ impl Scene for AttractorScene {
         upload_uniforms(
             queue,
             pipelines,
+            *active_count,
             &UniformInputs {
                 aspect,
                 coeffs: [*a, *b, *c, *d],
@@ -1709,12 +1775,13 @@ impl Scene for AttractorScene {
             queue,
             encoder,
             pipelines,
+            *active_count,
             *family,
             reseed_count,
             pending_jitter,
         );
-        encode_steps(encoder, pipelines, *pending_steps);
-        encode_trail_pass(encoder, pipelines, grid);
+        encode_steps(encoder, pipelines, *active_count, *pending_steps);
+        encode_trail_pass(encoder, pipelines, *active_count, grid);
         // Between the trail pass and the present, and nowhere else: the trail wrote
         // the write side, so the present must read it.
         grid.field.swap();
@@ -1798,7 +1865,12 @@ fn flush_deferred_uploads(
 
 /// This frame's three uniform buffers: the compute step's coefficients, the
 /// point draw's projection and colour, and the trail decay factor.
-fn upload_uniforms(queue: &wgpu::Queue, pipelines: &PipelineResources, inputs: &UniformInputs) {
+fn upload_uniforms(
+    queue: &wgpu::Queue,
+    pipelines: &PipelineResources,
+    active: u32,
+    inputs: &UniformInputs,
+) {
     queue.write_buffer(
         &pipelines.step_uniform,
         0,
@@ -1806,16 +1878,20 @@ fn upload_uniforms(queue: &wgpu::Queue, pipelines: &PipelineResources, inputs: &
             coeffs: inputs.coeffs,
             dt: FIXED_STEP,
             family: inputs.family.shader_id(),
-            count: pipelines.count,
+            // The **active** count, not the allocated one: this is the bound the
+            // compute step early-returns against, so it is what leaves the tail
+            // beyond `density` untouched (ADR-0069).
+            count: active,
             salt: 0,
         }),
     );
     let (scale, dim, z_center) = inputs.family.projection();
     let ([hx, hy, hz], [vx, vy, vz]) = inputs.family.basis().masks();
-    // Off the buffer that was actually allocated, not off the tier: the count the
-    // draw instances is `pipelines.count`, and normalizing against anything else
-    // would be a claim about a different draw call.
-    let deposit = deposit_scale(pipelines.count);
+    // Off the count actually drawn, not off the tier and not off the buffer that
+    // was allocated: the draw below issues `active` instances, and normalizing
+    // against anything else would be a claim about a different draw call. This is
+    // what carries ADR-0065's invariance across `density` (ADR-0069).
+    let deposit = deposit_scale(active);
     queue.write_buffer(
         &pipelines.draw_uniform,
         0,
@@ -1876,6 +1952,7 @@ fn encode_jitter(
     queue: &wgpu::Queue,
     encoder: &mut wgpu::CommandEncoder,
     pipelines: &PipelineResources,
+    active: u32,
     family: AttractorFamily,
     reseed_count: &u32,
     pending_jitter: &mut bool,
@@ -1893,7 +1970,10 @@ fn encode_jitter(
             coeffs: [jx, jy, jz, 0.0],
             dt: FIXED_STEP,
             family: JITTER_MODE,
-            count: pipelines.count,
+            // Active, like the step above — a reseed that kicked the inert tail
+            // would move particles nothing draws, and would break the very
+            // property that proves the tail is inert.
+            count: active,
             salt: *reseed_count,
         }),
     );
@@ -1904,7 +1984,7 @@ fn encode_jitter(
     });
     pass.set_pipeline(&pipelines.compute_pipeline);
     pass.set_bind_group(0, &pipelines.compute_bg, &[pipelines.step_stride]);
-    pass.dispatch_workgroups(pipelines.count.div_ceil(WORKGROUP), 1, 1);
+    pass.dispatch_workgroups(active.div_ceil(WORKGROUP), 1, 1);
 }
 
 /// Step the particles: one compute dispatch per scheduled sub-step. wgpu inserts
@@ -1912,9 +1992,10 @@ fn encode_jitter(
 fn encode_steps(
     encoder: &mut wgpu::CommandEncoder,
     pipelines: &PipelineResources,
+    active: u32,
     pending_steps: u32,
 ) {
-    let groups = pipelines.count.div_ceil(WORKGROUP);
+    let groups = active.div_ceil(WORKGROUP);
     for _ in 0..pending_steps {
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("attractor-step-pass"),
@@ -1933,6 +2014,7 @@ fn encode_steps(
 fn encode_trail_pass(
     encoder: &mut wgpu::CommandEncoder,
     pipelines: &PipelineResources,
+    active: u32,
     grid: &FieldResources,
 ) {
     let decay_bg = if grid.field.reading_a() {
@@ -1963,7 +2045,11 @@ fn encode_trail_pass(
     pass.set_pipeline(&pipelines.draw_pipeline);
     pass.set_bind_group(0, &pipelines.draw_bg, &[]);
     pass.set_vertex_buffer(0, pipelines.particles.slice(..));
-    pass.draw(0..6, 0..pipelines.count);
+    // Clamped to what was allocated rather than trusted: `active` is derived from
+    // a preset-supplied `density`, and an instance range past the buffer is an
+    // out-of-bounds vertex fetch. `active_particles` already bounds it, so this
+    // costs nothing and removes the possibility rather than documenting it.
+    pass.draw(0..6, 0..active.min(pipelines.count));
 }
 
 /// Present the freshly-written accumulation to the target, loading over whatever
@@ -2009,7 +2095,8 @@ mod tests {
     #![allow(clippy::panic, clippy::expect_used)]
 
     use super::{
-        AttractorFamily, AttractorScene, Basis, FIXED_STEP, Particle, Scene, deposit_scale,
+        AttractorFamily, AttractorScene, Basis, FIXED_STEP, MIN_PARTICLE_DENSITY, Particle, Scene,
+        active_particles, deposit_scale,
     };
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderContext;
@@ -2157,6 +2244,111 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
+    // Sample density (Plan 0059 Phase 2 / ADR-0069)
+    // -----------------------------------------------------------------------
+
+    /// `density` resolves against the budget, rounds, and never leaves the range
+    /// a draw can survive.
+    #[test]
+    fn density_resolves_against_the_tier_budget() {
+        let floor = TierConfig::FLOOR.attractor_particles;
+        let rich = TierConfig::RICH.attractor_particles;
+        assert_eq!(active_particles(floor, 1.0), floor);
+        assert_eq!(active_particles(rich, 1.0), rich);
+        assert_eq!(active_particles(floor, 0.5), 25_000);
+
+        // The documented floor, at both tiers. These are the numbers
+        // `MIN_PARTICLE_DENSITY`'s rationale is written against — and that
+        // rationale is a rendered capture, so pinning them here is what keeps the
+        // doc comment honest if the constant is ever nudged.
+        assert_eq!(active_particles(floor, MIN_PARTICLE_DENSITY), 25);
+        assert_eq!(active_particles(rich, MIN_PARTICLE_DENSITY), 75);
+
+        // The captures that set the floor were taken at these fractions, so the
+        // counts they correspond to are pinned too.
+        assert_eq!(active_particles(floor, 0.01), 500);
+        assert_eq!(active_particles(floor, 0.002), 100);
+
+        // Never zero (a scene drawing nothing would look like a hang, not an
+        // error) and never above the allocation (an out-of-bounds vertex fetch).
+        assert_eq!(active_particles(1, MIN_PARTICLE_DENSITY), 1);
+        assert_eq!(active_particles(floor, 1.0), floor);
+    }
+
+    /// **Total deposited light is invariant across `density`** — the property that
+    /// makes this key structural rather than an exposure control (ADR-0069 on top
+    /// of ADR-0065).
+    ///
+    /// Asserted on the value, like ADR-0065's own scalar: `active * scale(active)`
+    /// is the frame's total weight, and it must not depend on `active`. Were it
+    /// not so, lowering `density` would dim the picture and every author would
+    /// have to re-tune exposure to change sample count — which is precisely the
+    /// trap ADR-0065 removed one plan earlier.
+    #[test]
+    fn total_deposited_light_is_invariant_across_density() {
+        let floor = TierConfig::FLOOR.attractor_particles;
+        let reference = floor as f64 * f64::from(deposit_scale(floor));
+        for density in [1.0, 0.5, 0.25, 0.1, MIN_PARTICLE_DENSITY] {
+            let active = active_particles(floor, density);
+            let total = f64::from(active) * f64::from(deposit_scale(active));
+            assert!(
+                (total - reference).abs() < 1e-6 * reference,
+                "density {density} draws {active} particles for total light {total},                  against {reference} at full density"
+            );
+        }
+        // Non-vacuity: the counts genuinely differ, so the constancy above is a
+        // property of the scalar and not of an unchanging `active`.
+        assert_ne!(
+            active_particles(floor, 1.0),
+            active_particles(floor, MIN_PARTICLE_DENSITY)
+        );
+    }
+
+    /// **A density change rebuilds no GPU resource**, asserted where it can fail
+    /// rather than by reading the code: the particles past `active_count` still
+    /// hold their seeded positions after the cloud has run.
+    ///
+    /// This is the same claim as "the buffer stays allocated at the tier budget
+    /// and the compute early-returns" (ADR-0069), stated as an observable. It also
+    /// proves the guard is what does the work — a dispatch that ran over the whole
+    /// buffer, or a reallocation sized to `active`, both fail here.
+    #[test]
+    fn the_tail_beyond_the_active_count_never_moves() {
+        const DENSITY: f32 = 0.25;
+        let Some(mut h) = Harness::with_density(AttractorFamily::DeJong, DENSITY) else {
+            return;
+        };
+        let active = active_particles(TEST_PARTICLES, DENSITY) as usize;
+        assert!(active > 0 && active < TEST_PARTICLES as usize);
+        let seeded: Vec<[f32; 3]> = h.scene.seed_particles.iter().map(|p| p.pos).collect();
+
+        h.run(CONVERGE_FRAMES);
+        let after = h.positions();
+
+        // The tail is untouched, bit for bit. Not an epsilon: these particles were
+        // never dispatched, so anything but equality means they were.
+        for (i, (now, seed)) in after.iter().zip(seeded.iter()).enumerate().skip(active) {
+            assert_eq!(
+                now, seed,
+                "particle {i} is past the active count {active} but moved from its seed"
+            );
+        }
+
+        // Non-vacuity: the active head DID move, so the equality above is a real
+        // constraint and not a report that nothing ran at all.
+        let moved = after
+            .iter()
+            .zip(seeded.iter())
+            .take(active)
+            .filter(|(now, seed)| now != seed)
+            .count();
+        assert!(
+            moved * 2 > active,
+            "only {moved} of {active} active particles moved - the dispatch did not run,              so the inert tail proves nothing"
+        );
+    }
+
+    // -----------------------------------------------------------------------
     // The reseed (Plan 0057 Phase 3 / ADR-0066)
     // -----------------------------------------------------------------------
 
@@ -2192,6 +2384,12 @@ mod tests {
         /// this test green and vacuous on CI**, which is the shape the skip was
         /// about to take.
         fn new(family: AttractorFamily) -> Option<Self> {
+            Self::with_density(family, 1.0)
+        }
+
+        /// As [`Self::new`], at a chosen `[particles] density`. The buffer is
+        /// still `TEST_PARTICLES` either way — that is the point of the key.
+        fn with_density(family: AttractorFamily, density: f32) -> Option<Self> {
             let ctx = match RenderContext::new_headless(64, 64, true) {
                 Ok(ctx) => ctx,
                 Err(crate::render::RenderError::RequestAdapter(_)) => {
@@ -2211,7 +2409,10 @@ mod tests {
                 TEST_PARTICLES,
                 TierConfig::FLOOR.attractor_trail_cap,
             );
-            scene.configure(&crate::render::scenes::lines::GeneratorConfig::Particles { family });
+            scene.configure(&crate::render::scenes::lines::GeneratorConfig::Particles {
+                family,
+                density,
+            });
             scene.set_target_size(64, 64);
             let target = ctx
                 .device

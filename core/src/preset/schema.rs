@@ -550,13 +550,16 @@ fn build_config(
         // absent, it defaults to De Jong. Config is always `Some` so `configure`
         // runs on every preset switch (resetting the family — never stale).
         SystemKind::Attractor => {
-            let family = match particles {
-                Some(p) => AttractorFamily::from_name(&p.family).ok_or_else(|| {
-                    PresetError::Config(format!("unknown attractor family '{}'", p.family))
-                })?,
-                None => AttractorFamily::DeJong,
+            let (family, density) = match particles {
+                Some(p) => (
+                    AttractorFamily::from_name(&p.family).ok_or_else(|| {
+                        PresetError::Config(format!("unknown attractor family '{}'", p.family))
+                    })?,
+                    p.density()?,
+                ),
+                None => (AttractorFamily::DeJong, 1.0),
             };
-            Ok(Some(GeneratorConfig::Particles { family }))
+            Ok(Some(GeneratorConfig::Particles { family, density }))
         }
         // The spectrum readout selects its element count, layout and per-element
         // easing through an optional `[spectrum]` table; absent, it takes the
@@ -846,11 +849,33 @@ fn validate_stops(stops: Vec<RawStop>) -> Result<Vec<(f32, [f32; 3])>, PresetErr
 }
 
 /// The raw `[particles]` table: which strange-attractor family the
-/// compute-particle scene iterates.
+/// compute-particle scene iterates, and how much of the tier's particle budget
+/// it draws.
 #[derive(Deserialize)]
 struct RawParticles {
     /// Attractor family name (e.g. `"lorenz"`); validated at load.
     family: String,
+    /// Fraction of the tier's particle budget to draw (ADR-0069). Optional —
+    /// absent means the whole budget, which is byte-identical to the behaviour
+    /// before the key existed.
+    density: Option<f32>,
+}
+
+impl RawParticles {
+    /// Validate `density` into the fraction the scene will resolve against the
+    /// tier budget. Erroring rather than clamping, like every other structural
+    /// key: a preset asking for a count the engine will not give it should say so
+    /// at load, not render something the author did not ask for.
+    fn density(&self) -> Result<f32, PresetError> {
+        let d = self.density.unwrap_or(1.0);
+        if !(crate::render::scenes::particles::MIN_PARTICLE_DENSITY..=1.0).contains(&d) {
+            return Err(PresetError::Config(format!(
+                "[particles] density must be {}..=1.0, got {d}",
+                crate::render::scenes::particles::MIN_PARTICLE_DENSITY
+            )));
+        }
+        Ok(d)
+    }
 }
 
 /// The raw `[spectrum]` table: how the readout divides the frequency axis, what
@@ -1150,3 +1175,63 @@ impl fmt::Display for PresetError {
 }
 
 impl std::error::Error for PresetError {}
+
+#[cfg(test)]
+mod tests {
+    // Tests panic on failure; this file is not the render path.
+    #![allow(clippy::panic, clippy::expect_used, clippy::unwrap_used)]
+
+    use super::*;
+    use crate::render::scenes::particles::MIN_PARTICLE_DENSITY;
+
+    fn attractor(extra: &str) -> Result<Preset, PresetError> {
+        Preset::from_toml_str(&format!(
+            "system = \"attractor\"\nname = \"t\"\n[particles]\nfamily = \"lorenz\"\n{extra}"
+        ))
+    }
+
+    /// `[particles] density` is validated at load, with the range in the message
+    /// (Plan 0059 Phase 2 / ADR-0069) — like every other structural key, and
+    /// unlike a bindable param it cannot be clamped per frame.
+    #[test]
+    fn density_is_range_checked_at_load() {
+        for good in ["", "density = 1.0\n", "density = 0.5\n", "density = 0.01\n"] {
+            assert!(
+                attractor(good).is_ok(),
+                "`{good}` should load, it is inside {MIN_PARTICLE_DENSITY}..=1.0"
+            );
+        }
+
+        // Above the tier budget, at zero, negative, and below the floor. The tier
+        // caps the top: a preset cannot ask for more particles than exist.
+        for bad in ["density = 1.5\n", "density = 0.0\n", "density = -0.2\n"] {
+            let err = attractor(bad).expect_err("`{bad}` must be rejected");
+            let msg = err.to_string();
+            assert!(
+                msg.contains("[particles] density") && msg.contains("1.0"),
+                "the error must name the key and its range, got: {msg}"
+            );
+        }
+
+        // The boundary is inclusive on both ends and exclusive just below — so the
+        // message's stated range is the range that is actually enforced, which is
+        // the part a reader of the error depends on.
+        assert!(attractor("density = 0.0004\n").is_err());
+        assert!(attractor(&format!("density = {MIN_PARTICLE_DENSITY}\n")).is_ok());
+    }
+
+    /// An absent `[particles] density` is the whole budget. This is what makes the
+    /// key a strict superset — every preset shipped before it existed keeps its
+    /// exact sample count, so no capture moves.
+    #[test]
+    fn an_absent_density_is_the_whole_budget() {
+        let with = attractor("density = 1.0\n").unwrap();
+        let without = attractor("").unwrap();
+        let density_of = |p: &Preset| match p.config {
+            Some(GeneratorConfig::Particles { density, .. }) => density,
+            _ => panic!("attractor preset carries a Particles config"),
+        };
+        assert_eq!(density_of(&with), 1.0);
+        assert_eq!(density_of(&without), 1.0);
+    }
+}
