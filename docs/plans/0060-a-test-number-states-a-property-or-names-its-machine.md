@@ -236,9 +236,12 @@ from.
   dissolving. It must stop reading as a guard on the defect, because on WARP it is not one — this
   plan's own Risks section says the allocation quirk lets a held outgoing side through, and that
   belongs in the test rather than only here. Record both readings and the 11.3x signal spread in
-  the comment, and point at ADR-0074 and at Plan
-  [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3. Change no assertion **in
-  the WARP test**.
+  the comment, and point at ADR-0074. Change no assertion **in the WARP test**.
+  **Landed as `a324b21`, with one thing now stale in it.** That commit sent the magnitude claim to
+  Plan [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3, which was this plan's
+  instruction at the time and was superseded hours later when ADR-0074's premise was corrected. The
+  pointer sits at `core/src/render/mod.rs:3223-3225` and is re-pointed by the hardware item below —
+  **it is not a second thing to decide.**
 - **Detail — the magnitude claim, on hardware (added 2026-08-04, after the deferral's premise
   turned out to be false).** The gate these checks skip on is
   `Renderer::adapter_is_software()` — `device_type == DeviceType::Cpu`
@@ -272,7 +275,7 @@ from.
   one machine**, and reproduction across architectures is deliberately not claimed. This is the
   sentence whose absence let the frozen-literal test read as though it followed from the spec.
 - **Done when:** the dual-live test's doc comment states what it proves on a software adapter and
-  what it does not, carries both readings and the spread, and cites ADR-0074 and Plan 0053 Phase 3
+  what it does not, carries both readings and the spread, and cites ADR-0074
   — with **no assertion added, removed or loosened**, and the printed statistic set left intact;
   the DSP test's doc comment carries the four arm64 values; the determinism spec states the scope
   of its bit-identity clause; `fmt`, `clippy -D warnings` and the full `nextest` run are clean
@@ -281,8 +284,20 @@ from.
   from a reading taken on a **non-software** adapter, at most half of that reading; its doc comment
   names the adapter and driver version in the ADR-0071 measurement shape, states that it skips on
   both CI runners so CI never enforces it, and reports the observed hardware ratio against the local
-  WARP `0.268675`. The WARP test is **not** modified, and `a324b21`'s pointer at Plan 0053 Phase 3
-  is re-pointed at this test.
+  WARP `0.268675`. The WARP test is **not** modified apart from that citation, and `a324b21`'s
+  pointer at Plan 0053 Phase 3 (`core/src/render/mod.rs:3223-3225`) is re-pointed at this test.
+- **Running alongside Plan [0059](0059-lorenz-finds-its-plane.md), which is live in a parallel
+  session as of 2026-08-04.** No file is shared — that plan's Phase 4 is `presets/attractor_*.toml`
+  and this one is `core/src/render/mod.rs`, `core/tests/dsp.rs` and `docs/specs/`. Three
+  consequences, all mechanical:
+  - **Commit with explicit pathspecs** (`git commit -- <paths>`). `git commit` takes the whole
+    index, so a file the other session has staged sweeps into your commit otherwise. This repo has
+    been bitten by it before.
+  - **Expect `target/` lock contention.** Two concurrent cargo invocations produced a Windows
+    `LNK1104: cannot open file ...exe` in this session — a stale handle, not a code failure.
+    Re-run rather than diagnosing it.
+  - **Do not touch `core/tests/sanity.rs`.** [0059] Phase 4 may re-derive coverage floors there;
+    this phase has no business in that file.
 - ~~**Route back to `architect` if:** Phase 2's ratio does not clear the fallback condition in Risks
   below.~~ **This fired.** The ratio came back at `0.036654`, under the `0.05` condition, and the
   decision was taken in
