@@ -1,0 +1,70 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The attractor's DEPTH CUES (Plan 0063, ADR-0076), which the per-SystemKind
+# roster structurally cannot reach. `attractor.toml` is De Jong, and a 2-D
+# family's inverse depth extent is exactly 0.0 by design - so `perspective`,
+# `depth_fade` and `depth_hue` are the identity there no matter how badly they
+# are broken. This is a 3-D family with all four levers off their defaults, and
+# it is the only thing in the suite that would notice a regression in them.
+#
+# WHAT EACH VALUE IS HOLDING - none of these is a look choice:
+#   family      lorenz, so the projection takes the 3-D branch at all. Its basis
+#               is x-z (ADR-0068), which puts the depth axis on y.
+#   density     0.02 -> 1000 particles at the floor tier. Sparse enough that the
+#               figure reads as separable traces rather than a fog, so a
+#               magnification or fade change moves recognisable geometry.
+#   perspective 0.5 -> a 3:1 near-to-far magnification ratio, comfortably inside
+#               the silent 0.8 clamp. At 0 the whole magnification is the exact
+#               identity and this fixture would pin nothing.
+#   depth_fade  0.95 -> the far end at 5% brightness. THIS VALUE WAS SET BY
+#               MEASUREMENT AND THE FIRST GUESS WAS WRONG. At 0.6 (the far end
+#               at 40%) neutralizing the fade moved the capture by mean 0.0091
+#               and a single-channel outlier of exactly 48 - UNDER the 0.02 mean
+#               tolerance and ON the 48 outlier one, so a regression that killed
+#               `depth_fade` outright would have passed this guard. The
+#               reasoning that picked 0.6 was that the extreme blacks the far
+#               material out and leaves fewer pixels to move; what it missed is
+#               that the fade mostly dims material that is already dim, so a
+#               mild setting moves almost no bytes at all. At 0.95 the same
+#               neutralization reads mean 0.0169 / outlier 92, which the
+#               outlier gate fails decisively.
+#   depth_hue   0.35 -> a +/-0.175 swing of the palette coordinate across the
+#               depth range, which is a visible traverse of the default spectrum.
+#   spin        3.0 -> three times the base 0.18 rad/s, so the 60 warm-up frames
+#               turn through ~31 degrees. At the default 1.0 they turn through
+#               ~10, which is little enough that the depth ordering barely
+#               changes and the capture would be weakly sensitive to the phase.
+#   fade/size   a trail long enough that the traces read, at a nib that does not
+#               clip the accumulation to flat white.
+#
+# THE GUARD IS DEMONSTRATED, NOT ASSUMED. Each lever was neutralized in turn and
+# the capture re-measured against this baseline (tolerances: mean 0.02, outlier
+# 48):
+#
+#   perspective -> 0     mean 0.1193   outlier 253
+#   depth_fade  -> 0     mean 0.0169   outlier  92
+#   depth_hue   -> 0     mean 0.0462   outlier 103
+#   spin        -> 1     mean 0.0956   outlier 253
+#
+# All four fail. If you weaken a value here, re-run that check - a fixture that
+# renders a pretty figure and notices nothing is worse than no fixture, because
+# it reads as coverage.
+#
+# Constant-driven throughout, so the capture is a pure function of the seeded
+# scatter and the fixed step sequence (NFR 6) and reproduces exactly on WARP.
+system = "attractor"
+name   = "fixture_attractor_depth"
+
+[particles]
+family  = "lorenz"
+density = 0.02
+
+[params]
+size        = "0.35"
+fade        = "0.90"
+zoom        = "1.30"
+exposure    = "0.30"
+perspective = "0.5"
+depth_fade  = "0.95"
+depth_hue   = "0.35"
+spin        = "3.0"
