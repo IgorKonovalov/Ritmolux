@@ -399,12 +399,66 @@ fn load_capture(path: &Path) -> CaptureImage {
     }
 }
 
+/// A three-preset library across **two** families, written to a scratch directory
+/// so `--report`'s cost is a property of this test rather than of how many presets
+/// the project happens to ship.
+///
+/// This ran against `presets/` until 2026-08-04, where it was the slowest test in
+/// CI by a factor of two — 948.9 s on `check (windows-latest)`, 61% of the whole
+/// nextest wall clock, because `--report` probes every preset over the full window
+/// and the shipped library had grown to 35. None of that expense reached the
+/// assertion: the claim is that a hand-rolled emitter produces well-formed JSON,
+/// which one family cannot show and thirty-five prove no better than three.
+///
+/// Three, not one, and two families rather than one, because the emitter writes
+/// its separators by hand: two entries in `families` exercise the comma between
+/// family objects and two presets inside `spectrum` the comma between preset
+/// objects. A single-preset report — which the transient test already covers via
+/// `--preset-file` — walks neither path.
+///
+/// Both families are line scenes, the cheapest thing `shot` can probe, and the two
+/// spectrum entries differ in more than their name so the near-duplicate pass has
+/// nothing to report.
+fn tiny_report_library() -> PathBuf {
+    let dir = scratch("json-report-library");
+    for (file, toml) in [
+        (
+            "one.toml",
+            "system = \"spectrum\"\nname = \"ReportOne\"\n\
+             [params]\nbase = \"0.05\"\nscale = \"1.1\"\nthickness = \"6\"\n\
+             hue = \"0.55\"\nbrightness = \"0.9\"\n",
+        ),
+        (
+            "two.toml",
+            "system = \"spectrum\"\nname = \"ReportTwo\"\n\
+             [params]\nbase = \"0.4\"\nscale = \"0.6\"\nthickness = \"2\"\n\
+             hue = \"0.12\"\nbrightness = \"0.7\"\n",
+        ),
+        (
+            "three.toml",
+            "system = \"parametric_curve\"\nname = \"ReportThree\"\n\
+             [curve]\nfamily = \"maurer_rose\"\n\
+             [params]\nn = \"6\"\nd = \"71\"\nsamples = \"361\"\nscale = \"0.8\"\n\
+             spin = \"0\"\nhue = \"0.55\"\nthickness = \"2.0\"\nbrightness = \"0.9\"\n\
+             draw_progress = \"1\"\n",
+        ),
+    ] {
+        std::fs::write(dir.join(file), toml).expect("write report fixture");
+    }
+    dir
+}
+
 /// `--report --json` emits parseable JSON with the documented top-level shape. The
 /// report is hand-rolled (no serde), so nothing but a consumer proves it is
 /// well-formed — and the `preset-author` lane is that consumer.
+///
+/// Read over [`tiny_report_library`] rather than the shipped set: see there for why
+/// the preset count was never part of the claim.
 #[test]
 fn the_json_report_is_well_formed_and_carries_its_top_level_keys() {
-    let out = run(&["--report", "--json", "--presets", "presets"]);
+    let dir = tiny_report_library();
+    let dir_arg = dir.to_string_lossy().into_owned();
+    let out = run(&["--report", "--json", "--presets", &dir_arg]);
     if skipped_for_no_adapter(&out) {
         return;
     }
@@ -424,6 +478,17 @@ fn the_json_report_is_well_formed_and_carries_its_top_level_keys() {
             top_level_keys(&json).iter().any(|k| k == key),
             "the report is missing top-level key `{key}`; keys were {:?}",
             top_level_keys(&json)
+        );
+    }
+
+    // Both fixture families reached the map, so the balance check above was made
+    // over a report that actually walked the hand-written separators — otherwise
+    // a shrunken library would quietly turn this into a single-object test.
+    for family in ["spectrum", "parametric_curve"] {
+        assert!(
+            json.contains(&format!("\"{family}\":")),
+            "the report dropped the `{family}` family, so the emitter's \
+             between-families comma went untested:\n{json}"
         );
     }
 }
