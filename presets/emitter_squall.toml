@@ -1,0 +1,112 @@
+# Squall - light driven across the frame at an angle, in sweeping arcs.
+#
+# THE POINT OF DIFFERENCE FROM SPARKS IS THE EXIT, NOT THE COLOUR. Sparks throws
+# straight up and its marks leave through the BOTTOM, falling back the way they
+# came; that picture is a rising column. This one throws hard off vertical, so a
+# mark crosses the frame and leaves through the SIDE - the arc is a traverse, not
+# a rise, and the whole population streams one way. That is a shape difference,
+# which matters because the `distinctness` report measures shape and a recolour
+# of Sparks would not have been a second look.
+#
+# THE ARITHMETIC. `launch_angle` is radians clockwise from straight up, so a
+# throw at 0.92 rad splits its speed cos/sin: at v = 5.6 that is 3.39 up and 4.46
+# across. The rise gives a crest 3.39^2 / (2 * 6.4) = 0.90 above the source line
+# at y = -1.12, i.e. y = -0.22 - just below centre, so the turn-over happens in
+# shot. Meanwhile 4.46 across covers the 3.56-wide 16:9 frame in 0.8 s. That
+# ratio is the look: every mark is visibly falling AND visibly travelling, and it
+# leaves sideways before it can pile up.
+#
+# TWO DRAFTS DIED TO GET HERE AND BOTH FAILURES ARE WORTH KNOWING.
+#
+# The first was a vertical fountain with the crest deliberately INSIDE the frame,
+# on the theory that a wide launch cone would spread the crest heights into a
+# dome. It does not. Crest height goes as cos^2 of the launch angle, so the fan
+# varies it DOWNWARD from the vertical mark's maximum - the top edge stays a hard
+# horizontal line exactly where Sparks' note says it will be, with everything
+# below it filled in. Sparks throws its crest off-frame for a real reason.
+#
+# The second was this geometry at a fifth of the density, which looked far better
+# - individual parabolas, lots of dark - and FAILED THE GATES. `animation.rs`
+# renders at 96x96 and measures a whole-frame difference, so a sparse field of
+# small marks reads near zero however obviously it is moving (design-backlog
+# 0009). It scored `anim` 0.005 against a 0.01 floor and three of four reactivity
+# bands under 0.02. The density below is the lowest that clears both with margin,
+# measured rather than guessed: at this rate `anim` is 0.018 and the bands are
+# 0.025 / 0.018 / 0.032 / 0.023. It is a real constraint on how sparse anything
+# on this idiom can be, and it is a gate limitation rather than a taste - worth
+# revisiting if that floor ever learns about coverage.
+system = "emitter"
+name = "Squall"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#050a18" },
+  { at = 0.28, color = "#1d3f7a" },
+  { at = 0.58, color = "#4f8fd6" },
+  { at = 0.84, color = "#a9d4f5" },
+  { at = 1.00, color = "#f2f8ff" },
+]
+
+[params]
+# THE SOURCE. Bass adds marks rather than light - more weather, not brighter
+# weather. The base matches Sparks' but the on-screen population is lower, because
+# these marks exit sideways in well under their lifetime instead of arcing the
+# full height of the frame and back.
+spawn_rate = "470 + clamp(bass * 329, 0, 280) + clamp(onset * 424, 0, 254)"
+
+# THE THROW. Keep the pair together: raising `launch_speed` without `gravity`
+# pushes the crest off the top and the turn-over stops being visible.
+launch_speed = "5.60 + clamp(mid * 0.494, 0, 0.42)"
+gravity      = "6.4"
+launch_angle = "0.92 + sin(time * 0.061) * 0.13"
+
+# THE CONE. Narrow on purpose: this is driven weather, and a wide fan turns a
+# directional stream back into a shower. Wide enough that the arcs are not
+# tram-lines, and no wider.
+spread          = "0.30 + clamp(onset * 0.20, 0, 0.12)"
+size_spread     = "0.70"
+lifetime_spread = "0.55"
+
+# LIFE. Covers the longest traverse - a mark launched from the upwind edge - and
+# no more. Lifetime past the exit is wasted pool, because a mark that has left the
+# frame is retired the moment it does.
+lifetime = "1.7"
+size     = "2.05 + clamp(treb * 0.633, 0, 0.38)"
+
+# Fast tumble, strong blink. `twinkle` draws its RATE as well as its phase from
+# the object's seed, which is what keeps the field steady while its members blink;
+# a shared rate would flash the whole squall as one sheet.
+spin    = "0.85 + clamp(mid * 0.741, 0, 0.63)"
+twinkle = "0.52 + clamp(treb * 0.467, 0, 0.28)"
+
+brightness = "1.12 + clamp(bass * 0.400, 0, 0.34)"
+hue        = "mod(0.60 + time * 0.009, 1)"
+hue_spread = "0.38 + clamp(treb * 0.300, 0, 0.18)"
+hue_center = "0.58"
+saturation = "0.98"
+
+zoom  = "1.00"
+pan_x = "sin(time * 0.031) * 0.05"
+
+# COMPOSITE. `trails` draws the arc - a decaying smear behind an object that
+# LEAVES is a comet tail, where behind a wrapping particle it is a current. Held
+# at a length that shows the curve of a parabola without neighbouring tails
+# merging into a sheet, which is what the first draft did at 0.64.
+trails      = "0.44 + clamp(mid * 0.188, 0, 0.16)"
+# `bg_hue` feeds a COSINE palette, not an HSV wheel, so the number is not the hue
+# you would guess. Measured on this build: 0.00 crimson, 0.15 magenta, 0.30 blue,
+# 0.45 teal, 0.60 green, 0.85 amber. An earlier draft read 0.60 as "blue" and
+# rendered the storm on a green sky.
+bg_hue      = "0.30 + sin(time * 0.014) * 0.03"
+bg_bright   = "0.016 + clamp(treb * 0.0217, 0, 0.013)"
+bg_vignette = "0.68"
+
+[smoothing]
+spawn_rate   = { attack = 0.05, release = 0.58 }
+launch_speed = { attack = 0.10, release = 0.40 }
+launch_angle = 0.85
+brightness   = { attack = 0.06, release = 0.32 }
+size         = { attack = 0.07, release = 0.38 }
+hue_spread   = 0.9
+trails       = 0.50
+bg_bright    = 0.30
