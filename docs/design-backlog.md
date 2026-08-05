@@ -1185,3 +1185,60 @@ passing `anim` is not evidence of a *watchable* preset on this family.
 **Low-medium.** Purely advisory, but it is the difference between the family's first two presets
 looking alive and looking like wallpaper, and neither the gates nor `--report`'s `anim` column
 flags it.
+
+## 0067 — `depth_fade` is a uniform dimmer on every flat family, where the other two depth cues are exact no-ops
+
+- **Raised:** 2026-08-05, from `preset-author`, while looking for depth on the IFS family.
+- **Verified by measurement:** yes — per-parameter capture diffs on `attractor_dissolve`.
+
+ADR-0076's design is that a 2-D family has an inverse depth extent of **exactly `0.0`**, so every
+depth cue collapses to the identity "with no shader branch, no division and no way to reach a
+`NaN`". Two of the three do. The third does not.
+
+Isolated on `attractor_dissolve` (an IFS, so `dn ≡ 0`), each parameter set alone against an
+otherwise identical capture:
+
+| parameter | value | pixels differing | max channel delta |
+|---|---|---|---|
+| `perspective` | 0.7 | **0** of 921 600 | 0 |
+| `depth_hue` | 0.6 | **0** of 921 600 | 0 |
+| `depth_fade` | 0.9 | **184 989** (20.1 %) | **97** |
+
+The arithmetic is straightforward once seen. `haze(dn) = 1 - depth_fade * (1 - depth01(dn))` and
+`depth01(dn) = (dn + 1) * 0.5`, so at `dn = 0` the multiplier is `1 - depth_fade/2` — **not 1**. A
+flat figure at `depth_fade = 0.9` is uniformly dimmed by 45 %, with no gradient, because "mid depth"
+is the only depth it has.
+
+It is arithmetically consistent — `dn = 0` genuinely is the middle of the depth range, and the middle
+of a fade is half of it. It is not what the ADR's own summary claims, and it is not what
+`presets/README.md` claimed either until this entry (that text has been corrected).
+
+**Why it matters more than a doc slip.** It is a trap in both directions. An author binding
+`depth_fade` on a 2-D preset expecting nothing gets a 45 % brightness cut that looks like the preset
+being mysteriously dark; an author who *notices* the dimming may start using `depth_fade` as a
+brightness trim, which works, is undocumented, and would break the moment anyone gave the IFS family
+a third dimension. `exposure` is the parameter that means "dimmer" and says so.
+
+**Note this is not IFS-specific** — `de_jong` and `clifford` have had it since Plan 0063 / ADR-0076
+landed. Neither shipped preset binds `depth_fade`, which is why it went unnoticed.
+
+### What a fix would be
+
+Three options, in ascending cost.
+
+1. **Document it** — done, in `presets/README.md`'s depth section. Cheapest, and leaves the
+   asymmetry live.
+2. **Make it a true no-op**, by multiplying the fade term by whether the family has depth at all:
+   `1 - depth_fade * (1 - depth01(dn)) * has_depth`, where `has_depth` is `0` when the inverse extent
+   is `0`. That restores the ADR's stated property — all three cues identical on a flat family — for
+   one extra multiply and no branch, in the same style as the existing zero-extent trick. It would
+   move any baseline of a preset that binds `depth_fade` on a flat family; none does.
+3. **Redefine `depth01` so a flat family reads as nearest** rather than mid. Cleaner conceptually
+   (a figure with no depth is not "half far away") but it changes the meaning of `dn = 0` for the 3-D
+   families too, so it is the one that needs thought rather than a patch.
+
+### Priority
+
+**Low-medium.** Nothing renders wrong today and no shipped preset touches it. But it is a stated
+invariant that is false, and the ADR leans on the "no branch, no division" phrasing as evidence the
+design is clean — which is true for two thirds of it.
