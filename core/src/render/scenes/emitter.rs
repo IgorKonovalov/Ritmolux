@@ -62,6 +62,7 @@
     clippy::unreachable
 )]
 
+use super::marks;
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::gpu;
@@ -92,20 +93,23 @@ const SOURCE_Y: f32 = -1.12;
 /// The sprite's world half-size at `size = 1`, before the per-object size draw.
 const BASE_SIZE: f32 = 0.019;
 
-/// The mark's minor axis as a fraction of its major one.
+/// The mark's minor axis as a fraction of its major one — **this scene's `disc`**.
 ///
-/// **This is what keeps `spin` from being a no-op, and it is not a shape
-/// vocabulary.** The fragment falloff is still the single radial function the
-/// swarm's is; this scales one axis of the distance it measures, so the mark is a
-/// soft elongated *glint* rather than a perfect disc. A perfect disc is
-/// rotationally symmetric, so rotating its quad would change nothing at all and
-/// `spin` would join the list of parameters that are documented and do nothing
-/// (the swarm's `hue` was one for four plans). One constant, one falloff — the
-/// question of whether the engine should draw genuinely *shaped* marks stays open
-/// in design-backlog 0033 and is explicitly not this plan's.
+/// It exists because a perfect disc is rotationally symmetric, so rotating its
+/// quad would change nothing at all and `spin` would join the list of parameters
+/// that are documented and do nothing (the swarm's `hue` was one for four plans).
+/// One constant on one radial falloff makes the mark a soft elongated *glint*
+/// instead, which a rotation can be seen in.
 ///
-/// Sized so the elongation reads at a few pixels across without the mark
-/// becoming a streak: at 0.55 the long axis is not quite twice the short one.
+/// Sized so the elongation reads at a few pixels across without the mark becoming
+/// a streak: at 0.55 the long axis is not quite twice the short one.
+///
+/// **Plan 0070 answered the shape question this used to defer** (ADR-0084), and
+/// deliberately left this arm alone: `shape = disc` on the emitter is *this*
+/// figure, not a circle, so every existing preset and the golden baseline are
+/// untouched. The roster's other four silhouettes are evaluated on the
+/// un-squashed sprite frame, so a star is a star rather than a squashed one — and
+/// `spin` turns it, which is what makes a shaped mark read as an object.
 const GLINT_ANISO: f32 = 0.55;
 
 /// The per-object twinkle rate, in Hz, at the two ends of the seeded draw.
@@ -168,16 +172,29 @@ const DEFAULT_PALETTE_MIX: f32 = 0.0;
 // Shared view transform (ADR-0018): identity by default.
 const DEFAULT_ZOOM: f32 = 1.0;
 const DEFAULT_PAN: f32 = 0.0;
+// The shared mark silhouette (ADR-0084). `disc` is this scene's glint, exactly
+// as it was, so an unbound emitter is unchanged.
+const DEFAULT_SHAPE: f32 = marks::DEFAULT_SHAPE;
+const DEFAULT_POINTS: f32 = marks::DEFAULT_POINTS;
 
 /// The WGSL, with `%ANISO%` substituted from [`GLINT_ANISO`] at module creation
 /// so the elongation exists in exactly one place — a second copy in the shader
 /// string is a constant that drifts silently the first time the Rust one moves.
+/// The shared mark-silhouette chunk ([`marks::sdf_wgsl`]) is prepended, so
+/// `mark_distance` here is the same function the swarm evaluates.
+///
+/// `shape` / `points` travel vertex -> fragment as flat varyings, as they do on
+/// the swarm — see that scene's shader comment for why a per-draw value goes
+/// through the varyings rather than through a wider bind-layout visibility.
 const SHADER: &str = r#"
 const ANISO: f32 = %ANISO%;
 
 struct Misc {
     // x: aspect, y: zoom, zw: pan (the shared ViewTransform, ADR-0018)
     v: vec4<f32>,
+    // x: mark shape index, y: quantized point count (ADR-0084). Per draw, not
+    // per instance.
+    m: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> misc: Misc;
@@ -186,6 +203,8 @@ struct VsOut {
     @builtin(position) pos: vec4<f32>,
     @location(0) local: vec2<f32>,
     @location(1) color: vec3<f32>,
+    @location(2) @interpolate(flat) shape: f32,
+    @location(3) @interpolate(flat) points: f32,
 }
 
 @vertex
@@ -217,14 +236,24 @@ fn vs_main(
     out.pos = vec4<f32>(world.x / misc.v.x, world.y, 0.0, 1.0);
     out.local = c;
     out.color = color;
+    out.shape = misc.m.x;
+    out.points = misc.m.y;
     return out;
 }
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    // One radial falloff with one axis scaled: a soft elongated glint, which is
-    // what makes a rotation visible at all.
-    let d = length(vec2<f32>(in.local.x, in.local.y / ANISO));
+    // This scene's `disc` is the glint, not a circle: one radial falloff with one
+    // axis scaled, which is what makes a rotation visible at all. Left exactly as
+    // it was so every shipped emitter preset is untouched (ADR-0084). The
+    // roster's other silhouettes read the un-squashed sprite frame, so a star is
+    // a star rather than a squashed one.
+    var d: f32;
+    if (in.shape < 0.5) {
+        d = length(vec2<f32>(in.local.x, in.local.y / ANISO));
+    } else {
+        d = mark_distance(in.local, in.shape, in.points);
+    }
     let falloff = max(0.0, 1.0 - d);
     let g = falloff * falloff;
     // Premultiplied: colour AND alpha carry the same coverage `g`, so the four
@@ -250,6 +279,9 @@ struct Instance {
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Misc {
     v: [f32; 4],
+    /// `[shape, points, 0, 0]` — the mark silhouette, quantized on the way in
+    /// (ADR-0084), padded to a second `vec4` by WGSL's uniform layout rule.
+    m: [f32; 4],
 }
 
 /// One thrown object. Everything here is fixed at spawn — the path is decided
@@ -617,6 +649,10 @@ pub const PARAMS: &[&str] = &[
     "zoom",
     "pan_x",
     "pan_y",
+    // The shared mark silhouette (ADR-0084) — the same two names the swarm
+    // carries; `marks::PARAMS` is the single statement of the pair.
+    "shape",
+    "points",
 ];
 
 /// Objects that spawn, fall on a parabola, and die (ADR-0057).
@@ -658,6 +694,12 @@ pub struct EmitterScene {
     zoom: f32,
     pan_x: f32,
     pan_y: f32,
+    /// The mark silhouette and its point count, **as bound** (ADR-0084). Both
+    /// are quantized on the way to the uniform, not here, so a `[smoothing]`-eased
+    /// binding still eases — it just steps at the midpoints
+    /// (see [`marks::mark_points`]).
+    shape: f32,
+    points: f32,
 }
 
 impl EmitterScene {
@@ -674,9 +716,14 @@ impl EmitterScene {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("emitter-shader"),
             source: wgpu::ShaderSource::Wgsl(
-                SHADER
-                    .replace("%ANISO%", &format!("{GLINT_ANISO:?}"))
-                    .into(),
+                // The shared silhouette chunk first, then this scene's own
+                // source — one `mark_distance`, two scenes (ADR-0084).
+                format!(
+                    "{}{}",
+                    marks::sdf_wgsl(),
+                    SHADER.replace("%ANISO%", &format!("{GLINT_ANISO:?}"))
+                )
+                .into(),
             ),
         });
         let instances = device.create_buffer(&wgpu::BufferDescriptor {
@@ -818,6 +865,8 @@ impl EmitterScene {
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
+            shape: DEFAULT_SHAPE,
+            points: DEFAULT_POINTS,
         }
     }
 
@@ -885,6 +934,8 @@ impl Scene for EmitterScene {
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
+        self.shape = DEFAULT_SHAPE;
+        self.points = DEFAULT_POINTS;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -909,6 +960,8 @@ impl Scene for EmitterScene {
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
+            "shape" => self.shape = value,
+            "points" => self.points = value,
             _ => {}
         }
     }
@@ -982,6 +1035,15 @@ impl Scene for EmitterScene {
             0,
             bytemuck::bytes_of(&Misc {
                 v: [self.aspect, self.zoom, self.pan_x, self.pan_y],
+                // Quantized here, on the way into the uniform, so the shader's
+                // precondition stays visible on the CPU side: no fractional
+                // point count ever reaches an angular fold (ADR-0084).
+                m: [
+                    marks::mark_shape(self.shape),
+                    marks::mark_points(self.points),
+                    0.0,
+                    0.0,
+                ],
             }),
         );
         if let Some(live) = self.instance_data.get(..self.draw_count)
@@ -1030,6 +1092,49 @@ mod tests {
 
     /// A test aspect, and the retirement bound it gives.
     const ASPECT: f32 = 16.0 / 9.0;
+
+    /// **The two particle scenes share one shape vocabulary** (Plan 0070 Phase
+    /// 2's done-when): the same parameter names, and the same set of `shape`
+    /// values, because the roster is one list in one place and both scenes go
+    /// through the same quantizer to reach it.
+    ///
+    /// It lives here rather than in `marks.rs` because this is the file that can
+    /// see both scenes — and because the *second* adopter is where a drift would
+    /// be introduced.
+    ///
+    /// The last claim is the one that would catch a scene quietly growing its
+    /// own roster: every value outside the list clamps to the same place, so a
+    /// private copy with a different ceiling fails here rather than rendering a
+    /// different figure on one of the two scenes.
+    #[test]
+    fn both_particle_scenes_carry_the_same_shape_vocabulary() {
+        use crate::render::scenes::{marks, swarm};
+
+        for name in marks::PARAMS {
+            assert!(
+                swarm::PARAMS.contains(&name),
+                "the swarm must carry `{name}`"
+            );
+            assert!(
+                super::PARAMS.contains(&name),
+                "the emitter must carry `{name}`"
+            );
+        }
+
+        for (index, name) in marks::SHAPES.iter().enumerate() {
+            assert_eq!(
+                marks::mark_shape(index as f32),
+                index as f32,
+                "`{name}` must survive the quantizer as {index}"
+            );
+        }
+        assert_eq!(marks::mark_shape(-1.0), 0.0);
+        assert_eq!(
+            marks::mark_shape(marks::SHAPES.len() as f32),
+            marks::SHAPES.len() as f32 - 1.0,
+            "a shape past the roster clamps to its last entry, for both scenes"
+        );
+    }
 
     /// A spawn config with everything named, so each test says exactly what it
     /// varies.
