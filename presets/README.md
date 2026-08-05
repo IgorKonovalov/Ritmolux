@@ -226,7 +226,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
-| `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
+| `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `size` `size_spread` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` |
 
@@ -242,19 +242,29 @@ Every system additionally accepts the engine-stage params `bg_*`, `trails`,
 `kaleido_*`, `bloom_*`, `exposure`, and the final `ink_*`/`paper_*` remap
 documented there.
 
+> **The `attractor` roster is the one place a param's meaning depends on the
+> family.** `a b c d` mean different things per family and mean *nothing* on the
+> five IFS figures; `morph` `curl` `vigor` `lean` `bias` are **IFS-only** and are
+> inert on the four map families; `perspective` `depth_fade` `depth_hue` reach
+> only the two 3-D flows. Binding an inert one is not an error and produces no
+> warning — it produces nothing at all. See
+> [The five IFS figures](#the-five-ifs-figures--a-different-kind-of-family) and
+> [Attractor depth](#attractor-depth-perspective-depth_fade-depth_hue-spin-plan-0063).
+
 ### Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin` (Plan 0063)
 
-**Three of these four are inert on three of the four families**, the same way
+**Three of these four are inert on every flat family**, the same way
 `a b c d` already carry family-specific meanings. `perspective`, `depth_fade` and
 `depth_hue` do something only on the **3-D families — `thomas` and `lorenz`.**
-On `de_jong`, `clifford` and any other flat figure they are *exactly* the
+On `de_jong`, `clifford` and the five IFS figures they are *exactly* the
 identity: those maps have no third coordinate, so the engine hands the shader a
 depth extent of zero and every cue collapses to a no-op. Binding them there is
 not an error and produces no warning — it produces nothing at all.
 
-`spin` is the exception and reaches **all four**. The discrete maps rotate
+`spin` is the exception and reaches **every** family. The flat ones rotate
 in-plane through the same angle, so an audio-driven `spin` is a real look on
-De Jong today. That asymmetry is deliberate; do not read it as an oversight.
+De Jong today, and a fern that rocks a couple of degrees either side of upright
+reads as wind. That asymmetry is deliberate; do not read it as an oversight.
 
 | Param | What it does | Range that means something |
 |---|---|---|
@@ -1398,10 +1408,11 @@ character is an inert grammar variable.
 
 ### `[particles]` — for `attractor`
 
-| Key       | Values                                       | Notes                                             |
-|-----------|----------------------------------------------|---------------------------------------------------|
-| `family`  | `de_jong`, `clifford`, `thomas`, `lorenz`    | Which strange attractor the compute step iterates. Optional — absent means `de_jong`. |
-| `density` | `0.0005` .. `1.0`                            | What fraction of the tier's particle budget to draw. Optional — absent means `1.0`, the whole budget. |
+| Key        | Values                                                          | Notes                                             |
+|------------|-----------------------------------------------------------------|---------------------------------------------------|
+| `family`   | `de_jong`, `clifford`, `thomas`, `lorenz`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Which figure the compute step iterates. Optional — absent means `de_jong`. The last five are **IFS figures**, not strange attractors — see below. |
+| `density`  | `0.0005` .. `1.0`                                                | What fraction of the tier's particle budget to draw. Optional — absent means `1.0`, the whole budget. |
+| `morph_to` | any **IFS figure** name                                          | The figure the bindable `morph` param travels towards. Optional — absent pins the figure and makes `morph` inert. **A load error on the four map families**, which have no table to interpolate. |
 
 ```toml
 system = "attractor"
@@ -1479,6 +1490,8 @@ The family sets the map **and** the meaning of the four bindable coefficients
 alone at `0.19`; Lorenz `sigma/rho/beta` = `10 28 2.667`, `d` unused). Bind them
 to bands for a morphing cloud, but move them **slowly and by a little** — these
 are chaotic maps, and a large jump reads as a hard cut rather than a morph.
+**On the five IFS figures they mean nothing at all** — that family's shape is an
+affine table, and `morph`/`curl`/`vigor`/`lean`/`bias` are what reach it.
 
 **Each family is viewed in its own plane**, and it matters the moment you reach
 for `zoom` or `pan_*`, because those aim at the figure the plane produces:
@@ -1489,6 +1502,7 @@ for `zoom` or `pan_*`, because those aim at the figure the plane produces:
 | `clifford` | 2-D map    | x–y       | — (in-plane rotation)      |
 | `thomas`   | 3-D flow   | x–y       | `z`                        |
 | `lorenz`   | 3-D flow   | **x–z**   | `y`                        |
+| the five IFS figures | 2-D IFS | x–y | — (in-plane rotation)      |
 
 Lorenz is the exception, and it is one deliberately: its butterfly *lives* in
 x–z, and viewed x–y the two lobes are edge-on — a hard X that reads as a dense
@@ -1501,6 +1515,52 @@ One consequence to author around: the 3-D families spin as a turntable about the
 **vertical** axis, so a quarter turn necessarily leaves the family's own plane.
 Lorenz reads as the butterfly near 0° and 180° and as a low-structure cloud near
 90° and 270° — the plane buys the shape, not the shape at every angle.
+
+#### The five IFS figures — a different kind of family
+
+`fern`, `tree`, `dragon`, `sierpinski` and `spiral` are **iterated function
+systems**, not strange attractors
+([ADR-0075](../docs/adrs/0075-ifs-family-morphs-in-singular-value-space.md)). Same
+scene, same trails, same `density` / `fade` / palette / view surface — different
+step: four affine maps, one drawn at random per particle per step, converging
+onto a *figure* rather than onto a filigree.
+
+**Two things change for you as an author.**
+
+**`a` `b` `c` `d` are inert.** An IFS's shape lives in its affine table, not in
+four scalars. What reaches the figure is the five params below, and they are
+**IFS-only** — inert on `de_jong`, `clifford`, `thomas` and `lorenz`, the same
+way `a`..`d` already carry family-specific meanings.
+
+| Param   | Default | What it does |
+|---------|---------|--------------|
+| `morph` | `0`     | Position from `family` to `[particles] morph_to`. `0` is the named figure, `1` is the target, and every value between is a real figure. Clamped; out of range pins to an endpoint. |
+| `curl`  | `0`     | Radians added to every map's rotation — fronds curl and uncurl. |
+| `vigor` | `1`     | Multiplier on the figure's contraction — a bushier, deeper, denser figure. **Has a silent ceiling; see below.** |
+| `lean`  | `0`     | Radians every translation is rotated by — the plant bends. |
+| `bias`  | `0`     | Moves sampling weight from the trunk/body maps to the branch maps. Geometry is untouched; only the density distribution moves. Inert on `dragon`, whose two maps are both branches. |
+
+**You cannot break the figure with them, and that is the point.** The maps are
+carried as the singular value decomposition of their linear parts, so
+contractivity is a comparison on two numbers and every reachable value —
+including every intermediate `morph` and every combination of the four levers —
+is a converging system. Drive them as hard as you like; unlike `a`..`d` on a
+chaotic map, there is no cliff to fall off.
+
+**`vigor`'s ceiling is silent**, the same shape as `bloom_threshold` and
+`perspective`. Every map's contraction is held under **0.97**, and the fern's
+largest is already `0.851` — so about 17 % of headroom, and asking for more than
+that gets *silence* rather than an error or a warning. Past the ceiling every
+value renders identically. If `vigor` seems to stop responding, that is where it
+stopped.
+
+**The framing follows `morph` but not the levers, deliberately.** The scene
+measures each figure pair's extent at load and re-frames as the morph crosses,
+so an intermediate figure fills the frame instead of drifting off it. It does
+**not** re-frame for the levers, because a fit that did would cancel `vigor`
+exactly — the figure would surge and the frame would shrink it back for a net
+zero. The cost is that a hard `vigor` push can leave the frame; `zoom` is the
+recourse.
 
 ### `[spectrum]` — for `spectrum`
 

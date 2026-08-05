@@ -1,0 +1,77 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The attractor's IFS FAMILY (Plan 0062, ADR-0075), which the per-SystemKind
+# roster structurally cannot reach. `attractor.toml` is De Jong: it takes a
+# different arm of the step shader, its `a`..`d` coefficients ARE its shape, and
+# `morph`/`curl`/`vigor`/`lean`/`bias` are inert on it no matter how badly they
+# are broken. This is a figure mid-morph with all four levers off their
+# defaults, and it is the only thing in the suite that would notice a
+# regression in the SVD decomposition, the morph, the framing fit, or the
+# levers.
+#
+# WHAT EACH VALUE IS HOLDING - none of these is a look choice:
+#   family/     fern -> spiral. Two figures that differ in every way a table
+#   morph_to    can: the fern's stem is rank 1 and its f4 REFLECTS, the spiral's
+#               arm is near the contractivity ceiling. A pair of similar figures
+#               would let a broken interpolation look plausible.
+#   morph       0.35 -> a genuine intermediate, not an endpoint. `resolve`
+#               returns the endpoints EXACTLY (by an early return), so a fixture
+#               at 0 or 1 would exercise the lerp, the shortest-arc angle
+#               interpolation and the fit's interpolation not at all.
+#   density     0.12 -> 6000 particles at the floor tier. Sparse enough at 128px
+#               that the figure reads as separable strokes rather than a fog, so
+#               a geometry change moves recognisable structure.
+#   vigor       1.06 -> inside the headroom at this morph, so the CLAMP does not
+#               fire and the lever's actual arithmetic is what is pinned. A
+#               value past the ceiling would pin the clamp instead and go on
+#               passing if the multiply broke.
+#   curl        0.35 rad added to every map's rotation.
+#   lean        0.40 rad of translation rotation.
+#   bias        0.65 -> weight moved from the body maps to the branch maps. The
+#               only lever that touches no geometry, so it is the one a capture
+#               is weakest at seeing - see the measured table below.
+#   fade/size/  a trail long enough that the strokes read, at a nib that does
+#   zoom        not clip the accumulation to flat white.
+#
+# THE GUARD IS DEMONSTRATED, NOT ASSUMED. Each lever was neutralized in turn and
+# the capture re-measured against this baseline (tolerances: mean 0.02,
+# outlier 48):
+#
+#   morph -> 0        mean 0.1328   outlier 254
+#   curl  -> 0        mean 0.0890   outlier 253
+#   lean  -> 0        mean 0.0915   outlier 253
+#   vigor -> 1        mean 0.0266   outlier 252
+#   bias  -> 0        mean 0.0117   outlier 216
+#
+# All five fail. Four fail both gates; `bias` fails the OUTLIER gate alone, at
+# mean 0.0117 against a 0.02 tolerance. That is the expected shape rather than a
+# weakness, and it is worth stating because it is the one that could be mistaken
+# for a weak fixture: `bias` moves only the DENSITY distribution and leaves
+# every stroke exactly where it was, so it shifts a great many pixels a little
+# and a few a great deal. It is precisely what `MAX_OUTLIER` exists to catch,
+# and without that gate this fixture would not notice `bias` breaking.
+#
+# If you weaken a value here, re-run that check - a fixture that renders a
+# pretty figure and notices nothing is worse than no fixture, because it reads
+# as coverage.
+#
+# Constant-driven throughout, so the capture is a pure function of the seeded
+# scatter and the fixed step sequence (NFR 6) and reproduces exactly on WARP.
+system = "attractor"
+name   = "fixture_attractor_ifs"
+
+[particles]
+family   = "fern"
+morph_to = "spiral"
+density  = 0.12
+
+[params]
+size     = "0.55"
+fade     = "0.90"
+zoom     = "1.10"
+exposure = "0.30"
+morph    = "0.35"
+vigor    = "1.06"
+curl     = "0.35"
+lean     = "0.40"
+bias     = "0.65"
