@@ -23,7 +23,7 @@
 # the drawing rendered as a solid indigo blot with the lattice inside it lost.
 #
 # THE ANSWER IS `density`, NOT A DIMMER (ADR-0069). At the full 50 000
-# particles the lattice is a fog whatever the exposure - the ink remap just
+# particles the lattice is a fog whatever the level - the ink remap just
 # turns a bright fog into a dark one. At 0.02 - 1 000 particles at the floor
 # tier, 3 000 at rich - each trajectory is a separate stroke, the segment joins
 # its steps end to end, and ~25 frames of trail draw the loops as pen lines on
@@ -38,9 +38,9 @@ name = "Thomas"
 
 [particles]
 family = "thomas"
-# The structural half of the drawing - see the header. Not an exposure control:
+# The structural half of the drawing - see the header. Not a level control:
 # the deposit is normalized by count (ADR-0065), so total light is invariant
-# and only its distribution changes. That is also why `exposure` below is set
+# and only its distribution changes. That is also why `brightness` below is set
 # where it is - the same light on 1/50th of the pixels.
 density = 0.02
 
@@ -48,16 +48,23 @@ density = 0.02
 name = "mono"
 
 [params]
-# EXPOSURE - the level the ink ramp reads. `density = 0.02` multiplies each
+# BRIGHTNESS - the level the ink ramp reads. `density = 0.02` multiplies each
 # particle's deposit by 50 and the long `fade` accumulates ~25 frames of it, so
 # left at 1.0 every stroke is far over the tonemap knee, the whole luminance
 # ramp flattens to one value, and the remap paints a flat blot. 0.10 is where
 # the loops separate into lines with the page still white between them.
 # MEASURED on the ladder 1.0 / 0.2 / 0.05: blot, dark drawing, faint wash.
-# `exposure` is engine-wide and crossfades across a preset dissolve, so the
-# blend into this preset passes through a briefly darker page - a transition,
-# not a resting state.
-exposure = "0.10"
+#
+# THIS USED TO BE `exposure`, AND PLAN 0066 MOVED IT. The number is unchanged
+# because the swap is level-neutral - the deposit is scaled where it is made
+# rather than at the tonemap, and everything between is linear - but the cost it
+# carried is gone. The engine-wide stop crossfades across a preset dissolve, so
+# the ~1 s blend into this preset used to drag the page through a briefly darker
+# state; a scene-local level blends as pixels, so the page arrives white. That
+# matters more here than on any other preset in the set, because the ink remap
+# keys on luminance: a mid-dissolve level error does not merely dim this look,
+# it redraws which strokes are ink.
+brightness = "0.10"
 # SHAPE - Thomas uses `a` alone (canonical 0.19). Small numbers matter here: the
 # lattice opens out below ~0.17 and knots up above ~0.21.
 # THE TREBLE BINDING MOVED HERE, and the reason is worth keeping. This preset
