@@ -102,6 +102,45 @@ fn fixture_with(amount: f32, threshold: f32, radius: f32) -> Preset {
     Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("bloom fixture parses: {e}"))
 }
 
+/// The fixture's own scene `brightness`, which its header calls out as the reason
+/// the knot is over range at all.
+const FIXTURE_BRIGHTNESS: f32 = 3.0;
+
+/// The same fixture with the scene's level and the frame's stop both spelled out
+/// alongside the three `bloom_*` bindings (Plan 0066 Phase 2).
+///
+/// `exposure = None` leaves it unbound — what every shipped golden fixture does,
+/// and therefore the case whose pixels may not move.
+///
+/// The scene `brightness` is a knob here because a stop and a level are the two
+/// halves of one product: the bright-pass now compares `scene light x exposure`,
+/// so a test that lowered only the stop would be measuring a black frame rather
+/// than the threshold (measured: at `exposure = 0.03` on the shipped level every
+/// pixel of the capture rounds to 0 and both thresholds report a halo energy of
+/// exactly 0). Raising the level to compensate is not a dodge — it is precisely
+/// the configuration the two shipped attractor presets are in, and the reason they
+/// reached for an extreme stop in the first place.
+fn fixture_exposed(brightness: f32, amount: f32, threshold: f32, exposure: Option<f32>) -> Preset {
+    let base: String = FIXTURE
+        .lines()
+        .filter(|line| {
+            let line = line.trim_start();
+            !line.starts_with("bloom_")
+                && !line.starts_with("exposure")
+                && !line.starts_with("brightness")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut toml = format!(
+        "{base}\nbrightness = \"{brightness}\"\nbloom_amount = \"{amount}\"\n\
+         bloom_threshold = \"{threshold}\"\nbloom_radius = \"1.0\"\n"
+    );
+    if let Some(exposure) = exposure {
+        toml.push_str(&format!("exposure = \"{exposure}\"\n"));
+    }
+    Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("bloom fixture parses: {e}"))
+}
+
 /// The fixed frame every capture is taken under — the same one `composite.rs`
 /// blesses its baselines at.
 fn fixed_frame() -> AnalysisFrame {
@@ -282,6 +321,100 @@ fn the_halo_follows_its_params_and_is_round() {
         "the halo is {ratio:.2}:1 elongated on a square target (x {sx:.2} px, \
          y {sy:.2} px) — the separable kernel's two passes are stepping in \
          different units"
+    );
+}
+
+/// **`bloom_threshold` is compared against EXPOSED light** (Plan 0066 Phase 2,
+/// ADR-0080).
+///
+/// The chain is scene -> post -> tonemap, so the bright-pass used to threshold the
+/// frame *before* `exposure` scaled it. That made the parameter meaningful only
+/// while a preset sat near `exposure = 1.0`: at `0.03` the whole figure is over
+/// every threshold the engine allows (`MAX_THRESHOLD = 8.0`), so `0.95` and `8.0`
+/// selected the same thing. `presets/attractor_lorenz.toml` shipped its threshold
+/// pinned at the ceiling with a header saying to read it as *capped, not tuned* —
+/// this is the property that was absent under it.
+///
+/// Both halves are asserted. The second is the one that makes the golden suite a
+/// **check** rather than a re-bless: no shipped fixture binds `exposure`, so if
+/// the neutral stop is not exactly the identity here, every baseline moves.
+#[test]
+fn the_bright_pass_thresholds_exposed_light() {
+    let Some(mut renderer) = headless(Tier::Floor) else {
+        return;
+    };
+    let mut shoot = |brightness: f32, amount: f32, threshold: f32, exposure: Option<f32>| {
+        renderer.set_presets(vec![fixture_exposed(
+            brightness, amount, threshold, exposure,
+        )]);
+        renderer
+            .capture_preset(FIXTURE_NAME, &fixed_frame(), FRAMES)
+            .unwrap_or_else(|e| panic!("capture at threshold {threshold}: {e}"))
+    };
+
+    // --- the neutral stop is the exact identity ---
+    //
+    // An explicit `exposure = 1.0` and no `exposure` at all must produce the same
+    // bytes: the bright-pass's new multiply is by literal 1.0 either way. Every
+    // fixture in the golden suite is the unbound case.
+    let unbound = shoot(FIXTURE_BRIGHTNESS, 1.0, 1.0, None);
+    let neutral = shoot(FIXTURE_BRIGHTNESS, 1.0, 1.0, Some(1.0));
+    assert_eq!(
+        unbound.rgba, neutral.rgba,
+        "at `exposure = 1.0` the bright-pass must be byte-identical to the unbound \
+         frame — the multiply is by literal 1.0, which is the IEEE-754 identity. If \
+         these differ, every golden baseline has moved and Phase 3 is a re-bless \
+         rather than a check"
+    );
+
+    // --- and at a low stop the threshold discriminates ---
+    //
+    // `exposure = 0.03` is Lorenz's shipped value, with the scene's level raised by
+    // the same factor so the frame the *display* sees is the one the baseline is
+    // taken at — see [`fixture_exposed`]. `0.95` against the `8.0` ceiling is the
+    // exact pair backlog 0057 reports as indistinguishable on Lorenz.
+    const LOW_STOP: f32 = 0.03;
+    let lifted = FIXTURE_BRIGHTNESS / LOW_STOP;
+    // The stage switched off, so this is the frame's own light outside the core —
+    // the rose's outer arms, which no threshold puts there and which both captures
+    // below therefore carry. The halo is the EXCESS over it.
+    let off = shoot(lifted, 0.0, 1.0, Some(LOW_STOP));
+    let core = lit_radius(&off) * CORE_MARGIN;
+    let floor = halo_energy(&off, core);
+    let permissive = shoot(lifted, 2.0, 0.95, Some(LOW_STOP));
+    let strict = shoot(lifted, 2.0, 8.0, Some(LOW_STOP));
+    let (loose_halo, tight_halo) = (
+        halo_energy(&permissive, core) - floor,
+        halo_energy(&strict, core) - floor,
+    );
+    eprintln!(
+        "at exposure {LOW_STOP} (scene brightness {lifted}): halo energy over the \
+         {floor:.0} the bare frame already carries — {loose_halo:.0} at threshold \
+         0.95, {tight_halo:.0} at 8.0"
+    );
+    assert!(
+        loose_halo > 0.0,
+        "the permissive threshold must select something at all, or the comparison \
+         below is between two empty frames"
+    );
+    // The bar is 1.25:1, and it is sized from measurement rather than taste. The
+    // same two captures, taken against a build whose bright-pass compares
+    // pre-exposure light (the multiply forced back to 1.0), read **168424 and
+    // 166737** — a ratio of 1.010, which is the "near-indistinguishable" backlog
+    // 0057 recorded. Against this build they read **161069 and 99989**, a ratio of
+    // 1.611. 1.25 sits an order of magnitude clear of the defect and a comfortable
+    // margin under the fix.
+    //
+    // The strict threshold still blooms a great deal, and that is correct rather
+    // than a weak result: the rose's self-crossings sum well past 8 even after the
+    // stop, so the 8.0 ceiling still selects the knot's core. What changed is that
+    // it no longer selects the whole figure.
+    assert!(
+        tight_halo * 1.25 < loose_halo,
+        "`bloom_threshold` does not discriminate at `exposure = {LOW_STOP}`: the 8.0 \
+         ceiling bloomed {tight_halo:.0} against 0.95's {loose_halo:.0}. Under a \
+         pre-exposure comparison the whole figure sits over every reachable \
+         threshold and these two are the same picture"
     );
 }
 
