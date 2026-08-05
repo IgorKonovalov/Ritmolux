@@ -60,6 +60,27 @@ bloom_radius    = "1.1"
 # a still image between beats.
 morph = "0.13 + sin(time * 0.0266) * 0.11 + clamp(bass * 0.18, 0, 0.15)"
 
+# THE FOUR SHAPE LEVERS, and what separates them from the coefficient knobs on
+# a strange attractor: none of them can break the figure. The whole family is
+# parameterized so a preset cannot reach a non-contractive table, which is why
+# these can be driven hard without the reluctance `a`..`d` need on De Jong.
+#
+# vigor - the loudest of the four. The framing is fitted at NEUTRAL levers on
+# purpose (ADR-0075), so this genuinely swells the plant rather than being
+# re-framed back to nothing. The ceiling is 0.97 and the fern's own largest
+# singular value is 0.851, so there is about 17% of headroom - asking for more
+# than that gets silence, not an error. Bound so a beat lands inside it.
+vigor = "1.00 + clamp(bass * 0.09, 0, 0.075) + beat * 0.035"
+# curl - the fronds curl and uncurl. Small: a whole radian is a different plant.
+curl  = "sin(time * 0.021) * 0.10 + clamp(mid * 0.10, 0, 0.085)"
+# lean - the plant bends. Slow and wide, so it reads as wind rather than as a
+# parameter moving.
+lean  = "sin(time * 0.0143) * 0.22 + clamp(bass * 0.13, 0, 0.11)"
+# bias - weight moves from the stem and body to the fronds, so the leaflets
+# brighten while the geometry holds still. The cheapest organic response in the
+# set, and the one most likely to read as breathing rather than as motion.
+bias  = "0.10 + sin(time * 0.031) * 0.26 + clamp(treb * 0.30, 0, 0.26)"
+
 # DENSITY - low base, falling on energy. A fern's leaflets are separated by
 # roughly a point-width at this scale; raising `size` on a peak fuses them into
 # a green blob, which is the one way this figure reads as a mistake.
@@ -97,6 +118,12 @@ bg_vignette = "0.85"
 # The morph is eased hard. It is the most structural thing a preset can move,
 # and a step in it re-forms the whole figure at once.
 morph       = 0.9
+# The shape levers, eased in proportion to how structural each one is. `vigor`
+# is left the quickest of the four so a beat still lands as a surge.
+vigor       = { attack = 0.03, release = 0.28 }
+curl        = 0.45
+lean        = 0.60
+bias        = 0.30
 fade        = 0.18
 size        = { attack = 0.02, release = 0.24 }
 zoom        = 0.14

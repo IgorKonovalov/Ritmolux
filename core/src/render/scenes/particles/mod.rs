@@ -56,7 +56,7 @@ pub mod ifs;
 
 use crate::render::gpu;
 
-use ifs::{FitLut, IfsFigure, IfsPacked, IfsTable};
+use ifs::{FitLut, IfsFigure, IfsPacked, IfsTable, Levers};
 
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
@@ -2008,6 +2008,14 @@ pub struct AttractorScene {
     /// [`ifs::resolve`](ifs::resolve), where extrapolation would be the one
     /// operation that can leave the contractive ball.
     morph: f32,
+    /// The four IFS shape levers (ADR-0075), applied in SVD space by
+    /// [`ifs::resolve`]. Inert on the four map families, which have no table for
+    /// them to act on.
+    ///
+    /// Held as the lever struct rather than four loose floats so the one thing
+    /// that must not happen — a lever reaching [`FitLut::build`] — is a type
+    /// error rather than a discipline.
+    levers: Levers,
     /// Attractor coefficients — named params, so a preset can steer the cloud's
     /// shape with the bands. Their meaning is family-specific.
     a: f32,
@@ -2096,6 +2104,7 @@ impl AttractorScene {
             ifs_ends: None,
             ifs_fit: None,
             morph: DEFAULT_MORPH,
+            levers: Levers::NEUTRAL,
             a,
             b,
             c,
@@ -2290,6 +2299,10 @@ pub const PARAMS: &[&str] = &[
     // IFS-only (ADR-0075). Inert on the four map families, the same way `a`..`d`
     // already carry family-specific meanings.
     "morph",
+    "curl",
+    "vigor",
+    "lean",
+    "bias",
 ];
 
 impl Scene for AttractorScene {
@@ -2352,6 +2365,7 @@ impl Scene for AttractorScene {
         self.depth_hue = DEFAULT_DEPTH_HUE;
         self.spin = DEFAULT_SPIN;
         self.morph = DEFAULT_MORPH;
+        self.levers = Levers::NEUTRAL;
         self.reseed = 0.0;
     }
 
@@ -2376,6 +2390,10 @@ impl Scene for AttractorScene {
             "depth_hue" => self.depth_hue = value,
             "spin" => self.spin = value,
             "morph" => self.morph = value,
+            "curl" => self.levers.curl = value,
+            "vigor" => self.levers.vigor = value,
+            "lean" => self.levers.lean = value,
+            "bias" => self.levers.bias = value,
             "reseed" => self.reseed = value,
             _ => {}
         }
@@ -2492,6 +2510,7 @@ impl Scene for AttractorScene {
             ifs_ends,
             ifs_fit,
             morph,
+            levers,
             dt,
             spin_time,
             family,
@@ -2548,8 +2567,12 @@ impl Scene for AttractorScene {
                 // branch on the family — a map family has no ends cached, and
                 // that is the same question asked once.
                 ifs: ifs_ends.as_ref().map_or(IfsPacked::ZERO, |(a, b)| {
-                    ifs::pack(&ifs::resolve(a, b, *morph))
+                    ifs::pack(&ifs::resolve(a, b, *morph, *levers))
                 }),
+                // **The levers are deliberately absent here** (ADR-0075
+                // Alternative C): the fit is a function of `morph` and the
+                // figure pair only, so `vigor` surges the figure instead of
+                // being re-framed back to a net zero.
                 ifs_frame: ifs_fit.as_ref().map(|fit| fit.sample(*morph)),
                 size: *size,
                 hue: *hue,
