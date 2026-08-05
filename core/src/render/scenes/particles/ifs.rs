@@ -530,24 +530,116 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
 }
 
+/// The ceiling every map's operator norm is held under (ADR-0075).
+///
+/// **A look constant with no principled value**, and it is worth being honest
+/// about that. It is far enough below `1.0` that floating-point error cannot
+/// cross it, and it leaves the fern's largest singular value — `0.851` — about
+/// 17 % to grow, which is what `vigor` has to work with. Whether that is enough
+/// to feel like a surge is a question for the content pass; if it is too tight,
+/// **this constant is the lever and widening the parameterization is not**.
+///
+/// A preset asking for more `vigor` than this allows gets silence rather than an
+/// error — the same undiscoverable-ceiling shape `presets/README.md` already
+/// documents for `bloom_threshold` and `perspective`.
+pub const SIGMA_CEILING: f32 = 0.97;
+
+/// How far [`Levers::bias`] may shift the sampling weight, as a fraction.
+///
+/// At `1.0` a full-scale `bias` would take one group's probability to exactly
+/// zero, which stops drawing part of the figure rather than re-weighting it —
+/// the orbit would then converge onto the *sub*-system of the maps that remain,
+/// a much smaller attractor that the neutral-lever fit does not frame. `0.6`
+/// keeps every map drawn at both extremes.
+const BIAS_DEPTH: f32 = 0.6;
+
+/// The four audio-driven shape levers (ADR-0075), applied in SVD space.
+///
+/// **Built to be safe rather than checked**, which is the whole point of the
+/// parameterization: `curl` and `lean` are rotations and cannot affect
+/// contractivity at all, `bias` moves probabilities and changes only where
+/// points land, and `vigor` is the one that touches the singular values — so it
+/// is the one, and the only one, behind a clamp.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Levers {
+    /// Radians added to **every** map's `θ`. Fronds curl and uncurl.
+    /// Unconditionally safe: `R` is an isometry.
+    pub curl: f32,
+    /// Multiplier on every singular value, under [`SIGMA_CEILING`]. A bushier,
+    /// deeper, denser figure — and the only lever that can reach the cliff.
+    pub vigor: f32,
+    /// Radians every translation vector is rotated about the origin by, bending
+    /// the plant. Translations do not enter contractivity, so this is
+    /// unconditionally safe.
+    pub lean: f32,
+    /// Shifts sampling weight between the **body** maps (canonical indices 0
+    /// and 1) and the **branch** maps (2 and 3), renormalizing. The shape is
+    /// untouched and only the density distribution moves — the cheapest
+    /// genuinely organic response in the set.
+    ///
+    /// Inert on the dragon, whose two real maps both live in the branch slots
+    /// (its body slots are the padding), so there is nothing to shift weight
+    /// away from. Worth a note in the content pass rather than a special case.
+    pub bias: f32,
+}
+
+impl Levers {
+    /// Every lever at rest. The fit is built here, and `resolve` at these values
+    /// is **bit-identical** to `resolve` with no levers at all — every operation
+    /// below is guarded so that neutrality is exact rather than approximate.
+    pub const NEUTRAL: Self = Self {
+        curl: 0.0,
+        vigor: 1.0,
+        lean: 0.0,
+        bias: 0.0,
+    };
+
+    /// The documented extremes, for the sweep that has to cover them.
+    ///
+    /// `curl` and `lean` are angles, so their "extreme" is a look choice rather
+    /// than a limit — a full turn is the same figure. `vigor` is quoted well
+    /// past what [`SIGMA_CEILING`] will grant, precisely so the sweep exercises
+    /// the clamp; `bias` is quoted at the ends of its own range.
+    pub const EXTREMES: [Self; 2] = [
+        Self {
+            curl: -1.5,
+            vigor: 0.4,
+            lean: -1.5,
+            bias: -1.0,
+        },
+        Self {
+            curl: 1.5,
+            vigor: 2.5,
+            lean: 1.5,
+            bias: 1.0,
+        },
+    ];
+}
+
 /// **The pure function everything safety-critical lives in** — no GPU, no clock,
 /// no randomness (ADR-0075).
 ///
 /// Interpolates two figures **in SVD space**, map by map, paired by index:
 /// singular values and translations lerped, angles taken along the shortest arc,
-/// probabilities lerped.
+/// probabilities lerped. Then applies the four levers, in the same space.
 ///
-/// The result is contractive by construction and there is no clamp here to make
-/// it so. A lerp of two values below 1 is below 1, and the angles do not enter
+/// The morph is contractive by construction and there is no clamp making it so.
+/// A lerp of two values below 1 is below 1, and the angles do not enter
 /// contractivity at all — so if both endpoints converge, so does every point on
-/// the path between them. Phase 5's levers are applied on top, in this same
-/// space, and only one of them needs a clamp.
+/// the path between them. Of the levers, only `vigor` can reach the cliff, and
+/// it is held under [`SIGMA_CEILING`] by one comparison on one number.
 ///
 /// Degenerate maps stay legal rather than being special-cased: the fern's stem
 /// is rank 1 (`sx = 0`), and morphing a reflection into a non-reflection passes
 /// through `sy = 0`. Both are contractions — the branch momentarily collapses to
 /// a line and recovers.
-pub fn resolve(a: &IfsTable, b: &IfsTable, morph: f32) -> IfsTable {
+pub fn resolve(a: &IfsTable, b: &IfsTable, morph: f32, levers: Levers) -> IfsTable {
+    apply_levers(morph_tables(a, b, morph), levers)
+}
+
+/// The morph half of [`resolve`], separated so the fit — which must never see a
+/// lever — can call it and be structurally unable to pass one.
+fn morph_tables(a: &IfsTable, b: &IfsTable, morph: f32) -> IfsTable {
     // Clamped rather than trusted: `morph` is a bindable param, so a preset
     // expression can hand this anything. Outside [0, 1] the lerp would
     // extrapolate, and an extrapolated singular value is exactly the one number
@@ -585,6 +677,87 @@ pub fn resolve(a: &IfsTable, b: &IfsTable, morph: f32) -> IfsTable {
         };
     }
     IfsTable { maps }
+}
+
+/// Apply the four levers to a resolved table, in SVD space.
+///
+/// **Every step is guarded so that neutrality is exact.** That is not tidiness:
+/// the fit LUT is built at neutral, so a lever that perturbed the table by an
+/// ulp at its rest value would make the framing disagree with the figure, and
+/// would move a golden baseline for a preset that binds nothing.
+fn apply_levers(mut table: IfsTable, levers: Levers) -> IfsTable {
+    let Levers {
+        curl,
+        vigor,
+        lean,
+        bias,
+    } = levers;
+
+    // `curl` — a shared rotation added after the scale. Cannot affect
+    // contractivity: `R` is an isometry, so this needs no bound of any kind.
+    if curl != 0.0 && curl.is_finite() {
+        for map in &mut table.maps {
+            map.theta += curl;
+        }
+    }
+
+    // `lean` — the translations rotated about the origin. Translations do not
+    // enter contractivity either, so this is unconditionally safe.
+    if lean != 0.0 && lean.is_finite() {
+        let (sn, cs) = lean.sin_cos();
+        for map in &mut table.maps {
+            let [x, y] = map.t;
+            map.t = [x * cs - y * sn, x * sn + y * cs];
+        }
+    }
+
+    // `vigor` — **the one lever that can reach the cliff**, and the only one
+    // behind a clamp. A non-finite or non-positive value is treated as neutral
+    // rather than propagated: a preset expression can produce either, and a zero
+    // scale would collapse the figure to its fixed points.
+    if vigor != 1.0 && vigor.is_finite() && vigor > 0.0 {
+        for map in &mut table.maps {
+            map.sx *= vigor;
+            map.sy *= vigor;
+        }
+    }
+    // Run unconditionally, so the ceiling holds whatever route the table took
+    // here — the compare is the whole cost, and it removes a dependency on
+    // reasoning about what the morph can produce.
+    //
+    // The **whole table** is scaled by one factor rather than each map clamped
+    // separately: clamping per map would change the figure's proportions, which
+    // is a different shape rather than a smaller one.
+    let sigma = table.sigma_max();
+    if sigma > SIGMA_CEILING {
+        let shrink = SIGMA_CEILING / sigma;
+        for map in &mut table.maps {
+            map.sx *= shrink;
+            map.sy *= shrink;
+        }
+    }
+
+    // `bias` — weight moved between the body maps (canonical 0 and 1) and the
+    // branch maps (2 and 3). Multiplicative and bounded by [`BIAS_DEPTH`], so no
+    // probability can go negative and none can reach zero.
+    if bias != 0.0 && bias.is_finite() {
+        let b = bias.clamp(-1.0, 1.0) * BIAS_DEPTH;
+        let mut total = 0.0;
+        for (i, map) in table.maps.iter_mut().enumerate() {
+            map.p *= if i < 2 { 1.0 - b } else { 1.0 + b };
+            total += map.p;
+        }
+        // A table whose weight is entirely in one group (the dragon's is) can
+        // still renormalize; a table with no weight at all cannot, and dividing
+        // by it would put a NaN in the cumulative table.
+        if total > 0.0 {
+            for map in &mut table.maps {
+                map.p /= total;
+            }
+        }
+    }
+
+    table
 }
 
 /// A sampled bounding box in the figure's own world units.
@@ -674,7 +847,7 @@ impl FitLut {
         let mut entries = [([0.0; 2], [1.0; 2]); FIT_STEPS];
         for (i, slot) in entries.iter_mut().enumerate() {
             let morph = i as f32 / (FIT_STEPS - 1) as f32;
-            let extent = chaos_extent(&resolve(a, b, morph), FIT_ITERATIONS);
+            let extent = chaos_extent(&morph_tables(a, b, morph), FIT_ITERATIONS);
             // A diverged table cannot reach here — the sweep proves no reachable
             // morph produces one — but the fit is what the *projection* reads, so
             // a non-finite box would put a NaN in the uniform rather than fail a
@@ -831,8 +1004,8 @@ mod tests {
     #![allow(clippy::panic, clippy::expect_used, clippy::indexing_slicing)]
 
     use super::{
-        FIT_STEPS, FitLut, IfsFigure, MAPS, chaos_extent, decompose, fit_scale, lerp_angle,
-        recompose, resolve,
+        FIT_STEPS, FitLut, IfsFigure, Levers, MAPS, SIGMA_CEILING, chaos_extent, decompose,
+        fit_scale, lerp_angle, recompose, resolve,
     };
 
     /// The tolerance the plan states for the round trip: well above `f32`
@@ -1162,7 +1335,7 @@ mod tests {
                 pairs += 1;
                 let (a, b) = (start.table(), target.table());
                 for morph in morph_sweep() {
-                    let table = resolve(&a, &b, morph);
+                    let table = resolve(&a, &b, morph, Levers::NEUTRAL);
 
                     // Contractivity first — it is the *reason* the box below is
                     // bounded, and asserting it separately is what distinguishes
@@ -1217,12 +1390,12 @@ mod tests {
             for target in IfsFigure::ALL {
                 let (a, b) = (start.table(), target.table());
                 assert_eq!(
-                    resolve(&a, &b, 0.0),
+                    resolve(&a, &b, 0.0, Levers::NEUTRAL),
                     a,
                     "{start:?} -> {target:?} at morph 0 must be {start:?}"
                 );
                 assert_eq!(
-                    resolve(&a, &b, 1.0),
+                    resolve(&a, &b, 1.0, Levers::NEUTRAL),
                     b,
                     "{start:?} -> {target:?} at morph 1 must be {target:?}"
                 );
@@ -1235,7 +1408,7 @@ mod tests {
             let t = figure.table();
             for morph in morph_sweep() {
                 assert_eq!(
-                    resolve(&t, &t, morph),
+                    resolve(&t, &t, morph, Levers::NEUTRAL),
                     t,
                     "{figure:?} morphing to itself moved at {morph}"
                 );
@@ -1250,7 +1423,7 @@ mod tests {
     fn an_out_of_range_morph_clamps_rather_than_extrapolating() {
         let (a, b) = (IfsFigure::Fern.table(), IfsFigure::Spiral.table());
         for wild in [-5.0, -1.0, -0.001, 1.001, 2.0, 47.0] {
-            let table = resolve(&a, &b, wild);
+            let table = resolve(&a, &b, wild, Levers::NEUTRAL);
             let expected = if wild < 0.0 { a } else { b };
             assert_eq!(table, expected, "morph {wild} must clamp to an endpoint");
             assert!(table.sigma_max() < 1.0);
@@ -1258,7 +1431,7 @@ mod tests {
         // A NaN — reachable from a preset expression like `0/0` — must not
         // produce a NaN table. `clamp` panics on a NaN bound but propagates a
         // NaN value, so this is asserted rather than assumed.
-        let table = resolve(&a, &b, f32::NAN);
+        let table = resolve(&a, &b, f32::NAN, Levers::NEUTRAL);
         assert!(
             table.maps.iter().all(|m| m.sigma_max().is_finite()),
             "a NaN morph produced a non-finite table: {table:?}"
@@ -1549,7 +1722,7 @@ mod tests {
             for morph in [0.25, 0.5, 0.75] {
                 cases.push((
                     format!("{start:?}->{target:?}@{morph}"),
-                    resolve(&a, &b, morph),
+                    resolve(&a, &b, morph, Levers::NEUTRAL),
                 ));
             }
         }
@@ -1610,5 +1783,428 @@ mod tests {
         // uniform — `Extent::half` floors it, and this states the consequence.
         assert!(fit_scale([1e-6, 1e-6], 1.0).is_finite());
         assert!(fit_scale([1.0, 1.0], 0.0).is_finite());
+    }
+
+    // -----------------------------------------------------------------------
+    // The levers (Plan 0062 Phase 5 / ADR-0075)
+    // -----------------------------------------------------------------------
+
+    /// Each lever alone at each documented extreme, plus all four at once —
+    /// the cases the sweep below has to cover.
+    fn lever_cases() -> Vec<(String, Levers)> {
+        let mut out = vec![("neutral".into(), Levers::NEUTRAL)];
+        for (end, extreme) in Levers::EXTREMES.into_iter().enumerate() {
+            // One at a time, so a lever that is only safe because another one
+            // happened to shrink the table is caught.
+            for (name, solo) in [
+                (
+                    "curl",
+                    Levers {
+                        curl: extreme.curl,
+                        ..Levers::NEUTRAL
+                    },
+                ),
+                (
+                    "vigor",
+                    Levers {
+                        vigor: extreme.vigor,
+                        ..Levers::NEUTRAL
+                    },
+                ),
+                (
+                    "lean",
+                    Levers {
+                        lean: extreme.lean,
+                        ..Levers::NEUTRAL
+                    },
+                ),
+                (
+                    "bias",
+                    Levers {
+                        bias: extreme.bias,
+                        ..Levers::NEUTRAL
+                    },
+                ),
+            ] {
+                out.push((format!("{name}@{end}"), solo));
+            }
+            out.push((format!("all@{end}"), extreme));
+        }
+        out
+    }
+
+    /// **Divergence is excluded before a shader runs**: every figure, every
+    /// lever at both documented extremes, all four at once, at every position of
+    /// the morph sweep — `max σ` stays below 1 throughout, and the orbit stays
+    /// finite and bounded.
+    #[test]
+    fn no_reachable_lever_setting_diverges() {
+        const BOUND: f32 = 1_000.0;
+        for start in IfsFigure::ALL {
+            for target in IfsFigure::ALL {
+                let (a, b) = (start.table(), target.table());
+                for (name, levers) in lever_cases() {
+                    // Coarser in `morph` than the Phase 3 sweep, and deliberately:
+                    // this multiplies that sweep by eleven lever settings, and
+                    // contractivity is a property of the resolved table rather
+                    // than of how finely the path is sampled.
+                    for i in 0..=8 {
+                        let morph = i as f32 / 8.0;
+                        let table = resolve(&a, &b, morph, levers);
+                        let sigma = table.sigma_max();
+                        assert!(
+                            sigma < 1.0,
+                            "{start:?} -> {target:?} at morph {morph} with {name}: \
+                             sigma_max = {sigma}"
+                        );
+                        assert!(
+                            sigma <= SIGMA_CEILING + 1e-6,
+                            "{start:?} -> {target:?} at morph {morph} with {name}: \
+                             sigma_max = {sigma} is past the {SIGMA_CEILING} ceiling"
+                        );
+                        // Probabilities stay a distribution — a negative or NaN
+                        // one would corrupt the cumulative table the shader
+                        // compares against.
+                        let total: f32 = table.maps.iter().map(|m| m.p).sum();
+                        assert!(
+                            table.maps.iter().all(|m| m.p >= 0.0 && m.p.is_finite()),
+                            "{start:?} -> {target:?} with {name}: bad probabilities"
+                        );
+                        assert!(
+                            (total - 1.0).abs() < 1e-4,
+                            "{start:?} -> {target:?} with {name}: probabilities sum \
+                             to {total}"
+                        );
+
+                        let extent = chaos_extent(&table, 4_000);
+                        assert!(
+                            extent.is_finite(),
+                            "{start:?} -> {target:?} at morph {morph} with {name}: \
+                             the orbit left the reals"
+                        );
+                        for v in extent.lo.iter().chain(extent.hi.iter()) {
+                            assert!(
+                                v.abs() < BOUND,
+                                "{start:?} -> {target:?} at morph {morph} with \
+                                 {name}: the orbit reached {v}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// A preset expression can produce a `NaN` or an infinity for any lever.
+    /// None of them may reach the affine table.
+    #[test]
+    fn a_wild_lever_value_never_reaches_the_table() {
+        let (a, b) = (IfsFigure::Fern.table(), IfsFigure::Tree.table());
+        for wild in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -1.0, 0.0] {
+            for levers in [
+                Levers {
+                    curl: wild,
+                    ..Levers::NEUTRAL
+                },
+                Levers {
+                    vigor: wild,
+                    ..Levers::NEUTRAL
+                },
+                Levers {
+                    lean: wild,
+                    ..Levers::NEUTRAL
+                },
+                Levers {
+                    bias: wild,
+                    ..Levers::NEUTRAL
+                },
+                Levers {
+                    curl: wild,
+                    vigor: wild,
+                    lean: wild,
+                    bias: wild,
+                },
+            ] {
+                let table = resolve(&a, &b, 0.4, levers);
+                assert!(
+                    table.sigma_max() < 1.0,
+                    "{levers:?} produced sigma_max {}",
+                    table.sigma_max()
+                );
+                for map in &table.maps {
+                    let affine = map.to_affine();
+                    for v in [
+                        affine.a, affine.b, affine.c, affine.d, affine.e, affine.f, map.p,
+                    ] {
+                        assert!(v.is_finite(), "{levers:?} put {v} in the table");
+                    }
+                }
+            }
+        }
+    }
+
+    /// **Neutral is exact.** Every lever operation is guarded so that resting
+    /// values leave the morphed table bit-identical — which is what keeps the
+    /// framing (fitted at neutral) agreeing with the figure, and what keeps a
+    /// preset that binds no lever byte-stable.
+    #[test]
+    fn every_lever_is_bit_exact_at_rest() {
+        for start in IfsFigure::ALL {
+            for target in IfsFigure::ALL {
+                let (a, b) = (start.table(), target.table());
+                for i in 0..=8 {
+                    let morph = i as f32 / 8.0;
+                    assert_eq!(
+                        resolve(&a, &b, morph, Levers::NEUTRAL),
+                        super::morph_tables(&a, &b, morph),
+                        "{start:?} -> {target:?} at morph {morph}: the neutral \
+                         levers moved the table"
+                    );
+                }
+            }
+        }
+    }
+
+    /// **The fit does not see the levers** — Phase 4's deferred half, and the
+    /// property `vigor` being audible at all depends on (ADR-0075 Alternative C).
+    ///
+    /// Stated as the pair it has to be: the levers genuinely move the resolved
+    /// table, and the framing built from the same figure pair is bit-identical
+    /// regardless. One without the other is vacuous.
+    #[test]
+    fn the_fit_is_bit_identical_under_every_lever_extreme() {
+        for start in IfsFigure::ALL {
+            for target in IfsFigure::ALL {
+                let (a, b) = (start.table(), target.table());
+                let neutral_fit = FitLut::build(&a, &b);
+
+                for (name, levers) in lever_cases() {
+                    if levers == Levers::NEUTRAL {
+                        continue;
+                    }
+                    // The framing is the same table, to the bit.
+                    assert_eq!(
+                        FitLut::build(&a, &b),
+                        neutral_fit,
+                        "{start:?} -> {target:?} with {name}: the fit moved"
+                    );
+                    // ...and the figure it frames genuinely did move, or the
+                    // assertion above is about a lever that does nothing.
+                    let moved = (0..=4).any(|i| {
+                        let morph = i as f32 / 4.0;
+                        resolve(&a, &b, morph, levers) != resolve(&a, &b, morph, Levers::NEUTRAL)
+                    });
+                    // The one documented exception, pinned separately below:
+                    // `bias` is inert on the dragon, whose two real maps both
+                    // live in the branch slots, so there is nothing to shift
+                    // weight away from.
+                    let dragon_bias = name.starts_with("bias")
+                        && start == IfsFigure::Dragon
+                        && target == IfsFigure::Dragon;
+                    assert!(
+                        moved || dragon_bias,
+                        "{start:?} -> {target:?}: lever {name} changed nothing, so \
+                         the invariance above is vacuous"
+                    );
+                }
+            }
+        }
+    }
+
+    /// **`bias` is inert on the dragon, and that is a property rather than a
+    /// bug** — pinned here so the exemption in the invariance test above is a
+    /// stated fact and not a hand-wave.
+    ///
+    /// The dragon has two real maps and both live in the *branch* slots (its
+    /// body slots are the padding), so there is no body weight to move. Scaling
+    /// one group and renormalizing is the identity. A special case could invent
+    /// something for it; ADR-0075's roster is five hand-authored figures and
+    /// this is the honest consequence of the dragon being one of them. It is a
+    /// Phase 7 note, not a Phase 5 fix.
+    #[test]
+    fn bias_is_inert_on_the_dragon_and_live_on_every_other_figure() {
+        let biased = |figure: IfsFigure, b: f32| {
+            let t = figure.table();
+            resolve(
+                &t,
+                &t,
+                0.0,
+                Levers {
+                    bias: b,
+                    ..Levers::NEUTRAL
+                },
+            )
+        };
+        for extreme in [-1.0, 1.0] {
+            assert_eq!(
+                biased(IfsFigure::Dragon, extreme),
+                IfsFigure::Dragon.table(),
+                "bias {extreme} on the dragon must be exactly the identity"
+            );
+        }
+        for figure in IfsFigure::ALL {
+            if figure == IfsFigure::Dragon {
+                continue;
+            }
+            assert_ne!(
+                biased(figure, 1.0),
+                figure.table(),
+                "bias must reach {figure:?}"
+            );
+        }
+    }
+
+    /// Each lever moves the thing it names and leaves the others alone — which
+    /// is what makes them four levers rather than one with four names.
+    #[test]
+    fn each_lever_moves_its_own_axis() {
+        let fern = IfsFigure::Fern.table();
+        let at = |levers| resolve(&fern, &fern, 0.0, levers);
+        let base = at(Levers::NEUTRAL);
+
+        // `curl` rotates, so every theta moves by the same amount and nothing
+        // else does.
+        let curled = at(Levers {
+            curl: 0.4,
+            ..Levers::NEUTRAL
+        });
+        for (c, n) in curled.maps.iter().zip(base.maps.iter()) {
+            assert!((c.theta - n.theta - 0.4).abs() < 1e-6);
+            assert_eq!(c.sx, n.sx);
+            assert_eq!(c.sy, n.sy);
+            assert_eq!(c.t, n.t);
+            assert_eq!(c.p, n.p);
+        }
+
+        // `vigor` scales the singular values and nothing else. Below the ceiling
+        // so the clamp does not fire and the ratio is exactly the multiplier.
+        let vigorous = at(Levers {
+            vigor: 1.1,
+            ..Levers::NEUTRAL
+        });
+        assert!(vigorous.sigma_max() > base.sigma_max());
+        for (v, n) in vigorous.maps.iter().zip(base.maps.iter()) {
+            assert!((v.sx - n.sx * 1.1).abs() < 1e-6);
+            assert_eq!(v.theta, n.theta);
+            assert_eq!(v.t, n.t);
+            assert_eq!(v.p, n.p);
+        }
+
+        // `lean` rotates the translations, preserving their length — the sense
+        // in which it bends the plant rather than stretching it.
+        let leaning = at(Levers {
+            lean: 0.5,
+            ..Levers::NEUTRAL
+        });
+        for (l, n) in leaning.maps.iter().zip(base.maps.iter()) {
+            let len = |[x, y]: [f32; 2]| (x * x + y * y).sqrt();
+            assert!((len(l.t) - len(n.t)).abs() < 1e-5);
+            assert_eq!(l.sx, n.sx);
+            assert_eq!(l.theta, n.theta);
+            assert_eq!(l.p, n.p);
+        }
+        // ...and it actually moved one: the fern's body translates (0, 1.6).
+        assert_ne!(leaning.maps[1].t, base.maps[1].t);
+
+        // `bias` moves probability from the body maps to the branch maps and
+        // touches no geometry at all.
+        let biased = at(Levers {
+            bias: 1.0,
+            ..Levers::NEUTRAL
+        });
+        for (x, n) in biased.maps.iter().zip(base.maps.iter()) {
+            assert_eq!(x.sx, n.sx);
+            assert_eq!(x.sy, n.sy);
+            assert_eq!(x.theta, n.theta);
+            assert_eq!(x.t, n.t);
+        }
+        let body = |t: &super::IfsTable| t.maps[0].p + t.maps[1].p;
+        let branch = |t: &super::IfsTable| t.maps[2].p + t.maps[3].p;
+        assert!(
+            branch(&biased) > branch(&base),
+            "a positive bias must move weight to the branches: {} -> {}",
+            branch(&base),
+            branch(&biased)
+        );
+        assert!(body(&biased) < body(&base));
+        // ...and symmetrically the other way.
+        let unbiased = at(Levers {
+            bias: -1.0,
+            ..Levers::NEUTRAL
+        });
+        assert!(branch(&unbiased) < branch(&base));
+        // No probability is ever driven to zero — that would stop drawing part
+        // of the figure rather than re-weighting it (see `BIAS_DEPTH`).
+        for extreme in [-1.0, 1.0] {
+            let t = at(Levers {
+                bias: extreme,
+                ..Levers::NEUTRAL
+            });
+            for (i, map) in t.maps.iter().enumerate() {
+                if base.maps.get(i).is_some_and(|b| b.p > 0.0) {
+                    assert!(map.p > 0.0, "bias {extreme} zeroed a drawn map {i}");
+                }
+            }
+        }
+    }
+
+    /// **`vigor` is a real lever within the ceiling and a silent no-op past it**,
+    /// which is the trade ADR-0075 accepts and `presets/README.md` documents.
+    #[test]
+    fn vigor_grows_the_figure_until_the_ceiling_stops_it() {
+        let fern = IfsFigure::Fern.table();
+        let at = |v: f32| {
+            resolve(
+                &fern,
+                &fern,
+                0.0,
+                Levers {
+                    vigor: v,
+                    ..Levers::NEUTRAL
+                },
+            )
+        };
+
+        // Below the ceiling the figure genuinely grows — asserted on the
+        // measured extent, not on the multiplier, because "the lever is visible"
+        // is a claim about the drawing.
+        let base = chaos_extent(&at(1.0), 20_000).half();
+        let grown = chaos_extent(&at(1.1), 20_000).half();
+        assert!(
+            grown[1] > base[1] * 1.05,
+            "vigor 1.1 must visibly grow the fern: {} -> {}",
+            base[1],
+            grown[1]
+        );
+
+        // The fern's own sigma_max is 0.851, so the ceiling is reached at
+        // 0.97/0.851 = 1.14. Past there every value gives the same table —
+        // silence rather than an error.
+        let ceiling_ratio = SIGMA_CEILING / fern.sigma_max();
+        assert!((ceiling_ratio - 1.14).abs() < 0.01, "{ceiling_ratio}");
+        for past in [ceiling_ratio + 0.01, 1.5, 3.0, 20.0] {
+            let table = at(past);
+            assert!(
+                (table.sigma_max() - SIGMA_CEILING).abs() < 1e-5,
+                "vigor {past} must land exactly on the ceiling, got {}",
+                table.sigma_max()
+            );
+        }
+        // Past the ceiling every value draws the same figure. Compared within a
+        // tolerance rather than bit-for-bit: the clamp is
+        // `sx · vigor · (ceiling / sigma)`, so multiplying up by 1.5 and back
+        // down rounds differently from multiplying up by 20 and back down. The
+        // claim is that the *figure* is the same, and a last-bit difference in
+        // a singular value is not a different figure.
+        for (x, y) in at(1.5).maps.iter().zip(at(20.0).maps.iter()) {
+            assert!((x.sx - y.sx).abs() < 1e-6 && (x.sy - y.sy).abs() < 1e-6);
+        }
+
+        // The clamp scales the WHOLE table by one factor, so the figure's
+        // proportions are preserved — it is a smaller figure, not a different
+        // one. Asserted on the ratio between two maps.
+        let clamped = at(3.0);
+        let ratio = |t: &super::IfsTable| t.maps[2].sx / t.maps[1].sx;
+        assert!((ratio(&clamped) - ratio(&at(1.0))).abs() < 1e-5);
     }
 }
