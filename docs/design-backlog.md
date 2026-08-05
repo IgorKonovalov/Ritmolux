@@ -999,6 +999,15 @@ family wants.
 
 ## 0064 — an IFS preset switch shows a hard-edged rectangle of noise for two thirds of a second, which is the artifact ADR-0066 already removed once
 
+- **PROMOTED 2026-08-05 → [ADR-0087](adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md) +
+  [Plan 0073](plans/0073-the-fern-unfurls-and-colours-by-what-made-it.md)** — and the route taken is
+  the *second* of the two this entry proposed, folded into a change that was happening anyway. The
+  entry's cheaper interim (seed at the figure's own fixed points) is Plan 0073 **Phase 2**; its
+  Phase 3 then goes further and makes the respawn **continuous**, so the population is never a
+  uniform box at any moment and the rectangle has no instant in which to form. The plan also catches
+  something this entry did not: `jitter_extent` is *derived* from `seed_box`, so collapsing that
+  spread — the obvious reading of "fix the seed box" — would have made `reseed` silently inert
+  across the whole family. What changes is what `seed()` writes, not the box.
 - **Raised:** 2026-08-04, from `preset-author`, during the Plan 0062 Phase 7 content pass.
 - **Verified by measurement:** yes — captures at 2 / 6 / 12 / 24 / 40 / 90 frames.
 
@@ -1090,6 +1099,13 @@ ADR-0066 replaced the mechanism.
 > row still reads "every value between is a real figure" ~40 lines above the correction, which is
 > what an author scanning the table reads.
 
+- **RESOLVED 2026-08-05, by documentation** — `presets/README.md`'s IFS section now carries the
+  measured table, the travel-not-life sentence and the spiral-is-a-poor-target note (`cf977f9`). The
+  `morph` row of the param table, which still read "every value between is a real figure" some
+  thirty lines above its own correction, now points down to it (`Plan 0073` Phase 5 caught that
+  inconsistency; it is done, so that item of its doc sweep is already satisfied). Kept here rather
+  than archived because the *shape* of the finding — a parameter whose visible rate is front-loaded
+  and whose description implies otherwise — is the reusable part.
 - **Raised:** 2026-08-04, from `preset-author`, during the Plan 0062 Phase 7 content pass.
 - **Verified by measurement:** yes.
 
@@ -1145,6 +1161,11 @@ authors the wrong way.
 > evidence of a watchable preset on a still family. That is a real gap in `docs/capturing.md` and is
 > the sort of thing that belongs in whatever plan next touches the gate, not in a plan of its own.
 
+- **RESOLVED 2026-08-05, by documentation** — `presets/README.md`'s IFS section now says the figure
+  is static so the levers carry all the motion and want ~30 s periods, and that `spin`'s default is
+  wrong for a figure with an orientation (`cf977f9`). The optional half — a note wherever the
+  animation gate is described, that a passing `anim` is not evidence of a *watchable* preset on this
+  family — is **not** done and is the part still worth doing.
 - **Raised:** 2026-08-04, from `preset-author`, during the Plan 0062 Phase 7 content pass.
 - **Verified by measurement:** yes — `shot --report`.
 

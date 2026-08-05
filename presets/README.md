@@ -226,7 +226,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
-| `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
+| `attractor`       | `a` `b` `c` `d` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` |
 
@@ -251,6 +251,19 @@ documented there.
 > [The five IFS figures](#the-five-ifs-figures--a-different-kind-of-family) and
 > [Attractor depth](#attractor-depth-perspective-depth_fade-depth_hue-spin-plan-0063).
 
+**My attractor is too bright / too dim — which knob?** `brightness`. It is a
+plain multiplier on the light each particle deposits (default `1.0`), so it
+changes the figure's level and nothing else: same points, same trail, same
+geometry. It is the same param, under the same name, that `swarm` and `emitter`
+carry ([ADR-0080](../docs/adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md)).
+The deposit is already normalized by particle count, so `brightness` composes
+with `[particles] density` rather than fighting it. **Not `exposure`** — that is
+the whole-frame stop, it crossfades as a scalar across a preset dissolve, and
+`bloom_threshold` is measured against it; see
+[Linear light and `exposure`](#linear-light-and-exposure-plan-0045). `size` and
+`fade` also move the level, but they move the picture with it — a wider nib and a
+longer trail — so use them when that is what you want.
+
 ### Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin` (Plan 0063)
 
 **Two of these four are inert on every flat family**, the same way `a b c d`
@@ -271,7 +284,7 @@ setting, **zero pixels** differ.)
 >
 > Nothing is broken by this — but it is a trap in both directions. Do not reach
 > for `depth_fade` expecting nothing to happen on a 2-D family, and do not reach
-> for it *as* a dimmer: `exposure` is the parameter for that and says what it
+> for it *as* a dimmer: `brightness` is the parameter for that and says what it
 > means. See [design-backlog 0067](../docs/design-backlog.md).
 
 `spin` is the exception and reaches **every** family. The flat ones rotate
@@ -1098,7 +1111,7 @@ all: a preset that does not bind it pays nothing and renders exactly as before.
 | Param | Default | Meaning |
 |---|---|---|
 | `bloom_amount` | `0` | Strength of the halo added back. `0` = off. Around `0.5–1.5` is a glow; past `2` the frame is mostly halo (clamped at `4`). Bindable — this is the one to put a beat on. |
-| `bloom_threshold` | `1.0` | Where "bright" starts, in **linear light**. At the default only light that is genuinely over range blooms — see below. Lower it to bloom mid-tones too; `0` blooms everything. |
+| `bloom_threshold` | `1.0` | Where "bright" starts, in linear light **after `exposure`** — so it means the same thing at any stop. At the default only light that is genuinely over range blooms — see below. Lower it to bloom mid-tones too; `0` blooms everything. |
 | `bloom_radius` | `1.0` | How far the halo scatters, `0..4`. Low is a tight rim around the figure; high is a wide wash. It does not change how much light there is, only where it goes. |
 
 **`bloom_threshold = 1.0` is a meaningful default, not a placeholder.** Since Plan
@@ -1107,6 +1120,17 @@ means precisely: bloom the light the display could not have shown anyway. Turn
 bloom on with nothing else and you get halos exactly where the frame used to
 clip, and nowhere else. That is usually what you want; reach for a lower
 threshold when you want the whole figure to glow rather than just its hot spots.
+
+**The comparison happens *after* `exposure`, which is what lets that sentence stay
+true when you move the stop** (ADR-0080). The bright-pass scales the light it
+samples by the frame's `exposure` before comparing, so "over range" means over the
+range the *display* is being asked to show, not over the scene's own linear units.
+At `exposure = 1` — the default, and where most presets sit — nothing about this
+is visible. It matters the moment a preset moves off it: before this, a preset at
+`exposure = 0.03` put its entire figure over every threshold the engine allows
+(the ceiling is `8`), so `bloom_threshold` had no discriminating range left and
+authors ended up pinning it at the top and calling it capped. Whatever stop you
+choose, pick `bloom_threshold` against the picture you see.
 
 **The consequence, and it is the thing that bites first: a preset authored to the
 old additive-ceiling habit gets *nothing* from this stage.** For years the
@@ -1178,14 +1202,26 @@ What that changes for authoring:
 
 | Param | Default | Meaning |
 |---|---|---|
-| `exposure` | `1.0` | A linear multiplier on the whole frame before the tonemap. `2` is a stop up, `0.5` a stop down. Engine-wide and *not* per-stage, so like `ink_*` it crossfades across a preset dissolve rather than snapping. |
+| `exposure` | `1.0` | A linear multiplier on the **whole frame** before the tonemap — backdrop, scene, halo and all. `2` is a stop up, `0.5` a stop down. Engine-wide and *not* per-stage, so like `ink_*` it crossfades across a preset dissolve rather than snapping. |
 
-`exposure` is the honest way to make a whole preset brighter or darker: it
-scales everything together and then rolls off, where raising `brightness` on
-each element re-balances the picture against its own background. Bind it
-sparingly — an `exposure` riding the bass pumps the entire frame, which reads as
-a camera reacting rather than as the music, and it is the same trap `glow` on a
-beat has always been.
+`exposure` is the whole-frame correction, and specifically it is the answer to
+*the tonemap*: the curve above compresses everything past about `0.6`, so a
+mid-tone-dominated look can come out a few percent flatter than it was authored
+and a stop up is how you give that back.
+
+**It is not a figure's level, and reaching for it as one costs you twice.** If
+one element is too bright or too dim, the lever is that scene's own level param —
+`brightness` on the particle scenes (`attractor`, `swarm`, `emitter`), `glow` on
+the line scenes, `bg_bright` for the backdrop. Those are scene-local: they blend
+as *pixels* across a dissolve and they leave everything else in the frame where
+it was. `exposure` does neither. It crossfades as a scalar, so a preset sitting
+at an extreme stop drags the ~1 s blend from *any* neighbouring preset through a
+badly exposed frame; and it is the number `bloom_threshold` is measured against,
+so spending it on a level moves the bright-pass's units under you.
+
+Bind it sparingly for the same reason it exists — an `exposure` riding the bass
+pumps the entire frame, which reads as a camera reacting rather than as the
+music, and it is the same trap `glow` on a beat has always been.
 
 ### Ink on paper — `ink_amount`, `paper_*`, `ink_*` (Plan 0027)
 
@@ -1540,12 +1576,16 @@ Two things worth knowing before you reach for it:
   though**, and the first two presets to go sparse both had to pay for it: the
   same light landing on a fraction of the pixels is far brighter *per texel*, so
   a sparse preset needs a cut on the order of `trail frames / density` to stay
-  off the tonemap shoulder. `attractor_lorenz` ships `exposure = 0.03` at
-  `density = 0.002`, and `attractor_thomas` `0.10` at `0.02` — both chosen off
-  rendered ladders, not derived. **Buy as much of that level as you can with
-  `size` and `fade` first**: those are scene-local and blend as pixels, where
-  `exposure` is engine-wide and crossfades across a preset dissolve, so an
-  extreme value drags the ~1 s transition through a badly-exposed frame.
+  off the tonemap shoulder. **Spend that cut on `brightness`.** It is a plain
+  multiplier on the same already-count-normalized deposit, so it composes with
+  `density` instead of fighting it, and being scene-local it blends as pixels
+  across a dissolve. `size` and `fade` also buy level and change the picture
+  while they do it — a wider nib and a longer trail are looks, not stops — so
+  reach for them when you want what they do, not when you only want less light.
+  (`attractor_lorenz` ships `brightness = 0.03` at `density = 0.002` and
+  `attractor_thomas` `0.10` at `0.02` — the two worked examples of that cut. Both
+  carried the number on `exposure` until Plan 0066 moved it; if you are reading an
+  older copy, the swap is level-neutral and the value transfers unchanged.)
 - **The tier caps the top, it does not set the value.** `density` is a fraction
   of whatever the current quality tier allows (50 000 at the standard tier,
   150 000 at the rich one), so `density = 0.02` is 1 000 points on one and 3 000
@@ -1575,8 +1615,11 @@ What that means when you are tuning:
   more light: measured on a plain figure, mean frame luminance went up **2.0x on
   `thomas` and 3.1x on `lorenz`**. This is deliberately *not* compensated in the
   engine — a faster-moving particle drawing a longer, brighter streak is arguably
-  the correct rendering of speed. If it is too hot for your look, the levers are
-  `exposure`, `size` and `fade`, in that order.
+  the correct rendering of speed. If it is too hot for your look, the lever is
+  `brightness` — one multiplier on the deposit, which is exactly what "the same
+  figure, less light" asks for. `size` and `fade` will also pull it back, at the
+  cost of a finer nib and a shorter trace; `exposure` will too, and should be
+  your last resort rather than your first, because it moves the whole frame.
 
 The family sets the map **and** the meaning of the four bindable coefficients
 `a`/`b`/`c`/`d`, each of which defaults to that family's canonical value
@@ -1630,7 +1673,7 @@ way `a`..`d` already carry family-specific meanings.
 
 | Param   | Default | What it does |
 |---------|---------|--------------|
-| `morph` | `0`     | Position from `family` to `[particles] morph_to`. `0` is the named figure, `1` is the target, and every value between is a real figure. Clamped; out of range pins to an endpoint. |
+| `morph` | `0`     | Position from `family` to `[particles] morph_to`. `0` is the named figure, `1` is the target, and every value between is a real figure — but **not a proportionally-different one**, see [below](#morph-is-a-travel-knob). Clamped; out of range pins to an endpoint. |
 | `curl`  | `0`     | Radians added to every map's rotation — fronds curl and uncurl. |
 | `vigor` | `1`     | Multiplier on the figure's contraction — a bushier, deeper, denser figure. **Has a silent ceiling; see below.** |
 | `lean`  | `0`     | Radians every translation is rotated by — the plant bends. |
@@ -1657,6 +1700,8 @@ so an intermediate figure fills the frame instead of drifting off it. It does
 exactly — the figure would surge and the frame would shrink it back for a net
 zero. The cost is that a hard `vigor` push can leave the frame; `zoom` is the
 recourse.
+
+<a id="morph-is-a-travel-knob"></a>
 
 **`morph` is a TRAVEL knob, not a little-life knob**, and its visible rate is
 steepest near zero — which is the opposite of what "every value between is a

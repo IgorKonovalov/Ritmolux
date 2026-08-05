@@ -97,7 +97,21 @@ const MAX_OUTLIER: u8 = 48;
 /// renders identically under every treatment (measured at Phase 3 — its
 /// `kaleido_edge` pinned to 0 and to 1 gives md5-identical PNGs) and therefore
 /// cannot pin the edge at all. Its sibling's own header carries the rest.
-const FIXTURES: [(&str, &str); 5] = [
+///
+/// `composite_bloom_exposed` (Plan 0066 Phase 3, ADR-0080) is the second
+/// pair-that-shares-a-stage, and the same argument applies to it: it binds
+/// bloom and nothing else, so it puts no pipeline on the device its sibling does
+/// not. What the two separate is the bright-pass's **units**. The threshold is now
+/// compared against post-`exposure` light, and `composite_bloom` cannot pin that
+/// because it leaves `exposure` unbound — at the neutral stop the new multiply is
+/// the identity, which is exactly what makes that baseline byte-identical across
+/// this change and exactly what makes it blind to it.
+///
+/// **Appended, never inserted**, for the reason `golden.rs`'s `EXTRA_FIXTURES`
+/// records: every pre-existing baseline is then rendered from the device state it
+/// always was, which matters on WARP where building GPU resources mid-run changes
+/// what a later capture resolves to.
+const FIXTURES: [(&str, &str); 6] = [
     (
         "composite_trails",
         include_str!("fixtures/composite_trails.toml"),
@@ -117,6 +131,10 @@ const FIXTURES: [(&str, &str); 5] = [
     (
         "composite_bloom",
         include_str!("fixtures/composite_bloom.toml"),
+    ),
+    (
+        "composite_bloom_exposed",
+        include_str!("fixtures/composite_bloom_exposed.toml"),
     ),
 ];
 

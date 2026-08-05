@@ -1137,6 +1137,39 @@ fn declared_params_match_set_param() {
     }
 }
 
+/// **The three additive-particle scenes spell their level lever the same way**
+/// (Plan 0066 Phase 1 / ADR-0080).
+///
+/// `swarm`, `emitter` and `attractor` all draw additive particle marks, and until
+/// this plan only two of them could say how bright. The one without it is the one
+/// whose shipped presets reached for the engine-wide `exposure` instead — which
+/// crossfades across a dissolve and sits downstream of the bloom bright-pass, so
+/// the substitution cost them both.
+///
+/// Pinned on the **name**, not just on the capability, because ADR-0080
+/// Alternative D is exactly the temptation this guards against: a distinct name
+/// for the attractor's (`intensity`, on the grounds that its deposit accumulates
+/// into a trail field) would leave three sibling scenes with two words for one
+/// lever, and `presets/README.md` explaining the distinction on every mention.
+#[test]
+fn the_additive_particle_scenes_share_one_level_param() {
+    use lmv_core::preset::SystemKind;
+
+    for system in [
+        SystemKind::Swarm,
+        SystemKind::Emitter,
+        SystemKind::Attractor,
+    ] {
+        assert!(
+            system.param_names().contains(&"brightness"),
+            "{system:?} draws additive particle marks and must expose the level \
+             lever under the shared name `brightness` (ADR-0080); it declares \
+             {:?}",
+            system.param_names()
+        );
+    }
+}
+
 /// The parameter names a file's `set_param` body matches on, read from the
 /// source: every `"name" =>` arm, plus the `if name == "…"` single-param form
 /// `trails` uses. Scanning the source is what lets this guard cover scenes that
