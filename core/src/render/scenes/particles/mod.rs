@@ -56,7 +56,7 @@ pub mod ifs;
 
 use crate::render::gpu;
 
-use ifs::{IfsFigure, IfsPacked, IfsTable};
+use ifs::{FitLut, IfsFigure, IfsPacked, IfsTable};
 
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
@@ -1999,6 +1999,10 @@ pub struct AttractorScene {
     /// bindable. When `[particles] morph_to` is absent both ends are the same
     /// table, so `morph` is exactly inert rather than conditionally applied.
     ifs_ends: Option<(IfsTable, IfsTable)>,
+    /// The figure pair's framing over `morph`, measured once at `configure`
+    /// with every lever at neutral (ADR-0075). `None` on the four map families,
+    /// which keep their single hand-fitted world scale.
+    ifs_fit: Option<FitLut>,
     /// Position along the morph from the configured figure to `morph_to`
     /// (ADR-0075). Bindable; clamped to `[0, 1]` inside
     /// [`ifs::resolve`](ifs::resolve), where extrapolation would be the one
@@ -2090,6 +2094,7 @@ impl AttractorScene {
             spin_time: 0.0,
             family,
             ifs_ends: None,
+            ifs_fit: None,
             morph: DEFAULT_MORPH,
             a,
             b,
@@ -2434,6 +2439,13 @@ impl Scene for AttractorScene {
                 let end = morph_to.unwrap_or(figure).table();
                 (start, end)
             });
+            // ...and the framing that follows the morph, measured here for the
+            // same reason: it is a function of the figure pair alone, so a frame
+            // pays one lerp rather than 33 chaos games.
+            self.ifs_fit = self
+                .ifs_ends
+                .as_ref()
+                .map(|(start, end)| FitLut::build(start, end));
             if *family != self.family {
                 self.family = *family;
                 let [a, b, c, d] = family.default_coeffs();
@@ -2478,6 +2490,7 @@ impl Scene for AttractorScene {
             pending_steps,
             step_index,
             ifs_ends,
+            ifs_fit,
             morph,
             dt,
             spin_time,
@@ -2537,6 +2550,7 @@ impl Scene for AttractorScene {
                 ifs: ifs_ends.as_ref().map_or(IfsPacked::ZERO, |(a, b)| {
                     ifs::pack(&ifs::resolve(a, b, *morph))
                 }),
+                ifs_frame: ifs_fit.as_ref().map(|fit| fit.sample(*morph)),
                 size: *size,
                 hue: *hue,
                 fade: *fade,
@@ -2607,6 +2621,10 @@ struct UniformInputs {
     /// family. Resolved by the caller because it depends on the cached morph
     /// ends rather than on the family alone.
     ifs: IfsPacked,
+    /// This frame's IFS framing as `(centre, half-extent)`, sampled from the fit
+    /// LUT at the current `morph`. `None` on a map family, which keeps the
+    /// single world scale [`AttractorFamily::projection`] hands out.
+    ifs_frame: Option<([f32; 2], [f32; 2])>,
     size: f32,
     hue: f32,
     fade: f32,
@@ -2696,6 +2714,19 @@ fn upload_uniforms(
         );
     }
     let (scale, dim, centre) = inputs.family.projection();
+    // An IFS takes its framing from the fit instead — measured over `morph` at
+    // load, so the figure stays in the frame as it crosses from one figure to
+    // another, and **aspect-aware**, so a wide figure fits a portrait window
+    // rather than hanging out of it.
+    //
+    // The aspect handed in is the render **target's**, not the trail grid's
+    // (ADR-0037): the present stretches the grid over the whole target, so the
+    // grid's own aspect cancels and using it would draw the figure the wrong
+    // width.
+    let (scale, centre) = match inputs.ifs_frame {
+        Some((c, half)) => (ifs::fit_scale(half, inputs.aspect), [c[0], c[1], 0.0]),
+        None => (scale, centre),
+    };
     let ([hx, hy, hz], [vx, vy, vz]) = inputs.family.basis().masks();
     // Off the count actually drawn, not off the tier and not off the buffer that
     // was allocated: the draw below issues `active` instances, and normalizing

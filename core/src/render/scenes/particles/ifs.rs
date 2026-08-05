@@ -410,20 +410,15 @@ impl IfsFigure {
         IfsTable { maps }
     }
 
-    /// `(world scale, centre)` — the projection's framing for this figure.
+    /// `(world scale, centre)` — the projection's framing for this figure at the
+    /// reference aspect, **as a fallback**.
     ///
-    /// Both are **measured**, from a fixed-seed 400 000-iteration run of the
-    /// chaos game on the curated table: the centre is the sampled bounding box's
-    /// midpoint and the scale fits its larger half-extent to `0.88` of the frame.
+    /// Since Phase 4 the render path takes its framing from [`FitLut`] instead,
+    /// which follows the morph and knows the target's aspect. This survives for
+    /// the two callers that have neither: the seeded scatter, and the CPU
+    /// transcription of the draw shader that the projection tests run.
     ///
-    /// **Fitted at a 16:9 reference**, which is what the four map families do
-    /// too — their world scales are single constants. The wide figures (dragon,
-    /// spiral) therefore overflow a portrait window horizontally, and that is
-    /// what Phase 4 fixes when it replaces this with a lookup over `morph` and
-    /// makes the scale aspect-aware. The fern, which is tall, is inside the frame
-    /// at both aspects already.
-    ///
-    /// The fern is also the reason
+    /// The fern is the reason
     /// [`projection`](super::AttractorFamily::projection) carries a full
     /// three-component centre rather than a z-centre: it spans `y ∈ [0, 10]` and
     /// is not origin-centred, so a projection that subtracts nothing puts its
@@ -431,25 +426,20 @@ impl IfsFigure {
     pub fn frame(self) -> (f32, [f32; 3]) {
         let (centre, half) = self.extent();
         let [cx, cy] = centre;
-        let [_, hy] = half;
-        let scale = match self {
-            // Phase 1's measured value, kept exactly: Phase 2 changes how the
-            // table is *represented*, and a re-derived scale here would move the
-            // figure for a reason that has nothing to do with the SVD.
-            IfsFigure::Fern => 0.168,
-            _ => (FRAME_FILL / hy).min(FRAME_FILL * REFERENCE_ASPECT / half[0]),
-        };
-        (scale, [cx, cy, 0.0])
+        (fit_scale(half, REFERENCE_ASPECT), [cx, cy, 0.0])
     }
 
     /// The figure's sampled bounding box as `(centre, half-extent)`, in its own
     /// world units.
     ///
-    /// Measured, and quoted here rather than recomputed, because a fixed-seed
-    /// chaos game at load would be the same numbers at a cost. Phase 4 replaces
-    /// these five literals with a 33-entry lookup over `morph`, built from a
-    /// fixed-seed run of the CPU reference at `configure` time — at which point
-    /// the measurement moves into code and these become its endpoints.
+    /// Measured literals rather than a call to [`chaos_extent`], because
+    /// [`frame`](Self::frame) reaches this through
+    /// [`projection`](super::AttractorFamily::projection), which the uniform
+    /// packing calls **every frame** — a few thousand iterations there would be
+    /// a chaos game per frame to answer a question whose answer never changes.
+    /// The 400 000-iteration run they come from is reproduced by
+    /// `the_chaos_reference_is_deterministic_and_measures_the_figure`, so the
+    /// two cannot drift.
     fn extent(self) -> ([f32; 2], [f32; 2]) {
         match self {
             IfsFigure::Fern => ([0.237, 4.999], [2.419, 4.968]),
@@ -490,9 +480,30 @@ impl IfsFigure {
 
 /// The fraction of the frame a fitted figure occupies along its binding axis.
 const FRAME_FILL: f32 = 0.88;
-/// The aspect [`IfsFigure::frame`] fits against until Phase 4 makes it the
-/// target's.
+/// The aspect [`IfsFigure::frame`]'s fallback fits against.
 const REFERENCE_ASPECT: f32 = 16.0 / 9.0;
+
+/// The world scale that fits a figure of this half-extent inside the frame.
+///
+/// **Aspect-aware, and it has to be** (ADR-0037's lesson in its own costume).
+/// The vertex shader divides world `x` by the target's aspect and leaves `y`
+/// alone, so the horizontal budget is `aspect` world units and the vertical is
+/// `1`. A single scale fitted at 16:9 leaves the dragon and the spiral — both
+/// about twice as wide as they are tall — hanging out of a portrait window.
+/// Taking the smaller of the two fits is what makes "inside the frame" true at
+/// every aspect rather than at one.
+///
+/// The aspect comes from the **render target**, never from the trail grid: the
+/// grid is a resolution, not a shape (ADR-0037), and the present is a plain
+/// stretch, so the grid's own aspect cancels out.
+pub fn fit_scale(half: [f32; 2], aspect: f32) -> f32 {
+    let [hx, hy] = half;
+    // `half()` floors both axes above zero, so neither division can blow up;
+    // a non-positive aspect would, and is not reachable from a real target.
+    let vertical = FRAME_FILL / hy;
+    let horizontal = FRAME_FILL * aspect.max(1e-3) / hx;
+    vertical.min(horizontal)
+}
 
 /// Interpolate two angles along the **shortest arc**.
 ///
@@ -611,6 +622,99 @@ impl Extent {
     }
 }
 
+/// Samples in the framing lookup, spanning `morph` from 0 to 1 inclusive.
+///
+/// A figure's extent moves smoothly along the morph — it is a bounded
+/// continuous function of a table that is itself a lerp — so 33 samples put the
+/// interpolation error far below the `0.12` of frame the fit leaves as margin.
+pub const FIT_STEPS: usize = 33;
+
+/// Chaos-game iterations behind each [`FIT_STEPS`] entry.
+///
+/// The measurement is a **maximum** over the sampled orbit, so it converges
+/// from below: too few iterations under-measure the figure and the fit draws it
+/// slightly too large. What the error has to stay inside is the margin
+/// [`FRAME_FILL`] leaves — see
+/// `the_fit_leaves_margin_for_what_it_under_measures`, which also records why
+/// iterating it to zero is not available.
+///
+/// **Kept low deliberately, because iterating buys almost nothing here.** The
+/// binding figure is the tree, whose `y` is 7.9 % under a long run at this
+/// count — and still 6.6 % at 32 000, for eight times the load cost. The margin
+/// absorbs both; the extra 3.5 ms buys 1.3 points of an error that never
+/// reaches zero.
+const FIT_ITERATIONS: u32 = 4_000;
+
+/// The framing of a figure pair, sampled over `morph` once at `configure`.
+///
+/// **Built with every lever at neutral, and that is the non-obvious half of the
+/// design** (ADR-0075 Alternative C). A fit that saw the levers would cancel its
+/// own most valuable one: `vigor` exists to make the figure surge on a beat, and
+/// a fit that re-framed every frame would shrink it back by exactly as much, for
+/// a net zero. So the fit is a function of `morph` and the figure pair **only** —
+/// which is also what lets it be a load-time table instead of a per-frame chaos
+/// game, and what leaves nothing stochastic to shimmer between frames.
+///
+/// The accepted cost is that a hard `vigor` push can leave the frame. That is
+/// the intended trade — an audible lever that can overshoot beats an inaudible
+/// one that cannot — and `zoom` is the recourse.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FitLut {
+    /// `(centre, half-extent)` per sample, evenly spaced over `morph`.
+    entries: [([f32; 2], [f32; 2]); FIT_STEPS],
+}
+
+impl FitLut {
+    /// Measure the figure pair's framing at [`FIT_STEPS`] positions.
+    ///
+    /// Takes the two **neutral** tables and nothing else, so the lever
+    /// independence above is structural rather than a discipline: there is no
+    /// parameter here through which a lever could arrive.
+    pub fn build(a: &IfsTable, b: &IfsTable) -> Self {
+        let mut entries = [([0.0; 2], [1.0; 2]); FIT_STEPS];
+        for (i, slot) in entries.iter_mut().enumerate() {
+            let morph = i as f32 / (FIT_STEPS - 1) as f32;
+            let extent = chaos_extent(&resolve(a, b, morph), FIT_ITERATIONS);
+            // A diverged table cannot reach here — the sweep proves no reachable
+            // morph produces one — but the fit is what the *projection* reads, so
+            // a non-finite box would put a NaN in the uniform rather than fail a
+            // test. Falling back to the unit box draws a wrong size, not nothing.
+            *slot = if extent.is_finite() {
+                (extent.centre(), extent.half())
+            } else {
+                ([0.0; 2], [1.0; 2])
+            };
+        }
+        Self { entries }
+    }
+
+    /// The framing at this `morph`, linearly interpolated between the two
+    /// bracketing samples. One lerp per frame; no chaos game, no allocation.
+    pub fn sample(&self, morph: f32) -> ([f32; 2], [f32; 2]) {
+        let t = if morph.is_nan() {
+            0.0
+        } else {
+            morph.clamp(0.0, 1.0)
+        };
+        let last = FIT_STEPS - 1;
+        let pos = t * last as f32;
+        // `min(last - 1)` so `i + 1` is always in range, including at `t == 1`
+        // where `pos` lands exactly on the final sample and `frac` is then 1.
+        let i = (pos.floor() as usize).min(last - 1);
+        let frac = pos - i as f32;
+        let (Some((c0, h0)), Some((c1, h1))) = (self.entries.get(i), self.entries.get(i + 1))
+        else {
+            // Unreachable given the clamp above; this file denies `unreachable`,
+            // and a unit box is a visible wrong size rather than a panic.
+            return ([0.0; 2], [1.0; 2]);
+        };
+        (
+            [lerp(c0[0], c1[0], frac), lerp(c0[1], c1[1], frac)],
+            [lerp(h0[0], h1[0], frac), lerp(h0[1], h1[1], frac)],
+        )
+    }
+}
+
 /// Burn-in iterations discarded before the box is measured.
 ///
 /// The orbit starts at the origin, which need not be on the figure. The
@@ -726,7 +830,10 @@ mod tests {
     // Tests panic on failure; allowed over the file's hot-path pragma.
     #![allow(clippy::panic, clippy::expect_used, clippy::indexing_slicing)]
 
-    use super::{IfsFigure, MAPS, chaos_extent, decompose, lerp_angle, recompose, resolve};
+    use super::{
+        FIT_STEPS, FitLut, IfsFigure, MAPS, chaos_extent, decompose, fit_scale, lerp_angle,
+        recompose, resolve,
+    };
 
     /// The tolerance the plan states for the round trip: well above `f32`
     /// round-trip error on values of order 1 through five multiplies and two
@@ -972,11 +1079,14 @@ mod tests {
         }
     }
 
-    /// Every figure is framed inside the 16:9 reference frame it is fitted
-    /// against, and the fern — which is tall — is inside a portrait frame too.
+    /// [`IfsFigure::frame`] — the **fallback** framing, used by the seeded
+    /// scatter and by the CPU transcription of the draw shader — frames every
+    /// figure at the reference aspect.
     ///
-    /// Phase 4 strengthens this to every figure at every aspect, which is what
-    /// the aspect-aware fit buys.
+    /// The render path does not go through here since Phase 4; what it uses is
+    /// asserted by `every_shipped_pair_stays_framed_at_both_aspects`. This
+    /// stays because the fallback is what sizes the seed box, and a figure
+    /// seeded outside its own attractor takes visibly longer to converge.
     #[test]
     fn every_figure_is_framed_at_the_reference_aspect() {
         const REFERENCE: f32 = 16.0 / 9.0;
@@ -1003,11 +1113,9 @@ mod tests {
             );
         }
 
-        // The fern's Phase 1 claim, kept: it is framed at portrait too, and its
-        // scale is the measured value Phase 1 shipped rather than a re-derived
-        // one — Phase 2 changes the representation, not the picture.
+        // The fern's Phase 1 claim, kept: it is tall, so it is framed at a
+        // portrait aspect too without the fit having to narrow it.
         let (scale, centre) = IfsFigure::Fern.frame();
-        assert_eq!(scale, 0.168);
         assert_eq!(centre, [0.237, 4.999, 0.0]);
         let ([hx, hy, _], _) = IfsFigure::Fern.seed_box();
         assert!(hy * scale < 1.0);
@@ -1234,5 +1342,273 @@ mod tests {
                 );
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // The fit (Plan 0062 Phase 4 / ADR-0075)
+    // -----------------------------------------------------------------------
+
+    /// The two aspects the framing has to hold at: a 16:9 landscape window and a
+    /// 9:16 portrait one. The wide figures are the reason the second is checked —
+    /// the dragon and the spiral are about twice as wide as they are tall, and a
+    /// scale fitted at 16:9 leaves them hanging out of a portrait frame.
+    const FRAMED_ASPECTS: [f32; 2] = [16.0 / 9.0, 9.0 / 16.0];
+
+    /// **The figure stays in the frame, at every morph, at both aspects.**
+    ///
+    /// Asserted on the fitted extent rather than on pixels: what a capture could
+    /// say is that the picture looked plausible at one size, and the claim is
+    /// about every position of a continuous parameter at any window shape.
+    #[test]
+    fn every_shipped_pair_stays_framed_at_both_aspects() {
+        for start in IfsFigure::ALL {
+            for target in IfsFigure::ALL {
+                let (a, b) = (start.table(), target.table());
+                let fit = FitLut::build(&a, &b);
+                // Sampled between the LUT's own entries too, so the assertion
+                // covers the interpolation and not only the measured points.
+                for i in 0..=128 {
+                    let morph = i as f32 / 128.0;
+                    let (centre, half) = fit.sample(morph);
+                    assert!(
+                        centre.iter().chain(half.iter()).all(|v| v.is_finite()),
+                        "{start:?} -> {target:?} at {morph}: non-finite framing"
+                    );
+                    for aspect in FRAMED_ASPECTS {
+                        let scale = fit_scale(half, aspect);
+                        // The frame is NDC |y| <= 1 and |x| <= aspect (the
+                        // vertex shader divides x by the aspect).
+                        let (ndc_x, ndc_y) = (half[0] * scale / aspect, half[1] * scale);
+                        assert!(
+                            ndc_x <= 1.0 && ndc_y <= 1.0,
+                            "{start:?} -> {target:?} at morph {morph}, aspect {aspect}: \
+                             the figure reaches ({ndc_x}, {ndc_y}) in NDC"
+                        );
+                        // Non-vacuity: it fills the frame along its binding axis
+                        // rather than shrinking to a dot to stay inside.
+                        assert!(
+                            ndc_x.max(ndc_y) > 0.7,
+                            "{start:?} -> {target:?} at morph {morph}, aspect {aspect}: \
+                             occupies only {} of the binding axis",
+                            ndc_x.max(ndc_y)
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// The fit's endpoints are each figure's own framing — so a preset that
+    /// never binds `morph` is framed exactly as the single figure it named.
+    #[test]
+    fn the_fit_endpoints_are_the_figures_own_framing() {
+        for start in IfsFigure::ALL {
+            for target in IfsFigure::ALL {
+                let fit = FitLut::build(&start.table(), &target.table());
+                for (morph, figure) in [(0.0, start), (1.0, target)] {
+                    let (centre, half) = fit.sample(morph);
+                    let solo = chaos_extent(&figure.table(), super::FIT_ITERATIONS);
+                    assert_eq!(
+                        (centre, half),
+                        (solo.centre(), solo.half()),
+                        "{start:?} -> {target:?} at morph {morph} must frame {figure:?} \
+                         exactly as it frames itself"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The fit is a **function of `morph` and the figure pair only** — the
+    /// property the whole design rests on, since a fit that saw `vigor` would
+    /// cancel it (ADR-0075 Alternative C).
+    ///
+    /// Phase 4 can assert the structural half: the builder takes two tables and
+    /// nothing else, and the same pair produces a bit-identical table however
+    /// many times it is built. Phase 5 asserts the half that needs levers to
+    /// exist — that moving all four to their extremes does not move this.
+    #[test]
+    fn the_fit_is_reproducible_and_sees_nothing_but_the_pair() {
+        for start in IfsFigure::ALL {
+            for target in IfsFigure::ALL {
+                let (a, b) = (start.table(), target.table());
+                assert_eq!(
+                    FitLut::build(&a, &b),
+                    FitLut::build(&a, &b),
+                    "{start:?} -> {target:?}: the fit is not reproducible, so a \
+                     capture's framing would depend on when it ran"
+                );
+            }
+        }
+        // Different pairs give different fits — otherwise the assertion above
+        // holds for a builder that ignores its arguments.
+        assert_ne!(
+            FitLut::build(&IfsFigure::Fern.table(), &IfsFigure::Fern.table()),
+            FitLut::build(&IfsFigure::Fern.table(), &IfsFigure::Spiral.table())
+        );
+    }
+
+    /// `morph` is bindable, so the LUT is sampled with whatever a preset
+    /// produces. Out of range and at `NaN` it must stay on the table.
+    #[test]
+    fn sampling_the_fit_out_of_range_stays_on_the_table() {
+        let fit = FitLut::build(&IfsFigure::Fern.table(), &IfsFigure::Dragon.table());
+        let at0 = fit.sample(0.0);
+        let at1 = fit.sample(1.0);
+        for (wild, expected) in [
+            (-1.0, at0),
+            (-0.001, at0),
+            (f32::NAN, at0),
+            (1.001, at1),
+            (99.0, at1),
+        ] {
+            assert_eq!(fit.sample(wild), expected, "sampling at {wild}");
+        }
+        // And the table really has FIT_STEPS entries the sampler walks — an
+        // off-by-one at the top end would read past the last.
+        assert_eq!(FIT_STEPS, 33);
+        assert!(fit.sample(1.0).1.iter().all(|v| v.is_finite()));
+    }
+
+    /// The fit is built at `configure`, so it has to sit inside the
+    /// preset-switch budget (~150 ms).
+    ///
+    /// **Asserted on the work rather than on a wall clock**, and not only
+    /// because this crate forbids reading one (the determinism rule, enforced by
+    /// a clippy `disallowed_methods` entry). An iteration count is the thing the
+    /// cost is actually proportional to, it is the same number on every machine,
+    /// and it is what an order-of-magnitude mistake would move — a chaos game
+    /// per frame, or an iteration count with an extra zero. A timing assertion
+    /// would measure the CI runner's load instead and flake.
+    ///
+    /// The constant is calibrated against a measured run: the 140 448 iterations
+    /// this table costs take **0.51 ms** in an optimized build, so a 500 000
+    /// ceiling is under 2 ms — about 1 % of the switch budget.
+    #[test]
+    fn the_fit_is_built_inside_the_preset_switch_budget() {
+        const ITERATION_CEILING: u32 = 500_000;
+        let total = FIT_STEPS as u32 * (super::FIT_ITERATIONS + super::CHAOS_BURN_IN);
+        assert!(
+            total <= ITERATION_CEILING,
+            "the fit runs {total} chaos-game iterations at every preset switch, \
+             past the {ITERATION_CEILING} ceiling"
+        );
+
+        // Non-vacuity: not so few iterations that the box is noise. How close
+        // it has to be is the next test's question, not this one's.
+        const { assert!(super::FIT_ITERATIONS >= 1_000) };
+        assert!(
+            FitLut::build(&IfsFigure::Fern.table(), &IfsFigure::Spiral.table())
+                .sample(0.5)
+                .1
+                .iter()
+                .all(|h| *h > 0.0)
+        );
+    }
+
+    /// **What the fit under-measures, [`FRAME_FILL`](super::FRAME_FILL)'s margin
+    /// has to absorb** — and this is the assertion that makes
+    /// `every_shipped_pair_stays_framed_at_both_aspects` a claim about the
+    /// figure rather than about the lookup's own numbers.
+    ///
+    /// A sampled bounding box is a **maximum over a finite orbit**, so it
+    /// converges from below: the fit always measures a figure slightly smaller
+    /// than it is, and therefore draws it slightly larger than it planned. If the
+    /// under-measure is `e`, the true fill is `FRAME_FILL / (1 - e)`, so the
+    /// figure stays inside the frame exactly while `e < 1 - FRAME_FILL`.
+    ///
+    /// **Iterating the error away is not available, and that is worth knowing
+    /// before someone tries.** The tree's trunk map is `(0, 0, 0, 0.5)` — it
+    /// halves `y` towards zero — so the figure's true infimum in `y` is
+    /// approached and never reached, and the sampled box keeps creeping for as
+    /// long as anyone is willing to iterate. Measured: **7.9 % under at 4 000
+    /// iterations and still 6.6 % at 32 000**, for eight times the load cost.
+    /// The margin is the mechanism; the iteration count only has to keep the
+    /// error inside it.
+    ///
+    /// So this asserts the **consequence** — the fraction of the frame the true
+    /// figure occupies — rather than the error itself. The error is a proxy with
+    /// an arbitrary budget; the fill is the property, and a figure whose fill
+    /// crosses 1 is a figure hanging out of the frame.
+    #[test]
+    fn the_fit_leaves_margin_for_what_it_under_measures() {
+        /// How much of the frame the true figure may occupy along its binding
+        /// axis. Below `1.0` is the property; this leaves visible daylight so a
+        /// pass is not a near-miss.
+        const FILL_CEILING: f32 = 0.97;
+
+        let mut cases: Vec<(String, super::IfsTable)> = IfsFigure::ALL
+            .iter()
+            .map(|f| (format!("{f:?}"), f.table()))
+            .collect();
+        for (start, target) in [
+            (IfsFigure::Fern, IfsFigure::Spiral),
+            (IfsFigure::Fern, IfsFigure::Dragon),
+        ] {
+            let (a, b) = (start.table(), target.table());
+            for morph in [0.25, 0.5, 0.75] {
+                cases.push((
+                    format!("{start:?}->{target:?}@{morph}"),
+                    resolve(&a, &b, morph),
+                ));
+            }
+        }
+
+        let mut worst_fill = 0.0f32;
+        for (name, table) in &cases {
+            let quick = chaos_extent(table, super::FIT_ITERATIONS).half();
+            let long = chaos_extent(table, 200_000).half();
+            for axis in 0..2 {
+                let (Some(q), Some(c)) = (quick.get(axis), long.get(axis)) else {
+                    continue;
+                };
+                // The fit scales so the MEASURED half-extent occupies
+                // `FRAME_FILL`; the TRUE half-extent then occupies this.
+                let fill = super::FRAME_FILL * c / q;
+                worst_fill = worst_fill.max(fill);
+                assert!(
+                    fill < FILL_CEILING,
+                    "{name} axis {axis}: the fit measures {q} against a long-run \
+                     {c}, so the true figure fills {:.3} of the frame — past the \
+                     {FILL_CEILING} ceiling, and {:.3} is where it leaves it",
+                    fill,
+                    1.0f32
+                );
+            }
+        }
+        // Non-vacuity in both directions: the under-measure is real (so the
+        // margin is doing work rather than the two runs agreeing exactly), and
+        // it never inverts (a sampled maximum cannot over-measure).
+        assert!(
+            worst_fill > super::FRAME_FILL + 0.001,
+            "no figure under-measured at all ({worst_fill}), so this test is not \
+             measuring what it claims"
+        );
+    }
+
+    /// The aspect-aware fit is what makes a wide figure legal in a narrow
+    /// window, so the scale must genuinely differ between the two aspects for a
+    /// wide figure and not for a tall one.
+    #[test]
+    fn the_fit_scale_binds_on_whichever_axis_is_tighter() {
+        // The fern is tall: vertically bound at both aspects, same scale.
+        let fern_half = chaos_extent(&IfsFigure::Fern.table(), 20_000).half();
+        assert!(
+            (fit_scale(fern_half, 16.0 / 9.0) - fit_scale(fern_half, 9.0 / 16.0)).abs() < 1e-6,
+            "a tall figure is vertically bound at every aspect"
+        );
+
+        // The dragon is wide: horizontally bound in portrait, so its scale must
+        // drop — that is the whole point of taking the aspect.
+        let dragon_half = chaos_extent(&IfsFigure::Dragon.table(), 20_000).half();
+        assert!(
+            fit_scale(dragon_half, 9.0 / 16.0) < fit_scale(dragon_half, 16.0 / 9.0) * 0.6,
+            "a wide figure must shrink in a portrait window"
+        );
+
+        // A degenerate half-extent cannot produce an infinity on its way to a
+        // uniform — `Extent::half` floors it, and this states the consequence.
+        assert!(fit_scale([1e-6, 1e-6], 1.0).is_finite());
+        assert!(fit_scale([1.0, 1.0], 0.0).is_finite());
     }
 }
