@@ -82,14 +82,24 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// line of them. A 3-D family with all four levers off their defaults is the
 /// only thing in this suite that would catch a regression in them.
 ///
-/// **Captured after the roster loop.** Every pre-existing baseline is therefore
-/// rendered from the device state it always was, so adding this moved none of
-/// them — which matters on WARP, where building GPU resources mid-run is
-/// documented to change what a later capture resolves to.
-const EXTRA_FIXTURES: [(&str, &str); 1] = [(
-    "attractor_depth",
-    include_str!("fixtures/attractor_depth.toml"),
-)];
+/// `attractor_ifs` is the same shape of argument for the same scene (Plan 0062).
+/// De Jong takes a different arm of the step shader, its `a`..`d` coefficients
+/// *are* its shape, and `morph`/`curl`/`vigor`/`lean`/`bias` are inert on it —
+/// so nothing that could be done to `attractor.toml` would exercise the SVD
+/// decomposition, the morph, the framing fit or the levers.
+///
+/// **Captured after the roster loop, and appended rather than inserted.** Every
+/// pre-existing baseline is therefore rendered from the device state it always
+/// was, so adding an entry here moves none of them — which matters on WARP,
+/// where building GPU resources mid-run is documented to change what a later
+/// capture resolves to. For the same reason a new entry goes at the **end**.
+const EXTRA_FIXTURES: [(&str, &str); 2] = [
+    (
+        "attractor_depth",
+        include_str!("fixtures/attractor_depth.toml"),
+    ),
+    ("attractor_ifs", include_str!("fixtures/attractor_ifs.toml")),
+];
 
 fn golden_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -6,8 +6,8 @@
 # WHAT IS DIFFERENT ABOUT AUTHORING THIS FAMILY. The `a` `b` `c` `d`
 # coefficients that steer De Jong and Clifford are INERT here - an IFS's shape
 # lives in its affine table, not in four scalars. What reaches the figure is
-# `morph` (plus `curl`, `vigor`, `lean` and `bias`, which arrive in a later
-# phase).
+# `morph`, `curl`, `vigor`, `lean` and `bias`; see the [particles] section of
+# presets/README.md for the full roster and for `vigor`'s silent ceiling.
 #
 # THE MORPH IS THE THING THE ENGINE COULD NOT DO BEFORE. `morph_to` names a
 # second figure and `morph` travels continuously to it, through tables that are
