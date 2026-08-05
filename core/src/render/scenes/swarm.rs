@@ -1355,6 +1355,81 @@ mod tests {
         }
     }
 
+    /// **An eased `points` renders only whole figures — never a partial lobe**
+    /// (Plan 0070 Phase 3's done-when), asserted on the pixels rather than on the
+    /// quantizer.
+    ///
+    /// `marks::mark_points` already pins the arithmetic. This pins the
+    /// *behaviour* the arithmetic exists for, because the two are separable: a
+    /// count could be rounded on the way into the uniform and still reach an
+    /// angular fold fractionally if some later hand re-derived it. So a sweep
+    /// from 7 to 9 — the fractional values an ease actually visits — is rendered,
+    /// and the frames are grouped by **exact** equality.
+    ///
+    /// The claim, stated as the test checks it: the seven captures fall into
+    /// exactly **three** groups; the group boundaries sit at the half-integers
+    /// (7.4 draws the same frame as 7.0, 7.6 the same as 8.0); and the three
+    /// groups have 7, 8 and 9 angular maxima. No frame between them exists to be
+    /// found.
+    ///
+    /// The first pair is the determinism control: the same request captured twice
+    /// must produce the same bytes, or grouping by equality would be measuring
+    /// the adapter.
+    #[test]
+    fn an_eased_points_sweep_renders_only_whole_figures() {
+        const BINS: usize = 360;
+        const STAR: f32 = 3.0;
+        /// The sweep, straddling both half-integer steps between 7 and 9.
+        const SWEEP: [f32; 7] = [7.0, 7.4, 7.6, 8.0, 8.4, 8.6, 9.0];
+
+        let Some(control_a) = capture_one_mark(STAR, 7.0) else {
+            return;
+        };
+        let Some(control_b) = capture_one_mark(STAR, 7.0) else {
+            return;
+        };
+        assert_eq!(
+            control_a, control_b,
+            "the same request must render the same bytes, or grouping frames by \
+             equality measures the adapter rather than the point count"
+        );
+
+        let mut frames = Vec::new();
+        for points in SWEEP {
+            let Some(frame) = capture_one_mark(STAR, points) else {
+                return;
+            };
+            frames.push((points, frame));
+        }
+
+        // Group by exact frame equality, keeping first-seen order.
+        let mut groups: Vec<(Vec<f32>, Vec<f32>)> = Vec::new();
+        for (points, frame) in &frames {
+            match groups.iter_mut().find(|(pixels, _)| pixels == frame) {
+                Some((_, members)) => members.push(*points),
+                None => groups.push((frame.clone(), vec![*points])),
+            }
+        }
+        let members: Vec<Vec<f32>> = groups.iter().map(|(_, m)| m.clone()).collect();
+        let lobes: Vec<usize> = groups
+            .iter()
+            .map(|(pixels, _)| angular_lobes(&lit_radius_profile(pixels, BINS)))
+            .collect();
+        eprintln!("points sweep {SWEEP:?} -> groups {members:?}, angular maxima {lobes:?}");
+
+        assert_eq!(
+            members,
+            vec![vec![7.0, 7.4], vec![7.6, 8.0, 8.4], vec![8.6, 9.0]],
+            "an eased 7 -> 9 sweep must render exactly three figures, switching at \
+             the half-integers"
+        );
+        assert_eq!(
+            lobes,
+            vec![7, 8, 9],
+            "the three figures must be the 7-, 8- and 9-pointed stars"
+        );
+    }
+
     /// **The default mark is byte-identical to the one this scene drew before it
     /// had a shape at all** (Plan 0070 Phase 1's first done-when), end to end
     /// through the preset path.
