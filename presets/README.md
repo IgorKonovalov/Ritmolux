@@ -1591,7 +1591,7 @@ way `a`..`d` already carry family-specific meanings.
 
 | Param   | Default | What it does |
 |---------|---------|--------------|
-| `morph` | `0`     | Position from `family` to `[particles] morph_to`. `0` is the named figure, `1` is the target, and every value between is a real figure. Clamped; out of range pins to an endpoint. |
+| `morph` | `0`     | Position from `family` to `[particles] morph_to`. `0` is the named figure, `1` is the target, and every value between is a real figure — but **not a proportionally-different one**, see [below](#morph-is-a-travel-knob). Clamped; out of range pins to an endpoint. |
 | `curl`  | `0`     | Radians added to every map's rotation — fronds curl and uncurl. |
 | `vigor` | `1`     | Multiplier on the figure's contraction — a bushier, deeper, denser figure. **Has a silent ceiling; see below.** |
 | `lean`  | `0`     | Radians every translation is rotated by — the plant bends. |
@@ -1618,6 +1618,8 @@ so an intermediate figure fills the frame instead of drifting off it. It does
 exactly — the figure would surge and the frame would shrink it back for a net
 zero. The cost is that a hard `vigor` push can leave the frame; `zoom` is the
 recourse.
+
+<a id="morph-is-a-travel-knob"></a>
 
 **`morph` is a TRAVEL knob, not a little-life knob**, and its visible rate is
 steepest near zero — which is the opposite of what "every value between is a
