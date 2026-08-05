@@ -88,17 +88,24 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// so nothing that could be done to `attractor.toml` would exercise the SVD
 /// decomposition, the morph, the framing fit or the levers.
 ///
+/// `swarm_shaped` is the third (Plan 0070, ADR-0084). The mark silhouette's
+/// default is `disc`, and `disc` is **exactly** `length(local)` — the arithmetic
+/// the sprite drew before the roster existed — so the rostered `swarm.toml`
+/// takes that arm, and no edit to it that kept its baseline could execute a line
+/// of the ring, polygon, star or heart arms.
+///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 2] = [
+const EXTRA_FIXTURES: [(&str, &str); 3] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
     ),
     ("attractor_ifs", include_str!("fixtures/attractor_ifs.toml")),
+    ("swarm_shaped", include_str!("fixtures/swarm_shaped.toml")),
 ];
 
 fn golden_dir() -> PathBuf {

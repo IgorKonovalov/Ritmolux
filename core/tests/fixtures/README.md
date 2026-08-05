@@ -79,6 +79,32 @@ Two properties of it are worth knowing before touching either file:
 `systems_rosters_every_variant` holds it to the same conditions as the roster
 (the TOML parses, and its stem cannot collide with a rostered baseline's).
 
+## `swarm_shaped.toml` is a *third* off-roster fixture, on the same argument
+
+It is in `EXTRA_FIXTURES` for the reason the two above are (Plan 0070 Phase 4,
+[ADR-0084](../../../docs/adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md)):
+the rostered fixture **structurally cannot reach** the code under test. The mark
+silhouette's default is `disc`, and `disc` is *exactly* `length(local)` — the
+arithmetic the sprite drew before the roster existed, which is what keeps every
+other baseline in this directory byte-identical — so `swarm.toml` takes that arm
+and no edit to it that kept its own baseline could execute a line of the ring,
+polygon, star or heart arms.
+
+It draws seven-pointed stars, which is the figure the plan came from. Two of its
+values are load-bearing and its header says so: `size = 9.0` (at 128 px a sprite
+has to be several pixels across before a silhouette is anything but its own
+anti-aliasing) and `zoom = 8.0` (the swarm's population is fixed at the tier's
+10 000, so a sprite that large saturates the frame — the first draft at zoom 1
+was an even confetti mush with no figure in it at all, and the zoom is what puts
+a few hundred separated marks in frame instead).
+
+Appended at the **end** of `EXTRA_FIXTURES`, for the reason that list gives.
+Blessing it moved no other baseline: `LMV_BLESS` rewrites all of them, and the
+three line-scene PNGs it rewrote (`lsystem`, `parametric_curve`,
+`star_pattern` — the three that read `max_outlier 1` against their committed
+baselines, i.e. WARP's own rasterization noise) were restored before committing.
+Check `git status` after any bless here and do the same.
+
 ## The `composite_*` fixtures are a different guard
 
 `composite_trails.toml` and `composite_kaleido.toml` are **not** part of the

@@ -1,0 +1,37 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The one baseline in this suite that takes a NON-DISC arm of the mark
+# silhouette (Plan 0070 Phase 4, ADR-0084). The rostered swarm.toml cannot:
+# `shape` defaults to `disc`, which is exactly `length(local)` - the arithmetic
+# the sprite drew before the roster existed - so no edit to that file that kept
+# its baseline could execute a line of the ring, polygon, star or heart arms.
+# That is the same argument attractor_depth.toml and attractor_ifs.toml make,
+# and it is why this lives in EXTRA_FIXTURES rather than in the roster.
+#
+# It draws seven-pointed stars, which is the figure the whole plan came from.
+# Three values are load-bearing and none of them is a look choice:
+#
+# - `size = 9.0` against the rostered fixture's 3.0. At 128 px a sprite has to be
+#   several pixels across before a silhouette is anything but its own
+#   anti-aliasing, and a baseline that could not see the shape would pass a
+#   regression that removed it.
+# - `zoom = 8.0`. The swarm's population is fixed at the tier's 10 000, so a
+#   sprite large enough to have a legible shape saturates the frame - the first
+#   draft at zoom 1 was an even confetti mush with no figure in it at all. Zoom
+#   spreads the toroidal domain across the frame so only a few hundred marks
+#   land inside it, and the baseline shows separated stars on black.
+# - `spin = 0` and `burst = 0`, with a constant `force`, so the field stays a
+#   pure function of the seeded scatter as the rostered fixture's does.
+system = "swarm"
+name   = "fixture_swarm_shaped"
+
+[params]
+force      = "0.8"
+spin       = "0.0"
+burst      = "0.0"
+hue        = "0.6"
+brightness = "0.9"
+size       = "9.0"
+zoom       = "8.0"
+shape      = "3"
+points     = "7"
