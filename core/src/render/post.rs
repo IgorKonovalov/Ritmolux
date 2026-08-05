@@ -191,6 +191,21 @@ pub(crate) trait PostStage {
     /// to the live array at construction; never on the hot path.
     fn params(&self) -> &'static [&'static str];
 
+    /// Hand this stage the frame's evaluated `exposure` (ADR-0080).
+    ///
+    /// **Not a param, and deliberately not routed like one.** `exposure` belongs
+    /// to the tonemap: the tonemap owns the name, takes the binding, and is the
+    /// only pass that applies it. This is a one-way read for the one stage that
+    /// needs to know what the display will be shown — the bloom bright-pass, whose
+    /// `bloom_threshold` is meaningless in pre-exposure units once a preset moves
+    /// off 1.0. A stage cannot change the value, so the composite's fixed order
+    /// (ADR-0018) is unaffected.
+    ///
+    /// Defaulted to a no-op because two of the three stages have no business with
+    /// it, and because a stage added later should have to opt in rather than
+    /// remember to ignore it.
+    fn set_exposure(&mut self, _exposure: f32) {}
+
     /// Whether this stage runs this frame. `false` skips it entirely — the
     /// passthrough that keeps an unbound preset paying nothing.
     fn active(&self) -> bool;
@@ -499,6 +514,19 @@ impl PostChain {
         self.stages
             .get_mut(index)
             .is_some_and(|stage| stage.set_param(name, value))
+    }
+
+    /// Hand every stage this frame's evaluated `exposure` (ADR-0080). Only bloom
+    /// reads it; see [`PostStage::set_exposure`] for why it travels this way
+    /// rather than as a routed param.
+    ///
+    /// Called once per side per frame, before [`resolve`](Self::resolve) — the
+    /// value has to be the crossfaded one a dissolve will actually apply, and that
+    /// is not known until the incoming preset's bindings have been routed.
+    pub(crate) fn set_exposure(&mut self, exposure: f32) {
+        for stage in self.stages.iter_mut() {
+            stage.set_exposure(exposure);
+        }
     }
 
     /// Drop every stage's lazily-built resources (capture rebuild — keeps a
