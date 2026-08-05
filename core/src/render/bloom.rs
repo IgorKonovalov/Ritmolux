@@ -246,7 +246,7 @@ fn level_sizes(grid: (u32, u32), max_levels: u32) -> Vec<(u32, u32)> {
 
 /// Bright-pass body. `VsOut`/`vs_main` come from [`gpu::FULLSCREEN_VS_UV_FLIPPED`].
 const BRIGHT_SHADER: &str = r#"
-struct Bright { v: vec4<f32> } // x: threshold, y: knee band
+struct Bright { v: vec4<f32> } // x: threshold, y: knee band, z: exposure
 
 @group(0) @binding(0) var<uniform> u: Bright;
 @group(0) @binding(1) var samp: sampler;
@@ -260,12 +260,25 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // The BRIGHTEST CHANNEL, the same measure the tonemap's roll-off uses. A luma
     // measure would under-select saturated blues (luma 0.114) whose blue channel
     // is well over range, which is most of the neon palette.
-    let m = max(c.r, max(c.g, c.b));
+    //
+    // Scaled by the frame's EXPOSURE (ADR-0080), so the comparison below is
+    // against the light the display will be asked to show rather than against the
+    // scene's own linear units. `bloom_threshold` then means one thing at any
+    // stop; before this, a preset at exposure 0.03 put its whole figure over every
+    // threshold it could ask for and 0.95 against the 8.0 ceiling rendered alike.
+    // At the default stop of exactly 1.0 this multiply is the identity.
+    let m = max(c.r, max(c.g, c.b)) * u.v.z;
     let over = max(m - u.v.x, 0.0);
     let band = max(u.v.y, 1e-4);
     // Smooth the first `band` of over-range so an eased `bloom_threshold` sweeping
     // past a stroke does not pop it into existence.
     let soft = smoothstep(0.0, 1.0, clamp(over / band, 0.0, 1.0));
+    // `w` is a dimensionless FRACTION of `m` — `over` and `m` are both in exposed
+    // units, so the stop cancels out of it. That is why what leaves this pass is
+    // `c * w` and not `c * u.v.z * w`: only the *selection* moved to
+    // display-referred units. The light itself stays in the scene's linear
+    // currency, because the recombine adds it back onto an un-exposed frame and
+    // the tonemap applies the stop to the sum, downstream, exactly as before.
     let w = clamp(over * soft / max(m, 1e-4), 0.0, 1.0);
     // COLOUR AND ALPHA together (ADR-0055): the chain carries premultiplied alpha
     // and the recombine adds this on top of the source, so the halo has to be a
@@ -854,6 +867,16 @@ pub struct Bloom {
     amount: f32,
     threshold: f32,
     radius: f32,
+    /// The frame's evaluated `exposure`, handed down by the renderer through
+    /// [`PostStage::set_exposure`] (ADR-0080). **Not a param of this stage**: it is
+    /// owned, bound and applied by the tonemap, and read here only so the
+    /// bright-pass can compare against the light the display will be shown.
+    ///
+    /// Set once per frame per side, before [`resolve`](PostStage::resolve); it is
+    /// not reset by [`reset_params`](PostStage::reset_params) because it is not
+    /// this stage's to default. The neutral stop is the initial value, so a caller
+    /// that never sets it gets today's arithmetic exactly.
+    exposure: f32,
     /// The active tier's cap on this stage's internal grid — see
     /// [`Trails::post_cap`](super::trails::Trails).
     post_cap: (u32, u32),
@@ -887,6 +910,7 @@ impl Bloom {
             amount: DEFAULT_AMOUNT,
             threshold: DEFAULT_THRESHOLD,
             radius: DEFAULT_RADIUS,
+            exposure: super::tonemap::DEFAULT_EXPOSURE,
             post_cap,
             max_levels,
             builds: 0,
@@ -925,6 +949,12 @@ impl PostStage for Bloom {
 
     fn params(&self) -> &'static [&'static str] {
         PARAMS
+    }
+
+    /// Take the frame's evaluated stop (ADR-0080). See the field's docs for why
+    /// this is not a param and not reset with them.
+    fn set_exposure(&mut self, exposure: f32) {
+        self.exposure = exposure;
     }
 
     /// Whether bloom runs this frame (a preset bound `bloom_amount > 0`).
@@ -985,6 +1015,15 @@ impl PostStage for Bloom {
         let threshold = self.threshold.clamp(0.0, MAX_THRESHOLD);
         let radius = self.radius.clamp(MIN_RADIUS, MAX_RADIUS);
         let amount = self.amount.clamp(0.0, MAX_AMOUNT);
+        // Already sanitized by `Tonemap::applied_exposure` at the source; guarded
+        // again here because this stage must stay correct whatever a future caller
+        // hands it, and because a NaN reaching `m * u.v.z` would make the whole
+        // bright-pass select nothing.
+        let exposure = if self.exposure.is_finite() {
+            self.exposure.max(0.0)
+        } else {
+            super::tonemap::DEFAULT_EXPOSURE
+        };
         let s = scatter(radius);
         let norm = pyramid_sum(s, res.levels.len());
 
@@ -994,7 +1033,7 @@ impl PostStage for Bloom {
             &res.bright_uniform,
             0,
             bytemuck::bytes_of(&V4 {
-                v: [threshold, knee_band(threshold), 0.0, 0.0],
+                v: [threshold, knee_band(threshold), exposure, 0.0],
             }),
         );
         queue.write_buffer(

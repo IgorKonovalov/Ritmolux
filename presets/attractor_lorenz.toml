@@ -17,7 +17,7 @@
 # THE LOOK IS `density` + `fade`, AND THAT PAIR IS THE WHOLE POINT (ADR-0069).
 # At the full 50 000 particles this scene draws 50 000 independent samples of
 # the invariant measure: raising `fade` just piles them into a smooth fog, and
-# no exposure makes a fog into a figure. At 0.002 - 100 particles at the floor
+# no level setting makes a fog into a figure. At 0.002 - 100 particles at the floor
 # tier, 300 at rich - each one is a trajectory you can follow, the segment
 # joins its steps end to end, and ~13 frames of trail resolve the two lobes
 # into the banded spirals the textbook plot shows. RENDERED, not reasoned: the
@@ -32,10 +32,10 @@ name = "Lorenz"
 [particles]
 family = "lorenz"
 # See the header. This is the structural half of the look, not a performance
-# dial - and it is NOT an exposure control: the engine divides each particle's
+# dial - and it is NOT a level control: the engine divides each particle's
 # deposit by how many are drawn (ADR-0065), so total light is invariant. What
 # changes is WHERE that light lands - the same energy on 1/500th of the pixels,
-# which is why `exposure` below is what it is.
+# which is why `brightness` below is what it is.
 density = 0.002
 
 [palette]
@@ -51,29 +51,37 @@ stops = [
 name = "ember"
 
 [params]
-# EXPOSURE - the first shipped preset to bind it, and it is not a taste knob
-# here, it is arithmetic. `density = 0.002` multiplies each particle's deposit
-# by 500 (ADR-0065's invariance), and `fade ~ 0.93` accumulates ~14 frames of
-# it, so the trace sits some three orders of magnitude over the tonemap knee.
+# BRIGHTNESS - the scene's own level, and it is not a taste knob here, it is
+# arithmetic. `density = 0.002` multiplies each particle's deposit by 500
+# (ADR-0065's invariance), and `fade ~ 0.93` accumulates ~14 frames of it, so
+# the trace would sit some three orders of magnitude over the tonemap knee.
 # Left at 1.0 the whole figure lands on the shoulder's asymptote and renders as
-# one flat teal mass with the spirals gone - MEASURED: an exposure ladder from
-# 1.0 down to 0.0002 only starts resolving curves below ~0.004, and 0.03 with
-# the fine nib below is where the cores stay lit and the background stays
-# black. Two consequences to know before touching it:
+# one flat teal mass with the spirals gone - MEASURED: a level ladder from 1.0
+# down to 0.0002 only starts resolving curves below ~0.004, and 0.03 with the
+# fine nib below is where the cores stay lit and the background stays black.
+#
+# THIS USED TO BE `exposure`, AND MOVING IT IS THE POINT OF PLAN 0066. The
+# number is unchanged because the swap is level-neutral - the deposit is scaled
+# where it is made instead of at the tonemap, and the whole chain between is
+# linear - but two costs went away with it:
 #   - `exposure` is ENGINE-WIDE and crossfades across a preset dissolve, so the
-#     ~1 s blend into this preset passes through a briefly over-exposed frame.
-#     That is why the level is bought as far as possible with `size` and `fade`
-#     first (both scene-local, both blended as pixels rather than as a scalar)
-#     and only the remainder with `exposure`.
-#   - `bloom_threshold` is measured BEFORE this multiplier and is clamped at 8,
-#     so at this exposure the bright-pass cannot be selective - the whole
-#     figure is over any threshold a preset can ask for. It is pinned at the
-#     ceiling with a small amount, which buys a halo on the densest crossings
-#     rather than the "only the filaments bloom" behaviour the rest of the
-#     family gets. Do not read the pair as tuned; read it as capped.
-exposure        = "0.03"
+#     ~1 s blend into this preset used to pass through a badly exposed frame.
+#     `brightness` is scene-local and blends as pixels, so the dissolve is now
+#     a dissolve. The old advice to buy level from `size` and `fade` first, and
+#     only the remainder from the stop, is retired: buy it here.
+#   - `bloom_threshold` is now compared AFTER exposure (ADR-0080), so it
+#     discriminates on this preset for the first time. See below.
+brightness      = "0.03"
 bloom_amount    = "0.35"
-bloom_threshold = "8"
+# MEASURED, and it is tuned now rather than capped. The bright-pass compares
+# exposed luminance, so this number is in the same units the figure is finally
+# seen in: the trace's peak lands near 1.0-1.5 and its bulk well below 0.5, so
+# the threshold picks the densest crossings out of the sparse outer trace
+# instead of taking the whole figure or none of it. Coverage across the sweep -
+# 3.0 / 1.5 / 0.8 / 0.5 / 0.4 / 0.3 / 0.2 reads 0.164 / 0.165 / 0.177 / 0.207 /
+# 0.224 / 0.245 / 0.269 - is the discrimination that did not exist before: at
+# the old ceiling of 8 every value in that list rendered the same picture.
+bloom_threshold = "0.4"
 bloom_radius    = "1.3"
 # SHAPE - canonical Lorenz; `d` is unused by this family. Unchanged by the
 # re-author: Phase 4 re-gains and re-aims, it does not re-design.
@@ -225,7 +233,13 @@ spin        = "1.0 + clamp(bass * 0.94, 0, 0.80)"
 # COMPOSITE - a cold backdrop that warms with the mix, and a four-fold screen
 # fold that only engages on the fast personality WITH real energy behind it.
 bg_hue        = "0.30 + clamp(bass * 0.118, 0, 0.10)"
-bg_bright     = "0.010 + clamp(mid * 0.0235, 0, 0.020)"
+# THESE NUMBERS ARE 0.03x THEIR PREVIOUS SELVES AND THE BACKDROP IS UNCHANGED.
+# The background pre-pass is upstream of the tonemap, so it was scaled by the
+# `exposure = 0.03` this preset used to carry; `brightness` is scene-local and
+# does not reach it. Left alone, moving the level would have raised the backdrop
+# 33x - from ~1/255 (black, as authored) to a visible grey wash that would have
+# put a floor under the figure the whole look is composed against.
+bg_bright     = "0.0003 + clamp(mid * 0.000705, 0, 0.0006)"
 bg_vignette   = "0.88"
 # THE BAND HALF WAS DEAD BEHIND THE TEMPO HALF. `bass + treb > 0.38` cannot be
 # reached - the sum tops out near 0.138 - so this fold would not have engaged

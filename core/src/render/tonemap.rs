@@ -72,7 +72,12 @@ use super::gpu;
 
 /// `exposure` default — a plain 1.0 stop, so an unbound preset is scaled by
 /// nothing and only the curve applies.
-const DEFAULT_EXPOSURE: f32 = 1.0;
+///
+/// `pub(crate)` since ADR-0080: the bloom bright-pass now thresholds against
+/// *exposed* luminance, so it needs the neutral stop — the value at which its own
+/// multiply is the IEEE-754 identity and every existing baseline is byte-identical
+/// — and the two must not be able to drift to different numbers.
+pub(crate) const DEFAULT_EXPOSURE: f32 = 1.0;
 
 /// Where the shoulder starts. Below this the curve is **exactly** the identity,
 /// which is what keeps existing sub-1.0 content where it was (ADR-0046).
@@ -359,6 +364,28 @@ impl Tonemap {
         self.exposure
     }
 
+    /// The stop this pass will **actually apply** this frame: the bound value with
+    /// the two guards [`resolve`](Self::resolve) used to apply inline — negatives
+    /// floored (a negative stop would invert the frame) and a non-finite binding
+    /// replaced by the default.
+    ///
+    /// Extracted so the bloom stage can threshold against the same number rather
+    /// than a second transcription of it (ADR-0080). It is a **one-way read**: the
+    /// stage takes the value and has no way to change it, which is what keeps the
+    /// composite's fixed-order property (ADR-0018) intact — the tonemap still owns
+    /// `exposure` and still applies it, downstream, exactly as before.
+    ///
+    /// Distinct from [`exposure`](Self::exposure), which returns the raw bound
+    /// value because that is what a dissolve holds and hands back to
+    /// [`crossfade_from`](Self::crossfade_from).
+    pub(crate) fn applied_exposure(&self) -> f32 {
+        if self.exposure.is_finite() {
+            self.exposure.max(0.0)
+        } else {
+            DEFAULT_EXPOSURE
+        }
+    }
+
     /// Declare that this frame is `t` of the way through a dissolve out of an
     /// `from` exposure, and interpolate to this frame's own (the incoming
     /// preset's, already routed).
@@ -407,11 +434,7 @@ impl Tonemap {
         let Some(res) = self.res.as_ref() else {
             return 0;
         };
-        let exposure = if self.exposure.is_finite() {
-            self.exposure.max(0.0)
-        } else {
-            DEFAULT_EXPOSURE
-        };
+        let exposure = self.applied_exposure();
         queue.write_buffer(
             &res.uniform,
             0,

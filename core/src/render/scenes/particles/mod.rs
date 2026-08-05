@@ -467,6 +467,15 @@ const DEFAULT_MORPH: f32 = 0.0;
 /// Parameter defaults — a calm idle look when nothing is bound.
 const DEFAULT_SIZE: f32 = 1.0;
 const DEFAULT_HUE: f32 = 0.0;
+/// `brightness`'s default (ADR-0080): a multiply by **literal `1.0`**, which is
+/// the identity in IEEE-754 — so an unbound preset renders byte-identically to
+/// the build before this param existed, and no golden baseline moves.
+///
+/// The name matches [`swarm`](super::swarm::PARAMS) and
+/// [`emitter`](super::emitter::PARAMS) exactly. Three scenes draw additive
+/// particle marks and this is the one lever that says how bright; a fourth name
+/// for it would be a vocabulary an author has to re-learn per scene.
+const DEFAULT_BRIGHTNESS: f32 = 1.0;
 /// Depth-cue defaults (ADR-0076): **exactly the pre-ADR-0076 behaviour**. At
 /// `perspective = 0` the magnification is `1 / (1 - 0 * d_n)` = `1`, and a
 /// multiply by `1.0` is exact — so an unbound preset is byte-identical and no
@@ -556,6 +565,29 @@ pub fn deposit_scale(active_count: u32) -> f32 {
     // `max(1)` rather than a branch: a zero-particle scene draws nothing, so the
     // value is unobservable, and a division by zero here would reach the shader.
     crate::render::TierConfig::FLOOR.attractor_particles as f32 / active_count.max(1) as f32
+}
+
+/// The sanitized `brightness` multiplier on that deposit (ADR-0080).
+///
+/// Two guards, both for the same reason — the value arrives from an eased
+/// expression and lands in an **accumulation** the trail carries across frames,
+/// so a bad frame's value is not a bad frame, it is a permanently poisoned field:
+///
+/// - **Negative is floored to zero.** The draw blends `One, One`, so negative
+///   light would *subtract* from whatever the trail already holds — the same trap
+///   `depth_fade`'s clamp exists for.
+/// - **Non-finite falls back to the default.** An infinite deposit writes `inf`
+///   into the field and every later decay multiplies it back to `inf`; nothing
+///   downstream recovers.
+///
+/// At the default this returns exactly `1.0`, so the multiply at the packing site
+/// is the identity.
+fn brightness_factor(value: f32) -> f32 {
+    if value.is_finite() {
+        value.max(0.0)
+    } else {
+        DEFAULT_BRIGHTNESS
+    }
 }
 
 /// Whether a **reseed's** kick is drawn as a streak (ADR-0069).
@@ -1061,10 +1093,11 @@ fn vs_main(
     let col = apply_saturation(mix(ca, cb, clamp(palette_mix, 0.0, 1.0)), saturation);
 
     // Normalize the additive deposit by the particle count (ADR-0065), so total
-    // light per frame is invariant to the tier. Applied here rather than in the
-    // fragment shader because the draw uniform is bound VERTEX-only; the fragment
-    // multiplies this by its own radial falloff, and both are linear, so the
-    // result is identical to scaling the emitted fragment.
+    // light per frame is invariant to the tier, times the preset's `brightness`
+    // (ADR-0080). Applied here rather than in the fragment shader because the draw
+    // uniform is bound VERTEX-only; the fragment multiplies this by its own radial
+    // falloff, and both are linear, so the result is identical to scaling the
+    // emitted fragment.
     let deposit = draw.w.w;
 
     var out: VsOut;
@@ -1331,7 +1364,7 @@ impl StepUniform {
 
 /// Draw uniform (per frame). `v`: x aspect, y point half-size, z hue offset, w
 /// spin. `w`: x world scale, y projection dim (2 or 3), z z-centre (3D),
-/// w [`deposit_scale`] (ADR-0065).
+/// w [`deposit_scale`] (ADR-0065) times [`brightness_factor`] (ADR-0080).
 /// `u`: x hue_spread, y hue_center, z palette_mix, w saturation (ADR-0021).
 /// `x`: x zoom, yz pan (view transform, ADR-0018), w the streak flag
 /// (ADR-0069) — non-zero exactly when [`AttractorFamily::is_continuous`].
@@ -2024,6 +2057,13 @@ pub struct AttractorScene {
     d: f32,
     size: f32,
     hue: f32,
+    /// Scene-local level (ADR-0080): a multiplier on the per-particle additive
+    /// deposit, which [`deposit_scale`] has already normalized by the particle
+    /// count. So it composes with `density` instead of fighting it, and — being a
+    /// property of the pixels this scene lays down — it blends across a dissolve
+    /// the way the picture does, which the engine-wide `exposure` presets used to
+    /// reach for does not.
+    brightness: f32,
     fade: f32,
     /// Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5): the per-particle
     /// seed jitter band + shared desaturation + A/B crossfade.
@@ -2111,6 +2151,7 @@ impl AttractorScene {
             d,
             size: DEFAULT_SIZE,
             hue: DEFAULT_HUE,
+            brightness: DEFAULT_BRIGHTNESS,
             fade: DEFAULT_FADE,
             hue_spread: DEFAULT_HUE_SPREAD,
             hue_center: DEFAULT_HUE_CENTER,
@@ -2283,6 +2324,9 @@ pub const PARAMS: &[&str] = &[
     "d",
     "size",
     "hue",
+    // The scene-local level (ADR-0080) — spelled exactly as `swarm` and
+    // `emitter` spell it.
+    "brightness",
     "fade",
     "hue_spread",
     "hue_center",
@@ -2352,6 +2396,7 @@ impl Scene for AttractorScene {
         self.d = d;
         self.size = DEFAULT_SIZE;
         self.hue = DEFAULT_HUE;
+        self.brightness = DEFAULT_BRIGHTNESS;
         self.fade = DEFAULT_FADE;
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.hue_center = DEFAULT_HUE_CENTER;
@@ -2377,6 +2422,7 @@ impl Scene for AttractorScene {
             "d" => self.d = value,
             "size" => self.size = value,
             "hue" => self.hue = value,
+            "brightness" => self.brightness = value,
             "fade" => self.fade = value,
             "hue_spread" => self.hue_spread = value,
             "hue_center" => self.hue_center = value,
@@ -2520,6 +2566,7 @@ impl Scene for AttractorScene {
             d,
             size,
             hue,
+            brightness,
             fade,
             hue_spread,
             hue_center,
@@ -2576,6 +2623,7 @@ impl Scene for AttractorScene {
                 ifs_frame: ifs_fit.as_ref().map(|fit| fit.sample(*morph)),
                 size: *size,
                 hue: *hue,
+                brightness: *brightness,
                 fade: *fade,
                 hue_spread: *hue_spread,
                 hue_center: *hue_center,
@@ -2650,6 +2698,9 @@ struct UniformInputs {
     ifs_frame: Option<([f32; 2], [f32; 2])>,
     size: f32,
     hue: f32,
+    /// The raw bound `brightness`; sanitized by [`brightness_factor`] where it is
+    /// packed, not here, so the guard has exactly one site.
+    brightness: f32,
     fade: f32,
     hue_spread: f32,
     hue_center: f32,
@@ -2755,7 +2806,13 @@ fn upload_uniforms(
     // was allocated: the draw below issues `active` instances, and normalizing
     // against anything else would be a claim about a different draw call. This is
     // what carries ADR-0065's invariance across `density` (ADR-0069).
-    let deposit = deposit_scale(active);
+    //
+    // `brightness` (ADR-0080) rides the same slot rather than a second uniform
+    // field: both are scalars on the very same additive weight, and the shader
+    // has no reason to tell "how many particles are sharing this light" apart
+    // from "how bright the figure is". At the default the factor is exactly
+    // `1.0`, so this line is the identity and no existing capture moves.
+    let deposit = deposit_scale(active) * brightness_factor(inputs.brightness);
     queue.write_buffer(
         &pipelines.draw_uniform,
         0,
@@ -2993,10 +3050,11 @@ mod tests {
     #![allow(clippy::panic, clippy::expect_used)]
 
     use super::{
-        AttractorFamily, AttractorScene, Basis, DEFAULT_DEPTH_FADE, DEFAULT_DEPTH_HUE,
-        DEFAULT_SPIN, FIXED_STEP, JITTER_MODE, MAX_PERSPECTIVE, MIN_PARTICLE_DENSITY, Particle,
-        RESEED_DRAWS_STREAK, SPIN_RATE, STEP_SLOTS, Scene, StepUniform, active_particles,
-        advance_spin, deposit_scale, ifs, projection_mirror, spin_phase, streak_flag,
+        AttractorFamily, AttractorScene, Basis, DEFAULT_BRIGHTNESS, DEFAULT_DEPTH_FADE,
+        DEFAULT_DEPTH_HUE, DEFAULT_SPIN, FIXED_STEP, JITTER_MODE, MAX_PERSPECTIVE,
+        MIN_PARTICLE_DENSITY, Particle, RESEED_DRAWS_STREAK, SPIN_RATE, STEP_SLOTS, Scene,
+        StepUniform, active_particles, advance_spin, brightness_factor, deposit_scale, ifs,
+        projection_mirror, spin_phase, streak_flag,
     };
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderContext;
@@ -3141,6 +3199,43 @@ mod tests {
         // means: three times the samples at a third the weight is the same light.
         let total = |count: u32| count as f32 * deposit_scale(count);
         assert_eq!(total(floor), total(rich));
+    }
+
+    /// ADR-0080's identity claim, asserted on the scalar for the same reason
+    /// ADR-0065's is: it is what makes every existing golden baseline
+    /// **byte-identical** rather than approximately unchanged. A multiply by
+    /// literal `1.0` is exact in IEEE-754, and this is where that literal is.
+    #[test]
+    fn the_brightness_factor_is_exactly_one_by_default_and_scales_linearly() {
+        assert_eq!(
+            brightness_factor(DEFAULT_BRIGHTNESS),
+            1.0,
+            "the default must be an exact 1.0 — no golden baseline may move"
+        );
+        assert_eq!(brightness_factor(0.5), 0.5);
+        assert_eq!(brightness_factor(2.0), 2.0);
+        // The whole product, at the floor tier where every baseline is blessed:
+        // half the brightness is exactly half the deposit.
+        let floor = TierConfig::for_tier(Tier::Floor).attractor_particles;
+        assert_eq!(
+            deposit_scale(floor) * brightness_factor(0.5),
+            deposit_scale(floor) * 0.5
+        );
+    }
+
+    /// The two guards on that factor. Both matter more here than for an ordinary
+    /// param because the value lands in an accumulation the trail carries forward:
+    /// a single poisoned frame is a permanently poisoned field.
+    #[test]
+    fn the_brightness_factor_refuses_negative_and_non_finite_bindings() {
+        // Negative light would *subtract* from the additive accumulation.
+        assert_eq!(brightness_factor(-1.0), 0.0);
+        assert_eq!(brightness_factor(-0.0), 0.0);
+        // NaN and the infinities fall back rather than reaching the uniform: an
+        // `inf` deposit survives every later decay multiply.
+        assert_eq!(brightness_factor(f32::NAN), DEFAULT_BRIGHTNESS);
+        assert_eq!(brightness_factor(f32::INFINITY), DEFAULT_BRIGHTNESS);
+        assert_eq!(brightness_factor(f32::NEG_INFINITY), DEFAULT_BRIGHTNESS);
     }
 
     /// A zero-particle scene draws nothing, so the factor is unobservable — but it

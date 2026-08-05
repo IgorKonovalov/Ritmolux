@@ -533,7 +533,13 @@ fn composite_into(
     encoder: &mut wgpu::CommandEncoder,
     destination: &wgpu::TextureView,
     surface: (u32, u32),
+    exposure: f32,
 ) -> u32 {
+    // The stop this side's light will be shown at, handed to the chain before it
+    // folds (ADR-0080). Only the bloom bright-pass reads it, and only to decide
+    // what counts as over-range; nothing here applies it — the tonemap still does,
+    // downstream.
+    side.chain.set_exposure(exposure);
     let target = side.chain.begin(encoder, destination, surface);
     side.background.render(&ctx.queue, encoder, destination);
     // Hand the scene its target size before it renders: a scene with an internal
@@ -1603,7 +1609,27 @@ impl Renderer {
                     dt,
                     series_scratch.get_mut(..out_elements).unwrap_or(&mut []),
                 );
-                draw_calls += composite_into(ctx, out_scene, side, encoder, &out_view, surface);
+                // **The outgoing preset's OWN held stop, not the crossfaded one**
+                // (ADR-0080). Two reasons, and the first is structural: the
+                // crossfade below cannot have run yet, because it interpolates
+                // towards the incoming preset's `exposure` and that is not routed
+                // until further down. The second is that this is the right answer
+                // anyway — the outgoing side's bright-pass should keep selecting
+                // what its author aimed it at for as long as the side is drawn;
+                // fading it out is the blend's job, not the threshold's.
+                let out_exposure = transition
+                    .as_ref()
+                    .and_then(Transition::outgoing_exposure)
+                    .unwrap_or(tonemap::DEFAULT_EXPOSURE);
+                draw_calls += composite_into(
+                    ctx,
+                    out_scene,
+                    side,
+                    encoder,
+                    &out_view,
+                    surface,
+                    out_exposure,
+                );
             }
         }
 
@@ -1690,7 +1716,18 @@ impl Renderer {
         };
         let destination = blend_input.as_ref().unwrap_or(terminal);
 
-        draw_calls += composite_into(ctx, scene, live_side, encoder, destination, surface);
+        // After the crossfade above, so a dissolve's bright-pass thresholds against
+        // the stop the tonemap will actually apply to this frame rather than the
+        // incoming preset's endpoint (ADR-0080).
+        draw_calls += composite_into(
+            ctx,
+            scene,
+            live_side,
+            encoder,
+            destination,
+            surface,
+            tonemap.applied_exposure(),
+        );
         if let (Some(tr), true) = (transition.as_ref(), blend_input.is_some()) {
             // Mix the outgoing side with the live incoming one into the tonemap's
             // input. At t = 0 this is the outgoing frame exactly, which is what lets
