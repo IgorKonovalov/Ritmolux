@@ -1501,9 +1501,10 @@ Two things worth knowing before you reach for it:
   across a dissolve. `size` and `fade` also buy level and change the picture
   while they do it — a wider nib and a longer trail are looks, not stops — so
   reach for them when you want what they do, not when you only want less light.
-  (`attractor_lorenz` ships `exposure = 0.03` at `density = 0.002` and
-  `attractor_thomas` `0.10` at `0.02`. Both predate `brightness` and are on the
-  list to be moved onto it; do not copy the pattern.)
+  (`attractor_lorenz` ships `brightness = 0.03` at `density = 0.002` and
+  `attractor_thomas` `0.10` at `0.02` — the two worked examples of that cut. Both
+  carried the number on `exposure` until Plan 0066 moved it; if you are reading an
+  older copy, the swap is level-neutral and the value transfers unchanged.)
 - **The tier caps the top, it does not set the value.** `density` is a fraction
   of whatever the current quality tier allows (50 000 at the standard tier,
   150 000 at the rich one), so `density = 0.02` is 1 000 points on one and 3 000
