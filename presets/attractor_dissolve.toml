@@ -60,7 +60,7 @@ stops = [
 [params]
 # GLOW - the crystalline end has hard edges that bloom readily, so the threshold
 # sits high and only the densest crossings cross it.
-bloom_amount    = "1.1"
+bloom_amount    = "1.35"
 bloom_threshold = "0.94"
 bloom_radius    = "1.2"
 
@@ -94,7 +94,7 @@ vigor = "1.00 + clamp(bass * 0.070, 0, 0.060) + beat * 0.030"
 # `anim` 0.016 against a 0.01 gate floor - and it only cleared it at all because
 # the UNBOUND `spin` was turning the whole figure. Binding `spin` to a rock, as
 # it had to be, removed that and left the levers doing the work alone.
-curl  = "sin(time * 0.17) * 0.16 + clamp(mid * 0.14, 0, 0.12)"
+curl  = "sin(time * 0.23) * 0.30 + clamp(mid * 0.20, 0, 0.17)"
 # bias opens and closes the texture without moving the silhouette (Phase 7
 # measured the bounding box as identical across its whole range). On the
 # triangle it redistributes weight between the apex and the base corners.
@@ -103,11 +103,26 @@ bias  = "0.05 + sin(time * 0.29) * 0.30 + clamp(treb * 0.50, 0, 0.30)"
 # the whole picture sliding rather than as the figure bending.
 lean  = "sin(time * 0.21) * 0.12"
 
-# DENSITY - the same inversion the rest of the attractor set uses. The triangle
-# end is the one at risk: its strokes are straight and parallel, so they stack
-# into flat sheets far more readily than the fern's do.
-fade = "0.88 - clamp(bass * 0.082, 0, 0.070) - beat * 0.030"
-size = "0.46 - clamp((bass + mid) * 0.065, 0, 0.105) + beat * 0.05"
+# DENSITY - the same inversion the rest of the attractor set uses, and a LONGER
+# TRAIL than the family's other preset, which is where this look gets its
+# apparent depth from.
+#
+# THE TRAIL IS AN EXTRUSION, AND THAT IS THE WHOLE 3-D TRICK HERE. Every real
+# depth cue the engine has is dead on this family: `perspective` and `depth_hue`
+# are EXACTLY the identity on a 2-D figure (measured - zero pixels differ at any
+# setting), because ADR-0076 gives a flat family an inverse depth extent of
+# exactly zero. What is left is the accumulation. The levers move the figure a
+# little between frames and the trail holds the recent states, so each element
+# leaves a short streak behind it - and on the Sierpinski end, whose edges are
+# STRAIGHT AND PARALLEL, those streaks read as extrusion rather than as blur.
+# The triangle acquires thickness and looks like a carved lattice.
+#
+# It is a cheat and it only works because the figure is rigid; the same trail on
+# a strange attractor is the rotational smear design-backlog 0063 warns about.
+# `fade` is nonetheless kept well under that entry's ceiling - at 0.912 the trail
+# is ~11 frames, and `spin` at this amplitude turns ~0.6 degrees across it.
+fade = "0.912 - clamp(bass * 0.055, 0, 0.048) - beat * 0.020"
+size = "0.38 - clamp((bass + mid) * 0.055, 0, 0.090) + beat * 0.042"
 # Held higher than the fern's 0.30 - a reseed shakes a crystal, and a crystal
 # that shivers on every onset reads as unstable rather than as struck.
 reseed = "onset > 0.44"
@@ -131,7 +146,7 @@ saturation  = "1.05 + clamp(treb * 0.47, 0, 0.28)"
 # the figure turning - an equilateral triangle has an "up" and a chaotic cloud
 # does not. A rock of about +/-15 degrees keeps the tilt alive without ever
 # inverting it, and the fern end takes the same rock happily as sway.
-spin  = "sin(time * 0.085) * 0.24"
+spin  = "sin(time * 0.070) * 0.34"
 zoom  = "1.04 + bar * 0.06 + clamp(bass * 0.19, 0, 0.16)"
 pan_x = "sin(time * 0.115) * 0.04"
 pan_y = "cos(time * 0.091) * 0.035"

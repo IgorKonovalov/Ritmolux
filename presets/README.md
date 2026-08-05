@@ -253,13 +253,26 @@ documented there.
 
 ### Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin` (Plan 0063)
 
-**Three of these four are inert on every flat family**, the same way
-`a b c d` already carry family-specific meanings. `perspective`, `depth_fade` and
-`depth_hue` do something only on the **3-D families — `thomas` and `lorenz`.**
-On `de_jong`, `clifford` and the five IFS figures they are *exactly* the
-identity: those maps have no third coordinate, so the engine hands the shader a
-depth extent of zero and every cue collapses to a no-op. Binding them there is
-not an error and produces no warning — it produces nothing at all.
+**Two of these four are inert on every flat family**, the same way `a b c d`
+already carry family-specific meanings. `perspective` and `depth_hue` do
+something only on the **3-D families — `thomas` and `lorenz`.** On `de_jong`,
+`clifford` and the five IFS figures they are *exactly* the identity: those maps
+have no third coordinate, so the engine hands the shader a depth extent of zero
+and both cues collapse to a no-op. Binding them there is not an error and
+produces no warning — it produces nothing at all. (Verified by capture: at any
+setting, **zero pixels** differ.)
+
+> **`depth_fade` is the exception, and it is not a no-op on a flat family — it
+> is a uniform dimmer.** The haze is `1 − depth_fade · (1 − depth01(dn))`, and a
+> flat family's `dn` is `0`, which puts `depth01` at `0.5` rather than `1`. So
+> the multiplier lands at `1 − depth_fade/2`: at `depth_fade = 0.9` a flat
+> figure is dimmed **45 %** everywhere, with no depth gradient at all. Measured
+> on `attractor_dissolve`: 20 % of pixels move, max channel delta 97.
+>
+> Nothing is broken by this — but it is a trap in both directions. Do not reach
+> for `depth_fade` expecting nothing to happen on a 2-D family, and do not reach
+> for it *as* a dimmer: `exposure` is the parameter for that and says what it
+> means. See [design-backlog 0067](../docs/design-backlog.md).
 
 `spin` is the exception and reaches **every** family. The flat ones rotate
 in-plane through the same angle, so an audio-driven `spin` is a real look on
