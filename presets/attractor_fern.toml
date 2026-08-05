@@ -86,17 +86,23 @@ bloom_radius    = "1.1"
 # The framing is fitted at NEUTRAL levers on purpose (ADR-0075), so this
 # genuinely swells the plant rather than being re-framed back to nothing.
 #
-# IT IS MOSTLY A TRANSIENT HERE, WHICH IS THE OPPOSITE OF THE OBVIOUS TUNING.
-# The ceiling is 0.97 against the fern's own 0.851, so a preset has ~17% of
-# headroom, and the tempting move is to spend it on a band at the house gain.
-# Rendered against a sustained loud passage that is wrong: at a steady 1.09 the
-# leaflets fuse and the fern becomes a soft mass filling the frame - the lever
-# has enough authority that a SUSTAINED level saturates the figure the way a
-# sustained luminance term saturates the accumulation. So the band term is small
-# and most of the range is on `beat`, where it lands as a surge and is gone.
-# The 0.97 clamp is not too tight; the honest finding is that it is too loose to
-# drive from a band scalar.
-vigor = "1.00 + clamp(bass * 0.035, 0, 0.030) + beat * 0.045"
+# MOSTLY A TRANSIENT, WHICH IS THE OPPOSITE OF THE OBVIOUS TUNING. The ceiling
+# is 0.97 against the fern's own 0.851, so a preset has ~17% of headroom, and
+# the tempting move is to spend all of it on a band at the house gain. Rendered
+# against a sustained loud passage that is wrong: at a steady 1.09 the leaflets
+# fuse and the fern becomes a soft mass filling the frame - the lever has enough
+# authority that a SUSTAINED level saturates the figure the way a sustained
+# luminance term saturates the accumulation. The 0.97 clamp is not too tight;
+# the honest finding is that it is too loose to drive hard from a band scalar.
+#
+# THE SPLIT IS THE POINT, and the first pass got it wrong in BOTH directions.
+# It shipped at cap 0.075 (fused on loud passages), was cut to 0.030 - and
+# watched live against real music that was too timid, the plant barely answering
+# the bass at all. The cap is now 0.050: at a typical bass of 0.66 the sustained
+# value is ~1.048, well clear of the fusing point, and a beat still takes it to
+# ~1.095 for as long as a beat lasts. Sustained swell and transient surge want
+# different budgets, and this lever needs both.
+vigor = "1.00 + clamp(bass * 0.059, 0, 0.050) + beat * 0.045"
 # curl - the fronds curl and uncurl.
 #
 # THE PERIODS ON ALL THREE TIME-DRIVEN LEVERS ARE ~30 s, NOT THE ~200-400 s THE
@@ -109,8 +115,16 @@ vigor = "1.00 + clamp(bass * 0.035, 0, 0.030) + beat * 0.045"
 # floor - technically alive, visually a still image.
 curl  = "sin(time * 0.19) * 0.11 + clamp(mid * 0.10, 0, 0.085)"
 # lean - the plant bends. Slow and wide, so it reads as wind rather than as a
-# parameter moving. Time only: see the note above.
-lean  = "sin(time * 0.23) * 0.20"
+# parameter moving.
+#
+# THE SECOND BASS TERM, AND IT IS SAFE TO STACK WITH `vigor` WHERE THE FIRST
+# DRAFT'S WERE NOT. The rule above is about compounding terms that all make the
+# figure BIGGER; `lean` rotates the translation vectors, so it bends the plant
+# without changing its extent at all. Bass therefore gets two orthogonal
+# answers - the plant swells AND sways - which is far more legible than pushing
+# one of them harder, and neither can fuse the leaflets. Watched live, this is
+# what "moves to the bass" actually reads as: a gust, not a zoom.
+lean  = "sin(time * 0.23) * 0.20 + clamp(bass * 0.165, 0, 0.14)"
 # bias - the plant BREATHES. Measured (Plan 0062 Phase 7): the silhouette and
 # the bounding box do not move at all, and the texture goes from fused-solid at
 # -0.2 to open-and-feathery at +0.6 - the leaflets separate and you can see
