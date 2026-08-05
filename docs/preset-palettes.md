@@ -138,7 +138,12 @@ picture gets brighter — the opposite of the intent. This is not hypothetical: 
 the content lane three rendered iterations of chasing exposure, contour density and the
 palette ramp, all downstream of a cause that was none of them (design-backlog 0027).
 Keep the centre inside `0..1` and know that `-0.1` and `0.9` are the same place. To
-actually darken a field, change the palette's stops or the scene's own exposure.
+actually darken a field, change the palette's stops or the scene's own **level
+param** — `glow` on the fragment field and reaction-diffusion, `brightness` on the
+three particle scenes. **Not `exposure`**: that is the whole-frame stop, it moves
+the backdrop and every other stage with the field, and `bloom_threshold` is
+measured against it
+([ADR-0080](adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md)).
 
 **Reaction-diffusion needs a much larger `color_span` than the fragment field.**
 `color_span` multiplies each scene's *native* field level, and those ranges differ:
