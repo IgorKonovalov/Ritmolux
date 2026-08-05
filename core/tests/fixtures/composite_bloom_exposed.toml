@@ -1,0 +1,63 @@
+# COMPOSITE FIXTURE - do not tune; editing this invalidates the drift baseline.
+# Plan 0066 Phase 3, ADR-0080. Sibling of composite_bloom.toml, and the ONLY
+# fixture in the suite that binds `exposure`.
+#
+# WHAT IT PINS: that `bloom_threshold` is compared against POST-EXPOSURE light.
+# The chain is scene -> post -> tonemap, so until ADR-0080 the bright-pass
+# thresholded the frame before `exposure` scaled it - which made the parameter
+# meaningful only while a preset sat near 1.0. Two shipped attractor presets do
+# not, and both ship a threshold their headers describe as capped rather than
+# tuned. Nothing in the suite guarded the relationship, because no fixture bound
+# `exposure` at all: `grep -l exposure core/tests/fixtures/*.toml` was empty
+# across all 23. This is that fixture.
+#
+# THE PAIR IS THE POINT AND NEITHER HALF WORKS ALONE. `exposure = 0.03` is
+# Lorenz's shipped stop, and `brightness = 10` is what keeps the frame visible
+# through it. Against the exposed light the star's dense crossings clear the
+# default `bloom_threshold = 1.0` and the arms do not, so the halo is a SELECTION
+# out of the figure. Remove the exposure multiply from the bright-pass and it sees
+# unexposed light of 10 and up against that same 1.0: `w` goes to ~0.99
+# everywhere the figure is, the whole star blooms at `bloom_amount = 3`, and the
+# picture becomes a wash.
+#
+# MEASURED, which is the only reason to believe the fixture guards anything. The
+# same capture against a build whose bright-pass compares pre-exposure light
+# reads **mean 0.0146, max outlier 209** against this baseline - the outlier is
+# 4.4x the suite's tolerance of 48, so the regression fails loudly rather than
+# sliding under it. Three weaker configurations were tried first and all three
+# passed within tolerance (outliers 13, 14 and 15): the tonemap's shoulder
+# flattens a difference between two already-blown-out frames, so the frame has to
+# be one where the halo's PRESENCE is what changes, not its magnitude.
+#
+# `bloom_threshold = 1.0` is the shipped default and is left there deliberately.
+# The fixture's job is to pin the UNITS the threshold is measured in, not a tuned
+# value; a hand-picked number would drift with taste and this one cannot.
+#
+# `scale = 0.30` rather than composite_bloom.toml's 0.12: the property is about
+# which PARTS of a figure clear the threshold, so the figure has to be big enough
+# to have parts. `bg_bright = 0` and `spin = 0` for composite_bloom.toml's own
+# reasons - the halo is additive so a lit backdrop would swamp its outer reaches,
+# and a frozen figure makes the baseline one frame rather than a phase.
+system = "parametric_curve"
+name   = "fixture_composite_bloom_exposed"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "5"
+d             = "43"
+samples       = "301"
+scale         = "0.30"
+spin          = "0"
+hue           = "0.12"
+thickness     = "2.5"
+brightness    = "10.0"
+draw_progress = "1"
+
+exposure        = "0.03"
+bloom_amount    = "3.0"
+bloom_threshold = "1.0"
+bloom_radius    = "1.0"
+
+bg_bright     = "0"

@@ -99,6 +99,14 @@ Two things about them differ from the rest of this directory, both deliberate:
   0010, a Plan 0018 Phase 7 clamp artifact). Its header says what will and will
   not be visible and why. Fixing 0010 moves that baseline; re-bless it then.
 
+`composite_bloom_exposed.toml` (Plan 0066 Phase 3, ADR-0080) is the **only
+fixture in this directory that binds `exposure`** — before it, `grep -l exposure
+*.toml` was empty across all 23, which is exactly why nothing guarded the
+relationship between a preset's stop and its `bloom_threshold`. It pairs an
+extreme stop with a scene level that compensates for it, so the tonemap sees the
+frame it always saw and only the bright-pass's input has moved. Its header
+carries the measurement that says the guard bites.
+
 They are otherwise governed by everything above: do not tune, bless on WARP,
 eyeball before committing.
 
