@@ -2905,9 +2905,7 @@ mod tests {
     #[test]
     fn a_figure_name_selects_the_ifs_family() {
         for figure in ifs::IfsFigure::ALL {
-            let name = match figure {
-                ifs::IfsFigure::Fern => "fern",
-            };
+            let name = figure.name();
             assert_eq!(
                 AttractorFamily::from_name(name),
                 Some(AttractorFamily::Ifs(figure)),
