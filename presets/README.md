@@ -221,14 +221,14 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | System            | Named `[params]`                                                         |
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
-| `swarm`           | `force` `spin` `burst` `field_freq` `hue` `brightness` `size` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
+| `swarm`           | `force` `spin` `burst` `field_freq` `hue` `brightness` `size` `shape` `points` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `attractor`       | `a` `b` `c` `d` `size` `hue` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
-| `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `size` `size_spread` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` |
+| `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -400,6 +400,11 @@ presets' `size` and `brightness`. A swarm preset carried over from before Plan
 0043 will read dimmer and sparser than it used to; raise those two rather than
 assuming something broke.
 
+The swarm's mark is no longer only a round blob: `shape` and `points` give it a
+silhouette — see
+[Shaped marks](#shaped-marks--the-particle-silhouette-plan-0070), which covers
+this scene and the emitter together.
+
 ### `emitter` — objects that spawn, fall, and die (Plan 0052)
 
 The emitter is the only system whose **population is not fixed**. Every other
@@ -464,10 +469,13 @@ Because each object draws its own *rate* as well as its own phase, the whole-fra
 brightness stays steady while every member of the field swings; a shared rate
 would flash as one sheet whatever the phases were.
 
-`spin` turns the mark. The mark is a soft **elongated glint** rather than a
-perfect disc — a disc is rotationally symmetric, so on one `spin` would be
-invisible. It is one fixed elongation on the same radial falloff, not a shape
-vocabulary; objects still have no *figure*.
+`spin` turns the mark, and since Plan 0070 there is something to turn. The
+emitter's default mark is a soft **elongated glint** rather than a perfect disc —
+a disc is rotationally symmetric, so on one `spin` would be invisible — and that
+glint is what `shape = disc` means *on this scene*. Select any other silhouette
+and `spin` rotates the figure itself, which is what makes a shaped mark read as
+an object rather than a stamp. See
+[Shaped marks](#shaped-marks--the-particle-silhouette-plan-0070).
 
 #### What it does not have
 
@@ -481,6 +489,79 @@ if the arcs should read as arcs.
 There is also no positionable source: the line spans the frame width at
 `y = -1.12` and cannot be moved or narrowed. A look that wants a point fountain
 or an off-centre jet is engine feedback, not a preset.
+
+### Shaped marks — the particle silhouette (Plan 0070)
+
+`swarm` and `emitter` both carry `shape` and `points`. They are the only two
+scenes that do: the `attractor`'s marks are a chaos-game accumulation, and at the
+densities that make a figure one mark is a point, so a silhouette there would be
+invisible on principle rather than by tuning
+([ADR-0084](../docs/adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md)).
+
+**`shape` is a numeric selector**, like `kaleido_edge` — the expression grammar
+has no strings, so a star is `shape = "3"`.
+
+| `shape` | mark | what it draws |
+|---|---|---|
+| `0` | `disc` | the default, and **exactly** what these scenes drew before the roster existed. On the swarm a round blob; on the emitter its elongated glint (see `spin` above) |
+| `1` | `ring` | an annulus the same size as the disc: brightest at 0.7 of the mark's radius, dark at the centre, with a hole reaching 0.4 of it |
+| `2` | `polygon` | a regular `points`-sided polygon, one vertex pointing along +x |
+| `3` | `star` | a `points`-pointed star, valleys at 0.45 of the tip radius |
+| `4` | `heart` | a heart, point down |
+
+`points` is the count for `polygon` and `star`, `3` to `12`, default `5`. It does
+nothing on `disc`, `ring` or `heart`. Past a dozen the marks these are *for* — a
+few pixels across — are a disc with a rough edge.
+
+**`polygon` has far less range than `star`, and the reason is geometry rather
+than tuning.** A polygon's corners sit at radius 1 and its edges at
+`cos(pi / points)` of that, so by seven sides the figure is within 10 % of a
+circle everywhere and reads as one: rendered side by side, a 7-gon field and a
+disc field are the same picture. Reach for `points = 3` or `4` — a field of
+triangles is unmistakable — or reach for `star`, whose valleys sit at 0.45 of its
+tips at every count.
+
+**`points` is a stepped parameter: it is rounded to a whole number**, so an eased
+`points` *snaps* at each half-integer rather than morphing. Both silhouettes fold
+the angle by the count, and that fold only absorbs `atan2`'s branch cut when the
+count divides the circle evenly — at a fractional count the mark tears along one
+ray. This is `kaleido_order`'s rule for `kaleido_order`'s reason, and it is worth
+stating because the surrounding vocabulary teaches the opposite: `variant`
+interpolates ([ADR-0060](../docs/adrs/0060-star-pattern-variants-interpolate.md))
+and the attractor's IFS morphs
+([ADR-0075](../docs/adrs/0075-ifs-family-morphs-in-singular-value-space.md)). A
+star's angle fold is periodic in the count, so a fractional count is a
+discontinuity and not an intermediate figure. `shape` is stepped for the stricter
+version of the same reason — its values are names, and there is nothing halfway
+between a ring and a polygon.
+
+Two consequences worth planning around:
+
+- **`hash(beat_index)` on `points` is the trick.** The count flipping per beat is
+  what already worked on `parametric_curve`'s `radial_offset` lobes, and it
+  carries over: `points = "7 + floor(hash(beat_index) * 2.999)"` gives a field
+  that re-cuts itself every beat, and the stepping is a feature there rather than
+  a cost.
+- **Small marks are where a silhouette earns its keep and also where it
+  disappears.** A seven-pointed star three pixels across is mostly its own
+  anti-aliasing. If the shape is not reading, raise `size` before anything else —
+  and note that on the swarm the population is fixed, so a mark large enough to
+  have a legible figure fills the frame. The engine's own shaped fixture reaches
+  for `zoom` to thin the field rather than for a smaller mark.
+
+> **A shaped mark is a silhouette in additive light — there is no fill and no
+> outline.** The compositor adds, so black adds nothing and a dark edge cannot
+> exist: a `heart` is a heart-shaped **glow**, brightest in its middle and fading
+> to nothing at its outline, not a red body with a black rim. The same is true of
+> every entry above. This is ADR-0084's deliberate scope and not a gap waiting to
+> be tuned around — a two-tone object reopens the additive-blend decision the
+> whole composite rests on and is its own backlog question. If a look needs one,
+> that is engine feedback.
+
+The roster is closed: a shape that is not in the table is `architect` + `dev`
+work, not a preset. That is the same trade
+[ADR-0061](../docs/adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)
+made for fold edges.
 
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 
