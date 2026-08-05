@@ -18,6 +18,7 @@
     clippy::unreachable
 )]
 
+use super::marks;
 use super::{FALLBACK_DT, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::gpu;
@@ -132,11 +133,32 @@ const DEFAULT_PALETTE_MIX: f32 = 0.0;
 // offset them — matching the line scenes' semantics (zoom > 1 = zoomed in).
 const DEFAULT_ZOOM: f32 = 1.0;
 const DEFAULT_PAN: f32 = 0.0;
+// The mark silhouette (ADR-0084). `disc` is exactly the arithmetic the sprite
+// drew before the roster existed, so an unbound swarm is unchanged.
+const DEFAULT_SHAPE: f32 = marks::DEFAULT_SHAPE;
+const DEFAULT_POINTS: f32 = marks::DEFAULT_POINTS;
 
+/// The scene's own WGSL. The shared mark-silhouette chunk
+/// ([`marks::sdf_wgsl`]) is prepended at module creation, so `mark_distance` here
+/// is the same function the emitter evaluates.
+///
+/// **`shape` and `points` travel vertex -> fragment as flat varyings rather than
+/// being read from `misc` in the fragment stage**, and that is deliberate. The
+/// fragment stage cannot see this scene's uniform without widening the bind
+/// layout's visibility to `VERTEX_FRAGMENT` — which would make this descriptor
+/// byte-identical to the line renderer's (`{uniform, VERTEX_FRAGMENT,
+/// min_binding_size: None}`), the exact collision shape
+/// [ADR-0058](../../../../docs/adrs/0058-bind-group-layout-collisions-carry-evidence.md)
+/// records and the one the emitter's layout comment says not to tidy back in. A
+/// flat varying carries a per-draw value with no descriptor change at all.
 const SHADER: &str = r#"
 struct Misc {
     // x: aspect, y: zoom, zw: pan (the shared ViewTransform, ADR-0018)
     v: vec4<f32>,
+    // x: mark shape index, y: quantized point count (ADR-0084). Per draw, not
+    // per instance: the branch stays uniform across a warp and `Instance` does
+    // not grow.
+    m: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> misc: Misc;
@@ -145,6 +167,8 @@ struct VsOut {
     @builtin(position) pos: vec4<f32>,
     @location(0) local: vec2<f32>,
     @location(1) color: vec3<f32>,
+    @location(2) @interpolate(flat) shape: f32,
+    @location(3) @interpolate(flat) points: f32,
 }
 
 @vertex
@@ -176,12 +200,18 @@ fn vs_main(
     out.pos = vec4<f32>(world.x / misc.v.x, world.y, 0.0, 1.0);
     out.local = c;
     out.color = color;
+    out.shape = misc.m.x;
+    out.points = misc.m.y;
     return out;
 }
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let d = length(in.local);
+    // The silhouette (ADR-0084). At the default `disc` this is `length(in.local)`
+    // and nothing else, so an unshaped swarm is the arithmetic it always was; the
+    // falloff below is untouched either way, so a visual change is attributable
+    // to the shape alone.
+    let d = mark_distance(in.local, in.shape, in.points);
     let falloff = max(0.0, 1.0 - d);
     let g = falloff * falloff;
     // Premultiplied: colour AND alpha carry the same coverage `g`, so the four
@@ -206,6 +236,10 @@ struct Instance {
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Misc {
     v: [f32; 4],
+    /// `[shape, points, 0, 0]` — the mark silhouette, quantized on the way in
+    /// (ADR-0084). Padded to a second `vec4` because that is WGSL's uniform
+    /// layout rule, not because three slots are wanted.
+    m: [f32; 4],
 }
 
 struct Particle {
@@ -290,6 +324,12 @@ pub struct SwarmScene {
     saturation: f32,
     /// A/B palette crossfade position (Plan 0020 Phase 4); 0 = palette A.
     palette_mix: f32,
+    /// The mark silhouette and its point count, **as bound** (ADR-0084). Both
+    /// are quantized on the way to the uniform rather than here, so a
+    /// `[smoothing]`-eased binding still eases — it just steps at the midpoints
+    /// (see [`marks::mark_points`]).
+    shape: f32,
+    points: f32,
 }
 
 impl SwarmScene {
@@ -306,7 +346,9 @@ impl SwarmScene {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("swarm-shader"),
-            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+            // The shared silhouette chunk first, then this scene's own source —
+            // one `mark_distance`, two scenes (ADR-0084).
+            source: wgpu::ShaderSource::Wgsl(format!("{}{SHADER}", marks::sdf_wgsl()).into()),
         });
         let instances = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("swarm-instances"),
@@ -419,6 +461,8 @@ impl SwarmScene {
             hue_center: DEFAULT_HUE_CENTER,
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
+            shape: DEFAULT_SHAPE,
+            points: DEFAULT_POINTS,
         }
     }
 
@@ -480,6 +524,10 @@ pub const PARAMS: &[&str] = &[
     "hue_center",
     "saturation",
     "palette_mix",
+    // The shared mark silhouette (ADR-0084) — the same two names the emitter
+    // carries; `marks::PARAMS` is the single statement of the pair.
+    "shape",
+    "points",
 ];
 
 impl Scene for SwarmScene {
@@ -516,6 +564,8 @@ impl Scene for SwarmScene {
         self.hue_center = DEFAULT_HUE_CENTER;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
+        self.shape = DEFAULT_SHAPE;
+        self.points = DEFAULT_POINTS;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -534,6 +584,8 @@ impl Scene for SwarmScene {
             "hue_center" => self.hue_center = value,
             "saturation" => self.saturation = value,
             "palette_mix" => self.palette_mix = value,
+            "shape" => self.shape = value,
+            "points" => self.points = value,
             _ => {}
         }
     }
@@ -659,6 +711,16 @@ impl Scene for SwarmScene {
             0,
             bytemuck::bytes_of(&Misc {
                 v: [self.aspect, self.zoom, self.pan_x, self.pan_y],
+                // Quantized here, on the way into the uniform, so the shader's
+                // precondition stays visible on the CPU side: the roster's
+                // bounds and the integer point count live in `marks`, and no
+                // fractional value ever reaches an angular fold (ADR-0084).
+                m: [
+                    marks::mark_shape(self.shape),
+                    marks::mark_points(self.points),
+                    0.0,
+                    0.0,
+                ],
             }),
         );
 
@@ -696,7 +758,8 @@ mod tests {
 
     use super::{
         DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, DEPTH_PARALLAX_FAR,
-        DEPTH_PARALLAX_NEAR, MARGIN, SEED, SwarmScene, bounds, hue_coord,
+        DEPTH_PARALLAX_NEAR, DEPTH_SCALE_FAR, DEPTH_SCALE_NEAR, MARGIN, SEED, Scene, SwarmScene,
+        bounds, hue_coord,
     };
     use crate::render::palette::Palette;
     use crate::render::scenes::SeededRng;
@@ -1014,6 +1077,355 @@ mod tests {
         assert!(
             narrow < full * 0.25,
             "narrow band ({narrow:.4}) is far more coherent than the full wheel ({full:.4})"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // The mark silhouette (Plan 0070 Phase 1, ADR-0084)
+    // -----------------------------------------------------------------------
+
+    /// The square capture the single-mark probe below draws into. Large enough
+    /// that a seven-pointed star's valleys are tens of pixels from its tips —
+    /// the whole point of the count is that the profile has structure, and at
+    /// `golden.rs`'s 128 there is not enough of it to bin cleanly.
+    const MARK_CAPTURE: u32 = 256;
+
+    /// The mark's half-size in world units. The frame is `|ndc| <= 1` on a square
+    /// target, so this leaves a tenth of the frame outside the sprite quad.
+    const MARK_HALF: f32 = 0.9;
+
+    /// **One mark, drawn large and centred, through the real swarm pipeline** —
+    /// the linear composite it wrote, RGBA, row-major.
+    ///
+    /// A swarm normally draws thousands of sprites and no single silhouette is
+    /// legible in the sum, so this builds the scene with a pool of **one**. Two
+    /// tricks make that one mark measurable, and both are arithmetic rather than
+    /// tuning:
+    ///
+    /// - **It is centred exactly**, whatever the seeded scatter put the particle
+    ///   at. The vertex shader computes
+    ///   `center * (1 + (zoom - 1) * parallax) + pan * parallax`, so
+    ///   `zoom = 1 - 1/parallax` with `pan = 0` collapses the position term to
+    ///   zero identically. The particle's own `parallax` comes off its depth,
+    ///   which the seeded draw is replayed here to read.
+    /// - **It is scaled to a known size** by dividing [`MARK_HALF`] through the
+    ///   per-particle size and depth scale the same replay gives.
+    ///
+    /// `saturation = 0` so every lit pixel is grey: the profile below thresholds
+    /// on luminance, and a palette sample that happened to be dark in one channel
+    /// would put notches in it that have nothing to do with the shape.
+    fn capture_one_mark(shape: f32, points: f32) -> Option<Vec<f32>> {
+        use crate::dsp::AnalysisFrame;
+        use crate::render::context::RenderError;
+        use crate::render::{COMPOSITE_FORMAT, HeadlessOptions, Renderer, capture};
+
+        let renderer = match Renderer::new_headless(HeadlessOptions {
+            width: MARK_CAPTURE,
+            height: MARK_CAPTURE,
+            prefer_software: true,
+        }) {
+            Ok(renderer) => renderer,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return None;
+            }
+            Err(e) => panic!("headless renderer build failed: {e}"),
+        };
+        let device = renderer.ctx.device.clone();
+        let queue = renderer.ctx.queue.clone();
+
+        // Replay the seeded draw the scene's own pool will make, so the depth
+        // terms below are the particle's and not an assumption about it.
+        let mut rng = SeededRng::new(SEED);
+        let particle = SwarmScene::spawn(&mut rng);
+        let parallax = DEPTH_PARALLAX_FAR + (DEPTH_PARALLAX_NEAR - DEPTH_PARALLAX_FAR) * particle.z;
+        let depth_scale = DEPTH_SCALE_FAR + (DEPTH_SCALE_NEAR - DEPTH_SCALE_FAR) * particle.z;
+
+        let mut scene = SwarmScene::new(&device, COMPOSITE_FORMAT, 1);
+        for (name, value) in [
+            ("force", 0.0),
+            ("spin", 0.0),
+            ("burst", 0.0),
+            ("brightness", 1.0),
+            ("saturation", 0.0),
+            ("size", MARK_HALF / (particle.size * depth_scale)),
+            ("zoom", 1.0 - 1.0 / parallax),
+            ("pan_x", 0.0),
+            ("pan_y", 0.0),
+            ("shape", shape),
+            ("points", points),
+        ] {
+            scene.set_param(name, value);
+        }
+        scene.set_time(0.0);
+        scene.update(&AnalysisFrame::default());
+
+        let (texture, view) =
+            capture::create_target(&device, COMPOSITE_FORMAT, MARK_CAPTURE, MARK_CAPTURE);
+        let (buffer, padded_bpr) =
+            capture::create_linear_readback(&device, MARK_CAPTURE, MARK_CAPTURE);
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("swarm-one-mark"),
+        });
+        capture::record_clear(&mut encoder, &view);
+        // A square target, so the shader's aspect divide is the identity and a
+        // world unit is a normalized-device unit on both axes.
+        scene.render(&queue, &mut encoder, &view, 1.0);
+        capture::record_copy(
+            &mut encoder,
+            &texture,
+            &buffer,
+            padded_bpr,
+            MARK_CAPTURE,
+            MARK_CAPTURE,
+        );
+        queue.submit(std::iter::once(encoder.finish()));
+        Some(
+            capture::read_back_linear(&device, &buffer, MARK_CAPTURE, MARK_CAPTURE, padded_bpr)
+                .expect("read back the one-mark composite"),
+        )
+    }
+
+    /// The lit radius of a capture, per direction: for each of `rays` angles out
+    /// of the frame centre, the furthest sample whose luminance still clears a
+    /// fraction of the frame's brightest.
+    ///
+    /// Marched along the ray rather than binned by pixel angle, because binning
+    /// leaves *holes*: at a hundred directions the angular width of a bin is
+    /// under a pixel of arc at small radii, so a valley direction can contain no
+    /// pixel centre at all and read as a lit radius of zero. Marching asks each
+    /// direction directly.
+    ///
+    /// The falloff is radial along every ray by construction — `d` scales
+    /// linearly with radius for the disc, polygon and star arms — so this profile
+    /// is the silhouette's own boundary radius times a constant, and its maxima
+    /// are the shape's points.
+    fn lit_radius_profile(pixels: &[f32], rays: usize) -> Vec<f32> {
+        let size = MARK_CAPTURE as usize;
+        let centre = MARK_CAPTURE as f32 * 0.5;
+        let lum = |x: f32, y: f32| -> f32 {
+            // The capture is row-major top-to-bottom; the sprite's `local` frame
+            // has +y up, so the row index counts down from the centre.
+            let col = (centre + x).floor();
+            let row = (centre - y).floor();
+            if col < 0.0 || row < 0.0 || col >= size as f32 || row >= size as f32 {
+                return 0.0;
+            }
+            let base = (row as usize * size + col as usize) * 4;
+            pixels
+                .get(base..base + 3)
+                .map_or(0.0, |px| px[0] + px[1] + px[2])
+        };
+        let peak = pixels
+            .chunks_exact(4)
+            .map(|px| px[0] + px[1] + px[2])
+            .fold(0.0f32, f32::max);
+        assert!(peak > 0.0, "the one-mark capture is empty");
+        // A fifth of the brightest sample: well clear of the half-float floor,
+        // and — because `g = (1 - d)^2` — a contour at a fixed fraction of the
+        // shape's own radius, so it has the silhouette's outline.
+        let threshold = peak * 0.2;
+
+        (0..rays)
+            .map(|i| {
+                let a = std::f32::consts::TAU * i as f32 / rays as f32;
+                let (dx, dy) = (a.cos(), a.sin());
+                let steps = (centre * 2.0) as usize;
+                let mut furthest = 0.0f32;
+                for s in 0..steps {
+                    let r = s as f32 * 0.5;
+                    if r > centre - 1.0 {
+                        break;
+                    }
+                    if lum(dx * r, dy * r) > threshold {
+                        furthest = r;
+                    }
+                }
+                furthest
+            })
+            .collect()
+    }
+
+    /// How many separated angular maxima a circular profile has — the point
+    /// count, counted rather than eyeballed.
+    ///
+    /// A **Schmitt trigger against the mark's own outer radius**, not a
+    /// derivative test and not the midpoint of the profile's own range. Both of
+    /// those count rasterization noise: a disc's profile here spans 62.8 to 64.0
+    /// px, and the midpoint of *that* range is crossed 88 times by a circle.
+    /// Here a lobe is an angular run reaching within 20 % of the furthest lit
+    /// radius, separated from the next by a dip below 70 % of it — so a figure
+    /// that never dips (a disc, a many-sided polygon) is one lobe, and a
+    /// seven-pointed star, whose valleys sit at 45 % of its tips, is seven.
+    fn angular_lobes(profile: &[f32]) -> usize {
+        let hi = profile.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let (on, off) = (hi * 0.8, hi * 0.7);
+        let n = profile.len();
+        // Latched state, walked twice so the wrap-around is settled before the
+        // count starts.
+        let mut lit = profile.iter().copied().fold(true, |acc, r| {
+            if r >= on {
+                true
+            } else if r <= off {
+                false
+            } else {
+                acc
+            }
+        });
+        if profile.iter().all(|&r| r > on) {
+            return 1;
+        }
+        let mut lobes = 0usize;
+        for i in 0..n {
+            let r = profile.get(i).copied().unwrap_or(0.0);
+            let next = if r >= on {
+                true
+            } else if r <= off {
+                false
+            } else {
+                lit
+            };
+            if next && !lit {
+                lobes += 1;
+            }
+            lit = next;
+        }
+        lobes
+    }
+
+    /// **A seven-pointed star has exactly seven angular maxima** (Plan 0070
+    /// Phase 1's second done-when), counted off a real capture of the real
+    /// pipeline rather than asserted by eye.
+    ///
+    /// Three counts, because one would not separate "the shape is a star" from
+    /// "the profile is noisy": the same probe at 5, 7 and 9 points must return 5,
+    /// 7 and 9. And a disc must return **one** — a circle's lit radius is
+    /// constant, so a lobe count above 1 on it would mean this whole measurement
+    /// is reading rasterization noise and the star counts prove nothing.
+    #[test]
+    fn a_seven_pointed_star_has_seven_angular_maxima() {
+        const BINS: usize = 360;
+        const STAR: f32 = 3.0;
+        const DISC: f32 = 0.0;
+
+        let Some(disc) = capture_one_mark(DISC, 7.0) else {
+            return;
+        };
+        let disc_profile = lit_radius_profile(&disc, BINS);
+        let disc_lobes = angular_lobes(&disc_profile);
+        let (lo, hi) = (
+            disc_profile.iter().copied().fold(f32::INFINITY, f32::min),
+            disc_profile
+                .iter()
+                .copied()
+                .fold(f32::NEG_INFINITY, f32::max),
+        );
+        eprintln!("disc lit radius {lo:.1}..{hi:.1} px over {BINS} bins, {disc_lobes} lobe(s)");
+        assert!(
+            hi < lo * 1.15,
+            "a disc's lit radius must be constant to within rasterization, got \
+             {lo:.1}..{hi:.1} px — the profile is measuring something other than \
+             the silhouette"
+        );
+        assert_eq!(
+            disc_lobes, 1,
+            "a disc has no points; a count above 1 means this measurement reads noise"
+        );
+
+        for points in [5.0f32, 7.0, 9.0] {
+            let Some(star) = capture_one_mark(STAR, points) else {
+                return;
+            };
+            let profile = lit_radius_profile(&star, BINS);
+            let lobes = angular_lobes(&profile);
+            let lo = profile.iter().copied().fold(f32::INFINITY, f32::min);
+            let hi = profile.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+            eprintln!(
+                "star points={points}: lit radius {lo:.1}..{hi:.1} px, {lobes} angular maxima"
+            );
+            assert!(
+                hi > lo * 1.5,
+                "a star's tips must reach well past its valleys, got {lo:.1}..{hi:.1} px"
+            );
+            assert_eq!(
+                lobes, points as usize,
+                "a {points}-pointed star must show exactly {points} angular maxima, \
+                 counted {lobes}"
+            );
+        }
+    }
+
+    /// **The default mark is byte-identical to the one this scene drew before it
+    /// had a shape at all** (Plan 0070 Phase 1's first done-when), end to end
+    /// through the preset path.
+    ///
+    /// Exact equality, not a tolerance: the `disc` arm is `length(p)` — the same
+    /// expression the fragment shader held — so binding `shape = "0"` and binding
+    /// nothing must produce the same bytes on the same adapter in the same run.
+    /// That is the property every untouched golden baseline rests on, asserted
+    /// here rather than inferred from the goldens passing.
+    ///
+    /// The third capture is the non-vacuity arm: a star through the same path
+    /// must genuinely move the frame, or the first assertion would also pass on a
+    /// `shape` binding that reached nothing.
+    #[test]
+    fn a_disc_shaped_swarm_is_byte_identical_to_the_unshaped_one() {
+        use crate::dsp::AnalysisFrame;
+        use crate::preset::Preset;
+        use crate::render::context::RenderError;
+        use crate::render::{HeadlessOptions, Renderer};
+
+        const SIZE: u32 = 128;
+        const FRAMES: u32 = 30;
+
+        let mut renderer = match Renderer::new_headless(HeadlessOptions {
+            width: SIZE,
+            height: SIZE,
+            prefer_software: true,
+        }) {
+            Ok(renderer) => renderer,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+            Err(e) => panic!("headless renderer build failed: {e}"),
+        };
+        let frame = AnalysisFrame::default();
+        let mut capture = |name: &str, extra: &str| {
+            let toml = format!(
+                "system = \"swarm\"\nname = \"{name}\"\n[params]\nforce = \"0.8\"\n\
+                 spin = \"0.1\"\nbrightness = \"0.9\"\nsize = \"3.0\"\n{extra}"
+            );
+            let preset = Preset::from_toml_str(&toml).expect("the probe preset parses");
+            renderer.set_presets(vec![preset]);
+            renderer
+                .capture_preset(name, &frame, FRAMES)
+                .expect("capture the probe preset")
+        };
+
+        let unshaped = capture("unshaped", "");
+        let disc = capture("disc", "shape = \"0\"\npoints = \"7\"\n");
+        let star = capture("star", "shape = \"3\"\npoints = \"7\"\n");
+
+        assert_eq!(
+            unshaped.rgba, disc.rgba,
+            "an explicit `shape = disc` must render byte-identically to no shape \
+             binding at all — the disc arm is the length() it replaced"
+        );
+        let differing = star
+            .rgba
+            .chunks_exact(4)
+            .zip(disc.rgba.chunks_exact(4))
+            .filter(|(a, b)| a[..3] != b[..3])
+            .count();
+        eprintln!(
+            "shaped swarm: {differing} of {} pixels differ between disc and star",
+            (SIZE * SIZE) as usize
+        );
+        assert!(
+            differing * 50 > (SIZE * SIZE) as usize,
+            "a star must genuinely move the frame, or the equality above is a \
+             statement about a binding that reached nothing: {differing} pixels"
         );
     }
 
