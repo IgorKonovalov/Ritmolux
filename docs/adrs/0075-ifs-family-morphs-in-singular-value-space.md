@@ -1,8 +1,11 @@
 # ADR-0075 — The IFS family is parameterized by its singular values, and morphs there
 
-> **Status:** proposed
+> **Status:** **accepted** (Plan 0062; carries an [Outcome](#outcome-2026-08-05) section — the step
+> uniform is **160 bytes, not 144**; the showcase pair named below came **last of five** and the
+> figure this ADR doubted came first; and `morph`'s visible rate is **front-loaded**, not the linear
+> read "every value between is a real figure" invites)
 > **Date:** 2026-08-04
-> **Related plan(s):** [0062](../plans/0062-the-chaos-game-grows-a-fern.md)
+> **Related plan(s):** [0062](../plans/done/0062-the-chaos-game-grows-a-fern.md)
 
 ## Context
 
@@ -188,3 +191,59 @@ started there is on-figure at every step and still visibly climbs — `f₂(0,0)
 form, so this generalizes to every curated figure. That property is what the successor plan's
 unfurl is built on; it is recorded here because it is a consequence of this parameterization rather
 than of that plan's design.
+
+## Outcome (2026-08-05)
+
+Plan 0062 implemented this in full — five phases of `dev` and a `preset-author` content pass — and
+the decision holds: no reachable table diverges, and the property is asserted on the CPU over all
+25 ordered figure pairs × 33 morph positions × every lever extreme, with no GPU involved. Four
+things this ADR recorded turned out to be wrong, and they are worth separating by *kind*, because
+one is arithmetic and three are claims about what the family would look like.
+
+**The step uniform is 160 bytes, not 144.** The arithmetic in Consequences omitted the alignment
+`step_index` forces: the scalar block ahead of the `vec4` affine table was already exactly full, so
+one more `u32` rounds it up to the next multiple of 16. The number is pinned by
+`the_step_uniform_carries_the_ifs_table_in_one_binding`. Nothing else changes — the bind-group
+layout still gains no binding, which was the load-bearing half of the claim.
+
+**Every claim about which figures would be worth looking at was wrong, in both directions.** The
+content pass swept five candidate crosses end to end as filmstrips:
+
+- **`fern → spiral`, this ADR's own showcase pair, came last of the five.** Anything ending at the
+  spiral thins into ragged streaks with half the frame empty, and the cause is in this document's
+  own numbers: the spiral's dominant map contracts at only `0.93` (after `SPIRAL_ARM`), so an
+  intermediate spends nearly every sample on a map that barely contracts and the orbit spreads
+  instead of settling. **A figure near the contractivity ceiling is a fine endpoint and a poor
+  morph target**, which is a property of the parameterization this ADR did not anticipate.
+- **`sierpinski → fern` came first, by a distance** — and the reason is the exact thing this ADR
+  hedged about. Consequences allowed that the Sierpinski might be "only a correctness fixture… the
+  least organic thing in a plan whose brief was organic". It earns a preset (`attractor_dissolve`),
+  but **not as a look — as an endpoint**: its rigidity is what makes the dissolve legible, because
+  interpolating singular values and rotations *separately* rounds sub-triangles into leaflets while
+  the silhouette holds. The ADR was right that it is the least organic figure and wrong that this
+  made it the least valuable one.
+
+**`morph`'s visible rate is front-loaded, and "every value between is a real figure" invited the
+wrong tuning.** The statement is true — every intermediate table converges, which is the whole
+decision — but it reads as an invitation to use a small `morph` for a little life. Measured on
+fern → dragon, the lit width of the figure as a fraction of the frame is `0.248` at `morph = 0` and
+`0.448` at `0.05`: **half again as wide by a twentieth of the range.** Per-map rotation compounds
+through the recursion, so the rate is dominated by the *angle* difference between the two tables.
+`morph` is a **travel** knob; a preset that wants to remain one figure should bind the four levers
+and leave `morph` alone. Both shipped presets are built that way. This is not a defect in the
+parameterization and no code changed for it — but it cost a draft, so it is recorded here and
+documented in `presets/README.md`.
+
+**One thing this ADR got exactly right, and it was not obvious.** Fitting the framing at neutral
+levers (Alternative C) is what makes `vigor` visible: the content pass measured a `0.11` swing
+taking the lit area of the frame from `0.112` to `0.297`. A full fit would have returned zero. The
+accepted cost — a hard `vigor` push can leave the frame — was hit in practice and is real, and
+`zoom` is indeed the recourse.
+
+**One consequence that landed harder than predicted, and is not fixed here.** The initial fill
+scatters particles over the figure's bounding box, and the plan predicted a "haze" while it
+contracts. It is not a haze: it is a **legible, hard-edged, axis-aligned rectangle** — the same
+artifact class [ADR-0066](0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) was written to remove from
+`reseed` — now on every switch *into* the family, with the ~1 s preset dissolve landing entirely
+inside it. Tracked as [backlog 0064](../design-backlog.md); the successor plan's staggered respawn
+removes it as a side effect.

@@ -13,7 +13,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong, and two guards start biting (layout-collision assertion + evidence allowlist, the line guard's fourth capture) | **approved 2026-08-02** — ready for `dev`; [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md); closes [backlog 0039](../design-backlog.md) + [0041](../design-backlog.md). **Phase 3 is `human`** and gates Phase 4. **Its "needs a discrete GPU" premise was corrected 2026-08-04 at [0060]'s close** — the gate is `device_type == Cpu`, not "discrete", and a real hardware measurement was taken on this box the same day (`ae4c215`), so try Phase 3 before deferring it. **[0060] also handed this plan a sharper question than it was written against**: the hardware dual-live reading matched **CI WARP** to five figures and disagreed with **this box's local WARP** by 1.54x on a sequence with no dual-live asymmetry — if that holds, the build the golden suite blesses on is the outlier ([ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) Outcome). Moves **no pixels** except one new baseline | dev, human |
 | [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended twice the same day** — **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (at the user's direct request), reconciled into the plan rather than reverted: it meets 4b's done-when with one accepted deviation (a test-written scratch library rather than a checked-in `fixtures/report/`), and it **opens the coverage gap 4b's sequencing existed to prevent** — nothing renders every shipped preset through the real CLI any more *and* Phase 4 has not yet put the generator under in-process tests. Every other phase is unstarted. From the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Amended a third time with Phase 2c** (2026-08-04, at [0060]'s close): a `links` job on `ubuntu-latest` giving `scripts/check-doc-links.mjs` a CI counterpart, so the doc-link gate stops depending on an opt-in hook. Independent of 2b/4b, touches neither Windows job, seconds on the cheapest runner — it is here only because this plan owns every `ci.yml` edit in flight. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. ~~Phase 6 is gated on [0059] being closed~~ — **released 2026-08-04**, [0059] has closed, so Phase 6 (which edits `particles/mod.rs`) is unblocked; it also inherits [0059]’s close decision to **retire `RESEED_DRAWS_STREAK`**, which lives in that same file; **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
 
-| [0062](0062-the-chaos-game-grows-a-fern.md) | The chaos game grows a fern: an IFS family that morphs between figures (`AttractorFamily::Ifs`, five curated tables in SVD form, safe-by-construction morph + four levers) | **approved 2026-08-04** — ready for `dev`; designed from the user's Barnsley-fern question; [ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md). **The first half of a deliberate two-plan split** (the user's call at interview): this one lands the *figure* — the family, the roster, the morph, the levers — so a real fern can be judged in motion; the successor carries the **unfurl and the depth/per-map colour**, which are the same per-particle channel and are tuned against a figure already known to be right. Adds **no** render idiom, no `Scene` change, no C ABI change, no dependency — the `attractor` scene is already a GPU chaos game and this is a fifth family plus one shader branch. **Phase 7 is `human`** (a `preset-author` pass judging levers against real audio), so it does not close in one session. Moves **no** existing golden baseline; adds one | dev, human |
 
 | [0064](0064-the-symmetry-stage-and-the-banded-palette.md) | The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour (`kaleido_radial`/`spiral`/`zoom`/`tile`/`inner`, `palette_steps`/`palette_contour`) | **approved 2026-08-04** — ready for `dev` **after [0055]**; from the user's five reference images; [ADR-0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) + [ADR-0078](../adrs/0078-banding-is-a-palette-coordinate-operation.md). Covers **three** of the five images, and applies to **every scene** because it is screen-space. The engine already has half the mechanism: periodicity in `theta` is the fold, periodicity in **`log r`** is the missing concentric self-similarity. **Both halves are one plan on purpose** — neither alone reproduces the references, and the user chose to decide the look from a rendered sample set that has to show the combination. **Phase 4 is `human`** (pick defaults and ranges from the grid) and gates Phases 5-6, so it does not close in one session. **Collides with [0055]** in `kaleidoscope.rs` — taking 0055 first is the cheaper order. Moves **no** existing golden baseline; adds one | dev, human |
 | [0065](0065-the-mandala-interior.md) | The mandala interior: `star_pattern` stops being hollow (a `rings` roster of motif / count / radius / scale / phase on `[generator]`) | **approved 2026-08-04** — ready for `dev`, gated by nothing; the fourth reference image; [ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md). **Closes the still-open half of [backlog 0034 → 0007](../design-backlog.md)** — the "hollow ring" finding with the user's standing *invest, do not cut* call on it, live since 2026-07-26 and never specified until the reference image arrived. Line geometry, so it **shares nothing** with [0055] or [0064] and can run in parallel with either. **Phase 3 is `human`** (pick the motif roster from a rendered grid) and gates Phases 4-6. Watch the `animation.rs` gate: a ring mandala is *more* rotationally symmetric than `star_rosette`, so spin alone will not pass it ([backlog 0009](../design-backlog.md)) — Phase 4 designs around it. Moves **no** golden baseline at all | dev, human |
@@ -38,8 +37,8 @@ preference, and a session may take any plan here.
 |---|------|----------|------------------------|
 | 1 | [0069] | **The only plan in the roster that closes in one session** — no `human` phase at all. Protective, moves no pixels, and it replaces a measure Plan 0058 proved cannot work with one that can. Shares no file with anything live | **Yes** |
 | ~~2~~ | ~~[0063]~~ | **Closed 2026-08-04** — see Recently closed. Its soft constraint **has been discharged in the direction it wanted**: `inv_depth_extent()` now exists as an exhaustive match over `AttractorFamily`, so [0062] adding a fifth family is **compiler-forced** to answer it (with `0.0` — its IFS figures are 2-D) | — |
-| 2 | [0062] | Adjacent to the now-closed [0063] in `particles/mod.rs`, and it inherits that file with four new params, an `inv_depth_extent()` it must answer, and a `projection_mirror` test module mirroring the draw shader | No — Phase 7 is `human` |
-| 2b | [0066] | **Soft constraint: after [0062].** Both add to `particles/mod.rs`, and this one adds a param to the same `PARAMS`/`set_param` pair — which [0063] has already grown by four, so read that file before estimating. Independent of it in every other respect | No — Phase 5 is `human`, terminal |
+| ~~2~~ | ~~[0062]~~ | **Closed 2026-08-05** — see Recently closed. All seven phases landed; its Phase 7 content pass is the source of backlog 0064-0066. `particles/mod.rs` now also carries `ifs.rs`, five new params and a `STEP_SLOTS` uniform-slot scheme, so anything inheriting that file should read it rather than [0063] alone | — |
+| 2 | [0066] | **Its soft constraint is discharged — [0062] closed 2026-08-05**, so `particles/mod.rs` is settled and this can start. It adds a param to the same `PARAMS`/`set_param` pair, which [0063] grew by four and [0062] by five more, so read that file before estimating. Independent of both in every other respect | No — Phase 5 is `human`, terminal |
 | 4 | [0065] | **Gated by nothing and shares no file with anything** — line geometry against a post chain and a particle scene. The safest parallel lane, and it can run *alongside* 1-3 rather than after them | No — Phase 3 is `human`, mid-plan |
 | 4 | [0064] | **Unblocked — [0055] has landed**, so the `kaleido_edge` branch it composes against is in place. Still deliberately after the attractor work rather than concurrent with it: its Phase 3 sample grid renders on `attractor_lorenz` as one of three sources, and [0063] changes what that source looks like. A look decision taken against a moving target is one that has to be retaken. **Read [0055]'s Recently-closed entry** — the fold's default is now `tile`, not the disc 0064 was drafted against | No — Phase 4 is `human`, mid-plan |
 | 5 | [0053] | Protective rather than additive; moves no pixels. Its `human` Phase 3 is runnable on this box after the 2026-08-04 premise correction. **Read BOTH [0052]'s and [0055]'s Recently-closed entries first** — each moved a bind-group layout 0053 asserts on, and neither moved in the direction 0053 predicted | No — Phase 3 is `human` |
@@ -807,6 +806,60 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0062 — The chaos game grows a fern](done/0062-the-chaos-game-grows-a-fern.md) — **done
+  2026-08-05**, Mode 4 review **no blockers, one major, four minor**. Phase 1 `8c621fa`, Phase 2
+  `7cdd34e`, Phase 3 `18a088c`, Phase 4 `b4aa911`, Phase 5 `daf59c6`, Phase 6 `7cab347`, the `human`
+  Phase 7 content pass `cf977f9`. Ran **in the main checkout on `main`, not in a worktree** — the
+  same ADR-0053 deviation [0063] took the day before. Full gate green (**521 tests, 0 skipped**),
+  `fmt` and `clippy --all-targets -D warnings` clean, **no existing golden baseline moved**, doc
+  links resolve. [ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md) is **accepted
+  with an Outcome section**.
+
+  **The engine can travel continuously from one figure to another, and the safety property is proved
+  without a GPU.** Every map is carried as the SVD of its linear part, so contractivity is
+  `max(|sx|, |sy|) < 1` — a comparison on two numbers rather than a property of a matrix. The sweep
+  that matters runs the shader's own step **in Rust**: 25 ordered figure pairs × 33 morph positions
+  × 10 000 iterations, asserting contractivity **separately** from boundedness, which is what
+  distinguishes "converges" from "happened not to blow up in ten thousand steps". The failure being
+  excluded is a permanently dead particle buffer, and a capture of a preset that diverges only on a
+  loud passage would have passed.
+
+  **The content pass falsified three of the ADR's own predictions, and the pattern is worth
+  carrying.** `fern -> spiral` — the design's showcase pair — came **last of five** crosses swept as
+  filmstrips, because a figure near the contractivity ceiling is a poor morph *target*: the spiral's
+  arm contracts at only 0.93, so the intermediate spreads instead of settling. `sierpinski -> fern`
+  came **first**, and the figure the ADR hedged might be "only a correctness fixture" earns a preset
+  — not as a look but as an **endpoint**, its rigidity being the reason the dissolve reads. And
+  `morph`'s visible rate is **front-loaded** (lit width 0.248 -> 0.448 across the first twentieth of
+  the range), because per-map rotation compounds through the recursion. All three were reachable only
+  by rendering; none is a defect. **The general lesson: a plan that names its own showcase before the
+  content pass is naming a hypothesis.**
+
+  **Two "the development configuration cannot see it" traps were found and closed unprompted.** The
+  fit is aspect-aware and tested at portrait as well as 16:9 — the dragon and the spiral are twice as
+  wide as they are tall and would hang out of a narrow window. And `STEP_SLOTS` gives every sub-step
+  its **own** uniform slot: one reused slot would hand every sub-step of a stalled frame the same
+  `step_index`, and at the steady 60 fps this box develops at, `pending_steps` is always 1, so no
+  test here could ever have disagreed.
+
+  **Numeric assertions in this plan are all properties, per
+  [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md).** The
+  measurements run on a fixed-seed CPU chaos game, so they are exact on every machine; the fit's
+  under-measure is asserted as **the fraction of the frame the true figure occupies** rather than as
+  the error itself; and the preset-switch budget is bounded by an **iteration count**, not wall
+  clock — the obvious version of that test would have measured CI load and flaked.
+
+  **The one engine finding is [backlog 0064](../design-backlog.md).** The predicted startup "haze" is
+  in fact a legible hard-edged rectangle — ADR-0066's own artifact class, back on every switch *into*
+  the family, with the ~1 s preset dissolve landing entirely inside it. Deferred to the successor
+  plan's staggered respawn, which removes it as a side effect; the entry carries a cheaper interim
+  and the coupling trap that interim has to avoid. **Backlog 0065 and 0066 are documentation and were
+  discharged in the same commit** (`presets/README.md`'s IFS section). Review minors, all
+  non-gating: `IfsFigure::frame()` and `AttractorFamily::projection()`'s IFS arm are unreachable in
+  production but documented as live; the `morph` table row still reads "every value between is a real
+  figure" ~40 lines above the correction; and `attractor_fern.toml`'s `[smoothing]` comment mentions
+  easing a `morph` that preset no longer binds.
 
 - [0063 — The attractor keeps its depth](done/0063-the-attractor-keeps-its-depth.md) — **done
   2026-08-04**, Mode 4 review **no blockers, one major, two minor**. Phase 1 `1f0fc41`, Phase 2

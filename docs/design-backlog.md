@@ -1047,7 +1047,48 @@ precisely because it is a consequence of the parameterization rather than of the
 **Medium**, and higher than the plan assumed. It is not a subtle quality issue: it is a visible
 rectangle on every entry into the family, and the family now ships two presets.
 
-## 0065 — `morph` is a travel knob whose visible rate is steepest near zero, and nothing says so
+### Architect note (2026-08-05, Plan 0062 close review)
+
+**Accepted, and the read is right on both counts** — it is the ADR-0066 artifact class, and the
+dissolve timing is the part that makes it matter rather than the duration. Two corrections to the
+interim before anyone implements it, and one sequencing call.
+
+**The interim must change `seed()`, not `seed_box()`, and the reason is a coupling the note does
+not name.** `AttractorFamily::jitter_extent` (`particles/mod.rs:334`) is *derived* from
+`seed_box()` — it is `JITTER_FRACTION` of that spread, which is how one constant serves a map
+bounded in `[-2, 2]` and a flow spanning `±26`. So returning a fixed point from `seed_box` makes the
+kick zero and **`reseed` goes inert on the whole IFS family**, silently, in a family whose
+`reseed` response ADR-0075 lists as one of its free wins. The note is right that the change belongs
+at the call site; it should say *why*, or the next person takes the shorter route and breaks the
+lever instead.
+
+**Seed at four fixed points, not one.** Putting every particle on a single fixed point trades a
+rectangle for 50 000 particles on one pixel for frame 0 — a different artifact, not no artifact.
+Same cost and same call site: seed particle `i` at the fixed point of map `i mod MAPS`, **restricted
+to the maps with `p > 0`**. All of them lie on the attractor (`A = ⋃ fᵢ(A)` with `A` closed, so each
+`fᵢ`'s fixed point is the limit of `fᵢⁿ(x)` for `x ∈ A` and therefore in `A`), they are already
+spread across the figure, and the fill is on-figure at step 0 with nothing to converge. The `p > 0`
+restriction matters because a padded slot's fixed point is only on the attractor when the pad
+duplicates a drawn map — true of all five curated tables today, and exactly the kind of thing that
+stops being true when a sixth figure is added.
+
+**Sequencing: do not spend a plan on this.** The successor plan (unfurl + per-map colour) removes it
+as a side effect of the staggered respawn, and this is two lines inside that plan's first phase. The
+successor is not written yet, so the interim stays live as an option — if the successor slips more
+than a session or two, fold the four-fixed-points change into whatever next touches
+`particles/mod.rs`. What is *not* acceptable is closing this by widening `seed_box`'s box or by
+shortening the trail: neither reaches the edge, and both were tried on the reseed path before
+ADR-0066 replaced the mechanism.
+
+## ~~0065 — `morph` is a travel knob whose visible rate is steepest near zero, and nothing says so~~
+
+> **Discharged 2026-08-05** (Plan 0062 close). The fix was documentation and landed in the same
+> commit that raised it, `cf977f9`: `presets/README.md`'s IFS section now carries the measured
+> table, "`morph` is a TRAVEL knob, not a little-life knob", and the spiral-as-poor-target finding.
+> Recorded in [ADR-0075](adrs/0075-ifs-family-morphs-in-singular-value-space.md)'s Outcome. **One
+> thing is still open and is a review minor, not a backlog entry:** the param table's own `morph`
+> row still reads "every value between is a real figure" ~40 lines above the correction, which is
+> what an author scanning the table reads.
 
 - **Raised:** 2026-08-04, from `preset-author`, during the Plan 0062 Phase 7 content pass.
 - **Verified by measurement:** yes.
@@ -1094,7 +1135,15 @@ authors the wrong way.
 **Medium.** It is a paragraph, and without it the natural first thing an author tries — a small
 `morph` for some life — produces a figure that is no longer the one they named.
 
-## 0066 — the IFS figures are STILL, so the library's conventions about drift rates are wrong for them
+## ~~0066 — the IFS figures are STILL, so the library's conventions about drift rates are wrong for them~~
+
+> **Discharged 2026-08-05** (Plan 0062 close). Documentation, landed in the same commit that raised
+> it, `cf977f9`: `presets/README.md`'s IFS section now says the figure is static so the levers carry
+> all the motion and want ~30 s periods, and that `spin`'s default of a full revolution every ~35 s
+> is wrong for a figure with an intrinsic "up". **The one part not discharged is the last sentence of
+> its fix** — nothing yet notes, where the animation gate is described, that a passing `anim` is not
+> evidence of a watchable preset on a still family. That is a real gap in `docs/capturing.md` and is
+> the sort of thing that belongs in whatever plan next touches the gate, not in a plan of its own.
 
 - **Raised:** 2026-08-04, from `preset-author`, during the Plan 0062 Phase 7 content pass.
 - **Verified by measurement:** yes — `shot --report`.
