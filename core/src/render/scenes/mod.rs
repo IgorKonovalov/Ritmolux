@@ -79,8 +79,17 @@ pub enum GeneratorConfig {
     /// the compute step iterates. Not a line scene — reuses this shared enum so
     /// the family rides the existing `configure` hook (no new trait method).
     Particles {
-        /// The attractor family (De Jong, Clifford, Thomas, Lorenz).
+        /// The attractor family (De Jong, Clifford, Thomas, Lorenz, or one of
+        /// the IFS figures).
         family: particles::AttractorFamily,
+        /// The figure the bindable `morph` param travels **towards** (ADR-0075),
+        /// from `[particles] morph_to`. `None` — the default — pins the figure,
+        /// so `morph` is inert.
+        ///
+        /// IFS-only, and validated as such at load: `morph_to` on a map family
+        /// is a load error rather than a silent no-op, because the author asked
+        /// for something the engine cannot do.
+        morph_to: Option<particles::ifs::IfsFigure>,
         /// Fraction of the tier's particle budget actually drawn (ADR-0069),
         /// validated at load into
         /// [`MIN_PARTICLE_DENSITY`](particles::MIN_PARTICLE_DENSITY)`..=1.0`.

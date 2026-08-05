@@ -494,6 +494,187 @@ const FRAME_FILL: f32 = 0.88;
 /// target's.
 const REFERENCE_ASPECT: f32 = 16.0 / 9.0;
 
+/// Interpolate two angles along the **shortest arc**.
+///
+/// Not a plain lerp, and the difference is visible rather than pedantic: two
+/// maps whose rotations are `+3.0` and `−3.0` rad are a tenth of a turn apart,
+/// and a plain lerp would walk the long way round — the branch would sweep
+/// almost all the way through the figure and back instead of nudging across the
+/// discontinuity.
+///
+/// Contractivity is untouched whatever this returns: `R` is an isometry, so an
+/// angle cannot make a map expand. That is why the morph needs no guard.
+fn lerp_angle(a: f32, b: f32, t: f32) -> f32 {
+    use std::f32::consts::{PI, TAU};
+    let mut delta = (b - a) % TAU;
+    if delta > PI {
+        delta -= TAU;
+    } else if delta < -PI {
+        delta += TAU;
+    }
+    a + delta * t
+}
+
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
+/// **The pure function everything safety-critical lives in** — no GPU, no clock,
+/// no randomness (ADR-0075).
+///
+/// Interpolates two figures **in SVD space**, map by map, paired by index:
+/// singular values and translations lerped, angles taken along the shortest arc,
+/// probabilities lerped.
+///
+/// The result is contractive by construction and there is no clamp here to make
+/// it so. A lerp of two values below 1 is below 1, and the angles do not enter
+/// contractivity at all — so if both endpoints converge, so does every point on
+/// the path between them. Phase 5's levers are applied on top, in this same
+/// space, and only one of them needs a clamp.
+///
+/// Degenerate maps stay legal rather than being special-cased: the fern's stem
+/// is rank 1 (`sx = 0`), and morphing a reflection into a non-reflection passes
+/// through `sy = 0`. Both are contractions — the branch momentarily collapses to
+/// a line and recovers.
+pub fn resolve(a: &IfsTable, b: &IfsTable, morph: f32) -> IfsTable {
+    // Clamped rather than trusted: `morph` is a bindable param, so a preset
+    // expression can hand this anything. Outside [0, 1] the lerp would
+    // extrapolate, and an extrapolated singular value is exactly the one number
+    // that can leave the contractive ball.
+    //
+    // A `NaN` is reachable too — `0/0` is a legal preset expression — and
+    // `f32::clamp` *propagates* it rather than clamping it, which would put a
+    // `NaN` in the affine table and kill the buffer as surely as a divergence.
+    // It resolves to the start figure.
+    let t = if morph.is_nan() {
+        0.0
+    } else {
+        morph.clamp(0.0, 1.0)
+    };
+    // **The endpoints are returned exactly, not lerped to.** `x + (y - x)·1` is
+    // not `y` in floating point, and the difference is not academic: an absent
+    // `morph_to` makes both ends the same table, and an unbound `morph` must
+    // draw precisely the figure the preset named rather than one a few ulps
+    // away from it. It is also what keeps a golden fixture stable.
+    if t == 0.0 {
+        return *a;
+    }
+    if t == 1.0 {
+        return *b;
+    }
+    let mut maps = a.maps;
+    for (slot, (x, y)) in maps.iter_mut().zip(a.maps.iter().zip(b.maps.iter())) {
+        *slot = IfsMap {
+            theta: lerp_angle(x.theta, y.theta, t),
+            phi: lerp_angle(x.phi, y.phi, t),
+            sx: lerp(x.sx, y.sx, t),
+            sy: lerp(x.sy, y.sy, t),
+            t: [lerp(x.t[0], y.t[0], t), lerp(x.t[1], y.t[1], t)],
+            p: lerp(x.p, y.p, t),
+        };
+    }
+    IfsTable { maps }
+}
+
+/// A sampled bounding box in the figure's own world units.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Extent {
+    /// Lower corner.
+    pub lo: [f32; 2],
+    /// Upper corner.
+    pub hi: [f32; 2],
+}
+
+impl Extent {
+    /// The box's midpoint.
+    pub fn centre(&self) -> [f32; 2] {
+        [
+            (self.lo[0] + self.hi[0]) * 0.5,
+            (self.lo[1] + self.hi[1]) * 0.5,
+        ]
+    }
+
+    /// Half the box's span on each axis, floored just above zero so a degenerate
+    /// figure (every point identical — reachable at a fully collapsed morph)
+    /// cannot produce a division by zero downstream where a scale is fitted.
+    pub fn half(&self) -> [f32; 2] {
+        [
+            ((self.hi[0] - self.lo[0]) * 0.5).max(1e-6),
+            ((self.hi[1] - self.lo[1]) * 0.5).max(1e-6),
+        ]
+    }
+
+    /// Whether every corner is a real number — the property a diverged table
+    /// fails, and the one the sweep asserts.
+    pub fn is_finite(&self) -> bool {
+        self.lo.iter().chain(self.hi.iter()).all(|v| v.is_finite())
+    }
+}
+
+/// Burn-in iterations discarded before the box is measured.
+///
+/// The orbit starts at the origin, which need not be on the figure. The
+/// probability-weighted per-step contraction is 0.742 for the fern, so a
+/// displacement shrinks a thousandfold in ~23 steps; 256 is far past that for
+/// any table here and costs nothing at load.
+const CHAOS_BURN_IN: u32 = 256;
+
+/// The seed the CPU reference runs from. Fixed, so every measurement this module
+/// makes is reproducible — the fit LUT built from it is part of a capture's
+/// determinism.
+const CHAOS_SEED: u64 = 0x4C4D_5641_4946_5300; // "LMVAIFS\0"
+
+/// **A CPU run of the same step the compute shader runs**, returning the
+/// sampled bounding box of the orbit.
+///
+/// Deliberately CPU-side and deliberately not a render (ADR-0075). The property
+/// this family rests on — that no reachable table diverges — is about
+/// *positions*, and a capture could only report that the picture looked
+/// plausible. Here it is an ordinary assertion over a sweep, provable without a
+/// GPU, before a shader ever runs.
+///
+/// It also feeds the framing: Phase 4's fit is this function at 33 values of
+/// `morph`, run once at `configure`.
+///
+/// Returns a box that may be non-finite. That is the point — the caller asserts
+/// finiteness rather than this silently repairing it.
+pub fn chaos_extent(table: &IfsTable, iterations: u32) -> Extent {
+    let mut rng = super::SeededRng::new(CHAOS_SEED);
+    let packed = pack(table);
+    let [c0, c1, c2, _] = packed.cumulative_p;
+    // Destructured rather than indexed — this file denies `indexing_slicing`,
+    // and the unrolled four-way choice below mirrors the shader's for the same
+    // reason the shader has one.
+    let [m0, m1, m2, m3] = table.maps.map(|m| m.to_affine());
+    let (mut x, mut y) = (0.0f32, 0.0f32);
+    let mut lo = [f32::INFINITY; 2];
+    let mut hi = [f32::NEG_INFINITY; 2];
+    for i in 0..(iterations + CHAOS_BURN_IN) {
+        // The shader's selection, in Rust: a unit draw against the cumulative
+        // table, with the fourth map as the `else` arm.
+        let r = rng.next_f32();
+        let m = if r < c0 {
+            m0
+        } else if r < c1 {
+            m1
+        } else if r < c2 {
+            m2
+        } else {
+            m3
+        };
+        let (nx, ny) = (m.a * x + m.b * y + m.e, m.c * x + m.d * y + m.f);
+        x = nx;
+        y = ny;
+        if i >= CHAOS_BURN_IN {
+            lo[0] = lo[0].min(x);
+            lo[1] = lo[1].min(y);
+            hi[0] = hi[0].max(x);
+            hi[1] = hi[1].max(y);
+        }
+    }
+    Extent { lo, hi }
+}
+
 /// Lay a resolved table out for the uniform, recomposing each map and
 /// accumulating the probabilities.
 ///
@@ -545,7 +726,7 @@ mod tests {
     // Tests panic on failure; allowed over the file's hot-path pragma.
     #![allow(clippy::panic, clippy::expect_used, clippy::indexing_slicing)]
 
-    use super::{IfsFigure, MAPS, decompose, recompose};
+    use super::{IfsFigure, MAPS, chaos_extent, decompose, lerp_angle, recompose, resolve};
 
     /// The tolerance the plan states for the round trip: well above `f32`
     /// round-trip error on values of order 1 through five multiplies and two
@@ -831,5 +1012,227 @@ mod tests {
         let ([hx, hy, _], _) = IfsFigure::Fern.seed_box();
         assert!(hy * scale < 1.0);
         assert!(hx * scale / (9.0 / 16.0) < 1.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // The morph (Plan 0062 Phase 3 / ADR-0075)
+    // -----------------------------------------------------------------------
+
+    /// The sweep resolution the plan names, and the one the fit LUT uses too.
+    const MORPH_STEPS: usize = 33;
+
+    /// The 33 sweep positions, `0.0` and `1.0` inclusive and exact at both ends.
+    fn morph_sweep() -> impl Iterator<Item = f32> {
+        (0..MORPH_STEPS).map(|i| i as f32 / (MORPH_STEPS - 1) as f32)
+    }
+
+    /// **The property the whole family rests on, asserted without a GPU.**
+    ///
+    /// A CPU run of the same step the shader runs, on the resolved table, at
+    /// every position of a 33-point sweep, for **every ordered pair** of the five
+    /// figures: 25 pairs x 33 positions x 10 000 iterations. Every position must
+    /// stay finite and inside a bounded box, and every map's `max σ` must stay
+    /// below 1.
+    ///
+    /// Ordered pairs rather than unordered, because `resolve` is not symmetric —
+    /// the shortest-arc angle interpolation and the clamp both read `a` first —
+    /// and a preset names a start and a target, not a set.
+    ///
+    /// Deliberately CPU-side (ADR-0075): the failure this excludes is a
+    /// permanently dead particle buffer, and a capture of a preset that only
+    /// diverges on a loud passage would pass.
+    #[test]
+    fn no_reachable_morph_diverges() {
+        // Generous, and it is meant to be: the point is to catch a run to
+        // infinity, not to pin a figure's size. The largest curated figure spans
+        // ~14 world units, so anything past 1000 is a divergence in progress
+        // rather than a big fern.
+        const BOUND: f32 = 1_000.0;
+        let mut pairs = 0;
+        for start in IfsFigure::ALL {
+            for target in IfsFigure::ALL {
+                pairs += 1;
+                let (a, b) = (start.table(), target.table());
+                for morph in morph_sweep() {
+                    let table = resolve(&a, &b, morph);
+
+                    // Contractivity first — it is the *reason* the box below is
+                    // bounded, and asserting it separately is what distinguishes
+                    // "converges" from "happened not to blow up in 10 000 steps".
+                    for (i, map) in table.maps.iter().enumerate() {
+                        let sigma = map.sigma_max();
+                        assert!(
+                            sigma < 1.0,
+                            "{start:?} -> {target:?} at morph {morph}: map {i} has \
+                             sigma_max = {sigma}, which does not contract"
+                        );
+                    }
+
+                    let extent = chaos_extent(&table, 10_000);
+                    assert!(
+                        extent.is_finite(),
+                        "{start:?} -> {target:?} at morph {morph}: the orbit left \
+                         the reals ({extent:?})"
+                    );
+                    for v in extent.lo.iter().chain(extent.hi.iter()) {
+                        assert!(
+                            v.abs() < BOUND,
+                            "{start:?} -> {target:?} at morph {morph}: the orbit \
+                             reached {v}, past the {BOUND} bound ({extent:?})"
+                        );
+                    }
+                    // Non-vacuity: a table that collapsed to a point would pass
+                    // every assertion above and draw nothing. Every intermediate
+                    // is a real figure with real extent.
+                    let [hx, hy] = extent.half();
+                    assert!(
+                        hx.max(hy) > 0.01,
+                        "{start:?} -> {target:?} at morph {morph}: collapsed to a \
+                         point ({extent:?})"
+                    );
+                }
+            }
+        }
+        assert_eq!(pairs, 25, "every ordered pair of the five figures");
+    }
+
+    /// The endpoints are the figures themselves, exactly — `morph = 0` is the
+    /// configured figure and `morph = 1` is its target, with no drift from the
+    /// lerp at either end.
+    ///
+    /// This is what makes an unbound `morph` a no-op rather than a slight
+    /// distortion, and what lets `morph_to` be absent by giving both ends the
+    /// same table.
+    #[test]
+    fn the_morph_endpoints_are_the_figures_themselves() {
+        for start in IfsFigure::ALL {
+            for target in IfsFigure::ALL {
+                let (a, b) = (start.table(), target.table());
+                assert_eq!(
+                    resolve(&a, &b, 0.0),
+                    a,
+                    "{start:?} -> {target:?} at morph 0 must be {start:?}"
+                );
+                assert_eq!(
+                    resolve(&a, &b, 1.0),
+                    b,
+                    "{start:?} -> {target:?} at morph 1 must be {target:?}"
+                );
+            }
+        }
+        // A figure morphing to itself is the identity at *every* position, which
+        // is the absent-`morph_to` case: `morph` is inert by arithmetic rather
+        // than by a branch on the render path.
+        for figure in IfsFigure::ALL {
+            let t = figure.table();
+            for morph in morph_sweep() {
+                assert_eq!(
+                    resolve(&t, &t, morph),
+                    t,
+                    "{figure:?} morphing to itself moved at {morph}"
+                );
+            }
+        }
+    }
+
+    /// `morph` is bindable, so a preset expression can hand `resolve` anything.
+    /// Out of range it must **clamp**, not extrapolate — an extrapolated singular
+    /// value is the one number that can leave the contractive ball.
+    #[test]
+    fn an_out_of_range_morph_clamps_rather_than_extrapolating() {
+        let (a, b) = (IfsFigure::Fern.table(), IfsFigure::Spiral.table());
+        for wild in [-5.0, -1.0, -0.001, 1.001, 2.0, 47.0] {
+            let table = resolve(&a, &b, wild);
+            let expected = if wild < 0.0 { a } else { b };
+            assert_eq!(table, expected, "morph {wild} must clamp to an endpoint");
+            assert!(table.sigma_max() < 1.0);
+        }
+        // A NaN — reachable from a preset expression like `0/0` — must not
+        // produce a NaN table. `clamp` panics on a NaN bound but propagates a
+        // NaN value, so this is asserted rather than assumed.
+        let table = resolve(&a, &b, f32::NAN);
+        assert!(
+            table.maps.iter().all(|m| m.sigma_max().is_finite()),
+            "a NaN morph produced a non-finite table: {table:?}"
+        );
+    }
+
+    /// Angles take the **shortest arc**, which is visible rather than pedantic:
+    /// a branch at `+3.0` rad and one at `−3.0` rad are a tenth of a turn apart,
+    /// and a plain lerp would sweep it almost all the way round and back.
+    #[test]
+    fn angles_interpolate_the_short_way_round() {
+        use std::f32::consts::PI;
+
+        // Across the +/-pi discontinuity: the midpoint is just past pi, not 0.
+        let mid = lerp_angle(3.0, -3.0, 0.5);
+        assert!(
+            (mid.abs() - PI).abs() < 0.15,
+            "the midpoint of 3.0 -> -3.0 should sit near +/-pi, got {mid}"
+        );
+        // ...and the total travel is the short arc, not the long one.
+        let travel = (lerp_angle(3.0, -3.0, 1.0) - 3.0).abs();
+        assert!(
+            travel < PI,
+            "3.0 -> -3.0 travelled {travel} rad, the long way round"
+        );
+
+        // Endpoints are exact, and an ordinary in-range pair is the plain lerp.
+        assert_eq!(lerp_angle(0.3, 1.1, 0.0), 0.3);
+        assert!((lerp_angle(0.3, 1.1, 1.0) - 1.1).abs() < 1e-6);
+        assert!((lerp_angle(0.0, 1.0, 0.5) - 0.5).abs() < 1e-6);
+    }
+
+    /// The CPU reference is deterministic and actually measures the figure —
+    /// otherwise the sweep above is asserting something about noise.
+    #[test]
+    fn the_chaos_reference_is_deterministic_and_measures_the_figure() {
+        let fern = IfsFigure::Fern.table();
+        let a = chaos_extent(&fern, 20_000);
+        let b = chaos_extent(&fern, 20_000);
+        assert_eq!(
+            a, b,
+            "the CPU reference must be a pure function of its table"
+        );
+
+        // It finds the fern's published box: x in ~[-2.2, 2.7], y in ~[0, 10].
+        assert!(a.lo[1] > -0.1 && a.lo[1] < 0.3, "fern y floor: {}", a.lo[1]);
+        assert!(
+            a.hi[1] > 9.0 && a.hi[1] < 10.2,
+            "fern y ceiling: {}",
+            a.hi[1]
+        );
+        assert!(
+            a.lo[0] > -2.6 && a.lo[0] < -1.8,
+            "fern x floor: {}",
+            a.lo[0]
+        );
+        assert!(
+            a.hi[0] > 2.2 && a.hi[0] < 3.0,
+            "fern x ceiling: {}",
+            a.hi[0]
+        );
+
+        // And it agrees with the measured literals `frame`/`seed_box` are built
+        // from — the two must not drift, since Phase 4 replaces those literals
+        // with this function's output.
+        for figure in IfsFigure::ALL {
+            let measured = chaos_extent(&figure.table(), 200_000);
+            let ([hx, hy, _], [cx, cy, _]) = figure.seed_box();
+            let [mcx, mcy] = measured.centre();
+            let [mhx, mhy] = measured.half();
+            for (got, want, axis) in [(mcx, cx, "centre x"), (mcy, cy, "centre y")] {
+                assert!(
+                    (got - want).abs() < 0.05 * (1.0 + want.abs()),
+                    "{figure:?} {axis}: reference says {got}, the literal says {want}"
+                );
+            }
+            for (got, want, axis) in [(mhx, hx, "half x"), (mhy, hy, "half y")] {
+                assert!(
+                    (got - want).abs() < 0.05 * (1.0 + want.abs()),
+                    "{figure:?} {axis}: reference says {got}, the literal says {want}"
+                );
+            }
+        }
     }
 }

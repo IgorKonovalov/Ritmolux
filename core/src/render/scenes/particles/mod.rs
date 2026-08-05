@@ -56,7 +56,7 @@ pub mod ifs;
 
 use crate::render::gpu;
 
-use ifs::{IfsFigure, IfsPacked};
+use ifs::{IfsFigure, IfsPacked, IfsTable};
 
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
@@ -459,6 +459,10 @@ fn advance_spin(spin_time: f32, spin: f32, dt: f32) -> f32 {
 fn spin_phase(spin_time: f32) -> f32 {
     spin_time * SPIN_RATE
 }
+
+/// `morph`'s default: the configured figure, unmixed (ADR-0075). An IFS preset
+/// that never binds it draws exactly the figure it named.
+const DEFAULT_MORPH: f32 = 0.0;
 
 /// Parameter defaults — a calm idle look when nothing is bound.
 const DEFAULT_SIZE: f32 = 1.0;
@@ -1985,6 +1989,21 @@ pub struct AttractorScene {
     /// The active attractor map, selected data-driven via `[particles]`
     /// (ADR-0007 `configure`); its default coefficients seed `a`..`d`.
     family: AttractorFamily,
+    /// The two ends of the IFS morph, **decomposed once at `configure`**
+    /// (ADR-0075). `None` on the four map families.
+    ///
+    /// Cached rather than derived per frame because the decomposition is the
+    /// expensive half — four hypotenuses and four `atan2`s per map — and it is a
+    /// function of the figure pair alone. What the frame pays is the lerp and
+    /// the recompose, which is what has to be per-frame because `morph` is
+    /// bindable. When `[particles] morph_to` is absent both ends are the same
+    /// table, so `morph` is exactly inert rather than conditionally applied.
+    ifs_ends: Option<(IfsTable, IfsTable)>,
+    /// Position along the morph from the configured figure to `morph_to`
+    /// (ADR-0075). Bindable; clamped to `[0, 1]` inside
+    /// [`ifs::resolve`](ifs::resolve), where extrapolation would be the one
+    /// operation that can leave the contractive ball.
+    morph: f32,
     /// Attractor coefficients — named params, so a preset can steer the cloud's
     /// shape with the bands. Their meaning is family-specific.
     a: f32,
@@ -2070,6 +2089,8 @@ impl AttractorScene {
             dt: FIXED_STEP,
             spin_time: 0.0,
             family,
+            ifs_ends: None,
+            morph: DEFAULT_MORPH,
             a,
             b,
             c,
@@ -2261,6 +2282,9 @@ pub const PARAMS: &[&str] = &[
     "depth_fade",
     "depth_hue",
     "spin",
+    // IFS-only (ADR-0075). Inert on the four map families, the same way `a`..`d`
+    // already carry family-specific meanings.
+    "morph",
 ];
 
 impl Scene for AttractorScene {
@@ -2322,6 +2346,7 @@ impl Scene for AttractorScene {
         self.depth_fade = DEFAULT_DEPTH_FADE;
         self.depth_hue = DEFAULT_DEPTH_HUE;
         self.spin = DEFAULT_SPIN;
+        self.morph = DEFAULT_MORPH;
         self.reseed = 0.0;
     }
 
@@ -2345,6 +2370,7 @@ impl Scene for AttractorScene {
             "depth_fade" => self.depth_fade = value,
             "depth_hue" => self.depth_hue = value,
             "spin" => self.spin = value,
+            "morph" => self.morph = value,
             "reseed" => self.reseed = value,
             _ => {}
         }
@@ -2385,12 +2411,29 @@ impl Scene for AttractorScene {
         &mut self,
         cfg: &super::lines::GeneratorConfig,
     ) -> Option<super::lines::CapOverflow> {
-        if let super::lines::GeneratorConfig::Particles { family, density } = cfg {
+        if let super::lines::GeneratorConfig::Particles {
+            family,
+            density,
+            morph_to,
+        } = cfg
+        {
             // `density` is resolved unconditionally, not behind the family guard:
             // two presets can share a family and differ only in how much of it
             // they draw, and `configure` runs on every preset switch.
             self.density = *density;
             self.active_count = active_particles(self.particle_count, *density);
+            // Likewise the morph ends: two presets can share a figure and morph
+            // it towards different partners. **Decomposed here**, off the hot
+            // path, so a frame pays only the lerp and the recompose.
+            //
+            // An absent `morph_to` gives both ends the same table rather than a
+            // `None` the render path has to branch on — so `morph` resolves to
+            // the identity by arithmetic instead of by a special case.
+            self.ifs_ends = family.figure().map(|figure| {
+                let start = figure.table();
+                let end = morph_to.unwrap_or(figure).table();
+                (start, end)
+            });
             if *family != self.family {
                 self.family = *family;
                 let [a, b, c, d] = family.default_coeffs();
@@ -2434,6 +2477,8 @@ impl Scene for AttractorScene {
             needs_clear,
             pending_steps,
             step_index,
+            ifs_ends,
+            morph,
             dt,
             spin_time,
             family,
@@ -2485,6 +2530,13 @@ impl Scene for AttractorScene {
                 dt: *dt,
                 pending_steps: *pending_steps,
                 step_index: *step_index,
+                // The frame's whole IFS cost: one lerp of two cached
+                // decompositions and four recomposes. `map_or` rather than a
+                // branch on the family — a map family has no ends cached, and
+                // that is the same question asked once.
+                ifs: ifs_ends.as_ref().map_or(IfsPacked::ZERO, |(a, b)| {
+                    ifs::pack(&ifs::resolve(a, b, *morph))
+                }),
                 size: *size,
                 hue: *hue,
                 fade: *fade,
@@ -2551,6 +2603,10 @@ struct UniformInputs {
     pending_steps: u32,
     /// The index of the first of them (ADR-0075's map-choice salt).
     step_index: u32,
+    /// This frame's resolved IFS affine table, or [`IfsPacked::ZERO`] on a map
+    /// family. Resolved by the caller because it depends on the cached morph
+    /// ends rather than on the family alone.
+    ifs: IfsPacked,
     size: f32,
     hue: f32,
     fade: f32,
@@ -2621,10 +2677,7 @@ fn upload_uniforms(
     active: u32,
     inputs: &UniformInputs,
 ) {
-    let packed = inputs
-        .family
-        .figure()
-        .map_or(StepUniform::NO_IFS, ifs::IfsFigure::packed);
+    let packed = inputs.ifs;
     for slot in 0..inputs.pending_steps.min(MAX_SUBSTEPS) {
         queue.write_buffer(
             &pipelines.step_uniform,
@@ -3911,6 +3964,7 @@ mod tests {
             scene.configure(&crate::render::scenes::lines::GeneratorConfig::Particles {
                 family,
                 density,
+                morph_to: None,
             });
             scene.set_target_size(64, 64);
             let target = ctx

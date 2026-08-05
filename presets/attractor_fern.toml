@@ -5,10 +5,19 @@
 #
 # WHAT IS DIFFERENT ABOUT AUTHORING THIS FAMILY. The `a` `b` `c` `d`
 # coefficients that steer De Jong and Clifford are INERT here - an IFS's shape
-# lives in its affine table, not in four scalars. The levers that reach the
-# figure (`morph`, `curl`, `vigor`, `lean`, `bias`) arrive in Plan 0062's later
-# phases; until then this preset drives the shared look surface only, which is
-# also the honest way to judge whether the figure itself is right.
+# lives in its affine table, not in four scalars. What reaches the figure is
+# `morph` (plus `curl`, `vigor`, `lean` and `bias`, which arrive in a later
+# phase).
+#
+# THE MORPH IS THE THING THE ENGINE COULD NOT DO BEFORE. `morph_to` names a
+# second figure and `morph` travels continuously to it, through tables that are
+# valid at every intermediate value - no preset can drive this family into a
+# divergence, because the interpolation happens in singular-value space where
+# contractivity is preserved by construction (ADR-0075). Here it is bound to a
+# SLOW breathing sine with a small bass term rather than to a beat: the fern is
+# a figure, and a figure that re-forms on every kick reads as a glitch rather
+# than as growth. The far end is deliberately short of 1.0 - this preset is a
+# fern that leans towards a spiral, not a preset that is sometimes a spiral.
 #
 # THE FIGURE IS FRAGILE IN ONE DIRECTION ONLY. It cannot diverge - the family is
 # built so a preset cannot reach a non-contractive table (ADR-0075) - but it CAN
@@ -20,6 +29,7 @@ name = "Barnsley Fern"
 
 [particles]
 family = "fern"
+morph_to = "spiral"
 
 [palette]
 stops = [
@@ -39,6 +49,19 @@ name = "ember"
 bloom_amount    = "1.2"
 bloom_threshold = "0.92"
 bloom_radius    = "1.1"
+
+# SHAPE - the slow cross toward the spiral. Period ~236 s, so the figure never
+# sits at one pose and never repeats within a listening session; the bass term
+# rides on top so a loud passage pushes the cross a little further.
+#
+# DELIBERATELY SHORT OF WHERE IT WANTS TO BE, and this is a note to the content
+# pass rather than an authoring preference. The projection currently fits the
+# START figure's scale and centre, so an intermediate table is drawn at the
+# fern's framing rather than at its own - it shrinks and drifts off-centre as
+# the cross proceeds, and by ~0.16 it has lost enough lit area to read as a
+# smaller drawing rather than a different one. The range here is what still
+# looks like a fern breathing. It opens up once the framing follows the morph.
+morph = "0.035 + sin(time * 0.0266) * 0.030 + clamp(bass * 0.05, 0, 0.04)"
 
 # DENSITY - low base, falling on energy. A fern's leaflets are separated by
 # roughly a point-width at this scale; raising `size` on a peak fuses them into
@@ -74,6 +97,9 @@ bg_bright   = "0.010 + clamp(mid * 0.026, 0, 0.022)"
 bg_vignette = "0.85"
 
 [smoothing]
+# The morph is eased hard. It is the most structural thing a preset can move,
+# and a step in it re-forms the whole figure at once.
+morph       = 0.9
 fade        = 0.18
 size        = { attack = 0.02, release = 0.24 }
 zoom        = 0.14
