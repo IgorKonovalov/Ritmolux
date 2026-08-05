@@ -106,7 +106,7 @@ flowchart TB
   unconditionally in the IFS arm; left at its seeded `0.0` by every other family.
 - **Done when:** `shot --preset-file presets/attractor_fern.toml` with `map_tint` bound renders a
   fern in which the stem, the body and the two fronds are distinguishable, and the two fronds differ
-  from each other. `size_of::<Particle>() == 48` is asserted. **All fourteen golden baselines are
+  from each other. `size_of::<Particle>() == 48` is asserted. **All seventeen golden baselines are
   byte-identical** — both new params default to `0.0`, so the colour path is the arithmetic identity,
   not a small change. A readback test asserts `map` takes every value `0..MAPS` across the buffer
   after one step on the fern, and is identically `0.0` on De Jong.
@@ -142,7 +142,7 @@ flowchart TB
   rectangle at any frame** — which is the measurement backlog 0064 was raised with, re-run.
   `attractor_ifs.png` is re-blessed here and **is the only baseline that moves**; a second moved
   baseline is a phase failure. Note the standing trap: `LMV_BLESS` rewrites **all** baselines —
-  restore the other thirteen before committing.
+  restore the other sixteen before committing.
 
 ### Phase 3 — the churn
 
@@ -210,11 +210,12 @@ flowchart TB
   gains a paragraph on what the two channels *are* — age is distance-from-the-fixed-points in
   disguise, `map` names which part of the figure a point belongs to — because neither is guessable
   from the name. **`docs/presets.md` is not touched:** no expression-grammar variable, function or
-  operator changes. While in `presets/README.md`, close the Plan 0062 review minor: the `morph` table
-  row still reads "every value between is a real figure" some forty lines above its own correction,
-  and wants a clause pointing down to it.
+  operator changes. ~~While in `presets/README.md`, close the Plan 0062 review minor: the `morph`
+  table row still reads "every value between is a real figure" some forty lines above its own
+  correction, and wants a clause pointing down to it.~~ **Already done 2026-08-05** — the row now
+  carries the clause and an anchor to the correction; nothing owed here.
 - **Done when:** the fixture binds all four params at non-default values and its baseline is
-  re-blessed; the other thirteen are verified untouched. The fixture's sensitivity is
+  re-blessed; the other sixteen are verified untouched. The fixture's sensitivity is
   **demonstrated, not assumed** — each of the four params neutralized in turn and the capture
   re-measured against the baseline, with the numbers recorded in the fixture's header comment, the
   way `attractor_ifs.toml` already does for the Plan 0062 levers.
@@ -268,7 +269,7 @@ fn fixed_points(table: &IfsTable) -> [[f32; 2]; MAPS];
   WARP twice.** Both `WARP allocation shifts trails` and `WARP aliases identical bind layouts` are
   recorded hazards, and the golden suite runs on the software adapter in CI. The buffer is built at
   scene build rather than mid-run, so the documented failure mode should not apply — but Phase 1's
-  "all fourteen byte-identical" is the assertion that finds out, and if it fails on WARP while
+  "all seventeen byte-identical" is the assertion that finds out, and if it fails on WARP while
   passing on hardware, **compare adapters before blessing anything.**
 - **`attractor_ifs.png` moves twice if the phases are taken literally** — once in Phase 2 (the seed)
   and once in Phase 5 (the fixture binds new params). That is expected and is two deliberate
