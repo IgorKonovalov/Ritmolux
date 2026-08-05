@@ -1,11 +1,29 @@
 # 0062 — The chaos game grows a fern: an IFS family that morphs between figures
 
-> **Status:** **in-progress 2026-08-04** — Phases 1-6 are `dev` and nothing gates
-> them, so they run start-to-finish in one session; **Phase 7 is `human`** (a `preset-author` pass
-> judging the levers against real audio), so the plan does not close in that session.
+> **Status:** **done 2026-08-05** — all seven phases landed: `8c621fa` (Phase 1, the fern),
+> `7cdd34e` (Phase 2, the SVD roster), `18a088c` (Phase 3, the morph), `b4aa911` (Phase 4, the fit),
+> `daf59c6` (Phase 5, the four levers), `7cab347` (Phase 6, the golden fixture and the doc sweep),
+> `cf977f9` (Phase 7, the content pass and the two shipped presets). Mode 4 review: **no blockers,
+> one major, four minor**; 521/521 tests green, `fmt` and `clippy --all-targets -D warnings` clean,
+> **no existing golden baseline moved**, doc links resolve. Verified by reading each named test's
+> assertion body: the 25-ordered-pair × 33-position contractivity sweep asserts `max σ < 1`
+> *separately* from boundedness, the fit's lever-independence is asserted bit-exact, and the
+> preset-switch budget is bounded by an **iteration count** rather than wall clock (ADR-0071).
+> Phase 7 falsified three things ADR-0075 recorded — see that ADR's Outcome section. **Its only
+> engine finding is [backlog 0064](../../design-backlog.md)**, an ADR-0066-class hard-edged rectangle
+> on every switch into the family; deferred to the successor plan, which removes it as a side
+> effect of the staggered respawn.
+>
+> Review minors, none of which gate the close and all of which live in one file each:
+> `IfsFigure::frame()` and `AttractorFamily::projection()`'s IFS arm are **unreachable in
+> production but documented as live** (`seed_box` calls `extent()` directly; the `projection_mirror`
+> tests exclude `Ifs`; `upload_uniforms` always overrides with the fit); `presets/README.md`'s
+> `morph` table row still reads "every value between is a real figure" ~40 lines above the measured
+> correction that it is a *travel* knob; and `presets/attractor_fern.toml`'s `[smoothing]` block
+> carries a comment about easing the morph, which that preset no longer binds.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md)
+> **Related ADRs:** [0075](../../adrs/0075-ifs-family-morphs-in-singular-value-space.md)
 
 ## TL;DR
 
@@ -24,8 +42,8 @@ at the same time". The organic half is not in doubt — the fern is the canonica
 The generative half is where the engine has a real gap, and the interview located it precisely:
 every structural choice in this codebase today is **discrete**. An L-system has production rules;
 `star_pattern` has three precomputed contact angles, which is exactly why
-[design-backlog 0007](../design-backlog.md) could not blend them and needed
-[ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md) to rescue it. Nothing in the engine
+[design-backlog 0007](../../design-backlog.md) could not blend them and needed
+[ADR-0060](../../adrs/0060-star-pattern-variants-interpolate.md) to rescue it. Nothing in the engine
 can travel continuously from one *figure* to another.
 
 An IFS can, because its whole structure is twenty-four affine coefficients and four probabilities,
@@ -58,7 +76,7 @@ passage passes every capture. We rejected a separate `ifs` scene, because it wou
 field, deposit normalization, projection, palette LUT path and view transform of the most complex
 scene in the repo to change one line of a step shader. Full reasoning and a third rejected option
 (fitting the framing from the fully-resolved table) are in
-[ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md).
+[ADR-0075](../../adrs/0075-ifs-family-morphs-in-singular-value-space.md).
 
 ## Architecture diagram
 
@@ -98,7 +116,7 @@ flowchart LR
   - `Step`'s uniform grows to carry the table: four `vec4` linear parts, two `vec4` packing the
     four `(e, f)` translations, one `vec4` of cumulative probabilities — 144 bytes total, from 32.
     The bind-group layout gains **no new binding**, so nothing about the layout-collision surface
-    [Plan 0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) reasons about changes shape.
+    [Plan 0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md) reasons about changes shape.
   - The shader draws `mix32(bitcast<u32>(seed) ^ (step_index * PRIME))` as a unit uniform, compares
     against the cumulative table, and applies the chosen map through an **unrolled four-way
     branch** — not a dynamically-indexed uniform array, matching the reason `Basis::masks`
@@ -269,7 +287,7 @@ fn resolve(a: &IfsTable, b: &IfsTable, morph: f32, lv: Levers) -> IfsUniform;
 
 ## Risks & open questions
 
-- **[Plan 0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 6 edits
+- **[Plan 0061](../0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 6 edits
   `particles/mod.rs` to split it, and this plan adds to it.** Mitigated by construction: every new
   line of consequence goes in a **new** `particles/ifs.rs`, which is both smaller surface for the
   collision and the direction 0061 Phase 6 is heading anyway. Whichever lands second inherits the
