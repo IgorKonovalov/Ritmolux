@@ -18,6 +18,7 @@ use crate::render::scenes::lines::{
     CurveFamily, GeneratorConfig, MAX_LSYSTEM_DEPTH, SpectrumLayout, hankin,
 };
 use crate::render::scenes::particles::AttractorFamily;
+use crate::render::scenes::particles::ifs::IfsFigure;
 
 /// The built-in system a preset drives. Extend as Plan 0003 (and later plans)
 /// add systems; unknown names are rejected at load.
@@ -559,16 +560,20 @@ fn build_config(
         // absent, it defaults to De Jong. Config is always `Some` so `configure`
         // runs on every preset switch (resetting the family — never stale).
         SystemKind::Attractor => {
-            let (family, density) = match particles {
-                Some(p) => (
-                    AttractorFamily::from_name(&p.family).ok_or_else(|| {
+            let (family, density, morph_to) = match particles {
+                Some(p) => {
+                    let family = AttractorFamily::from_name(&p.family).ok_or_else(|| {
                         PresetError::Config(format!("unknown attractor family '{}'", p.family))
-                    })?,
-                    p.density()?,
-                ),
-                None => (AttractorFamily::DeJong, 1.0),
+                    })?;
+                    (family, p.density()?, p.morph_to(family)?)
+                }
+                None => (AttractorFamily::DeJong, 1.0, None),
             };
-            Ok(Some(GeneratorConfig::Particles { family, density }))
+            Ok(Some(GeneratorConfig::Particles {
+                family,
+                density,
+                morph_to,
+            }))
         }
         // The spectrum readout selects its element count, layout and per-element
         // easing through an optional `[spectrum]` table; absent, it takes the
@@ -871,9 +876,36 @@ struct RawParticles {
     /// absent means the whole budget, which is byte-identical to the behaviour
     /// before the key existed.
     density: Option<f32>,
+    /// The IFS figure the bindable `morph` param travels towards (ADR-0075).
+    /// Optional; absent pins the figure and makes `morph` inert.
+    morph_to: Option<String>,
 }
 
 impl RawParticles {
+    /// Validate `morph_to` against the family it was written next to.
+    ///
+    /// **Two ways to be wrong, and both are load errors** (the project's
+    /// validate-at-the-boundary rule): an unknown figure name, and a `morph_to`
+    /// on one of the four *map* families, which have no table to interpolate.
+    /// The second is the one worth erroring on rather than ignoring — a silent
+    /// no-op would leave an author binding `morph` to audio and watching nothing
+    /// happen, with the preset loading cleanly.
+    fn morph_to(&self, family: AttractorFamily) -> Result<Option<IfsFigure>, PresetError> {
+        let Some(name) = self.morph_to.as_deref() else {
+            return Ok(None);
+        };
+        if !matches!(family, AttractorFamily::Ifs(_)) {
+            return Err(PresetError::Config(format!(
+                "[particles] morph_to is only meaningful for an IFS figure, but family is '{}'",
+                self.family
+            )));
+        }
+        let figure = IfsFigure::from_name(name).ok_or_else(|| {
+            PresetError::Config(format!("unknown [particles] morph_to figure '{name}'"))
+        })?;
+        Ok(Some(figure))
+    }
+
     /// Validate `density` into the fraction the scene will resolve against the
     /// tier budget. Erroring rather than clamping, like every other structural
     /// key: a preset asking for a count the engine will not give it should say so
@@ -1197,9 +1229,84 @@ mod tests {
     use crate::render::scenes::particles::MIN_PARTICLE_DENSITY;
 
     fn attractor(extra: &str) -> Result<Preset, PresetError> {
+        attractor_family("lorenz", extra)
+    }
+
+    fn attractor_family(family: &str, extra: &str) -> Result<Preset, PresetError> {
         Preset::from_toml_str(&format!(
-            "system = \"attractor\"\nname = \"t\"\n[particles]\nfamily = \"lorenz\"\n{extra}"
+            "system = \"attractor\"\nname = \"t\"\n[particles]\nfamily = \"{family}\"\n{extra}"
         ))
+    }
+
+    /// The IFS figures share the `family` namespace with the four map families
+    /// (ADR-0075), and an unknown name is still a load error rather than a
+    /// silent fallback to De Jong.
+    #[test]
+    fn an_ifs_figure_is_selected_by_the_family_key() {
+        for figure in IfsFigure::ALL {
+            let preset = attractor_family(figure.name(), "")
+                .unwrap_or_else(|e| panic!("'{}' should select an IFS figure: {e}", figure.name()));
+            match preset.config {
+                Some(GeneratorConfig::Particles { family, .. }) => {
+                    assert_eq!(family, AttractorFamily::Ifs(figure));
+                }
+                _ => panic!("an attractor preset carries a Particles config"),
+            }
+        }
+        let err = attractor_family("barnsley", "").expect_err("unknown family");
+        assert!(err.to_string().contains("unknown attractor family"));
+    }
+
+    /// **`morph_to` is validated at the boundary, both ways** (Plan 0062 Phase 3).
+    ///
+    /// An unknown figure is a load error, and so is a `morph_to` next to one of
+    /// the four *map* families — which have no table to interpolate. The second
+    /// is the one worth erroring on rather than ignoring: a silent no-op would
+    /// leave an author binding `morph` to audio, watching nothing happen, and
+    /// having the preset load cleanly.
+    #[test]
+    fn morph_to_is_validated_against_its_family_at_load() {
+        // Every figure is a legal target, including a figure's own name.
+        for figure in IfsFigure::ALL {
+            let preset = attractor_family("fern", &format!("morph_to = \"{}\"\n", figure.name()))
+                .unwrap_or_else(|e| panic!("fern -> {} should load: {e}", figure.name()));
+            match preset.config {
+                Some(GeneratorConfig::Particles { morph_to, .. }) => {
+                    assert_eq!(morph_to, Some(figure));
+                }
+                _ => panic!("an attractor preset carries a Particles config"),
+            }
+        }
+
+        // An unknown target names the key and the bad value.
+        let err = attractor_family("fern", "morph_to = \"maple\"\n").expect_err("unknown figure");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("morph_to") && msg.contains("maple"),
+            "the error must name the key and the value, got: {msg}"
+        );
+
+        // On a map family it is an error, not a no-op — for all four.
+        for family in ["de_jong", "clifford", "thomas", "lorenz"] {
+            let err = attractor_family(family, "morph_to = \"spiral\"\n")
+                .unwrap_err()
+                .to_string();
+            assert!(
+                err.contains("morph_to") && err.contains(family),
+                "{family}: the error must name the key and the family, got: {err}"
+            );
+        }
+    }
+
+    /// An absent `morph_to` pins the figure, which is what makes `morph` inert
+    /// on a preset that never mentions either.
+    #[test]
+    fn an_absent_morph_to_pins_the_figure() {
+        let preset = attractor_family("fern", "").unwrap();
+        match preset.config {
+            Some(GeneratorConfig::Particles { morph_to, .. }) => assert_eq!(morph_to, None),
+            _ => panic!("an attractor preset carries a Particles config"),
+        }
     }
 
     /// `[particles] density` is validated at load, with the range in the message
