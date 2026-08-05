@@ -148,6 +148,37 @@ fn attractor_bare_preset(name: &str, family: &str, extra: &str) -> Preset {
 /// against `PAN_PROBE` directly.
 const PAN_PROBE: f32 = 0.30;
 
+/// Which pixels are lit, as a mask over the frame — the figure's **geometry**,
+/// separated from how bright it is (Plan 0066 Phase 1).
+fn lit_mask(img: &CaptureImage) -> Vec<bool> {
+    let bg = background(img);
+    img.rgba
+        .chunks_exact(4)
+        .map(|px| {
+            px.iter()
+                .zip(bg.iter())
+                .take(3)
+                .any(|(&c, &b)| c.abs_diff(b) > EPS)
+        })
+        .collect()
+}
+
+/// Mean per-pixel luma over the pixels `mask` selects — the figure's **level**,
+/// measured over a set fixed from outside so two captures are compared over the
+/// same pixels rather than each over its own.
+fn mean_luma_over(img: &CaptureImage, mask: &[bool]) -> f32 {
+    let (mut sum, mut n) = (0.0f64, 0u64);
+    for (px, lit) in img.rgba.chunks_exact(4).zip(mask.iter()) {
+        if !lit {
+            continue;
+        }
+        sum += 0.299 * f64::from(px[0]) + 0.587 * f64::from(px[1]) + 0.114 * f64::from(px[2]);
+        n += 1;
+    }
+    assert!(n > 0, "the mask selects no pixels");
+    (sum / n as f64) as f32
+}
+
 #[test]
 fn attractor_contract() {
     let Some(mut renderer) = headless() else {
@@ -348,6 +379,84 @@ fn attractor_contract() {
         "Lorenz is not top-heavy: upper/lower lit area {top_heavy:.3}. At ~1.0 the trail is \
          mirroring itself and the butterfly is a symmetric bowtie (ADR-0070); below 1.0 the \
          vertical axis is inverted and the wings are at the bottom"
+    );
+
+    // --- `brightness` is a LEVEL, not a geometry (Plan 0066 Phase 1, ADR-0080) --
+    //
+    // The scene-local level the two sibling particle families already carried, and
+    // the property that makes it a *level*: at half the value the figure lights
+    // the same pixels and is dimmer over them. It multiplies the per-particle
+    // deposit, the trail accumulates linearly and everything up to the tonemap is
+    // linear, so in exact arithmetic the whole field is scaled and nothing moves.
+    //
+    // Appended at the end of this test, not inserted, so every capture above is
+    // still taken from the device state it always was.
+    //
+    // **The bare preset, not the view one, and that is measurement rather than
+    // taste.** `attractor_view_preset` runs `size = 1.0` at the default
+    // `fade = 0.94`, which is far enough over range that the tonemap's shoulder
+    // flattens the whole figure: measured, brightness 1.0 / 0.5 / 0.25 / 0.1 all
+    // peak at 255 and their mean luma moves 68.6 -> 68.8 -> 73.4 -> 74.4, i.e. not
+    // monotone at all. That is the shoulder doing its job on a badly exposed
+    // fixture — and it is exactly the state the two shipped attractor presets were
+    // in when they reached for `exposure = 0.03` (ADR-0080). At the bare preset's
+    // `size = 0.4` / `fade = 0.62` the same sweep reads 57.5 / 47.3 / 37.0 / 26.2,
+    // which is the linear regime this property is a claim about.
+    //
+    // The lit set is taken from the **dim** capture and both are measured over it.
+    // Halving the light drops the figure's faintest fringe under the `EPS` byte
+    // cut, so the dim set is a subset of the bright one by construction and
+    // asserting raw set equality would be asserting something about the cut. The
+    // real claims are that the dim figure lights **no pixel of its own** (a
+    // geometry change would) and keeps nearly all of the bright one.
+    renderer.set_presets(vec![
+        attractor_bare_preset("at_bright_full", "de_jong", "brightness = \"1.0\"\n"),
+        attractor_bare_preset("at_bright_half", "de_jong", "brightness = \"0.5\"\n"),
+    ]);
+    let full = renderer
+        .capture_preset("at_bright_full", &lively, 60)
+        .expect("capture at_bright_full");
+    let dim = renderer
+        .capture_preset("at_bright_half", &lively, 60)
+        .expect("capture at_bright_half");
+    let (full_mask, dim_mask) = (lit_mask(&full), lit_mask(&dim));
+    let full_lit = full_mask.iter().filter(|&&l| l).count();
+    let dim_lit = dim_mask.iter().filter(|&&l| l).count();
+    let only_dim = full_mask
+        .iter()
+        .zip(dim_mask.iter())
+        .filter(|&(&f, &d)| d && !f)
+        .count();
+    let full_mean = mean_luma_over(&full, &dim_mask);
+    let dim_mean = mean_luma_over(&dim, &dim_mask);
+    println!(
+        "brightness 1.0 -> {full_lit} lit px, mean {full_mean:.2}; \
+         0.5 -> {dim_lit} lit px, mean {dim_mean:.2}; lit only at 0.5: {only_dim}"
+    );
+    assert_eq!(
+        only_dim, 0,
+        "`brightness = 0.5` lit {only_dim} pixels `brightness = 1.0` did not. A level may \
+         only scale the light the figure already lays down; a pixel appearing where the \
+         brighter render has none means the param moved the geometry"
+    );
+    assert!(
+        dim_lit * 10 >= full_lit * 9,
+        "`brightness = 0.5` kept only {dim_lit} of {full_lit} lit pixels. Losing the faintest \
+         fringe to the EPS cut is expected (measured: 1023 of 1094); losing a tenth of the \
+         figure is the param doing something other than scaling the level"
+    );
+    assert!(
+        dim_mean < full_mean * 0.9,
+        "`brightness = 0.5` is not dimmer over the pixels it lights: mean luma {dim_mean:.2} \
+         against {full_mean:.2} at 1.0"
+    );
+    // And it is still a pure function of its params.
+    let dim_again = renderer
+        .capture_preset("at_bright_half", &lively, 60)
+        .expect("capture at_bright_half again");
+    assert_eq!(
+        dim.rgba, dim_again.rgba,
+        "a `brightness`-bound attractor capture is not reproducible"
     );
 }
 
