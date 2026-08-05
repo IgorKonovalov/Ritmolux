@@ -54,14 +54,11 @@ bloom_radius    = "1.1"
 # sits at one pose and never repeats within a listening session; the bass term
 # rides on top so a loud passage pushes the cross a little further.
 #
-# DELIBERATELY SHORT OF WHERE IT WANTS TO BE, and this is a note to the content
-# pass rather than an authoring preference. The projection currently fits the
-# START figure's scale and centre, so an intermediate table is drawn at the
-# fern's framing rather than at its own - it shrinks and drifts off-centre as
-# the cross proceeds, and by ~0.16 it has lost enough lit area to read as a
-# smaller drawing rather than a different one. The range here is what still
-# looks like a fern breathing. It opens up once the framing follows the morph.
-morph = "0.035 + sin(time * 0.0266) * 0.030 + clamp(bass * 0.05, 0, 0.04)"
+# THE RANGE STOPS WELL SHORT OF 1.0 ON PURPOSE. The framing follows the morph
+# now, so the far end is perfectly legible - it is simply a different preset.
+# This one is a fern that leans, and the cross is what keeps it from reading as
+# a still image between beats.
+morph = "0.13 + sin(time * 0.0266) * 0.11 + clamp(bass * 0.18, 0, 0.15)"
 
 # DENSITY - low base, falling on energy. A fern's leaflets are separated by
 # roughly a point-width at this scale; raising `size` on a peak fuses them into
