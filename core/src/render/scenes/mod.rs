@@ -18,6 +18,9 @@
 pub mod emitter;
 pub mod fragment_field;
 pub mod lines;
+/// The shared mark-silhouette vocabulary the two particle scenes draw through
+/// (ADR-0084). Crate-internal: it is arithmetic and a roster, not a scene.
+pub(crate) mod marks;
 pub mod particles;
 pub mod reaction_diffusion;
 pub mod swarm;
