@@ -1525,7 +1525,9 @@ scene, same trails, same `density` / `fade` / palette / view surface — differe
 step: four affine maps, one drawn at random per particle per step, converging
 onto a *figure* rather than onto a filigree.
 
-**Two things change for you as an author.**
+**Four things change for you as an author**, and the last two are the ones that
+cost a session if you carry the rest of this library's habits across. All four
+were measured in the Plan 0062 Phase 7 content pass.
 
 **`a` `b` `c` `d` are inert.** An IFS's shape lives in its affine table, not in
 four scalars. What reaches the figure is the five params below, and they are
@@ -1561,6 +1563,45 @@ so an intermediate figure fills the frame instead of drifting off it. It does
 exactly — the figure would surge and the frame would shrink it back for a net
 zero. The cost is that a hard `vigor` push can leave the frame; `zoom` is the
 recourse.
+
+**`morph` is a TRAVEL knob, not a little-life knob**, and its visible rate is
+steepest near zero — which is the opposite of what "every value between is a
+real figure" suggests. Measured on fern → dragon, the lit width of the figure as
+a fraction of the frame:
+
+| `morph` | 0.00 | 0.05 | 0.10 | 0.15 |
+|---|---|---|---|---|
+| lit width | 0.248 | 0.448 | 0.572 | 0.584 |
+
+By `0.05` the fern is half again as wide and reads as a curl rather than a
+plant, because a few degrees of per-map rotation **compounds through the
+recursion**. A cross that stays recognisably the figure you named would have to
+live under about `0.03`, which is not a lever. **So: bind `morph` when the
+preset is meant to travel, and leave it alone when it is meant to be one
+figure** — the four levers are what change a figure without leaving it.
+`attractor_fern` binds no `morph` at all; `attractor_dissolve` uses the full
+range, and travelling is its whole point.
+
+**The `spiral` is a fine figure and a poor morph target.** Anything ending there
+thins into ragged streaks with half the frame empty: its dominant map contracts
+at only `0.93`, so the intermediate spends nearly every sample on a map that
+barely contracts and the orbit spreads instead of settling. Of five pairs swept
+end to end, `sierpinski → fern` was the best by a distance and `fern → spiral`
+came last.
+
+**These figures are STILL, so your levers must move ~10× faster than the rest of
+this library's drifts.** Every other attractor preset evolves on `time` sines
+with 200–400 s periods, which is right for a strange attractor because the
+attractor is *already* churning and the drift only stops it repeating. An IFS at
+fixed levers is a photograph: everything a viewer sees moving is a lever moving.
+Copying the slow periods gives `anim` around 0.018 against a 0.01 gate floor —
+it **passes**, and looks like a still image. Around 30 s it reads as alive.
+
+**And bind `spin`.** It defaults to `1`, a full revolution every ~35 s. That is
+the shipped look on a chaotic cloud, but these figures have an intrinsic *up* —
+`sierpinski` is an equilateral triangle, `fern` is a plant — so the default
+spends half of every cycle upside down and reads as a crooked frame rather than
+a turning figure. A rock (`sin(time * k) * 0.25`) is almost always what you want.
 
 ### `[spectrum]` — for `spectrum`
 

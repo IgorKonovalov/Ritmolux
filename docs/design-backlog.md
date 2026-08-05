@@ -989,3 +989,150 @@ wrong for every attractor preset that ships.
 
 **Low**, and it is one paragraph. But the advice currently in the README points the wrong way, which
 is the same shape as 0061: guidance that actively costs an author a ladder.
+
+## Entries 0064-0066 — from the Plan 0062 Phase 7 content pass (2026-08-04)
+
+Three findings from judging the new IFS family against real audio. **0064 is the only one that is
+an engine defect**; the other two are documentation gaps, and both matter more than "documentation"
+usually does here because the current absence points an author the *opposite* way from what the
+family wants.
+
+## 0064 — an IFS preset switch shows a hard-edged rectangle of noise for two thirds of a second, which is the artifact ADR-0066 already removed once
+
+- **Raised:** 2026-08-04, from `preset-author`, during the Plan 0062 Phase 7 content pass.
+- **Verified by measurement:** yes — captures at 2 / 6 / 12 / 24 / 40 / 90 frames.
+
+Plan 0062 predicted this and called it a *haze*: "the initial fill scatters particles over the
+figure's bounding box, so they converge onto it over ~23 steps — 0.39 s at the fixed step, with the
+trail carrying the haze roughly a second at `fade = 0.94`". The timing is right and the description
+is not. It is not a haze — it is a **legible, hard-edged, axis-aligned rectangle**, which is a
+materially worse thing to show.
+
+Rendered at `fade = 0.88`, `density = 1.0`:
+
+| frame | what is on screen |
+|---|---|
+| 2-6 | a solid noise slab the shape of the seed box; the figure is a faint ghost inside it |
+| 12-24 | the fern has resolved, and a **hard rectangular edge** frames it, brighter than the interior |
+| 40 | the rectangle is down to a faint corner shadow |
+| 90 | clean |
+
+**Why this matters more than the plan's framing suggests.** It is the *same artifact class*
+ADR-0066 was written to remove. That decision's own words are that re-uploading the seed array
+"*replaced* the cloud with a uniform box rather than scattering it… a uniform fill of an
+axis-aligned box" — which is what a `reseed` visibly was, and why it was changed. The rectangle is
+now back: not on a beat, but on **every preset switch into an IFS**.
+
+And the timing is the worst available. Presets dissolve into each other over ~1 s (ADR-0024), so the
+**entire dissolve happens while the rectangle is on screen**. What a viewer sees a switch reveal is
+a rectangle of noise resolving into a plant, rather than a plant.
+
+**Not authorable around.** Nothing on the preset surface reaches the seed box. `fade` shortens how
+long the trail *carries* it but not the slab itself; `density` thins it without removing the edge.
+
+### What a fix would be
+
+The successor plan's **staggered respawn** — the one Plan 0062's "What this plan does NOT do"
+already names — is the fix, and it removes this as a side effect of doing something else.
+
+A cheaper interim, if the successor plan is far off: seed every particle **at the figure's own fixed
+point** instead of across its bounding box. ADR-0075's own Notes already establish that any
+contractive map's fixed point `(I - M)^-1 t` lies *on* the attractor, so an orbit started there is
+on-figure at step 0 and there is no convergence transient to hide at all. That is a change to what
+calls `IfsFigure::seed_box`, not to the parameterization — and the ADR wrote the property down
+precisely because it is a consequence of the parameterization rather than of the successor plan.
+
+### Priority
+
+**Medium**, and higher than the plan assumed. It is not a subtle quality issue: it is a visible
+rectangle on every entry into the family, and the family now ships two presets.
+
+## 0065 — `morph` is a travel knob whose visible rate is steepest near zero, and nothing says so
+
+- **Raised:** 2026-08-04, from `preset-author`, during the Plan 0062 Phase 7 content pass.
+- **Verified by measurement:** yes.
+
+`presets/README.md` documents `morph` as "position from `family` to `morph_to`… every value between
+is a real figure". That is true, and it reads as an invitation to use a small `morph` for a little
+life. Measured on fern → dragon at a neutral frame, the lit width of the figure as a fraction of the
+frame:
+
+| `morph` | 0.00 | 0.05 | 0.10 | 0.15 |
+|---|---|---|---|---|
+| lit width | 0.248 | 0.448 | 0.572 | 0.584 |
+
+**By 0.05 the fern is half again as wide and already reads as a curl rather than as a plant.** The
+cause is in the tables and is general: the dragon's two maps are `0.707 * R(45 deg)` and
+`R(135 deg)` against the fern's near-zero rotations, and a few degrees of per-map rotation
+**compounds through the recursion**. The rate of visible change is dominated by the *angle*
+difference between the two tables and is therefore front-loaded — nothing like the linear read the
+parameter's description invites. A cross that stays recognisably the named figure would have to live
+under about `0.03`, which is not a lever.
+
+The practical consequence: `morph` is for presets that **travel**, and a preset that wants to stay
+one figure should not bind it at all and should use the four levers, which is exactly what they are
+for. Both shipped IFS presets are now built that way — `attractor_fern` binds no `morph` at all, and
+`attractor_dissolve` uses the full range.
+
+**A second, independent finding on the same surface: the spiral is a poor morph TARGET.** Five
+candidate pairs were swept end to end as filmstrips. Anything ending at the spiral thins into ragged
+streaks with half the frame empty, because the spiral's dominant map contracts at only `0.93` — the
+intermediate spends nearly every sample on a map that barely contracts, so the orbit spreads instead
+of settling. `fern -> spiral` is the design's own showcase pair (ADR-0075) and came **last of the
+five**. The best by a distance is `sierpinski -> fern` — and the figure ADR-0075 doubted would earn a
+preset is exactly why it works: the Sierpinski's rigidity is what makes the dissolve legible.
+
+### What a fix would be
+
+Documentation, in `presets/README.md`'s IFS section: the measured table above, the sentence that
+`morph` is travel rather than life, and a note that the spiral is a fine figure and a poor target.
+No code change — the surface is behaving as designed and being described in a way that points
+authors the wrong way.
+
+### Priority
+
+**Medium.** It is a paragraph, and without it the natural first thing an author tries — a small
+`morph` for some life — produces a figure that is no longer the one they named.
+
+## 0066 — the IFS figures are STILL, so the library's conventions about drift rates are wrong for them
+
+- **Raised:** 2026-08-04, from `preset-author`, during the Plan 0062 Phase 7 content pass.
+- **Verified by measurement:** yes — `shot --report`.
+
+Every attractor preset in the library drives its slow evolution from `time` sines with periods of
+roughly **200-400 s**, and that is correct for a strange attractor: the attractor is *already*
+churning, and the drift only stops it repeating. An IFS at fixed levers is a **photograph**. Nothing
+in the figure moves on its own, so everything a viewer sees moving is a lever moving.
+
+Copying the library's periods therefore produces a preset that is technically alive and visually
+static. Measured `anim`, against the 0.01 gate floor:
+
+| preset | inherited ~200 s periods | ~30 s periods |
+|---|---|---|
+| `attractor_fern` | 0.018 | 0.033 |
+| `attractor_dissolve` | 0.016 | 0.025 |
+
+Both **cleared the gate** at the slow periods. That is the part worth recording: the animation gate
+does not catch this, because its floor is set for "is this frozen" and a still figure under a
+slowly-panning view clears it comfortably.
+
+**A related trap on the same family, and it cost a render to find.** `spin` **defaults to 1**, which
+is a full revolution every ~35 s. On a chaotic cloud that is the shipped look, and leaving `spin`
+unbound is correct. On a figure with an intrinsic "up" — the Sierpinski is an equilateral triangle,
+the fern is a plant — the default means the figure spends half of every cycle **upside down**, which
+reads as the frame being crooked rather than as the figure turning. An IFS preset almost always
+wants `spin` bound to a rock instead. It had also been supplying most of `attractor_dissolve`'s
+`anim` until it was bound, which is how the slow-period problem above stayed hidden.
+
+### What a fix would be
+
+Documentation in `presets/README.md`'s IFS section: one paragraph saying the figure is static so the
+levers carry all the motion and want ~30 s periods, and that `spin`'s default is wrong for a figure
+with an orientation. Optionally a line wherever the animation gate is described, noting that a
+passing `anim` is not evidence of a *watchable* preset on this family.
+
+### Priority
+
+**Low-medium.** Purely advisory, but it is the difference between the family's first two presets
+looking alive and looking like wallpaper, and neither the gates nor `--report`'s `anim` column
+flags it.

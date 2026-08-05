@@ -9,15 +9,26 @@
 # `morph`, `curl`, `vigor`, `lean` and `bias`; see the [particles] section of
 # presets/README.md for the full roster and for `vigor`'s silent ceiling.
 #
-# THE MORPH IS THE THING THE ENGINE COULD NOT DO BEFORE. `morph_to` names a
-# second figure and `morph` travels continuously to it, through tables that are
-# valid at every intermediate value - no preset can drive this family into a
-# divergence, because the interpolation happens in singular-value space where
-# contractivity is preserved by construction (ADR-0075). Here it is bound to a
-# SLOW breathing sine with a small bass term rather than to a beat: the fern is
-# a figure, and a figure that re-forms on every kick reads as a glitch rather
-# than as growth. The far end is deliberately short of 1.0 - this preset is a
-# fern that leans towards a spiral, not a preset that is sometimes a spiral.
+# THIS PRESET DOES NOT MORPH, AND THAT IS A MEASURED DECISION (Plan 0062
+# Phase 7). It shipped with `morph_to = "spiral"` and a cross bound to bass, on
+# the assumption that a small `morph` would give the plant some life without
+# taking it anywhere. Rendering says otherwise: `morph` is a TRAVEL knob, not a
+# little-life knob, and its visible rate of change is steepest near zero.
+# Measured on fern -> dragon at a neutral frame, the lit width of the figure:
+#
+#   morph 0.00   0.248        morph 0.10   0.572
+#   morph 0.05   0.448        morph 0.15   0.584
+#
+# By 0.05 the fern is half again as wide and already reads as a curl. The reason
+# is in the tables: the dragon's two maps are 0.707 * R(45 deg) and R(135 deg)
+# against the fern's near-zero rotations, and a few degrees of per-map rotation
+# compounds through the recursion into a large change of figure. A cross that
+# stays recognisably a fern would have to live under about 0.03, which is not a
+# lever - it is a rounding error.
+#
+# So the fern's life comes from THE FOUR LEVERS instead, which is exactly what
+# they are for: they change the figure without leaving it. `attractor_dissolve`
+# is the preset that travels, and there the travel is the whole point.
 #
 # THE FIGURE IS FRAGILE IN ONE DIRECTION ONLY. It cannot diverge - the family is
 # built so a preset cannot reach a non-contractive table (ADR-0075) - but it CAN
@@ -29,7 +40,6 @@ name = "Barnsley Fern"
 
 [particles]
 family = "fern"
-morph_to = "spiral"
 
 [palette]
 stops = [
@@ -50,36 +60,67 @@ bloom_amount    = "1.2"
 bloom_threshold = "0.92"
 bloom_radius    = "1.1"
 
-# SHAPE - the slow cross toward the spiral. Period ~236 s, so the figure never
-# sits at one pose and never repeats within a listening session; the bass term
-# rides on top so a loud passage pushes the cross a little further.
-#
-# THE RANGE STOPS WELL SHORT OF 1.0 ON PURPOSE. The framing follows the morph
-# now, so the far end is perfectly legible - it is simply a different preset.
-# This one is a fern that leans, and the cross is what keeps it from reading as
-# a still image between beats.
-morph = "0.13 + sin(time * 0.0266) * 0.11 + clamp(bass * 0.18, 0, 0.15)"
 
-# THE FOUR SHAPE LEVERS, and what separates them from the coefficient knobs on
-# a strange attractor: none of them can break the figure. The whole family is
-# parameterized so a preset cannot reach a non-contractive table, which is why
-# these can be driven hard without the reluctance `a`..`d` need on De Jong.
+# THE FOUR SHAPE LEVERS - this preset's whole shape surface, and what separates
+# them from the coefficient knobs on a strange attractor: none of them can break
+# the figure. The family is parameterized so a preset cannot reach a
+# non-contractive table, which is why these can be driven hard without the
+# reluctance `a`..`d` need on De Jong.
 #
-# vigor - the loudest of the four. The framing is fitted at NEUTRAL levers on
-# purpose (ADR-0075), so this genuinely swells the plant rather than being
-# re-framed back to nothing. The ceiling is 0.97 and the fern's own largest
-# singular value is 0.851, so there is about 17% of headroom - asking for more
-# than that gets silence, not an error. Bound so a beat lands inside it.
-vigor = "1.00 + clamp(bass * 0.09, 0, 0.075) + beat * 0.035"
-# curl - the fronds curl and uncurl. Small: a whole radian is a different plant.
-curl  = "sin(time * 0.021) * 0.10 + clamp(mid * 0.10, 0, 0.085)"
+# ONE BAND, ONE STRUCTURAL JOB, and that is not fussiness. The first draft put
+# bass on `vigor`, `lean`, `zoom` AND `hue_center` at once; each term was
+# individually modest and correctly gained, and a loud passage still turned the
+# plant into a soft green mass, because structural terms driven by one band
+# compound. The four map families cannot produce this failure - their only shape
+# knobs are `a`..`d`, bounded coefficients of a map that stays bounded whatever
+# they do. An IFS has levers with real structural authority, so the
+# additive-ceiling rule this library applies to LUMINANCE applies to STRUCTURE
+# here too:
+#   bass -> vigor   (the surge, and the loudest lever in the set)
+#   mid  -> curl    (the fronds)
+#   treb -> bias    (the breath)
+#   time -> lean    (the wind; no band touches it)
+#
+# vigor - by far the loudest of the four, and MEASURED: a 0.11 swing takes the
+# lit area of the frame from 0.112 to 0.297 and the lit width from 0.25 to 0.49.
+# The framing is fitted at NEUTRAL levers on purpose (ADR-0075), so this
+# genuinely swells the plant rather than being re-framed back to nothing.
+#
+# IT IS MOSTLY A TRANSIENT HERE, WHICH IS THE OPPOSITE OF THE OBVIOUS TUNING.
+# The ceiling is 0.97 against the fern's own 0.851, so a preset has ~17% of
+# headroom, and the tempting move is to spend it on a band at the house gain.
+# Rendered against a sustained loud passage that is wrong: at a steady 1.09 the
+# leaflets fuse and the fern becomes a soft mass filling the frame - the lever
+# has enough authority that a SUSTAINED level saturates the figure the way a
+# sustained luminance term saturates the accumulation. So the band term is small
+# and most of the range is on `beat`, where it lands as a surge and is gone.
+# The 0.97 clamp is not too tight; the honest finding is that it is too loose to
+# drive from a band scalar.
+vigor = "1.00 + clamp(bass * 0.035, 0, 0.030) + beat * 0.045"
+# curl - the fronds curl and uncurl.
+#
+# THE PERIODS ON ALL THREE TIME-DRIVEN LEVERS ARE ~30 s, NOT THE ~200-400 s THE
+# REST OF THIS LIBRARY USES, and that is the second lesson of Phase 7. Those
+# slow drifts are right for a strange attractor because the ATTRACTOR is already
+# churning - the drift only keeps it from repeating. An IFS figure is STILL: a
+# fern at fixed levers is a photograph. Everything a viewer sees moving here is
+# a lever moving, so the levers have to move at a rate a viewer can see. At the
+# inherited 200 s periods this preset measured `anim` 0.018 against a 0.01 gate
+# floor - technically alive, visually a still image.
+curl  = "sin(time * 0.19) * 0.11 + clamp(mid * 0.10, 0, 0.085)"
 # lean - the plant bends. Slow and wide, so it reads as wind rather than as a
-# parameter moving.
-lean  = "sin(time * 0.0143) * 0.22 + clamp(bass * 0.13, 0, 0.11)"
-# bias - weight moves from the stem and body to the fronds, so the leaflets
-# brighten while the geometry holds still. The cheapest organic response in the
-# set, and the one most likely to read as breathing rather than as motion.
-bias  = "0.10 + sin(time * 0.031) * 0.26 + clamp(treb * 0.30, 0, 0.26)"
+# parameter moving. Time only: see the note above.
+lean  = "sin(time * 0.23) * 0.20"
+# bias - the plant BREATHES. Measured (Plan 0062 Phase 7): the silhouette and
+# the bounding box do not move at all, and the texture goes from fused-solid at
+# -0.2 to open-and-feathery at +0.6 - the leaflets separate and you can see
+# through the frond. It is the only lever in the set that changes the figure
+# without moving it, which is exactly why it reads as breath rather than motion.
+# GAIN CORRECTED AT PHASE 7: this read `treb * 0.30` against a 0.26 cap, which
+# needs treb = 0.87 to reach the ceiling. Real-music treb means 0.22 and this
+# preset measured a treb reactivity column of 0.009 - the term was very nearly a
+# constant. 0.43 puts a typical passage near half the cap (house rule C/0.60).
+bias  = "0.10 + sin(time * 0.31) * 0.26 + clamp(treb * 0.43, 0, 0.26)"
 
 # DENSITY - low base, falling on energy. A fern's leaflets are separated by
 # roughly a point-width at this scale; raising `size` on a peak fuses them into
@@ -92,18 +133,19 @@ size = "0.40 - clamp((bass + mid) * 0.070, 0, 0.11) + beat * 0.05"
 reseed = "onset > 0.30"
 
 # COLOUR - a narrow green band that warms toward the ember palette as the top
-# end opens, so the plant reads as lit rather than as tinted.
-hue_spread  = "0.16 + clamp(mid * 0.30, 0, 0.26)"
-hue_center  = "0.30 + sin(time * 0.039) * 0.10 + clamp(bass * 0.24, 0, 0.20)"
+# end opens, so the plant reads as lit rather than as tinted. `palette_mix`
+# carried the same dead-gain problem as `bias` and is corrected the same way.
+hue_spread  = "0.16 + clamp(mid * 0.31, 0, 0.26)"
+hue_center  = "0.30 + sin(time * 0.085) * 0.10 + clamp(mid * 0.165, 0, 0.14)"
 saturation  = "1.15 + clamp(treb * 0.50, 0, 0.30)"
-palette_mix = "0.10 + sin(time * 0.023) * 0.10 + clamp(treb * 0.26, 0, 0.22)"
+palette_mix = "0.10 + sin(time * 0.023) * 0.10 + clamp(treb * 0.37, 0, 0.22)"
 
 # VIEW - a slow breathing push-in and a lazy sway. The fern is upright and
 # static in a way a strange attractor is not, so the view is what keeps it from
 # reading as a still image between beats.
-zoom  = "1.02 + bar * 0.07 + clamp(bass * 0.20, 0, 0.18)"
-pan_x = "sin(time * 0.047) * 0.05"
-pan_y = "cos(time * 0.031) * 0.04"
+zoom  = "0.96 + bar * 0.05 + clamp(bass * 0.082, 0, 0.070)"
+pan_x = "sin(time * 0.13) * 0.05"
+pan_y = "cos(time * 0.101) * 0.04"
 # The in-plane spin reaches the 2-D families too (ADR-0076), and a fern that
 # rocks a couple of degrees either side of upright reads as wind. Held well
 # under a full turn: this plant is meant to sway, not to tumble.
@@ -117,7 +159,6 @@ bg_vignette = "0.85"
 [smoothing]
 # The morph is eased hard. It is the most structural thing a preset can move,
 # and a step in it re-forms the whole figure at once.
-morph       = 0.9
 # The shape levers, eased in proportion to how structural each one is. `vigor`
 # is left the quickest of the four so a beat still lands as a surge.
 vigor       = { attack = 0.03, release = 0.28 }

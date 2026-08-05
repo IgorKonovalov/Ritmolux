@@ -1,0 +1,159 @@
+# ORDER DISSOLVING INTO LIFE - a Sierpinski triangle that softens into a fern
+# and crystallizes back. The showcase for the one thing this engine could not do
+# before Plan 0062: travel CONTINUOUSLY from one figure to another, through
+# tables that are a valid figure at every intermediate value.
+#
+# WHY THIS PAIR, AND IT WAS CHOSEN BY RENDERING (Plan 0062 Phase 7). Five
+# candidate crosses were swept end to end as filmstrips; this one is the best of
+# them by a distance, and for a reason worth writing down. The Sierpinski is the
+# most RIGID thing in the roster - three exact half-scale copies, no rotation at
+# all - and the fern is the most organic. Because the cross interpolates the
+# maps' singular values and their rotations separately, the triangle's
+# sub-triangles round into leaflets while the overall silhouette holds: you
+# watch crystalline order become foliage, and every frame between is dense and
+# legible. The design's own showcase pair (fern -> spiral) came last of the five
+# - anything ending at the spiral thins into ragged streaks, because the
+# spiral's dominant map contracts at only 0.93 and the intermediate spreads
+# instead of settling.
+#
+# The Sierpinski was put in the roster as a CORRECTNESS FIXTURE - its exact
+# self-similarity makes a wrong implementation obvious at a glance - and
+# ADR-0075 openly doubted it would earn a preset, being the least organic thing
+# in a plan whose brief was "organic". It earns one, but not as a look: as an
+# ENDPOINT. Its rigidity is the whole reason the dissolve reads.
+#
+# COLOUR TRACKS FORM. `palette_mix` rides the same driver as `morph`, so the
+# figure is mineral and cold while it is a triangle and warm while it is a
+# plant. That coupling is the point - a dissolve where only the geometry moves
+# reads as a glitch; one where the light changes with it reads as a season.
+system = "attractor"
+name = "Order Into Life"
+
+[particles]
+family = "sierpinski"
+morph_to = "fern"
+# Sparse enough that the triangle's interior voids stay black and the fern's
+# leaflets stay separable. At the full budget both fill in and the dissolve is
+# two solid masses trading places.
+density = 0.35
+
+# A - mineral. Cold blue-white through slate, the colour of the ordered end.
+[palette]
+stops = [
+  { at = 0.00, color = "#04070f" },
+  { at = 0.32, color = "#1b3a63" },
+  { at = 0.60, color = "#5f8fc4" },
+  { at = 0.84, color = "#a9cfe8" },
+  { at = 1.00, color = "#eaf4ff" },
+]
+
+# B - living. The same ramp walked through moss and sunlight.
+[palette_b]
+stops = [
+  { at = 0.00, color = "#050e06" },
+  { at = 0.30, color = "#194d1f" },
+  { at = 0.60, color = "#57a83a" },
+  { at = 0.84, color = "#c2dd63" },
+  { at = 1.00, color = "#fbf3c0" },
+]
+
+[params]
+# GLOW - the crystalline end has hard edges that bloom readily, so the threshold
+# sits high and only the densest crossings cross it.
+bloom_amount    = "1.1"
+bloom_threshold = "0.94"
+bloom_radius    = "1.2"
+
+# THE CROSS. A slow asymmetric arc - `sin` spends more time near its turning
+# points than in the middle, so the figure DWELLS at each end and passes through
+# the intermediate, which is the right way round: the ends are the two named
+# figures and the middle is the transition. Bass pushes it toward life, so a
+# loud passage is when the crystal opens.
+#
+# PERIOD ~52 s, AND THAT WAS SET BY WATCHING. The first draft ran at 157 s to
+# match the slow drifts the rest of the attractor set uses - and for a preset
+# whose whole identity IS the cross, that is invisible: a listener watching for
+# thirty seconds sees a still figure. The rest of the set can drift slowly
+# because its levers carry the motion; here the morph IS the motion.
+morph = "0.46 + sin(time * 0.1200) * 0.40 + clamp(bass * 0.14, 0, 0.12)"
+
+# THE LEVERS, held quieter than on the fern preset. The morph is doing the
+# structural work here and a lever fighting it reads as noise on top of a
+# transformation rather than as a second voice.
+#
+# vigor swells both ends - the triangle thickens, the fern bushes out.
+vigor = "1.00 + clamp(bass * 0.070, 0, 0.060) + beat * 0.030"
+# curl is the one lever that does something DIFFERENT at each end: the fern's
+# fronds curl, and the Sierpinski - which has no rotation of its own at all -
+# starts to twist, which is the only way that figure can be made to move.
+#
+# THE TIME PERIODS ON ALL THREE LEVERS ARE ~30 s, not the ~200-500 s the rest of
+# the attractor set uses. A strange attractor is already churning and a slow
+# drift only keeps it from repeating; an IFS figure is STILL, so every visible
+# motion is a lever moving. Measured: at the inherited periods this preset read
+# `anim` 0.016 against a 0.01 gate floor - and it only cleared it at all because
+# the UNBOUND `spin` was turning the whole figure. Binding `spin` to a rock, as
+# it had to be, removed that and left the levers doing the work alone.
+curl  = "sin(time * 0.17) * 0.16 + clamp(mid * 0.14, 0, 0.12)"
+# bias opens and closes the texture without moving the silhouette (Phase 7
+# measured the bounding box as identical across its whole range). On the
+# triangle it redistributes weight between the apex and the base corners.
+bias  = "0.05 + sin(time * 0.29) * 0.30 + clamp(treb * 0.50, 0, 0.30)"
+# lean stays small: this figure is symmetric at one end, and a big lean reads as
+# the whole picture sliding rather than as the figure bending.
+lean  = "sin(time * 0.21) * 0.12"
+
+# DENSITY - the same inversion the rest of the attractor set uses. The triangle
+# end is the one at risk: its strokes are straight and parallel, so they stack
+# into flat sheets far more readily than the fern's do.
+fade = "0.88 - clamp(bass * 0.082, 0, 0.070) - beat * 0.030"
+size = "0.46 - clamp((bass + mid) * 0.065, 0, 0.105) + beat * 0.05"
+# Held higher than the fern's 0.30 - a reseed shakes a crystal, and a crystal
+# that shivers on every onset reads as unstable rather than as struck.
+reseed = "onset > 0.44"
+
+# COLOUR - the coupling. `palette_mix` is the SAME expression as `morph` minus
+# its audio term, so the mineral-to-living crossfade and the triangle-to-fern
+# dissolve are one gesture. It is deliberately not literally identical: the
+# colour leads slightly, which is what makes the change feel caused rather than
+# simultaneous.
+palette_mix = "0.50 + sin(time * 0.1200 + 0.35) * 0.44"
+hue_spread  = "0.14 + clamp(mid * 0.29, 0, 0.24)"
+hue_center  = "0.26 + sin(time * 0.094) * 0.09 + clamp(bass * 0.21, 0, 0.18)"
+saturation  = "1.05 + clamp(treb * 0.47, 0, 0.28)"
+
+# VIEW - a slow push, a drift, and a ROCK rather than a turn.
+#
+# `spin` MUST BE BOUND HERE, and leaving it out is a trap worth naming: it
+# defaults to 1, which is a full revolution every 35 s. On a strange attractor
+# that is the shipped look. On a Sierpinski it means the triangle spends half of
+# every cycle upside down, which reads as the frame being crooked rather than as
+# the figure turning - an equilateral triangle has an "up" and a chaotic cloud
+# does not. A rock of about +/-15 degrees keeps the tilt alive without ever
+# inverting it, and the fern end takes the same rock happily as sway.
+spin  = "sin(time * 0.085) * 0.24"
+zoom  = "1.04 + bar * 0.06 + clamp(bass * 0.19, 0, 0.16)"
+pan_x = "sin(time * 0.115) * 0.04"
+pan_y = "cos(time * 0.091) * 0.035"
+
+# COMPOSITE - a cold vault under the crystal that warms with the mix.
+bg_hue      = "0.58 - clamp(mid * 0.28, 0, 0.24)"
+bg_bright   = "0.007 + clamp(mid * 0.021, 0, 0.018)"
+bg_vignette = "0.88"
+
+[smoothing]
+# The morph is eased hardest of anything here: it re-forms the whole figure, and
+# a step in it is a cut rather than a dissolve.
+morph       = 1.1
+palette_mix = 0.8
+vigor       = { attack = 0.03, release = 0.30 }
+curl        = 0.50
+bias        = 0.35
+lean        = 0.70
+fade        = 0.20
+size        = { attack = 0.02, release = 0.26 }
+zoom        = 0.16
+spin        = 0.30
+hue_center  = 0.35
+bg_bright   = 0.4
+bg_hue      = 0.6
