@@ -224,7 +224,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `swarm`           | `force` `spin` `burst` `field_freq` `hue` `brightness` `size` `shape` `points` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
-| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
+| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
 | `attractor`       | `a` `b` `c` `d` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
@@ -686,7 +686,7 @@ cannot infer from the param names:
 |--------|--------------------|--------|--------|
 | `parametric_curve` | **position along the traced path** — chord `0` is the walk's first | one flat `hue` | first chord at `hue`, last a full palette away |
 | `lsystem` | **generation depth** — branch nesting, `0` on the trunk and one more per open `[` | one flat `hue` | trunk at `hue`, deepest twigs a full palette away |
-| `star_pattern` | **radius from the rosette centre** — but see the warning below: **inert today** | one flat `hue` | one flat `hue` (no radial spread to walk) |
+| `star_pattern` | **radius from the figure's centre** — live on a `rings` preset, inert on a bare interlace, see below | one flat `hue` | innermost ring at `hue`, outermost a full palette away |
 | `spectrum` | **band index** — element `0` is the bottom of the spectrum | one flat `hue` | low band at `hue`, top band a full palette away |
 
 `hue_spread = 0` is the default on every one of them and reproduces exactly the
@@ -708,20 +708,28 @@ whatever the grammar's branching factor and whichever depth is visible.
 `draw_progress` riding `bar` *draws the gradient on* — a half-revealed curve shows
 the palette's first half — rather than re-tinting every chord it already drew.
 
-> **`hue_spread` does nothing on `star_pattern` today, and that is measured.** A
-> Hankin rosette is `2n` congruent segments about the frame centre, so every one
-> of them occupies the *same* radial interval: the spread of segment radii across
-> the whole figure measures `1.2e-7` (f32 noise) at every tiling order and every
-> contact angle, including both shipped presets and all their variants. There is
-> no range for a radial ramp to walk, so the ramp collapses to the flat `hue`
-> rather than sweeping on noise. What `star_pattern` *does* gain is `[palette]`
-> itself — the rosette can be an ember or an ice figure instead of a point on the
-> built-in cosine — plus `saturation` and `palette_mix`. What is empty is the
-> rosette's **interior**: at `star_rosette`'s 12-fold / 20° the strokes live
-> between radius 0.54 and 0.90, so the inner 60% of the disc is bare, and
-> `star_lantern`'s 55° variant empties 87% of it. That is the open half of
-> design-backlog 0007 and it is a generator question, not a colour one; the ramp
-> comes alive by itself the day a construction puts segments at different radii.
+> **`hue_spread` on `star_pattern` is live if and only if the preset declares
+> `rings`, and that is measured both ways.** A Hankin rosette is `2n` congruent
+> segments about the frame centre, so every one of them occupies the *same*
+> radial interval: on `star_rosette` and `star_lantern` the spread of segment
+> radii across the whole figure measures `1.2e-7` (f32 noise) at every tiling
+> order and every contact angle. There is no range for a radial ramp to walk, so
+> the ramp collapses to the flat `hue` rather than sweeping on noise, and what
+> those presets gain from the palette surface is `[palette]` itself — the rosette
+> can be an ember or an ice figure instead of a point on the built-in cosine —
+> plus `saturation` and `palette_mix`.
+>
+> The empty half was the rosette's **interior**: at `star_rosette`'s 12-fold / 20°
+> the strokes live between radius 0.54 and 0.90, so the inner 60% of the disc is
+> bare, and `star_lantern`'s 55° variant empties 87% of it. That was the open half
+> of design-backlog 0007, and [`rings`](#rings--concentric-rings-of-repeated-motifs)
+> closed it: a mandala preset puts segments at four to six different radii, the
+> ramp is computed over the **combined** figure, and `hue_spread` becomes a real
+> lever on exactly the presets that have an interior to spread across. On a
+> composited preset (`star_weave`) the interlace's own segments are all at one
+> radius, so the ramp puts the whole interlace at one end and spreads the ornament
+> along the rest — which is a way to separate the two figures by colour rather
+> than by brightness.
 
 ### `spectrum` — the frequency-axis readout (Plan 0034)
 
@@ -1533,8 +1541,103 @@ character is an inert grammar variable.
 
 | Key                 | Values                                                | Notes                        |
 |---------------------|-------------------------------------------------------|------------------------------|
-| `tiling`            | `square`/`4`/`4.4.4.4`, `hexagon`/`6`/`6.6.6`, `octagon`/`8`/`4.8.8`, `dodecagon`/`12`/`3.12.12` | Star order `n`. Required. |
-| `contact_angle_deg` | number                                                | Hankin contact angle. Default 30. |
+| `tiling`            | `square`/`4`/`4.4.4.4`, `hexagon`/`6`/`6.6.6`, `octagon`/`8`/`4.8.8`, `dodecagon`/`12`/`3.12.12`, `none` | Star order `n`. Required. **`none` draws no interlace at all** — the rings-only mandala below — and is a load error unless `rings` has at least one entry, because a preset with neither draws nothing. |
+| `contact_angle_deg` | number                                                | Hankin contact angle. Default 30. Inert at `tiling = "none"`. |
+| `rings`             | array of ring tables (below)                          | The **mandala interior** (ADR-0079 / Plan 0065). Optional — absent is the Hankin interlace alone, i.e. the scene as it was, segment for segment. |
+
+#### `rings` — concentric rings of repeated motifs
+
+The answer to `star_pattern` reading as a hollow ring. Each entry is one
+concentric ring; copy `i` of a ring of `k` sits at angle `2*pi*i/k + phase`, at
+`radius` from the frame centre, scaled by `scale`. Motifs are drawn through the
+same line renderer as the interlace, so the stroke, joins, glow and palette are
+the ones you already know.
+
+| Key      | Values                | Notes                                                                 |
+|----------|-----------------------|-----------------------------------------------------------------------|
+| `motif`  | one of the seven names below | Required. An unknown name is a **load error** listing the legal set — the roster is closed, not extensible. |
+| `count`  | `1` .. `512`          | Required. Copies around the ring. `0`, a negative, or anything over the ceiling is a load error. |
+| `radius` | number                | Required. Distance from the frame centre, in the fit-normalized world the figure lands in: it spans `+/- 0.9`, so `0.9` is the rim and anything smaller is interior. `0.0` is a single centre boss. |
+| `scale`  | number                | Motif size multiplier — close to the copy's diameter, since every outline spans about one unit. Default `0.25`. |
+| `phase`  | number (radians)      | Angular offset of copy `0`. Default `0`. Use it to stagger a ring against its neighbours. |
+
+**The closed motif roster is seven names**, picked from rendered samples at Plan
+0065 Phase 3 and closed on purpose — a look outside it routes back through
+`architect` + `dev`, it is not a preset-side extension point:
+
+| `motif`    | what it is                                                | segments per copy |
+|------------|-----------------------------------------------------------|-------------------|
+| `circle`   | a plain bead; the ring that reads as a dotted orbit        | 24 |
+| `petal`    | a pointed oval (vesica), cusped at both ends along the radius | 24 |
+| `teardrop` | round outward, cusped inward — the only motif with an unambiguous "which way is out" | 24 |
+| `diamond`  | a four-vertex rhombus, long along the radius               | 4  |
+| `arc`      | an **open** outward-bulging arc, chord tangential; the nearest this roster comes to a scalloped boundary | 12 |
+| `trefoil`  | a three-lobed rose — the densest member, and the one that reads as ornament rather than as a bead | 36 |
+| `chevron`  | an **open** two-segment wedge, apex outward; a sawtooth border at high counts | 2  |
+
+> **`star` and `triangle` were cut** at the same sitting and are load errors now.
+> The property they were cut on is the one to judge a candidate by: *does it hold
+> its identity across the whole 8-to-32 count range*. `star` is an ornament at ×8
+> and dissolves into texture by ×32; `triangle` duplicates `chevron`'s role at
+> twelve times the cost.
+
+**The segment budget, and what happens when you exceed it.** A ring costs
+`count × segments-per-copy`, and the interlace adds `2n` on top. The floor tier's
+ceiling is **20 000** segments (60 000 at rich), so the shipped four-ring mandala
+at `36 + 12×4 + 18×24 + 24×24 = 1 092` plus a 24-segment interlace uses about
+6 % of it. Two things to know:
+
+- **Truncation at the cap is silent.** The build stops emitting and nothing warns
+  you — no load error, no `--report` column. The figure simply ends part-way
+  through a ring, in roster order, so it is the *outermost* rings you lose. If a
+  dense mandala looks like it is missing its outer ring, count your segments.
+- **There are two ways to exhaust the same cap.** The interlace grows with the
+  tiling and the rings grow as `rings × count × resolution`; the failure looks
+  identical from either direction.
+
+The three bindable levers (`ring_phase`, `ring_spread`, `ring_scale`) move this
+roster without changing what is in it — see
+[the ring levers](#the-ring-levers--and-why-two-of-them-are-radial).
+
+```toml
+system = "star_pattern"
+
+[generator]
+tiling = "none"          # the ornament alone; "12" composites it inside the interlace
+rings = [
+  { motif = "trefoil", count = 1,  radius = 0.00, scale = 0.46 },
+  { motif = "diamond", count = 12, radius = 0.30, scale = 0.20 },
+  { motif = "petal",   count = 18, radius = 0.52, scale = 0.26, phase = 0.09 },
+  { motif = "circle",  count = 24, radius = 0.70, scale = 0.13 },
+]
+```
+
+#### The ring levers — and why two of them are radial
+
+| Param         | Default | What it does                                                                 |
+|---------------|---------|-------------------------------------------------------------------------------|
+| `ring_phase`  | `0`     | Turns **alternate rings in opposite directions**, in radians: ring 0 by `+phase`, ring 1 by `−phase`, and so on down the roster. Counter-rotation is the strongest ornamental gesture this geometry has. Wraps at one turn. |
+| `ring_spread` | `1`     | Multiplies every ring's `radius` about the centre — the figure opening and closing. Clamped to `0 .. 4`. |
+| `ring_scale`  | `1`     | Multiplies every motif's `scale` — the copies growing in place, without moving the rings. Clamped to `0 .. 8`. |
+
+All three default to the exact identity, so **a preset that binds none of them
+draws the roster it declared**, and one that declares no `rings` is untouched by
+their existence.
+
+> **Do not carry a mandala's animation on `ring_phase` alone.** A ring mandala is
+> *very* rotationally symmetric — an 18- and 24-fold figure turned by any angle
+> lands almost on top of itself — so a spin moves few pixels however fast it runs,
+> and both the eye at a distance and `core/tests/animation.rs` read it as frozen.
+> `ring_spread` and `ring_scale` change what the figure *is* at each radius rather
+> than where it points, so they are what actually carries the motion. Spend
+> `ring_phase` on the gesture and the radial pair on the liveness.
+
+> **A mandala that must hold up in a portrait window carries a narrower `scale`
+> or `zoom`.** The shared line renderer divides world x by the target's aspect,
+> so at 720×1280 a figure is 1.78× wider in NDC than it is tall: a radius-0.62
+> ring that fits comfortably at 16:9 runs off both sides in portrait. This is an
+> authoring fact rather than a defect — the three shipped mandalas are sized for
+> a landscape window and do graze the frame in portrait.
 
 ### `[particles]` — for `attractor`
 
