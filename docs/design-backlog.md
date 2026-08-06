@@ -390,13 +390,22 @@ would sharpen the 6 % figure the half-and-half split leaves approximate.
 
 ## 0054 — pixel coverage cannot see a figure whose *tips* leave the frame, and an in-frame geometry fraction is the successor
 
-- **PROMOTED 2026-08-04 → [ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) +
-  [Plan 0069](plans/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)** — and the "where
-  does it live" question this entry names as the real decision was answered by **none of its three
-  options**. It is measured inside `LineRenderer::draw`, which already receives every endpoint *and*
-  the render target's aspect, so all four line families are covered by one implementation with no
-  `Scene` accessor (ADR-0067's stated objection) and no harness re-derivation of generator math. The
-  entry's per-family limit stands and is documented rather than papered over.
+- ~~**PROMOTED 2026-08-04**~~ → **CLOSED 2026-08-06 by
+  [ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) (accepted,
+  with an Outcome section) + [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)
+  (done)** — and the "where does it live" question this entry names as the real decision was answered
+  by **none of its three options**. It is measured inside `LineRenderer::draw`, which already receives
+  every endpoint *and* the render target's aspect, so all four line families are covered by one
+  implementation with no `Scene` accessor (ADR-0067's stated objection) and no harness re-derivation
+  of generator math. The entry's per-family limit stands and is documented rather than papered over.
+- **What shipped is narrower than what this entry asked for, and the difference is the finding.**
+  The entry wanted a successor *gate*. The geometry fraction has **no separating absolute threshold
+  either**: `Rose Zoom` (`0.3492`) and `Rose Overflow` (`0.3659`) bracket the frozen over-scaled comb
+  (`0.3563`) and both are correct content, because a length fraction cannot tell "deliberately inside
+  the figure" from "accidentally outside the frame". So `core/tests/geometry_extent.rs` convicts a
+  configuration against **its own repair**, by name — which does work, and is what a content pass
+  actually asks. Repairing the two frozen defects moves the measure `0.4975` and `0.7788`, against
+  the `0.055` pixel coverage had and could not use. See `docs/capturing.md` for what it cannot see.
 - **Raised:** 2026-08-03, at [Plan 0058](plans/done/0058-the-gate-can-see-an-empty-frame.md)'s
   close. This is not a fresh idea —
   [ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) named it in Alternatives,

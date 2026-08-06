@@ -1,13 +1,33 @@
 # 0069 — The instrument that sees a figure leave the frame
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing and sharing no file with
-> any other plan in the roster. **The only plan in the roster with no `human` phase: all four phases
-> are `dev` and it closes in one session.** Protective rather than additive — it moves no pixels and
-> adds no golden baseline.
+> **Status:** **done 2026-08-06** — all four phases landed on `plan-0069-in-frame-geometry` as
+> `c3ce524` / `a359b67` / `9289a7c` / `1abf3a9`, one commit each. `main` was already an ancestor of
+> the branch, so no merge was needed; the full gate is green on the tip (`fmt`,
+> `clippy --all-targets -D warnings`, **546/546 nextest, 0 skipped**, doc links resolve) and **no
+> golden baseline moved or was added**, as promised. Mode 4 review: **no blockers, three minor, one
+> nit**. Verified rather than trusted — the `Scene` trait and the C ABI are untouched, the aspect has
+> exactly one source (a free function with no `self`, no texture and no grid in scope, asserted at
+> three aspects), the draw path costs one `Cell::get` when off, and Phase 2's byte-identity check is
+> non-vacuous in both arms.
+>
+> **One done-when was not met literally, and the plan's arithmetic is why.** Phase 3 asked for a
+> separation "at least an order of magnitude larger than the 0.055"; the shipped bar is `5x` and the
+> comb measures `9.0x` (the corona `14.2x`). A comb roots every bar on a shared baseline, so a
+> fully-driven bar at `scale = 3.80` keeps about `0.47` of its own length in frame **whatever else is
+> done to it**, bounding the achievable separation near `0.53` — the same baseline-rooted fact that
+> made this figure invisible to pixel coverage, showing up as a much weaker version of itself. The
+> bar was set at a factor of `1.8` below the smaller measured separation so it is fitted to neither.
+> That is an unchecked number in this plan, not a shortfall in the implementation.
+>
+> **What the plan did not anticipate: no absolute threshold orders this library either.** `Rose Zoom`
+> (`0.3492`) and `Rose Overflow` (`0.3659`) bracket the frozen over-scaled comb (`0.3563`) and both
+> are working exactly as authored — a figure flown into and a figure that outgrows the frame are the
+> preset *names*. So this shipped as a **paired** instrument, convicting a configuration against its
+> own repair, never against a floor. Recorded in ADR-0083's Outcome section.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev
-> **Related ADRs:** [0083](../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md), supplementing [0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)
-> **Closes:** [design-backlog 0054](../design-backlog.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor)
+> **Related ADRs:** [0083](../../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) (**accepted with an Outcome section** at this close), supplementing [0067](../../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)
+> **Closes:** [design-backlog 0054](../../design-backlog.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor)
 
 ## TL;DR
 
@@ -42,7 +62,7 @@ Nothing needs to be exposed, re-derived or added to a trait.
 
 ## Decision
 
-Per [ADR-0083](../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md):
+Per [ADR-0083](../../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md):
 compute the in-frame geometry fraction in `LineRenderer::draw`, behind a diagnostic switch that is
 off in the shipped render path, and use it as a gate for the four line families while pixel
 coverage keeps the rest. We rejected a `Scene` accessor (the same computation four times, over data
@@ -81,7 +101,7 @@ flowchart TD
   its length rather than all-or-nothing, verified on a hand-computed case where the answer is a
   round fraction. The aspect used is the one `draw` is handed — the render target's — and a unit
   test asserts no other source of aspect appears in the computation
-  ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+  ([ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
 
 ### Phase 2 — The diagnostic changes nothing about the picture
 
@@ -105,14 +125,14 @@ flowchart TD
   threshold. That comparison is the property this plan exists to buy, it is dimensionless, and it is
   the honest form of "the new measure convicts what the old one could not". The absolute fractions
   are **printed, not asserted** — they are measurements of specific presets and would freeze content
-  that is allowed to move ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
+  that is allowed to move ([ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
   `pre_repair_spectrum_ridge` stays where it is: it is the *total* case and `sanity.rs` is its home.
 
 ### Phase 4 — Say what it cannot see
 
 - **Owner skill:** dev
 - **What:** the harness docs describe the instrument, its reach, and the two things it is blind to.
-- **Files touched:** [`docs/capturing.md`](../capturing.md).
+- **Files touched:** [`docs/capturing.md`](../../capturing.md).
 - **Done when:** the section leads with the four families it covers and the five it does not, states
   that it measures **length and not area** (so a thick stroke leaving the frame is under-counted),
   and states that a figure collapsed to a point scores a perfect 1.0 — which is `sanity.rs`'s
