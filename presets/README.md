@@ -1887,20 +1887,42 @@ Each reaches the picture by **two routes**, which is four params:
 |------------|---------|--------------|
 | `map_tint` | `0`     | Shifts the particle's **palette coordinate** by `±map_tint/2` across the four sub-copies. Rides your own `[palette]`, so a custom ramp, `palette_mix` and `saturation` all reach it for free. |
 | `map_hue`  | `0`     | **Rotates the hue** of the colour the palette returned, by `±map_hue/2` across the same four. Leaves the coordinate alone, so it nudges a part of the figure off your ramp without editing the ramp. `1.0` is a full turn of the wheel. |
-| `age_tint` | `0`     | The palette-coordinate route again, across the age range instead. |
-| `age_hue`  | `0`     | The hue-rotation route, across the age range. |
+| `age_tint` | `0`     | The palette-coordinate route again, across the age range instead. **Does not read — see below.** |
+| `age_hue`  | `0`     | The hue-rotation route, across the age range. **Does not read — see below.** |
 
-**Which route do you want?** `*_tint` when the figure's colour should be *yours*
-— you author the ramp and these choose where each part samples it. `*_hue` when
-you like your ramp as it is and just want one part pushed off it. Both are
-centred, so raising either opens a spread around the colour you already had
-rather than sliding the whole figure.
+> **The two `age_*` params do not currently produce a gradient, and no shipped
+> preset binds them.** They render as fine per-particle speckle: by the time a
+> particle is bright enough to see, it has been iterated enough that its age no
+> longer says anything about *where* it is. The first several steps — where age
+> and position genuinely do correlate — are exactly the ones the engine fades in
+> from black, because a particle that has just restarted is sitting on one of
+> four points and a thousand of them per frame would burn four dots into the
+> trail. Measured at Plan 0073 Phase 6 in the most favourable setting the preset
+> surface can build (`fade = 0`, high contrast ramp, `age_tint = 0.75`) and
+> across the whole `morph` range; see
+> [design-backlog 0074](../docs/design-backlog.md). **Reach for `map_*`.**
 
-**Two cautions.** `map_tint` and `age_tint` ride the **same** coordinate, so
-binding both hard mixes two gradients into one channel and neither reads
-cleanly — pick one, or keep the second small. And all four are **inert on the
-four map families**: nothing but an IFS writes either value, so binding them on
-`de_jong` does nothing at all rather than doing something subtle.
+**Which route do you want?** They are not peers — `*_tint` is the default and
+`*_hue` is the special case. `*_tint` keeps the figure inside the ramp you
+authored, so a fern stays botanical and merely separates; `*_hue` throws a part
+clear of the ramp entirely (on `attractor_fern`'s greens it sends the fronds to
+teal and periwinkle), which is striking and fights a palette you spent five
+stops on. Reach for `*_hue` when your palette is a narrow band and you want one
+part *out* of it. Both are centred, so raising either opens a spread around the
+colour you already had rather than sliding the whole figure.
+
+**`map_tint` competes with `hue_spread`, and this is the one that will cost you
+a session.** Both write the **same** palette coordinate — `hue_spread` per
+particle at random, `map_tint` per part — so a wide spread smears the parts into
+each other and `map_tint` reads as a faint wash *at any setting*. If you want
+the parts to separate, bring `hue_spread` down to make room: `attractor_fern`
+went from `0.16..0.42` to `0.05..0.125` at Plan 0073 Phase 6 and the fronds
+appeared. You are trading per-particle grain for per-part structure, which is
+the right trade on a figure whose parts *are* its structure.
+
+**And all four are inert on the four map families**: nothing but an IFS writes
+either channel, so binding them on `de_jong` does nothing at all rather than
+doing something subtle.
 
 **You cannot make the recycling itself an instrument.** Its rate is fixed and
 not bindable, so a beat cannot restart a burst of particles. That was a
