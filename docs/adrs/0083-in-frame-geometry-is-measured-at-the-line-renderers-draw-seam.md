@@ -45,7 +45,7 @@ had to be taken inside each scene. It does not.
 aspect, in one place, for all four line-family scenes. The quantity ADR-0067 wanted is computable
 there, from data already in hand, without any scene knowing it is being measured.
 
-Recorded as [design-backlog 0054](../design-backlog.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor).
+Recorded as [design-backlog 0054](../design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor) (archived at Plan 0069's close).
 
 ## Decision
 

@@ -27,7 +27,7 @@
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev
 > **Related ADRs:** [0083](../../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) (**accepted with an Outcome section** at this close), supplementing [0067](../../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)
-> **Closes:** [design-backlog 0054](../../design-backlog.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor)
+> **Closes:** [design-backlog 0054](../../design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor) (archived at this close)
 
 ## TL;DR
 
@@ -183,8 +183,16 @@ impl DrawExtent {
 
 ## Followups (after this lands)
 
-- If Phase 3 convicts a shipped preset, file it for `preset-author` with the measured fraction — the
-  first time this repo has been able to name that defect mechanically.
+- ~~If Phase 3 convicts a shipped preset, file it for `preset-author` with the measured fraction — the
+  first time this repo has been able to name that defect mechanically.~~ **Answered, not pending
+  (2026-08-06).** It did not fire and structurally could not have: the instrument shipped
+  **paired**, convicting a configuration only against a frozen repair of itself, and a shipped preset
+  has none. The two lowest scorers in the library, `Rose Zoom` (`0.3492`) and `Rose Overflow`
+  (`0.3659`), are the lowest *by design*. See
+  [ADR-0083's Outcome](../../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md).
+  What this leaves open is filed as
+  [backlog 0070](../../design-backlog.md#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report).
 - The particle families' equivalent, if wanted, is a genuinely different design: they have no
   segment list and their "figure" is a statistical cloud. Do not assume it is this measure with a
-  different input.
+  different input. **Still open and correctly parked** — it needs a reference case before it is
+  designable, and none exists.

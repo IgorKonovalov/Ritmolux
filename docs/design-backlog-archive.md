@@ -2930,3 +2930,83 @@ nothing in the grammar hints that figurative is off the table.
 **Not deciding:** whether the engine *should* draw figurative objects at all, or which of the four
 routes above is right. Both are architect calls, and the additive-model question is ADR-shaped.
 
+---
+
+## Entry 0054 — from the Plan 0058 close (2026-08-03), and the plan's own measurement is the argument
+
+---
+
+## 0054 — pixel coverage cannot see a figure whose *tips* leave the frame, and an in-frame geometry fraction is the successor
+
+- ~~**PROMOTED 2026-08-04**~~ → **CLOSED 2026-08-06 by
+  [ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) (accepted,
+  with an Outcome section) + [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)
+  (done)** — and the "where does it live" question this entry names as the real decision was answered
+  by **none of its three options**. It is measured inside `LineRenderer::draw`, which already receives
+  every endpoint *and* the render target's aspect, so all four line families are covered by one
+  implementation with no `Scene` accessor (ADR-0067's stated objection) and no harness re-derivation
+  of generator math. The entry's per-family limit stands and is documented rather than papered over.
+- **What shipped is narrower than what this entry asked for, and the difference is the finding.**
+  The entry wanted a successor *gate*. The geometry fraction has **no separating absolute threshold
+  either**: `Rose Zoom` (`0.3492`) and `Rose Overflow` (`0.3659`) bracket the frozen over-scaled comb
+  (`0.3563`) and both are correct content, because a length fraction cannot tell "deliberately inside
+  the figure" from "accidentally outside the frame". So `core/tests/geometry_extent.rs` convicts a
+  configuration against **its own repair**, by name — which does work, and is what a content pass
+  actually asks. Repairing the two frozen defects moves the measure `0.4975` and `0.7788`, against
+  the `0.055` pixel coverage had and could not use. See `docs/capturing.md` for what it cannot see.
+- **Raised:** 2026-08-03, at [Plan 0058](plans/done/0058-the-gate-can-see-an-empty-frame.md)'s
+  close. This is not a fresh idea —
+  [ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) named it in Alternatives,
+  rejected it as the *primary* mechanism and kept it explicitly as the supplement. What is new is
+  the evidence that it is now wanted, and the evidence is a measurement rather than an argument.
+- **Verified against code:** yes — measured through the instrument Plan 0058 Phase 3 built, printed
+  by `core/tests/sanity.rs` on every run.
+- **Lane:** `architect` → `dev`. Engine/harness work, no preset content.
+
+**What Plan 0058 established, and what it could not.** Phase 1 made `sanity` measure the scene
+against black instead of against a sampled corner pixel, which catches the **total** case — a figure
+so far out of frame that nothing is drawn. That is real and it is pinned by a frozen fixture. Phase 3
+then tried to catch the **partial** case with a stimulus-relative check: capture at two excitations
+and assert the louder frame does not draw less picture. It ships as a **report, not a gate**, and
+the numbers are why:
+
+```text
+ ratio   cov@0.4  cov@1.0  preset
+ 0.8552   0.2878   0.2461  De Jong          <- lowest legitimate (correct content)
+ 0.9568   0.3164   0.3027  Leviathan        <- correct content
+ 1.0514   0.3866   0.4065  Spectrum Corona  <- OVER-SCALED, scale = 5.20
+ 1.0891   0.5088   0.5541  Spectrum Comb    <- OVER-SCALED, scale = 3.80
+    inf   0.0000   0.0000  Spectrum Ridge (pre-repair)  <- 0/0, no denominator
+```
+
+**No threshold on this axis convicts anything it was built for.** The two over-scaled presets score
+*above* 1.0 — they draw more when loud — because a comb roots every bar on a shared baseline and a
+corona roots every spoke at a centre, so clipping the tips costs a rounding error of lit pixels
+while the body stays exactly where it was. Meanwhile the only content anywhere near a plausible
+threshold is correct: the attractor family's *peak buys structure* idiom, which
+[ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) already records as real. A
+gate at `0.80` would sit `0.055` from De Jong while catching none of the three known-defective
+configurations.
+
+**So the diagnosis is that the measure is wrong, not the threshold.** Tips are almost no pixels.
+Asking a pixel-coverage statistic about a figure that overshoots its frame is asking the wrong
+question, and no calibration of it will help.
+
+**What a design here would weigh.**
+
+- **The obvious mechanism, and its reach.** Line and spectrum scenes build a CPU segment list, so
+  "what share of the drawn geometry lands inside the render target" is computable without a GPU
+  readback for exactly the families most exposed. That is also its limit: `fragment_field`,
+  `reaction_diffusion` and the attractor draw no such list, so this cannot be an engine-wide gate —
+  it is a per-family instrument, which is a shape this project has not built before.
+- **Where it lives.** ADR-0067 declined it partly because it "needs a `Scene`-adjacent accessor",
+  and widening the `Scene` trait is ADR-0002 territory. Whether the fraction is computed inside the
+  scene, exposed through a diagnostic seam, or derived by the harness from the same generator config
+  a preset declares is the real decision, with rejected alternatives.
+- **The confirmation half already works and is worth keeping either way.** Repaired, the same ratio
+  moved `1.0891 -> 1.7196` (comb) and `1.0514 -> 1.6756` (corona). The check is blind as a
+  conviction and sharp as a confirmation — useful to a content pass verifying its own repair even
+  though it can never fail the build.
+- **Non-vacuity is already available.** `core/tests/sanity.rs` carries `pre_repair_spectrum_ridge`
+  as a frozen fixture, and `git show 2efb80e^:presets/spectrum_comb.toml` is the partial case. Any
+  instrument proposed here can be tested against both before it is trusted.
