@@ -133,7 +133,20 @@ reseed = "onset > 0.44"
 # colour leads slightly, which is what makes the change feel caused rather than
 # simultaneous.
 palette_mix = "0.50 + sin(time * 0.1200 + 0.35) * 0.44"
-hue_spread  = "0.14 + clamp(mid * 0.29, 0, 0.24)"
+#
+# `map_tint` COLOURS EACH PART OF THE FIGURE SEPARATELY, and on this preset that
+# is not decoration - it is the same gesture again (Plan 0073 Phase 6). The
+# channel names which sub-copy of the figure a point belongs to, so at
+# `morph = 0` it colours the gasket's three corners and at `morph = 1` it
+# colours the plant's stem, body and two fronds. The correspondence between the
+# two - which corner BECOMES which part - is exactly what this preset is about,
+# and until now nothing made it visible. Verified across the whole morph range.
+#
+# `hue_spread` comes down for it, for the reason the fern's does: both write the
+# same palette coordinate, and a wide per-particle spread smears the parts into
+# each other until the channel reads as a wash.
+hue_spread  = "0.06 + clamp(mid * 0.12, 0, 0.10)"
+map_tint    = "0.40 + sin(time * 0.077) * 0.09 + clamp(mid * 0.13, 0, 0.11)"
 hue_center  = "0.26 + sin(time * 0.094) * 0.09 + clamp(bass * 0.21, 0, 0.18)"
 saturation  = "1.05 + clamp(treb * 0.47, 0, 0.28)"
 
@@ -170,5 +183,6 @@ size        = { attack = 0.02, release = 0.26 }
 zoom        = 0.16
 spin        = 0.30
 hue_center  = 0.35
+map_tint    = 0.45
 bg_bright   = 0.4
 bg_hue      = 0.6

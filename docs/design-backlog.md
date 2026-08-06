@@ -1403,3 +1403,86 @@ improve upon in the future"; it is lower now, because the look that made it urge
 through this code. It becomes urgent again the moment anyone wants a *line* scene to draw something
 that reads as a curve — which is every future user of `star_pattern`'s motif roster, and arguably
 `parametric_curve` too.
+
+---
+
+## Entry 0074 — from Plan 0073 Phase 6 (2026-08-06), the content pass on the two IFS colour channels
+
+## 0074 — the age channel has nothing spatial to colour, because the emergence ramp hides the only steps where age correlates with position
+
+- **Raised:** 2026-08-06, at [Plan 0073](plans/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
+  Phase 6 — the `preset-author` pass that phase exists to run. It is the phase's own
+  "any channel or route that could not be made to read is written up here rather than quietly left
+  bound to nothing".
+- **Verified by measurement:** yes — rendered, and rendered in the configuration most favourable to
+  the channel.
+- **Half of the plan landed and landed well.** `map_tint` / `map_hue` work, are now bound in both
+  shipped IFS presets, and survive the morph. This entry is about the other half only.
+
+**What was built.** [ADR-0087](adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md) gave
+every particle two channels — which map last moved it, and how many steps since it last respawned —
+each reaching the picture by a palette coordinate and a hue rotation. The ADR's stated reading of the
+age channel is that "age is distance-from-the-fixed-points in disguise": a young particle has been
+iterated only a few times, so it sits near one of the four points the figure contracts toward, and an
+old one has spread across the whole figure.
+
+**What it actually renders as: per-particle speckle with no gradient anywhere.** Measured on a bare
+fern, `fade = 0` so no trail could average anything, `size = 0.9`, a three-stop ramp chosen for
+maximum contrast, and `age_tint = 0.75` — the most favourable configuration the preset surface can
+build. The figure comes out a uniform tint carrying fine multi-coloured noise. The same probe with
+`map_tint = 0.75` instead, everything else identical, separates the fern into four legible regions:
+cream body, teal and cyan fronds, a thin stem. Swept across `morph` at 0 / 0.25 / 0.5 / 0.75 / 1.0 on
+`sierpinski -> fern` with `age_tint = 0.75` and a long `fade = 0.912`, no position shows a gradient.
+
+**Why, and it is structural rather than a tuning miss.** The ADR's reading is true only for a
+particle's first handful of steps. The family's probability-weighted per-step contraction is `0.742`,
+so after about ten iterations a particle's position is decorrelated from its age — it can be
+anywhere on the figure. And the first **eight** steps are exactly what
+[`EMERGENCE_STEPS`](../core/src/render/scenes/particles/mod.rs) deliberately makes invisible, because
+those are the steps where a particle sits on one of four points and the trail field would integrate
+a thousand of them per frame into four bright dots.
+
+So the two constants ADR-0087 treats as independent look knobs are in **direct opposition**:
+
+- the emergence ramp exists to hide the four restart points;
+- the restart points are the only place age correlates with position;
+- therefore the ramp hides precisely the material the age channel exists to colour.
+
+Lengthening the lifetime does not help — the problem is spatial, not temporal. The 180-step lifetime
+was judged fine in the running app on 2026-08-06 ("looks ok really"), and the churn reads as life
+rather than as twinkle, so the plan's *other* two open questions are answered and only this one is not.
+
+**What the channel is still good for, and why that is not enough to bind it.** Because each
+particle's colour cycles through the ramp over its own life, `age_tint` under a trail is a slow
+per-particle shimmer. But `hue_spread` already gives per-particle colour variation from the fixed
+seed, on the same coordinate, and reads as *grain* rather than as noise because it does not cycle.
+Neither shipped preset binds `age_tint` or `age_hue`, and neither should until this is resolved.
+
+### What would close it
+
+Three candidates, and they are genuinely different decisions rather than a menu:
+
+1. **Make the ramp length authorable, or shorten it, and accept some hot spots.** The cheapest, and
+   the one the plan half-anticipated by calling both constants "the lever". It trades the artifact
+   the ramp was built to remove against the gradient the age channel was built to show. Somebody has
+   to look at that trade in motion; no capture decides it.
+2. **Colour by a channel that IS spatial.** What the ADR wanted to show — distance from the fixed
+   points — is computable directly and does not decay: the shader already has the four points on its
+   step uniform. A `depth`-like "how far from the nearest restart point" channel would produce the
+   gradient the age channel was reaching for, permanently, and would not fight the ramp. This is the
+   honest successor and it is a new plan.
+3. **Retire `age_tint` / `age_hue`.** Two params on the longest roster in the library that no
+   shipped preset can use is a cost, and ADR-0087's Consequences already flagged "four new params on
+   a scene that just took five" as a knowing risk. The two spare words in `Particle` stay spent
+   either way — `age` still drives the emergence ramp, which is load-bearing.
+
+**Not the answer:** tuning the lifetime, or binding the channel harder. Both were tried at the
+extremes and the picture does not change in kind.
+
+### Priority
+
+**Medium.** Nothing is broken and nothing ships defective — the params default to the identity and
+no preset binds them. But half of an accepted ADR is currently unusable content surface, and the
+roster documents four channels where an author will find two that work. Whichever of the three
+routes is taken, `presets/README.md` needs to stop presenting the four as peers.
+
