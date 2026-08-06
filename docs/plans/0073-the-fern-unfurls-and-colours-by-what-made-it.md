@@ -1,6 +1,6 @@
 # 0073 — The fern unfurls and colours by what made it: age, last map, and the end of the startup rectangle
 
-> **Status:** **approved 2026-08-05** — ready for `dev`. Phases 1-5 are `dev` and nothing gates them,
+> **Status:** **in-progress 2026-08-06**. Phases 1-5 are `dev` and nothing gates them,
 > so they run start-to-finish in one session; **Phase 6 is `human`** (a `preset-author` pass judging
 > the two colour channels and the churn constants against real audio), so the plan does not close in
 > that session.

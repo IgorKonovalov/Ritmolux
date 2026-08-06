@@ -494,6 +494,15 @@ const DEFAULT_PERSPECTIVE: f32 = 0.0;
 /// what reads as depth for a diffuse cloud that cannot hide anything.
 const DEFAULT_DEPTH_FADE: f32 = 0.0;
 const DEFAULT_DEPTH_HUE: f32 = 0.0;
+/// ADR-0087's colour channels, all four inert at their default. `*_tint` adds an
+/// exact `0` to the palette coordinate; `*_hue` compares equal to literal `0.0`
+/// and takes `shift_hue`'s early return, so no capture moves through a
+/// round trip that is not bit-exact.
+///
+/// One constant for all four rather than four spellings of `0.0`: they are the
+/// same claim — *the default is the identity* — and it is the claim, not the
+/// number, that has to hold.
+const DEFAULT_CHANNEL_COLOUR: f32 = 0.0;
 /// Ceiling on `perspective`, applied silently where the uniform is packed.
 ///
 /// `perspective` means **the figure's depth half-extent as a fraction of the
@@ -667,6 +676,16 @@ struct Particle {
     seed: f32,
     prev: vec3<f32>,
     pad: f32,
+    // ADR-0087's two channels. `age` counts steps since this particle last
+    // respawned; `map` is the index of the map applied on the most recent step.
+    // Both are written by the IFS arm alone and stay at their seeded 0.0
+    // everywhere else.
+    age: f32,
+    map: f32,
+    // Named, not implicit: WGSL's 16-byte round-up bought these, and they are
+    // the next channel's budget rather than slack.
+    spare0: f32,
+    spare1: f32,
 }
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
 
@@ -804,18 +823,30 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         // rest, the same reason `hash3` above is three named rounds.
         var m = step.m3;
         var t = step.t23.zw;
+        // Which of the four was chosen, carried as an f32 because that is what
+        // the channel is and because the draw reads it through a vertex
+        // attribute, which has no integer path here (ADR-0087).
+        var k = 3.0;
         if (r < step.cumulative_p.x) {
             m = step.m0;
             t = step.t01.xy;
+            k = 0.0;
         } else if (r < step.cumulative_p.y) {
             m = step.m1;
             t = step.t01.zw;
+            k = 1.0;
         } else if (r < step.cumulative_p.z) {
             m = step.m2;
             t = step.t23.xy;
+            k = 2.0;
         }
         // x' = a*x + b*y + e,  y' = c*x + d*y + f. Two dimensional: z stays 0.
         p = vec3<f32>(m.x * p.x + m.y * p.y + t.x, m.z * p.x + m.w * p.y + t.y, 0.0);
+        // Unconditional within this arm: the value names where the particle now
+        // IS, so it is only meaningful when written every step. The jitter
+        // dispatch returns above without touching it, which is right — a reseed
+        // displaces a particle without changing which sub-copy it belongs to.
+        particles[i].map = k;
     } else if (step.family == 2u) {
         // Thomas cyclically-symmetric flow (b = dissipation). Lively speed-up so
         // the slow flow visibly moves each frame.
@@ -868,6 +899,10 @@ struct Draw {
     // ctr: xyz the world centre subtracted before projection, w unused. The four
     //    map families pass [0,0,0] or [0,0,25] - exactly what they passed when
     //    this was the scalar `w.z` - and subtracting a zero is exact.
+    // ch: ADR-0087's two per-particle channels, two routes each -
+    //    x map_tint, y map_hue, z age_tint, w age_hue. Every one defaults to 0
+    //    and 0 is the arithmetic identity on both routes, so a preset that binds
+    //    none of them renders exactly what it rendered before they existed.
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
@@ -876,6 +911,7 @@ struct Draw {
     bv: vec4<f32>,
     d: vec4<f32>,
     ctr: vec4<f32>,
+    ch: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> draw: Draw;
 // Shared gradient LUTs (ADR-0021): sampled per-particle in the vertex shader
@@ -988,12 +1024,78 @@ fn depth_tint(dn: f32) -> f32 {
     return draw.d.z * (depth01(dn) - 0.5);
 }
 
+// The largest map index, so `map / MAP_SPAN` puts the fern's stem at 0 and its
+// right frond at 1. Mirrors `ifs::MAPS - 1`; the count is structural (the step
+// shader's choice is an unrolled four-way branch), so this is a constant rather
+// than a uniform field.
+const MAP_SPAN: f32 = 3.0;
+
+// A per-particle channel's contribution, **centred**: a shift of +/- amount/2
+// across the channel's [0, 1] range, so the mid-channel colour is the one the
+// preset asked for and raising the amount opens a spread rather than sliding the
+// whole figure. Exactly `depth_tint`'s shape, for exactly its reason.
+//
+// At `amount = 0` this is an exact 0 whatever `unit` is, which is what makes
+// both palette-coordinate routes the arithmetic identity at their defaults.
+fn channel_shift(unit: f32, amount: f32) -> f32 {
+    return amount * (unit - 0.5);
+}
+
+// Standard RGB->HSV, the inverse of `hsv2rgb` below (both are the iq forms; the
+// forward one is transcribed from `render/ink.rs`, which is where this project
+// already spells HSV). The `1e-10` guards the two divisions on a greyscale or
+// black input, where hue is undefined and any value is as good as another.
+fn rgb2hsv(c: vec3<f32>) -> vec3<f32> {
+    let k = vec4<f32>(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    let p = mix(vec4<f32>(c.bg, k.wz), vec4<f32>(c.gb, k.xy), step(c.b, c.g));
+    let q = mix(vec4<f32>(p.xyw, c.r), vec4<f32>(c.r, p.yzx), step(p.x, c.r));
+    let d = q.x - min(q.w, q.y);
+    let e = 1.0e-10;
+    return vec3<f32>(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+// Standard HSV->RGB (iq form), transcribed from `render/ink.rs::hsv2rgb`.
+// `fract` normalizes an arbitrary hue into [0, 1), so a shift may sweep freely.
+fn hsv2rgb(c: vec3<f32>) -> vec3<f32> {
+    let h = fract(c.x);
+    let rgb = clamp(
+        abs(((h * 6.0 + vec3<f32>(0.0, 4.0, 2.0)) % vec3<f32>(6.0)) - vec3<f32>(3.0)) - vec3<f32>(1.0),
+        vec3<f32>(0.0),
+        vec3<f32>(1.0),
+    );
+    return c.z * mix(vec3<f32>(1.0), rgb, c.y);
+}
+
+// The **second** route a channel reaches colour by (ADR-0087): rotate the hue of
+// the colour the palette already produced, leaving the palette coordinate alone.
+// That is the route for a preset that wants its fronds nudged off its body
+// without editing its ramp; `*_tint` is the route for one whose colour should be
+// the author's gradient.
+//
+// **The zero early-out is load-bearing, not an optimization.** An RGB -> HSV ->
+// RGB round trip is not bit-exact, and sixteen golden baselines assert that a
+// preset binding none of these params renders byte-identically. Comparing
+// against literal 0.0 is exact, and 0.0 is what every unbound preset carries.
+fn shift_hue(c: vec3<f32>, turns: f32) -> vec3<f32> {
+    if (turns == 0.0) {
+        return c;
+    }
+    var hsv = rgb2hsv(c);
+    hsv.x = fract(hsv.x + turns);
+    return hsv2rgb(hsv);
+}
+
 @vertex
 fn vs_main(
     @builtin(vertex_index) vi: u32,
     @location(0) center: vec3<f32>,
     @location(1) seed: f32,
     @location(2) previous: vec3<f32>,
+    // ADR-0087's last-map channel, at byte offset 36 of the particle. The
+    // attribute offsets are spelled out in `PARTICLE_ATTRIBUTES` rather than
+    // taken from `vertex_attr_array!`, which lays attributes out consecutively
+    // and would fetch this from the padding word.
+    @location(3) map: f32,
 ) -> VsOut {
     var corners = array<vec2<f32>, 6>(
         vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(0.0, 1.0),
@@ -1087,10 +1189,24 @@ fn vs_main(
     // particle's own `dn` - for a segment that is the head's, not the midpoint's:
     // the colour follows where the particle IS, and the trail behind it already
     // carries the shade it had when it was there.
-    let coord = hue + hue_center + (seed - 0.5) * hue_spread + depth_tint(dn);
+    //
+    // The last-map channel rides it too (ADR-0087), by the same centred shift:
+    // `map` names which sub-copy of the figure this point sits in, so on the
+    // fern this is what makes stem, body and the two fronds separate colours.
+    // It is identically 0 on every family but the IFS, where nothing writes it.
+    let map01 = map / MAP_SPAN;
+    let coord = hue + hue_center + (seed - 0.5) * hue_spread + depth_tint(dn)
+        + channel_shift(map01, draw.ch.x);
     let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
     let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
-    let col = apply_saturation(mix(ca, cb, clamp(palette_mix, 0.0, 1.0)), saturation);
+    // ...and the channel's OTHER route, which shifts the hue of whatever colour
+    // the palette produced instead of moving where it was sampled. Before
+    // `apply_saturation`, so `saturation` stays the last word on colour.
+    let shifted = shift_hue(
+        mix(ca, cb, clamp(palette_mix, 0.0, 1.0)),
+        channel_shift(map01, draw.ch.y),
+    );
+    let col = apply_saturation(shifted, saturation);
 
     // Normalize the additive deposit by the particle count (ADR-0065), so total
     // light per frame is invariant to the tier, times the preset's `brightness`
@@ -1266,23 +1382,32 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 "#;
 
-/// One particle, GPU storage-buffer layout (std430). **32 bytes**: the current
+/// One particle, GPU storage-buffer layout (std430). **48 bytes**: the current
 /// 3D attractor position (2D families keep `z = 0`), a per-particle seed jitter
-/// set once at init, and the position this particle held *before* the current
-/// step, which the continuous families draw a segment back to (ADR-0069).
+/// set once at init, the position this particle held *before* the current step
+/// (which the continuous families draw a segment back to, ADR-0069), and the two
+/// channels ADR-0087 added — how old the particle is and which map last moved it.
 ///
-/// Each `f32` packs into the preceding `vec3`'s trailing slot (offsets 12 and
-/// 28), so std430 lays this out as two tight 16-byte halves and the stride is 32
-/// — matching this `repr(C)` layout. **It used to be a tight 16**, and that note
-/// is corrected here rather than deleted because the packing argument is the same
-/// one, applied twice; `_pad` is the explicit name for the slot `seed` occupies
-/// in the first half.
+/// Each of the first two `f32`s packs into the preceding `vec3`'s trailing slot
+/// (offsets 12 and 28), so std430 lays the first 32 bytes out as two tight
+/// 16-byte halves. **It used to be a tight 16**, then a tight 32, and that note
+/// is kept rather than deleted because the packing argument is the same one
+/// applied twice; `_pad` is the explicit name for the slot `seed` occupies in
+/// the first half.
 ///
-/// The price of `prev` is one extra 16 bytes per particle, which at the tier
-/// budgets is **1.6 MB** at `Floor` (50 000) and **4.8 MB** at `Rich` (150 000),
-/// up from 0.8 MB and 2.4 MB. It is GPU storage, allocated once at build and
-/// never resized — `[particles] density` narrows what is *drawn*, not what is
-/// allocated (ADR-0069), so a sparse preset pays the full figure.
+/// **Why 48 and not 40.** WGSL rounds a struct to a multiple of its alignment
+/// and `vec3<f32>` aligns to 16, so `age` and `map` land at offsets 32 and 36
+/// and the whole rounds to 48. The two words that follow are **not slack to be
+/// reclaimed** — they are the budget for the next per-particle channel, which is
+/// why they are named rather than left implicit (and why `bytemuck::Pod`, which
+/// forbids implicit padding, agrees).
+///
+/// The price is one more 16 bytes per particle: at the tier budgets **2.4 MB**
+/// at `Floor` (50 000) and **7.2 MB** at `Rich` (150 000), up from 1.6 and 4.8.
+/// Paid by all five families including the four that never read the new fields
+/// (ADR-0087 Consequences). It is GPU storage, allocated once at build and never
+/// resized — `[particles] density` narrows what is *drawn*, not what is allocated
+/// (ADR-0069), so a sparse preset pays the full figure.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Particle {
@@ -1290,6 +1415,20 @@ struct Particle {
     seed: f32,
     prev: [f32; 3],
     _pad: f32,
+    /// Steps since this particle last respawned (ADR-0087). Written by the IFS
+    /// arm of the step shader; left at its seeded `0.0` by every other family.
+    age: f32,
+    /// Index of the map applied on the **most recent** step — a property of
+    /// *position*, not of history: it names which sub-copy `fₖ(A)` the particle
+    /// currently sits in (the fern's stem, body, left frond, right frond), which
+    /// is what makes a one-value channel refreshed every step partition the
+    /// figure into its parts rather than read as noise (ADR-0087).
+    ///
+    /// `0.0` on every non-IFS family, where nothing writes it.
+    map: f32,
+    /// The next channel's budget, explicit so it reads as such. See the layout
+    /// note above: this is what the 16-byte round-up bought, not slack.
+    _spare: [f32; 2],
 }
 
 /// Compute step uniform (per frame): the attractor coefficients, the fixed
@@ -1374,6 +1513,9 @@ impl StepUniform {
 /// **inverse** depth half-extent (ADR-0076) — `0` for a 2D family, which is what
 /// makes every depth cue the identity there without a shader branch.
 /// `ctr`: xyz the world centre subtracted before projection (Plan 0062), w unused.
+/// `ch`: ADR-0087's two per-particle channels at two routes each — x `map_tint`,
+/// y `map_hue`, z `age_tint`, w `age_hue`. All four default to `0`, which is the
+/// arithmetic identity on both routes.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct DrawUniform {
@@ -1385,6 +1527,7 @@ struct DrawUniform {
     bv: [f32; 4],
     d: [f32; 4],
     ctr: [f32; 4],
+    ch: [f32; 4],
 }
 
 /// Decay uniform (per frame): x is the per-frame trail retention factor.
@@ -1492,6 +1635,40 @@ impl Resources {
         self.grid = FieldResources::build(device, &self.pipelines, trail_w, trail_h);
     }
 }
+
+/// The draw pass's instance attributes, with **explicit byte offsets into
+/// [`Particle`]**.
+///
+/// **Spelled out rather than built by `vertex_attr_array!`, and that is the
+/// whole point of this constant.** That macro lays its attributes out
+/// *consecutively* — which was correct while the struct was `pos`, `seed`,
+/// `prev` and one trailing pad, and stopped being correct the moment ADR-0087
+/// put `age` and `map` past that pad. A fourth macro entry would have fetched
+/// the padding word at offset 28 and fed the draw someone else's bytes, silently
+/// and with no compile error. `the_particle_layout_carries_two_channels`
+/// measures these offsets against the struct so the two cannot drift.
+const PARTICLE_ATTRIBUTES: &[wgpu::VertexAttribute] = &[
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32x3,
+        offset: 0,
+        shader_location: 0, // pos (z = 0 for 2D families)
+    },
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32,
+        offset: 12,
+        shader_location: 1, // seed
+    },
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32x3,
+        offset: 16,
+        shader_location: 2, // prev (ADR-0069)
+    },
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32,
+        offset: 36,
+        shader_location: 3, // map (ADR-0087) — 36, NOT 28, which is `_pad`
+    },
+];
 
 impl PipelineResources {
     fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat, count: u32) -> Self {
@@ -1681,11 +1858,7 @@ impl PipelineResources {
                 buffers: &[Some(wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Particle>() as u64,
                     step_mode: wgpu::VertexStepMode::Instance,
-                    attributes: &wgpu::vertex_attr_array![
-                        0 => Float32x3, // pos (z = 0 for 2D families)
-                        1 => Float32,   // seed
-                        2 => Float32x3, // prev (ADR-0069; offset 16, see `Particle`)
-                    ],
+                    attributes: PARTICLE_ATTRIBUTES,
                 })],
             },
             fragment: Some(wgpu::FragmentState {
@@ -2089,6 +2262,18 @@ pub struct AttractorScene {
     /// depth range. Both inert on the 2D families, like `perspective`.
     depth_fade: f32,
     depth_hue: f32,
+    /// The last-map colour channel's two routes (ADR-0087), **IFS-only** — every
+    /// other family leaves `Particle::map` at `0.0`, so both are exactly inert
+    /// there without a branch, the way `perspective` is inert on a 2D family.
+    ///
+    /// `map_tint` shifts the particle's palette coordinate by `±map_tint/2`
+    /// across the four maps, so the colour comes from the preset's own
+    /// `[palette]` ramp and `palette_mix`/`saturation` reach it for free.
+    /// `map_hue` instead rotates the hue of the colour that ramp produced,
+    /// leaving the coordinate alone — the route for a preset that wants its
+    /// fronds nudged off its body without editing its gradient.
+    map_tint: f32,
+    map_hue: f32,
     /// Rate multiplier on [`SPIN_RATE`] (ADR-0076). Unlike the depth cues this is
     /// **not** inert on the 2D families: the discrete maps rotate in-plane
     /// through the same angle, so `spin` reaches all four families where
@@ -2163,6 +2348,8 @@ impl AttractorScene {
             perspective: DEFAULT_PERSPECTIVE,
             depth_fade: DEFAULT_DEPTH_FADE,
             depth_hue: DEFAULT_DEPTH_HUE,
+            map_tint: DEFAULT_CHANNEL_COLOUR,
+            map_hue: DEFAULT_CHANNEL_COLOUR,
             spin: DEFAULT_SPIN,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
@@ -2245,8 +2432,14 @@ impl AttractorScene {
     /// only say the picture moved, which the wipe also did.
     ///
     /// `None` before the first render, when there are no GPU resources yet.
+    ///
+    /// Returns whole [`Particle`]s rather than the `(pos, prev)` pair it used to:
+    /// ADR-0087's `age` and `map` are the same kind of claim — a property of the
+    /// buffer that a capture can only report indirectly — so the readback hands
+    /// back the struct and each caller takes the fields its own assertion is
+    /// about.
     #[cfg(test)]
-    fn read_particles(&self, queue: &wgpu::Queue) -> Option<Vec<([f32; 3], [f32; 3])>> {
+    fn read_particles(&self, queue: &wgpu::Queue) -> Option<Vec<Particle>> {
         let res = self.res.as_ref()?;
         let size = (self.particle_count as usize * std::mem::size_of::<Particle>()) as u64;
         let staging = self.device.create_buffer(&wgpu::BufferDescriptor {
@@ -2280,7 +2473,7 @@ impl AttractorScene {
         let out = {
             let mapped = slice.get_mapped_range().expect("particle readback range");
             let particles: &[Particle] = bytemuck::cast_slice(&mapped);
-            particles.iter().map(|p| (p.pos, p.prev)).collect()
+            particles.to_vec()
         };
         staging.unmap();
         Some(out)
@@ -2304,6 +2497,12 @@ impl AttractorScene {
                     // frame — a starburst that the trail would then keep.
                     prev: [x, y, 0.0],
                     _pad: 0.0,
+                    // Both channels start at zero. `age` is what Phase 3 of Plan
+                    // 0073 gives a staggered start; `map` stays 0.0 forever on
+                    // the four map families, which never write it.
+                    age: 0.0,
+                    map: 0.0,
+                    _spare: [0.0; 2],
                 }
             })
             .collect();
@@ -2347,6 +2546,12 @@ pub const PARAMS: &[&str] = &[
     "vigor",
     "lean",
     "bias",
+    // Also IFS-only (ADR-0087), and for a structural reason rather than a
+    // default: `Particle::map` is written by the IFS arm of the step shader and
+    // by nothing else, so on the four map families it is identically `0.0` and
+    // both of these are exactly the identity.
+    "map_tint",
+    "map_hue",
 ];
 
 impl Scene for AttractorScene {
@@ -2408,6 +2613,8 @@ impl Scene for AttractorScene {
         self.perspective = DEFAULT_PERSPECTIVE;
         self.depth_fade = DEFAULT_DEPTH_FADE;
         self.depth_hue = DEFAULT_DEPTH_HUE;
+        self.map_tint = DEFAULT_CHANNEL_COLOUR;
+        self.map_hue = DEFAULT_CHANNEL_COLOUR;
         self.spin = DEFAULT_SPIN;
         self.morph = DEFAULT_MORPH;
         self.levers = Levers::NEUTRAL;
@@ -2434,6 +2641,8 @@ impl Scene for AttractorScene {
             "perspective" => self.perspective = value,
             "depth_fade" => self.depth_fade = value,
             "depth_hue" => self.depth_hue = value,
+            "map_tint" => self.map_tint = value,
+            "map_hue" => self.map_hue = value,
             "spin" => self.spin = value,
             "morph" => self.morph = value,
             "curl" => self.levers.curl = value,
@@ -2578,6 +2787,8 @@ impl Scene for AttractorScene {
             perspective,
             depth_fade,
             depth_hue,
+            map_tint,
+            map_hue,
             palette,
             palette_dirty,
             ..
@@ -2634,6 +2845,8 @@ impl Scene for AttractorScene {
                 perspective: *perspective,
                 depth_fade: *depth_fade,
                 depth_hue: *depth_hue,
+                map_tint: *map_tint,
+                map_hue: *map_hue,
             },
         );
         // Before the steps, and only on the frame a `reseed` edge landed: kick each
@@ -2711,6 +2924,11 @@ struct UniformInputs {
     perspective: f32,
     depth_fade: f32,
     depth_hue: f32,
+    /// ADR-0087's last-map channel, at its two routes. Both reach the draw
+    /// uniform unclamped: the palette LUT sampler repeats, so any coordinate
+    /// shift is legitimate, and `shift_hue` takes `fract` of its argument.
+    map_tint: f32,
+    map_hue: f32,
 }
 
 /// The deferred one-shot uploads: the palette LUTs on a preset switch or fresh
@@ -2868,6 +3086,11 @@ fn upload_uniforms(
                 inputs.family.inv_depth_extent(),
             ],
             ctr: [centre[0], centre[1], centre[2], 0.0],
+            // ADR-0087's channels, unclamped for the same reason `depth_hue`
+            // above is: the LUT sampler repeats, so any palette-coordinate
+            // shift is legitimate, and the hue route takes `fract`. The two
+            // `age` slots are Plan 0073 Phase 4's.
+            ch: [inputs.map_tint, inputs.map_hue, 0.0, 0.0],
         }),
     );
     // Frame-rate-independent trail decay: retain `fade` per 1/60 s, raised to
@@ -3052,13 +3275,14 @@ mod tests {
     use super::{
         AttractorFamily, AttractorScene, Basis, DEFAULT_BRIGHTNESS, DEFAULT_DEPTH_FADE,
         DEFAULT_DEPTH_HUE, DEFAULT_SPIN, FIXED_STEP, JITTER_MODE, MAX_PERSPECTIVE,
-        MIN_PARTICLE_DENSITY, Particle, RESEED_DRAWS_STREAK, SPIN_RATE, STEP_SLOTS, Scene,
-        StepUniform, active_particles, advance_spin, brightness_factor, deposit_scale, ifs,
-        projection_mirror, spin_phase, streak_flag,
+        MIN_PARTICLE_DENSITY, PARTICLE_ATTRIBUTES, Particle, RESEED_DRAWS_STREAK, SPIN_RATE,
+        STEP_SLOTS, Scene, StepUniform, active_particles, advance_spin, brightness_factor,
+        deposit_scale, ifs, projection_mirror, spin_phase, streak_flag,
     };
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderContext;
     use crate::render::{Tier, TierConfig};
+    use ifs::IfsFigure;
 
     // -----------------------------------------------------------------------
     // The IFS family (Plan 0062 Phase 1 / ADR-0075)
@@ -4159,12 +4383,18 @@ mod tests {
         }
 
         fn positions(&self) -> Vec<[f32; 3]> {
-            self.particles().into_iter().map(|(pos, _)| pos).collect()
+            self.raw().into_iter().map(|p| p.pos).collect()
         }
 
         /// `(pos, prev)` per particle — the pair ADR-0069's segment is drawn
         /// between.
         fn particles(&self) -> Vec<([f32; 3], [f32; 3])> {
+            self.raw().into_iter().map(|p| (p.pos, p.prev)).collect()
+        }
+
+        /// The whole particle buffer, for the assertions that are about
+        /// ADR-0087's channels rather than about position.
+        fn raw(&self) -> Vec<Particle> {
             self.scene
                 .read_particles(&self.ctx.queue)
                 .expect("resources exist after a render")
@@ -4460,17 +4690,21 @@ mod tests {
     }
 
     /// The `Particle` layout the storage buffer and the vertex attributes both
-    /// assume: **two** tight 16-byte std430 halves, stride 32, each `f32` packed
-    /// into the preceding `vec3`'s trailing slot. The readback above casts raw
-    /// bytes to this, so a change here silently reinterprets every position.
+    /// assume: two tight 16-byte std430 halves, then ADR-0087's two channels and
+    /// the two words WGSL's 16-byte round-up leaves behind — stride **48**. The
+    /// readback above casts raw bytes to this, so a change here silently
+    /// reinterprets every position.
     ///
-    /// It was a tight 16 until ADR-0069 added `prev`. The offsets matter beyond
-    /// the size: `vertex_attr_array!` lays its attributes out consecutively, so
-    /// `prev` is fetched from offset 16 and a padding change would feed the draw
-    /// someone else's bytes rather than fail to compile.
+    /// It was a tight 16 until ADR-0069 added `prev`, and 32 until ADR-0087
+    /// added `age` and `map`. **The offsets matter more than the size**, and the
+    /// reason is the trap this phase walked into: `vertex_attr_array!` lays its
+    /// attributes out *consecutively*, so a fourth entry would have fetched
+    /// `map` from offset 28 — the padding word — rather than from 36, silently
+    /// and with no compile error. [`PARTICLE_ATTRIBUTES`] spells the offsets out
+    /// and this test is what holds them to the struct.
     #[test]
-    fn the_particle_layout_is_two_tight_sixteens() {
-        assert_eq!(std::mem::size_of::<Particle>(), 32);
+    fn the_particle_layout_carries_two_channels() {
+        assert_eq!(std::mem::size_of::<Particle>(), 48);
         assert_eq!(std::mem::align_of::<Particle>(), 4);
 
         // The offsets the vertex layout hard-codes, measured rather than assumed.
@@ -4479,17 +4713,82 @@ mod tests {
             seed: 0.0,
             prev: [0.0; 3],
             _pad: 0.0,
+            age: 0.0,
+            map: 0.0,
+            _spare: [0.0; 2],
         };
         let base = std::ptr::from_ref(&p) as usize;
+        let offset_of = |field: &f32| std::ptr::from_ref(field) as usize - base;
         assert_eq!(std::ptr::from_ref(&p.pos) as usize - base, 0);
-        assert_eq!(std::ptr::from_ref(&p.seed) as usize - base, 12);
+        assert_eq!(offset_of(&p.seed), 12);
         assert_eq!(std::ptr::from_ref(&p.prev) as usize - base, 16);
+        assert_eq!(offset_of(&p.age), 32);
+        assert_eq!(offset_of(&p.map), 36);
 
-        // The memory this costs, at both tier budgets — the number ADR-0069's
-        // price is quoted as, so it fails here if the struct grows again.
+        // ...and the vertex attributes agree with them. This is the assertion
+        // that would have caught the consecutive-layout bug: it compares the
+        // constant the pipeline is built from against the struct itself.
+        let attr_offsets: Vec<u64> = PARTICLE_ATTRIBUTES.iter().map(|a| a.offset).collect();
+        assert_eq!(attr_offsets, vec![0, 12, 16, 36]);
+        let locations: Vec<u32> = PARTICLE_ATTRIBUTES
+            .iter()
+            .map(|a| a.shader_location)
+            .collect();
+        assert_eq!(locations, vec![0, 1, 2, 3]);
+
+        // The memory this costs, at both tier budgets — ADR-0087 quotes the rise
+        // from 1.6/4.8 MB, so it fails here if the struct grows again.
         let floor = TierConfig::FLOOR.attractor_particles as usize;
         let rich = TierConfig::RICH.attractor_particles as usize;
-        assert_eq!(floor * size_of::<Particle>(), 1_600_000);
-        assert_eq!(rich * size_of::<Particle>(), 4_800_000);
+        assert_eq!(floor * size_of::<Particle>(), 2_400_000);
+        assert_eq!(rich * size_of::<Particle>(), 7_200_000);
+    }
+
+    /// ADR-0087's `map` channel is written by the IFS arm and by nothing else.
+    ///
+    /// **Both halves are the test.** That the fern reaches all four values says
+    /// the channel is a live partition of the figure rather than a constant that
+    /// happens to render; that De Jong stays at `0.0` says the write is confined
+    /// to the arm that owns it, which is what makes `map_tint`/`map_hue` exactly
+    /// inert on the four map families without a branch anywhere.
+    ///
+    /// One step is enough on purpose: `map` names the map applied on the *most
+    /// recent* step, so its distribution is a property of a single step and not
+    /// of a converged run.
+    #[test]
+    fn the_ifs_writes_every_map_index_and_no_other_family_writes_any() {
+        let Some(mut fern) = Harness::new(AttractorFamily::Ifs(IfsFigure::Fern)) else {
+            return;
+        };
+        fern.run(1);
+        let seen: std::collections::BTreeSet<u32> = fern
+            .raw()
+            .iter()
+            .map(|p| {
+                assert!(
+                    p.map >= 0.0 && p.map <= (ifs::MAPS - 1) as f32 && p.map.fract() == 0.0,
+                    "map must be a whole index in 0..{}, got {}",
+                    ifs::MAPS,
+                    p.map
+                );
+                p.map as u32
+            })
+            .collect();
+        assert_eq!(
+            seen,
+            (0..ifs::MAPS as u32).collect(),
+            "after one step the fern's population should sit in all {} sub-copies",
+            ifs::MAPS
+        );
+
+        let Some(mut de_jong) = Harness::new(AttractorFamily::DeJong) else {
+            return;
+        };
+        de_jong.run(4);
+        assert!(
+            de_jong.raw().iter().all(|p| p.map == 0.0),
+            "a map family must leave `map` at its seeded 0.0 — anything else \
+             makes `map_tint` reach a family it has no meaning on"
+        );
     }
 }
