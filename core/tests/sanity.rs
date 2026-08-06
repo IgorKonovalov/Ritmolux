@@ -208,11 +208,50 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// swarm               0.42    0.8407  Storm              2.00
 /// parametric_curve    0.33    0.6722  Rose Trails        2.04
 /// lsystem             0.32    0.6413  Fern Grow          2.00
-/// star_pattern        0.34    0.6908  Star Lantern       2.03
+/// star_pattern        0.12    0.2442  Star Mandala       2.04
 /// reaction_diffusion  0.07    0.1420  Coral              2.03
 /// attractor           0.18    0.3442  Leviathan          1.91
 /// spectrum            0.06    0.1189  Spectrum Ridge     1.98
 /// ```
+///
+/// **This table is a snapshot and the printed distribution is authoritative.**
+/// As of 2026-08-06 three rows have drifted *upward* without any floor needing
+/// to move — `swarm`'s minimum is now `0.6208` Starfield (slack `1.48`),
+/// `attractor`'s is `0.2356` Lorenz (`1.31`), and `emitter` postdates the table
+/// entirely at `0.25` against `0.3086` Squall (`1.23`). Upward drift is the safe
+/// direction and [`MAX_FLOOR_SLACK`] is what will eventually call it; the rows
+/// are left as written because the prose below narrates the numbers in them.
+///
+/// **The `star_pattern` floor moved on 2026-08-06, downward, and this is the
+/// first time this constant has been re-derived against *sparser* content.** It
+/// was `0.34`, half of `0.6908` Star Lantern, derived from a three-preset roster
+/// of bare Hankin interlaces. Plan 0065 filled the interior of that scene:
+/// `Star Mandala`, `Mandala Six` and `Mandala Weave` draw a 46-fold ornament of
+/// hairline strokes and measure `0.2442` / `0.2505` / `0.2544`, moving the
+/// family minimum to **`0.2442` Star Mandala** and the floor to `0.2442 / 2 =
+/// **0.12**` (slack `2.04`).
+///
+/// **They are not sparse, and the number is a property of this test rather than
+/// of the picture.** At this test's 96x96 capture a hairline over a 46-fold
+/// ornament aliases to almost nothing, so `coverage` on that content measures
+/// the halo and the trail rather than the figure. The lane measured it three
+/// ways: the bare rosette and the 46x-denser mandala score *identically* at one
+/// tuning; `Mandala Six` draws 54 % more geometry than `Star Mandala` for a
+/// 2.6 % coverage difference; and sweeping `thickness` alone first clears `0.34`
+/// at a base of about `9`, a 29-px stroke at 1080p, with the figure closing into
+/// a blot well before that. The presets were **not** inflated with `glow` and
+/// `trails` to clear the old floor — an earlier draft was, and the user rejected
+/// it in the running app as "maximally lame, all lines are half transparent".
+///
+/// **This re-derivation is not the fix for that** — see design-backlog 0072,
+/// which stays open at medium-high and asks for a structural occupancy measure.
+/// Re-deriving is what happens to this floor whether or not the measure is
+/// replaced. What it costs, stated rather than discovered: the band `0.12`-`0.34`
+/// is now unpoliced on `star_pattern`, the same price `attractor`, `spectrum` and
+/// `reaction_diffusion` already pay for 3-5x internal spread. The floor's only
+/// claim survives at the new value — a scene rendering nothing still fails at
+/// `0.0`, ADR-0067 keeps a bare vignette from counting as a figure, and
+/// `geometry_extent.rs` covers this family besides.
 ///
 /// **The attractor floor moved on 2026-08-03 and the mechanism above is why it
 /// was noticed rather than missed.** It was `0.12` against `0.2461` De Jong.
@@ -293,7 +332,12 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // still lit; Rose Trails at 0.6722 sets this one.
         SystemKind::ParametricCurve => 0.33,
         SystemKind::LSystem => 0.32,
-        SystemKind::StarPattern => 0.34,
+        // Re-derived downward 2026-08-06 (Plan 0065 Phase 7). The mandala
+        // presets fill the interior with hairline strokes that alias away at
+        // 96x96, so Star Mandala's 0.2442 — not Star Lantern's 0.6908 — sets
+        // this one now. Its 3.3x internal spread is why it reads oddly against
+        // the two line families above.
+        SystemKind::StarPattern => 0.12,
         // Reaction-diffusion paints a real pattern across the frame, but the
         // present maps only the sparse V species, so the lit fraction is modest.
         SystemKind::ReactionDiffusion => 0.07,
