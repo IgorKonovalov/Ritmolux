@@ -132,15 +132,59 @@ flowchart TB
   `JITTER_FRACTION` of its spread, so collapsing that spread would make **`reseed` silently inert on
   the whole family** — a lever ADR-0075 lists among the family's free wins. The change is to what
   `seed()` writes.
-- **Done when:** for every figure, every `morph` in the 33-point sweep, and every lever extreme,
-  every returned point is finite and **a zero-burn-in chaos run started there produces a bounding box
-  agreeing with the burnt-in reference to within the `5 %` tolerance
-  `the_chaos_reference_is_deterministic_and_measures_the_figure` already uses** for the curated
-  `extent()` literals. **The test demonstrates its own sensitivity**: the same zero-burn-in run
-  started from a corner of the old seed box must *fail* that bound, or it is asserting nothing.
-  Visually: captures at 2 / 6 / 12 / 24 frames after a switch into `attractor_fern` show **no
-  rectangle at any frame** — which is the measurement backlog 0064 was raised with, re-run.
-  `attractor_ifs.png` is re-blessed here and **is the only baseline that moves**; a second moved
+- **"On the attractor" is a theorem, and no chaos run can assert it.** ADR-0075's Notes already
+  prove `pₖ ∈ A`: `A = ⋃ fᵢ(A)` with `A` compact makes `pₖ = lim fₖⁿ(x)` for any `x ∈ A`, and `A` is
+  closed. A chaos run is a finite sample of a measure whose *support* is `A` — it can fail to
+  contradict membership, never certify it. So this phase asserts the thing that can actually be
+  wrong, which is the **transcription of the closed form**, and takes membership from the proof.
+  See the ADR's Notes for the full statement of what a run can and cannot say.
+
+- **Done when**, in three claims:
+
+  **1. The closed form is right, asserted as a residual rather than as a location.** For every
+  figure, every `morph` in the 33-point sweep, and both `Levers::EXTREMES`, the point `p` returned
+  for a map `(M, t)` satisfies `‖M p + t − p‖ ≤ 1e-4 · (1 + ‖p‖)`. **The tolerance is derived, not
+  measured:** `cond(I − M) ≤ (1 + σ_max)/(1 − σ_max) ≤ 65.7` under ADR-0075's `0.97` ceiling, so an
+  `f32` solve (`ε ≈ 1.2e-7`) carries `‖δp‖ ≲ 8e-6 ‖p‖`, and the residual is `(M − I) δp ≲ 1.6e-5 ‖p‖`.
+  `1e-4` is that with an order of magnitude of headroom. It holds on every machine CI runs: the
+  inputs are committed constants and every IEEE-754 operation here is correctly rounded.
+
+  **2. The magnitude is bounded by the theorem, and the padding is a set property.**
+  `‖p‖ ≤ ‖t‖ / (1 − σ_max)` per map over the same sweep — the ADR's own bound, which subsumes
+  "every returned point is finite" and fails loudly on a table that escaped the clamp. Separately,
+  with no threshold in it at all: each of the four slots `fixed_points` returns equals the fixed
+  point of some `p > 0` map, and every `p > 0` map appears in at least one slot.
+
+  **3. The rectangle is gone — asserted as a count, confirmed as a picture.** `seed()` on every IFS
+  figure returns **at most as many distinct positions as the figure has drawn maps** (at most four),
+  against `count` distinct positions under the box fill. That is "the initial fill is not a box"
+  stated exactly: a box fill cannot pass it, a fixed-point fill cannot fail it, and there is no
+  statistic to converge. The picture then *confirms* rather than carries the claim — captures at
+  2 / 6 / 12 / 24 frames after a switch into `attractor_fern`, with frame 2's `lit_mask` bounding box
+  (`core/tests/attractor.rs:153`, `:599`) contained in frame 90's on both axes, recorded alongside
+  the same measurement on the pre-phase build where it is not. That is the measurement backlog 0064
+  was raised with, re-run.
+
+- **Sensitivity, demonstrated where it is exact.** A seed-box corner `q` fails claim 1 by
+  construction, and by a provable margin: `‖fₖ(q) − q‖ = ‖(M − I)(q − pₖ)‖ ≥ (1 − σ_max)‖q − pₖ‖`,
+  so at the `0.97` ceiling at least `0.03 ‖q − pₖ‖`. Feed each figure's `seed_box` corners through
+  the same residual, assert every one exceeds the `1e-4` bound, and print the observed margin. This
+  is the "or it is asserting nothing" clause the phase wanted, discharged without a chaos run and
+  with a lower bound rather than a hope.
+
+- **Do not compare two chaos runs' bounding boxes**, and do not reach for nearest-approach. The
+  first draft of this done-when did both and neither can work. A bounding box is a **supremum** over
+  the sample, set by the single rarest point the orbit reached; two runs' boxes therefore disagree by
+  an amount that is not controlled by iteration count (measured at implementation: under-coverage
+  `0.046` at 20 k, `0.143` at 100 k, growing). The `5 %` it borrowed governs
+  `the_chaos_reference_is_deterministic_and_measures_the_figure`'s comparison of `chaos_extent` against
+  literals *derived from that same function* — self-consistency slack, which does not travel to a
+  run-vs-run comparison. Nearest-approach fails for the dual reason: it measures distance to a finite
+  sample, which has a resolution floor at every point including those genuinely on `A`, so the
+  separation between a fixed point and a box corner is a difference of two numbers both dominated by
+  sample density.
+
+- `attractor_ifs.png` is re-blessed here and **is the only baseline that moves**; a second moved
   baseline is a phase failure. Note the standing trap: `LMV_BLESS` rewrites **all** baselines —
   restore the other sixteen before committing.
 
