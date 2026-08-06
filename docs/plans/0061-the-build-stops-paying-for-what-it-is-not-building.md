@@ -447,19 +447,70 @@ stops being an expectation.
   frame, so the runs must be re-queued each frame — reuse is the only correct shape.*
 
 ### Phase 6 — Split `particles/` into the directory it already is
+
+> **Re-measured 2026-08-06** against the current file, at the architect's request and because this
+> plan's own header says every number in it is a 2026-08-04 snapshot to re-check before acting. The
+> snapshot had gone stale in the direction that matters: `particles/mod.rs` was **4,495 lines** when
+> this phase was written and is **5,672** now, because [Plan 0073](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
+> added 1,177 in one plan. **Three of the four done-when claims survived the re-measure unchanged.
+> The line target did not, and the fix is a fifth file rather than a bigger number** — see the
+> measurement below.
+
 - **Owner skill:** dev
-- **What:** Decompose `core/src/render/scenes/particles/mod.rs` into the four files its concerns
+- **What:** Decompose `core/src/render/scenes/particles/mod.rs` into the five files its concerns
   already are: `family.rs` (the ODE/basis math, pure and GPU-free), `shaders.rs` (the four WGSL
-  constants), `resources.rs` (the three GPU resource structs), and `mod.rs` (the scene, its `Scene`
-  impl, and the `encode_*` pass functions).
-- **Files touched:** `core/src/render/scenes/particles/{mod.rs,family.rs,shaders.rs,resources.rs}`
-- **Done when:** **Plan 0059 is `Status: done` and sits in `docs/plans/done/`** — this phase does not
-  start otherwise, and `dev` surfaces and skips it if the gate is unmet rather than merging around a
-  live lane. Afterwards: `mod.rs` is under 1400 total lines, contains no `r#"` WGSL literal and no
-  `AttractorFamily` match arm; `family.rs` has no `wgpu` import, proving the math is separable and
-  unit-testable without a device. The existing `particles` tests are distributed to the file they
-  cover and all still run. Golden baselines byte-identical (standing done-when) — this is the phase
-  most able to move a pixel by accident, so check `attractor.png` explicitly.
+  constants and `projection_mirror`, their CPU transcription), `resources.rs` (the uniform structs,
+  the three GPU resource structs and their bind-group helpers), `encode.rs` (`UniformInputs`, the
+  uniform upload and the four `encode_*` pass functions), and `mod.rs` (the scene, its `Scene` impl,
+  and the param surface).
+- **Files touched:** `core/src/render/scenes/particles/{mod.rs,family.rs,shaders.rs,resources.rs,encode.rs}`
+
+- **The measurement, 2026-08-06, at `b957da2`.** Non-test region is 3,629 lines; the test module is
+  a further 2,044. Assigning by the boundaries above:
+
+  | Destination | Lines | What it takes |
+  |---|---|---|
+  | `shaders.rs` | 845 | the four `r#"` literals (277 + 388 + 12 + 16) plus `projection_mirror` |
+  | `resources.rs` | 676 | `StepUniform`/`DrawUniform`/`DecayUniform`, `Resources`/`PipelineResources`/`FieldResources`, `PARTICLE_ATTRIBUTES`, the bind-group helpers |
+  | `encode.rs` | 408 | `UniformInputs`, `flush_deferred_uploads`, `upload_uniforms`, `encode_{jitter,steps,trail_pass,present}` |
+  | `family.rs` | 321 | `AttractorFamily`, `Basis`, the spin helpers |
+  | **`mod.rs` residual** | **1,379** | the scene struct, `impl Scene`, `PARAMS`, the defaults, `Particle`, the churn constants |
+
+- **`encode.rs` is the amendment, and it is what rescues the original number.** At the four-way split
+  this phase was written against, the residual is **1,787** — 387 over the 1,400 target, and that is
+  before a single test line is placed. Carving the encode path out lands `mod.rs` at **1,379**, under
+  the number this plan chose in the first place. The target was right; the file count was wrong.
+- **`under 1400 *total* lines` was ambiguous and is now resolved to non-test.** The test module is
+  2,044 lines across 40 tests, only 12 of which touch the GPU harness, so "total" was unachievable
+  under any split and would have forced either a meaningless target or a test exodus nobody designed.
+  The count below is **non-test lines**, stated as such.
+- **Headroom is thin and [Plan 0074](0074-the-figure-colours-by-how-far-it-has-come.md) will eat it.**
+  1,379 against 1,400 is 21 lines. Plan 0074 adds `root_tint`/`root_hue`/`emergence` to `PARAMS`,
+  `set_param`, `reset_params` and the scene struct — all in the residual — for roughly 40-60 lines.
+  So the threshold below is **1,500**, which is the measured 1,379 plus that plan's expected cost
+  plus a little, and it is stated as a number somebody earned rather than one that sounded round.
+- **Sequencing against Plan 0074.** Both own this file; 0074 is live and this plan is sequenced last
+  by the user's own instruction, so **0074 goes first and this phase rebases onto it**. If that
+  order ever inverts, re-measure again rather than trusting the table above — it is a snapshot, and
+  this phase now has a documented history of exactly that going stale.
+
+- **Done when:** **Plan 0059 is `Status: done` and sits in `docs/plans/done/`** — *verified met
+  2026-08-06: it is `docs/plans/done/0059-lorenz-finds-its-plane.md`*, so this gate no longer blocks.
+  Afterwards:
+  - `mod.rs` is **under 1,500 non-test lines** (measured 1,379 at the five-way split before Plan
+    0074; the allowance is that plan's additions, not slack).
+  - `mod.rs` contains **no `r#"` WGSL literal** — *re-verified: there are still exactly four, so the
+    "four WGSL constants" wording holds unchanged*.
+  - `mod.rs` contains **no `AttractorFamily` match arm** — *re-verified achievable: every remaining
+    mention outside the impl is a doc-comment link except one constructor inside
+    `PipelineResources`, which moves to `resources.rs` with it*.
+  - `family.rs` has **no `wgpu` import**, proving the math is separable and unit-testable without a
+    device — *re-verified achievable: the 144-464 region contains zero `wgpu` references today*.
+  - The existing `particles` tests are distributed to the file they cover and all still run.
+  - Golden baselines byte-identical (standing done-when) — this is the phase most able to move a
+    pixel by accident, so check `attractor.png` explicitly, **by `git diff` rather than by a green
+    suite**: `LMV_BLESS` rewrites baselines even on a pristine HEAD, so a green golden run means
+    *within tolerance* and never byte-identical.
 
 ### Phase 7 — Guard the third copy of every param name
 - **Owner skill:** dev
