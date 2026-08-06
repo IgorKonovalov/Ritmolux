@@ -1,15 +1,18 @@
 # 0066 — The level lever: the attractor gets a `brightness`, and bloom stops thresholding unexposed light
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, **after [0062]/[0063]** if those are live
-> (all three add to `particles/mod.rs`, and this one extends the same `PARAMS`/`set_param` pair —
-> taking it third costs one rebase instead of two). Phases 1-4 are `dev` and nothing gates them, so
-> they run start-to-finish in one session; **Phase 5 is `human`** (a `preset-author` retune of
-> Lorenz and Thomas) and terminal, so the plan does not close in that session. **Moves no golden
-> baseline** — a moved baseline is a phase failure, not a re-bless.
+> **Status:** **done 2026-08-05** — all five phases landed on the `plan-0066-the-level-lever`
+> branch and fast-forwarded to `main`. Phases 1-4 as `2a4f65c` / `2e2cc32` / `0f10f18` / `3502c2e`,
+> and the terminal `human` Phase 5 as `d7bf78c`. Mode 4 review 2026-08-05: **no blockers**, one
+> minor (the ADR did not anticipate the backdrop coupling Phase 5 found — recorded as ADR-0080's
+> `Outcome`). **Verified:** the no-pixels claim held exactly — `git diff --name-status` over the
+> whole range adds `composite_bloom_exposed.png` and modifies **zero** existing baselines; both
+> halves of Phase 2's identity are asserted in `core/tests/bloom.rs`
+> (`the_bright_pass_thresholds_exposed_light`); the whole gate is green on the merged tip (fmt,
+> clippy, 538/538 nextest).
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0080](../adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md)
-> **Closes:** [design-backlog 0057](../design-backlog.md#0057--a-preset-has-no-scene-local-way-to-set-a-figures-level-so-exposure-gets-used-for-it-and-two-other-stages-disagree-with-that-use)
+> **Related ADRs:** [0080](../../adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md) (accepted 2026-08-05)
+> **Closes:** [design-backlog 0057](../../design-backlog.md#0057--a-preset-has-no-scene-local-way-to-set-a-figures-level-so-exposure-gets-used-for-it-and-two-other-stages-disagree-with-that-use)
 
 ## TL;DR
 
@@ -31,7 +34,7 @@ carry `brightness`. Three scenes draw additive particle marks; one of them canno
 Two things then go wrong, both recorded in the backlog entry and both verified:
 
 1. **`exposure` interpolates across a preset dissolve** (`tonemap.rs`, `crossfade_from`,
-   [ADR-0024](../adrs/0024-cross-preset-transitions.md)'s seam), so `0.03` drags the ~1 s blend
+   [ADR-0024](../../adrs/0024-cross-preset-transitions.md)'s seam), so `0.03` drags the ~1 s blend
    from any neighbour through a badly exposed
    frame. Both presets' headers document buying level from `size`/`fade` first to avoid pushing it
    further — a workaround with a ceiling they have already reached.
@@ -47,7 +50,7 @@ not true now.
 
 ## Decision
 
-Per [ADR-0080](../adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md):
+Per [ADR-0080](../../adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md):
 add `brightness` to the attractor as a multiplier on its already-count-normalized deposit, and pass
 the frame's evaluated `exposure` into the bloom stage so the bright-pass thresholds exposed
 luminance. We rejected relocating the exposure multiply upstream (it would make the trails buffer's
@@ -108,7 +111,7 @@ flowchart LR
   params), `core/src/render/tonemap.rs` (expose the evaluated value — `exposure()` already exists
   at `:358`).
 - **Done when:** at `exposure = 0.03`, captures at `bloom_threshold = 0.95` and `bloom_threshold =
-  8.0` are **measurably different** — the property [backlog 0057](../design-backlog.md) reports as
+  8.0` are **measurably different** — the property [backlog 0057](../../design-backlog.md) reports as
   absent today. At `exposure = 1.0` (the default, and every existing fixture) output is
   **byte-identical** to the pre-phase build. Both halves are asserted, because the second is what
   makes Phase 3 a check rather than a re-bless.
@@ -187,7 +190,7 @@ struct Bright {
 - **It does not touch `swarm` or `emitter`.** Both already have `brightness`; this closes the
   asymmetry rather than redesigning the family.
 - **It does not retune the library for the tonemap knee.** That is
-  [backlog 0038](../design-backlog.md#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned),
+  [backlog 0038](../../design-backlog.md#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned),
   already routed to `preset-author`, and it wants `exposure` — which this plan is *freeing up* for
   exactly that use. Doing both at once would confuse which lever bought which change.
 - **It does not move the exposure multiply out of the tonemap.** ADR-0080 Alternative A, rejected
@@ -197,7 +200,7 @@ struct Bright {
 
 ## Followups (after this lands)
 
-- Re-read [backlog 0038](../design-backlog.md) with `exposure` no longer doing two jobs — the
+- Re-read [backlog 0038](../../design-backlog.md) with `exposure` no longer doing two jobs — the
   ~8 % knee retune it describes should get simpler, not just possible.
 - If Phase 5 finds `bloom_threshold` still hard to aim, the next question is whether the knee band
   (`KNEE_FRACTION` of the threshold) should also be display-referred. Not in scope here.
