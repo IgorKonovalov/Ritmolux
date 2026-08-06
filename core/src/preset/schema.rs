@@ -1551,7 +1551,7 @@ mod tests {
     #[test]
     fn tiling_none_draws_the_ornament_alone_and_needs_one() {
         let p =
-            star("tiling = \"none\"\nrings = [{ motif = \"star\", count = 9, radius = 0.6 }]\n")
+            star("tiling = \"none\"\nrings = [{ motif = \"trefoil\", count = 9, radius = 0.6 }]\n")
                 .unwrap();
         match p.config {
             Some(GeneratorConfig::Star { order, .. }) => {

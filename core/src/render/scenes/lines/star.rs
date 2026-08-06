@@ -94,6 +94,35 @@
 //!
 //! The motif roster is **closed** ([`Motif`]): a look outside it routes back
 //! through `architect` + `dev` rather than being added on request (ADR-0079).
+//!
+//! ## The rings move: three levers, and why two of them are radial
+//!
+//! Plan 0065 Phase 4 puts the ornament on the param surface without making the
+//! roster bindable — the roster stays structural, and what moves is a
+//! [`RingMotion`] applied to it: `ring_phase` turns **alternate rings in opposite
+//! directions**, `ring_spread` multiplies every radius about the centre, and
+//! `ring_scale` multiplies every motif's size. All three default to
+//! [`RingMotion::STATIC`], which is the exact identity (`+ 0`, `* 1`, `* 1`), so a
+//! preset that binds none of them draws Phase 1's figure bit for bit.
+//!
+//! **The radial pair is not a garnish, and this is the one design note worth
+//! reading before authoring a mandala.** `core/tests/animation.rs` captures at
+//! 96x96 and diffs whole frames, and a ring mandala is *more* rotationally
+//! symmetric than the bare rosette design-backlog 0009 measured — an 18- and
+//! 24-fold figure turned by any angle lands almost on top of itself, so **spin
+//! alone reads as frozen to that gate and, at a distance, to the eye**.
+//! `ring_spread` and `ring_scale` change what the figure *is* at each radius
+//! rather than where it sits, so they move pixels. A shipped mandala carries its
+//! animation on those and spends `ring_phase` on the counter-rotation, which is
+//! the ornamental gesture rather than the liveness.
+//!
+//! Like the rosette, the ornament is **rebuilt under hysteresis**: a motion
+//! further than one step ([`RING_PHASE_STEP`] and friends) from what is held
+//! rebuilds, anything nearer reuses. A preset binding none of the three
+//! therefore never rebuilds after `configure`, which is the ADR-0007 property
+//! that made the roster structural in the first place — but a preset that
+//! *animates* a lever does re-place its ornament on most frames, and that is
+//! affordable rather than free. See [`RING_PHASE_STEP`] for the measurement.
 
 // Hot-path panic-denial pragma: `update`/`render` run every displayed frame.
 // `configure` (the Hankin construction) is build-time but colocated, so it
@@ -162,6 +191,11 @@ const DEFAULT_PAN: f32 = 0.0;
 // Geometry mirror (Phase 4): identity by default.
 const DEFAULT_MIRROR_ORDER: f32 = 1.0;
 const DEFAULT_MIRROR_REFLECT: f32 = 0.0;
+// The ring levers (Plan 0065 Phase 4), all at the exact identity so a preset
+// that binds none of them draws the static roster it declared.
+const DEFAULT_RING_PHASE: f32 = 0.0;
+const DEFAULT_RING_SPREAD: f32 = 1.0;
+const DEFAULT_RING_SCALE_PARAM: f32 = 1.0;
 
 /// A generator scene drawing a Hankin star pattern.
 pub struct StarPatternScene {
@@ -175,11 +209,22 @@ pub struct StarPatternScene {
     /// `configure`. `variant` offsets the angle around this.
     order: u32,
     base_contact_deg: f32,
-    /// The ring ornament (ADR-0079), built once in `configure` and static for as
-    /// long as the preset is loaded. **Empty is the signal** that this preset
+    /// The validated roster this preset declared (ADR-0079) — **structural**,
+    /// read once at load and never bindable. Empty for a rings-less preset.
+    rings: Vec<RingSpec>,
+    /// The ring ornament (ADR-0079): [`rings`](Self::rings) placed, under the
+    /// motion it was last built at. **Empty is the signal** that this preset
     /// declared no `rings`, and every ring-aware branch below keys off it, so a
     /// rings-less preset takes exactly the path it took before Plan 0065.
     ring_segments: Vec<SegmentInstance>,
+    /// The [`RingMotion`] [`ring_segments`](Self::ring_segments) holds, i.e. this
+    /// ornament's half of the hysteresis (Phase 4). A preset binding none of the
+    /// three levers never leaves [`RingMotion::STATIC`] and so never rebuilds.
+    built_motion: RingMotion,
+    /// How many times the ornament has been rebuilt. Not read by the render path
+    /// — it is the observable the hysteresis test asserts on, exactly as
+    /// [`RosetteCache::rebuilds`] is.
+    ring_rebuilds: u64,
     /// The rosette and the ornament concatenated — the geometry actually
     /// transformed per frame when both exist. Allocated only when `rings` is
     /// present, and refilled when the rosette rebuilds under it (the rings do not
@@ -225,6 +270,9 @@ pub struct StarPatternScene {
     pan_y: f32,
     mirror_order: f32,
     mirror_reflect: f32,
+    ring_phase: f32,
+    ring_spread: f32,
+    ring_scale: f32,
 }
 
 impl StarPatternScene {
@@ -237,8 +285,11 @@ impl StarPatternScene {
             order: 0,
             base_contact_deg: 0.0,
             // Sized at `configure` from the roster the preset actually declares —
-            // a rings-less preset never allocates either of these.
+            // a rings-less preset never allocates any of these.
+            rings: Vec::new(),
             ring_segments: Vec::new(),
+            built_motion: RingMotion::STATIC,
+            ring_rebuilds: 0,
             combined: Vec::new(),
             combined_radii: Vec::new(),
             colors: Vec::new(),
@@ -266,6 +317,9 @@ impl StarPatternScene {
             pan_y: DEFAULT_PAN,
             mirror_order: DEFAULT_MIRROR_ORDER,
             mirror_reflect: DEFAULT_MIRROR_REFLECT,
+            ring_phase: DEFAULT_RING_PHASE,
+            ring_spread: DEFAULT_RING_SPREAD,
+            ring_scale: DEFAULT_RING_SCALE_PARAM,
         }
     }
 
@@ -277,12 +331,14 @@ impl StarPatternScene {
             self.order,
             contact_angle_deg(self.base_contact_deg, self.variant),
         );
+        let rings_moved = self.refresh_rings();
         if !self.ring_segments.is_empty() {
-            // The rings are static, but the rosette under them is not, and the
-            // radial ramp is a min-max over the pair — so a rosette rebuild
-            // refills both. Bounded by the cache's own hysteresis, i.e. by
-            // distance travelled rather than by frame count (ADR-0060).
-            if rebuilt || self.combined.len() != self.combined_len() {
+            // Either half can move under the other — the rosette on `variant`,
+            // the ornament on the three ring levers — and the radial ramp is a
+            // min-max over the pair, so either rebuild refills both. Bounded by
+            // the two hystereses, i.e. by distance travelled rather than by frame
+            // count (ADR-0060).
+            if rebuilt || rings_moved || self.combined.len() != self.combined_len() {
                 self.rebuild_combined();
             }
         }
@@ -293,6 +349,33 @@ impl StarPatternScene {
             self.colors.clear();
             self.colors.resize(wanted, [0.0; 3]);
         }
+    }
+
+    /// Re-place the ornament if this frame's [`RingMotion`] has walked further
+    /// than one step from the one it holds. Returns `true` if it rebuilt.
+    ///
+    /// The rebuild reuses the buffer, which is what keeps a moving mandala
+    /// allocation-free: a motion changes where segments are, never how many, so
+    /// the `Vec` that `configure` grew is exactly the right size forever.
+    fn refresh_rings(&mut self) -> bool {
+        if self.rings.is_empty() {
+            return false;
+        }
+        let want = RingMotion::from_params(self.ring_phase, self.ring_spread, self.ring_scale);
+        if !self.built_motion.needs_rebuild(want) {
+            return false;
+        }
+        self.built_motion = want;
+        self.ring_rebuilds = self.ring_rebuilds.saturating_add(1);
+        // Truncation stays silent at the cap, exactly as it is at load — a bound
+        // lever cannot change the count, so a preset that fits keeps fitting.
+        let _dropped = build_rings(
+            &self.rings,
+            want,
+            self.max_segments,
+            &mut self.ring_segments,
+        );
+        true
     }
 
     /// How long the combined figure is once the cap has bitten — the rosette
@@ -484,9 +567,16 @@ const RADIAL_FLOOR: f32 = 1e-4;
 /// the frame centre) along `+x`. Placement is then one rotation for both the
 /// orientation and the position — see [`build_rings`].
 ///
-/// **This roster is provisional** until Plan 0065 Phase 3, where the user picks
-/// from rendered samples which of these ship. Dropping members there is the
-/// expected outcome.
+/// **The roster closed at seven on 2026-08-06** (Plan 0065 Phase 3), picked from
+/// the rendered sample sheets rather than from names. Two of the nine provisional
+/// members were **cut**, and the property they were cut on is worth keeping
+/// because the next candidate meets it too: *does it hold its identity across the
+/// whole 8-to-32 count range*.
+///
+/// - **`star`** is an ornament at x8 and dissolves into texture by x32.
+/// - **`triangle`** duplicates [`Chevron`](Motif::Chevron)'s sawtooth role at
+///   roughly twelve times the segment cost — `chevron` is 2 segments, the
+///   cheapest member in the set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Motif {
     /// A closed circle — the plainest bead, and the ring that reads as a dotted
@@ -499,15 +589,15 @@ pub enum Motif {
     Teardrop,
     /// A four-vertex rhombus, long along the radius.
     Diamond,
-    /// A three-vertex wedge, apex outward.
-    Triangle,
-    /// An **open** circular arc bulging outward, chord tangential. The scalloped
-    /// boundary as a *motif ring*: raise `scale` until neighbouring members'
-    /// chord ends touch and the ring closes into a scallop (ADR-0079's Notes
-    /// leave that A/B to the sample set).
+    /// An **open** circular arc bulging outward, chord tangential. The nearest
+    /// the closed roster comes to a scalloped boundary: raise `scale` until
+    /// neighbouring members' chord ends touch and the ring closes into a scallop.
+    ///
+    /// **It is an approximation and the user chose the real thing.** Shown side
+    /// by side with a dense overlapping arc ring at Phase 3, the user picked a
+    /// genuine boundary *curve primitive*, which the engine does not have —
+    /// design-backlog 0070, architect then dev. Nothing here fakes one.
     Arc,
-    /// A six-pointed star polygon.
-    Star,
     /// A three-lobed rose, `r = |cos(3*theta/2)|` — the densest member, and the
     /// one that reads as ornament rather than as a bead.
     Trefoil,
@@ -517,15 +607,14 @@ pub enum Motif {
 }
 
 impl Motif {
-    /// Every motif, in roster order. The sample set renders this list.
+    /// Every motif, in roster order — **the closed set**, and the list a load
+    /// error names when a preset asks for something outside it.
     pub const ALL: &'static [Motif] = &[
         Motif::Circle,
         Motif::Petal,
         Motif::Teardrop,
         Motif::Diamond,
-        Motif::Triangle,
         Motif::Arc,
-        Motif::Star,
         Motif::Trefoil,
         Motif::Chevron,
     ];
@@ -538,9 +627,7 @@ impl Motif {
             "petal" => Motif::Petal,
             "teardrop" => Motif::Teardrop,
             "diamond" => Motif::Diamond,
-            "triangle" => Motif::Triangle,
             "arc" => Motif::Arc,
-            "star" => Motif::Star,
             "trefoil" => Motif::Trefoil,
             "chevron" => Motif::Chevron,
             _ => return None,
@@ -554,9 +641,7 @@ impl Motif {
             Motif::Petal => "petal",
             Motif::Teardrop => "teardrop",
             Motif::Diamond => "diamond",
-            Motif::Triangle => "triangle",
             Motif::Arc => "arc",
-            Motif::Star => "star",
             Motif::Trefoil => "trefoil",
             Motif::Chevron => "chevron",
         }
@@ -574,9 +659,7 @@ impl Motif {
         match self {
             Motif::Circle | Motif::Petal | Motif::Teardrop => SMOOTH_SAMPLES,
             Motif::Diamond => 4,
-            Motif::Triangle => 3,
             Motif::Arc => ARC_SAMPLES + 1,
-            Motif::Star => 2 * STAR_POINTS,
             Motif::Trefoil => TREFOIL_SAMPLES,
             Motif::Chevron => 3,
         }
@@ -629,11 +712,6 @@ impl Motif {
                 out.push([-0.5, 0.0]);
                 out.push([0.0, -0.3]);
             }
-            Motif::Triangle => {
-                out.push([0.5, 0.0]);
-                out.push([-0.3, 0.32]);
-                out.push([-0.3, -0.32]);
-            }
             // Chord along `y`, bulge along `+x`, then shifted so the arc is
             // centred on the origin like every other motif — otherwise `radius`
             // would mean the chord for this one member and the centre for the
@@ -646,13 +724,6 @@ impl Motif {
                         ARC_RADIUS * (psi.cos() - ARC_HALF_ANGLE.cos()) - bulge,
                         ARC_RADIUS * psi.sin(),
                     ]);
-                }
-            }
-            Motif::Star => {
-                for k in 0..2 * STAR_POINTS {
-                    let t = TAU * k as f32 / (2 * STAR_POINTS) as f32;
-                    let r = if k % 2 == 0 { 0.5 } else { 0.22 };
-                    out.push([r * t.cos(), r * t.sin()]);
                 }
             }
             // `|cos(1.5 t)|` has three lobes over a full turn, and the sample
@@ -689,8 +760,6 @@ const ARC_SAMPLES: usize = 12;
 const ARC_HALF_ANGLE: f32 = std::f32::consts::FRAC_PI_3;
 /// [`Motif::Arc`]'s radius of curvature.
 const ARC_RADIUS: f32 = 0.5;
-/// Points on [`Motif::Star`].
-const STAR_POINTS: usize = 6;
 
 /// The largest `count` one ring may declare, enforced at load.
 ///
@@ -730,14 +799,143 @@ pub struct RingSpec {
     pub phase: f32,
 }
 
-/// Place every ring's motifs into `out` (cleared first) and return how many
-/// segments were dropped at `cap`.
+/// The per-frame motion applied to a validated roster (Plan 0065 Phase 4): what
+/// the three bindable ring params resolve to.
+///
+/// Separate from [`RingSpec`] on purpose. The roster is **structural** — read
+/// once at load, fixed for as long as the preset is loaded — and this is the
+/// thin, three-scalar layer a bound expression may move it through, so nothing
+/// bindable can change how many segments exist or which motif they are.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct RingMotion {
+    /// Counter-rotation, radians. Ring `i` turns by `+phase` when `i` is even and
+    /// `-phase` when it is odd — see [`ring_direction`].
+    pub phase: f32,
+    /// Multiplies every ring's `radius`, about the frame centre.
+    pub spread: f32,
+    /// Multiplies every ring's motif `scale`.
+    pub scale: f32,
+}
+
+impl RingMotion {
+    /// The identity, and every param's default: the roster exactly as declared.
+    /// `+ 0.0`, `* 1.0` and `* 1.0` are exact in IEEE, so this really is
+    /// bit-for-bit the pre-Phase-4 geometry rather than approximately it.
+    pub(crate) const STATIC: RingMotion = RingMotion {
+        phase: 0.0,
+        spread: 1.0,
+        scale: 1.0,
+    };
+
+    /// Resolve the three bound params into a motion.
+    ///
+    /// **Total**, because all three run per frame from author expressions: a
+    /// non-finite value falls back to its static component rather than reaching
+    /// the placement arithmetic and writing NaN vertices into the draw buffer.
+    /// `phase` wraps into one turn (it is typically `k * time`, which would
+    /// otherwise lose angular precision within minutes and stop the hysteresis
+    /// below resolving a step at all); `spread` and `scale` clamp to a range that
+    /// keeps the figure on the same order as the frame.
+    pub(crate) fn from_params(phase: f32, spread: f32, scale: f32) -> Self {
+        let phase = if phase.is_finite() {
+            phase.rem_euclid(TAU)
+        } else {
+            RingMotion::STATIC.phase
+        };
+        let clamp = |v: f32, hi: f32, fallback: f32| {
+            if v.is_finite() {
+                v.clamp(0.0, hi)
+            } else {
+                fallback
+            }
+        };
+        RingMotion {
+            phase,
+            spread: clamp(spread, MAX_RING_SPREAD, RingMotion::STATIC.spread),
+            scale: clamp(scale, MAX_RING_SCALE, RingMotion::STATIC.scale),
+        }
+    }
+
+    /// Whether `want` has walked further than one step from `self` on any lever,
+    /// i.e. whether the ornament has to be rebuilt.
+    ///
+    /// The same hysteresis habit as [`RosetteCache`] (ADR-0060), for the same
+    /// reason: it is what keeps generator work off the hot path now that a bound
+    /// param can reach it. The steps are chosen so one of them is sub-pixel at
+    /// 1080p — see [`RING_PHASE_STEP`].
+    pub(crate) fn needs_rebuild(self, want: RingMotion) -> bool {
+        (want.phase - self.phase).abs() > RING_PHASE_STEP
+            || (want.spread - self.spread).abs() > RING_SPREAD_STEP
+            || (want.scale - self.scale).abs() > RING_SCALE_STEP
+    }
+}
+
+/// The direction ring `i` turns under `ring_phase` — **the whole of
+/// counter-rotation, and it costs one sign** (ADR-0079's ornamental motion).
+///
+/// Adjacent rings turn opposite ways, which is what makes a mandala read as one
+/// figure breathing rather than as a rigid plate being spun. Indexed by position
+/// in the roster, so a preset chooses which rings pair up by the order it writes
+/// them in.
+pub(crate) fn ring_direction(index: usize) -> f32 {
+    if index.is_multiple_of(2) { 1.0 } else { -1.0 }
+}
+
+/// The largest `ring_spread` a binding may reach. The roster's radii live in the
+/// fit-normalized world the rosette lands in (`+/- 0.9`), so `4` already pushes
+/// every ring well off frame — past this the figure is gone and only the cost of
+/// drawing it remains.
+const MAX_RING_SPREAD: f32 = 4.0;
+/// The largest `ring_scale` a binding may reach. Motifs span about one unit, so
+/// at `8` a single copy covers the whole frame; beyond that the ring is a blob
+/// whatever its count.
+const MAX_RING_SCALE: f32 = 8.0;
+
+/// The `ring_phase` hysteresis: a requested phase further than this from the
+/// built one rebuilds the ornament, anything nearer reuses it.
+///
+/// **Sized the way [`STEP_DEG`] is — but it buys something different, and the
+/// difference is stated rather than implied.** The outermost ring a shipped
+/// preset places sits at radius `0.82` in a world whose half-height maps to
+/// 540 px at 1080p, so one step moves a motif `0.001 * 0.82 * 540 =` **0.44 px**,
+/// invisible under a stroke several pixels wide. That is what lets the step exist
+/// at all.
+///
+/// What it does *not* do is keep an animated mandala off the rebuild path. A
+/// `ring_phase` turning at any usable rate covers more than a step per frame at
+/// 60 fps, so **an animated preset re-places its ornament on most frames**; what
+/// never rebuilds is a preset that binds none of the three, which is every
+/// rings-less preset and the static-roster default.
+///
+/// That is affordable rather than free, and the number is measured rather than
+/// assumed: the shipped four-ring roster costs **4.9 us** per rebuild in release
+/// (1 092 segments over 20 000 iterations) — 0.03 % of a 16.7 ms frame, and 0.5 %
+/// for a hypothetical ornament filled to the floor tier's whole 20 000-segment
+/// cap. So the hysteresis is a *saving* on slow and static levers, and the thing
+/// that makes the fast case fine is the placement being O(segments) with no
+/// allocation, not the step.
+const RING_PHASE_STEP: f32 = 0.001;
+/// The `ring_spread` hysteresis. Same arithmetic at the same outer radius:
+/// `0.001 * 0.82 * 540 = 0.44 px`.
+const RING_SPREAD_STEP: f32 = 0.001;
+/// The `ring_scale` hysteresis. A motif `scale` is an order of magnitude smaller
+/// than a ring radius (`0.13` to `0.46` across the shipped presets), so the same
+/// sub-pixel step is a looser number: `0.002 * 0.46 * 540 = 0.50 px`.
+const RING_SCALE_STEP: f32 = 0.002;
+
+/// Place every ring's motifs into `out` (cleared first) under `motion`, and
+/// return how many segments were dropped at `cap`.
 ///
 /// The placement, which is the whole of ADR-0079's geometry: copy `i` of a ring
 /// of `k` sits at angle `2*pi*i/k + phase`, and because each motif is authored
 /// with **outward along `+x`**, that one rotation supplies both the copy's
 /// position and its orientation — the motif is offset to `(radius, 0)` in the
 /// ring's own frame and the whole frame is turned.
+///
+/// `motion` (Phase 4) rides on top of that and changes no count: it adds a
+/// **signed** `phase` per ring, multiplies `radius` by `spread` and `scale` by
+/// `scale`. At [`RingMotion::STATIC`] every one of those is an exact IEEE
+/// identity, so the static roster is reproduced rather than approximated.
 ///
 /// **Truncation at `cap` is silent by construction** (ADR-0007's behaviour on the
 /// turtle, kept deliberately): the caller drops the count, `presets/README.md`
@@ -746,7 +944,12 @@ pub struct RingSpec {
 ///
 /// Build-time: runs from `configure`, never from `update`. Written panic-free
 /// under the module's pragma all the same.
-pub(crate) fn build_rings(rings: &[RingSpec], cap: usize, out: &mut Vec<SegmentInstance>) -> usize {
+pub(crate) fn build_rings(
+    rings: &[RingSpec],
+    motion: RingMotion,
+    cap: usize,
+    out: &mut Vec<SegmentInstance>,
+) -> usize {
     out.clear();
     // What a cap-free build would emit — the only way to report the drop without
     // running the loop past the cap, which for a large `count` is the difference
@@ -760,7 +963,7 @@ pub(crate) fn build_rings(rings: &[RingSpec], cap: usize, out: &mut Vec<SegmentI
     });
 
     let mut pts: Vec<[f32; 2]> = Vec::new();
-    'rings: for ring in rings {
+    'rings: for (index, ring) in rings.iter().enumerate() {
         ring.motif.outline(&mut pts);
         let n = pts.len();
         if n < 2 {
@@ -768,12 +971,17 @@ pub(crate) fn build_rings(rings: &[RingSpec], cap: usize, out: &mut Vec<SegmentI
         }
         let edges = if ring.motif.is_closed() { n } else { n - 1 };
         let count = ring.count.max(1);
+        // The ring's own configuration, moved. Hoisted out of the copy loop
+        // because it is constant across the ring.
+        let base_phase = ring.phase + ring_direction(index) * motion.phase;
+        let radius = ring.radius * motion.spread;
+        let scale = ring.scale * motion.scale;
         for i in 0..count {
-            let theta = TAU * i as f32 / count as f32 + ring.phase;
+            let theta = TAU * i as f32 / count as f32 + base_phase;
             let (sin, cos) = theta.sin_cos();
             let place = |p: [f32; 2]| -> [f32; 2] {
-                let x = p[0] * ring.scale + ring.radius;
-                let y = p[1] * ring.scale;
+                let x = p[0] * scale + radius;
+                let y = p[1] * scale;
                 [x * cos - y * sin, x * sin + y * cos]
             };
             for e in 0..edges {
@@ -829,6 +1037,11 @@ pub const PARAMS: &[&str] = &[
     "pan_y",
     "mirror_order",
     "mirror_reflect",
+    // The ring levers (Plan 0065 Phase 4). Inert on a preset that declares no
+    // `[generator] rings` — there is nothing for them to move.
+    "ring_phase",
+    "ring_spread",
+    "ring_scale",
 ];
 
 impl Scene for StarPatternScene {
@@ -857,6 +1070,9 @@ impl Scene for StarPatternScene {
         self.pan_y = DEFAULT_PAN;
         self.mirror_order = DEFAULT_MIRROR_ORDER;
         self.mirror_reflect = DEFAULT_MIRROR_REFLECT;
+        self.ring_phase = DEFAULT_RING_PHASE;
+        self.ring_spread = DEFAULT_RING_SPREAD;
+        self.ring_scale = DEFAULT_RING_SCALE_PARAM;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -877,6 +1093,9 @@ impl Scene for StarPatternScene {
             "pan_y" => self.pan_y = value,
             "mirror_order" => self.mirror_order = value,
             "mirror_reflect" => self.mirror_reflect = value,
+            "ring_phase" => self.ring_phase = value,
+            "ring_spread" => self.ring_spread = value,
+            "ring_scale" => self.ring_scale = value,
             _ => {}
         }
     }
@@ -900,11 +1119,20 @@ impl Scene for StarPatternScene {
                 // angle it happens to sit at.
                 self.cache.invalidate();
                 // The ornament is placement arithmetic over a validated roster,
-                // done once here and never again — the rings do not move until
-                // Plan 0065 Phase 4 gives them params. The cap truncates
-                // **silently**, exactly as the turtle's has since ADR-0007:
-                // nothing detects it, and `presets/README.md` documents it.
-                let _dropped = build_rings(rings, self.max_segments, &mut self.ring_segments);
+                // built here at the **static** motion and re-placed thereafter
+                // only when a bound lever has moved a whole step (Phase 4). The
+                // cap truncates **silently**, exactly as the turtle's has since
+                // ADR-0007: nothing detects it, and `presets/README.md`
+                // documents it.
+                self.rings.clear();
+                self.rings.extend_from_slice(rings);
+                self.built_motion = RingMotion::STATIC;
+                let _dropped = build_rings(
+                    &self.rings,
+                    RingMotion::STATIC,
+                    self.max_segments,
+                    &mut self.ring_segments,
+                );
                 if self.ring_segments.is_empty() {
                     // A switch *away* from a mandala must not leave its buffers
                     // behind for `base` to pick up.
@@ -1377,7 +1605,7 @@ mod tests {
             };
             3
         ];
-        let dropped = build_rings(&[], CAP, &mut out);
+        let dropped = build_rings(&[], RingMotion::STATIC, CAP, &mut out);
         assert_eq!(dropped, 0);
         assert!(out.is_empty(), "an empty roster clears rather than appends");
     }
@@ -1385,13 +1613,21 @@ mod tests {
     /// The roster is closed and its two name maps are inverses — the property
     /// that makes an unknown `motif = "..."` a load error rather than a silent
     /// fallback to whichever variant happened to be first.
+    ///
+    /// **The count is seven and the two cut names are checked by name** (Plan
+    /// 0065 Phase 3). `star` and `triangle` were in the provisional set, so they
+    /// are the two strings most likely to be written by someone working from a
+    /// pre-verdict draft — they must reach the *unknown motif* error with its
+    /// roster list, not silently draw something else.
     #[test]
     fn the_motif_roster_round_trips_and_rejects_everything_else() {
         for &m in Motif::ALL {
             assert_eq!(Motif::from_name(m.name()), Some(m), "{}", m.name());
         }
-        assert_eq!(Motif::ALL.len(), 9, "the provisional roster is nine motifs");
-        for bad in ["", "hexagon", "Circle", "crescent", "petal2"] {
+        assert_eq!(Motif::ALL.len(), 7, "the closed roster is seven motifs");
+        for bad in [
+            "", "hexagon", "Circle", "crescent", "petal2", "star", "triangle",
+        ] {
             assert_eq!(Motif::from_name(bad), None, "'{bad}' is outside the roster");
         }
     }
@@ -1413,7 +1649,7 @@ mod tests {
             assert_eq!(m.segments(), expected, "{}: segment count", m.name());
 
             let mut out = Vec::new();
-            build_rings(&[ring(m, 1, 0.5, 1.0)], CAP, &mut out);
+            build_rings(&[ring(m, 1, 0.5, 1.0)], RingMotion::STATIC, CAP, &mut out);
             assert_eq!(out.len(), m.segments(), "{}: one copy", m.name());
         }
     }
@@ -1430,7 +1666,12 @@ mod tests {
                 let radius = 0.6;
                 let scale = 0.18;
                 let mut out = Vec::new();
-                build_rings(&[ring(m, count, radius, scale)], CAP, &mut out);
+                build_rings(
+                    &[ring(m, count, radius, scale)],
+                    RingMotion::STATIC,
+                    CAP,
+                    &mut out,
+                );
                 assert_eq!(out.len(), m.segments() * count as usize);
 
                 // Every segment sits within one motif's reach of the ring.
@@ -1490,6 +1731,7 @@ mod tests {
                 scale: 0.3,
                 phase: std::f32::consts::FRAC_PI_2,
             }],
+            RingMotion::STATIC,
             CAP,
             &mut out,
         );
@@ -1525,7 +1767,12 @@ mod tests {
         let cap = 100usize;
         let mut out = Vec::with_capacity(cap);
         // 40 trefoils at 36 segments each: 1 440 wanted against a 100 cap.
-        let dropped = build_rings(&[ring(Motif::Trefoil, 40, 0.6, 0.1)], cap, &mut out);
+        let dropped = build_rings(
+            &[ring(Motif::Trefoil, 40, 0.6, 0.1)],
+            RingMotion::STATIC,
+            cap,
+            &mut out,
+        );
         assert_eq!(out.len(), cap, "the cap is filled exactly");
         assert_eq!(dropped, 40 * 36 - cap, "and the rest is counted");
 
@@ -1537,6 +1784,7 @@ mod tests {
                 ring(Motif::Diamond, 10, 0.4, 0.2),
                 ring(Motif::Circle, 10, 0.7, 0.2),
             ],
+            RingMotion::STATIC,
             40,
             &mut out,
         );
@@ -1586,7 +1834,7 @@ mod tests {
         let bare_shells = occupied(&bare);
 
         let mut rings = Vec::new();
-        build_rings(&mandala_roster(), CAP, &mut rings);
+        build_rings(&mandala_roster(), RingMotion::STATIC, CAP, &mut rings);
         let mut combined = bare.clone();
         combined.extend(rings.iter());
         let mandala_shells = occupied(&combined);
@@ -1652,10 +1900,356 @@ mod tests {
     fn the_ornament_is_deterministic() {
         let mut a = Vec::new();
         let mut b = Vec::new();
-        build_rings(&mandala_roster(), CAP, &mut a);
-        build_rings(&mandala_roster(), CAP, &mut b);
+        build_rings(&mandala_roster(), RingMotion::STATIC, CAP, &mut a);
+        build_rings(&mandala_roster(), RingMotion::STATIC, CAP, &mut b);
         assert_eq!(a, b, "same roster -> identical geometry");
         assert!(a.iter().all(|s| s.a[0].is_finite() && s.a[1].is_finite()));
+    }
+
+    // -----------------------------------------------------------------------
+    // The rings move (Plan 0065 Phase 4)
+    // -----------------------------------------------------------------------
+
+    /// The mean of a slice of segment midpoints — where a single placed copy
+    /// sits, since every motif is authored about its own centre.
+    fn centroid(segs: &[SegmentInstance]) -> [f32; 2] {
+        let n = segs.len().max(1) as f32;
+        let mut acc = [0.0f32; 2];
+        for s in segs {
+            acc[0] += 0.25 * (s.a[0] + s.b[0]) * 2.0 / n;
+            acc[1] += 0.25 * (s.a[1] + s.b[1]) * 2.0 / n;
+        }
+        acc
+    }
+
+    /// **The default is the exact identity, which is why Phase 1's captures do
+    /// not move.** Not "close enough": `+ 0.0`, `* 1.0` and `* 1.0` are exact in
+    /// IEEE, so the static roster is reproduced bit for bit and the shipped
+    /// golden baseline for this scene is untouched by Phase 4 existing.
+    ///
+    /// The second half is the meaning of the two radial levers, stated as an
+    /// identity rather than as a tolerance: `spread` and `scale` multiply the
+    /// roster, so moving them is *exactly* the same figure as declaring the
+    /// multiplied roster in the first place.
+    #[test]
+    fn the_static_motion_is_the_identity_and_the_radial_levers_are_multipliers() {
+        let roster = mandala_roster();
+
+        let mut declared = Vec::new();
+        let mut moved = Vec::new();
+        build_rings(&roster, RingMotion::STATIC, CAP, &mut declared);
+        build_rings(
+            &roster,
+            RingMotion::from_params(
+                DEFAULT_RING_PHASE,
+                DEFAULT_RING_SPREAD,
+                DEFAULT_RING_SCALE_PARAM,
+            ),
+            CAP,
+            &mut moved,
+        );
+        assert_eq!(
+            declared, moved,
+            "the three defaults must be RingMotion::STATIC"
+        );
+
+        // A roster scaled by hand, against the same roster moved by the levers.
+        let (spread, scale) = (1.7f32, 0.6f32);
+        let by_hand: Vec<RingSpec> = roster
+            .iter()
+            .map(|r| RingSpec {
+                radius: r.radius * spread,
+                scale: r.scale * scale,
+                ..*r
+            })
+            .collect();
+        let mut want = Vec::new();
+        let mut got = Vec::new();
+        build_rings(&by_hand, RingMotion::STATIC, CAP, &mut want);
+        build_rings(
+            &roster,
+            RingMotion::from_params(0.0, spread, scale),
+            CAP,
+            &mut got,
+        );
+        assert_eq!(want, got, "spread and scale are multipliers on the roster");
+    }
+
+    /// **Phase 4's done-when, on the placement arithmetic rather than on pixels**
+    /// — deliberately, because the gate that would otherwise check it cannot:
+    /// `animation.rs` diffs 96x96 frames and a ring mandala is nearly invariant
+    /// under rotation, so a spinning ornament reads as frozen there however fast
+    /// it turns (design-backlog 0009, with more force than the rosette had).
+    ///
+    /// So the claim is asserted where it is true: for a **positive** `ring_phase`,
+    /// adjacent rings turn in **opposite** directions.
+    #[test]
+    fn a_positive_ring_phase_turns_adjacent_rings_opposite_ways() {
+        // Alternating signs, starting positive, is the whole of counter-rotation.
+        for i in 0..6usize {
+            let want = if i.is_multiple_of(2) { 1.0 } else { -1.0 };
+            assert_eq!(ring_direction(i), want, "ring {i}");
+        }
+
+        // Four single-copy rings at the same radius: each copy's centre sits at
+        // exactly its ring's own phase, so the turn is readable as an angle.
+        const RADIUS: f32 = 0.6;
+        let roster: Vec<RingSpec> = (0..4)
+            .map(|_| ring(Motif::Circle, 1, RADIUS, 0.12))
+            .collect();
+        let per_ring = Motif::Circle.segments();
+
+        let turn = 0.35f32;
+        let mut out = Vec::new();
+        build_rings(
+            &roster,
+            RingMotion::from_params(turn, 1.0, 1.0),
+            CAP,
+            &mut out,
+        );
+        assert_eq!(out.len(), per_ring * roster.len());
+
+        for (index, chunk) in out.chunks(per_ring).enumerate() {
+            let c = centroid(chunk);
+            let angle = c[1].atan2(c[0]);
+            let want = ring_direction(index) * turn;
+            assert!(
+                (angle - want).abs() < 1e-3,
+                "ring {index} turned to {angle}, expected {want}"
+            );
+            // ...and it is a rotation, not a drift: the copy stays on its ring.
+            let r = (c[0] * c[0] + c[1] * c[1]).sqrt();
+            assert!(
+                (r - RADIUS).abs() < 1e-3,
+                "ring {index} left its radius: {r}"
+            );
+        }
+
+        // The pairing is the roster's own order, so two adjacent rings really do
+        // separate: the angle between ring 0 and ring 1 is twice the turn.
+        let first = centroid(out.get(..per_ring).unwrap_or_default());
+        let second = centroid(out.get(per_ring..2 * per_ring).unwrap_or_default());
+        let between = first[1].atan2(first[0]) - second[1].atan2(second[0]);
+        assert!(
+            (between - 2.0 * turn).abs() < 1e-3,
+            "adjacent rings should separate by twice the turn, got {between}"
+        );
+    }
+
+    /// The two **radial** levers, which are the ones a shipped preset carries its
+    /// animation on. `ring_spread` moves each ring's centre distance; `ring_scale`
+    /// changes how big a copy is without moving the ring it sits on.
+    #[test]
+    fn spread_moves_the_rings_out_and_scale_only_grows_the_motifs() {
+        const RADIUS: f32 = 0.5;
+        const SCALE: f32 = 0.2;
+        let roster = vec![ring(Motif::Circle, 1, RADIUS, SCALE)];
+        let extent = |segs: &[SegmentInstance]| -> (f32, f32) {
+            let c = centroid(segs);
+            let r = (c[0] * c[0] + c[1] * c[1]).sqrt();
+            let reach = segs.iter().fold(0.0f32, |acc, s| {
+                let (dx, dy) = (
+                    0.5 * (s.a[0] + s.b[0]) - c[0],
+                    0.5 * (s.a[1] + s.b[1]) - c[1],
+                );
+                acc.max((dx * dx + dy * dy).sqrt())
+            });
+            (r, reach)
+        };
+
+        let mut base = Vec::new();
+        build_rings(&roster, RingMotion::STATIC, CAP, &mut base);
+        let (r0, reach0) = extent(&base);
+
+        let mut spread = Vec::new();
+        build_rings(
+            &roster,
+            RingMotion::from_params(0.0, 1.6, 1.0),
+            CAP,
+            &mut spread,
+        );
+        let (r1, reach1) = extent(&spread);
+        assert!((r1 / r0 - 1.6).abs() < 1e-3, "spread must scale the radius");
+        assert!(
+            (reach1 - reach0).abs() < 1e-4,
+            "spread must not resize the motif"
+        );
+
+        let mut scaled = Vec::new();
+        build_rings(
+            &roster,
+            RingMotion::from_params(0.0, 1.0, 2.5),
+            CAP,
+            &mut scaled,
+        );
+        let (r2, reach2) = extent(&scaled);
+        assert!((r2 - r0).abs() < 1e-4, "scale must not move the ring");
+        assert!(
+            (reach2 / reach0 - 2.5).abs() < 1e-3,
+            "scale must resize the motif"
+        );
+
+        // Neither can change how much geometry there is — that is what keeps the
+        // roster structural and the draw buffer allocation-free once built.
+        assert_eq!(base.len(), spread.len());
+        assert_eq!(base.len(), scaled.len());
+    }
+
+    /// The three levers run per frame from author expressions, so
+    /// [`RingMotion::from_params`] is **total**: nothing an expression can produce
+    /// reaches the placement arithmetic as a NaN vertex or as a figure so large
+    /// the frame is a wall of stroke.
+    #[test]
+    fn the_ring_levers_survive_everything_an_expression_can_produce() {
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let m = RingMotion::from_params(bad, bad, bad);
+            assert_eq!(m, RingMotion::STATIC, "{bad} must fall back to static");
+        }
+        // Out of range clamps rather than running off.
+        let hot = RingMotion::from_params(0.0, 99.0, 99.0);
+        assert_eq!(hot.spread, MAX_RING_SPREAD);
+        assert_eq!(hot.scale, MAX_RING_SCALE);
+        let cold = RingMotion::from_params(0.0, -3.0, -3.0);
+        assert_eq!(cold.spread, 0.0);
+        assert_eq!(cold.scale, 0.0);
+
+        // `ring_phase` is typically `k * time`, so it wraps rather than clamping —
+        // an angle has no ends, and an unwrapped one loses the precision the
+        // hysteresis below needs to resolve a step at all.
+        let wrapped = RingMotion::from_params(3.0 * TAU + 0.25, 1.0, 1.0);
+        assert!(
+            (wrapped.phase - 0.25).abs() < 1e-3,
+            "phase must wrap into one turn, got {}",
+            wrapped.phase
+        );
+        assert!(
+            RingMotion::from_params(-0.5, 1.0, 1.0).phase > 0.0,
+            "and stay positive"
+        );
+
+        // A moved motion still places finite geometry.
+        let mut out = Vec::new();
+        build_rings(&mandala_roster(), hot, CAP, &mut out);
+        assert!(out.iter().all(|s| s.a[0].is_finite() && s.b[1].is_finite()));
+    }
+
+    /// The ornament is rebuilt under **hysteresis**, exactly as the rosette is
+    /// (ADR-0060), and this pins what that does and does not buy — because the
+    /// two cases differ and the honest version is the useful one.
+    ///
+    /// The bound is *distance travelled / step*, never the frame count. So a
+    /// preset binding none of the three never rebuilds at all, a slow lever
+    /// rebuilds on a fraction of its frames, and a lever turning fast enough to
+    /// see rebuilds every frame — which is affordable at the measured 4.9 us, see
+    /// [`RING_PHASE_STEP`], and is *not* a claim this test hides.
+    #[test]
+    fn the_ornament_rebuilds_per_step_not_per_frame() {
+        const FRAMES: usize = 2_000;
+        let rebuilds_over = |span: f32| {
+            let mut held = RingMotion::STATIC;
+            let mut n = 0u32;
+            for frame in 0..FRAMES {
+                let want =
+                    RingMotion::from_params(span * frame as f32 / (FRAMES - 1) as f32, 1.0, 1.0);
+                if held.needs_rebuild(want) {
+                    held = want;
+                    n += 1;
+                }
+            }
+            n
+        };
+
+        // A full turn over the window: `+ 2` for the first build and the final
+        // partial step. The distance bound holds...
+        let full = rebuilds_over(TAU);
+        let bound = (TAU / RING_PHASE_STEP) as u32 + 2;
+        assert!(full <= bound, "{full} rebuilds exceeds the {bound} allowed");
+
+        // ...and at that rate it really is every frame, which is the part the
+        // step does not save and the measurement in `RING_PHASE_STEP` covers.
+        assert!(
+            full >= FRAMES as u32 - 2,
+            "a full turn per 2 000 frames moves more than a step per frame"
+        );
+
+        // A tenth of a turn over the same window is a tenth of the rebuilds —
+        // distance travelled, not frames elapsed, which is the whole claim.
+        let tenth = rebuilds_over(0.1 * TAU);
+        assert!(
+            tenth < FRAMES as u32 / 2,
+            "{tenth} rebuilds over {FRAMES} frames tracks the frame rate, not the step"
+        );
+        let tenth_bound = (0.1 * TAU / RING_PHASE_STEP) as u32 + 2;
+        assert!(
+            tenth <= tenth_bound,
+            "{tenth} rebuilds over a tenth of a turn exceeds the {tenth_bound} \
+             its distance allows"
+        );
+
+        // Dithering inside one step never rebuilds — the half a quantized-bucket
+        // key would get wrong.
+        let held = RingMotion::from_params(1.0, 1.0, 1.0);
+        for frame in 0..600u32 {
+            let jitter = if frame.is_multiple_of(2) { 0.0004 } else { -0.0004 };
+            let want = RingMotion::from_params(1.0 + jitter, 1.0 + jitter, 1.0 + jitter);
+            assert!(
+                !held.needs_rebuild(want),
+                "a sub-step dither must not rebuild"
+            );
+        }
+
+        // And a preset that binds none of them never leaves the static motion.
+        assert!(
+            !RingMotion::STATIC.needs_rebuild(RingMotion::from_params(
+                DEFAULT_RING_PHASE,
+                DEFAULT_RING_SPREAD,
+                DEFAULT_RING_SCALE_PARAM,
+            )),
+            "an unbound preset must never rebuild its ornament"
+        );
+
+        // Each lever is watched on its own, or a preset moving only one of them
+        // would freeze.
+        for want in [
+            RingMotion::from_params(0.5, 1.0, 1.0),
+            RingMotion::from_params(0.0, 1.4, 1.0),
+            RingMotion::from_params(0.0, 1.0, 1.4),
+        ] {
+            assert!(
+                RingMotion::STATIC.needs_rebuild(want),
+                "{want:?} must rebuild"
+            );
+        }
+    }
+
+    /// The three levers are in the param vocabulary, which is what makes a
+    /// preset's `ring_spread = "..."` a binding rather than an ignored key — an
+    /// unknown name is dropped by the loader, so a lever missing from here is a
+    /// preset that quietly does nothing.
+    ///
+    /// The defaults are pinned in the same place because they are the compat
+    /// claim: `reset_params` puts the scene back on [`RingMotion::STATIC`], so a
+    /// preset that binds none of them draws the roster it declared.
+    #[test]
+    fn the_ring_levers_are_bindable_and_default_to_the_static_configuration() {
+        for lever in ["ring_phase", "ring_spread", "ring_scale"] {
+            assert!(PARAMS.contains(&lever), "{lever} must be in PARAMS");
+        }
+        let mut seen = PARAMS.to_vec();
+        seen.sort_unstable();
+        let before = seen.len();
+        seen.dedup();
+        assert_eq!(before, seen.len(), "a param is declared twice");
+
+        assert_eq!(
+            RingMotion::from_params(
+                DEFAULT_RING_PHASE,
+                DEFAULT_RING_SPREAD,
+                DEFAULT_RING_SCALE_PARAM,
+            ),
+            RingMotion::STATIC,
+            "the three defaults must be the static configuration"
+        );
     }
 
     /// A closed outline is a closed chain and every vertex is a joint
@@ -1666,7 +2260,7 @@ mod tests {
     fn closed_motifs_join_everywhere_and_open_ones_only_inside() {
         for &m in Motif::ALL {
             let mut out = Vec::new();
-            build_rings(&[ring(m, 1, 0.5, 0.3)], CAP, &mut out);
+            build_rings(&[ring(m, 1, 0.5, 0.3)], RingMotion::STATIC, CAP, &mut out);
             let flags: Vec<u32> = out.iter().map(|s| s.joined).collect();
             if m.is_closed() {
                 assert!(
