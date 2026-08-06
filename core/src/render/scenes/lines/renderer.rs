@@ -173,6 +173,170 @@ fn shader_source() -> String {
     format!("const JOINED_A: u32 = {JOINED_A}u;\nconst JOINED_B: u32 = {JOINED_B}u;\n{SHADER_BODY}")
 }
 
+// ---------------------------------------------------------------------------
+// The in-frame geometry diagnostic (Plan 0069, ADR-0083)
+// ---------------------------------------------------------------------------
+
+/// How much of the drawn segment length landed inside the render target, summed
+/// over one [`LineRenderer::draw`] call (Plan 0069, [ADR-0083]).
+///
+/// Pixel coverage cannot see an over-scaled figure: a comb roots every bar on a
+/// shared baseline and a corona roots every spoke at a centre, so clipping the
+/// tips costs a rounding error of lit pixels and the statistic goes the *wrong
+/// way*. Length does see it — a bar that overshoots loses in-frame length in
+/// exact proportion to the overshoot.
+///
+/// **Length, not area.** The stroke's width and the ADR-0041 join extensions are
+/// not counted, so a thick stroke leaving the frame is under-counted. That is
+/// the right measure for *overshoot* and a poor one for anything else.
+///
+/// [ADR-0083]: ../../../../../docs/adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DrawExtent {
+    /// World-space length of every segment actually drawn (post view transform).
+    pub total_len: f32,
+    /// The share of that length lying inside `[-aspect, aspect] x [-1, 1]`.
+    pub in_frame_len: f32,
+}
+
+impl DrawExtent {
+    /// The in-frame fraction — exactly `1.0` when nothing was clipped, exactly
+    /// `0.0` when the whole figure is outside.
+    ///
+    /// `None` when nothing was drawn at all: that is a `0/0`, and inventing a
+    /// number for it is what made Plan 0058's table print `inf`. "Nothing drawn"
+    /// is the *total* case and `core/tests/sanity.rs` is its instrument, not this
+    /// one.
+    pub fn fraction(self) -> Option<f32> {
+        (self.total_len > 0.0).then(|| self.in_frame_len / self.total_len)
+    }
+}
+
+// Thread-local rather than a field on `LineRenderer`, because the four line
+// scenes reach the one shared renderer through an `Rc<RefCell<..>>` owned by the
+// scene registry and nothing outside `render` holds a handle to it — see
+// `scenes::create_all`. Thread-local rather than a global: the renderer is
+// single-threaded by construction (`Rc`), so this is the cheapest correct sink,
+// and it also keeps one test's switch out of another's capture when the harness
+// runs test threads in parallel.
+thread_local! {
+    /// Whether `draw` measures. **Off in the shipped render path** — that is the
+    /// whole of the switch, and `core/tests/geometry_extent.rs` asserts "off"
+    /// means byte-identical output.
+    static EXTENT_ON: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The most recent measured draw, if any.
+    static LAST_EXTENT: std::cell::Cell<Option<DrawExtent>> = const { std::cell::Cell::new(None) };
+}
+
+/// Turn the in-frame geometry diagnostic on or off for **this thread**, clearing
+/// any previously recorded measurement. Off by default; the shipped render path
+/// never calls this.
+pub fn set_extent_diagnostic(on: bool) {
+    EXTENT_ON.with(|flag| flag.set(on));
+    LAST_EXTENT.with(|slot| slot.set(None));
+}
+
+/// Take the extent of the **most recent** measured `draw`, leaving the slot
+/// empty. `None` when no line scene has drawn since the diagnostic was enabled
+/// (or when it is off) — distinct from a recorded draw whose
+/// [`fraction`](DrawExtent::fraction) is `None` because nothing was drawn.
+///
+/// Only one line scene draws per frame ([`scenes::shares_resources`] forbids
+/// two), so "the most recent draw" is "this frame's figure".
+///
+/// [`scenes::shares_resources`]: crate::render::scenes
+pub fn take_draw_extent() -> Option<DrawExtent> {
+    LAST_EXTENT.with(|slot| slot.take())
+}
+
+/// The share of the segment `a -> b` lying inside `[-aspect, aspect] x [-1, 1]`,
+/// as a fraction of its own length: Liang-Barsky against the four edges.
+///
+/// **Exactly `1.0`** when the segment is untouched by any edge — the two
+/// parameters start at `0.0` and `1.0` and no edge moves them — which is what
+/// lets an unclipped figure sum to exactly its own total. **Exactly `0.0`** when
+/// the segment is wholly outside.
+///
+/// A parametric clip rather than an endpoint test on purpose: the case a naive
+/// "are both ends outside" check gets wrong is a segment whose ends are both out
+/// but which crosses the frame between them, and that is precisely what a badly
+/// over-scaled figure is made of.
+fn in_frame_fraction(a: [f32; 2], b: [f32; 2], aspect: f32) -> f32 {
+    let [ax, ay] = a;
+    let [bx, by] = b;
+    let (dx, dy) = (bx - ax, by - ay);
+    let (mut t0, mut t1) = (0.0f32, 1.0f32);
+    // (direction, distance) per edge: left, right, bottom, top.
+    for (p, q) in [
+        (-dx, ax + aspect),
+        (dx, aspect - ax),
+        (-dy, ay + 1.0),
+        (dy, 1.0 - ay),
+    ] {
+        if p == 0.0 {
+            // Parallel to this edge: wholly out if it starts outside it.
+            if q < 0.0 {
+                return 0.0;
+            }
+            continue;
+        }
+        let r = q / p;
+        if p < 0.0 {
+            if r > t1 {
+                return 0.0;
+            }
+            if r > t0 {
+                t0 = r;
+            }
+        } else {
+            if r < t0 {
+                return 0.0;
+            }
+            if r < t1 {
+                t1 = r;
+            }
+        }
+    }
+    t1 - t0
+}
+
+/// Measure `segments` against the frame — the diagnostic's whole computation.
+///
+/// **The aspect is a parameter, and it is the only source of one in here**
+/// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)):
+/// this is a free function over the endpoints, so there is no internal grid, no
+/// texture and no `self` for a second aspect to come from. Its caller hands it
+/// the value `draw` was handed, which is the **render target's**.
+///
+/// The view transform is applied first, exactly as the vertex shader applies it
+/// (`a * zoom + pan`, before the aspect divide), because a figure pushed off the
+/// frame by `zoom` or `pan_y` has overshot just as surely as one scaled off it.
+fn measure_extent(
+    segments: &[SegmentInstance],
+    aspect: f32,
+    xform: super::ViewTransform,
+) -> DrawExtent {
+    let mut extent = DrawExtent::default();
+    let [pan_x, pan_y] = xform.pan;
+    for segment in segments {
+        let [ax, ay] = segment.a;
+        let [bx, by] = segment.b;
+        let a = [ax * xform.zoom + pan_x, ay * xform.zoom + pan_y];
+        let b = [bx * xform.zoom + pan_x, by * xform.zoom + pan_y];
+        let ([ax, ay], [bx, by]) = (a, b);
+        let (dx, dy) = (bx - ax, by - ay);
+        let len = (dx * dx + dy * dy).sqrt();
+        if len <= 0.0 || !len.is_finite() {
+            continue; // a degenerate (or non-finite) segment measures nothing
+        }
+        extent.total_len += len;
+        // `len * 1.0` is `len` exactly, so an unclipped figure adds the same
+        // value to both sums and the fraction is exactly 1.0.
+        extent.in_frame_len += len * in_frame_fraction(a, b, aspect);
+    }
+    extent
+}
+
 /// Draws segment buffers as thick glowing quads. Owns its pipeline, a
 /// fixed-capacity instance buffer, and the aspect/glow uniform.
 pub struct LineRenderer {
@@ -315,6 +479,19 @@ impl LineRenderer {
     ) {
         let count = segments.len().min(self.capacity);
         let drawn = segments.get(..count).unwrap_or(&[]);
+
+        // The in-frame geometry diagnostic (Plan 0069, ADR-0083). Off in the
+        // shipped path, and it reads `drawn` — the segments that actually reach
+        // the instance buffer — without touching a GPU resource, so "off" is a
+        // `Cell::get` and "on" changes nothing about the picture. The aspect it
+        // measures against is the one this call was handed: the render target's
+        // (ADR-0037), under the same `max(0.1)` clamp the uniform and the shader
+        // apply, so the rectangle is the one the frame actually shows.
+        if EXTENT_ON.with(std::cell::Cell::get) {
+            let extent = measure_extent(drawn, aspect.max(0.1), xform);
+            LAST_EXTENT.with(|slot| slot.set(Some(extent)));
+        }
+
         if !drawn.is_empty() {
             queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(drawn));
         }
@@ -360,6 +537,177 @@ mod tests {
     // Tests index slices and panic on failure; allowed over the file's hot-path
     // pragma — this is not the render path.
     #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
+
+    // -----------------------------------------------------------------------
+    // The in-frame geometry fraction (Plan 0069 Phase 1, ADR-0083)
+    // -----------------------------------------------------------------------
+
+    use super::super::ViewTransform;
+    use super::{DrawExtent, SegmentInstance, measure_extent};
+
+    /// A segment with everything but its endpoints held constant — colour, width
+    /// and the join flags are not part of this measurement (it is length, not
+    /// area).
+    fn seg(a: [f32; 2], b: [f32; 2]) -> SegmentInstance {
+        SegmentInstance {
+            a,
+            b,
+            color: [1.0, 1.0, 1.0],
+            width: 0.01,
+            joined: 0,
+        }
+    }
+
+    /// Slack for the *clipped* cases only. The two endpoints of the property —
+    /// wholly inside and wholly outside — are asserted **exactly** below, which
+    /// is the point: they are the same sum and the empty sum respectively, not
+    /// two nearly-equal ones.
+    const EPS: f32 = 1e-6;
+
+    /// A figure entirely inside the frame is **exactly** 1.0: no segment is
+    /// clipped, so `len * 1.0` adds the same value to both sums.
+    #[test]
+    fn a_figure_inside_the_frame_measures_exactly_one() {
+        let segments = [
+            seg([-0.5, -0.5], [0.5, 0.5]),
+            seg([0.2, -0.9], [1.5, 0.9]),
+            seg([-1.55, 0.0], [1.55, 0.1]),
+        ];
+        let extent = measure_extent(&segments, 1.6, ViewTransform::default());
+        assert!(extent.total_len > 0.0, "the fixture must draw something");
+        assert_eq!(
+            extent.in_frame_len, extent.total_len,
+            "an unclipped figure must accumulate the identical sum twice"
+        );
+        assert_eq!(extent.fraction(), Some(1.0));
+    }
+
+    /// A figure entirely outside is **exactly** 0.0 — a real denominator over an
+    /// empty numerator, which is what distinguishes it from "nothing drawn".
+    #[test]
+    fn a_figure_outside_the_frame_measures_exactly_zero() {
+        let segments = [
+            seg([2.0, 2.0], [3.0, 3.0]),
+            seg([-4.0, 1.5], [4.0, 1.5]), // spans the width, above the top edge
+        ];
+        let extent = measure_extent(&segments, 1.0, ViewTransform::default());
+        assert!(extent.total_len > 0.0, "the fixture must draw something");
+        assert_eq!(extent.in_frame_len, 0.0);
+        assert_eq!(extent.fraction(), Some(0.0));
+    }
+
+    /// A segment crossing an edge contributes its **clipped share**, not
+    /// all-or-nothing — including the case both endpoints are outside, which is
+    /// the one an endpoint test gets wrong and exactly what an over-scaled figure
+    /// is made of.
+    ///
+    /// Every case is hand-computed against the unit frame (`aspect = 1.0`, so the
+    /// rectangle is `[-1, 1]^2`):
+    ///
+    /// | segment                   | length | inside | fraction |
+    /// |---------------------------|--------|--------|----------|
+    /// | `(0,0) -> (4,0)`          | 4      | 1      | 0.25     |
+    /// | `(-2,0) -> (2,0)`         | 4      | 2      | 0.5      |
+    /// | `(-2,-2) -> (2,2)`        | √32    | √8     | 0.5      |
+    /// | `(-2,0.5) -> (0.5,-2)`    | √12.5  | ·0.2   | 0.2      |
+    /// | `(-2,1.5) -> (2,1.5)`     | 4      | 0      | 0        |
+    #[test]
+    fn a_crossing_segment_contributes_its_clipped_share() {
+        let cases: [([f32; 2], [f32; 2], f32); 5] = [
+            ([0.0, 0.0], [4.0, 0.0], 0.25),
+            ([-2.0, 0.0], [2.0, 0.0], 0.5),
+            ([-2.0, -2.0], [2.0, 2.0], 0.5),
+            ([-2.0, 0.5], [0.5, -2.0], 0.2),
+            ([-2.0, 1.5], [2.0, 1.5], 0.0),
+        ];
+        for (a, b, want) in cases {
+            let extent = measure_extent(&[seg(a, b)], 1.0, ViewTransform::default());
+            let got = extent.fraction().expect("the segment has a length");
+            assert!(
+                (got - want).abs() < EPS,
+                "{a:?} -> {b:?} measured {got}, hand-computed {want}"
+            );
+        }
+    }
+
+    /// **The rectangle follows the aspect the caller hands in, and only that**
+    /// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+    ///
+    /// `measure_extent` is a free function over the endpoints: there is no
+    /// `self`, no texture and no internal grid in scope, so the aspect parameter
+    /// is the *only* source of one — and `draw` passes the value it was handed,
+    /// which is the render target's. This asserts the consequence, which is what
+    /// a reader can check: the same segment measures 0.5 in a square frame and
+    /// 1.0 in one twice as wide, while the **vertical** half-extent stays at 1.0
+    /// whatever the aspect (the renderer maps two world units to the frame
+    /// *height*).
+    #[test]
+    fn the_rectangle_follows_the_aspect_the_draw_is_handed() {
+        let across = [seg([0.0, 0.0], [2.0, 0.0])];
+        let up = [seg([0.0, 0.0], [0.0, 2.0])];
+        let square = measure_extent(&across, 1.0, ViewTransform::default());
+        let wide = measure_extent(&across, 2.0, ViewTransform::default());
+        assert!((square.fraction().expect("length") - 0.5).abs() < EPS);
+        assert_eq!(
+            wide.fraction(),
+            Some(1.0),
+            "at aspect 2 the same horizontal segment fits exactly"
+        );
+        for aspect in [1.0, 2.0, 3.5] {
+            let vertical = measure_extent(&up, aspect, ViewTransform::default());
+            assert!(
+                (vertical.fraction().expect("length") - 0.5).abs() < EPS,
+                "the frame's half-height is 1.0 at every aspect, got {vertical:?} at {aspect}"
+            );
+        }
+    }
+
+    /// The view transform is part of what the frame shows, so it is part of the
+    /// measurement: the shader moves endpoints by `a * zoom + pan` before the
+    /// aspect divide, and a figure pushed off the top by `pan_y` has overshot
+    /// just as surely as one scaled off it.
+    #[test]
+    fn the_view_transform_moves_the_figure_against_the_frame() {
+        let segments = [seg([0.0, 0.0], [0.0, 0.5])];
+        let zoomed = ViewTransform {
+            zoom: 4.0,
+            ..Default::default()
+        };
+        let panned = ViewTransform {
+            pan: [0.0, 1.0],
+            ..Default::default()
+        };
+        assert_eq!(
+            measure_extent(&segments, 1.0, ViewTransform::default()).fraction(),
+            Some(1.0)
+        );
+        let zoomed = measure_extent(&segments, 1.0, zoomed);
+        assert!((zoomed.fraction().expect("length") - 0.5).abs() < EPS);
+        assert_eq!(
+            measure_extent(&segments, 1.0, panned).fraction(),
+            Some(0.0),
+            "panned up by a full half-height, the segment sits on and above the edge"
+        );
+    }
+
+    /// Nothing drawn is **not** a fraction of zero. Plan 0058's table printed
+    /// `inf` for a preset that drew nothing; this reports `None` and leaves the
+    /// total case to `sanity.rs`.
+    #[test]
+    fn nothing_drawn_reports_no_fraction() {
+        assert_eq!(DrawExtent::default().fraction(), None);
+        assert_eq!(
+            measure_extent(&[], 1.6, ViewTransform::default()).fraction(),
+            None
+        );
+        // A degenerate segment is length zero wherever it sits, so it moves
+        // neither sum — a figure collapsed to a point is `sanity.rs`'s question.
+        let degenerate = [seg([9.0, 9.0], [9.0, 9.0])];
+        assert_eq!(
+            measure_extent(&degenerate, 1.6, ViewTransform::default()).fraction(),
+            None
+        );
+    }
 
     // -----------------------------------------------------------------------
     // The stroke seam does not punch holes in the backdrop (Plan 0051 Phase 2)
