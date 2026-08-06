@@ -1,8 +1,8 @@
 # ADR-0080 — The attractor owns its level, and the bright-pass thresholds exposed light
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-05
 > **Date:** 2026-08-04
-> **Related plan(s):** [0066](../plans/0066-the-level-lever.md)
+> **Related plan(s):** [0066](../plans/done/0066-the-level-lever.md)
 
 ## Context
 
@@ -131,6 +131,37 @@ distinct name would signal that it behaves differently. Rejected because the dif
 author discovers in a second of rendering and the naming cost is permanent: three particle scenes
 with two names for the same lever is exactly the sort of surface a content lane mis-remembers, and
 `presets/README.md` would have to explain the distinction on every mention.
+
+## Outcome (2026-08-05, at Plan 0066's close)
+
+Accepted as written. Three things the implementation and the Phase 5 retune settled, one of which
+this ADR did not anticipate and which every future preset making the same swap will meet.
+
+**The swap is level-neutral on the figure and NOT on the backdrop, because the background pre-pass
+is upstream of the tonemap.** `exposure` scaled the backdrop; `brightness` is scene-local and does
+not reach it. So a preset moving a number from one to the other keeps its figure and multiplies its
+sky by `1 / old_exposure`. On `attractor_lorenz` that was 33x — a `bg_bright` authored at ~1/255
+(black) would have become a visible grey wash, putting a floor under the figure the whole look is
+composed against. Phase 5 caught it and divided the backdrop terms by the same 0.03
+(`presets/attractor_lorenz.toml`, `bg_bright = "0.0003 + …"`). `attractor_thomas` was unaffected
+because it binds no `bg_*` at all, and its `paper_*`/`ink_*` sit *downstream* of the tonemap. The
+rule worth carrying: **this ADR's "level-neutral" claim covers the scene, not the frame** — check
+every upstream-of-tonemap term a preset binds before moving a number across.
+
+**The Neutral note about `MAX_THRESHOLD = 8.0` is answered, and the ceiling is not a constraint.**
+Lorenz's threshold moved from `8` — where its header called the value *capped, not tuned* — to a
+measured `0.4`, chosen off a coverage sweep (`3.0 / 1.5 / 0.8 / 0.5 / 0.4 / 0.3 / 0.2` reading
+`0.164 / 0.165 / 0.177 / 0.207 / 0.224 / 0.245 / 0.269`) that simply did not exist before: at the
+old ceiling every value in that list rendered the same picture. A real preset is now an order of
+magnitude *below* 8.0, so nothing suggests the ceiling should move.
+
+**The byte-identical claim held exactly, and it is now guarded rather than assumed.** No existing
+baseline moved across the whole plan. The Negative bullet's warning — that this is a fact about
+today's fixtures rather than a property — was answered by adding the fixture that makes it false:
+`core/tests/fixtures/composite_bloom_exposed.toml` is the suite's first and only `exposure`-binding
+fixture, and it was sized by measurement (against a build with the multiply forced back to 1.0 it
+reads a max outlier of 209 against a tolerance of 48; three weaker configurations all passed within
+tolerance, because the tonemap shoulder flattens a difference between two already-blown frames).
 
 ## Notes
 

@@ -2786,3 +2786,61 @@ and watching. The parameter roster and the per-treatment guidance are in
 
 **Not in scope.** Adding a fourth treatment. The roster is a closed set by ADR-0061; a look that
 needs a new edge behaviour is engine work and routes back through `architect`.
+
+---
+
+## Entry 0057 — from the Plan 0059 Phase 4 content pass (2026-08-04)
+
+---
+
+## ~~0057 — a preset has no scene-local way to set a figure's level, so `exposure` gets used for it and two other stages disagree with that use~~
+
+- **PROMOTED 2026-08-04 → [ADR-0080](adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md) +
+  [Plan 0066](plans/done/0066-the-level-lever.md)** — both halves, at the user's call. The attractor gains
+  `brightness`, matching the param `swarm` and `emitter` already carry (it is the **only** particle
+  family without one, which is why its two presets reached for `exposure`), and the bloom
+  bright-pass thresholds **post-exposure** luminance. **The pixel cost turned out to be nil on the
+  golden suite and the arithmetic is why:** no fixture binds `exposure`
+  (`grep -l exposure core/tests/fixtures/*.toml` is empty across all 23), so the new factor is
+  literal `1.0` and every baseline is byte-identical. The only looks that move are Lorenz and
+  Thomas, which Phase 5 retunes because their headers document the retired model.
+- **Raised:** 2026-08-04, from `preset-author` (Plan [0059](plans/done/0059-lorenz-finds-its-plane.md)
+  Phase 4, `990fedc`). All three findings verified against code, with rendered evidence noted.
+- **One entry, not three.** These are one gap seen from three sides: there is no per-scene deposit
+  or intensity param, so a figure's level is spent on `exposure` — the one lever that is
+  engine-wide, interpolated across a dissolve, and measured *after* the stage that would want to
+  discriminate on it.
+- **Why it has no history:** `attractor_lorenz` and `attractor_thomas` are the **first two shipped
+  presets to bind `exposure` at all.** Nothing had a caller before, so nothing had a complaint.
+
+**1. `density` is exposure-neutral in total light only (ADR-0065), and the docs said otherwise.**
+Per texel it is not neutral: the same energy lands on `1/N` of the pixels, so a sparse preset needs
+a cut on the order of `trail frames / density`. The shipped values are `exposure = 0.03` on Lorenz at
+`density = 0.002` and `0.10` on Thomas at `0.02`, both picked off rendered ladders rather than
+derived. `presets/README.md`'s `[particles]` section told authors they could re-aim `density`
+*"without re-tuning `size`, `fade` or `exposure`"* — **true of the sum, false of the picture.**
+*Corrected at this close* rather than left for the entry's promotion, because it is wrong today and
+the next sparse preset would be misled by it.
+
+**2. The ADR-shaped half: should a scene have a local deposit / intensity param?** `exposure` is
+engine-wide and **crossfades across a preset dissolve** (`crossfade_from` in
+`core/src/render/tonemap.rs`, ADR-0032's seam), so an extreme per-preset value drags the ~1 s blend
+through a badly-exposed frame. Both new presets deliberately buy as much of their level as possible
+with `size` and `fade` first *because of this* — those are scene-local and blend as pixels. That is
+a workaround with a ceiling, and the question it poses is a real tradeoff with alternatives to
+reject: a per-scene param, versus normalizing `exposure` per-preset at the crossfade, versus
+declaring the current behaviour correct and documenting the workaround as the technique.
+
+**3. `bloom_threshold` is measured in pre-exposure units, so at these values it cannot discriminate
+at all.** Chain order is scene → post chain → tonemap, so the bright-pass reads the figure *before*
+`exposure` scales it, and `bloom.rs` clamps the threshold at `MAX_THRESHOLD = 8.0`. At
+`exposure = 0.03` the whole figure is over any threshold a preset can ask for. **Rendered: threshold
+`0.95` against `8.0` on Lorenz are near-indistinguishable.** Lorenz therefore ships it pinned at the
+ceiling, with its header saying to read the pair as *capped, not tuned*. **A threshold in
+pre-exposure linear units is only meaningful while every preset sits near `exposure = 1.0`** — which
+was true until this commit and is now not.
+
+**What this entry is not.** It is not a bug report: nothing renders wrongly, both presets ship the
+look they intend, and the workarounds are recorded in their headers. It is the observation that the
+workarounds exist because one lever is doing a job it was not shaped for, and that the cost lands on
+the *next* author rather than on these two.
