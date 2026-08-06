@@ -226,7 +226,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
-| `attractor`       | `a` `b` `c` `d` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
+| `attractor`       | `a` `b` `c` `d` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `age_tint` `age_hue` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` |
 
@@ -244,11 +244,14 @@ documented there.
 
 > **The `attractor` roster is the one place a param's meaning depends on the
 > family.** `a b c d` mean different things per family and mean *nothing* on the
-> five IFS figures; `morph` `curl` `vigor` `lean` `bias` are **IFS-only** and are
-> inert on the four map families; `perspective` `depth_fade` `depth_hue` reach
-> only the two 3-D flows. Binding an inert one is not an error and produces no
-> warning — it produces nothing at all. See
-> [The five IFS figures](#the-five-ifs-figures--a-different-kind-of-family) and
+> five IFS figures; `morph` `curl` `vigor` `lean` `bias` **and** `map_tint`
+> `map_hue` `age_tint` `age_hue` are **IFS-only** and are inert on the four map
+> families; `perspective` `depth_fade` `depth_hue` reach only the two 3-D flows.
+> Binding an inert one is not an error and produces no warning — it produces
+> nothing at all. See
+> [The five IFS figures](#the-five-ifs-figures--a-different-kind-of-family),
+> [What made this point, and how old it is](#what-made-this-point-and-how-old-it-is)
+> and
 > [Attractor depth](#attractor-depth-perspective-depth_fade-depth_hue-spin-plan-0063).
 
 **My attractor is too bright / too dim — which knob?** `brightness`. It is a
@@ -1779,8 +1782,10 @@ cost a session if you carry the rest of this library's habits across. All four
 were measured in the Plan 0062 Phase 7 content pass.
 
 **`a` `b` `c` `d` are inert.** An IFS's shape lives in its affine table, not in
-four scalars. What reaches the figure is the five params below, and they are
-**IFS-only** — inert on `de_jong`, `clifford`, `thomas` and `lorenz`, the same
+four scalars. What reaches the figure is the five params below — plus the four
+colour channels in [the next
+section](#what-made-this-point-and-how-old-it-is) — and all nine are
+**IFS-only**, inert on `de_jong`, `clifford`, `thomas` and `lorenz`, the same
 way `a`..`d` already carry family-specific meanings.
 
 | Param   | Default | What it does |
@@ -1853,6 +1858,53 @@ the shipped look on a chaotic cloud, but these figures have an intrinsic *up* �
 `sierpinski` is an equilateral triangle, `fern` is a plant — so the default
 spends half of every cycle upside down and reads as a crooked frame rather than
 a turning figure. A rock (`sin(time * k) * 0.25`) is almost always what you want.
+
+<a id="what-made-this-point-and-how-old-it-is"></a>
+
+#### Colouring by what made a point, and by how old it is (Plan 0073)
+
+Every particle carries two extra values, and **neither is guessable from the
+param name**, so read this before reaching for them
+([ADR-0087](../docs/adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md)).
+
+- **`map` — which part of the figure a point belongs to.** It is the index of
+  the affine map applied on that particle's *most recent* step, which makes it a
+  property of **position rather than of history**: it names which sub-copy of the
+  figure the point currently sits in. On the fern those four sub-copies are the
+  stem, the body, the left frond and the right frond. So colouring by it
+  genuinely separates the parts of the plant; it is not a per-particle identity
+  that would read as noise.
+- **`age` — how many steps since that particle last restarted.** Particles
+  continuously recycle back onto the figure, each with its own lifetime around
+  3 s, so the population always holds every age at once. Age is really
+  **distance-from-the-restart-points in disguise**: a young particle has been
+  iterated only a few times, so it sits near one of the four points the figure
+  contracts toward, and an old one has spread out across the whole figure.
+
+Each reaches the picture by **two routes**, which is four params:
+
+| Param      | Default | What it does |
+|------------|---------|--------------|
+| `map_tint` | `0`     | Shifts the particle's **palette coordinate** by `±map_tint/2` across the four sub-copies. Rides your own `[palette]`, so a custom ramp, `palette_mix` and `saturation` all reach it for free. |
+| `map_hue`  | `0`     | **Rotates the hue** of the colour the palette returned, by `±map_hue/2` across the same four. Leaves the coordinate alone, so it nudges a part of the figure off your ramp without editing the ramp. `1.0` is a full turn of the wheel. |
+| `age_tint` | `0`     | The palette-coordinate route again, across the age range instead. |
+| `age_hue`  | `0`     | The hue-rotation route, across the age range. |
+
+**Which route do you want?** `*_tint` when the figure's colour should be *yours*
+— you author the ramp and these choose where each part samples it. `*_hue` when
+you like your ramp as it is and just want one part pushed off it. Both are
+centred, so raising either opens a spread around the colour you already had
+rather than sliding the whole figure.
+
+**Two cautions.** `map_tint` and `age_tint` ride the **same** coordinate, so
+binding both hard mixes two gradients into one channel and neither reads
+cleanly — pick one, or keep the second small. And all four are **inert on the
+four map families**: nothing but an IFS writes either value, so binding them on
+`de_jong` does nothing at all rather than doing something subtle.
+
+**You cannot make the recycling itself an instrument.** Its rate is fixed and
+not bindable, so a beat cannot restart a burst of particles. That was a
+deliberate call; `reseed` is the percussive lever on this family.
 
 ### `[spectrum]` — for `spectrum`
 
