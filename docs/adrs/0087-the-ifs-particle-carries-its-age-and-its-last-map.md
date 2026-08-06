@@ -181,6 +181,31 @@ figure at step zero.
 `det(I − M)`, which vanishes only if `M` has an eigenvalue of `1`, which a map with `σ_max < 1`
 cannot.
 
+**"On the attractor" is a theorem, and a chaos run cannot assert it.** This is worth writing down
+because Plan 0073's first draft tried to, and the attempt fails in a way that looks like a tuning
+problem. The membership `pₖ ∈ A` follows from `A = ⋃ fᵢ(A)` with `A` compact and each `fᵢ`
+contractive: `pₖ = lim fₖⁿ(x)` for any `x ∈ A`, and `A` is closed. There is nothing left for a
+measurement to establish. What a chaos game produces is a finite sample of a measure whose *support*
+is `A` — so it can fail to contradict membership, and it can never certify it.
+
+Two consequences, both found by measurement during implementation:
+
+- **A bounding box is a supremum statistic**, fixed by the single rarest point the orbit reached, so
+  two runs' boxes disagree by an amount that iteration count does not control. Measured on the fern:
+  under-coverage `0.046` at 20 k iterations and `0.143` at 100 k — it *grows*. Both boxes approach the
+  true extent from below at a rate set by how thin the invariant measure is at the tips, and their
+  difference does not shrink like a mean would.
+- **Nearest-approach measures distance to a finite sample, not to `A`.** That has a resolution floor
+  at every probe, including probes genuinely on the attractor, since no orbit point lands exactly on
+  a fixed point. So it does not separate a fixed point from a seed-box corner — the two are a
+  difference of small numbers both dominated by sample density.
+
+What *is* assertable is the arithmetic: the residual `‖M p + t − p‖`, whose float bound follows from
+`cond(I − M) ≤ (1 + σ_max)/(1 − σ_max) ≤ 65.7`, and the magnitude bound `‖p‖ ≤ ‖t‖/(1 − σ_max)`
+above. A wrong transcription of the closed form is the only thing that can actually be wrong here,
+and both catch it exactly. The same residual is what separates a fixed point from any other point,
+with a provable margin: `‖fₖ(q) − q‖ ≥ (1 − σ_max)‖q − pₖ‖`.
+
 Only maps with `p > 0` are legitimate respawn targets — a padded slot's fixed point is on the
 attractor only when the pad duplicates a drawn map, which is true of all five curated tables today
 and is exactly the sort of thing that stops being true when a sixth figure is added. The CPU writes
