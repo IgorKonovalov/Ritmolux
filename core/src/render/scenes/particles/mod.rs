@@ -2479,14 +2479,52 @@ impl AttractorScene {
         Some(out)
     }
 
+    /// The CPU-side initial fill.
+    ///
+    /// **The IFS does not fill a box, and that is where backlog 0064 dies**
+    /// (ADR-0087). Every other family scatters uniformly over
+    /// [`AttractorFamily::seed_box`] and contracts onto its attractor over the
+    /// following second, which showed as a legible, hard-edged, axis-aligned
+    /// rectangle for roughly two thirds of a second on every switch into the
+    /// family — the same artifact class ADR-0066 removed from `reseed`, back on
+    /// a different path. An IFS has somewhere legal to start instead: its maps'
+    /// fixed points are **on** the attractor by construction
+    /// ([`ifs::fixed_points`]), so its fill is on the figure at step zero and
+    /// there is no rectangle to fade out at any frame.
+    ///
+    /// **`seed_box` is deliberately untouched.**
+    /// [`AttractorFamily::jitter_extent`] is derived from it as a fraction of its
+    /// spread, so collapsing that spread would make `reseed` silently inert on
+    /// the whole family. What changes is what this function *writes*.
+    ///
+    /// The figure's **base** table, not the resolved one: `configure` runs on a
+    /// preset switch, before that preset's `morph` and levers have been routed,
+    /// so there is no resolved table to ask. Phase 3's continuous respawn targets
+    /// the live resolved table, which is what carries the fill to wherever a
+    /// bound `morph` has taken the figure — within one particle lifetime.
     fn seed(family: AttractorFamily, count: u32) -> Vec<Particle> {
         let (spread, center) = family.seed_box();
+        let fixed = family.figure().map(|f| ifs::fixed_points(&f.table()));
         let mut rng = SeededRng::new(SEED);
         let mut particles: Vec<Particle> = (0..count)
             .map(|_| {
-                let x = center[0] + rng.range(-spread[0], spread[0]);
-                let y = center[1] + rng.range(-spread[1], spread[1]);
-                let seed = rng.next_f32();
+                let (x, y, seed) = match fixed {
+                    // Drawn from the particle's own fixed seed, so which point a
+                    // given particle starts at is a pure function of the seeded
+                    // scatter — the same property every other determinism claim
+                    // in this scene rests on.
+                    Some(points) => {
+                        let seed = rng.next_f32();
+                        let slot = ((seed * ifs::MAPS as f32) as usize).min(ifs::MAPS - 1);
+                        let [x, y] = points.get(slot).copied().unwrap_or([0.0, 0.0]);
+                        (x, y, seed)
+                    }
+                    None => {
+                        let x = center[0] + rng.range(-spread[0], spread[0]);
+                        let y = center[1] + rng.range(-spread[1], spread[1]);
+                        (x, y, rng.next_f32())
+                    }
+                };
                 Particle {
                     pos: [x, y, 0.0],
                     seed,
@@ -4742,6 +4780,67 @@ mod tests {
         let rich = TierConfig::RICH.attractor_particles as usize;
         assert_eq!(floor * size_of::<Particle>(), 2_400_000);
         assert_eq!(rich * size_of::<Particle>(), 7_200_000);
+    }
+
+    /// **Backlog 0064's rectangle stops existing, stated as a count** (Plan 0073
+    /// Phase 2).
+    ///
+    /// "The initial fill is not a box" is exactly this: an IFS seeds at most as
+    /// many *distinct* positions as its figure has drawn maps — at most four —
+    /// where a box fill seeds `count` of them. There is no statistic to converge
+    /// and no tolerance to tune: a box fill cannot pass it and a fixed-point fill
+    /// cannot fail it.
+    ///
+    /// The box families are asserted in the same test rather than a separate one,
+    /// because the number that makes this claim mean anything is the *contrast* —
+    /// `count` against four.
+    #[test]
+    fn the_ifs_fill_is_four_points_and_a_box_fill_is_every_point() {
+        const COUNT: u32 = 512;
+
+        // Compared as bit patterns: two particles at the same position are the
+        // same position, and `f32` has no equality wrinkle here that `to_bits`
+        // does not settle exactly.
+        fn distinct(particles: &[Particle]) -> usize {
+            particles
+                .iter()
+                .map(|p| p.pos.map(f32::to_bits))
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+        }
+
+        for figure in ifs::IfsFigure::ALL {
+            let family = AttractorFamily::Ifs(figure);
+            let drawn = figure.table().maps.iter().filter(|m| m.p > 0.0).count();
+            let seeded = distinct(&AttractorScene::seed(family, COUNT));
+            assert!(
+                seeded <= drawn,
+                "{figure:?} seeded {seeded} distinct positions for {drawn} drawn maps — \
+                 the fill is not landing on the fixed points"
+            );
+            assert!(
+                seeded >= 2,
+                "{figure:?} seeded {seeded} distinct positions: a fill collapsed to one \
+                 point is not a figure either"
+            );
+        }
+
+        // ...and the contrast, on the families that still fill a box. Every
+        // particle lands somewhere of its own, which is the artifact ADR-0066
+        // named and the reason the IFS number above is worth asserting.
+        for family in [
+            AttractorFamily::DeJong,
+            AttractorFamily::Clifford,
+            AttractorFamily::Thomas,
+            AttractorFamily::Lorenz,
+        ] {
+            assert_eq!(
+                distinct(&AttractorScene::seed(family, COUNT)),
+                COUNT as usize,
+                "{family:?} should still scatter over its seed box — this plan changes \
+                 only what the IFS writes"
+            );
+        }
     }
 
     /// ADR-0087's `map` channel is written by the IFS arm and by nothing else.
