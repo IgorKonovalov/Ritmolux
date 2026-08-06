@@ -333,7 +333,7 @@ of the perceived benefit for a fraction of that.
   angle with a hysteresis cache, so the three precomputed geometries and the `floor` between them are
   gone. ADR-0060's Notes carry the lane's `contact_angle_deg` sweep as the starting measurement.
 - **Interior half — PROMOTED 2026-08-04 → [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md) +
-  [Plan 0065](plans/0065-the-mandala-interior.md)**: `[generator] rings`, a closed seven-motif roster
+  [Plan 0065](plans/done/0065-the-mandala-interior.md)**: `[generator] rings`, a closed seven-motif roster
   of concentric rings drawn through the same line renderer, plus three bindable levers
   (`ring_phase` / `ring_spread` / `ring_scale`). Three mandala presets ship. The "hollow ring" is a
   measurement rather than an opinion and the plan closed it as one: the bare rosette occupies

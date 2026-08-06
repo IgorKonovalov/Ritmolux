@@ -1,8 +1,8 @@
 # ADR-0079 — The mandala interior is rings of motifs, and it lives inside `star_pattern`
 
-> **Status:** proposed
+> **Status:** **accepted 2026-08-06** (with an Outcome section)
 > **Date:** 2026-08-04
-> **Related plan(s):** [0065](../plans/0065-the-mandala-interior.md)
+> **Related plan(s):** [0065](../plans/done/0065-the-mandala-interior.md)
 > **Supplements:** [0007](0007-line-geometry-generators.md),
 > [0060](0060-star-pattern-variants-interpolate.md)
 
@@ -127,3 +127,37 @@ The reference image's outer boundary is a scalloped closed curve rather than a r
 motifs, which is a third element beyond rings and interlace. It is deliberately not decided here:
 whether that is a motif ring whose members touch, or a separate boundary curve, is a question for
 the rendered sample set rather than for this ADR.
+
+## Outcome (2026-08-06, at Plan 0065's close)
+
+Everything above shipped as designed: the roster closed at **seven** motifs (`star` and `triangle`
+were cut from the sampled nine — one dissolves into texture by x32, the other duplicates `chevron`
+at twelve times the segment cost), `rings` is optional so a bare interlace is unchanged segment for
+segment, and the budget claim held with room to spare. Three things the decision did not anticipate,
+recorded because they are what a reader would want to know before extending this.
+
+**The closed-roster consequence fired on the very first content pass, not eventually.** The
+open-question above — is the scalloped boundary a ring of touching motifs, or its own primitive —
+went to the sample set as planned, and the user chose **the primitive**, having been shown the
+approximation side by side and told it was one. So the roster's stopping point was reached the same
+day it was drawn, and the engine gap is filed as
+[design-backlog 0071](../design-backlog.md). That is this ADR's "routes back through `architect` +
+`dev`" consequence working, but it is worth knowing it cost a round trip immediately rather than
+after several presets.
+
+**Filling the interior made the scene measure *sparser*, not denser.** `star_pattern`'s coverage
+floor in `core/tests/sanity.rs` had to be re-derived downward, `0.34` → `0.12`, because the three
+mandala presets score `0.2442`-`0.2544` where the bare interlace they fill scores `0.6908`-`0.7995`.
+The figure is unambiguously fuller; the pixel statistic is lower, because at that test's 96x96
+capture a hairline over a 46-fold ornament aliases to almost nothing and `coverage` there measures
+halo and trail rather than geometry. Measured, not inferred: the bare rosette and the 46x-denser
+mandala score *identically* at one tuning, and 54 % more geometry moves the number 2.6 %. The
+re-derivation is Plan 0065 Phase 7; the measure's replacement is
+[design-backlog 0072](../design-backlog.md), still open.
+
+**The interlace-plus-rings composition survived the judgement that nearly cut it.** The reviewing
+session read the twelve-fold interlace as a separate coarse figure sitting on top of the ornament
+rather than framing it, and recommended against shipping it; the user kept it, and on the rendered
+result it reads as a star frame around the ornament. Both compositions ship — `star_mandala` is the
+ornament alone, `star_weave` the roster inside the interlace — so backlog 0007's composition
+question is answered rather than dropped.

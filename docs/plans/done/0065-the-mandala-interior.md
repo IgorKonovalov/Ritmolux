@@ -1,32 +1,40 @@
 # 0065 — The mandala interior: `star_pattern` stops being hollow
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, and **gated by nothing**. It is line-geometry
-> work and shares no file with any other plan in the roster, so it is the safest parallel lane
-> available. Phases 1-2 are `dev` and run start-to-finish; **Phase 3 is `human`** (pick the motif
-> roster from the rendered grid) and gates Phases 4-6, so the plan does not close in one session.
+> **Status:** **done 2026-08-06** — Phases 1, 2, 4, 5 and 7 landed on `plan-0065-mandala-interior`
+> as `33e5efc` / `1904469` / `419418f` / `a35485a` / `b026ff3`, with `3c0e56a` recording the Phase 3
+> human verdict and `d4030b2` merging `main`. The full gate is green on the merged tip (`fmt`,
+> `clippy --all-targets -D warnings`, **566/566 nextest, 0 skipped**, doc links resolve) and **no
+> golden baseline moved or was added** — `git diff main -- core/tests/golden/` is empty and
+> `LMV_BLESS` was never run, exactly as the plan promised. Mode 4 review: **no blockers**.
 >
-> **Architect disposition, 2026-08-06 — the plan is NOT blocked, and a Phase 7 was added.** Phases
-> 1-5 have landed on `plan-0065-mandala-interior` (`33e5efc` / `1904469` / `3c0e56a` / `419418f` /
-> `a35485a`, clean tree, no golden baseline moved and `LMV_BLESS` never run). The lane closed with
-> `sanity.rs` red on the three new presets and read that as a block on
-> [backlog 0072](../design-backlog.md). It is not one. `coverage_floor` is **derived from the shipped
-> library** at half each family's sparsest member, with `MAX_FLOOR_SLACK` as the mechanism that
-> forces re-derivation when that minimum moves — so the gate fired correctly, a human looked, the
-> content is good, and the documented answer is to re-measure the floor. That is **Phase 7**, added
-> below. Backlog 0071 stays open at medium-high; it is the measure's replacement, on its own
-> schedule, and re-derivation is not its fix.
+> **Phase 6 did NOT run as a plan phase, and this closes anyway — deliberately, at the user's call.**
+> The live judgement it asked for happens immediately after this close, outside the plan. Part of it
+> is already answered from the running app: the user rejected the washed-out first draft, approved
+> the solid-stroke retune, cut eight rings as lace, and kept `rings in weave` against the reviewing
+> session's reading of the sample. What remains unanswered is counter-rotation against real music and
+> `glow` + `thickness` together on adjacent thin rings, which is the additive-ceiling risk this plan
+> named. Anything that pass turns up is ordinary `preset-author` work on shipped presets, or a
+> backlog entry — not a reopened plan.
 >
-> **What is actually owed before the close:** Phase 6 (`human`, unrun — a plan with an unrun phase
-> cannot flip to `done`), then Phase 7, then the ADR-0053 close ceremony. Two things the close will
-> trip on: `main` and this branch each minted a design-backlog entry **`0070`** on 2026-08-06 for
-> different findings, so this lane's `0070`/`0071`/`0072` renumber to `0071`/`0072`/`0073` at the
-> merge and `design-backlog-archive.md` conflicts too; and `main` has reached `v0.41.0`, so the
-> close-ceremony bump is **`cargo release minor` → `v0.42.0`**, run on the branch after the merge.
+> **The gate went red, and the answer was to re-derive the floor rather than hold the plan.** The
+> three presets measure `0.2442` / `0.2505` / `0.2544` against a `star_pattern` coverage floor of
+> `0.34`. That floor is **derived from the shipped library** at half each family's sparsest member,
+> with `MAX_FLOOR_SLACK` as the mechanism that forces re-derivation when the minimum moves — so the
+> gate fired correctly, a human looked, the content is good, and `coverage_floor`'s own doc comment
+> prescribes re-measuring. **Phase 7** was added at this close and does exactly that: `0.2442 / 2 =
+> 0.12`, slack `2.04`. [Backlog 0072](../../design-backlog.md) stays **open at medium-high** as the
+> measure's replacement; re-derivation is not its fix.
+>
+> **Two merge artifacts worth knowing about.** This lane and `main` each minted a design-backlog
+> entry `0070` on 2026-08-06 for different findings, so this lane's `0070`/`0071`/`0072` renumbered
+> to `0071`/`0072`/`0073` at the merge — the Phase 3 and Phase 5 commit messages still cite the old
+> numbers and the mapping is recorded in the entries' own header. And Phase 5's roster cut rode in
+> its own commit rather than Phase 3's, because Phase 3 is `human` and has no commit.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
-> (this plan's decision), [0007](../adrs/0007-line-geometry-generators.md) (the `[generator]`
-> config seam it extends), [0060](../adrs/0060-star-pattern-variants-interpolate.md) (the `variant`
+> **Related ADRs:** [0079](../../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
+> (this plan's decision), [0007](../../adrs/0007-line-geometry-generators.md) (the `[generator]`
+> config seam it extends), [0060](../../adrs/0060-star-pattern-variants-interpolate.md) (the `variant`
 > morph it composes with)
 
 ## TL;DR
@@ -34,7 +42,7 @@
 `star_pattern` gains an optional `rings` roster on its `[generator]` table: concentric rings of
 repeated motifs, each with its own count, radius, scale and phase, drawn through the shared
 `LineRenderer` alongside — or instead of — the Hankin interlace it draws today. This closes
-[design-backlog 0007](../design-backlog.md)'s still-open "hollow ring" half with the *invest, do not
+[design-backlog 0007](../../design-backlog.md)'s still-open "hollow ring" half with the *invest, do not
 cut* decision the user made on 2026-07-26, and it makes the fourth reference image authorable
 directly. First user-visible behavior: a preset declaring four rings draws an ornamental mandala with
 a filled interior instead of a bare rim.
@@ -45,13 +53,13 @@ One of the user's five reference images is not a fractal: it is a drawn ornament
 discrete repeated motifs, thin bright strokes on black, each ring with its own count and radius. It
 is line geometry, and this project has a line scene that has been waiting for exactly this.
 
-[Design-backlog 0007](../design-backlog.md) recorded `star_pattern` as reading like "a hollow ring",
+[Design-backlog 0007](../../design-backlog.md) recorded `star_pattern` as reading like "a hollow ring",
 established by a rendered sweep rather than argument: segments sit near the rim at every
 `contact_angle_deg`, with no meaningful interior change across 12 / 20 / 28 degrees. The user's
 verdict moved from "idea is interesting but looks poor" to "very nice, but can we make morphing
 between shapes easier, slower" once preset-side mitigation landed. **That second ask was answered** —
-[ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md) and
-[Plan 0054](done/0054-the-line-scenes-catch-up.md) made `variant` a continuous contact angle. The
+[ADR-0060](../../adrs/0060-star-pattern-variants-interpolate.md) and
+[Plan 0054](0054-the-line-scenes-catch-up.md) made `variant` a continuous contact angle. The
 first ask, the hollow interior, was never decided; the entry says so explicitly and carries the
 user's standing *invest, do not cut* call, along with three unchosen options ("more tilings, an
 off-centre mirror, or drawing the underlying tiling grid").
@@ -71,7 +79,7 @@ on something else — and because the two geometries share the one structural pr
 n-fold rotational symmetry about the frame centre, so a ring count and a fold order are chosen
 together rather than fought. Rejected alternatives (a new `mandala` scene; deriving the interior from
 the tiling; an open motif grammar) are in
-[ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md).
+[ADR-0079](../../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md).
 
 ## Architecture diagram
 
@@ -158,7 +166,7 @@ the whole 8-to-32 count range, which is the property the cut was made on.
 user was shown side A (24 touching `arc` members) and side B (40 overlapping `arc` members faking a
 continuous curve), told explicitly that the engine has no boundary primitive and that side B is an
 approximation, and chose **the primitive**. That is architect + dev work: a new roster member or a
-new `[generator]` key, filed as [backlog 0071](../design-backlog.md). **It does not gate Phases 4-5**
+new `[generator]` key, filed as [backlog 0071](../../design-backlog.md). **It does not gate Phases 4-5**
 — none of the three chosen compositions carries a boundary ring.
 
 **3. Three compositions ship:** **four rings**, **six rings**, and **rings in weave**. **Eight rings
@@ -173,7 +181,7 @@ answer. Keeping it also keeps backlog 0007's composition question answered rathe
 
 The user judged `presets/star_mandala.toml` in the running app and rejected it: *"maximally lame —
 all lines are half transparent, line connections are visible, there is no curve lines"*. Those are
-filed as [backlog 0072](../design-backlog.md) and [backlog 0073](../design-backlog.md), and **0072
+filed as [backlog 0072](../../design-backlog.md) and [backlog 0073](../../design-backlog.md), and **0072
 lands directly on this plan's Phase 5**:
 
 The preset's `glow` (0.85 -> 1.55) and `trails` (0.26 -> 0.40) were raised *only* to clear
@@ -196,7 +204,7 @@ this geometry should look like.
   defaulting to the static configuration so Phase 1's captures do not move.
 - **The gate hazard this phase must design around, not discover:** `core/tests/animation.rs` renders
   at 96×96 and diffs whole frames, so a rotationally symmetric figure is nearly invariant under
-  rotation — [design-backlog 0009](../design-backlog.md) documented exactly this penalty for
+  rotation — [design-backlog 0009](../../design-backlog.md) documented exactly this penalty for
   `star_rosette`, and a ring mandala is *more* rotationally symmetric than the rosette was. **Spin
   alone will not pass the gate.** `ring_spread` and `ring_scale` are radial and will; the shipped
   presets must carry their animation on those.
@@ -213,7 +221,7 @@ this geometry should look like.
   five keys, the closed motif names, the segment budget and what happens at the cap, and the three
   new params. It is load-bearing for the `preset-author` lane, which keeps no catalogue of its own.
   `docs/presets.md` is **not** touched: no grammar change. **Also strike through
-  [design-backlog 0007](../design-backlog.md)** with a pointer here — its interior half is what this
+  [design-backlog 0007](../../design-backlog.md)** with a pointer here — its interior half is what this
   plan closes, and the entry has been half-struck since Plan 0054.
 - **Done when:** the docs are swept, backlog 0007 is struck through in full, and every existing
   golden baseline is byte-identical (this plan adds geometry behind an absent-by-default roster and
@@ -264,7 +272,7 @@ this geometry should look like.
   figure. The three mandalas also join `geometry_extent.rs`'s line-family sweep at the merge, which
   asserts every line preset draws segments at all.
 - **What this is NOT.** It is not the fix for
-  [backlog 0072](../design-backlog.md) — that entry stays open at medium-high with all three of its
+  [backlog 0072](../../design-backlog.md) — that entry stays open at medium-high with all three of its
   measurements, and re-deriving is what happens on this family's floor *whether or not* the measure
   is replaced later. No other system's floor moves, `MAX_FLOOR_SLACK` is untouched, and no preset is
   retuned to meet a number.
@@ -302,13 +310,13 @@ struct Ring {
   rings × count × resolution, and the failure is the same silent truncation from either direction.
   Phase 5 documents it; nothing detects it.
 - **Thin concentric strokes are the worst case for the additive ceiling.** Where adjacent rings'
-  halos overlap they sum, and [Plan 0040](done/0040-line-joins-finish-the-job.md)'s close found
+  halos overlap they sum, and [Plan 0040](0040-line-joins-finish-the-job.md)'s close found
   exactly this on a mirrored line preset — the *quietest* part of the readout rendering as its
   brightest. Phase 6 should watch `glow` and `thickness` together, not separately.
 - **Phase 3 is `human` and gates Phases 4-6**, so this plan does not close in one session by
   construction.
-- **[Plan 0055](done/0055-the-fold-edge-becomes-a-choice.md) and
-  [Plan 0064](0064-the-symmetry-stage-and-the-banded-palette.md) do not touch this file at all** —
+- **[Plan 0055](0055-the-fold-edge-becomes-a-choice.md) and
+  [Plan 0064](../0064-the-symmetry-stage-and-the-banded-palette.md) do not touch this file at all** —
   this plan is line-geometry work and shares nothing with the post chain. It can run in parallel with
   either.
 
