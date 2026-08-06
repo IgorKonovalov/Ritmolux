@@ -1,0 +1,113 @@
+# Starfield - the look Plan 0070 was built for, and the first shipped preset to
+# name a mark silhouette. Small white-gold stars on black, drifting rather than
+# falling, re-cutting their point count on every beat.
+#
+# WHY THE SWARM AND NOT THE EMITTER, WHICH HAS THE BETTER TWINKLE. The emitter is
+# the obvious choice: it carries `twinkle`, whose rate and phase come off each
+# object's own seed, so a field shimmers while the frame's total light sits
+# still - exactly what stars do and what a whole-field brightness term cannot
+# fake. It was drafted that way first and it renders beautifully in a long
+# capture. It is not what ships, for a reason that is arithmetic rather than
+# taste:
+#
+#   The emitter's source line is fixed at y = -1.12 and cannot be moved, so a
+#   star has to TRAVEL 2.12 units to cross the sky. A drift slow enough to read
+#   as a sky - 0.85 units a second - needs ~2.5 s to fill the frame. Every
+#   behavioral gate in the suite captures 30 frames at 1/60 s, which is 0.5 s, so
+#   the gate sees an empty sky: measured, the emitter draft reported cover 0.013
+#   and 0.000 on all four bands. Speeding it up until the gates can see it - the
+#   ~4.3 units a second the geometry demands - is a rising shower, not a
+#   starfield, and the twinkle stops reading at that speed anyway.
+#
+# The swarm's population is fixed and present from the first frame, so it has no
+# warm-up at all. What it costs is the per-star twinkle: a swarm binding moves
+# the WHOLE field at once, so the shimmer below is a slow global breath plus a
+# beat flash, and the per-star life comes from `size_spread`-like variation the
+# swarm does not have either. That gap is written up for architect.
+#
+# THE FIELD IS THINNED WITH `zoom`, NOT WITH A SMALLER MARK. The population is
+# fixed at the tier's 10 000, so a mark big enough to show seven points saturates
+# the frame at zoom 1 - the first draft was an even confetti mush. Zoom spreads
+# the toroidal domain so only a few hundred marks land in shot, which is the same
+# move the engine's own shaped fixture makes.
+system = "swarm"
+name = "Starfield"
+
+[palette]
+# White-gold: a deep ember at the foot of the ramp so the dimmest stars still
+# carry colour, climbing to a warm white the brightest reach.
+stops = [
+  { at = 0.00, color = "#1a0e00" },
+  { at = 0.35, color = "#a86a1e" },
+  { at = 0.70, color = "#ffd98a" },
+  { at = 1.00, color = "#fffdf2" },
+]
+
+[params]
+# THE SILHOUETTE. `shape = 3` is the star; the count flips per beat across 7, 8
+# and 9 - the trick Plan 0070 named. The stepping is what makes it work: a
+# fractional count tears the mark along one ray, so a parameter that SNAPS is the
+# only way a per-beat re-cut looks deliberate rather than broken. It is
+# deliberately absent from [smoothing] for the same reason.
+shape  = "3"
+points = "7 + floor(hash(beat_index) * 2.999)"
+
+# THE SKY. A slow drift - this is the calmest swarm in the set and it should read
+# as a sky turning, not as a current. `force` and `field_freq` stay low and move
+# on long sines; `burst` is the one fast term, and it scatters on the transient.
+force      = "0.34 + sin(time * 0.023) * 0.06 + clamp(mid * 0.176, 0, 0.15)"
+field_freq = "0.85 + sin(time * 0.017) * 0.14"
+spin       = "0.012 + clamp(mid * 0.0118, 0, 0.010)"
+burst      = "clamp(beat * 0.22 + clamp(onset * 0.33, 0, 0.20), 0, 0.42)"
+
+# THE MARK AND THE THINNING - see the header. `size` carries the beat flash as a
+# swell rather than a brightness push, because peak energy on luminance is what
+# turns a field of points into a wash with the points gone.
+size = "5.4 + clamp(bass * 1.06, 0, 0.90) + beat * 0.70"
+# THE ZOOM IS FITTED TO A STABLE REGIME AND THAT IS NOT THE SAME AS "TO TASTE".
+# Thinning the field further is prettier in a still - at 6.2 this is a sparse
+# night sky with a lot of black - but coverage there reads 0.080 against the
+# swarm floor of 0.42, so it cannot ship. What is worth knowing is the shape of
+# the number in between: measured at the loud frame, zoom 1.5 / 2.4 / 3.6 gives
+# coverage 0.846 / 0.866 / 0.903, smooth and monotone, while 3.8 / 4.0 / 4.2 /
+# 4.4 gives 0.207 / 0.960 / 0.957 / 0.145. That cliff is not density - it is the
+# bloom haze crossing the metric's 10/255 lit threshold, so a preset parked there
+# would pass or fail on an invisible wash and flip on any bloom change. This base
+# and its whole travel (1.65..2.75 with the sine and the bass term at their
+# extremes) stay inside the smooth region, which is what makes the margin real.
+zoom = "2.40 + sin(time * 0.019) * 0.30 - clamp(bass * 0.35, 0, 0.30)"
+
+# THE LIGHT. Held nearly flat on purpose: the visible reactivity is the star
+# COUNT changing shape, the field scattering on a transient, and the marks
+# swelling - all structure. The brightness term is the small one.
+brightness  = "0.82 + clamp(mid * 0.141, 0, 0.12) + beat * 0.08"
+hue_center  = "0.11 + sin(time * 0.011) * 0.02"
+hue_spread  = "0.20 + clamp(treb * 0.167, 0, 0.10)"
+saturation  = "0.78 + clamp(treb * 0.25, 0, 0.15)"
+
+# THE BACKDROP stays black. The whole look is small bright marks over nothing,
+# which is precisely the case where a raised backdrop puts a floor under the
+# figure and spends the contrast the stars live on.
+bg_bright   = "0"
+bg_vignette = "0.72"
+
+# Bloom is the point on a preset made of small over-range marks: at the default
+# threshold of 1.0 - over range, in exposed units since ADR-0080 - only the
+# brightest stars halo, so a few flare and the rest stay crisp points.
+bloom_amount    = "0.60 + clamp(bass * 0.235, 0, 0.20)"
+bloom_threshold = "1.0"
+bloom_radius    = "1.15"
+
+[smoothing]
+# The mark swells fast and releases slowly, so a beat reads as a flare rather
+# than a square pulse. `points` is absent deliberately - see its comment above.
+size         = { attack = 0.02, release = 0.34 }
+brightness   = { attack = 0.03, release = 0.30 }
+burst        = { attack = 0.02, release = 0.28 }
+force        = 0.60
+field_freq   = 1.40
+zoom         = 0.45
+hue_spread   = 0.85
+hue_center   = 0.70
+saturation   = 0.50
+bloom_amount = 0.50
