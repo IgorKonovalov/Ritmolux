@@ -21,7 +21,6 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0067](0067-the-curation-route.md) | The curation route: a gate worth trusting, and the preset that has been waiting six weeks | **approved 2026-08-04** — ready for `dev`; from the [backlog sweep](../design-backlog.md#0056--a-user-authored-preset-has-been-living-outside-the-repo-for-six-weeks-and-it-is-a-curation-candidate-the-boundary-has-no-route-for); [ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md), the **ADR-0017 supplement this repo has owed since ADR-0022** removed its premise. The boundary moves: `preset-author` lands presets, `architect` curates the set. Phase 1 first makes the gate that authorizes it worth leaning on — **all five preset gates synthesize `AnalysisFrame` and none runs the analyzer**, so "the suite is green" currently means the renderer did something with numbers we made up. **Phase 3 is `human`** (the untracked Chthonic Coral Oracle; declining it is a successful outcome). Moves no pixels | dev, human |
 | [0068](0068-why-the-downbeat-rarely-locks.md) | Why the downbeat rarely locks: an instrument, an ablation, and a verdict | **approved 2026-08-04** — ready for `dev`; from the [backlog sweep](../design-backlog.md#0042--the-downbeat-estimator-locks-on-3--of-audible-time-so-the-gated-bar-variables-are-almost-always-fallback); [ADR-0082](../adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md), supplementing ADR-0050. **Ships no fix on purpose.** The estimator locks on 3.1 % of audible time and three terms could be responsible; the only instrument prints the outcome, not the terms. **`CONFIDENCE_THRESHOLD` does not move** — adjusting a safety gate using data collected while the gate was closed is circular. **Phase 3 is `human`** and mid-plan. Moves no pixels | dev, human |
 | [0069](0069-the-instrument-that-sees-a-figure-leave-the-frame.md) | The instrument that sees a figure leave the frame (in-frame geometry fraction at the line renderer's draw seam) | **approved 2026-08-04** — ready for `dev`; from the [backlog sweep](../design-backlog.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor); [ADR-0083](../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md). Plan 0058 measured that **no pixel-coverage threshold convicts an over-scaled figure** — the two defective presets score *above* the legitimate content. The successor is measured inside `LineRenderer::draw`, which already holds every endpoint and the target aspect, so all four line families are covered with **no `Scene` change** (answering ADR-0067's stated objection rather than overriding it). **The only plan here with no `human` phase — it closes in one session.** Adds no baseline | dev |
-| [0070](0070-shaped-marks.md) | Shaped marks: the particle sprite stops being a circle (`shape` / `points` as an SDF on `swarm` + `emitter`) | **approved 2026-08-04** — ready for `dev`; from the [backlog sweep](../design-backlog.md#0033--every-mark-the-engine-can-draw-is-a-round-additive-blob-or-a-stroked-curve-so-no-object-has-a-shape); [ADR-0084](../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md). The engine's only marks are a round blob and a stroked curve; the user asked twice for scattered shaped objects. **Answers the silhouette half only** — a heart in additive light is a heart-shaped glow, and the fill-and-outline half reopens ADR-0018/0056 and stays in the backlog. The user picked the SDF route over a glyph atlas, a fill/stroke path and author-supplied WGSL. **Phase 6 is `human`** and terminal. Every existing baseline byte-identical (`disc` is the default and the same three lines); adds one | dev, human |
 | [0071](0071-light-that-adds-without-covering.md) | Light that adds without covering: `occlude`, decided from a sample set | **approved 2026-08-04** — ready for `dev`; from the [backlog sweep](../design-backlog.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle); [ADR-0085](../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md), supplementing ADR-0056. Coverage-as-alpha means a fragment occludes the backdrop whatever light it emits, so `bg_bright` can rise only to the figure's dimmest emitted luminance — a ceiling nobody chose, on a floor the ADR-0056 fix *invited* raising. One scalar at the backdrop composite; default `1.0` is byte-identical. **Phase 3 is `human`** and mid-plan — the default is decided by looking, over a **lit** backdrop, because at `bg_bright = 0` the two models are identical | dev, human |
 | [0072](0072-the-backdrop-joins-the-palette.md) | The backdrop joins the palette (`bg_hue` becomes a coordinate in the preset's own gradient) | **approved 2026-08-04** — ready for `dev`, gated by nothing; from the `preset-author` handoff after `emitter_squall` ([backlog 0059](../design-backlog.md#0059--the-backdrop-is-the-one-surface-left-that-does-not-colour-through-the-shared-palette-and-nothing-says-so)); [ADR-0086](../adrs/0086-the-backdrop-colours-through-the-preset-palette.md). `background.rs:70` holds the **third copy** of the cosine constant [ADR-0021](../adrs/0021-shared-palette-system.md) exists to de-duplicate, and binds no LUT — so `[palette]`, `saturation` and `palette_mix` stop at the scene and never reach the sky. Every other surface converged (RD at Plan 0020, the line families at [0054]); this is the last one out. **Eleven lit-backdrop presets provably cannot move** (their gradient already *is* `spectrum`, and the difference is sub-LSB by arithmetic in the ADR); **fifteen re-tint** and get a `human` pass. Two golden fixtures move visibly and are re-blessed — and **only** those two. The real risk is [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md)'s WARP layout aliasing: the new bind group is shape-identical to the fragment field's group 1 | dev, human |
 
@@ -43,7 +42,7 @@ preference, and a session may take any plan here.
 | 4 | [0065] | **Gated by nothing and shares no file with anything** — line geometry against a post chain and a particle scene. The safest parallel lane, and it can run *alongside* 1-3 rather than after them | No — Phase 3 is `human`, mid-plan |
 | 4 | [0064] | **Unblocked — [0055] has landed**, so the `kaleido_edge` branch it composes against is in place. Still deliberately after the attractor work rather than concurrent with it: its Phase 3 sample grid renders on `attractor_lorenz` as one of three sources, and [0063] changes what that source looks like. A look decision taken against a moving target is one that has to be retaken. **Read [0055]'s Recently-closed entry** — the fold's default is now `tile`, not the disc 0064 was drafted against | No — Phase 4 is `human`, mid-plan |
 | 5 | [0053] | Protective rather than additive; moves no pixels. Its `human` Phase 3 is runnable on this box after the 2026-08-04 premise correction. **Read BOTH [0052]'s and [0055]'s Recently-closed entries first** — each moved a bind-group layout 0053 asserts on, and neither moved in the direction 0053 predicted | No — Phase 3 is `human` |
-| 6 | [0070] | Shaped marks. `swarm.rs` + `emitter.rs` — **collides with nothing else in the roster**, so it is the other safe parallel lane beside [0065]. Sequenced here rather than earlier only because it is additive capability rather than a correction | No — Phase 6 is `human`, terminal |
+| ~~6~~ | ~~[0070]~~ | **Closed 2026-08-05** — see Recently closed. All six phases landed. `swarm.rs` and `emitter.rs` now both read a shared `marks.rs` SDF chunk, so anything touching either scene's fragment shader should read that file rather than the scene alone | — |
 | 7 | [0071] | `occlude`. Touches `post.rs`'s backdrop composite, which [0064] does not (that is the fold shader). **Its Phase 5 retune wants to run as one pass with [backlog 0038] and [backlog 0058]** — all three are retunes of the same shipped set against a composite that moved under it, all three are judged over a lit backdrop, and doing them separately walks the same presets three times | No — Phase 3 is `human`, mid-plan |
 | 8 | [0068] | The downbeat diagnosis. `dsp/downbeat.rs` and a test — shares no file with anything. Sequenced late because it ships no fix and blocks nobody, not because it is unimportant: it is the one item here whose *absence* is silently mis-teaching authors to bind layer-2 variables | No — Phase 3 is `human`, mid-plan |
 | 9 | [0067] | The curation route. Its Phase 1 touches `core/tests/reactivity.rs`, adjacent to [0061]'s CI and coverage work — keep that seam clean if both are live | No — Phase 3 is `human` |
@@ -118,10 +117,20 @@ held ~8 GB in `target/debug/incremental` and filled the disk mid-session), and `
 fails with `Permission denied` on Windows while any shell still has its working directory inside.
 
 
-**NO LANE IS LIVE AS OF 2026-08-04, LATE.** [0063] and [0036] both closed that day and `main` is at
+**NO LANE IS LIVE AS OF 2026-08-05, LATE.** [0066] and [0070] both closed that day and `main` is at
+`v0.40.0`; [0062] closed the same day at `v0.38.0`. `git worktree list` shows **only the main
+checkout** — every plan worktree has been removed — and the working tree is clean.
+
+**One thing that day cost time and will recur.** [0070]'s terminal `human` Phase 6 produced its
+preset and left it **untracked**, so the close ceremony found a finished deliverable that was not in
+the repo — and `cargo release` refuses to run against *any* dirty file, so the bump for the
+*other* plan closing that session was blocked by it. A `human` phase's output is not landed until it
+is committed; check `git status` before starting a close, not after.
+
+~~**NO LANE IS LIVE AS OF 2026-08-04, LATE.** [0063] and [0036] both closed that day and `main` is at
 `v0.37.0`. The main checkout's working tree is free again, and `lmv-plan-0036`'s worktree is spent —
-**remove it before opening the next lane** (`git worktree remove`; on Windows it fails with
-`Permission denied` while any shell still has its working directory inside).
+**remove it before opening the next lane**~~ (`git worktree remove`; on Windows it fails with
+`Permission denied` while any shell still has its working directory inside — that warning stands).
 
 **What that day taught, kept because it will recur.** [0063] ran **in the main checkout on `main`,
 not in a worktree** — a deviation from [ADR-0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md),
@@ -811,6 +820,47 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0070 — Shaped marks](done/0070-shaped-marks.md) — **done 2026-08-05**, Mode 4 review **no
+  blockers, one minor**. Phases 1-5 `5d21e76` / `c15112a` / `564f3bd` / `d922ce1` / `a87e05b` on
+  `plan-0070-shaped-marks`, merged `main` in as `7d5e43f` per ADR-0053 and fast-forwarded; the
+  terminal `human` Phase 6 landed at this close as `20657a8`. Full gate green on the merged tip with
+  the preset embedded (`fmt`, `clippy --all-targets -D warnings`, **538/538 nextest, 0 skipped**),
+  doc links resolve, **no existing golden baseline moved** (one added).
+  [ADR-0084](../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) is
+  **accepted with an Outcome section**.
+
+  **The ADR's headline worry did not materialize, and the way it was measured is the transferable
+  part.** It booked "a branch in the hottest fragment shader" as a known negative. Measured on an
+  RTX 3080 Laptop in release at 1280x720 with 10 000 particles, the **matched-coverage isolate** — a
+  12-sided polygon at 75 % quad coverage against the disc's 78 %, taking the full `atan2`/`floor`/
+  `cos` path — reads 0.858 ms against the disc's 0.877, with a run-to-run spread of ~0.01 ms. The
+  branch's arithmetic is **below the resolution of the measurement**. The plan's own figure, a
+  7-pointed star, is 19 % *faster* because it lights 34 % of the quad. Naively measuring
+  disc-against-star would have "shown" a 19 % saving from a branch, which is why the third probe
+  exists: **any fragment-shader cost reading owes a matched-coverage isolate**, or it prices the
+  silhouette rather than the code. Per ADR-0071 `core/tests/mark_cost.rs` reports and does not gate,
+  and skips with a notice on a software rasterizer.
+
+  **The done-whens were checked on pixels, not on the quantizer.** The seven-maxima claim is counted
+  off a real capture at 5, 7 and 9 points, with a **disc as the noise control** — a circle must
+  return exactly one lobe, or the star counts would be reading rasterization noise. The stepping
+  claim is asserted twice and the second one is the load-bearing one: the eased `7 → 9` sweep is
+  *rendered* and the frames grouped by exact equality, so a count re-derived fractionally further
+  downstream would still be caught.
+
+  **The one minor:** `marks.rs`'s tests carry a CPU mirror of the WGSL SDF, kept identical by
+  inspection (the `kaleidoscope.rs` `edge_sample_radius` precedent). The pixel-level tests render the
+  real shader for `disc` and `star`, so a mirror drift on `ring`, `heart` or the polygon inradius
+  would go unnoticed. Not worth a change now; worth knowing before editing either copy.
+
+  `disc` means something different on each scene on purpose — the emitter's is its pre-existing
+  anisotropic *glint*, so its `spin` stays visible and every shipped emitter preset is untouched.
+  Backlog 0033's silhouette half closes; its **fill-and-outline half is re-filed as
+  [backlog 0069](../design-backlog.md)**, as that entry asked. Phase 6 also raised
+  [backlog 0068](../design-backlog.md): the swarm has no per-mark variation, and the emitter — which
+  has exactly the `twinkle` a starfield wants — cannot hold one, because its fixed source line needs
+  ~2.5 s to fill the frame and every behavioral gate captures 0.5 s.
 
 - [0066 — The level lever](done/0066-the-level-lever.md) — **done 2026-08-05**, Mode 4 review **no
   blockers, one minor**. Phases 1-4 `2a4f65c` / `2e2cc32` / `0f10f18` / `3502c2e`, the terminal

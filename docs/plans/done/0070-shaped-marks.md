@@ -1,15 +1,19 @@
 # 0070 — Shaped marks: the particle sprite stops being a circle
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing. It touches `swarm.rs` and
-> `emitter.rs` and **collides with nothing else in the roster**, so it is a safe parallel lane
-> beside [0065](0065-the-mandala-interior.md). Phases 1-5 are `dev` and nothing gates them, so they
-> run start-to-finish in one session; **Phase 6 is `human`** (the starfield preset) and terminal.
-> Every existing golden baseline stays byte-identical — `disc` is the default and is the same three
-> lines it replaces; the plan adds one baseline.
+> **Status:** **done 2026-08-05** — all six phases landed. Phases 1-5 on the
+> `plan-0070-shaped-marks` branch as `5d21e76` / `c15112a` / `564f3bd` / `d922ce1` / `a87e05b`,
+> fast-forwarded to `main`; the terminal `human` Phase 6 as `20657a8` at this close. Mode 4 review
+> 2026-08-05: **no blockers**, one minor (the CPU mirror of the SDF chunk in `marks.rs`'s tests is
+> kept identical by inspection). **Verified:** every pre-existing golden baseline byte-identical
+> (`git diff --name-status` over the whole range adds `swarm_shaped.png` and modifies **zero**);
+> the seven-maxima claim is counted off a real capture at 5, 7 and 9 points with a disc as the
+> noise control; the branch cost is *reported* and not gated, per ADR-0071; the whole gate is
+> green on the merged tip (fmt, clippy, 538/538 nextest) with the Phase 6 preset embedded.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0084](../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md)
-> **Closes:** the silhouette half of [design-backlog 0033](../design-backlog.md#0033--every-mark-the-engine-can-draw-is-a-round-additive-blob-or-a-stroked-curve-so-no-object-has-a-shape)
+> **Related ADRs:** [0084](../../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) (accepted 2026-08-05)
+> **Closes:** the silhouette half of [design-backlog 0033](../../design-backlog.md); the
+> fill-and-outline half is re-filed as its own entry at this close, as that entry asked
 
 ## TL;DR
 
@@ -48,7 +52,7 @@ averages to mid luminance. A heart-shaped *glow* is what this plan delivers.
 
 ## Decision
 
-Per [ADR-0084](../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md): a `shape`
+Per [ADR-0084](../../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md): a `shape`
 enum evaluated as an SDF in the existing fragment shader, `disc` as the default and exactly today's
 arithmetic, on `swarm` and `emitter` only. We rejected a texture atlas (an asset pipeline, and worse
 than an SDF at the small sizes this is *for*), a fill-and-stroke path outside the additive model
@@ -107,8 +111,8 @@ flowchart LR
 - **Files touched:** wherever the scenes fold evaluated params into their uniform; a test.
 - **Done when:** an eased `points` sweeping `7 → 9` produces **only** the figures at 7, 8 and 9 —
   never a partial lobe — and the test states that as the behavioral claim. This is the opposite of
-  what `variant` ([ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md)) and the IFS morph
-  ([ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md)) taught, so it is called out
+  what `variant` ([ADR-0060](../../adrs/0060-star-pattern-variants-interpolate.md)) and the IFS morph
+  ([ADR-0075](../../adrs/0075-ifs-family-morphs-in-singular-value-space.md)) taught, so it is called out
   rather than assumed: a star's angle fold is periodic in the count, and a fractional count is a
   discontinuity, not an intermediate.
 
@@ -121,7 +125,7 @@ flowchart LR
   pre-existing baseline is byte-identical** (no shipped preset names a shape, so they all take the
   disc branch, which is exact); and the per-frame cost with a non-disc shape is *reported* against
   the disc case on the machine it was measured on, not asserted as a threshold
-  ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)). If the
+  ([ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)). If the
   reading is alarming against `docs/nfr.md` §7, say so — do not tune until it passes.
 
 ### Phase 5 — The docs carry the roster and the two warnings
@@ -163,7 +167,7 @@ enum MarkShape { Disc = 0, Ring = 1, Polygon = 2, Star = 3, Heart = 4 }
   rather than per instance is what keeps it uniform; Phase 4 measures rather than assuming. If the
   cost is real, the fallback is separate pipelines per shape, which trades pipeline count for
   branchlessness — and pipeline count has its own hazard on the WARP adapter
-  ([ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md)), so that fallback is not
+  ([ADR-0058](../../adrs/0058-bind-group-layout-collisions-carry-evidence.md)), so that fallback is not
   free either.
 - **Small marks are where SDFs earn their keep and also where they alias.** A seven-pointed star at
   three pixels is mostly its own anti-aliasing. The falloff curve helps (it is a soft edge by
