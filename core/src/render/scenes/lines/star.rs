@@ -2190,7 +2190,11 @@ mod tests {
         // key would get wrong.
         let held = RingMotion::from_params(1.0, 1.0, 1.0);
         for frame in 0..600u32 {
-            let jitter = if frame.is_multiple_of(2) { 0.0004 } else { -0.0004 };
+            let jitter = if frame.is_multiple_of(2) {
+                0.0004
+            } else {
+                -0.0004
+            };
             let want = RingMotion::from_params(1.0 + jitter, 1.0 + jitter, 1.0 + jitter);
             assert!(
                 !held.needs_rebuild(want),

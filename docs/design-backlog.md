@@ -36,7 +36,7 @@ cannot express them.
 | 0004 | `zoom`/`pan_*` smear RD's edge: a toroidal sim behind a clamped sampler | [ADR-0034](adrs/0034-internal-resolution-follows-the-target.md) + [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 5 |
 | 0005 | No bloom / glow / halo stage | [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) + [Plan 0045](plans/done/0045-linear-light-and-bloom.md) |
 | 0006 | `[smoothing]` is a symmetric one-pole: no attack/release split | [ADR-0035](adrs/0035-asymmetric-attack-release-easing.md) + [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 2 |
-| 0007 | `star_pattern` is a hollow ring, and `variant` cannot be blended | Morph half: [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md) + [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md). Interior half: [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md) + [Plan 0065](plans/0065-the-mandala-interior.md) |
+| 0007 | `star_pattern` is a hollow ring, and `variant` cannot be blended | **Closed in full 2026-08-06.** Morph half: [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md) + [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md). Interior half: [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md) + [Plan 0065](plans/0065-the-mandala-interior.md) — `[generator] rings`, three ring levers, three mandala presets |
 | 0008 | `shot` harness gaps that cost the content lane real iterations | [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 1 + [Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md) Phase 4 |
 | 0010 | The fold samples outside its source rectangle and clamps | [ADR-0047](adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) + [Plan 0045](plans/done/0045-linear-light-and-bloom.md) |
 | 0011 | The fold axis is screen-centred, so `pan_*` and `kaleido_*` fight | [ADR-0047](adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) + [Plan 0045](plans/done/0045-linear-light-and-bloom.md) Phase 1 |
@@ -1272,6 +1272,36 @@ every line is half transparent.
 At 96x96 a hairline over a 46-fold ornament aliases to nothing, so `coverage` on this scene is a
 measure of the **halo and the trail**, not of the figure. The only lever that moves it is inflating
 glow and tail — which is exactly the look the user rejected. **The gate is selecting for the defect.**
+
+### What Plan 0065 Phase 5 measured when it refused the trade (2026-08-06)
+
+The phase was told not to buy coverage with `glow` and `trails`, and it did not. Three mandala
+presets ship tuned by eye at 1280x720 with **`glow` at the engine's 1.0 and no `trails` binding at
+all**, and all three **fail** this floor:
+
+```text
+star_pattern  floor 0.34  lowest 0.2442 (Star Mandala) - factor 0.72
+  0.2442 Star Mandala  |  0.2505 Mandala Six  |  0.2544 Mandala Weave  |  0.6908 Star Lantern  |  0.7995 Star Rosette
+```
+
+Three things that sharpen the entry rather than repeating it:
+
+- **`thickness` alone cannot reach the floor at a look anyone would ship.** Swept on the four-ring
+  preset with `glow = 1.0` and no trail: `2.2 -> 0.198`, `3.1 -> 0.244`, `4.6 -> 0.247`,
+  `6.5 -> 0.311`, `9.0 -> 0.366`. The floor is first cleared at a base thickness of about **9**,
+  which is a **29-px-wide stroke at 1080p**; the figure has already started closing into a blot by
+  4.6. The lever the entry hoped for is not enough on its own.
+- **Density still does nothing, now measured within one tuning family.** `Mandala Six` draws 1 684
+  segments against `Star Mandala`'s 1 092 — **54 % more geometry** — for a coverage difference of
+  0.2442 vs 0.2505, i.e. **2.6 %**. That is the entry's central claim reproduced without changing
+  anything else.
+- **The three failures are the honest tuning, and the pictures are the evidence.** Compare
+  `presets/star_mandala.toml` before and after this phase in `git log` — the pre-Phase-5 file carries
+  `glow = 1.55` / `trails = 0.40` and its own comment block explaining the escalation, which is the
+  tuning the user rejected in the running app.
+
+**So the gate is red on `star_pattern` until this entry is taken.** That was accepted deliberately
+rather than papered over; the alternative was to ship the look the user had already refused.
 
 ### Why this is not the same entry as 0054
 

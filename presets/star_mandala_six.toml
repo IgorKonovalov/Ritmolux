@@ -1,0 +1,84 @@
+# Mandala Six - the same vocabulary as `star_mandala`, one register denser. Six
+# rings instead of four, chosen from the Plan 0065 Phase 2 sample sheet against
+# a four-ring and an eight-ring sibling: eight was cut because the centre
+# muddles and the figure reads as lace rather than ornament, and six is the last
+# count where every ring is still individually readable.
+#
+# It is the roster, not the tuning, that makes this a different preset. The
+# stroke, the glow and the absent trail are deliberately the same as
+# `star_mandala`'s, because the question the pair answers is "how much density
+# does this geometry take", and changing two things at once would not answer it.
+system = "star_pattern"
+name   = "Mandala Six"
+
+[generator]
+tiling = "none"
+
+# SIX RINGS, read outward. Note the counts: 1 / 8 / 14 / 20 / 28 / 36 - no two
+# adjacent rings share a factor larger than 2, so no pair locks into a single
+# coarse rotational figure. Under a moving `ring_phase` that is what keeps the
+# ornament from reading as one rigid plate.
+#
+# Every `scale` here is smaller than `star_mandala`'s at the same radius, and it
+# has to be: `scale` is close to the copy's diameter, and at 20 or 36 copies the
+# chord between neighbours is short. These sit at about 0.85x that chord -
+# members distinct but close.
+#
+# SEGMENT BUDGET: 36 + 8*24 + 14*4 + 20*24 + 28*2 + 36*24 = 1684 of the floor
+# tier's 20 000. The `chevron` ring is the cheap one at 2 segments a copy, which
+# is why a 28-count ring costs less than the 14-count diamond ring next to it.
+rings = [
+  { motif = "trefoil",  count = 1,  radius = 0.00, scale = 0.34 },
+  { motif = "circle",   count = 8,  radius = 0.22, scale = 0.143 },
+  { motif = "diamond",  count = 14, radius = 0.38, scale = 0.144 },
+  { motif = "petal",    count = 20, radius = 0.55, scale = 0.146, phase = 0.08 },
+  { motif = "chevron",  count = 28, radius = 0.70, scale = 0.133 },
+  { motif = "circle",   count = 36, radius = 0.82, scale = 0.122 },
+]
+
+[params]
+# Counter-rotation over six rings alternates three ways against three, which is
+# a busier gesture than the four-ring version and wants a slower rate.
+ring_phase = "time * 0.062 + clamp(bass * 0.17, 0, 0.14)"
+
+# THE RADIAL PAIR, and this preset leans on `ring_spread` harder than
+# `star_mandala` does: with six rings there is somewhere for the inner ones to
+# go, so the whole figure opens and closes like a shutter rather than only
+# breathing at the rim.
+ring_spread = "1.00 + sin(time * 0.71) * 0.095 + clamp(bass * 0.15, 0, 0.13)"
+ring_scale  = "1.00 + sin(time * 0.49) * 0.100 + clamp(mid * 0.18, 0, 0.15)"
+
+rotation = "-0.06 * time"
+scale    = "0.94 + sin(time * 0.19) * 0.040"
+zoom     = "1.02 + sin(time * 0.13) * 0.030"
+
+# STROKE, and the same argument as `star_mandala`: `thickness` is the honest
+# lever, `glow` stays at the engine's 1.0, there is no `trails`. A little thinner
+# than the four-ring preset because there are half again as many strokes in the
+# same disc and they would otherwise start to meet - which is the point at which
+# a mandala turns into lace.
+thickness  = "2.70 + clamp(bass * 1.40, 0, 1.15) + beat * 0.40"
+brightness = "0.95 + clamp(treb * 0.38, 0, 0.32)"
+
+# Six radii instead of four, so the radial ramp has more to walk along; a wider
+# `hue_spread` than `star_mandala` and a cooler base separate the two at a
+# glance.
+hue        = "0.12 + time * 0.009 + clamp(treb * 0.34, 0, 0.26)"
+hue_spread = "0.78 + clamp(mid * 0.18, 0, 0.15)"
+saturation = "0.90"
+
+bg_hue      = "0.10 + sin(time * 0.0070) * 0.04"
+bg_bright   = "0.014 + clamp(mid * 0.010, 0, 0.008)"
+bg_vignette = "0.82"
+
+[smoothing]
+ring_phase  = 0.25
+ring_spread = 0.35
+ring_scale  = 0.40
+rotation    = 0.20
+scale       = 0.45
+zoom        = 0.22
+thickness   = { attack = 0.02, release = 0.32 }
+hue         = 0.40
+hue_spread  = 0.55
+bg_bright   = 0.40

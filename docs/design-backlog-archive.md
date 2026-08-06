@@ -327,11 +327,25 @@ of the perceived benefit for a fraction of that.
 
 ## ~~0007 — `star_pattern` reads as a hollow ring, and discrete `variant` cannot be blended~~
 
-- **PROMOTED 2026-08-01 → [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md) +
-  [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md)** — the *smooth transition* ask is decided:
-  `variant` becomes a continuous contact angle with a hysteresis cache. **The interior "hollow
-  ring" half is NOT decided** and stays live; ADR-0060's Notes carry the lane's
-  `contact_angle_deg` sweep as the starting measurement. Notes below retained as the origin record.
+- **CLOSED IN FULL 2026-08-06.** Both asks are now built, and the entry has no live half left.
+- **Morph half — PROMOTED 2026-08-01 → [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md) +
+  [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md)**: `variant` becomes a continuous contact
+  angle with a hysteresis cache, so the three precomputed geometries and the `floor` between them are
+  gone. ADR-0060's Notes carry the lane's `contact_angle_deg` sweep as the starting measurement.
+- **Interior half — PROMOTED 2026-08-04 → [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md) +
+  [Plan 0065](plans/0065-the-mandala-interior.md)**: `[generator] rings`, a closed seven-motif roster
+  of concentric rings drawn through the same line renderer, plus three bindable levers
+  (`ring_phase` / `ring_spread` / `ring_scale`). Three mandala presets ship. The "hollow ring" is a
+  measurement rather than an opinion and the plan closed it as one: the bare rosette occupies
+  **1 of 10** radial shells, a four-ring mandala **9 of 10**.
+- **The plan also answered this entry's composition question** — "is the interlace worth keeping" —
+  by shipping both: `star_mandala` is the ornament alone and `star_weave` is the same roster inside
+  the twelve-fold interlace. Which reads better against real music is Plan 0065 Phase 6, and it is
+  the one part of this entry that only a live judgement can settle.
+- **Two findings the same work raised are live and are NOT this entry**: the coverage floor that
+  pushes this scene toward washed-out tuning ([0071](design-backlog.md)), and the scalloped boundary
+  the user chose as a real curve primitive ([0070](design-backlog.md)). Notes below retained as the
+  origin record.
 
 - **Raised:** 2026-07-26, from `preset-author`. The user's verdict: **"idea is interesting but looks
   poor"**, and separately "change between star rosette shapes should be smooth".
