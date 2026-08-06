@@ -952,6 +952,71 @@ pub fn chaos_extent(table: &IfsTable, iterations: u32) -> Extent {
     Extent { lo, hi }
 }
 
+/// One map's fixed point `(I − M)⁻¹ t` — **a point that is on the attractor**.
+///
+/// That it lies on `A` is a consequence of the parameterization rather than of
+/// anything this plan added: `A = ⋃ fᵢ(A)` with `A` closed makes each `fᵢ`'s
+/// fixed point the limit of `fᵢⁿ(x)` for any `x ∈ A` (ADR-0075's Notes,
+/// ADR-0087). **It does not exist for De Jong, Clifford, Thomas or Lorenz**, and
+/// that is why the respawn ADR-0087 builds on this is IFS-only structurally
+/// rather than by default.
+///
+/// **Closed form, and unguarded on purpose.** For `M = [[a, b], [c, d]]`,
+/// `(I − M)⁻¹` is `1/Δ · [[1 − d, b], [c, 1 − a]]` with
+/// `Δ = (1 − a)(1 − d) − bc`. `Δ ≠ 0` **follows from contractivity rather than
+/// being checked**: `Δ` is `det(I − M)`, which vanishes only if `M` has an
+/// eigenvalue of `1`, which `σ_max < 1` forbids — and [`SIGMA_CEILING`] is
+/// enforced on every reachable table. The magnitude is bounded the same way,
+/// `‖(I − M)⁻¹‖ ≤ 1/(1 − σ_max)`, at most `33.3` under the `0.97` ceiling. So
+/// there is nothing here for a caller to fall back to, which is the same shape
+/// as the rest of this module: safety by construction, not by a guard.
+fn fixed_point(map: &IfsMap) -> [f32; 2] {
+    let Affine { a, b, c, d, e, f } = map.to_affine();
+    let delta = (1.0 - a) * (1.0 - d) - b * c;
+    [
+        ((1.0 - d) * e + b * f) / delta,
+        (c * e + (1.0 - a) * f) / delta,
+    ]
+}
+
+/// Every map's fixed point, **with the padded slots filled by duplication**.
+///
+/// A table always carries [`MAPS`] maps, but a figure with fewer duplicates one
+/// at probability `0` — and a padded slot's fixed point is on the attractor only
+/// when the pad happens to duplicate a drawn map. That is true of all five
+/// curated tables today and is exactly the sort of thing that stops being true
+/// when a sixth figure is added, so this returns only the `p > 0` maps' points,
+/// repeated around all four slots. Every consumer then picks one of four
+/// unconditionally: no branch, and no knowledge of the probability table.
+///
+/// The `p > 0` test survives the levers: `bias` is multiplicative and bounded by
+/// [`BIAS_DEPTH`], so it can neither zero a drawn map nor revive a pad.
+pub fn fixed_points(table: &IfsTable) -> [[f32; 2]; MAPS] {
+    let mut drawn = [[0.0f32; 2]; MAPS];
+    let mut count = 0usize;
+    for map in table.maps.iter().filter(|m| m.p > 0.0) {
+        if let Some(slot) = drawn.get_mut(count) {
+            *slot = fixed_point(map);
+        }
+        count += 1;
+    }
+    let mut out = [[0.0f32; 2]; MAPS];
+    for i in 0..MAPS {
+        // A table with no drawn map at all is not reachable — every curated
+        // figure has at least two — and `count == 0` would be a modulo by zero
+        // here rather than a wrong picture, so it is spelled out.
+        let source = if count == 0 {
+            None
+        } else {
+            drawn.get(i % count)
+        };
+        if let (Some(slot), Some(point)) = (out.get_mut(i), source) {
+            *slot = *point;
+        }
+    }
+    out
+}
+
 /// Lay a resolved table out for the uniform, recomposing each map and
 /// accumulating the probabilities.
 ///
@@ -1004,8 +1069,8 @@ mod tests {
     #![allow(clippy::panic, clippy::expect_used, clippy::indexing_slicing)]
 
     use super::{
-        FIT_STEPS, FitLut, IfsFigure, Levers, MAPS, SIGMA_CEILING, chaos_extent, decompose,
-        fit_scale, lerp_angle, recompose, resolve,
+        FIT_STEPS, FitLut, IfsFigure, IfsMap, Levers, MAPS, SIGMA_CEILING, chaos_extent, decompose,
+        fit_scale, fixed_point, fixed_points, lerp_angle, recompose, resolve,
     };
 
     /// The tolerance the plan states for the round trip: well above `f32`
@@ -1515,6 +1580,251 @@ mod tests {
                 );
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // The fixed points (Plan 0073 Phase 2 / ADR-0087)
+    // -----------------------------------------------------------------------
+
+    /// The residual a genuine fixed point is allowed, relative to `1 + ‖p‖`.
+    ///
+    /// **Derived, not measured.** `cond(I − M) ≤ (1 + σ_max)/(1 − σ_max)`, which
+    /// is at most `65.7` under [`SIGMA_CEILING`], so an `f32` solve
+    /// (`ε ≈ 1.2e-7`) carries `‖δp‖ ≲ 8e-6 ‖p‖` and the residual `(M − I) δp` is
+    /// `≲ 1.6e-5 ‖p‖`. This is that with an order of magnitude of headroom, and
+    /// it holds on every machine CI runs: the inputs are committed constants and
+    /// every IEEE-754 operation on the path is correctly rounded.
+    const RESIDUAL_TOL: f32 = 1e-4;
+
+    /// Relative slack on the two *inequalities* below, for the rounding in
+    /// computing each side. Not a tuning knob — both bounds are exact in real
+    /// arithmetic, and this is only the last-bits allowance.
+    const BOUND_SLACK: f32 = 1e-4;
+
+    /// Neutral plus both documented extremes — a superset of the sweep the plan
+    /// names, because neutral is what every unbound preset actually ships.
+    const LEVER_SETTINGS: [Levers; 3] = [Levers::NEUTRAL, Levers::EXTREMES[0], Levers::EXTREMES[1]];
+
+    fn norm(q: [f32; 2]) -> f32 {
+        q[0].hypot(q[1])
+    }
+
+    /// `‖f(q) − q‖` — how far `q` is from being this map's fixed point.
+    ///
+    /// **This is the whole instrument of Phase 2.** It is zero exactly at the
+    /// fixed point and, by `‖fₖ(q) − q‖ = ‖(M − I)(q − pₖ)‖ ≥ (1 − σ_max)‖q − pₖ‖`,
+    /// grows at least linearly away from it — so one number both certifies the
+    /// closed form and separates a fixed point from anything else, with a
+    /// provable margin and no sampling in it.
+    fn residual(map: &IfsMap, q: [f32; 2]) -> f32 {
+        let a = map.to_affine();
+        let [x, y] = q;
+        norm([a.a * x + a.b * y + a.e - x, a.c * x + a.d * y + a.f - y])
+    }
+
+    /// **Claims 1 and 2 of Plan 0073 Phase 2**, over every reachable table: the
+    /// closed form really does return a fixed point, and its magnitude respects
+    /// ADR-0087's own bound.
+    ///
+    /// Asserted as a **residual** rather than as a location, because "is this
+    /// point on the attractor" is a theorem (ADR-0075's Notes) and not something
+    /// a measurement can establish — a chaos game is a finite sample of a measure
+    /// whose *support* is the attractor, so it can fail to contradict membership
+    /// and never certify it. What can actually be wrong here is the transcription
+    /// of `(I − M)⁻¹ t`, and that is exactly what a residual catches.
+    ///
+    /// The magnitude bound is the second half and it is not redundant:
+    /// `‖p‖ ≤ ‖t‖/(1 − σ_max)` subsumes "every returned point is finite" and
+    /// fails loudly on a table that escaped [`SIGMA_CEILING`], which a residual
+    /// alone would not notice.
+    #[test]
+    fn the_fixed_point_closed_form_is_right_and_bounded() {
+        let mut worst_residual = 0.0f32;
+        let mut tightest_magnitude = 0.0f32;
+        for start in IfsFigure::ALL {
+            for target in IfsFigure::ALL {
+                for morph in morph_sweep() {
+                    for levers in LEVER_SETTINGS {
+                        let table = resolve(&start.table(), &target.table(), morph, levers);
+                        // Every map, pads included: the closed form has to be
+                        // right for any contractive map, and a pad becomes a
+                        // respawn target the moment it duplicates a drawn one.
+                        for (i, map) in table.maps.iter().enumerate() {
+                            let where_ = format!(
+                                "{start:?} -> {target:?} at morph {morph}, levers {levers:?}, map {i}"
+                            );
+                            let p = fixed_point(map);
+                            assert!(
+                                p[0].is_finite() && p[1].is_finite(),
+                                "{where_}: fixed point is {p:?}"
+                            );
+
+                            // Claim 1 — the closed form returns a fixed point.
+                            let r = residual(map, p);
+                            let scale = 1.0 + norm(p);
+                            assert!(
+                                r <= RESIDUAL_TOL * scale,
+                                "{where_}: f(p) - p has norm {r}, past {} for p = {p:?} — \
+                                 the closed form is transcribed wrong",
+                                RESIDUAL_TOL * scale
+                            );
+                            worst_residual = worst_residual.max(r / scale);
+
+                            // Claim 2 — ADR-0087's magnitude bound. Written as a
+                            // multiply rather than as a divide so a table that
+                            // somehow reached sigma >= 1 fails here instead of
+                            // producing a negative or infinite limit to pass.
+                            let headroom = 1.0 - map.sigma_max();
+                            assert!(
+                                headroom > 0.0,
+                                "{where_}: sigma_max = {} does not contract",
+                                map.sigma_max()
+                            );
+                            let ratio = norm(p) * headroom / norm(map.t).max(f32::MIN_POSITIVE);
+                            assert!(
+                                norm(p) * headroom <= norm(map.t) * (1.0 + BOUND_SLACK),
+                                "{where_}: ||p|| = {} exceeds ||t||/(1 - sigma_max) = {}",
+                                norm(p),
+                                norm(map.t) / headroom
+                            );
+                            if norm(map.t) > 0.0 {
+                                tightest_magnitude = tightest_magnitude.max(ratio);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        println!(
+            "worst relative residual {worst_residual:.3e} against a {RESIDUAL_TOL:.0e} \
+             bound; tightest magnitude ratio {tightest_magnitude:.4} of the theorem's 1.0"
+        );
+    }
+
+    /// **Claim 2's second half, with no threshold in it at all**: the padded
+    /// slots duplicate a *drawn* map, and no drawn map is left unreachable.
+    ///
+    /// A padded slot's own fixed point is on the attractor only when the pad
+    /// happens to duplicate a drawn map — true of all five curated tables today,
+    /// and exactly what stops being true when a sixth figure is added. Exact
+    /// equality rather than a tolerance, because both sides come from the same
+    /// function applied to the same map.
+    #[test]
+    fn every_slot_is_a_drawn_maps_fixed_point_and_every_drawn_map_gets_one() {
+        for start in IfsFigure::ALL {
+            for target in IfsFigure::ALL {
+                for morph in morph_sweep() {
+                    for levers in LEVER_SETTINGS {
+                        let table = resolve(&start.table(), &target.table(), morph, levers);
+                        let slots = fixed_points(&table);
+                        let drawn: Vec<[f32; 2]> = table
+                            .maps
+                            .iter()
+                            .filter(|m| m.p > 0.0)
+                            .map(fixed_point)
+                            .collect();
+                        let where_ =
+                            format!("{start:?} -> {target:?} at morph {morph}, levers {levers:?}");
+                        assert!(!drawn.is_empty(), "{where_}: no map is drawn at all");
+                        for (i, slot) in slots.iter().enumerate() {
+                            assert!(
+                                drawn.contains(slot),
+                                "{where_}: slot {i} is {slot:?}, which is no drawn map's \
+                                 fixed point — a respawn there lands off the attractor"
+                            );
+                        }
+                        for (k, point) in drawn.iter().enumerate() {
+                            assert!(
+                                slots.contains(point),
+                                "{where_}: drawn map {k}'s fixed point {point:?} appears in \
+                                 no slot, so one sub-copy is never a respawn target"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// **The sensitivity claim, discharged where it is exact.**
+    ///
+    /// A seed-box corner — which is precisely where backlog 0064's rectangle put
+    /// particles — fails the residual bound *by construction*, and by a margin
+    /// that is a theorem rather than a hope:
+    /// `‖fₖ(q) − q‖ = ‖(M − I)(q − pₖ)‖ ≥ (1 − σ_max)‖q − pₖ‖`, so at
+    /// [`SIGMA_CEILING`] at least `0.03 ‖q − pₖ‖`. Both halves are asserted: the
+    /// lower bound holds for **every** corner-and-map pair, and the corners are
+    /// far enough from the fixed points that the residual clears
+    /// [`RESIDUAL_TOL`].
+    ///
+    /// **Two pairs are exempt from the second half, and that is a fact about one
+    /// figure rather than a weakness.** A Sierpinski gasket's three vertices
+    /// *are* its three maps' fixed points, and its seed box is its own extent —
+    /// so the box's lower-left and lower-right corners, `(0, 0)` and `(1, 0)`,
+    /// land exactly on two of them. (The apex sits at the midpoint of the top
+    /// edge, not at a corner, which is why it is two and not three.) The lower
+    /// bound still holds there — both sides are zero — which is precisely why
+    /// *that* is the half stated over every pair.
+    ///
+    /// **The measured margins are wide except at one pair, and that pair is
+    /// honest too.** Most corners clear [`RESIDUAL_TOL`] by three orders of
+    /// magnitude; the weakest is the fern's top-right corner `[2.656, 9.967]`
+    /// against its body map, at **1.2x**. That is not the test being thin — the
+    /// fern's body map's fixed point is the frond tip, which genuinely sits
+    /// `0.0085` from the corner of the fern's own bounding box, so a point that
+    /// is nearly a fixed point nearly passes. It is the lower bound, not this
+    /// margin, that carries the claim.
+    #[test]
+    fn a_seed_box_corner_fails_the_residual_bound_by_a_provable_margin() {
+        let mut exempt = 0;
+        let mut worst_margin = f32::INFINITY;
+        let mut weakest = String::new();
+        for figure in IfsFigure::ALL {
+            let table = figure.table();
+            let ([hx, hy, _], [cx, cy, _]) = figure.seed_box();
+            for (sx, sy) in [(1.0, 1.0), (1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)] {
+                let q = [cx + sx * hx, cy + sy * hy];
+                for (k, map) in table.maps.iter().enumerate() {
+                    let p = fixed_point(map);
+                    let distance = norm([q[0] - p[0], q[1] - p[1]]);
+                    let r = residual(map, q);
+
+                    // The theorem, over every pair.
+                    let lower = (1.0 - map.sigma_max()) * distance;
+                    assert!(
+                        r >= lower * (1.0 - BOUND_SLACK),
+                        "{figure:?} corner {q:?} vs map {k}: residual {r} is under the \
+                         provable floor {lower}"
+                    );
+
+                    // ...and the consequence, everywhere the corner is not
+                    // literally the fixed point.
+                    if distance == 0.0 {
+                        exempt += 1;
+                        continue;
+                    }
+                    let bound = RESIDUAL_TOL * (1.0 + norm(q));
+                    assert!(
+                        r > bound,
+                        "{figure:?} corner {q:?} vs map {k}: residual {r} does not clear \
+                         {bound}, so the closed-form assertion is measuring nothing"
+                    );
+                    if r / bound < worst_margin {
+                        worst_margin = r / bound;
+                        weakest =
+                            format!("{figure:?} corner {q:?} vs map {k} (distance {distance})");
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            exempt, 2,
+            "exactly two corner-and-map pairs should coincide (the Sierpinski gasket's \
+             two lower vertices); {exempt} did, so the figures have changed"
+        );
+        println!(
+            "the weakest seed-box corner clears the residual bound by {worst_margin:.1}x: {weakest}"
+        );
     }
 
     // -----------------------------------------------------------------------
