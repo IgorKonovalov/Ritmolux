@@ -9,7 +9,7 @@
 > 1-5 have landed on `plan-0065-mandala-interior` (`33e5efc` / `1904469` / `3c0e56a` / `419418f` /
 > `a35485a`, clean tree, no golden baseline moved and `LMV_BLESS` never run). The lane closed with
 > `sanity.rs` red on the three new presets and read that as a block on
-> [backlog 0071](../design-backlog.md). It is not one. `coverage_floor` is **derived from the shipped
+> [backlog 0072](../design-backlog.md). It is not one. `coverage_floor` is **derived from the shipped
 > library** at half each family's sparsest member, with `MAX_FLOOR_SLACK` as the mechanism that
 > forces re-derivation when that minimum moves — so the gate fired correctly, a human looked, the
 > content is good, and the documented answer is to re-measure the floor. That is **Phase 7**, added
@@ -158,7 +158,7 @@ the whole 8-to-32 count range, which is the property the cut was made on.
 user was shown side A (24 touching `arc` members) and side B (40 overlapping `arc` members faking a
 continuous curve), told explicitly that the engine has no boundary primitive and that side B is an
 approximation, and chose **the primitive**. That is architect + dev work: a new roster member or a
-new `[generator]` key, filed as [backlog 0070](../design-backlog.md). **It does not gate Phases 4-5**
+new `[generator]` key, filed as [backlog 0071](../design-backlog.md). **It does not gate Phases 4-5**
 — none of the three chosen compositions carries a boundary ring.
 
 **3. Three compositions ship:** **four rings**, **six rings**, and **rings in weave**. **Eight rings
@@ -173,7 +173,7 @@ answer. Keeping it also keeps backlog 0007's composition question answered rathe
 
 The user judged `presets/star_mandala.toml` in the running app and rejected it: *"maximally lame —
 all lines are half transparent, line connections are visible, there is no curve lines"*. Those are
-filed as [backlog 0071](../design-backlog.md) and [backlog 0072](../design-backlog.md), and **0071
+filed as [backlog 0072](../design-backlog.md) and [backlog 0073](../design-backlog.md), and **0072
 lands directly on this plan's Phase 5**:
 
 The preset's `glow` (0.85 -> 1.55) and `trails` (0.26 -> 0.40) were raised *only* to clear
@@ -264,14 +264,14 @@ this geometry should look like.
   figure. The three mandalas also join `geometry_extent.rs`'s line-family sweep at the merge, which
   asserts every line preset draws segments at all.
 - **What this is NOT.** It is not the fix for
-  [backlog 0071](../design-backlog.md) — that entry stays open at medium-high with all three of its
+  [backlog 0072](../design-backlog.md) — that entry stays open at medium-high with all three of its
   measurements, and re-deriving is what happens on this family's floor *whether or not* the measure
   is replaced later. No other system's floor moves, `MAX_FLOOR_SLACK` is untouched, and no preset is
   retuned to meet a number.
 - **Done when:** the full suite is green with the floor taken from the printed distribution; the
   per-system table in the doc comment carries the new `star_pattern` row with its new lowest preset
   and factor; the surrounding prose names which preset moved the minimum and why a 46-fold ornament
-  of hairline strokes reads low at this test's 96x96 capture; and one sentence points at backlog 0071
+  of hairline strokes reads low at this test's 96x96 capture; and one sentence points at backlog 0072
   saying this re-derivation is not that entry's fix.
 
 ## Data shapes

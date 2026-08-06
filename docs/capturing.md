@@ -838,6 +838,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `attractor` | HARD | the first compute-particle scene: seed reproducibility + beat perturbation ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
 | `line_joints` | HARD (+ tolerance) | a **flagged joint stops leaving a hole** in the stroke ([ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)): against a purpose-built zigzag `polyline`, a vertex is not a local luminance minimum relative to the segment interiors either side of it. Threshold-free, and captured at **512x512** because the wedge it measures is a fraction of a stroke-width across. The same capture is then pinned to a committed baseline (Plan 0040), since the reported defect had no pixel guard anywhere; the relative claim runs **first, even under `LMV_BLESS`**, so the notch cannot be blessed back in. Bless with `--test line_joints`, which cannot reach the golden roster |
 | `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
+| `geometry_extent` | HARD | the **in-frame geometry fraction**, for the four line families *only* ([ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)): that the diagnostic is **byte-identical** to having it off, and that each of the two frozen over-scaled configurations measures below the shipped preset it was recovered from. **Neither engine-wide nor a threshold** — read the section below before using its numbers |
 | lit-backdrop guards (**in-crate**, `--lib`) | HARD (exact) | one per **draw seam**, three of them: `swarm.rs`'s `a_lit_backdrop_survives_where_the_swarm_drew_nothing`, `lines/renderer.rs`'s `a_lit_backdrop_survives_where_the_strokes_drew_nothing`, and `emitter.rs`'s `a_lit_backdrop_survives_where_the_emitter_drew_nothing` ([ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md)). Each captures `swarm_lit_backdrop.toml` / `lines_lit_backdrop.toml` / `emitter_lit_backdrop.toml` three ways — lit backdrop, black backdrop, backdrop with the scene contributing nothing — and asserts that wherever the scene wrote no light the backdrop arrives **intact**. Bound **0** rather than a tolerance, because it reads the linear composite; see the section below |
 | emitter burst (**in-crate**, `--lib`) | HARD (relative) | the emitter is the first scene whose **population** varies, so `emitter.rs`'s `a_spawn_rate_on_onset_bursts_and_then_idles` drives `emitter_onset.toml` through `capture_preset_over` with a silent lead, a six-frame transient and a second of silence, and asserts the frame is dark before, lit after, and dark again by the end. `capture_preset` cannot ask this: it holds one analysis frame for every step, so it can show that a binding is live but never that the shower **empties** when the transient passes ([ADR-0057](adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)) |
 | `background_composite` | HARD (**hardware only**) | RD / attractor presents alpha-blend over the `bg_*` backdrop; **skipped** on a software adapter, which mis-renders that pipeline set |
@@ -1008,6 +1009,65 @@ directly rather than trusting a baseline to notice.
 > baselines your change had no business moving; committing an incidental re-bless
 > silently retires the drift guard for that scene. (Learned the hard way in Plan
 > 0027, where an over-broad bless moved `fragment_field` and `swarm`.)
+
+### The in-frame geometry fraction, and the four things it cannot see (Plan 0069)
+
+**It covers four scene families and not the other five.** `parametric_curve`,
+`lsystem`, `star_pattern` and `spectrum` build a CPU-side segment list and stroke
+it through one shared `LineRenderer`, and the measurement is taken there — the
+share of total drawn segment length that lands inside the render target's world
+rectangle `[-aspect, aspect] x [-1, 1]`, computed inside `LineRenderer::draw`
+from endpoints and an aspect it already holds
+([ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)).
+`fragment_field`, `reaction_diffusion`, `attractor`, `swarm` and `emitter` build
+no segment list, are **not covered at all**, and keep pixel coverage. The split
+follows whether a scene rasterizes a segment list — not a line an author would
+guess — so **this is not an engine-wide gate and no number it prints says
+anything about half the library.**
+
+It exists because pixel coverage cannot see a figure whose tips leave the frame.
+A comb roots every bar on a shared baseline and a corona roots every spoke at a
+centre, so clipping the tips costs a rounding error of lit pixels: Plan 0058
+measured two over-scaled presets scoring *above* the lowest legitimate content,
+where no threshold ordering separates them. Repairing the same two moves this
+measure by `0.4975` and `0.7788` — 9x and 14x the `0.055` that pixel coverage had
+between its lowest legitimate preset and a plausible threshold.
+
+Four things it does not see, each of which has its own answer:
+
+- **It measures length, not area.** Stroke width and the joint extensions are not
+  counted, so a **thick** stroke leaving the frame is under-counted relative to
+  the picture it actually costs, and a hairline and a 24-px bar of the same
+  length are weighted identically. It is the right measure for *overshoot* and a
+  poor one for anything else; a stroke-width-weighted version is a different
+  measure with a different failure mode, and it is deliberately not built.
+- **A figure collapsed to a point scores a perfect `1.0`.** Zero-length segments
+  contribute to neither sum, and a curve that has degenerated to a dot is
+  entirely in frame, which is all this instrument is asked. *Is anything actually
+  drawn* is `sanity.rs`'s question — coverage against black — and the two are
+  complements rather than a progression. A figure drawing **nothing** reports no
+  fraction at all (`None`) rather than a zero, for the same reason.
+- **It cannot tell a deliberately zoomed-in figure from an over-scaled one**,
+  because they are the same picture. `Rose Zoom` (`zoom` bound to `2.15..3.09`)
+  measures `0.3492` and `Rose Overflow` (`scale` to `2.84`) `0.3659` — they
+  **bracket** the frozen over-scaled comb's `0.3563`, one just below it and one
+  just above, and both are working exactly as authored. No absolute threshold
+  passes those two and fails the comb; that is why the gate is **paired**: it
+  compares a
+  configuration against *its own repair*, never against an absolute floor.
+  Anyone adding `assert!(fraction > 0.5)` over the library would fail two shipped
+  presets, which is precisely the mistake ADR-0083 catalogues pixel coverage
+  making one axis over.
+- **It is off in the shipped render path**, so it is not a runtime signal. The
+  diagnostic is a thread-local switch (`set_extent_diagnostic` /
+  `take_draw_extent`) and the first test in `geometry_extent.rs` asserts a capture
+  with it on is **byte-identical** to one with it off. When on, it costs a CPU
+  loop over the segment list per draw — bounded by the renderer's capacity, but
+  real.
+
+The particle families' equivalent, if it is ever wanted, is a genuinely different
+design: they have no segment list and their "figure" is a statistical cloud. It
+is not this measure with a different input.
 
 ## The habit for a new scene
 

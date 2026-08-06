@@ -596,7 +596,7 @@ pub enum Motif {
     /// **It is an approximation and the user chose the real thing.** Shown side
     /// by side with a dense overlapping arc ring at Phase 3, the user picked a
     /// genuine boundary *curve primitive*, which the engine does not have —
-    /// design-backlog 0070, architect then dev. Nothing here fakes one.
+    /// design-backlog 0071, architect then dev. Nothing here fakes one.
     Arc,
     /// A three-lobed rose, `r = |cos(3*theta/2)|` — the densest member, and the
     /// one that reads as ornament rather than as a bead.

@@ -1,0 +1,85 @@
+# FROZEN DEFECT - not a preset, not tunable, and pinned by no baseline.
+#
+# `spectrum_corona` exactly as it shipped over-scaled, recovered from
+# `git show 2efb80e^:presets/spectrum_corona.toml`: every table and every
+# binding byte-for-byte, comments stripped and the `name` suffixed so the report
+# reads clearly. It belongs to `core/tests/geometry_extent.rs` (Plan 0069
+# Phase 3, ADR-0083) as the second non-vacuity fixture for the in-frame geometry
+# gate.
+#
+# `scale = 5.20` is the whole of it, the same ADR-0049 miscalibration the comb
+# beside it carries. The spokes start at the ring, so a tip is
+# `radius + base + curve(level) * scale`, and at 5.20 that is about 5.9 against
+# a visible half-height of 1.0 - rendered, a starburst running off all four
+# edges with no tip visible anywhere and the ring itself, the whole figure,
+# gone.
+#
+# IT IS THE SECOND PRESET PIXEL COVERAGE SCORED ABOVE THE LEGITIMATE CONTENT.
+# A corona roots every spoke at a centre, so clipping the tips costs almost no
+# lit pixels: Plan 0058 Phase 3 measured its loud/moderate coverage ratio at
+# 1.0514, above the 0.8552 of the correctly-authored De Jong. The repair was
+# 5.20 -> 0.45 in 2efb80e.
+#
+# It carries a `trails` binding and the comb does not, which is deliberate
+# coverage rather than incidental: the two fixtures put a clipped figure through
+# both a bare composite and a feedback stage.
+#
+# DO NOT "FIX" THE SCALE. See the comb fixture beside this one.
+system = "spectrum"
+name   = "Spectrum Corona (pre-repair)"
+
+[spectrum]
+elements = 44
+layout   = "radial_ring"
+smoothing = { attack = 0.05, release = 0.40 }
+
+[palette]
+stops = [
+  { at = 0.00, color = [0.05, 0.01, 0.00] },
+  { at = 0.25, color = [0.60, 0.12, 0.02] },
+  { at = 0.45, color = [1.00, 0.42, 0.06] },
+  { at = 0.55, color = [1.00, 0.86, 0.52] },
+  { at = 0.78, color = [0.70, 0.20, 0.03] },
+  { at = 1.00, color = [0.05, 0.01, 0.00] },
+]
+
+[palette_b]
+stops = [
+  { at = 0.00, color = [0.00, 0.05, 0.18] },
+  { at = 0.28, color = [0.09, 0.42, 0.72] },
+  { at = 0.50, color = [0.40, 0.75, 0.92] },
+  { at = 0.60, color = [0.85, 0.95, 1.00] },
+  { at = 0.82, color = [0.12, 0.45, 0.78] },
+  { at = 1.00, color = [0.00, 0.05, 0.18] },
+]
+
+[params]
+rotation = "time * 0.42 + sin(time * 0.05) * 0.30 + clamp(bass * 0.212, 0, 0.18)"
+radius = "0.34 + sin(time * 0.27) * 0.05 + clamp(bass * 0.165, 0, 0.14)"
+base  = "0.09 + index * 0.04 + sin(time * 1.1) * 0.07"
+scale = "5.20"
+curve = "0.58"
+hue         = "mod(time * 0.03, 1)"
+hue_spread  = "1.0"
+saturation  = "1.0"
+palette_mix = "0.5 + sin(time * 0.18) * 0.5"
+thickness  = "2.4 + clamp(treb * 3, 0, 1.8)"
+glow       = "0.68"
+brightness = "0.78 + clamp(mid * 0.282, 0, 0.24)"
+zoom  = "1.05 + bar * 0.05"
+pan_y = "0.0"
+bg_hue      = "0.06 + sin(time * 0.009) * 0.05"
+bg_bright   = "0.024 + clamp(bass * 0.0165, 0, 0.014)"
+bg_vignette = "0.86"
+trails = "0.52 + clamp(mid * 0.094, 0, 0.08)"
+
+[smoothing]
+rotation    = 0.15
+radius      = 0.35
+thickness   = { attack = 0.02, release = 0.32 }
+brightness  = { attack = 0.04, release = 0.28 }
+hue         = 0.40
+palette_mix = 0.60
+zoom        = 0.25
+bg_bright   = 0.40
+trails      = 0.55

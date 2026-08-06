@@ -274,3 +274,32 @@ about that floor rather than about the scene. And it binds **no `trails`**: with
 feedback stage on, the tail would decay the same way whether objects were retired
 or not, so the measurement would say nothing about lifetimes. `lifetime = 0.55`
 is 33 frames, comfortably inside the silent tail.
+
+## The `*_over_scaled.toml` pair is a seventh guard, and neither file is a preset
+
+`spectrum_comb_over_scaled.toml` and `spectrum_corona_over_scaled.toml` belong to
+`core/tests/geometry_extent.rs` (Plan 0069 Phase 3,
+[ADR-0083](../../../docs/adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)).
+They pin no pixels, have no baselines, and `LMV_BLESS` does not touch them.
+
+They are **frozen defects** rather than fixtures authored for a look: each is a
+shipped preset exactly as it shipped over-scaled, recovered from
+`git show 2efb80e^:presets/<name>.toml` with the comments stripped and the `name`
+suffixed. Both were tuned before ADR-0049 normalized the bands to `0..1` and
+afterwards multiplied a value roughly five times larger, so the comb's bars stood
+more than two frame-heights above the top edge and the corona's spokes ran off
+all four.
+
+The point of keeping them is that **pixel coverage scored both of them above the
+legitimate content**: a comb roots every bar on a shared baseline and a corona
+roots every spoke at a centre, so clipping the tips costs almost no lit pixels.
+They are what makes "the new measure convicts what the old one could not" a claim
+with evidence behind it, and the gate compares each against **the shipped preset
+it was recovered from**, by name — a paired comparison, because two shipped
+presets (`Rose Zoom`, `Rose Overflow`) deliberately leave the frame and sit right
+beside the defect on an absolute scale.
+
+"Do not tune" bites in an unusual direction here: a fixture quietly brought back
+inside the frame would leave the gate's assertion true of nothing at all. The one
+binding that matters in each is `scale` (`3.80` and `5.20`), and each header
+records the arithmetic that makes it wrong.
