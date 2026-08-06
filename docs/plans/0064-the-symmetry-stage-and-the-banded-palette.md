@@ -238,7 +238,7 @@ flowchart LR
 - **No change to ADR-0021's LUT bake**, no new post stage, no `Scene` trait change, no C ABI change,
   no new dependency.
 - **Not the drawn mandala.** The fourth reference image is line geometry and is
-  [Plan 0065](0065-the-mandala-interior.md).
+  [Plan 0065](done/0065-the-mandala-interior.md).
 
 ## Followups (after this lands)
 
