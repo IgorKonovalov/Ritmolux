@@ -1,9 +1,14 @@
 # 0061 — The build stops paying for what it is not building, and the two oversized modules come apart
 
-> **Status:** draft — **Phase 4b's scoping half landed early and out of sequence** as `1c55476`
-> (2026-08-04, at the user's direct request); see the note on that phase for what it satisfies, the
-> one accepted deviation, and the coverage gap it opens until Phase 4 lands. Every other phase is
-> unstarted.
+> **Status:** **approved 2026-08-06** — ready for `dev`. **Phase 4b's scoping half landed early and
+> out of sequence** as `1c55476` (2026-08-04, at the user's direct request); see the note on that
+> phase for what it satisfies, the one accepted deviation, and the coverage gap it opens until Phase
+> 4 lands. Every other phase is unstarted.
+> **Only Phase 6 has been re-measured** (2026-08-06). Every other number in this plan is still a
+> **2026-08-04 snapshot** — the 412 MB staticlib, the 33.9 GB of PDBs, the 948.9 s `shot_cli` test,
+> `Renderer`'s size. The Phase 6 re-measure found the raw file up 84 % in two days while its *code*
+> moved 40 %, so treat the others the same way: **re-measure before acting, and do not satisfy a
+> stale number literally.** That instruction is this plan's own and it has now been vindicated twice.
 > **Created:** 2026-08-04
 > **Amended:** 2026-08-04 — four phases added (1b, 2b, 4b, 9) covering CI wall time, after run
 > 30903871856 made the first green measurement available; [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md)
@@ -32,7 +37,8 @@ staticlib no test consumes, `target/debug` carries 33.9 GB of debug symbols acro
 modules have grown past the point where a reader can hold them. This plan halves the edit-compile
 loop, extracts the C ABI into its own crate ([ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md)),
 carves the capture and transition families out of `Renderer`, splits the attractor's
-3077-line `mod.rs` into the directory it already lives in, and closes four smaller findings. **It
+`mod.rs` (3077 lines at drafting, **5672 as of 2026-08-06** — but 1370 → 1912 of *code*; see Phase
+6's re-measure) into the directory it already lives in, and closes four smaller findings. **It
 moves no pixels** — every golden baseline must come back byte-identical.
 
 **Amended 2026-08-04 with the same finding on the build machine.** The first green run since
@@ -449,56 +455,70 @@ stops being an expectation.
 ### Phase 6 — Split `particles/` into the directory it already is
 
 > **Re-measured 2026-08-06** against the current file, at the architect's request and because this
-> plan's own header says every number in it is a 2026-08-04 snapshot to re-check before acting. The
-> snapshot had gone stale in the direction that matters: `particles/mod.rs` was **4,495 lines** when
-> this phase was written and is **5,672** now, because [Plan 0073](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
-> added 1,177 in one plan. **Three of the four done-when claims survived the re-measure unchanged.
-> The line target did not, and the fix is a fifth file rather than a bigger number** — see the
-> measurement below.
+> plan's own header says every number in it is a 2026-08-04 snapshot to re-check before acting.
+> **All four done-when claims survived, and the phase is less urgent than the raw file size
+> suggests** — see the measurement below.
+>
+> **The first pass at this re-measure got it wrong, in exactly the way this plan warns about two
+> paragraphs above its own table.** It counted *non-test* lines (1,787 at the four-way split),
+> concluded the 1,400 target was unreachable, and proposed a fifth file to rescue it. But the table
+> at the head of this plan measures **code** — tests, doc comments and blanks excluded — and 1,400
+> was chosen against that table's **1,370**. Measured the same way, the four-way split lands at
+> **883**. The target holds with room, and no fifth file is needed. Recorded rather than quietly
+> fixed, because "raw line counts are misleading in this repo" is this plan's own finding and it
+> caught the architect re-measuring it.
 
 - **Owner skill:** dev
-- **What:** Decompose `core/src/render/scenes/particles/mod.rs` into the five files its concerns
+- **What:** Decompose `core/src/render/scenes/particles/mod.rs` into the four files its concerns
   already are: `family.rs` (the ODE/basis math, pure and GPU-free), `shaders.rs` (the four WGSL
   constants and `projection_mirror`, their CPU transcription), `resources.rs` (the uniform structs,
-  the three GPU resource structs and their bind-group helpers), `encode.rs` (`UniformInputs`, the
-  uniform upload and the four `encode_*` pass functions), and `mod.rs` (the scene, its `Scene` impl,
-  and the param surface).
-- **Files touched:** `core/src/render/scenes/particles/{mod.rs,family.rs,shaders.rs,resources.rs,encode.rs}`
+  the three GPU resource structs and their bind-group helpers), and `mod.rs` (the scene, its `Scene`
+  impl, the param surface, and the `encode_*` pass functions).
+- **Files touched:** `core/src/render/scenes/particles/{mod.rs,family.rs,shaders.rs,resources.rs}`
 
-- **The measurement, 2026-08-06, at `b957da2`.** Non-test region is 3,629 lines; the test module is
-  a further 2,044. Assigning by the boundaries above:
+- **The measurement, 2026-08-06 at `b957da2`, in this plan's own four columns.**
 
-  | Destination | Lines | What it takes |
+  | | total | tests | doc/blank | **code** |
+  |---|---|---|---|---|
+  | at plan creation (2026-08-04) | 3077 | 822 | 885 | **1370** |
+  | **now** | **5672** | **2043** | **1717** | **1912** |
+
+  **Total grew 84 %; code grew 40 %.** The rest is 1,221 lines of new tests and 832 of new doc
+  comments — this repo's deliberate style, and precisely why this plan measures code rather than
+  raw lines. [Plan 0073](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md) is most of it.
+
+  Assigning by the boundaries above, **code lines**:
+
+  | Destination | code | What it takes |
   |---|---|---|
-  | `shaders.rs` | 845 | the four `r#"` literals (277 + 388 + 12 + 16) plus `projection_mirror` |
-  | `resources.rs` | 676 | `StepUniform`/`DrawUniform`/`DecayUniform`, `Resources`/`PipelineResources`/`FieldResources`, `PARTICLE_ATTRIBUTES`, the bind-group helpers |
-  | `encode.rs` | 408 | `UniformInputs`, `flush_deferred_uploads`, `upload_uniforms`, `encode_{jitter,steps,trail_pass,present}` |
-  | `family.rs` | 321 | `AttractorFamily`, `Basis`, the spin helpers |
-  | **`mod.rs` residual** | **1,379** | the scene struct, `impl Scene`, `PARAMS`, the defaults, `Particle`, the churn constants |
+  | `resources.rs` | 496 | `StepUniform`/`DrawUniform`/`DecayUniform`, `Resources`/`PipelineResources`/`FieldResources`, `PARTICLE_ATTRIBUTES`, the bind-group helpers |
+  | `shaders.rs` | 409 | the four `r#"` literals plus `projection_mirror` |
+  | `family.rs` | 124 | `AttractorFamily`, `Basis`, the spin helpers |
+  | **`mod.rs` residual** | **883** | the scene, `impl Scene`, `PARAMS`, the defaults, `Particle`, the churn constants, `UniformInputs`, the uniform upload, the four `encode_*` |
 
-- **`encode.rs` is the amendment, and it is what rescues the original number.** At the four-way split
-  this phase was written against, the residual is **1,787** — 387 over the 1,400 target, and that is
-  before a single test line is placed. Carving the encode path out lands `mod.rs` at **1,379**, under
-  the number this plan chose in the first place. The target was right; the file count was wrong.
-- **`under 1400 *total* lines` was ambiguous and is now resolved to non-test.** The test module is
-  2,044 lines across 40 tests, only 12 of which touch the GPU harness, so "total" was unachievable
-  under any split and would have forced either a meaningless target or a test exodus nobody designed.
-  The count below is **non-test lines**, stated as such.
-- **Headroom is thin and [Plan 0074](0074-the-figure-colours-by-how-far-it-has-come.md) will eat it.**
-  1,379 against 1,400 is 21 lines. Plan 0074 adds `root_tint`/`root_hue`/`emergence` to `PARAMS`,
-  `set_param`, `reset_params` and the scene struct — all in the residual — for roughly 40-60 lines.
-  So the threshold below is **1,500**, which is the measured 1,379 plus that plan's expected cost
-  plus a little, and it is stated as a number somebody earned rather than one that sounded round.
+- **`under 1400 *total* lines` is resolved to `code`,** matching the table this plan derived the
+  number from — 1,400 was chosen against a measured 1,370 of code, and reading it as *total* was a
+  slip in the wording rather than a different intent. Under the literal *total* reading no split
+  passes without a test exodus nobody designed; under the intended one the four-way split passes
+  with 517 lines of room.
+- **A fifth file is available and is not required.** Carving `encode.rs` (`UniformInputs`, the
+  uniform upload, the four `encode_*`) takes a further 270 code lines and leaves `mod.rs` at 613.
+  That is a judgment call about whether 883 lines of scene-plus-encode reads as one unit, **not** a
+  threshold question. Take it if the residual reads badly once split; do not take it to satisfy a
+  number, because the number is already satisfied.
+- **[Plan 0074](0074-the-figure-colours-by-how-far-it-has-come.md) does not threaten the target.**
+  It adds `root_tint`/`root_hue`/`emergence` to `PARAMS`, `set_param`, `reset_params` and the scene
+  struct — perhaps 25 lines of code in the residual, against 517 of headroom.
 - **Sequencing against Plan 0074.** Both own this file; 0074 is live and this plan is sequenced last
   by the user's own instruction, so **0074 goes first and this phase rebases onto it**. If that
-  order ever inverts, re-measure again rather than trusting the table above — it is a snapshot, and
-  this phase now has a documented history of exactly that going stale.
+  order ever inverts, re-measure rather than trusting the tables above — they are a snapshot, and
+  this phase now has a documented history of exactly that going stale, twice.
 
 - **Done when:** **Plan 0059 is `Status: done` and sits in `docs/plans/done/`** — *verified met
   2026-08-06: it is `docs/plans/done/0059-lorenz-finds-its-plane.md`*, so this gate no longer blocks.
   Afterwards:
-  - `mod.rs` is **under 1,500 non-test lines** (measured 1,379 at the five-way split before Plan
-    0074; the allowance is that plan's additions, not slack).
+  - `mod.rs` is **under 1,400 lines of code** — tests, doc comments and blanks excluded, measured the
+    way this plan's opening table measures. (Projected 883 at the four-way split.)
   - `mod.rs` contains **no `r#"` WGSL literal** — *re-verified: there are still exactly four, so the
     "four WGSL constants" wording holds unchanged*.
   - `mod.rs` contains **no `AttractorFamily` match arm** — *re-verified achievable: every remaining
