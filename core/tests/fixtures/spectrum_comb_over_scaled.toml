@@ -1,0 +1,56 @@
+# FROZEN DEFECT - not a preset, not tunable, and pinned by no baseline.
+#
+# `spectrum_comb` exactly as it shipped over-scaled, recovered from
+# `git show 2efb80e^:presets/spectrum_comb.toml`: every table and every binding
+# byte-for-byte, comments stripped and the `name` suffixed so the report reads
+# clearly. It belongs to `core/tests/geometry_extent.rs` (Plan 0069 Phase 3,
+# ADR-0083) as the non-vacuity fixture for the in-frame geometry gate.
+#
+# `scale = 3.80` is the whole of it. Tuned before ADR-0049 normalized the bands
+# to 0..1, it afterwards multiplied a value roughly five times larger. The bars
+# stand on `baseline`, unbound here and so at its default -0.85, against a
+# visible half-height of 1.0 - a usable height of 1.85 world units. A fully
+# driven element stood `base + 3.80` = about 3.97 tall, putting its tip at
+# +3.12: more than two frame-heights above the top edge, rendering as a solid
+# block of bars with every tip clipped away.
+#
+# THIS IS THE PRESET PIXEL COVERAGE COULD NOT CONVICT, and that is why it is
+# here. A comb roots every bar on a shared baseline, so clipping the tips costs
+# almost no lit pixels: Plan 0058 Phase 3 measured its loud/moderate coverage
+# ratio at 1.0891 - it drew MORE when loud, scoring above the lowest legitimate
+# content in the library. No threshold on that axis separates it from correct
+# work. The repair was 3.80 -> 1.20 in 2efb80e.
+#
+# DO NOT "FIX" THE SCALE. The gate this fixture feeds asserts that the defect
+# measures below the repaired preset it was recovered from; a fixture quietly
+# brought back into the frame would leave that assertion true of nothing.
+system = "spectrum"
+name   = "Spectrum Comb (pre-repair)"
+
+[spectrum]
+elements = 26
+layout   = "bars"
+smoothing = { attack = 0.025, release = 0.22 }
+
+[params]
+base = "0.09 + sin(time * 1.5) * 0.075"
+rotation = "sin(time * 0.9) * 0.135"
+scale = "3.80"
+curve = "0.55"
+span  = "1.72"
+thickness  = "13 + clamp(bass * 4.12, 0, 3.5)"
+glow       = "0.75"
+brightness = "0.72 + clamp(mid * 0.306, 0, 0.26)"
+hue = "mod(time * 0.09 + clamp(treb * 0.233, 0, 0.14), 1)"
+zoom  = "1.05 + sin(time * 1.1) * 0.125 + clamp(bass * 0.118, 0, 0.10)"
+pan_y = "0.06 + sin(time * 0.17) * 0.03"
+bg_hue      = "0.58 + sin(time * 0.011) * 0.05"
+bg_bright   = "0.022 + clamp(mid * 0.0141, 0, 0.012)"
+bg_vignette = "0.75"
+
+[smoothing]
+thickness = { attack = 0.03, release = 0.30 }
+brightness = { attack = 0.04, release = 0.28 }
+hue       = 0.45
+zoom      = 0.22
+bg_bright = 0.40
