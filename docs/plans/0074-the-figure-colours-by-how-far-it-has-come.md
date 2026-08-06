@@ -1,9 +1,10 @@
 # 0074 — The figure colours by how far it has come: distance from the skeleton, and the age channel retires
 
-> **Status:** **draft 2026-08-06** — ready for review, then `dev`.
+> **Status:** **approved 2026-08-06** — ready for `dev`, gated by nothing.
 > **Phase 2 is `human` and it is a GATE**, deliberately placed after one `dev` phase rather than at
 > the end. Phase 6 is `human` and terminal. So this plan does not close in one session, and it can
-> legitimately stop after Phase 2.
+> legitimately stop after Phase 2. **A `dev` session lands Phase 1 and then stops** — do not
+> continue past the gate on the assumption that the channel reads.
 > **Created:** 2026-08-06
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0088](../adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md);
