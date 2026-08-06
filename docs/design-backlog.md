@@ -59,6 +59,7 @@ cannot express them.
 | 0029 | The swarm's wrap seam sits on the frame edge, and feedback burns it in | [ADR-0044](adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) + [Plan 0043](plans/done/0043-swarm-depth-and-domain.md) |
 | 0030 | The library binds audio to luminance far more than to geometry | `.claude/skills/preset-author/references/craft.md` §1, which is where the entry asked it to land. **Closed 2026-08-04 during a backlog sweep** |
 | 0031 | The Rich tier's 3x particle count makes the reseed transient opaque | [Plan 0057](plans/done/0057-the-attractors-compute-path.md) |
+| 0033 | Every mark the engine can draw is a round blob or a stroked curve — **silhouette half only** | [ADR-0084](adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) + [Plan 0070](plans/done/0070-shaped-marks.md). **Closed 2026-08-05.** `shape`/`points` on `swarm` and `emitter`; `swarm_starfield` ships. **The fill-and-outline half is NOT closed** — re-filed as [0069](#0069--there-is-no-way-to-draw-a-two-tone-object-a-fill-with-a-contrasting-outline-because-the-composite-is-additive) at that close, as this entry asked, so the two stop being confused |
 | 0034 | Nothing in the engine spawns, throws, ages or individuates an object | [ADR-0057](adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md) + [Plan 0052](plans/done/0052-the-emitter-objects-that-spawn-fall-and-die.md) |
 | 0035 | `presets/README.md` listed 10 expression variables; the code had 19 | Fixed at [Plan 0048](plans/done/0048-analysis-v2-and-the-retune.md)'s close |
 | 0036 | Does the fold stop folding the backdrop, and does that lose a look? | **Retired unfired 2026-08-04.** [ADR-0055](adrs/0055-backdrop-leaves-the-post-chain.md) shipped 2026-07-31; three full-library content passes have run since and no preset was reported worse. The way back is recorded in the archived body if it ever bites |
@@ -235,91 +236,6 @@ Low and honest about it. Nobody has reported it, the two rates that dominate (44
 clean, and the failure is a coarser low end rather than anything broken. Worth taking the day
 someone runs the standalone on a 96 kHz interface and says the sub-bass reads mushy — at which
 point this entry is the starting measurement rather than a fresh investigation.
-
----
-
-## Entries 0033-0035 — the 2026-07-30 `preset-author` batch (fifth), from two figurative requests
-
-The user asked for two looks that are **figurative** rather than generative, which is a class this
-library has never been asked for before:
-
-1. the Windows Solitaire win-cascade, with **hearts** instead of cards — red fill, black outline,
-   falling at a rate set by the BPM, arcing off in different directions and leaving a trail of
-   stamped copies;
-2. **small seven-, eight- and nine-pointed stars**, white-gold on black, twinkling and flashing on
-   bass and beat.
-
-Both were rendered as far as the current surface reaches before being reported. The two requests
-are independent in the user's mind and turned out to share **exactly one** root gap, which is why
-they are filed together. Neither look shipped; the drafts were discarded on the user's instruction.
-
-**What was already sufficient, and should be said first:** the *audio* half of "falls at a speed
-that depends on the BPM, a new one on every beat" needs nothing. `tempo` is BPM, and ADR-0050's
-clock — `beat_index`, `time_since_beat`, `beat_in_bar`, `bar_index`, `bar_phase` — supplies both the
-per-beat event and the phase to drive an arc from. The gap in both requests is entirely in **what
-can be drawn**, not in what can be heard.
-
----
-
-## 0033 — every mark the engine can draw is a round additive blob or a stroked curve, so no *object* has a shape
-
-- **PROMOTED 2026-08-04 (the silhouette half only) → [ADR-0084](adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) +
-  [Plan 0070](plans/0070-shaped-marks.md)** — a `shape` param selecting a signed-distance function
-  in the existing particle fragment shader, on `swarm` and `emitter`, keeping the additive model and
-  the quadratic falloff. The user chose the SDF route over a fill-and-stroke path, a glyph atlas and
-  author-supplied WGSL. **The fill-and-outline half of this entry stays open and is not promoted** —
-  a heart in additive light is a heart-shaped glow, and the red-body-black-edge ask still reopens
-  ADR-0018/ADR-0056. Re-file that half as its own entry when Plan 0070 lands, so the two stop being
-  confused.
-- **Raised:** 2026-07-30, from `preset-author`, by both requests above independently.
-- **Verified against code:** yes — `core/src/render/scenes/swarm.rs` (`fs_main`),
-  `core/src/render/scenes/particles/mod.rs`, `core/src/render/scenes/lines/*`,
-  `core/src/render/ink.rs`.
-
-The engine has **no shape vocabulary for an object**. There are exactly two mark-making models:
-
-- **Particles are one hardcoded round blob.** The swarm's fragment shader is three lines —
-  `let d = length(in.local); let falloff = max(0.0, 1.0 - d); let g = falloff * falloff;` — a radial
-  falloff with no shape input at all. The attractor's compute points are the same idea. There is no
-  glyph atlas, no SDF, no shape parameter, and nothing in `PARAMS` that could carry one.
-- **Line scenes stroke a generator's path.** `maurer_rose`, the L-system turtle, the Hankin
-  rosette, the spectrum comb. These *can* make a shape, but only one figure, centred, whole-frame,
-  and only as a **stroke** — there is no fill.
-
-**The second half is worse than the first: the pipeline is additive, so a dark mark cannot exist.**
-Every scene blends additively (`swarm.rs`: *"Additive: overlapping particles bloom brighter"*), which
-is a lightening model — black adds zero. A red-filled heart with a black outline is **three** tones
-(light ground, red body, black edge) and the only dark-on-light route in the engine is the ink stage,
-which is structurally **two**-poled: `mix(paper, ink, luminance)`.
-
-**Measured, not assumed.** I drew the cardioid `r = 1 - sin(theta)` through `parametric_curve`
-(`n = 1`, `phase = -pi`, `radial_offset = 1`) — a genuinely recognisable heart, and a useful data
-point that the *outline* is reachable today. Running the same figure at `ink_amount = 1` with white
-paper and black ink rendered the outline **grey, not black**: a thin anti-aliased stroke averages to
-mid luminance, so it lands halfway down the paper→ink ramp. The ink stage cannot produce a crisp dark
-contour around a light interior, because the contour is not where the luminance is.
-
-**The star half lands on the same gap.** Small 7/8/9-pointed stars scattered across the frame are not
-reachable: the swarm can put ten thousand small marks anywhere, but they are round; `parametric_curve`
-with `radial_offset = 1` gives exactly `n` lobes and can flip the count every beat
-(`n = "7 + floor(hash(beat_index) * 2.999)"`, which works and is rather nice) — but it is **one large
-centred figure**, and `mirror_order` replicates about the origin, so the copies land on each other
-rather than scattering. Rendered both; the starfield reads well as a starfield and not at all as
-*stars with points*.
-
-**Why this is not a preset problem.** There is no combination of existing params that gets closer.
-Whatever the answer is — a shape enum on the particle sprite, an SDF glyph, an author-supplied WGSL
-pass (already noted as absent in the skill's own gap list), a fill+stroke draw path outside the
-additive model — it is a change to how the engine draws, and the fill/outline half re-opens the
-additive-blending decision that everything else in the composite assumes.
-
-**Impact.** First time it has been asked for, but it is not an exotic ask: "a shower of *things*" is
-a mainstream visualizer idiom, and the request arrived twice in one session from one user. It is also
-the gap that most limits what this lane can offer, because the library is entirely non-figurative and
-nothing in the grammar hints that figurative is off the table.
-
-**Not deciding:** whether the engine *should* draw figurative objects at all, or which of the four
-routes above is right. Both are architect calls, and the additive-model question is ADR-shaped.
 
 ---
 
@@ -1205,3 +1121,94 @@ Three options, in ascending cost.
 **Low-medium.** Nothing renders wrong today and no shipped preset touches it. But it is a stated
 invariant that is false, and the ADR leans on the "no branch, no division" phrasing as evidence the
 design is clean — which is true for two thirds of it.
+
+---
+
+## Entries 0068-0069 — from Plan 0070's close (2026-08-05)
+
+---
+
+## 0068 — a swarm mark has no per-mark variation, so the only scene that can hold a starfield cannot make one twinkle
+
+- **Raised:** 2026-08-05, from `preset-author`, during [Plan 0070](plans/done/0070-shaped-marks.md)
+  Phase 6 — the starfield the whole plan was built for.
+- **Verified by measurement:** yes. The emitter draft was rendered and gated before being discarded;
+  the numbers below are from that run, not from reading the code.
+
+**The scene with the right individuation cannot hold the look, and the scene that can hold it has no
+individuation.** `emitter` carries `twinkle`, whose *rate and phase both* come off each object's own
+seed, so a field shimmers while the frame's total light sits still — which is exactly what a sky of
+stars does and exactly what a whole-field brightness term cannot fake. It also carries
+`size_spread`. It is unusable for a starfield anyway, and the reason is geometry rather than taste:
+its source line is fixed at `y = -1.12` and cannot be moved, so a star must travel 2.12 units to
+cross the frame. A drift slow enough to read as a sky (~0.85 units/s) needs ~2.5 s to fill it, and
+**every behavioral gate in the suite captures 30 frames at 1/60 s, which is 0.5 s** — so the gate
+sees an empty sky. Measured: the emitter draft reported cover `0.013` and `0.000` on all four bands.
+Speeding it to the ~4.3 units/s the geometry demands is a rising shower rather than a starfield, and
+the twinkle stops reading at that speed regardless.
+
+`swarm` has the opposite profile. Its population is fixed and present from frame one, so it has no
+warm-up at all and the gates see it immediately — which is why `swarm_starfield` ships on it. What
+it has no way to express is **per-mark** anything: a `brightness` or `size` binding moves the entire
+field together, so the shipped preset's shimmer is a slow global breath plus a beat flash, and the
+per-star life the look actually wants is simply absent.
+
+### What would close it
+
+Either half would; they are independent and the first is much smaller.
+
+1. **Per-mark variation on the swarm** — a `twinkle` and a `size_spread` in the emitter's shape,
+   driven off the existing per-particle seed. The swarm already draws a seeded per-particle `size`
+   factor and a depth scale, so the machinery to individuate is there; nothing exposes a *bound*
+   parameter through it.
+2. **A movable or point source on the emitter** — the fixed line is recorded separately in
+   [0060](#0060--an-engine-fix-leaves-its-preset-side-workarounds-standing-and-only-a-header-comment-remembers-them)'s
+   neighbourhood as "no positionable source". Closing that would make the emitter reachable for
+   slow-drift looks, and this entry is a second, independent reason to want it.
+
+**Not the answer:** raising the gate's capture length. The gates are 0.5 s by design and a preset
+that needs 2.5 s of warm-up to look like anything is also a preset that looks like nothing for the
+first 2.5 s of a live show.
+
+### Priority
+
+**Medium.** One preset ships today with a documented compromise rather than a defect, so nothing is
+broken. But the emitter's `twinkle` is the single most-cited example of per-object life in the whole
+parameter surface, and the scene that most wants it cannot reach it.
+
+---
+
+## 0069 — there is no way to draw a two-tone object (a fill with a contrasting outline), because the composite is additive
+
+- **Raised:** 2026-08-05, at [Plan 0070](plans/done/0070-shaped-marks.md)'s close. **Re-filed from
+  [0033](design-backlog-archive.md), at that entry's own instruction** — 0033 carried two asks, Plan
+  0070 answered one of them, and leaving the other inside a closed entry is how the two get confused
+  again.
+- **Verified by measurement:** yes, and the measurement is the point. The cardioid
+  `r = 1 - sin(theta)` drawn through `parametric_curve` at `ink_amount = 1` on white paper renders
+  its outline **grey**, not black: a thin anti-aliased stroke averages to mid luminance and lands
+  halfway down the ink ramp.
+
+The original ask was a Solitaire-style cascade of **hearts — red fill, black outline**. Plan 0070
+delivered the silhouette: `shape = heart` on `swarm`/`emitter` draws a heart-shaped *glow*,
+brightest in its middle, fading to nothing at its boundary. That is as far as an additive pipeline
+reaches. **Black adds zero**, so a dark edge cannot exist inside the composite, and the only
+dark-on-light route in the engine is the ink stage, which is structurally two-poled
+(`mix(paper, ink, luminance)`) and therefore cannot hold three tones either.
+
+### Why this is its own question and not a follow-on
+
+It reopens [ADR-0018](adrs/0018-engine-wide-scene-compositing.md)'s composite and
+[ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md)'s alpha model, and it needs an
+ordering or sorting story the additive pipeline has never required — a filled object *occludes*, and
+nothing in this engine has ever had to decide what is in front. That is why
+[ADR-0084](adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) rejected it as a
+bundled decision (Alternative B) rather than on its merits. It also sits adjacent to
+[0040](#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle)
+and its plan, which is the *other* place the additive model's occlusion behaviour is being
+questioned — anyone taking this should read that first.
+
+### Priority
+
+**Low, and deliberately so.** The user has asked for it once, in a form Plan 0070 partially answered,
+and the cost is a composite redesign. It is here so the ask survives, not because it is next.

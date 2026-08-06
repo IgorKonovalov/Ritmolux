@@ -1,8 +1,8 @@
 # ADR-0084 — A particle mark's silhouette is a signed-distance function
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-05
 > **Date:** 2026-08-04
-> **Related plan(s):** [0070](../plans/0070-shaped-marks.md)
+> **Related plan(s):** [0070](../plans/done/0070-shaped-marks.md)
 
 ## Context
 
@@ -123,6 +123,44 @@ The n-lobed figure already exists; the missing part is placing many small copies
 `mirror_order` replicates about the origin by construction, so scattering would mean giving a line
 scene a per-instance transform — which is the particle idiom, arrived at from the wrong side and
 without the particle scenes' motion, lifetime or depth machinery.
+
+## Outcome (2026-08-05, at Plan 0070's close)
+
+Accepted as written. Three things the implementation measured or discovered that this ADR either
+got wrong in the pessimistic direction or did not say.
+
+**The first Negative — "a branch in the hottest fragment shader" — did not materialize, and the
+measurement is in `core/tests/mark_cost.rs`.** On the machine Plan 0070 was implemented on (Windows
+10 19045, DX12, RTX 3080 Laptop, release, 1280x720, 10 000 swarm particles at `size = 3`), the
+matched-coverage isolate — a 12-sided polygon, 75 % quad coverage against the disc's 78 %, taking
+the full `atan2` + `floor` + `cos` path — reads **0.858 ms against the disc's 0.877 ms**, i.e. the
+shaped arm is *not slower*, and the run-to-run spread of ~0.01 ms puts the branch's arithmetic
+**below the resolution of the measurement**. The plan's own figure, a seven-pointed star, reads
+0.710 ms — 19 % *faster*, because it lights 34 % of the quad where a disc lights 78 % and this frame
+is bandwidth-bound through overdrawing quads rather than ALU-bound. The fallback this ADR reserved
+(separate pipelines per shape, with its own ADR-0058 hazard) stays unneeded. Per ADR-0071 the test
+reports and does not gate, and it skips with a notice on a software rasterizer.
+
+**The third probe is the finding, not the number.** Measured naively as disc-against-star the branch
+appears to *save* 19 %, which says nothing about the branch at all — the two probes differ in
+coverage as much as in arithmetic. Any future cost reading on a fragment-shader change owes the same
+matched-coverage isolate, or it is measuring the silhouette rather than the code.
+
+**`disc` means something different on each of the two scenes, and that is deliberate.** The
+emitter's mark was already an anisotropic *glint* (`GLINT_ANISO = 0.55`) rather than a circle,
+because a rotationally symmetric mark makes its `spin` a no-op. Rather than unify, `shape = disc`
+selects each scene's own pre-existing arm — so every shipped emitter preset and the golden baseline
+are untouched — while the roster's other four silhouettes read the un-squashed sprite frame on both
+scenes, so a star is a star and not a squashed one. `presets/README.md`'s roster table states the
+per-scene reading at the `disc` row.
+
+**Phase 6 could not use the scene the look wanted, for a reason worth recording.** The emitter
+carries `twinkle`, whose rate and phase come off each object's own seed, which is exactly what a
+starfield wants and what a whole-field brightness term cannot fake. It is unusable here anyway: its
+source line is fixed at `y = -1.12`, so a drift slow enough to read as a sky needs ~2.5 s to fill
+the frame while every behavioral gate captures 0.5 s — the emitter draft reported cover 0.013 on all
+four bands. The shipped `swarm_starfield` uses the swarm, which has no warm-up and no per-mark
+variation. That gap is design-backlog 0068.
 
 ## Notes
 

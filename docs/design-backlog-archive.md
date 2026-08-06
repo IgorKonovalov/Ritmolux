@@ -2844,3 +2844,89 @@ was true until this commit and is now not.
 look they intend, and the workarounds are recorded in their headers. It is the observation that the
 workarounds exist because one lever is doing a job it was not shaped for, and that the cost lands on
 the *next* author rather than on these two.
+
+---
+
+## Entries 0033-0035 — the 2026-07-30 `preset-author` batch (fifth), from two figurative requests
+
+The user asked for two looks that are **figurative** rather than generative, which is a class this
+library has never been asked for before:
+
+1. the Windows Solitaire win-cascade, with **hearts** instead of cards — red fill, black outline,
+   falling at a rate set by the BPM, arcing off in different directions and leaving a trail of
+   stamped copies;
+2. **small seven-, eight- and nine-pointed stars**, white-gold on black, twinkling and flashing on
+   bass and beat.
+
+Both were rendered as far as the current surface reaches before being reported. The two requests
+are independent in the user's mind and turned out to share **exactly one** root gap, which is why
+they are filed together. Neither look shipped; the drafts were discarded on the user's instruction.
+
+**What was already sufficient, and should be said first:** the *audio* half of "falls at a speed
+that depends on the BPM, a new one on every beat" needs nothing. `tempo` is BPM, and ADR-0050's
+clock — `beat_index`, `time_since_beat`, `beat_in_bar`, `bar_index`, `bar_phase` — supplies both the
+per-beat event and the phase to drive an arc from. The gap in both requests is entirely in **what
+can be drawn**, not in what can be heard.
+
+---
+
+## ~~0033 — every mark the engine can draw is a round additive blob or a stroked curve, so no *object* has a shape~~ (silhouette half; the fill-and-outline half is re-filed as [0069](design-backlog.md))
+
+- **PROMOTED 2026-08-04 (the silhouette half only) → [ADR-0084](adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) +
+  [Plan 0070](plans/done/0070-shaped-marks.md)** — a `shape` param selecting a signed-distance function
+  in the existing particle fragment shader, on `swarm` and `emitter`, keeping the additive model and
+  the quadratic falloff. The user chose the SDF route over a fill-and-stroke path, a glyph atlas and
+  author-supplied WGSL. **The fill-and-outline half of this entry stays open and is not promoted** —
+  a heart in additive light is a heart-shaped glow, and the red-body-black-edge ask still reopens
+  ADR-0018/ADR-0056. Re-file that half as its own entry when Plan 0070 lands, so the two stop being
+  confused.
+- **Raised:** 2026-07-30, from `preset-author`, by both requests above independently.
+- **Verified against code:** yes — `core/src/render/scenes/swarm.rs` (`fs_main`),
+  `core/src/render/scenes/particles/mod.rs`, `core/src/render/scenes/lines/*`,
+  `core/src/render/ink.rs`.
+
+The engine has **no shape vocabulary for an object**. There are exactly two mark-making models:
+
+- **Particles are one hardcoded round blob.** The swarm's fragment shader is three lines —
+  `let d = length(in.local); let falloff = max(0.0, 1.0 - d); let g = falloff * falloff;` — a radial
+  falloff with no shape input at all. The attractor's compute points are the same idea. There is no
+  glyph atlas, no SDF, no shape parameter, and nothing in `PARAMS` that could carry one.
+- **Line scenes stroke a generator's path.** `maurer_rose`, the L-system turtle, the Hankin
+  rosette, the spectrum comb. These *can* make a shape, but only one figure, centred, whole-frame,
+  and only as a **stroke** — there is no fill.
+
+**The second half is worse than the first: the pipeline is additive, so a dark mark cannot exist.**
+Every scene blends additively (`swarm.rs`: *"Additive: overlapping particles bloom brighter"*), which
+is a lightening model — black adds zero. A red-filled heart with a black outline is **three** tones
+(light ground, red body, black edge) and the only dark-on-light route in the engine is the ink stage,
+which is structurally **two**-poled: `mix(paper, ink, luminance)`.
+
+**Measured, not assumed.** I drew the cardioid `r = 1 - sin(theta)` through `parametric_curve`
+(`n = 1`, `phase = -pi`, `radial_offset = 1`) — a genuinely recognisable heart, and a useful data
+point that the *outline* is reachable today. Running the same figure at `ink_amount = 1` with white
+paper and black ink rendered the outline **grey, not black**: a thin anti-aliased stroke averages to
+mid luminance, so it lands halfway down the paper→ink ramp. The ink stage cannot produce a crisp dark
+contour around a light interior, because the contour is not where the luminance is.
+
+**The star half lands on the same gap.** Small 7/8/9-pointed stars scattered across the frame are not
+reachable: the swarm can put ten thousand small marks anywhere, but they are round; `parametric_curve`
+with `radial_offset = 1` gives exactly `n` lobes and can flip the count every beat
+(`n = "7 + floor(hash(beat_index) * 2.999)"`, which works and is rather nice) — but it is **one large
+centred figure**, and `mirror_order` replicates about the origin, so the copies land on each other
+rather than scattering. Rendered both; the starfield reads well as a starfield and not at all as
+*stars with points*.
+
+**Why this is not a preset problem.** There is no combination of existing params that gets closer.
+Whatever the answer is — a shape enum on the particle sprite, an SDF glyph, an author-supplied WGSL
+pass (already noted as absent in the skill's own gap list), a fill+stroke draw path outside the
+additive model — it is a change to how the engine draws, and the fill/outline half re-opens the
+additive-blending decision that everything else in the composite assumes.
+
+**Impact.** First time it has been asked for, but it is not an exotic ask: "a shower of *things*" is
+a mainstream visualizer idiom, and the request arrived twice in one session from one user. It is also
+the gap that most limits what this lane can offer, because the library is entirely non-figurative and
+nothing in the grammar hints that figurative is off the table.
+
+**Not deciding:** whether the engine *should* draw figurative objects at all, or which of the four
+routes above is right. Both are architect calls, and the additive-model question is ADR-shaped.
+
