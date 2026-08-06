@@ -460,6 +460,103 @@ fn attractor_contract() {
     );
 }
 
+/// **A colour lever moves colour and leaves geometry alone** — the two IFS tint
+/// channels, asserted the way ADR-0087 distinguishes them from a shape param
+/// (Plan 0073 Phase 4).
+///
+/// Two captures differing **only** in `map_tint` (then only in `age_tint`) must
+/// have measurably different colour distributions over the lit region while
+/// lighting the *same* pixels. That pairing is the whole test: a param that moved
+/// the figure would change the lit set, and a param that did nothing would leave
+/// the colours alone. Either alone would pass on a broken build.
+///
+/// Chromaticity rather than luma, because the claim is about hue: the mean
+/// `R − G` and `G − B` over the lit set move under a tint and would not under a
+/// level change.
+#[test]
+fn the_ifs_tint_channels_move_colour_without_moving_the_figure() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    // A sustained mid-energy frame; no beat. The bare preset binds no
+    // expressions, so this only has to be a valid frame.
+    let lively = AnalysisFrame {
+        bass: 0.5,
+        mid: 0.4,
+        treb: 0.5,
+        ..Default::default()
+    };
+
+    // A bare fern: no backdrop and no bloom, so the measured pixels are the
+    // figure's own and the corner-pixel background is uniform (ADR-0067).
+    renderer.set_presets(vec![
+        attractor_bare_preset("at_tint_off", "fern", ""),
+        attractor_bare_preset("at_map_tint", "fern", "map_tint = \"0.7\"\n"),
+        attractor_bare_preset("at_age_tint", "fern", "age_tint = \"0.7\"\n"),
+    ]);
+    let base = renderer
+        .capture_preset("at_tint_off", &lively, 60)
+        .expect("capture at_tint_off");
+    let base_mask = lit_mask(&base);
+    let base_lit = base_mask.iter().filter(|&&l| l).count();
+    assert!(base_lit > 500, "the bare fern lit only {base_lit} pixels");
+
+    for (name, param) in [("at_map_tint", "map_tint"), ("at_age_tint", "age_tint")] {
+        let tinted = renderer
+            .capture_preset(name, &lively, 60)
+            .expect("capture a tinted fern");
+        let tinted_mask = lit_mask(&tinted);
+
+        // Geometry: the same pixels are lit. A handful may cross the `EPS` byte
+        // cut when a colour moves - that is the cut, not the figure - so this is
+        // a proportion rather than set equality, the same allowance the
+        // `brightness` property above makes for the faintest fringe.
+        let differing = base_mask
+            .iter()
+            .zip(tinted_mask.iter())
+            .filter(|&(&a, &b)| a != b)
+            .count();
+        assert!(
+            differing * 50 < base_lit,
+            "`{param}` moved {differing} of {base_lit} lit pixels in or out of the \
+             figure - a colour lever must not change what is lit"
+        );
+
+        // Colour: measured over the BASE lit set, so both are read over the same
+        // pixels rather than each over its own.
+        let (base_rg, base_gb) = mean_chroma_over(&base, &base_mask);
+        let (tint_rg, tint_gb) = mean_chroma_over(&tinted, &base_mask);
+        let moved = (tint_rg - base_rg).abs() + (tint_gb - base_gb).abs();
+        println!(
+            "{param}: chroma (R-G, G-B) {base_rg:.2}, {base_gb:.2} -> {tint_rg:.2}, \
+             {tint_gb:.2}; {differing} of {base_lit} lit pixels changed state"
+        );
+        assert!(
+            moved > 4.0,
+            "`{param} = 0.7` moved the mean chromaticity by only {moved:.2} - the \
+             channel is not reaching the picture"
+        );
+    }
+}
+
+/// Mean `(R − G, G − B)` over the pixels `mask` selects — the figure's **colour**,
+/// separated from how bright it is the way [`mean_luma_over`] separates level.
+fn mean_chroma_over(img: &CaptureImage, mask: &[bool]) -> (f32, f32) {
+    let (mut rg, mut gb, mut n) = (0.0f64, 0.0f64, 0u64);
+    for (px, lit) in img.rgba.chunks_exact(4).zip(mask.iter()) {
+        if !lit {
+            continue;
+        }
+        rg += f64::from(px[0]) - f64::from(px[1]);
+        gb += f64::from(px[1]) - f64::from(px[2]);
+        n += 1;
+    }
+    if n == 0 {
+        return (0.0, 0.0);
+    }
+    ((rg / n as f64) as f32, (gb / n as f64) as f32)
+}
+
 // --- Trail grid sizing (Plan 0029 Phase 2) -------------------------------------
 //
 // `trail_grid_size` is pure, so these need no GPU and never skip. They mirror the
