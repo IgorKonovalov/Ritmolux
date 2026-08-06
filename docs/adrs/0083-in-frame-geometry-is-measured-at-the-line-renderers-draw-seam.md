@@ -1,8 +1,8 @@
 # ADR-0083 — In-frame geometry is measured at the line renderer's draw seam
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-06 (see **Outcome**)
 > **Date:** 2026-08-04
-> **Related plan(s):** [0069](../plans/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)
+> **Related plan(s):** [0069](../plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)
 > **Supplements:** [ADR-0067](0067-coverage-measures-the-scene-not-the-backdrop.md)
 
 ## Context
@@ -45,7 +45,7 @@ had to be taken inside each scene. It does not.
 aspect, in one place, for all four line-family scenes. The quantity ADR-0067 wanted is computable
 there, from data already in hand, without any scene knowing it is being measured.
 
-Recorded as [design-backlog 0054](../design-backlog.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor).
+Recorded as [design-backlog 0054](../design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor) (archived at Plan 0069's close).
 
 ## Decision
 
@@ -128,3 +128,41 @@ the finding that makes a new measure necessary at all.
 - The world rectangle is `[-aspect, aspect] x [-1, 1]` — the line renderer maps two world units to
   the frame **height**, which is also why [backlog 0016](../design-backlog-archive.md#0016--the-spectrum-readout-has-no-width-control-and-density-makes-it-worse)'s
   `span` is a world quantity rather than a fraction of the width.
+
+## Outcome (added at Plan 0069's close, 2026-08-06)
+
+The decision held: the measurement lives in `LineRenderer::draw`, the `Scene` trait and the C ABI
+are untouched, all four line families are covered by one implementation, and the diagnostic is
+byte-identically inert when off. Repairing the two frozen defects moves the measure by **`0.4975`**
+(comb, `0.3563 → 0.8538`) and **`0.7788`** (corona, `0.1639 → 0.9428`) — the conviction pixel
+coverage could not deliver on any threshold. Two things this ADR did not anticipate are worth
+carrying forward.
+
+**It is a paired instrument, not a gate — and no absolute threshold orders this library either.**
+This ADR framed the new measure as the successor *gate*, on the strength of pixel coverage having no
+separating threshold. Measured over the shipped set, the geometry fraction has none either:
+`Rose Zoom` reads `0.3492` and `Rose Overflow` `0.3659`, **bracketing** the frozen over-scaled comb's
+`0.3563`, and both are working exactly as authored — `zoom` bound to `2.15..3.09` and `scale` driven
+to `2.84` are what those preset *names* mean. A length fraction cannot distinguish "deliberately
+inside the figure" from "accidentally outside the frame" because they are the same picture. So
+`core/tests/geometry_extent.rs` convicts a configuration against **its own repair**, by name, and an
+`assert!(fraction > 0.5)` over the library would fail two shipped presets — the identical mistake
+this ADR catalogues pixel coverage making, one axis over. The gain over pixel coverage is real but
+narrower than "a gate": it is a *paired* comparison that now works, where before none did.
+
+**The achievable separation is bounded by the same geometry that hid the defect.** Plan 0069 asked
+for an order of magnitude on the `0.055` benchmark; the comb delivers `9.0x` and the shipped bar sits
+at `5x`. A comb roots every bar on a shared baseline, so a fully-driven bar at `scale = 3.80` keeps
+roughly `0.47` of its own length below the top edge whatever else is done to it, capping the
+separation near `0.53` before the repaired preset's own losses. The baseline-rooted fact that made
+this figure invisible to pixel coverage is still present here, as a much weaker version of itself.
+Expect a *bounded* margin from any baseline-rooted family, not an unbounded one.
+
+**One caveat on the `Nx` framing.** `separation / 0.055` divides an in-frame-length-fraction
+difference by a pixel-coverage-ratio difference: those are not the same kind of quantity, so per
+[ADR-0074](0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) the ratio is
+presentational and the assertion is really an absolute `0.275`. That is safe here for a reason worth
+stating explicitly, because it is what makes this instrument cheap to trust: the fraction is a pure
+CPU computation over segment endpoints and an aspect, with no rasterizer in the loop, so it is
+**machine-independent** — the portability failure ADR-0074 records does not apply. The live exposure
+is *content* drift, and the margin is a factor of `1.8` on the tighter pair.

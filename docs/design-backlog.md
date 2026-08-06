@@ -77,6 +77,7 @@ cannot express them.
 | 0051 | `variant` can morph and neither `star_*` preset does | Closed by content: both presets now drive `variant` with a triangle wave (`star_rosette.toml:59`, `star_lantern.toml:77`). **Closed 2026-08-04 during a backlog sweep** |
 | 0052 | `Spectrum Ridge` has no tonal structure — **premise was false** | Retired 2026-08-03; the preset was never flat and the statistic convicted the right preset for the wrong reason |
 | 0053 | The retune rescaled band gains but not the world-space params | [ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) + [Plan 0058](plans/done/0058-the-gate-can-see-an-empty-frame.md) |
+| 0054 | Pixel coverage cannot see a figure whose *tips* leave the frame | [ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) + [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md). **Closed 2026-08-06.** The successor measures in-frame segment length inside `LineRenderer::draw` and convicts both frozen defects (`0.4975` / `0.7788` separation, against the `0.055` pixel coverage had). **But it has no separating absolute threshold over the shipped library either** — `Rose Zoom` and `Rose Overflow` bracket the over-scaled comb and both are correct content, so it shipped as a **paired** instrument, not the gate this entry asked for. What that leaves open is [0070](#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report) |
 | 0057 | No scene-local level param, so `exposure` gets used for one and two stages disagree | [ADR-0080](adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md) + [Plan 0066](plans/done/0066-the-level-lever.md). **Closed 2026-08-05.** Both halves landed; the retune found a consequence the ADR had not — the background pre-pass is upstream of the tonemap, so moving a number from `exposure` to `brightness` multiplies the sky by `1/old_exposure` (33x on Lorenz). Recorded as the ADR's `Outcome` |
 | 0058 | Thirteen presets bind the fold and eleven had not chosen an edge treatment | Closed by content 2026-08-04, `859ec66` — all thirteen now name a `kaleido_edge`, the verdicts spread across all three treatments. **The entry named `attractor_dejong`, which binds no `kaleido_*` param; the thirteenth is `attractor_clifford`** — inherited from [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md)'s own scope bullet, corrected in both |
 
@@ -381,78 +382,6 @@ instead.
 layer 2 as decorative — recorded in that plan's Phase 6 results. **Do not re-measure by ear**: the
 1 Hz `downbeat_locked` column is the instrument, and a targeted pass on known-4/4 material only
 would sharpen the 6 % figure the half-and-half split leaves approximate.
-
----
-
-## Entry 0054 — from the Plan 0058 close (2026-08-03), and the plan's own measurement is the argument
-
----
-
-## 0054 — pixel coverage cannot see a figure whose *tips* leave the frame, and an in-frame geometry fraction is the successor
-
-- **PROMOTED 2026-08-04 → [ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) +
-  [Plan 0069](plans/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)** — and the "where
-  does it live" question this entry names as the real decision was answered by **none of its three
-  options**. It is measured inside `LineRenderer::draw`, which already receives every endpoint *and*
-  the render target's aspect, so all four line families are covered by one implementation with no
-  `Scene` accessor (ADR-0067's stated objection) and no harness re-derivation of generator math. The
-  entry's per-family limit stands and is documented rather than papered over.
-- **Raised:** 2026-08-03, at [Plan 0058](plans/done/0058-the-gate-can-see-an-empty-frame.md)'s
-  close. This is not a fresh idea —
-  [ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) named it in Alternatives,
-  rejected it as the *primary* mechanism and kept it explicitly as the supplement. What is new is
-  the evidence that it is now wanted, and the evidence is a measurement rather than an argument.
-- **Verified against code:** yes — measured through the instrument Plan 0058 Phase 3 built, printed
-  by `core/tests/sanity.rs` on every run.
-- **Lane:** `architect` → `dev`. Engine/harness work, no preset content.
-
-**What Plan 0058 established, and what it could not.** Phase 1 made `sanity` measure the scene
-against black instead of against a sampled corner pixel, which catches the **total** case — a figure
-so far out of frame that nothing is drawn. That is real and it is pinned by a frozen fixture. Phase 3
-then tried to catch the **partial** case with a stimulus-relative check: capture at two excitations
-and assert the louder frame does not draw less picture. It ships as a **report, not a gate**, and
-the numbers are why:
-
-```text
- ratio   cov@0.4  cov@1.0  preset
- 0.8552   0.2878   0.2461  De Jong          <- lowest legitimate (correct content)
- 0.9568   0.3164   0.3027  Leviathan        <- correct content
- 1.0514   0.3866   0.4065  Spectrum Corona  <- OVER-SCALED, scale = 5.20
- 1.0891   0.5088   0.5541  Spectrum Comb    <- OVER-SCALED, scale = 3.80
-    inf   0.0000   0.0000  Spectrum Ridge (pre-repair)  <- 0/0, no denominator
-```
-
-**No threshold on this axis convicts anything it was built for.** The two over-scaled presets score
-*above* 1.0 — they draw more when loud — because a comb roots every bar on a shared baseline and a
-corona roots every spoke at a centre, so clipping the tips costs a rounding error of lit pixels
-while the body stays exactly where it was. Meanwhile the only content anywhere near a plausible
-threshold is correct: the attractor family's *peak buys structure* idiom, which
-[ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) already records as real. A
-gate at `0.80` would sit `0.055` from De Jong while catching none of the three known-defective
-configurations.
-
-**So the diagnosis is that the measure is wrong, not the threshold.** Tips are almost no pixels.
-Asking a pixel-coverage statistic about a figure that overshoots its frame is asking the wrong
-question, and no calibration of it will help.
-
-**What a design here would weigh.**
-
-- **The obvious mechanism, and its reach.** Line and spectrum scenes build a CPU segment list, so
-  "what share of the drawn geometry lands inside the render target" is computable without a GPU
-  readback for exactly the families most exposed. That is also its limit: `fragment_field`,
-  `reaction_diffusion` and the attractor draw no such list, so this cannot be an engine-wide gate —
-  it is a per-family instrument, which is a shape this project has not built before.
-- **Where it lives.** ADR-0067 declined it partly because it "needs a `Scene`-adjacent accessor",
-  and widening the `Scene` trait is ADR-0002 territory. Whether the fraction is computed inside the
-  scene, exposed through a diagnostic seam, or derived by the harness from the same generator config
-  a preset declares is the real decision, with rejected alternatives.
-- **The confirmation half already works and is worth keeping either way.** Repaired, the same ratio
-  moved `1.0891 -> 1.7196` (comb) and `1.0514 -> 1.6756` (corona). The check is blind as a
-  conviction and sharp as a confirmation — useful to a content pass verifying its own repair even
-  though it can never fail the build.
-- **Non-vacuity is already available.** `core/tests/sanity.rs` carries `pre_repair_spectrum_ridge`
-  as a frozen fixture, and `git show 2efb80e^:presets/spectrum_comb.toml` is the partial case. Any
-  instrument proposed here can be tested against both before it is trusted.
 
 ---
 
@@ -1213,15 +1142,84 @@ questioned — anyone taking this should read that first.
 **Low, and deliberately so.** The user has asked for it once, in a form Plan 0070 partially answered,
 and the cost is a composite redesign. It is here so the ask survives, not because it is next.
 
-## Entries 0070-0072 — from the Plan 0065 Phase 3 roster decision (2026-08-06)
+---
+
+## Entry 0070 — from the Plan 0069 close (2026-08-06), and it is what that plan turned out not to buy
+
+---
+
+## 0070 — the in-frame geometry fraction cannot gate new content, and the number it computes for every line preset is not in the author's report
+
+- **Raised:** 2026-08-06, at [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)'s
+  Mode 4 review. Successor to archived [0054](design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor),
+  which asked for a **gate** and got a **paired instrument**.
+- **Verified by measurement:** yes — the numbers below are the printed report from
+  `cargo nextest run -p lmv-core --test geometry_extent --no-capture`, reproduced on this box at the
+  close.
+- **Not a defect.** Everything Plan 0069 built works exactly as
+  [ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) designed it.
+  This is the gap that remains after it.
+
+**What landed, and the shape of what it left.** `LineRenderer::draw` now measures the share of drawn
+segment length inside the render target, covering the four line families with one implementation.
+Against the two frozen defects it is decisive: repairing them moves the measure `0.4975` (comb) and
+`0.7788` (corona), where pixel coverage had `0.055` and scored both defects *above* the legitimate
+content. That half is closed and closed well.
+
+**But the instrument convicts only in pairs, and a new preset has no pair.** The gate compares a
+configuration against a frozen *repair* of itself, matched by name. That is the right question for a
+content pass verifying its own fix, and it is the only question available — no absolute threshold
+orders the library, because `Rose Zoom` (`0.3492`) and `Rose Overflow` (`0.3659`) **bracket** the
+over-scaled comb (`0.3563`) and both are working exactly as authored. A length fraction cannot tell
+"deliberately inside the figure" from "accidentally outside the frame"; they are the same picture.
+
+So the defect class Plan 0069 was built for **still ships undetected on new content**. Author a
+`spectrum` preset tomorrow with the same over-scale that shipped in `2efb80e^` and nothing fails:
+`sanity.rs` sweeps the library against per-system coverage floors, but `geometry_extent.rs` asserts
+only on the two frozen pairs. The plan's own Followup — "if Phase 3 convicts a shipped preset, file
+it" — could not fire for the same structural reason, and should be read as answered rather than
+pending.
+
+### What would close it
+
+**Put the number where the author already looks, rather than inventing a threshold ADR-0083 twice
+proves does not exist.** `shot --report` (`standalone/examples/shot.rs:28`) is the content lane's own
+metrics table and does not carry this column. The fraction is computed on the CPU from segment
+endpoints and an aspect, with no rasterizer in the loop — so it is cheap, machine-independent, and
+already produced on every capture of a line-family preset. Surfacing it there turns "no gate" from a
+hole into a number a human can read while tuning `scale`, which is the point at which the defect is
+actually introduced.
+
+A distribution *report* in `sanity.rs`'s shape (`report_coverage_distribution`, lowest-first, printed
+not asserted) is the natural second step and is explicitly an ADR-0071 report rather than a gate.
+
+**Not the answer:** an absolute floor over the library. It fails two shipped presets on day one, and
+it is the identical mistake this whole line of work exists to stop making.
+
+### Priority
+
+**Medium-low.** Nothing is broken and no preset ships defective today — both known defects were
+already repaired before the instrument existed. But the plan that built the instrument was scoped as
+"the gate that convicts an over-scaled figure", and what is deployed cannot do that for content
+nobody has already fixed. The cheap half (a `--report` column) is small enough that leaving it undone
+is mostly a matter of nobody having filed it.
+
+---
+
+## Entries 0071-0073 — from the Plan 0065 Phase 3 roster decision (2026-08-06)
 
 Three findings raised when the user judged the Phase 2 sample set and the shipped `star_mandala`
-preset in the running app. **0070 is a decision the user actually took** and needs promoting rather
-than re-deciding; 0071 and 0072 are the two defects behind the verdict on the preset, which was
+preset in the running app. **0071 is a decision the user actually took** and needs promoting rather
+than re-deciding; 0072 and 0073 are the two defects behind the verdict on the preset, which was
 "maximally lame — all lines are half transparent, line connections are visible, there is no curve
 lines".
 
-## 0070 — the scalloped boundary was chosen as a real curve primitive, and the engine has none
+**These three were raised as `0070`-`0072` on the `plan-0065-mandala-interior` lane and renumbered
+here at its merge**, because `main` had independently minted a `0070` the same day at Plan 0069's
+close. Commit messages from that lane (`3c0e56a`, `a35485a`) and the plan's own Phase 3 verdict
+still cite the old numbers; the mapping is `0070`→`0071`, `0071`→`0072`, `0072`→`0073`.
+
+## 0071 — the scalloped boundary was chosen as a real curve primitive, and the engine has none
 
 - **Raised:** 2026-08-06, at Plan 0065 Phase 3. **This is a user decision, not an open question.**
 - **Verified by measurement:** n/a — it is a look decision, taken from the `bound A touch` /
@@ -1249,7 +1247,7 @@ copies. Architect (ADR) then dev.
 roster, and this is engine work by the user's own choice. It does not gate Phases 4-5: the three
 chosen compositions (four rings, six rings, rings in weave) carry no boundary ring.
 
-## 0071 — `sanity.rs`'s coverage floor forces dense thin-stroke line scenes into washed-out tuning, and it is measuring the halo
+## 0072 — `sanity.rs`'s coverage floor forces dense thin-stroke line scenes into washed-out tuning, and it is measuring the halo
 
 - **Raised:** 2026-08-06, at Plan 0065 Phase 3, from the user's verdict on the shipped preset.
 - **Verified by measurement:** yes, three ways, all inside Plan 0065's own lane.
@@ -1305,10 +1303,10 @@ rather than papered over; the alternative was to ship the look the user had alre
 
 ### Why this is not the same entry as 0054
 
-[0054](#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor)
-and its successor [Plan 0069](plans/0069-the-instrument-that-sees-a-figure-leave-the-frame.md) are
-about a figure leaving the frame; the in-frame geometry fraction Plan 0069 builds would **not** catch
-this one, because a mandala is entirely inside the frame and would score a clean 1.0. This is the
+[0054](design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor)
+and its successor [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)
+are about a figure leaving the frame; the in-frame geometry fraction that plan shipped does **not**
+catch this one, because a mandala is entirely inside the frame and scores a clean 1.0. This is the
 opposite failure: the figure is present, correct and dense, and the instrument reads it as sparse.
 Both entries are the same root cause — a pixel statistic standing in for a structural one — and
 anyone taking either should read the other.
@@ -1326,7 +1324,7 @@ where it currently succeeds, which is catching a scene that renders **nothing**.
 same floor and gets pushed toward the same washed-out tuning. It is the one item here that actively
 degrades shipped content rather than merely failing to help.
 
-## 0072 — motif outlines show their vertices, and a sampled polyline does not read as a curve
+## 0073 — motif outlines show their vertices, and a sampled polyline does not read as a curve
 
 - **Raised:** 2026-08-06, at Plan 0065 Phase 3, from the user's verdict in the running app: "line
   connections are visible, there is no curve lines".

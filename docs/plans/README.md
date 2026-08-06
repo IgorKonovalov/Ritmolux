@@ -16,11 +16,10 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 | [0073](0073-the-fern-unfurls-and-colours-by-what-made-it.md) | The fern unfurls and colours by what made it: age, last map, and the end of the startup rectangle (`Particle` 32 -> 48 B, staggered fixed-point respawn, `age_tint`/`age_hue`/`map_tint`/`map_hue`) | **approved 2026-08-05** — ready for `dev`, gated by nothing; the successor [0062](done/0062-the-chaos-game-grows-a-fern.md) named in its Followups, plus the one engine finding its content pass raised; [ADR-0087](../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md). **The only plan in the roster that removes a visible defect rather than adding capability** — [backlog 0064](../design-backlog.md)’s hard-edged startup rectangle dies **by construction** in Phase 2, because a continuous churn means the population is never a uniform box at any moment. `Particle` grows to a struct **four families share**, so Phase 1’s "all fourteen baselines byte-identical" is the assertion that matters — and it runs on WARP, where allocation changes are a **recorded** hazard twice over. **Phase 6 is `human`** and terminal, so one `dev` session lands Phases 1-5. Re-blesses `attractor_ifs.png` and **only** that one; any other moved baseline is a defect | dev, human |
 | [0064](0064-the-symmetry-stage-and-the-banded-palette.md) | The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour (`kaleido_radial`/`spiral`/`zoom`/`tile`/`inner`, `palette_steps`/`palette_contour`) | **approved 2026-08-04** — ready for `dev` **after [0055]**; from the user's five reference images; [ADR-0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) + [ADR-0078](../adrs/0078-banding-is-a-palette-coordinate-operation.md). Covers **three** of the five images, and applies to **every scene** because it is screen-space. The engine already has half the mechanism: periodicity in `theta` is the fold, periodicity in **`log r`** is the missing concentric self-similarity. **Both halves are one plan on purpose** — neither alone reproduces the references, and the user chose to decide the look from a rendered sample set that has to show the combination. **Phase 4 is `human`** (pick defaults and ranges from the grid) and gates Phases 5-6, so it does not close in one session. **Collides with [0055]** in `kaleidoscope.rs` — taking 0055 first is the cheaper order. Moves **no** existing golden baseline; adds one | dev, human |
-| [0065](0065-the-mandala-interior.md) | The mandala interior: `star_pattern` stops being hollow (a `rings` roster of motif / count / radius / scale / phase on `[generator]`) | **approved 2026-08-04** — ready for `dev`, gated by nothing; the fourth reference image; [ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md). **Closes the still-open half of [backlog 0034 → 0007](../design-backlog.md)** — the "hollow ring" finding with the user's standing *invest, do not cut* call on it, live since 2026-07-26 and never specified until the reference image arrived. Line geometry, so it **shares nothing** with [0055] or [0064] and can run in parallel with either. **Phase 3 is `human`** (pick the motif roster from a rendered grid) and gates Phases 4-6. Watch the `animation.rs` gate: a ring mandala is *more* rotationally symmetric than `star_rosette`, so spin alone will not pass it ([backlog 0009](../design-backlog.md)) — Phase 4 designs around it. Moves **no** golden baseline at all | dev, human |
+| [0065](0065-the-mandala-interior.md) | The mandala interior: `star_pattern` stops being hollow (a `rings` roster of motif / count / radius / scale / phase on `[generator]`) | **approved 2026-08-04** — ready for `dev`, gated by nothing; the fourth reference image; [ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md). **Closes the still-open half of [backlog 0034 → 0007](../design-backlog.md)** — the "hollow ring" finding with the user's standing *invest, do not cut* call on it, live since 2026-07-26 and never specified until the reference image arrived. Line geometry, so it **shares nothing** with [0055] or [0064] and can run in parallel with either. **Phase 3 is `human`** (pick the motif roster from a rendered grid) and gates Phases 4-6. Watch the `animation.rs` gate: a ring mandala is *more* rotationally symmetric than `star_rosette`, so spin alone will not pass it ([backlog 0009](../design-backlog.md)) — Phase 4 designs around it. Moves **no** golden baseline at all. **Phases 1-5 landed 2026-08-06** on `plan-0065-mandala-interior` (`33e5efc`/`1904469`/`3c0e56a`/`419418f`/`a35485a`); three mandala presets ship tuned by eye and **`sanity.rs` is red on all three** (0.2442/0.2505/0.2544 against a `star_pattern` floor of 0.34). **Architect disposition 2026-08-06: not a block.** The floor is *derived from the shipped library* at half each family's sparsest member, `MAX_FLOOR_SLACK` exists to force re-derivation when that minimum moves, and this plan moved it — so a **Phase 7** (`dev`) was added to re-derive it (expected `0.12`, slack 2.04) after Phase 6 and after the merge. [Backlog 0071](../design-backlog.md) stays open at medium-high as the measure's replacement, which re-derivation is *not*. **Still owed:** Phase 6 (`human`, unrun), then Phase 7, then the close. Two merge hazards: this lane and `main` each minted design-backlog **`0070`** on 2026-08-06 (lane's `0070`-`0072` renumber to `0071`-`0073`, and the archive conflicts), and `main` is at `v0.41.0` so the close bump is **`minor` → `v0.42.0`** | dev, human |
 
 | [0067](0067-the-curation-route.md) | The curation route: a gate worth trusting, and the preset that has been waiting six weeks | **approved 2026-08-04** — ready for `dev`; from the [backlog sweep](../design-backlog.md#0056--a-user-authored-preset-has-been-living-outside-the-repo-for-six-weeks-and-it-is-a-curation-candidate-the-boundary-has-no-route-for); [ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md), the **ADR-0017 supplement this repo has owed since ADR-0022** removed its premise. The boundary moves: `preset-author` lands presets, `architect` curates the set. Phase 1 first makes the gate that authorizes it worth leaning on — **all five preset gates synthesize `AnalysisFrame` and none runs the analyzer**, so "the suite is green" currently means the renderer did something with numbers we made up. **Phase 3 is `human`** (the untracked Chthonic Coral Oracle; declining it is a successful outcome). Moves no pixels | dev, human |
 | [0068](0068-why-the-downbeat-rarely-locks.md) | Why the downbeat rarely locks: an instrument, an ablation, and a verdict | **approved 2026-08-04** — ready for `dev`; from the [backlog sweep](../design-backlog.md#0042--the-downbeat-estimator-locks-on-3--of-audible-time-so-the-gated-bar-variables-are-almost-always-fallback); [ADR-0082](../adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md), supplementing ADR-0050. **Ships no fix on purpose.** The estimator locks on 3.1 % of audible time and three terms could be responsible; the only instrument prints the outcome, not the terms. **`CONFIDENCE_THRESHOLD` does not move** — adjusting a safety gate using data collected while the gate was closed is circular. **Phase 3 is `human`** and mid-plan. Moves no pixels | dev, human |
-| [0069](0069-the-instrument-that-sees-a-figure-leave-the-frame.md) | The instrument that sees a figure leave the frame (in-frame geometry fraction at the line renderer's draw seam) | **approved 2026-08-04** — ready for `dev`; from the [backlog sweep](../design-backlog.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor); [ADR-0083](../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md). Plan 0058 measured that **no pixel-coverage threshold convicts an over-scaled figure** — the two defective presets score *above* the legitimate content. The successor is measured inside `LineRenderer::draw`, which already holds every endpoint and the target aspect, so all four line families are covered with **no `Scene` change** (answering ADR-0067's stated objection rather than overriding it). **The only plan here with no `human` phase — it closes in one session.** Adds no baseline | dev |
 | [0071](0071-light-that-adds-without-covering.md) | Light that adds without covering: `occlude`, decided from a sample set | **approved 2026-08-04** — ready for `dev`; from the [backlog sweep](../design-backlog.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle); [ADR-0085](../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md), supplementing ADR-0056. Coverage-as-alpha means a fragment occludes the backdrop whatever light it emits, so `bg_bright` can rise only to the figure's dimmest emitted luminance — a ceiling nobody chose, on a floor the ADR-0056 fix *invited* raising. One scalar at the backdrop composite; default `1.0` is byte-identical. **Phase 3 is `human`** and mid-plan — the default is decided by looking, over a **lit** backdrop, because at `bg_bright = 0` the two models are identical | dev, human |
 | [0072](0072-the-backdrop-joins-the-palette.md) | The backdrop joins the palette (`bg_hue` becomes a coordinate in the preset's own gradient) | **approved 2026-08-04** — ready for `dev`, gated by nothing; from the `preset-author` handoff after `emitter_squall` ([backlog 0059](../design-backlog.md#0059--the-backdrop-is-the-one-surface-left-that-does-not-colour-through-the-shared-palette-and-nothing-says-so)); [ADR-0086](../adrs/0086-the-backdrop-colours-through-the-preset-palette.md). `background.rs:70` holds the **third copy** of the cosine constant [ADR-0021](../adrs/0021-shared-palette-system.md) exists to de-duplicate, and binds no LUT — so `[palette]`, `saturation` and `palette_mix` stop at the scene and never reach the sky. Every other surface converged (RD at Plan 0020, the line families at [0054]); this is the last one out. **Eleven lit-backdrop presets provably cannot move** (their gradient already *is* `spectrum`, and the difference is sub-LSB by arithmetic in the ADR); **fifteen re-tint** and get a `human` pass. Two golden fixtures move visibly and are re-blessed — and **only** those two. The real risk is [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md)'s WARP layout aliasing: the new bind group is shape-identical to the fragment field's group 1 | dev, human |
 
@@ -34,12 +33,12 @@ preference, and a session may take any plan here.
 
 | # | Plan | Why here | Closes in one session? |
 |---|------|----------|------------------------|
-| 1 | [0069] | **The only plan in the roster that closes in one session** — no `human` phase at all. Protective, moves no pixels, and it replaces a measure Plan 0058 proved cannot work with one that can. Shares no file with anything live | **Yes** |
+| ~~1~~ | ~~[0069]~~ | **Closed 2026-08-06** — see Recently closed. All four phases landed in one session, exactly as this row predicted. `LineRenderer::draw` now carries a thread-local diagnostic switch, so anything editing that draw call should read `geometry_extent.rs` alongside it. **No plan in the roster closes in one session any more** — every remaining one carries a `human` phase | — |
 | ~~2~~ | ~~[0063]~~ | **Closed 2026-08-04** — see Recently closed. Its soft constraint **has been discharged in the direction it wanted**: `inv_depth_extent()` now exists as an exhaustive match over `AttractorFamily`, so [0062] adding a fifth family is **compiler-forced** to answer it (with `0.0` — its IFS figures are 2-D) | — |
 | ~~2~~ | ~~[0062]~~ | **Closed 2026-08-05** — see Recently closed. All seven phases landed; its Phase 7 content pass is the source of backlog 0064-0066. `particles/mod.rs` now also carries `ifs.rs`, five new params and a `STEP_SLOTS` uniform-slot scheme, so anything inheriting that file should read it rather than [0063] alone | — |
 | 2 | [0073] | **The successor [0062] named and did not write.** Take it while `particles/mod.rs` and `ifs.rs` are still in context — it is the third leg of the attractor run after [0063] and [0062], and the only plan in the roster that **removes a visible defect** ([backlog 0064]) rather than adding capability. ~~Shares `particles/mod.rs` with [0066], so those two are a sequence rather than a pair~~ — **[0066] closed 2026-08-05**, so that constraint is discharged and this is now the only live plan touching that file | No — Phase 6 is `human`, terminal |
 | ~~3~~ | ~~[0066]~~ | **Closed 2026-08-05** — see Recently closed. All five phases landed. `particles/mod.rs` now carries a `brightness` on the attractor, so [0073] inherits a `PARAMS`/`set_param` pair one entry longer than the row above assumed | — |
-| 4 | [0065] | **Gated by nothing and shares no file with anything** — line geometry against a post chain and a particle scene. The safest parallel lane, and it can run *alongside* 1-3 rather than after them | No — Phase 3 is `human`, mid-plan |
+| 4 | [0065] | **Gated by nothing and shares no file with anything** — line geometry against a post chain and a particle scene. The safest parallel lane, and it can run *alongside* 1-3 rather than after them. **In flight** — Phases 1-5 landed 2026-08-06 in `WORK/lmv-plan-0065`; Phase 6 (`human`) and the added Phase 7 remain | No — Phase 3 is `human`, mid-plan |
 | 4 | [0064] | **Unblocked — [0055] has landed**, so the `kaleido_edge` branch it composes against is in place. Still deliberately after the attractor work rather than concurrent with it: its Phase 3 sample grid renders on `attractor_lorenz` as one of three sources, and [0063] changes what that source looks like. A look decision taken against a moving target is one that has to be retaken. **Read [0055]'s Recently-closed entry** — the fold's default is now `tile`, not the disc 0064 was drafted against | No — Phase 4 is `human`, mid-plan |
 | 5 | [0053] | Protective rather than additive; moves no pixels. Its `human` Phase 3 is runnable on this box after the 2026-08-04 premise correction. **Read BOTH [0052]'s and [0055]'s Recently-closed entries first** — each moved a bind-group layout 0053 asserts on, and neither moved in the direction 0053 predicted | No — Phase 3 is `human` |
 | ~~6~~ | ~~[0070]~~ | **Closed 2026-08-05** — see Recently closed. All six phases landed. `swarm.rs` and `emitter.rs` now both read a shared `marks.rs` SDF chunk, so anything touching either scene's fragment shader should read that file rather than the scene alone | — |
@@ -51,9 +50,11 @@ preference, and a session may take any plan here.
 | ~~12~~ | ~~[0036]~~ | **Closed 2026-08-04** — see Recently closed. Phases 1-3 shipped; Phase 4 is carried forward as a `human` follow-up, not a live plan | — |
 | 13 | [0061] | **Last, by the user's own instruction** | No — Phases 8-9 are `human` |
 
-**[0069] is now the only plan in the roster that closes in one session** — every other one carries a
-`human` phase. That makes it the obvious pick for a session that wants a finished thing rather than
-a decision owed. **If you want the most visible change per session**, take [0073]: it is the last leg
+~~**[0069] is now the only plan in the roster that closes in one session**~~ — **[0069] closed
+2026-08-06**, so **no plan left here closes in one session**: every remaining one carries a `human`
+phase, and a session that wants a finished thing has to bring the user in at some point. Plan
+accordingly rather than picking on that criterion.
+**If you want the most visible change per session**, take [0073]: it is the last leg
 of the attractor run and the only live plan still touching `particles/mod.rs`, so take it while that
 file and `ifs.rs` are in context — [0063], [0062] and [0066] were the first three legs and closed
 2026-08-04, 2026-08-05 and 2026-08-05. **If a second lane is running in parallel**, give it [0065]:
@@ -98,7 +99,7 @@ now that most plans here carry a `human` phase:
 |------|-----------------------------------|------------------------------|
 | ~~[0063]~~ | ~~**4** (Phases 1-4)~~ | **closed 2026-08-04** — the shape held exactly: four `dev` phases in one session, then a terminal content pass |
 | [0062] | **6** (Phases 1-6) | **terminal** — Phase 7 is the content pass, all code done |
-| [0065] | 2 (Phases 1-2) | **mid-plan** — Phase 3 gates Phases 4-6 |
+| [0065] | 2 (Phases 1-2) | **mid-plan** — Phase 3 gates Phases 4-6. **Held exactly**: Phases 1-2, stop, then Phases 4-5 in one sitting after the verdict |
 | [0064] | 3 (Phases 1-3) | **mid-plan** — Phase 4 gates Phases 5-6 |
 
 The pairing was **ten `dev` phases with no mid-plan stop**, in one file's context, with the ordering
@@ -820,6 +821,55 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   iGPU-fps carry-forward).
 
 ## Recently closed
+
+- [0069 — The instrument that sees a figure leave the frame](done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)
+  — **done 2026-08-06**, Mode 4 review **no blockers, three minor, one nit**. Phases 1-4
+  `c3ce524` / `a359b67` / `9289a7c` / `1abf3a9` on `plan-0069-in-frame-geometry`; `main` was already
+  an ancestor of the branch, so **no merge commit** — a straight fast-forward. Full gate green on the
+  tip (`fmt`, `clippy --all-targets -D warnings`, **546/546 nextest, 0 skipped**, doc links resolve)
+  and **no golden baseline moved or was added**, as the plan promised.
+  [ADR-0083](../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) is
+  **accepted with an Outcome section**.
+
+  **The headline result is narrower than the plan's own framing, and that is the transferable part.**
+  The plan set out to replace a failed *gate* with a working one. The new measure convicts both
+  frozen defects decisively — repairing them moves it `0.4975` (comb) and `0.7788` (corona), against
+  the `0.055` pixel coverage had and could not use — but **it has no separating absolute threshold
+  over the shipped library either**. `Rose Zoom` (`0.3492`) and `Rose Overflow` (`0.3659`) *bracket*
+  the frozen over-scaled comb (`0.3563`), and both are working exactly as authored: a length fraction
+  cannot distinguish "deliberately inside the figure" from "accidentally outside the frame", because
+  they are the same picture. So it shipped as a **paired** instrument — a configuration against its
+  own repair, matched by name — which is the question a content pass actually asks. Anyone adding
+  `assert!(fraction > 0.5)` over the library fails two shipped presets, which is the same mistake one
+  axis over. `docs/capturing.md` leads with what it cannot see, per the plan's Phase 4.
+
+  **One done-when was not met literally, and the plan's arithmetic is why.** Phase 3 asked for a
+  separation "at least an order of magnitude larger than the `0.055`"; the shipped bar is `5x` and
+  the comb reads `9.0x`. A comb roots every bar on a shared baseline, so a fully-driven bar at
+  `scale = 3.80` keeps about `0.47` of its own length in frame **whatever else is done to it**,
+  capping the separation near `0.53`. The baseline-rooted fact that made this figure invisible to
+  pixel coverage is still present, as a much weaker version of itself — so expect a *bounded* margin
+  from any baseline-rooted family. That is an unchecked number in the plan, not a shortfall in the
+  implementation, and it is the fourth close in a row where an architect-authored numeric done-when
+  cost a round trip.
+
+  **The `Nx` framing is presentational.** `separation / 0.055` divides an in-frame-length-fraction
+  difference by a pixel-coverage-ratio difference, so per
+  [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) it is
+  not a dimensionless property and the assertion is really an absolute `0.275`. Safe here for a
+  reason worth knowing before anyone tightens it: the fraction is a **pure CPU computation** over
+  segment endpoints and an aspect, with no rasterizer in the loop, so it is machine-independent. The
+  live exposure is *content* drift, with a factor of `1.8` of headroom on the tighter pair.
+
+  **What to know before editing the line renderer.** `LineRenderer::draw` now costs one `Cell::get`
+  on the shipped path and, when the thread-local switch is on, a CPU loop over the segment slice
+  bounded by the renderer's capacity. `geometry_extent.rs`'s first test asserts a capture with it on
+  is **byte-identical** to one with it off — that assertion is what makes "off" mean off, and it is
+  not optional. `draws_segments()` is an **exhaustive match with no wildcard arm**, so a new
+  `SystemKind` fails to compile until someone says which side of the split it is on. Two frozen
+  defect fixtures now live in `core/tests/fixtures/` with a "do not tune" header apiece: bringing one
+  back inside the frame would leave the gate true of nothing. One doc error was fixed at this close
+  — `capturing.md` claimed both zoomed presets sat at or below the comb, where one is above it.
 
 - [0070 — Shaped marks](done/0070-shaped-marks.md) — **done 2026-08-05**, Mode 4 review **no
   blockers, one minor**. Phases 1-5 `5d21e76` / `c15112a` / `564f3bd` / `d922ce1` / `a87e05b` on
