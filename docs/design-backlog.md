@@ -1212,3 +1212,119 @@ questioned — anyone taking this should read that first.
 
 **Low, and deliberately so.** The user has asked for it once, in a form Plan 0070 partially answered,
 and the cost is a composite redesign. It is here so the ask survives, not because it is next.
+
+## Entries 0070-0072 — from the Plan 0065 Phase 3 roster decision (2026-08-06)
+
+Three findings raised when the user judged the Phase 2 sample set and the shipped `star_mandala`
+preset in the running app. **0070 is a decision the user actually took** and needs promoting rather
+than re-deciding; 0071 and 0072 are the two defects behind the verdict on the preset, which was
+"maximally lame — all lines are half transparent, line connections are visible, there is no curve
+lines".
+
+## 0070 — the scalloped boundary was chosen as a real curve primitive, and the engine has none
+
+- **Raised:** 2026-08-06, at Plan 0065 Phase 3. **This is a user decision, not an open question.**
+- **Verified by measurement:** n/a — it is a look decision, taken from the `bound A touch` /
+  `bound B curve` A/B in the Phase 2 sample set.
+
+[ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)'s Notes left
+open whether the reference image's scalloped outer boundary is "a motif ring whose members touch, or
+a separate boundary curve". Phase 2 rendered it both ways and **the user chose the curve** — and
+chose it in the strong form, as a real primitive rather than as side B's approximation.
+
+Side B in the sample set is **not** a boundary curve. The engine has no such primitive and Phase 1
+did not add one; side B is 40 `arc` motifs scaled 1.12x so their members overlap and the scallops
+merge into something that *reads* continuous. The user was shown that distinction explicitly and
+picked the primitive anyway.
+
+### What a fix would be
+
+A new roster member or a new `[generator]` key on `star_pattern` — a closed scalloped curve whose
+lobe count and depth are parameters, sampled as one continuous outline rather than as N placed
+copies. Architect (ADR) then dev.
+
+### Priority
+
+**Blocked out of Plan 0065 by construction** — the plan's Phase 5 ships presets from the closed
+roster, and this is engine work by the user's own choice. It does not gate Phases 4-5: the three
+chosen compositions (four rings, six rings, rings in weave) carry no boundary ring.
+
+## 0071 — `sanity.rs`'s coverage floor forces dense thin-stroke line scenes into washed-out tuning, and it is measuring the halo
+
+- **Raised:** 2026-08-06, at Plan 0065 Phase 3, from the user's verdict on the shipped preset.
+- **Verified by measurement:** yes, three ways, all inside Plan 0065's own lane.
+
+`star_mandala`'s first draft ran `thickness = 1.15` / `glow = 0.85` / `trails = 0.26` — the author's
+judgement that forty times as many segments want a lighter hand. It **fails** `core/tests/sanity.rs`,
+which captures at 96x96 and enforces a `star_pattern` coverage floor of **0.34**: it measured
+**0.2541**. A second pass at 2.05 / 1.20 / 0.30 read **0.3053**, still short. What ships reads
+**0.4346** at 2.45 / 1.55 / 0.40 — and the user's first reaction to it in the running app was that
+every line is half transparent.
+
+**The gate cannot see the figure it is gating.** Three measurements say so:
+
+- The mandala's coverage (0.4346) sits **below** bare `star_rosette`'s (0.7995) while drawing ~46x
+  the geometry.
+- In a controlled A/B at `star_rosette`'s own shipped tuning, the bare rosette and the four-ring
+  mandala score **identically (0.403)** — 46x the segments, same number.
+- A structural measure separates them cleanly: **9 of 10 radial shells occupied against 1**.
+
+At 96x96 a hairline over a 46-fold ornament aliases to nothing, so `coverage` on this scene is a
+measure of the **halo and the trail**, not of the figure. The only lever that moves it is inflating
+glow and tail — which is exactly the look the user rejected. **The gate is selecting for the defect.**
+
+### Why this is not the same entry as 0054
+
+[0054](#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor)
+and its successor [Plan 0069](plans/0069-the-instrument-that-sees-a-figure-leave-the-frame.md) are
+about a figure leaving the frame; the in-frame geometry fraction Plan 0069 builds would **not** catch
+this one, because a mandala is entirely inside the frame and would score a clean 1.0. This is the
+opposite failure: the figure is present, correct and dense, and the instrument reads it as sparse.
+Both entries are the same root cause — a pixel statistic standing in for a structural one — and
+anyone taking either should read the other.
+
+### What a fix would be
+
+Not a threshold change. Either a per-family floor that acknowledges what thin-stroke line scenes
+render at 96x96, or a structural occupancy measure (the radial-shell count above is one candidate and
+it already exists as a one-off in the lane). Whatever replaces it must be checked against the case
+where it currently succeeds, which is catching a scene that renders **nothing**.
+
+### Priority
+
+**Medium-high, and it will recur on the next mandala.** Every future preset on this scene meets the
+same floor and gets pushed toward the same washed-out tuning. It is the one item here that actively
+degrades shipped content rather than merely failing to help.
+
+## 0072 — motif outlines show their vertices, and a sampled polyline does not read as a curve
+
+- **Raised:** 2026-08-06, at Plan 0065 Phase 3, from the user's verdict in the running app: "line
+  connections are visible, there is no curve lines".
+- **Verified by measurement:** **no** — user judgement in the running app, corroborated by the
+  Phase 2 sheets (the joints are clearest on `bound A touch`, where neighbouring `arc` members meet).
+  **The mechanism below is a hypothesis and has not been measured.**
+
+Every motif in the closed roster is a parametric outline **sampled to straight segments** and drawn
+as instanced quads through the shared `LineRenderer`. Two consequences the user saw:
+
+- **Joints are brighter than the strokes they join.** Where two quads meet at a vertex they overlap
+  and sum additively, so a vertex reads as a bead. [Plan 0040](plans/done/0040-line-joins-finish-the-job.md)'s
+  close found the same shape on a mirrored line preset — the quietest part of the readout rendering
+  as its brightest — and Plan 0065's own Risks section predicted it for concentric strokes before the
+  plan was built. **Verify against what Plan 0040 actually landed before assuming joins are absent;**
+  the visible artifact may be additive overlap on top of working joins rather than missing joins.
+- **`circle`, `petal` and `arc` are polygons.** At the sample sheets' stroke and scale they read as
+  smooth; in the shipped preset, at motif `scale` 0.13-0.46 with an inflated glow, they do not.
+  Segment count per motif is fixed and is not an authorable parameter.
+
+### What a fix would be
+
+Unclear, and deliberately left so — it spans at least three candidates that should not be bundled: a
+curve-aware stroke in the line renderer, an authorable sample resolution per motif, and whatever
+0071's retuning does to the apparent faceting once the strokes stop being inflated. **Re-judge after
+0071**, because the cheapest possibility is that this is largely 0071 wearing a different mask.
+
+### Priority
+
+**Deferred by the user** — "maybe we can improve upon in the future". Recorded so the three specific
+complaints survive the session that produced them.
