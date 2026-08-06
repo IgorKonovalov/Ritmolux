@@ -214,6 +214,39 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// spectrum            0.06    0.1189  Spectrum Ridge     1.98
 /// ```
 ///
+/// **This table is a snapshot and the printed distribution is authoritative.**
+/// As of 2026-08-06 three rows have drifted *upward* without any floor needing
+/// to move — `swarm`'s minimum is now `0.6208` Starfield (slack `1.48`),
+/// `attractor`'s is `0.2356` Lorenz (`1.31`), and `emitter` postdates the table
+/// entirely at `0.25` against `0.3086` Squall (`1.23`). Upward drift is the safe
+/// direction and [`MAX_FLOOR_SLACK`] is what will eventually call it; the rows
+/// are left as written because the prose below narrates the numbers in them.
+///
+/// **The `star_pattern` floor went to `0.12` on 2026-08-06 and came back to
+/// `0.34` the same day, and both moves were correct.** Plan 0065 filled the
+/// interior of that scene with three ring-mandala presets measuring `0.2442` /
+/// `0.2505` / `0.2544`, which moved the family minimum below the floor, so the
+/// floor was re-derived to `0.2442 / 2 = 0.12` exactly as the rule below says to.
+/// Then the user rejected all three on sight in the running app and they were
+/// **retired**, taking the minimum back to `0.6908` Star Lantern and the floor
+/// back to `0.34`.
+///
+/// **Keep the round trip in mind before treating a re-derivation as permanent.**
+/// The reason the presets were cut is not the reason the floor moved: every motif
+/// in that scene is a parametric outline *sampled to straight segments*, so the
+/// vertices are visible and a circle reads as a polygon — a ceiling on the
+/// approach, not a tuning miss (design-backlog 0073). The mandala look now ships
+/// as `reaction_gilt`, an analytic iso-contour field folded by `kaleido_order`,
+/// where there is no geometry and so no vertex at any resolution.
+///
+/// **What the episode still proves about this measure stands, and it is filed.**
+/// At this test's 96x96 capture a hairline over a 46-fold ornament aliases to
+/// almost nothing, so `coverage` on that content measured the halo and the trail
+/// rather than the figure — the bare rosette and the 46x-denser mandala scored
+/// *identically*, and 54 % more geometry moved the number 2.6 %. See
+/// design-backlog 0072, which stays open at medium-high and asks for a structural
+/// occupancy measure; nothing about retiring the presets answers it.
+///
 /// **The attractor floor moved on 2026-08-03 and the mechanism above is why it
 /// was noticed rather than missed.** It was `0.12` against `0.2461` De Jong.
 /// Plan 0057 Phase 6 re-raised the exposure of Clifford, De Jong and Leviathan,
@@ -293,6 +326,9 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // still lit; Rose Trails at 0.6722 sets this one.
         SystemKind::ParametricCurve => 0.33,
         SystemKind::LSystem => 0.32,
+        // Went to 0.12 and back on 2026-08-06 — see the doc comment. Star
+        // Lantern's 0.6908 sets it again now that the three ring mandalas are
+        // retired.
         SystemKind::StarPattern => 0.34,
         // Reaction-diffusion paints a real pattern across the frame, but the
         // present maps only the sparse V species, so the lit fraction is modest.
