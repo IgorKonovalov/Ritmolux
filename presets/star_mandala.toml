@@ -1,0 +1,125 @@
+# Star Mandala - the first preset with an INTERIOR. `star_pattern` drew a
+# twelve-fold Hankin interlace and nothing else, which design-backlog 0007
+# reported as "a hollow ring": at a 20-degree contact angle the strokes live
+# between radius 0.54 and 0.90, so the inner 60% of the disc was empty at every
+# angle the scene could reach.
+#
+# ADR-0079 / Plan 0065 fill it from the other direction - not with a denser
+# interlace but with RINGS OF MOTIFS, the vocabulary the reference image is
+# actually made of. Four of them here, inside the interlace the scene already
+# drew, which is the composition backlog 0007 asked for and the reference itself
+# does not show.
+#
+# THE RING ROSTER IS STRUCTURAL, not bindable: it is read once at load and fixed
+# for as long as the preset is loaded, exactly like `tiling`. The moving levers
+# on the rings arrive in Plan 0065 Phase 4; everything animated below is the
+# scene's existing transform surface.
+system = "star_pattern"
+name   = "Star Mandala"
+
+[generator]
+tiling            = "12"
+contact_angle_deg = 26
+
+# FOUR RINGS, read outward. Radii are in the fit-normalized world the rosette
+# lands in - that figure spans +/- 0.9, so 0.9 is its rim and everything here is
+# genuinely interior. `scale` is close to the copy's diameter, because every
+# motif in the closed roster is authored to span about one unit.
+#
+# THE COUNTS ARE DELIBERATELY NOT ALL TWELVE. A ring whose count divides the
+# interlace's twelve-fold symmetry locks onto it and the two figures read as one
+# coarse shape; 18 and 24 against 12 beat against it instead, which is what makes
+# the interior read as ornament rather than as a thicker star. The 12-count
+# diamond ring is the one that DOES lock, on purpose - it is the seam between the
+# centre boss and the beating outer rings.
+#
+# SEGMENT BUDGET: 36 + 12*4 + 18*24 + 24*24 = 1092, plus the interlace's 24, so
+# 1116 of the floor tier's 20 000. Room to spare, which is the point of stating
+# it - a ring costs `count` copies of the motif's own segment count, and nothing
+# warns you at the cap (it truncates silently).
+rings = [
+  { motif = "trefoil",  count = 1,  radius = 0.00, scale = 0.46 },
+  { motif = "diamond",  count = 12, radius = 0.30, scale = 0.20 },
+  { motif = "petal",    count = 18, radius = 0.52, scale = 0.26, phase = 0.09 },
+  { motif = "circle",   count = 24, radius = 0.70, scale = 0.13 },
+]
+
+[params]
+# THE INTERLACE STILL MORPHS. Same triangle wave `star_rosette` uses (a bare
+# `mod` would be a sawtooth and would snap 2 -> 0 once per cycle), a little
+# slower here because there is now a whole interior competing for the eye.
+variant = "2 * abs(mod(0.5 + time * 0.014 + clamp(bass * 0.30, 0, 0.26), 2) - 1)"
+
+# MOTION IS RADIAL, and that is a decision rather than a taste. A ring mandala is
+# MORE rotationally symmetric than the rosette was - the outer rings are 18- and
+# 24-fold - so a turn moves almost no pixels and reads as frozen (this is
+# design-backlog 0009's penalty, with more force). The turn is kept because the
+# centre boss and the beating ring counts do show it; the breath below is what
+# actually carries the animation.
+rotation = "0.52 * time + sin(time * 0.037) * 0.18"
+
+# THE BREATH - two radial levers turning at different rates so the figure never
+# repeats itself exactly. `scale` moves the geometry, `zoom` moves the whole
+# frame, and the two beat slowly against each other.
+scale = "0.80 + sin(time * 0.62) * 0.115 + clamp(bass * 0.20, 0, 0.17)"
+zoom  = "1.05 + sin(time * 0.41) * 0.075 + clamp(bass * 0.11, 0, 0.09)"
+
+# THE REVEAL sweeps the figure in draw order, which here means the interlace
+# first and then the rings outward - the ornament assembling itself. It is also
+# the strongest frame-level motion this preset has, because it changes how much
+# is drawn rather than only where.
+draw_progress = "clamp(0.72 + sin(time * 0.29) * 0.26 + clamp(onset * 0.24, 0, 0.18), 0, 1)"
+
+# STROKE, GLOW AND THE SHIPPING FLOOR - measured, not taste, and the numbers are
+# here because the next mandala will meet exactly this.
+#
+# The first draft ran `thickness = 1.15` / `glow = 0.85` / `trails = 0.26`,
+# thinner than `star_rosette`'s on the honest argument that forty times as many
+# segments want a lighter hand. It looks right at 900 px and it FAILS
+# `core/tests/sanity.rs`, which captures at 96x96: coverage 0.2541 against the
+# star_pattern floor of 0.34. A second pass at 2.05 / 1.20 / 0.30 read 0.3053 -
+# still short. These values read 0.4346.
+#
+# The reason is worth stating: at 96x96 a hairline over a 46-fold ornament
+# aliases away to almost nothing, so `coverage` on this scene is a measure of the
+# HALO, not of the figure. That is also why this preset's coverage sits BELOW
+# `star_rosette`'s 0.7995 despite drawing 46x the geometry - the rosette's fatter
+# stroke and longer tail fill more of a 96 px frame than an interior of thin
+# strokes ever will. Do not read the gap as the mandala being the sparser figure.
+thickness  = "2.45 + clamp(mid * 1.30, 0, 1.05) + beat * 0.32"
+brightness = "0.92 + clamp(treb * 0.44, 0, 0.36)"
+glow       = "1.55 + clamp(mid * 0.32, 0, 0.26)"
+
+# COLOUR ALONG THE RADIUS, which is a lever this scene did not have until now.
+# ADR-0059 gave `star_pattern` a radial colour axis and it was IDENTICALLY FLAT
+# on a bare rosette - 2n congruent segments all at the same radius, so
+# `hue_spread` was documented as a no-op. With four rings at four radii the axis
+# finally has a range, and this is the first preset to spend it.
+hue        = "0.58 + time * 0.012 + clamp(treb * 0.42, 0, 0.30)"
+hue_spread = "0.52 + clamp(mid * 0.28, 0, 0.22)"
+saturation = "0.92"
+
+pan_x       = "sin(time * 0.0130) * 0.03"
+bg_hue      = "0.68 + sin(time * 0.0085) * 0.05"
+bg_bright   = "0.024 + clamp(mid * 0.018, 0, 0.015)"
+bg_vignette = "0.86"
+
+# FEEDBACK - a little longer than `star_rosette`'s 0.34, which was NOT the first
+# instinct. A dense interior wants a short tail or the rings smear into an
+# annulus; but the 96x96 coverage floor above is carried mostly by the tail, and
+# 0.40 is where the two meet. Eyeballed at 900 px: the four rings are still
+# individually readable, which is the constraint that stops this going higher.
+trails = "0.40 + clamp(mid * 0.070, 0, 0.06)"
+
+[smoothing]
+variant       = 1.6
+rotation      = 0.20
+scale         = 0.45
+zoom          = 0.22
+draw_progress = 0.30
+thickness     = { attack = 0.02, release = 0.32 }
+hue           = 0.40
+hue_spread    = 0.55
+glow          = 0.35
+bg_bright     = 0.40
+trails        = 0.50

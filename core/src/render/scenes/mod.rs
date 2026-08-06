@@ -71,12 +71,20 @@ pub enum GeneratorConfig {
         seed: u64,
     },
     /// A Hankin star pattern: an `n`-fold star rosette built at load, with a few
-    /// contact-angle variants a beat can switch between.
+    /// contact-angle variants a beat can switch between — and, since ADR-0079,
+    /// an optional ring ornament drawn inside it.
     Star {
-        /// Star order `n` (from the tiling), e.g. 6 or 12.
+        /// Star order `n` (from the tiling), e.g. 6 or 12. **`0` means no
+        /// interlace at all** (`tiling = "none"`), which the loader accepts only
+        /// alongside a non-empty `rings` roster — the ornament drawn alone.
         order: u32,
         /// Contact angle in degrees; variants are precomputed around it.
         contact_angle_deg: f32,
+        /// The `[generator] rings` roster (ADR-0079): concentric rings of
+        /// repeated motifs filling the interior the rosette leaves hollow. Empty
+        /// — the default, and what an absent `rings` key means — is exactly the
+        /// pre-Plan-0065 scene.
+        rings: Vec<lines::star::RingSpec>,
     },
     /// A GPU compute-particle attractor (Plan 0016): which strange-attractor map
     /// the compute step iterates. Not a line scene — reuses this shared enum so
