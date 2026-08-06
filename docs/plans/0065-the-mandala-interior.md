@@ -4,6 +4,24 @@
 > work and shares no file with any other plan in the roster, so it is the safest parallel lane
 > available. Phases 1-2 are `dev` and run start-to-finish; **Phase 3 is `human`** (pick the motif
 > roster from the rendered grid) and gates Phases 4-6, so the plan does not close in one session.
+>
+> **Architect disposition, 2026-08-06 — the plan is NOT blocked, and a Phase 7 was added.** Phases
+> 1-5 have landed on `plan-0065-mandala-interior` (`33e5efc` / `1904469` / `3c0e56a` / `419418f` /
+> `a35485a`, clean tree, no golden baseline moved and `LMV_BLESS` never run). The lane closed with
+> `sanity.rs` red on the three new presets and read that as a block on
+> [backlog 0071](../design-backlog.md). It is not one. `coverage_floor` is **derived from the shipped
+> library** at half each family's sparsest member, with `MAX_FLOOR_SLACK` as the mechanism that
+> forces re-derivation when that minimum moves — so the gate fired correctly, a human looked, the
+> content is good, and the documented answer is to re-measure the floor. That is **Phase 7**, added
+> below. Backlog 0071 stays open at medium-high; it is the measure's replacement, on its own
+> schedule, and re-derivation is not its fix.
+>
+> **What is actually owed before the close:** Phase 6 (`human`, unrun — a plan with an unrun phase
+> cannot flip to `done`), then Phase 7, then the ADR-0053 close ceremony. Two things the close will
+> trip on: `main` and this branch each minted a design-backlog entry **`0070`** on 2026-08-06 for
+> different findings, so this lane's `0070`/`0071`/`0072` renumber to `0071`/`0072`/`0073` at the
+> merge and `design-backlog-archive.md` conflicts too; and `main` has reached `v0.41.0`, so the
+> close-ceremony bump is **`cargo release minor` → `v0.42.0`**, run on the branch after the merge.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
@@ -211,6 +229,50 @@ this geometry should look like.
   of backlog 0007 that only a live judgement can settle?
 - **Done when:** the presets ship tuned, and anything that could not be made to read goes to
   `docs/design-backlog.md`.
+
+### Phase 7 — the `star_pattern` coverage floor is re-derived from what now ships
+
+- **Owner skill:** dev
+- **Added 2026-08-06**, after Phase 5 landed three presets below the floor. It was not in the
+  original plan because nobody expected this family's minimum to move; the mechanism that catches
+  that is working exactly as designed, and this phase is the documented response to it.
+- **Runs after Phase 6 and after `git merge main`**, in that order — both can move the number, and a
+  floor derived before either is derived from a distribution that is about to change.
+- **Files touched:** `core/tests/sanity.rs` only.
+- **What:** Re-derive `coverage_floor(SystemKind::StarPattern)` from the distribution
+  `every_preset_draws_a_real_shape` prints, and rewrite the doc-comment paragraph that carries the
+  per-system table.
+
+  This is the procedure that constant's own doc comment prescribes, verbatim: *"The response to a
+  legitimately sparser new preset is to re-derive that system's floor from the printed distribution,
+  and to say in the commit which preset moved the minimum — not to nudge a constant back until the
+  run goes green."* The attractor floor moved the same way on 2026-08-03. `0.34` was half of
+  `0.6908` (Star Lantern), derived from a three-preset roster that had never seen thin-stroke
+  ornament; this plan added the content the constant was never measured against.
+
+- **The arithmetic, done here so the phase is not tuning against a number it invented.** Each floor
+  sits at **half** its family's sparsest shipped member, and `MAX_FLOOR_SLACK = 2.2` holds it there.
+  Phase 5 measured the new minimum at `0.2442` (Star Mandala), so the floor is `0.2442 / 2 = 0.1221`
+  → **`0.12`**, giving slack `0.2442 / 0.12 = 2.04`, inside `MAX_FLOOR_SLACK`. **Take the actual
+  number from the post-merge, post-Phase-6 printed distribution** — if Phase 6's tuning moves the
+  minimum, the half-rule is what is fixed, not the `0.12`.
+- **What this costs, stated rather than discovered.** The band `0.12`–`0.34` becomes unpoliced on
+  `star_pattern`. That is the same price `attractor`, `spectrum` and `reaction_diffusion` already pay
+  for 3-5x internal spread, and the floor's only claim — *a preset drawing less than half of the
+  thinnest shipped member of its own family is worth a look* — survives at the new value. A scene
+  rendering nothing still fails at `0.0`, and ADR-0067 keeps a bare vignette from counting as a
+  figure. The three mandalas also join `geometry_extent.rs`'s line-family sweep at the merge, which
+  asserts every line preset draws segments at all.
+- **What this is NOT.** It is not the fix for
+  [backlog 0071](../design-backlog.md) — that entry stays open at medium-high with all three of its
+  measurements, and re-deriving is what happens on this family's floor *whether or not* the measure
+  is replaced later. No other system's floor moves, `MAX_FLOOR_SLACK` is untouched, and no preset is
+  retuned to meet a number.
+- **Done when:** the full suite is green with the floor taken from the printed distribution; the
+  per-system table in the doc comment carries the new `star_pattern` row with its new lowest preset
+  and factor; the surrounding prose names which preset moved the minimum and why a 46-fold ornament
+  of hairline strokes reads low at this test's 96x96 capture; and one sentence points at backlog 0071
+  saying this re-derivation is not that entry's fix.
 
 ## Data shapes
 
