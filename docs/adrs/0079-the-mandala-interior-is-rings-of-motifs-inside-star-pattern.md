@@ -161,3 +161,35 @@ rather than framing it, and recommended against shipping it; the user kept it, a
 result it reads as a star frame around the ornament. Both compositions ship — `star_mandala` is the
 ornament alone, `star_weave` the roster inside the interlace — so backlog 0007's composition
 question is answered rather than dropped.
+
+### Outcome addendum (2026-08-06, same day) — every preset built on this decision was retired within hours
+
+The three compositions named above no longer exist. The live judgement Plan 0065's Phase 6 deferred
+happened immediately after the close and came back against the **mechanism**, not against any tuning
+or composition choice: *"we don't have curves, anything curved is based on several lines, and it's
+easy to see them — lines look upscaled and half baked."* Every motif in the closed roster is a
+parametric outline sampled to straight segments, so at ornament scale the vertices are visible, a
+circle reads as a polygon, and additive overlap beads every joint. The solid-stroke retune had
+already run, which rules out the inflated-glow explanation the backlog had been holding open
+([design-backlog 0073](../design-backlog.md)).
+
+**This does not supersede the decision, and deliberately so.** Everything the Decision section claims
+is still true and still shipped: `rings` lives inside `star_pattern` rather than beside it, the scene
+is no longer hollow, the roster is closed at seven, the segment budget holds, and the interior
+measurement (bare rosette **1 of 10** radial shells, four-ring mandala **9 of 10**) is a property of
+the geometry rather than of any preset. The Context section's premise — that a ring ornament and a
+Hankin interlace are different geometry sharing one symmetry — is unaffected.
+
+**What is now known, and what a superseding ADR would have to be about.** The unexamined assumption
+was not *where* the ring generator lives but *that placed outline geometry can render an ornament at
+all* through a stroke renderer that draws instanced quads over sampled polylines. It cannot, at this
+scale. The mandala look ships instead as `presets/reaction_gilt.toml`: a Gray-Scott field's
+**analytic iso-contours** — evaluated per pixel, no geometry anywhere in the picture, therefore no
+vertex at any resolution — folded into a 10-to-18-wedge rosette by `kaleido_order`, with
+`kaleido_edge = 0` so it reads as an object on black. The symmetry became a composite-stage property
+instead of a placement rule.
+
+So the honest status of this ADR is: **accepted, delivered, and currently unused.** No preset in the
+library binds `rings`. Whether that capability earns its config surface without a shipped user is a
+real question and belongs to whoever next touches `star_pattern` — it is not answered here, because
+one rejected look is not enough to retire a tested capability.

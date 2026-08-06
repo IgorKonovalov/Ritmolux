@@ -16,6 +16,25 @@
 > named. Anything that pass turns up is ordinary `preset-author` work on shipped presets, or a
 > backlog entry — not a reopened plan.
 >
+> > **Postscript, 2026-08-06, hours after this close: the Phase 6 pass ran and all three presets were
+> > retired.** It did not come back against counter-rotation or the additive ceiling. It came back
+> > against the mechanism: *"we don't have curves, anything curved is based on several lines, and
+> > it's easy to see them — lines look upscaled and half baked."* Every motif is a parametric outline
+> > sampled to straight segments, so at ornament scale the vertices show and a circle reads as a
+> > polygon. That is a ceiling on the approach, not a tuning miss, and the retune to solid strokes had
+> > already happened first — so this was not the inflated-glow hypothesis
+> > ([design-backlog 0073](../../design-backlog.md)). `star_mandala`, `star_mandala_six` and
+> > `star_weave` are deleted and the `star_pattern` coverage floor reverted to `0.34` with them.
+> >
+> > **The plan's deliverable stands and this entry is not reopened.** `rings` is shipped, tested and
+> > documented, `star_pattern` is genuinely no longer hollow, and the 1-of-10 / 9-of-10 shell
+> > measurement is unaffected by whether a preset ships it. What the retirement establishes is
+> > narrower: placed outline geometry is the wrong mechanism *for a mandala*. That look now ships as
+> > `presets/reaction_gilt.toml` — a Gray-Scott field's analytic iso-contours folded by
+> > `kaleido_order`, with no geometry in the picture and therefore no vertex at any resolution. **No
+> > preset in the library uses `rings` today**, which is a decision someone owes eventually and did
+> > not need to make off one rejected look.
+>
 > **The gate went red, and the answer was to re-derive the floor rather than hold the plan.** The
 > three presets measure `0.2442` / `0.2505` / `0.2544` against a `star_pattern` coverage floor of
 > `0.34`. That floor is **derived from the shipped library** at half each family's sparsest member,

@@ -726,10 +726,19 @@ the palette's first half — rather than re-tinting every chord it already drew.
 > closed it: a mandala preset puts segments at four to six different radii, the
 > ramp is computed over the **combined** figure, and `hue_spread` becomes a real
 > lever on exactly the presets that have an interior to spread across. On a
-> composited preset (`star_weave`) the interlace's own segments are all at one
-> radius, so the ramp puts the whole interlace at one end and spreads the ornament
-> along the rest — which is a way to separate the two figures by colour rather
-> than by brightness.
+> composited preset — rings *plus* a tiling — the interlace's own segments are all
+> at one radius, so the ramp puts the whole interlace at one end and spreads the
+> ornament along the rest, which is a way to separate the two figures by colour
+> rather than by brightness.
+>
+> **No preset in the shipped library uses `rings` today.** The three that did
+> (`star_mandala`, `star_mandala_six`, `star_weave`) were retired on 2026-08-06:
+> every motif is a parametric outline sampled to straight segments, so at ornament
+> scale the vertices show and a circle reads as a polygon (design-backlog 0073).
+> The capability, this documentation and the tests all stand — what is retired is
+> the *content*, and the mandala look now ships as `reaction_gilt`, which folds an
+> analytic iso-contour field with `kaleido_order` and therefore has no geometry to
+> facet. Read that before authoring the next rings preset.
 
 ### `spectrum` — the frequency-axis readout (Plan 0034)
 
