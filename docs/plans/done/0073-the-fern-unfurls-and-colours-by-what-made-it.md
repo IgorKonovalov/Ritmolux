@@ -1,12 +1,23 @@
 # 0073 — The fern unfurls and colours by what made it: age, last map, and the end of the startup rectangle
 
-> **Status:** **in-progress 2026-08-06**. Phases 1-5 are `dev` and nothing gates them,
-> so they run start-to-finish in one session; **Phase 6 is `human`** (a `preset-author` pass judging
-> the two colour channels and the churn constants against real audio), so the plan does not close in
-> that session.
+> **Status:** **done 2026-08-06**. All six phases shipped —
+> `c2c8c76` (the map channel), `339a178` (the fixed points, and the startup rectangle stops
+> existing), `7ef5270` (the churn), `b69ca4e` (age as colour), `50c4eda` (the fixture + doc sweep),
+> `6e335b2` (the `preset-author` content pass). `main` was merged in mid-plan at `52b34e0`.
+> Mode 4 verdict: **landed cleanly, no blockers**; two minor doc items repaired at the close.
+> **What the review verified rather than took on report:** `attractor_ifs.png` is the only baseline
+> that moved (a diffstat, not a claim); the fixed-point residual measures `2.198e-7` against its
+> derived `1e-4` bound and the magnitude bound is tight at `1.0000` of the theorem; the tint capture
+> moves mean chromaticity by `133` against a `4.0` floor while changing `12` of `1782` lit pixels;
+> `fmt` + `clippy` + `nextest` green on the branch after the merge.
+> **The plan's own finding is the interesting one:** Phase 6 falsified
+> [ADR-0087](../../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md)'s reading of the
+> age channel, which is accepted with a dated Outcome section rather than edited, and is written up
+> with three candidate repairs as [design-backlog 0074](../../design-backlog.md).
 > **Created:** 2026-08-05
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0087](../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md)
+> **Related ADRs:** [0087](../../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md)
+> — **accepted 2026-08-06 with an Outcome section**
 
 ## TL;DR
 
@@ -20,7 +31,7 @@ particle population is never a uniform box at any moment.
 
 ## Context & problem
 
-[Plan 0062](done/0062-the-chaos-game-grows-a-fern.md) landed the IFS family and deliberately left two
+[Plan 0062](0062-the-chaos-game-grows-a-fern.md) landed the IFS family and deliberately left two
 things out, on the stated grounds that they are the same per-particle channel and are better tuned
 against a figure already known to be right. That figure now exists and ships two presets. Its content
 pass then found a third item that turns out to share the mechanism.
@@ -28,17 +39,17 @@ pass then found a third item that turns out to share the mechanism.
 - **The unfurl and the depth colour** — Plan 0062's own Followups, from the user's interview answers
   3 and 4.
 - **Per-map tint** — deferred once already, because it needs a *second* per-particle channel.
-- **[Backlog 0064](../design-backlog.md)** — the initial fill scatters particles over the figure's
+- **[Backlog 0064](../../design-backlog.md)** — the initial fill scatters particles over the figure's
   bounding box, so a switch into the family shows a legible, hard-edged, axis-aligned rectangle for
   roughly two thirds of a second, with the ~1 s preset dissolve landing entirely inside it. Verified
   by measurement at 2 / 6 / 12 / 24 / 40 / 90 frames. It is the same artifact class
-  [ADR-0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) was written to
+  [ADR-0066](../../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) was written to
   remove from `reseed`, back on a different path, and it is **not authorable around** — nothing on
   the preset surface reaches the seed box.
 
 The three want one thing: a particle that knows its age, knows which map last moved it, and restarts
 somewhere legal. "Somewhere legal" has a closed form and only for this family —
-[ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md)'s Notes prove any contractive
+[ADR-0075](../../adrs/0075-ifs-family-morphs-in-singular-value-space.md)'s Notes prove any contractive
 map's fixed point `(I − M)⁻¹ t` lies *on* the attractor. The blocker is that `Particle` has exactly
 **one** free word (`pad`, written to `0.0` at seed and read by nothing), and the two channels are
 independent: age is a continuous ramp that resets, last-map is a categorical value that changes every
@@ -58,7 +69,7 @@ Rejected: packing both channels into the free word (aliasing with a convention n
 deferring per-map tint a second time (the identical choice would recur with no new information), a
 one-time unfurl (above), and respawning into the seed box (ADR-0066's artifact made permanent and
 thin). Full reasoning in
-[ADR-0087](../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md).
+[ADR-0087](../../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md).
 
 **IFS-only, and that is structural rather than a default.** The fixed point is a consequence of
 ADR-0075's parameterization; De Jong, Clifford, Thomas and Lorenz have no closed-form on-attractor
@@ -115,7 +126,7 @@ flowchart TB
 
 - **Owner skill:** dev
 - **What:** A CPU `fixed_points(&IfsTable) -> [[f32; 2]; MAPS]` in `ifs.rs`, and `seed()` using it for
-  the IFS family's initial fill. This phase closes [backlog 0064](../design-backlog.md).
+  the IFS family's initial fill. This phase closes [backlog 0064](../../design-backlog.md).
 - **Files touched:** `core/src/render/scenes/particles/ifs.rs`,
   `core/src/render/scenes/particles/mod.rs` (`seed` only).
 - **The closed form, not an iteration:** for `M = [[a, b], [c, d]]`, `(I − M)⁻¹` is
@@ -197,8 +208,8 @@ flowchart TB
   arm, the draw shader), `core/src/render/scenes/particles/ifs.rs` (packing).
 - **The uniform grows from 160 to 192 bytes** — two `vec4` carrying four `(x, y)` fixed points,
   packed two per row exactly as `translate` already is. **The bind-group layout gains no binding**,
-  so the collision surface [Plan 0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) and
-  [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md) reason about does not
+  so the collision surface [Plan 0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md) and
+  [ADR-0058](../../adrs/0058-bind-group-layout-collisions-carry-evidence.md) reason about does not
   change shape.
 - **Why the emergence ramp is load-bearing rather than polish.** At the 150 000-particle ceiling a
   fixed rate lands on the order of a thousand particles per frame onto exactly **four points**, and
@@ -228,8 +239,8 @@ flowchart TB
   `reset_params`, and `projection_mirror`'s transcription if the colour maths lands there).
 - **Two channels, two routes each, and the symmetry is the point.** A **palette coordinate** rides
   the preset's own `[palette]` gradient, so `palette_mix` and `saturation` reach it for free and a
-  custom ramp works — the direction [ADR-0021](../adrs/0021-shared-palette-system.md) through
-  [ADR-0086](../adrs/0086-the-backdrop-colours-through-the-preset-palette.md) has been converging on.
+  custom ramp works — the direction [ADR-0021](../../adrs/0021-shared-palette-system.md) through
+  [ADR-0086](../../adrs/0086-the-backdrop-colours-through-the-preset-palette.md) has been converging on.
   A **hue offset** shifts hue directly, matching the `depth_hue` lever authors already know on the
   3-D families. Both, because the user chose both at interview: the gradient route is right for a
   figure whose colour should be the author's, and the offset route is right for a preset that wants

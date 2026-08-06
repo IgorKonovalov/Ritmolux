@@ -787,7 +787,7 @@ family wants.
 ## 0064 — an IFS preset switch shows a hard-edged rectangle of noise for two thirds of a second, which is the artifact ADR-0066 already removed once
 
 - **PROMOTED 2026-08-05 → [ADR-0087](adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md) +
-  [Plan 0073](plans/0073-the-fern-unfurls-and-colours-by-what-made-it.md)** — and the route taken is
+  [Plan 0073](plans/done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)** — and the route taken is
   the *second* of the two this entry proposed, folded into a change that was happening anyway. The
   entry's cheaper interim (seed at the figure's own fixed points) is Plan 0073 **Phase 2**; its
   Phase 3 then goes further and makes the respawn **continuous**, so the population is never a
@@ -1410,7 +1410,7 @@ that reads as a curve — which is every future user of `star_pattern`'s motif r
 
 ## 0074 — the age channel has nothing spatial to colour, because the emergence ramp hides the only steps where age correlates with position
 
-- **Raised:** 2026-08-06, at [Plan 0073](plans/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
+- **Raised:** 2026-08-06, at [Plan 0073](plans/done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
   Phase 6 — the `preset-author` pass that phase exists to run. It is the phase's own
   "any channel or route that could not be made to read is written up here rather than quietly left
   bound to nothing".

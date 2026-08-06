@@ -1,8 +1,11 @@
 # ADR-0087 — The IFS particle carries its age and its last map, and respawns onto the attractor
 
-> **Status:** proposed
+> **Status:** **accepted 2026-08-06** — implemented by Plan 0073 in six phases. See the
+> **[Outcome](#outcome-added-at-plan-0073s-close-2026-08-06)**: three of the four decisions landed
+> as written, and the fourth — the age channel's stated reading — was **falsified by the
+> implementation**, by this ADR's own emergence ramp.
 > **Date:** 2026-08-05
-> **Related plan(s):** [0073](../plans/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
+> **Related plan(s):** [0073](../plans/done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
 
 ## Context
 
@@ -211,3 +214,56 @@ attractor only when the pad duplicates a drawn map, which is true of all five cu
 and is exactly the sort of thing that stops being true when a sixth figure is added. The CPU writes
 the drawn maps' fixed points into all four uniform slots, duplicating as needed, so the shader picks
 one of four unconditionally and needs no branch and no knowledge of the probability table.
+
+## Outcome (added at Plan 0073's close, 2026-08-06)
+
+Accepted with this section rather than edited, because the implementation confirmed three of this
+ADR's four claims and **falsified the fourth**. The body above stands as written; what follows is
+what was measured.
+
+**Confirmed as decided.**
+
+- **Backlog 0064 is gone by construction.** The IFS initial fill lands on the fixed points, asserted
+  as a count with no statistic in it: `seed()` returns at most as many distinct positions as the
+  figure has drawn maps (at most four), where the four box-filling families still return one per
+  particle. A box fill cannot pass it and a fixed-point fill cannot fail it.
+- **The closed form is right, and the safety-by-contractivity argument holds.** The residual
+  `‖M p + t − p‖` over every figure pair, the whole `morph` sweep and both lever extremes measures
+  **2.198e-7** against the derived `1e-4` bound — 455x headroom — and the magnitude bound
+  `‖p‖ ≤ ‖t‖/(1 − σ_max)` is tight at exactly `1.0000` of the theorem. Nothing needed a guard.
+- **The `map` channel does what the ADR says it does.** It partitions the fern into stem, body and
+  two fronds; both shipped IFS presets now bind `map_tint`, and `attractor_dissolve` uses it to make
+  visible *which gasket corner becomes which part of the plant* across the morph — a correspondence
+  the family had no way to show before.
+
+**Falsified: "a permanent gradient from the fixed points outward" (Consequences → Positive).** The
+age channel renders as per-particle speckle with no spatial gradient anywhere. Measured at Phase 6
+in the most favourable configuration the preset surface can build — bare fern, `fade = 0` so no
+trail could average anything, a three-stop maximum-contrast ramp, `age_tint = 0.75` — and swept
+across `morph` at 0 / 0.25 / 0.5 / 0.75 / 1.0 on `sierpinski -> fern` under a long `fade = 0.912`.
+The identical probe with `map_tint` instead separates the figure into four legible regions, so the
+instrument was not at fault.
+
+The cause is structural, and it is **this ADR arguing with itself**. The reading "age is
+distance-from-the-fixed-points in disguise" is true only for a particle's first handful of steps:
+the family's probability-weighted per-step contraction of `0.742` decorrelates position from age
+after roughly ten iterations. And the first **eight** steps are exactly what `EMERGENCE_STEPS` makes
+invisible — deliberately, for the reason this ADR argues at length, because a particle that has just
+restarted sits on one of four points and a thousand of them per frame would burn four dots into the
+trail field. So the two constants the Decision treats as independent look knobs are in **direct
+opposition**: the ramp exists to hide the four restart points, those points are the only place age
+correlates with position, and therefore the ramp hides precisely the material the age channel exists
+to colour. Lengthening the lifetime cannot help — the problem is spatial, not temporal.
+
+The other two questions Plan 0073 Phase 6 was written to answer came back clean: the 180-step
+lifetime is the right order, and the churn reads as life rather than as twinkle.
+
+**Consequences of that, none of them urgent.** `age_tint` and `age_hue` ship, default to the
+identity, and are bound by no preset; `age` itself remains load-bearing as the emergence ramp's
+input, so the widened struct is not wasted. What is real is that half an accepted ADR is currently
+unusable content surface on the longest param roster in the library. The three candidate repairs —
+make the ramp length authorable and accept some hot spots; add a genuinely spatial
+distance-from-the-nearest-restart-point channel, which the shader already has the four points for;
+or retire the two params — are written up with their tradeoffs in
+[design-backlog 0074](../design-backlog.md). The second is the honest successor and is a new plan,
+not an amendment to this one.

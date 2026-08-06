@@ -14,7 +14,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 | [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building, and the two oversized modules come apart (`[profile.dev]` debuginfo + dep opt-level, the `core-cabi` extraction, **the CI double payment**, the `Renderer` carve-out, the `particles/` split, + four smaller findings) | **draft 2026-08-04, amended twice the same day** — **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (at the user's direct request), reconciled into the plan rather than reverted: it meets 4b's done-when with one accepted deviation (a test-written scratch library rather than a checked-in `fixtures/report/`), and it **opens the coverage gap 4b's sequencing existed to prevent** — nothing renders every shipped preset through the real CLI any more *and* Phase 4 has not yet put the generator under in-process tests. Every other phase is unstarted. From the whole-tree maintainability audit the user asked for; [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) + [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md). **Amended with four CI phases (1b, 2b, 4b, 9)** after run 30903871856 — the first green run since 2026-07-30 — made CI measurable for the first time: the shipped preset library is rendered **three times per push**. **Amended a third time with Phase 2c** (2026-08-04, at [0060]'s close): a `links` job on `ubuntu-latest` giving `scripts/check-doc-links.mjs` a CI counterpart, so the doc-link gate stops depending on an opt-in hook. Independent of 2b/4b, touches neither Windows job, seconds on the cheapest runner — it is here only because this plan owns every `ci.yml` edit in flight. **Scheduled last and explicitly subject to change** — every number in it is a 2026-08-04 snapshot, so re-measure before acting rather than satisfying a line count literally. ~~Phase 6 is gated on [0059] being closed~~ — **released 2026-08-04**, [0059] has closed, so Phase 6 (which edits `particles/mod.rs`) is unblocked; it also inherits [0059]’s close decision to **retire `RESEED_DRAWS_STREAK`**, which lives in that same file; **two `human` phases, both last** — Phase 8 (VS Build Tools + the foobar SDK; CI has no plugin job) and Phase 9 (read the CI run, which `dev` cannot: no CI measurement exists locally and `dev` does not push), so one `dev` session lands Phases 1-7 including 1b/2b/4b. Moves **no pixels**: no golden baseline is re-blessed, and a baseline diff is a phase failure | dev, human |
 
 
-| [0073](0073-the-fern-unfurls-and-colours-by-what-made-it.md) | The fern unfurls and colours by what made it: age, last map, and the end of the startup rectangle (`Particle` 32 -> 48 B, staggered fixed-point respawn, `age_tint`/`age_hue`/`map_tint`/`map_hue`) | **approved 2026-08-05** — ready for `dev`, gated by nothing; the successor [0062](done/0062-the-chaos-game-grows-a-fern.md) named in its Followups, plus the one engine finding its content pass raised; [ADR-0087](../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md). **The only plan in the roster that removes a visible defect rather than adding capability** — [backlog 0064](../design-backlog.md)’s hard-edged startup rectangle dies **by construction** in Phase 2, because a continuous churn means the population is never a uniform box at any moment. `Particle` grows to a struct **four families share**, so Phase 1’s "all fourteen baselines byte-identical" is the assertion that matters — and it runs on WARP, where allocation changes are a **recorded** hazard twice over. **Phase 6 is `human`** and terminal, so one `dev` session lands Phases 1-5. Re-blesses `attractor_ifs.png` and **only** that one; any other moved baseline is a defect | dev, human |
+| ~~[0073](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)~~ | ~~The fern unfurls and colours by what made it: age, last map, and the end of the startup rectangle~~ | **Closed 2026-08-06** - see Recently closed. All six phases landed, including the terminal `human` Phase 6. `Particle` is now **48 bytes** and `vertex_attr_array!` is gone from the draw pipeline (see [`PARTICLE_ATTRIBUTES`] in `particles/mod.rs`), so anything adding a sixth vertex attribute must read that constant rather than the macro. [backlog 0064](../design-backlog.md) closed by construction. [ADR-0087](../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md) accepted **with an Outcome section**: its `map` half works and ships bound in both IFS presets, its `age` half does not read and is written up as [backlog 0074](../design-backlog.md) with three candidate repairs | - |
 | [0064](0064-the-symmetry-stage-and-the-banded-palette.md) | The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour (`kaleido_radial`/`spiral`/`zoom`/`tile`/`inner`, `palette_steps`/`palette_contour`) | **approved 2026-08-04** — ready for `dev` **after [0055]**; from the user's five reference images; [ADR-0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) + [ADR-0078](../adrs/0078-banding-is-a-palette-coordinate-operation.md). Covers **three** of the five images, and applies to **every scene** because it is screen-space. The engine already has half the mechanism: periodicity in `theta` is the fold, periodicity in **`log r`** is the missing concentric self-similarity. **Both halves are one plan on purpose** — neither alone reproduces the references, and the user chose to decide the look from a rendered sample set that has to show the combination. **Phase 4 is `human`** (pick defaults and ranges from the grid) and gates Phases 5-6, so it does not close in one session. **Collides with [0055]** in `kaleidoscope.rs` — taking 0055 first is the cheaper order. Moves **no** existing golden baseline; adds one | dev, human |
 | ~~[0065](done/0065-the-mandala-interior.md)~~ | ~~The mandala interior: `star_pattern` stops being hollow~~ | **Closed 2026-08-06** — see Recently closed. All phases but the `human` Phase 6 landed; a **Phase 7 was added at the close** to re-derive `sanity.rs`'s `star_pattern` coverage floor (`0.34` -> `0.12`), because filling the interior moved the family minimum and the constant is derived from the shipped library. [ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md) accepted with an Outcome section; [design-backlog 0007](../design-backlog-archive.md) closed in full; backlog [0071](../design-backlog.md)/[0072](../design-backlog.md)/[0073](../design-backlog.md) raised | — |
 
@@ -36,7 +36,7 @@ preference, and a session may take any plan here.
 | ~~1~~ | ~~[0069]~~ | **Closed 2026-08-06** — see Recently closed. All four phases landed in one session, exactly as this row predicted. `LineRenderer::draw` now carries a thread-local diagnostic switch, so anything editing that draw call should read `geometry_extent.rs` alongside it. **No plan in the roster closes in one session any more** — every remaining one carries a `human` phase | — |
 | ~~2~~ | ~~[0063]~~ | **Closed 2026-08-04** — see Recently closed. Its soft constraint **has been discharged in the direction it wanted**: `inv_depth_extent()` now exists as an exhaustive match over `AttractorFamily`, so [0062] adding a fifth family is **compiler-forced** to answer it (with `0.0` — its IFS figures are 2-D) | — |
 | ~~2~~ | ~~[0062]~~ | **Closed 2026-08-05** — see Recently closed. All seven phases landed; its Phase 7 content pass is the source of backlog 0064-0066. `particles/mod.rs` now also carries `ifs.rs`, five new params and a `STEP_SLOTS` uniform-slot scheme, so anything inheriting that file should read it rather than [0063] alone | — |
-| 2 | [0073] | **The successor [0062] named and did not write.** Take it while `particles/mod.rs` and `ifs.rs` are still in context — it is the third leg of the attractor run after [0063] and [0062], and the only plan in the roster that **removes a visible defect** ([backlog 0064]) rather than adding capability. ~~Shares `particles/mod.rs` with [0066], so those two are a sequence rather than a pair~~ — **[0066] closed 2026-08-05**, so that constraint is discharged and this is now the only live plan touching that file | No — Phase 6 is `human`, terminal |
+| ~~2~~ | ~~[0073]~~ | **Closed 2026-08-06** - see Recently closed. All six phases landed, the terminal `human` Phase 6 included, so the attractor run ([0063], [0062], [0066], [0073]) is complete and **no live plan touches `particles/mod.rs` any more** except [0061] Phase 6. Its content pass falsified half of [ADR-0087] and left [backlog 0074] behind, which is the natural successor if anyone wants to keep going on this family | - |
 | ~~3~~ | ~~[0066]~~ | **Closed 2026-08-05** — see Recently closed. All five phases landed. `particles/mod.rs` now carries a `brightness` on the attractor, so [0073] inherits a `PARAMS`/`set_param` pair one entry longer than the row above assumed | — |
 | ~~4~~ | ~~[0065]~~ | **Closed 2026-08-06** — see Recently closed. It was the safest parallel lane and behaved like one: line geometry, no file shared with anything, and it merged `main` with exactly one conflict (a design-backlog number both sides minted the same day) | — |
 | 4 | [0064] | **Unblocked — [0055] has landed**, so the `kaleido_edge` branch it composes against is in place. Still deliberately after the attractor work rather than concurrent with it: its Phase 3 sample grid renders on `attractor_lorenz` as one of three sources, and [0063] changes what that source looks like. A look decision taken against a moving target is one that has to be retaken. **Read [0055]'s Recently-closed entry** — the fold's default is now `tile`, not the disc 0064 was drafted against | No — Phase 4 is `human`, mid-plan |
@@ -54,11 +54,10 @@ preference, and a session may take any plan here.
 2026-08-06**, so **no plan left here closes in one session**: every remaining one carries a `human`
 phase, and a session that wants a finished thing has to bring the user in at some point. Plan
 accordingly rather than picking on that criterion.
-**If you want the most visible change per session**, take [0073]: it is the last leg
-of the attractor run and the only live plan still touching `particles/mod.rs`, so take it while that
-file and `ifs.rs` are in context — [0063], [0062] and [0066] were the first three legs and closed
-2026-08-04, 2026-08-05 and 2026-08-05. **If a second lane is running in parallel**, give it [0065]:
-line geometry, colliding with nothing.
+~~**If you want the most visible change per session**, take [0073]~~ - **[0073] closed 2026-08-06**,
+and with it the attractor run ([0063], [0062], [0066], [0073], closed 2026-08-04 through 2026-08-06).
+**If a second lane is running in parallel**, give it [0064] or [0068]: neither shares a file with
+anything else live.
 
 ### The six plans added 2026-08-04, and why they exist
 
@@ -822,6 +821,38 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 
 ## Recently closed
 
+- [0073 — The fern unfurls and colours by what made it](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
+  — **done 2026-08-06**, Mode 4 review **no blockers, two minor doc items repaired at the close**.
+  All six phases as `c2c8c76` / `339a178` / `7ef5270` / `b69ca4e` / `50c4eda` / `6e335b2` on
+  `plan-0073-the-fern-unfurls`, with `52b34e0` merging `main` mid-plan and `40fd1ee` amending
+  Phase 2's done-when. Full gate green on the merged tip (`fmt`, `clippy --all-targets -D warnings`,
+  `nextest`, doc links resolve), and **`attractor_ifs.png` is the only baseline that moved** —
+  verified as a diffstat against `main`, not taken on report.
+  **`Particle` is now 48 bytes** with `age` and `map`, two words still free, so anything touching
+  `particles/mod.rs` inherits a struct four families share and a `PARTICLE_ATTRIBUTES` constant that
+  **replaced `vertex_attr_array!`** — that macro lays attributes out consecutively and would now
+  fetch `map` from the padding word, silently and with no compile error. Read that constant before
+  adding a sixth attribute. [backlog 0064](../design-backlog.md)'s startup rectangle is **gone by
+  construction**: the IFS initial fill seeds at most four distinct positions where a box fill seeds
+  one per particle, asserted as a count with no statistic in it.
+  **Half of [ADR-0087](../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md) was
+  falsified by its own implementation, and that is the finding worth carrying forward.** `map_tint` /
+  `map_hue` work and are bound in both shipped IFS presets; `age_tint` / `age_hue` render as
+  per-particle speckle with no gradient, because the 8-step emergence ramp deliberately hides
+  exactly the first steps where age correlates with position — the two constants the ADR treats as
+  independent look knobs are in opposition, and lengthening the lifetime cannot help. The ADR is
+  **accepted with a dated Outcome section** rather than edited; three candidate repairs (authorable
+  ramp length / a genuinely spatial distance-from-restart-point channel / retire the two params) are
+  in [design-backlog 0074](../design-backlog.md) and the second is a new plan. Nothing ships
+  defective — both params default to the identity and no preset binds them.
+  **Two doc repairs at the close**, both in the sweep Phase 5 owed: `presets/README.md` asserted the
+  falsified reading as fact four paragraphs above its own correction, and `docs/preset-palettes.md`
+  was never swept at all — its attractor coordinate formula
+  `hue_center + (seed - 0.5) * hue_spread` had silently stopped being the whole expression, which
+  matters because `map_tint` **competes with `hue_spread` for that same number** (`attractor_fern`
+  had to drop from `0.16..0.42` to `0.05..0.125` before its fronds separated).
+  Followups the plan names and did not take: a bindable churn rate (Phase 6 did not ask for it), and
+  the `IfsFigure::frame()` comment fix Plan 0062's review raised.
 - [0065 — The mandala interior: `star_pattern` stops being hollow](done/0065-the-mandala-interior.md)
   — **done 2026-08-06**, Mode 4 review **no blockers**. Phases 1, 2, 4, 5, 7 as
   `33e5efc` / `1904469` / `419418f` / `a35485a` / `b026ff3` on `plan-0065-mandala-interior`, with

@@ -168,6 +168,28 @@ Particle hues occupy `hue_center + (particle_seed - 0.5) * hue_spread`. `hue_cen
 is cyclic for the same reason `color_center` is — a negative centre wraps into the
 bright end of the gradient, it does not clamp toward the dark one.
 
+**On the five IFS figures that coordinate has two more terms**, and they are the
+reason a wide `hue_spread` can make them look broken (Plan 0073,
+[ADR-0087](adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md)). The
+full expression there is
+
+```
+hue_center + (particle_seed - 0.5) * hue_spread
+            + (which_sub_copy - 0.5) * map_tint
+            + (how_old        - 0.5) * age_tint
+```
+
+so `hue_spread` (per particle, at random) and `map_tint` (per part of the figure)
+**compete for the same number**. A wide spread smears the parts into each other
+and `map_tint` reads as a faint wash at any setting — `attractor_fern` had to come
+down from `0.16..0.42` to `0.05..0.125` before its fronds separated. The other
+route, `map_hue`, does not touch this coordinate at all: it rotates the hue of the
+colour the ramp already returned, which is what makes it the tool for throwing one
+part *out* of a narrow palette rather than moving it within one. `age_tint` /
+`age_hue` exist but do not currently produce a gradient — see
+[the full section in `presets/README.md`](../presets/README.md#what-made-this-point-and-how-old-it-is)
+before reaching for any of the four.
+
 ### Spectrum — colour along the frequency axis
 
 `spectrum` is the one **line** system on this surface, and it uses the palette for

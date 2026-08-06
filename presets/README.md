@@ -1876,10 +1876,11 @@ param name**, so read this before reaching for them
   that would read as noise.
 - **`age` — how many steps since that particle last restarted.** Particles
   continuously recycle back onto the figure, each with its own lifetime around
-  3 s, so the population always holds every age at once. Age is really
-  **distance-from-the-restart-points in disguise**: a young particle has been
+  3 s, so the population always holds every age at once. It was *designed* to be
+  **distance-from-the-restart-points in disguise** — a young particle has been
   iterated only a few times, so it sits near one of the four points the figure
-  contracts toward, and an old one has spread out across the whole figure.
+  contracts toward — but **it does not read that way in practice**, for the
+  reason in the box below. Treat this bullet as background, not as a lever.
 
 Each reaches the picture by **two routes**, which is four params:
 
