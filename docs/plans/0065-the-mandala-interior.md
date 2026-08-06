@@ -120,11 +120,51 @@ flowchart LR
 ### Phase 3 — pick the roster
 
 - **Owner skill:** human
+- **Status:** **DECIDED 2026-08-06.** The verdict is recorded below verbatim, because it is a human
+  judgement no commit can re-derive.
 - **What:** The user picks which motifs ship, whether the scalloped boundary is a motif ring or its
   own thing, and which compositions become presets.
 - **Done when:** the roster is closed with a decision per motif. **Dropping motifs here is expected**
   — a curated set is the point, and ADR-0079 records that a look outside it routes back through
   `architect` and `dev` rather than being added on request.
+
+#### The verdict
+
+**1. The roster closes at seven.** `circle`, `petal`, `teardrop`, `diamond`, `arc`, `trefoil`,
+`chevron`. **`star` and `triangle` are cut** — `star` is an ornament at x8 and dissolves into texture
+by x32, and `triangle` duplicates `chevron`'s sawtooth role at roughly twelve times the segment cost
+(`chevron` is 2 segments, the cheapest member in the set). Every survivor holds its identity across
+the whole 8-to-32 count range, which is the property the cut was made on.
+
+**2. The scalloped boundary is a real curve primitive — which means it is NOT in this plan.** The
+user was shown side A (24 touching `arc` members) and side B (40 overlapping `arc` members faking a
+continuous curve), told explicitly that the engine has no boundary primitive and that side B is an
+approximation, and chose **the primitive**. That is architect + dev work: a new roster member or a
+new `[generator]` key, filed as [backlog 0070](../design-backlog.md). **It does not gate Phases 4-5**
+— none of the three chosen compositions carries a boundary ring.
+
+**3. Three compositions ship:** **four rings**, **six rings**, and **rings in weave**. **Eight rings
+is cut** — the centre muddles and the figure reads as lace rather than ornament. Note that
+`rings in weave` was chosen *against* the reviewing session's reading of the sample, which was that
+the twelve-fold interlace sits on top of the ornament as a separate coarse figure rather than framing
+it. That reading may be wrong, and it may be an artifact of the sample's static params; **Phase 6 is
+where it gets settled**, and it is exactly the half of backlog 0007 that only a live judgement can
+answer. Keeping it also keeps backlog 0007's composition question answered rather than dropped.
+
+#### What the same sitting found about the shipped preset — read before Phase 5
+
+The user judged `presets/star_mandala.toml` in the running app and rejected it: *"maximally lame —
+all lines are half transparent, line connections are visible, there is no curve lines"*. Those are
+filed as [backlog 0071](../design-backlog.md) and [backlog 0072](../design-backlog.md), and **0071
+lands directly on this plan's Phase 5**:
+
+The preset's `glow` (0.85 -> 1.55) and `trails` (0.26 -> 0.40) were raised *only* to clear
+`sanity.rs`'s 0.34 coverage floor, on a scene where that floor provably measures the halo rather than
+the figure — the same lane measured the bare rosette and the 46x-denser mandala at an **identical**
+0.403. The washed-out look the user rejected is what the gate selected for. **Phase 5 must not repeat
+that trade for the three new presets:** the Phase 2 sample sheets, rendered at an untouched stroke
+with no trails, are visibly crisper than the shipped preset and are the better reference for what
+this geometry should look like.
 
 ### Phase 4 — the rings move
 
