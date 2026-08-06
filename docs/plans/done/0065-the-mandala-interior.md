@@ -1,14 +1,59 @@
 # 0065 — The mandala interior: `star_pattern` stops being hollow
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, and **gated by nothing**. It is line-geometry
-> work and shares no file with any other plan in the roster, so it is the safest parallel lane
-> available. Phases 1-2 are `dev` and run start-to-finish; **Phase 3 is `human`** (pick the motif
-> roster from the rendered grid) and gates Phases 4-6, so the plan does not close in one session.
+> **Status:** **done 2026-08-06** — Phases 1, 2, 4, 5 and 7 landed on `plan-0065-mandala-interior`
+> as `33e5efc` / `1904469` / `419418f` / `a35485a` / `b026ff3`, with `3c0e56a` recording the Phase 3
+> human verdict and `d4030b2` merging `main`. The full gate is green on the merged tip (`fmt`,
+> `clippy --all-targets -D warnings`, **566/566 nextest, 0 skipped**, doc links resolve) and **no
+> golden baseline moved or was added** — `git diff main -- core/tests/golden/` is empty and
+> `LMV_BLESS` was never run, exactly as the plan promised. Mode 4 review: **no blockers**.
+>
+> **Phase 6 did NOT run as a plan phase, and this closes anyway — deliberately, at the user's call.**
+> The live judgement it asked for happens immediately after this close, outside the plan. Part of it
+> is already answered from the running app: the user rejected the washed-out first draft, approved
+> the solid-stroke retune, cut eight rings as lace, and kept `rings in weave` against the reviewing
+> session's reading of the sample. What remains unanswered is counter-rotation against real music and
+> `glow` + `thickness` together on adjacent thin rings, which is the additive-ceiling risk this plan
+> named. Anything that pass turns up is ordinary `preset-author` work on shipped presets, or a
+> backlog entry — not a reopened plan.
+>
+> > **Postscript, 2026-08-06, hours after this close: the Phase 6 pass ran and all three presets were
+> > retired.** It did not come back against counter-rotation or the additive ceiling. It came back
+> > against the mechanism: *"we don't have curves, anything curved is based on several lines, and
+> > it's easy to see them — lines look upscaled and half baked."* Every motif is a parametric outline
+> > sampled to straight segments, so at ornament scale the vertices show and a circle reads as a
+> > polygon. That is a ceiling on the approach, not a tuning miss, and the retune to solid strokes had
+> > already happened first — so this was not the inflated-glow hypothesis
+> > ([design-backlog 0073](../../design-backlog.md)). `star_mandala`, `star_mandala_six` and
+> > `star_weave` are deleted and the `star_pattern` coverage floor reverted to `0.34` with them.
+> >
+> > **The plan's deliverable stands and this entry is not reopened.** `rings` is shipped, tested and
+> > documented, `star_pattern` is genuinely no longer hollow, and the 1-of-10 / 9-of-10 shell
+> > measurement is unaffected by whether a preset ships it. What the retirement establishes is
+> > narrower: placed outline geometry is the wrong mechanism *for a mandala*. That look now ships as
+> > `presets/reaction_gilt.toml` — a Gray-Scott field's analytic iso-contours folded by
+> > `kaleido_order`, with no geometry in the picture and therefore no vertex at any resolution. **No
+> > preset in the library uses `rings` today**, which is a decision someone owes eventually and did
+> > not need to make off one rejected look.
+>
+> **The gate went red, and the answer was to re-derive the floor rather than hold the plan.** The
+> three presets measure `0.2442` / `0.2505` / `0.2544` against a `star_pattern` coverage floor of
+> `0.34`. That floor is **derived from the shipped library** at half each family's sparsest member,
+> with `MAX_FLOOR_SLACK` as the mechanism that forces re-derivation when the minimum moves — so the
+> gate fired correctly, a human looked, the content is good, and `coverage_floor`'s own doc comment
+> prescribes re-measuring. **Phase 7** was added at this close and does exactly that: `0.2442 / 2 =
+> 0.12`, slack `2.04`. [Backlog 0072](../../design-backlog.md) stays **open at medium-high** as the
+> measure's replacement; re-derivation is not its fix.
+>
+> **Two merge artifacts worth knowing about.** This lane and `main` each minted a design-backlog
+> entry `0070` on 2026-08-06 for different findings, so this lane's `0070`/`0071`/`0072` renumbered
+> to `0071`/`0072`/`0073` at the merge — the Phase 3 and Phase 5 commit messages still cite the old
+> numbers and the mapping is recorded in the entries' own header. And Phase 5's roster cut rode in
+> its own commit rather than Phase 3's, because Phase 3 is `human` and has no commit.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
-> (this plan's decision), [0007](../adrs/0007-line-geometry-generators.md) (the `[generator]`
-> config seam it extends), [0060](../adrs/0060-star-pattern-variants-interpolate.md) (the `variant`
+> **Related ADRs:** [0079](../../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
+> (this plan's decision), [0007](../../adrs/0007-line-geometry-generators.md) (the `[generator]`
+> config seam it extends), [0060](../../adrs/0060-star-pattern-variants-interpolate.md) (the `variant`
 > morph it composes with)
 
 ## TL;DR
@@ -16,7 +61,7 @@
 `star_pattern` gains an optional `rings` roster on its `[generator]` table: concentric rings of
 repeated motifs, each with its own count, radius, scale and phase, drawn through the shared
 `LineRenderer` alongside — or instead of — the Hankin interlace it draws today. This closes
-[design-backlog 0007](../design-backlog.md)'s still-open "hollow ring" half with the *invest, do not
+[design-backlog 0007](../../design-backlog.md)'s still-open "hollow ring" half with the *invest, do not
 cut* decision the user made on 2026-07-26, and it makes the fourth reference image authorable
 directly. First user-visible behavior: a preset declaring four rings draws an ornamental mandala with
 a filled interior instead of a bare rim.
@@ -27,13 +72,13 @@ One of the user's five reference images is not a fractal: it is a drawn ornament
 discrete repeated motifs, thin bright strokes on black, each ring with its own count and radius. It
 is line geometry, and this project has a line scene that has been waiting for exactly this.
 
-[Design-backlog 0007](../design-backlog.md) recorded `star_pattern` as reading like "a hollow ring",
+[Design-backlog 0007](../../design-backlog.md) recorded `star_pattern` as reading like "a hollow ring",
 established by a rendered sweep rather than argument: segments sit near the rim at every
 `contact_angle_deg`, with no meaningful interior change across 12 / 20 / 28 degrees. The user's
 verdict moved from "idea is interesting but looks poor" to "very nice, but can we make morphing
 between shapes easier, slower" once preset-side mitigation landed. **That second ask was answered** —
-[ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md) and
-[Plan 0054](done/0054-the-line-scenes-catch-up.md) made `variant` a continuous contact angle. The
+[ADR-0060](../../adrs/0060-star-pattern-variants-interpolate.md) and
+[Plan 0054](0054-the-line-scenes-catch-up.md) made `variant` a continuous contact angle. The
 first ask, the hollow interior, was never decided; the entry says so explicitly and carries the
 user's standing *invest, do not cut* call, along with three unchosen options ("more tilings, an
 off-centre mirror, or drawing the underlying tiling grid").
@@ -53,7 +98,7 @@ on something else — and because the two geometries share the one structural pr
 n-fold rotational symmetry about the frame centre, so a ring count and a fold order are chosen
 together rather than fought. Rejected alternatives (a new `mandala` scene; deriving the interior from
 the tiling; an open motif grammar) are in
-[ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md).
+[ADR-0079](../../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md).
 
 ## Architecture diagram
 
@@ -120,11 +165,51 @@ flowchart LR
 ### Phase 3 — pick the roster
 
 - **Owner skill:** human
+- **Status:** **DECIDED 2026-08-06.** The verdict is recorded below verbatim, because it is a human
+  judgement no commit can re-derive.
 - **What:** The user picks which motifs ship, whether the scalloped boundary is a motif ring or its
   own thing, and which compositions become presets.
 - **Done when:** the roster is closed with a decision per motif. **Dropping motifs here is expected**
   — a curated set is the point, and ADR-0079 records that a look outside it routes back through
   `architect` and `dev` rather than being added on request.
+
+#### The verdict
+
+**1. The roster closes at seven.** `circle`, `petal`, `teardrop`, `diamond`, `arc`, `trefoil`,
+`chevron`. **`star` and `triangle` are cut** — `star` is an ornament at x8 and dissolves into texture
+by x32, and `triangle` duplicates `chevron`'s sawtooth role at roughly twelve times the segment cost
+(`chevron` is 2 segments, the cheapest member in the set). Every survivor holds its identity across
+the whole 8-to-32 count range, which is the property the cut was made on.
+
+**2. The scalloped boundary is a real curve primitive — which means it is NOT in this plan.** The
+user was shown side A (24 touching `arc` members) and side B (40 overlapping `arc` members faking a
+continuous curve), told explicitly that the engine has no boundary primitive and that side B is an
+approximation, and chose **the primitive**. That is architect + dev work: a new roster member or a
+new `[generator]` key, filed as [backlog 0071](../../design-backlog.md). **It does not gate Phases 4-5**
+— none of the three chosen compositions carries a boundary ring.
+
+**3. Three compositions ship:** **four rings**, **six rings**, and **rings in weave**. **Eight rings
+is cut** — the centre muddles and the figure reads as lace rather than ornament. Note that
+`rings in weave` was chosen *against* the reviewing session's reading of the sample, which was that
+the twelve-fold interlace sits on top of the ornament as a separate coarse figure rather than framing
+it. That reading may be wrong, and it may be an artifact of the sample's static params; **Phase 6 is
+where it gets settled**, and it is exactly the half of backlog 0007 that only a live judgement can
+answer. Keeping it also keeps backlog 0007's composition question answered rather than dropped.
+
+#### What the same sitting found about the shipped preset — read before Phase 5
+
+The user judged `presets/star_mandala.toml` in the running app and rejected it: *"maximally lame —
+all lines are half transparent, line connections are visible, there is no curve lines"*. Those are
+filed as [backlog 0072](../../design-backlog.md) and [backlog 0073](../../design-backlog.md), and **0072
+lands directly on this plan's Phase 5**:
+
+The preset's `glow` (0.85 -> 1.55) and `trails` (0.26 -> 0.40) were raised *only* to clear
+`sanity.rs`'s 0.34 coverage floor, on a scene where that floor provably measures the halo rather than
+the figure — the same lane measured the bare rosette and the 46x-denser mandala at an **identical**
+0.403. The washed-out look the user rejected is what the gate selected for. **Phase 5 must not repeat
+that trade for the three new presets:** the Phase 2 sample sheets, rendered at an untouched stroke
+with no trails, are visibly crisper than the shipped preset and are the better reference for what
+this geometry should look like.
 
 ### Phase 4 — the rings move
 
@@ -138,7 +223,7 @@ flowchart LR
   defaulting to the static configuration so Phase 1's captures do not move.
 - **The gate hazard this phase must design around, not discover:** `core/tests/animation.rs` renders
   at 96×96 and diffs whole frames, so a rotationally symmetric figure is nearly invariant under
-  rotation — [design-backlog 0009](../design-backlog.md) documented exactly this penalty for
+  rotation — [design-backlog 0009](../../design-backlog.md) documented exactly this penalty for
   `star_rosette`, and a ring mandala is *more* rotationally symmetric than the rosette was. **Spin
   alone will not pass the gate.** `ring_spread` and `ring_scale` are radial and will; the shipped
   presets must carry their animation on those.
@@ -155,7 +240,7 @@ flowchart LR
   five keys, the closed motif names, the segment budget and what happens at the cap, and the three
   new params. It is load-bearing for the `preset-author` lane, which keeps no catalogue of its own.
   `docs/presets.md` is **not** touched: no grammar change. **Also strike through
-  [design-backlog 0007](../design-backlog.md)** with a pointer here — its interior half is what this
+  [design-backlog 0007](../../design-backlog.md)** with a pointer here — its interior half is what this
   plan closes, and the entry has been half-struck since Plan 0054.
 - **Done when:** the docs are swept, backlog 0007 is struck through in full, and every existing
   golden baseline is byte-identical (this plan adds geometry behind an absent-by-default roster and
@@ -171,6 +256,50 @@ flowchart LR
   of backlog 0007 that only a live judgement can settle?
 - **Done when:** the presets ship tuned, and anything that could not be made to read goes to
   `docs/design-backlog.md`.
+
+### Phase 7 — the `star_pattern` coverage floor is re-derived from what now ships
+
+- **Owner skill:** dev
+- **Added 2026-08-06**, after Phase 5 landed three presets below the floor. It was not in the
+  original plan because nobody expected this family's minimum to move; the mechanism that catches
+  that is working exactly as designed, and this phase is the documented response to it.
+- **Runs after Phase 6 and after `git merge main`**, in that order — both can move the number, and a
+  floor derived before either is derived from a distribution that is about to change.
+- **Files touched:** `core/tests/sanity.rs` only.
+- **What:** Re-derive `coverage_floor(SystemKind::StarPattern)` from the distribution
+  `every_preset_draws_a_real_shape` prints, and rewrite the doc-comment paragraph that carries the
+  per-system table.
+
+  This is the procedure that constant's own doc comment prescribes, verbatim: *"The response to a
+  legitimately sparser new preset is to re-derive that system's floor from the printed distribution,
+  and to say in the commit which preset moved the minimum — not to nudge a constant back until the
+  run goes green."* The attractor floor moved the same way on 2026-08-03. `0.34` was half of
+  `0.6908` (Star Lantern), derived from a three-preset roster that had never seen thin-stroke
+  ornament; this plan added the content the constant was never measured against.
+
+- **The arithmetic, done here so the phase is not tuning against a number it invented.** Each floor
+  sits at **half** its family's sparsest shipped member, and `MAX_FLOOR_SLACK = 2.2` holds it there.
+  Phase 5 measured the new minimum at `0.2442` (Star Mandala), so the floor is `0.2442 / 2 = 0.1221`
+  → **`0.12`**, giving slack `0.2442 / 0.12 = 2.04`, inside `MAX_FLOOR_SLACK`. **Take the actual
+  number from the post-merge, post-Phase-6 printed distribution** — if Phase 6's tuning moves the
+  minimum, the half-rule is what is fixed, not the `0.12`.
+- **What this costs, stated rather than discovered.** The band `0.12`–`0.34` becomes unpoliced on
+  `star_pattern`. That is the same price `attractor`, `spectrum` and `reaction_diffusion` already pay
+  for 3-5x internal spread, and the floor's only claim — *a preset drawing less than half of the
+  thinnest shipped member of its own family is worth a look* — survives at the new value. A scene
+  rendering nothing still fails at `0.0`, and ADR-0067 keeps a bare vignette from counting as a
+  figure. The three mandalas also join `geometry_extent.rs`'s line-family sweep at the merge, which
+  asserts every line preset draws segments at all.
+- **What this is NOT.** It is not the fix for
+  [backlog 0072](../../design-backlog.md) — that entry stays open at medium-high with all three of its
+  measurements, and re-deriving is what happens on this family's floor *whether or not* the measure
+  is replaced later. No other system's floor moves, `MAX_FLOOR_SLACK` is untouched, and no preset is
+  retuned to meet a number.
+- **Done when:** the full suite is green with the floor taken from the printed distribution; the
+  per-system table in the doc comment carries the new `star_pattern` row with its new lowest preset
+  and factor; the surrounding prose names which preset moved the minimum and why a 46-fold ornament
+  of hairline strokes reads low at this test's 96x96 capture; and one sentence points at backlog 0072
+  saying this re-derivation is not that entry's fix.
 
 ## Data shapes
 
@@ -200,13 +329,13 @@ struct Ring {
   rings × count × resolution, and the failure is the same silent truncation from either direction.
   Phase 5 documents it; nothing detects it.
 - **Thin concentric strokes are the worst case for the additive ceiling.** Where adjacent rings'
-  halos overlap they sum, and [Plan 0040](done/0040-line-joins-finish-the-job.md)'s close found
+  halos overlap they sum, and [Plan 0040](0040-line-joins-finish-the-job.md)'s close found
   exactly this on a mirrored line preset — the *quietest* part of the readout rendering as its
   brightest. Phase 6 should watch `glow` and `thickness` together, not separately.
 - **Phase 3 is `human` and gates Phases 4-6**, so this plan does not close in one session by
   construction.
-- **[Plan 0055](done/0055-the-fold-edge-becomes-a-choice.md) and
-  [Plan 0064](0064-the-symmetry-stage-and-the-banded-palette.md) do not touch this file at all** —
+- **[Plan 0055](0055-the-fold-edge-becomes-a-choice.md) and
+  [Plan 0064](../0064-the-symmetry-stage-and-the-banded-palette.md) do not touch this file at all** —
   this plan is line-geometry work and shares nothing with the post chain. It can run in parallel with
   either.
 

@@ -36,7 +36,7 @@ cannot express them.
 | 0004 | `zoom`/`pan_*` smear RD's edge: a toroidal sim behind a clamped sampler | [ADR-0034](adrs/0034-internal-resolution-follows-the-target.md) + [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 5 |
 | 0005 | No bloom / glow / halo stage | [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) + [Plan 0045](plans/done/0045-linear-light-and-bloom.md) |
 | 0006 | `[smoothing]` is a symmetric one-pole: no attack/release split | [ADR-0035](adrs/0035-asymmetric-attack-release-easing.md) + [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 2 |
-| 0007 | `star_pattern` is a hollow ring, and `variant` cannot be blended | Morph half: [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md) + [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md). Interior half: [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md) + [Plan 0065](plans/0065-the-mandala-interior.md) |
+| 0007 | `star_pattern` is a hollow ring, and `variant` cannot be blended | **Closed in full 2026-08-06.** Morph half: [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md) + [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md). Interior half: [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md) + [Plan 0065](plans/done/0065-the-mandala-interior.md) — `[generator] rings`, three ring levers, three mandala presets |
 | 0008 | `shot` harness gaps that cost the content lane real iterations | [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 1 + [Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md) Phase 4 |
 | 0010 | The fold samples outside its source rectangle and clamps | [ADR-0047](adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) + [Plan 0045](plans/done/0045-linear-light-and-bloom.md) |
 | 0011 | The fold axis is screen-centred, so `pan_*` and `kaleido_*` fight | [ADR-0047](adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) + [Plan 0045](plans/done/0045-linear-light-and-bloom.md) Phase 1 |
@@ -1203,3 +1203,203 @@ already repaired before the instrument existed. But the plan that built the inst
 "the gate that convicts an over-scaled figure", and what is deployed cannot do that for content
 nobody has already fixed. The cheap half (a `--report` column) is small enough that leaving it undone
 is mostly a matter of nobody having filed it.
+
+---
+
+## Entries 0071-0073 — from the Plan 0065 Phase 3 roster decision (2026-08-06)
+
+Three findings raised when the user judged the Phase 2 sample set and the shipped `star_mandala`
+preset in the running app. **0071 is a decision the user actually took** and needs promoting rather
+than re-deciding; 0072 and 0073 are the two defects behind the verdict on the preset, which was
+"maximally lame — all lines are half transparent, line connections are visible, there is no curve
+lines".
+
+**These three were raised as `0070`-`0072` on the `plan-0065-mandala-interior` lane and renumbered
+here at its merge**, because `main` had independently minted a `0070` the same day at Plan 0069's
+close. Commit messages from that lane (`3c0e56a`, `a35485a`) and the plan's own Phase 3 verdict
+still cite the old numbers; the mapping is `0070`→`0071`, `0071`→`0072`, `0072`→`0073`.
+
+## 0071 — the scalloped boundary was chosen as a real curve primitive, and the engine has none
+
+- **Raised:** 2026-08-06, at Plan 0065 Phase 3. **This is a user decision, not an open question.**
+- **Verified by measurement:** n/a — it is a look decision, taken from the `bound A touch` /
+  `bound B curve` A/B in the Phase 2 sample set.
+
+[ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)'s Notes left
+open whether the reference image's scalloped outer boundary is "a motif ring whose members touch, or
+a separate boundary curve". Phase 2 rendered it both ways and **the user chose the curve** — and
+chose it in the strong form, as a real primitive rather than as side B's approximation.
+
+Side B in the sample set is **not** a boundary curve. The engine has no such primitive and Phase 1
+did not add one; side B is 40 `arc` motifs scaled 1.12x so their members overlap and the scallops
+merge into something that *reads* continuous. The user was shown that distinction explicitly and
+picked the primitive anyway.
+
+### What a fix would be
+
+A new roster member or a new `[generator]` key on `star_pattern` — a closed scalloped curve whose
+lobe count and depth are parameters, sampled as one continuous outline rather than as N placed
+copies. Architect (ADR) then dev.
+
+### Priority
+
+**Blocked out of Plan 0065 by construction** — the plan's Phase 5 ships presets from the closed
+roster, and this is engine work by the user's own choice. It does not gate Phases 4-5: the three
+chosen compositions (four rings, six rings, rings in weave) carry no boundary ring.
+
+## 0072 — `sanity.rs`'s coverage floor forces dense thin-stroke line scenes into washed-out tuning, and it is measuring the halo
+
+- **Raised:** 2026-08-06, at Plan 0065 Phase 3, from the user's verdict on the shipped preset.
+- **Verified by measurement:** yes, three ways, all inside Plan 0065's own lane.
+
+`star_mandala`'s first draft ran `thickness = 1.15` / `glow = 0.85` / `trails = 0.26` — the author's
+judgement that forty times as many segments want a lighter hand. It **fails** `core/tests/sanity.rs`,
+which captures at 96x96 and enforces a `star_pattern` coverage floor of **0.34**: it measured
+**0.2541**. A second pass at 2.05 / 1.20 / 0.30 read **0.3053**, still short. What ships reads
+**0.4346** at 2.45 / 1.55 / 0.40 — and the user's first reaction to it in the running app was that
+every line is half transparent.
+
+**The gate cannot see the figure it is gating.** Three measurements say so:
+
+- The mandala's coverage (0.4346) sits **below** bare `star_rosette`'s (0.7995) while drawing ~46x
+  the geometry.
+- In a controlled A/B at `star_rosette`'s own shipped tuning, the bare rosette and the four-ring
+  mandala score **identically (0.403)** — 46x the segments, same number.
+- A structural measure separates them cleanly: **9 of 10 radial shells occupied against 1**.
+
+At 96x96 a hairline over a 46-fold ornament aliases to nothing, so `coverage` on this scene is a
+measure of the **halo and the trail**, not of the figure. The only lever that moves it is inflating
+glow and tail — which is exactly the look the user rejected. **The gate is selecting for the defect.**
+
+### What Plan 0065 Phase 5 measured when it refused the trade (2026-08-06)
+
+The phase was told not to buy coverage with `glow` and `trails`, and it did not. Three mandala
+presets ship tuned by eye at 1280x720 with **`glow` at the engine's 1.0 and no `trails` binding at
+all**, and all three **fail** this floor:
+
+```text
+star_pattern  floor 0.34  lowest 0.2442 (Star Mandala) - factor 0.72
+  0.2442 Star Mandala  |  0.2505 Mandala Six  |  0.2544 Mandala Weave  |  0.6908 Star Lantern  |  0.7995 Star Rosette
+```
+
+Three things that sharpen the entry rather than repeating it:
+
+- **`thickness` alone cannot reach the floor at a look anyone would ship.** Swept on the four-ring
+  preset with `glow = 1.0` and no trail: `2.2 -> 0.198`, `3.1 -> 0.244`, `4.6 -> 0.247`,
+  `6.5 -> 0.311`, `9.0 -> 0.366`. The floor is first cleared at a base thickness of about **9**,
+  which is a **29-px-wide stroke at 1080p**; the figure has already started closing into a blot by
+  4.6. The lever the entry hoped for is not enough on its own.
+- **Density still does nothing, now measured within one tuning family.** `Mandala Six` draws 1 684
+  segments against `Star Mandala`'s 1 092 — **54 % more geometry** — for a coverage difference of
+  0.2442 vs 0.2505, i.e. **2.6 %**. That is the entry's central claim reproduced without changing
+  anything else.
+- **The three failures are the honest tuning, and the pictures are the evidence.** Compare
+  `presets/star_mandala.toml` before and after this phase in `git log` — the pre-Phase-5 file carries
+  `glow = 1.55` / `trails = 0.40` and its own comment block explaining the escalation, which is the
+  tuning the user rejected in the running app.
+
+**So the gate is red on `star_pattern` until this entry is taken.** That was accepted deliberately
+rather than papered over; the alternative was to ship the look the user had already refused.
+
+### Update 2026-08-06 — the floor moved to `0.12` and back to `0.34` the same day, and this entry survives both
+
+Plan 0065 Phase 7 re-derived the floor to `0.12` at its close, which is exactly what
+`coverage_floor`'s own rule prescribes when a family minimum moves. Hours later the user rejected all
+three presets on sight for a reason that has nothing to do with this entry — the motifs are sampled
+polylines and the vertices show ([0073](#0073--motif-outlines-show-their-vertices-and-a-sampled-polyline-does-not-read-as-a-curve))
+— so they were retired and the floor reverted to `0.34`.
+
+**Nothing about that answers this entry.** The three measurements above were taken on real content
+and stand on their own: at 96x96 the bare rosette and the 46x-denser mandala score *identically*,
+54 % more geometry moves coverage 2.6 %, and `thickness` alone first clears the floor at a 29-px
+stroke. The next dense thin-stroke line preset meets the same wall. What changed is only that the
+library currently ships no preset sitting against it, so the pressure is off the schedule rather than
+off the problem — and a reader finding `0.34` in the code should not conclude the episode never
+happened.
+
+### Why this is not the same entry as 0054
+
+[0054](design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor)
+and its successor [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)
+are about a figure leaving the frame; the in-frame geometry fraction that plan shipped does **not**
+catch this one, because a mandala is entirely inside the frame and scores a clean 1.0. This is the
+opposite failure: the figure is present, correct and dense, and the instrument reads it as sparse.
+Both entries are the same root cause — a pixel statistic standing in for a structural one — and
+anyone taking either should read the other.
+
+### What a fix would be
+
+Not a threshold change. Either a per-family floor that acknowledges what thin-stroke line scenes
+render at 96x96, or a structural occupancy measure (the radial-shell count above is one candidate and
+it already exists as a one-off in the lane). Whatever replaces it must be checked against the case
+where it currently succeeds, which is catching a scene that renders **nothing**.
+
+### Priority
+
+**Medium-high, and it will recur on the next mandala.** Every future preset on this scene meets the
+same floor and gets pushed toward the same washed-out tuning. It is the one item here that actively
+degrades shipped content rather than merely failing to help.
+
+## 0073 — motif outlines show their vertices, and a sampled polyline does not read as a curve
+
+- **Raised:** 2026-08-06, at Plan 0065 Phase 3, from the user's verdict in the running app: "line
+  connections are visible, there is no curve lines".
+- **Verified by measurement:** **no** — user judgement in the running app, corroborated by the
+  Phase 2 sheets (the joints are clearest on `bound A touch`, where neighbouring `arc` members meet).
+  **The mechanism below is a hypothesis and has not been measured.**
+
+Every motif in the closed roster is a parametric outline **sampled to straight segments** and drawn
+as instanced quads through the shared `LineRenderer`. Two consequences the user saw:
+
+- **Joints are brighter than the strokes they join.** Where two quads meet at a vertex they overlap
+  and sum additively, so a vertex reads as a bead. [Plan 0040](plans/done/0040-line-joins-finish-the-job.md)'s
+  close found the same shape on a mirrored line preset — the quietest part of the readout rendering
+  as its brightest — and Plan 0065's own Risks section predicted it for concentric strokes before the
+  plan was built. **Verify against what Plan 0040 actually landed before assuming joins are absent;**
+  the visible artifact may be additive overlap on top of working joins rather than missing joins.
+- **`circle`, `petal` and `arc` are polygons.** At the sample sheets' stroke and scale they read as
+  smooth; in the shipped preset, at motif `scale` 0.13-0.46 with an inflated glow, they do not.
+  Segment count per motif is fixed and is not an authorable parameter.
+
+### Update 2026-08-06, same day — this was re-judged after the retune and it is NOT 0072 wearing a mask
+
+The paragraph below hoped the faceting was mostly inflated strokes. It is not. The three presets
+were retuned to solid strokes at `glow = 1.0` with no trails, rendered, and the user's verdict on
+the result was **"we don't have curves, anything curved is based on several lines, and it's easy to
+see them — lines look upscaled and half baked"**. A crop of `Mandala Weave` confirms it directly:
+the `circle` motifs are visibly polygons, the strokes carry stair-stepped edges, and every vertex is
+a bright bead.
+
+**So this is a ceiling on the approach, not a defect in it.** A parametric outline sampled to
+straight segments cannot read as a drawn curve at ornament scale, and no tuning available to the
+content lane changes that. **All three ring-mandala presets were retired** (`star_mandala`,
+`star_mandala_six`, `star_weave`) and the `star_pattern` coverage floor reverted to `0.34` with them.
+
+**The mandala look now ships as [`presets/reaction_gilt.toml`](../presets/reaction_gilt.toml)**, by a
+different mechanism entirely: a Gray-Scott field's **analytic iso-contours** — curves evaluated per
+pixel in the shader, with no geometry and therefore no vertex at any resolution — folded into a
+10-to-18-wedge rosette by `kaleido_order`, on `kaleido_edge = 0` so it reads as an object on black.
+The symmetry is a composite-stage property rather than a placement rule, which is the user's own
+proposal ("mandalas really should be done differently — with kaleidoscope") and it is measurably
+better: it passes every gate, reacts on all four bands, and is not a near-duplicate of `Reef` or
+`Reliquary`.
+
+**What this does NOT close.** The `rings` capability itself is shipped, tested and documented, and
+`star_pattern` is no longer hollow — [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
+stands. What is now known is that placed outline geometry is the wrong mechanism *for this look*;
+whether it is right for some other look is untested, and the roster has no shipped user of it.
+
+### What a fix would be
+
+Unchanged in substance, and the candidates should still not be bundled: a curve-aware stroke in the
+line renderer, or an authorable sample resolution per motif. The third candidate — "wait and see
+what 0072's retune does to the faceting" — is **answered and closed**: the retune happened and the
+faceting survived it.
+
+### Priority
+
+**Low, and it changed shape rather than urgency.** It was deferred by the user as "maybe we can
+improve upon in the future"; it is lower now, because the look that made it urgent no longer routes
+through this code. It becomes urgent again the moment anyone wants a *line* scene to draw something
+that reads as a curve — which is every future user of `star_pattern`'s motif roster, and arguably
+`parametric_curve` too.
