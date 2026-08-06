@@ -32,24 +32,43 @@
 #               is weakest at seeing - see the measured table below.
 #   fade/size/  a trail long enough that the strokes read, at a nib that does
 #   zoom        not clip the accumulation to flat white.
+#   map_tint/   ADR-0087's two per-particle colour channels, at BOTH of their
+#   map_hue/    routes each. `*_tint` shifts the palette coordinate; `*_hue`
+#   age_tint/   rotates the hue of the colour that ramp returned. All four are
+#   age_hue     IFS-only, and they are the only thing in the suite that would
+#               notice either channel, the `map` write in the step shader, or
+#               the staggered age the churn seeds. `age_hue` is NEGATIVE so the
+#               sign of the rotation is pinned too.
 #
 # THE GUARD IS DEMONSTRATED, NOT ASSUMED. Each lever was neutralized in turn and
 # the capture re-measured against this baseline (tolerances: mean 0.02,
-# outlier 48):
+# outlier 48). Re-measured IN FULL at Plan 0073 Phase 5: the baseline itself
+# moved three times over that plan, so the previous five numbers were taken
+# against a picture that no longer exists.
 #
-#   morph -> 0        mean 0.1328   outlier 254
-#   curl  -> 0        mean 0.0890   outlier 253
-#   lean  -> 0        mean 0.0915   outlier 253
-#   vigor -> 1        mean 0.0266   outlier 252
-#   bias  -> 0        mean 0.0117   outlier 216
+#   morph    -> 0     mean 0.1584   outlier 254
+#   curl     -> 0     mean 0.1079   outlier 254
+#   lean     -> 0     mean 0.1108   outlier 254
+#   vigor    -> 1     mean 0.0326   outlier 253
+#   bias     -> 0     mean 0.0145   outlier 237
+#   map_tint -> 0     mean 0.0142   outlier 192
+#   map_hue  -> 0     mean 0.0062   outlier  90
+#   age_tint -> 0     mean 0.0117   outlier 108
+#   age_hue  -> 0     mean 0.0058   outlier  69
 #
-# All five fail. Four fail both gates; `bias` fails the OUTLIER gate alone, at
-# mean 0.0117 against a 0.02 tolerance. That is the expected shape rather than a
-# weakness, and it is worth stating because it is the one that could be mistaken
-# for a weak fixture: `bias` moves only the DENSITY distribution and leaves
-# every stroke exactly where it was, so it shifts a great many pixels a little
-# and a few a great deal. It is precisely what `MAX_OUTLIER` exists to catch,
-# and without that gate this fixture would not notice `bias` breaking.
+# All nine fail. Four fail both gates; `bias` and ALL FOUR COLOUR CHANNELS fail
+# the OUTLIER gate alone. That is the expected shape rather than a weakness, and
+# it is worth stating because it is what could be mistaken for a weak fixture:
+# `bias` moves only the DENSITY distribution and leaves every stroke exactly
+# where it was, and the four colour channels move no stroke at all. Both kinds
+# therefore shift a great many pixels a little and a few a great deal, while the
+# frame mean is diluted by a mostly-unlit frame. `MAX_OUTLIER` is precisely what
+# exists to catch that, and without it this fixture would notice none of the
+# five.
+#
+# The two `*_tint` channels also confound each other by construction - they ride
+# the SAME palette coordinate, so neutralizing one leaves the other still moving
+# it. Each is still caught decisively, which is what the table is for.
 #
 # If you weaken a value here, re-run that check - a fixture that renders a
 # pretty figure and notices nothing is worse than no fixture, because it reads
@@ -75,3 +94,7 @@ vigor    = "1.06"
 curl     = "0.35"
 lean     = "0.40"
 bias     = "0.65"
+map_tint = "0.55"
+map_hue  = "0.22"
+age_tint = "0.40"
+age_hue  = "-0.18"
