@@ -1049,9 +1049,11 @@ Four things it does not see, each of which has its own answer:
   fraction at all (`None`) rather than a zero, for the same reason.
 - **It cannot tell a deliberately zoomed-in figure from an over-scaled one**,
   because they are the same picture. `Rose Zoom` (`zoom` bound to `2.15..3.09`)
-  measures `0.3492` and `Rose Overflow` (`scale` to `2.84`) `0.3659`, both
-  **at or below** the frozen over-scaled comb's `0.3563` — and both are working
-  exactly as authored. That is why the gate is **paired**: it compares a
+  measures `0.3492` and `Rose Overflow` (`scale` to `2.84`) `0.3659` — they
+  **bracket** the frozen over-scaled comb's `0.3563`, one just below it and one
+  just above, and both are working exactly as authored. No absolute threshold
+  passes those two and fails the comb; that is why the gate is **paired**: it
+  compares a
   configuration against *its own repair*, never against an absolute floor.
   Anyone adding `assert!(fraction > 0.5)` over the library would fail two shipped
   presets, which is precisely the mistake ADR-0083 catalogues pixel coverage
