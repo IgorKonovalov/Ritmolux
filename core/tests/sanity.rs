@@ -208,7 +208,7 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// swarm               0.42    0.8407  Storm              2.00
 /// parametric_curve    0.33    0.6722  Rose Trails        2.04
 /// lsystem             0.32    0.6413  Fern Grow          2.00
-/// star_pattern        0.12    0.2442  Star Mandala       2.04
+/// star_pattern        0.34    0.6908  Star Lantern       2.03
 /// reaction_diffusion  0.07    0.1420  Coral              2.03
 /// attractor           0.18    0.3442  Leviathan          1.91
 /// spectrum            0.06    0.1189  Spectrum Ridge     1.98
@@ -222,36 +222,30 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// direction and [`MAX_FLOOR_SLACK`] is what will eventually call it; the rows
 /// are left as written because the prose below narrates the numbers in them.
 ///
-/// **The `star_pattern` floor moved on 2026-08-06, downward, and this is the
-/// first time this constant has been re-derived against *sparser* content.** It
-/// was `0.34`, half of `0.6908` Star Lantern, derived from a three-preset roster
-/// of bare Hankin interlaces. Plan 0065 filled the interior of that scene:
-/// `Star Mandala`, `Mandala Six` and `Mandala Weave` draw a 46-fold ornament of
-/// hairline strokes and measure `0.2442` / `0.2505` / `0.2544`, moving the
-/// family minimum to **`0.2442` Star Mandala** and the floor to `0.2442 / 2 =
-/// **0.12**` (slack `2.04`).
+/// **The `star_pattern` floor went to `0.12` on 2026-08-06 and came back to
+/// `0.34` the same day, and both moves were correct.** Plan 0065 filled the
+/// interior of that scene with three ring-mandala presets measuring `0.2442` /
+/// `0.2505` / `0.2544`, which moved the family minimum below the floor, so the
+/// floor was re-derived to `0.2442 / 2 = 0.12` exactly as the rule below says to.
+/// Then the user rejected all three on sight in the running app and they were
+/// **retired**, taking the minimum back to `0.6908` Star Lantern and the floor
+/// back to `0.34`.
 ///
-/// **They are not sparse, and the number is a property of this test rather than
-/// of the picture.** At this test's 96x96 capture a hairline over a 46-fold
-/// ornament aliases to almost nothing, so `coverage` on that content measures
-/// the halo and the trail rather than the figure. The lane measured it three
-/// ways: the bare rosette and the 46x-denser mandala score *identically* at one
-/// tuning; `Mandala Six` draws 54 % more geometry than `Star Mandala` for a
-/// 2.6 % coverage difference; and sweeping `thickness` alone first clears `0.34`
-/// at a base of about `9`, a 29-px stroke at 1080p, with the figure closing into
-/// a blot well before that. The presets were **not** inflated with `glow` and
-/// `trails` to clear the old floor — an earlier draft was, and the user rejected
-/// it in the running app as "maximally lame, all lines are half transparent".
+/// **Keep the round trip in mind before treating a re-derivation as permanent.**
+/// The reason the presets were cut is not the reason the floor moved: every motif
+/// in that scene is a parametric outline *sampled to straight segments*, so the
+/// vertices are visible and a circle reads as a polygon — a ceiling on the
+/// approach, not a tuning miss (design-backlog 0073). The mandala look now ships
+/// as `reaction_gilt`, an analytic iso-contour field folded by `kaleido_order`,
+/// where there is no geometry and so no vertex at any resolution.
 ///
-/// **This re-derivation is not the fix for that** — see design-backlog 0072,
-/// which stays open at medium-high and asks for a structural occupancy measure.
-/// Re-deriving is what happens to this floor whether or not the measure is
-/// replaced. What it costs, stated rather than discovered: the band `0.12`-`0.34`
-/// is now unpoliced on `star_pattern`, the same price `attractor`, `spectrum` and
-/// `reaction_diffusion` already pay for 3-5x internal spread. The floor's only
-/// claim survives at the new value — a scene rendering nothing still fails at
-/// `0.0`, ADR-0067 keeps a bare vignette from counting as a figure, and
-/// `geometry_extent.rs` covers this family besides.
+/// **What the episode still proves about this measure stands, and it is filed.**
+/// At this test's 96x96 capture a hairline over a 46-fold ornament aliases to
+/// almost nothing, so `coverage` on that content measured the halo and the trail
+/// rather than the figure — the bare rosette and the 46x-denser mandala scored
+/// *identically*, and 54 % more geometry moved the number 2.6 %. See
+/// design-backlog 0072, which stays open at medium-high and asks for a structural
+/// occupancy measure; nothing about retiring the presets answers it.
 ///
 /// **The attractor floor moved on 2026-08-03 and the mechanism above is why it
 /// was noticed rather than missed.** It was `0.12` against `0.2461` De Jong.
@@ -332,12 +326,10 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // still lit; Rose Trails at 0.6722 sets this one.
         SystemKind::ParametricCurve => 0.33,
         SystemKind::LSystem => 0.32,
-        // Re-derived downward 2026-08-06 (Plan 0065 Phase 7). The mandala
-        // presets fill the interior with hairline strokes that alias away at
-        // 96x96, so Star Mandala's 0.2442 — not Star Lantern's 0.6908 — sets
-        // this one now. Its 3.3x internal spread is why it reads oddly against
-        // the two line families above.
-        SystemKind::StarPattern => 0.12,
+        // Went to 0.12 and back on 2026-08-06 — see the doc comment. Star
+        // Lantern's 0.6908 sets it again now that the three ring mandalas are
+        // retired.
+        SystemKind::StarPattern => 0.34,
         // Reaction-diffusion paints a real pattern across the frame, but the
         // present maps only the sparse V species, so the lit fraction is modest.
         SystemKind::ReactionDiffusion => 0.07,

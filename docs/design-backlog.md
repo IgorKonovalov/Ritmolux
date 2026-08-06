@@ -1301,6 +1301,22 @@ Three things that sharpen the entry rather than repeating it:
 **So the gate is red on `star_pattern` until this entry is taken.** That was accepted deliberately
 rather than papered over; the alternative was to ship the look the user had already refused.
 
+### Update 2026-08-06 — the floor moved to `0.12` and back to `0.34` the same day, and this entry survives both
+
+Plan 0065 Phase 7 re-derived the floor to `0.12` at its close, which is exactly what
+`coverage_floor`'s own rule prescribes when a family minimum moves. Hours later the user rejected all
+three presets on sight for a reason that has nothing to do with this entry — the motifs are sampled
+polylines and the vertices show ([0073](#0073--motif-outlines-show-their-vertices-and-a-sampled-polyline-does-not-read-as-a-curve))
+— so they were retired and the floor reverted to `0.34`.
+
+**Nothing about that answers this entry.** The three measurements above were taken on real content
+and stand on their own: at 96x96 the bare rosette and the 46x-denser mandala score *identically*,
+54 % more geometry moves coverage 2.6 %, and `thickness` alone first clears the floor at a 29-px
+stroke. The next dense thin-stroke line preset meets the same wall. What changed is only that the
+library currently ships no preset sitting against it, so the pressure is off the schedule rather than
+off the problem — and a reader finding `0.34` in the code should not conclude the episode never
+happened.
+
 ### Why this is not the same entry as 0054
 
 [0054](design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor)
@@ -1345,14 +1361,45 @@ as instanced quads through the shared `LineRenderer`. Two consequences the user 
   smooth; in the shipped preset, at motif `scale` 0.13-0.46 with an inflated glow, they do not.
   Segment count per motif is fixed and is not an authorable parameter.
 
+### Update 2026-08-06, same day — this was re-judged after the retune and it is NOT 0072 wearing a mask
+
+The paragraph below hoped the faceting was mostly inflated strokes. It is not. The three presets
+were retuned to solid strokes at `glow = 1.0` with no trails, rendered, and the user's verdict on
+the result was **"we don't have curves, anything curved is based on several lines, and it's easy to
+see them — lines look upscaled and half baked"**. A crop of `Mandala Weave` confirms it directly:
+the `circle` motifs are visibly polygons, the strokes carry stair-stepped edges, and every vertex is
+a bright bead.
+
+**So this is a ceiling on the approach, not a defect in it.** A parametric outline sampled to
+straight segments cannot read as a drawn curve at ornament scale, and no tuning available to the
+content lane changes that. **All three ring-mandala presets were retired** (`star_mandala`,
+`star_mandala_six`, `star_weave`) and the `star_pattern` coverage floor reverted to `0.34` with them.
+
+**The mandala look now ships as [`presets/reaction_gilt.toml`](../presets/reaction_gilt.toml)**, by a
+different mechanism entirely: a Gray-Scott field's **analytic iso-contours** — curves evaluated per
+pixel in the shader, with no geometry and therefore no vertex at any resolution — folded into a
+10-to-18-wedge rosette by `kaleido_order`, on `kaleido_edge = 0` so it reads as an object on black.
+The symmetry is a composite-stage property rather than a placement rule, which is the user's own
+proposal ("mandalas really should be done differently — with kaleidoscope") and it is measurably
+better: it passes every gate, reacts on all four bands, and is not a near-duplicate of `Reef` or
+`Reliquary`.
+
+**What this does NOT close.** The `rings` capability itself is shipped, tested and documented, and
+`star_pattern` is no longer hollow — [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
+stands. What is now known is that placed outline geometry is the wrong mechanism *for this look*;
+whether it is right for some other look is untested, and the roster has no shipped user of it.
+
 ### What a fix would be
 
-Unclear, and deliberately left so — it spans at least three candidates that should not be bundled: a
-curve-aware stroke in the line renderer, an authorable sample resolution per motif, and whatever
-0071's retuning does to the apparent faceting once the strokes stop being inflated. **Re-judge after
-0071**, because the cheapest possibility is that this is largely 0071 wearing a different mask.
+Unchanged in substance, and the candidates should still not be bundled: a curve-aware stroke in the
+line renderer, or an authorable sample resolution per motif. The third candidate — "wait and see
+what 0072's retune does to the faceting" — is **answered and closed**: the retune happened and the
+faceting survived it.
 
 ### Priority
 
-**Deferred by the user** — "maybe we can improve upon in the future". Recorded so the three specific
-complaints survive the session that produced them.
+**Low, and it changed shape rather than urgency.** It was deferred by the user as "maybe we can
+improve upon in the future"; it is lower now, because the look that made it urgent no longer routes
+through this code. It becomes urgent again the moment anyone wants a *line* scene to draw something
+that reads as a curve — which is every future user of `star_pattern`'s motif roster, and arguably
+`parametric_curve` too.
