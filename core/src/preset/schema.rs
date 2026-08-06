@@ -14,6 +14,7 @@ use serde::Deserialize;
 
 use super::expr::{self, Expr, ExprError};
 use crate::render::palette::{NamedPalette, PaletteConfig};
+use crate::render::scenes::lines::star::{DEFAULT_RING_SCALE, MAX_RING_COUNT, Motif, RingSpec};
 use crate::render::scenes::lines::{
     CurveFamily, GeneratorConfig, MAX_LSYSTEM_DEPTH, SpectrumLayout, hankin,
 };
@@ -1105,6 +1106,30 @@ struct RawGenerator {
     /// Star pattern: contact angle in degrees.
     #[serde(default)]
     contact_angle_deg: Option<f32>,
+    /// Star pattern: the ring roster that fills the interior (ADR-0079). Absent
+    /// — the default — is the Hankin interlace alone, i.e. the scene as it was.
+    #[serde(default)]
+    rings: Vec<RawRing>,
+}
+
+/// One raw `[generator] rings` entry, before validation. `count` is an `i64`
+/// rather than a `u32` so a negative literal reaches
+/// [`into_star`](RawGenerator::into_star) and is rejected with a message about
+/// ring counts, instead of failing as an anonymous serde type error.
+#[derive(Deserialize)]
+struct RawRing {
+    /// Which motif to repeat — a name from the closed roster.
+    motif: String,
+    /// Copies around the ring.
+    count: i64,
+    /// Distance from the frame centre to each copy's centre.
+    radius: f32,
+    /// Motif size multiplier.
+    #[serde(default)]
+    scale: Option<f32>,
+    /// Angular offset of copy 0, in radians.
+    #[serde(default)]
+    phase: Option<f32>,
 }
 
 impl RawGenerator {
@@ -1159,14 +1184,25 @@ impl RawGenerator {
         })
     }
 
-    /// Validate the table as a star-pattern config: a known regular tiling and a
-    /// finite contact angle. Every failure is a surfaced load error (ADR-0007).
+    /// Validate the table as a star-pattern config: a known regular tiling (or
+    /// `"none"`), a finite contact angle, and a well-formed ring roster. Every
+    /// failure is a surfaced load error (ADR-0007).
+    ///
+    /// **The roster is validated exactly once, here** — the project's
+    /// validate-at-the-boundary rule. Downstream, `build_rings` trusts every
+    /// motif, count, radius, scale and phase it is handed.
     fn into_star(self) -> Result<GeneratorConfig, PresetError> {
         let tiling = self
             .tiling
             .ok_or_else(|| PresetError::Config("star_pattern needs a tiling".into()))?;
-        let order = hankin::tiling_order(&tiling)
-            .ok_or_else(|| PresetError::Config(format!("unknown tiling '{tiling}'")))?;
+        // `"none"` is the rings-only composition (ADR-0079): no interlace at all,
+        // which the star construction expresses as order 0.
+        let order = if tiling.trim().eq_ignore_ascii_case("none") {
+            0
+        } else {
+            hankin::tiling_order(&tiling)
+                .ok_or_else(|| PresetError::Config(format!("unknown tiling '{tiling}'")))?
+        };
 
         let contact_angle_deg = self.contact_angle_deg.unwrap_or(30.0);
         if !contact_angle_deg.is_finite() {
@@ -1175,9 +1211,54 @@ impl RawGenerator {
             ));
         }
 
+        let mut rings = Vec::with_capacity(self.rings.len());
+        for (i, raw) in self.rings.into_iter().enumerate() {
+            let motif = Motif::from_name(&raw.motif).ok_or_else(|| {
+                let roster: Vec<&str> = Motif::ALL.iter().map(|m| m.name()).collect();
+                PresetError::Config(format!(
+                    "ring {i}: unknown motif '{}' (the roster is closed: {})",
+                    raw.motif,
+                    roster.join(", ")
+                ))
+            })?;
+            if raw.count < 1 || raw.count > i64::from(MAX_RING_COUNT) {
+                return Err(PresetError::Config(format!(
+                    "ring {i}: count must be 1..={MAX_RING_COUNT}, got {}",
+                    raw.count
+                )));
+            }
+            let scale = raw.scale.unwrap_or(DEFAULT_RING_SCALE);
+            let phase = raw.phase.unwrap_or(0.0);
+            if !raw.radius.is_finite() || !scale.is_finite() || !phase.is_finite() {
+                return Err(PresetError::Config(format!(
+                    "ring {i}: radius, scale and phase must all be finite"
+                )));
+            }
+            rings.push(RingSpec {
+                motif,
+                #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+                count: raw.count as u32,
+                radius: raw.radius,
+                scale,
+                phase,
+            });
+        }
+
+        // Without an interlace *and* without rings there is no figure at all, and
+        // a preset that draws nothing is a mistake worth naming rather than a
+        // black frame the sanity gate reports later.
+        if order == 0 && rings.is_empty() {
+            return Err(PresetError::Config(
+                "star_pattern tiling = \"none\" draws no interlace, so it needs at \
+                 least one entry in rings"
+                    .into(),
+            ));
+        }
+
         Ok(GeneratorConfig::Star {
             order,
             contact_angle_deg,
+            rings,
         })
     }
 }
@@ -1352,5 +1433,139 @@ mod tests {
         };
         assert_eq!(density_of(&with), 1.0);
         assert_eq!(density_of(&without), 1.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // The `[generator] rings` roster (Plan 0065 Phase 1 / ADR-0079)
+    // -----------------------------------------------------------------------
+
+    fn star(generator: &str) -> Result<Preset, PresetError> {
+        Preset::from_toml_str(&format!(
+            "system = \"star_pattern\"\nname = \"t\"\n[generator]\n{generator}"
+        ))
+    }
+
+    fn rings_of(preset: &Preset) -> Vec<RingSpec> {
+        match &preset.config {
+            Some(GeneratorConfig::Star { rings, .. }) => rings.clone(),
+            _ => panic!("a star preset carries a Star config"),
+        }
+    }
+
+    /// **The roster is a strict superset**: a preset that declares no `rings`
+    /// gets an empty one, which is what makes Plan 0065 add geometry without
+    /// moving a pixel of anything already shipped.
+    #[test]
+    fn an_absent_rings_key_is_an_empty_roster() {
+        let p = star("tiling = \"12\"\ncontact_angle_deg = 20\n").unwrap();
+        assert!(rings_of(&p).is_empty());
+        match p.config {
+            Some(GeneratorConfig::Star {
+                order,
+                contact_angle_deg,
+                ..
+            }) => assert_eq!((order, contact_angle_deg), (12, 20.0)),
+            _ => panic!("a star preset carries a Star config"),
+        }
+    }
+
+    /// The roster parses in declaration order, with `scale` and `phase`
+    /// defaulting — the five keys ADR-0079's data shape names.
+    #[test]
+    fn a_declared_roster_parses_in_order_with_its_defaults() {
+        let p = star(
+            "tiling = \"6\"\n\
+             rings = [\n\
+             { motif = \"petal\", count = 12, radius = 0.4, scale = 0.2, phase = 0.25 },\n\
+             { motif = \"circle\", count = 24, radius = 0.75 },\n\
+             ]\n",
+        )
+        .unwrap();
+        let rings = rings_of(&p);
+        assert_eq!(rings.len(), 2);
+        assert_eq!(
+            rings[0],
+            RingSpec {
+                motif: Motif::Petal,
+                count: 12,
+                radius: 0.4,
+                scale: 0.2,
+                phase: 0.25,
+            }
+        );
+        assert_eq!(rings[1].motif, Motif::Circle);
+        assert_eq!(rings[1].scale, DEFAULT_RING_SCALE, "scale defaults");
+        assert_eq!(rings[1].phase, 0.0, "phase defaults");
+    }
+
+    /// **Validated once, at the boundary** (the project's rule, and the plan's
+    /// explicit instruction): an unknown motif and a non-positive count are load
+    /// errors rather than something the placement arithmetic has to survive.
+    #[test]
+    fn a_malformed_ring_is_a_load_error_naming_what_is_wrong() {
+        let unknown =
+            star("tiling = \"6\"\nrings = [{ motif = \"crescent\", count = 8, radius = 0.5 }]\n")
+                .expect_err("an unknown motif must not fall back to one in the roster");
+        let msg = unknown.to_string();
+        assert!(msg.contains("unknown motif 'crescent'"), "{msg}");
+        // The error names the closed roster, because that is the one thing the
+        // author needs and cannot get from the file they are editing.
+        for m in Motif::ALL {
+            assert!(msg.contains(m.name()), "{msg} should list {}", m.name());
+        }
+
+        for bad in ["0", "-1", "-4000"] {
+            let err = star(&format!(
+                "tiling = \"6\"\nrings = [{{ motif = \"circle\", count = {bad}, radius = 0.5 }}]\n"
+            ))
+            .expect_err("count {bad} must be rejected");
+            assert!(err.to_string().contains("count must be"), "{err}");
+        }
+
+        let over = star(&format!(
+            "tiling = \"6\"\nrings = [{{ motif = \"circle\", count = {}, radius = 0.5 }}]\n",
+            MAX_RING_COUNT + 1
+        ))
+        .expect_err("a count past the ceiling can only buy truncation");
+        assert!(over.to_string().contains("count must be"), "{over}");
+        assert!(
+            star(&format!(
+                "tiling = \"6\"\nrings = [{{ motif = \"circle\", count = {MAX_RING_COUNT}, radius = 0.5 }}]\n"
+            ))
+            .is_ok(),
+            "the ceiling itself is legal"
+        );
+
+        // A non-finite geometry key would put NaN into the placement, which is a
+        // frame of nothing rather than an error anywhere downstream.
+        let nan =
+            star("tiling = \"6\"\nrings = [{ motif = \"circle\", count = 8, radius = nan }]\n")
+                .expect_err("a non-finite radius must be rejected");
+        assert!(nan.to_string().contains("must all be finite"), "{nan}");
+    }
+
+    /// `tiling = "none"` is the rings-only composition — the reference image
+    /// itself. It is legal only with a roster, because a preset with neither
+    /// draws nothing at all and that is worth naming at load rather than
+    /// discovering as a black frame.
+    #[test]
+    fn tiling_none_draws_the_ornament_alone_and_needs_one() {
+        let p =
+            star("tiling = \"none\"\nrings = [{ motif = \"star\", count = 9, radius = 0.6 }]\n")
+                .unwrap();
+        match p.config {
+            Some(GeneratorConfig::Star { order, .. }) => {
+                assert_eq!(order, 0, "no interlace");
+            }
+            _ => panic!("a star preset carries a Star config"),
+        }
+        assert_eq!(rings_of(&p).len(), 1);
+
+        let empty = star("tiling = \"none\"\n").expect_err("nothing to draw");
+        assert!(empty.to_string().contains("at least one entry in rings"));
+
+        // ...and `none` did not become a wildcard: everything else outside the
+        // tiling vocabulary is still rejected.
+        assert!(star("tiling = \"nonsense\"\n").is_err());
     }
 }
