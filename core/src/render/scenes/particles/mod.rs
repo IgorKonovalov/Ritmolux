@@ -973,13 +973,18 @@ struct Draw {
     // ch: ADR-0087's two per-particle channels, two routes each -
     //    x map_tint, y map_hue, z age_tint, w age_hue. Every one defaults to 0
     //    and 0 is the arithmetic identity on both routes, so a preset that binds
-    //    none of them renders exactly what it rendered before they existed.
-    // em: ADR-0087's emergence ramp - x the per-step brightness increment, y the
-    //    floor. The IFS passes (1/EMERGENCE_STEPS, 0); every other family passes
-    //    (0, 1), which makes the ramp EXACTLY 1.0 there rather than exactly 0 -
-    //    their `age` is identically zero, so a bare `age * rate` would black them
-    //    out. Two numbers rather than a branch, and the multiply by a literal 1.0
-    //    is the identity in IEEE-754, so no existing capture moves.
+    //    none of them renders exactly what it rendered before they existed. The
+    //    CPU zeroes the WHOLE ROW on a non-IFS family, where both channels are
+    //    identically 0 and `channel_shift` being centred would otherwise turn a
+    //    bound value into a uniform tint over a family it means nothing on.
+    // em: ADR-0087's emergence ramp and age normalization - x the per-step
+    //    brightness increment, y the floor, z the reciprocal of the longest
+    //    reachable lifetime. The IFS passes (1/EMERGENCE_STEPS, 0, 1/max_life);
+    //    every other family passes (0, 1, 0), which makes the ramp EXACTLY 1.0
+    //    there rather than exactly 0 - their `age` is identically zero, so a bare
+    //    `age * rate` would black them out. Two numbers rather than a branch, and
+    //    the multiply by a literal 1.0 is the identity in IEEE-754, so no
+    //    existing capture moves.
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
@@ -1275,9 +1280,17 @@ fn vs_main(
     // `map` names which sub-copy of the figure this point sits in, so on the
     // fern this is what makes stem, body and the two fronds separate colours.
     // It is identically 0 on every family but the IFS, where nothing writes it.
+    // ...and so does the age channel (ADR-0087), normalized against the LONGEST
+    // reachable lifetime rather than against this particle's own. That is the
+    // difference between "how old is it" and "how far through its life is it",
+    // and the first is what the param is called: two particles of the same age
+    // get the same colour whatever lifetimes they drew, where per-particle
+    // normalization would give them different colours and read as noise.
     let map01 = map / MAP_SPAN;
+    let age01 = age * draw.em.z;
     let coord = hue + hue_center + (seed - 0.5) * hue_spread + depth_tint(dn)
-        + channel_shift(map01, draw.ch.x);
+        + channel_shift(map01, draw.ch.x)
+        + channel_shift(age01, draw.ch.z);
     let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
     let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
     // ...and the channel's OTHER route, which shifts the hue of whatever colour
@@ -1285,7 +1298,7 @@ fn vs_main(
     // `apply_saturation`, so `saturation` stays the last word on colour.
     let shifted = shift_hue(
         mix(ca, cb, clamp(palette_mix, 0.0, 1.0)),
-        channel_shift(map01, draw.ch.y),
+        channel_shift(map01, draw.ch.y) + channel_shift(age01, draw.ch.w),
     );
     let col = apply_saturation(shifted, saturation);
 
@@ -1411,6 +1424,70 @@ mod projection_mirror {
     /// added to the per-particle palette coordinate.
     pub(super) fn depth_tint(dn: f32, depth_hue: f32) -> f32 {
         depth_hue * (depth01(dn) - 0.5)
+    }
+
+    /// Mirrors `channel_shift()` in [`DRAW_SHADER`](super::DRAW_SHADER) —
+    /// ADR-0087's centred contribution from a `[0, 1]` per-particle channel.
+    pub(super) fn channel_shift(unit: f32, amount: f32) -> f32 {
+        amount * (unit - 0.5)
+    }
+
+    /// Mirrors `rgb2hsv()` in [`DRAW_SHADER`](super::DRAW_SHADER).
+    ///
+    /// The WGSL is branchless (two `mix`es driven by `step`); this spells the
+    /// same selects as the branches they are, which is the only difference. The
+    /// `1e-10` guards the two divisions on a greyscale or black input, where hue
+    /// is undefined and any value is as good as another.
+    pub(super) fn rgb2hsv(c: [f32; 3]) -> [f32; 3] {
+        let [r, g, b] = c;
+        // `p = mix(vec4(c.bg, k.wz), vec4(c.gb, k.xy), step(c.b, c.g))`, where
+        // `step(edge, x)` is 1.0 when `x >= edge`.
+        let (p0, p1, p2, p3) = if g >= b {
+            (g, b, 0.0, -1.0 / 3.0)
+        } else {
+            (b, g, -1.0, 2.0 / 3.0)
+        };
+        // `q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r))`.
+        let (q0, q1, q2, q3) = if r >= p0 {
+            (r, p1, p2, p0)
+        } else {
+            (p0, p1, p3, r)
+        };
+        let d = q0 - q1.min(q3);
+        let e = 1.0e-10;
+        [(q2 + (q3 - q1) / (6.0 * d + e)).abs(), d / (q0 + e), q0]
+    }
+
+    /// Mirrors `hsv2rgb()` in [`DRAW_SHADER`](super::DRAW_SHADER), which is
+    /// itself transcribed from `render/ink.rs::hsv2rgb`.
+    pub(super) fn hsv2rgb(c: [f32; 3]) -> [f32; 3] {
+        let [hue, sat, val] = c;
+        let h = hue - hue.floor();
+        let mut out = [0.0f32; 3];
+        for (slot, offset) in out.iter_mut().zip([0.0f32, 4.0, 2.0]) {
+            let k = (h * 6.0 + offset) % 6.0;
+            let ramp = ((k - 3.0).abs() - 1.0).clamp(0.0, 1.0);
+            // `c.z * mix(vec3(1.0), rgb, c.y)`, multiplied out.
+            *slot = val * (1.0 + (ramp - 1.0) * sat);
+        }
+        out
+    }
+
+    /// Mirrors `shift_hue()` in [`DRAW_SHADER`](super::DRAW_SHADER) — the
+    /// channels' second route, **including the exact-zero early return**.
+    ///
+    /// That early return is load-bearing rather than an optimization: an
+    /// RGB → HSV → RGB round trip is not bit-exact, and sixteen golden baselines
+    /// assert that a preset binding none of these params renders byte-identically.
+    pub(super) fn shift_hue(c: [f32; 3], turns: f32) -> [f32; 3] {
+        if turns == 0.0 {
+            return c;
+        }
+        let mut hsv = rgb2hsv(c);
+        if let Some(h) = hsv.first_mut() {
+            *h += turns;
+        }
+        hsv2rgb(hsv)
     }
 
     /// The magnified world-space position of one particle — `project` composed
@@ -1634,6 +1711,20 @@ const EMERGENCE_STEPS: f32 = 8.0;
 fn churn_lifetime(seed: f32) -> f32 {
     let [lo, hi] = CHURN_LIFETIME_SPREAD;
     CHURN_LIFETIME * (lo + hash_unit(seed.to_bits() ^ LIFETIME_SALT) * (hi - lo))
+}
+
+/// The longest lifetime any particle can draw — what the **age colour channel**
+/// normalizes against (ADR-0087).
+///
+/// Against the maximum rather than against each particle's own life, because the
+/// channel is called *age*: two particles of the same age should be the same
+/// colour whatever lifetimes they happened to draw. Per-particle normalization
+/// would give them different colours for the same age, which reads as noise
+/// rather than as a gradient. The cost is that only the longest-lived particles
+/// ever reach the top of the range, which is honest — they are the oldest.
+fn churn_max_lifetime() -> f32 {
+    let [_, hi] = CHURN_LIFETIME_SPREAD;
+    CHURN_LIFETIME * hi
 }
 
 /// Salt separating the lifetime draw from every other hash on the particle's
@@ -2441,6 +2532,16 @@ pub struct AttractorScene {
     /// fronds nudged off its body without editing its gradient.
     map_tint: f32,
     map_hue: f32,
+    /// The age channel's two routes (ADR-0087), IFS-only for the same structural
+    /// reason: nothing but the IFS arm ages a particle, and the engine declines
+    /// to upload either param on a family where the channel means nothing.
+    ///
+    ///  shifts the palette coordinate across the age range;
+    /// rotates the hue of the colour the ramp produced. Both centred on the
+    /// mid-age colour, so raising one opens a spread rather than sliding the
+    /// whole figure.
+    age_tint: f32,
+    age_hue: f32,
     /// Rate multiplier on [`SPIN_RATE`] (ADR-0076). Unlike the depth cues this is
     /// **not** inert on the 2D families: the discrete maps rotate in-plane
     /// through the same angle, so `spin` reaches all four families where
@@ -2517,6 +2618,8 @@ impl AttractorScene {
             depth_hue: DEFAULT_DEPTH_HUE,
             map_tint: DEFAULT_CHANNEL_COLOUR,
             map_hue: DEFAULT_CHANNEL_COLOUR,
+            age_tint: DEFAULT_CHANNEL_COLOUR,
+            age_hue: DEFAULT_CHANNEL_COLOUR,
             spin: DEFAULT_SPIN,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
@@ -2771,6 +2874,8 @@ pub const PARAMS: &[&str] = &[
     // both of these are exactly the identity.
     "map_tint",
     "map_hue",
+    "age_tint",
+    "age_hue",
 ];
 
 impl Scene for AttractorScene {
@@ -2834,6 +2939,8 @@ impl Scene for AttractorScene {
         self.depth_hue = DEFAULT_DEPTH_HUE;
         self.map_tint = DEFAULT_CHANNEL_COLOUR;
         self.map_hue = DEFAULT_CHANNEL_COLOUR;
+        self.age_tint = DEFAULT_CHANNEL_COLOUR;
+        self.age_hue = DEFAULT_CHANNEL_COLOUR;
         self.spin = DEFAULT_SPIN;
         self.morph = DEFAULT_MORPH;
         self.levers = Levers::NEUTRAL;
@@ -2862,6 +2969,8 @@ impl Scene for AttractorScene {
             "depth_hue" => self.depth_hue = value,
             "map_tint" => self.map_tint = value,
             "map_hue" => self.map_hue = value,
+            "age_tint" => self.age_tint = value,
+            "age_hue" => self.age_hue = value,
             "spin" => self.spin = value,
             "morph" => self.morph = value,
             "curl" => self.levers.curl = value,
@@ -3008,6 +3117,8 @@ impl Scene for AttractorScene {
             depth_hue,
             map_tint,
             map_hue,
+            age_tint,
+            age_hue,
             palette,
             palette_dirty,
             ..
@@ -3066,6 +3177,8 @@ impl Scene for AttractorScene {
                 depth_hue: *depth_hue,
                 map_tint: *map_tint,
                 map_hue: *map_hue,
+                age_tint: *age_tint,
+                age_hue: *age_hue,
             },
         );
         // Before the steps, and only on the frame a `reseed` edge landed: kick each
@@ -3148,6 +3261,8 @@ struct UniformInputs {
     /// shift is legitimate, and `shift_hue` takes `fract` of its argument.
     map_tint: f32,
     map_hue: f32,
+    age_tint: f32,
+    age_hue: f32,
 }
 
 /// The deferred one-shot uploads: the palette LUTs on a preset switch or fresh
@@ -3309,12 +3424,30 @@ fn upload_uniforms(
             // above is: the LUT sampler repeats, so any palette-coordinate
             // shift is legitimate, and the hue route takes `fract`. The two
             // `age` slots are Plan 0073 Phase 4's.
-            ch: [inputs.map_tint, inputs.map_hue, 0.0, 0.0],
-            // The IFS ramps a respawned particle in; nothing else respawns, so
-            // nothing else has an age to ramp against — hence the flat floor of
-            // exactly 1.0 rather than a rate they would all read as zero.
+            // **Zeroed wholesale off the IFS**, which is what makes all four
+            // exactly inert on the four map families rather than merely
+            // defaulted. `map` and `age` are identically `0.0` there, and
+            // `channel_shift` is *centred* — so a bound `map_tint` would land a
+            // uniform `-map_tint/2` on the palette coordinate of a family the
+            // channel means nothing on. Inertness has to be the engine declining
+            // to upload the param, the way `d.w` makes the depth cues inert on a
+            // 2D family; a default of zero only covers presets that never bind it.
+            ch: if inputs.family.figure().is_some() {
+                [
+                    inputs.map_tint,
+                    inputs.map_hue,
+                    inputs.age_tint,
+                    inputs.age_hue,
+                ]
+            } else {
+                [0.0; 4]
+            },
+            // The IFS ramps a respawned particle in and normalizes its age;
+            // nothing else respawns, so nothing else has an age at all — hence
+            // the flat floor of exactly 1.0 rather than a rate they would read as
+            // zero and black themselves out with.
             em: if inputs.family.figure().is_some() {
-                [1.0 / EMERGENCE_STEPS, 0.0, 0.0, 0.0]
+                [1.0 / EMERGENCE_STEPS, 0.0, 1.0 / churn_max_lifetime(), 0.0]
             } else {
                 [0.0, 1.0, 0.0, 0.0]
             },
@@ -5250,6 +5383,134 @@ mod tests {
             respawns > 1_000_000,
             "only {respawns} respawns over the sweep — the churn is not running"
         );
+    }
+
+    /// **All four colour channels default to the identity** (Plan 0073 Phase 4).
+    ///
+    /// "The default is the identity" is a claim about arithmetic rather than a
+    /// hope, and it is what sixteen unmoved golden baselines rest on: `*_tint`
+    /// adds an exact `0` to the palette coordinate and `*_hue` compares equal to
+    /// literal `0.0` and takes `shift_hue`'s early return. Asserted here on the
+    /// scene's own state, and by the golden suite on the pixels.
+    #[test]
+    fn the_four_colour_channels_default_to_the_identity() {
+        use projection_mirror as m;
+
+        let names = ["map_tint", "map_hue", "age_tint", "age_hue"];
+        for name in names {
+            assert!(
+                super::PARAMS.contains(&name),
+                "`{name}` is missing from PARAMS, so a preset binding it warns instead \
+                 of working"
+            );
+        }
+
+        let Some(mut h) = Harness::new(AttractorFamily::Ifs(IfsFigure::Fern)) else {
+            return;
+        };
+        // Bound away from the default, then reset — `reset_params` is what runs
+        // between presets, so a channel it forgot would leak the last preset's.
+        for name in names {
+            h.scene.set_param(name, 0.9);
+        }
+        h.scene.reset_params();
+        for (name, got) in names.into_iter().zip([
+            h.scene.map_tint,
+            h.scene.map_hue,
+            h.scene.age_tint,
+            h.scene.age_hue,
+        ]) {
+            assert_eq!(got, 0.0, "`{name}` did not reset to the identity");
+        }
+
+        // ...and zero really is the identity on both routes, at any channel value.
+        for unit in [0.0f32, 0.33, 0.5, 1.0] {
+            assert_eq!(m::channel_shift(unit, 0.0), 0.0);
+        }
+        let colour = [0.2f32, 0.65, 0.35];
+        assert_eq!(
+            m::shift_hue(colour, 0.0).map(f32::to_bits),
+            colour.map(f32::to_bits)
+        );
+    }
+
+    /// **The two routes are genuinely two routes** (Plan 0073 Phase 4), asserted
+    /// on the transcribed CPU maths rather than on pixels — which is the only
+    /// place the claim is even expressible, since a capture cannot separate
+    /// "sampled the ramp elsewhere" from "rotated the colour the ramp produced".
+    ///
+    /// `*_tint` moves the palette **coordinate**, which is the number handed to
+    /// the LUT; `*_hue` leaves that coordinate untouched and rotates the hue of
+    /// the colour that came back. So one rides the preset's own gradient — a
+    /// custom ramp, `palette_mix` and `saturation` all reach it for free — and the
+    /// other nudges a part of the figure off that gradient without editing it.
+    #[test]
+    fn the_hue_route_moves_hue_and_leaves_the_palette_coordinate_alone() {
+        use projection_mirror as m;
+
+        // A saturated mid-tone: hue is well defined, so a rotation is measurable.
+        let base = [0.20f32, 0.65, 0.35];
+
+        // The hue route is a rotation about the wheel: hue moves by the shift,
+        // and saturation and value are carried through.
+        let [h0, s0, v0] = m::rgb2hsv(base);
+        for turns in [0.05f32, 0.25, -0.30, 0.75] {
+            let [h1, s1, v1] = m::rgb2hsv(m::shift_hue(base, turns));
+            let moved = (h1 - (h0 + turns).rem_euclid(1.0)).abs();
+            assert!(
+                moved < 1e-3 || (moved - 1.0).abs() < 1e-3,
+                "a shift of {turns} took hue {h0} to {h1}, not to {}",
+                (h0 + turns).rem_euclid(1.0)
+            );
+            assert!(
+                (s1 - s0).abs() < 1e-3 && (v1 - v0).abs() < 1e-3,
+                "the hue route moved saturation {s0} -> {s1} or value {v0} -> {v1}"
+            );
+        }
+
+        // ...and it is EXACTLY the identity at zero, which is what sixteen
+        // baselines rest on. Compared as bits: the round trip is not bit-exact,
+        // so "close enough" would not be the same claim.
+        assert_eq!(
+            m::shift_hue(base, 0.0).map(f32::to_bits),
+            base.map(f32::to_bits)
+        );
+
+        // The tint route is the other one: it moves the coordinate, and it is an
+        // exact zero at its own default whatever the channel reads.
+        for unit in [0.0f32, 0.25, 0.5, 1.0] {
+            assert_eq!(m::channel_shift(unit, 0.0).abs(), 0.0);
+        }
+        assert!(m::channel_shift(1.0, 0.4) > 0.0 && m::channel_shift(0.0, 0.4) < 0.0);
+        // Centred, so the mid-channel colour is the one the preset asked for and
+        // raising the amount opens a spread rather than sliding the figure.
+        assert_eq!(m::channel_shift(0.5, 0.4), 0.0);
+    }
+
+    /// **The CPU mirror agrees with itself**, so the assertions above are about
+    /// the transcription rather than about one direction of it.
+    ///
+    /// The round trip is not bit-exact — which is exactly why `shift_hue` early-
+    /// returns on a literal zero rather than trusting it.
+    #[test]
+    fn the_hsv_mirror_round_trips() {
+        use projection_mirror as m;
+
+        for c in [
+            [0.20f32, 0.65, 0.35],
+            [0.90, 0.10, 0.05],
+            [0.05, 0.05, 0.90],
+            [0.50, 0.50, 0.50],
+            [0.00, 0.00, 0.00],
+        ] {
+            let back = m::hsv2rgb(m::rgb2hsv(c));
+            for (got, want) in back.iter().zip(c.iter()) {
+                assert!(
+                    (got - want).abs() < 1e-4,
+                    "round trip of {c:?} gave {back:?}"
+                );
+            }
+        }
     }
 
     /// **The respawn is a pure function of the particle's fixed seed and the step
