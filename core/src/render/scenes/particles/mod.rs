@@ -721,8 +721,27 @@ struct Step {
     t01: vec4<f32>,
     t23: vec4<f32>,
     cumulative_p: vec4<f32>,
+    // The four respawn targets (ADR-0087), two (x, y) per row exactly as the
+    // translations above are. Every slot is a DRAWN map's fixed point - the CPU
+    // duplicates into the pads - so a pick of one of four needs no branch and no
+    // knowledge of the probability table.
+    fixed01: vec4<f32>,
+    fixed23: vec4<f32>,
 }
 @group(0) @binding(1) var<uniform> step: Step;
+
+// ADR-0087's churn constants. MIRRORED FROM THE RUST SIDE, which is the source:
+// `CHURN_LIFETIME`, `CHURN_LIFETIME_SPREAD` and `LIFETIME_SALT`, held to these
+// literals by `the_churn_constants_agree_between_rust_and_wgsl`. The CPU needs
+// the same numbers because `seed()` places each particle at a point in a life
+// this shader measures.
+const LIFETIME_STEPS: f32 = 180.0;
+const LIFETIME_LO: f32 = 0.5;
+const LIFETIME_HI: f32 = 1.5;
+const LIFETIME_SALT: u32 = 0x9E3779B1u;
+// A separate salt for the respawn target, so which point a particle restarts at
+// does not correlate with how long it lived.
+const RESPAWN_SALT: u32 = 0x85EBCA6Bu;
 
 // Euler sub-steps per frame for the continuous (ODE) families, so a stiff flow
 // (Lorenz) stays stable at the frame dt without a per-family clock.
@@ -764,6 +783,37 @@ fn unit01(h: u32) -> f32 {
 // Unrolled rather than looped over a dynamically-indexed vector: WGSL permits
 // that only for addressable storage and the backends disagree about the rest, so
 // three named rounds is the portable spelling.
+// This particle's lifetime in steps (ADR-0087). A pure function of its own fixed
+// seed, so the phases are spread across the buffer once and stay spread: a small
+// flat fraction of the population restarts each step rather than the whole of it
+// restarting together every three seconds.
+fn ifs_lifetime(seed: f32) -> f32 {
+    let u = unit01(mix32(bitcast<u32>(seed) ^ LIFETIME_SALT));
+    return LIFETIME_STEPS * (LIFETIME_LO + u * (LIFETIME_HI - LIFETIME_LO));
+}
+
+// Which of the four targets this particle restarts at. Salted by the step index
+// as well as the seed, so a particle does not return to the same point every
+// time it recycles - the same reason ADR-0066's kick is salted by the reseed
+// counter rather than by the seed alone.
+fn ifs_respawn_slot(seed: f32, step_index: u32) -> u32 {
+    let u = unit01(mix32(bitcast<u32>(seed) ^ (step_index * RESPAWN_SALT)));
+    return min(u32(u * 4.0), 3u);
+}
+
+// Unrolled for the reason the map choice above is: WGSL will not dynamically
+// index a uniform, and the backends disagree about the rest.
+fn ifs_fixed_point(slot: u32) -> vec2<f32> {
+    if (slot == 0u) {
+        return step.fixed01.xy;
+    } else if (slot == 1u) {
+        return step.fixed01.zw;
+    } else if (slot == 2u) {
+        return step.fixed23.xy;
+    }
+    return step.fixed23.zw;
+}
+
 fn hash3(seed: f32, salt: u32) -> vec3<f32> {
     let h0 = mix32(bitcast<u32>(seed) ^ (salt * 0x9E3779B9u));
     let h1 = mix32(h0);
@@ -842,6 +892,27 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
         // x' = a*x + b*y + e,  y' = c*x + d*y + f. Two dimensional: z stays 0.
         p = vec3<f32>(m.x * p.x + m.y * p.y + t.x, m.z * p.x + m.w * p.y + t.y, 0.0);
+
+        // ADR-0087's churn. The particle ages one step, and at the end of its own
+        // lifetime restarts at one of the drawn maps' fixed points - which are ON
+        // the attractor, so it is drawing the figure again from its first step
+        // rather than travelling to it.
+        //
+        // Continuous rather than a one-time unfurl, and that is the load-bearing
+        // half: under a one-time unfurl every age saturates within ~0.4 s and the
+        // age channel is a uniform value thereafter. Under churn the population
+        // always holds every age, so Phase 4's gradient is permanent.
+        var age = particles[i].age + 1.0;
+        if (age >= ifs_lifetime(particles[i].seed)) {
+            let slot = ifs_respawn_slot(particles[i].seed, step.step_index);
+            p = vec3<f32>(ifs_fixed_point(slot), 0.0);
+            // It now sits AT map `slot`'s fixed point, which is inside that map's
+            // sub-copy - so `map` is the slot, not the map that was applied above
+            // and then discarded.
+            k = f32(slot);
+            age = 0.0;
+        }
+        particles[i].age = age;
         // Unconditional within this arm: the value names where the particle now
         // IS, so it is only meaningful when written every step. The jitter
         // dispatch returns above without touching it, which is right — a reseed
@@ -903,6 +974,12 @@ struct Draw {
     //    x map_tint, y map_hue, z age_tint, w age_hue. Every one defaults to 0
     //    and 0 is the arithmetic identity on both routes, so a preset that binds
     //    none of them renders exactly what it rendered before they existed.
+    // em: ADR-0087's emergence ramp - x the per-step brightness increment, y the
+    //    floor. The IFS passes (1/EMERGENCE_STEPS, 0); every other family passes
+    //    (0, 1), which makes the ramp EXACTLY 1.0 there rather than exactly 0 -
+    //    their `age` is identically zero, so a bare `age * rate` would black them
+    //    out. Two numbers rather than a branch, and the multiply by a literal 1.0
+    //    is the identity in IEEE-754, so no existing capture moves.
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
@@ -912,6 +989,7 @@ struct Draw {
     d: vec4<f32>,
     ctr: vec4<f32>,
     ch: vec4<f32>,
+    em: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> draw: Draw;
 // Shared gradient LUTs (ADR-0021): sampled per-particle in the vertex shader
@@ -1096,6 +1174,9 @@ fn vs_main(
     // taken from `vertex_attr_array!`, which lays attributes out consecutively
     // and would fetch this from the padding word.
     @location(3) map: f32,
+    // ADR-0087's age channel, at byte offset 32. Steps since this particle last
+    // respawned; identically 0 on every family but the IFS.
+    @location(4) age: f32,
 ) -> VsOut {
     var corners = array<vec2<f32>, 6>(
         vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(0.0, 1.0),
@@ -1224,7 +1305,14 @@ fn vs_main(
     // scene deliberately does not do (ADR-0076). Applied to the emitted light,
     // so the trail inherits the grading: a particle that was far and is now near
     // leaves a dim streak behind a bright head.
-    out.color = col * deposit * haze(dn);
+    //
+    // Times the emergence ramp (ADR-0087), which is what makes the churn
+    // invisible: a just-respawned particle sits on one of exactly four points, so
+    // a thousand of them per frame would integrate into four bright dots in the
+    // trail field. Ramped from zero it deposits almost nothing until it has been
+    // iterated enough to have spread. Exactly 1.0 on every non-IFS family.
+    let emergence = min(1.0, age * draw.em.x + draw.em.y);
+    out.color = col * deposit * haze(dn) * emergence;
     return out;
 }
 
@@ -1440,12 +1528,14 @@ struct Particle {
 /// each: the jitter reads and writes the same storage buffer through the same
 /// bind-group layout, so only the uniform's contents differ.
 ///
-/// **160 bytes since Plan 0062**, up from 32, for every family including the four
-/// that ignore the new fields — negligible in bandwidth, and noted because it is
-/// a struct four families share. ADR-0075 predicted 144; the extra 16 is the
-/// alignment padding [`step_index`](Self::step_index) forces, because the scalar
-/// block ahead of the `vec4` table has to round up to a multiple of 16 and it was
-/// already exactly full.
+/// **192 bytes since Plan 0073**, 160 since Plan 0062 and 32 before that, for
+/// every family including the four that ignore the new fields — negligible in
+/// bandwidth, and noted because it is a struct four families share. ADR-0075
+/// predicted 144 for the Plan 0062 shape; the extra 16 is the alignment padding
+/// [`step_index`](Self::step_index) forces, because the scalar block ahead of the
+/// `vec4` table has to round up to a multiple of 16 and it was already exactly
+/// full. **The bind-group layout gains no binding at either step**, so the
+/// collision surface ADR-0058 reasons about does not change shape.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct StepUniform {
@@ -1469,6 +1559,9 @@ struct StepUniform {
     linear: [[f32; 4]; ifs::MAPS],
     translate: [[f32; 4]; 2],
     cumulative_p: [f32; 4],
+    /// The four respawn targets (ADR-0087), two `(x, y)` per row exactly as
+    /// `translate` is packed.
+    fixed: [[f32; 4]; 2],
 }
 
 impl StepUniform {
@@ -1497,8 +1590,72 @@ impl StepUniform {
             linear: packed.linear,
             translate: packed.translate,
             cumulative_p: packed.cumulative_p,
+            fixed: packed.fixed,
         }
     }
+}
+
+/// Mean particle lifetime, in fixed steps (ADR-0087) — 3 s at [`FIXED_STEP`].
+///
+/// **A look constant with no principled value**, in the same position ADR-0075's
+/// `0.97` occupies, and the acceptance is the look rather than the number. At the
+/// 150 000-particle ceiling this restarts ~0.56 % of the buffer per step. Plan
+/// 0073 Phase 6 judges it live; if the churn reads as *twinkle*, **this constant
+/// and [`EMERGENCE_STEPS`] are the lever, and making the rate bindable is not**.
+const CHURN_LIFETIME: f32 = 180.0;
+
+/// The per-particle spread on [`CHURN_LIFETIME`], as multipliers of it.
+///
+/// **The spread is what makes the churn continuous rather than a pulse.** With
+/// one shared lifetime every particle seeded together would restart together —
+/// a bulk respawn, which is the artifact this whole plan exists to remove, just
+/// on a 3-second period. Drawn from the particle's own fixed `seed`, so the
+/// phases stay spread for the life of the session and the restart rate is flat.
+const CHURN_LIFETIME_SPREAD: [f32; 2] = [0.5, 1.5];
+
+/// Steps a respawned particle takes to reach full brightness (ADR-0087).
+///
+/// **Load-bearing rather than polish.** A fixed rate at the particle ceiling
+/// lands on the order of a thousand particles per frame onto exactly **four
+/// points**, and the trail field integrates that into four bright dots. Ramping
+/// from zero means those points deposit almost nothing, and by the time a
+/// particle is bright it has been iterated enough to have spread across the
+/// figure. Without it the churn is four blobs; with it the churn is invisible,
+/// which is the whole intent.
+const EMERGENCE_STEPS: f32 = 8.0;
+
+/// This particle's lifetime in steps, from its own fixed `seed`.
+///
+/// **The CPU mirror of `ifs_lifetime` in [`STEP_SHADER`]**, and the two must
+/// agree exactly or a particle's seeded age would not sit inside the life the
+/// GPU measures it against. `the_churn_constants_agree_between_rust_and_wgsl`
+/// holds the shader's literals to these constants;
+/// [`hash_unit`] is the transcription of the hash itself.
+fn churn_lifetime(seed: f32) -> f32 {
+    let [lo, hi] = CHURN_LIFETIME_SPREAD;
+    CHURN_LIFETIME * (lo + hash_unit(seed.to_bits() ^ LIFETIME_SALT) * (hi - lo))
+}
+
+/// Salt separating the lifetime draw from every other hash on the particle's
+/// seed — the map choice, the reseed kick, and the respawn slot each use their
+/// own, so two of them cannot correlate.
+const LIFETIME_SALT: u32 = 0x9E37_79B1;
+
+/// **The CPU mirror of `mix32` + `unit01` in [`STEP_SHADER`]** — one round of the
+/// lowbias32 bit-mixer, then the top 24 bits as a fraction in `[0, 1)`.
+///
+/// The same discipline `projection_mirror` follows: **the WGSL is the source and
+/// this is the mirror**. It exists because `seed()` has to place a particle at a
+/// point in a life the *shader* computes, and a CPU that disagreed about the
+/// lifetime would seed ages outside it.
+fn hash_unit(v: u32) -> f32 {
+    let mut h = v;
+    h ^= h >> 16;
+    h = h.wrapping_mul(0x7FEB_352D);
+    h ^= h >> 15;
+    h = h.wrapping_mul(0x846C_A68B);
+    h ^= h >> 16;
+    (h >> 8) as f32 / 16_777_216.0
 }
 
 /// Draw uniform (per frame). `v`: x aspect, y point half-size, z hue offset, w
@@ -1516,6 +1673,10 @@ impl StepUniform {
 /// `ch`: ADR-0087's two per-particle channels at two routes each — x `map_tint`,
 /// y `map_hue`, z `age_tint`, w `age_hue`. All four default to `0`, which is the
 /// arithmetic identity on both routes.
+/// `em`: the emergence ramp (ADR-0087) — x the per-step brightness increment, y
+/// the floor. `(1/EMERGENCE_STEPS, 0)` on the IFS and `(0, 1)` everywhere else,
+/// because every other family's `age` is identically zero and a bare `age·rate`
+/// would black them out rather than leave them alone.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct DrawUniform {
@@ -1528,6 +1689,7 @@ struct DrawUniform {
     d: [f32; 4],
     ctr: [f32; 4],
     ch: [f32; 4],
+    em: [f32; 4],
 }
 
 /// Decay uniform (per frame): x is the per-frame trail retention factor.
@@ -1667,6 +1829,11 @@ const PARTICLE_ATTRIBUTES: &[wgpu::VertexAttribute] = &[
         format: wgpu::VertexFormat::Float32,
         offset: 36,
         shader_location: 3, // map (ADR-0087) — 36, NOT 28, which is `_pad`
+    },
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32,
+        offset: 32,
+        shader_location: 4, // age (ADR-0087)
     },
 ];
 
@@ -2508,7 +2675,7 @@ impl AttractorScene {
         let mut rng = SeededRng::new(SEED);
         let mut particles: Vec<Particle> = (0..count)
             .map(|_| {
-                let (x, y, seed) = match fixed {
+                let (x, y, seed, age) = match fixed {
                     // Drawn from the particle's own fixed seed, so which point a
                     // given particle starts at is a pure function of the seeded
                     // scatter — the same property every other determinism claim
@@ -2517,12 +2684,26 @@ impl AttractorScene {
                         let seed = rng.next_f32();
                         let slot = ((seed * ifs::MAPS as f32) as usize).min(ifs::MAPS - 1);
                         let [x, y] = points.get(slot).copied().unwrap_or([0.0, 0.0]);
-                        (x, y, seed)
+                        // **Age starts spread, and that is not a refinement of
+                        // the churn — it is the churn's first frame.** Seeded at
+                        // zero, every particle would reach the end of its life
+                        // within one lifetime-spread of every other, and the
+                        // population would hold a single age for the first
+                        // ~1.5 s of every preset. The colour gradient Phase 4
+                        // builds on this would be flat for exactly as long.
+                        //
+                        // Strictly below the particle's own life (`next_f32` is
+                        // `[0, 1)`), so nothing respawns on its first step and
+                        // there is no bulk restart at startup either.
+                        let age = rng.next_f32() * churn_lifetime(seed);
+                        (x, y, seed, age)
                     }
                     None => {
                         let x = center[0] + rng.range(-spread[0], spread[0]);
                         let y = center[1] + rng.range(-spread[1], spread[1]);
-                        (x, y, rng.next_f32())
+                        // Nothing ages a map family: no respawn, and the draw's
+                        // emergence ramp is a flat 1.0 there.
+                        (x, y, rng.next_f32(), 0.0)
                     }
                 };
                 Particle {
@@ -2535,10 +2716,10 @@ impl AttractorScene {
                     // frame — a starburst that the trail would then keep.
                     prev: [x, y, 0.0],
                     _pad: 0.0,
-                    // Both channels start at zero. `age` is what Phase 3 of Plan
-                    // 0073 gives a staggered start; `map` stays 0.0 forever on
-                    // the four map families, which never write it.
-                    age: 0.0,
+                    // Staggered on the IFS (see above), flat zero everywhere
+                    // else. `map` stays 0.0 forever on the four map families,
+                    // which never write it.
+                    age,
                     map: 0.0,
                     _spare: [0.0; 2],
                 }
@@ -3129,6 +3310,14 @@ fn upload_uniforms(
             // shift is legitimate, and the hue route takes `fract`. The two
             // `age` slots are Plan 0073 Phase 4's.
             ch: [inputs.map_tint, inputs.map_hue, 0.0, 0.0],
+            // The IFS ramps a respawned particle in; nothing else respawns, so
+            // nothing else has an age to ramp against — hence the flat floor of
+            // exactly 1.0 rather than a rate they would all read as zero.
+            em: if inputs.family.figure().is_some() {
+                [1.0 / EMERGENCE_STEPS, 0.0, 0.0, 0.0]
+            } else {
+                [0.0, 1.0, 0.0, 0.0]
+            },
         }),
     );
     // Frame-rate-independent trail decay: retain `fade` per 1/60 s, raised to
@@ -3320,7 +3509,7 @@ mod tests {
     use crate::dsp::AnalysisFrame;
     use crate::render::context::RenderContext;
     use crate::render::{Tier, TierConfig};
-    use ifs::IfsFigure;
+    use ifs::{IfsFigure, Levers};
 
     // -----------------------------------------------------------------------
     // The IFS family (Plan 0062 Phase 1 / ADR-0075)
@@ -3388,9 +3577,13 @@ mod tests {
     /// safety net — it is the record of *which* number the two agree on, and of
     /// the one place the ADR's arithmetic was off: 160 rather than 144, because
     /// `step_index` forced the scalar block up to the next multiple of 16.
+    ///
+    /// **192 since Plan 0073**, the extra two `vec4` being ADR-0087's four
+    /// respawn targets. The binding *count* is what matters for the ADR-0058
+    /// collision surface and it has not moved — one storage, one uniform.
     #[test]
     fn the_step_uniform_carries_the_ifs_table_in_one_binding() {
-        assert_eq!(size_of::<StepUniform>(), 160);
+        assert_eq!(size_of::<StepUniform>(), 192);
         // A slot per possible sub-step plus the jitter's — the property
         // `encode_steps` relies on when it offsets by the sub-step index.
         assert_eq!(STEP_SLOTS, super::MAX_SUBSTEPS + 1);
@@ -4766,13 +4959,20 @@ mod tests {
         // ...and the vertex attributes agree with them. This is the assertion
         // that would have caught the consecutive-layout bug: it compares the
         // constant the pipeline is built from against the struct itself.
+        //
+        // The last two are deliberately **out of offset order**: `map` took
+        // location 3 when Plan 0073 Phase 1 added it and `age` took location 4 in
+        // Phase 3, so the locations follow the order the channels shipped rather
+        // than the order they sit in the struct. Each attribute carries its own
+        // offset so nothing depends on the ordering — spelled out because it
+        // reads like a mistake.
         let attr_offsets: Vec<u64> = PARTICLE_ATTRIBUTES.iter().map(|a| a.offset).collect();
-        assert_eq!(attr_offsets, vec![0, 12, 16, 36]);
+        assert_eq!(attr_offsets, vec![0, 12, 16, 36, 32]);
         let locations: Vec<u32> = PARTICLE_ATTRIBUTES
             .iter()
             .map(|a| a.shader_location)
             .collect();
-        assert_eq!(locations, vec![0, 1, 2, 3]);
+        assert_eq!(locations, vec![0, 1, 2, 3, 4]);
 
         // The memory this costs, at both tier budgets — ADR-0087 quotes the rise
         // from 1.6/4.8 MB, so it fails here if the struct grows again.
@@ -4839,6 +5039,324 @@ mod tests {
                 COUNT as usize,
                 "{family:?} should still scatter over its seed box — this plan changes \
                  only what the IFS writes"
+            );
+        }
+    }
+
+    /// One particle under the CPU reference of the step shader's IFS arm.
+    ///
+    /// **The WGSL is the source and this is the mirror**, the discipline
+    /// `projection_mirror` follows. It exists because the property Plan 0073
+    /// Phase 3 has to establish — that no reachable table sends a particle
+    /// anywhere unbounded, respawns included — is about *positions*, and a
+    /// capture could only report that the picture looked plausible.
+    struct ChurnState {
+        at: [f32; 2],
+        age: f32,
+        /// The particle's fixed seed. Every draw below is a pure function of it
+        /// and the step index, which is the determinism claim itself.
+        seed: f32,
+    }
+
+    /// A resolved table in the form the reference steps against - the same two
+    /// things the GPU is handed on the step uniform, resolved once per table
+    /// rather than once per particle per step.
+    struct ChurnTable {
+        maps: [ifs::Affine; ifs::MAPS],
+        cumulative_p: [f32; ifs::MAPS],
+        fixed: [[f32; 2]; ifs::MAPS],
+    }
+
+    impl ChurnTable {
+        fn resolve(table: &ifs::IfsTable) -> Self {
+            Self {
+                maps: table.maps.map(|m| m.to_affine()),
+                cumulative_p: ifs::pack(table).cumulative_p,
+                fixed: ifs::fixed_points(table),
+            }
+        }
+    }
+
+    impl ChurnState {
+        /// Advance one fixed step. Returns whether the particle respawned.
+        fn step(&mut self, step_index: u32, table: &ChurnTable) -> bool {
+            let [c0, c1, c2, _] = table.cumulative_p;
+            // The shader's map draw, salted by the step counter.
+            let r = super::hash_unit(self.seed.to_bits() ^ step_index.wrapping_mul(0x9E37_79B9));
+            let k = if r < c0 {
+                0
+            } else if r < c1 {
+                1
+            } else if r < c2 {
+                2
+            } else {
+                ifs::MAPS - 1
+            };
+            let [x, y] = self.at;
+            if let Some(m) = table.maps.get(k) {
+                self.at = [m.a * x + m.b * y + m.e, m.c * x + m.d * y + m.f];
+            }
+
+            self.age += 1.0;
+            if self.age < super::churn_lifetime(self.seed) {
+                return false;
+            }
+            // The respawn, salted differently so where a particle restarts does
+            // not correlate with how long it lived.
+            let u = super::hash_unit(self.seed.to_bits() ^ step_index.wrapping_mul(0x85EB_CA6B));
+            let slot = ((u * ifs::MAPS as f32) as usize).min(ifs::MAPS - 1);
+            if let Some(point) = table.fixed.get(slot) {
+                self.at = *point;
+            }
+            self.age = 0.0;
+            true
+        }
+    }
+
+    /// The churn constants the CPU and the shader **both** need, held to one
+    /// source (Plan 0073 Phase 3).
+    ///
+    /// `seed()` places every particle at a point inside a lifetime the *shader*
+    /// computes, so a disagreement would seed ages outside the life they are
+    /// measured against — particles respawning on their first step, or never.
+    /// The WGSL cannot import a Rust constant, so the shader carries literals and
+    /// this asserts they are the right literals. Crude, and it is the failure
+    /// mode that would otherwise be silent.
+    #[test]
+    fn the_churn_constants_agree_between_rust_and_wgsl() {
+        let [lo, hi] = super::CHURN_LIFETIME_SPREAD;
+        for expected in [
+            format!("const LIFETIME_STEPS: f32 = {:.1};", super::CHURN_LIFETIME),
+            format!("const LIFETIME_LO: f32 = {lo:.1};"),
+            format!("const LIFETIME_HI: f32 = {hi:.1};"),
+            format!("const LIFETIME_SALT: u32 = 0x{:X}u;", super::LIFETIME_SALT),
+        ] {
+            assert!(
+                super::STEP_SHADER.contains(&expected),
+                "the step shader should carry `{expected}` — the Rust constant moved \
+                 and the WGSL literal did not"
+            );
+        }
+    }
+
+    /// **The CPU mirror of the shader's hash agrees with the shader's own draw.**
+    ///
+    /// Not a re-derivation: this asserts the mirror is a *bijection-preserving*
+    /// transcription by checking the property `seed()` actually depends on —
+    /// every seeded age lands strictly inside that particle's own lifetime, so
+    /// nothing respawns on its first step. If `hash_unit` and `mix32` disagreed,
+    /// the seeded ages would be drawn against a different life and this fails.
+    #[test]
+    fn every_seeded_age_sits_inside_its_own_lifetime() {
+        for figure in ifs::IfsFigure::ALL {
+            let particles = AttractorScene::seed(AttractorFamily::Ifs(figure), 4096);
+            let [lo, hi] = super::CHURN_LIFETIME_SPREAD;
+            for p in &particles {
+                let life = super::churn_lifetime(p.seed);
+                assert!(
+                    life >= super::CHURN_LIFETIME * lo && life <= super::CHURN_LIFETIME * hi,
+                    "{figure:?}: lifetime {life} outside the spread"
+                );
+                assert!(
+                    p.age >= 0.0 && p.age < life,
+                    "{figure:?}: seeded age {} is not inside a life of {life} — a \
+                     particle would respawn on its first step",
+                    p.age
+                );
+            }
+            // ...and the ages are actually spread, not merely in range: a bulk
+            // start is the artifact this seeding exists to avoid.
+            let spread = particles
+                .iter()
+                .map(|p| p.age)
+                .fold(f32::NEG_INFINITY, f32::max);
+            assert!(
+                spread > super::CHURN_LIFETIME * lo * 0.9,
+                "{figure:?}: the oldest seeded age is only {spread} — the stagger is \
+                 not covering a lifetime"
+            );
+        }
+    }
+
+    /// **The churn never sends a particle anywhere unbounded**, over a 10 000-step
+    /// CPU reference at every morph and every lever extreme, respawns included
+    /// (Plan 0073 Phase 3).
+    ///
+    /// Deliberately CPU-side and deliberately not a render, for ADR-0075's
+    /// reason: the failure this excludes is a permanently dead particle buffer,
+    /// and a capture of a preset that only diverges on a loud passage would pass.
+    /// The respawn is the new thing it has to cover — it teleports a particle,
+    /// which is the one operation in this family that is not a contraction.
+    #[test]
+    fn the_churn_stays_finite_across_ten_thousand_steps() {
+        // Enough particles that a range of lifetimes is represented and every
+        // one of them recycles many times over 10 000 steps.
+        const PARTICLES: usize = 64;
+        const STEPS: u32 = 10_000;
+        // The largest curated figure spans ~14 world units, so anything past
+        // this is a divergence in progress rather than a big fern — the bound
+        // `no_reachable_morph_diverges` already uses.
+        const BOUND: f32 = 1_000.0;
+
+        let [low_levers, high_levers] = Levers::EXTREMES;
+        let mut respawns = 0u64;
+        for figure in ifs::IfsFigure::ALL {
+            for target in ifs::IfsFigure::ALL {
+                for morph in [0.0, 0.35, 0.5, 1.0] {
+                    for levers in [Levers::NEUTRAL, low_levers, high_levers] {
+                        let table = ChurnTable::resolve(&ifs::resolve(
+                            &figure.table(),
+                            &target.table(),
+                            morph,
+                            levers,
+                        ));
+                        let seeded =
+                            AttractorScene::seed(AttractorFamily::Ifs(figure), PARTICLES as u32);
+                        let mut state: Vec<ChurnState> = seeded
+                            .iter()
+                            .map(|p| {
+                                let [x, y, _] = p.pos;
+                                ChurnState {
+                                    at: [x, y],
+                                    age: p.age,
+                                    seed: p.seed,
+                                }
+                            })
+                            .collect();
+                        for step_index in 0..STEPS {
+                            for particle in state.iter_mut() {
+                                if particle.step(step_index, &table) {
+                                    respawns += 1;
+                                }
+                                let [x, y] = particle.at;
+                                assert!(
+                                    x.is_finite()
+                                        && y.is_finite()
+                                        && x.abs() < BOUND
+                                        && y.abs() < BOUND,
+                                    "{figure:?} -> {target:?} at morph {morph}, levers \
+                                     {levers:?}, step {step_index}: position [{x}, {y}] is \
+                                     not inside +/-{BOUND}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // The respawn path was actually exercised — without this the test above
+        // would pass just as well on a build where the churn never fired.
+        assert!(
+            respawns > 1_000_000,
+            "only {respawns} respawns over the sweep — the churn is not running"
+        );
+    }
+
+    /// **The respawn is a pure function of the particle's fixed seed and the step
+    /// index** (Plan 0073 Phase 3), asserted on the buffer rather than on a
+    /// picture.
+    ///
+    /// Two runs of the same figure at the same injected `dt` sequence must
+    /// produce **bit-identical** particle buffers — positions, ages and map
+    /// indices alike. A respawn that reached for a clock, an unseeded draw or a
+    /// frame counter would diverge here and nowhere else: the picture would look
+    /// exactly as alive either way.
+    #[test]
+    fn two_runs_of_the_churn_produce_identical_buffers() {
+        const FRAMES: u32 = 240;
+
+        let Some(mut first) = Harness::new(AttractorFamily::Ifs(IfsFigure::Fern)) else {
+            return;
+        };
+        first.run(FRAMES);
+        let a = first.raw();
+
+        let Some(mut second) = Harness::new(AttractorFamily::Ifs(IfsFigure::Fern)) else {
+            return;
+        };
+        second.run(FRAMES);
+        let b = second.raw();
+
+        assert_eq!(a.len(), b.len());
+        // Compared as bits: two buffers agreeing to within a tolerance is not the
+        // claim — determinism is exact or it is not determinism.
+        let differing = a
+            .iter()
+            .zip(b.iter())
+            .filter(|(x, y)| {
+                x.pos.map(f32::to_bits) != y.pos.map(f32::to_bits)
+                    || x.age.to_bits() != y.age.to_bits()
+                    || x.map.to_bits() != y.map.to_bits()
+            })
+            .count();
+        assert_eq!(
+            differing,
+            0,
+            "{differing} of {} particles differ between two identical runs — the churn \
+             is reading something that is not the seed and the step index",
+            a.len()
+        );
+
+        // ...and the run actually churned, or the assertion above is about a
+        // buffer that never moved. 240 frames is past the shortest lifetime.
+        assert!(
+            a.iter().any(|p| p.age < super::CHURN_LIFETIME * 0.1),
+            "no particle is freshly respawned after {FRAMES} frames — the churn did \
+             not run, so the determinism claim is vacuous"
+        );
+    }
+
+    /// **The property the phase exists for, asserted as a distribution rather
+    /// than as a picture** (Plan 0073 Phase 3).
+    ///
+    /// After 600 steps the population must still hold *every* age. That is what
+    /// makes Phase 4's colour gradient permanent rather than a one-second startup
+    /// animation — and it is the assertion a bulk respawn would fail while
+    /// passing every other check here, because a synchronized population is
+    /// deterministic, finite and continuously churning too.
+    ///
+    /// Measured on each particle's age as a fraction of **its own** lifetime,
+    /// which is the quantity the colour channel reads: lifetimes differ per
+    /// particle, so raw ages would blur the deciles rather than test them.
+    #[test]
+    fn after_six_hundred_steps_the_population_holds_every_age() {
+        const FRAMES: u32 = 600;
+        const DECILES: usize = 10;
+
+        let Some(mut h) = Harness::new(AttractorFamily::Ifs(IfsFigure::Fern)) else {
+            return;
+        };
+        h.run(FRAMES);
+        let particles = h.raw();
+
+        let mut deciles = [0usize; DECILES];
+        let (mut lowest, mut highest) = (f32::INFINITY, f32::NEG_INFINITY);
+        for p in &particles {
+            let life = super::churn_lifetime(p.seed);
+            let fraction = p.age / life;
+            assert!(
+                (0.0..1.0).contains(&fraction),
+                "age {} is outside a lifetime of {life}",
+                p.age
+            );
+            lowest = lowest.min(fraction);
+            highest = highest.max(fraction);
+            let bucket = ((fraction * DECILES as f32) as usize).min(DECILES - 1);
+            if let Some(slot) = deciles.get_mut(bucket) {
+                *slot += 1;
+            }
+        }
+
+        assert!(
+            highest - lowest >= 0.9,
+            "the ages span only {:.3} of a lifetime ({lowest:.3}..{highest:.3}) — the \
+             population has synchronized",
+            highest - lowest
+        );
+        for (i, count) in deciles.iter().enumerate() {
+            assert!(
+                *count > 0,
+                "decile {i} of the age range is empty after {FRAMES} steps: {deciles:?}"
             );
         }
     }

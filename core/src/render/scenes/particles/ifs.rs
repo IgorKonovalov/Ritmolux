@@ -183,6 +183,11 @@ pub struct IfsPacked {
     pub translate: [[f32; 4]; 2],
     /// `c0, c1, c2, 1.0`.
     pub cumulative_p: [f32; MAPS],
+    /// The four respawn targets (ADR-0087), packed two `(x, y)` per row exactly
+    /// as [`translate`](Self::translate) is. Straight from [`fixed_points`], so
+    /// the padded slots already duplicate a drawn map and the shader picks one of
+    /// four with no branch and no knowledge of the probability table.
+    pub fixed: [[f32; 4]; 2],
 }
 
 impl IfsPacked {
@@ -196,6 +201,7 @@ impl IfsPacked {
         linear: [[0.0; 4]; MAPS],
         translate: [[0.0; 4]; 2],
         cumulative_p: [0.0; MAPS],
+        fixed: [[0.0; 4]; 2],
     };
 }
 
@@ -1056,10 +1062,27 @@ pub fn pack(table: &IfsTable) -> IfsPacked {
     if let Some(last) = cumulative_p.get_mut(MAPS - 1) {
         *last = 1.0;
     }
+    // The respawn targets ride the same packing (ADR-0087), so the one function
+    // that lays a table out for the GPU lays out all of it — a caller cannot
+    // upload a table and forget its fixed points.
+    let points = fixed_points(table);
+    let mut fixed = [[0.0f32; 4]; 2];
+    for (i, [x, y]) in points.into_iter().enumerate() {
+        if let Some(row) = fixed.get_mut(i / 2) {
+            let half = (i % 2) * 2;
+            if let Some(slot) = row.get_mut(half) {
+                *slot = x;
+            }
+            if let Some(slot) = row.get_mut(half + 1) {
+                *slot = y;
+            }
+        }
+    }
     IfsPacked {
         linear,
         translate,
         cumulative_p,
+        fixed,
     }
 }
 
