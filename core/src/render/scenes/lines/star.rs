@@ -1570,9 +1570,16 @@ mod tests {
         }
     }
 
-    /// The four-ring roster `presets/star_mandala.toml` ships, so the coverage
-    /// claim below is measured on the figure that actually shipped rather than
-    /// on a fixture invented to pass.
+    /// The four-ring roster `presets/star_mandala.toml` shipped with, so the
+    /// coverage claim below is measured on a figure that was really authored
+    /// rather than on a fixture invented to pass.
+    ///
+    /// **That preset was retired on 2026-08-06** — the sampled-polyline motifs
+    /// read as polygons at ornament scale and the user rejected the look
+    /// (design-backlog 0073). The roster is kept here verbatim because what it
+    /// pins is the *geometry* claim — rings put segments at four radii where a
+    /// bare interlace puts them at one — and that is unaffected by whether any
+    /// preset ships it. It is now a fixture, and no longer also a preset.
     fn mandala_roster() -> Vec<RingSpec> {
         vec![
             ring(Motif::Trefoil, 1, 0.00, 0.46),

@@ -335,13 +335,21 @@ of the perceived benefit for a fraction of that.
 - **Interior half — PROMOTED 2026-08-04 → [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md) +
   [Plan 0065](plans/done/0065-the-mandala-interior.md)**: `[generator] rings`, a closed seven-motif roster
   of concentric rings drawn through the same line renderer, plus three bindable levers
-  (`ring_phase` / `ring_spread` / `ring_scale`). Three mandala presets ship. The "hollow ring" is a
+  (`ring_phase` / `ring_spread` / `ring_scale`). The "hollow ring" is a
   measurement rather than an opinion and the plan closed it as one: the bare rosette occupies
   **1 of 10** radial shells, a four-ring mandala **9 of 10**.
 - **The plan also answered this entry's composition question** — "is the interlace worth keeping" —
-  by shipping both: `star_mandala` is the ornament alone and `star_weave` is the same roster inside
-  the twelve-fold interlace. Which reads better against real music is Plan 0065 Phase 6, and it is
-  the one part of this entry that only a live judgement can settle.
+  by shipping both: `star_mandala` was the ornament alone and `star_weave` the same roster inside
+  the twelve-fold interlace.
+- **All three of those presets were retired hours after the close, on 2026-08-06, and this entry
+  stays closed anyway.** The live judgement Plan 0065 Phase 6 was to settle came back against the
+  whole approach rather than against either composition: the motifs are parametric outlines sampled
+  to straight segments, so at ornament scale the vertices show and a circle reads as a polygon
+  ([0073](design-backlog.md)). **This entry asked for the interior to stop being hollow and it did**
+  — the capability is shipped, tested and documented, and the 1-of-10 / 9-of-10 measurement is
+  unaffected by whether a preset ships it. What the retirement establishes is narrower and belongs to
+  0073: *placed outline geometry is the wrong mechanism for a mandala*. That look now ships as
+  `reaction_gilt`, a folded analytic iso-contour field with no geometry in it at all.
 - **Two findings the same work raised are live and are NOT this entry**: the coverage floor that
   pushes this scene toward washed-out tuning ([0072](design-backlog.md)), and the scalloped boundary
   the user chose as a real curve primitive ([0071](design-backlog.md)). Notes below retained as the

@@ -833,14 +833,23 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   **accepted with an Outcome section**. **Closes
   [design-backlog 0007](../design-backlog-archive.md) in full** — its hollow-interior half, live
   since 2026-07-26 under the user's *invest, do not cut* call, and its composition question, answered
-  by shipping both (`star_mandala` is the ornament alone, `star_weave` the same roster inside the
-  twelve-fold interlace).
+  by shipping both (`star_mandala` was the ornament alone, `star_weave` the same roster inside the
+  twelve-fold interlace — both since retired, see below).
   - **Phase 6 (`human`, "judge it against music") did not run as a plan phase** and the plan closed
     anyway, at the user's call, with the live pass happening immediately after, outside the plan.
     Part was already answered from the running app — the washed-out first draft rejected, the
     solid-stroke retune approved, eight rings cut as lace, `rings in weave` kept against the
     reviewing session's reading of the sample. Still open going in: counter-rotation against real
     music, and `glow` + `thickness` together on adjacent thin rings.
+  - **That pass ran the same day and retired all three presets** (`654304a`). It came back against
+    neither of those, but against the mechanism — the motifs are sampled polylines, so the vertices
+    show and a circle reads as a polygon, *after* the solid-stroke retune had already removed the
+    inflated-glow explanation ([backlog 0073](../design-backlog.md)). The `star_pattern` coverage
+    floor reverted to `0.34` with them, so **Phase 7's re-derivation lasted about six hours** — a
+    round trip worth knowing about before treating any floor move as settled. **The plan's
+    deliverable is not reopened**: `rings` ships, `star_pattern` is not hollow, and the shell
+    measurement holds. The mandala look now ships as `reaction_gilt` — analytic iso-contours folded
+    by `kaleido_order`, no geometry and so no vertex. **No preset uses `rings` today.**
   - **The gate went red and the floor was re-derived rather than the plan held.** The three presets
     measure `0.2442`-`0.2544` against a `star_pattern` coverage floor of `0.34`. That floor is
     derived from the shipped library at half each family's sparsest member, and `MAX_FLOOR_SLACK`
