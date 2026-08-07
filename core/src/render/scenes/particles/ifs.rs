@@ -188,6 +188,13 @@ pub struct IfsPacked {
     /// the padded slots already duplicate a drawn map and the shader picks one of
     /// four with no branch and no knowledge of the probability table.
     pub fixed: [[f32; 4]; 2],
+    /// The reciprocal of [`skeleton_scale`] (ADR-0088) — what the step shader
+    /// multiplies a raw nearest-fixed-point distance by to get the `[0, 1]`-ish
+    /// colour coordinate it stores on the particle.
+    ///
+    /// Shipped as a reciprocal rather than as the diameter because the shader
+    /// then multiplies where it would otherwise divide, per particle per step.
+    pub root_recip: f32,
 }
 
 impl IfsPacked {
@@ -202,6 +209,11 @@ impl IfsPacked {
         translate: [[0.0; 4]; 2],
         cumulative_p: [0.0; MAPS],
         fixed: [[0.0; 4]; 2],
+        // Zero rather than the floor's reciprocal, for the same reason the table
+        // above is zeroed: a family that reached this data by mistake reads a
+        // distance of exactly 0 everywhere, which is an inert channel rather than
+        // a gradient measured against somebody else's figure.
+        root_recip: 0.0,
     };
 }
 
@@ -1023,6 +1035,65 @@ pub fn fixed_points(table: &IfsTable) -> [[f32; 2]; MAPS] {
     out
 }
 
+/// Floor on the fixed-point set's diameter (ADR-0088).
+///
+/// **Required rather than defensive.** Two drawn maps' fixed points genuinely
+/// approach each other as a morph interpolates between two tables, and a
+/// diameter of zero makes [`skeleton_scale`]'s reciprocal diverge — every
+/// particle's stored distance would come back `inf` or `NaN` and the whole
+/// figure would sample one end of the palette.
+///
+/// It is **a constant somebody picked**, in the same position ADR-0075's `0.97`
+/// and ADR-0087's `180` occupy, but it is bounded by measurement rather than by
+/// taste: `the_skeleton_never_collapses_across_the_morph` sweeps every ordered
+/// figure pair, every position of the 33-point morph sweep and all three lever
+/// settings, and asserts the observed minimum diameter sits above this while
+/// printing the margin and where it occurred. A thin margin there does not mean
+/// "tune the floor" — it means the channel degenerates somewhere in the morph
+/// and the figure pair the assertion names is where to look.
+pub const SKELETON_FLOOR: f32 = 0.05;
+
+/// The **diameter of the fixed-point set**: `max over j, k of ‖pⱼ − pₖ‖`.
+///
+/// At most six pairwise distances over [`fixed_points`]' four slots. The padded
+/// slots duplicate drawn maps, so a duplicate contributes a zero distance and
+/// this is the *drawn* set's diameter exactly — the same property that lets the
+/// respawn pick one of four with no branch.
+///
+/// **Closed form, and deliberately not [`chaos_extent`].** A bounding box is a
+/// supremum statistic fixed by the single rarest point an orbit reached: two
+/// runs of `chaos_extent` on the same table disagree by `0.046` at 20 000
+/// iterations and by `0.143` at 100 000, and the disagreement *grows* (ADR-0087
+/// Notes, ADR-0088 Alternative D). Normalising a colour coordinate by that would
+/// make the gradient's scale wobble across a morph by an amount nobody chose,
+/// and cost a Monte Carlo per preset switch. This is exact, deterministic, and a
+/// continuous function of the table, so it moves across a morph exactly as
+/// smoothly as the points themselves do.
+///
+/// It is also the *meaningful* scale — the figure's own skeleton rather than a
+/// box drawn around its excursions — which is why a particle can legitimately
+/// measure past `1`. That is clamped at the read, not here.
+pub fn skeleton_diameter(table: &IfsTable) -> f32 {
+    let points = fixed_points(table);
+    let mut max = 0.0f32;
+    for (i, [ax, ay]) in points.into_iter().enumerate() {
+        for [bx, by] in points.into_iter().skip(i + 1) {
+            max = max.max((bx - ax).hypot(by - ay));
+        }
+    }
+    max
+}
+
+/// [`skeleton_diameter`] held above [`SKELETON_FLOOR`] — the scale the GPU
+/// normalises a particle's distance-from-the-skeleton against.
+///
+/// The floored value rather than the raw one is what ships; the raw one is what
+/// the sweep measures, which is the only way to find out whether the floor is
+/// doing nothing (good) or is load-bearing (a finding).
+pub fn skeleton_scale(table: &IfsTable) -> f32 {
+    skeleton_diameter(table).max(SKELETON_FLOOR)
+}
+
 /// Lay a resolved table out for the uniform, recomposing each map and
 /// accumulating the probabilities.
 ///
@@ -1083,6 +1154,10 @@ pub fn pack(table: &IfsTable) -> IfsPacked {
         translate,
         cumulative_p,
         fixed,
+        // ...and so does the scale those points are measured against (ADR-0088),
+        // for the same reason: one function lays a table out for the GPU, so a
+        // caller cannot upload the skeleton and forget its size.
+        root_recip: 1.0 / skeleton_scale(table),
     }
 }
 
@@ -1092,8 +1167,9 @@ mod tests {
     #![allow(clippy::panic, clippy::expect_used, clippy::indexing_slicing)]
 
     use super::{
-        FIT_STEPS, FitLut, IfsFigure, IfsMap, Levers, MAPS, SIGMA_CEILING, chaos_extent, decompose,
-        fit_scale, fixed_point, fixed_points, lerp_angle, recompose, resolve,
+        FIT_STEPS, FitLut, IfsFigure, IfsMap, Levers, MAPS, SIGMA_CEILING, SKELETON_FLOOR,
+        chaos_extent, decompose, fit_scale, fixed_point, fixed_points, lerp_angle, recompose,
+        resolve, skeleton_diameter, skeleton_scale,
     };
 
     /// The tolerance the plan states for the round trip: well above `f32`
@@ -1463,6 +1539,120 @@ mod tests {
             }
         }
         assert_eq!(pairs, 25, "every ordered pair of the five figures");
+    }
+
+    /// **The normaliser never approaches its floor** (Plan 0074 Phase 1, claim 1)
+    /// — measured across the whole reachable morph rather than assumed.
+    ///
+    /// [`SKELETON_FLOOR`] exists because two drawn maps' fixed points *can*
+    /// approach each other as a morph interpolates, and a diameter of zero gives
+    /// a divergent reciprocal. This is the assertion that finds out whether the
+    /// floor is doing nothing (good) or is load-bearing — which would mean the
+    /// root channel degenerates somewhere in the morph, and the printed figure
+    /// pair is where to look.
+    ///
+    /// **There is no tolerance here to tune.** The two numbers are the
+    /// measurement and the constant; if they ever meet, the answer is a finding
+    /// rather than a smaller floor.
+    #[test]
+    fn the_skeleton_never_collapses_across_the_morph() {
+        let [low, high] = Levers::EXTREMES;
+        let mut worst = f32::INFINITY;
+        let mut worst_at = None;
+        for start in IfsFigure::ALL {
+            for target in IfsFigure::ALL {
+                let (a, b) = (start.table(), target.table());
+                for morph in morph_sweep() {
+                    for levers in [Levers::NEUTRAL, low, high] {
+                        let d = skeleton_diameter(&resolve(&a, &b, morph, levers));
+                        assert!(
+                            d.is_finite(),
+                            "{start:?} -> {target:?} at morph {morph}, levers \
+                             {levers:?}: the skeleton's diameter is {d}"
+                        );
+                        if d < worst {
+                            worst = d;
+                            worst_at = Some((start, target, morph, levers));
+                        }
+                    }
+                }
+            }
+        }
+        // Printed whether or not it passes — the margin is the finding, and a
+        // green run that never says how close it came is exactly the shape of
+        // report this claim exists to avoid.
+        println!(
+            "minimum fixed-point diameter over the sweep: {worst} (floor {SKELETON_FLOOR}, \
+             margin x{:.1}) at {worst_at:?}",
+            worst / SKELETON_FLOOR
+        );
+        assert!(
+            worst > SKELETON_FLOOR,
+            "the fixed-point diameter falls to {worst} at {worst_at:?}, at or below the \
+             {SKELETON_FLOOR} floor — the root channel degenerates there, and the floor \
+             has become load-bearing rather than defensive"
+        );
+    }
+
+    /// The scale is the diameter, floored, and the pack ships its reciprocal.
+    ///
+    /// Three separate claims, and the middle one is the only place the floor's
+    /// arithmetic is exercised at all — no reachable table reaches it (the sweep
+    /// above), so a degenerate one is constructed here on purpose.
+    #[test]
+    fn the_skeleton_scale_floors_the_diameter_and_packs_as_a_reciprocal() {
+        for figure in IfsFigure::ALL {
+            let table = figure.table();
+            let diameter = skeleton_diameter(&table);
+            // Printed for the Phase 2 gate: the diameter is the *scale* the
+            // gradient is drawn against, so a figure whose skeleton is small
+            // relative to its own reach saturates the channel at 1 over most of
+            // itself, and one whose skeleton is large uses only the bottom of the
+            // range. Neither is visible in a pass/fail.
+            println!("{figure:?}: skeleton diameter {diameter}");
+            assert!(
+                diameter > SKELETON_FLOOR,
+                "{figure:?} has a skeleton of {diameter}, at or below the floor"
+            );
+            assert_eq!(skeleton_scale(&table), diameter, "{figure:?}");
+            // The reciprocal the GPU is handed, against the scale it came from —
+            // the property that stops a caller uploading the skeleton and
+            // forgetting its size.
+            assert_eq!(super::pack(&table).root_recip, 1.0 / diameter, "{figure:?}");
+
+            // ...and it is the DRAWN set's diameter: the padded slots duplicate
+            // drawn maps, so they contribute nothing but a zero distance.
+            let points = fixed_points(&table);
+            let mut by_hand = 0.0f32;
+            for (i, p) in points.iter().enumerate() {
+                for q in points.iter().skip(i + 1) {
+                    by_hand = by_hand.max((q[0] - p[0]).hypot(q[1] - p[1]));
+                }
+            }
+            assert_eq!(by_hand, diameter, "{figure:?}");
+        }
+
+        // The floor, on a table no morph reaches: every map contracts to the
+        // same point, so the skeleton has no extent at all and the raw
+        // reciprocal would be infinite.
+        let point = IfsMap {
+            theta: 0.0,
+            phi: 0.0,
+            sx: 0.5,
+            sy: 0.5,
+            t: [1.0, -2.0],
+            p: 0.25,
+        };
+        let degenerate = super::IfsTable {
+            maps: [point; MAPS],
+        };
+        assert_eq!(skeleton_diameter(&degenerate), 0.0);
+        assert_eq!(skeleton_scale(&degenerate), SKELETON_FLOOR);
+        let recip = super::pack(&degenerate).root_recip;
+        assert!(
+            recip.is_finite() && recip == 1.0 / SKELETON_FLOOR,
+            "a collapsed skeleton must clamp to the floor's reciprocal, got {recip}"
+        );
     }
 
     /// The endpoints are the figures themselves, exactly — `morph = 0` is the

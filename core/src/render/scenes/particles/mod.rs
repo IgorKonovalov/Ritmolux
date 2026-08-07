@@ -682,9 +682,12 @@ struct Particle {
     // everywhere else.
     age: f32,
     map: f32,
-    // Named, not implicit: WGSL's 16-byte round-up bought these, and they are
-    // the next channel's budget rather than slack.
-    spare0: f32,
+    // ADR-0088's third, at offset 40: the distance from this point to the
+    // nearest of the drawn maps' fixed points, normalised by the skeleton's own
+    // diameter. Written by the IFS arm alone, like the two above.
+    root: f32,
+    // The LAST spare word. Named, not implicit: WGSL's 16-byte round-up bought
+    // it, and it is the next channel's budget rather than slack.
     spare1: f32,
 }
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
@@ -703,10 +706,16 @@ struct Step {
     // step sequence is a pure function of accumulated injected dt, which captures
     // pin at 1/60 s. Zero and unread on every other family.
     step_index: u32,
-    // The vec4 alignment the affine table below requires. THREE SCALARS, not a
-    // `vec3<u32>`: a WGSL vec3 aligns to 16, which would push the table to offset
-    // 64 and the struct to 176 while the Rust side laid it out at 48 and 160.
-    _pad0: u32,
+    // The reciprocal of the fixed-point set's floored diameter (ADR-0088). It
+    // spends the FIRST of the three padding words below, which the vec4
+    // alignment had already paid for - so the struct stays 192 bytes and the
+    // bind-group layout gains no binding. Zero (and unread) on every other
+    // family and on the jitter dispatch.
+    root_recip: f32,
+    // The rest of the vec4 alignment the affine table below requires. SCALARS,
+    // not a `vec3<u32>`: a WGSL vec3 aligns to 16, which would push the table to
+    // offset 64 and the struct to 176 while the Rust side laid it out at 48 and
+    // 160.
     _pad1: u32,
     _pad2: u32,
     // The IFS's resolved affine table (family 4), CPU-side output of
@@ -814,6 +823,27 @@ fn ifs_fixed_point(slot: u32) -> vec2<f32> {
     return step.fixed23.zw;
 }
 
+// ADR-0088's channel: how far this point is from the figure's own skeleton,
+// normalised by the skeleton's diameter (the CPU ships the reciprocal).
+//
+// A `min` over all four slots with no branch and no knowledge of the probability
+// table, for the reason `ifs_fixed_point` above needs neither: every slot is a
+// DRAWN map's fixed point, because the CPU duplicates into the pads.
+//
+// **This is the SOURCE**; `root_distance` in the Rust test body transcribes it,
+// the discipline `projection_mirror` follows against the draw shader.
+//
+// Normalised at the write and clamped at the READ, so the stored value stays a
+// faithful measurement: the skeleton's diameter is not an upper bound on how far
+// the attractor reaches, and a point past 1 is a real point rather than an error.
+fn ifs_root_distance(q: vec2<f32>) -> f32 {
+    let d0 = distance(q, step.fixed01.xy);
+    let d1 = distance(q, step.fixed01.zw);
+    let d2 = distance(q, step.fixed23.xy);
+    let d3 = distance(q, step.fixed23.zw);
+    return min(min(d0, d1), min(d2, d3)) * step.root_recip;
+}
+
 fn hash3(seed: f32, salt: u32) -> vec3<f32> {
     let h0 = mix32(bitcast<u32>(seed) ^ (salt * 0x9E3779B9u));
     let h1 = mix32(h0);
@@ -918,6 +948,17 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         // dispatch returns above without touching it, which is right — a reseed
         // displaces a particle without changing which sub-copy it belongs to.
         particles[i].map = k;
+        // ...and so is ADR-0088's distance, for a stronger version of the same
+        // reason. It is a PURE FUNCTION OF POSITION, recomputed from where the
+        // particle now sits rather than accumulated — which is the whole
+        // difference from `age`, and the reason this gradient does not decay: a
+        // particle five hundred steps old sitting near a fixed point reads the
+        // same near-zero a freshly restarted one does.
+        //
+        // After the respawn branch, so a just-restarted particle reads EXACTLY
+        // 0 — it *is* at a fixed point. That is one end of the ramp rather than a
+        // special case.
+        particles[i].root = ifs_root_distance(p.xy);
     } else if (step.family == 2u) {
         // Thomas cyclically-symmetric flow (b = dissipation). Lively speed-up so
         // the slow flow visibly moves each frame.
@@ -985,6 +1026,16 @@ struct Draw {
     //    `age * rate` would black them out. Two numbers rather than a branch, and
     //    the multiply by a literal 1.0 is the identity in IEEE-754, so no
     //    existing capture moves.
+    // rc: ADR-0088's root channel - x root_tint, yzw unused. ANCHORED at 0
+    //    rather than centred, so unlike `ch` it is inert on a non-IFS family by
+    //    ARITHMETIC: their `root` is identically 0, and `root_tint * 0` is 0
+    //    whatever the binding. The row is zeroed off the IFS anyway - belt and
+    //    braces, and Phase 3 moves this into `ch`, where `map_*` still needs it.
+    //    **A TEMPORARY ROW.** Plan 0074 Phase 3 retires `age_tint`/`age_hue` and
+    //    moves both root routes into `ch.zw`, at which point this row goes and
+    //    the draw uniform is back to the size it is today. It exists only
+    //    because Phase 1 ships the first route BEFORE the retirement, so that
+    //    Phase 2 can decide whether the channel reads at all.
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
@@ -995,6 +1046,7 @@ struct Draw {
     ctr: vec4<f32>,
     ch: vec4<f32>,
     em: vec4<f32>,
+    rc: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> draw: Draw;
 // Shared gradient LUTs (ADR-0021): sampled per-particle in the vertex shader
@@ -1182,6 +1234,10 @@ fn vs_main(
     // ADR-0087's age channel, at byte offset 32. Steps since this particle last
     // respawned; identically 0 on every family but the IFS.
     @location(4) age: f32,
+    // ADR-0088's root channel, at byte offset 40. Distance to the nearest of the
+    // drawn maps' fixed points, already normalised by the skeleton's diameter;
+    // identically 0 on every family but the IFS.
+    @location(5) root: f32,
 ) -> VsOut {
     var corners = array<vec2<f32>, 6>(
         vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(0.0, 1.0),
@@ -1286,11 +1342,31 @@ fn vs_main(
     // and the first is what the param is called: two particles of the same age
     // get the same colour whatever lifetimes they drew, where per-particle
     // normalization would give them different colours and read as noise.
+    // ...and ADR-0088's root channel, which is what the age channel was trying
+    // to be. `age` proxied distance-from-the-fixed-points and the proxy decayed
+    // after ~10 steps; this IS that distance, recomputed every step, so it is
+    // permanent. Clamped at the READ rather than at the write: the skeleton's
+    // diameter is not an upper bound on the attractor's reach, so a stored value
+    // past 1 is a faithful measurement, and the palette coordinate is where it
+    // has to become a unit.
+    //
+    // **ANCHORED AT ZERO, and deliberately not `channel_shift`** (ADR-0088's
+    // Anchoring section). The other terms are centred because `map01` and
+    // `depth01` genuinely span [0, 1], so their midpoint means *typical* and
+    // raising the amount opens a spread about the preset's colour. `root01` does
+    // NOT span [0, 1] - measured, it tops out at 0.41 on the spiral and 1.05 on
+    // the dragon - so a centred shift would be negative almost everywhere and
+    // would slide the figure as well as spread it. Zero is the anchor that is
+    // both meaningful and exactly reachable here: it is the respawn state, a
+    // particle sitting on a fixed point. So the contraction points keep the
+    // preset's chosen colour and the figure ramps away from them.
     let map01 = map / MAP_SPAN;
     let age01 = age * draw.em.z;
+    let root01 = clamp(root, 0.0, 1.0);
     let coord = hue + hue_center + (seed - 0.5) * hue_spread + depth_tint(dn)
         + channel_shift(map01, draw.ch.x)
-        + channel_shift(age01, draw.ch.z);
+        + channel_shift(age01, draw.ch.z)
+        + draw.rc.x * root01;
     let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
     let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
     // ...and the channel's OTHER route, which shifts the hue of whatever colour
@@ -1430,6 +1506,19 @@ mod projection_mirror {
     /// ADR-0087's centred contribution from a `[0, 1]` per-particle channel.
     pub(super) fn channel_shift(unit: f32, amount: f32) -> f32 {
         amount * (unit - 0.5)
+    }
+
+    /// Mirrors the root channel's palette term in
+    /// [`DRAW_SHADER`](super::DRAW_SHADER) — ADR-0088's **anchored**
+    /// contribution, and deliberately not [`channel_shift`].
+    ///
+    /// A separate function rather than a call with an offset, because the
+    /// difference between the two is the decision: `channel_shift` is centred on
+    /// the assumption that its channel spans `[0, 1]`, which `root01` does not.
+    /// Spelling them apart is what stops a later edit from "tidying" this into
+    /// the shared helper and silently reintroducing the slide.
+    pub(super) fn root_shift(unit: f32, amount: f32) -> f32 {
+        amount * unit
     }
 
     /// Mirrors `rgb2hsv()` in [`DRAW_SHADER`](super::DRAW_SHADER).
@@ -1591,9 +1680,25 @@ struct Particle {
     ///
     /// `0.0` on every non-IFS family, where nothing writes it.
     map: f32,
-    /// The next channel's budget, explicit so it reads as such. See the layout
-    /// note above: this is what the 16-byte round-up bought, not slack.
-    _spare: [f32; 2],
+    /// Distance from this point to the nearest of the **drawn** maps' fixed
+    /// points, normalised by the skeleton's own diameter (ADR-0088). **Offset
+    /// 40**, which [`PARTICLE_ATTRIBUTES`] spells out by hand.
+    ///
+    /// A pure function of *position*, recomputed every step rather than
+    /// accumulated — which is the whole difference from [`age`](Self::age), and
+    /// the reason this gradient is permanent where that one decayed: an old
+    /// particle near a fixed point reads the same near-zero a fresh one does.
+    ///
+    /// **May exceed `1`, and that is not an error.** The fixed-point set's
+    /// diameter is not an upper bound on how far the attractor reaches, so the
+    /// stored value is a faithful measurement and the *draw* clamps.
+    ///
+    /// `0.0` on every non-IFS family, where nothing writes it.
+    root: f32,
+    /// The **last** spare word — the next per-particle channel after this one is
+    /// a struct change to a type four families share (ADR-0088 Consequences).
+    /// Explicit so it reads as budget rather than as slack.
+    _spare: f32,
 }
 
 /// Compute step uniform (per frame): the attractor coefficients, the fixed
@@ -1627,10 +1732,19 @@ struct StepUniform {
     /// (ADR-0075). Zero (and unread) on every other family, and on the jitter
     /// dispatch — which keeps its own `salt` rather than sharing this.
     step_index: u32,
-    /// Explicit, because the `vec4` table below is 16-byte aligned and the
-    /// scalars above are five words. `bytemuck::Pod` requires no implicit
-    /// padding, so this word must be named.
-    _pad: [u32; 3],
+    /// The reciprocal of the fixed-point set's floored diameter
+    /// ([`ifs::skeleton_scale`], ADR-0088) — the scale the step shader's IFS arm
+    /// normalises a raw nearest-point distance by. Zero (and unread) on the four
+    /// map families and on the jitter dispatch, exactly as the affine table is.
+    ///
+    /// **It costs no bytes.** It takes the first of the three explicit padding
+    /// words the `vec4` table's alignment had already paid for, so the struct
+    /// stays 192 and the bind-group layout gains no binding.
+    root_recip: f32,
+    /// The rest of that padding. Explicit, because the `vec4` table below is
+    /// 16-byte aligned and the scalars above are five words. `bytemuck::Pod`
+    /// requires no implicit padding, so these words must be named.
+    _pad: [u32; 2],
     /// The IFS's resolved affine table — [`IfsPacked`] laid out flat. Zeroed for
     /// the four map families, which never read it.
     linear: [[f32; 4]; ifs::MAPS],
@@ -1663,7 +1777,8 @@ impl StepUniform {
             count,
             salt,
             step_index,
-            _pad: [0; 3],
+            root_recip: packed.root_recip,
+            _pad: [0; 2],
             linear: packed.linear,
             translate: packed.translate,
             cumulative_p: packed.cumulative_p,
@@ -1768,6 +1883,11 @@ fn hash_unit(v: u32) -> f32 {
 /// the floor. `(1/EMERGENCE_STEPS, 0)` on the IFS and `(0, 1)` everywhere else,
 /// because every other family's `age` is identically zero and a bare `age·rate`
 /// would black them out rather than leave them alone.
+/// `rc`: ADR-0088's root channel — x `root_tint`, yzw unused. **Temporary**:
+/// Plan 0074 Phase 3 retires `age_tint`/`age_hue` and moves both root routes
+/// into `ch.zw`, which drops this row again. It exists only because Phase 1
+/// ships the first route *before* the retirement, so the Phase 2 gate can judge
+/// whether the channel reads at all.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct DrawUniform {
@@ -1781,6 +1901,7 @@ struct DrawUniform {
     ctr: [f32; 4],
     ch: [f32; 4],
     em: [f32; 4],
+    rc: [f32; 4],
 }
 
 /// Decay uniform (per frame): x is the per-frame trail retention factor.
@@ -1898,7 +2019,7 @@ impl Resources {
 /// `prev` and one trailing pad, and stopped being correct the moment ADR-0087
 /// put `age` and `map` past that pad. A fourth macro entry would have fetched
 /// the padding word at offset 28 and fed the draw someone else's bytes, silently
-/// and with no compile error. `the_particle_layout_carries_two_channels`
+/// and with no compile error. `the_particle_layout_carries_three_channels`
 /// measures these offsets against the struct so the two cannot drift.
 const PARTICLE_ATTRIBUTES: &[wgpu::VertexAttribute] = &[
     wgpu::VertexAttribute {
@@ -1925,6 +2046,11 @@ const PARTICLE_ATTRIBUTES: &[wgpu::VertexAttribute] = &[
         format: wgpu::VertexFormat::Float32,
         offset: 32,
         shader_location: 4, // age (ADR-0087)
+    },
+    wgpu::VertexAttribute {
+        format: wgpu::VertexFormat::Float32,
+        offset: 40,
+        shader_location: 5, // root (ADR-0088) — 40, the first spare word
     },
 ];
 
@@ -2542,6 +2668,22 @@ pub struct AttractorScene {
     /// whole figure.
     age_tint: f32,
     age_hue: f32,
+    /// The root channel's palette-coordinate route (ADR-0088), IFS-only for the
+    /// same structural reason the two above are: only the IFS arm writes
+    /// [`Particle::root`].
+    ///
+    /// Shifts the palette coordinate by `root_tint · root01` across the figure's
+    /// own skeleton — dark at the stem base and the frond origins, bright at the
+    /// tips.
+    ///
+    /// **Anchored at `0`, not centred like the others** (ADR-0088's Anchoring
+    /// section): the fixed points keep the preset's chosen colour exactly and
+    /// the figure ramps away from them. Centring assumes the channel spans
+    /// `[0, 1]`, and this one does not — its ceiling is a property of each
+    /// figure's own invariant measure, from `0.41` on the spiral to `1.05` on
+    /// the dragon, so the **same binding is not the same look across figures**.
+    /// The hue route is Plan 0074 Phase 3.
+    root_tint: f32,
     /// Rate multiplier on [`SPIN_RATE`] (ADR-0076). Unlike the depth cues this is
     /// **not** inert on the 2D families: the discrete maps rotate in-plane
     /// through the same angle, so `spin` reaches all four families where
@@ -2620,6 +2762,7 @@ impl AttractorScene {
             map_hue: DEFAULT_CHANNEL_COLOUR,
             age_tint: DEFAULT_CHANNEL_COLOUR,
             age_hue: DEFAULT_CHANNEL_COLOUR,
+            root_tint: DEFAULT_CHANNEL_COLOUR,
             spin: DEFAULT_SPIN,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
@@ -2824,7 +2967,12 @@ impl AttractorScene {
                     // which never write it.
                     age,
                     map: 0.0,
-                    _spare: [0.0; 2],
+                    // Exact, not a placeholder: an IFS seeds every particle AT a
+                    // fixed point, so its distance from the nearest one really
+                    // is zero, and the first step overwrites it anyway. On a map
+                    // family nothing ever writes it (ADR-0088).
+                    root: 0.0,
+                    _spare: 0.0,
                 }
             })
             .collect();
@@ -2876,6 +3024,9 @@ pub const PARAMS: &[&str] = &[
     "map_hue",
     "age_tint",
     "age_hue",
+    // ...and ADR-0088's root channel, IFS-only for exactly the same structural
+    // reason: `Particle::root` is written by the IFS arm and by nothing else.
+    "root_tint",
 ];
 
 impl Scene for AttractorScene {
@@ -2941,6 +3092,7 @@ impl Scene for AttractorScene {
         self.map_hue = DEFAULT_CHANNEL_COLOUR;
         self.age_tint = DEFAULT_CHANNEL_COLOUR;
         self.age_hue = DEFAULT_CHANNEL_COLOUR;
+        self.root_tint = DEFAULT_CHANNEL_COLOUR;
         self.spin = DEFAULT_SPIN;
         self.morph = DEFAULT_MORPH;
         self.levers = Levers::NEUTRAL;
@@ -2971,6 +3123,7 @@ impl Scene for AttractorScene {
             "map_hue" => self.map_hue = value,
             "age_tint" => self.age_tint = value,
             "age_hue" => self.age_hue = value,
+            "root_tint" => self.root_tint = value,
             "spin" => self.spin = value,
             "morph" => self.morph = value,
             "curl" => self.levers.curl = value,
@@ -3119,6 +3272,7 @@ impl Scene for AttractorScene {
             map_hue,
             age_tint,
             age_hue,
+            root_tint,
             palette,
             palette_dirty,
             ..
@@ -3179,6 +3333,7 @@ impl Scene for AttractorScene {
                 map_hue: *map_hue,
                 age_tint: *age_tint,
                 age_hue: *age_hue,
+                root_tint: *root_tint,
             },
         );
         // Before the steps, and only on the frame a `reseed` edge landed: kick each
@@ -3263,6 +3418,10 @@ struct UniformInputs {
     map_hue: f32,
     age_tint: f32,
     age_hue: f32,
+    /// ADR-0088's root channel, at its one route so far. Unclamped here for the
+    /// same reason: the LUT sampler repeats. The *particle's* value is what gets
+    /// clamped, in the shader, and that is a different number.
+    root_tint: f32,
 }
 
 /// The deferred one-shot uploads: the palette LUTs on a preset switch or fresh
@@ -3450,6 +3609,18 @@ fn upload_uniforms(
                 [1.0 / EMERGENCE_STEPS, 0.0, 1.0 / churn_max_lifetime(), 0.0]
             } else {
                 [0.0, 1.0, 0.0, 0.0]
+            },
+            // ADR-0088's route, zeroed off the IFS by the same rule — though
+            // here it is redundant rather than load-bearing, which is the one
+            // way this channel is *safer* than the row above. Anchored at zero,
+            // `root_tint * root` is exactly `0` on a family whose `root` is
+            // identically `0`, so inertness holds even if this branch were
+            // dropped. Kept because Phase 3 folds this into `ch`, where the
+            // centred `map_*` still depend on it.
+            rc: if inputs.family.figure().is_some() {
+                [inputs.root_tint, 0.0, 0.0, 0.0]
+            } else {
+                [0.0; 4]
             },
         }),
     );
@@ -5054,20 +5225,24 @@ mod tests {
     }
 
     /// The `Particle` layout the storage buffer and the vertex attributes both
-    /// assume: two tight 16-byte std430 halves, then ADR-0087's two channels and
-    /// the two words WGSL's 16-byte round-up leaves behind — stride **48**. The
-    /// readback above casts raw bytes to this, so a change here silently
-    /// reinterprets every position.
+    /// assume: two tight 16-byte std430 halves, then ADR-0087's two channels,
+    /// ADR-0088's third, and the one word WGSL's 16-byte round-up still leaves
+    /// behind — stride **48**. The readback above casts raw bytes to this, so a
+    /// change here silently reinterprets every position.
     ///
     /// It was a tight 16 until ADR-0069 added `prev`, and 32 until ADR-0087
     /// added `age` and `map`. **The offsets matter more than the size**, and the
-    /// reason is the trap this phase walked into: `vertex_attr_array!` lays its
+    /// reason is the trap Plan 0073 walked into: `vertex_attr_array!` lays its
     /// attributes out *consecutively*, so a fourth entry would have fetched
     /// `map` from offset 28 — the padding word — rather than from 36, silently
     /// and with no compile error. [`PARTICLE_ATTRIBUTES`] spells the offsets out
     /// and this test is what holds them to the struct.
+    ///
+    /// **The size not moving is half the claim.** ADR-0088 spends one of the two
+    /// words ADR-0087 reserved rather than growing a struct four families share,
+    /// so `root` arriving at 48 bytes is the decision, not a coincidence.
     #[test]
-    fn the_particle_layout_carries_two_channels() {
+    fn the_particle_layout_carries_three_channels() {
         assert_eq!(std::mem::size_of::<Particle>(), 48);
         assert_eq!(std::mem::align_of::<Particle>(), 4);
 
@@ -5079,7 +5254,8 @@ mod tests {
             _pad: 0.0,
             age: 0.0,
             map: 0.0,
-            _spare: [0.0; 2],
+            root: 0.0,
+            _spare: 0.0,
         };
         let base = std::ptr::from_ref(&p) as usize;
         let offset_of = |field: &f32| std::ptr::from_ref(field) as usize - base;
@@ -5088,24 +5264,28 @@ mod tests {
         assert_eq!(std::ptr::from_ref(&p.prev) as usize - base, 16);
         assert_eq!(offset_of(&p.age), 32);
         assert_eq!(offset_of(&p.map), 36);
+        assert_eq!(offset_of(&p.root), 40);
+        // One word left. Named here because ADR-0088's Consequences turn on it:
+        // the next per-particle channel after this one is a struct change.
+        assert_eq!(offset_of(&p._spare), 44);
 
         // ...and the vertex attributes agree with them. This is the assertion
         // that would have caught the consecutive-layout bug: it compares the
         // constant the pipeline is built from against the struct itself.
         //
-        // The last two are deliberately **out of offset order**: `map` took
+        // Locations 3 and 4 are deliberately **out of offset order**: `map` took
         // location 3 when Plan 0073 Phase 1 added it and `age` took location 4 in
         // Phase 3, so the locations follow the order the channels shipped rather
         // than the order they sit in the struct. Each attribute carries its own
         // offset so nothing depends on the ordering — spelled out because it
         // reads like a mistake.
         let attr_offsets: Vec<u64> = PARTICLE_ATTRIBUTES.iter().map(|a| a.offset).collect();
-        assert_eq!(attr_offsets, vec![0, 12, 16, 36, 32]);
+        assert_eq!(attr_offsets, vec![0, 12, 16, 36, 32, 40]);
         let locations: Vec<u32> = PARTICLE_ATTRIBUTES
             .iter()
             .map(|a| a.shader_location)
             .collect();
-        assert_eq!(locations, vec![0, 1, 2, 3, 4]);
+        assert_eq!(locations, vec![0, 1, 2, 3, 4, 5]);
 
         // The memory this costs, at both tier budgets — ADR-0087 quotes the rise
         // from 1.6/4.8 MB, so it fails here if the struct grows again.
@@ -5210,6 +5390,36 @@ mod tests {
         }
     }
 
+    /// The four fixed points as the **shader** reads them — unpacked back out of
+    /// the two `vec4` rows [`ifs::pack`] laid them into, exactly as
+    /// `ifs_fixed_point()` in [`STEP_SHADER`](super::STEP_SHADER) does.
+    ///
+    /// Deliberately *not* a second call to [`ifs::fixed_points`]: the whole point
+    /// of routing through the packed rows is that the packing itself — which
+    /// point lands in which half of which row — is under test.
+    fn packed_points(packed: &ifs::IfsPacked) -> [[f32; 2]; ifs::MAPS] {
+        let [row0, row1] = packed.fixed;
+        let [a, b, c, d] = row0;
+        let [e, f, g, h] = row1;
+        [[a, b], [c, d], [e, f], [g, h]]
+    }
+
+    /// Mirrors `ifs_root_distance()` in [`STEP_SHADER`](super::STEP_SHADER) —
+    /// ADR-0088's channel, from the uniform's own bytes.
+    ///
+    /// **The WGSL is the source and this is the mirror**, the discipline
+    /// `projection_mirror` follows against the draw shader. It exists because the
+    /// claim is about a *number* — that the stored value is the normalised
+    /// nearest-point distance and is exactly zero at a fixed point — and a
+    /// capture could only say the picture had colours in it.
+    fn root_distance(q: [f32; 2], packed: &ifs::IfsPacked) -> f32 {
+        let [qx, qy] = q;
+        packed_points(packed)
+            .into_iter()
+            .fold(f32::INFINITY, |acc, [x, y]| acc.min((qx - x).hypot(qy - y)))
+            * packed.root_recip
+    }
+
     impl ChurnState {
         /// Advance one fixed step. Returns whether the particle respawned.
         fn step(&mut self, step_index: u32, table: &ChurnTable) -> bool {
@@ -5270,6 +5480,143 @@ mod tests {
                  and the WGSL literal did not"
             );
         }
+    }
+
+    /// **ADR-0088's channel is what it claims to be** (Plan 0074 Phase 1, claim
+    /// 2), asserted on the CPU transcription rather than on pixels.
+    ///
+    /// Two claims, and they are different. The first is that the value routed
+    /// through the packed uniform rows — which half of which `vec4` each point
+    /// landed in, and the reciprocal alongside them — agrees with the distance
+    /// computed straight from [`ifs::fixed_points`] and [`ifs::skeleton_scale`].
+    /// A packing that transposed two points would still produce a plausible
+    /// gradient and would fail here.
+    ///
+    /// The second is that a particle **at** a fixed point reads **exactly** `0`.
+    /// That is the respawn's own state, so it is one end of the ramp rather than
+    /// a special case, and "approximately zero" would not be the same claim —
+    /// the emergence ramp lands a thousand particles a frame on exactly those
+    /// points.
+    #[test]
+    fn the_root_channel_measures_distance_to_the_nearest_fixed_point() {
+        // Positions sampled by running the reference chaos game, so they are on
+        // the figure rather than on a grid over its bounding box.
+        const WARMUP: u32 = 64;
+        const SAMPLES: u32 = 256;
+
+        for figure in ifs::IfsFigure::ALL {
+            // Morphed as well as static: the fixed points travel across a morph,
+            // and the packing has to follow them.
+            for (target, morph) in [(figure, 0.0), (ifs::IfsFigure::Sierpinski, 0.4)] {
+                let table = ifs::resolve(&figure.table(), &target.table(), morph, Levers::NEUTRAL);
+                let packed = ifs::pack(&table);
+                let reference = ChurnTable::resolve(&table);
+                let points = ifs::fixed_points(&table);
+                let recip = 1.0 / ifs::skeleton_scale(&table);
+
+                // At each fixed point itself: exactly zero, compared on bits.
+                for (k, p) in points.into_iter().enumerate() {
+                    let d = root_distance(p, &packed);
+                    assert_eq!(
+                        d.to_bits(),
+                        0.0f32.to_bits(),
+                        "{figure:?} -> {target:?} at morph {morph}: a particle sitting on \
+                         fixed point {k} reads {d}, not an exact 0 — the respawn's own \
+                         state is one end of this channel's ramp"
+                    );
+                }
+
+                // ...and on the figure, against a distance computed without ever
+                // touching the packed rows.
+                let mut state = ChurnState {
+                    at: points.first().copied().unwrap_or([0.0, 0.0]),
+                    age: 0.0,
+                    seed: 0.375,
+                };
+                for step in 0..WARMUP {
+                    state.step(step, &reference);
+                }
+                let mut seen_far = false;
+                for step in WARMUP..WARMUP + SAMPLES {
+                    state.step(step, &reference);
+                    let [qx, qy] = state.at;
+                    let direct = points
+                        .into_iter()
+                        .fold(f32::INFINITY, |acc, [x, y]| acc.min((qx - x).hypot(qy - y)))
+                        * recip;
+                    let got = root_distance(state.at, &packed);
+                    // `f32` rounding on two paths through the same arithmetic:
+                    // the operations are identical, so this is tight on purpose.
+                    assert!(
+                        (got - direct).abs() <= 1e-6 * direct.max(1.0),
+                        "{figure:?} -> {target:?} at morph {morph}, step {step}: the \
+                         packed rows give {got} where the points give {direct}"
+                    );
+                    seen_far |= got > 0.1;
+                }
+                // Non-vacuity: a table whose orbit never left the fixed points
+                // would satisfy every assertion above with a column of zeros.
+                assert!(
+                    seen_far,
+                    "{figure:?} -> {target:?} at morph {morph}: every sample sat within \
+                     0.1 of a fixed point — the reference is not exploring the figure"
+                );
+            }
+        }
+    }
+
+    /// **The mirror above is held to the shader it transcribes** (Plan 0074
+    /// Phase 1), the way `the_churn_constants_agree_between_rust_and_wgsl` holds
+    /// the churn's literals.
+    ///
+    /// This channel adds no shared numeric constant — the normaliser is computed
+    /// on the CPU and arrives as one uniform word — so what there is to pin is
+    /// the *expression*: a `min` over all four slots times the reciprocal at the
+    /// write, and a clamp to `[0, 1]` at the read. Crude, and it is the failure
+    /// mode that would otherwise be silent: a shader edited to clamp at the write
+    /// or to `min` over three slots would leave every test above green, because
+    /// every test above runs the mirror.
+    #[test]
+    fn the_root_channel_maths_agree_between_rust_and_wgsl() {
+        for expected in [
+            "let d0 = distance(q, step.fixed01.xy);",
+            "let d1 = distance(q, step.fixed01.zw);",
+            "let d2 = distance(q, step.fixed23.xy);",
+            "let d3 = distance(q, step.fixed23.zw);",
+            "return min(min(d0, d1), min(d2, d3)) * step.root_recip;",
+            // Written after the respawn branch, so a restarted particle reads an
+            // exact 0 — the property the test above asserts on bits.
+            "particles[i].root = ifs_root_distance(p.xy);",
+        ] {
+            assert!(
+                super::STEP_SHADER.contains(expected),
+                "the step shader should carry `{expected}` — the Rust mirror \
+                 `root_distance` transcribes it, and the two have drifted"
+            );
+        }
+        // The other half of ADR-0088's Notes: normalised at the write, clamped at
+        // the READ, so the stored value stays a faithful measurement.
+        assert!(
+            super::DRAW_SHADER.contains("let root01 = clamp(root, 0.0, 1.0);"),
+            "the draw shader must clamp the root channel at the read — clamping at \
+             the write would throw away a legitimate measurement"
+        );
+        // ...and the anchoring, which is the one place this channel departs from
+        // every other term on the coordinate. Pinned as source text because the
+        // mirror cannot catch it: `root_shift` and `channel_shift` are both
+        // one-line multiplies, so a shader "tidied" into the shared helper would
+        // leave every mirror-based assertion green while sliding the figure.
+        assert!(
+            super::DRAW_SHADER.contains("+ draw.rc.x * root01;"),
+            "the root channel's palette term must be ANCHORED (`draw.rc.x * root01`), \
+             not routed through the centred `channel_shift` — ADR-0088's Anchoring \
+             section, and root01 does not span [0, 1]"
+        );
+        assert!(
+            !super::DRAW_SHADER.contains("channel_shift(root01"),
+            "the root channel must not use `channel_shift` — it is centred on 0.5, \
+             which root01 reaches on only one of the five figures"
+        );
     }
 
     /// **The CPU mirror of the shader's hash agrees with the shader's own draw.**
@@ -5385,18 +5732,22 @@ mod tests {
         );
     }
 
-    /// **All four colour channels default to the identity** (Plan 0073 Phase 4).
+    /// **Every colour channel defaults to the identity** (Plan 0073 Phase 4,
+    /// extended by Plan 0074 Phase 1).
     ///
     /// "The default is the identity" is a claim about arithmetic rather than a
-    /// hope, and it is what sixteen unmoved golden baselines rest on: `*_tint`
+    /// hope, and it is what the unmoved golden baselines rest on: `*_tint`
     /// adds an exact `0` to the palette coordinate and `*_hue` compares equal to
     /// literal `0.0` and takes `shift_hue`'s early return. Asserted here on the
     /// scene's own state, and by the golden suite on the pixels.
+    ///
+    /// Counted by the list rather than by the name, because Plan 0074 makes the
+    /// roster five and then four again.
     #[test]
-    fn the_four_colour_channels_default_to_the_identity() {
+    fn the_colour_channels_default_to_the_identity() {
         use projection_mirror as m;
 
-        let names = ["map_tint", "map_hue", "age_tint", "age_hue"];
+        let names = ["map_tint", "map_hue", "age_tint", "age_hue", "root_tint"];
         for name in names {
             assert!(
                 super::PARAMS.contains(&name),
@@ -5419,14 +5770,27 @@ mod tests {
             h.scene.map_hue,
             h.scene.age_tint,
             h.scene.age_hue,
+            h.scene.root_tint,
         ]) {
             assert_eq!(got, 0.0, "`{name}` did not reset to the identity");
         }
 
-        // ...and zero really is the identity on both routes, at any channel value.
+        // ...and zero really is the identity on every route, at any channel
+        // value — including the anchored one, where it is `0.0 * unit` rather
+        // than `0.0 * (unit - 0.5)` and just as exact.
         for unit in [0.0f32, 0.33, 0.5, 1.0] {
             assert_eq!(m::channel_shift(unit, 0.0), 0.0);
+            assert_eq!(m::root_shift(unit, 0.0), 0.0);
         }
+
+        // The anchored route is inert on a family whose channel is identically
+        // zero **by arithmetic**, whatever the binding — which the centred route
+        // is not, and which is why the engine has to zero the `ch` row off the
+        // IFS rather than relying on a default (ADR-0088's Anchoring section).
+        for amount in [0.0f32, 0.3, 0.9, -0.4] {
+            assert_eq!(m::root_shift(0.0, amount), 0.0);
+        }
+        assert_eq!(m::channel_shift(0.0, 0.4), -0.2);
         let colour = [0.2f32, 0.65, 0.35];
         assert_eq!(
             m::shift_hue(colour, 0.0).map(f32::to_bits),
@@ -5622,6 +5986,125 @@ mod tests {
         }
     }
 
+    /// **The root channel's population is spread rather than clustered, on every
+    /// figure** (Plan 0074 Phase 1, claim 3, as restated 2026-08-07).
+    ///
+    /// **This is the cheap early warning for the exact failure Plan 0073 hit.** A
+    /// channel whose population clusters cannot show a gradient however it is
+    /// coloured, and this catches that on the readback buffer before a human
+    /// looks at a picture. It does **not** establish that the gradient is
+    /// *visible* — that is the Phase 2 gate's job, and no readback can do it.
+    ///
+    /// **What it asserts, and what it deliberately only prints.** The claim
+    /// originally read "spans at least 90 % of `[0, 1]`"; that is false on four
+    /// of the five figures, because the fixed-point diameter is not a *lower*
+    /// bound on the attractor's reach any more than it is an upper one. The
+    /// **ceiling is therefore measured and printed, never asserted** — it is a
+    /// property of each figure's invariant measure rather than of this code, and
+    /// a threshold on it would be a frozen number asserted universally, the
+    /// shape [ADR-0071] forbids. What *is* asserted is the property the claim was
+    /// reaching for and which holds on all five: the values reach an exact `0`
+    /// and rise with **no gap wider than a decile of the occupied bulk**.
+    ///
+    /// The bulk is `[0, p99]` rather than `[0, max]` on purpose. The spiral's top
+    /// few particles are a handful out of 4 096, so a statistic anchored on the
+    /// single farthest one would be measuring that particle rather than the
+    /// distribution — and would flake.
+    ///
+    /// The printed table is what the Phase 2 gate reads: it is the only place the
+    /// per-figure ceilings are recorded from a live run.
+    ///
+    /// [ADR-0071]: ../../../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
+    #[test]
+    fn after_six_hundred_steps_the_root_channel_is_spread_on_every_figure() {
+        const FRAMES: u32 = 600;
+        const DECILES: usize = 10;
+
+        for figure in ifs::IfsFigure::ALL {
+            let Some(mut h) = Harness::new(AttractorFamily::Ifs(figure)) else {
+                return;
+            };
+            h.run(FRAMES);
+
+            let mut roots: Vec<f32> = h
+                .raw()
+                .iter()
+                .map(|p| {
+                    assert!(
+                        p.root.is_finite() && p.root >= 0.0,
+                        "{figure:?}: root {} is not a finite distance — the normaliser \
+                         diverged",
+                        p.root
+                    );
+                    p.root
+                })
+                .collect();
+            roots.sort_by(f32::total_cmp);
+
+            // The respawn state, on bits. A particle that has just restarted sits
+            // *on* a fixed point, so its distance is not approximately zero — it
+            // is zero, and that is one end of this channel's ramp. Non-vacuous
+            // too: it is the evidence the churn ran at all during the readback
+            // frame.
+            let at_zero = roots
+                .iter()
+                .filter(|r| r.to_bits() == 0.0f32.to_bits())
+                .count();
+
+            let ceiling = roots.last().copied().unwrap_or(0.0);
+            // The 99th percentile of ~4 096 samples — the 41st value from the
+            // top, which is stable in a way the maximum is not.
+            let p99 = roots
+                .get(roots.len().saturating_sub(1) * 99 / 100)
+                .copied()
+                .unwrap_or(0.0);
+
+            // Printed, not asserted (see the doc comment): this is the Phase 2
+            // gate's input.
+            let mut deciles = [0usize; DECILES];
+            for r in &roots {
+                let bucket = ((r.clamp(0.0, 1.0) * DECILES as f32) as usize).min(DECILES - 1);
+                if let Some(slot) = deciles.get_mut(bucket) {
+                    *slot += 1;
+                }
+            }
+            println!(
+                "{figure:?}: root 0.000..{ceiling:.3} (p99 {p99:.3}), {at_zero} at exact 0, \
+                 deciles of [0, 1] {deciles:?}"
+            );
+
+            assert!(
+                at_zero > 0,
+                "{figure:?}: no particle reads an exact 0 after {FRAMES} steps — either \
+                 nothing respawned during the readback frame, or the distance is not \
+                 exact at a fixed point"
+            );
+
+            // The property itself: no hole wider than a decile of the bulk. This
+            // subsumes a decile-occupancy check and states the claim directly —
+            // a clustered population is exactly one with a large interior gap.
+            let widest = roots
+                .iter()
+                .copied()
+                .filter(|r| *r <= p99)
+                .collect::<Vec<_>>()
+                .windows(2)
+                .filter_map(|w| match w {
+                    [a, b] => Some(b - a),
+                    _ => None,
+                })
+                .fold(0.0f32, f32::max);
+            let limit = p99 / DECILES as f32;
+            assert!(
+                widest <= limit,
+                "{figure:?}: the root values have a {widest:.4} hole inside [0, {p99:.3}], \
+                 wider than the {limit:.4} decile of that bulk — the population is \
+                 clustered, and a clustered channel cannot show a gradient whatever \
+                 colours it"
+            );
+        }
+    }
+
     /// ADR-0087's `map` channel is written by the IFS arm and by nothing else.
     ///
     /// **Both halves are the test.** That the fern reaches all four values says
@@ -5667,6 +6150,14 @@ mod tests {
             de_jong.raw().iter().all(|p| p.map == 0.0),
             "a map family must leave `map` at its seeded 0.0 — anything else \
              makes `map_tint` reach a family it has no meaning on"
+        );
+        // ...and ADR-0088's channel is confined to the same arm, for the same
+        // reason: a map family has no closed-form on-attractor point, so it has
+        // no skeleton to measure a distance from.
+        assert!(
+            de_jong.raw().iter().all(|p| p.root == 0.0),
+            "a map family must leave `root` at its seeded 0.0 — it has no fixed \
+             points, so any value there is measured against a zeroed table"
         );
     }
 }
