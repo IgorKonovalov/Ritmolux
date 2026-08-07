@@ -76,6 +76,39 @@ reasons about does not change shape.
 `Particle::age` **stays**. It is what drives the emergence ramp, which is load-bearing. Only the two
 params that read it for colour are retired.
 
+### Anchoring: `root_tint` is anchored at zero, not centred on a half
+
+*Added 2026-08-07, while this ADR is still `proposed`, from Plan 0074 Phase 1's first measurement.*
+
+`root_tint` adds `root_tint · root01` to the palette coordinate. It does **not** go through
+ADR-0087's centred `channel_shift`, which every other channel on that coordinate uses.
+
+ADR-0087 centres because `map01` and `depth01` genuinely span `[0, 1]`: their midpoint means
+*typical*, so raising the amount opens a spread about the preset's chosen colour instead of sliding
+the figure. **`root01` does not span `[0, 1]`.** Measured over 600 steps at 4 096 particles, its
+ceiling is `0.46` on the fern, `0.41` on the spiral, `0.50` on the sierpinski, `0.70` on the tree
+and `1.05` on the dragon. On four of five figures a centred shift would therefore be negative almost
+everywhere — sliding the base colour by roughly `−root_tint/2` while spreading by less than half of
+what the author asked for, which is exactly what `presets/README.md` promises the centring prevents.
+
+Zero is the right anchor because here it is both **meaningful and exactly reachable**: it is the
+respawn state, a particle sitting on a fixed point, asserted bit-exact. Anchored there, the figure's
+contraction points keep the preset's chosen colour and everything ramps away from them — which is
+the picture this ADR opens by describing.
+
+Rejected alternative: keep `channel_shift`, and let `hue_center` absorb the offset. It is defensible
+— the two spellings differ by the constant `−root_tint/2`, and the LUT sampler repeats, so the
+gradient's shape and contrast are identical either way and only the base colour moves. It loses on
+the contract rather than on the picture: a param documented as opening a spread would in fact be
+doing two things, and the operator docs would have to explain an exception that costs one line of
+shader to remove.
+
+Two consequences worth naming. Anchored at zero, a bound `root_tint` on a family whose `root` is
+identically `0` is inert **by arithmetic**, where the centred spelling needed the engine to zero the
+whole channel row — a strictly stronger version of the inertness Plan 0073 Phase 4 had to build.
+And the three channels competing for this coordinate are now asymmetric: two centred, one anchored,
+so they do not simply sum into a wider band — the third also displaces it.
+
 ## Consequences
 
 ### Positive
@@ -112,6 +145,10 @@ params that read it for colour are retired.
 - **The diameter floor is a constant with no principled value**, in the same position ADR-0075's
   `0.97` and ADR-0087's `180` occupy. It is bounded by measurement rather than chosen by taste,
   which is better, but it is still a number somebody picked.
+  *Measured 2026-08-07: `0.05`, against a sweep minimum of `0.1506` at `Tree -> Sierpinski`,
+  `morph = 0.25`, low lever extreme — a margin of ×3.0. The floor never engages on any reachable
+  table, so it is defensive rather than load-bearing. A sixth figure could change that, which is why
+  the assertion prints where the minimum occurred instead of merely passing.*
 
 ### Neutral
 
@@ -193,6 +230,18 @@ The distance is stored **normalised** rather than raw, so the draw path multipli
 the value is directly a `[0, 1]` palette coordinate. Values above `1` are legitimate — the diameter
 of the fixed-point set is not an upper bound on how far the attractor reaches — and are clamped at
 the read rather than at the write, so the stored quantity stays a faithful measurement.
+
+**The paragraph above named one direction and the measurement found the other** (2026-08-07). The
+diameter is not a *lower* bound either, and that is the common case rather than the exception: four
+of the five curated figures have skeletons **wider** than their own reach away from that skeleton,
+so their `root01` tops out well short of `1` — `0.41` spiral, `0.46` fern, `0.50` sierpinski, `0.70`
+tree, `1.05` dragon. The channel is continuous and gap-free over its own occupied range on all five,
+which is the property that matters, but the *range itself is per figure*. A given `root_tint` is
+therefore worth up to 2.5× more on one figure than another.
+
+This does not change the decision. Every normaliser that would flatten it is a sampled supremum,
+which is Alternative D's objection and it stands. It changes what the operator docs owe: the range
+is a documented property of each figure, not a constant an author can carry between them.
 
 The one thing this ADR wants a future reader to check before trusting it: **the gradient's survival
 is a claim about the invariant measure having support near each fixed point**, which is true as a

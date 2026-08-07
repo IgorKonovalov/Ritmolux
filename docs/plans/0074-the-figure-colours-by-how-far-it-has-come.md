@@ -1,6 +1,13 @@
 # 0074 — The figure colours by how far it has come: distance from the skeleton, and the age channel retires
 
-> **Status:** **approved 2026-08-06** — ready for `dev`, gated by nothing.
+> **Status:** **in-progress 2026-08-06** — Phase 1 under way.
+> **Amended 2026-08-07, mid-Phase-1, by measurement.** Claim 3 asserted the population spans ≥ 90 %
+> of `[0, 1]`; it does not, on four of five figures, because the fixed-point diameter is not a
+> *lower* bound on the attractor's reach either — a direction ADR-0088 never considered. Claim 3 is
+> restated as the no-clustering property it was reaching for, widened to all five figures, and the
+> measured ceilings are recorded as Phase 2's input. Claim 1 passed with a ×3.0 margin, so the floor
+> is defensive. One code decision follows from the same measurement: **`root_tint` anchors at `0`
+> rather than centring on `0.5`** — see Phase 1 and ADR-0088's *Anchoring* section.
 > **Phase 2 is `human` and it is a GATE**, deliberately placed after one `dev` phase rather than at
 > the end. Phase 6 is `human` and terminal. So this plan does not close in one session, and it can
 > legitimately stop after Phase 2. **A `dev` session lands Phase 1 and then stops** — do not
@@ -106,6 +113,10 @@ flowchart TB
 - **The floor is required, not defensive.** Two drawn maps' fixed points can approach each other as
   the morph interpolates, and a diameter of zero gives a divergent reciprocal. Floor the diameter;
   the done-when measures how close the sweep actually gets.
+  *Measured 2026-08-07: the minimum diameter over the whole sweep is `0.1506`, at
+  `Tree -> Sierpinski`, `morph = 0.25`, low lever extreme, against a floor of `0.05` — a margin of
+  ×3.0. **The floor is doing nothing, which is the good outcome**: the channel does not degenerate
+  anywhere in the reachable morph, and Phase 2 has no specific place it must go and look.*
 - **The uniform does not grow.** `StepUniform::_pad` is `[u32; 3]`, three explicitly named padding
   words the scalar block's alignment already paid for. The reciprocal takes one and leaves two, so
   the struct stays **192 bytes** and `the_step_uniform_carries_the_ifs_table_in_one_binding` keeps
@@ -114,10 +125,35 @@ flowchart TB
   offset spelled out. **Do not reach for `vertex_attr_array!`** — it lays attributes out
   consecutively, which is the trap Plan 0073 documented and this is the first phase since to add an
   attribute. `the_particle_layout_carries_two_channels` is the test that holds the offsets to the
-  struct; extend it rather than writing a new one.
+  struct; extend it rather than writing a new one (renaming it to say *three* is part of extending
+  it — the name is a claim and it has to stay true).
 - **Store normalised, clamp at the read.** Values above `1` are legitimate — the skeleton's diameter
   is not an upper bound on the attractor's reach — so the stored value stays a faithful measurement
   and the draw clamps.
+- **Anchor the tint at `0`, not at `0.5` — do not use `channel_shift` for this one**
+  (amended 2026-08-07, ADR-0088's *Anchoring* section). The palette shift is
+  `coord += root_tint · root01`, not `root_tint · (root01 − 0.5)`.
+
+  The reason is measurement, not taste. `channel_shift` is centred because `map01` and `depth01`
+  genuinely span `[0, 1]`, so their midpoint means *typical* and raising the amount opens a spread
+  about the preset's chosen colour. **`root01` does not span `[0, 1]`** — it reaches `0.46` on the
+  fern and `0.41` on the spiral (table below) — so a centred shift would be almost always negative
+  and would *slide* the figure as well as spreading it, which is precisely what
+  `presets/README.md` promises the centring prevents. Zero, by contrast, is both meaningful and
+  exactly reachable here: it is the respawn state, and claim 2 asserts it bit-exact. Anchored
+  there, the fixed points keep the preset's chosen colour exactly and the figure ramps away from
+  it — which is what "dark at the stem base, bright at the tips" describes.
+
+  It costs one line, no constant, no per-figure table and no Monte Carlo, and it is **not** a
+  change to what the Phase 2 gate sees: the two spellings differ by the constant `−root_tint/2`
+  across every particle, and the LUT sampler repeats, so the gradient's shape and contrast are
+  identical either way. Only the base colour moves, and `hue_center` already owns that.
+
+  One property comes free and is worth keeping in mind at Phase 3: anchored at zero, a bound
+  `root_tint` on a family whose `root` is identically `0` is inert **by arithmetic**, where the
+  centred spelling needed the engine to zero the whole row. Keep the row-zeroing anyway — Phase 3
+  moves `root_tint` into the shared `ch` row where `map_*` still needs it — but the inertness no
+  longer rests on it alone.
 - **Done when**, in three claims:
 
   **1. The normaliser is bounded away from its floor, measured rather than assumed.** Over every
@@ -134,14 +170,66 @@ flowchart TB
   fixed point itself. The `projection_mirror` discipline: the WGSL is the source, the Rust is the
   mirror, and a constants-agree test holds the shader's literals to the Rust ones the way
   `the_churn_constants_agree_between_rust_and_wgsl` already does.
+  *Note (2026-08-07): this channel turns out to add **no shared numeric constant** — the normaliser
+  is computed on the CPU and arrives as one uniform word — so there are no literals to agree on and
+  a constants-agree test in the literal sense would be vacuous. What there is to pin is the
+  **expression**: `min` over all four slots times the reciprocal at the write, and the clamp at the
+  read. Pinning those source lines is the faithful reading of this claim, and it catches the failure
+  the mirror cannot — a shader edited to `min` over three slots leaves every mirror-based test
+  green, because they all run the mirror.*
+  Route the mirror through the **packed uniform rows** rather than calling `fixed_points` twice: the
+  packing — which point lands in which half of which `vec4` — is then under test too, and a
+  transposition would still produce a plausible gradient.
 
-  **3. The population occupies the whole range, which is the property the channel exists for.**
-  After 600 steps the readback buffer's `spare0` values span at least 90 % of `[0, 1]` and **no
-  decile is empty** — the direct analogue of Plan 0073's age-decile test, on the quantity that
-  actually matters. *This is the cheap early warning for the exact failure that plan hit:* a channel
-  whose population clusters cannot show a gradient, and this catches that before a human looks.
+  **3. The population is spread rather than clustered, across all five figures.** *(Restated
+  2026-08-07 — the original wording asserted a span of ≥ 90 % of `[0, 1]`, which no figure but the
+  dragon reaches. See "What the first measurement found" below; the property below is what the
+  claim was reaching for and the `[0, 1]` framing was an assumption ADR-0088 never made.)*
+
+  After 600 steps, for **each of the five figures**, the readback buffer's `root` values must
+  reach an exact `0` and rise continuously to that figure's own ceiling **with no gap wider than
+  a decile of the occupied bulk**. *This is the cheap early warning for the exact failure Plan
+  0073 hit:* a channel whose population clusters cannot show a gradient however it is coloured,
+  and this catches that before a human looks.
+
+  **The ceiling itself is measured and printed, never asserted.** It ranges `0.41`–`1.05` across
+  the five figures, it is a property of each figure's invariant measure rather than of this code,
+  and a threshold on it would be a frozen number asserted universally — the shape
+  [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+  forbids.
+  Print min / ceiling / deciles per figure: that table *is* the input Phase 2 needs.
+
+  Pick a statistic that is robust at the thin top tail — bucketing `[0, max]` and demanding every
+  bucket non-empty is fragile on the spiral, whose top few particles are a handful out of 4 096.
+  Bucketing the bulk (say `[0, p99]`) states the same property without hinging on one particle.
+
   It does **not** establish that the gradient is *visible* — that is Phase 2's job, and no readback
   can do it.
+
+- **What the first measurement found** (2026-08-07, 600 steps, 4 096 particles, clamped deciles).
+  Recorded here because it is Phase 2's starting data, not just an implementation note:
+
+  | figure | ceiling | deciles of `[0, 1]` |
+  |---|---|---|
+  | Fern | `0.461` | `[685, 840, 1084, 1097, 390, 0, 0, 0, 0, 0]` |
+  | Tree | `0.695` | `[882, 561, 751, 546, 561, 483, 312, 0, 0, 0]` |
+  | Dragon | `1.050` | `[176, 389, 479, 524, 547, 567, 526, 332, 307, 249]` |
+  | Sierpinski | `0.500` | `[356, 592, 738, 1021, 1385, 4, 0, 0, 0, 0]` |
+  | Spiral | `0.412` | `[1694, 1092, 1026, 277, 7, 0, 0, 0, 0, 0]` |
+
+  Two readings, and the first is the good news. **The distribution is continuous and gap-free over
+  its own occupied range on every figure** — there is no interior hole anywhere, which is exactly
+  the clustering failure the claim exists to catch, and it is absent. The channel behaves as
+  ADR-0088 argued.
+
+  **The second reading is a real finding and it is Phase 2's to weigh: contrast is per-figure.**
+  Four of five figures have skeletons *wider* than their own reach away from that skeleton, so the
+  same `root_tint` binding buys about **41 % of the palette swing on the spiral and 105 % on the
+  dragon**. That is the honest consequence of normalising by the figure's own skeleton — the
+  meaningful scale ADR-0088 deliberately chose over a bounding box — and the answer is to
+  **document it rather than engineer it away**: an author tunes `root_tint` per preset regardless,
+  and every alternative normaliser is a sampled supremum with the wobble ADR-0088 Alternative D
+  rejected. Phase 5's `presets/README.md` row owes the range and this table.
 
 - **Not a done-when, because it cannot be one:** "the fern reads as graded". Phase 2 owns that.
 - **Baselines:** all seventeen stay byte-identical. `root_tint` defaults to `0` and the palette
@@ -172,6 +260,15 @@ flowchart TB
   it survive the morph, where the fixed points move? Does it survive a long `fade`, where the trail
   averages neighbouring particles of different distances? And does it fight `map_tint`, which is
   bound in both shipped presets and writes the same palette coordinate?
+- **It arrives with numbers, and it should use them** (added 2026-08-07). Phase 1's claim 3
+  measured each figure's ceiling — the fraction of the palette swing a given `root_tint` actually
+  buys there: spiral `0.41`, fern `0.46`, sierpinski `0.50`, tree `0.70`, dragon `1.05`. So **the
+  same binding is not the same look across figures**, and a `root_tint` tuned on the fern is worth
+  roughly 2.5× more on the dragon. Two things follow for this pass. Render each figure at a
+  `root_tint` scaled by its own ceiling as well as at a shared value, or the comparison confounds
+  "this figure's measure is thin" with "this figure's channel is compressed". And treat a verdict
+  of *does not read* on the spiral differently from one on the dragon: the spiral has the least
+  range to work with and is the hardest case by construction, the dragon the easiest.
 - **Done when:** a verdict is recorded in this plan, in one of three shapes.
   - **It reads** → Phases 3-6 proceed as written.
   - **It reads on some figures and not others** → Phases 3-6 proceed, and the figures where it does
@@ -238,9 +335,18 @@ flowchart TB
   - `presets/README.md` — the roster row (`age_tint`/`age_hue` out, `root_tint`/`root_hue`/
     `emergence` in), the IFS-only warning, and the "Colouring by what made a point" section, whose
     `age` bullet and warning box both describe a channel that no longer exists.
+    **Two things `root_tint` owes that no shipped param has needed before** (added 2026-08-07):
+    that it is **anchored at `0`, not centred** — the fixed points keep the preset's colour and the
+    figure ramps away from it, which is the *opposite* of what the page says about `map_tint` two
+    paragraphs earlier, so say it explicitly rather than letting the reader generalise; and that
+    **its effective range is per figure**, with Phase 1's ceiling table (spiral `0.41` → dragon
+    `1.05`) reproduced, because an author tuning on one figure and reusing the number on another
+    will otherwise be quietly wrong by up to 2.5×.
   - `docs/preset-palettes.md` — the three-term coordinate expression added at Plan 0073's close
-    becomes a three-term expression again with a different third term. The `map_tint`-competes-with-
-    `hue_spread` warning still stands and now applies to `root_tint` too.
+    becomes a three-term expression again with a different third term. **The third term is not the
+    same shape as the other two**: `root_tint · root01`, not `root_tint · (root01 − 0.5)`. The
+    `map_tint`-competes-with-`hue_spread` warning still stands and now applies to `root_tint` too —
+    and applies *asymmetrically*, since an anchored term only ever pushes the coordinate one way.
   - `docs/design-backlog.md` — **strike entry 0074 through** with a pointer to this plan and
     ADR-0088. It is the architect inbox; an entry that has been built and not struck reads as open.
   - **`docs/presets.md` is not touched:** no expression-grammar variable, function or operator changes.
@@ -276,7 +382,12 @@ flowchart TB
 /// Closed form, at most six distances, continuous in the table. Floored,
 /// because two drawn maps' fixed points can approach each other across a morph
 /// and the reciprocal would diverge.
-fn skeleton_scale(table: &IfsTable) -> f32;
+///
+/// Two functions in practice, and claim 1 is why: the RAW diameter is the
+/// measurement the sweep asserts against the floor, and the FLOORED one is what
+/// ships. One function that floored silently could not tell the two apart.
+fn skeleton_diameter(table: &IfsTable) -> f32;
+fn skeleton_scale(table: &IfsTable) -> f32;   // = diameter.max(SKELETON_FLOOR)
 
 /// 48 bytes, unchanged. One spare word is spent; one remains.
 #[repr(C)]
@@ -310,10 +421,24 @@ struct Particle {
   `attractor_fern`'s `hue_spread` from `0.16..0.42` to `0.05..0.125` to let `map_tint` read. There
   may not be room for a third. `root_hue` is the escape — it does not touch that coordinate — and
   Phase 6's done-when is what converts this from an assumption into a finding.
-- **The floor could be load-bearing rather than defensive.** If Phase 1's claim 1 finds the minimum
-  diameter close to the floor, the channel degenerates somewhere in the morph and Phase 2 must be
-  told exactly where to look. That is why the assertion prints the figure pair and morph rather than
-  just passing.
+  **The competition is now *asymmetric*, which makes it harder rather than easier** (2026-08-07):
+  `hue_spread` and `map_tint` are centred and spend their budget either side of the preset's chosen
+  colour, while `root_tint` is anchored at `0` and only ever pushes one way. So the three do not
+  simply sum into a wider band — two of them widen it and the third also *displaces* it. Phase 6
+  should expect to re-centre `hue_center` after binding `root_tint`, and should say so if that
+  turns out to be the thing that makes the three-way unworkable.
+- **~~The floor could be load-bearing rather than defensive.~~ Answered 2026-08-07: it is
+  defensive.** Claim 1 measured the minimum diameter at `0.1506` (`Tree -> Sierpinski`,
+  `morph = 0.25`, low levers) against a floor of `0.05` — margin ×3.0. The channel does not
+  degenerate anywhere in the reachable morph, so Phase 2 has no specific place it must go and look.
+  The assertion still prints the figure pair and morph, because the *next* figure added to the
+  roster could change this and a bare pass would not say so.
+- **The channel's range is figure-dependent, and no cheap fix exists** (added 2026-08-07). Phase 1
+  measured ceilings of `0.41`–`1.05` across the five figures, so the same `root_tint` is worth up
+  to 2.5× more on one figure than another. Every alternative normaliser that would flatten this is
+  a sampled supremum — ADR-0088 Alternative D's objection, which stands. The decision is to
+  **document rather than engineer**, and the risk it carries is an authoring one: a preset tuned on
+  the fern and copied to the dragon is wrong by a factor nobody will see in a diff.
 - **`attractor_ifs.png` moves twice if the phases are taken literally** — once when Phase 3 retires
   the two params the fixture binds, once when Phase 5 rebinds it. That is two deliberate re-blesses
   of one file. Any *other* baseline moving, at any phase, is a defect.
