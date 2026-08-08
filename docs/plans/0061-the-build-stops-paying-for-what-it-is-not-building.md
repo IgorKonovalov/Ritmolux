@@ -1,14 +1,16 @@
 # 0061 — The build stops paying for what it is not building, and the two oversized modules come apart
 
-> **Status:** **approved 2026-08-06** — ready for `dev`. **Phase 4b's scoping half landed early and
+> **Status:** **approved 2026-08-08** — ready for `dev`. **Phase 4b's scoping half landed early and
 > out of sequence** as `1c55476` (2026-08-04, at the user's direct request); see the note on that
 > phase for what it satisfies, the one accepted deviation, and the coverage gap it opens until Phase
 > 4 lands. Every other phase is unstarted.
-> **Only Phase 6 has been re-measured** (2026-08-06). Every other number in this plan is still a
-> **2026-08-04 snapshot** — the 412 MB staticlib, the 33.9 GB of PDBs, the 948.9 s `shot_cli` test,
-> `Renderer`'s size. The Phase 6 re-measure found the raw file up 84 % in two days while its *code*
-> moved 40 %, so treat the others the same way: **re-measure before acting, and do not satisfy a
-> stale number literally.** That instruction is this plan's own and it has now been vindicated twice.
+> **Every file measurement was re-taken 2026-08-08** (fourth amendment). The build and CI numbers —
+> the 412 MB staticlib, the 33.9 GB of PDBs, the 948.9 s `shot_cli` test — are **still 2026-08-04
+> snapshots** and are the ones left to re-measure before acting. This plan's own instruction, **do
+> not satisfy a stale number literally**, has now been vindicated three times: the 2026-08-06 Phase 6
+> re-measure, its own first pass counting the wrong column, and the 2026-08-08 pass that found the
+> 2026-08-06 table already wrong (`shaders.rs` 409 → 785 code lines in two days) and Phase 3's line
+> target unreachable by the moves Phase 3 names.
 > **Created:** 2026-08-04
 > **Amended:** 2026-08-04 — four phases added (1b, 2b, 4b, 9) covering CI wall time, after run
 > 30903871856 made the first green measurement available; [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md)
@@ -18,6 +20,17 @@
 > check. The checker and its pre-push step landed at Plan 0060's close (`06d198f`, `cdcd750`) after
 > 74 broken links were found across 23 files; the CI half comes here because this plan owns every
 > `ci.yml` edit in flight. Independent of 2b/4b and separable from them.
+> **Amended:** 2026-08-08 (fourth pass) — **Phases 2d and 7b added, Phase 3's target corrected,
+> Phase 6's table re-measured.** The user's re-review request named the goal this plan had been
+> approximating: *files are huge and that is bad for context and readability*. Measured against that
+> goal rather than against code lines, **Phase 6 as approved did not deliver it** — after its
+> four-way split `particles/mod.rs` still stood at ~4,100 total lines, because 2,586 lines of
+> `mod tests` stayed behind and no phase moved them. **Phase 2d** is the missing phase: 40.9 % of
+> this project's Rust source is inline `#[cfg(test)] mod` blocks, and moving them out of line is a
+> pure file move that changes no visibility and no test path. It also repairs **Phase 3**, whose
+> "under 2400 lines" was unreachable by the moves it names — at any point in this plan's life.
+> **Phase 7b** takes `docs/plans/README.md`, which at 3,516 lines is the largest document in the
+> repository and the one the `architect` skill tells every session to read first.
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) (new, proposed),
 > [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) (new, proposed),
@@ -37,9 +50,22 @@ staticlib no test consumes, `target/debug` carries 33.9 GB of debug symbols acro
 modules have grown past the point where a reader can hold them. This plan halves the edit-compile
 loop, extracts the C ABI into its own crate ([ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md)),
 carves the capture and transition families out of `Renderer`, splits the attractor's
-`mod.rs` (3077 lines at drafting, **5672 as of 2026-08-06** — but 1370 → 1912 of *code*; see Phase
-6's re-measure) into the directory it already lives in, and closes four smaller findings. **It
-moves no pixels** — every golden baseline must come back byte-identical.
+`mod.rs` (3077 lines at drafting, **6449 as of 2026-08-08**; see Phase 6's re-measure) into the
+directory it already lives in, and closes four smaller findings. **It moves no pixels** — every
+golden baseline must come back byte-identical.
+
+**Amended 2026-08-08 with the finding that the size half of this plan was measuring the wrong
+number.** Phases 3 and 6 both stated line targets, and both were derived from *code* lines — tests,
+doc comments and blanks excluded — because this plan's opening table found raw counts misleading. That
+correction was right for judging whether a module does too many jobs, and **wrong for the goal the
+user actually stated**: a reader, and a session's context window, pays for *total* lines. The two
+numbers diverge here more than anywhere: **40.9 % of this project's Rust source (19,130 of 46,793
+lines) is inline `#[cfg(test)] mod` blocks**, and not one file in the tree uses an out-of-line test
+module. Phase 6's four-way split would have left `particles/mod.rs` at ~4,100 total lines — a file
+nobody can hold, passing a done-when. **Phase 2d** moves every substantial test module to a sibling
+`tests.rs`; it is a pure file move that changes no visibility, no test name and no behaviour, and it
+is what makes Phases 3 and 6 deliver what they claim. **Phase 7b** applies the same finding to
+`docs/plans/README.md` (3,516 lines, the repo's largest document, read first by every session).
 
 **Amended 2026-08-04 with the same finding on the build machine.** The first green run since
 2026-07-30 shows the shipped preset library rendered **three times per push**: once in `check
@@ -70,20 +96,57 @@ the biggest files — `core/src/render/tonemap.rs` is 1034 lines holding **10** 
 
 | File | total | tests | doc/blank | **code** |
 |---|---|---|---|---|
-| `core/src/render/scenes/particles/mod.rs` | 3077 | 822 | 885 | **1370** |
-| `core/src/render/mod.rs` | 3272 | 1142 | 988 | **1142** |
-| `core/src/preset/expr.rs` | 1878 | 241 | 609 | **1028** |
-| `standalone/examples/shot.rs` | 1621 | 0 | 504 | **1117** |
-| `standalone/src/main.rs` | 1414 | 0 | 427 | **987** |
+| `core/src/render/scenes/particles/mod.rs` | 6449 | 2793 | 1417 | **2239** |
+| `core/src/render/mod.rs` | 3518 | 1357 | 1015 | **1146** |
+| `core/src/render/scenes/particles/ifs.rs` | 2734 | 1570 | 646 | **518** |
+| `core/src/preset/expr.rs` | 1879 | 241 | 614 | **1024** |
+| `standalone/examples/shot.rs` | 1622 | 0 | 506 | **1116** |
+| `standalone/src/main.rs` | 1415 | 0 | 428 | **987** |
 
-`expr.rs` is a tokenizer + parser + evaluator + gate analyzer, which is a defensible unit at 1028
+*(Re-measured 2026-08-08 at `f0dbf57`. The 2026-08-04 drafting figures were 3077 / 3272 / — / 1878 /
+1621 / 1414 total; `ifs.rs` did not exist in the table because it landed the same day, as `8c621fa`.)*
+
+`expr.rs` is a tokenizer + parser + evaluator + gate analyzer, which is a defensible unit at ~1024
 lines; it is **out of scope**. The two that are not defensible:
 
-- **`particles/mod.rs` is a directory module holding one file.** `particles/` contains only `mod.rs`,
-  while the sibling `lines/` is decomposed into ten files. Five concerns share it: attractor family
-  ODE math (`AttractorFamily`/`Basis`, 26 match arms), 326 lines of embedded WGSL across four shader
-  constants, three GPU resource structs, `AttractorScene` (37 fields) plus its `Scene` impl, and five
-  free `encode_*` functions. The decomposition the directory implies was never done.
+- **`particles/mod.rs` is a directory module doing a directory's worth of work in one file.**
+  `particles/` holds `mod.rs` plus `ifs.rs` — the latter added 2026-08-04 by Plan 0062 — while the
+  sibling `lines/` is decomposed into ten files. Five concerns share `mod.rs`: attractor family ODE
+  math (`AttractorFamily`/`Basis`, 26 match arms), **785 code lines** of embedded WGSL across four
+  shader constants (326 at drafting — Plans 0073 and 0074 nearly doubled it), three GPU resource
+  structs, `AttractorScene` plus its `Scene` impl, and five free `encode_*` functions. The
+  decomposition the directory implies was never done.
+
+### Two different metrics, and the one this plan was missing (added 2026-08-08)
+
+The table above measures **code**, and that is the right lens for *does this module do too many
+jobs*. It is the wrong lens for *can a reader, or a session's context, hold this file* — that is paid
+in **total** lines, and the gap between the two columns is where this plan's size half was leaking.
+
+**40.9 % of this project's Rust source — 19,130 of 46,793 lines across `core/src`, `standalone/src`
+and `lmv-ring/src` — sits inside inline `#[cfg(test)] mod` blocks.** Seventeen files carry 250 or more
+such lines. Not one file in the tree uses an out-of-line test module, so the idiom was never rejected
+here; it simply was never adopted. Moving `mod tests { … }` into a sibling `tests.rs` declared
+`#[cfg(test)] mod tests;` is a **pure file move**: the child module keeps its position in the module
+tree, so `use super::*` still reaches every private item, every test's full path is unchanged, and no
+`pub` anywhere in the tree moves. Phase 2d takes it.
+
+| File | total | after 2d | test lines moved |
+|---|---|---|---|
+| `render/scenes/particles/mod.rs` | 6449 | **3696** | 2753 (`projection_mirror` 167 + `tests` 2586) |
+| `render/mod.rs` | 3518 | **2168** | 1350 |
+| `render/scenes/particles/ifs.rs` | 2734 | **1164** | 1570 |
+| `render/scenes/lines/star.rs` | 2303 | **1262** | 1041 |
+| `render/scenes/emitter.rs` | 2177 | **1082** | 1095 |
+| `render/scenes/swarm.rs` | 1783 | **753** | 1030 |
+| `render/post.rs` | 1659 | **638** | 1021 |
+| `render/scenes/lines/spectrum.rs` | 1562 | **826** | 736 |
+| `render/tonemap.rs` | 1058 | **483** | 575 |
+| `render/scenes/lines/renderer.rs` | 1043 | **535** | 508 |
+| ... and seven more at 250-350 lines each | | | |
+
+`tonemap.rs` is the extreme case and the one the opening paragraph already named: 1058 lines holding
+**10** of actual code. After Phase 2d it is 483; after nothing else.
 - **`Renderer` is a god object.** `impl Renderer` spans `core/src/render/mod.rs:746-2132` — 55
   methods over six responsibilities: frame encoding, preset roster selection, the dissolve state
   machine, the tier governor, **five public `capture_*` methods that are dev-tooling API rather than
@@ -160,6 +223,19 @@ We rejected **majors-only** because the four small items are cheap to carry and 
 backlog entries that will rot, and **build-config-only** because it leaves the two oversized modules
 untouched for another cycle while the review that found them is still fresh.
 
+**Added 2026-08-08: the size half measures both columns, and the test modules move first.** The plan
+had been judging file size in *code* lines — right for asking whether a module does too many jobs,
+wrong for the goal the user stated, which is that a file be small enough to read and to load into a
+session's context. Measured the second way, Phase 6 was going to satisfy its done-when and leave a
+4,100-line file. The fix is **Phase 2d**, and it is deliberately the cheapest possible kind of change:
+an out-of-line test module sits in the same place in the module tree as the inline one, so nothing
+about visibility, test naming or behaviour moves — which is why a phase that touches ~14,000 lines can
+be verified by one empty diff. We rejected **making Phase 6's targets stricter instead**, which would
+have forced a decomposition the code does not want in order to make room for tests that should not
+have been in the file; and **doing the exodus in its own plan**, because Phases 3 and 6 depend on it
+arithmetically and shipping them against the old numbers would just re-run the failure this pass
+caught.
+
 **Both `human` phases go last, deliberately.** `dev` stops at a `human` tag, so placing the plugin
 verification immediately after the extraction would end the session with two-thirds of the plan
 unwritten. Phases 4-7 touch nothing the ABI depends on, so nothing is invalidated if the link needs a
@@ -201,14 +277,40 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph before["core/src/render/ — before"]
-        M1["mod.rs — 3272 lines<br/>Renderer: 55 methods<br/>frame + roster + dissolve<br/>+ tier + 5x capture_* + diag"]
+        M1["mod.rs — 3518 lines<br/>Renderer: 55 methods<br/>frame + roster + dissolve<br/>+ tier + 5x capture_* + diag<br/><i>1350 lines of mod tests</i>"]
     end
     subgraph after["core/src/render/ — after"]
-        M2["mod.rs<br/>Renderer core + draw_frame"]
+        M2["mod.rs — ~1704<br/>Renderer core + draw_frame"]
         C2["capture_api.rs<br/>the 5 capture_* + helpers"]
-        T2["transition.rs (existing)<br/>+ the dissolve drivers"]
+        T2["transition.rs (existing)<br/>+ the dissolve drivers<br/>(pub(super))"]
+        X2["tests.rs — 1350<br/><i>Phase 2d</i>"]
     end
-    M1 --> M2 & C2 & T2
+    M1 -->|"Phase 2d"| X2
+    M1 -->|"Phase 3"| M2 & C2 & T2
+```
+
+Phase 2d applied tree-wide, on the seventeen files carrying 250+ inline test lines. The move is
+vertical — nothing crosses a module boundary, because an out-of-line `mod` sits where the inline one
+sat.
+
+```mermaid
+flowchart LR
+    subgraph b2["before — one file per module"]
+        F1["particles/mod.rs<br/><b>6449</b><br/>code + doc + 2753 test"]
+    end
+    subgraph a2["after Phase 2d"]
+        F2["particles/mod.rs<br/><b>3696</b>"]
+        F3["particles/tests.rs<br/>2586"]
+        F4["particles/projection_mirror.rs<br/>167"]
+    end
+    subgraph a6["after Phase 6"]
+        F5["mod.rs <b>1726</b>"]
+        F6["shaders.rs 841"]
+        F7["resources.rs 808"]
+        F8["family.rs 321<br/><i>no wgpu</i>"]
+    end
+    F1 --> F2 & F3 & F4
+    F2 --> F5 & F6 & F7 & F8
 ```
 
 The CI half, before and after Phases 2b + 4b. The library is rendered three times on the left and
@@ -232,7 +334,7 @@ flowchart TB
 Each phase ships as its own commit. `dev` runs every `dev`-tagged phase in one session, stopping at
 the `human` tag in Phase 8. Phase 9 is the second `human` phase and is read after the user pushes.
 
-**Standing done-when for Phases 1b and 3-7: the golden suite comes back byte-identical.** These
+**Standing done-when for Phases 1b and 2d-7: the golden suite comes back byte-identical.** These
 phases are refactors and configuration; none is allowed to move a pixel. `LMV_BLESS` must **not** be
 set in any of them, and a baseline diff is a phase failure, not a re-bless. (Note the standing
 hazard: bless is not scoped to the failing scene — see the repo's own history of re-blessing
@@ -358,18 +460,81 @@ stops being an expectation.
   threaten ADR-0073's *"`coverage` is the longest job"* property, so it does not complicate that
   measurement — but Phase 9 should not be surprised by an unfamiliar job in the run.
 
+### Phase 2d — The test modules move out of line (added 2026-08-08)
+- **Owner skill:** dev
+- **What:** For every source file carrying a substantial inline test module, replace
+  `#[cfg(test)] mod tests { … }` with `#[cfg(test)] mod tests;` and move the body to a sibling
+  `tests.rs` (or `<name>.rs` for a differently-named module, e.g. `particles/projection_mirror.rs`).
+  Nothing else changes: not a test, not an assertion, not a `use`, not a visibility keyword.
+- **Files touched:** the seventeen files measured at 250+ test lines (table under *Two different
+  metrics*), plus the `tests.rs` each one gains. **`dev` re-derives the list mechanically rather than
+  trusting that table** — it is a 2026-08-08 snapshot and this plan has been bitten three times by
+  reading one literally.
+- **Why this is safe, stated once so the done-when can be short.** An out-of-line module occupies the
+  **same position in the module tree** as the inline one it replaces. `core::render::mod::tests`
+  written in `render/mod.rs` and written in `render/tests.rs` are both `core::render::tests`. So
+  `use super::*` reaches exactly the same private items, every test's full path is character-identical,
+  and no `pub` is needed anywhere. This is why the phase is a file move and not a refactor.
+- **What does NOT move:** `#[cfg(test)]` on a **function or an impl member** — `read_particles` in
+  `particles/mod.rs`, `src_texture` and `map` in `tonemap.rs`, `begin_transition_forced` in
+  `render/mod.rs`. Those are test-only members of a type or of the parent module, not modules; moving
+  them would be a real refactor with real visibility consequences. Only `#[cfg(test)] mod NAME { … }`
+  blocks move.
+- **Done when:** `cargo nextest list`, sorted, is **byte-identical before and after**, and that diff
+  (empty) is pasted in the commit message. **That is the whole safety argument for this phase** — the
+  listing carries every test's full module path, so an empty diff proves simultaneously that no test
+  was lost, none was renamed, and none changed its position in the module tree. A non-empty diff means
+  something moved that was not supposed to, and the phase is not done.
+  Additionally: `git diff` adds **no** `pub`, `pub(crate)` or `pub(super)` token anywhere in the diff —
+  if the compiler demands one, a `mod` block was moved to the wrong place or a `#[cfg(test)] fn` was
+  moved when it should not have been. No file left with a 250+ line inline test module. `cargo clippy
+  --all-targets -- -D warnings` and `cargo fmt --all --check` green. Golden baselines byte-identical
+  (standing done-when).
+- **The measured outcome, for the commit message:** the three files this plan already owns go
+  `particles/mod.rs` 6449 → **3696**, `render/mod.rs` 3518 → **2168**, `particles/ifs.rs` 2734 →
+  **1164**. Record the before/after total for every file touched; no threshold is set on the others,
+  because the reduction is arithmetic rather than a target to hit.
+- **Sequenced before Phases 3 and 6, and this ordering is load-bearing.** Phase 3's line target is
+  **unreachable without it** (see there), and Phase 6's four-way split leaves a 4,100-line `mod.rs`
+  without it. Both were written against a metric that excluded exactly the lines this phase moves.
+- *One accepted cost, stated because it is the reason to think twice: this is the largest diff in the
+  plan (~14,000 lines) and it touches files that several live plans also touch. It is tolerable only
+  because this plan is sequenced **last** by the user's own instruction, and because `git`'s conflict
+  resolution on a pure move is mechanical. If a lane goes live in `post.rs`, `transition.rs` or
+  `kaleidoscope.rs` while this is unlanded, take those files in a second commit rather than fighting
+  the merge.*
+
 ### Phase 3 — Carve the capture and dissolve families out of `Renderer`
 - **Owner skill:** dev
 - **What:** Move the five public `capture_*` methods and their private helpers into
   `core/src/render/capture_api.rs`, and the dissolve-driving methods next to the transition code, as
-  additional `impl Renderer` blocks. Pure code movement — no signature, visibility or behavior change.
+  additional `impl Renderer` blocks. Pure code movement — no signature or behavior change.
 - **Files touched:** `core/src/render/mod.rs`, new `core/src/render/capture_api.rs`,
   `core/src/render/transition.rs`
+- **Depends on Phase 2d**, arithmetically and not just for tidiness — see the corrected target below.
+- **The one visibility change, named because the phase used to claim there was none.** A private
+  method is visible to the module that defines it *and its descendants*. Every caller of the dissolve
+  family (`begin_transition`, `dissolve_mode`, `snap_finish_transition`, `promote_incoming_side`,
+  `select_preset_instantly`, `cancel_transition`, `reset_transition_rotation`,
+  `begin_transition_forced`) is in `render/mod.rs` — `cycle_preset`, `select_preset*`, `set_presets`,
+  `render` — and those stay. Once the callees live in `render::transition`, the **parent** can no
+  longer see them, so each moved private method takes `pub(super)`. That grants exactly the
+  visibility it has today — the `render` module and its descendants — so **the visibility boundary is
+  preserved and only the keyword expressing it changes**. Do not reach for `pub(crate)`; that would
+  widen it. The same rule applies to any `capture_*` helper that ends up with a caller outside
+  `capture_api.rs` (`capture_at_clock`, `reset_for_capture` and `step_offscreen` have callers only
+  inside the family, so they are expected to need nothing — verify rather than assume).
 - **Done when:** `core/src/render/mod.rs` contains no `fn capture_` and no `fn begin_transition`,
-  and the file is under 2400 lines. The five capture entry points keep their exact public paths, so
-  `standalone/examples/shot.rs` and every `core/tests/` caller compile **unchanged** — no call site
-  edits in this phase's diff outside the moved code. `cargo nextest run` green; golden baselines
-  byte-identical (standing done-when).
+  and the file is **under 1800 total lines**. The five capture entry points keep their exact public
+  paths, so `standalone/examples/shot.rs` and every `core/tests/` caller compile **unchanged** — no
+  call site edits in this phase's diff outside the moved code and the `pub(super)` keywords above.
+  `cargo nextest run` green; golden baselines byte-identical (standing done-when).
+  *The target was **2400** until 2026-08-08 and was unreachable at every point in this plan's life —
+  a fact `dev` would have discovered mid-phase and had to litigate. The capture family is 309 lines
+  (`mod.rs:1838-2146`) and the dissolve family 155 (`1063-1217`); 464 out of today's 3518 leaves
+  3054, and out of the drafting-day 3272 would have left ~2812. Both miss 2400. After Phase 2d the
+  file is 2168, the same 464 moves leave **1704**, and 1800 is the same ~100 lines of headroom 2400
+  was presumably meant to carry. Re-derive rather than trusting these line numbers.*
 
 ### Phase 4 — `shot.rs`: move the report machinery into the library
 - **Owner skill:** dev
@@ -384,6 +549,15 @@ stops being an expectation.
   nothing under `standalone/src/` names an `image` type (the ADR-0011 / ADR-0033 boundary). The
   `--report` and `--report --json` output for a fixed preset set is **byte-identical** to before the
   move, captured before and diffed after.
+  *Target re-verified 2026-08-08: `shot.rs` is 1622 total lines and its report section
+  (`shot.rs:602`-EOF) is ~1020 of them, so 1200 is reachable with room. Unlike Phase 3's, this number
+  was always sound.*
+- **Carries Phase 4b's one outstanding item**, restated here because 4b landed early and this is where
+  the item is now taken: **the `--size` / `--frames` reduction for `--report`**, which `1c55476` did
+  not take. It was written as "check, don't assume" and is still unchecked — confirm `--report`
+  honours those flags before relying on them. It is worth having and is **not** a substitute for 4b's
+  scoping; it is the half that keeps the cost from growing with a preset library that grows every
+  content plan.
 
 ### Phase 4b — A shape claim stops sweeping the library (ADR-0073) (added 2026-08-04)
 
@@ -454,71 +628,87 @@ stops being an expectation.
 
 ### Phase 6 — Split `particles/` into the directory it already is
 
-> **Re-measured 2026-08-06** against the current file, at the architect's request and because this
-> plan's own header says every number in it is a 2026-08-04 snapshot to re-check before acting.
-> **All four done-when claims survived, and the phase is less urgent than the raw file size
-> suggests** — see the measurement below.
+> **Re-measured twice, 2026-08-06 and 2026-08-08. The tables below are the live ones; the earlier
+> numbers are gone rather than archived.** The history worth keeping is one sentence long: on
+> 2026-08-06 the file was 5672 total / 1912 code and the split projected an 883-line residual; two
+> days later it was 6449 / 2239, with `shaders.rs` alone going **409 → 785** code lines as Plans 0073
+> and 0074 grew `STEP_SHADER` and `DRAW_SHADER`. **The conclusion has now survived three
+> re-measures** — the residual is 803, no fifth file is needed — but no individual number in it has
+> survived one. The 2026-08-06 pass also caught itself counting *non-test* lines against a target
+> derived from *code*, which is this plan's own "raw line counts are misleading here" finding
+> catching the architect applying it.
 >
-> **The first pass at this re-measure got it wrong, in exactly the way this plan warns about two
-> paragraphs above its own table.** It counted *non-test* lines (1,787 at the four-way split),
-> concluded the 1,400 target was unreachable, and proposed a fifth file to rescue it. But the table
-> at the head of this plan measures **code** — tests, doc comments and blanks excluded — and 1,400
-> was chosen against that table's **1,370**. Measured the same way, the four-way split lands at
-> **883**. The target holds with room, and no fifth file is needed. Recorded rather than quietly
-> fixed, because "raw line counts are misleading in this repo" is this plan's own finding and it
-> caught the architect re-measuring it.
+> **What changed materially on 2026-08-08 is that this phase no longer carries the size claim alone.**
+> Phase 2d moves this file's 2,753 test lines out first, so the two phases together take
+> `particles/mod.rs` from **6449 total lines to 1726** — the outcome this phase was always reaching
+> for and could not deliver by itself.
 
 - **Owner skill:** dev
 - **What:** Decompose `core/src/render/scenes/particles/mod.rs` into the four files its concerns
   already are: `family.rs` (the ODE/basis math, pure and GPU-free), `shaders.rs` (the four WGSL
-  constants and `projection_mirror`, their CPU transcription), `resources.rs` (the uniform structs,
-  the three GPU resource structs and their bind-group helpers), and `mod.rs` (the scene, its `Scene`
-  impl, the param surface, and the `encode_*` pass functions).
-- **Files touched:** `core/src/render/scenes/particles/{mod.rs,family.rs,shaders.rs,resources.rs}`
+  constants), `resources.rs` (the uniform structs, the three GPU resource structs and their
+  bind-group helpers), and `mod.rs` (the scene, its `Scene` impl, the param surface, and the
+  `encode_*` pass functions).
+- **Files touched:** `core/src/render/scenes/particles/{mod.rs,family.rs,shaders.rs,resources.rs}`.
+  *`projection_mirror` — the CPU transcription of the draw shader's projection, which the phase used
+  to hand to `shaders.rs` — is a `#[cfg(test)] mod` and therefore already left in Phase 2d, to
+  `particles/projection_mirror.rs`. It stays a child of `particles`, so it keeps reaching the shader
+  constants after they move.*
 
-- **The measurement, 2026-08-06 at `b957da2`, in this plan's own four columns.**
+- **The measurement, 2026-08-08 at `f0dbf57`, in this plan's own four columns.**
 
   | | total | tests | doc/blank | **code** |
   |---|---|---|---|---|
   | at plan creation (2026-08-04) | 3077 | 822 | 885 | **1370** |
-  | **now** | **5672** | **2043** | **1717** | **1912** |
+  | at the first re-measure (2026-08-06) | 5672 | 2043 | 1717 | **1912** |
+  | **now** | **6449** | **2793** | **1417** | **2239** |
 
-  **Total grew 84 %; code grew 40 %.** The rest is 1,221 lines of new tests and 832 of new doc
-  comments — this repo's deliberate style, and precisely why this plan measures code rather than
-  raw lines. [Plan 0073](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md) is most of it.
+  **Total grew 110 % from drafting; code grew 63 %.** The rest is new tests and new doc comments —
+  this repo's deliberate style, and precisely why this plan measures code when it is judging *how
+  many jobs a module does*. It is also precisely why Phase 2d exists: 2,793 of these 6,449 lines
+  answer to a file move, not to a decomposition. [Plans 0073 and
+  0074](done/0074-the-figure-colours-by-how-far-it-has-come.md) are most of the growth.
 
-  Assigning by the boundaries above, **code lines**:
+  Assigning by the boundaries above. **Both columns matter, and they answer different questions** —
+  `code` says the split puts each concern somewhere defensible, `total after 2d` says what a reader
+  actually opens:
 
-  | Destination | code | What it takes |
-  |---|---|---|
-  | `resources.rs` | 496 | `StepUniform`/`DrawUniform`/`DecayUniform`, `Resources`/`PipelineResources`/`FieldResources`, `PARTICLE_ATTRIBUTES`, the bind-group helpers |
-  | `shaders.rs` | 409 | the four `r#"` literals plus `projection_mirror` |
-  | `family.rs` | 124 | `AttractorFamily`, `Basis`, the spin helpers |
-  | **`mod.rs` residual** | **883** | the scene, `impl Scene`, `PARAMS`, the defaults, `Particle`, the churn constants, `UniformInputs`, the uniform upload, the four `encode_*` |
+  | Destination | code | total after 2d | What it takes |
+  |---|---|---|---|
+  | `shaders.rs` | 785 | 841 | the four `r#"` literals (`projection_mirror`'s 167 test lines leave in Phase 2d, to `projection_mirror.rs`) |
+  | `resources.rs` | 527 | 808 | `StepUniform`/`DrawUniform`/`DecayUniform`, `Resources`/`PipelineResources`/`FieldResources`, `PARTICLE_ATTRIBUTES`, the bind-group helpers |
+  | `family.rs` | 124 | 321 | `AttractorFamily`, `Basis`, the spin helpers |
+  | **`mod.rs` residual** | **803** | **1726** | the scene, `impl Scene`, `PARAMS`, the defaults, `Particle`, the churn constants, `UniformInputs`, the uniform upload, the four `encode_*` |
 
-- **`under 1400 *total* lines` is resolved to `code`,** matching the table this plan derived the
-  number from — 1,400 was chosen against a measured 1,370 of code, and reading it as *total* was a
-  slip in the wording rather than a different intent. Under the literal *total* reading no split
-  passes without a test exodus nobody designed; under the intended one the four-way split passes
-  with 517 lines of room.
+  **`particles/mod.rs`: 6449 → 1726 total across Phases 2d and 6**, with `tests.rs` (2586) and
+  `projection_mirror.rs` (167) beside it. `ifs.rs` is untouched by this phase and lands at 1164 from
+  Phase 2d alone; it needs no decomposition at 518 code lines.
+
+- **The `1400` target is a `code` number, and 2026-08-08 adds a `total` one beside it.** 1,400 was
+  chosen against the opening table's measured 1,370 of *code*, so reading it as *total* was a slip in
+  the wording; that resolution stands. But the *total* reading was dismissed on 2026-08-06 as
+  requiring "a test exodus nobody designed" — and **Phase 2d is now that exodus, designed.** So the
+  phase carries both: `code` proves each concern landed somewhere defensible, `total` proves the file
+  a reader opens actually got smaller. Neither alone would have caught what the other did.
 - **A fifth file is available and is not required.** Carving `encode.rs` (`UniformInputs`, the
-  uniform upload, the four `encode_*`) takes a further 270 code lines and leaves `mod.rs` at 613.
-  That is a judgment call about whether 883 lines of scene-plus-encode reads as one unit, **not** a
-  threshold question. Take it if the residual reads badly once split; do not take it to satisfy a
-  number, because the number is already satisfied.
-- **[Plan 0074](done/0074-the-figure-colours-by-how-far-it-has-come.md) does not threaten the target.**
-  It adds `root_tint`/`root_hue`/`emergence` to `PARAMS`, `set_param`, `reset_params` and the scene
-  struct — perhaps 25 lines of code in the residual, against 517 of headroom.
-- **Sequencing against Plan 0074.** Both own this file; 0074 is live and this plan is sequenced last
-  by the user's own instruction, so **0074 goes first and this phase rebases onto it**. If that
-  order ever inverts, re-measure rather than trusting the tables above — they are a snapshot, and
-  this phase now has a documented history of exactly that going stale, twice.
+  uniform upload, the four `encode_*`, `mod.rs:3439-3862`) takes a further 424 total lines and leaves
+  `mod.rs` at **1302**. That is a judgment call about whether scene-plus-encode reads as one unit,
+  **not** a threshold question — both targets pass without it. Take it if the residual reads badly
+  once split; do not take it to satisfy a number.
+- **Sequencing against Plan 0074: discharged.** 0074 **closed 2026-08-08** (`1618a90`), and the
+  measurement above is taken at `f0dbf57`, after it. **No live plan touches `particles/` any more**,
+  so this phase has the file to itself — which is also why Phase 2d can take its 2,753 test lines
+  without racing anyone.
 
 - **Done when:** **Plan 0059 is `Status: done` and sits in `docs/plans/done/`** — *verified met
   2026-08-06: it is `docs/plans/done/0059-lorenz-finds-its-plane.md`*, so this gate no longer blocks.
-  Afterwards:
+  **Phase 2d has landed** (its test lines are out of this file already). Afterwards:
   - `mod.rs` is **under 1,400 lines of code** — tests, doc comments and blanks excluded, measured the
-    way this plan's opening table measures. (Projected 883 at the four-way split.)
+    way this plan's opening table measures. (Projected 803 at the four-way split.)
+  - `mod.rs` is **under 1,900 total lines**, which is the claim a reader can check by opening it.
+    (Projected 1726; it was 6449 before Phase 2d.) Stated as a second, looser bound rather than
+    folded into the first, because the two numbers can fail independently: a split that satisfies
+    `code` while leaving a wall of doc comments behind satisfies nothing the user asked for.
   - `mod.rs` contains **no `r#"` WGSL literal** — *re-verified: there are still exactly four, so the
     "four WGSL constants" wording holds unchanged*.
   - `mod.rs` contains **no `AttractorFamily` match arm** — *re-verified achievable: every remaining
@@ -526,7 +716,13 @@ stops being an expectation.
     `PipelineResources`, which moves to `resources.rs` with it*.
   - `family.rs` has **no `wgpu` import**, proving the math is separable and unit-testable without a
     device — *re-verified achievable: the 144-464 region contains zero `wgpu` references today*.
-  - The existing `particles` tests are distributed to the file they cover and all still run.
+  - **`particles::tests` still runs in full.** After Phase 2d it is `particles/tests.rs`, and it
+    reaches the new sibling modules through `use super::*` exactly as it reached the same items
+    inline, so the split needs no test edits and `cargo nextest list` stays byte-identical through
+    this phase too. *Redistributing those tests into per-file modules is **optional and not required
+    here** — it would rename every test path, which is a different kind of change from a move, and it
+    is the one thing in this phase that cannot be checked by an empty list diff. If taken, take it as
+    its own commit.*
   - Golden baselines byte-identical (standing done-when) — this is the phase most able to move a
     pixel by accident, so check `attractor.png` explicitly, **by `git diff` rather than by a green
     suite**: `LMV_BLESS` rewrites baselines even on a pristine HEAD, so a green golden run means
@@ -544,6 +740,52 @@ stops being an expectation.
   reading the failure message. Any genuinely doc-exempt name sits in an explicit, commented allowlist
   (the shape ADR-0058 uses for evidence), never an unexplained skip. `CLAUDE.md`'s C ABI bullet stops
   paraphrasing a five-function surface and points at `docs/specs/0001-c-abi.md` as the authority.
+  *Re-verified 2026-08-08: `core/src/ffi.rs` declares **12** `extern "C"` functions against
+  `CLAUDE.md`'s five-item paraphrase, so this finding is still live.*
+
+### Phase 7b — The plans index stops being the largest document in the repo (added 2026-08-08)
+- **Owner skill:** dev
+- **What:** Cut `docs/plans/README.md` from 3,516 lines to a roster a session can actually read
+  first, which is the job the `architect` skill assigns it.
+- **Files touched:** `docs/plans/README.md`, new `docs/plans/README-archive.md`
+- **The measurement, 2026-08-08.** The file is **328 KB — it exceeds the `Read` tool's 256 KB limit,
+  so an agent cannot open it in one call.** Three sections carry it:
+
+  | Section | lines | What it is |
+  |---|---|---|
+  | `## Recently closed` | **2630** | a paragraph per closed plan, 66 of them |
+  | `### What to take once [0052] and [0055] close` | **622** | deliberation about two plans that have **both since closed** |
+  | `### Prior sequencing notes` | 100 | superseded orderings |
+  | everything else (header, roster, roadmap, order, conventions) | ~160 | the part that is actually the index |
+
+  The roster table holds **35 rows for 8 active plans** — 13 are struck-through closed plans that
+  already appear in `Recently closed`, and the rest carry multi-paragraph amendment histories (this
+  plan's own row is ~700 words).
+- **Done when:** `docs/plans/README.md` is **under 400 lines**, and every one of these holds:
+  - The roster lists **only plans that are still in `docs/plans/`** — a closed plan leaves the roster
+    entirely, since `Recently closed` and `done/` both already record it. No struck-through rows.
+  - Each roster row carries **plan link, title, status + date, owner skills, and at most two
+    sentences of live constraint** — what a reader needs to decide whether to pick this plan up.
+    Everything longer belongs in the plan file, which is where someone who picked it up is reading.
+  - `Recently closed` becomes **one line per plan** (link, title, close date, one clause) and the
+    existing paragraphs move verbatim to `docs/plans/README-archive.md` — the shape
+    `docs/design-backlog-archive.md` already established here. Nothing is deleted; it stops being
+    loaded on every session.
+  - The 622-line `What to take once [0052] and [0055] close` section is **removed**, not archived.
+    Both plans closed; it is deliberation about a decision that has been made.
+  - **`node scripts/check-doc-links.mjs` exits 0.** This phase moves ~2,700 lines of link-dense prose
+    between two files and is exactly the kind of edit that produced the 74 broken links Plan 0060
+    found. Run it, do not inspect.
+  - `docs/plans/README.md` still answers its three questions in the first screen: what is in flight,
+    what order to take it in, and the next free plan and ADR number.
+  *No line target is set on the archive file — it is a write-only record and its size is not a cost.
+  The 400 on the README is derived, not chosen: ~160 lines of index that already works, 8 roster rows,
+  and ~70 for a one-line-per-plan closed list leaves room without inviting the prose back.*
+- **This is a docs phase in a code plan on purpose.** It is the same finding as Phases 2d, 3 and 6 —
+  a file that grew past what a reader can hold, because nothing ever said how big the parts were
+  allowed to be — and it lands here rather than in its own number because this plan is where the
+  finding is being acted on. It shares no file with any other phase and can be dropped without
+  affecting one.
 
 ### Phase 8 — Verify the foobar plugin still links
 - **Owner skill:** human
@@ -623,10 +865,26 @@ lmv-core = { path = "../core" }
   just the failing one, and WARP can alias identical bind-group layouts so the suite blesses garbage
   that hardware renders correctly. Neither Phase 3 nor Phase 6 should need a bless at all — if one
   seems to, that is a bug in the refactor.
-- **This plan is scheduled last and is explicitly subject to change.** Every measurement in it is a
-  2026-08-04 snapshot of this machine. Re-measure before acting: if an intervening plan has already
-  moved `render/mod.rs` or `particles/mod.rs`, the line-count done-whens need re-deriving, not
-  satisfying literally.
+- **This plan is scheduled last and is explicitly subject to change.** Every *file* measurement was
+  re-taken 2026-08-08; the build and CI measurements are still 2026-08-04 snapshots of this machine.
+  Re-measure before acting rather than satisfying a line count literally. **This risk has now
+  materialised four times** and is the single most reliable thing in the document: the 2026-08-06
+  Phase 6 re-measure, its own first pass counting the wrong column, the 2026-08-08 pass finding that
+  table stale in two days, and the same pass finding Phase 3's target unreachable *at every point in
+  the plan's life*. Treat a number here as evidence of what someone once saw, not as a contract.
+- **Phase 2d is the largest diff in the plan (~14,000 lines) and touches files other lanes touch.**
+  `post.rs`, `transition.rs`, `kaleidoscope.rs`, `bloom.rs` and the `lines/` family all appear in live
+  plans ([0046], [0053], [0064], [0067], [0071], [0072]). The exposure is real and is accepted for
+  three reasons: this plan is sequenced **last** by the user's own instruction; a pure move conflicts
+  mechanically rather than semantically; and the phase can be split by file at any point without
+  losing its safety property, since `cargo nextest list` is checked per commit. **If a lane is live in
+  one of those files, take that file in a separate commit** rather than resolving a merge over 1,000
+  moved test lines.
+- **Phase 2d's safety rests on one claim, and it is a language rule rather than a measurement.** An
+  out-of-line `mod` occupies the same position in the module tree as the inline one, so privacy and
+  test paths are unchanged. If that claim were wrong the compiler would say so immediately and loudly
+  — which is why the phase's done-when is *no `pub` token appears in the diff* rather than a green
+  suite. A green suite after adding visibility keywords would look identical and prove nothing.
 - **Three separate reasons now move `COVERAGE_FLOOR`, and they must not be read as competing.** Plan
   0060 may re-derive it; Phase 2 moves it again by removing `ffi.rs` from the gated crate; and Phase
   2b changes nothing about the number but makes the job that carries it load-bearing for correctness.
@@ -676,8 +934,15 @@ lmv-core = { path = "../core" }
 ## Followups (after this lands)
 
 - Consolidating `core/tests/`' 25 targets into fewer binaries, if link time still bites after Phase 1.
-- `reaction_diffusion.rs` (719 code lines, 234 of doc, no inline tests) is the next-largest scene and
-  has the same embedded-WGSL-plus-resources shape `particles/` had. Not urgent; revisit if it grows.
+- `core/src/render/scenes/reaction_diffusion.rs` (1024 total, **810 code**, 214 of doc, and the only
+  large scene in the tree with **no inline tests at all** — so Phase 2d does not touch it) is the
+  next-largest scene and has the same embedded-WGSL-plus-resources shape `particles/` had. Not
+  urgent; revisit if it grows. *Re-measured 2026-08-08; it was 719 code at drafting.*
+- **`core/src/preset/expr.rs` and `standalone/src/main.rs` stay out of scope but are now the two
+  largest files in the tree that no phase shrinks** — after Phase 2d they sit at ~1638 and 1415 total
+  lines, because neither carries much inline test weight (241 and 0). Both are argued defensible under
+  *What this plan does NOT do*; that argument is unchanged, but they are what "largest remaining file"
+  will mean after this plan lands.
 - A `target/` size check in the pre-push hook or a periodic prune, given ADR-0053 multiplies it per
   lane.
 - **Merging the two Windows jobs** (ADR-0073 Alternative A) if Phase 9 shows the surviving `check
