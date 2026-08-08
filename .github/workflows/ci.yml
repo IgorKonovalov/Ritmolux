@@ -64,7 +64,28 @@ jobs:
       # bare `cargo nextest run` would silently skip the ABI conformance suite
       # and a bare `cargo clippy` would silently stop linting the ABI. This is
       # the job that proves the C ABI still compiles and behaves.
-      - run: cargo nextest run --workspace
+      #
+      # THE NINE GPU-HEAVY SUITES ARE EXCLUDED HERE (ADR-0073). They render the
+      # shipped preset library on WARP, and until this change they ran twice per
+      # push - uninstrumented in this job and instrumented in `coverage`,
+      # concurrently on two identical windows-latest runners, about 1930 CPU-
+      # seconds paid a second time a few metres away. THE `coverage` JOB IS NOW
+      # THE ONLY PLACE THESE SUITES RUN ON WINDOWS, which means it is
+      # load-bearing for correctness and not only for the ratchet: disabling it,
+      # skipping it, or letting `cargo-llvm-cov` fail to install takes the golden
+      # guard and every GPU behavioural suite with it, and nothing else says so.
+      # Treat deleting this comment as deleting a gate.
+      #
+      # The same list `.githooks/pre-push` skips locally, by the same measured
+      # reason. Verified by a union check rather than asserted: `nextest list`
+      # for this job plus `nextest list -p lmv-core` / `-p lmv-core-cabi` for
+      # `coverage` covers all 589 tests the unfiltered run listed, and all 18
+      # tests this removes are `lmv-core` binaries.
+      #
+      # Applied on BOTH matrix arms, not branched per-OS: macOS already skips
+      # every GPU suite (ADR-0016), so the filter removes nothing there, and a
+      # per-OS branch is a second thing to keep true.
+      - run: cargo nextest run --workspace -E 'not (binary(golden) + binary(attractor) + binary(reaction_diffusion) + binary(background_composite) + binary(ink) + binary(reactivity) + binary(animation) + binary(sanity) + binary(distinctness))'
       - run: cargo test --workspace --doc
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo fmt --all --check
