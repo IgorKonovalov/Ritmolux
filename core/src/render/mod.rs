@@ -172,6 +172,15 @@ enum ParamRoute {
     Tonemap,
     /// The active scene's named-parameter surface.
     Scene,
+    /// A shared colour modulation (`saturation`, `palette_mix`) — the scene's
+    /// **and** the backdrop's, from one binding (ADR-0086).
+    ///
+    /// The only fan-out in this enum, and it is one because the backdrop joined
+    /// the scenes' two colour levers rather than declaring its own: an author who
+    /// crossfades palettes means the whole frame, not the figure alone. The name
+    /// still belongs to the system's vocabulary — `background::PARAMS` does not
+    /// claim it — so a system that declared neither reaches neither.
+    SceneAndBackdrop,
     /// No owner claimed the name — silently dropped at apply time, exactly as
     /// the old fallthrough dropped it on reaching a scene that ignores it. The
     /// author already heard about it: an unknown name is a **load-time warning**
@@ -203,6 +212,14 @@ fn resolve_route(name: &str, system: SystemKind) -> ParamRoute {
         return ParamRoute::Ink;
     }
     if system.param_names().contains(&name) {
+        // The backdrop colours through the preset's palette (ADR-0086), so the
+        // two shared modulations move it with the figure. Tested *after* the
+        // system's own vocabulary, not before it: a system that declares neither
+        // gives neither to the sky, and the fan-out can never conjure a route for
+        // a name the scene would have dropped.
+        if background::SHARED_COLOUR_PARAMS.contains(&name) {
+            return ParamRoute::SceneAndBackdrop;
+        }
         return ParamRoute::Scene;
     }
     ParamRoute::Unclaimed
@@ -478,12 +495,25 @@ fn evaluate_preset(
         // is skipped with it — a per-element binding's `tau` is always
         // `INSTANT` (the loader forces it and warns), so its slot was a
         // passthrough nothing read.
-        if matches!(*route, ParamRoute::Scene) && !series.is_empty() && binding.expr.uses_index() {
+        if matches!(*route, ParamRoute::Scene | ParamRoute::SceneAndBackdrop)
+            && !series.is_empty()
+            && binding.expr.uses_index()
+        {
             // The scene eases the element levels itself through
             // `[spectrum] smoothing`; a series has no single value for the
             // per-binding smoother to hold.
             evaluate_series(&binding.expr, vars, series);
             scene.set_param_series(&binding.name, series);
+            // One backdrop has no elements to vary across, so it takes element
+            // 0 — the same fallback `set_param_series` already gives a
+            // whole-figure param, which is what `saturation` and `palette_mix`
+            // are on every scene that has a per-element surface.
+            if matches!(*route, ParamRoute::SceneAndBackdrop)
+                && let Some(&first) = series.first()
+            {
+                side.background
+                    .set_shared_colour_param(&binding.name, first);
+            }
             continue;
         }
         let raw = binding.expr.eval(vars);
@@ -513,6 +543,11 @@ fn evaluate_preset(
             }
             ParamRoute::Scene => {
                 scene.set_param(&binding.name, value);
+            }
+            ParamRoute::SceneAndBackdrop => {
+                scene.set_param(&binding.name, value);
+                side.background
+                    .set_shared_colour_param(&binding.name, value);
             }
             // Nothing consumes it. Surfaced at load, silent here (ADR-0020).
             ParamRoute::Unclaimed => {}
@@ -1185,6 +1220,8 @@ impl Renderer {
             scenes,
             roster,
             cap_overflow,
+            side,
+            incoming_side,
             ..
         } = self;
         *cap_overflow = None;
@@ -1211,6 +1248,16 @@ impl Renderer {
             (None, None) => Palette::default_spectrum(),
         };
         scene.set_palette(&baked);
+        // The backdrop colours through the same bake (ADR-0086) — one gradient,
+        // two consumers, no second bake and no drift.
+        //
+        // It goes to the side that will actually **draw** this preset. During a
+        // dissolve that is `incoming_side`, which this call precedes by one frame
+        // (the roster flips at the end of the capture frame); `side` is still
+        // painting the outgoing preset's backdrop and keeps the gradient it was
+        // given, until `promote_incoming_side` makes the incoming one *the* side.
+        let live = incoming_side.as_mut().unwrap_or(side);
+        live.background.set_palette(&baked);
         // Structural config (ADR-0007), if any: capture segment-cap truncation so
         // the frontend can surface it (never a silent cut). `None` for the
         // fit/no-config case.

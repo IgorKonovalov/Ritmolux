@@ -71,16 +71,39 @@ fn each_namespace_resolves_to_its_owner() {
 
     // Everything a system declares goes to its scene — checked for **every**
     // system, so a family whose names happened to collide with a global
-    // namespace could not slip through.
+    // namespace could not slip through. The two shared colour modulations are
+    // the one exception, and they are a **fan-out** rather than a transfer: the
+    // scene still receives them, the backdrop receives them too (ADR-0086).
     for system in SystemKind::ALL {
         for name in system.param_names() {
+            let shared = crate::render::background::SHARED_COLOUR_PARAMS.contains(name);
+            let want = if shared {
+                ParamRoute::SceneAndBackdrop
+            } else {
+                ParamRoute::Scene
+            };
             assert_eq!(
                 resolve_route(name, system),
-                ParamRoute::Scene,
+                want,
                 "`{name}` is {}'s own param",
                 system.as_str()
             );
         }
+    }
+    // The fan-out cannot conjure a route on a system that declares neither: the
+    // shared-name test sits *after* the vocabulary check, so an unknown name is
+    // still unclaimed even when it is one of the two.
+    for name in crate::render::background::SHARED_COLOUR_PARAMS {
+        assert_eq!(
+            resolve_route(name, swarm),
+            ParamRoute::SceneAndBackdrop,
+            "`{name}` reaches the swarm and the backdrop"
+        );
+        assert!(
+            !crate::render::background::PARAMS.contains(name),
+            "`{name}` must stay out of the backdrop's own vocabulary — claiming \
+             it there would take it off the scene"
+        );
     }
 
     // An unknown name is ignored, not an error and not mis-routed. Includes a

@@ -1,6 +1,6 @@
 # Plan 0072 — The backdrop joins the palette
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing. Phases 1 and 3 are `dev`;
+> **Status:** **in-progress 2026-08-08** — Phases 1 and 3 are `dev`;
 > Phase 2 is `human` (a `preset-author` pass, landing directly per
 > [ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)).
 > **ADR:** [0086](../adrs/0086-the-backdrop-colours-through-the-preset-palette.md)
