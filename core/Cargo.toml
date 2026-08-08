@@ -13,8 +13,12 @@ publish = false
 
 [lib]
 name = "lmv_core"
-# rlib for the standalone (native Rust), cdylib/staticlib for the foobar C++ shim (C ABI).
-crate-type = ["rlib", "cdylib", "staticlib"]
+# rlib only (ADR-0072). Every consumer in this workspace links the rlib: the
+# standalone, all integration test targets and both examples. The cdylib and
+# staticlib the foobar C++ shim links now come from the `lmv-core-cabi` crate,
+# so a core edit stops re-emitting ~550 MB of artifacts nobody in the command's
+# dependency graph reads.
+crate-type = ["rlib"]
 
 [lints]
 workspace = true
@@ -24,7 +28,7 @@ workspace = true
 # wgpu graph (Plan 0005). Intra-workspace path dep, re-exported by `audio`.
 lmv-ring = { path = "../lmv-ring" }
 # FFT for the spectrum path. Pure Rust, ~5 transitive deps (num-* family),
-# no unsafe SIMD requirements — well under the NFR 4 dependency gate.
+# no unsafe SIMD requirements â€” well under the NFR 4 dependency gate.
 rustfft = "=6.4.1"
 # The GPU abstraction ADR-0001 commits to; its transitive weight is the one
 # accepted fixed cost (NFR 4). Backends are gated per-OS (NFR 12 primary memory

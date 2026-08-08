@@ -1,0 +1,41 @@
+# The C ABI, and nothing else (ADR-0072). The only crate in the workspace that
+# declares cdylib/staticlib, so a plain `cargo build` - and every `cargo test`
+# and `cargo run` - stops emitting a 412 MB staticlib and a 24 MB dll that no
+# test, no example and no CI job links. The one consumer is the foobar2000 C++
+# shim, built on demand by plugin-foobar/build.ps1 through a separate MSVC
+# toolchain.
+#
+# The `extern "C"` surface, LMV_ABI_VERSION and docs/specs/0001-c-abi.md are
+# unchanged by the split: this crate moves where the ABI is compiled, not what
+# it is (ADR-0003's rule still holds - the ABI version moves only on a shape
+# change, and a file move is not one).
+[package]
+name = "lmv-core-cabi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+# Not a crates.io package - linked by the foobar plugin as a compiled artifact.
+publish = false
+
+[lib]
+# NOT `lmv_core`, which was Plan 0061's preferred stem and does not work. The
+# emitted FILE names would not have collided (`liblmv_core.rlib` against
+# `lmv_core.lib`/`.dll`), but the CRATE name does: `tests/ffi.rs` is an
+# integration test of this crate, and cargo passes both the crate under test and
+# this package's dependencies as `--extern`. Two `--extern lmv_core=` cannot
+# coexist, `lmv-core` wins, and every ABI symbol resolves to a crate that no
+# longer defines one. So the ABI would ship untested to satisfy a file name.
+# The plan's stated fallback, taken: plugin-foobar/build.ps1 links
+# `lmv_core_c.lib` in the same commit.
+name = "lmv_core_c"
+# `rlib` is here for `tests/ffi.rs` to link against, and costs nothing in the
+# everyday loop because `default-members` in the root manifest excludes this
+# crate - a bare `cargo build` never selects it at all.
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[lints]
+workspace = true
+
+[dependencies]
+lmv-core = { path = "../core" }

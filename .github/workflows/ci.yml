@@ -17,12 +17,30 @@ env:
   CARGO_TERM_COLOR: always
   # ADR-0033 ratchet: line coverage of lmv-core only, measured on Windows where
   # the DX12 WARP software adapter makes the render paths genuinely executable.
-  # Set from a real measurement (90.13% at Plan 0032's close) minus a 2-point
-  # margin so an unrelated change does not trip on rounding.
+  # Set from a real measurement minus a margin so an unrelated change does not
+  # trip on rounding.
   #
   # Raise it at a close ceremony when a plan improves coverage. Never lower it
   # without a one-line note here naming the plan that lowered it and why.
-  COVERAGE_FLOOR: "88"
+  #
+  # 88 -> 91 at Plan 0061 Phase 2, and the reason is a moved denominator rather
+  # than better tests: ADR-0072 took `ffi.rs` (493 lines, its conformance suite
+  # covering ~57% of them) out of this crate, so the same code scores higher.
+  # Measured 94.85% lines LOCALLY after the move; the run that CI will produce is
+  # not this run, and is expected to read slightly LOWER because this box has a
+  # hardware GPU and CI has WARP, so hardware-gated tests execute here and skip
+  # there. Hence a ~3-point margin rather than the usual 2. Plan 0061 Phase 9
+  # re-derives this from the first cache-warm CI run - treat 91 as a floor that
+  # has been measured once, on the wrong machine, and is owed a second look.
+  COVERAGE_FLOOR: "91"
+  # The C ABI's own gate (ADR-0072 Negative: without it the ABI's coverage
+  # silently stops being watched the moment it leaves `lmv-core`). Measured
+  # 56.60% lines. The number is low because most of `core-cabi` is error and
+  # null-handle paths plus the catch_unwind wrappers, and it is recorded rather
+  # than aspired to - the gate exists to catch a REGRESSION, not to claim the
+  # ABI is well covered. Raising it means writing ABI tests, which no phase of
+  # Plan 0061 does.
+  CABI_COVERAGE_FLOOR: "54"
 
 jobs:
   check:
@@ -39,9 +57,16 @@ jobs:
       - run: cargo build
       # nextest for parallelism + per-test isolation; it does not run doctests,
       # so cover those separately.
-      - run: cargo nextest run
-      - run: cargo test --doc
-      - run: cargo clippy --all-targets -- -D warnings
+      #
+      # `--workspace` is load-bearing since ADR-0072: `lmv-core-cabi` is
+      # deliberately outside `default-members` (so a bare `cargo build` stops
+      # emitting a cdylib and a 102 MB staticlib nothing links), which means a
+      # bare `cargo nextest run` would silently skip the ABI conformance suite
+      # and a bare `cargo clippy` would silently stop linting the ABI. This is
+      # the job that proves the C ABI still compiles and behaves.
+      - run: cargo nextest run --workspace
+      - run: cargo test --workspace --doc
+      - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo fmt --all --check
 
   # Supply-chain gate (deny.toml): advisories, licenses, bans, sources.
@@ -73,6 +98,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@nextest
       - uses: taiki-e/install-action@cargo-llvm-cov
+      # The ABI's gate runs FIRST and deliberately so: each `cargo llvm-cov
+      # nextest` invocation clears stale profile data, so the LAST measuring run
+      # is the one the breakdown step below re-reports. This suite is five tests
+      # and ~0.1 s, so it costs nothing to put it here.
+      - name: Measure lmv-core-cabi line coverage and enforce its floor
+        run: cargo llvm-cov nextest -p lmv-core-cabi --summary-only --fail-under-lines ${{ env.CABI_COVERAGE_FLOOR }}
       - name: Measure lmv-core line coverage and enforce the floor
         run: cargo llvm-cov nextest -p lmv-core --summary-only --fail-under-lines ${{ env.COVERAGE_FLOOR }}
       # Re-report from the profile data already collected (no second test run)

@@ -20,10 +20,15 @@ if (-not (Test-Path (Join-Path $sdk "foobar2000\SDK\foobar2000.h"))) {
 }
 
 # --- 1. Rust core: release staticlib (fat LTO per the workspace profile) ---
+# The C ABI ships from its own crate (ADR-0072), which is the only one declaring
+# cdylib/staticlib and is deliberately OUTSIDE the workspace default-members -
+# so it is built by naming it here, and a bare `cargo build` never emits it.
+# The emitted stem is lmv_core_c, not lmv_core: see core-cabi/Cargo.toml for why
+# the preferred name could not be kept.
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
-cargo build --release -p lmv-core 2>&1 | ForEach-Object { "$_" }
+cargo build --release -p lmv-core-cabi 2>&1 | ForEach-Object { "$_" }
 if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
-$coreLib = Join-Path $repo "target\release\lmv_core.lib"
+$coreLib = Join-Path $repo "target\release\lmv_core_c.lib"
 
 # --- 2. Locate MSVC ---
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -68,7 +73,7 @@ $libs = @(
     (Join-Path $sdk "pfc\x64\Release\pfc.lib"),
     (Join-Path $sdk "foobar2000\shared\shared-x64.lib"),
     $coreLib,
-    # lmv_core.lib's system deps (from rustc --print native-static-libs)
+    # lmv_core_c.lib's system deps (from rustc --print native-static-libs)
     # plus user32/gdi32 for the component's own window.
     "opengl32.lib", "kernel32.lib", "ntdll.lib", "userenv.lib",
     "ws2_32.lib", "dbghelp.lib", "user32.lib", "gdi32.lib", "advapi32.lib",
@@ -76,7 +81,7 @@ $libs = @(
 )
 $libArgs = ($libs | ForEach-Object { "`"$_`"" }) -join " "
 $cl = "cl /nologo /std:c++17 /EHsc /MD /O2 /W3 /DNDEBUG /DUNICODE /D_UNICODE " +
-    "/I `"$sdk`" /I `"$sdk\foobar2000`" /I `"$repo\core\include`" /I `"$build`" " +
+    "/I `"$sdk`" /I `"$sdk\foobar2000`" /I `"$repo\core-cabi\include`" /I `"$build`" " +
     "/Fo`"$build\\`" `"$root\foo_lmv.cpp`" " +
     "/link /DLL /OUT:`"$build\foo_lmv.dll`" $libArgs"
 cmd /c "`"$vcvars`" >nul && $cl"
