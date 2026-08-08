@@ -1501,3 +1501,112 @@ no preset binds them. But half of an accepted ADR is currently unusable content 
 roster documents four channels where an author will find two that work. Whichever of the three
 routes is taken, `presets/README.md` needs to stop presenting the four as peers.
 
+---
+
+## Entries 0075-0076 — from the Plan 0074 Phase 6 content pass (2026-08-08), binding the root channel
+
+## 0075 — `root_tint` earned no binding on either shipped IFS preset, and `root_hue` earned both
+
+- **Raised:** 2026-08-08, at [Plan 0074](plans/0074-the-figure-colours-by-how-far-it-has-come.md)
+  Phase 6 — the `preset-author` pass, filed under that phase's own "any route that could not be made
+  to read is written up here rather than quietly left bound to nothing".
+- **Verified by measurement:** yes — both routes rendered against each other on both presets, at a
+  quiet frame and a typical one, and on `attractor_dissolve` at three points across its morph.
+- **Nothing here argues the channel was a mistake.** `root` reads, exactly as the Phase 2 gate
+  found. This entry is about *which of its two routes* a real preset can afford, and the answer was
+  the same on both looks for two **different** reasons — which is what makes it a property of the
+  tint route rather than a fact about one palette.
+
+**What shipped.** `attractor_fern` binds `root_hue = 0.21 + sin(time * 0.047) * 0.05` with
+`map_tint` **left at its full `0.46`**; `attractor_dissolve` binds
+`root_hue = 0.17 + sin(time * 0.1200 + 0.35) * 0.05`, in phase with its `palette_mix` so the crystal
+end is nearly pure and the living end carries the depth. Neither binds `root_tint`.
+
+**The fern: the coordinate was already spent, and the hue route made the budget question moot.**
+Phase 2's gate had found a tuning that beats stock — `map_tint` `0.46 -> 0.22` with
+`root_tint = 0.85`, the budget *split* rather than stacked — and it recorded that it had judged that
+split before `root_hue` existed. Rendered against each other now: the split reads *flatter* than
+stock at rest, because cutting `map_tint` in half is exactly the part-separation the fern's Plan
+0073 pass paid `hue_spread` for, and the anchored `root_tint` returns a wash rather than a
+separation. `root_hue` at full `map_tint` keeps both — the body cools to jade while the frond
+origins stay warm, and nothing was given up. **The hue route is not the fallback the gate assumed;
+on this preset it is the answer.**
+
+**The dissolve: a different reason, and the general one.** Its palette coordinate is not
+contested — the problem is that its mineral end already runs its densest crossings into near-white.
+`root_tint` is **anchored**, so it only ever pushes *up* the ramp: at `0.75` it whitens exactly the
+regions that were already brightest and the frost structure flattens. The hue route does not touch
+the coordinate, so it buys the same depth with none of the headroom.
+
+Stated generally, and this is the part worth keeping: **an anchored coordinate term spends the
+ramp's bright end by construction.** So `root_tint` is structurally disadvantaged on any preset
+whose palette *ends* bright — which, under the additive composite this library authors for, is most
+of them. `map_tint` does not have this problem because it is centred and spends both directions.
+
+**Negative `root_tint` is expressible, is the obvious escape, and has an unflagged edge.** Nothing
+stops a preset writing `root_tint = -0.30`, which ramps the figure *down* the palette — spending the
+dark end, which is empty. It reads (subtly) on the fern and costs no headroom. But at `-0.55` a
+**bright cream speckle appears mid-figure**, in the region that should be darkest: the coordinate
+crosses zero and the LUT sampler *repeats*, wrapping the darkest points to the ramp's brightest
+stop. Arithmetic confirms it — the fern's coordinate floor is `hue_center` at its sine trough
+(`0.20`) minus `hue_spread/2`, so a `root01` of `0.46` goes negative at about `root_tint = -0.38`.
+The centred params can find the same edge, but they are far less likely to: they push half as far in
+either direction, where an anchored term walks monotonically toward one edge and will find it if
+driven. **`presets/README.md` documents neither the negative direction nor the wrap.**
+
+### What a fix would be
+
+Nothing engine-side is *required* — the two-route design already provides the escape, and it worked.
+Three things are cheap and would save the next author the same session:
+
+1. **Say in `presets/README.md` that `root_tint` may be negative, and what happens at the edge.** One
+   sentence and the arithmetic for the floor. This is the whole gap for most readers.
+2. **Consider clamping the palette coordinate rather than repeating it** — or documenting the repeat
+   as deliberate. A wrap that turns the darkest region of a figure into its brightest speckle is a
+   surprising default for a *coordinate*, whatever it is for a texture sampler. This is an engine
+   question and an ADR-sized one; it touches every scene that samples the LUT, not just the IFS.
+3. **Nothing about the anchoring.** It is correct — [ADR-0088](adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md)'s
+   *Anchoring* section reasoned it from the measured distribution and this pass agrees with it. The
+   consequence above is a cost of a right decision, not evidence against it.
+
+### Priority
+
+**Low.** No shipped content is wrong and no author is blocked — the route that works is bound in
+both presets and documented. It is a documentation gap with one genuine engine question behind it.
+
+## 0076 — the operator docs describe a fern tuning that the shipped fern does not carry
+
+- **Raised:** 2026-08-08, same pass as [0075](#0075--root_tint-earned-no-binding-on-either-shipped-ifs-preset-and-root_hue-earned-both). **This is drift, not a design gap** — filed here because
+  it was found by the content lane and the fix is the architect's.
+- **Verified:** yes, by reading both files against the shipped `.toml`.
+
+Plan 0074 Phase 5 wrote the Phase 2 gate's fern finding into two operator docs as the worked example
+of the palette-coordinate budget rule:
+
+- `presets/README.md` — "Plan 0074 then found the same fern needs `map_tint` cut from `0.46` to
+  `0.22` before `root_tint` improves the picture."
+- `docs/preset-palettes.md` — the same numbers, as the budget rule's worked example.
+
+Both sentences are **true as measurements** and were correct when written. But Phase 6 then did the
+comparison the gate could not — against `root_hue`, which did not exist yet — and shipped the fern
+with `map_tint` at its **full `0.46`** and no `root_tint` at all. So a reader who opens
+`attractor_fern.toml` expecting the documented `0.22` finds `0.46`, and the worked example now
+illustrates a tuning nothing in the repo carries.
+
+**The rule itself survives intact** — the coordinate *is* a fixed budget, and the fern is still the
+evidence for it. What changed is the conclusion drawn from it: the fern did not pay the budget, it
+took the escape. That is arguably the *better* worked example, since it ends by showing what `*_hue`
+is for.
+
+### What a fix would be
+
+Two sentences in each file at the plan's close: keep the measurement, attribute it to the gate, and
+finish it with what shipped instead. `docs/preset-palettes.md`'s "**`*_hue` is the escape**"
+paragraph is already immediately below the worked example in both files, so the correction is a
+join, not a rewrite.
+
+### Priority
+
+**Medium** — it is small, it is in the two files an author reads *first* for exactly this decision,
+and it is the kind of drift that reads as authoritative until someone diffs it against the preset.
+
