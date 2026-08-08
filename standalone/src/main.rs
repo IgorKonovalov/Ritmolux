@@ -148,6 +148,16 @@ struct AppState {
     /// (Plan 0044 Phase 2, the same shape as `reported_overflow` above). The
     /// demotion is one-way, so this only ever goes false -> true.
     reported_demotion: bool,
+    /// Retained scratch for [`AppState::queue_frame_text`], cleared at entry
+    /// rather than reallocated (Plan 0061 Phase 5).
+    ///
+    /// `text_layer.end_frame()` clears the text queue every frame, so the runs
+    /// have to be re-queued every frame — an early return is **not** the fix
+    /// here, reuse is. Holding the two vectors on the state means a steady-state
+    /// frame allocates only when the content grows past the retained capacity.
+    frame_texts: Vec<String>,
+    /// `(x, y, size, color)` parallel to [`Self::frame_texts`].
+    frame_text_meta: Vec<(f32, f32, f32, [f32; 4])>,
 }
 
 /// Narrow alias so the non-Windows build (no capture until Phase 9) compiles
@@ -247,6 +257,8 @@ impl AppState {
             // frame loop does not re-announce the startup preset's truncation.
             reported_overflow: renderer_overflow,
             reported_demotion: false,
+            frame_texts: Vec::new(),
+            frame_text_meta: Vec::new(),
             config,
             config_path,
             display_index,
@@ -688,9 +700,16 @@ impl AppState {
     }
 
     fn queue_frame_text(&mut self) {
-        let mut texts: Vec<String> = Vec::new();
-        // (x, y, size, color) parallel to `texts`.
-        let mut meta: Vec<(f32, f32, f32, [f32; 4])> = Vec::new();
+        // Taken out and put back rather than borrowed in place: the body below
+        // calls `&self` methods (`modal`, `settings_view`, `roster_names`,
+        // `list_layout`) while filling them, which a live `&mut self.field`
+        // borrow would forbid. `take` leaves an empty Vec behind for the
+        // duration and the originals - with their retained capacity - go back at
+        // the end, so a steady-state frame does no allocation here.
+        let mut texts = std::mem::take(&mut self.frame_texts);
+        let mut meta = std::mem::take(&mut self.frame_text_meta);
+        texts.clear();
+        meta.clear();
 
         texts.push(self.renderer.preset_name().to_owned());
         meta.push((NAME_INSET, NAME_INSET, NAME_SIZE, NAME_COLOR));
@@ -761,6 +780,12 @@ impl AppState {
             })
             .collect();
         self.renderer.queue_text(&runs);
+
+        // `runs` borrows `texts`, so the buffers can only go home once its last
+        // use is behind us.
+        drop(runs);
+        self.frame_texts = texts;
+        self.frame_text_meta = meta;
     }
 
     /// Route a pressed key. Overlay control keys (toggle / nav / enter / esc /
