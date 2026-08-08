@@ -1,11 +1,18 @@
-//! The `shot` CLI's **pure** helpers, hosted in the library so they are testable.
+//! The `shot` CLI's helpers, hosted in the library so they are testable.
 //!
 //! `standalone/examples/shot.rs` is an `examples/` target, and `#[test]` in an
 //! example does not run under `cargo test` — which is why a hand-rolled WAV
 //! parser, a JSON emitter, filmstrip index math and a bitmap glyph table sat
-//! untested for five plans (Plan 0031 Phase 1). Everything here is a pure
-//! function of its arguments: no GPU, no filesystem, no `Args`, no process
-//! state. The example keeps argument parsing, GPU capture, and file I/O.
+//! untested for five plans (Plan 0031 Phase 1). [`args`], [`film`], [`glyph`],
+//! [`json`] and [`wav`] are pure functions of their arguments: no GPU, no
+//! filesystem, no `Args`, no process state.
+//!
+//! [`report`] is the exception and it is deliberate (Plan 0061 Phase 4). The
+//! `--report` machinery *does* drive a renderer, so it is not pure — but leaving
+//! it in the example meant a thousand lines of table generation, gate
+//! reachability and transient analysis whose only coverage was a subprocess
+//! asserting that the JSON's braces balanced. Its pure half is now directly
+//! testable; the GPU half is one function it calls.
 //!
 //! **`image` stays a dev-dependency.** The PNG codec is deliberately out of the
 //! shipped `lmv.exe` (ADR-0011, ADR-0033 Alt E), so nothing here names an
@@ -17,4 +24,33 @@ pub mod args;
 pub mod film;
 pub mod glyph;
 pub mod json;
+pub mod report;
 pub mod wav;
+
+use lmv_core::preset::Preset;
+use lmv_core::render::{HeadlessOptions, Renderer, Tier};
+
+/// A headless renderer over `presets`, using the real GPU at full quality (the
+/// CLI wants speed and true output, not the tests' software reproducibility).
+///
+/// Shared rather than duplicated: the example's capture modes and [`report`]
+/// both need it, and they need it configured identically or a report would
+/// describe a different renderer than a capture of the same preset.
+pub fn renderer(
+    width: u32,
+    height: u32,
+    presets: Vec<Preset>,
+    tier: Tier,
+) -> Result<Renderer, String> {
+    let mut r = Renderer::new_headless_tiered(
+        HeadlessOptions {
+            width,
+            height,
+            prefer_software: false,
+        },
+        tier,
+    )
+    .map_err(|e| format!("headless renderer: {e}"))?;
+    r.set_presets(presets);
+    Ok(r)
+}
