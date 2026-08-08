@@ -9,14 +9,20 @@
 > Every numeric done-when was met with margin: `render/mod.rs` 1688 (< 1800), `particles/mod.rs` 1459
 > total / 634 code (< 1900 / < 1400), `shot.rs` 618 (< 1200), `docs/plans/README.md` 214 (< 400).
 >
-> **The two `human` phases are outstanding and are carried forward rather than holding the plan open**
-> — neither is runnable by `dev` or by `architect`, and neither blocks anything that has landed.
-> **Phase 8** (link the foobar plugin against the extracted crate) needs VS Build Tools plus the
-> unpacked foobar SDK; the artifact it links is now `lmv_core_c.lib`, which is exactly what Phase 2's
-> rename changed, so this is the check most worth running. **Phase 9** (read a cache-warm CI run)
-> is what re-derives `COVERAGE_FLOOR` from the right machine and confirms `coverage` is the longest
-> job — the property that would otherwise flip ADR-0073's Alternative A. Both are recorded under
-> *Standing* in [`docs/plans/README.md`](../README.md) and in each ADR's `Outcome` section.
+> **Phase 8 ran and passed the same day (2026-08-08).** `plugin-foobar/build.ps1` completed and
+> `foo_lmv.dll` loads in foobar2000 v2 and renders. It was a real test of the one risk this plan
+> carried into C++ link time: no `lmv_core_c.lib` existed beforehand, so the ABI crate built from
+> scratch, and a missed rename would have failed with unresolved externals. Machine-checked
+> alongside — x64 DLL exporting `foobar2000_get_interface`, the core statically linked in (`0.44.1`,
+> the scene names, `wgpu` all present in the binary), every import resolving except foobar's own
+> `shared.dll`, which resolves from the host process and is correct.
+>
+> **Phase 9 is the one phase still outstanding**, and it is carried forward rather than holding the
+> plan open: reading a **cache-warm** CI run (the *second* after the push — Phases 1, 1b and 2 each
+> invalidate `rust-cache` wholesale) is what re-derives `COVERAGE_FLOOR` from a WARP machine rather
+> than this box's hardware GPU, and confirms `coverage` is the longest job — the property that would
+> otherwise flip ADR-0073's Alternative A. Recorded under *Standing* in
+> [`docs/plans/README.md`](../README.md) and in ADR-0073's `Outcome`.
 >
 > **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (2026-08-04, at the
 > user's direct request); see the note on that phase for what it satisfies, the one accepted
