@@ -42,9 +42,47 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
+/// Is `path` an out-of-line **test** module — a file the parent declares as
+/// `#[cfg(test)] mod <stem>;` (Plan 0061 Phase 2d)?
+///
+/// Such a file compiles only under `cfg(test)`, so it is not hot-path code and
+/// the pragma does not apply to it. **Skipping it is what keeps this guard
+/// honest, not a convenience**: a test module carries
+/// `#![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]`,
+/// and [`PRAGMA_SENTINEL`] greps for the literal `clippy::indexing_slicing`. So
+/// a moved-out test file would satisfy the check with an **allow** exactly where
+/// the guard means to demand a **deny** — passing vacuously, and turning a real
+/// gate into a spelling coincidence.
+///
+/// This asks the parent rather than matching on the file name, because the moved
+/// modules are not all called `tests`: `particles/projection_mirror.rs` is one
+/// too, and a name-based rule would silently let it back in.
+fn is_cfg_test_module(path: &Path) -> bool {
+    let (Some(stem), Some(dir)) = (path.file_stem(), path.parent()) else {
+        return false;
+    };
+    // `dir/name.rs` is a child of `dir/mod.rs` when that exists, otherwise of
+    // the `dir.rs` sitting beside `dir` (the Rust 2018 layout).
+    let parent_src = [
+        dir.join("mod.rs"),
+        dir.join("lib.rs"),
+        dir.with_extension("rs"),
+    ]
+    .into_iter()
+    .find(|p| p.is_file() && p != path);
+
+    let Some(text) = parent_src.and_then(|p| std::fs::read_to_string(p).ok()) else {
+        return false;
+    };
+    let decl = format!("mod {};", stem.to_string_lossy());
+    text.lines()
+        .zip(text.lines().skip(1))
+        .any(|(a, b)| a.trim() == "#[cfg(test)]" && b.trim() == decl)
+}
+
 fn collect_rs_files(path: &Path, out: &mut Vec<PathBuf>) {
     if path.is_file() {
-        if path.extension().is_some_and(|ext| ext == "rs") {
+        if path.extension().is_some_and(|ext| ext == "rs") && !is_cfg_test_module(path) {
             out.push(path.to_path_buf());
         }
         return;
