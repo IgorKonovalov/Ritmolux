@@ -423,3 +423,5 @@ narrower than they read. Carried in ADR-0074's **Outcome** section and in Follow
   a universal floor and that rejection stands on its remaining leg, but the question is now open
   rather than settled — see ADR-0074's Outcome. **Do not reopen it on a fourth sample from this
   box**; reopen it on a configuration this project has not yet measured.
+
+[0059]: 0059-lorenz-finds-its-plane.md

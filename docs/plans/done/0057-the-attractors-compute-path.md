@@ -315,3 +315,5 @@ let deposit_scale = FLOOR_PARTICLES as f32 / active_count as f32;
   mechanism (the 3x and the box), so it should close on measurement rather than on argument.
 - Whether the swarm's additive draw has the same tier asymmetry. No one has reported it; ADR-0065
   is the shape of the answer if they do.
+
+[0056]: 0056-clamp-occupancy-and-the-axis-anchor.md

@@ -332,3 +332,5 @@ consistency with no external anchor. Both are now designed out
    at ~0.089 against the scalars' 0.28-0.66 — two calibrations, a milder form of exactly what
    Alternative C was rejected for. The authoring docs say so; ADR-0049 did not. Now in its
    Outcome.
+
+[0044]: 0044-quality-tiers.md

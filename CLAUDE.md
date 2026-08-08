@@ -202,3 +202,6 @@ audio + graphics**, where the usual "just allocate and log it" habits cause glit
   the same session that wrote it — the fresh-context review is where drift gets caught.
 - **Trust `git` / `Glob` over stale docs.** If a plan or ADR names a module that isn't there
   (or vice versa), surface the drift rather than papering over it.
+
+[Plan 0029]: docs/plans/done/0029-attractor-resize-cost-and-ink-followups.md
+[Plan 0033]: docs/plans/done/0033-internal-resolution-and-preset-surface.md

@@ -215,3 +215,5 @@ render path.
   shows the pixel ratio cannot reach a comb's clipped tips.
 - Whether `sanity` should also run at `Rich` — [ADR-0064](../../adrs/0064-a-capture-may-pin-the-rich-tier.md)
   and `shot --tier` make it possible, and Plan 0056 Phase 5's measurement is the argument for it.
+
+[0057]: 0057-the-attractors-compute-path.md

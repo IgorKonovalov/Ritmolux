@@ -1617,3 +1617,4 @@ join, not a rewrite.
 **Medium** — it is small, it is in the two files an author reads *first* for exactly this decision,
 and it is the kind of drift that reads as authoritative until someone diffs it against the preset.
 
+[0048]: plans/done/0048-analysis-v2-and-the-retune.md

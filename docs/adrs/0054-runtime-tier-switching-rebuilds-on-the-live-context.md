@@ -159,3 +159,5 @@ Implemented as designed in `14cd9e2`, and **operated** on 2026-08-04 in Plan 005
   unrun calibration answering itself the moment an instrument existed to hear it — this ADR's
   Positive claim that a tier is a *look* decision best judged on the machine, discharged on its
   first outing.
+
+[0045]: ../plans/done/0045-linear-light-and-bloom.md
