@@ -25,6 +25,15 @@ dbg_macro = "deny"
 todo = "warn"
 unimplemented = "warn"
 
+# Plan 0061 Phase 1. Full debuginfo dominated `target/debug`: measured 47.3 GB,
+# of which 29.0 GB was 284 PDB files - one ~193 MB PDB per integration test
+# target, times the stale hashes left by earlier builds, times every plan lane
+# (ADR-0053 gives each worktree its own `target/`). Line tables are what a
+# backtrace actually reads, so panics keep their `file:line` frames; what goes
+# away is the type/variable DWARF no test consumes.
+[profile.dev]
+debug = "line-tables-only"
+
 # NFR section 4: small release binaries - LTO on, symbols stripped.
 [profile.release]
 lto = "fat"
