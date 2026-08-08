@@ -212,3 +212,5 @@ exempt = ["fade"]   # this clamp is a safety rail; pinning at peak is the design
   measured constant, so it has a shelf life.
 - If occupancy proves useful, the same walk could report the mirror for the *lower* clamp bound,
   which nothing currently observes at all.
+
+[Plan 0054]: 0054-the-line-scenes-catch-up.md

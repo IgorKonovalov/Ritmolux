@@ -477,3 +477,6 @@ pub enum SettingsAction {
 - A text-measurement seam on `TextLayer` if the estimated column width proves inadequate
   (ADR-0009 supplement).
 - Persisting the diagnostics-overlay state, if it turns out operators want it sticky after all.
+
+[0045]: 0045-linear-light-and-bloom.md
+[0059]: 0059-lorenz-finds-its-plane.md

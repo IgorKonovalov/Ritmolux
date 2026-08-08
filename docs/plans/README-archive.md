@@ -2742,3 +2742,38 @@ as 0023's Phase 1: ink left the chain to become a terminal post-pass, byte-ident
 blend sits ahead of it without widening the `PostStage` trait. A tidy-up candidate still
 open in `render/scenes/reaction_diffusion.rs:1048`: correct the stale "fullscreen opaque pass" comment
 on the RD present, left from before 0025's alpha switch — **carried by [0031] Phase 6**.)
+
+[0010]: done/0010-line-geometry-scenes.md
+[0015]: done/0015-preset-dir-override-and-live-iteration.md
+[0016]: done/0016-gpu-compute-particle-scenes.md
+[0019]: done/0019-preset-grammar-v2.md
+[0020]: done/0020-shared-palette-system.md
+[0023]: done/0023-cross-preset-transitions.md
+[0025]: done/0025-full-composite-coverage.md
+[0027]: done/0027-attractor-ink-and-crisp-trails.md
+[0028]: done/0028-parametric-curve-shape-params.md
+[0029]: done/0029-attractor-resize-cost-and-ink-followups.md
+[0030]: done/0030-composite-chain-and-scene-keying.md
+[0031]: done/0031-composite-cleanup-and-debt.md
+[0032]: done/0032-testing-strategy-e2e-coverage-and-pre-push.md
+[0033]: done/0033-internal-resolution-and-preset-surface.md
+[0034]: done/0034-preset-reachable-spectrum.md
+[0035]: done/0035-composite-aspect-and-grid-policy.md
+[0036]: done/0036-macos-and-windows-release-artifacts.md
+[0039]: done/0039-line-joins.md
+[0044]: done/0044-quality-tiers.md
+[0045]: done/0045-linear-light-and-bloom.md
+[0047]: done/0047-expression-randomness.md
+[0048]: done/0048-analysis-v2-and-the-retune.md
+[0051]: done/0051-the-scene-seam-emits-premultiplied-alpha.md
+[0052]: done/0052-the-emitter-objects-that-spawn-fall-and-die.md
+[0053]: 0053-the-suite-stops-blessing-what-warp-gets-wrong.md
+[0054]: done/0054-the-line-scenes-catch-up.md
+[0055]: done/0055-the-fold-edge-becomes-a-choice.md
+[0056]: done/0056-clamp-occupancy-and-the-axis-anchor.md
+[0057]: done/0057-the-attractors-compute-path.md
+[0059]: done/0059-lorenz-finds-its-plane.md
+[0063]: done/0063-the-attractor-keeps-its-depth.md
+[0069]: done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md
+[0074]: done/0074-the-figure-colours-by-how-far-it-has-come.md
+[ADR-0037]: ../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md
