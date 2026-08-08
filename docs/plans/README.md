@@ -860,9 +860,16 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   `map_tint 0.46 -> 0.22` split as the shipped fern tuning ([backlog 0076](../design-backlog.md),
   raised by Phase 6 against its own Phase 5); `core/tests/fixtures/attractor_ifs.toml` had picked up
   a **UTF-8 BOM** at Phase 5 (the standing `Set-Content` trap); and `core/tests/attractor.rs`'s
-  header comment still named `age_tint` where the body binds `root_tint`. One minor item left open
-  and named in the review: the step shader's comment claims the reseed dispatch skipping `root` is
-  "a stronger version of the same reason" it skips `map`, where it is in fact weaker.
+  header comment still named `age_tint` where the body binds `root_tint`.
+  **The fourth was repaired the same session** (`3ca736f`), at the user's ask: the step shader
+  claimed the reseed dispatch skipping `root` was "a stronger version of the same reason" it skips
+  `map`, where it is **weaker** — `map` survives a kick because sub-copy membership does, `root`
+  does not because it is a pure function of position, so a kicked particle carries a stale distance
+  for one fixed step. The comment now also names the trap in the obvious repair: the jitter slot is
+  handed `StepUniform::NO_IFS`, so calling `ifs_root_distance` there returns an exact `0` for every
+  particle and flashes the figure to the palette's anchor colour on every reseed.
+  **The stale `lmv-plan-0074` worktree and its branch were removed at the same time** — `-d`
+  succeeded, confirming the branch was fully merged.
 - [0073 — The fern unfurls and colours by what made it](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
   — **done 2026-08-06**, Mode 4 review **no blockers, two minor doc items repaired at the close**.
   All six phases as `c2c8c76` / `339a178` / `7ef5270` / `b69ca4e` / `50c4eda` / `6e335b2` on
