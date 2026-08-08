@@ -850,6 +850,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lmv-core-cabi"
+version = "0.44.0"
+dependencies = [
+ "lmv-core",
+]
+
+[[package]]
 name = "lmv-ring"
 version = "0.44.0"
 

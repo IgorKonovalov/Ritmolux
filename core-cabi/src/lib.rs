@@ -1,10 +1,16 @@
 //! The versioned C ABI — the single FFI seam of the project (ADR-0001).
 //!
 //! **This surface is a contract.** The C++ foobar2000 shim compiles against
-//! `core/include/lmv_core.h` separately from this crate, so any change to the
-//! shape of these functions is an ADR-worthy event, not a casual edit. Keep
+//! `core-cabi/include/lmv_core.h` separately from this crate, so any change to
+//! the shape of these functions is an ADR-worthy event, not a casual edit. Keep
 //! it minimal: create/free, push samples, attach window, render, resize,
 //! cycle scene, load presets, version query.
+//!
+//! **This crate exists so the rest of the workspace stops paying for it**
+//! (ADR-0072). It is the only crate declaring `cdylib`/`staticlib`, and its
+//! whole contents are this file — so an ABI change is a diff in a crate whose
+//! entire purpose is the ABI. It reaches `lmv-core` through that crate's public
+//! surface only; nothing widened in visibility to make the split compile.
 //!
 //! # Threading contract (mirrored in the header)
 //! - `lmv_push_samples` is called from at most one thread at a time (the
@@ -28,14 +34,17 @@
     clippy::panic,
     clippy::unreachable
 )]
+// The ABI is the crate's whole public surface; it stays documented for the same
+// reason `lmv-core` does (Plan 0002 Phase 0).
+#![warn(missing_docs)]
 
 use std::cell::UnsafeCell;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use crate::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
-use crate::dsp::Analyzer;
-use crate::preset::{self, Preset};
-use crate::render::Renderer;
+use lmv_core::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
+use lmv_core::dsp::Analyzer;
+use lmv_core::preset::{self, Preset};
+use lmv_core::render::Renderer;
 
 /// Bump on any ABI shape change (with the accompanying ADR). v2 added
 /// `lmv_load_presets` (ADR-0006); v3 added `lmv_set_debug` + `lmv_get_metrics`
@@ -71,7 +80,7 @@ const DEBUG_OVERLAY_ENV: &str = "LMV_DEBUG_OVERLAY";
 /// The diagnostics snapshot the host reads over the ABI (ADR-0008). Plain data,
 /// caller-allocated — no allocation crosses the boundary. Leads with
 /// `struct_size` + `abi_version` so later fields append without a v4 bump
-/// (forward-extensible by size). Layout mirrors `core/include/lmv_core.h`;
+/// (forward-extensible by size). Layout mirrors `core-cabi/include/lmv_core.h`;
 /// process RSS is deliberately NOT here (host-process-owned).
 #[repr(C)]
 #[derive(Clone, Copy)]

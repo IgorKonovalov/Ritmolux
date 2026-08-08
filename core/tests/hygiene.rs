@@ -10,9 +10,10 @@ use std::path::{Path, PathBuf};
 
 /// The panic-denial header every hot-path module must carry. Copy it verbatim
 /// to the top of any new file under `core/src/dsp/`, `core/src/render/`,
-/// `core/src/diag/`, `core/src/ffi.rs`, `core/src/audio.rs`,
-/// `core/src/preset/expr.rs`, or the `lmv-ring` crate's `src/` (the extracted
-/// SPSC ring, Plan 0005):
+/// `core/src/diag/`, `core/src/audio.rs`, `core/src/preset/expr.rs`, the
+/// `core-cabi` crate's `src/` (the C ABI, moved out of `core/src/ffi.rs` by
+/// ADR-0072), or the `lmv-ring` crate's `src/` (the extracted SPSC ring,
+/// Plan 0005):
 ///
 /// ```ignore
 /// #![deny(
@@ -68,8 +69,12 @@ fn hot_path_modules_carry_the_panic_pragma() {
         src.join("dsp"),
         src.join("render"),
         src.join("diag"),
-        src.join("ffi.rs"),
         src.join("audio.rs"),
+        // The C ABI left this crate for `core-cabi` (ADR-0072). The guard
+        // follows the file: if it did not, the pragma would silently stop being
+        // enforced on the one seam in the project that must never panic, which
+        // is exactly the failure this test exists to prevent.
+        workspace_root().join("core-cabi").join("src"),
         // Per-frame preset evaluator (Plan 0003): a single hot-path file inside
         // an otherwise load-time module, so it is listed directly rather than
         // scanning all of `src/preset/`.
@@ -108,6 +113,7 @@ fn direct_dependencies_are_exact_pinned() {
     let root = workspace_root();
     let manifests = [
         root.join("core").join("Cargo.toml"),
+        root.join("core-cabi").join("Cargo.toml"),
         root.join("lmv-ring").join("Cargo.toml"),
         root.join("standalone").join("Cargo.toml"),
     ];

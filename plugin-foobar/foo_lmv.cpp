@@ -3,7 +3,7 @@
 // A thin shim per ADR-0001: pulls PCM from foobar's visualisation_stream,
 // forwards it across lmv-core's C ABI, and hosts the core's wgpu output in a
 // plain Win32 window. All logic lives in the Rust core; this file only
-// bridges foobar2000 conventions to the ABI in core/include/lmv_core.h.
+// bridges foobar2000 conventions to the ABI in core-cabi/include/lmv_core.h.
 //
 // Two entry points share ONE core instance: a View-menu pop-out window and a
 // Default UI panel (ui_element). Both are "host windows" that claim a single

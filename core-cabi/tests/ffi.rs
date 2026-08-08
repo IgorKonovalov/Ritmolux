@@ -8,7 +8,7 @@
 
 use std::path::Path;
 
-use lmv_core::ffi::{
+use lmv_core_c::{
     LMV_ABI_VERSION, LMV_DEBUG_OVERLAY, LMV_ERR_INVALID_ARG, LMV_ERR_NO_WINDOW, LMV_OK, LmvMetrics,
     lmv_abi_version, lmv_create, lmv_free, lmv_get_metrics, lmv_load_presets, lmv_render,
     lmv_render_dt, lmv_set_debug,
