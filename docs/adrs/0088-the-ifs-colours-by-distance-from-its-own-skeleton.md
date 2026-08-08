@@ -131,11 +131,20 @@ so they do not simply sum into a wider band — the third also displaces it.
 - **It spends one of the two words ADR-0087 reserved.** One remains. The next per-particle channel
   after this one is a struct change to a type four families share, which is exactly the cost
   ADR-0087 paid 48 bytes to defer — deferred once more, not avoided.
-- **The claim that the gradient survives the emergence ramp is argued, not yet measured.** It is the
-  same *class* of claim ADR-0087 made and got wrong. The argument here is different in kind — a
-  property of position rather than a proxy for it — but the honest position is that this ADR is
-  betting on reasoning that its own predecessor's reasoning failed at. Plan 0074 gates on it after
-  one phase for that reason.
+- **~~The claim that the gradient survives the emergence ramp is argued, not yet measured.~~
+  Measured 2026-08-08 at Plan 0074's Phase 2 gate: it survives, on all five figures.** It was the
+  same *class* of claim ADR-0087 made and got wrong, and the honest position when this was written
+  was that the ADR was betting on reasoning whose predecessor had failed. The bet came in. The
+  gradient reads as **depth into the figure** rather than as a radial wash (clearest on the tree),
+  and it is *more* legible at `fade = 0.90` than bare — the trail fills the figure in rather than
+  averaging the channel away, which is exactly where the age channel died.
+- **The channel is not free at the preset surface, and that is its real price.** The same gate found
+  that adding `root_tint` to a preset already spending the palette coordinate makes the picture
+  **worse** unless another channel gives authority up: `attractor_fern` needs `map_tint` cut from
+  `0.46` to `0.22` before `root_tint` improves on stock. The coordinate is a fixed budget. This ADR
+  gives an author a new thing to say and simultaneously makes the two existing ones harder to
+  spend — a cost the Consequences above did not anticipate, and the reason `root_hue` (the route
+  that touches no coordinate) matters more than the two-route theory made it sound.
 - **A per-step `min` over four distances on every particle.** Four subtractions, four dot products
   and three comparisons in the IFS arm of the step shader, at up to 150 000 particles per fixed
   step. Small against the maps themselves, and paid only by the IFS.
