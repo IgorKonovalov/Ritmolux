@@ -21,6 +21,13 @@ So **every** scene reaches `[palette]`. Before Plan 0054 those three did not, an
 `hue` was the only colour control they had; a note anywhere still saying a
 `[palette]` table is inert on a line scene is stale.
 
+**The backdrop reaches it too**, since Plan 0072
+([ADR-0086](adrs/0086-the-backdrop-colours-through-the-preset-palette.md)): the background pre-pass
+samples the same baked LUT, so `bg_hue` is a coordinate in the preset's own gradient — see
+[The backdrop](#the-backdrop--bg_hue-is-a-coordinate-in-your-gradient). There is no longer any
+surface in the engine that colours outside `[palette]`, and a note saying `bg_hue` walks a fixed
+cosine whatever the preset declares is stale.
+
 A preset that declares no `[palette]` gets the default **`spectrum`** palette —
 the exact iq cosine the scenes used before this system existed — so every shipped
 preset renders unchanged. (The one exception: `reaction_diffusion` previously used
@@ -114,13 +121,19 @@ Everything that *modulates* the gradient is a normal `[params]` expression over
 the audio vocabulary (`bass mid treb onset beat bar time` …) — only the gradient
 *shape* above is static config. Defaults reproduce each scene's prior look.
 
-### Shared (every palette-coloured scene)
+### Shared (every palette-coloured scene — **and the backdrop**)
 
 | Param | Default | What it does |
 |-------|---------|--------------|
-| `hue`        | `0.0` | Rotates the gradient sample coordinate (the pre-existing hue knob). |
+| `hue`        | `0.0` | Rotates the gradient sample coordinate (the pre-existing hue knob). Scene only. |
 | `saturation` | `1.0` | Scales chroma toward luma. `1` unchanged, `0` grayscale, `>1` oversaturated. |
 | `palette_mix`| `0.0` | A/B crossfade position (see below); `0` = palette A. |
+
+`saturation` and `palette_mix` are **one binding with two consumers**: the active scene and the
+background pre-pass. You write them once and the whole frame answers — see
+[the backdrop](#the-backdrop--bg_hue-is-a-coordinate-in-your-gradient). `hue` is the exception, and
+deliberately: it offsets the *scene's* sample coordinate, and the backdrop has its own coordinate in
+`bg_hue`.
 
 ### Fragment field & reaction-diffusion — where the field sits in the gradient
 
@@ -308,29 +321,38 @@ Two honest limits, both measured rather than estimated:
 
 ---
 
-### The backdrop — `bg_hue`, and the one surface still outside the palette
-
-> **This section describes today's behaviour and is scheduled to change.**
-> [ADR-0086](adrs/0086-the-backdrop-colours-through-the-preset-palette.md) /
-> [Plan 0072](plans/0072-the-backdrop-joins-the-palette.md) bring the backdrop into the palette;
-> until that lands, what is below is what renders.
+### The backdrop — `bg_hue` is a coordinate in *your* gradient
 
 The background pre-pass (`bg_hue`, `bg_bright`, `bg_vignette` — the full roster is in
-[`presets/README.md`](../presets/README.md)) draws a tinted gradient *under* the scene. **It does
-not read your `[palette]`.** `core/src/render/background.rs` carries its own copy of the default
-cosine and binds no LUT, so:
+[`presets/README.md`](../presets/README.md)) draws a tinted gradient *under* the scene, and it
+colours through the same `[palette]` everything else does
+([ADR-0086](adrs/0086-the-backdrop-colours-through-the-preset-palette.md)).
 
-- **`bg_hue` always walks the `spectrum` ramp**, whatever palette the preset declares. An `ember`
-  preset draws an ember figure over a spectrum-cosine sky.
-- **`saturation` and `palette_mix` do not reach the backdrop.** An A/B crossfade moves the figure
-  and leaves the sky where it was.
-- **`bg_hue` is therefore readable off the table below**, because that table *is* this ramp — the
-  backdrop's cosine and the line scenes' default are the same `d = (0.10, 0.42, 0.62)`. `bg_hue`
-  `0.30` is cornflower blue, `0.45` aqua, `0.85` amber, in every preset in the library.
+| Param | Default | What it does |
+|-------|---------|--------------|
+| `bg_hue` | `0.0` | Where in the preset's gradient the backdrop's tint is taken from. **Cyclic** — same wrap trap as `color_center`, below. |
 
-This is the only place in the colour surface where a preset's declared gradient does not apply, and
-it is an accident of ordering rather than a decision — the pass predates the shared palette module
-and nothing failed when the rest converged onto it.
+- **`bg_hue` selects a colour from the gradient you declared**, not from a fixed ramp. An `ember`
+  preset draws an ember figure over an ember sky, and a custom `crimson -> gold` gradient tints its
+  own backdrop. Changing `[palette]` therefore changes what every `bg_hue` value means.
+- **`saturation` and `palette_mix` reach it too.** Desaturating a look desaturates the sky with it,
+  and an A/B crossfade moves the whole frame rather than the figure alone.
+- **When the preset declares no `[palette]`, `bg_hue` is readable straight off
+  [the ramp table below](#the-line-scenes-cosine-ramp--what-hue-actually-looks-like)** — that table
+  *is* the default `spectrum` gradient, so with no palette declared `bg_hue` `0.30` is cornflower
+  blue, `0.45` aqua, `0.85` amber. Declare a palette and those readings stop applying, exactly as
+  they stop applying to a line scene's `hue`.
+
+**The wrap is the same trap `color_center` has**, and on the backdrop it is easier to miss because
+the surface is dim. `bg_hue` rides the repeating gradient, so `-0.1` and `0.9` are the same place: a
+negative value nudged toward a palette's dark end lands in its **bright** stops instead. On the
+default `spectrum` the cosine is genuinely periodic and the wrap is invisible; on the four stop-list
+palettes it is the sharpest transition in the gradient. To darken a backdrop, use `bg_bright`.
+
+**`bg_hue` is a *position*, not a colour name.** Before ADR-0086 it meant the same thing in every
+preset in the library, and a value copied between two presets rendered the same sky. It no longer
+does — a `bg_hue` lifted from another preset arrives at whatever colour *your* gradient holds at
+that coordinate, which is usually the point and occasionally a surprise.
 
 ---
 
@@ -347,6 +369,12 @@ not have to.
 (Until Plan 0054 this was the *only* thing `parametric_curve`, `lsystem` and
 `star_pattern` could colour through. It is now their default rather than their
 ceiling — set a `[palette]` and these swatches stop applying.)
+
+**It doubles as the backdrop's table.** `bg_hue` reads the same gradient, so with no `[palette]`
+declared these swatches are what a `bg_hue` value looks like — and, for the same reason, they stop
+applying to `bg_hue` the moment a preset declares one. There is deliberately no second table for the
+backdrop: an independently-measured colour table drifted from the one in the code once already, and
+every name in it was wrong (design-backlog 0014).
 
 Swatches are the ramp at `brightness = 1`, sRGB, computed from the shader's own
 arithmetic and confirmed against rendered strokes:
