@@ -1,6 +1,6 @@
 # 0061 — The build stops paying for what it is not building, and the two oversized modules come apart
 
-> **Status:** **approved 2026-08-08** — ready for `dev`. **Phase 4b's scoping half landed early and
+> **Status:** **in-progress 2026-08-08** — `dev` implementing. **Phase 4b's scoping half landed early and
 > out of sequence** as `1c55476` (2026-08-04, at the user's direct request); see the note on that
 > phase for what it satisfies, the one accepted deviation, and the coverage gap it opens until Phase
 > 4 lands. Every other phase is unstarted.
