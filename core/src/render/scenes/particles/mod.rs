@@ -948,12 +948,27 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         // dispatch returns above without touching it, which is right — a reseed
         // displaces a particle without changing which sub-copy it belongs to.
         particles[i].map = k;
-        // ...and so is ADR-0088's distance, for a stronger version of the same
-        // reason. It is a PURE FUNCTION OF POSITION, recomputed from where the
+        // ...and so is ADR-0088's distance, but NOT for the same reason, and the
+        // difference is worth spelling out because the obvious reading has it
+        // backwards. It is a PURE FUNCTION OF POSITION, recomputed from where the
         // particle now sits rather than accumulated — which is the whole
         // difference from `age`, and the reason this gradient does not decay: a
         // particle five hundred steps old sitting near a fixed point reads the
         // same near-zero a freshly restarted one does.
+        //
+        // That makes the jitter dispatch's early return WEAKER here than it is
+        // for `map`, not stronger. A reseed kick leaves sub-copy membership
+        // alone, so `map` is still correct after it; it moves the particle, so
+        // `root` is not. The kicked particle carries the distance it had before
+        // the kick until the next fixed step overwrites it — one step, ~1/60 s,
+        // and the emergence ramp is not involved because nothing respawned.
+        // Do NOT "fix" it by calling `ifs_root_distance` in the jitter arm. That
+        // dispatch is handed `StepUniform::NO_IFS`, so `step.fixed01`/`fixed23`
+        // and `step.root_recip` are all zero there — the call would return an
+        // exact 0 for every particle and flash the whole figure to the palette's
+        // anchor colour on every reseed. Fixing it properly means uploading the
+        // table to the jitter slot, which costs more than one stale step is
+        // worth.
         //
         // After the respawn branch, so a just-restarted particle reads EXACTLY
         // 0 — it *is* at a fixed point. That is one end of the ramp rather than a
