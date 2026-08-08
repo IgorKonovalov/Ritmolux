@@ -464,7 +464,7 @@ fn attractor_contract() {
 /// channels, asserted the way ADR-0087 distinguishes them from a shape param
 /// (Plan 0073 Phase 4).
 ///
-/// Two captures differing **only** in `map_tint` (then only in `age_tint`) must
+/// Two captures differing **only** in `map_tint` (then only in `root_tint`) must
 /// have measurably different colour distributions over the lit region while
 /// lighting the *same* pixels. That pairing is the whole test: a param that moved
 /// the figure would change the lit set, and a param that did nothing would leave
