@@ -90,6 +90,27 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo fmt --all --check
 
+  # Doc-link gate (Plan 0061 Phase 2c). Every relative markdown link in the repo
+  # must resolve - across docs/, README.md and .claude/skills/**.
+  #
+  # It exists because moving a plan into docs/plans/done/ breaks links in BOTH
+  # directions, and nothing checked: 74 broken links across 23 files had
+  # accumulated over six consecutive closes by the time Plan 0060 looked. The
+  # checker and its pre-push step landed then; this job is what makes it apply to
+  # everyone rather than only to clones that opted the hook in.
+  #
+  # Its own job rather than a second step in `deny`, deliberately: folding it in
+  # saves one runner spin-up and makes a red `deny` ambiguous between a
+  # supply-chain failure and a broken link. Seconds on the cheapest runner, and
+  # nowhere near the Windows critical path ADR-0073 is fighting. GitHub's ubuntu
+  # images ship Node, so no setup step - and unlike the hook, this one cannot
+  # skip itself for want of a Node.
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node scripts/check-doc-links.mjs
+
   # Supply-chain gate (deny.toml): advisories, licenses, bans, sources.
   # Platform-independent (reads Cargo.lock + the [graph] targets in deny.toml),
   # so it runs once on the cheapest runner.

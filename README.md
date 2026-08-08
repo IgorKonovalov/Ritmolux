@@ -250,14 +250,14 @@ What it runs, stopping at the first failure and naming the step that failed:
 |------|---------|
 | Doc links | `node scripts/check-doc-links.mjs` |
 | Format | `cargo fmt --all --check` |
-| Lint | `cargo clippy --all-targets -- -D warnings` |
-| Tests | `cargo nextest run` (narrowed — see below) |
+| Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
+| Tests | `cargo nextest run --workspace` (narrowed — see below) |
 
 The doc-link step is first because it is the cheapest (~50 ms) — every relative
-markdown link in the repo must resolve. It is the one step with **no CI
-counterpart**, so for it this opt-in, `--no-verify`-bypassable hook is currently
-the only gate. If `node` is not on your `PATH` it **skips with a notice** rather
-than failing the push; nothing else here needs Node.
+markdown link in the repo must resolve. If `node` is not on your `PATH` it
+**skips with a notice** rather than failing the push; nothing else here needs
+Node. That skip is about the hook only — CI's `links` job runs the same check on
+`ubuntu-latest`, where it cannot skip and is not bypassable.
 
 **Measured warm wall time: ~41 s** (fmt ~0.5 s, clippy ~0.7 s, tests ~40 s —
 most of the suite, minus the nine excluded below). The full suite is

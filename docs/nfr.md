@@ -120,7 +120,8 @@ contradicts this file is a plan bug — surface it, don't guess.
   and a narrowed `nextest` — in **~28 s** warm, and prints the GPU-heavy suites it skipped.
   `cargo deny`, doctests, Miri, and coverage stay in CI. An uninstalled clone silently has no gate;
   see the README's developer section. The doc-link step (`scripts/check-doc-links.mjs`, ~50 ms) is
-  the one with **no CI counterpart**, so it is gated only here until that changes.
+  also a CI job (`links`, `ubuntu-latest`), so it is enforced for everyone rather than only where
+  the hook is installed.
 
 ## 8. Distribution (v1)
 
