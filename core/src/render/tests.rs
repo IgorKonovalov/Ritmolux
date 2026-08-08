@@ -7,9 +7,12 @@
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
 use super::{
-    AnalysisMetrics, CaptureImage, HeadlessOptions, Mode, ParamRoute, ParamSmoother, RenderError,
+    AnalysisMetrics, CaptureImage, HeadlessOptions, ParamRoute, ParamSmoother, RenderError,
     Renderer, Roster, element_prefix, evaluate_series, resolve_route,
 };
+// `Mode` is named from its own module now: `render/mod.rs` stopped importing it
+// when `dissolve_mode` moved next to the transition code (Plan 0061 Phase 3).
+use super::transition::Mode;
 use crate::dsp::AnalysisFrame;
 use crate::preset::{Easing, Preset, SystemKind, Variables, compile};
 use crate::render::metrics::frame_diff;

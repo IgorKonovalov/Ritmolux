@@ -54,6 +54,10 @@
 use crate::render::gpu;
 
 use super::ink::InkParams;
+// For the `impl Renderer` block at the bottom of this file (Plan 0061 Phase 3),
+// which is a continuation of the one in `render/mod.rs` and needs the same names
+// in scope. The explicit imports above still win over the glob.
+use super::*;
 
 /// The engine's default dissolve duration, in seconds (ADR-0024: policy is
 /// engine-configured in code, not preset-declared). One second is MilkDrop's
@@ -686,6 +690,194 @@ impl Targets {
             width,
             height,
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The dissolve drivers, carved out of `render/mod.rs` by Plan 0061 Phase 3.
+//
+// They live beside the `Transition` they drive rather than beside the rest of
+// `Renderer`, because every one of them is about starting, settling or
+// cancelling a dissolve. They stay an `impl Renderer` block: these are methods
+// on the renderer's state machine, not on the transition itself.
+//
+// `pub(super)` on the private ones grants exactly the visibility they had as
+// members of `render/mod.rs` — the `render` module and its descendants. It is
+// not a widening: `pub(crate)` would be.
+// ---------------------------------------------------------------------------
+
+impl Renderer {
+    /// Start a dissolve to `to`, or cut instantly when a dissolve would be
+    /// meaningless (a switch to the already-active preset). An out-of-range `to` is
+    /// a no-op that does not disturb a dissolve already running.
+    ///
+    /// The outgoing index is read from the roster **after** settling any dissolve in
+    /// flight, never passed in: a caller that resolved it earlier would name a
+    /// preset the snapshot is no longer going to hold.
+    ///
+    /// The roster is deliberately **not** flipped here: the dissolve's opening
+    /// frame composites the still-active outgoing preset into the snapshot, and
+    /// [`Transition::advance`] hands back the index to flip to once that frame has
+    /// been encoded.
+    ///
+    /// **This is where a dissolve's GPU cost lands.** Every scene is built at
+    /// startup, but the blend's two surface-sized targets (~16 MB at 1080p) and the
+    /// incoming side's chain stages build lazily on the frames that first need them
+    /// — the dissolve's opening frames. A one-time hitch there is a known
+    /// limitation, not a bug; pre-warming here was considered and declined, since
+    /// the chain's stages cannot know which of them a preset will even activate
+    /// until its params are evaluated.
+    pub(super) fn begin_transition(&mut self, to: usize) {
+        if to >= self.roster.presets.len() {
+            // Out of range (a stale index from a shrunk hot-reloaded roster): a
+            // no-op. Deliberately checked before settling, so an invalid request
+            // cannot cut short a dissolve that is running correctly.
+            return;
+        }
+        // A switch arriving mid-dissolve snap-finishes the one in flight to its own
+        // target before starting the new one, so the roster is never left on an
+        // index nobody asked for (Plan 0023 Phase 5 re-entrancy rule).
+        self.snap_finish_transition();
+        let from = self.roster.active;
+        if to == from {
+            self.select_preset_instantly(to);
+            return;
+        }
+        let kind =
+            TRANSITION_KIND.unwrap_or_else(|| TransitionKind::rotating(self.transitions_started));
+        self.transitions_started = self.transitions_started.wrapping_add(1);
+        self.transition = Some(Transition::new(
+            from,
+            to,
+            TRANSITION_DURATION_SECS,
+            kind,
+            self.dissolve_mode(from, to),
+        ));
+        // The incoming preset gets its own backdrop + chain for the dissolve, so
+        // neither side can see the other's uniforms or feedback history. It is
+        // promoted to *the* side at finalize; until then `side` stays on the
+        // outgoing preset (see the field docs).
+        self.incoming_side = Some(CompositeSide::new(
+            &self.ctx.device,
+            COMPOSITE_FORMAT,
+            &self.tier,
+        ));
+    }
+
+    /// The fidelity a dissolve from `from` to `to` may run at — ADR-0024's
+    /// adaptive governor, resolved once at the switch site.
+    ///
+    /// Dual-live needs both halves: two presets whose scenes hold **independent**
+    /// GPU state (not the same `SystemKind`, and not two of the three line scenes,
+    /// which share one renderer), and measured frame-time headroom. The decision
+    /// itself is the pure [`transition::dual_live_eligible`]; this only gathers its
+    /// two inputs.
+    pub(super) fn dissolve_mode(&self, from: usize, to: usize) -> Mode {
+        let systems = (
+            self.roster.presets.get(from).map(|p| p.system),
+            self.roster.presets.get(to).map(|p| p.system),
+        );
+        let shares = match systems {
+            (Some(a), Some(b)) => scenes::shares_resources(a, b),
+            // A preset we cannot even resolve is not a pair we will render twice.
+            _ => true,
+        };
+        if transition::dual_live_eligible(
+            shares,
+            self.diag.stats().frame_ms_avg(),
+            DUAL_LIVE_BUDGET_MS,
+        ) {
+            Mode::DualLive
+        } else {
+            Mode::Freeze
+        }
+    }
+
+    /// Start a dissolve to `to` at a forced fidelity, bypassing the governor.
+    /// **Test-only** — see [`Transition::set_mode`] for why the GPU dual-live path
+    /// is otherwise unreachable from a headless test. No frontend calls this.
+    #[cfg(test)]
+    pub(super) fn begin_transition_forced(&mut self, to: usize, mode: Mode) {
+        self.begin_transition(to);
+        if let Some(tr) = self.transition.as_mut() {
+            tr.set_mode(mode);
+        }
+    }
+
+    /// Land any dissolve in flight on its own target immediately, as if it had run
+    /// to `t = 1`, leaving nothing running. The re-entrancy rule's first half: a
+    /// switch arriving mid-dissolve finishes the current one before starting the
+    /// new one, so the roster is never left on an index nobody asked for.
+    ///
+    /// Idempotent, and a no-op when nothing is running — callers invoke it to
+    /// *settle* the roster before reading it, not only before replacing a dissolve.
+    pub(super) fn snap_finish_transition(&mut self) {
+        let Some(running) = self.transition.take() else {
+            return;
+        };
+        let target = running.incoming_index();
+        // The roster is already on the target unless the dissolve was interrupted
+        // before its capture frame ran — that frame is what flips it. Only then has
+        // the incoming preset never been configured, and only then may the eased
+        // params be reset; doing it unconditionally would snap a smoothed preset on
+        // every mid-dissolve switch.
+        let settled_early = self.roster.active != target;
+        self.roster.select(target);
+        // Its incoming side is promoted whether or not the roster moved: that preset
+        // is the active one now, so its composite is the one the next dissolve's
+        // outgoing side must use.
+        self.promote_incoming_side();
+        if settled_early {
+            self.configure_active_scene();
+        }
+    }
+
+    /// Make the dissolve's incoming composite *the* composite, dropping the
+    /// outgoing one. Called at finalize (and when a switch snap-finishes another),
+    /// so there is never a frame with both live or neither.
+    fn promote_incoming_side(&mut self) {
+        if let Some(incoming) = self.incoming_side.take() {
+            self.side = incoming;
+        }
+    }
+
+    /// Jump straight to `index` with no dissolve — the escape hatch for paths
+    /// where a blend would be wrong (a capture, which must stay a pure function of
+    /// its inputs) or meaningless (a switch to the already-active preset). Cancels
+    /// any dissolve in flight and releases its GPU targets.
+    pub(super) fn select_preset_instantly(&mut self, index: usize) {
+        if index >= self.roster.presets.len() {
+            return; // out of range: a no-op, never a panic and never a wrap
+        }
+        self.cancel_transition();
+        self.reset_transition_rotation();
+        self.roster.select(index);
+        self.configure_active_scene();
+    }
+
+    /// Drop any dissolve in flight and release its full-frame GPU targets, leaving
+    /// the roster wherever it currently points. The caller decides the resolved
+    /// index; this only tears down the blend.
+    pub(super) fn cancel_transition(&mut self) {
+        // The incoming side has been rendering the preset the roster now points at,
+        // so it is the one to keep — dropping it instead would restart that
+        // preset's feedback history mid-show.
+        self.promote_incoming_side();
+        self.transition = None;
+        self.blend.release_targets();
+    }
+
+    /// Restart the kind rotation. A **cut** — a roster hot-reload, a capture, or
+    /// the [`select_preset_now`](Self::select_preset_now) escape — is the start of
+    /// a new stretch of show, so the next dissolve begins the library again rather
+    /// than resuming wherever the last one left off, and a scripted sequence of
+    /// switches reproduces the same kinds from a known starting point.
+    ///
+    /// A *dissolving* switch does not reset it: the rotation is what gives a live
+    /// show its variety, and restarting it on every browse-select would pin every
+    /// hand-picked switch to the library's first kind.
+    pub(super) fn reset_transition_rotation(&mut self) {
+        self.transitions_started = 0;
     }
 }
 
