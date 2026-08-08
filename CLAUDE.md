@@ -44,8 +44,13 @@ C ABI, C++ foobar shim. **Read it before questioning the language/GPU/FFI split.
 
 ```
 core/                # Rust library crate — the shared brain. DSP + render engine + scenes.
-                     #   Exposes both a native Rust API (for the standalone) and a C ABI
-                     #   (cdylib/staticlib) for the foobar plugin. NO audio-source code here.
+                     #   `rlib` ONLY (ADR-0072): every consumer in the workspace links the
+                     #   rlib, so a core edit stops re-emitting artifacts nothing reads.
+                     #   NO audio-source code here.
+core-cabi/           # The C ABI, and nothing else (ADR-0072) — the only crate declaring
+                     #   cdylib/staticlib, plus include/lmv_core.h. Deliberately OUTSIDE the
+                     #   workspace `default-members`, so a bare `cargo build` never emits it;
+                     #   `--workspace` (CI, pre-push) and `-p lmv-core-cabi` do.
 lmv-ring/            # The lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI.
 standalone/          # Rust binary + lib — winit window, wgpu surface, loopback capture, `shot`.
 plugin-foobar/       # C++ shim: foobar2000 SDK integration, links core's C ABI. Windows-first.
@@ -145,8 +150,10 @@ audio + graphics**, where the usual "just allocate and log it" habits cause glit
   types in `core/`. No raw Metal/DX/Vulkan calls outside the wgpu layer. The whole point of the
   split is swappability; a leak here forfeits it.
 - **The C ABI is a contract.** The `extern "C"` surface the plugin links against is versioned
-  and minimal: opaque handle, push-samples, render-into-context, resize, free. Changing its
-  shape is an ADR-worthy event, not a casual edit — the C++ side is compiled separately.
+  and minimal, and **[`docs/specs/0001-c-abi.md`](docs/specs/0001-c-abi.md) is the authority on
+  its shape** — not this file, which paraphrased a five-function surface for long enough that it
+  drifted to twelve. Changing that shape is an ADR-worthy event, not a casual edit: the C++ side
+  is compiled separately, so a mismatch fails at link time or, worse, at runtime.
 - **Validate at the boundary, trust inside.** Sample-rate, channel count, and buffer sizes get
   checked once where audio enters the core; the hot path downstream assumes them valid.
 - **Lightweight is a feature.** Small binaries, few dependencies, low idle CPU/GPU. Every new

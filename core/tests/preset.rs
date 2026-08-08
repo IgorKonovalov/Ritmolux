@@ -1036,6 +1036,119 @@ fn a_bad_spectrum_table_is_a_surfaced_load_error() {
     );
 }
 
+/// Param names that are deliberately absent from `presets/README.md`.
+///
+/// **Empty, and a new entry needs a reason next to it** (the shape ADR-0058 uses
+/// for evidence). A name here is a promise that an author never has to reach for
+/// it; an unexplained skip is how the third copy drifts in the first place.
+const README_EXEMPT: &[(&str, &str)] = &[
+    // ("param_name", "why an author never binds this"),
+];
+
+/// **The third copy of every parameter name** (Plan 0061 Phase 7).
+///
+/// The name of a param exists in three places: the scene's `PARAMS` list, its
+/// `set_param` match, and `presets/README.md`. `declared_params_match_set_param`
+/// below guards code against code. Nothing guarded code against the **doc**, and
+/// that doc is the surface `preset-author` composes against (ADR-0017) — a param
+/// missing from it is a capability the content lane cannot discover exists.
+///
+/// The scan is recursive rather than a hand-kept file list precisely so a new
+/// scene is covered the day it lands, without anyone remembering to add it here.
+/// It matches the README's own convention — a documented param appears in
+/// backticks — so a bare mention of `size` inside `--size` does not count as
+/// documenting the `size` param.
+#[test]
+fn every_declared_param_is_documented_in_the_presets_readme() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let readme_path = root
+        .parent()
+        .expect("core has a workspace-root parent")
+        .join("presets/README.md");
+    let readme = std::fs::read_to_string(&readme_path)
+        .unwrap_or_else(|e| panic!("read {}: {e}", readme_path.display()));
+
+    let mut sources = Vec::new();
+    collect_rs(&root.join("src"), &mut sources);
+
+    let mut checked = 0usize;
+    let mut undocumented: Vec<String> = Vec::new();
+    for file in &sources {
+        let text = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
+        for name in params_declared_in(&text) {
+            if README_EXEMPT.iter().any(|(n, _)| *n == name) {
+                continue;
+            }
+            checked += 1;
+            if !readme.contains(&format!("`{name}`")) {
+                undocumented.push(format!(
+                    "  `{name}` (declared in {})",
+                    file.strip_prefix(root).unwrap_or(file).display()
+                ));
+            }
+        }
+    }
+
+    assert!(
+        checked > 100,
+        "only {checked} params scanned — the PARAMS scan has stopped finding \
+         declarations, so this guard would pass vacuously"
+    );
+    assert!(
+        undocumented.is_empty(),
+        "{} declared parameter(s) are missing from presets/README.md:\n{}\n\
+         Document each one there, or add it to README_EXEMPT with a reason.\n\
+         That file is the surface `preset-author` writes against (ADR-0017): an \
+         undocumented param is a capability the content lane cannot find.",
+        undocumented.len(),
+        undocumented.join("\n"),
+    );
+}
+
+/// Every `.rs` under `dir`, recursively.
+fn collect_rs(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+    let entries = std::fs::read_dir(dir)
+        .unwrap_or_else(|e| panic!("read_dir {}: {e}", dir.display()))
+        .map(|e| e.expect("dir entry").path());
+    let mut entries: Vec<_> = entries.collect();
+    entries.sort();
+    for path in entries {
+        if path.is_dir() {
+            collect_rs(&path, out);
+        } else if path.extension().is_some_and(|e| e == "rs") {
+            out.push(path);
+        }
+    }
+}
+
+/// The string literals of a `const PARAMS … = [ … ];` declaration, if the file
+/// has one. Both spellings in the tree are covered: `&[&str]` slices and the
+/// `[&str; N]` array `marks.rs` uses.
+fn params_declared_in(text: &str) -> Vec<String> {
+    let Some(start) = text.find("const PARAMS") else {
+        return Vec::new();
+    };
+    let Some(open) = text.get(start..).and_then(|t| t.find('[')) else {
+        return Vec::new();
+    };
+    let body_start = start + open;
+    let Some(end) = text.get(body_start..).and_then(|t| t.find("];")) else {
+        return Vec::new();
+    };
+    let body = text.get(body_start..body_start + end).unwrap_or_default();
+
+    let mut names = Vec::new();
+    let mut rest = body;
+    while let Some(q) = rest.find('"') {
+        let after = rest.get(q + 1..).unwrap_or_default();
+        let Some(close) = after.find('"') else { break };
+        names.push(after.get(..close).unwrap_or_default().to_string());
+        rest = after.get(close + 1..).unwrap_or_default();
+    }
+    names
+}
+
 /// Drift guard (ADR-0020's flagged risk): each declared `PARAMS` list must be
 /// exactly the set of names its `set_param` match handles. The two sit side by
 /// side in the source, so this compares them by scanning it — which covers the
