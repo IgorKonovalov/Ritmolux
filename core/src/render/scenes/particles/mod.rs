@@ -1011,31 +1011,30 @@ struct Draw {
     // ctr: xyz the world centre subtracted before projection, w unused. The four
     //    map families pass [0,0,0] or [0,0,25] - exactly what they passed when
     //    this was the scalar `w.z` - and subtracting a zero is exact.
-    // ch: ADR-0087's two per-particle channels, two routes each -
-    //    x map_tint, y map_hue, z age_tint, w age_hue. Every one defaults to 0
-    //    and 0 is the arithmetic identity on both routes, so a preset that binds
-    //    none of them renders exactly what it rendered before they existed. The
-    //    CPU zeroes the WHOLE ROW on a non-IFS family, where both channels are
-    //    identically 0 and `channel_shift` being centred would otherwise turn a
-    //    bound value into a uniform tint over a family it means nothing on.
-    // em: ADR-0087's emergence ramp and age normalization - x the per-step
-    //    brightness increment, y the floor, z the reciprocal of the longest
-    //    reachable lifetime. The IFS passes (1/EMERGENCE_STEPS, 0, 1/max_life);
-    //    every other family passes (0, 1, 0), which makes the ramp EXACTLY 1.0
-    //    there rather than exactly 0 - their `age` is identically zero, so a bare
-    //    `age * rate` would black them out. Two numbers rather than a branch, and
-    //    the multiply by a literal 1.0 is the identity in IEEE-754, so no
-    //    existing capture moves.
-    // rc: ADR-0088's root channel - x root_tint, yzw unused. ANCHORED at 0
-    //    rather than centred, so unlike `ch` it is inert on a non-IFS family by
-    //    ARITHMETIC: their `root` is identically 0, and `root_tint * 0` is 0
-    //    whatever the binding. The row is zeroed off the IFS anyway - belt and
-    //    braces, and Phase 3 moves this into `ch`, where `map_*` still needs it.
-    //    **A TEMPORARY ROW.** Plan 0074 Phase 3 retires `age_tint`/`age_hue` and
-    //    moves both root routes into `ch.zw`, at which point this row goes and
-    //    the draw uniform is back to the size it is today. It exists only
-    //    because Phase 1 ships the first route BEFORE the retirement, so that
-    //    Phase 2 can decide whether the channel reads at all.
+    // ch: the two per-particle colour channels, two routes each -
+    //    x map_tint, y map_hue (ADR-0087), z root_tint, w root_hue (ADR-0088).
+    //    The row SWAPPED rather than grew at Plan 0074 Phase 3: `age_tint` and
+    //    `age_hue` held z and w and were retired, because `age` proxied
+    //    distance-from-the-fixed-points and the proxy decayed. Every one defaults
+    //    to 0 and 0 is the arithmetic identity on all four routes, so a preset
+    //    that binds none of them renders exactly what it rendered before they
+    //    existed. The CPU zeroes the WHOLE ROW on a non-IFS family, where both
+    //    channels are identically 0 and `channel_shift` being centred would
+    //    otherwise turn a bound value into a uniform tint over a family it means
+    //    nothing on.
+    //    THE TWO HALVES ARE NOT THE SAME SHAPE. `map_*` is centred, because
+    //    `map01` genuinely spans [0, 1]; `root_*` is ANCHORED at 0, because
+    //    `root01` does not (ADR-0088's Anchoring section). The zeroing above is
+    //    therefore load-bearing for x/y and merely belt-and-braces for z/w.
+    // em: ADR-0087's emergence ramp - x the per-step brightness increment, y the
+    //    floor. The IFS passes (1/emergence, 0); every other family passes
+    //    (0, 1), which makes the ramp EXACTLY 1.0 there rather than exactly 0 -
+    //    their `age` is identically zero, so a bare `age * rate` would black them
+    //    out. Two numbers rather than a branch, and the multiply by a literal 1.0
+    //    is the identity in IEEE-754, so no existing capture moves.
+    //    z and w are FREE since Plan 0074 Phase 3: z carried the reciprocal of
+    //    the longest reachable lifetime, which only the retired age colour
+    //    channel read.
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
@@ -1046,7 +1045,6 @@ struct Draw {
     ctr: vec4<f32>,
     ch: vec4<f32>,
     em: vec4<f32>,
-    rc: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> draw: Draw;
 // Shared gradient LUTs (ADR-0021): sampled per-particle in the vertex shader
@@ -1336,19 +1334,15 @@ fn vs_main(
     // `map` names which sub-copy of the figure this point sits in, so on the
     // fern this is what makes stem, body and the two fronds separate colours.
     // It is identically 0 on every family but the IFS, where nothing writes it.
-    // ...and so does the age channel (ADR-0087), normalized against the LONGEST
-    // reachable lifetime rather than against this particle's own. That is the
-    // difference between "how old is it" and "how far through its life is it",
-    // and the first is what the param is called: two particles of the same age
-    // get the same colour whatever lifetimes they drew, where per-particle
-    // normalization would give them different colours and read as noise.
+    //
     // ...and ADR-0088's root channel, which is what the age channel was trying
     // to be. `age` proxied distance-from-the-fixed-points and the proxy decayed
-    // after ~10 steps; this IS that distance, recomputed every step, so it is
-    // permanent. Clamped at the READ rather than at the write: the skeleton's
-    // diameter is not an upper bound on the attractor's reach, so a stored value
-    // past 1 is a faithful measurement, and the palette coordinate is where it
-    // has to become a unit.
+    // after ~10 steps, so `age_tint`/`age_hue` never produced a gradient and were
+    // retired here (Plan 0074 Phase 3). This IS that distance, recomputed every
+    // step, so it is permanent. Clamped at the READ rather than at the write: the
+    // skeleton's diameter is not an upper bound on the attractor's reach, so a
+    // stored value past 1 is a faithful measurement, and the palette coordinate
+    // is where it has to become a unit.
     //
     // **ANCHORED AT ZERO, and deliberately not `channel_shift`** (ADR-0088's
     // Anchoring section). The other terms are centred because `map01` and
@@ -1361,20 +1355,25 @@ fn vs_main(
     // particle sitting on a fixed point. So the contraction points keep the
     // preset's chosen colour and the figure ramps away from them.
     let map01 = map / MAP_SPAN;
-    let age01 = age * draw.em.z;
     let root01 = clamp(root, 0.0, 1.0);
     let coord = hue + hue_center + (seed - 0.5) * hue_spread + depth_tint(dn)
         + channel_shift(map01, draw.ch.x)
-        + channel_shift(age01, draw.ch.z)
-        + draw.rc.x * root01;
+        + draw.ch.z * root01;
     let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
     let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
-    // ...and the channel's OTHER route, which shifts the hue of whatever colour
+    // ...and each channel's OTHER route, which shifts the hue of whatever colour
     // the palette produced instead of moving where it was sampled. Before
     // `apply_saturation`, so `saturation` stays the last word on colour.
+    //
+    // `root_hue` is anchored for the same reason `root_tint` is: a particle on a
+    // fixed point takes NO rotation, and the figure rotates away from the colour
+    // the ramp gave it. Centring would rotate the skeleton itself by
+    // `-root_hue/2`, which is the slide the anchoring exists to avoid - and it
+    // matters more on this route than on the tint one, because a hue rotation
+    // has no `hue_center` to absorb it.
     let shifted = shift_hue(
         mix(ca, cb, clamp(palette_mix, 0.0, 1.0)),
-        channel_shift(map01, draw.ch.y) + channel_shift(age01, draw.ch.w),
+        channel_shift(map01, draw.ch.y) + draw.ch.w * root01,
     );
     let col = apply_saturation(shifted, saturation);
 
@@ -1828,19 +1827,11 @@ fn churn_lifetime(seed: f32) -> f32 {
     CHURN_LIFETIME * (lo + hash_unit(seed.to_bits() ^ LIFETIME_SALT) * (hi - lo))
 }
 
-/// The longest lifetime any particle can draw — what the **age colour channel**
-/// normalizes against (ADR-0087).
-///
-/// Against the maximum rather than against each particle's own life, because the
-/// channel is called *age*: two particles of the same age should be the same
-/// colour whatever lifetimes they happened to draw. Per-particle normalization
-/// would give them different colours for the same age, which reads as noise
-/// rather than as a gradient. The cost is that only the longest-lived particles
-/// ever reach the top of the range, which is honest — they are the oldest.
-fn churn_max_lifetime() -> f32 {
-    let [_, hi] = CHURN_LIFETIME_SPREAD;
-    CHURN_LIFETIME * hi
-}
+// `churn_max_lifetime()` lived here until Plan 0074 Phase 3. It was the longest
+// lifetime any particle could draw, and the ONLY thing that read it was the age
+// colour channel's normalizer (`em.z`). Retiring `age_tint`/`age_hue` left it
+// with no caller, so it went with them rather than sitting as dead code that
+// reads like a live invariant.
 
 /// Salt separating the lifetime draw from every other hash on the particle's
 /// seed — the map choice, the reseed kick, and the respawn slot each use their
@@ -1876,18 +1867,21 @@ fn hash_unit(v: u32) -> f32 {
 /// **inverse** depth half-extent (ADR-0076) — `0` for a 2D family, which is what
 /// makes every depth cue the identity there without a shader branch.
 /// `ctr`: xyz the world centre subtracted before projection (Plan 0062), w unused.
-/// `ch`: ADR-0087's two per-particle channels at two routes each — x `map_tint`,
-/// y `map_hue`, z `age_tint`, w `age_hue`. All four default to `0`, which is the
-/// arithmetic identity on both routes.
+/// `ch`: the two per-particle colour channels at two routes each — x `map_tint`,
+/// y `map_hue` (ADR-0087), z `root_tint`, w `root_hue` (ADR-0088). All four
+/// default to `0`, which is the arithmetic identity on every route.
+///
+/// **The row swapped rather than grew** at Plan 0074 Phase 3: `age_tint` and
+/// `age_hue` held z and w until the age channel was retired. The two halves are
+/// *not* the same shape — `map_*` is centred, `root_*` is anchored at `0` — for
+/// the reason in ADR-0088's Anchoring section.
+///
 /// `em`: the emergence ramp (ADR-0087) — x the per-step brightness increment, y
-/// the floor. `(1/EMERGENCE_STEPS, 0)` on the IFS and `(0, 1)` everywhere else,
+/// the floor. `(1/emergence, 0)` on the IFS and `(0, 1)` everywhere else,
 /// because every other family's `age` is identically zero and a bare `age·rate`
-/// would black them out rather than leave them alone.
-/// `rc`: ADR-0088's root channel — x `root_tint`, yzw unused. **Temporary**:
-/// Plan 0074 Phase 3 retires `age_tint`/`age_hue` and moves both root routes
-/// into `ch.zw`, which drops this row again. It exists only because Phase 1
-/// ships the first route *before* the retirement, so the Phase 2 gate can judge
-/// whether the channel reads at all.
+/// would black them out rather than leave them alone. **z and w are free** since
+/// the retirement: z carried `1/churn_max_lifetime()`, which only the age colour
+/// channel read.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct DrawUniform {
@@ -1901,7 +1895,6 @@ struct DrawUniform {
     ctr: [f32; 4],
     ch: [f32; 4],
     em: [f32; 4],
-    rc: [f32; 4],
 }
 
 /// Decay uniform (per frame): x is the per-frame trail retention factor.
@@ -2658,32 +2651,30 @@ pub struct AttractorScene {
     /// fronds nudged off its body without editing its gradient.
     map_tint: f32,
     map_hue: f32,
-    /// The age channel's two routes (ADR-0087), IFS-only for the same structural
-    /// reason: nothing but the IFS arm ages a particle, and the engine declines
-    /// to upload either param on a family where the channel means nothing.
+    /// The root channel's two routes (ADR-0088), IFS-only for the same structural
+    /// reason the two above are: only the IFS arm writes [`Particle::root`].
     ///
-    ///  shifts the palette coordinate across the age range;
-    /// rotates the hue of the colour the ramp produced. Both centred on the
-    /// mid-age colour, so raising one opens a spread rather than sliding the
-    /// whole figure.
-    age_tint: f32,
-    age_hue: f32,
-    /// The root channel's palette-coordinate route (ADR-0088), IFS-only for the
-    /// same structural reason the two above are: only the IFS arm writes
-    /// [`Particle::root`].
+    /// `root_tint` shifts the palette coordinate by `root_tint · root01` across
+    /// the figure's own skeleton — dark at the stem base and the frond origins,
+    /// bright at the tips. `root_hue` rotates the hue of the colour that ramp
+    /// produced instead, leaving the coordinate untouched.
     ///
-    /// Shifts the palette coordinate by `root_tint · root01` across the figure's
-    /// own skeleton — dark at the stem base and the frond origins, bright at the
-    /// tips.
-    ///
-    /// **Anchored at `0`, not centred like the others** (ADR-0088's Anchoring
+    /// **Both anchored at `0`, not centred like `map_*`** (ADR-0088's Anchoring
     /// section): the fixed points keep the preset's chosen colour exactly and
     /// the figure ramps away from them. Centring assumes the channel spans
     /// `[0, 1]`, and this one does not — its ceiling is a property of each
     /// figure's own invariant measure, from `0.41` on the spiral to `1.05` on
     /// the dragon, so the **same binding is not the same look across figures**.
-    /// The hue route is Plan 0074 Phase 3.
+    ///
+    /// **`root_hue` is the escape from a full palette coordinate.** Three params
+    /// write that coordinate and it is a fixed budget — Plan 0074's gate measured
+    /// `attractor_fern` needing `map_tint` cut `0.46 -> 0.22` before `root_tint`
+    /// improved on stock. This route costs it nothing.
+    ///
+    /// These replaced `age_tint`/`age_hue`, which read the decaying age proxy and
+    /// never produced a gradient.
     root_tint: f32,
+    root_hue: f32,
     /// Rate multiplier on [`SPIN_RATE`] (ADR-0076). Unlike the depth cues this is
     /// **not** inert on the 2D families: the discrete maps rotate in-plane
     /// through the same angle, so `spin` reaches all four families where
@@ -2760,9 +2751,8 @@ impl AttractorScene {
             depth_hue: DEFAULT_DEPTH_HUE,
             map_tint: DEFAULT_CHANNEL_COLOUR,
             map_hue: DEFAULT_CHANNEL_COLOUR,
-            age_tint: DEFAULT_CHANNEL_COLOUR,
-            age_hue: DEFAULT_CHANNEL_COLOUR,
             root_tint: DEFAULT_CHANNEL_COLOUR,
+            root_hue: DEFAULT_CHANNEL_COLOUR,
             spin: DEFAULT_SPIN,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
@@ -3022,11 +3012,12 @@ pub const PARAMS: &[&str] = &[
     // both of these are exactly the identity.
     "map_tint",
     "map_hue",
-    "age_tint",
-    "age_hue",
     // ...and ADR-0088's root channel, IFS-only for exactly the same structural
     // reason: `Particle::root` is written by the IFS arm and by nothing else.
+    // These two took `age_tint`/`age_hue`'s place at Plan 0074 Phase 3 rather
+    // than joining them, so the roster did not grow.
     "root_tint",
+    "root_hue",
 ];
 
 impl Scene for AttractorScene {
@@ -3090,9 +3081,8 @@ impl Scene for AttractorScene {
         self.depth_hue = DEFAULT_DEPTH_HUE;
         self.map_tint = DEFAULT_CHANNEL_COLOUR;
         self.map_hue = DEFAULT_CHANNEL_COLOUR;
-        self.age_tint = DEFAULT_CHANNEL_COLOUR;
-        self.age_hue = DEFAULT_CHANNEL_COLOUR;
         self.root_tint = DEFAULT_CHANNEL_COLOUR;
+        self.root_hue = DEFAULT_CHANNEL_COLOUR;
         self.spin = DEFAULT_SPIN;
         self.morph = DEFAULT_MORPH;
         self.levers = Levers::NEUTRAL;
@@ -3121,9 +3111,8 @@ impl Scene for AttractorScene {
             "depth_hue" => self.depth_hue = value,
             "map_tint" => self.map_tint = value,
             "map_hue" => self.map_hue = value,
-            "age_tint" => self.age_tint = value,
-            "age_hue" => self.age_hue = value,
             "root_tint" => self.root_tint = value,
+            "root_hue" => self.root_hue = value,
             "spin" => self.spin = value,
             "morph" => self.morph = value,
             "curl" => self.levers.curl = value,
@@ -3270,9 +3259,8 @@ impl Scene for AttractorScene {
             depth_hue,
             map_tint,
             map_hue,
-            age_tint,
-            age_hue,
             root_tint,
+            root_hue,
             palette,
             palette_dirty,
             ..
@@ -3331,9 +3319,8 @@ impl Scene for AttractorScene {
                 depth_hue: *depth_hue,
                 map_tint: *map_tint,
                 map_hue: *map_hue,
-                age_tint: *age_tint,
-                age_hue: *age_hue,
                 root_tint: *root_tint,
+                root_hue: *root_hue,
             },
         );
         // Before the steps, and only on the frame a `reseed` edge landed: kick each
@@ -3416,12 +3403,11 @@ struct UniformInputs {
     /// shift is legitimate, and `shift_hue` takes `fract` of its argument.
     map_tint: f32,
     map_hue: f32,
-    age_tint: f32,
-    age_hue: f32,
-    /// ADR-0088's root channel, at its one route so far. Unclamped here for the
-    /// same reason: the LUT sampler repeats. The *particle's* value is what gets
+    /// ADR-0088's root channel, at both routes. Unclamped here for the same
+    /// reason: the LUT sampler repeats. The *particle's* value is what gets
     /// clamped, in the shader, and that is a different number.
     root_tint: f32,
+    root_hue: f32,
 }
 
 /// The deferred one-shot uploads: the palette LUTs on a preset switch or fresh
@@ -3579,48 +3565,46 @@ fn upload_uniforms(
                 inputs.family.inv_depth_extent(),
             ],
             ctr: [centre[0], centre[1], centre[2], 0.0],
-            // ADR-0087's channels, unclamped for the same reason `depth_hue`
-            // above is: the LUT sampler repeats, so any palette-coordinate
-            // shift is legitimate, and the hue route takes `fract`. The two
-            // `age` slots are Plan 0073 Phase 4's.
+            // The four colour channels, unclamped for the same reason
+            // `depth_hue` above is: the LUT sampler repeats, so any
+            // palette-coordinate shift is legitimate, and the hue route takes
+            // `fract`. `map_*` is ADR-0087's, `root_*` ADR-0088's — the latter
+            // took the `age_*` slots at Plan 0074 Phase 3 rather than adding to
+            // them.
+            //
             // **Zeroed wholesale off the IFS**, which is what makes all four
             // exactly inert on the four map families rather than merely
-            // defaulted. `map` and `age` are identically `0.0` there, and
+            // defaulted. `map` and `root` are identically `0.0` there, and
             // `channel_shift` is *centred* — so a bound `map_tint` would land a
             // uniform `-map_tint/2` on the palette coordinate of a family the
             // channel means nothing on. Inertness has to be the engine declining
             // to upload the param, the way `d.w` makes the depth cues inert on a
             // 2D family; a default of zero only covers presets that never bind it.
+            //
+            // The `root_*` half would survive without this branch — anchored at
+            // zero, `root_tint * 0` is `0` whatever the binding — so the zeroing
+            // is load-bearing for x/y and belt-and-braces for z/w. Kept whole
+            // because a row that is conditionally zeroed in halves is worse to
+            // reason about than one that is zeroed outright.
             ch: if inputs.family.figure().is_some() {
                 [
                     inputs.map_tint,
                     inputs.map_hue,
-                    inputs.age_tint,
-                    inputs.age_hue,
+                    inputs.root_tint,
+                    inputs.root_hue,
                 ]
             } else {
                 [0.0; 4]
             },
-            // The IFS ramps a respawned particle in and normalizes its age;
-            // nothing else respawns, so nothing else has an age at all — hence
-            // the flat floor of exactly 1.0 rather than a rate they would read as
-            // zero and black themselves out with.
+            // The IFS ramps a respawned particle in; nothing else respawns, so
+            // nothing else has an age at all — hence the flat floor of exactly
+            // 1.0 rather than a rate they would read as zero and black
+            // themselves out with. `z`/`w` are unused since the age colour
+            // channel retired.
             em: if inputs.family.figure().is_some() {
-                [1.0 / EMERGENCE_STEPS, 0.0, 1.0 / churn_max_lifetime(), 0.0]
+                [1.0 / EMERGENCE_STEPS, 0.0, 0.0, 0.0]
             } else {
                 [0.0, 1.0, 0.0, 0.0]
-            },
-            // ADR-0088's route, zeroed off the IFS by the same rule — though
-            // here it is redundant rather than load-bearing, which is the one
-            // way this channel is *safer* than the row above. Anchored at zero,
-            // `root_tint * root` is exactly `0` on a family whose `root` is
-            // identically `0`, so inertness holds even if this branch were
-            // dropped. Kept because Phase 3 folds this into `ch`, where the
-            // centred `map_*` still depend on it.
-            rc: if inputs.family.figure().is_some() {
-                [inputs.root_tint, 0.0, 0.0, 0.0]
-            } else {
-                [0.0; 4]
             },
         }),
     );
@@ -5607,15 +5591,29 @@ mod tests {
         // one-line multiplies, so a shader "tidied" into the shared helper would
         // leave every mirror-based assertion green while sliding the figure.
         assert!(
-            super::DRAW_SHADER.contains("+ draw.rc.x * root01;"),
-            "the root channel's palette term must be ANCHORED (`draw.rc.x * root01`), \
+            super::DRAW_SHADER.contains("+ draw.ch.z * root01;"),
+            "the root channel's palette term must be ANCHORED (`draw.ch.z * root01`), \
              not routed through the centred `channel_shift` — ADR-0088's Anchoring \
              section, and root01 does not span [0, 1]"
+        );
+        assert!(
+            super::DRAW_SHADER.contains("channel_shift(map01, draw.ch.y) + draw.ch.w * root01"),
+            "the root channel's HUE term must be anchored too — a centred one would \
+             rotate the skeleton itself by -root_hue/2, and unlike the tint route \
+             there is no `hue_center` to absorb it"
         );
         assert!(
             !super::DRAW_SHADER.contains("channel_shift(root01"),
             "the root channel must not use `channel_shift` — it is centred on 0.5, \
              which root01 reaches on only one of the five figures"
+        );
+        // The retirement, asserted on the shader rather than on the roster: a
+        // draw path still reading an age-normalized channel would keep working
+        // and keep not producing a gradient.
+        assert!(
+            !super::DRAW_SHADER.contains("age01"),
+            "the age colour channel is retired (Plan 0074 Phase 3) — `age` survives \
+             only as the emergence ramp's input"
         );
     }
 
@@ -5747,7 +5745,7 @@ mod tests {
     fn the_colour_channels_default_to_the_identity() {
         use projection_mirror as m;
 
-        let names = ["map_tint", "map_hue", "age_tint", "age_hue", "root_tint"];
+        let names = ["map_tint", "map_hue", "root_tint", "root_hue"];
         for name in names {
             assert!(
                 super::PARAMS.contains(&name),
@@ -5768,9 +5766,8 @@ mod tests {
         for (name, got) in names.into_iter().zip([
             h.scene.map_tint,
             h.scene.map_hue,
-            h.scene.age_tint,
-            h.scene.age_hue,
             h.scene.root_tint,
+            h.scene.root_hue,
         ]) {
             assert_eq!(got, 0.0, "`{name}` did not reset to the identity");
         }
@@ -5849,6 +5846,119 @@ mod tests {
         // Centred, so the mid-channel colour is the one the preset asked for and
         // raising the amount opens a spread rather than sliding the figure.
         assert_eq!(m::channel_shift(0.5, 0.4), 0.0);
+    }
+
+    /// **`root_hue` moves hue and leaves the palette coordinate alone** (Plan
+    /// 0074 Phase 3), asserted on the transcribed CPU maths rather than on
+    /// pixels — the only place the claim is expressible, since a capture cannot
+    /// separate "sampled the ramp elsewhere" from "rotated the colour the ramp
+    /// returned".
+    ///
+    /// The two routes share `root01` and diverge in what they do with it: the
+    /// tint route adds `root_shift(root01, root_tint)` to the coordinate handed
+    /// to the LUT, and the hue route leaves that coordinate untouched and rotates
+    /// the colour that came back. That separation is what makes `root_hue` the
+    /// escape when the palette coordinate is already fully spent — which Plan
+    /// 0074's Phase 2 gate measured it to be on `attractor_fern`.
+    #[test]
+    fn the_root_hue_route_rotates_without_touching_the_palette_coordinate() {
+        use projection_mirror as m;
+
+        let base = [0.20f32, 0.65, 0.35];
+        let [h0, s0, v0] = m::rgb2hsv(base);
+
+        for unit in [0.0f32, 0.25, 0.46, 1.0] {
+            for amount in [0.10f32, 0.35, -0.25] {
+                let turns = m::root_shift(unit, amount);
+
+                // The hue route rotates by exactly the anchored shift, carrying
+                // saturation and value through untouched.
+                let [h1, s1, v1] = m::rgb2hsv(m::shift_hue(base, turns));
+                let moved = (h1 - (h0 + turns).rem_euclid(1.0)).abs();
+                assert!(
+                    moved < 1e-3 || (moved - 1.0).abs() < 1e-3,
+                    "root01 {unit} at root_hue {amount} took hue {h0} to {h1}, not to {}",
+                    (h0 + turns).rem_euclid(1.0)
+                );
+                assert!(
+                    (s1 - s0).abs() < 1e-3 && (v1 - v0).abs() < 1e-3,
+                    "the hue route moved saturation {s0} -> {s1} or value {v0} -> {v1}"
+                );
+            }
+        }
+
+        // ...and it is ANCHORED, like the tint route: a particle ON a fixed
+        // point takes no rotation at all, so the skeleton keeps exactly the
+        // colour the ramp gave it. A centred route would rotate it by
+        // `-root_hue/2`, and unlike the tint route there is no `hue_center` to
+        // absorb that.
+        for amount in [0.0f32, 0.2, 0.9, -0.4] {
+            assert_eq!(m::root_shift(0.0, amount), 0.0);
+            assert_eq!(
+                m::shift_hue(base, m::root_shift(0.0, amount)).map(f32::to_bits),
+                base.map(f32::to_bits),
+                "a particle on a fixed point must take root_hue {amount} as the identity"
+            );
+        }
+
+        // The two routes are genuinely separate: the same channel value feeds
+        // both, and binding one leaves the other's input alone. Stated as the
+        // arithmetic rather than as a picture, because a capture cannot tell the
+        // two apart.
+        let unit = 0.4f32;
+        assert_eq!(
+            m::root_shift(unit, 0.0),
+            0.0,
+            "root_hue bound alone must not move the coordinate"
+        );
+        assert!(m::root_shift(unit, 0.5) > 0.0);
+    }
+
+    /// **The retired names no longer resolve** (Plan 0074 Phase 3).
+    ///
+    /// `set_param` silently ignores an unknown name — that is how a preset
+    /// binding a typo warns at load rather than failing — so "it no longer
+    /// resolves" has to be asserted as *the field it used to write does not
+    /// move*, which here means the whole colour row stays at its default.
+    #[test]
+    fn the_age_colour_channel_is_gone_from_the_roster() {
+        for retired in ["age_tint", "age_hue"] {
+            assert!(
+                !super::PARAMS.contains(&retired),
+                "`{retired}` is still in PARAMS — it was retired at Plan 0074 Phase 3 \
+                 because `age` proxied distance-from-the-fixed-points and the proxy decayed"
+            );
+        }
+        for live in ["map_tint", "map_hue", "root_tint", "root_hue"] {
+            assert!(
+                super::PARAMS.contains(&live),
+                "`{live}` is missing from PARAMS, so a preset binding it warns instead \
+                 of working"
+            );
+        }
+
+        let Some(mut h) = Harness::new(AttractorFamily::Ifs(IfsFigure::Fern)) else {
+            return;
+        };
+        // Binding a retired name must be inert, not merely absent from the list.
+        for retired in ["age_tint", "age_hue"] {
+            h.scene.set_param(retired, 0.9);
+        }
+        for (name, got) in ["map_tint", "map_hue", "root_tint", "root_hue"]
+            .into_iter()
+            .zip([
+                h.scene.map_tint,
+                h.scene.map_hue,
+                h.scene.root_tint,
+                h.scene.root_hue,
+            ])
+        {
+            assert_eq!(
+                got, 0.0,
+                "setting a retired age param moved `{name}` — the name was re-pointed \
+                 rather than removed"
+            );
+        }
     }
 
     /// **The CPU mirror agrees with itself**, so the assertions above are about
