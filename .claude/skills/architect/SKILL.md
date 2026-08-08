@@ -363,7 +363,9 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    `.githooks/pre-push` runs it too (first step, before `fmt`), so an installed hook catches this
    at the push rather than the close — but the hook is **opt-in per clone**, bypassable with
    `--no-verify`, and skips when `node` is absent, so it is a safety net under this step and not a
-   replacement for it. There is no CI counterpart yet.
+   replacement for it. CI's `links` job is the backstop under both: it runs the same check on
+   `ubuntu-latest`, where it cannot be skipped or bypassed — but it reports **after** the push,
+   which is why this step still runs at the close.
 
    It prints `file:line -> target` for each break and repeats the repair rules above. Two traps it
    cannot decide for you: a bare `NNNN-*.md` link inside `docs/adrs/` is identified by its

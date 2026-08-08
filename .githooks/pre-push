@@ -4,11 +4,6 @@
 # Runs the fast subset of what CI runs, so a broken push costs seconds here
 # instead of minutes there. Stops at the first failure and names the step.
 #
-# One exception to "what CI runs": the doc-link check has no CI counterpart yet,
-# so for that one step this hook is the only gate — and it is opt-in per clone
-# and bypassable with --no-verify, which is a weaker guarantee than the rest of
-# this file offers. Moving it into CI would retire the caveat.
-#
 # NOT run here, by design (ADR-0033 Alternative F): `cargo deny`, doctests,
 # Miri, and the coverage job. Those push the gate from tens of seconds into
 # minutes, and a gate that hurts gets disabled — at which point it is worth less
@@ -69,8 +64,9 @@ echo "pre-push: running the fast subset (doc links, fmt, clippy, tests)"
 # by Plan 0060) precisely because nothing ran at push time.
 #
 # Node is not otherwise required to build or test this project, so an absent node
-# SKIPS with a notice rather than failing the push — the ADR-0016 shape. CI is
-# where this should eventually be non-skippable.
+# SKIPS with a notice rather than failing the push — the ADR-0016 shape. That is
+# a statement about this HOOK, not about the gate: the `links` job in CI runs the
+# same check on ubuntu-latest, where Node is always present and it cannot skip.
 if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-doc-links.mjs" node scripts/check-doc-links.mjs
 else
