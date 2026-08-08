@@ -259,14 +259,15 @@ markdown link in the repo must resolve. If `node` is not on your `PATH` it
 Node. That skip is about the hook only — CI's `links` job runs the same check on
 `ubuntu-latest`, where it cannot skip and is not bypassable.
 
-**Measured warm wall time: ~41 s** (fmt ~0.5 s, clippy ~0.7 s, tests ~40 s —
-most of the suite, minus the nine excluded below). The full suite is
-~121 s, so the hook excludes the nine
+**Measured warm wall time: ~48.6 s** (2026-08-08; dominated by the tests — `fmt`
+and `clippy` are under two seconds between them). The hook excludes the nine
 GPU-heavy suites that iterate every shipped preset or scene through a real
 adapter — `golden`, `attractor`, `reaction_diffusion`, `background_composite`,
 `ink`, `reactivity`, `animation`, `sanity`, `distinctness`. It **prints which
 suites it skipped** on every run, so the narrowing is never silent, and **CI runs
-all of them regardless**.
+all of them regardless** — though since [ADR-0073](docs/adrs/0073-the-windows-ci-critical-path.md)
+it runs those nine in the `coverage` job alone rather than in two Windows jobs, so
+the promise is now underwritten by one job instead of a redundancy between two.
 
 `cargo deny`, doctests, Miri, and the coverage job are deliberately *not* in the
 hook — they push it into minutes, and a gate that hurts gets disabled (ADR-0033
