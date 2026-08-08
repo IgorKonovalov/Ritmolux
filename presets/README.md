@@ -899,20 +899,22 @@ and why those pins are now unnecessary.
 
 An audio-tintable gradient + vignette backdrop drawn *before* the scene, engine-
 wide. `bg_bright = 0` (the default) is a black backdrop; raise it to reveal the
-gradient. `bg_hue` offsets into a cosine ramp; `bg_vignette` (0..1)
+gradient. `bg_hue` picks the tint out of the preset's palette; `bg_vignette` (0..1)
 darkens the corners.
 
-**`bg_hue` does not read your `[palette]`, and this is the one place in the
-colour surface where that is true.** The background pass carries its own copy of
-the default `spectrum` cosine and binds no LUT, so `bg_hue` walks that ramp
-whatever gradient the preset declares, and `saturation` / `palette_mix` do not
-reach the backdrop at all. The upside is that the ramp is already tabulated:
-`bg_hue` `0.30` is cornflower blue, `0.45` aqua, `0.85` amber — the twenty-row
-swatch table in
+**`bg_hue` is a coordinate in your `[palette]`**
+([ADR-0086](../docs/adrs/0086-the-backdrop-colours-through-the-preset-palette.md)). The pass samples
+the same baked LUT every scene samples, so an `ember` preset gets an ember sky and a custom gradient
+tints its own backdrop — and `saturation` / `palette_mix` move the backdrop with the figure, so an
+A/B crossfade carries the whole frame. It is **cyclic**, with the same wrap trap `color_center` has:
+`-0.1` and `0.9` are the same place, and on a stop-list palette that seam is the sharpest transition
+in the gradient. With no `[palette]` declared the gradient is `spectrum`, and the twenty-row swatch
+table in
 [`docs/preset-palettes.md`](../docs/preset-palettes.md#the-line-scenes-cosine-ramp--what-hue-actually-looks-like)
-is the same ramp. [ADR-0086](../docs/adrs/0086-the-backdrop-colours-through-the-preset-palette.md) /
-[Plan 0072](../docs/plans/0072-the-backdrop-joins-the-palette.md) change this; until they land,
-tune `bg_hue` against that table rather than against your own stops. Visible wherever the scene leaves the frame unpainted: behind
+is that ramp — so `bg_hue` `0.30` is cornflower blue, `0.45` aqua, `0.85` amber *until* you declare
+stops of your own, at which point read the value off your own gradient instead. A `bg_hue` copied
+from another preset arrives at whatever colour your gradient holds there, not the colour it was in
+the preset you took it from. Visible wherever the scene leaves the frame unpainted: behind
 the **sparse** scenes (lines, swarm, attractor) where the gaps show through, and —
 since Plan 0025 — in the **reaction-diffusion** field's voids (both scenes now
 composite over the backdrop instead of presenting opaque). The **fragment field**
