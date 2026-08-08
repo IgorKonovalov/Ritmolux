@@ -1617,4 +1617,51 @@ join, not a rewrite.
 **Medium** — it is small, it is in the two files an author reads *first* for exactly this decision,
 and it is the kind of drift that reads as authoritative until someone diffs it against the preset.
 
+## Entry 0077 — from the Plan 0061 close (2026-08-08), and it is a gate's blind spot rather than a preset gap
+
+## 0077 — the doc-link gate is blind to reference-style links, so 85 of them rendered as bracket noise behind a green check
+
+**Raised by:** `architect`, at Plan 0061's close ceremony. **Owner if taken:** `dev` — it is a
+change to `scripts/check-doc-links.mjs`, which gates CI and the pre-push hook.
+
+### The finding
+
+Markdown has two link forms. `scripts/check-doc-links.mjs` validates one of them: its regex is
+`/\]\((?!https?:|mailto:|#)([^)#\s]+)/g`, which matches `[text](target)` and nothing else. The
+reference form — `[0044]` in the prose, resolved by a `[0044]: plans/done/0044-….md` definition
+elsewhere in the file — is invisible to it, in **both** directions:
+
+- a **use with no definition** renders as the literal characters `[0044]`, and the checker is silent;
+- a **definition with a broken target** is never resolved at all, so it can rot freely.
+
+Measured at Plan 0061's close: **85 undefined uses across 11 files**, every one of them behind a
+green `links` job and a green pre-push hook.
+
+### Why it accumulated, which is the part worth keeping
+
+**62 of the 85 were created by Plan 0061's own Phase 7b**, and the phase did nothing wrong. It moved
+~2,700 lines of link-dense prose from `docs/plans/README.md` into `README-archive.md` verbatim; the
+reference *definitions* those lines depend on sit in a block at the bottom of `README.md` and stayed
+behind. The archive shipped with **zero** definitions. The phase's done-when said, correctly, *"Run
+it, do not inspect"* — and it ran clean.
+
+This is the same shape as the 74 broken inline links Plan 0060 found: a rot that degrades only in a
+browser, accumulates one close at a time, and has no natural moment of discovery. Plan 0060 built
+the gate for the first form. This is the second form of the identical failure.
+
+### What a fix would be
+
+Collect each file's `^[label]: target` definitions and its `[label]` uses (excluding inline `[…](…)`
+and fenced/inline code, which the checker already strips), then report two new classes beside the
+existing one: a use with no definition, and a definition whose relative target does not resolve. The
+existing per-line `file:line -> target` output shape carries both without a new format. Worth a
+deliberately-broken-label check that it goes red naming the label, for the same reason Phase 2c owed
+one: a link checker that silently passes is worse than none.
+
+### Priority
+
+**Medium.** The 85 uses were repaired at the close and all 68 definitions in the repo currently
+resolve, so nothing is broken today — it is *unguarded*, and it re-accumulates on exactly the
+close-ceremony `git mv` that Plan 0060 already proved nobody catches by eye.
+
 [0048]: plans/done/0048-analysis-v2-and-the-retune.md

@@ -1006,6 +1006,13 @@ cost it was meant to bound is bounded by the fixture instead. Recorded in
   1439** total lines, because neither carries much inline test weight (241 and 0). Both are argued
   defensible under *What this plan does NOT do*; that argument is unchanged, but they are what
   "largest remaining file" means now that this plan has landed.
+- **Teach `scripts/check-doc-links.mjs` the reference-link form** — [design-backlog
+  0077](../../design-backlog.md), raised at this plan's close and owned by `dev`. The checker
+  validates `[text](target)` only, so `[0044]` with no `[0044]: …` definition renders as literal
+  bracket text behind a green gate. **62 of the 85 found were created by this plan's own Phase 7b**,
+  which moved 2,700 lines of link-dense prose into `README-archive.md` and left the definition block
+  behind in `README.md`. The phase ran the checker exactly as its done-when instructed and it came
+  back clean. All 85 are repaired; the gate is still blind.
 - **Reading the slowest-test list at a close ceremony**, raised in the last bullet below and still
   not a ceremony step. `shot_cli`'s 948.9 s was invisible for the same reason the doubled attractor
   was — nothing had ever rendered the configuration. Whether it becomes a step is an ADR-0033
