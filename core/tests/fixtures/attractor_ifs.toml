@@ -1,4 +1,4 @@
-# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+﻿# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
 #
 # The attractor's IFS FAMILY (Plan 0062, ADR-0075), which the per-SystemKind
 # roster structurally cannot reach. `attractor.toml` is De Jong: it takes a
@@ -32,39 +32,53 @@
 #               is weakest at seeing - see the measured table below.
 #   fade/size/  a trail long enough that the strokes read, at a nib that does
 #   zoom        not clip the accumulation to flat white.
-#   map_tint/   ADR-0087's two per-particle colour channels, at BOTH of their
-#   map_hue/    routes each. `*_tint` shifts the palette coordinate; `*_hue`
-#   age_tint/   rotates the hue of the colour that ramp returned. All four are
-#   age_hue     IFS-only, and they are the only thing in the suite that would
-#               notice either channel, the `map` write in the step shader, or
-#               the staggered age the churn seeds. `age_hue` is NEGATIVE so the
-#               sign of the rotation is pinned too.
+#   map_tint/   The two per-particle colour channels, at BOTH of their routes
+#   map_hue/    each. `*_tint` shifts the palette coordinate; `*_hue` rotates the
+#   root_tint/  hue of the colour that ramp returned. All four are IFS-only, and
+#   root_hue    they are the only thing in the suite that would notice either
+#               channel, the `map` write in the step shader, or the per-step
+#               distance-to-the-skeleton the IFS arm writes (ADR-0088).
+#               `root_hue` is NEGATIVE so the sign of the rotation is pinned too.
+#               The two halves are NOT the same shape: `map_*` is centred on 0.5,
+#               `root_*` is anchored at 0, so a `root_*` value has to be larger
+#               to buy the same palette travel - the fern/spiral pair tops out
+#               around 0.43 of the range at this morph.
+#   emergence   45 steps against a default of 8 (Plan 0074 Phase 4). Nothing else
+#               in the suite would notice the ramp at all, and at `fade = 0.90`
+#               the trail integrates the dimmed just-respawned particles over
+#               many frames, which is precisely the interaction ADR-0087's Risks
+#               flagged and could not test. 45 rather than the 24 first tried:
+#               at 24 the neutralized capture cleared the outlier gate 56 to 48,
+#               a margin thin enough that an adapter difference could flip it.
 #
 # THE GUARD IS DEMONSTRATED, NOT ASSUMED. Each lever was neutralized in turn and
 # the capture re-measured against this baseline (tolerances: mean 0.02,
-# outlier 48). Re-measured IN FULL at Plan 0073 Phase 5: the baseline itself
-# moved three times over that plan, so the previous five numbers were taken
-# against a picture that no longer exists.
+# outlier 48). Re-measured IN FULL at Plan 0074 Phase 5, as it was at Plan 0073
+# Phase 5 and for the same reason: the baseline moved twice over this plan (the
+# age channel's retirement, then this rebind), so any number taken before that
+# was taken against a picture that no longer exists.
 #
-#   morph    -> 0     mean 0.1584   outlier 254
-#   curl     -> 0     mean 0.1079   outlier 254
-#   lean     -> 0     mean 0.1108   outlier 254
-#   vigor    -> 1     mean 0.0326   outlier 253
-#   bias     -> 0     mean 0.0145   outlier 237
-#   map_tint -> 0     mean 0.0142   outlier 192
-#   map_hue  -> 0     mean 0.0062   outlier  90
-#   age_tint -> 0     mean 0.0117   outlier 108
-#   age_hue  -> 0     mean 0.0058   outlier  69
+#   morph     -> 0     mean 0.1590   outlier 254
+#   curl      -> 0     mean 0.1009   outlier 254
+#   lean      -> 0     mean 0.1047   outlier 254
+#   vigor     -> 1     mean 0.0308   outlier 253
+#   bias      -> 0     mean 0.0126   outlier 238
+#   map_tint  -> 0     mean 0.0209   outlier 214
+#   map_hue   -> 0     mean 0.0075   outlier 150
+#   root_tint -> 0     mean 0.0263   outlier 199
+#   root_hue  -> 0     mean 0.0101   outlier 187
+#   emergence -> 8     mean 0.0017   outlier  78
 #
-# All nine fail. Four fail both gates; `bias` and ALL FOUR COLOUR CHANNELS fail
-# the OUTLIER gate alone. That is the expected shape rather than a weakness, and
-# it is worth stating because it is what could be mistaken for a weak fixture:
-# `bias` moves only the DENSITY distribution and leaves every stroke exactly
-# where it was, and the four colour channels move no stroke at all. Both kinds
-# therefore shift a great many pixels a little and a few a great deal, while the
-# frame mean is diluted by a mostly-unlit frame. `MAX_OUTLIER` is precisely what
-# exists to catch that, and without it this fixture would notice none of the
-# five.
+# All ten fail. Six fail both gates; `bias`, the two `*_hue` routes and
+# `emergence` fail the OUTLIER gate alone. That is the expected shape rather than
+# a weakness, and it is worth stating because it is what could be mistaken for a
+# weak fixture: `bias` moves only the DENSITY distribution and leaves every
+# stroke exactly where it was, the colour channels move no stroke at all, and
+# `emergence` changes only how bright the small recently-respawned fraction of
+# the population is. All three kinds shift a great many pixels a little and a few
+# a great deal, while the frame mean is diluted by a mostly-unlit frame.
+# `MAX_OUTLIER` is precisely what exists to catch that, and without it this
+# fixture would notice none of the four.
 #
 # The two `*_tint` channels also confound each other by construction - they ride
 # the SAME palette coordinate, so neutralizing one leaves the other still moving
@@ -85,16 +99,17 @@ morph_to = "spiral"
 density  = 0.12
 
 [params]
-size     = "0.55"
-fade     = "0.90"
-zoom     = "1.10"
-exposure = "0.30"
-morph    = "0.35"
-vigor    = "1.06"
-curl     = "0.35"
-lean     = "0.40"
-bias     = "0.65"
-map_tint = "0.55"
-map_hue  = "0.22"
-age_tint = "0.40"
-age_hue  = "-0.18"
+size      = "0.55"
+fade      = "0.90"
+zoom      = "1.10"
+exposure  = "0.30"
+morph     = "0.35"
+vigor     = "1.06"
+curl      = "0.35"
+lean      = "0.40"
+bias      = "0.65"
+map_tint  = "0.55"
+map_hue   = "0.22"
+root_tint = "0.90"
+root_hue  = "-0.45"
+emergence = "45"

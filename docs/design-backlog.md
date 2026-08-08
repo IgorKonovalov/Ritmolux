@@ -1406,9 +1406,24 @@ that reads as a curve — which is every future user of `star_pattern`'s motif r
 
 ---
 
-## Entry 0074 — from Plan 0073 Phase 6 (2026-08-06), the content pass on the two IFS colour channels
+## ~~Entry 0074 — from Plan 0073 Phase 6 (2026-08-06), the content pass on the two IFS colour channels~~ — BUILT
 
-## 0074 — the age channel has nothing spatial to colour, because the emergence ramp hides the only steps where age correlates with position
+> **Closed 2026-08-08 by [Plan 0074](plans/0074-the-figure-colours-by-how-far-it-has-come.md) /
+> [ADR-0088](adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md).** Route 2 was taken —
+> the channel that IS spatial — and route 3 shipped with it: `root_tint` / `root_hue` measure
+> distance to the nearest drawn fixed point directly, and `age_tint` / `age_hue` are retired, so the
+> roster did not grow. Route 1 (`emergence`) shipped too, but on ADR-0087's independent
+> `fade`-interaction merits rather than as the age channel's rescue.
+>
+> The plan gated on a rendered sample set after one implementation phase rather than at the end,
+> because this entry's whole lesson was that the *previous* channel's reasoning sounded right and
+> was not. It read, on all five figures. The gate also found something this entry did not predict:
+> the palette coordinate is a **fixed budget**, so `attractor_fern` needs `map_tint` cut `0.46 -> 0.22`
+> before `root_tint` improves on stock — stacked at full strength the plant washes out.
+>
+> Kept below unstruck as the record of the measurement that motivated it.
+
+## ~~0074 — the age channel has nothing spatial to colour, because the emergence ramp hides the only steps where age correlates with position~~
 
 - **Raised:** 2026-08-06, at [Plan 0073](plans/done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
   Phase 6 — the `preset-author` pass that phase exists to run. It is the phase's own
