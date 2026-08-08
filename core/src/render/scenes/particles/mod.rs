@@ -1792,7 +1792,7 @@ impl StepUniform {
 /// `0.97` occupies, and the acceptance is the look rather than the number. At the
 /// 150 000-particle ceiling this restarts ~0.56 % of the buffer per step. Plan
 /// 0073 Phase 6 judges it live; if the churn reads as *twinkle*, **this constant
-/// and [`EMERGENCE_STEPS`] are the lever, and making the rate bindable is not**.
+/// and [`DEFAULT_EMERGENCE`] are the lever, and making the rate bindable is not**.
 const CHURN_LIFETIME: f32 = 180.0;
 
 /// The per-particle spread on [`CHURN_LIFETIME`], as multipliers of it.
@@ -1804,7 +1804,8 @@ const CHURN_LIFETIME: f32 = 180.0;
 /// phases stay spread for the life of the session and the restart rate is flat.
 const CHURN_LIFETIME_SPREAD: [f32; 2] = [0.5, 1.5];
 
-/// Steps a respawned particle takes to reach full brightness (ADR-0087).
+/// Steps a respawned particle takes to reach full brightness (ADR-0087) — the
+/// default the `emergence` param falls back to.
 ///
 /// **Load-bearing rather than polish.** A fixed rate at the particle ceiling
 /// lands on the order of a thousand particles per frame onto exactly **four
@@ -1813,7 +1814,48 @@ const CHURN_LIFETIME_SPREAD: [f32; 2] = [0.5, 1.5];
 /// particle is bright it has been iterated enough to have spread across the
 /// figure. Without it the churn is four blobs; with it the churn is invisible,
 /// which is the whole intent.
-const EMERGENCE_STEPS: f32 = 8.0;
+///
+/// Bindable since Plan 0074 Phase 4, and **for ADR-0087's reason rather than the
+/// colour one**: a ramp sufficient at `fade = 0.86` may not be at `0.94`,
+/// because a longer trail integrates the four restart points over more frames.
+/// The *other* motivation for exposing it — letting the age gradient show — died
+/// with the age channel and is not why this shipped.
+const DEFAULT_EMERGENCE: f32 = 8.0;
+
+/// The shortest ramp that is still a ramp.
+///
+/// **The guard here is arithmetic, not taste.** `em.x` is `1 / emergence`, so a
+/// zero binding divides by zero and a negative one *inverts* the ramp — a
+/// just-respawned particle would start at full brightness and dim, which is the
+/// four-blob artifact the ramp exists to remove, brought back through the front
+/// door. Below `1` nothing further changes: a particle's `age` is a whole number
+/// of steps, so a rate at or above `1.0` already means the first step after a
+/// respawn is fully bright.
+const MIN_EMERGENCE: f32 = 1.0;
+
+/// The per-step brightness increment the draw uniform carries, from a bound
+/// `emergence` in **steps**.
+///
+/// Clamped here rather than in the shader for the reason `perspective` is
+/// (ADR-0076): this is the one place the value crosses into the GPU, so a preset
+/// asking for something the maths does not accept gets the floor rather than a
+/// divisor approaching zero. **A smoothing curve makes this necessary rather
+/// than defensive** — an eased param is continuous even when its own maths is
+/// not, so a binding easing from `8` toward `0` sweeps *through* the invalid
+/// range whatever its endpoints are.
+///
+/// **There is deliberately no upper clamp.** Past the longest lifetime a
+/// particle can draw, no particle completes the ramp and the figure simply gets
+/// dimmer — that is a look an author can ask for, not an arithmetic hazard, and
+/// capping it would be taste. Non-finite is the one case a clamp cannot handle:
+/// `f32::clamp` propagates `NaN`, which would reach the division and black the
+/// figure out, so it falls back to the default instead.
+fn emergence_rate(steps: f32) -> f32 {
+    if !steps.is_finite() {
+        return 1.0 / DEFAULT_EMERGENCE;
+    }
+    1.0 / steps.max(MIN_EMERGENCE)
+}
 
 /// This particle's lifetime in steps, from its own fixed `seed`.
 ///
@@ -2675,6 +2717,15 @@ pub struct AttractorScene {
     /// never produced a gradient.
     root_tint: f32,
     root_hue: f32,
+    /// Length of the emergence ramp in **steps** - how long a just-respawned
+    /// particle takes to reach full brightness (ADR-0087), IFS-only because
+    /// nothing else respawns.
+    ///
+    /// At [`FIXED_STEP`] the default 8 steps is ~0.13 s. Raise it when a longer
+    /// `fade` lets the four restart points accumulate: a trail integrates them
+    /// over more frames, so a ramp sufficient at `fade = 0.86` may not be at
+    /// `0.94`. Clamped silently at the pack site by [`emergence_rate`].
+    emergence: f32,
     /// Rate multiplier on [`SPIN_RATE`] (ADR-0076). Unlike the depth cues this is
     /// **not** inert on the 2D families: the discrete maps rotate in-plane
     /// through the same angle, so `spin` reaches all four families where
@@ -2753,6 +2804,7 @@ impl AttractorScene {
             map_hue: DEFAULT_CHANNEL_COLOUR,
             root_tint: DEFAULT_CHANNEL_COLOUR,
             root_hue: DEFAULT_CHANNEL_COLOUR,
+            emergence: DEFAULT_EMERGENCE,
             spin: DEFAULT_SPIN,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
@@ -3018,6 +3070,10 @@ pub const PARAMS: &[&str] = &[
     // than joining them, so the roster did not grow.
     "root_tint",
     "root_hue",
+    // The emergence ramp's length in steps (Plan 0074 Phase 4). IFS-only for the
+    // structural reason the channels above are: nothing else respawns, so
+    // nothing else has a ramp - em is a flat 1.0 on the four map families.
+    "emergence",
 ];
 
 impl Scene for AttractorScene {
@@ -3083,6 +3139,7 @@ impl Scene for AttractorScene {
         self.map_hue = DEFAULT_CHANNEL_COLOUR;
         self.root_tint = DEFAULT_CHANNEL_COLOUR;
         self.root_hue = DEFAULT_CHANNEL_COLOUR;
+        self.emergence = DEFAULT_EMERGENCE;
         self.spin = DEFAULT_SPIN;
         self.morph = DEFAULT_MORPH;
         self.levers = Levers::NEUTRAL;
@@ -3113,6 +3170,7 @@ impl Scene for AttractorScene {
             "map_hue" => self.map_hue = value,
             "root_tint" => self.root_tint = value,
             "root_hue" => self.root_hue = value,
+            "emergence" => self.emergence = value,
             "spin" => self.spin = value,
             "morph" => self.morph = value,
             "curl" => self.levers.curl = value,
@@ -3261,6 +3319,7 @@ impl Scene for AttractorScene {
             map_hue,
             root_tint,
             root_hue,
+            emergence,
             palette,
             palette_dirty,
             ..
@@ -3321,6 +3380,7 @@ impl Scene for AttractorScene {
                 map_hue: *map_hue,
                 root_tint: *root_tint,
                 root_hue: *root_hue,
+                emergence: *emergence,
             },
         );
         // Before the steps, and only on the frame a `reseed` edge landed: kick each
@@ -3408,6 +3468,10 @@ struct UniformInputs {
     /// clamped, in the shader, and that is a different number.
     root_tint: f32,
     root_hue: f32,
+    /// The emergence ramp's length in **steps**, raw. Sanitized by
+    /// [emergence_rate] where it is packed, not here, so the guard has exactly
+    /// one site — the discipline rightness follows.
+    emergence: f32,
 }
 
 /// The deferred one-shot uploads: the palette LUTs on a preset switch or fresh
@@ -3602,7 +3666,7 @@ fn upload_uniforms(
             // themselves out with. `z`/`w` are unused since the age colour
             // channel retired.
             em: if inputs.family.figure().is_some() {
-                [1.0 / EMERGENCE_STEPS, 0.0, 0.0, 0.0]
+                [emergence_rate(inputs.emergence), 0.0, 0.0, 0.0]
             } else {
                 [0.0, 1.0, 0.0, 0.0]
             },
@@ -5912,6 +5976,102 @@ mod tests {
             "root_hue bound alone must not move the coordinate"
         );
         assert!(m::root_shift(unit, 0.5) > 0.0);
+    }
+
+    /// **`emergence` at its default is bit-identical to the constant it
+    /// replaced** (Plan 0074 Phase 4).
+    ///
+    /// This is what every baseline rests on. The param arrived by making a
+    /// constant bindable, so "the default changes nothing" is not a tolerance
+    /// claim — the packed rate must be the *same bits* `1.0 / EMERGENCE_STEPS`
+    /// produced, or all nineteen goldens move for a change that was supposed to
+    /// be inert.
+    #[test]
+    fn the_emergence_default_reproduces_the_constant_exactly() {
+        assert_eq!(super::DEFAULT_EMERGENCE, 8.0);
+        assert_eq!(
+            super::emergence_rate(super::DEFAULT_EMERGENCE).to_bits(),
+            (1.0f32 / 8.0).to_bits(),
+            "the default rate must be the exact bits the fixed constant produced"
+        );
+
+        // ...and the scene actually starts and resets there, which is the other
+        // half: a correct rate reached from a wrong default is still a moved
+        // baseline.
+        let Some(mut h) = Harness::new(AttractorFamily::Ifs(IfsFigure::Fern)) else {
+            return;
+        };
+        assert_eq!(h.scene.emergence, super::DEFAULT_EMERGENCE);
+        h.scene.set_param("emergence", 40.0);
+        h.scene.reset_params();
+        assert_eq!(
+            h.scene.emergence,
+            super::DEFAULT_EMERGENCE,
+            "`emergence` did not reset — a preset that bound it would leak into the next"
+        );
+    }
+
+    /// **A binding the ramp's maths cannot accept is clamped at the pack site**
+    /// (Plan 0074 Phase 4), not passed through to a division.
+    ///
+    /// `em.x` is `1 / emergence`. Zero divides; a negative *inverts* the ramp, so
+    /// a just-respawned particle would start bright and dim — the four-blob
+    /// artifact the ramp exists to remove, arriving through the front door. And
+    /// non-finite is the case a bare `clamp` cannot fix, because `f32::clamp`
+    /// propagates `NaN` straight into the division.
+    ///
+    /// **A smoothing curve is what makes this necessary rather than defensive.**
+    /// An eased param is continuous even when its own maths is not, so a binding
+    /// easing from `8` toward `0` sweeps *through* the invalid range whatever its
+    /// endpoints are — this repo has been bitten by exactly that shape before.
+    #[test]
+    fn an_unusable_emergence_binding_clamps_instead_of_dividing() {
+        let floor_rate = 1.0f32 / super::MIN_EMERGENCE;
+
+        for bad in [0.0f32, -1.0, -1e9, 0.5, f32::MIN_POSITIVE] {
+            let rate = super::emergence_rate(bad);
+            assert!(
+                rate.is_finite(),
+                "emergence {bad} produced a non-finite rate {rate}"
+            );
+            assert!(
+                rate > 0.0,
+                "emergence {bad} produced rate {rate} — a non-positive rate inverts \
+                 the ramp, which is the artifact it exists to remove"
+            );
+            assert_eq!(
+                rate.to_bits(),
+                floor_rate.to_bits(),
+                "emergence {bad} should clamp to the {} floor",
+                super::MIN_EMERGENCE
+            );
+        }
+
+        // Non-finite falls back to the default rather than to the floor: a `NaN`
+        // is not a small number, it is an absent one.
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let rate = super::emergence_rate(bad);
+            assert_eq!(
+                rate.to_bits(),
+                (1.0f32 / super::DEFAULT_EMERGENCE).to_bits(),
+                "a non-finite emergence must fall back to the default, got {rate}"
+            );
+        }
+
+        // The range is pinned, not just its edges: inside it the param is the
+        // reciprocal it claims to be, and it is monotone — a longer ramp is a
+        // smaller per-step increment.
+        let mut previous = f32::INFINITY;
+        for steps in [1.0f32, 2.0, 8.0, 60.0, 270.0, 1e6] {
+            let rate = super::emergence_rate(steps);
+            assert_eq!(
+                rate.to_bits(),
+                (1.0f32 / steps).to_bits(),
+                "at {steps} steps"
+            );
+            assert!(rate < previous, "the rate must fall as the ramp lengthens");
+            previous = rate;
+        }
     }
 
     /// **The retired names no longer resolve** (Plan 0074 Phase 3).
