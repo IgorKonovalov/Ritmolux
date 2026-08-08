@@ -1,6 +1,7 @@
 # 0074 — The figure colours by how far it has come: distance from the skeleton, and the age channel retires
 
-> **Status:** **in-progress 2026-08-06** — Phase 1 under way.
+> **Status:** **in-progress 2026-08-06** — Phase 1 landed (`79c08a9`); **Phase 2's gate passed
+> 2026-08-08 — it reads on all five figures**, so Phases 3-6 proceed. Next up is Phase 3 (`dev`).
 > **Amended 2026-08-07, mid-Phase-1, by measurement.** Claim 3 asserted the population spans ≥ 90 %
 > of `[0, 1]`; it does not, on four of five figures, because the fixed-point diameter is not a
 > *lower* bound on the attractor's reach either — a direction ADR-0088 never considered. Claim 3 is
@@ -280,6 +281,60 @@ flowchart TB
     Do not rescue the channel by tuning; the whole point of gating here is that the honest answer is
     cheap at this phase and expensive at Phase 6.
 
+#### VERDICT (2026-08-08): **it reads, on all five figures. Phases 3-6 proceed.**
+
+Judged against 25 headless captures — five figures × `root_tint` off / shared `1.0` / scaled to
+each figure's own ceiling, the `sierpinski -> fern` morph sweep, both `fade = 0.90` variants, and
+`map_tint` alone against both — plus a live standalone session at the **rich** tier driven from a
+scratch `LMV_PRESET_DIR`. The running app printed **no load warnings**, which is the check `shot`
+cannot make: an unknown param name is a warning there and invisible, so this is what establishes
+`root_tint` resolved as a real binding end to end.
+
+Per figure:
+
+| figure | reads | note |
+|---|---|---|
+| Tree | **clearest** | Dark trunk base, blue through the branches, cream at the crown tips. Reads specifically as **depth into the figure** rather than as an arbitrary radial wash — the question ADR-0088 most needed answered and could not argue. |
+| Dragon | **strongest look** | The only figure whose channel fills `[0, 1]`, and the only one needing `root_tint` *below* `1.0` (`0.95`) where the rest want `1.4`-`2.4`. |
+| Fern | yes, with a cost | See the finding below — it is the whole value of this gate. |
+| Sierpinski | yes | A tri-fold band structure off its three corners rather than a single ramp. |
+| Spiral | **weakest** | Consistent with its `0.41` ceiling and bottom-heavy distribution: the gradient is present but the far-end regions are small and the figure is sparse. Hardest case by construction, as this phase predicted. |
+
+**Both named risks came back clean.** At `fade = 0.90` the gradient is *more* legible than bare —
+the trail fills the figure in rather than averaging the channel away, which is precisely where the
+age channel died. Across the `sierpinski -> fern` morph the gradient travels with the fixed points.
+
+##### The finding: the palette coordinate is a fixed budget, not a stack
+
+This is the gate's real output, and it took **two** judgements in sequence to reach:
+
+1. `root_tint = 1.55` **stacked** on top of the shipped fern — which already binds `map_tint = 0.46`
+   and had `hue_spread` cut to `0.05..0.125` at Plan 0073 Phase 6 to make room for *that* — is
+   **worse than stock**. The plant washes cream and stops reading as a fern.
+2. The same two channels with the budget **split** — `map_tint` `0.46 -> 0.22`, `root_tint`
+   `1.55 -> 0.85` — is **better than stock**.
+
+So a channel added to this coordinate has to be **paid for by taking authority away from another
+one**. Plan 0073 already paid this once and did not draw the general rule; this is the second
+instance, which is what makes it a rule rather than an anecdote.
+
+**Judgement 1 alone would have produced the wrong conclusion** — "the fern is a figure the channel
+does not suit" — and under this phase's second done-when shape that would have been written into
+`presets/README.md` as a standing warning about a figure that is in fact fine. Worth remembering
+the next time a gate looks decided after one comparison.
+
+This **answers the plan's standing risk** that three channels may be one too many for one
+coordinate: there is room, at the price of halving the second.
+
+##### What did not get tested, and it may change the answer
+
+`root_hue` does not exist until Phase 3, so the fern's split was judged **without the escape route
+the two-route theory predicts for exactly this case**. `root_hue` rotates the hue of the colour the
+ramp returned rather than moving where the ramp is sampled, so it costs the contested coordinate
+nothing — the fern could keep `map_tint` at full authority *and* carry a depth cue. If that works,
+the split above is a fallback rather than the answer, and Phase 6 should try the hue route on the
+fern **before** settling for it.
+
 ### Phase 3 — the second route, and the age channel retires
 
 - **Owner skill:** dev
@@ -347,6 +402,14 @@ flowchart TB
     same shape as the other two**: `root_tint · root01`, not `root_tint · (root01 − 0.5)`. The
     `map_tint`-competes-with-`hue_spread` warning still stands and now applies to `root_tint` too —
     and applies *asymmetrically*, since an anchored term only ever pushes the coordinate one way.
+    **And it owes the rule the Phase 2 gate established, stated once and generally**: the attractor's
+    palette coordinate is a **fixed budget**. Three params write it (`hue_spread`, `map_tint`,
+    `root_tint`), and adding one means *taking authority away from another*, not stacking a third
+    term on top. Two instances now support this — Plan 0073 cut `hue_spread` to `0.05..0.125` to let
+    `map_tint` read, and Plan 0074's gate found the fern needs `map_tint` halved to `0.22` to let
+    `root_tint` read. Worked example with those numbers, because "budgets compete" is abstract and
+    `0.46 -> 0.22` is not. **`*_hue` is the escape and the page should say so**: the hue routes do
+    not touch this coordinate at all, so a preset out of budget has somewhere to go.
   - `docs/design-backlog.md` — **strike entry 0074 through** with a pointer to this plan and
     ADR-0088. It is the architect inbox; an entry that has been built and not struck reads as open.
   - **`docs/presets.md` is not touched:** no expression-grammar variable, function or operator changes.
@@ -367,6 +430,13 @@ flowchart TB
   it? Does `attractor_dissolve` want it across the morph, where the fixed points travel? Is
   `root_hue` the better route on a narrow palette, as the two-route theory predicts? And does
   `emergence` want to move on the longer-`fade` of the two presets?
+- **It starts from numbers, not from zero** (added 2026-08-08 from the Phase 2 verdict). The gate
+  already found a fern tuning that beats stock: **`map_tint ≈ 0.22`, `root_tint ≈ 0.85`** — the
+  budget split rather than stacked. Start there rather than re-deriving it.
+  **But try `root_hue` on the fern first.** The split was judged before the hue route existed, and
+  the hue route costs the contested coordinate nothing — if it carries the depth cue with
+  `map_tint` left at its full `0.46`, that is strictly better than the split and the split becomes
+  the fallback. This is the two-route theory's cleanest test case and nobody has run it.
 - **Done when:** both shipped IFS presets are retuned, and any route that could not be made to read
   is written up in `docs/design-backlog.md` rather than quietly left bound to nothing. If the
   three-way competition for the palette coordinate (`hue_spread`, `map_tint`, `root_tint`) turns out
@@ -416,11 +486,15 @@ struct Particle {
   fixed point. Membership is a theorem; density is not, and is per-figure. A figure thin near one of
   its points shows that region sparse rather than coloured. Phase 2 looks at all five figures for
   this reason and nothing else would catch it.
-- **Three channels now compete for one palette coordinate.** `hue_spread` (per particle),
+- **~~Three channels now compete for one palette coordinate.~~ Answered 2026-08-08 by the Phase 2
+  gate: there is room, at the price of halving the second.** `hue_spread` (per particle),
   `map_tint` (per part) and `root_tint` (per distance) all write it. Plan 0073 already had to drop
-  `attractor_fern`'s `hue_spread` from `0.16..0.42` to `0.05..0.125` to let `map_tint` read. There
-  may not be room for a third. `root_hue` is the escape — it does not touch that coordinate — and
-  Phase 6's done-when is what converts this from an assumption into a finding.
+  `attractor_fern`'s `hue_spread` from `0.16..0.42` to `0.05..0.125` to let `map_tint` read; the
+  gate found the fern needs `map_tint` cut `0.46 -> 0.22` to let `root_tint` read, and at that
+  split it beats stock — where the same `root_tint` *stacked* on the unchanged preset is worse than
+  stock. **The coordinate is a fixed budget, not a stack**, which is now a two-instance rule rather
+  than an anecdote and is owed to `docs/preset-palettes.md` at Phase 5. `root_hue` remains the
+  escape and is still untested; Phase 6 tries it before settling for the split.
   **The competition is now *asymmetric*, which makes it harder rather than easier** (2026-08-07):
   `hue_spread` and `map_tint` are centred and spend their budget either side of the preset's chosen
   colour, while `root_tint` is anchored at `0` and only ever pushes one way. So the three do not
