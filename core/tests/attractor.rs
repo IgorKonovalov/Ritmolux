@@ -489,10 +489,17 @@ fn the_ifs_tint_channels_move_colour_without_moving_the_figure() {
 
     // A bare fern: no backdrop and no bloom, so the measured pixels are the
     // figure's own and the corner-pixel background is uniform (ADR-0067).
+    // `root_tint` replaced `age_tint` here at Plan 0074 Phase 3, and it is bound
+    // at **1.5 rather than 0.7** on purpose. `map_tint` is centred over a channel
+    // that spans [0, 1], so `0.7` buys 0.7 of palette travel; `root_tint` is
+    // anchored over one that tops out at 0.461 on the fern (ADR-0088), so the
+    // equivalent authority is `0.7 / 0.461 ~ 1.5`. Binding both at 0.7 would
+    // compare a full-strength lever against a 46 % one and call the difference a
+    // property of the channel.
     renderer.set_presets(vec![
         attractor_bare_preset("at_tint_off", "fern", ""),
         attractor_bare_preset("at_map_tint", "fern", "map_tint = \"0.7\"\n"),
-        attractor_bare_preset("at_age_tint", "fern", "age_tint = \"0.7\"\n"),
+        attractor_bare_preset("at_root_tint", "fern", "root_tint = \"1.5\"\n"),
     ]);
     let base = renderer
         .capture_preset("at_tint_off", &lively, 60)
@@ -501,7 +508,7 @@ fn the_ifs_tint_channels_move_colour_without_moving_the_figure() {
     let base_lit = base_mask.iter().filter(|&&l| l).count();
     assert!(base_lit > 500, "the bare fern lit only {base_lit} pixels");
 
-    for (name, param) in [("at_map_tint", "map_tint"), ("at_age_tint", "age_tint")] {
+    for (name, param) in [("at_map_tint", "map_tint"), ("at_root_tint", "root_tint")] {
         let tinted = renderer
             .capture_preset(name, &lively, 60)
             .expect("capture a tinted fern");
