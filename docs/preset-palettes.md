@@ -170,25 +170,44 @@ bright end of the gradient, it does not clamp toward the dark one.
 
 **On the five IFS figures that coordinate has two more terms**, and they are the
 reason a wide `hue_spread` can make them look broken (Plan 0073,
-[ADR-0087](adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md)). The
-full expression there is
+[ADR-0087](adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md); Plan
+0074, [ADR-0088](adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md)).
+The full expression there is
 
 ```
-hue_center + (particle_seed - 0.5) * hue_spread
+hue_center + (particle_seed  - 0.5) * hue_spread
             + (which_sub_copy - 0.5) * map_tint
-            + (how_old        - 0.5) * age_tint
+            +  how_far_from_skeleton * root_tint
 ```
 
-so `hue_spread` (per particle, at random) and `map_tint` (per part of the figure)
-**compete for the same number**. A wide spread smears the parts into each other
-and `map_tint` reads as a faint wash at any setting — `attractor_fern` had to come
-down from `0.16..0.42` to `0.05..0.125` before its fronds separated. The other
-route, `map_hue`, does not touch this coordinate at all: it rotates the hue of the
-colour the ramp already returned, which is what makes it the tool for throwing one
-part *out* of a narrow palette rather than moving it within one. `age_tint` /
-`age_hue` exist but do not currently produce a gradient — see
-[the full section in `presets/README.md`](../presets/README.md#what-made-this-point-and-how-old-it-is)
-before reaching for any of the four.
+**The third term is not the same shape as the other two.** `map_tint` is
+*centred* — it spreads either side of the colour you chose — while `root_tint` is
+**anchored at zero**: a point sitting on one of the figure's contraction points
+takes no shift at all and keeps your colour exactly, and the rest of the figure
+ramps away from there in one direction. So the third term only ever pushes the
+coordinate one way, which matters when you are budgeting.
+
+**And it is a budget.** All three write the same number, so **adding one means
+taking authority away from another**, not stacking a third term on top. This has
+now been measured twice on the same preset:
+
+| when | the change | why |
+|---|---|---|
+| Plan 0073 | `attractor_fern`'s `hue_spread` `0.16..0.42` → `0.05..0.125` | until then the random per-particle spread smeared the parts together and `map_tint` was a faint wash at *any* setting |
+| Plan 0074 | the same fern's `map_tint` `0.46` → `0.22` | stacked at full strength alongside `root_tint` the plant washes out; the stock preset looked better until the budget was split |
+
+**The `*_hue` routes are the escape, and that is what they are for.** Neither
+`map_hue` nor `root_hue` touches this coordinate — they rotate the hue of the
+colour the ramp already returned — so a figure whose coordinate is fully spent
+can still take a part separation or a depth cue through the hue route. That is
+also why they throw a part *out* of a narrow palette rather than moving it
+within one.
+
+One more trap on `root_tint` specifically: **its effective range is per figure**,
+from `0.41` on the spiral to `1.05` on the dragon, so the same binding is not the
+same look across figures. See
+[the full section in `presets/README.md`](../presets/README.md#what-made-this-point-and-how-far-into-the-figure-it-is)
+for the table and for the `age_*` params these replaced.
 
 ### Spectrum — colour along the frequency axis
 
