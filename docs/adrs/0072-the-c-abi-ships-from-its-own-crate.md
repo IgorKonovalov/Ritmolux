@@ -136,8 +136,17 @@ satisfy a file name. The plan's stated fallback was taken: the stem is `lmv_core
 `plugin-foobar/build.ps1` was updated in the same commit. There is no `.vcxproj` in this repo; the
 plan's reference to one was stale.
 
-**Still owed:** the plugin has not been linked against the extracted crate (Plan 0061 Phase 8,
-`human` — it needs VS Build Tools plus the unpacked foobar SDK, and CI has no plugin job). The
-exposure is bounded, because the `extern "C"` surface did not change, so the only realistic failure
-is an artifact path — and the artifact path is precisely what item 2 above changed. That check is
-carried forward on the plans index rather than holding this ADR open.
+**Verified end to end (2026-08-08, Plan 0061 Phase 8).** `plugin-foobar/build.ps1` completes and
+`foo_lmv.dll` loads in foobar2000 v2 and renders. This mattered more than a formality: no
+`lmv_core_c.lib` existed on disk beforehand, so the ABI crate built from scratch, and the artifact
+rename in item 2 above is the **only realistic failure mode this decision had** — the `extern "C"`
+surface did not change, so a missed rename would have failed at C++ link time with unresolved
+externals rather than anywhere subtler. It linked. Machine-checked alongside: the built DLL is x64
+and exports `foobar2000_get_interface`; the core is genuinely statically linked in (the binary
+carries `0.44.1`, the scene names and `wgpu`); every import resolves except foobar's own
+`shared.dll`, which resolves from the host process directory and is correct.
+
+**The gap this closes is that CI has no plugin job**, so nothing automated would have caught a
+broken link — the shim compiles under a separate MSVC toolchain, on demand. That remains true, and
+it is why an ADR that moves the ABI's build location owes a manual link check at its close rather
+than at some later convenience.

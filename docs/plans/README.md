@@ -92,23 +92,22 @@ the rows above.
 
 ## Standing (not a plan)
 
-- **Plan [0061]'s two `human` verifications, carried forward at its close (2026-08-08).** The plan is
-  `done` and every `dev` phase landed; these two are outstanding because neither `dev` nor
-  `architect` can run them, and neither blocks anything that shipped.
-  - **Phase 8 — link the foobar plugin.** `.\plugin-foobaruild.ps1` must produce
-    `plugin-foobar/build/foo_lmv.dll` and that component must load in foobar2000 v2 and render.
-    Needs VS Build Tools 2022 plus the unpacked foobar SDK; CI has no plugin job. **This is the check
-    most worth running**, because [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md)
-    renamed the linked artifact to `lmv_core_c.lib` — the `extern "C"` surface did not change, so an
-    artifact path is the only realistic failure and the artifact path is what moved.
-  - **Phase 9 — read a cache-warm CI run** (the *second* after the push; the first is a cold build,
-    because a `[profile.dev]` edit and a new workspace member each invalidate `rust-cache`
+- **Plan [0061] Phase 9 — the one verification still outstanding** (2026-08-08). The plan is
+  `done` and every `dev` phase landed. **Phase 8 ran and passed the same day**: the foobar plugin
+  builds against the extracted `lmv-core-cabi` and `foo_lmv.dll` loads in foobar2000 v2 and
+  renders. That closed the one risk [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md)
+  carried into C++ link time — the linked artifact renamed to `lmv_core_c.lib`, and CI has no
+  plugin job that would have caught a stale path. What remains needs a CI run rather than this
+  machine:
+  - **Phase 9 — read a cache-warm CI run** (the *second* after the push; the first is a cold
+    build, because a `[profile.dev]` edit and a new workspace member each invalidate `rust-cache`
     wholesale). It re-derives `COVERAGE_FLOOR` — currently **91**, measured on a hardware-GPU box
     where CI has WARP — and checks the one property
     [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) committed to: **`coverage` is the
-    longest job**. If it is not, `check (windows-latest)` is build-dominated, and that is the single
-    measurement that flips ADR-0073's Alternative A (merge the two Windows jobs) from rejected to
-    worth taking — route it back to `architect` as a supplement rather than editing the job.
+    longest job**. If it is not, `check (windows-latest)` is build-dominated, and that is the
+    single measurement that flips ADR-0073's Alternative A (merge the two Windows jobs) from
+    rejected to worth taking — route it back to `architect` as a supplement rather than editing
+    the job.
 - **[On-device validation — low-end Windows iGPU smoke](../on-device-validation.md)** — a
   hardware-gated checklist, **not** a phased plan and **not** in the roster above: it never blocks a
   plan from closing. Holds the low-end / older Windows iGPU checks (fps floor ≥ 60 @ 1080p; footprint
