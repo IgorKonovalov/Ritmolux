@@ -8,15 +8,20 @@ Intended shape for orientation, not an inventory — trust `Glob`/`git` for what
 today (the tree has grown well past the founding scaffold).
 
 ```
-core/            # package `lmv-core` — DSP + render + scenes + preset engine + C ABI.
-                 #   crate-type = ["rlib", "cdylib", "staticlib"]
+core/            # package `lmv-core` — DSP + render + scenes + preset engine. NO C ABI.
+                 #   crate-type = ["rlib"] ONLY (ADR-0072)
   build.rs       #   globs presets/*.toml into the EMBEDDED table (ADR-0022) — generated, not edited
   src/audio.rs   #   source-agnostic sample intake, validated at the boundary
   src/dsp/       #   bands/fft/onset/beat — pure, deterministic, unit-tested
   src/preset/    #   .toml schema (schema.rs) + the pure expression evaluator (expr.rs)
   src/render/    #   wgpu layer, the composite stages, and scenes/ (NOT core/src/scenes/)
-  src/ffi.rs     #   extern "C" surface for the plugin
   tests/         #   incl. the behavioral gates: sanity.rs, reactivity.rs, animation.rs, golden.rs
+core-cabi/       # package `lmv-core-cabi` — the C ABI and nothing else (ADR-0072).
+                 #   The ONLY crate declaring cdylib/staticlib; emitted lib stem is `lmv_core_c`.
+  src/lib.rs     #   the extern "C" surface (was core/src/ffi.rs)
+  include/       #   lmv_core.h — the C mirror the shim compiles against
+  tests/ffi.rs   #   the ABI conformance suite
+                 #   OUTSIDE workspace `default-members` — see the commands table below
 lmv-ring/        # package `lmv-ring` — the lock-free SPSC ring, zero-dependency so Miri gates it
 standalone/      # package `standalone`, binary `lmv` — winit + wgpu + loopback capture
   examples/shot.rs #  the headless capture CLI (an example, not a bin — keeps `image` out of lmv.exe)
@@ -34,12 +39,19 @@ specification `core` did not match any packages". The directory and the package 
 |------------------------------|---------|
 | Build all                    | `cargo build` |
 | Run the standalone           | `cargo run -p standalone` |
-| Test all / just core         | `cargo test` / `cargo test -p lmv-core` |
-| Test via nextest             | `cargo nextest run -p lmv-core` (what plan closes verify with) |
-| Lints (errors)               | `cargo clippy --all-targets -- -D warnings` |
+| Test all / just core         | `cargo test --workspace` / `cargo test -p lmv-core` |
+| Test via nextest             | `cargo nextest run --workspace` (what plan closes verify with) |
+| Lints (errors)               | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Format check / apply         | `cargo fmt --all --check` / `cargo fmt --all` |
-| Build C-ABI artifacts        | `cargo build -p lmv-core` (cdylib/staticlib) |
+| Build C-ABI artifacts        | `cargo build -p lmv-core-cabi` (emits `lmv_core_c.lib` / `.dll`) |
 | Headless render check        | `cargo run -p standalone --example shot -- <flags>` (`docs/capturing.md`) |
+
+**`--workspace` is load-bearing on the test and clippy rows, not a stylistic flourish** (ADR-0072).
+`lmv-core-cabi` sits outside the workspace `default-members`, which is what makes a bare `cargo
+build` stop re-emitting ~550 MB of artifacts nothing links — and the same exclusion means a bare
+`cargo nextest run` silently skips the ABI conformance suite and a bare `cargo clippy` silently
+stops linting the C ABI. Both come back green while covering nothing. `.githooks/pre-push` and
+`ci.yml` both pass `--workspace` for this reason; match them.
 
 All four of build / test / clippy / fmt-check must be green before you commit a phase, unless the
 phase's done-when says otherwise.

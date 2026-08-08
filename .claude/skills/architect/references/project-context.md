@@ -22,14 +22,17 @@ Cargo workspace. This is the intended shape for orientation, not an inventory �
 `Glob`/`git` for what actually exists today (the tree has grown well past the founding scaffold).
 
 ```
-core/            # Rust library crate — DSP + render engine + scenes + preset engine + C ABI.
-                 #   crate-type = ["rlib", "cdylib", "staticlib"]
+core/            # Rust library crate — DSP + render engine + scenes + preset engine. NO C ABI.
+                 #   crate-type = ["rlib"] only (ADR-0072)
   build.rs       #   globs presets/*.toml into the embedded set (ADR-0022)
   src/audio.rs   #   source-agnostic sample intake (validated at boundary)
   src/dsp/       #   bands/fft/onset/beat — pure, deterministic, unit-tested
   src/preset/    #   the .toml schema + the pure expression evaluator (expr.rs, schema.rs)
   src/render/    #   wgpu device/surface/context, the composite stages, and scenes/
-  src/ffi.rs     #   extern "C" surface for the plugin
+core-cabi/       # the C ABI and nothing else (ADR-0072) — the only crate declaring
+                 #   cdylib/staticlib, emitted stem `lmv_core_c`. src/lib.rs + include/lmv_core.h
+                 #   + tests/ffi.rs. OUTSIDE workspace `default-members`, so `--workspace` is
+                 #   load-bearing on every test/clippy invocation that must cover the ABI.
 lmv-ring/        # the lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI
 standalone/      # Rust binary + lib — winit + wgpu surface + loopback capture + the `shot` example
 plugin-foobar/   # C++ shim — foobar2000 SDK glue, links core's C ABI (Windows-first)
@@ -51,11 +54,15 @@ Rust (run from repo root):
 
 - Build everything: `cargo build`
 - Run the standalone: `cargo run -p standalone`
-- Tests: `cargo test` (or `cargo test -p core` for just the core)
-- Lints (treated as errors): `cargo clippy --all-targets -- -D warnings`
+- Tests: `cargo test --workspace` (or `cargo test -p lmv-core` for just the core — the package is
+  `lmv-core`, not `core`; the directory and the package name differ)
+- Lints (treated as errors): `cargo clippy --workspace --all-targets -- -D warnings`
 - Format check: `cargo fmt --all --check`  (apply: `cargo fmt --all`)
-- Build the C-ABI artifacts + header: `cargo build -p core` (emits cdylib/staticlib; header via
-  `cbindgen` if configured)
+- Build the C-ABI artifacts: `cargo build -p lmv-core-cabi` (emits `lmv_core_c.lib`/`.dll`; the
+  header is hand-maintained at `core-cabi/include/lmv_core.h`, no `cbindgen` — ADR-0003)
+
+**`--workspace` is load-bearing, not stylistic** (ADR-0072): `lmv-core-cabi` is outside the workspace
+`default-members`, so the bare forms come back green having never touched the C ABI.
 
 foobar plugin (Windows, C++): built with its own project/toolchain under `plugin-foobar/` linking
 the core's staticlib + generated header. Check the plugin's own README for the current invocation.

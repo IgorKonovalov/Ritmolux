@@ -287,7 +287,7 @@ fn resolve(a: &IfsTable, b: &IfsTable, morph: f32, lv: Levers) -> IfsUniform;
 
 ## Risks & open questions
 
-- **[Plan 0061](../0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 6 edits
+- **[Plan 0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 6 edits
   `particles/mod.rs` to split it, and this plan adds to it.** Mitigated by construction: every new
   line of consequence goes in a **new** `particles/ifs.rs`, which is both smaller surface for the
   collision and the direction 0061 Phase 6 is heading anyway. Whichever lands second inherits the

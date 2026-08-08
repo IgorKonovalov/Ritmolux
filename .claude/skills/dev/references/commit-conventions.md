@@ -48,7 +48,7 @@ Smallest meaningful scope. Omit if a commit truly spans many (usually a sign to 
 | `render`     | `core/src/render/` — wgpu layer, composite stages |
 | `scenes`     | `core/src/render/scenes/` |
 | `preset`     | `core/src/preset/` — schema + expression evaluator |
-| `ffi`        | `core/src/ffi.rs`, `core/include/` — the C ABI |
+| `ffi`        | `core-cabi/` — the C ABI crate: `src/lib.rs`, `include/`, `tests/ffi.rs` (ADR-0072) |
 | `standalone` | `standalone/` — winit, capture, input, the `shot` example |
 | `plugin`     | `plugin-foobar/` — C++ shim |
 | `tooling`    | `Cargo.toml`, lockfile, rust-toolchain, `.gitignore` |

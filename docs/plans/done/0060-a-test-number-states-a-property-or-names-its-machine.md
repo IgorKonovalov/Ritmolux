@@ -213,7 +213,7 @@ see [ADR-0074](../../adrs/0074-a-ratio-against-an-in-run-control-is-not-automati
 and it passes with 5.34 points of slack. The Risks entry that named this as a possible Phase 2
 finding is closed: no floor change is owed by this plan, and the followup it would have triggered
 is not needed. Note for whoever writes the floor next — Plan
-[0061](../0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2 moves the same number
+[0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2 moves the same number
 for a different reason (it removes `ffi.rs` from the gated crate), and this is the reading it moves
 from.
 

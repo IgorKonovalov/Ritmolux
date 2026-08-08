@@ -1,9 +1,26 @@
 # 0061 — The build stops paying for what it is not building, and the two oversized modules come apart
 
-> **Status:** **in-progress 2026-08-08** — `dev` implementing. **Phase 4b's scoping half landed early and
-> out of sequence** as `1c55476` (2026-08-04, at the user's direct request); see the note on that
-> phase for what it satisfies, the one accepted deviation, and the coverage gap it opens until Phase
-> 4 lands. Every other phase is unstarted.
+> **Status:** **done 2026-08-08** — all ten `dev` phases landed (`02a03ba` 1, `e7a68a1` 1b, `d442f7a` 2,
+> `55388b2` 2b, `49ca599` 2c, `b449b45` 2d, `f74cb1d` 3, `5bb754c` 4, `1c55476` 4b, `ab5de61` 5,
+> `3d36715` 6, `fa76fc5` 7, `800f102` 7b). Mode 4 review: **no blockers, two majors, three minors** —
+> all five were doc drift, all five repaired in the close commit. Every phase carries a valid
+> `**Owner skill:**` tag; no ADR decision was reversed; `core/tests/golden/` is byte-identical across
+> the whole plan by `git diff` (checked as a diff, never as a green suite — `LMV_BLESS` was never set).
+> Every numeric done-when was met with margin: `render/mod.rs` 1688 (< 1800), `particles/mod.rs` 1459
+> total / 634 code (< 1900 / < 1400), `shot.rs` 618 (< 1200), `docs/plans/README.md` 214 (< 400).
+>
+> **The two `human` phases are outstanding and are carried forward rather than holding the plan open**
+> — neither is runnable by `dev` or by `architect`, and neither blocks anything that has landed.
+> **Phase 8** (link the foobar plugin against the extracted crate) needs VS Build Tools plus the
+> unpacked foobar SDK; the artifact it links is now `lmv_core_c.lib`, which is exactly what Phase 2's
+> rename changed, so this is the check most worth running. **Phase 9** (read a cache-warm CI run)
+> is what re-derives `COVERAGE_FLOOR` from the right machine and confirms `coverage` is the longest
+> job — the property that would otherwise flip ADR-0073's Alternative A. Both are recorded under
+> *Standing* in [`docs/plans/README.md`](../README.md) and in each ADR's `Outcome` section.
+>
+> **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (2026-08-04, at the
+> user's direct request); see the note on that phase for what it satisfies, the one accepted
+> deviation, and the coverage gap it opened — **now closed by Phase 4**.
 > **Every file measurement was re-taken 2026-08-08** (fourth amendment). The build and CI numbers —
 > the 412 MB staticlib, the 33.9 GB of PDBs, the 948.9 s `shot_cli` test — are **still 2026-08-04
 > snapshots** and are the ones left to re-measure before acting. This plan's own instruction, **do
@@ -13,7 +30,7 @@
 > target unreachable by the moves Phase 3 names.
 > **Created:** 2026-08-04
 > **Amended:** 2026-08-04 — four phases added (1b, 2b, 4b, 9) covering CI wall time, after run
-> 30903871856 made the first green measurement available; [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md)
+> 30903871856 made the first green measurement available; [ADR-0073](../../adrs/0073-the-windows-ci-critical-path.md)
 > **Amended:** 2026-08-04 (second pass) — Phase 4b reconciled against `1c55476`, which implemented
 > it ahead of its sequence
 > **Amended:** 2026-08-04 (third pass) — **Phase 2c added**: a CI counterpart for the doc-link
@@ -32,14 +49,14 @@
 > **Phase 7b** takes `docs/plans/README.md`, which at 3,516 lines is the largest document in the
 > repository and the one the `architect` skill tells every session to read first.
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) (new, proposed),
-> [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) (new, proposed),
-> [ADR-0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md),
-> [ADR-0003](../adrs/0003-c-abi-v1-surface.md),
-> [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
-> [ADR-0017](../adrs/0017-preset-author-skill-lane.md),
-> [ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
-> [ADR-0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md)
+> **Related ADRs:** [ADR-0072](../../adrs/0072-the-c-abi-ships-from-its-own-crate.md) (new, proposed),
+> [ADR-0073](../../adrs/0073-the-windows-ci-critical-path.md) (new, proposed),
+> [ADR-0001](../../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md),
+> [ADR-0003](../../adrs/0003-c-abi-v1-surface.md),
+> [ADR-0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md),
+> [ADR-0017](../../adrs/0017-preset-author-skill-lane.md),
+> [ADR-0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
+> [ADR-0053](../../adrs/0053-plan-lanes-run-in-git-worktrees.md)
 
 ## TL;DR
 
@@ -48,7 +65,7 @@ healthy — no layering violations, a clean audio callback, an allocation-free p
 green clippy — but three localized problems worth a plan: every core edit rebuilds a 412 MB
 staticlib no test consumes, `target/debug` carries 33.9 GB of debug symbols across 264 PDBs, and two
 modules have grown past the point where a reader can hold them. This plan halves the edit-compile
-loop, extracts the C ABI into its own crate ([ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md)),
+loop, extracts the C ABI into its own crate ([ADR-0072](../../adrs/0072-the-c-abi-ships-from-its-own-crate.md)),
 carves the capture and transition families out of `Renderer`, splits the attractor's
 `mod.rs` (3077 lines at drafting, **6449 as of 2026-08-08**; see Phase 6's re-measure) into the
 directory it already lives in, and closes four smaller findings. **It moves no pixels** — every
@@ -74,12 +91,12 @@ runners at the same moment), and a third time by a single `shot_cli` subprocess 
 **948.9 s — 61 % of `check`'s test wall clock** — to assert that some JSON is balanced. That is this
 plan's own title applied to CI, so it lands here rather than in a plan of its own. Phase 2b gives the
 GPU sweep one owner and Phase 4b takes the shape claim off the critical path (both
-[ADR-0073](../adrs/0073-the-windows-ci-critical-path.md)); Phase 1b tries dependency optimization in
+[ADR-0073](../../adrs/0073-the-windows-ci-critical-path.md)); Phase 1b tries dependency optimization in
 the same `[profile.dev]` table Phase 1 edits; Phase 9 reads the resulting run. **Neither CI phase
 works without the other** — see Phase 2b's note.
 
 **Amended again the same day with Phase 2c**, which is a different kind of CI cost: not wall time
-but a gate that does not exist. Plan [0060](done/0060-a-test-number-states-a-property-or-names-its-machine.md)'s
+but a gate that does not exist. Plan [0060](0060-a-test-number-states-a-property-or-names-its-machine.md)'s
 close found **74 broken relative markdown links across 23 files**, accumulated over six consecutive
 closes because moving a plan into `plans/done/` breaks links in both directions and nothing checked.
 `scripts/check-doc-links.mjs` and its pre-push step exist now; Phase 2c adds the CI job, so the
@@ -159,13 +176,13 @@ Separately, the build configuration taxes every iteration. `core/Cargo.toml` dec
 of artifact writes against ~2.3 s for `["rlib"]` alone — and the cdylib/staticlib serve only the
 foobar shim, which is built by a separate MSVC toolchain and never in CI. Meanwhile `target/debug` is
 **55.7 GB**, of which **33.9 GB is 264 PDB files** (25 integration test targets × ~193 MB each, plus
-stale hashes). Under [ADR-0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md) every plan lane pays
+stale hashes). Under [ADR-0053](../../adrs/0053-plan-lanes-run-in-git-worktrees.md) every plan lane pays
 that separately, which is the mechanism behind the disk-fill already recorded against a lane.
 
 ### The same shape, on the build machine (added 2026-08-04)
 
 The audit measured the *local* build. Run **30903871856** — the first green CI run since 2026-07-30,
-made possible by Plan [0060](done/0060-a-test-number-states-a-property-or-names-its-machine.md) — made the
+made possible by Plan [0060](0060-a-test-number-states-a-property-or-names-its-machine.md) — made the
 CI side measurable for the first time, and it is the same finding twice.
 
 | Job | Runner | Wall |
@@ -190,7 +207,7 @@ CI side measurable for the first time, and it is the same finding twice.
   keys. **None of those claims depends on the preset count.**
 
 Both are the same defect as `crate-type = ["rlib", "cdylib", "staticlib"]`: paying again for
-something already built. [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) takes them.
+something already built. [ADR-0073](../../adrs/0073-the-windows-ci-critical-path.md) takes them.
 
 ### The four smaller findings
 
@@ -204,10 +221,10 @@ ABI as five functions when it has twelve.
 
 We take all ten findings in one plan, ordered so a single `dev` session lands everything and only two
 verifications remain for the user — a plugin link and a CI run, neither of which `dev` can perform.
-The C ABI extraction gets [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md), because
+The C ABI extraction gets [ADR-0072](../../adrs/0072-the-c-abi-ships-from-its-own-crate.md), because
 "leave it, the plugin build is rare" is a nameable rejected alternative and the re-export-shim variant
 is a genuine footgun (an rlib's `no_mangle` symbols are not guaranteed to survive into a downstream
-cdylib). The two CI findings get [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md), because
+cdylib). The two CI findings get [ADR-0073](../../adrs/0073-the-windows-ci-critical-path.md), because
 deciding **which job proves the Windows GPU tier** changes what ADR-0033 wrote down about each job,
 and because four alternatives lose for reasons a future reader will otherwise re-derive — merging the
 two Windows jobs, moving coverage off branch pushes, sampling the sweep, and narrowing the coverage
@@ -443,7 +460,7 @@ stops being an expectation.
 - **Shape:** its **own job on `ubuntu-latest`**, beside `deny` — checkout, then
   `node scripts/check-doc-links.mjs` (GitHub's ubuntu images ship Node, so no setup step). Seconds,
   on the cheapest runner, and **nowhere near the Windows critical path**
-  [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) is fighting.
+  [ADR-0073](../../adrs/0073-the-windows-ci-critical-path.md) is fighting.
   *Rejected: folding it into the existing `deny` job as a second step.* It saves one runner
   spin-up and makes a red `deny` ambiguous between a supply-chain failure and a broken link —
   buying seconds with exactly the diagnostic ambiguity ADR-0073 already lists as an accepted cost
@@ -667,7 +684,7 @@ stops being an expectation.
   this repo's deliberate style, and precisely why this plan measures code when it is judging *how
   many jobs a module does*. It is also precisely why Phase 2d exists: 2,793 of these 6,449 lines
   answer to a file move, not to a decomposition. [Plans 0073 and
-  0074](done/0074-the-figure-colours-by-how-far-it-has-come.md) are most of the growth.
+  0074](0074-the-figure-colours-by-how-far-it-has-come.md) are most of the growth.
 
   Assigning by the boundaries above. **Both columns matter, and they answer different questions** —
   `code` says the split puts each concern somewhere defensible, `total after 2d` says what a reader
@@ -931,6 +948,52 @@ lmv-core = { path = "../core" }
   workflow's second-largest *cost* line while being its third-fastest job — a different question from
   this plan's, and not one it opens.
 
+## Deviations from the plan as written (recorded at the close, 2026-08-08)
+
+Five, none of them drift. Four were forced by the code; the fifth was a judgment call the phase
+explicitly left open.
+
+1. **`default-members` was required and unstated** (Phase 2). Making `core-cabi` a member is not
+   enough — a bare `cargo build` builds every member, so the new crate would have re-emitted exactly
+   what the phase exists to stop emitting. The root manifest excludes it. The follow-on cost is that
+   `--workspace` becomes load-bearing on every `nextest`/`clippy` run that must cover the ABI; `ci.yml`
+   and `.githooks/pre-push` took it in the same plan, and the docs were swept at this close.
+   Recorded in [ADR-0072](../../adrs/0072-the-c-abi-ships-from-its-own-crate.md)'s `Outcome`.
+2. **The preferred `lmv_core` lib stem is unusable, for a sharper reason than the predicted filename
+   clash** (Phase 2). Two `--extern lmv_core=` cannot coexist, so the crate's own integration test
+   could not address it and the ABI would have shipped untested to satisfy a file name. The plan's
+   named fallback `lmv_core_c` was taken; `build.ps1` updated in the same commit. **There is no
+   `.vcxproj`** — the Risks section's reference to one was stale. Also in ADR-0072's `Outcome`.
+3. **`COVERAGE_FLOOR` 88 → 91 rests on weaker evidence than the phase asked for**, and this is the
+   one place the plan asked for something no `dev` phase could produce. It wanted the first post-move
+   CI run; `dev` does not push. Measured **94.85 %** locally, which reads high here because this box
+   has a hardware GPU and CI has WARP, so a ~3-point margin was taken and the caveat written into
+   `ci.yml` beside the number. **Phase 9 owes the re-derive.** The new `CABI_COVERAGE_FLOOR: 54`
+   (measured 56.60 %) closes ADR-0072's Negative about the ABI's coverage going unwatched.
+4. **Two scope expansions, both forced rather than chosen.** `core/tests/hygiene.rs` had to stop
+   scanning `cfg(test)` modules, or ten of Phase 2d's moved files would have satisfied the
+   panic-denial guard by presenting an **allow** exactly where it demands a **deny** — a real gate
+   decaying into a spelling coincidence. And `.githooks/pre-push` took `--workspace` so the local
+   gate did not silently drop the ABI tier the moment Phase 2 landed. Both are in the phase commits.
+5. **Phase 6 took the optional fifth file** (`encode.rs`), and on the reason the phase named rather
+   than the one it warned against: both thresholds already passed at the four-way split (902 code /
+   1882 total), and the residual carried its own section banner marking the seam. Not taken to
+   satisfy a number.
+
+**One safety claim needed a footnote.** Phase 2d's "an out-of-line module is position-neutral" is
+true for **name resolution** and false for **`include_str!`**, which resolves relative to the
+containing file. Seven fixture paths across five files failed to compile until each gained one `../`.
+It bit at compile time rather than silently, which is the phase's own argument for why the claim was
+safe to rest on.
+
+**Phase 4b's outstanding item is answered, and the answer is no.** `--report` ignores `--size` and
+`--frames`, verified byte-identically. Taking them means plumbing into `PROBE_WINDOW`, whose own doc
+comments say a shortened window returns "a plausible smaller number with no signal that anything
+went wrong" — and a truncated window has already falsified an ADR in this repo once. A CLI flag that
+silently distorts a published report is worse than a slow report. **Not taken, and not owed:** the
+cost it was meant to bound is bounded by the fixture instead. Recorded in
+[ADR-0073](../../adrs/0073-the-windows-ci-critical-path.md)'s `Outcome`.
+
 ## Followups (after this lands)
 
 - Consolidating `core/tests/`' 25 targets into fewer binaries, if link time still bites after Phase 1.
@@ -939,10 +1002,14 @@ lmv-core = { path = "../core" }
   next-largest scene and has the same embedded-WGSL-plus-resources shape `particles/` had. Not
   urgent; revisit if it grows. *Re-measured 2026-08-08; it was 719 code at drafting.*
 - **`core/src/preset/expr.rs` and `standalone/src/main.rs` stay out of scope but are now the two
-  largest files in the tree that no phase shrinks** — after Phase 2d they sit at ~1638 and 1415 total
-  lines, because neither carries much inline test weight (241 and 0). Both are argued defensible under
-  *What this plan does NOT do*; that argument is unchanged, but they are what "largest remaining file"
-  will mean after this plan lands.
+  largest files in the tree that no phase shrinks** — measured at the close they sit at **1878 and
+  1439** total lines, because neither carries much inline test weight (241 and 0). Both are argued
+  defensible under *What this plan does NOT do*; that argument is unchanged, but they are what
+  "largest remaining file" means now that this plan has landed.
+- **Reading the slowest-test list at a close ceremony**, raised in the last bullet below and still
+  not a ceremony step. `shot_cli`'s 948.9 s was invisible for the same reason the doubled attractor
+  was — nothing had ever rendered the configuration. Whether it becomes a step is an ADR-0033
+  question, and it wants Phase 9's run to exist first.
 - A `target/` size check in the pre-push hook or a periodic prune, given ADR-0053 multiplies it per
   lane.
 - **Merging the two Windows jobs** (ADR-0073 Alternative A) if Phase 9 shows the surviving `check

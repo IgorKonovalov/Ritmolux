@@ -239,7 +239,7 @@ impl AttractorFamily {
   correctly, but its width is uniform. A tapered capsule means the fragment's distance function
   interpolates a radius, which reworks ADR-0069's single-expression point/segment unification.
   Deliberately out of scope; a followup if Phase 5 wants it.
-- **[Plan 0062](0062-the-chaos-game-grows-a-fern.md) and [Plan 0061](../0061-the-build-stops-paying-for-what-it-is-not-building.md)
+- **[Plan 0062](0062-the-chaos-game-grows-a-fern.md) and [Plan 0061](0061-the-build-stops-paying-for-what-it-is-not-building.md)
   both touch `particles/mod.rs`.** This plan edits `project()`, the vertex shader and `PARAMS` — 0062
   adds a family and a new `ifs.rs`, 0061 Phase 6 splits the file. All three overlap only in the
   family enum's method set, where each adds an arm or a method rather than changing one. Whichever
