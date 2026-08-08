@@ -159,8 +159,37 @@ reseed = "onset > 0.30"
 # up the green ramp, which is where new growth sits on a real plant. The per-
 # particle grain `hue_spread` used to supply is what pays for it, and that is
 # the right trade on a figure whose PARTS are its structure.
+#
+# `root_hue` GIVES THE PLANT DEPTH, AND IT TAKES THE HUE ROUTE BECAUSE THE
+# PALETTE COORDINATE IS ALREADY SPENT (Plan 0074 Phase 6). The channel is how
+# far a point is from the nearest of the four maps' fixed points - the stem base
+# and the frond origins - so it is the one thing on this figure that reads as
+# depth INTO the plant rather than as a part of it. Both routes were rendered
+# against each other and the result was not close:
+#
+#   root_tint 0.85 with map_tint cut 0.46 -> 0.22 (the budget split): the plant
+#     goes one flat yellow-green mass. The tint route is ANCHORED - it only ever
+#     pushes UP the ramp - so it spends the green end of the palette to buy the
+#     gradient, and the parts `map_tint` was separating stop separating.
+#   root_hue 0.21 with map_tint LEFT AT 0.46: the body cools to jade while the
+#     frond origins stay warm, and the map separation is untouched. It costs the
+#     palette coordinate nothing, which is the whole point of the second route.
+#
+# THE DIRECTION IS NOT ARBITRARY. Rotating the other way (-0.20, -0.35) warms
+# the far parts, which collides with the ramp's own warm end - the palette
+# already goes green -> cream with brightness, so a warm rotation is a second
+# vote for a change the ramp is making anyway and it just washes. Cooling is
+# orthogonal to the ramp, so it reads as aerial perspective: near is warm and
+# lit, far is cool. Above about 0.30 the plant stops being green and starts
+# being a slate-blue object, which is a different preset.
+#
+# NO BAND DRIVES IT, DELIBERATELY. `mid` already moves three colour terms here
+# and `treb` two more; a depth cue that flickers with the music reads as the
+# figure changing shape rather than as depth. It drifts slowly instead, at a
+# period decorrelated from `hue_center`'s so the two do not beat together.
 hue_spread  = "0.05 + clamp(mid * 0.09, 0, 0.075)"
 map_tint    = "0.46 + clamp(mid * 0.14, 0, 0.12)"
+root_hue    = "0.21 + sin(time * 0.047) * 0.05"
 hue_center  = "0.30 + sin(time * 0.085) * 0.10 + clamp(mid * 0.165, 0, 0.14)"
 saturation  = "1.15 + clamp(treb * 0.50, 0, 0.30)"
 palette_mix = "0.10 + sin(time * 0.023) * 0.10 + clamp(treb * 0.37, 0, 0.22)"
@@ -198,5 +227,9 @@ hue_center  = 0.35
 # Eased like the other colour terms: `map_tint` sets how far apart the plant's
 # parts sit, and a step in it re-colours three regions at once.
 map_tint    = 0.40
+# `root_hue` only drifts, so this is belt and braces rather than load-bearing -
+# but it is the term that decides how deep the plant looks, and easing it keeps
+# a preset switch from arriving mid-rotation with a jade plant.
+root_hue    = 0.45
 palette_mix = 0.5
 bg_bright   = 0.4

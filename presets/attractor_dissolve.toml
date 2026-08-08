@@ -121,6 +121,15 @@ lean  = "sin(time * 0.21) * 0.12"
 # a strange attractor is the rotational smear design-backlog 0063 warns about.
 # `fade` is nonetheless kept well under that entry's ceiling - at 0.912 the trail
 # is ~11 frames, and `spin` at this amplitude turns ~0.6 degrees across it.
+#
+# `emergence` IS DELIBERATELY NOT BOUND, AND THAT IS A MEASUREMENT (Plan 0074
+# Phase 6). It exists because a longer trail integrates the four restart points
+# over more frames, so the ramp that hides the recycling at `fade = 0.86` might
+# not at 0.912 - this is the preset that would find out. It does not: rendered
+# against a 120 BPM click at emergence 1, 8 (the default) and 20, no restart
+# cluster appears at any of them and the frames differ only below the visual
+# threshold. The param is a safety valve for a preset pushing `fade` past what
+# ships here, not something this set needs.
 fade = "0.912 - clamp(bass * 0.055, 0, 0.048) - beat * 0.020"
 size = "0.38 - clamp((bass + mid) * 0.055, 0, 0.090) + beat * 0.042"
 # Held higher than the fern's 0.30 - a reseed shakes a crystal, and a crystal
@@ -145,8 +154,24 @@ palette_mix = "0.50 + sin(time * 0.1200 + 0.35) * 0.44"
 # `hue_spread` comes down for it, for the reason the fern's does: both write the
 # same palette coordinate, and a wide per-particle spread smears the parts into
 # each other until the channel reads as a wash.
+#
+# `root_hue` IS THE SAME GESTURE A THIRD TIME (Plan 0074 Phase 6). The channel
+# is how far a point is from the nearest fixed point of the drawn maps, so at
+# `morph = 0` it bands the gasket outward from its three corners and at
+# `morph = 1` it reads as depth into the plant - and it is bound IN PHASE with
+# `palette_mix`, so the crystal is nearly pure and the plant has the most of it.
+# Cold order, then depth as it comes alive.
+#
+# IT TAKES THE HUE ROUTE, AND FOR A DIFFERENT REASON THAN THE FERN'S. There the
+# palette coordinate was already spent on `map_tint`. Here the problem is the
+# CEILING: the mineral end of this look already runs its densest crossings into
+# near-white, and `root_tint` is anchored so it only ever pushes UP the ramp -
+# rendered at 0.75 it whitens exactly the regions that are already brightest and
+# the frost structure flattens. The hue route does not touch the coordinate, so
+# it buys the same depth with none of the headroom.
 hue_spread  = "0.06 + clamp(mid * 0.12, 0, 0.10)"
 map_tint    = "0.40 + sin(time * 0.077) * 0.09 + clamp(mid * 0.13, 0, 0.11)"
+root_hue    = "0.17 + sin(time * 0.1200 + 0.35) * 0.05"
 hue_center  = "0.26 + sin(time * 0.094) * 0.09 + clamp(bass * 0.21, 0, 0.18)"
 saturation  = "1.05 + clamp(treb * 0.47, 0, 0.28)"
 
@@ -184,5 +209,6 @@ zoom        = 0.16
 spin        = 0.30
 hue_center  = 0.35
 map_tint    = 0.45
+root_hue    = 0.45
 bg_bright   = 0.4
 bg_hue      = 0.6
