@@ -1914,6 +1914,19 @@ Each reaches the picture by **two routes**, which is four params:
 > | `dragon` | `1.05` | `0.95` |
 >
 > A value tuned on the fern and reused on the dragon is wrong by about 2.5×.
+>
+> **Because it is anchored, `root_tint` spends the ramp's *bright* end by
+> construction** — it only ever pushes the coordinate up. On a palette that
+> already ends bright (most of them here) it whitens exactly the regions that
+> were already brightest, which is why neither shipped IFS preset binds it.
+> A **negative** value is legal and is the obvious escape: it ramps down the
+> ramp's dark end instead. But the coordinate is sampled by a **repeating** LUT,
+> so once it crosses zero the darkest points wrap to the ramp's *brightest*
+> stop and a cream speckle appears where the figure should be darkest. On
+> `attractor_fern` that is around `root_tint = -0.38` (its coordinate floor is
+> `hue_center`'s sine trough `0.20` minus `hue_spread/2`, against a `root01`
+> ceiling of `0.46`). Do the same arithmetic for your own preset before going
+> negative.
 
 > **The `age_*` params are gone** (Plan 0074). They coloured by how many steps
 > since a particle last restarted, on the theory that age proxied
@@ -1947,6 +1960,15 @@ Each time you are trading one kind of structure for another, which is a real
 choice rather than a bug. **`*_hue` is the escape**: it does not touch this
 coordinate at all, so a figure that is out of budget can still take a depth cue
 or a part separation through the hue route.
+
+**And on the fern, the escape is what shipped** — so do not read the `0.22`
+above as the tuning in the file. Rendered against each other, `root_hue` at the
+fern's *full* `map_tint = 0.46` beat the split: the body cools to jade, the
+frond origins stay warm, and the part separation Plan 0073 paid `hue_spread` for
+is not given back. Both shipped IFS presets bind `root_hue` and **neither binds
+`root_tint`**. The budget rule is real and the `0.22` measurement stands; the
+conclusion drawn from it is that when a coordinate is spent you take the other
+route rather than pay.
 
 **And all four are inert on the four map families**: nothing but an IFS writes
 either channel, so binding them on `de_jong` does nothing at all rather than

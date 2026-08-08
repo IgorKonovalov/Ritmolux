@@ -1,0 +1,575 @@
+# 0074 — The figure colours by how far it has come: distance from the skeleton, and the age channel retires
+
+> **Status:** **done 2026-08-08** — all six phases landed as `79c08a9` (1), the Phase 2 gate verdict
+> in `6c928f6` (2), `22956e0` (3), `776d6da` (4), `57965df` (5) and `dcc88ba` (6), all on `main`.
+> Mode 4 review **no blockers**; four minor items, three repaired at the close. Full gate re-run on
+> the close tip: `fmt`, `clippy --workspace --all-targets -D warnings`, `nextest`, `check-doc-links`.
+> **`attractor_ifs.png` is the only baseline that moved**, twice as the plan predicted, verified by
+> `git diff` of `core/tests/golden/` against `v0.43.0` rather than taken from a green suite.
+>
+> **The headline is that Phase 6 reversed the Phase 2 gate's conclusion, and the plan is what asked
+> it to.** The gate found `attractor_fern` needed its palette budget *split* — `map_tint`
+> `0.46 -> 0.22` with `root_tint = 0.85` — and recorded, as its own "what did not get tested", that
+> it had judged that split before `root_hue` existed. Phase 6 ran the comparison the gate could not:
+> the split reads flatter than stock, because halving `map_tint` gives back exactly the part
+> separation Plan 0073 paid `hue_spread` for, while the anchored tint returns a wash. **`root_hue`
+> at the fern's full `map_tint` keeps both.** So **both** shipped IFS presets bind `root_hue` and
+> **neither binds `root_tint`** — the opposite of what the plan expected, reached by rendering rather
+> than by argument, and the reason the gate is worth its phase. `attractor_dissolve` takes the same
+> route for an independent reason, which generalises: an **anchored** coordinate term only ever
+> pushes *up* the ramp, so it spends the bright end by construction and is structurally disadvantaged
+> on any palette that ends bright. That property, plus an undocumented repeating-LUT wrap below about
+> `root_tint = -0.38` on the fern, is [backlog 0075](../../design-backlog.md); the operator-doc drift the
+> reversal created is [backlog 0076](../../design-backlog.md) and was **repaired at this close** in both
+> `presets/README.md` and `docs/preset-palettes.md`.
+>
+> `emergence` shipped and is deliberately bound by nothing: measured at `attractor_dissolve`'s
+> `0.912` fade, emergence 1 / 8 / 20 against a 120 BPM click produce no visible restart cluster. It
+> is a safety valve for a preset pushing `fade` past what ships, which is ADR-0087's reason and the
+> only one it shipped for.
+>
+> [ADR-0088](../../adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md) is **accepted with a
+> dated Outcome section**: its central claim was measured and held, and its two-route theory was
+> vindicated harder than it predicted — the second route did not turn out to be the fallback.
+>
+> **Amended 2026-08-07, mid-Phase-1, by measurement.** Claim 3 asserted the population spans ≥ 90 %
+> of `[0, 1]`; it does not, on four of five figures, because the fixed-point diameter is not a
+> *lower* bound on the attractor's reach either — a direction ADR-0088 never considered. Claim 3 is
+> restated as the no-clustering property it was reaching for, widened to all five figures, and the
+> measured ceilings are recorded as Phase 2's input. Claim 1 passed with a ×3.0 margin, so the floor
+> is defensive. One code decision follows from the same measurement: **`root_tint` anchors at `0`
+> rather than centring on `0.5`** — see Phase 1 and ADR-0088's *Anchoring* section.
+> **Phase 2 is `human` and it is a GATE**, deliberately placed after one `dev` phase rather than at
+> the end. Phase 6 is `human` and terminal. So this plan does not close in one session, and it can
+> legitimately stop after Phase 2. **A `dev` session lands Phase 1 and then stops** — do not
+> continue past the gate on the assumption that the channel reads.
+> **Created:** 2026-08-06
+> **Owner skill(s):** dev, human
+> **Related ADRs:** [0088](../../adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md);
+> supplements [0087](../../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md), whose age
+> channel this replaces rather than repairs
+
+## TL;DR
+
+Each IFS particle gains a third channel: **how far it is from the nearest of the drawn maps' fixed
+points**, normalised against the diameter of the fixed-point set, computed in the step shader and
+stored in one of the two spare `Particle` words. It reaches the picture as `root_tint` and
+`root_hue`, and **`age_tint` / `age_hue` retire in the same plan** so the roster does not grow.
+First user-visible behaviour: `shot --preset-file presets/attractor_fern.toml` with `root_tint`
+bound renders a fern that is dark at the stem base and the frond origins and bright at the tips — a
+continuous gradient, permanent, which is what
+[ADR-0087](../../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md) promised and did not
+deliver.
+
+## Context & problem
+
+Plan 0073 shipped two colour channels. `map` works and is bound in both shipped IFS presets. `age`
+does not read: it renders as per-particle speckle with no gradient anywhere, measured in the most
+favourable configuration the preset surface can build and swept across the whole morph range.
+[design-backlog 0074](../../design-backlog.md) has the full write-up; ADR-0087's Outcome section has
+the short version.
+
+The cause is structural, and it is ADR-0087 arguing with itself: age is a proxy for
+distance-from-the-fixed-points, the proxy decays after ~10 steps (the family contracts by `0.742`
+per step), and the first 8 steps — where the proxy is good — are exactly what the emergence ramp
+deliberately hides. Lengthening the lifetime cannot help, because the problem is spatial rather than
+temporal.
+
+**The idea was right and the proxy was wrong.** Distance from the figure's contraction points is
+real structure, it is permanent, and nothing else in this family exposes it. The points are already
+computed, already correct, and already uploaded — they are just on the *step* uniform rather than the
+draw uniform, so the colour path cannot reach them.
+
+## Decision
+
+Compute the distance in the step shader, where the points already live, and store it in a spare
+`Particle` word. Expose it by the two routes ADR-0087 established. Retire the two params it
+replaces. Normalise by the **diameter of the fixed-point set** rather than by a sampled bounding box.
+Full reasoning, and five rejected alternatives, in
+[ADR-0088](../../adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md).
+
+**Naming: `root_tint` / `root_hue`, and `depth_*` was not available.** `depth_fade` and `depth_hue`
+are shipped params — the 3-D depth cues from [Plan 0063](0063-the-attractor-keeps-its-depth.md) — so the
+obvious name collides with something live. The fixed points are where each sub-copy converges, which
+on the fern is the stem base and the frond origins, so "root" is both free and apt.
+
+**What is different from Plan 0073, and it is the whole bet.** The age channel was a *proxy* for
+position and decayed. This channel is a *pure function of position*, recomputed every step from
+where the particle currently is. A particle five hundred steps old sitting near a fixed point reads
+a distance near zero, exactly as a freshly restarted one does — so the emergence ramp dims only the
+small fraction that has just respawned, and the neighbourhood of each fixed point is otherwise
+occupied by old, bright particles.
+
+**That last sentence is a claim of the same kind ADR-0087 got wrong, so this plan gates on it after
+one phase instead of at the end.** Phase 2 is a `human` look at a rendered sample set across all
+five figures, and "it does not read" is a legitimate outcome that stops the plan with the retirement
+half shipped.
+
+## Architecture diagram
+
+```mermaid
+flowchart TB
+    subgraph cpu["core/ — CPU, per preset switch"]
+        FIX["ifs::fixed_points()<br/>4 points, drawn maps duplicated<br/>(exists, Plan 0073)"]
+        DIA["skeleton_scale()<br/>max pairwise distance, floored<br/>-> reciprocal"]
+    end
+    subgraph gpu["GPU — per fixed step"]
+        STEP["step shader, IFS arm<br/>apply map -> maybe respawn<br/>d = min_k |p - fixed_k| * recip<br/>spare0 = d"]
+        DRAW["draw shader<br/>spare0 -> palette coord (root_tint)<br/>spare0 -> hue offset  (root_hue)"]
+    end
+    FIX --> DIA
+    FIX -->|"already on the step uniform"| STEP
+    DIA -->|"1 word of StepUniform::_pad<br/>(no growth: 192 B stays 192 B)"| STEP
+    STEP -->|"vertex attribute, offset 40"| DRAW
+```
+
+## Implementation phases
+
+### Phase 1 — the channel exists and the fern has a gradient
+
+- **Owner skill:** dev
+- **What:** `skeleton_scale()` on the CPU, the reciprocal onto the step uniform, the distance written
+  to `spare0` in the step shader's IFS arm, and `root_tint` on the draw path. The walking skeleton:
+  a visibly graded fern before the second route, the retirement or the docs exist.
+- **Files touched:** `core/src/render/scenes/particles/ifs.rs` (`skeleton_scale`, `IfsPacked`),
+  `core/src/render/scenes/particles/mod.rs` (`StepUniform`, step shader, draw shader,
+  `PARTICLE_ATTRIBUTES`, `PARAMS`, `set_param`, `reset_params`, `DrawUniform`).
+- **The normaliser, and why it is not a bounding box.** `skeleton_scale` returns
+  `max over drawn j, k of ‖p_j − p_k‖` — at most six pairwise distances. Closed form, exact,
+  deterministic, and a continuous function of the fixed points, so it moves as smoothly across the
+  morph as they do. **Do not reach for `chaos_extent`**: it returns a bounding box, which is a
+  supremum statistic, and ADR-0087's Notes already record that two runs' boxes disagree by `0.046` at
+  20 k iterations and `0.143` at 100 k — *growing*. Normalising a colour coordinate by that would
+  make the gradient's scale wobble by an amount nobody chose, and cost a Monte Carlo per switch.
+- **The floor is required, not defensive.** Two drawn maps' fixed points can approach each other as
+  the morph interpolates, and a diameter of zero gives a divergent reciprocal. Floor the diameter;
+  the done-when measures how close the sweep actually gets.
+  *Measured 2026-08-07: the minimum diameter over the whole sweep is `0.1506`, at
+  `Tree -> Sierpinski`, `morph = 0.25`, low lever extreme, against a floor of `0.05` — a margin of
+  ×3.0. **The floor is doing nothing, which is the good outcome**: the channel does not degenerate
+  anywhere in the reachable morph, and Phase 2 has no specific place it must go and look.*
+- **The uniform does not grow.** `StepUniform::_pad` is `[u32; 3]`, three explicitly named padding
+  words the scalar block's alignment already paid for. The reciprocal takes one and leaves two, so
+  the struct stays **192 bytes** and `the_step_uniform_carries_the_ifs_table_in_one_binding` keeps
+  asserting that number unchanged. No binding is added, so ADR-0058's collision surface is untouched.
+- **`spare0` is at byte offset 40**, and `PARTICLE_ATTRIBUTES` must be extended by hand with that
+  offset spelled out. **Do not reach for `vertex_attr_array!`** — it lays attributes out
+  consecutively, which is the trap Plan 0073 documented and this is the first phase since to add an
+  attribute. `the_particle_layout_carries_two_channels` is the test that holds the offsets to the
+  struct; extend it rather than writing a new one (renaming it to say *three* is part of extending
+  it — the name is a claim and it has to stay true).
+- **Store normalised, clamp at the read.** Values above `1` are legitimate — the skeleton's diameter
+  is not an upper bound on the attractor's reach — so the stored value stays a faithful measurement
+  and the draw clamps.
+- **Anchor the tint at `0`, not at `0.5` — do not use `channel_shift` for this one**
+  (amended 2026-08-07, ADR-0088's *Anchoring* section). The palette shift is
+  `coord += root_tint · root01`, not `root_tint · (root01 − 0.5)`.
+
+  The reason is measurement, not taste. `channel_shift` is centred because `map01` and `depth01`
+  genuinely span `[0, 1]`, so their midpoint means *typical* and raising the amount opens a spread
+  about the preset's chosen colour. **`root01` does not span `[0, 1]`** — it reaches `0.46` on the
+  fern and `0.41` on the spiral (table below) — so a centred shift would be almost always negative
+  and would *slide* the figure as well as spreading it, which is precisely what
+  `presets/README.md` promises the centring prevents. Zero, by contrast, is both meaningful and
+  exactly reachable here: it is the respawn state, and claim 2 asserts it bit-exact. Anchored
+  there, the fixed points keep the preset's chosen colour exactly and the figure ramps away from
+  it — which is what "dark at the stem base, bright at the tips" describes.
+
+  It costs one line, no constant, no per-figure table and no Monte Carlo, and it is **not** a
+  change to what the Phase 2 gate sees: the two spellings differ by the constant `−root_tint/2`
+  across every particle, and the LUT sampler repeats, so the gradient's shape and contrast are
+  identical either way. Only the base colour moves, and `hue_center` already owns that.
+
+  One property comes free and is worth keeping in mind at Phase 3: anchored at zero, a bound
+  `root_tint` on a family whose `root` is identically `0` is inert **by arithmetic**, where the
+  centred spelling needed the engine to zero the whole row. Keep the row-zeroing anyway — Phase 3
+  moves `root_tint` into the shared `ch` row where `map_*` still needs it — but the inertness no
+  longer rests on it alone.
+- **Done when**, in three claims:
+
+  **1. The normaliser is bounded away from its floor, measured rather than assumed.** Over every
+  figure pair, every `morph` in the existing 33-point sweep and both `Levers::EXTREMES`, the
+  fixed-point diameter is computed and its **minimum over the whole sweep is asserted above the
+  floor**, with the observed minimum and the figure pair and morph it occurred at printed. This is
+  the assertion that finds out whether the floor is doing nothing (good) or is load-bearing (which
+  would mean the channel degenerates somewhere in the morph and Phase 2 should be told where to
+  look). No tolerance to tune: the two numbers are the measurement and the constant.
+
+  **2. The distance is what it claims to be**, asserted on a CPU transcription rather than on
+  pixels. For a sample of positions on each figure, the mirrored `min_k ‖p − p_k‖ · recip` agrees
+  with a directly computed nearest-distance to within `f32` rounding, and is **exactly `0`** at each
+  fixed point itself. The `projection_mirror` discipline: the WGSL is the source, the Rust is the
+  mirror, and a constants-agree test holds the shader's literals to the Rust ones the way
+  `the_churn_constants_agree_between_rust_and_wgsl` already does.
+  *Note (2026-08-07): this channel turns out to add **no shared numeric constant** — the normaliser
+  is computed on the CPU and arrives as one uniform word — so there are no literals to agree on and
+  a constants-agree test in the literal sense would be vacuous. What there is to pin is the
+  **expression**: `min` over all four slots times the reciprocal at the write, and the clamp at the
+  read. Pinning those source lines is the faithful reading of this claim, and it catches the failure
+  the mirror cannot — a shader edited to `min` over three slots leaves every mirror-based test
+  green, because they all run the mirror.*
+  Route the mirror through the **packed uniform rows** rather than calling `fixed_points` twice: the
+  packing — which point lands in which half of which `vec4` — is then under test too, and a
+  transposition would still produce a plausible gradient.
+
+  **3. The population is spread rather than clustered, across all five figures.** *(Restated
+  2026-08-07 — the original wording asserted a span of ≥ 90 % of `[0, 1]`, which no figure but the
+  dragon reaches. See "What the first measurement found" below; the property below is what the
+  claim was reaching for and the `[0, 1]` framing was an assumption ADR-0088 never made.)*
+
+  After 600 steps, for **each of the five figures**, the readback buffer's `root` values must
+  reach an exact `0` and rise continuously to that figure's own ceiling **with no gap wider than
+  a decile of the occupied bulk**. *This is the cheap early warning for the exact failure Plan
+  0073 hit:* a channel whose population clusters cannot show a gradient however it is coloured,
+  and this catches that before a human looks.
+
+  **The ceiling itself is measured and printed, never asserted.** It ranges `0.41`–`1.05` across
+  the five figures, it is a property of each figure's invariant measure rather than of this code,
+  and a threshold on it would be a frozen number asserted universally — the shape
+  [ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+  forbids.
+  Print min / ceiling / deciles per figure: that table *is* the input Phase 2 needs.
+
+  Pick a statistic that is robust at the thin top tail — bucketing `[0, max]` and demanding every
+  bucket non-empty is fragile on the spiral, whose top few particles are a handful out of 4 096.
+  Bucketing the bulk (say `[0, p99]`) states the same property without hinging on one particle.
+
+  It does **not** establish that the gradient is *visible* — that is Phase 2's job, and no readback
+  can do it.
+
+- **What the first measurement found** (2026-08-07, 600 steps, 4 096 particles, clamped deciles).
+  Recorded here because it is Phase 2's starting data, not just an implementation note:
+
+  | figure | ceiling | deciles of `[0, 1]` |
+  |---|---|---|
+  | Fern | `0.461` | `[685, 840, 1084, 1097, 390, 0, 0, 0, 0, 0]` |
+  | Tree | `0.695` | `[882, 561, 751, 546, 561, 483, 312, 0, 0, 0]` |
+  | Dragon | `1.050` | `[176, 389, 479, 524, 547, 567, 526, 332, 307, 249]` |
+  | Sierpinski | `0.500` | `[356, 592, 738, 1021, 1385, 4, 0, 0, 0, 0]` |
+  | Spiral | `0.412` | `[1694, 1092, 1026, 277, 7, 0, 0, 0, 0, 0]` |
+
+  Two readings, and the first is the good news. **The distribution is continuous and gap-free over
+  its own occupied range on every figure** — there is no interior hole anywhere, which is exactly
+  the clustering failure the claim exists to catch, and it is absent. The channel behaves as
+  ADR-0088 argued.
+
+  **The second reading is a real finding and it is Phase 2's to weigh: contrast is per-figure.**
+  Four of five figures have skeletons *wider* than their own reach away from that skeleton, so the
+  same `root_tint` binding buys about **41 % of the palette swing on the spiral and 105 % on the
+  dragon**. That is the honest consequence of normalising by the figure's own skeleton — the
+  meaningful scale ADR-0088 deliberately chose over a bounding box — and the answer is to
+  **document it rather than engineer it away**: an author tunes `root_tint` per preset regardless,
+  and every alternative normaliser is a sampled supremum with the wobble ADR-0088 Alternative D
+  rejected. Phase 5's `presets/README.md` row owes the range and this table.
+
+- **Not a done-when, because it cannot be one:** "the fern reads as graded". Phase 2 owns that.
+- **Baselines:** all seventeen stay byte-identical. `root_tint` defaults to `0` and the palette
+  coordinate takes an exact `+0`, so the colour path is the arithmetic identity. Note the standing
+  trap — `LMV_BLESS` rewrites *all* baselines even on a pristine HEAD, so a green golden run means
+  *within tolerance*, never byte-identical; assert this from a `git diff` of `core/tests/golden/`,
+  not from a green suite.
+
+### Phase 2 — does it read? The gate
+
+- **Owner skill:** human
+- **What:** A `preset-author` pass over a rendered sample set, deciding whether the gradient is
+  actually visible before three more `dev` phases are spent on it.
+- **Why this is mid-plan and not terminal, in one sentence:** Plan 0073 spent five `dev` phases
+  building a channel that turned out not to read, and found out in its terminal `human` phase — this
+  plan pays one phase to ask the same question first.
+- **What `dev` leaves for it:** a sample grid rendered by `shot`, **all five figures** at
+  `root_tint` off / mid / high, plus `sierpinski -> fern` swept across `morph` at 0 / 0.25 / 0.5 /
+  0.75 / 1.0. Rendered bare — no backdrop, no bloom — and also once at a long `fade`, because the
+  trail is what a real preset has.
+- **All five figures, not just the fern, and that is deliberate.** ADR-0088's Notes name the one
+  thing its argument cannot prove: the gradient's survival rests on the invariant measure having
+  *support* near each fixed point, which is a theorem, but says nothing about **density**. A figure
+  whose measure is thin near one of its fixed points will show that region as sparse rather than as
+  coloured. That is per-figure and not provable in general, so it is looked at per figure.
+- **Questions it answers, and they are the ones no capture can:** is there a gradient at all, or is
+  this speckle again? Does it read as *depth into the figure* or as an arbitrary radial wash? Does
+  it survive the morph, where the fixed points move? Does it survive a long `fade`, where the trail
+  averages neighbouring particles of different distances? And does it fight `map_tint`, which is
+  bound in both shipped presets and writes the same palette coordinate?
+- **It arrives with numbers, and it should use them** (added 2026-08-07). Phase 1's claim 3
+  measured each figure's ceiling — the fraction of the palette swing a given `root_tint` actually
+  buys there: spiral `0.41`, fern `0.46`, sierpinski `0.50`, tree `0.70`, dragon `1.05`. So **the
+  same binding is not the same look across figures**, and a `root_tint` tuned on the fern is worth
+  roughly 2.5× more on the dragon. Two things follow for this pass. Render each figure at a
+  `root_tint` scaled by its own ceiling as well as at a shared value, or the comparison confounds
+  "this figure's measure is thin" with "this figure's channel is compressed". And treat a verdict
+  of *does not read* on the spiral differently from one on the dragon: the spiral has the least
+  range to work with and is the hardest case by construction, the dragon the easiest.
+- **Done when:** a verdict is recorded in this plan, in one of three shapes.
+  - **It reads** → Phases 3-6 proceed as written.
+  - **It reads on some figures and not others** → Phases 3-6 proceed, and the figures where it does
+    not are named in `presets/README.md` rather than left for an author to discover.
+  - **It does not read** → **the plan stops here, and that is a successful outcome, not a failure.**
+    Phase 3's retirement half ships on its own (that is
+    [backlog 0074](../../design-backlog.md)'s route 3), the rest is reverted, ADR-0088 is closed
+    `rejected` with the measurement that rejected it, and the two spare words go back in the budget.
+    Do not rescue the channel by tuning; the whole point of gating here is that the honest answer is
+    cheap at this phase and expensive at Phase 6.
+
+#### VERDICT (2026-08-08): **it reads, on all five figures. Phases 3-6 proceed.**
+
+Judged against 25 headless captures — five figures × `root_tint` off / shared `1.0` / scaled to
+each figure's own ceiling, the `sierpinski -> fern` morph sweep, both `fade = 0.90` variants, and
+`map_tint` alone against both — plus a live standalone session at the **rich** tier driven from a
+scratch `LMV_PRESET_DIR`. The running app printed **no load warnings**, which is the check `shot`
+cannot make: an unknown param name is a warning there and invisible, so this is what establishes
+`root_tint` resolved as a real binding end to end.
+
+Per figure:
+
+| figure | reads | note |
+|---|---|---|
+| Tree | **clearest** | Dark trunk base, blue through the branches, cream at the crown tips. Reads specifically as **depth into the figure** rather than as an arbitrary radial wash — the question ADR-0088 most needed answered and could not argue. |
+| Dragon | **strongest look** | The only figure whose channel fills `[0, 1]`, and the only one needing `root_tint` *below* `1.0` (`0.95`) where the rest want `1.4`-`2.4`. |
+| Fern | yes, with a cost | See the finding below — it is the whole value of this gate. |
+| Sierpinski | yes | A tri-fold band structure off its three corners rather than a single ramp. |
+| Spiral | **weakest** | Consistent with its `0.41` ceiling and bottom-heavy distribution: the gradient is present but the far-end regions are small and the figure is sparse. Hardest case by construction, as this phase predicted. |
+
+**Both named risks came back clean.** At `fade = 0.90` the gradient is *more* legible than bare —
+the trail fills the figure in rather than averaging the channel away, which is precisely where the
+age channel died. Across the `sierpinski -> fern` morph the gradient travels with the fixed points.
+
+##### The finding: the palette coordinate is a fixed budget, not a stack
+
+This is the gate's real output, and it took **two** judgements in sequence to reach:
+
+1. `root_tint = 1.55` **stacked** on top of the shipped fern — which already binds `map_tint = 0.46`
+   and had `hue_spread` cut to `0.05..0.125` at Plan 0073 Phase 6 to make room for *that* — is
+   **worse than stock**. The plant washes cream and stops reading as a fern.
+2. The same two channels with the budget **split** — `map_tint` `0.46 -> 0.22`, `root_tint`
+   `1.55 -> 0.85` — is **better than stock**.
+
+So a channel added to this coordinate has to be **paid for by taking authority away from another
+one**. Plan 0073 already paid this once and did not draw the general rule; this is the second
+instance, which is what makes it a rule rather than an anecdote.
+
+**Judgement 1 alone would have produced the wrong conclusion** — "the fern is a figure the channel
+does not suit" — and under this phase's second done-when shape that would have been written into
+`presets/README.md` as a standing warning about a figure that is in fact fine. Worth remembering
+the next time a gate looks decided after one comparison.
+
+This **answers the plan's standing risk** that three channels may be one too many for one
+coordinate: there is room, at the price of halving the second.
+
+##### What did not get tested, and it may change the answer
+
+`root_hue` does not exist until Phase 3, so the fern's split was judged **without the escape route
+the two-route theory predicts for exactly this case**. `root_hue` rotates the hue of the colour the
+ramp returned rather than moving where the ramp is sampled, so it costs the contested coordinate
+nothing — the fern could keep `map_tint` at full authority *and* carry a depth cue. If that works,
+the split above is a fallback rather than the answer, and Phase 6 should try the hue route on the
+fern **before** settling for it.
+
+### Phase 3 — the second route, and the age channel retires
+
+- **Owner skill:** dev
+- **What:** `root_hue` alongside `root_tint`, and the removal of `age_tint` / `age_hue`.
+- **Files touched:** `core/src/render/scenes/particles/mod.rs` (draw shader, `PARAMS`, `set_param`,
+  `reset_params`, `DrawUniform`, `UniformInputs`, `projection_mirror`).
+- **The `ch` row swaps rather than grows.** It is `(map_tint, map_hue, age_tint, age_hue)` today and
+  becomes `(map_tint, map_hue, root_tint, root_hue)`. The draw uniform does not change size, and the
+  engine keeps zeroing the whole row off the IFS — which is what makes all four exactly inert on the
+  four map families rather than merely defaulted (the gap Plan 0073 Phase 4 closed; do not reopen it).
+- **`Particle::age` stays.** It drives the emergence ramp, which is load-bearing. Only the two
+  params that read it for colour go. Leaving `age` unused-for-colour but live-for-brightness is the
+  correct end state, and the field's doc comment should say so, because a future reader will
+  otherwise take it for dead weight.
+- **Done when:** `root_hue` moves hue and leaves the palette coordinate alone, asserted on the
+  transcribed CPU maths rather than on pixels — the claim is not expressible in a capture, since a
+  capture cannot separate "sampled the ramp elsewhere" from "rotated the colour the ramp returned".
+  `shift_hue`'s exact-zero early return is preserved and re-asserted on bits. `set_param("age_tint",
+  …)` no longer resolves, and **no shipped preset or fixture binds either retired name** — grepped,
+  not assumed. All seventeen baselines byte-identical except the fixture's, which Phase 5 re-blesses.
+
+### Phase 4 — the emergence ramp becomes authorable
+
+- **Owner skill:** dev
+- **What:** `emergence`, a param on the ramp length `EMERGENCE_STEPS` currently fixes at 8.
+- **Files touched:** `core/src/render/scenes/particles/mod.rs`.
+- **On its own merits, and explicitly not as the age channel's rescue.** ADR-0087's Risks flagged
+  that a ramp sufficient at `fade = 0.86` may not be at `0.94`, because a longer trail integrates
+  the four restart points over more frames. That reason is independent of any colour channel and
+  survives this plan; the *other* reason to expose it — letting the age gradient show — is exactly
+  what Phases 1-3 make obsolete. Ship it for the first reason only, and say so in the roster.
+- **The guard is arithmetic, not taste.** `em.x` is `1 / emergence`, so a zero or negative binding
+  divides or inverts the ramp. Clamp at the pack site, the way `perspective` is clamped silently
+  (`MAX_PERSPECTIVE`), and pin the clamped range in a test — a smoothing curve can sweep a param
+  through values its own maths does not accept, which this repo has already been bitten by.
+- **Done when:** the default reproduces the current constant **exactly** — `emergence = 8` is
+  bit-identical to today, asserted, so every baseline holds. A binding of `0`, a negative, and a
+  non-finite each clamp rather than producing a division artifact, asserted at the pack site. The
+  units are steps and the roster says so, with the seconds equivalence at `FIXED_STEP` spelled out
+  because authors think in time.
+
+### Phase 5 — the fixture, and the doc sweep
+
+- **Owner skill:** dev
+- **What:** Rebind the IFS golden fixture to the new channels, and sweep every operator doc this
+  plan moved.
+- **Files touched:** `core/tests/fixtures/attractor_ifs.toml` + its baseline, `presets/README.md`,
+  `docs/preset-palettes.md`, `docs/design-backlog.md`.
+- **Docs the sweep owes, and `preset-palettes.md` is on the list this time.** Plan 0073's Phase 5
+  named only `presets/README.md` and its close had to repair `docs/preset-palettes.md` afterwards,
+  because that file carries the attractor's palette-coordinate formula and `root_tint` is a **fourth
+  term** in it. Both files, both directions:
+  - `presets/README.md` — the roster row (`age_tint`/`age_hue` out, `root_tint`/`root_hue`/
+    `emergence` in), the IFS-only warning, and the "Colouring by what made a point" section, whose
+    `age` bullet and warning box both describe a channel that no longer exists.
+    **Two things `root_tint` owes that no shipped param has needed before** (added 2026-08-07):
+    that it is **anchored at `0`, not centred** — the fixed points keep the preset's colour and the
+    figure ramps away from it, which is the *opposite* of what the page says about `map_tint` two
+    paragraphs earlier, so say it explicitly rather than letting the reader generalise; and that
+    **its effective range is per figure**, with Phase 1's ceiling table (spiral `0.41` → dragon
+    `1.05`) reproduced, because an author tuning on one figure and reusing the number on another
+    will otherwise be quietly wrong by up to 2.5×.
+  - `docs/preset-palettes.md` — the three-term coordinate expression added at Plan 0073's close
+    becomes a three-term expression again with a different third term. **The third term is not the
+    same shape as the other two**: `root_tint · root01`, not `root_tint · (root01 − 0.5)`. The
+    `map_tint`-competes-with-`hue_spread` warning still stands and now applies to `root_tint` too —
+    and applies *asymmetrically*, since an anchored term only ever pushes the coordinate one way.
+    **And it owes the rule the Phase 2 gate established, stated once and generally**: the attractor's
+    palette coordinate is a **fixed budget**. Three params write it (`hue_spread`, `map_tint`,
+    `root_tint`), and adding one means *taking authority away from another*, not stacking a third
+    term on top. Two instances now support this — Plan 0073 cut `hue_spread` to `0.05..0.125` to let
+    `map_tint` read, and Plan 0074's gate found the fern needs `map_tint` halved to `0.22` to let
+    `root_tint` read. Worked example with those numbers, because "budgets compete" is abstract and
+    `0.46 -> 0.22` is not. **`*_hue` is the escape and the page should say so**: the hue routes do
+    not touch this coordinate at all, so a preset out of budget has somewhere to go.
+  - `docs/design-backlog.md` — **strike entry 0074 through** with a pointer to this plan and
+    ADR-0088. It is the architect inbox; an entry that has been built and not struck reads as open.
+  - **`docs/presets.md` is not touched:** no expression-grammar variable, function or operator changes.
+- **Done when:** the fixture binds `root_tint`, `root_hue` and `emergence` at non-default values and
+  its baseline is re-blessed; the other sixteen are verified untouched **by `git diff`**, not by a
+  green suite. The fixture's sensitivity is **demonstrated, not assumed** — each new param
+  neutralized in turn and the capture re-measured against the baseline, with the numbers recorded in
+  the header comment the way that file already does. Note that the previous table was re-measured in
+  full at Plan 0073 Phase 5 for exactly this reason: the baseline had moved under it.
+
+### Phase 6 — the content pass
+
+- **Owner skill:** human
+- **What:** A `preset-author` pass binding the new channel in the two shipped IFS presets, live
+  against real audio.
+- **Questions it answers:** does `root_tint` earn a binding on `attractor_fern`, given `map_tint`
+  already writes that coordinate and `hue_spread` had to come down to 0.05..0.125 to make room for
+  it? Does `attractor_dissolve` want it across the morph, where the fixed points travel? Is
+  `root_hue` the better route on a narrow palette, as the two-route theory predicts? And does
+  `emergence` want to move on the longer-`fade` of the two presets?
+- **It starts from numbers, not from zero** (added 2026-08-08 from the Phase 2 verdict). The gate
+  already found a fern tuning that beats stock: **`map_tint ≈ 0.22`, `root_tint ≈ 0.85`** — the
+  budget split rather than stacked. Start there rather than re-deriving it.
+  **But try `root_hue` on the fern first.** The split was judged before the hue route existed, and
+  the hue route costs the contested coordinate nothing — if it carries the depth cue with
+  `map_tint` left at its full `0.46`, that is strictly better than the split and the split becomes
+  the fallback. This is the two-route theory's cleanest test case and nobody has run it.
+- **Done when:** both shipped IFS presets are retuned, and any route that could not be made to read
+  is written up in `docs/design-backlog.md` rather than quietly left bound to nothing. If the
+  three-way competition for the palette coordinate (`hue_spread`, `map_tint`, `root_tint`) turns out
+  to be one channel too many, **say so** — that is a finding, and it is the one this plan's shape
+  most plausibly gets wrong.
+
+## Data shapes
+
+```rust
+// illustrative — not the final interface
+
+/// The diameter of the fixed-point set: `max over drawn j, k of ‖p_j − p_k‖`.
+/// Closed form, at most six distances, continuous in the table. Floored,
+/// because two drawn maps' fixed points can approach each other across a morph
+/// and the reciprocal would diverge.
+///
+/// Two functions in practice, and claim 1 is why: the RAW diameter is the
+/// measurement the sweep asserts against the floor, and the FLOORED one is what
+/// ships. One function that floored silently could not tell the two apart.
+fn skeleton_diameter(table: &IfsTable) -> f32;
+fn skeleton_scale(table: &IfsTable) -> f32;   // = diameter.max(SKELETON_FLOOR)
+
+/// 48 bytes, unchanged. One spare word is spent; one remains.
+#[repr(C)]
+struct Particle {
+    pos: [f32; 3],
+    seed: f32,
+    prev: [f32; 3],
+    _pad: f32,
+    age: f32,          // still drives the emergence ramp; no longer drives colour
+    map: f32,
+    /// Normalised distance to the nearest drawn fixed point (ADR-0088).
+    /// Offset 40. May exceed 1; clamped at the read, not at the write.
+    root: f32,
+    _spare: f32,       // the last one
+}
+```
+
+## Risks & open questions
+
+- **The central claim is the one its predecessor's twin got wrong.** ADR-0088 argues the gradient
+  survives because the channel is a property of position rather than a proxy for it. That reasoning
+  is different in kind from ADR-0087's, but ADR-0087's also sounded right. **This is why Phase 2 is
+  a gate and not a review**, and why "it does not read" is written into the plan as a successful
+  outcome with a defined shape.
+- **Support is not density.** The gradient rests on the invariant measure having mass near each
+  fixed point. Membership is a theorem; density is not, and is per-figure. A figure thin near one of
+  its points shows that region sparse rather than coloured. Phase 2 looks at all five figures for
+  this reason and nothing else would catch it.
+- **~~Three channels now compete for one palette coordinate.~~ Answered 2026-08-08 by the Phase 2
+  gate: there is room, at the price of halving the second.** `hue_spread` (per particle),
+  `map_tint` (per part) and `root_tint` (per distance) all write it. Plan 0073 already had to drop
+  `attractor_fern`'s `hue_spread` from `0.16..0.42` to `0.05..0.125` to let `map_tint` read; the
+  gate found the fern needs `map_tint` cut `0.46 -> 0.22` to let `root_tint` read, and at that
+  split it beats stock — where the same `root_tint` *stacked* on the unchanged preset is worse than
+  stock. **The coordinate is a fixed budget, not a stack**, which is now a two-instance rule rather
+  than an anecdote and is owed to `docs/preset-palettes.md` at Phase 5. `root_hue` remains the
+  escape and is still untested; Phase 6 tries it before settling for the split.
+  **The competition is now *asymmetric*, which makes it harder rather than easier** (2026-08-07):
+  `hue_spread` and `map_tint` are centred and spend their budget either side of the preset's chosen
+  colour, while `root_tint` is anchored at `0` and only ever pushes one way. So the three do not
+  simply sum into a wider band — two of them widen it and the third also *displaces* it. Phase 6
+  should expect to re-centre `hue_center` after binding `root_tint`, and should say so if that
+  turns out to be the thing that makes the three-way unworkable.
+- **~~The floor could be load-bearing rather than defensive.~~ Answered 2026-08-07: it is
+  defensive.** Claim 1 measured the minimum diameter at `0.1506` (`Tree -> Sierpinski`,
+  `morph = 0.25`, low levers) against a floor of `0.05` — margin ×3.0. The channel does not
+  degenerate anywhere in the reachable morph, so Phase 2 has no specific place it must go and look.
+  The assertion still prints the figure pair and morph, because the *next* figure added to the
+  roster could change this and a bare pass would not say so.
+- **The channel's range is figure-dependent, and no cheap fix exists** (added 2026-08-07). Phase 1
+  measured ceilings of `0.41`–`1.05` across the five figures, so the same `root_tint` is worth up
+  to 2.5× more on one figure than another. Every alternative normaliser that would flatten this is
+  a sampled supremum — ADR-0088 Alternative D's objection, which stands. The decision is to
+  **document rather than engineer**, and the risk it carries is an authoring one: a preset tuned on
+  the fern and copied to the dragon is wrong by a factor nobody will see in a diff.
+- **`attractor_ifs.png` moves twice if the phases are taken literally** — once when Phase 3 retires
+  the two params the fixture binds, once when Phase 5 rebinds it. That is two deliberate re-blesses
+  of one file. Any *other* baseline moving, at any phase, is a defect.
+- **One spare word remains after this.** The next per-particle channel is a struct change to a type
+  four families share. Alternative A in ADR-0088 (two-step map history) is the obvious claimant and
+  is deliberately not taken here.
+
+## What this plan does NOT do
+
+- **No respawn or channel on the four map families.** They have no closed-form on-attractor point,
+  so they have no skeleton to measure distance from. The word exists on their particles because the
+  struct is shared; nothing writes or reads it there.
+- **No two-step map history.** ADR-0088 Alternative A — a good idea, rejected here for being a
+  second *categorical* channel where the gap is a continuous one. It could use the last spare word,
+  as its own plan.
+- **No change to `EMERGENCE_STEPS`' default,** only to whether it can be bound. `emergence = 8` is
+  asserted bit-identical to today.
+- **No bindable churn rate.** Still declined, still Plan 0073's open followup, still a separate plan
+  if anyone asks.
+- **No new normaliser for the four map families,** no `chaos_extent` change, no fit change.
+- **No C ABI change, no `Scene` trait change, no new dependency, no new render idiom.**
+- **It does not close the Plan 0062 review minor about `IfsFigure::frame()`** being unreachable but
+  documented as live. Named again so it is not lost; it is a two-line comment fix for whoever next
+  opens `ifs.rs` with a reason — which, for once, is this plan's Phase 1.
+
+## Followups (after this lands)
+
+- Two-step map history on the last spare word, if the finer partition is wanted.
+- The bindable churn rate, still unclaimed since Plan 0073.
+- Whether three channels on one palette coordinate is one too many, decided by Phase 6.

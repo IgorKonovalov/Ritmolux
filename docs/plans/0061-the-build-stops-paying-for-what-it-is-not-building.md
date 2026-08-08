@@ -506,7 +506,7 @@ stops being an expectation.
   That is a judgment call about whether 883 lines of scene-plus-encode reads as one unit, **not** a
   threshold question. Take it if the residual reads badly once split; do not take it to satisfy a
   number, because the number is already satisfied.
-- **[Plan 0074](0074-the-figure-colours-by-how-far-it-has-come.md) does not threaten the target.**
+- **[Plan 0074](done/0074-the-figure-colours-by-how-far-it-has-come.md) does not threaten the target.**
   It adds `root_tint`/`root_hue`/`emergence` to `PARAMS`, `set_param`, `reset_params` and the scene
   struct — perhaps 25 lines of code in the residual, against 517 of headroom.
 - **Sequencing against Plan 0074.** Both own this file; 0074 is live and this plan is sequenced last

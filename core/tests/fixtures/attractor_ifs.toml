@@ -1,4 +1,4 @@
-﻿# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
 #
 # The attractor's IFS FAMILY (Plan 0062, ADR-0075), which the per-SystemKind
 # roster structurally cannot reach. `attractor.toml` is De Jong: it takes a

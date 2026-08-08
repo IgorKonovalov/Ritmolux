@@ -1408,7 +1408,7 @@ that reads as a curve — which is every future user of `star_pattern`'s motif r
 
 ## ~~Entry 0074 — from Plan 0073 Phase 6 (2026-08-06), the content pass on the two IFS colour channels~~ — BUILT
 
-> **Closed 2026-08-08 by [Plan 0074](plans/0074-the-figure-colours-by-how-far-it-has-come.md) /
+> **Closed 2026-08-08 by [Plan 0074](plans/done/0074-the-figure-colours-by-how-far-it-has-come.md) /
 > [ADR-0088](adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md).** Route 2 was taken —
 > the channel that IS spatial — and route 3 shipped with it: `root_tint` / `root_hue` measure
 > distance to the nearest drawn fixed point directly, and `age_tint` / `age_hue` are retired, so the
@@ -1507,7 +1507,7 @@ routes is taken, `presets/README.md` needs to stop presenting the four as peers.
 
 ## 0075 — `root_tint` earned no binding on either shipped IFS preset, and `root_hue` earned both
 
-- **Raised:** 2026-08-08, at [Plan 0074](plans/0074-the-figure-colours-by-how-far-it-has-come.md)
+- **Raised:** 2026-08-08, at [Plan 0074](plans/done/0074-the-figure-colours-by-how-far-it-has-come.md)
   Phase 6 — the `preset-author` pass, filed under that phase's own "any route that could not be made
   to read is written up here rather than quietly left bound to nothing".
 - **Verified by measurement:** yes — both routes rendered against each other on both presets, at a
@@ -1559,8 +1559,10 @@ driven. **`presets/README.md` documents neither the negative direction nor the w
 Nothing engine-side is *required* — the two-route design already provides the escape, and it worked.
 Three things are cheap and would save the next author the same session:
 
-1. **Say in `presets/README.md` that `root_tint` may be negative, and what happens at the edge.** One
-   sentence and the arithmetic for the floor. This is the whole gap for most readers.
+1. ~~**Say in `presets/README.md` that `root_tint` may be negative, and what happens at the edge.**~~
+   **Done 2026-08-08 at Plan 0074's close**, with the anchored-term-spends-the-bright-end property, the
+   negative escape, the wrap, and the fern's `-0.38` arithmetic. **That is the authoring half of this
+   entry closed; what remains open is item 2, which is the engine question.**
 2. **Consider clamping the palette coordinate rather than repeating it** — or documenting the repeat
    as deliberate. A wrap that turns the darkest region of a figure into its brightest speckle is a
    surprising default for a *coordinate*, whatever it is for a texture sampler. This is an engine
@@ -1574,7 +1576,12 @@ Three things are cheap and would save the next author the same session:
 **Low.** No shipped content is wrong and no author is blocked — the route that works is bound in
 both presets and documented. It is a documentation gap with one genuine engine question behind it.
 
-## 0076 — the operator docs describe a fern tuning that the shipped fern does not carry
+## ~~0076 — the operator docs describe a fern tuning that the shipped fern does not carry~~ — REPAIRED
+
+> **Closed 2026-08-08 at [Plan 0074](plans/done/0074-the-figure-colours-by-how-far-it-has-come.md)'s
+> Mode 4 close**, in exactly the shape this entry proposed: the measurement and its attribution to the
+> gate are kept in both files, and each is finished with what actually shipped, joined to the
+> `*_hue`-is-the-escape paragraph already sitting below it.
 
 - **Raised:** 2026-08-08, same pass as [0075](#0075--root_tint-earned-no-binding-on-either-shipped-ifs-preset-and-root_hue-earned-both). **This is drift, not a design gap** — filed here because
   it was found by the content lane and the fix is the architect's.

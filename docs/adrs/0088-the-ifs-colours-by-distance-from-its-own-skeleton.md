@@ -1,8 +1,8 @@
 # ADR-0088 — The IFS colours by distance from its own skeleton, and the age channel is retired
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-08 — **with an Outcome section** (see the end)
 > **Date:** 2026-08-06
-> **Related plan(s):** [0074](../plans/0074-the-figure-colours-by-how-far-it-has-come.md)
+> **Related plan(s):** [0074](../plans/done/0074-the-figure-colours-by-how-far-it-has-come.md)
 > **Supplements:** [ADR-0087](0087-the-ifs-particle-carries-its-age-and-its-last-map.md), whose age
 > channel this replaces rather than repairs
 
@@ -258,3 +258,42 @@ theorem (each `p_k` is on `A`, and `A` is the support) but says nothing about *d
 whose measure is very thin near one of its fixed points would show that region as sparse rather than
 as coloured. That is a per-figure property, it is not provable in general, and it is the reason Plan
 0074's gate is a rendered sample set across all five figures rather than one capture of the fern.
+
+## Outcome (2026-08-08, at Plan 0074's close)
+
+**The decision holds, and its central bet came in.** The channel reads on all five figures, as
+*depth into the figure* rather than as a radial wash, and it is **more** legible under a long trail
+than bare — the trail fills the figure in where it averaged the age channel away. The `min` over
+four packed slots, the diameter normaliser, the floor, the anchoring and the zero-cost placement in
+`StepUniform::_pad` all shipped as decided, with the floor measured defensive (`0.1506` minimum
+against `0.05`, margin ×3.0) and the respawn state bit-exactly `0`.
+
+**One thing this ADR got wrong, and it is about the two routes rather than the channel.** The
+Decision presents `root_tint` (the palette coordinate) as the channel's primary route and `root_hue`
+as its companion; the Consequences, amended at the Phase 2 gate, went as far as calling the hue
+route "the one that matters more than the two-route theory made it sound". Plan 0074's Phase 6 went
+further: **neither shipped IFS preset binds `root_tint` at all.** Both take the hue route, for two
+independent reasons, and the second generalises past this family:
+
+- On `attractor_fern` the palette coordinate was already spent, and the split the gate had measured
+  (`map_tint 0.46 -> 0.22`, `root_tint 0.85`) reads *flatter* than stock — halving `map_tint` gives
+  back exactly the part separation Plan 0073 had paid `hue_spread` for. The hue route keeps both at
+  no cost to the coordinate.
+- On `attractor_dissolve` the coordinate is not contested at all. **An anchored term only ever
+  pushes the coordinate *up*, so it spends the palette's bright end by construction** — and that
+  preset's mineral phase already runs its densest crossings into near-white, so `root_tint` whitens
+  exactly what was brightest.
+
+That second reason is the general one and it is the price of the *Anchoring* section above, which
+this ADR still considers correct: centring would have slid the figure, and the measured distribution
+is what forbids it. But an anchored term is structurally disadvantaged on any palette that ends
+bright, which is most of this library's. The escape — a **negative** `root_tint` — is expressible
+and useful, and carries an edge nothing in the engine documents: the LUT sampler **repeats**, so
+once the coordinate crosses zero the figure's darkest region wraps to the ramp's brightest stop.
+On `attractor_fern` that is around `root_tint = -0.38`. Whether a palette *coordinate* should clamp
+rather than repeat is an engine question touching every LUT-sampling scene, and it is open as
+[backlog 0075](../design-backlog.md).
+
+**Not falsified, and worth saying because the shape resembles ADR-0087's Outcome:** the tint route
+is not defective. It works, it is measured, and it is the right route on a palette with dark-end
+headroom. It simply lost a rendered comparison on the two presets that exist today.

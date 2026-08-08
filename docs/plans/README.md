@@ -15,7 +15,7 @@ re-deriving state from `git log`. Completed plans move to `done/`.
 
 
 | ~~[0073](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)~~ | ~~The fern unfurls and colours by what made it: age, last map, and the end of the startup rectangle~~ | **Closed 2026-08-06** - see Recently closed. All six phases landed, including the terminal `human` Phase 6. `Particle` is now **48 bytes** and `vertex_attr_array!` is gone from the draw pipeline (see [`PARTICLE_ATTRIBUTES`] in `particles/mod.rs`), so anything adding a sixth vertex attribute must read that constant rather than the macro. [backlog 0064](../design-backlog.md) closed by construction. [ADR-0087](../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md) accepted **with an Outcome section**: its `map` half works and ships bound in both IFS presets, its `age` half does not read and is written up as [backlog 0074](../design-backlog.md) with three candidate repairs | - |
-| [0074](0074-the-figure-colours-by-how-far-it-has-come.md) | The figure colours by how far it has come: distance from the skeleton, and the age channel retires (`root_tint`/`root_hue`, `emergence`, `age_tint`/`age_hue` retired) | **approved 2026-08-06** — ready for `dev`, gated by nothing; from [backlog 0074](../design-backlog.md), which [0073](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)’s content pass raised against its own ADR; [ADR-0088](../adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md). **Delivers what [ADR-0087](../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md) promised and could not**: age was a *proxy* for distance-from-the-fixed-points and the proxy decays after ~10 steps, which the 8-step emergence ramp then hides; this measures the distance itself, every step, from the points already on the step uniform. Costs **one of the two spare `Particle` words** and **no uniform growth** (`StepUniform::_pad` pays for the normaliser, so 192 B stays 192 B). Normalised by the fixed-point set’s **diameter**, not by `chaos_extent` — a bounding box is a supremum statistic this repo has already measured as non-converging. **Phase 2 is `human` and is a GATE placed after ONE `dev` phase**, because 0073 spent five phases on a channel that did not read and found out terminally; “it does not read” is written in as a successful outcome that ships the retirement half alone. Phase 6 is `human` and terminal. Re-blesses `attractor_ifs.png` twice and **only** that one | dev, human |
+| ~~[0074](done/0074-the-figure-colours-by-how-far-it-has-come.md)~~ | ~~The figure colours by how far it has come: distance from the skeleton, and the age channel retires~~ | **Closed 2026-08-08** — see Recently closed. All six phases landed, both `human` ones included. `Particle` is now 48 bytes with **one** spare word left and **six** vertex attributes, so the next per-particle channel is a struct change to a type four families share — read `PARTICLE_ATTRIBUTES` in `particles/mod.rs`, not `vertex_attr_array!`. [ADR-0088](../adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md) accepted **with an Outcome section**: the channel reads on all five figures, but **neither shipped IFS preset binds `root_tint`** — both take `root_hue`, because an *anchored* coordinate term spends the palette's bright end by construction. [backlog 0074](../design-backlog.md) closed; [backlog 0075](../design-backlog.md) raised (the repeating-LUT wrap under a negative `root_tint`, an engine question touching every LUT-sampling scene) | - |
 | [0064](0064-the-symmetry-stage-and-the-banded-palette.md) | The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour (`kaleido_radial`/`spiral`/`zoom`/`tile`/`inner`, `palette_steps`/`palette_contour`) | **approved 2026-08-04** — ready for `dev` **after [0055]**; from the user's five reference images; [ADR-0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) + [ADR-0078](../adrs/0078-banding-is-a-palette-coordinate-operation.md). Covers **three** of the five images, and applies to **every scene** because it is screen-space. The engine already has half the mechanism: periodicity in `theta` is the fold, periodicity in **`log r`** is the missing concentric self-similarity. **Both halves are one plan on purpose** — neither alone reproduces the references, and the user chose to decide the look from a rendered sample set that has to show the combination. **Phase 4 is `human`** (pick defaults and ranges from the grid) and gates Phases 5-6, so it does not close in one session. **Collides with [0055]** in `kaleidoscope.rs` — taking 0055 first is the cheaper order. Moves **no** existing golden baseline; adds one | dev, human |
 | ~~[0065](done/0065-the-mandala-interior.md)~~ | ~~The mandala interior: `star_pattern` stops being hollow~~ | **Closed 2026-08-06** — see Recently closed. All phases but the `human` Phase 6 landed; a **Phase 7 was added at the close** to re-derive `sanity.rs`'s `star_pattern` coverage floor (`0.34` -> `0.12`), because filling the interior moved the family minimum and the constant is derived from the shipped library. [ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md) accepted with an Outcome section; [design-backlog 0007](../design-backlog-archive.md) closed in full; backlog [0071](../design-backlog.md)/[0072](../design-backlog.md)/[0073](../design-backlog.md) raised | — |
 
@@ -38,7 +38,7 @@ preference, and a session may take any plan here.
 | ~~2~~ | ~~[0063]~~ | **Closed 2026-08-04** — see Recently closed. Its soft constraint **has been discharged in the direction it wanted**: `inv_depth_extent()` now exists as an exhaustive match over `AttractorFamily`, so [0062] adding a fifth family is **compiler-forced** to answer it (with `0.0` — its IFS figures are 2-D) | — |
 | ~~2~~ | ~~[0062]~~ | **Closed 2026-08-05** — see Recently closed. All seven phases landed; its Phase 7 content pass is the source of backlog 0064-0066. `particles/mod.rs` now also carries `ifs.rs`, five new params and a `STEP_SLOTS` uniform-slot scheme, so anything inheriting that file should read it rather than [0063] alone | — |
 | ~~2~~ | ~~[0073]~~ | **Closed 2026-08-06** - see Recently closed. All six phases landed, the terminal `human` Phase 6 included, so the attractor run ([0063], [0062], [0066], [0073]) is complete and **no live plan touches `particles/mod.rs` any more** except [0061] Phase 6. Its content pass falsified half of [ADR-0087] and left [backlog 0074] behind, which is the natural successor if anyone wants to keep going on this family | - |
-| 1 | [0074] | **The successor [0073] wrote its own case for**, from the finding its content pass raised against [ADR-0087]. Take it while `particles/mod.rs` and `ifs.rs` are still in context — it is the fifth leg of the attractor run and the **only live plan touching that file** apart from [0061] Phase 6. Cheap to start and cheap to abandon: **Phase 1 is one `dev` phase and then a `human` gate**, and the gate saying "it does not read" ships the retirement half alone rather than wasting the plan. It also spends the **last-but-one** spare `Particle` word, so anything else wanting a per-particle channel should watch this land | No — **Phase 2 is a `human` GATE after one `dev` phase**; Phase 6 is `human` and terminal |
+| ~~1~~ | ~~[0074]~~ | **Closed 2026-08-08** — see Recently closed. It closed in two sessions, not one, exactly as this row predicted: one `dev` phase, the `human` gate, then Phases 3-6. The gate earned its placement twice over — it passed, and it recorded the one comparison it could not run, which Phase 6 then ran and reversed. **`particles/mod.rs` now has one spare `Particle` word**, so anything wanting a per-particle channel is buying a struct change | - |
 | ~~3~~ | ~~[0066]~~ | **Closed 2026-08-05** — see Recently closed. All five phases landed. `particles/mod.rs` now carries a `brightness` on the attractor, so [0073] inherits a `PARAMS`/`set_param` pair one entry longer than the row above assumed | — |
 | ~~4~~ | ~~[0065]~~ | **Closed 2026-08-06** — see Recently closed. It was the safest parallel lane and behaved like one: line geometry, no file shared with anything, and it merged `main` with exactly one conflict (a design-backlog number both sides minted the same day) | — |
 | 4 | [0064] | **Unblocked — [0055] has landed**, so the `kaleido_edge` branch it composes against is in place. Still deliberately after the attractor work rather than concurrent with it: its Phase 3 sample grid renders on `attractor_lorenz` as one of three sources, and [0063] changes what that source looks like. A look decision taken against a moving target is one that has to be retaken. **Read [0055]'s Recently-closed entry** — the fold's default is now `tile`, not the disc 0064 was drafted against | No — Phase 4 is `human`, mid-plan |
@@ -58,9 +58,11 @@ phase, and a session that wants a finished thing has to bring the user in at som
 accordingly rather than picking on that criterion.
 ~~**If you want the most visible change per session**, take [0073]~~ - **[0073] closed 2026-08-06**,
 and with it the attractor run ([0063], [0062], [0066], [0073], closed 2026-08-04 through 2026-08-06).
-**The cheapest thing to start right now is [0074]**: one `dev` phase, then a `human` gate that can
-legitimately end the plan. **If a second lane is running in parallel**, give it [0064] or [0068]:
-neither shares a file with [0074], which owns `particles/mod.rs`.
+~~**The cheapest thing to start right now is [0074]**~~ — **[0074] closed 2026-08-08**, which ends
+the attractor run ([0063], [0062], [0066], [0073], [0074]). **No live plan touches `particles/mod.rs`
+any more except [0061] Phase 6**, so that file is free — and it now carries one spare `Particle` word
+rather than two. On the same criterion the cheapest remaining starts are [0071] and [0072]: each is a
+small engine change with a mid-plan `human` look.
 
 ### The six plans added 2026-08-04, and why they exist
 
@@ -824,6 +826,43 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 
 ## Recently closed
 
+- [0074 — The figure colours by how far it has come](done/0074-the-figure-colours-by-how-far-it-has-come.md)
+  — **done 2026-08-08**, Mode 4 review **no blockers, four minor items (three repaired at the
+  close)**. All six phases as `79c08a9` / `6c928f6` (the Phase 2 gate verdict) / `22956e0` /
+  `776d6da` / `57965df` / `dcc88ba`, on `main` rather than in the `lmv-plan-0074` worktree — that
+  lane was created and never used, and is stale at the approval commit. Full gate re-run at the
+  close (`fmt`, `clippy --workspace --all-targets -D warnings`, `nextest` 589/589, doc links), and
+  **`attractor_ifs.png` is the only baseline that moved** — twice, as the plan predicted — verified
+  as a `git diff` of `core/tests/golden/` against `v0.43.0`.
+  **The gate paid for itself twice, and that is the transferable finding.** Phase 2 is a `human`
+  gate placed after *one* `dev` phase because Plan 0073 spent five phases on a channel that did not
+  read. It passed — the gradient reads on all five figures as *depth into the figure*, and is more
+  legible under a long trail than bare, which is exactly where the age channel died. It also wrote
+  down the one comparison it could not run (`root_hue` did not exist yet), and Phase 6 ran that
+  comparison and **reversed the gate's conclusion**: `root_hue` at the fern's full `map_tint` beats
+  the budget split the gate had found, so **both shipped IFS presets bind `root_hue` and neither
+  binds `root_tint`**. A gate that records what it could not test is worth more than one that only
+  records a verdict.
+  **The general property behind that, and it outlives this family:** `root_*` is **anchored** at
+  zero rather than centred (measured — `root01` tops out at `0.41`–`1.05` per figure, so centring
+  would slide the figure rather than spread it), and an anchored coordinate term therefore only ever
+  pushes *up* the ramp, spending the palette's bright end by construction. Its escape, a negative
+  binding, runs into an **undocumented repeating-LUT wrap** — below about `root_tint = -0.38` on the
+  fern the darkest region wraps to the ramp's brightest stop as cream speckle. Whether a palette
+  *coordinate* should clamp rather than repeat is an **engine question touching every LUT-sampling
+  scene** and is [backlog 0075](../design-backlog.md); the authoring half of it is now documented in
+  `presets/README.md`.
+  **`Particle` has one spare word left** and `PARTICLE_ATTRIBUTES` six entries, so the next
+  per-particle channel is a struct change to a type four families share — ADR-0088 Alternative A
+  (two-step map history) is the standing claimant. `age_tint` / `age_hue` are gone; `Particle::age`
+  stays, and now drives a bindable `emergence`.
+  **Three close repairs, all doc/asset:** the two operator docs still presented the gate's
+  `map_tint 0.46 -> 0.22` split as the shipped fern tuning ([backlog 0076](../design-backlog.md),
+  raised by Phase 6 against its own Phase 5); `core/tests/fixtures/attractor_ifs.toml` had picked up
+  a **UTF-8 BOM** at Phase 5 (the standing `Set-Content` trap); and `core/tests/attractor.rs`'s
+  header comment still named `age_tint` where the body binds `root_tint`. One minor item left open
+  and named in the review: the step shader's comment claims the reseed dispatch skipping `root` is
+  "a stronger version of the same reason" it skips `map`, where it is in fact weaker.
 - [0073 — The fern unfurls and colours by what made it](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
   — **done 2026-08-06**, Mode 4 review **no blockers, two minor doc items repaired at the close**.
   All six phases as `c2c8c76` / `339a178` / `7ef5270` / `b69ca4e` / `50c4eda` / `6e335b2` on
@@ -831,11 +870,11 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
   Phase 2's done-when. Full gate green on the merged tip (`fmt`, `clippy --all-targets -D warnings`,
   `nextest`, doc links resolve), and **`attractor_ifs.png` is the only baseline that moved** —
   verified as a diffstat against `main`, not taken on report.
-  **`Particle` is now 48 bytes** with `age` and `map`, two words still free, so anything touching
-  `particles/mod.rs` inherits a struct four families share and a `PARTICLE_ATTRIBUTES` constant that
-  **replaced `vertex_attr_array!`** — that macro lays attributes out consecutively and would now
-  fetch `map` from the padding word, silently and with no compile error. Read that constant before
-  adding a sixth attribute. [backlog 0064](../design-backlog.md)'s startup rectangle is **gone by
+  **`Particle` is now 48 bytes** with `age` and `map`, two words still free *at this close* (one
+  after [0074]), so anything touching `particles/mod.rs` inherits a struct four families share and a
+  `PARTICLE_ATTRIBUTES` constant that **replaced `vertex_attr_array!`** — that macro lays attributes
+  out consecutively and would now fetch `map` from the padding word, silently and with no compile
+  error. Read that constant before adding an attribute; [0074] added the sixth. [backlog 0064](../design-backlog.md)'s startup rectangle is **gone by
   construction**: the IFS initial fill seeds at most four distinct positions where a box fill seeds
   one per particle, asserted as a count with no statistic in it.
   **Half of [ADR-0087](../adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md) was

@@ -203,6 +203,13 @@ can still take a part separation or a depth cue through the hue route. That is
 also why they throw a part *out* of a narrow palette rather than moving it
 within one.
 
+**On the fern the escape won, so the second row is a measurement rather than the
+shipped tuning.** Judged against `root_hue` — which did not exist when the split
+was measured — the fern keeps `map_tint` at its full `0.46` and takes its depth
+cue through the hue route instead, giving up nothing. Both shipped IFS presets
+bind `root_hue`; neither binds `root_tint`. The budget is real; paying it is the
+second choice.
+
 One more trap on `root_tint` specifically: **its effective range is per figure**,
 from `0.41` on the spiral to `1.05` on the dragon, so the same binding is not the
 same look across figures. See
