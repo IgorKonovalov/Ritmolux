@@ -74,7 +74,7 @@ pub(super) struct UniformInputs {
     pub(super) root_hue: f32,
     /// The emergence ramp's length in **steps**, raw. Sanitized by
     /// [emergence_rate] where it is packed, not here, so the guard has exactly
-    /// one site — the discipline rightness follows.
+    /// one site — the discipline `brightness` follows.
     pub(super) emergence: f32,
 }
 
