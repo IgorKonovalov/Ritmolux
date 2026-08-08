@@ -33,8 +33,11 @@ set -u
 # through a real GPU, which is what makes them slow and what makes them CI's
 # job. Excluding them takes the gate from ~98 s to ~27 s warm.
 #
-# CI runs the full suite on every push regardless — this only changes what you
-# wait for locally.
+# CI still runs all of it on every push, but since ADR-0073 it runs these nine
+# in ONE job rather than two: `check (windows-latest)` now carries the same
+# exclusion this hook does, and `coverage` is the only place they execute on
+# Windows. So skipping them locally still costs nothing — but that promise is
+# now underwritten by a single CI job rather than by a redundancy between two.
 SKIPPED_SUITES="golden attractor reaction_diffusion background_composite ink reactivity animation sanity distinctness"
 
 NEXTEST_FILTER='not (binary(golden) + binary(attractor) + binary(reaction_diffusion) + binary(background_composite) + binary(ink) + binary(reactivity) + binary(animation) + binary(sanity) + binary(distinctness))'
@@ -75,13 +78,16 @@ else
 fi
 
 run_step "cargo fmt --all --check" cargo fmt --all --check
-run_step "cargo clippy --all-targets -- -D warnings" cargo clippy --all-targets -- -D warnings
+# `--workspace` matches what CI now runs, and is load-bearing since ADR-0072:
+# `lmv-core-cabi` sits outside the workspace default-members, so a bare `cargo
+# clippy` / `cargo nextest run` silently stops covering the C ABI entirely.
+run_step "cargo clippy --workspace --all-targets -- -D warnings" cargo clippy --workspace --all-targets -- -D warnings
 
 echo "pre-push: skipping GPU-heavy suites (CI runs them):"
 for suite in $SKIPPED_SUITES; do
     echo "pre-push:   - $suite"
 done
-run_step "cargo nextest run (narrowed)" cargo nextest run -E "$NEXTEST_FILTER"
+run_step "cargo nextest run (narrowed)" cargo nextest run --workspace -E "$NEXTEST_FILTER"
 
 echo ""
 echo "pre-push: OK"
