@@ -1,8 +1,8 @@
 # ADR-0073 — The Windows CI critical path: the sweep gets one owner, and a shape claim stops sweeping
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-08, Plan 0061 close)
 > **Date:** 2026-08-04
-> **Related plan(s):** [0061](../plans/0061-the-build-stops-paying-for-what-it-is-not-building.md)
+> **Related plan(s):** [0061](../plans/done/0061-the-build-stops-paying-for-what-it-is-not-building.md)
 > **Supplements:** [ADR-0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
 > **Related:** [ADR-0016](0016-gpu-tests-opt-in-ci-scope.md),
 > [ADR-0023](0023-golden-drift-guard-uses-frozen-fixtures.md),
@@ -249,3 +249,42 @@ worth taking instead.
   the gap is what serialization costs. `nextest` overlaps the suites across cores; a subprocess
   sweeping a directory in a loop gets one core and the runner's clock speed, and GitHub's is slow.
   Any future test that loops over the library inside one process inherits that multiplier.
+
+## Outcome (2026-08-08, at Plan 0061's close)
+
+Both halves landed — the scoping as `1c55476` (early and out of sequence, at the user's request) and
+the sweep's single ownership as `55388b2`. **The decision is accepted; the measurement that would
+confirm it is not yet taken**, and that gap is the point of this section.
+
+**What is confirmed, locally.** Scoping `the_json_report_is_well_formed_and_carries_its_top_level_keys`
+to a three-preset fixture took it from **85 s to 5.0 s** on the dev box. The union check that is this
+ADR's whole safety argument for narrowing `check` came back empty: `nextest list` for `check` plus
+`-p lmv-core` / `-p lmv-core-cabi` for `coverage` covers all 589 tests the unfiltered run listed, and
+all 18 tests the filter removes are `lmv-core` binaries. Nothing fell through the gap.
+
+**What is not confirmed.** Every wall-time claim in this ADR rests on run 30903871856 — still the only
+green run in existence — and no CI run has yet been read after these changes. Plan 0061 Phase 9 is
+`human` and outstanding: it wants the **second** post-push run, because Phases 1, 1b and 2 each
+invalidate `Swatinem/rust-cache` wholesale and the first is a cold build. Until it is read, three
+things stated above are predictions rather than results: that the workflow's wall clock actually
+moved, that `coverage` is now the longest job, and that `COVERAGE_FLOOR = 91` (set from a
+hardware-GPU measurement on the dev box, where CI has WARP) is not too high. **If `coverage` turns
+out not to be the longest job, the surviving `check (windows-latest)` is build-dominated rather than
+test-dominated, and that is the one measurement that flips Alternative A** — merging the two Windows
+jobs — from rejected to worth taking. Route it back to `architect` as a supplement rather than
+editing the job.
+
+**One open question this ADR raised and Plan 0061 Phase 4 answered: no.** The plan carried "take the
+`--size` / `--frames` reduction for `--report` if it honours them (unverified — check, don't assume)".
+Checked: `--report` ignores both, byte-identically. Taking it would mean new plumbing into
+`REPORT_SIZE`, `PROBE_SIZE` and `PROBE_WINDOW`, which are fixed on purpose — a shortened probe window
+does not fail, it returns a plausible smaller number with no signal that anything went wrong, and a
+truncated window has already falsified an ADR in this repo once. A CLI flag that silently distorts a
+published report is worse than a slower report. **Not taken, and not owed** — the cost this was meant
+to bound is bounded by the fixture instead.
+
+**The accepted cost is now a single point of failure, and it is named in three places** (`ci.yml`,
+`.githooks/pre-push`, `docs/nfr.md` §7): `coverage` is the only job running the nine GPU suites on
+Windows, so disabling it, skipping it, or letting `cargo-llvm-cov` fail to install takes the golden
+guard and every GPU behavioural suite with it — while the workflow still goes green. Treat deleting
+those comments as deleting a gate.

@@ -18,9 +18,8 @@ someone who picked it up is reading.
 |------|-------|--------|-------|-----------------|
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move | **approved 2026-07-30** | dev, human | Unblocked — [0045] landed, so the linear-light pipeline exists. Cheaper after the attractor plans settled `particles/`. |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong | **approved 2026-08-02** | dev, human | Phase 3 is `human` and gates Phase 4; it **is** runnable on this box (the gate is `device_type == Cpu`, not "discrete"). Read [0052]'s and [0055]'s archive entries first — each moved a bind-group layout this plan asserts on. |
-| [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) | The build stops paying for what it is not building | **in-progress 2026-08-08** | dev, human | Phases 1–7b landed; **Phase 8 (plugin link) and Phase 9 (read the CI run) are `human` and outstanding**. Sequenced last by the user's own instruction. |
 | [0064](0064-the-symmetry-stage-and-the-banded-palette.md) | The symmetry stage and the banded palette | **approved 2026-08-04** | dev, human | Unblocked ([0055] landed), but Phase 4 is `human` and mid-plan, so it does not close in one session. The fold's default is now `tile`, not the disc it was drafted against. |
-| [0067](0067-the-curation-route.md) | The curation route | **approved 2026-08-04** | dev, human | Phase 1 first makes the gate worth trusting — all five preset gates synthesize `AnalysisFrame` and none runs the analyzer. Its Phase 1 touches `core/tests/reactivity.rs`, adjacent to [0061]'s CI work. |
+| [0067](0067-the-curation-route.md) | The curation route | **approved 2026-08-04** | dev, human | Phase 1 first makes the gate worth trusting — all five preset gates synthesize `AnalysisFrame` and none runs the analyzer. Its Phase 1 touches `core/tests/reactivity.rs`, which [0061] moved into the `coverage` job's sole ownership (ADR-0073) — a change there is now proved by one CI job, not two. |
 | [0068](0068-why-the-downbeat-rarely-locks.md) | Why the downbeat rarely locks | **approved 2026-08-04** | dev, human | Ships a diagnosis and **no fix** on purpose; `CONFIDENCE_THRESHOLD` does not move. Shares no file with anything; Phase 3 is `human` and mid-plan. |
 | [0071](0071-light-that-adds-without-covering.md) | Light that adds without covering (`occlude`) | **approved 2026-08-04** | dev, human | One scalar at the backdrop composite; default `1.0` is byte-identical. Phase 3 is `human` and mid-plan — the default is decided over a **lit** backdrop, because at `bg_bright = 0` the two models are identical. |
 | [0072](0072-the-backdrop-joins-the-palette.md) | The backdrop joins the palette (`bg_hue`) | **approved 2026-08-04** | dev, human | Eleven lit-backdrop presets provably cannot move, fifteen re-tint and get a `human` pass. Two golden fixtures re-blessed and **only** those two; the real risk is ADR-0058 WARP layout aliasing. |
@@ -40,9 +39,8 @@ that criterion.
 | 3 | [0064] | After the attractor work rather than concurrent with it: its Phase 3 sample grid renders on `attractor_lorenz`, and a look decision taken against a moving target has to be retaken. |
 | 4 | [0053] | Protective rather than additive; moves no pixels. |
 | 5 | [0068] | Blocks nobody. Late because it ships no fix, not because it is unimportant. |
-| 6 | [0067] | The curation route; watch the `core/tests/reactivity.rs` seam against [0061]. |
+| 6 | [0067] | The curation route. `reactivity.rs` now runs only in `coverage` (ADR-0073), so a break there shows up in one job. |
 | 7 | [0046] | Touches the attractor's feedback path, cheapest once that file has settled. |
-| 8 | [0061] | **Last, by the user's own instruction.** |
 
 [0045]: done/0045-linear-light-and-bloom.md
 [0046]: 0046-transformed-feedback.md
@@ -53,7 +51,7 @@ that criterion.
 [0065]: done/0065-the-mandala-interior.md
 [0066]: done/0066-the-level-lever.md
 [0069]: done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md
-[0061]: 0061-the-build-stops-paying-for-what-it-is-not-building.md
+[0061]: done/0061-the-build-stops-paying-for-what-it-is-not-building.md
 [0064]: 0064-the-symmetry-stage-and-the-banded-palette.md
 [0067]: 0067-the-curation-route.md
 [0068]: 0068-why-the-downbeat-rarely-locks.md
@@ -94,6 +92,23 @@ the rows above.
 
 ## Standing (not a plan)
 
+- **Plan [0061]'s two `human` verifications, carried forward at its close (2026-08-08).** The plan is
+  `done` and every `dev` phase landed; these two are outstanding because neither `dev` nor
+  `architect` can run them, and neither blocks anything that shipped.
+  - **Phase 8 — link the foobar plugin.** `.\plugin-foobaruild.ps1` must produce
+    `plugin-foobar/build/foo_lmv.dll` and that component must load in foobar2000 v2 and render.
+    Needs VS Build Tools 2022 plus the unpacked foobar SDK; CI has no plugin job. **This is the check
+    most worth running**, because [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md)
+    renamed the linked artifact to `lmv_core_c.lib` — the `extern "C"` surface did not change, so an
+    artifact path is the only realistic failure and the artifact path is what moved.
+  - **Phase 9 — read a cache-warm CI run** (the *second* after the push; the first is a cold build,
+    because a `[profile.dev]` edit and a new workspace member each invalidate `rust-cache`
+    wholesale). It re-derives `COVERAGE_FLOOR` — currently **91**, measured on a hardware-GPU box
+    where CI has WARP — and checks the one property
+    [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) committed to: **`coverage` is the
+    longest job**. If it is not, `check (windows-latest)` is build-dominated, and that is the single
+    measurement that flips ADR-0073's Alternative A (merge the two Windows jobs) from rejected to
+    worth taking — route it back to `architect` as a supplement rather than editing the job.
 - **[On-device validation — low-end Windows iGPU smoke](../on-device-validation.md)** — a
   hardware-gated checklist, **not** a phased plan and **not** in the roster above: it never blocks a
   plan from closing. Holds the low-end / older Windows iGPU checks (fps floor ≥ 60 @ 1080p; footprint
@@ -109,6 +124,7 @@ each close recorded, the properties that outlived the plan — moved verbatim to
 [README-archive.md](README-archive.md)** (Plan 0061 Phase 7b). Nothing was
 deleted; it simply stopped being loaded into every session's context.
 
+- [0061 — The build stops paying for what it is not building](done/0061-the-build-stops-paying-for-what-it-is-not-building.md) — closed 2026-08-08. Review: no blockers, two majors, three minors (all five doc drift, all repaired at the close). **Phases 8 and 9 are `human` and carried forward — see Standing.**
 - [0074 — The figure colours by how far it has come](done/0074-the-figure-colours-by-how-far-it-has-come.md) — closed 2026-08-08. Review: no blockers, four minor items (three repaired at the close)
 - [0073 — The fern unfurls and colours by what made it](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md) — closed 2026-08-06. Review: no blockers, two minor doc items repaired at the close
 - [0065 — The mandala interior: `star_pattern` stops being hollow](done/0065-the-mandala-interior.md) — closed 2026-08-06. Review: no blockers

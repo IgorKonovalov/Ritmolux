@@ -1,11 +1,11 @@
 # ADR-0072 — The C ABI ships from its own crate
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-08, Plan 0061 close)
 > **Date:** 2026-08-04
 > **Related:** [ADR-0001](0001-rust-core-wgpu-cabi-foobar-shim.md) (the C ABI seam),
 > [ADR-0003](0003-c-abi-v1-surface.md) (the ABI surface + versioning),
 > [ADR-0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) (the coverage gate this moves),
-> [Plan 0061](../plans/0061-the-build-stops-paying-for-what-it-is-not-building.md)
+> [Plan 0061](../plans/done/0061-the-build-stops-paying-for-what-it-is-not-building.md)
 
 ## Context
 
@@ -102,3 +102,42 @@ that fails silently and at C++ link time. Moving the source removes the question
 
 **D. A separate cargo profile for plugin builds.** Rejected because profiles select optimization and
 debug settings, not which crate types are emitted. It addresses none of the cost.
+
+## Outcome (2026-08-08, at Plan 0061's close)
+
+Landed as `d442f7a`. The decision holds unchanged — `lmv-core` is `crate-type = ["rlib"]`, a plain
+`cargo build` emits no `lmv_core*.lib` and no `.dll`, and `cargo build -p lmv-core-cabi` emits both.
+`LMV_ABI_VERSION` is still `4` and the twelve-function surface is byte-for-byte what it was. Both
+Negatives this ADR named were closed rather than accepted-and-forgotten: `core/tests/hygiene.rs`
+follows the file, so the panic pragma is still enforced on the ABI (verified by deleting the pragma
+and watching the guard fail by name), and `CABI_COVERAGE_FLOOR` gates the new crate so its coverage
+did not silently stop being watched.
+
+**Two things the implementation found that this ADR did not anticipate. Both are recorded here
+rather than edited into the body above, because both are load-bearing for anyone reading this
+decision later.**
+
+**1. `default-members` was required, and this ADR never named it.** Making `core-cabi` a workspace
+member is *not* sufficient: a bare `cargo build` builds every member, so the new crate would have
+re-emitted on every iteration exactly what the split exists to stop emitting. The root manifest
+excludes it from `default-members`, which is what actually delivers the win. The cost is a second
+edge this ADR also did not price: `--workspace` becomes load-bearing on every `nextest` and `clippy`
+invocation that must cover the ABI, since the bare forms now come back green having tested and
+linted nothing of it. `ci.yml` and `.githooks/pre-push` both took `--workspace` in the same plan;
+`docs/nfr.md` and both skills' references were swept at this close.
+
+**2. The preferred `lmv_core` lib stem is not merely risky — it is unusable, and for a sharper
+reason than the filename clash the plan predicted.** The emitted *files* would not have collided
+(`liblmv_core.rlib` against `lmv_core.lib`). The *crate name* does: `core-cabi/tests/ffi.rs` is an
+integration test of this crate, and cargo passes both the crate under test and this package's
+dependencies as `--extern`. Two `--extern lmv_core=` cannot coexist, `lmv-core` wins, and every ABI
+symbol resolves to a crate that no longer defines one — so the ABI would have shipped **untested** to
+satisfy a file name. The plan's stated fallback was taken: the stem is `lmv_core_c`, and
+`plugin-foobar/build.ps1` was updated in the same commit. There is no `.vcxproj` in this repo; the
+plan's reference to one was stale.
+
+**Still owed:** the plugin has not been linked against the extracted crate (Plan 0061 Phase 8,
+`human` — it needs VS Build Tools plus the unpacked foobar SDK, and CI has no plugin job). The
+exposure is bounded, because the `extern "C"` surface did not change, so the only realistic failure
+is an artifact path — and the artifact path is precisely what item 2 above changed. That check is
+carried forward on the plans index rather than holding this ADR open.

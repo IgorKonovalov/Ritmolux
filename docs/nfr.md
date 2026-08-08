@@ -98,26 +98,50 @@ contradicts this file is a plan bug — surface it, don't guess.
 - GitHub Actions from the start (right after the workspace scaffold): Windows + macOS
   runners running `cargo build`, `cargo nextest run`, `cargo test --doc`,
   `cargo clippy --all-targets -- -D warnings`, `cargo fmt --all --check` on every push.
-- Plus three single-runner gates: `cargo deny check` (supply chain), Miri over `lmv-ring`'s
-  `unsafe` (UB), and the coverage ratchet below.
+  **All of those carry `--workspace` since [ADR-0072](adrs/0072-the-c-abi-ships-from-its-own-crate.md)**,
+  and it is load-bearing rather than stylistic: `lmv-core-cabi` is deliberately outside the workspace
+  `default-members`, so the bare forms would silently stop testing and linting the C ABI entirely.
+- Plus **four** single-runner gates: `cargo deny check` (supply chain), Miri over `lmv-ring`'s
+  `unsafe` (UB), `node scripts/check-doc-links.mjs` (every relative markdown link resolves — Plan
+  0061 Phase 2c), and the coverage ratchet below.
+- **The nine GPU-heavy suites run once per push, not twice**
+  ([ADR-0073](adrs/0073-the-windows-ci-critical-path.md), Plan 0061 Phase 2b). They render the shipped
+  preset library on WARP, and until that change ran uninstrumented in `check (windows-latest)` and
+  instrumented in `coverage` at the same moment on two identical runners (≈ 1930 duplicated CPU-
+  seconds). `check` now carries the same exclusion `.githooks/pre-push` does, which makes **`coverage`
+  the only place they execute on Windows** — so that job is load-bearing for *correctness*, not only
+  for the ratchet. Disabling it, skipping it, or letting `cargo-llvm-cov` fail to install takes the
+  golden guard and every GPU behavioural suite with it.
 - **Live audio** cannot run in CI. **GPU rendering partly can**: on Windows the DX12 **WARP**
   software adapter makes headless rendering deterministic, which is what the golden suite and
   the tier-4 chain test ride on. macOS has no software Metal fallback ([ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)),
   so the GPU suites skip there with a printed reason. Real-GPU-vendor and live-loopback checks
   stay manual — see [`on-device-validation.md`](on-device-validation.md).
 - **Coverage ratchet** ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)):
-  a Windows-only job runs `cargo llvm-cov nextest -p lmv-core --fail-under-lines $COVERAGE_FLOOR`.
-  It gates **`lmv-core` only** — `standalone/` is a `winit` event loop plus two platform capture
-  backends no runner can execute. The floor lives in exactly one place, the `COVERAGE_FLOOR`
-  `env:` key in `ci.yml`, and is a **ratchet, not a target**: set from measurement, raised at a
-  close ceremony when a plan improves coverage, lowered only with a note naming the plan and the
-  reason. Measured **90.13 %** at Plan 0032's close; floor set to **88** (a 2-point margin so an
-  unrelated change does not trip on rounding). A line-coverage floor is gameable by design — it
+  a Windows-only job runs `cargo llvm-cov nextest -p lmv-core --fail-under-lines $COVERAGE_FLOOR`,
+  and since ADR-0072 a second, smaller gate beside it on `-p lmv-core-cabi` against
+  `$CABI_COVERAGE_FLOOR` — without which the C ABI's coverage would silently stop being watched the
+  moment it left `lmv-core`. Neither gates `standalone/`: it is a `winit` event loop plus two platform
+  capture backends no runner can execute. Both floors live in exactly one place, the `env:` block in
+  `ci.yml`, and are a **ratchet, not a target**: set from measurement, raised at a close ceremony when
+  a plan improves coverage, lowered only with a note naming the plan and the reason. `COVERAGE_FLOOR`
+  was **88** from Plan 0032's measured 90.13 %, and is **91** since Plan 0061 Phase 2 — a *moved
+  denominator*, not better tests, since `ffi.rs` and its conformance suite left the gated crate.
+  **That 91 was measured on the dev box, which has a hardware GPU where CI has WARP, so it is owed a
+  re-derive from a cache-warm CI run** (Plan 0061 Phase 9, outstanding); the margin is ~3 points rather
+  than the usual 2 for exactly that reason. `CABI_COVERAGE_FLOOR` is **54** against a measured 56.60 %,
+  and it is low because most of `core-cabi` is error, null-handle and `catch_unwind` paths — recorded
+  to catch a regression, not claimed as good coverage. A line-coverage floor is gameable by design — it
   is a backstop against silent erosion, not a quality measure. The Mode 4 review's
   "read the assertion body" step remains the actual quality gate.
 - **Local pre-push gate** (opt-in, per clone): `.githooks/pre-push`, enabled with
-  `git config core.hooksPath .githooks`. Runs the fast subset — a doc-link check, `fmt`, `clippy`,
-  and a narrowed `nextest` — in **~28 s** warm, and prints the GPU-heavy suites it skipped.
+  `git config core.hooksPath .githooks`. Runs the fast subset — a doc-link check, `fmt`, `clippy
+  --workspace`, and a narrowed `nextest --workspace` — and prints the GPU-heavy suites it skipped.
+  **Measured 48.6 s warm (2026-08-08, dev box), against the ~28 s recorded when ADR-0033 set it up.**
+  The number drifted with the suite it runs, not with the gate's design; it is recorded here rather
+  than targeted, and the README's developer section carries the per-step breakdown. If it grows past
+  the point where people start reaching for `--no-verify`, that is the signal to narrow it further —
+  ADR-0033's own argument is that a gate which hurts gets disabled.
   `cargo deny`, doctests, Miri, and coverage stay in CI. An uninstalled clone silently has no gate;
   see the README's developer section. The doc-link step (`scripts/check-doc-links.mjs`, ~50 ms) is
   also a CI job (`links`, `ubuntu-latest`), so it is enforced for everyone rather than only where

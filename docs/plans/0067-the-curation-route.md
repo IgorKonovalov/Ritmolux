@@ -4,7 +4,7 @@
 > are `dev`; **Phase 3 is `human`** (the Coral Oracle pass — declining it is a successful outcome)
 > and gates Phase 4, so the plan does not close in one session. Phase 1 touches
 > `core/tests/reactivity.rs`, adjacent to
-> [0061](0061-the-build-stops-paying-for-what-it-is-not-building.md)'s CI and coverage work — keep
+> [0061](done/0061-the-build-stops-paying-for-what-it-is-not-building.md)'s CI and coverage work — keep
 > that seam clean if both are live. **Moves no pixels.**
 > **Created:** 2026-08-04
 > **Extended:** 2026-08-04 — Phases **1c** and **1d** and a second Phase 4 trigger, from the
@@ -130,7 +130,7 @@ flowchart TD
 - **Watch the cost.** The test renders every preset in every listed family for 60 frames at 128x128.
   It captures 24 presets today; all nine families is 37, so this is roughly a **54 % increase** in
   that test's work, on a suite CI already pays for preset sweeps in more than once per push
-  ([Plan 0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 4b measured it). If
+  ([Plan 0061](done/0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 4b measured it). If
   the wall-clock grows materially, say so rather than absorbing it.
 - **Expect the attractor matrix to be the interesting one and do not act on it here.** Six presets
   on one map family, several sharing a coefficient idiom, is exactly the configuration
@@ -235,7 +235,7 @@ flowchart TD
 
 - **Phase 1 could get expensive.** Running the analyzer per preset adds work to a gate that already
   sweeps the shipped set, and CI pays for preset sweeps more than once per push
-  ([Plan 0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 4b measured it).
+  ([Plan 0061](done/0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 4b measured it).
   Keep the stimulus short — the analyzer needs enough window to fill, not a musical phrase — and if
   the gate's wall-clock grows materially, say so rather than absorbing it.
 - **Phase 1 is adjacent to Plan 0061's CI work**, which owns `ci.yml` edits and the report
