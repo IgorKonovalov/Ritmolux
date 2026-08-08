@@ -34,6 +34,18 @@ unimplemented = "warn"
 [profile.dev]
 debug = "line-tables-only"
 
+# Plan 0061 Phase 1b. Dependencies compile optimized; workspace crates stay at
+# opt-level 0. Every WARP test here spends most of its time inside `wgpu-core`
+# validation and `naga` shader translation, which are ours only in the sense
+# that we depend on them.
+#
+# SCOPED TO DEPENDENCIES ON PURPOSE, and widening it is the obvious wrong move:
+# a workspace-wide `opt-level` would optimize `lmv-core` itself, and inlining
+# muddies the line mapping the ADR-0033 coverage ratchet gates on - so the floor
+# would silently start measuring something other than what it was derived from.
+[profile.dev.package."*"]
+opt-level = 2
+
 # NFR section 4: small release binaries - LTO on, symbols stripped.
 [profile.release]
 lto = "fat"
