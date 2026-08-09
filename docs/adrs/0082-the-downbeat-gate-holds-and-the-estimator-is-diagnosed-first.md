@@ -1,8 +1,8 @@
 # ADR-0082 — The downbeat gate holds, and the estimator is diagnosed before it is tuned
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-08-04
-> **Related plan(s):** [0068](../plans/0068-why-the-downbeat-rarely-locks.md)
+> **Related plan(s):** [0068](../plans/done/0068-why-the-downbeat-rarely-locks.md)
 > **Supplements:** [ADR-0050](0050-downbeat-and-phrase-tracking-with-confidence-fallback.md)
 
 ## Context
