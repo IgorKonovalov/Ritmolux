@@ -1,0 +1,39 @@
+# FEEDBACK FIXTURE - do not tune; the deposit guards in core/tests/feedback.rs
+# read it. Plan 0046 Phase 2, ADR-0048.
+#
+# A dense STATIC rose under the `add` deposit, at the MAX_FADE ceiling. Its
+# twin differs in exactly one key, so a blend selector that never reached the
+# shader would make the two render identically.
+#
+# Static, and dense. Static because the whole claim is about what repeated
+# deposits of the SAME light do - a moving figure would confound accumulation with
+# motion. Dense because the guards compare whole-frame means, and a thin figure on
+# a black field can differ enormously along its own line while barely moving a
+# frame average.
+#
+# `brightness` is deliberately TINY. Under `add` the accumulation converges to
+# `cur / (1 - trails)`, which at 0.98 is fifty times the figure - so a normally-lit
+# figure would settle far above the tonemap's white and the readback would be a
+# flat page of 255s, which converges trivially and proves nothing. At 0.02 the
+# limit lands near 1.0, and the approach to it is legible in bytes.
+system = "parametric_curve"
+name   = "fixture_feedback_add"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "5"
+d             = "43"
+samples       = "301"
+scale         = "0.72"
+spin          = "0"
+hue           = "0.55"
+thickness     = "2.0"
+brightness    = "0.02"
+draw_progress = "1"
+
+trails        = "0.98"
+
+[feedback]
+blend = "add"

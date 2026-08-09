@@ -42,7 +42,7 @@ use std::f32::consts::{PI, TAU};
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
 
 /// Portrait, and not a 256 px multiple — see the module docs. **Not
 /// interchangeable**: a square or 16:9 target defeats the shear guard entirely.
@@ -66,6 +66,18 @@ const LATE: usize = FRAMES - 1;
 /// reaches", and a fixed fraction of the peak is that on any of them.
 const LIT_FRACTION: f32 = 0.12;
 
+/// Frames the additive-convergence guard runs for.
+///
+/// At the `MAX_FADE = 0.98` ceiling the accumulation is within `0.98^n` of its
+/// limit, so 360 frames leaves 0.07 % of the gap — and the per-frame *change* at
+/// that point is well under the precision of an 8-bit readback, which is what
+/// makes "it stopped moving" a readable fact rather than a tolerance. At 240 the
+/// residue was still worth ~2 bytes over the final window, which is convergent and
+/// also indistinguishable from a slow leak.
+const CONVERGE_FRAMES: usize = 360;
+/// The window, in frames, each end of the convergence guard measures over.
+const CONVERGE_WINDOW: usize = 60;
+
 const STILL: (&str, &str) = (
     "fixture_feedback_still",
     include_str!("fixtures/feedback_still.toml"),
@@ -86,6 +98,47 @@ const RING: (&str, &str) = (
     "fixture_feedback_ring",
     include_str!("fixtures/feedback_ring.toml"),
 );
+const ADD: (&str, &str) = (
+    "fixture_feedback_add",
+    include_str!("fixtures/feedback_add.toml"),
+);
+const MAX: (&str, &str) = (
+    "fixture_feedback_max",
+    include_str!("fixtures/feedback_max.toml"),
+);
+
+/// The un-warped control the three warp fixtures are each a one-key edit of.
+/// Shared with `composite.rs`, which pins its baseline — here it is read only as
+/// the "before" of a controlled comparison.
+const WARP_CONTROL: (&str, &str) = (
+    "fixture_composite_trails",
+    include_str!("fixtures/composite_trails.toml"),
+);
+/// The `[feedback] warp` roster, as fixtures. Each differs from
+/// [`WARP_CONTROL`] in exactly two keys — the kind and its strength.
+const WARPS: [(&str, &str); 3] = [
+    (
+        "fixture_composite_warp_swirl",
+        include_str!("fixtures/composite_warp_swirl.toml"),
+    ),
+    (
+        "fixture_composite_warp_ripple",
+        include_str!("fixtures/composite_warp_ripple.toml"),
+    ),
+    (
+        "fixture_composite_warp_fisheye",
+        include_str!("fixtures/composite_warp_fisheye.toml"),
+    ),
+];
+
+/// How far apart two renders of the same figure must be before this file will
+/// call them different pictures — mean per-channel difference, 0..1.
+///
+/// `composite.rs` tolerates drift up to `0.02` before it calls a baseline moved,
+/// so anything at or below that is inside the noise it already accepts. This sits
+/// well above it: a warp that only cleared this bar by a hair would be a warp
+/// nobody could see.
+const DISTINCT_MEAN: f32 = 0.05;
 
 /// A headless renderer on the **software** adapter, or `None` (a logged skip)
 /// when the runner exposes no GPU adapter — macOS has no software Metal fallback
@@ -339,6 +392,159 @@ fn a_rotated_accumulation_stays_round() {
         skew * 100.0,
         HEIGHT as f32 / WIDTH as f32
     );
+}
+
+/// **Each warp kind bends the past its own way** (ADR-0048's curated family).
+///
+/// Four renders of one figure that differ in a single structural key each. Two
+/// things could go wrong silently and this catches both: a `warp` selector that
+/// never reached the shader would make all three warps identical to the control,
+/// and a shader that took the same arm for every kind would make them identical to
+/// each other. The kinds are compared pairwise, not against pinned pixels —
+/// `composite.rs` owns the drift baselines, this owns the claim that there are
+/// three distinct behaviors to have baselines *of*.
+#[test]
+fn each_warp_kind_bends_the_past_its_own_way() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let control = last_frame(&mut renderer, WARP_CONTROL, 40);
+    let mut rendered = Vec::new();
+    for warp in WARPS {
+        let frame = last_frame(&mut renderer, warp, 40);
+        let against_control = frame_diff(&control, &frame);
+        println!("{:<32} vs no warp: mean {against_control:.4}", warp.0);
+        assert!(
+            against_control > DISTINCT_MEAN,
+            "{} renders the same picture as the un-warped control (mean \
+             {against_control:.4}). Either the [feedback] warp key never reached \
+             the stage, or fb_warp is not being applied.",
+            warp.0
+        );
+        rendered.push((warp.0, frame));
+    }
+    for (index, (name_a, a)) in rendered.iter().enumerate() {
+        for (name_b, b) in rendered.iter().skip(index + 1) {
+            let mean = frame_diff(a, b);
+            println!("{name_a:<32} vs {name_b}: mean {mean:.4}");
+            assert!(
+                mean > DISTINCT_MEAN,
+                "{name_a} and {name_b} render the same picture (mean {mean:.4}) — \
+                 the warp kinds are not distinct, so the shader is taking one arm \
+                 for more than one selector"
+            );
+        }
+    }
+}
+
+/// **The additive deposit is bounded** (ADR-0048): a static bright source under
+/// `blend = "add"` at the `MAX_FADE` ceiling **converges** rather than growing
+/// without bound.
+///
+/// The arithmetic says the accumulation is a geometric series summing to
+/// `cur / (1 - fade)` — at most 50x here — and the guard reads that back as a
+/// *fixed point*: over a long run the frame stops changing. Both halves are
+/// asserted, because "stopped changing" is also what a broken stage that never
+/// accumulated at all would say: the early window must move a lot and the late
+/// window must not move at all.
+///
+/// The fixture's `brightness` is tiny on purpose, so the limit lands near 1.0
+/// instead of far above the tonemap's white — see its header.
+#[test]
+fn an_additive_deposit_converges_instead_of_running_away() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let frames = run(&mut renderer, ADD, CONVERGE_FRAMES);
+
+    let early = u32::from(max_channel_diff(
+        frames.get(10).expect("frame 10"),
+        frames.get(10 + CONVERGE_WINDOW).expect("early window end"),
+    ));
+    let late = u32::from(max_channel_diff(
+        frames
+            .get(CONVERGE_FRAMES - 1 - CONVERGE_WINDOW)
+            .expect("late window start"),
+        frames.get(CONVERGE_FRAMES - 1).expect("last frame"),
+    ));
+    println!("add: early window moved {early}, late window moved {late}");
+
+    assert!(
+        early > 8,
+        "the additive accumulation never built up at all (the first \
+         {CONVERGE_WINDOW} frames moved by {early}), so 'it converged' would be \
+         vacuous"
+    );
+    // The ratio is the claim, not the absolute: an accumulation growing without
+    // bound moves the late window by about what it moved the early one, whatever
+    // the units. A converging one is orders below it — measured 97 against 0.
+    assert!(
+        late * 10 <= early,
+        "the additive accumulation moved {late} over the last {CONVERGE_WINDOW} \
+         frames of a {CONVERGE_FRAMES}-frame run against {early} over the first — \
+         it is still climbing, not settling. `add` is only safe because its series \
+         is bounded by 1/(1 - fade); if this fails, the deposit is not multiplying \
+         the past by the decay before summing it"
+    );
+}
+
+/// `blend = "add"` and `blend = "max"` are two different pictures. The guard above
+/// asserts `add` converges — and so does `max`, trivially, so without this one a
+/// blend selector that never reached the shader would pass it.
+#[test]
+fn the_deposit_blend_selector_reaches_the_shader() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let additive = last_frame(&mut renderer, ADD, 120);
+    let maximum = last_frame(&mut renderer, MAX, 120);
+    let mean = frame_diff(&additive, &maximum);
+    println!("add vs max: mean {mean:.4}");
+    assert!(
+        mean > DISTINCT_MEAN,
+        "`blend = \"add\"` and `blend = \"max\"` rendered the same frame (mean \
+         {mean:.4}) from fixtures that differ in that one key"
+    );
+    // …and in the direction the arithmetic says: summing echoes is brighter than
+    // taking their maximum, never dimmer.
+    assert!(
+        peak(&additive) > peak(&maximum),
+        "summing the past cannot be dimmer than taking its maximum — got peak {} \
+         under `add` against {} under `max`",
+        peak(&additive),
+        peak(&maximum)
+    );
+}
+
+/// The brightest channel anywhere in the frame.
+fn peak(img: &CaptureImage) -> u8 {
+    img.rgba
+        .chunks_exact(4)
+        .map(|px| px.iter().take(3).copied().max().unwrap_or(0))
+        .max()
+        .unwrap_or(0)
+}
+
+/// The largest single-channel (RGB) byte difference between two frames.
+fn max_channel_diff(a: &CaptureImage, b: &CaptureImage) -> u8 {
+    a.rgba
+        .chunks_exact(4)
+        .zip(b.rgba.chunks_exact(4))
+        .flat_map(|(pa, pb)| {
+            pa.iter()
+                .zip(pb.iter())
+                .take(3)
+                .map(|(x, y)| x.abs_diff(*y))
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+/// The last frame of a `frames`-long run of `fixture`.
+fn last_frame(renderer: &mut Renderer, fixture: (&str, &str), frames: usize) -> CaptureImage {
+    run(renderer, fixture, frames)
+        .pop()
+        .expect("a run of at least one frame")
 }
 
 /// The `(radial, angular)` growth ratios of a run: the late frame's extent over

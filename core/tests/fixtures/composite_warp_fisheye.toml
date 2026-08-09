@@ -1,0 +1,42 @@
+# COMPOSITE FIXTURE - do not tune; editing this invalidates the drift baseline.
+# Plan 0046 Phase 2, ADR-0048.
+#
+# `composite_trails.toml`, PARAMETER FOR PARAMETER, plus the two keys that select
+# the fisheye warp and give it a strength. That is the whole design: the four
+# files differ in exactly one structural key each, so the three warp baselines are
+# a controlled comparison against each other and against the un-warped original.
+# If the `[feedback] warp` selector were ignored, all three would render the same
+# picture, and `each_warp_kind_bends_the_past_its_own_way` in core/tests/feedback.rs
+# is what says so out loud.
+#
+# `fisheye` magnifies radially with the square of the radius, so the centre barely
+# moves while the rim travels. NEGATIVE here (-14/s), which pushes the past
+# outward into a bulge rather than drawing it in - the direction that spreads the
+# trail across more of the frame, and therefore the one a whole-frame mean can
+# see. Larger in magnitude than its siblings for the same reason: the r^2 factor
+# makes it nearly nothing over the inner half of the frame, where most of this
+# rose lives.
+system = "parametric_curve"
+name   = "fixture_composite_warp_fisheye"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "5"
+d             = "43"
+samples       = "301"
+scale         = "0.72"
+spin          = "0.4"
+hue           = "0.55"
+thickness     = "2.0"
+brightness    = "0.9"
+draw_progress = "1"
+
+# The stage under test. High enough that the tail spans many frames, below the
+# MAX_FADE ceiling.
+trails        = "0.9"
+fb_warp       = "-14"
+
+[feedback]
+warp = "fisheye"

@@ -89,7 +89,7 @@
     clippy::unreachable
 )]
 
-use super::feedback::PingPongField;
+use super::feedback::{Deposit, FeedbackConfig, PingPongField, Warp};
 use super::gpu;
 use super::post::{Fold, PostStage, internal_grid_size};
 
@@ -107,6 +107,9 @@ const DEFAULT_FB_ZOOM: f32 = 1.0;
 const DEFAULT_FB_RATE: f32 = 0.0;
 /// `fb_center_x` / `fb_center_y` default — the middle of the frame, in uv.
 const DEFAULT_FB_CENTER: f32 = 0.5;
+/// `fb_warp` default — no strength, so the selected `[feedback] warp` (if any)
+/// does nothing until a preset drives it. Identity twice over.
+const DEFAULT_FB_WARP: f32 = 0.0;
 
 /// The reference frame duration the `fade` exponent is expressed against: `fade`
 /// is retention **per 1/60 s**, so the per-frame factor is `fade^(dt / this)`.
@@ -124,18 +127,66 @@ const FADE_REFERENCE_DT: f32 = super::scenes::FALLBACK_DT;
 /// rendered, so it needs the Y flip.
 const TRAILS_SHADER: &str = r#"
 struct Feedback {
-    // x: decay factor, y: occlude (present pass only), z: transform-active flag
+    // x: decay factor, y: occlude (present pass only), z: transform-active flag,
+    // w: 1 = additive deposit
     v:  vec4<f32>,
     // x: cos(theta), y: sin(theta), z: 1/scale, w: render-target aspect
     xf: vec4<f32>,
     // x,y: this frame's translation in isotropic units, z,w: the centre in uv
     tr: vec4<f32>,
+    // x: warp kind selector, y: this frame's warp strength
+    wp: vec4<f32>,
 }
+
+// The `[feedback] warp` roster, as the CPU writes it — keep in step with
+// `feedback::Warp::code`.
+const WARP_SWIRL:   f32 = 1.0;
+const WARP_RIPPLE:  f32 = 2.0;
+const WARP_FISHEYE: f32 = 3.0;
+
+// Radius (in frame-heights) at which the swirl has faded to ~1/e of its centre
+// strength. Just over half a frame-height, so the vortex is a whole-frame gesture
+// that still leaves the corners nearly still.
+const SWIRL_SIGMA: f32 = 0.35;
+// Ripple spatial frequency, rad per frame-height: ~2.9 wave crests between the
+// centre and the top edge.
+const RIPPLE_FREQ: f32 = 18.0;
 
 @group(0) @binding(0) var<uniform> u: Feedback;
 @group(0) @binding(1) var t_composited: texture_2d<f32>;
 @group(0) @binding(2) var t_accum: texture_2d<f32>;
 @group(0) @binding(3) var samp: sampler;
+
+// The curated procedural warp (ADR-0048), in the same centred isotropic space the
+// affine works in and about the same `fb_center_*`. Displaces the SOURCE
+// coordinate, so a positive strength moves the past the way the docs say.
+//
+// A `kind` selector rather than four pipelines: coexisting pipelines with matching
+// bind-group layouts mis-render on the DX12 WARP software adapter (ADR-0058), and
+// the branch here is uniform across the draw anyway.
+fn warp_source(p: vec2<f32>) -> vec2<f32> {
+    let kind = u.wp.x;
+    let k = u.wp.y;
+    let r = length(p);
+    if (kind == WARP_SWIRL) {
+        // Rotate by an angle that falls off as a Gaussian in radius — smooth
+        // everywhere, unlike a linear falloff's kink at the cutoff radius.
+        let a = k * exp(-(r * r) / (2.0 * SWIRL_SIGMA * SWIRL_SIGMA));
+        let c = cos(a);
+        let s = sin(a);
+        return vec2<f32>(p.x * c + p.y * s, p.y * c - p.x * s);
+    }
+    if (kind == WARP_RIPPLE) {
+        // Radial displacement by a standing wave in r. The guarded divide keeps
+        // the direction defined at the exact centre, where there is no direction.
+        let dir = p / max(r, 1e-4);
+        return p - dir * (k * sin(r * RIPPLE_FREQ));
+    }
+    if (kind == WARP_FISHEYE) {
+        return p * (1.0 + k * r * r);
+    }
+    return p;
+}
 
 // Where the pixel at `uv` was one frame ago — the INVERSE of the motion the
 // params name, because a destination pixel asks where its content came from.
@@ -149,10 +200,12 @@ fn source_uv(uv: vec2<f32>) -> vec2<f32> {
     var p = uv - centre;
     p.x = p.x * aspect;
     // Undo this frame's translation, then its rotation (by -theta: the transpose
-    // of R(theta)), then its scale.
+    // of R(theta)), then its scale — and last the warp, which therefore rides on
+    // top of the affine rather than being carried through it.
     p = p - u.tr.xy;
     p = vec2<f32>(p.x * u.xf.x + p.y * u.xf.y, p.y * u.xf.x - p.x * u.xf.y);
     p = p * u.xf.z;
+    p = warp_source(p);
     p.x = p.x / aspect;
     return p + centre;
 }
@@ -175,15 +228,19 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         f32(all(suv >= vec2<f32>(0.0)) && all(suv <= vec2<f32>(1.0))),
         moved,
     );
-    let prev = textureSample(t_accum, samp, suv) * inside;
+    let faded = textureSample(t_accum, samp, suv) * inside * u.v.x;
 
-    // Max-decay: the current frame at full brightness, the past fading by `fade`.
+    // The deposit (ADR-0048). `max` is the default and the arm that ran before the
+    // choice existed — the current frame at full brightness, the past fading by
+    // `fade`. `add` sums instead, so overlapping echoes brighten; its geometric
+    // series is bounded by 1/(1 - fade) and rolls off through the tonemap, which
+    // is only true because the composite runs in linear light above 1.0 (ADR-0046).
     //
     // On ALL FOUR channels (ADR-0055). Alpha is coverage and it decays on the same
     // schedule as colour, so a trail releases the backdrop at the rate it dims.
     // Forcing alpha to 1 here held `bg_*` out of every pixel the trail had ever
     // touched, permanently.
-    return max(cur, prev * u.v.x);
+    return select(max(cur, faded), cur + faded, u.v.w != 0.0);
 }
 "#;
 
@@ -235,6 +292,7 @@ struct Feedback {
     v: [f32; 4],
     xf: [f32; 4],
     tr: [f32; 4],
+    wp: [f32; 4],
 }
 
 /// The `fb_*` transform as a preset states it: rates per second, centre in uv.
@@ -254,6 +312,10 @@ struct Transform {
     /// The fixed point everything above turns about, in uv.
     centre_x: f32,
     centre_y: f32,
+    /// `fb_warp` — the strength of whichever `[feedback] warp` the preset
+    /// selected, per second like every other rate here. Inert at `0`, and inert
+    /// at any value when the selected kind is [`Warp::None`].
+    warp: f32,
 }
 
 impl Transform {
@@ -266,34 +328,41 @@ impl Transform {
         dy: DEFAULT_FB_RATE,
         centre_x: DEFAULT_FB_CENTER,
         centre_y: DEFAULT_FB_CENTER,
+        warp: DEFAULT_FB_WARP,
     };
 
     /// Whether this frame's transform moves nothing — the flag the shader
     /// `select`s on, and the whole basis of the byte-identity claim.
     ///
+    /// `kind` is the preset's `[feedback] warp`: `fb_warp` alone moves nothing
+    /// when no kind is selected, and no kind moves anything at zero strength, so
+    /// both have to be off their defaults before the transform is live.
+    ///
     /// The centre is deliberately **not** tested: it is the fixed point, so with
-    /// no scale, rotation or translation it names a point nothing moves about.
-    /// A non-finite rate counts as identity for the same reason the `fade` clamp
-    /// exists — a `NaN` uv would sample garbage for the rest of the run.
-    fn is_identity(&self) -> bool {
+    /// no scale, rotation, translation or warp it names a point nothing moves
+    /// about. A non-finite rate counts as identity for the same reason the `fade`
+    /// clamp exists — a `NaN` uv would sample garbage for the rest of the run.
+    fn is_identity(&self, kind: Warp) -> bool {
         let finite = self.zoom.is_finite()
             && self.rotate.is_finite()
             && self.dx.is_finite()
             && self.dy.is_finite()
             && self.centre_x.is_finite()
-            && self.centre_y.is_finite();
+            && self.centre_y.is_finite()
+            && self.warp.is_finite();
         !finite
             || (self.zoom == DEFAULT_FB_ZOOM
                 && self.rotate == DEFAULT_FB_RATE
                 && self.dx == DEFAULT_FB_RATE
-                && self.dy == DEFAULT_FB_RATE)
+                && self.dy == DEFAULT_FB_RATE
+                && (kind == Warp::None || self.warp == DEFAULT_FB_WARP))
     }
 
     /// Pack this frame's motion for the shader: `dt` seconds of it, about
     /// `aspect` (the **render target's**, ADR-0037).
     ///
-    /// Returns `(xf, tr)` — the second and third `vec4` of [`Feedback`].
-    fn pack(&self, dt: f32, aspect: f32) -> ([f32; 4], [f32; 4]) {
+    /// Returns `(xf, tr, wp)` — the last three `vec4` of [`Feedback`].
+    fn pack(&self, dt: f32, aspect: f32, kind: Warp) -> ([f32; 4], [f32; 4], [f32; 4]) {
         let theta = self.rotate * dt;
         let (sin, cos) = theta.sin_cos();
         // `zoom^dt`: a factor per second, so two half-length frames scale the
@@ -310,6 +379,20 @@ impl Transform {
         (
             [cos, sin, inv_scale, aspect],
             [self.dx * dt, self.dy * dt, self.centre_x, self.centre_y],
+            // Strength per second like the rest, so a warp's advance per frame is
+            // the same wall-clock gesture at any refresh. Zeroed when no kind is
+            // selected, so the shader's `kind` branch is the only thing that has
+            // to agree with the preset.
+            [
+                kind.code(),
+                if kind == Warp::None {
+                    0.0
+                } else {
+                    self.warp * dt
+                },
+                0.0,
+                0.0,
+            ],
         )
     }
 }
@@ -529,6 +612,10 @@ pub struct Trails {
     /// This frame's `fb_*` transform (ADR-0048), reset to
     /// [`Transform::IDENTITY`] each frame with every other param.
     transform: Transform,
+    /// The active preset's `[feedback]` table — the warp kind and the deposit
+    /// blend. **Structural**, so unlike [`transform`](Self::transform) it is set
+    /// once at preset load and is *not* reset per frame.
+    config: FeedbackConfig,
     /// The real elapsed seconds of the frame being resolved, injected by
     /// [`PostChain::set_dt`](super::post::PostChain::set_dt).
     ///
@@ -566,6 +653,7 @@ pub const PARAMS: &[&str] = &[
     "fb_dy",
     "fb_center_x",
     "fb_center_y",
+    "fb_warp",
 ];
 
 impl Trails {
@@ -581,6 +669,7 @@ impl Trails {
             res: None,
             amount: DEFAULT_TRAILS,
             transform: Transform::IDENTITY,
+            config: FeedbackConfig::default(),
             dt: FADE_REFERENCE_DT,
             post_cap,
             builds: 0,
@@ -616,6 +705,7 @@ impl PostStage for Trails {
             "fb_dy" => self.transform.dy = value,
             "fb_center_x" => self.transform.centre_x = value,
             "fb_center_y" => self.transform.centre_y = value,
+            "fb_warp" => self.transform.warp = value,
             _ => return false,
         }
         true
@@ -629,6 +719,14 @@ impl PostStage for Trails {
         if dt.is_finite() && dt >= 0.0 {
             self.dt = dt;
         }
+    }
+
+    /// Take the active preset's `[feedback]` table (ADR-0048) — the warp kind and
+    /// the deposit blend. **Once at preset load, off the hot path**, like
+    /// `Scene::configure`: both are shader-path choices rather than quantities,
+    /// and a per-frame one would hard-cut the look.
+    fn set_feedback(&mut self, cfg: FeedbackConfig) {
+        self.config = cfg;
     }
 
     fn params(&self) -> &'static [&'static str] {
@@ -722,8 +820,9 @@ impl PostStage for Trails {
         } else {
             fade.powf(exponent)
         };
-        let moved = !transform.is_identity();
-        let (xf, tr) = transform.pack(dt, aspect);
+        let moved = !transform.is_identity(self.config.warp);
+        let (xf, tr, wp) = transform.pack(dt, aspect, self.config.warp);
+        let additive = self.config.blend == Deposit::Add;
         queue.write_buffer(
             &res.feedback_uniform,
             0,
@@ -731,9 +830,15 @@ impl PostStage for Trails {
                 // One write, two passes: `decay` for the feedback below, `occlude`
                 // for the present at the bottom (ADR-0085). The present applies it
                 // unconditionally — `Fold::Own` is a literal 1.0.
-                v: [decay, fold.alpha_scale(), f32::from(u8::from(moved)), 0.0],
+                v: [
+                    decay,
+                    fold.alpha_scale(),
+                    f32::from(u8::from(moved)),
+                    f32::from(u8::from(additive)),
+                ],
                 xf,
                 tr,
+                wp,
             }),
         );
 

@@ -22,6 +22,110 @@
     clippy::unreachable
 )]
 
+/// The curated procedural warp an accumulation resamples its past through, from
+/// the `[feedback] warp` structural key (ADR-0048).
+///
+/// **Load-time, not bindable**, by `[curve] family`'s reasoning: a warp kind is a
+/// shader path, not a quantity, and ADR-0021 already rejected bindable discrete
+/// indexes for the flicker/hard-cut class of reasons. Its *strength* is the
+/// ordinary bindable `fb_warp`, which is where a preset puts the audio.
+///
+/// The family is deliberately small (ADR-0048 Alternative A): an author-defined
+/// per-pixel warp is a grammar-to-WGSL translator and a per-preset pipeline
+/// compile, and it should be decided as that rather than smuggled in as a stage
+/// option.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Warp {
+    /// No procedural warp — the affine alone. The default, and the identity.
+    #[default]
+    None,
+    /// A vortex: the past rotates about the feedback centre by an angle that
+    /// falls off with radius, so the middle spins faster than the rim.
+    Swirl,
+    /// Concentric standing waves in radius — the past breathes in rings.
+    Ripple,
+    /// A radial magnification that grows with radius: the periphery is drawn in
+    /// (positive `fb_warp`) or pushed out (negative).
+    Fisheye,
+}
+
+impl Warp {
+    /// Every kind, in the order the error message lists them.
+    pub const ALL: [Warp; 4] = [Warp::None, Warp::Swirl, Warp::Ripple, Warp::Fisheye];
+
+    /// Parse a `[feedback] warp` value, or `None` if unknown (a load error — the
+    /// preset is rejected rather than silently rendering unwarped).
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "none" => Warp::None,
+            "swirl" => Warp::Swirl,
+            "ripple" => Warp::Ripple,
+            "fisheye" => Warp::Fisheye,
+            _ => return None,
+        })
+    }
+
+    /// The canonical name — the exact string [`from_name`](Self::from_name)
+    /// accepts. The two are inverses and the one place the mapping lives.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Warp::None => "none",
+            Warp::Swirl => "swirl",
+            Warp::Ripple => "ripple",
+            Warp::Fisheye => "fisheye",
+        }
+    }
+
+    /// The selector this kind is written into a shader uniform as.
+    ///
+    /// One shader with a kind uniform, **not one pipeline per kind** (Plan 0046's
+    /// own risk note): the DX12 WARP software adapter mis-renders coexisting
+    /// pipelines whose bind-group layouts match, and four permutations of one
+    /// stage is exactly the shape that bites.
+    pub(crate) fn code(self) -> f32 {
+        match self {
+            Warp::None => 0.0,
+            Warp::Swirl => 1.0,
+            Warp::Ripple => 2.0,
+            Warp::Fisheye => 3.0,
+        }
+    }
+}
+
+/// How this frame's light lands on the transformed past, from the
+/// `[feedback] blend` structural key (ADR-0048).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Deposit {
+    /// `accum = max(cur, prev * fade)` — the engine's only blend until ADR-0048,
+    /// and still the default. Bounded by the source maximum.
+    #[default]
+    Max,
+    /// `accum = cur + prev * fade` — echoes that **sum**. Its geometric series is
+    /// bounded by `1 / (1 - fade)`, which under the `MAX_FADE = 0.98` ceiling is
+    /// 50x, and it rolls off through ADR-0046's tonemap rather than clipping.
+    /// Only viable at all because the composite runs in linear light above 1.0.
+    Add,
+}
+
+/// A preset's `[feedback]` table: the two load-time choices about how an
+/// accumulation reads its own past (ADR-0048).
+///
+/// **One vocabulary, two sinks.** This type and the `fb_*` params it accompanies
+/// are consumed by *both* accumulation buffers — the engine trails stage and the
+/// attractor scene's internal trail — and each transforms only its own. It lives
+/// here, beside [`PingPongField`], rather than in either of them, because that is
+/// what makes "one vocabulary" structural instead of a convention.
+///
+/// [`Default`] is the identity in both fields, so a preset with no `[feedback]`
+/// table renders exactly what it rendered before the table existed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FeedbackConfig {
+    /// Which procedural warp, if any, rides on top of the `fb_*` affine.
+    pub warp: Warp,
+    /// How this frame's light is deposited onto the faded past.
+    pub blend: Deposit,
+}
+
 /// Two offscreen textures a feedback scene ping-pongs between. Held by named
 /// fields (not a `[_; 2]`) so read/write selection needs no array indexing on
 /// the hot path.

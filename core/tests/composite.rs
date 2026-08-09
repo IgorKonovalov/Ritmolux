@@ -117,11 +117,32 @@ const MAX_OUTLIER: u8 = 48;
 /// by the period could all have been broken with the suite green. Its own header
 /// carries the rest, including why every bound value is off its default.
 ///
+/// `composite_warp_swirl` / `_ripple` / `_fisheye` (Plan 0046 Phase 2, ADR-0048)
+/// are the **fourth** group that shares a stage, and the largest. They bind the
+/// trails stage and nothing else, and — unlike every other pair here — they bind
+/// it with the *same parameters as `composite_trails`*, param for param. What each
+/// adds is one structural key, `[feedback] warp`, plus the `fb_warp` strength that
+/// makes it do anything.
+///
+/// So this quartet is a controlled comparison, and its four baselines are only
+/// worth having together: `composite_trails` cannot pin a warp (it selects none),
+/// and none of the three can pin the *others* (a shader taking one arm for every
+/// selector would pin three identical pictures perfectly happily). That second
+/// half is not a baseline claim at all and is asserted where it belongs, in
+/// `feedback.rs`'s `each_warp_kind_bends_the_past_its_own_way`; what lives here is
+/// the ordinary drift guard on each one's pixels.
+///
+/// They add **no pipeline** the trails stage did not already build. The warp is a
+/// selector in one shader, not a shader per kind — deliberately, because the WARP
+/// software adapter's sensitivity to coexisting pipelines is the reason this file
+/// exists in the shape it does, and four permutations of one stage is exactly the
+/// shape that bites (Plan 0046's own risk note).
+///
 /// **Appended, never inserted**, for the reason `golden.rs`'s `EXTRA_FIXTURES`
 /// records: every pre-existing baseline is then rendered from the device state it
 /// always was, which matters on WARP where building GPU resources mid-run changes
 /// what a later capture resolves to.
-const FIXTURES: [(&str, &str); 7] = [
+const FIXTURES: [(&str, &str); 10] = [
     (
         "composite_trails",
         include_str!("fixtures/composite_trails.toml"),
@@ -149,6 +170,18 @@ const FIXTURES: [(&str, &str); 7] = [
     (
         "composite_symmetry",
         include_str!("fixtures/composite_symmetry.toml"),
+    ),
+    (
+        "composite_warp_swirl",
+        include_str!("fixtures/composite_warp_swirl.toml"),
+    ),
+    (
+        "composite_warp_ripple",
+        include_str!("fixtures/composite_warp_ripple.toml"),
+    ),
+    (
+        "composite_warp_fisheye",
+        include_str!("fixtures/composite_warp_fisheye.toml"),
     ),
 ];
 
