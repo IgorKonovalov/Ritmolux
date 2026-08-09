@@ -1,0 +1,21 @@
+# FEEDBACK FIXTURE - do not tune; the second-sink guards in core/tests/feedback.rs
+# read it. Plan 0046 Phase 3, ADR-0048.
+#
+# The attractor's OWN accumulation under `fb_rotate`. No `trails`: the engine
+# stage is off entirely, so anything that moves here moved in the scene's internal
+# trail field and nowhere else - which is the whole claim of the second sink.
+system = "attractor"
+name   = "fixture_attractor_fb_rotate"
+
+[params]
+size  = "1.0"
+hue   = "0.3"
+# SHORT, deliberately. This is the scene's OWN trail, and the pair of fixtures
+# with `trails` on need the engine stage to carry a longer tail than this one -
+# see the note there. A few frames of history is still plenty for the transform
+# to sweep at the rate below.
+fade  = "0.6"
+# The figure moves, so the accumulations have something to hold that this frame
+# does not already show.
+spin  = "0.6"
+fb_rotate = "12"

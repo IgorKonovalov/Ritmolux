@@ -183,6 +183,18 @@ enum ParamRoute {
     Tonemap,
     /// The active scene's named-parameter surface.
     Scene,
+    /// A `fb_*` name (ADR-0048) on a system whose scene owns an accumulation of
+    /// its own — today, only the attractor.
+    ///
+    /// **One vocabulary, two buffers.** The trails stage transforms the
+    /// accumulation every scene composites through; the attractor's internal trail
+    /// transforms its own field. Both may be live in one preset, and then one
+    /// `fb_rotate` turns both — each about its own buffer, neither about the
+    /// other's. This is the second fan-out in this enum and the reason it exists
+    /// is the reverse of [`SceneAndBackdrop`](Self::SceneAndBackdrop)'s: there the
+    /// name belongs to the *system* and reaches the sky as a courtesy; here it
+    /// belongs to a *stage* and reaches the scene because the scene declared it.
+    StageAndScene(usize),
     /// A shared colour modulation (`saturation`, `palette_mix`) — the scene's
     /// **and** the backdrop's, from one binding (ADR-0086).
     ///
@@ -219,6 +231,14 @@ fn resolve_route(name: &str, system: SystemKind) -> ParamRoute {
         return ParamRoute::Composite;
     }
     if let Some(stage) = post::stage_for(name) {
+        // The one place a stage name may also reach the scene (ADR-0048): a
+        // system whose scene owns an accumulation buffer of its own declares the
+        // `fb_*` names too, and then the binding drives both. Tested against the
+        // system's own vocabulary, exactly as `SceneAndBackdrop` is, so the
+        // fan-out can never conjure a route for a name the scene would drop.
+        if feedback::PARAMS.contains(&name) && system.param_names().contains(&name) {
+            return ParamRoute::StageAndScene(stage);
+        }
         return ParamRoute::Stage(stage);
     }
     if tonemap::PARAMS.contains(&name) {
@@ -565,6 +585,10 @@ fn evaluate_preset(
                 }
             }
             ParamRoute::Scene => {
+                scene.set_param(&binding.name, value);
+            }
+            ParamRoute::StageAndScene(stage) => {
+                side.chain.set_stage_param(stage, &binding.name, value);
                 scene.set_param(&binding.name, value);
             }
             ParamRoute::SceneAndBackdrop => {
@@ -1299,6 +1323,10 @@ impl Renderer {
         // a preset with no table hands the default, which is what stops the
         // previous preset's warp surviving a switch.
         live.chain.set_feedback(preset.feedback);
+        // ...and to the scene, which is the SECOND sink of the same table
+        // (ADR-0048): the attractor's internal trail. Unconditional for the same
+        // reason, and a no-op for every other scene.
+        scene.set_feedback(preset.feedback);
         // Structural config (ADR-0007), if any: capture segment-cap truncation so
         // the frontend can surface it (never a silent cut). `None` for the
         // fit/no-config case.

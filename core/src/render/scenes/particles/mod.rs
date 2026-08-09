@@ -80,7 +80,7 @@ use ifs::{FitLut, IfsFigure, IfsPacked, IfsTable, Levers};
 
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
-use crate::render::feedback::PingPongField;
+use crate::render::feedback::{self, FeedbackConfig, PingPongField};
 use crate::render::palette::{self, Palette};
 
 /// Compute workgroup size (1D). 64 is a safe, portable default across DX12/Metal.
@@ -697,6 +697,19 @@ pub struct AttractorScene {
     /// [`Scene::set_occlude`](super::Scene::set_occlude) — not a named param, so
     /// `reset_params` leaves it alone.
     occlude: f32,
+    /// This frame's `fb_*` transform (ADR-0048), reset with every other param.
+    feedback_transform: feedback::Transform,
+    /// The active preset's `[feedback]` table. **Structural**, so unlike
+    /// [`feedback_transform`](Self::feedback_transform) it is set once at preset
+    /// load and is not reset per frame.
+    ///
+    /// Only its `warp` reaches this scene. `blend` is a choice about how *this
+    /// frame's* light lands on the past, and this scene's deposit has been
+    /// additive since it was written — the points draw through an additive
+    /// pipeline over the decayed bed, in one pass. There is no `max` to select
+    /// here without a second draw pipeline, which is exactly the WARP hazard
+    /// ADR-0048 kept the warp family out of.
+    feedback: FeedbackConfig,
     /// Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5): the per-particle
     /// seed jitter band + shared desaturation + A/B crossfade.
     hue_spread: f32,
@@ -836,6 +849,8 @@ impl AttractorScene {
             brightness: DEFAULT_BRIGHTNESS,
             fade: DEFAULT_FADE,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
+            feedback_transform: feedback::Transform::IDENTITY,
+            feedback: FeedbackConfig::default(),
             hue_spread: DEFAULT_HUE_SPREAD,
             hue_center: DEFAULT_HUE_CENTER,
             saturation: DEFAULT_SATURATION,
@@ -1124,6 +1139,17 @@ pub const PARAMS: &[&str] = &[
     // structural reason the channels above are: nothing else respawns, so
     // nothing else has a ramp - em is a flat 1.0 on the four map families.
     "emergence",
+    // ADR-0048's transform, on THIS scene's own trail field. The same seven names
+    // the trails stage declares (`feedback::PARAMS` is what both are checked
+    // against) — one vocabulary, two buffers, each transforming only its own
+    // accumulation. A preset may drive both at once, and then both move.
+    "fb_zoom",
+    "fb_rotate",
+    "fb_dx",
+    "fb_dy",
+    "fb_center_x",
+    "fb_center_y",
+    "fb_warp",
 ];
 
 impl Scene for AttractorScene {
@@ -1200,6 +1226,7 @@ impl Scene for AttractorScene {
         self.morph = DEFAULT_MORPH;
         self.levers = Levers::NEUTRAL;
         self.reseed = 0.0;
+        self.feedback_transform = feedback::Transform::IDENTITY;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -1236,8 +1263,20 @@ impl Scene for AttractorScene {
             "lean" => self.levers.lean = value,
             "bias" => self.levers.bias = value,
             "reseed" => self.reseed = value,
-            _ => {}
+            // ADR-0048's shared vocabulary — delegated rather than re-matched,
+            // so this sink and the trails stage cannot disagree about what
+            // `fb_dx` means.
+            _ => {
+                self.feedback_transform.set_param(name, value);
+            }
         }
+    }
+
+    /// Take the active preset's `[feedback]` table (ADR-0048). **Once at preset
+    /// load, off the hot path**, exactly like [`configure`](Scene::configure) —
+    /// a warp kind is a shader path, not a scalar.
+    fn set_feedback(&mut self, cfg: FeedbackConfig) {
+        self.feedback = cfg;
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {
@@ -1364,6 +1403,8 @@ impl Scene for AttractorScene {
             brightness,
             fade,
             occlude,
+            feedback_transform,
+            feedback,
             hue_spread,
             hue_center,
             saturation,
@@ -1428,6 +1469,8 @@ impl Scene for AttractorScene {
                 brightness: *brightness,
                 fade: *fade,
                 occlude: *occlude,
+                feedback_transform: *feedback_transform,
+                feedback: *feedback,
                 hue_spread: *hue_spread,
                 hue_center: *hue_center,
                 saturation: *saturation,

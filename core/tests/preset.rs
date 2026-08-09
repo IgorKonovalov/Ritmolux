@@ -1255,7 +1255,19 @@ fn declared_params_match_set_param() {
             .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
         let handled = set_param_arm_names(&text, file);
 
-        let mut declared_sorted: Vec<&str> = declared.to_vec();
+        // The `fb_*` seven are **deliberately invisible to this scan** (ADR-0048).
+        // Both sinks that declare them — the trails stage and the attractor —
+        // delegate to one shared `feedback::Transform::set_param` rather than
+        // matching seven names each, which is the right factoring (one definition
+        // of what `fb_dx` means) and costs exactly this text scan's coverage. What
+        // replaces it is `feedback.rs`'s
+        // `both_sinks_declare_exactly_the_shared_fb_vocabulary`, which asserts the
+        // same property programmatically and across both sinks at once.
+        let mut declared_sorted: Vec<&str> = declared
+            .iter()
+            .copied()
+            .filter(|name| !name.starts_with("fb_"))
+            .collect();
         declared_sorted.sort_unstable();
         let mut handled_sorted: Vec<String> = handled.clone();
         handled_sorted.sort();

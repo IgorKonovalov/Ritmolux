@@ -328,6 +328,32 @@ pub(crate) trait Scene {
     /// ADR-0007's [`configure`](Scene::configure).
     fn set_palette(&mut self, _palette: &Palette) {}
 
+    /// Consume a preset's `[feedback]` structural table (ADR-0048). Invoked
+    /// **once at preset load, off the hot path**, like
+    /// [`configure`](Scene::configure) and [`set_palette`](Scene::set_palette),
+    /// and load-time for `configure`'s reason: a warp kind is a shader path, not
+    /// a scalar. Default no-op — the third and last thin off-hot-path widening of
+    /// this trait.
+    ///
+    /// # One vocabulary, two buffers
+    ///
+    /// **This is the routing contract, and it is worth stating plainly because it
+    /// will surprise someone.** The `fb_*` params and this table are consumed by
+    /// *two* sinks: the engine [`Trails`](crate::render::trails::Trails) stage,
+    /// which transforms the accumulation every scene composites through, and the
+    /// attractor scene's own internal trail field, which is what reaches here.
+    /// A preset may have **both** active at once — an attractor with `trails` on —
+    /// and then a single `fb_rotate` turns *both* accumulations, each about its
+    /// own buffer. Neither transforms the other's, and neither transforms the
+    /// present deposit: the transform applies to the past.
+    ///
+    /// That is a deliberate design (ADR-0048's Alternative D was to give the
+    /// engine stage the vocabulary and leave the attractor out), and the reason it
+    /// is safe is that the two answer the same param names with the same
+    /// arithmetic — [`feedback::Transform`](crate::render::feedback::Transform)
+    /// and one shared WGSL snippet, not two implementations that must agree.
+    fn set_feedback(&mut self, _cfg: crate::render::feedback::FeedbackConfig) {}
+
     /// The per-frame geometry-mirror cap overflow (Plan 0018 Phase 4), if this
     /// frame's N-fold replication exceeded the segment cap and truncated. Reuses
     /// the ADR-0007 [`CapOverflow`](lines::CapOverflow) so the frontend surfaces

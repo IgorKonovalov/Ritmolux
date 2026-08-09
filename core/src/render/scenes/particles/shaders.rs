@@ -807,14 +807,34 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// by the per-frame retention factor `k`, laying down the faded trail before the
 /// new points are added on top.
 pub(super) const DECAY_SHADER: &str = r#"
-struct Decay { k: vec4<f32> } // x: per-frame retention factor
+struct Decay {
+    // x: per-frame retention factor, y: occlude (present pass only),
+    // z: transform-active flag
+    k:  vec4<f32>,
+    // The ADR-0048 transform, exactly as `feedback::Transform::pack` returns it.
+    xf: vec4<f32>,
+    tr: vec4<f32>,
+    wp: vec4<f32>,
+}
 @group(0) @binding(0) var prev: texture_2d<f32>;
 @group(0) @binding(1) var samp: sampler;
 @group(0) @binding(2) var<uniform> decay: Decay;
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let c = textureSampleLevel(prev, samp, in.uv, 0.0).rgb * decay.k.x;
+    // The past, resampled through this frame's `fb_*` transform (ADR-0048) — the
+    // second of the engine's two accumulation sinks, running the same
+    // `lmv_source_uv` the trails stage does.
+    //
+    // **Only the past.** The fresh points are drawn additively over this bed in
+    // the same render pass, at their own projected positions, so the transform
+    // reaches the trail and never the head. `select` on a uniform flag, so an
+    // untransformed preset samples the LITERAL `in.uv` and every attractor golden
+    // is byte-identical.
+    let moved = decay.k.z != 0.0;
+    let suv = select(in.uv, lmv_source_uv(in.uv, decay.xf, decay.tr, decay.wp), moved);
+    let inside = select(1.0, lmv_inside(suv), moved);
+    let c = textureSampleLevel(prev, samp, suv, 0.0).rgb * (decay.k.x * inside);
     return vec4<f32>(c, 1.0);
 }
 "#;

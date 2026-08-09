@@ -53,6 +53,11 @@ pub(super) struct UniformInputs {
     /// packed, not here, so the guard has exactly one site.
     pub(super) brightness: f32,
     pub(super) fade: f32,
+    /// This frame's `fb_*` transform and the preset's `[feedback]` table
+    /// (ADR-0048) — the shared vocabulary, applied to this scene's own trail
+    /// field. See `upload_uniforms` for why the aspect above is the one it uses.
+    pub(super) feedback_transform: feedback::Transform,
+    pub(super) feedback: feedback::FeedbackConfig,
     /// How much of the cloud's coverage the backdrop resolves against (ADR-0085),
     /// carried to the present pass through the decay uniform's second component.
     /// Not a named param — the renderer sets it on the scene every frame.
@@ -302,13 +307,31 @@ pub(super) fn upload_uniforms(
         .fade
         .clamp(0.0, 1.0)
         .powf((inputs.dt * 60.0).max(0.0));
+    // The ADR-0048 transform this frame's decay resamples the field through — the
+    // engine's SECOND accumulation sink, packed by the same code the trails stage
+    // packs with, so the two cannot disagree about what `fb_rotate` means.
+    //
+    // `inputs.aspect` is the RENDER TARGET's, never the trail grid's (ADR-0037):
+    // the grid is quantized to a 256 px step, the present is a plain stretch, and
+    // a rotation computed in grid-uv would shear.
+    let moved = !inputs.feedback_transform.is_identity(inputs.feedback.warp);
+    let [xf, tr, wp] =
+        inputs
+            .feedback_transform
+            .pack(inputs.dt, inputs.aspect, inputs.feedback.warp);
     queue.write_buffer(
         &pipelines.decay_uniform,
         0,
         bytemuck::bytes_of(&DecayUniform {
             // y: `occlude` — the present pass reads it out of this same buffer
             // (ADR-0085), so one write feeds the decay and the composite seam.
-            k: [decay, inputs.occlude, 0.0, 0.0],
+            // z: whether the transform above moves anything at all; the decay
+            // shader `select`s on it so an untransformed preset samples the
+            // literal uv and every attractor golden is byte-identical.
+            k: [decay, inputs.occlude, f32::from(u8::from(moved)), 0.0],
+            xf,
+            tr,
+            wp,
         }),
     );
 }
