@@ -86,8 +86,9 @@ struct Fade { v: vec4<f32> } // x: fade factor (unread here), y: occlude
 
 // SAMPLER, UNIFORM, TEXTURE — a deliberate order, and the last permutation of
 // the three this crate had free. Two bind-group layouts with the same shape
-// mis-render when they coexist on the DX12 WARP software adapter (ADR-0021 /
-// Plan 0020), and `occlude` needed a uniform here where there had been none.
+// mis-render when they coexist on the DX12 WARP software adapter (ADR-0058,
+// which is where that hazard is recorded), and `occlude` needed a uniform here
+// where there had been none.
 // Every other arrangement was taken: `[texture, sampler, uniform]` is
 // `attractor-decay`, `[uniform, texture, sampler]` is `ink`, `[texture, uniform,
 // sampler]` is `tonemap`, `[sampler, texture, uniform]` is `bloom-up`, `[uniform,

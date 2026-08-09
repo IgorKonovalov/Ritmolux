@@ -811,9 +811,9 @@ struct Decay { k: vec4<f32> } // x: retention (unread here), y: occlude
 // FOUR entries for three resources, with the sampler bound twice. That is not an
 // oversight: `occlude` needed a uniform in a pass that had none, and two
 // bind-group layouts of the same shape mis-render when they coexist on the DX12
-// WARP software adapter (ADR-0021 / Plan 0020) — measured on this very change,
-// where a `[uniform]` group read the backdrop's buffer on WARP while working on
-// hardware. All six three-entry arrangements of {texture, sampler, uniform} are
+// WARP software adapter (ADR-0058, which is where that hazard is recorded) —
+// measured on this very change, where a `[uniform]` group read the backdrop's
+// buffer on WARP while working on hardware. All six three-entry arrangements of {texture, sampler, uniform} are
 // already spoken for (`attractor-decay`, `ink`, `tonemap`, `bloom-up`,
 // `bloom-bright`, and the trails present, which took the last one). A duplicate
 // sampler binding is the cheapest way to a fourth shape — no second texture view,
