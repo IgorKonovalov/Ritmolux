@@ -90,9 +90,10 @@
 //! — it is an undefined one. Rounding in Rust keeps the shader's precondition
 //! visible in Rust.
 //!
-//! **Identity passthrough when `kaleido_order < 2`** — every shipped preset until
-//! one opts in — so the [`PostChain`](super::post::PostChain) skips this stage
-//! entirely: no offscreen, no
+//! **Identity passthrough when every term is at its identity** — `kaleido_order <
+//! 2` *and* `kaleido_radial <= 1` *and* `kaleido_tile <= 1`, which is every shipped
+//! preset until one opts in — so the [`PostChain`](super::post::PostChain) skips
+//! this stage entirely: no offscreen, no
 //! pipeline, golden/determinism unchanged, the NFR §1 iGPU floor pays nothing,
 //! and (like the background/trails passes) the DX12 WARP software adapter never
 //! sees a coexisting fold pipeline during the no-kaleidoscope captures. When
@@ -113,6 +114,64 @@
 //! `mirror_reflect`) over this fold when either would do: that one replicates real
 //! segments *before* rasterization, so it costs nothing in resolution, while this
 //! one folds finished pixels at the stage's internal grid.
+//!
+//! # This is now **the symmetry stage** (ADR-0077)
+//!
+//! The fold is one term of a **composed destination-to-source coordinate map**,
+//! evaluated before the stage's *single* texture read. Map the plane to
+//! `(log r, θ)`: periodicity in `θ` is the dihedral fold above, and periodicity in
+//! **`log r`** is scale self-similarity — concentric rings, each a shrunk copy of
+//! the one outside it. The second half is what turns a flat rosette into a mandala.
+//!
+//! The composed order is **tile → fold → radial → spiral**, expressed
+//! destination-to-source, and it is **fixed, not author-selectable** — that is what
+//! keeps the whole stage one pipeline and one resample however many terms are live.
+//! Read forwards it means the polar rosette is the motif the tile replicates.
+//!
+//! | Param | Identity | What it is |
+//! |---|---|---|
+//! | `kaleido_tile` | `1` | mirrored wallpaper cells across the frame |
+//! | `kaleido_order` | `1` | the dihedral fold above |
+//! | `kaleido_radial` | `1` | the **scale ratio between successive rings** (2 = each ring half the last) |
+//! | `kaleido_spiral` | `0` | an **integer winding number** — the Droste shear |
+//! | `kaleido_zoom` | `0` | an offset along `log r` |
+//! | `kaleido_inner` | `0` | where the repeat stops, as a fraction of `r_max` |
+//!
+//! Three facts about the composition are worth having before reading the shader:
+//!
+//! - **The repeat subsumes the edge treatment.** Every destination radius wraps
+//!   into the canonical band `(r_max/radial, r_max]`, so with `kaleido_radial > 1`
+//!   nothing is ever outside the disc, nothing is clamped, nothing fades, and
+//!   `kaleido_edge` is inert. That is ADR-0077's "one radius policy" in one line:
+//!   the repeat *is* a radius policy, and two of them would fight.
+//! - **The zoom's period is exact.** The map is periodic in `log r` with period
+//!   `L = ln(radial)`, so an offset of exactly `L` is the identity map rather than
+//!   an approximation of it — an audio- or time-driven `kaleido_zoom` is an endless
+//!   tunnel with no reset and no crossfade. `kaleido_zoom` is in **`log r` units**,
+//!   so one ring is `ln(kaleido_radial)`, not 1.
+//! - **The spiral's winding number is quantized CPU-side, and must be.** Shearing
+//!   `log r` by `k·θ` shifts the radius by `2πk` over one revolution, so the image
+//!   closes only when `2πk` is a whole multiple of `L` — that is, `k = m·L/(2π)`
+//!   for integer `m`. `kaleido_spiral` *is* that `m`, and [`fold_spiral`] rounds it
+//!   for [`fold_order`]'s reason. A fractional winding draws a visible seam along
+//!   `atan2`'s branch cut, exactly as a fractional order tears along it.
+//!
+//! **The inner rings alias, and [`fold_inner`] is a workaround, not a fix.** The
+//! repeat *minifies* toward the centre: at `radial = 2`, after five repeats a
+//! destination annulus at 0.0125 displays the source's canonical annulus at 0.4 — a
+//! linear compression of 32, so roughly a thousand source texels land under one
+//! destination pixel against a bilinear sampler's four. `kaleido_inner` freezes the
+//! repeat below a radius, which makes that region *radially constant* (continuous
+//! at the cutoff, since `r_eff = max(r, inner·r_max)` agrees with `r` there) and
+//! therefore alias-free. The proper answer is a mip chain with an LOD from the
+//! map's Jacobian; the post chain's offscreens are single-level, so it is deferred.
+//!
+//! **With the fold inactive the stage can still be active** — a preset binding only
+//! `kaleido_radial` or only `kaleido_tile` gets those terms and no fold. The
+//! uniform then carries `order = 1` and the shader skips the wrap outright rather
+//! than folding into one wedge, because an order-1 wrap-and-mirror is a *mirror
+//! about the x-axis*, not the identity. `kaleido_angle` still applies in that
+//! configuration, where it reads as a plain rotation of the source.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). The fold pass encodes every displayed frame it is active.
@@ -163,10 +222,61 @@ const MAX_EDGE: f32 = 2.0;
 /// force the default to 0 would trade a readable history for a tidier constant.
 const DEFAULT_EDGE: f32 = 1.0;
 
-/// Below this order the fold is the identity passthrough (the stage is skipped).
+/// Below this order the fold term is the identity (no angular wrap at all).
 const MIN_ACTIVE_ORDER: f32 = 2.0;
 /// Ceiling on the fold order — beyond a couple dozen wedges the fold is a blur.
 const MAX_ORDER: f32 = 48.0;
+/// The order the uniform carries when the fold term is **off** but another term
+/// keeps the stage active (ADR-0077).
+///
+/// The shader skips its wrap below 1.5 rather than folding into a single wedge:
+/// `seg = 2*pi` makes `abs(a - seg/2)` a **mirror about the x-axis**, which is not
+/// the identity and is not what a preset binding only `kaleido_radial` asked for.
+const IDENTITY_ORDER: f32 = 1.0;
+
+// --- The composed coordinate map (ADR-0077) ---------------------------------
+
+/// `kaleido_radial` default — 1 = no repeat, the unmapped path.
+const DEFAULT_RADIAL: f32 = 1.0;
+/// At or below this ring ratio the log-radius repeat is **off**, and off is the
+/// unmapped path rather than a degenerate case of the mapped one.
+const MIN_ACTIVE_RADIAL: f32 = 1.0;
+/// The smallest ratio an *active* repeat is allowed, so `L = ln(radial)` cannot
+/// approach zero.
+///
+/// At 1.02 a 10:1 radius span already holds `ln(10)/ln(1.02)` ≈ **116** rings —
+/// past that the repeat is a grey wash, and the arithmetic starts losing the band
+/// to f32 precision (the wrap divides by `L`). An eased `kaleido_radial` crossing 1
+/// therefore snaps from off to 1.02, which costs nothing visually because 1.02 is
+/// already indistinguishable from a wash.
+const MIN_RADIAL: f32 = 1.02;
+/// Ceiling on the ring ratio — at 8 a 10:1 span holds barely more than one ring,
+/// so past it the repeat has nothing left to repeat.
+const MAX_RADIAL: f32 = 8.0;
+
+/// `kaleido_spiral` default — 0 = no shear.
+const DEFAULT_SPIRAL: f32 = 0.0;
+/// Ceiling on `|kaleido_spiral|`. The shear is `m` whole turns of `log r` per
+/// revolution; past a handful the rings are a vortex with no readable motif.
+const MAX_SPIRAL: f32 = 8.0;
+
+/// `kaleido_zoom` default — 0 = no offset along `log r`.
+const DEFAULT_ZOOM: f32 = 0.0;
+
+/// `kaleido_tile` default — 1 cell across, the identity.
+const DEFAULT_TILE: f32 = 1.0;
+/// At or below this cell count the wallpaper tile is **off**. Not a degenerate
+/// case: `abs(fract(x/2)*2 - 1)` at one cell is `1 - x`, a flip, not the identity.
+const MIN_ACTIVE_TILE: f32 = 1.0;
+/// Ceiling on the cell count — 16 cells across a 1280-wide grid is 80 px a cell,
+/// which is already less than the motif needs.
+const MAX_TILE: f32 = 16.0;
+
+/// `kaleido_inner` default — 0 = the repeat runs all the way to the fold axis.
+const DEFAULT_INNER: f32 = 0.0;
+/// Ceiling on the inner cutoff: `r_max` itself, at which the whole disc is the
+/// frozen innermost ring and the repeat shows nothing.
+const MAX_INNER: f32 = 1.0;
 
 /// The wedge count the shader is handed: clamped to the active range, then
 /// **rounded to an integer**.
@@ -238,6 +348,109 @@ fn fold_edge(v: f32) -> f32 {
     }
 }
 
+/// The **log period** `L` the shader is handed, from the authored ring ratio:
+/// `ln(radial)` when the repeat is active, and exactly `0` when it is not.
+///
+/// Zero is the shader's off switch for the whole radial group, which is why this
+/// returns a period rather than the ratio: `radial <= 1` (and any non-finite
+/// binding) takes the **unmapped** path, not a degenerate case of the mapped one.
+/// A ratio of exactly 1 has no period at all — `ln(1) = 0` would make the wrap
+/// divide by zero — so the two readings coincide and the constant does double duty.
+///
+/// The ratio is the authorable parameterization ADR-0077 chose: `2.0` means each
+/// ring is half the size of the one outside it, and across a 10:1 radius range
+/// `1.3` gives `ln(10)/ln(1.3)` ≈ 9 rings against `2.0`'s ≈ 3. Active values are
+/// clamped into `[MIN_RADIAL, MAX_RADIAL]` — see [`MIN_RADIAL`] for why the low
+/// bound is not 1.
+fn fold_radial(radial: f32) -> f32 {
+    if radial.is_finite() && radial > MIN_ACTIVE_RADIAL {
+        radial.clamp(MIN_RADIAL, MAX_RADIAL).ln()
+    } else {
+        0.0
+    }
+}
+
+/// The winding number the shear is built from: clamped into `±MAX_SPIRAL`, then
+/// **rounded to an integer**, with a non-finite binding falling back to no shear.
+///
+/// This is [`fold_order`]'s treatment for a sharper version of [`fold_order`]'s
+/// reason. Shearing `log r` by `k·θ` shifts the radius by `2πk` over one
+/// revolution, and the map is periodic in `log r` with period `L`, so the image
+/// closes across `atan2`'s branch cut only when `2πk = m·L` for a whole `m`. The
+/// authored parameter *is* that `m`; [`spiral_shear`] turns it into `k`. A
+/// fractional `m` leaves a seam along the -x ray — the same defect a fractional
+/// order produces, from the same branch cut — and `[smoothing]` and preset
+/// dissolves both sweep a binding continuously between two settings, so the
+/// fractional values are the common case rather than the exotic one.
+fn fold_spiral(spiral: f32) -> f32 {
+    if spiral.is_finite() {
+        spiral.clamp(-MAX_SPIRAL, MAX_SPIRAL).round()
+    } else {
+        DEFAULT_SPIRAL
+    }
+}
+
+/// The shear coefficient `k` for a winding number `m` and log period `L`:
+/// `k = m·L/(2π)`, the value that makes one revolution shift `log r` by exactly
+/// `m` whole periods. Zero whenever the repeat is off, because without a period
+/// there is no winding to be a whole number of.
+fn spiral_shear(spiral: f32, log_period: f32) -> f32 {
+    spiral * log_period / std::f32::consts::TAU
+}
+
+/// The `log r` offset the shader is handed, **wrapped into one period**.
+///
+/// The wrap is not the periodicity — the map is periodic in `log r` whatever
+/// offset it is given, and that is asserted on the map itself. It is precision
+/// hygiene for the common binding: `kaleido_zoom = "time * k"` grows without
+/// bound, and by the time it reaches a few thousand an f32's ulp is coarser than
+/// the band, so the tunnel would visibly step. Reducing it here keeps the uniform
+/// in `[0, L)` and the shader's arithmetic at full precision indefinitely.
+fn fold_zoom(zoom: f32, log_period: f32) -> f32 {
+    if !zoom.is_finite() {
+        return DEFAULT_ZOOM;
+    }
+    if log_period > 0.0 {
+        zoom.rem_euclid(log_period)
+    } else {
+        DEFAULT_ZOOM
+    }
+}
+
+/// The wallpaper cell count the shader is handed: clamped into the active range,
+/// with anything at or below one cell — and any non-finite binding — meaning off.
+///
+/// Deliberately **not** rounded, unlike the fold order and the winding number.
+/// Those two are integral because a fractional value is undefined or torn; a
+/// fractional cell count is neither. `abs(fract(x·n/2)·2 − 1)` at `n = 2.5` is a
+/// perfectly continuous mirrored grid whose last cell is cut off at the frame
+/// edge, so a smoothed `kaleido_tile` can ease between cell counts instead of
+/// snapping — the one param on this stage where that is true.
+fn fold_tile(tile: f32) -> f32 {
+    if tile.is_finite() && tile > MIN_ACTIVE_TILE {
+        tile.min(MAX_TILE)
+    } else {
+        DEFAULT_TILE
+    }
+}
+
+/// The inner cutoff the shader is handed, as a fraction of `r_max`: clamped into
+/// `[0, 1]`, with a non-finite binding falling back to no cutoff.
+///
+/// Below `inner · r_max` the repeat is *frozen* rather than skipped — the shader
+/// takes `r_eff = max(r, inner·r_max)`, which agrees with `r` at the cutoff, so the
+/// map stays continuous and the interior becomes radially constant. That constant
+/// interior is both the reference images' bright central disc and the reason the
+/// cutoff works as an anti-aliasing control: a map with zero radial derivative
+/// cannot minify.
+fn fold_inner(inner: f32) -> f32 {
+    if inner.is_finite() {
+        inner.clamp(0.0, MAX_INNER)
+    } else {
+        DEFAULT_INNER
+    }
+}
+
 /// The roster's radius map, normalized: given a treatment and `m = r / r_max`,
 /// the **sample** radius as a fraction of `r_max`.
 ///
@@ -267,11 +480,60 @@ fn edge_sample_radius(edge: f32, m: f32) -> f32 {
     }
 }
 
+/// The log-radius repeat's radius map — **the shader below is the
+/// implementation; this is its CPU mirror**, kept identical by inspection the way
+/// [`edge_sample_radius`] is.
+///
+/// It exists because the two properties that make the repeat *the* repeat are
+/// exact arithmetic rather than pixels, and asserting them here says what is
+/// guaranteed instead of measuring what a rasterizer happened to produce:
+///
+/// - offsetting `zoom` by exactly one period `L` is the **identity**, which is why
+///   a driven `kaleido_zoom` is an endless tunnel with no reset;
+/// - the map agrees at `θ` and `θ + 2π` for every **integer** winding number and
+///   disagrees for a fractional one, which is why [`fold_spiral`] rounds.
+///
+/// `theta` is the **unfolded** angle (`atan2 + kaleido_angle`), because the seam
+/// condition is about a full revolution of it — the folded angle never makes one.
+///
+/// Guard on the radius the logarithm is taken of, so an exact centre pixel with no
+/// inner cutoff yields a finite `log r` instead of `-inf`. Mirrors the shader's
+/// literal; it lives here rather than beside the other constants because the
+/// shader is a `&'static str` that cannot interpolate one.
+#[cfg(test)]
+const MIN_LOG_RADIUS: f32 = 1e-8;
+
+#[cfg(test)]
+fn repeat_sample_radius(
+    r: f32,
+    r_max: f32,
+    log_period: f32,
+    shear: f32,
+    zoom: f32,
+    inner: f32,
+    theta: f32,
+) -> f32 {
+    // Freeze the repeat below the cutoff. `max` rather than a branch: it agrees
+    // with `r` at the cutoff, so the map is continuous there.
+    let r_eff = r.max(inner * r_max);
+    let lr = r_eff.max(MIN_LOG_RADIUS).ln() + zoom + shear * theta;
+    let lm = r_max.ln();
+    // Wrap into the canonical band (r_max/radial, r_max] — the annulus of the
+    // source the whole plane is a self-similar copy of.
+    let n = ((lm - lr) / log_period).floor();
+    (lr + log_period * n).exp().min(r_max)
+}
+
 const SHADER: &str = r#"
 struct K {
     v: vec4<f32>, // x: order, y: angle, z: aspect, w: occlude (ADR-0085)
     c: vec4<f32>, // x,y: fold centre (uv), z: falloff band (fraction of r_max),
                   //   w: edge treatment (ADR-0061; integral, quantized CPU-side)
+    m: vec4<f32>, // ADR-0077's composed map. x: log period L (0 = repeat OFF),
+                  //   y: spiral shear k (= m*L/2pi, m integral CPU-side),
+                  //   z: zoom (offset along log r, pre-wrapped into [0, L)),
+                  //   w: tile cells across the frame (1 = OFF)
+    n: vec4<f32>, // x: inner cutoff (fraction of r_max), yzw: unused
 }
 
 @group(0) @binding(0) var<uniform> u: K;
@@ -289,22 +551,53 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let angle = u.v.y;
     let aspect = max(u.v.z, 0.001);
     let centre = u.c.xy;
+    let log_period = u.m.x;
+    let shear = u.m.y;
+    let zoom = u.m.z;
+    let tile = u.m.w;
+    let inner = u.n.x;
+
+    // --- tile, FIRST in the destination-to-source chain (ADR-0077) ------------
+    // Read forwards that means the polar rosette below is the motif this
+    // replicates, which is what the reference images show. `n` mirrored cells per
+    // axis: `fract` has period 2/n, `*2 - 1` makes it a signed ramp and `abs`
+    // reflects it, so alternate cells are mirrored and the grid is continuous
+    // across every cell boundary. BOTH axes take the same cell count, so a cell
+    // carries the frame's own aspect and the motif inside it is not distorted.
+    //
+    // PRECONDITION: `tile > 1` (the CPU side sends exactly 1 when off — see
+    // `fold_tile`). At one cell the expression is `1 - x`, a flip, not the
+    // identity, so "off" cannot be a value of `n`.
+    var duv = in.uv;
+    if (tile > 1.0) {
+        duv = abs(fract(duv * (tile * 0.5)) * 2.0 - 1.0);
+    }
 
     // Centre and aspect-correct so the wedges are radially symmetric.
-    var p = in.uv - centre;
+    var p = duv - centre;
     p.x = p.x * aspect;
 
     let r = length(p);
     let seg = 6.28318530 / order;
     var a = atan2(p.y, p.x) + angle;
+    // The UNFOLDED angle, kept for the spiral shear below: the seam condition is
+    // about a full revolution of this one, and the folded angle never makes one.
+    let a_raw = a;
     // Wrap into one wedge, then mirror within it (dihedral fold).
     //
     // PRECONDITION: `order` is integral (the CPU side rounds it — see
     // `fold_order`). `atan2` jumps by 2*pi across the -x ray, and this wrap only
     // absorbs that jump when 2*pi is a whole multiple of `seg`. A fractional
     // order tears the frame along that ray.
-    a = a - seg * floor(a / seg);
-    a = abs(a - seg * 0.5);
+    //
+    // Skipped outright below 1.5, which is the value the CPU sends when the fold
+    // term is off but another term keeps the stage alive (`IDENTITY_ORDER`): at
+    // `order = 1`, `seg = 2*pi` and `abs(a - seg*0.5)` is a MIRROR about the
+    // x-axis, not the identity a preset binding only `kaleido_radial` asked for.
+    if (order >= 1.5) {
+        a = a - seg * floor(a / seg);
+        a = abs(a - seg * 0.5);
+    }
 
     // The largest disc centred on the fold axis that the source rectangle
     // contains, in this same aspect-corrected space: the nearest of the four
@@ -327,7 +620,33 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let edge = u.c.w;
     var rs = min(r, r_max);
     var w = 1.0;
-    if (edge < 0.5) {
+    if (log_period > 0.0) {
+        // --- the log-radius repeat, and the spiral and zoom that live on it ---
+        //
+        // Periodicity in log r is scale self-similarity: every destination radius
+        // wraps into the canonical band (r_max/radial, r_max], so the frame becomes
+        // concentric shrinking copies of that one source annulus.
+        //
+        // THIS ARM SUBSUMES THE EDGE TREATMENT (ADR-0077's one radius policy).
+        // The wrap lands every radius inside the disc by construction, so there is
+        // no out-of-disc region left for `kaleido_edge` to treat, nothing to clamp
+        // and nothing to fade: `w` stays 1 and `rs <= r_max` holds for every
+        // finite `r`. Two radius policies here would fight rather than compose.
+        //
+        // `inner` freezes the repeat near the axis. `max` rather than a branch
+        // because it agrees with `r` at the cutoff, so the map stays continuous
+        // and the frozen interior is radially CONSTANT — which is both the
+        // reference tunnel's bright central disc and the anti-aliasing control: a
+        // map with no radial derivative cannot minify (module docs).
+        let r_eff = max(r, inner * r_max);
+        let lr = log(max(r_eff, 1e-8)) + zoom + shear * a_raw;
+        let lm = log(r_max);
+        // PRECONDITION: `log_period > 0` selects this arm, so the divide is safe;
+        // and `shear = m * log_period / 2pi` for an INTEGER m (`fold_spiral`), so
+        // the 2*pi jump `a_raw` takes across the -x ray moves `lr` by a whole
+        // number of periods and the wrap absorbs it. A fractional winding seams.
+        rs = min(exp(lr + log_period * floor((lm - lr) / log_period)), r_max);
+    } else if (edge < 0.5) {
         // 0 `falloff` — ADR-0047's treatment. Clamping the SAMPLE radius, not the
         // output pixel's, is what keeps every reconstructed coordinate inside
         // [0,1]: beyond r_max the polar reconstruction used to land outside the
@@ -358,7 +677,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let s_uv = q + centre;
     // Two `textureSample` calls, one per address mode, each in UNIFORM control
     // flow — the branch is on a uniform-buffer value, which is what `textureSample`
-    // requires. Only one executes per fragment.
+    // requires. Only one executes per fragment. With the repeat arm live the two
+    // are interchangeable — `rs <= r_max` puts `s_uv` inside `[0,1]`, where no
+    // address mode is reachable — so the selection stays exactly as ADR-0061 left
+    // it rather than growing a third case that could not be observed.
     var col: vec4<f32>;
     if (edge > 0.5 && edge < 1.5) {
         col = textureSample(t_src, samp_tile, s_uv);
@@ -385,6 +707,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 struct K {
     v: [f32; 4],
     c: [f32; 4],
+    /// ADR-0077's composed map: log period, spiral shear, zoom, tile cells.
+    m: [f32; 4],
+    /// `x` is the inner cutoff; the rest is padding to the `vec4` the WGSL side
+    /// declares.
+    n: [f32; 4],
 }
 
 struct Resources {
@@ -541,6 +868,14 @@ pub struct Kaleidoscope {
     /// The out-of-disc treatment (ADR-0061), raw as the preset bound it —
     /// [`fold_edge`] quantizes it on the way to the uniform.
     edge: f32,
+    /// The composed map's terms (ADR-0077), each raw as the preset bound it —
+    /// [`fold_radial`], [`fold_spiral`], [`fold_zoom`], [`fold_tile`] and
+    /// [`fold_inner`] condition them on the way to the uniform.
+    radial: f32,
+    spiral: f32,
+    zoom: f32,
+    tile: f32,
+    inner: f32,
     /// The active tier's cap on this stage's internal grid — see
     /// [`Trails::post_cap`](super::trails::Trails).
     post_cap: (u32, u32),
@@ -557,6 +892,14 @@ pub const PARAMS: &[&str] = &[
     "kaleido_center_x",
     "kaleido_center_y",
     "kaleido_edge",
+    // ADR-0077's composed map, in the order it is applied
+    // (destination-to-source): tile -> fold -> radial -> spiral, with `zoom` and
+    // `inner` riding on the radial term.
+    "kaleido_tile",
+    "kaleido_radial",
+    "kaleido_spiral",
+    "kaleido_zoom",
+    "kaleido_inner",
 ];
 
 impl Kaleidoscope {
@@ -575,6 +918,11 @@ impl Kaleidoscope {
             center_x: DEFAULT_CENTER,
             center_y: DEFAULT_CENTER,
             edge: DEFAULT_EDGE,
+            radial: DEFAULT_RADIAL,
+            spiral: DEFAULT_SPIRAL,
+            zoom: DEFAULT_ZOOM,
+            tile: DEFAULT_TILE,
+            inner: DEFAULT_INNER,
             post_cap,
             builds: 0,
         }
@@ -584,6 +932,14 @@ impl Kaleidoscope {
     #[cfg(test)]
     pub(crate) fn build_count(&self) -> u32 {
         self.builds
+    }
+
+    /// Whether the **fold term** is live — order at least 2, as it always was.
+    /// Since ADR-0077 this is no longer the same question as whether the *stage*
+    /// is live: another term can keep it running with the fold off, and the
+    /// uniform then carries [`IDENTITY_ORDER`].
+    fn fold_active(&self) -> bool {
+        self.order >= MIN_ACTIVE_ORDER && self.order.is_finite()
     }
 }
 
@@ -599,6 +955,11 @@ impl PostStage for Kaleidoscope {
         self.center_x = DEFAULT_CENTER;
         self.center_y = DEFAULT_CENTER;
         self.edge = DEFAULT_EDGE;
+        self.radial = DEFAULT_RADIAL;
+        self.spiral = DEFAULT_SPIRAL;
+        self.zoom = DEFAULT_ZOOM;
+        self.tile = DEFAULT_TILE;
+        self.inner = DEFAULT_INNER;
     }
 
     /// Apply one named parameter, returning whether it was a `kaleido_*` param.
@@ -609,6 +970,11 @@ impl PostStage for Kaleidoscope {
             "kaleido_center_x" => self.center_x = value,
             "kaleido_center_y" => self.center_y = value,
             "kaleido_edge" => self.edge = value,
+            "kaleido_tile" => self.tile = value,
+            "kaleido_radial" => self.radial = value,
+            "kaleido_spiral" => self.spiral = value,
+            "kaleido_zoom" => self.zoom = value,
+            "kaleido_inner" => self.inner = value,
             _ => return false,
         }
         true
@@ -618,10 +984,20 @@ impl PostStage for Kaleidoscope {
         PARAMS
     }
 
-    /// Whether the fold is active this frame (order at least 2; below that it is
-    /// the identity passthrough).
+    /// Whether **any** term of the composed map is active this frame — the fold
+    /// (order at least 2), the log-radius repeat (ratio above 1), or the wallpaper
+    /// tile (more than one cell). With none of them the stage is the identity and
+    /// the [`PostChain`](super::post::PostChain) skips it entirely.
+    ///
+    /// `kaleido_spiral`, `kaleido_zoom` and `kaleido_inner` deliberately do **not**
+    /// appear: all three are properties *of* the repeat — a winding number with no
+    /// period to wind, an offset along a `log r` nothing wraps, and a cutoff on a
+    /// repeat that is not happening are each a no-op — so none of them can wake the
+    /// stage on its own.
     fn active(&self) -> bool {
-        self.order >= MIN_ACTIVE_ORDER && self.order.is_finite()
+        self.fold_active()
+            || (self.radial.is_finite() && self.radial > MIN_ACTIVE_RADIAL)
+            || (self.tile.is_finite() && self.tile > MIN_ACTIVE_TILE)
     }
 
     /// The fold-input size, following the render target under the shared policy
@@ -665,7 +1041,20 @@ impl PostStage for Kaleidoscope {
         let Some(res) = self.res.as_ref() else {
             return 0;
         };
-        let order = fold_order(self.order);
+        // `IDENTITY_ORDER` when the fold term is off: the stage may be running for
+        // the repeat or the tile alone, and `fold_order` would clamp an unbound
+        // order UP into the active range and fold a frame nobody asked to fold.
+        let order = if self.fold_active() {
+            fold_order(self.order)
+        } else {
+            IDENTITY_ORDER
+        };
+        // ADR-0077's composed map. `log_period` is the whole radial group's off
+        // switch (0 = off), which is why the shear and the zoom are derived from
+        // it rather than sent raw: neither means anything without a period.
+        let log_period = fold_radial(self.radial);
+        let shear = spiral_shear(fold_spiral(self.spiral), log_period);
+        let zoom = fold_zoom(self.zoom, log_period);
         // The **render target's** ratio, not this stage's input grid's (ADR-0037).
         // The fold happens in the destination's space and the frame it samples was
         // drawn pre-squashed at this same aspect, so both the output geometry and
@@ -685,6 +1074,8 @@ impl PostStage for Kaleidoscope {
                     FALLOFF_BAND,
                     fold_edge(self.edge),
                 ],
+                m: [log_period, shear, zoom, fold_tile(self.tile)],
+                n: [fold_inner(self.inner), 0.0, 0.0, 0.0],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -928,5 +1319,324 @@ mod tests {
             "squash left the disc interior untouched — it is tanh, which compresses \
              everywhere past the axis"
         );
+    }
+
+    // --- The composed coordinate map (ADR-0077) -----------------------------
+    //
+    // The shader is the implementation; `repeat_sample_radius` is its CPU mirror
+    // and what the two exact properties are asserted against. Both are arithmetic
+    // — a periodicity and a seam condition — so they are stated here rather than
+    // measured on pixels, where a rasterizer's tolerance would blunt them.
+
+    /// The disc radius a centred fold has in the shader's aspect-corrected space.
+    const R_MAX: f32 = 0.5;
+
+    /// Destination radii the properties are sampled over: from well inside the
+    /// disc out past the 16:9 corner (2.04x `r_max`), which is the range a real
+    /// frame presents.
+    const SAMPLE_RADII: [f32; 9] = [0.004, 0.02, 0.06, 0.12, 0.25, 0.4, 0.5, 0.75, 1.05];
+
+    /// Relative agreement required of two maps the arithmetic says are the same
+    /// map. Not bit-equality: the two reach the identical value by different
+    /// roundings — `(lr + L) + L*(n-1)` against `lr + L*n` — so f32 associativity
+    /// is the whole gap, and it is a few ulps.
+    const MAP_REL_TOL: f32 = 1e-5;
+
+    fn assert_close_tol(a: f32, b: f32, tol: f32, what: &str) {
+        let rel = (a - b).abs() / a.abs().max(b.abs()).max(f32::MIN_POSITIVE);
+        assert!(
+            rel <= tol,
+            "{what}: {a} vs {b} (relative {rel:e}, tolerance {tol:e})"
+        );
+    }
+
+    fn assert_close(a: f32, b: f32, what: &str) {
+        assert_close_tol(a, b, MAP_REL_TOL, what);
+    }
+
+    /// The ring ratio maps to a log period only when the repeat is on, and `off`
+    /// is the unmapped path rather than a degenerate ratio.
+    #[test]
+    fn fold_radial_is_off_at_or_below_one_and_a_log_period_above_it() {
+        // Off — and exactly 0, which is the shader's off switch for the entire
+        // radial group (the spiral and the zoom hang off the same value).
+        assert_eq!(fold_radial(1.0), 0.0);
+        assert_eq!(fold_radial(0.4), 0.0);
+        assert_eq!(fold_radial(-3.0), 0.0);
+        assert_eq!(fold_radial(f32::NAN), 0.0);
+        assert_eq!(fold_radial(f32::INFINITY), 0.0);
+
+        // On — the period is the log of the authored ratio, so the ring count over
+        // a decade of radius is ln(10)/L: about 9 rings at 1.3 and 3 at 2.0, the
+        // two figures ADR-0077 sizes the parameterization by.
+        assert_close(fold_radial(2.0), std::f32::consts::LN_2, "ln(2)");
+        let rings = |ratio: f32| 10.0f32.ln() / fold_radial(ratio);
+        assert!(
+            (rings(1.3) - 9.0).abs() < 0.5,
+            "a decade of radius holds {} rings at ratio 1.3, not ~9",
+            rings(1.3)
+        );
+        assert!(
+            (rings(2.0) - 3.0).abs() < 0.5,
+            "a decade of radius holds {} rings at ratio 2.0, not ~3",
+            rings(2.0)
+        );
+
+        // An active ratio never approaches 1, where L would approach 0 and the
+        // wrap's divide would lose the band to f32 precision.
+        assert_eq!(fold_radial(1.000001), MIN_RADIAL.ln());
+        assert_eq!(fold_radial(1e9), MAX_RADIAL.ln());
+    }
+
+    /// **The seamless-loop property.** Offsetting `kaleido_zoom` by exactly one
+    /// log period is the identity map, at every destination coordinate — which is
+    /// what makes a driven zoom an endless tunnel with no reset and no crossfade,
+    /// rather than a loop with a hidden cut.
+    #[test]
+    fn a_zoom_offset_of_one_period_is_the_identity_map() {
+        for ratio in [1.15f32, 1.3, 2.0, 3.5] {
+            let l = fold_radial(ratio);
+            for &r in &SAMPLE_RADII {
+                for i in 0..12 {
+                    let theta = -std::f32::consts::PI + std::f32::consts::TAU * i as f32 / 12.0;
+                    // Sampled with the spiral and the inner cutoff live, so the
+                    // property is of the whole map and not of a stripped one.
+                    let shear = spiral_shear(2.0, l);
+                    let base = repeat_sample_radius(r, R_MAX, l, shear, 0.0, 0.05, theta);
+                    let shifted = repeat_sample_radius(r, R_MAX, l, shear, l, 0.05, theta);
+                    assert_close(
+                        base,
+                        shifted,
+                        &format!(
+                            "ratio {ratio}, r {r}, theta {theta}: zoom + L is not the identity"
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
+    /// **The seam condition, and the reason [`fold_spiral`] rounds.** Across
+    /// `atan2`'s branch cut the unfolded angle jumps by exactly `2*pi`; the map
+    /// absorbs that jump only when the shear moves `log r` by a whole number of
+    /// periods, which is exactly the integer winding numbers. A fractional one
+    /// leaves a discontinuity — a visible seam along the -x ray.
+    #[test]
+    fn only_an_integer_winding_number_closes_across_the_branch_cut() {
+        let l = fold_radial(1.3);
+        let theta = -std::f32::consts::PI + 0.017;
+
+        // Integral windings close, at every radius.
+        for m in [-3.0f32, -1.0, 0.0, 1.0, 2.0, 5.0] {
+            let shear = spiral_shear(m, l);
+            for &r in &SAMPLE_RADII {
+                let here = repeat_sample_radius(r, R_MAX, l, shear, 0.0, 0.0, theta);
+                let round = repeat_sample_radius(
+                    r,
+                    R_MAX,
+                    l,
+                    shear,
+                    0.0,
+                    0.0,
+                    theta + std::f32::consts::TAU,
+                );
+                assert_close(
+                    here,
+                    round,
+                    &format!("winding {m} at r {r} does not close across the branch cut"),
+                );
+            }
+        }
+
+        // ...and a fractional one does not, or the rounding guards nothing. Half a
+        // winding shifts `log r` by half a period, which is the worst case and the
+        // one a `[smoothing]` sweep sits on for as long as it sits anywhere.
+        let mut seamed = 0usize;
+        for m in [0.5f32, 1.5, -2.5] {
+            let shear = spiral_shear(m, l);
+            for &r in &SAMPLE_RADII {
+                let here = repeat_sample_radius(r, R_MAX, l, shear, 0.0, 0.0, theta);
+                let round = repeat_sample_radius(
+                    r,
+                    R_MAX,
+                    l,
+                    shear,
+                    0.0,
+                    0.0,
+                    theta + std::f32::consts::TAU,
+                );
+                // A half-period jump in log r is a ratio of sqrt(1.3) = 1.14, so
+                // "differs" here is a 14 % step in the sampled radius, not noise.
+                if (here / round - 1.0).abs() > 0.05 {
+                    seamed += 1;
+                }
+            }
+        }
+        assert_eq!(
+            seamed,
+            3 * SAMPLE_RADII.len(),
+            "a fractional winding number closed across the branch cut at some radius — \
+             then the seam it is supposed to draw is not there, and `fold_spiral`'s \
+             rounding is guarding nothing"
+        );
+
+        // And the guard itself: the uniform never carries a fractional winding.
+        for &raw in &[-99.0f32, -2.4, 0.0, 0.5, 1.4, 1.6, 99.0] {
+            let m = fold_spiral(raw);
+            assert_eq!(m, m.round(), "fold_spiral({raw}) = {m} is not an integer");
+            assert!((-MAX_SPIRAL..=MAX_SPIRAL).contains(&m));
+        }
+        // Non-finite means NO shear rather than the far end of the range, for
+        // `fold_edge`'s reason: a broken binding should land on the resting
+        // behaviour, and "as far as you can wind" is not a reading of infinity
+        // anyone authored.
+        assert_eq!(fold_spiral(f32::NAN), DEFAULT_SPIRAL);
+        assert_eq!(fold_spiral(f32::INFINITY), DEFAULT_SPIRAL);
+        assert_eq!(fold_spiral(f32::NEG_INFINITY), DEFAULT_SPIRAL);
+    }
+
+    /// The repeat lands **every** radius inside the disc — that is what lets this
+    /// arm subsume the edge treatment (ADR-0077's one radius policy) instead of
+    /// composing with it, and it must hold out past the frame corner.
+    #[test]
+    fn the_repeat_keeps_every_radius_inside_the_disc() {
+        let l = fold_radial(2.0);
+        let shear = spiral_shear(3.0, l);
+        let mut r = 0.0f32;
+        while r <= 1.2 {
+            let rs = repeat_sample_radius(r, R_MAX, l, shear, 0.31, 0.0, 1.1);
+            assert!(
+                rs.is_finite() && rs > 0.0 && rs <= R_MAX,
+                "the repeat mapped r = {r} to rs = {rs}, outside (0, r_max]"
+            );
+            // ...and into the canonical band, not merely inside the disc: the
+            // whole plane is a self-similar copy of ONE source annulus.
+            assert!(
+                rs > R_MAX / 2.0 * (1.0 - MAP_REL_TOL),
+                "the repeat mapped r = {r} to rs = {rs}, below the canonical band \
+                 (r_max/radial, r_max]"
+            );
+            r += 0.001;
+        }
+
+        // The exact fold axis included: with no inner cutoff, log(0) would be
+        // -inf, and the guard is what keeps the centre pixel a colour.
+        let at_axis = repeat_sample_radius(0.0, R_MAX, l, shear, 0.0, 0.0, 0.0);
+        assert!(
+            at_axis.is_finite() && at_axis > 0.0,
+            "the fold axis mapped to {at_axis} — the log guard is gone"
+        );
+    }
+
+    /// The inner cutoff **freezes** the repeat rather than skipping it: the map is
+    /// continuous at the cutoff and radially constant inside it. The constancy is
+    /// the anti-aliasing property — a map with no radial derivative cannot minify
+    /// — and the continuity is why it does not draw a ring.
+    #[test]
+    fn the_inner_cutoff_is_continuous_and_freezes_the_interior() {
+        let l = fold_radial(2.0);
+        let inner = 0.1f32;
+        let cutoff = inner * R_MAX;
+        let map = |r: f32| repeat_sample_radius(r, R_MAX, l, 0.0, 0.0, inner, 0.4);
+
+        // Constant inside.
+        let at_cutoff = map(cutoff);
+        for f in [0.0f32, 0.01, 0.25, 0.5, 0.9, 0.999] {
+            assert_close(
+                map(cutoff * f),
+                at_cutoff,
+                &format!("the interior is not frozen at {f} of the cutoff"),
+            );
+        }
+
+        // Continuous across it — no ring. A *skipping* cutoff (take the plain
+        // radius inside, the wrapped one outside) jumps by an arbitrary fraction
+        // of the whole band here; the frozen one moves only as far as the repeat
+        // itself does over the same 0.1 % step in `r`, which at ratio 2 is 0.1 %.
+        // The bound is 30x that and still two orders below a skip's jump.
+        assert_close_tol(
+            map(cutoff * 1.001),
+            at_cutoff,
+            0.03,
+            "the map jumps at the inner cutoff",
+        );
+
+        // Non-vacuity: outside the cutoff the repeat is doing something, or
+        // "frozen inside" would be a statement about a constant map.
+        //
+        // The multiplier is deliberately NOT a whole power of the ring ratio.
+        // 4 = 2^2 at ratio 2 is exactly two periods, so the repeat maps it to the
+        // *same* sample radius — the self-similarity working perfectly reads as a
+        // constant map, and a non-vacuity check written that way passes only when
+        // the feature is broken.
+        assert!(
+            (map(cutoff * 1.5) - at_cutoff).abs() > 1e-3,
+            "the map is constant outside the cutoff too — the repeat is not running"
+        );
+
+        // And a cutoff of 0 leaves the repeat running to the axis (the default).
+        // Same trap, same reason for 0.3 rather than 0.25.
+        let uncut = |r: f32| repeat_sample_radius(r, R_MAX, l, 0.0, 0.0, 0.0, 0.4);
+        assert!(
+            (uncut(cutoff * 0.3) - uncut(cutoff)).abs() > 1e-3,
+            "with kaleido_inner = 0 the interior is still frozen"
+        );
+    }
+
+    /// `kaleido_zoom` reaches the shader reduced into one period, and the
+    /// reduction is exact enough to be invisible: it is precision hygiene for a
+    /// `time`-driven binding, not a change to the map.
+    #[test]
+    fn the_zoom_offset_is_reduced_into_one_period() {
+        let l = fold_radial(1.3);
+        for raw in [0.0f32, 0.1, 1.0, 7.5, 1000.0, -3.25] {
+            let z = fold_zoom(raw, l);
+            assert!(
+                (0.0..l).contains(&z),
+                "fold_zoom({raw}) = {z} is outside [0, {l})"
+            );
+            // Same map, whatever multiple of the period was handed in. The
+            // tolerance is looser than [`MAP_REL_TOL`] on purpose and in the
+            // direction the reduction exists to fix: at raw = 1000 an f32's ulp is
+            // 6e-5, a quarter of a per-mille of the 0.262 period, so the
+            // *unreduced* side is the imprecise one. That drift is the whole
+            // argument for reducing, and asserting it away would delete the
+            // motive.
+            assert_close_tol(
+                repeat_sample_radius(0.2, R_MAX, l, 0.0, raw, 0.0, 0.3),
+                repeat_sample_radius(0.2, R_MAX, l, 0.0, z, 0.0, 0.3),
+                2e-4,
+                &format!("reducing zoom {raw} changed the map"),
+            );
+        }
+        // With the repeat off there is no period to reduce into, and no map to
+        // offset either.
+        assert_eq!(fold_zoom(4.0, 0.0), DEFAULT_ZOOM);
+        assert_eq!(fold_zoom(f32::NAN, l), DEFAULT_ZOOM);
+    }
+
+    /// The wallpaper tile is off at one cell and capped above, and — unlike the
+    /// fold order and the winding number — it is deliberately **not** rounded.
+    #[test]
+    fn fold_tile_is_off_at_one_cell_and_is_not_stepped() {
+        assert_eq!(fold_tile(1.0), DEFAULT_TILE);
+        assert_eq!(fold_tile(0.2), DEFAULT_TILE);
+        assert_eq!(fold_tile(f32::NAN), DEFAULT_TILE);
+        assert_eq!(fold_tile(1e9), MAX_TILE);
+        // A fractional cell count is a perfectly good mirrored grid whose last
+        // cell is cut off at the frame edge, so an eased binding travels rather
+        // than snapping. This is the one param on this stage where that is true.
+        assert_eq!(fold_tile(2.5), 2.5);
+    }
+
+    /// The inner cutoff is a fraction of `r_max`, clamped, with a broken binding
+    /// meaning no cutoff.
+    #[test]
+    fn fold_inner_is_a_clamped_fraction_of_r_max() {
+        assert_eq!(fold_inner(0.0), DEFAULT_INNER);
+        assert_eq!(fold_inner(0.35), 0.35);
+        assert_eq!(fold_inner(-1.0), 0.0);
+        assert_eq!(fold_inner(4.0), MAX_INNER);
+        assert_eq!(fold_inner(f32::NAN), DEFAULT_INNER);
     }
 }
