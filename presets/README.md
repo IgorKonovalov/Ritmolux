@@ -98,11 +98,26 @@ surfaced error — the engine keeps the last good preset, never crashes (NFR 10)
   **BPM**, not a 0..1 band; `novelty` is an experimental track-change transient;
   `index` is the element's own 0..1 position in a per-element binding, and `0`
   everywhere else. The four `*_raw` escapes carry the pre-v2 absolute magnitudes
-  (see below). The five musical-time variables are ADR-0050's: `beat_index` and
-  `time_since_beat` are always tracked; `beat_in_bar`, `bar_index` and `bar_phase`
-  come from a **gated** downbeat estimator and are counter-derived whenever it is
-  not confident — which, measured on real music, is most of the time, so build an
-  arc on `beat_index` and treat the bar trio as decorative.
+  (see below). The five musical-time variables are ADR-0050's, and they are **not
+  equals** — see the two layers immediately below.
+
+**The two musical-time layers, and why only one of them is load-bearing.**
+`beat_index` and `time_since_beat` are unconditional: always tracked, always
+meaning what they say. `beat_in_bar`, `bar_index` and `bar_phase` come from a
+**gated** downbeat estimator and are counter-derived whenever it is not confident
+— which, measured over 98 minutes of unambiguous 4/4 through the live app, is
+**94 % of audible time** (Plan 0068 Phase 3: **6.8 %** lock on four-on-the-floor
+techno, **0.14 %** on backbeat rock/pop). That is diagnosed rather than
+mysterious: the accent feature is 70 % bass band, and the kick marks every beat
+in four-on-the-floor and the half-bar in a backbeat, so it rarely marks the bar.
+[ADR-0082](../docs/adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md)'s
+`Outcome` carries the measurement and the cause.
+
+So **build an arc on `beat_index`, and treat the bar trio as decorative.** They
+are safe to bind — they stay periodic and never claim a wrong beat 1, which is
+the trade ADR-0050 made deliberately — but an eight-bar structure written on
+`bar_index` is, on most material, an eight-*beat* structure wearing a bar's name.
+Write `mod(beat_index, 16)` when you mean four bars of four.
 - **Functions:** `sin cos abs floor sqrt log min max pow mod clamp lerp
   smoothstep select bin hash noise` (17). `log` is the **natural** log; `bin(x)`
   reads the spectrum at a normalized position; `hash`/`noise` are the seeded
