@@ -17,12 +17,11 @@ someone who picked it up is reading.
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
 | [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move | **approved 2026-07-30** | dev, human | Unblocked — [0045] landed, so the linear-light pipeline exists. Cheaper after the attractor plans settled `particles/`. |
-| [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong | **approved 2026-08-02** | dev, human | Phase 3 is `human` and gates Phase 4; it **is** runnable on this box (the gate is `device_type == Cpu`, not "discrete"). Read [0052]'s and [0055]'s archive entries first — each moved a bind-group layout this plan asserts on. |
+| [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong | **approved 2026-08-02** | dev, human | Phase 3 is `human` and gates Phase 4; it **is** runnable on this box (the gate is `device_type == Cpu`, not "discrete"). Read [0052]'s and [0055]'s archive entries first — each moved a bind-group layout this plan asserts on, and [0072] added one: **`background-lut-layout` now shares `[Texture, Texture, Sampler]` with `fragment-field-lut-layout`**, with its per-pair evidence already measured and recorded in `core/src/render/background.rs`'s `Background` doc comment. Phase 1's allowlist must be derived from the code and pick that entry up. |
 | [0064](0064-the-symmetry-stage-and-the-banded-palette.md) | The symmetry stage and the banded palette | **approved 2026-08-04** | dev, human | Unblocked ([0055] landed), but Phase 4 is `human` and mid-plan, so it does not close in one session. The fold's default is now `tile`, not the disc it was drafted against. |
 | [0067](0067-the-curation-route.md) | The curation route | **approved 2026-08-04** | dev, human | Phase 1 first makes the gate worth trusting — all five preset gates synthesize `AnalysisFrame` and none runs the analyzer. Its Phase 1 touches `core/tests/reactivity.rs`, which [0061] moved into the `coverage` job's sole ownership (ADR-0073) — a change there is now proved by one CI job, not two. |
 | [0068](0068-why-the-downbeat-rarely-locks.md) | Why the downbeat rarely locks | **approved 2026-08-04** | dev, human | Ships a diagnosis and **no fix** on purpose; `CONFIDENCE_THRESHOLD` does not move. Shares no file with anything; Phase 3 is `human` and mid-plan. |
-| [0071](0071-light-that-adds-without-covering.md) | Light that adds without covering (`occlude`) | **approved 2026-08-04** | dev, human | One scalar at the backdrop composite; default `1.0` is byte-identical. Phase 3 is `human` and mid-plan — the default is decided over a **lit** backdrop, because at `bg_bright = 0` the two models are identical. |
-| [0072](0072-the-backdrop-joins-the-palette.md) | The backdrop joins the palette (`bg_hue`) | **approved 2026-08-04** | dev, human | Eleven lit-backdrop presets provably cannot move, fifteen re-tint and get a `human` pass. Two golden fixtures re-blessed and **only** those two; the real risk is ADR-0058 WARP layout aliasing. |
+| [0071](0071-light-that-adds-without-covering.md) | Light that adds without covering (`occlude`) | **approved 2026-08-04** | dev, human | One scalar at the backdrop composite; default `1.0` is byte-identical. Phase 3 is `human` and mid-plan — the default is decided over a **lit** backdrop, because at `bg_bright = 0` the two models are identical. **[0072] has closed underneath it**: a lit backdrop is now the preset's own gradient, so the Phase 3 look decision is taken over sixteen skies that just moved. |
 
 ## Recommended execution sequence
 
@@ -34,13 +33,12 @@ that criterion.
 
 | # | Plan | Why here |
 |---|------|----------|
-| 1 | [0072] | Small engine change with a mid-plan `human` look; gated by nothing. |
-| 2 | [0071] | Same shape. Its Phase 5 retune wants to run as one pass with [backlog 0038] and [backlog 0058] — all three walk the same shipped set. |
-| 3 | [0064] | After the attractor work rather than concurrent with it: its Phase 3 sample grid renders on `attractor_lorenz`, and a look decision taken against a moving target has to be retaken. |
-| 4 | [0053] | Protective rather than additive; moves no pixels. |
-| 5 | [0068] | Blocks nobody. Late because it ships no fix, not because it is unimportant. |
-| 6 | [0067] | The curation route. `reactivity.rs` now runs only in `coverage` (ADR-0073), so a break there shows up in one job. |
-| 7 | [0046] | Touches the attractor's feedback path, cheapest once that file has settled. |
+| 1 | [0071] | Small engine change with a mid-plan `human` look; gated by nothing. Its Phase 5 retune wants to run as one pass with [backlog 0038] and [backlog 0058] — all three walk the same shipped set, which [0072] has just re-tinted. |
+| 2 | [0064] | After the attractor work rather than concurrent with it: its Phase 3 sample grid renders on `attractor_lorenz`, and a look decision taken against a moving target has to be retaken. |
+| 3 | [0053] | Protective rather than additive; moves no pixels. Now carries one more layout pair to allowlist — see its row above. |
+| 4 | [0068] | Blocks nobody. Late because it ships no fix, not because it is unimportant. |
+| 5 | [0067] | The curation route. `reactivity.rs` now runs only in `coverage` (ADR-0073), so a break there shows up in one job. |
+| 6 | [0046] | Touches the attractor's feedback path, cheapest once that file has settled. |
 
 [0045]: done/0045-linear-light-and-bloom.md
 [0046]: 0046-transformed-feedback.md
@@ -56,7 +54,7 @@ that criterion.
 [0067]: 0067-the-curation-route.md
 [0068]: 0068-why-the-downbeat-rarely-locks.md
 [0071]: 0071-light-that-adds-without-covering.md
-[0072]: 0072-the-backdrop-joins-the-palette.md
+[0072]: done/0072-the-backdrop-joins-the-palette.md
 [backlog 0038]: ../design-backlog.md
 [backlog 0058]: ../design-backlog.md
 
@@ -123,6 +121,7 @@ each close recorded, the properties that outlived the plan — moved verbatim to
 [README-archive.md](README-archive.md)** (Plan 0061 Phase 7b). Nothing was
 deleted; it simply stopped being loaded into every session's context.
 
+- [0072 — The backdrop joins the palette](done/0072-the-backdrop-joins-the-palette.md) — closed 2026-08-09. Review: no blockers, no majors, four minors, three nits. **The last surface outside `[palette]` joined it**: no cosine copy remains in `background.rs`, and `saturation` / `palette_mix` fan out to the sky through one binding. Two of the plan's own claims were falsified and are recorded in [ADR-0086](../adrs/0086-the-backdrop-colours-through-the-preset-palette.md)'s `Outcome` — **the two fixtures it ordered re-blessed pin no pixels**, and its "fifteen" is 18 by its own grep (16 in scope, 3 moved). Zero golden baselines changed.
 - [0061 — The build stops paying for what it is not building](done/0061-the-build-stops-paying-for-what-it-is-not-building.md) — closed 2026-08-08. Review: no blockers, two majors, three minors (all five doc drift, all repaired at the close). **Phases 8 and 9 are `human` and carried forward — see Standing.**
 - [0074 — The figure colours by how far it has come](done/0074-the-figure-colours-by-how-far-it-has-come.md) — closed 2026-08-08. Review: no blockers, four minor items (three repaired at the close)
 - [0073 — The fern unfurls and colours by what made it](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md) — closed 2026-08-06. Review: no blockers, two minor doc items repaired at the close
