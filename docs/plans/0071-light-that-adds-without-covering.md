@@ -103,6 +103,38 @@ flowchart TD
   confirmation failure ADR-0061's Notes records — at a black backdrop the two models are identical,
   so a grid rendered there would show nothing and prove nothing.
 
+#### What was rendered (2026-08-09)
+
+Twenty-six captures, in the session scratch directory rather than the repo — nothing here is a
+baseline. Two scenes with different depth models (`swarm_storm`, a luminance depth model via
+`depth_fade`; `lsystem_fern`, a line family with none), each at `occlude` **1.0 / 0.5 / 0.0**, at
+**two** backdrop rungs, as stills **and** as filmstrips:
+
+| rung | `bg_bright` | why |
+|---|---|---|
+| invited | **0.35** | the raise ADR-0056's fix invites, and the value ADR-0085's own evidence was measured at |
+| bright | **0.60** | the Risks section's requirement — at the invited rung alone the sample set shows only the flattering half |
+
+Each rung has a labelled 3x2 contact sheet (`--all`, 960x540), six full-size stills (1280x720, held
+at the realistic levels `bass 0.66 / mid 0.58 / treb 0.28 / onset 0.15`), and six six-frame
+filmstrips (`--signal dynamic:110 --strip 6`, 640x360) for the motion half. Reproduce with a copy of
+each preset whose `bg_bright` line is replaced and an `occlude` line added beside it — `--set`
+reaches audio variables, not params, so the values have to be in the file.
+
+**Both presets keep their own `bg_vignette`** (0.82 on Storm, 0.75 on Fern) rather than being
+flattened for the test. That is deliberate — it is the shipped look — and it is also why the sky is
+most visible in the middle of the frame and the effect is easiest to read there.
+
+Two observations, offered as orientation and **not** as the Phase 3 verdict:
+
+- At the invited rung the difference is **subtle on both presets** at their shipped `brightness`.
+  The figure is brighter than the sky nearly everywhere, so there is little for the occlusion to
+  take away. This is the arithmetic ADR-0085 describes rather than a weak sample: the ceiling binds
+  where the figure is *dim*, and at 1.18 Storm mostly is not.
+- At the bright rung it separates clearly. Storm's particles read duller and greyer at `1.0` and
+  keep their colour at `0.0`; Fern's `glow`-dimmed outer stems are where the line family shows it.
+  Whether that is an improvement is exactly the question Phase 3 asks.
+
 ### Phase 3 — The user decides the default and any per-preset values
 
 - **Owner skill:** human
