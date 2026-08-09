@@ -550,9 +550,19 @@ impl PipelineResources {
             "attractor-decay",
         );
 
+        // Texture, sampler, uniform, **sampler again** — the fourth entry is the
+        // same sampler a second time, and it is there to make this layout a shape
+        // nothing else in the crate has. `occlude` (ADR-0085) needed a uniform in a
+        // pass that had none; see `PRESENT_SHADER` for the measurement that says a
+        // colliding shape silently mis-renders on WARP.
         let present_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("attractor-present-layout"),
-            entries: &[gpu::texture(0, true), gpu::sampler(1)],
+            entries: &[
+                gpu::texture(0, true),
+                gpu::sampler(1),
+                gpu::uniform(2, wgpu::ShaderStages::FRAGMENT),
+                gpu::sampler(3),
+            ],
         });
         let present_pipeline = gpu::fullscreen_pipeline(
             device,
@@ -608,6 +618,7 @@ impl FieldResources {
             field.view_a(),
             &pipelines.field_sampler,
             Some(&pipelines.decay_uniform),
+            false,
         );
         let decay_bg_b = blit_bind_group(
             device,
@@ -616,6 +627,7 @@ impl FieldResources {
             field.view_b(),
             &pipelines.field_sampler,
             Some(&pipelines.decay_uniform),
+            false,
         );
         let present_bg_a = blit_bind_group(
             device,
@@ -623,7 +635,8 @@ impl FieldResources {
             "attractor-present-bg-a",
             field.view_a(),
             &pipelines.field_sampler,
-            None,
+            Some(&pipelines.decay_uniform),
+            true,
         );
         let present_bg_b = blit_bind_group(
             device,
@@ -631,7 +644,8 @@ impl FieldResources {
             "attractor-present-bg-b",
             field.view_b(),
             &pipelines.field_sampler,
-            None,
+            Some(&pipelines.decay_uniform),
+            true,
         );
         Self {
             field,
@@ -700,9 +714,14 @@ pub(super) fn storage_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-/// A texture(+sampler)[+uniform] bind group for the decay/present fullscreen
-/// passes. `uniform` is `Some` for decay (the retention factor) and `None` for
-/// present (no scaling).
+/// A texture(+sampler)[+uniform][+sampler] bind group for the decay/present
+/// fullscreen passes.
+///
+/// `uniform` is the decay buffer for both — the retention factor for decay, and
+/// `occlude` out of the same buffer's second component for present (ADR-0085).
+/// `repeat_sampler` binds the sampler a second time at binding 3 and is the
+/// **present** pass only: it is what makes that layout a fourth shape rather than
+/// a copy of `attractor-decay-layout`'s. See `PRESENT_SHADER`.
 pub(super) fn blit_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
@@ -710,6 +729,7 @@ pub(super) fn blit_bind_group(
     input: &wgpu::TextureView,
     sampler: &wgpu::Sampler,
     uniform: Option<&wgpu::Buffer>,
+    repeat_sampler: bool,
 ) -> wgpu::BindGroup {
     let mut entries = vec![
         wgpu::BindGroupEntry {
@@ -725,6 +745,12 @@ pub(super) fn blit_bind_group(
         entries.push(wgpu::BindGroupEntry {
             binding: 2,
             resource: buf.as_entire_binding(),
+        });
+    }
+    if repeat_sampler {
+        entries.push(wgpu::BindGroupEntry {
+            binding: 3,
+            resource: wgpu::BindingResource::Sampler(sampler),
         });
     }
     device.create_bind_group(&wgpu::BindGroupDescriptor {

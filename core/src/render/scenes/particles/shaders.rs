@@ -806,8 +806,23 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// Present pass: composite the accumulation field to the surface (linear sample,
 /// stretched to fill; aspect ignored as in the reaction-diffusion present).
 pub(super) const PRESENT_SHADER: &str = r#"
+struct Decay { k: vec4<f32> } // x: retention (unread here), y: occlude
+
+// FOUR entries for three resources, with the sampler bound twice. That is not an
+// oversight: `occlude` needed a uniform in a pass that had none, and two
+// bind-group layouts of the same shape mis-render when they coexist on the DX12
+// WARP software adapter (ADR-0021 / Plan 0020) — measured on this very change,
+// where a `[uniform]` group read the backdrop's buffer on WARP while working on
+// hardware. All six three-entry arrangements of {texture, sampler, uniform} are
+// already spoken for (`attractor-decay`, `ink`, `tonemap`, `bloom-up`,
+// `bloom-bright`, and the trails present, which took the last one). A duplicate
+// sampler binding is the cheapest way to a fourth shape — no second texture view,
+// no new binding type. Pinned by
+// `the_two_present_layouts_added_for_occlude_are_shapes_nothing_else_has`.
 @group(0) @binding(0) var field: texture_2d<f32>;
 @group(0) @binding(1) var samp: sampler;
+@group(0) @binding(2) var<uniform> u: Decay;
+@group(0) @binding(3) var samp_unused: sampler;
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
@@ -817,7 +832,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // (luma -> 1) occlude it. The present pipeline blends premultiplied-OVER: `c` is
     // emitted as-is (added over the backdrop), so over the default black backdrop
     // this is byte-identical to the prior opaque present.
+    // …and `occlude` scales that coverage — how much of the backdrop the cloud
+    // holds out (ADR-0085). Reached only when no post stage is active; the chain
+    // owns the seam otherwise and the renderer hands a literal 1.0 here.
     let a = clamp(dot(c, vec3<f32>(0.299, 0.587, 0.114)), 0.0, 1.0);
-    return vec4<f32>(c, a);
+    return vec4<f32>(c, a * u.k.y);
 }
 "#;

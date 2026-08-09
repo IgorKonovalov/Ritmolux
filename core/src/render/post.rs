@@ -168,6 +168,21 @@ pub(crate) fn stage_for(name: &str) -> Option<usize> {
         .position(|params| params.contains(&name))
 }
 
+/// The chain's own parameter vocabulary — names owned by the **composite seam**
+/// rather than by any one stage (ADR-0085).
+///
+/// Disjoint from [`STAGE_PARAMS`] and resolved ahead of it, because a chain-level
+/// name has no stage index to route to: it reaches every stage's fold *and* the
+/// scene's own present, which is the one place a backdrop can be occluded when no
+/// stage is active at all.
+pub const CHAIN_PARAMS: &[&str] = &["occlude"];
+
+/// How much of the scene's coverage the backdrop resolves against, by default:
+/// **all of it**, which is the arithmetic every frame ran before `occlude`
+/// existed (ADR-0085). A literal `1.0` — the multiply it produces is exact, so
+/// an unbound preset renders byte-identically rather than approximately so.
+pub const DEFAULT_OCCLUDE: f32 = 1.0;
+
 /// One skippable post-composite stage (ADR-0031). Crate-internal on purpose: the
 /// composite order is fixed in [`PostChain::new`], not registered, and no preset
 /// or C-ABI caller can reach this seam.
@@ -280,7 +295,7 @@ pub(crate) trait PostStage {
 /// to transparent, `src + dst * (1 - src.a)` reduces to `src` in every channel, so
 /// [`Own`](Self::Own) is bit-identical to a `REPLACE` write — which is why this
 /// distinction costs a load-op and not a second pipeline per stage.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum Fold {
     /// `out` is the next stage's input: this stage owns it. Clear it to
     /// transparent first — it holds the **previous frame's** content otherwise,
@@ -289,7 +304,14 @@ pub(crate) enum Fold {
     /// `out` is the chain's destination, where the backdrop is already painted.
     /// Load and blend over it, so `bg_*` survives underneath wherever this stage's
     /// alpha is below 1.
-    Over,
+    ///
+    /// `occlude` is **how much of that alpha the backdrop resolves against**
+    /// (ADR-0085): the blend computes `src.rgb + bg * (1 - src.a * occlude)`, so
+    /// `1.0` is coverage-as-occlusion exactly as it has always been and `0.0` is
+    /// additive light that never covers. It rides on this variant rather than on
+    /// the stage because it is only meaningful where a backdrop is underneath —
+    /// there is nothing to occlude in a scratch offscreen.
+    Over { occlude: f32 },
 }
 
 impl Fold {
@@ -299,7 +321,23 @@ impl Fold {
             // TRANSPARENT, not BLACK: an opaque clear would hold the backdrop out
             // of every pixel the scene did not cover.
             Self::Own => wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-            Self::Over => wgpu::LoadOp::Load,
+            Self::Over { .. } => wgpu::LoadOp::Load,
+        }
+    }
+
+    /// The factor a stage must multiply its **emitted alpha** by before the blend
+    /// sees it (ADR-0085).
+    ///
+    /// Every stage applies this unconditionally rather than branching on the fold:
+    /// [`Own`](Self::Own) is a literal `1.0`, which over a transparent-cleared
+    /// target leaves the premultiplied-OVER reduction to `REPLACE` exactly intact.
+    /// A stage that read the variant instead would carry a conditional that only
+    /// the destination path exercises, which is the shape of bug ADR-0056's
+    /// two-seams-one-convention Negative bullet describes.
+    pub(crate) fn alpha_scale(self) -> f32 {
+        match self {
+            Self::Own => 1.0,
+            Self::Over { occlude } => occlude,
         }
     }
 }
@@ -434,6 +472,13 @@ pub(crate) struct SceneTarget {
 pub(crate) struct PostChain {
     /// Built once in fixed order; never reordered at runtime.
     stages: [Box<dyn PostStage>; STAGE_COUNT],
+    /// This side's `occlude` (ADR-0085), reset to [`DEFAULT_OCCLUDE`] each frame
+    /// and handed to the last active stage through [`Fold::Over`].
+    ///
+    /// On the chain rather than on a stage because it belongs to the **seam**, not
+    /// to whichever stage happens to be last this frame: a preset that turns bloom
+    /// off must not thereby change how much its figure covers the sky.
+    occlude: f32,
 }
 
 impl PostChain {
@@ -460,6 +505,7 @@ impl PostChain {
                     tier.bloom_levels,
                 )),
             ],
+            occlude: DEFAULT_OCCLUDE,
         };
         // The array above *is* the composite order, and the routing contract is
         // written against the positions below (module docs, ADR-0018). Assert they
@@ -497,6 +543,7 @@ impl PostChain {
     /// Reset every stage's params to their defaults (once per frame, before the
     /// active preset's bindings are routed).
     pub(crate) fn reset_params(&mut self) {
+        self.occlude = DEFAULT_OCCLUDE;
         for stage in self.stages.iter_mut() {
             stage.reset_params();
         }
@@ -527,6 +574,33 @@ impl PostChain {
         for stage in self.stages.iter_mut() {
             stage.set_exposure(exposure);
         }
+    }
+
+    /// Apply a [`CHAIN_PARAMS`] name, returning whether the chain owned it.
+    ///
+    /// Clamped to `[0, 1]` here rather than in the shaders: past 1 the blend's
+    /// `1 - a * occlude` goes negative and *subtracts* the backdrop under the
+    /// figure — the Plan 0045 Phase 4b defect, reachable again through a bound
+    /// expression. Below 0 it would add the backdrop twice. A `[smoothing]` ease
+    /// sweeps this continuously, so the clamp is on the value the frame uses, not
+    /// on what the author wrote.
+    pub(crate) fn set_chain_param(&mut self, name: &str, value: f32) -> bool {
+        if name == "occlude" {
+            self.occlude = if value.is_finite() {
+                value.clamp(0.0, 1.0)
+            } else {
+                DEFAULT_OCCLUDE
+            };
+            return true;
+        }
+        false
+    }
+
+    /// This frame's `occlude` for **this side**. Read by the renderer to hand the
+    /// same factor to the scene's own present, which is the composite's other
+    /// backdrop-facing seam when no stage is active (ADR-0085).
+    pub(crate) fn occlude(&self) -> f32 {
+        self.occlude
     }
 
     /// Drop every stage's lazily-built resources (capture rebuild — keeps a
@@ -615,7 +689,9 @@ impl PostChain {
             let fold = if next_stage.is_some() {
                 Fold::Own
             } else {
-                Fold::Over
+                Fold::Over {
+                    occlude: self.occlude,
+                }
             };
             if let Some(stage) = self.stages.get_mut(stage) {
                 draw_calls += stage.resolve(queue, encoder, &out, surface, fold);

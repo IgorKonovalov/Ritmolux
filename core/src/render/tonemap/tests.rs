@@ -568,3 +568,64 @@ fn the_tonemap_layout_is_a_shape_no_other_layout_in_core_has() {
         mine.1
     );
 }
+
+/// **The two present layouts `occlude` widened are shapes nothing else has**
+/// (Plan 0071 Phase 1, ADR-0085) — the second and third entries in this
+/// enumeration that are asserted on rather than printed.
+///
+/// They are asserted because this hazard was not hypothetical here: it was
+/// *measured on this change*. `occlude` needed a uniform in the trails present
+/// and the attractor present, neither of which had one. The first attempt put it
+/// in a second bind group holding the uniform alone — `[uniform]`, which is
+/// `background-bind-layout`'s shape, and the backdrop pass is live in every
+/// frame. On the DX12 WARP software adapter the trails present then read the
+/// *backdrop's* buffer: `occlude` moved 0 of 196 608 channels there while moving
+/// 3 307 of them on the hardware adapter, and every capture test in the suite
+/// went green over it. That is the whole failure mode — silent, adapter-specific,
+/// and invisible to a tolerance.
+///
+/// Unlike the tonemap above, these two are also asserted **against each other**:
+/// both are present passes, and a swarm-over-trails preset and an attractor
+/// preset can be live in the same session.
+#[test]
+fn the_two_present_layouts_added_for_occlude_are_shapes_nothing_else_has() {
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut files = Vec::new();
+    rs_files(&src, &mut files);
+    files.sort();
+
+    let mut all: Vec<(String, Vec<Kind>)> = Vec::new();
+    for file in &files {
+        let text = std::fs::read_to_string(file).expect("read a core source file");
+        let name = file
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("?")
+            .to_string();
+        all.extend(layouts_in(&text, &name));
+    }
+    assert!(all.len() >= 20, "the scan is not seeing the crate");
+
+    for label in ["trails-present-bind-layout", "attractor-present-layout"] {
+        let mine = all
+            .iter()
+            .find(|(found, _)| found == label)
+            .unwrap_or_else(|| panic!("`{label}` is in the enumeration"));
+        let sharers: Vec<&str> = all
+            .iter()
+            .filter(|(found, kinds)| kinds == &mine.1 && found != &mine.0)
+            .map(|(found, _)| found.as_str())
+            .collect();
+        assert!(
+            sharers.is_empty(),
+            "`{label}` is {:?}, and so is {sharers:?}. This pass carries \
+             `occlude` (ADR-0085), and a colliding layout is why an earlier \
+             shape of it silently did nothing on WARP while working on \
+             hardware. The odd-looking arrangement — a sampler before the \
+             uniform in one, a sampler bound twice in the other — is what buys \
+             the uniqueness this asserts; pick another free shape rather than \
+             tidying it away.",
+            mine.1
+        );
+    }
+}

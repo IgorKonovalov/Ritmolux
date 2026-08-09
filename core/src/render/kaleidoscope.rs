@@ -269,7 +269,7 @@ fn edge_sample_radius(edge: f32, m: f32) -> f32 {
 
 const SHADER: &str = r#"
 struct K {
-    v: vec4<f32>, // x: order, y: angle, z: aspect, w: unused
+    v: vec4<f32>, // x: order, y: angle, z: aspect, w: occlude (ADR-0085)
     c: vec4<f32>, // x,y: fold centre (uv), z: falloff band (fraction of r_max),
                   //   w: edge treatment (ADR-0061; integral, quantized CPU-side)
 }
@@ -371,7 +371,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // alpha to 1 is what made the falloff fade to black and fight `bg_*` instead
     // of landing on it. The three fill arms leave `w = 1`, so they carry the
     // source's own alpha out to the frame edge.
-    return col * w;
+    //
+    // Alpha is scaled once more by `occlude` — how much of the fold's coverage the
+    // backdrop underneath resolves against (ADR-0085). 1.0 folding into a scratch
+    // offscreen and by default, where the multiply is exact.
+    let out = col * w;
+    return vec4<f32>(out.rgb, out.a * u.v.w);
 }
 "#;
 
@@ -673,7 +678,7 @@ impl PostStage for Kaleidoscope {
             &res.uniform,
             0,
             bytemuck::bytes_of(&K {
-                v: [order, self.angle, aspect, 0.0],
+                v: [order, self.angle, aspect, fold.alpha_scale()],
                 c: [
                     fold_center(self.center_x),
                     fold_center(self.center_y),

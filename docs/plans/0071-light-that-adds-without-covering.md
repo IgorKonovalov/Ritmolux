@@ -1,6 +1,6 @@
 # 0071 — Light that adds without covering: `occlude`, decided from a sample set
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing. It touches `post.rs`'s
+> **Status:** **in-progress 2026-08-09** (was approved 2026-08-04) — gated by nothing. It touches `post.rs`'s
 > backdrop composite, which [0064](0064-the-symmetry-stage-and-the-banded-palette.md) does not (that
 > is the fold shader). Phases 1-2 are `dev` and end in a rendered grid; **Phase 3 is `human`** (the
 > user picks the default, in motion, over a **lit** backdrop — at `bg_bright = 0` the two models are

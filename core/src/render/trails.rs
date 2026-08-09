@@ -59,7 +59,7 @@ const MAX_FADE: f32 = 0.98;
 /// [`gpu::FULLSCREEN_VS_UV_FLIPPED`] — this pass samples what another pass
 /// rendered, so it needs the Y flip.
 const TRAILS_SHADER: &str = r#"
-struct Fade { v: vec4<f32> } // x: fade factor
+struct Fade { v: vec4<f32> } // x: fade factor, y: occlude (present pass only)
 
 @group(0) @binding(0) var<uniform> u: Fade;
 @group(0) @binding(1) var t_composited: texture_2d<f32>;
@@ -82,14 +82,34 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
 /// Present body; same Y-flipped prelude as [`TRAILS_SHADER`].
 const PRESENT_SHADER: &str = r#"
-@group(0) @binding(0) var t_accum: texture_2d<f32>;
-@group(0) @binding(1) var samp: sampler;
+struct Fade { v: vec4<f32> } // x: fade factor (unread here), y: occlude
+
+// SAMPLER, UNIFORM, TEXTURE — a deliberate order, and the last permutation of
+// the three this crate had free. Two bind-group layouts with the same shape
+// mis-render when they coexist on the DX12 WARP software adapter (ADR-0021 /
+// Plan 0020), and `occlude` needed a uniform here where there had been none.
+// Every other arrangement was taken: `[texture, sampler, uniform]` is
+// `attractor-decay`, `[uniform, texture, sampler]` is `ink`, `[texture, uniform,
+// sampler]` is `tonemap`, `[sampler, texture, uniform]` is `bloom-up`, `[uniform,
+// sampler, texture]` is `bloom-bright`. A SECOND GROUP holding the uniform alone
+// was tried first and is exactly what does not work: `[uniform]` is
+// `background-bind-layout`'s shape, and on WARP this pass read the backdrop's
+// buffer instead of this one — `occlude` measurably did nothing there while
+// working on the hardware adapter. Pinned by
+// `the_two_present_layouts_added_for_occlude_are_shapes_nothing_else_has`.
+@group(0) @binding(0) var samp: sampler;
+@group(0) @binding(1) var<uniform> u: Fade;
+@group(0) @binding(2) var t_accum: texture_2d<f32>;
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // Alpha travels with the colour (ADR-0055) — the accumulation is premultiplied
     // and the chain composites over the backdrop downstream.
-    return textureSample(t_accum, samp, in.uv);
+    let c = textureSample(t_accum, samp, in.uv);
+    // …scaled by how much of that coverage the backdrop resolves against
+    // (ADR-0085). `1.0` at the fold into a scratch offscreen and by default, where
+    // this multiply is exact and the frame is what it always was.
+    return vec4<f32>(c.rgb, c.a * u.v.y);
 }
 "#;
 
@@ -208,9 +228,17 @@ impl Resources {
             gpu::FULLSCREEN_VS_UV_FLIPPED,
             PRESENT_SHADER,
         );
+        // Sampler, uniform, texture — the order is the shape, and the shape is the
+        // point. See `PRESENT_SHADER`. The uniform is the SAME buffer the feedback
+        // pass reads for `fade`, so one write per frame feeds both passes and the
+        // two shaders take different components of it.
         let present_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("trails-present-bind-layout"),
-            entries: &[gpu::texture(0, true), gpu::sampler(1)],
+            entries: &[
+                gpu::sampler(0),
+                gpu::uniform(1, wgpu::ShaderStages::FRAGMENT),
+                gpu::texture(2, true),
+            ],
         });
         let make_present_bg = |accum_view: &wgpu::TextureView, label: &str| {
             device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -219,11 +247,15 @@ impl Resources {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: wgpu::BindingResource::TextureView(accum_view),
+                        resource: wgpu::BindingResource::Sampler(&sampler),
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&sampler),
+                        resource: fade_uniform.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(accum_view),
                     },
                 ],
             })
@@ -439,7 +471,10 @@ impl PostStage for Trails {
             &res.fade_uniform,
             0,
             bytemuck::bytes_of(&Fade {
-                v: [fade, 0.0, 0.0, 0.0],
+                // One write, two passes: `fade` for the feedback below, `occlude`
+                // for the present at the bottom (ADR-0085). The present applies it
+                // unconditionally — `Fold::Own` is a literal 1.0.
+                v: [fade, fold.alpha_scale(), 0.0, 0.0],
             }),
         );
 

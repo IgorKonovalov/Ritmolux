@@ -7,8 +7,8 @@
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
 use super::{
-    BLOOM, Fold, KALEIDOSCOPE, POST_GRID_STEP, PostChain, PostStage, Routing, STAGE_COUNT, TRAILS,
-    internal_grid_size, route,
+    BLOOM, CHAIN_PARAMS, DEFAULT_OCCLUDE, Fold, KALEIDOSCOPE, POST_GRID_STEP, PostChain, PostStage,
+    Routing, STAGE_COUNT, TRAILS, internal_grid_size, route,
 };
 use crate::render::TierConfig;
 use crate::render::background::Background;
@@ -469,7 +469,15 @@ fn pump(ctx: &RenderContext, stage: &mut dyn PostStage, surface: (u32, u32)) {
             label: Some("post-resize"),
         });
     stage.begin(&mut encoder, surface);
-    stage.resolve(&ctx.queue, &mut encoder, &view, surface, Fold::Over);
+    stage.resolve(
+        &ctx.queue,
+        &mut encoder,
+        &view,
+        surface,
+        Fold::Over {
+            occlude: DEFAULT_OCCLUDE,
+        },
+    );
     ctx.queue.submit(std::iter::once(encoder.finish()));
 }
 
@@ -1013,4 +1021,405 @@ fn active_stages_stay_in_chain_order() {
             .collect();
         assert_eq!(stages, expected, "exactly the active stages run");
     }
+}
+
+// -----------------------------------------------------------------------
+// `occlude`: how much of the scene's coverage the backdrop resolves
+// against (Plan 0071 Phase 1, ADR-0085)
+// -----------------------------------------------------------------------
+
+/// The chain-active fixture: a swarm over a **lit** backdrop with `trails`
+/// bound, so the last active stage folds onto the backdrop. Shared with
+/// `a_lit_backdrop_survives_where_the_swarm_drew_nothing`, which is the
+/// ADR-0056 guard at the same seam.
+const CHAIN_FIXTURE: &str = include_str!("../../../tests/fixtures/swarm_lit_backdrop.toml");
+
+/// The empty-chain fixture: an attractor cloud over a lit backdrop with **no
+/// stage bound at all**, so the scene presents straight onto the backdrop and
+/// owns the seam itself. See its header for why it is this scene and not an
+/// additive one, and for why `density` is its off switch.
+const NO_STAGE_FIXTURE: &str =
+    include_str!("../../../tests/fixtures/attractor_lit_backdrop_no_stage.toml");
+
+/// The square capture size — a multiple of [`POST_GRID_STEP`], so the trails
+/// stage runs at the target size and its present is a 1:1 sample rather than a
+/// resample that would blur the arithmetic being asserted.
+const OCCLUDE_CAPTURE_SIZE: u32 = 256;
+
+/// Frames per capture. Long enough for the swarm's seeded velocities to damp
+/// and the reaction-diffusion field to develop structure.
+const OCCLUDE_CAPTURE_FRAMES: u32 = 40;
+
+/// Slack for half-precision rounding, the same shape the two lit-backdrop
+/// guards use: the composite is `Rgba16Float`, so a value of magnitude `m` is
+/// stored to roughly `m / 1024` and two captures quantize different sums.
+///
+/// It is slack, not a tolerance. Upstream of the tonemap the resolve is a plain
+/// premultiplied OVER, so every claim below is **exact** in real arithmetic.
+fn occlude_slack(value: f32) -> f32 {
+    (4.0 / 1024.0) * value.abs().max(1.0)
+}
+
+/// The value of a top-level `key = "<number>"` line in `fixture`, or `NaN` when
+/// it is absent — so a fixture stays the single statement of what is captured.
+fn fixture_value(fixture: &str, key: &str) -> f32 {
+    fixture
+        .lines()
+        .find_map(|line| {
+            let rest = line.trim_start().strip_prefix(key)?;
+            let rest = rest.trim_start().strip_prefix('=')?;
+            rest.trim().trim_matches('"').parse::<f32>().ok()
+        })
+        .unwrap_or(f32::NAN)
+}
+
+/// The **linear composite** — the frame the tonemap is about to map — for
+/// `fixture` with `overrides` applied to its `[params]` table.
+///
+/// Reads upstream of the tonemap for the reason both lit-backdrop guards do:
+/// the tonemap scales all three channels off the brightest one (ADR-0046), so
+/// downstream of it every claim about one pixel is entangled with the whole
+/// frame. Upstream there is no confound.
+///
+/// Builds and drops **one** renderer per call rather than holding four: a
+/// second live device in a binary is what the software adapter falls over on,
+/// and building GPU resources mid-run shifts what the trails stage resolves to
+/// on WARP.
+///
+/// Every override key is stripped from the fixture first and re-appended, which
+/// works because `[params]` is the last table in both fixtures.
+fn linear_composite(fixture: &str, overrides: &[(&str, f32)]) -> Option<Vec<f32>> {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::{HeadlessOptions, Renderer};
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: OCCLUDE_CAPTURE_SIZE,
+        height: OCCLUDE_CAPTURE_SIZE,
+        prefer_software: true,
+    }) {
+        Ok(renderer) => renderer,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    let base: String = fixture
+        .lines()
+        .filter(|line| {
+            let line = line.trim_start();
+            !overrides
+                .iter()
+                .any(|(key, _)| line.starts_with(key) && !line.starts_with('#'))
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut toml = base;
+    for (key, value) in overrides {
+        toml.push_str(&format!("\n{key} = \"{value}\"\n"));
+    }
+    let preset = Preset::from_toml_str(&toml).expect("the occlude fixture parses with overrides");
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+
+    // Every binding is a constant, so the analysis frame only has to be
+    // well-formed.
+    let frame = AnalysisFrame::default();
+    renderer
+        .capture_preset(&name, &frame, OCCLUDE_CAPTURE_FRAMES)
+        .expect("capture the occlude fixture");
+
+    let device = renderer.ctx.device.clone();
+    let queue = renderer.ctx.queue.clone();
+    let src = renderer
+        .tonemap
+        .src_texture()
+        .expect("the tonemap built its input while capturing")
+        .clone();
+    let (buffer, padded_bpr) =
+        capture::create_linear_readback(&device, OCCLUDE_CAPTURE_SIZE, OCCLUDE_CAPTURE_SIZE);
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("occlude-readback"),
+    });
+    capture::record_copy(
+        &mut encoder,
+        &src,
+        &buffer,
+        padded_bpr,
+        OCCLUDE_CAPTURE_SIZE,
+        OCCLUDE_CAPTURE_SIZE,
+    );
+    queue.submit(std::iter::once(encoder.finish()));
+    Some(
+        capture::read_back_linear(
+            &device,
+            &buffer,
+            OCCLUDE_CAPTURE_SIZE,
+            OCCLUDE_CAPTURE_SIZE,
+            padded_bpr,
+        )
+        .expect("read back the linear composite"),
+    )
+}
+
+/// The three captures plus the backdrop, checked against the arithmetic
+/// ADR-0085 defines: `out = scene + bg * (1 - alpha * occlude)`.
+///
+/// Split out because both paths — chain-active and empty-chain — assert exactly
+/// the same three properties on exactly the same shape of data, and the point of
+/// Phase 1 is that the two paths agree. `label` names the path in failures.
+fn assert_occlude_arithmetic(label: &str, fixture: &str, silence: (&str, f32)) {
+    // The backdrop alone — `B`, PER PIXEL. Rendered from **this fixture's own
+    // file** with the scene switched off, because since ADR-0086 the sky colours
+    // through the preset's own palette: a second fixture is a second sky, and the
+    // property would be measured against a backdrop that was never underneath.
+    // An earlier draft did exactly that and read 106 382 false violations.
+    //
+    // Per pixel rather than as one number, because the sky is **not flat**:
+    // `background.rs` paints a gentle vertical gradient (0.72 to 1.0) whatever
+    // `bg_vignette` is. A constancy check written against a flat sky failed on
+    // both fixtures at 0.049 — the gradient, not the seam.
+    let Some(backdrop) = linear_composite(fixture, &[silence]) else {
+        return;
+    };
+    let Some(covering) = linear_composite(fixture, &[("occlude", 1.0)]) else {
+        return;
+    };
+    let Some(half) = linear_composite(fixture, &[("occlude", 0.5)]) else {
+        return;
+    };
+    let Some(adding) = linear_composite(fixture, &[("occlude", 0.0)]) else {
+        return;
+    };
+    assert_eq!(covering.len(), backdrop.len(), "{label}: capture sizes");
+    assert_eq!(covering.len(), half.len(), "{label}: capture sizes");
+    assert_eq!(covering.len(), adding.len(), "{label}: capture sizes");
+
+    // Printed rather than asserted on: the means are what tell a reader whether a
+    // failure below is the seam or the fixture. A lit capture whose mean equals
+    // the backdrop's is a scene that drew nothing.
+    for (name, cap) in [
+        ("backdrop   ", &backdrop),
+        ("occlude = 1", &covering),
+        ("occlude = 0", &adding),
+    ] {
+        let sum: f32 = cap.iter().sum();
+        eprintln!("{label} {name}: mean {:.5}", sum / cap.len() as f32);
+    }
+
+    let (mut held_out, mut not_monotone, mut off_midpoint) = (0usize, 0usize, 0usize);
+    let (mut occluding, mut worst_midpoint, mut worst_held) = (0usize, 0.0f32, 0.0f32);
+    for index in 0..covering.len() {
+        // Alpha is not part of the claim — the blend consumes it, and the
+        // tonemap downstream writes its own.
+        if index % 4 == 3 {
+            continue;
+        }
+        let (b, c, h, a) = (backdrop[index], covering[index], half[index], adding[index]);
+        // 1. At `occlude = 0` the scene never takes light *away* from the
+        //    backdrop: light adds, it does not cover.
+        let shortfall = b - a;
+        if shortfall > worst_held {
+            worst_held = shortfall;
+        }
+        if shortfall > occlude_slack(b) {
+            held_out += 1;
+        }
+        // 2. Less occlusion never darkens: the factor is monotone in `occlude`.
+        if a < c - occlude_slack(c) {
+            not_monotone += 1;
+        }
+        // 3. A value between the two ends lands **exactly** between them —
+        //    `bg * (1 - alpha * occlude)` is affine in `occlude`, so 0.5 is the
+        //    midpoint and not merely somewhere in the interval. That is what
+        //    makes this a blend of the two models rather than a switch between
+        //    them (ADR-0085's continuity argument).
+        let midpoint = 0.5 * (c + a);
+        let miss = (h - midpoint).abs();
+        if miss > worst_midpoint {
+            worst_midpoint = miss;
+        }
+        if miss > occlude_slack(midpoint) {
+            off_midpoint += 1;
+        }
+        // Non-vacuity: where the two ends genuinely differ, the seam is
+        // occluding something and the knob reaches it.
+        if a - c > 8.0 * occlude_slack(c) {
+            occluding += 1;
+        }
+    }
+    let channels = covering.len() / 4 * 3;
+    eprintln!(
+        "{label}: {occluding} of {channels} channels move between occlude 1 and \
+         0; worst backdrop shortfall {worst_held:.5}, worst |half - midpoint| \
+         {worst_midpoint:.5}"
+    );
+
+    // --- Non-vacuity first: a path where `occlude` changes nothing would pass
+    // all three properties trivially. ---
+    // A fiftieth of the frame's channels; both fixtures clear it with room. The
+    // bar is deliberately low, because what it has to exclude is a path where
+    // `occlude` reaches nothing at all — which reads as **zero**, not as a small
+    // number. It read exactly zero on WARP while this was being written, from a
+    // bind-group layout that collided with the backdrop's.
+    assert!(
+        occluding * 50 > channels,
+        "{label}: only {occluding} of {channels} channels differ between \
+         occlude = 1 and occlude = 0. This path is not occluding the backdrop \
+         at all, so the properties below are vacuous — check that the fixture \
+         still lights its backdrop and still draws over it, and that this \
+         pass's bind-group layout is still a shape no other live pipeline has \
+         (see `PRESENT_SHADER` in trails.rs)"
+    );
+
+    // --- The properties. ---
+    assert_eq!(
+        held_out, 0,
+        "{label}: at occlude = 0, {held_out} channels fall BELOW the unoccluded \
+         backdrop (worst {worst_held:.5}). Light that never covers can only \
+         add, so every pixel must be at least as bright as the sky alone — a \
+         shortfall means the seam is still resolving against a coverage it was \
+         told to ignore"
+    );
+    assert_eq!(
+        not_monotone, 0,
+        "{label}: {not_monotone} channels are darker at occlude = 0 than at \
+         occlude = 1 — the factor is not monotone, so `occlude` is not scaling \
+         the alpha the blend resolves against"
+    );
+    assert_eq!(
+        off_midpoint, 0,
+        "{label}: {off_midpoint} channels at occlude = 0.5 are not the midpoint \
+         of the two ends (worst {worst_midpoint:.5}). The resolve is affine in \
+         `occlude`, so a mid value must be a blend of the two models and not a \
+         switch between them"
+    );
+}
+
+/// **The chain-active path**: a post stage is bound, so the last active stage
+/// folds onto the backdrop and `occlude` reaches it through [`Fold::Over`].
+///
+/// This is the path ADR-0085's rendered evidence was measured on — every shipped
+/// swarm and line preset composes at least one stage.
+#[test]
+fn occlude_scales_the_backdrop_the_chains_last_stage_resolves_against() {
+    // Non-vacuity, before any GPU work: the fixture must still describe the
+    // configuration this covers.
+    let backdrop = fixture_value(CHAIN_FIXTURE, "bg_bright");
+    let trails = fixture_value(CHAIN_FIXTURE, "trails");
+    assert!(
+        backdrop > 0.0,
+        "swarm_lit_backdrop.toml no longer lights its backdrop (bg_bright = \
+         {backdrop}); at a black backdrop the two occlusion models are \
+         identical and this proves nothing (ADR-0085)"
+    );
+    assert!(
+        trails > 0.0,
+        "swarm_lit_backdrop.toml no longer binds `trails` (= {trails}), so no \
+         stage folds onto the backdrop and this test has moved to the other \
+         path without saying so"
+    );
+    // Silenced with zero-area sprites: the quads rasterize no fragments, so the
+    // trail accumulation stays empty, the chain resolves fully transparent, and
+    // the capture is the backdrop alone through the same pipeline as the lit ones.
+    assert_occlude_arithmetic("chain-active", CHAIN_FIXTURE, ("size", 0.0));
+}
+
+/// **The empty-chain path**: no stage is active, so the scene presents straight
+/// onto the backdrop and `occlude` reaches its own present pass instead.
+///
+/// The two paths are separate code and a factor applied to only one of them is
+/// the bug this phase could most plausibly have shipped (Plan 0071's Risks).
+/// They are asserted with the same function on purpose.
+#[test]
+fn occlude_releases_the_backdrop_with_no_post_stage_active() {
+    let backdrop = fixture_value(NO_STAGE_FIXTURE, "bg_bright");
+    assert!(
+        backdrop > 0.0,
+        "rd_lit_backdrop_no_stage.toml no longer lights its backdrop \
+         (bg_bright = {backdrop})"
+    );
+    // The whole point of this fixture is that the chain is EMPTY. A stage
+    // binding would move the seam to the chain and silently duplicate the test
+    // above.
+    for stage_params in super::STAGE_PARAMS {
+        for name in stage_params.iter() {
+            assert!(
+                fixture_value(NO_STAGE_FIXTURE, name).is_nan(),
+                "rd_lit_backdrop_no_stage.toml now binds `{name}`, so a post \
+                 stage is active and the scene no longer presents onto the \
+                 backdrop — which is the seam this fixture exists to reach"
+            );
+        }
+    }
+    // Silenced by depositing no light: the accumulation stays black, and this
+    // scene's alpha is that accumulation's luminance — so the present emits
+    // neither light nor coverage and the capture is the backdrop alone.
+    assert_occlude_arithmetic("empty-chain", NO_STAGE_FIXTURE, ("brightness", 0.0));
+}
+
+/// `Fold` carries the factor, and `Own` carries a **literal** 1.0 — which is
+/// what makes an unbound preset byte-identical rather than approximately so.
+#[test]
+fn the_own_fold_scales_alpha_by_exactly_one() {
+    assert_eq!(Fold::Own.alpha_scale(), 1.0);
+    assert_eq!(Fold::Over { occlude: 1.0 }.alpha_scale(), 1.0);
+    assert_eq!(Fold::Over { occlude: 0.0 }.alpha_scale(), 0.0);
+    assert_eq!(Fold::Over { occlude: 0.25 }.alpha_scale(), 0.25);
+    // The default is the value that changes nothing.
+    assert_eq!(DEFAULT_OCCLUDE, 1.0);
+}
+
+/// The chain owns `occlude` by name, clamps it into `[0, 1]`, and resets it
+/// every frame.
+///
+/// The clamp is not decoration: past 1 the blend's `1 - a * occlude` goes
+/// negative and *subtracts* the backdrop under the figure, which is the Plan
+/// 0045 Phase 4b defect reachable again through a bound expression. A
+/// `[smoothing]` ease sweeps this param continuously, so it is the value the
+/// frame uses that has to be in range.
+#[test]
+fn the_chain_clamps_and_resets_occlude() {
+    let Some(ctx) = headless_context_or_skip() else {
+        return;
+    };
+    let mut chain = PostChain::new(&ctx.device, ctx.surface_format(), &FLOOR);
+    assert_eq!(chain.occlude(), DEFAULT_OCCLUDE);
+
+    assert!(chain.set_chain_param("occlude", 0.25));
+    assert_eq!(chain.occlude(), 0.25);
+    assert!(
+        !chain.set_chain_param("trails", 0.5),
+        "a stage's name is not"
+    );
+    assert_eq!(chain.occlude(), 0.25, "and does not touch this");
+
+    for (value, expected) in [(2.0, 1.0), (-1.0, 0.0), (f32::NAN, DEFAULT_OCCLUDE)] {
+        chain.set_chain_param("occlude", value);
+        assert_eq!(chain.occlude(), expected, "{value} resolves to {expected}");
+    }
+
+    chain.set_chain_param("occlude", 0.0);
+    chain.reset_params();
+    assert_eq!(
+        chain.occlude(),
+        DEFAULT_OCCLUDE,
+        "an unbound preset must not inherit the last one's occlusion"
+    );
+}
+
+/// The chain's vocabulary and the stages' are **disjoint**, which is what lets
+/// `resolve_route` test one before the other and take the first match.
+#[test]
+fn the_chain_vocabulary_does_not_overlap_the_stages() {
+    for name in CHAIN_PARAMS {
+        assert!(
+            super::stage_for(name).is_none(),
+            "`{name}` is claimed by both the chain and a stage; route \
+             resolution takes the first match, so one of them would never be \
+             reached"
+        );
+    }
+    assert!(CHAIN_PARAMS.contains(&"occlude"));
 }

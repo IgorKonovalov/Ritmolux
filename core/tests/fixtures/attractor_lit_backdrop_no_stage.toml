@@ -1,0 +1,55 @@
+# OCCLUDE GUARD FIXTURE - do not tune (Plan 0071 Phase 1, ADR-0085).
+# It pins NO pixels and has no committed baseline. It belongs to
+# `occlude_releases_the_backdrop_with_no_post_stage_active` in
+# `core/src/render/post.rs`, which captures it at occlude 1.0 / 0.5 / 0.0 plus a
+# backdrop-only reference.
+#
+# It is the counterpart to `swarm_lit_backdrop.toml`, which covers the OTHER
+# composite path. Three things here are the point and none is decoration:
+#
+#  - `bg_bright > 0`. At a black backdrop the two occlusion models are identical
+#    (ADR-0085's Notes; the same confirmation failure ADR-0061 records for the
+#    fold edge), so a capture there would show nothing and prove nothing.
+#
+#  - NO POST STAGE IS BOUND. `trails`, `kaleido_*` and `bloom` are all absent, so
+#    the chain is empty and the scene presents STRAIGHT onto the backdrop - which
+#    is the seam this fixture exists to reach. Binding any stage moves the
+#    occlusion to the chain's last stage and silently retires the test.
+#
+#  - `brightness` IS THE OFF SWITCH. The test re-renders this same file at
+#    `brightness = 0` to get the backdrop alone: the particles still step, but
+#    they deposit no light, so the accumulation stays black and the present -
+#    whose alpha is the accumulated LUMINANCE - emits neither light nor
+#    coverage. (`density` would not do it: it is `[particles]` structural config
+#    rather than a bindable param, and `active_particles` floors it at one.)
+#    That reference has to come from THIS preset, because since ADR-0086 the sky
+#    colours through the preset's own palette - a second fixture would be a
+#    second sky, measured against a backdrop that was never underneath.
+#
+# The attractor rather than an additive family because its present blends
+# PREMULTIPLIED_ALPHA_BLENDING (ADR-0026) and so genuinely occludes on this path,
+# and because its alpha is DERIVED FROM LUMINANCE - the depth model ADR-0085 says
+# has the most to lose from dropping occlusion, and the one the sample set in
+# Phase 2 is judged on. The additive families (swarm, lines, emitter) blend colour
+# One/One with no stage under them, so their backdrop already survives in full and
+# `occlude` has nothing to scale there - see `Scene::set_occlude`.
+#
+# The flat [palette] keeps the figure one colour, so a failure reads as a number
+# rather than as a hue. `bg_vignette = 0` keeps the sky bright into the corners
+# (it stays a gentle vertical gradient regardless - see `background.rs`), so the
+# signal does not fade out where the cloud is thinnest.
+system = "attractor"
+name   = "fixture_attractor_lit_backdrop_no_stage"
+
+[palette]
+stops = [{ at = 0.0, color = "#ffcf80" }, { at = 1.0, color = "#ffcf80" }]
+
+[params]
+size       = "1.0"
+hue        = "0.3"
+brightness = "0.35"
+fade       = "0.9"
+
+bg_hue      = "0.55"
+bg_vignette = "0"
+bg_bright   = "0.35"

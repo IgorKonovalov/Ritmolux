@@ -59,7 +59,7 @@ struct Params {
     b: vec4<f32>,
     // xy: pan (field-space offset, ADR-0018), z: color_center, w: saturation
     c: vec4<f32>,
-    // x: palette_mix (A/B crossfade), yzw: unused
+    // x: palette_mix (A/B crossfade), y: occlude (ADR-0085), zw: unused
     d: vec4<f32>,
 }
 
@@ -127,7 +127,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     col = col * (glow * (1.0 - 0.25 * r));
     col = col + vec3<f32>(flash * 0.12);
 
-    return vec4<f32>(col, 1.0);
+    // Alpha 1.0: this field covers every pixel, which is the coverage it honestly
+    // has (ADR-0056). `occlude` scales how much of that the backdrop underneath
+    // resolves against (ADR-0085) — at 0 the sky adds through an opaque field.
+    // Reached only when no post stage is active; the chain owns the seam otherwise
+    // and the renderer hands a literal 1.0 here.
+    return vec4<f32>(col, params.d.y);
 }
 "#;
 
@@ -170,6 +175,11 @@ pub struct FragmentFieldScene {
     saturation: f32,
     /// A/B palette crossfade position (Plan 0020 Phase 4); 0 = palette A.
     palette_mix: f32,
+    /// How much of this field's (total) coverage the backdrop resolves against
+    /// (ADR-0085). Set by the renderer every frame through
+    /// [`Scene::set_occlude`](super::Scene::set_occlude) — **not** a named param,
+    /// so it is not reset by `reset_params`.
+    occlude: f32,
 }
 
 impl FragmentFieldScene {
@@ -267,6 +277,7 @@ impl FragmentFieldScene {
             color_center: DEFAULT_COLOR_CENTER,
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
+            occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
 }
@@ -297,6 +308,10 @@ impl Scene for FragmentFieldScene {
 
     fn set_time(&mut self, time: f32) {
         self.time = time;
+    }
+
+    fn set_occlude(&mut self, occlude: f32) {
+        self.occlude = occlude;
     }
 
     fn set_palette(&mut self, palette: &Palette) {
@@ -361,7 +376,7 @@ impl Scene for FragmentFieldScene {
             a: [self.time, aspect.max(0.1), self.warp, self.hue],
             b: [self.zoom, self.glow, self.flash, self.color_span],
             c: [self.pan_x, self.pan_y, self.color_center, self.saturation],
-            d: [self.palette_mix, 0.0, 0.0, 0.0],
+            d: [self.palette_mix, self.occlude, 0.0, 0.0],
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
 

@@ -53,6 +53,16 @@ fn each_namespace_resolves_to_its_owner() {
     for name in crate::render::kaleidoscope::PARAMS {
         assert_eq!(resolve_route(name, swarm), ParamRoute::Stage(KALEIDOSCOPE));
     }
+    // The composite seam itself (`occlude`, ADR-0085) — the chain's own
+    // vocabulary, which belongs to no stage in it and must therefore not resolve
+    // to one.
+    for name in crate::render::post::CHAIN_PARAMS {
+        assert_eq!(
+            resolve_route(name, swarm),
+            ParamRoute::Composite,
+            "`{name}` belongs to the composite seam, not to a stage"
+        );
+    }
     // The terminal engine-wide ink pass (ADR-0032) — `ink_*` and `paper_*`.
     for name in crate::render::ink::PARAMS {
         assert_eq!(
