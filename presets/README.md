@@ -220,15 +220,15 @@ preset folder — so while you are editing a file it re-rolls on each save.
 
 | System            | Named `[params]`                                                         |
 |-------------------|--------------------------------------------------------------------------|
-| `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
-| `swarm`           | `force` `spin` `burst` `field_freq` `hue` `brightness` `size` `shape` `points` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
-| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
-| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
-| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
-| `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` |
-| `attractor`       | `a` `b` `c` `d` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` |
-| `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` |
-| `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` |
+| `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
+| `swarm`           | `force` `spin` `burst` `field_freq` `hue` `brightness` `size` `shape` `points` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
+| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
+| `attractor`       | `a` `b` `c` `d` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
+| `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -1468,6 +1468,43 @@ three rendered iterations of chasing exposure and contour density, all downstrea
 of a cause that was neither. To darken, change the palette's stops or the scene's
 own exposure; to *move* the tonal centre, keep the centre inside `0..1` and know
 that `-0.1` and `0.9` are the same place.
+
+### Hard bands — `palette_steps` and `palette_contour`
+
+The gradient is a smooth ramp, and `palette_steps` turns it into hard graphic
+**bands** ([ADR-0078](../docs/adrs/0078-banding-is-a-palette-coordinate-operation.md)):
+the palette coordinate snaps to one of `palette_steps` band centres just before the
+LUT read. `palette_contour` then darkens a hairline where the coordinate crosses a
+band edge. Both default to `0` (off), and off is the *exact* identity, so adding
+them to an existing preset is the only thing that changes it.
+
+| Param | Default | Range that reads |
+|---|---|---|
+| `palette_steps` | `0` (off) | `0` = smooth, `4`–`16` graphic, up to `64` |
+| `palette_contour` | `0` (none) | `0` = none, `0.3` a hint, `1` a solid dark line |
+
+Three things to know before binding them:
+
+- **`palette_steps` is stepped.** It rounds to a whole number, like
+  `kaleido_order`: a fractional band count leaves every boundary crawling across
+  the field rather than stepping, which reads as shimmer. An eased or bound
+  `palette_steps` still eases — it snaps at each half-integer.
+- **`palette_contour` is inert on `attractor`, `swarm`, `emitter` and the line
+  scenes, and nothing warns.** A contour needs a *gradient across a fragment* to
+  sit in, and those scenes take one palette sample per particle or per segment —
+  the attractor's in the vertex stage, where the derivative the contour is measured
+  against does not exist at all. **Banding reaches every scene; contours reach the
+  continuous-field scenes**, `fragment_field` and `reaction_diffusion`. The
+  parameter is accepted everywhere because it *is* a known name, so no
+  unknown-param warning fires; this paragraph is the warning.
+- **Banding fights bloom.** The bright pass blurs exactly the hard edges this
+  creates, so a preset cannot have crisp bands and heavy `bloom_amount` at full
+  strength. Pick one.
+
+The cyclic *hue* character of a banded reference image is already reachable without
+this: the LUT is repeat-addressed, so a `color_span` above 1 wraps it and repeats
+the whole gradient across the field. `palette_steps` adds only the hard edge
+between one cycle's colours and the next.
 
 Full reference — built-in names, custom-stops rules, the per-scene colour params,
 and the A/B crossfade — is in **[docs/preset-palettes.md](../docs/preset-palettes.md)**.

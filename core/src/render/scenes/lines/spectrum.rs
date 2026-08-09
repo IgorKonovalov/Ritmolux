@@ -73,7 +73,7 @@ use super::{
 };
 use crate::dsp::AnalysisFrame;
 use crate::preset::Easing;
-use crate::render::palette::{Palette, desaturate};
+use crate::render::palette::{self, Palette, desaturate};
 
 /// Maps `thickness` to an NDC-y half-width — the same scale the other line
 /// scenes use, so a `thickness` that reads well on the rose reads the same here.
@@ -168,6 +168,8 @@ pub const PARAMS: &[&str] = &[
     "hue_spread",
     "saturation",
     "palette_mix",
+    "palette_steps",
+    "palette_contour",
     "brightness",
     "glow",
     "zoom",
@@ -478,6 +480,11 @@ pub struct SpectrumScene {
     hue_spread: f32,
     saturation: f32,
     palette_mix: f32,
+    /// Hard palette bands and their contour (ADR-0078), raw as the preset
+    /// bound them -- `palette::band_steps` / `band_contour` condition them on
+    /// the way to the sample site.
+    palette_steps: f32,
+    palette_contour: f32,
     brightness: f32,
     glow: f32,
     scale: f32,
@@ -523,6 +530,8 @@ impl SpectrumScene {
             hue_spread: DEFAULT_HUE_SPREAD,
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
+            palette_steps: palette::DEFAULT_PALETTE_STEPS,
+            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             brightness: DEFAULT_BRIGHTNESS,
             glow: DEFAULT_GLOW,
             scale: DEFAULT_SCALE,
@@ -593,6 +602,8 @@ impl Scene for SpectrumScene {
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
+        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
+        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.brightness = DEFAULT_BRIGHTNESS;
         self.glow = DEFAULT_GLOW;
         self.scale = DEFAULT_SCALE;
@@ -627,6 +638,8 @@ impl Scene for SpectrumScene {
             "hue_spread" => self.hue_spread = value,
             "saturation" => self.saturation = value,
             "palette_mix" => self.palette_mix = value,
+            "palette_steps" => self.palette_steps = value,
+            "palette_contour" => self.palette_contour = value,
             "brightness" => self.brightness = value,
             "glow" => self.glow = value,
             "zoom" => self.zoom = value,
@@ -745,7 +758,14 @@ impl Scene for SpectrumScene {
             // it spans the palette from the lowest element to the highest.
             let hue =
                 self.series_value(SERIES_HUE, i, self.hue) + self.hue_spread * (i as f32 / span);
-            let rgb = desaturate(self.palette.sample(hue, self.palette_mix), self.saturation);
+            // Hard bands on the palette coordinate (ADR-0078), the canonical
+            // `palette::band_coord` called rather than copied. `palette_steps <= 1`
+            // returns it untouched, so an unbound preset is byte-unchanged.
+            let banded = palette::band_coord(hue, self.palette_steps);
+            let rgb = desaturate(
+                self.palette.sample(banded, self.palette_mix),
+                self.saturation,
+            );
 
             if let Some(slot) = self.lengths.get_mut(i) {
                 *slot = element_length(level, base, scale);

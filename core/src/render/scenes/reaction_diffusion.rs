@@ -191,6 +191,9 @@ struct Present {
     b: vec4<f32>,
     // x: zoom, yz: pan (field-space view transform, ADR-0018), w: occlude (ADR-0085)
     c: vec4<f32>,
+    // x: palette_steps (integral, quantized CPU-side), y: palette_contour
+    // (ADR-0078), zw: unused
+    d: vec4<f32>,
 }
 @group(0) @binding(0) var present_field: texture_2d<f32>;
 @group(0) @binding(1) var present_samp: sampler;
@@ -206,6 +209,36 @@ struct Present {
 fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
     let luma = dot(c, vec3<f32>(0.299, 0.587, 0.114));
     return vec3<f32>(luma) + (c - vec3<f32>(luma)) * s;
+}
+
+// Shared `palette_steps` (mirrors core/src/render/palette.rs::band_coord
+// verbatim, ADR-0078): snap the palette coordinate to a band centre before the
+// LUT read. Below 1.5 steps it is the exact identity, not a one-band degenerate.
+fn band_coord(t: f32, steps: f32) -> f32 {
+    if (steps < 1.5) {
+        return t;
+    }
+    return (floor(t * steps) + 0.5) / steps;
+}
+
+// Shared `palette_contour` (ADR-0078; the WGSL is the implementation, copied
+// verbatim at each fragment-stage site — palette.rs has no CPU counterpart to be
+// canonical, since `fwidth` exists only here). Darkens within one PIXEL of a band
+// edge, so the line has the same weight where the field is shallow and where it
+// is steep.
+//
+// This scene already draws `contour` lines from the V field's own iso-levels;
+// this is a different family of lines on a different quantity (the PALETTE
+// coordinate, which `color_span` may wrap several times over that same field), so
+// the two stack rather than duplicate.
+fn band_contour(t: f32, steps: f32, amount: f32) -> f32 {
+    let f = t * steps;
+    let w = max(fwidth(f), 1e-5);
+    if (steps < 1.5 || amount <= 0.0) {
+        return 1.0;
+    }
+    let d = min(fract(f), 1.0 - fract(f));
+    return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d));
 }
 
 fn tap_v(uv: vec2<f32>) -> f32 {
@@ -321,9 +354,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // sets the spanned range, `color_center`/`hue` slide the window, and the A/B
     // LUTs crossfade by `palette_mix` before the shared `saturation`.
     let coord = v * color_span + color_center + hue;
-    let ca = textureSample(lut_a, lut_samp, vec2<f32>(coord, 0.5)).rgb;
-    let cb = textureSample(lut_b, lut_samp, vec2<f32>(coord, 0.5)).rgb;
-    let col = apply_saturation(mix(ca, cb, clamp(palette_mix, 0.0, 1.0)), saturation);
+    // Hard bands, then the contour from the SAME coordinate (ADR-0078), so the
+    // dark line follows the palette's iso-lines through the field.
+    let banded = band_coord(coord, pp.d.x);
+    let ca = textureSample(lut_a, lut_samp, vec2<f32>(banded, 0.5)).rgb;
+    let cb = textureSample(lut_b, lut_samp, vec2<f32>(banded, 0.5)).rgb;
+    let mixed = mix(ca, cb, clamp(palette_mix, 0.0, 1.0))
+        * band_contour(coord, pp.d.x, pp.d.y);
+    let col = apply_saturation(mixed, saturation);
 
     // Hatch/comb: stripes along the contour tangent (perpendicular to grad),
     // gated to the slopes so flats stay clean.
@@ -380,6 +418,8 @@ struct PresentParams {
     b: [f32; 4],
     /// x: zoom, yz: pan (view transform, ADR-0018), w: occlude (ADR-0085).
     c: [f32; 4],
+    /// x: palette_steps, y: palette_contour (ADR-0078); zw unused.
+    d: [f32; 4],
 }
 
 /// The GPU-side state, built lazily on first render (see the module docs).
@@ -651,6 +691,11 @@ pub struct ReactionDiffusionScene {
     color_center: f32,
     saturation: f32,
     palette_mix: f32,
+    /// Hard palette bands and their contour (ADR-0078), raw as the preset
+    /// bound them -- `palette::band_steps` / `band_contour` condition them on
+    /// the way to the sample site.
+    palette_steps: f32,
+    palette_contour: f32,
     /// Shared view transform (ADR-0018 / Plan 0025 Phase 2): `zoom` scales the
     /// present-pass sample window about its centre, `pan_*` offsets it.
     zoom: f32,
@@ -709,6 +754,8 @@ impl ReactionDiffusionScene {
             color_center: DEFAULT_COLOR_CENTER,
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
+            palette_steps: palette::DEFAULT_PALETTE_STEPS,
+            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
@@ -799,6 +846,8 @@ pub const PARAMS: &[&str] = &[
     "color_center",
     "saturation",
     "palette_mix",
+    "palette_steps",
+    "palette_contour",
     "zoom",
     "pan_x",
     "pan_y",
@@ -846,6 +895,8 @@ impl Scene for ReactionDiffusionScene {
         self.color_center = DEFAULT_COLOR_CENTER;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
+        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
+        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
@@ -869,6 +920,8 @@ impl Scene for ReactionDiffusionScene {
             "color_center" => self.color_center = value,
             "saturation" => self.saturation = value,
             "palette_mix" => self.palette_mix = value,
+            "palette_steps" => self.palette_steps = value,
+            "palette_contour" => self.palette_contour = value,
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
@@ -919,6 +972,8 @@ impl Scene for ReactionDiffusionScene {
             color_center,
             saturation,
             palette_mix,
+            palette_steps,
+            palette_contour,
             zoom,
             pan_x,
             pan_y,
@@ -946,6 +1001,12 @@ impl Scene for ReactionDiffusionScene {
                 a: [*hue, *contour, *hatch, *glow],
                 b: [*color_span, *color_center, *saturation, *palette_mix],
                 c: [*zoom, *pan_x, *pan_y, *occlude],
+                d: [
+                    palette::band_steps(*palette_steps),
+                    palette::band_contour(*palette_contour),
+                    0.0,
+                    0.0,
+                ],
             }),
         );
 

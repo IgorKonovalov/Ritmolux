@@ -646,6 +646,8 @@ pub const PARAMS: &[&str] = &[
     "hue_center",
     "saturation",
     "palette_mix",
+    "palette_steps",
+    "palette_contour",
     "zoom",
     "pan_x",
     "pan_y",
@@ -691,6 +693,11 @@ pub struct EmitterScene {
     hue_center: f32,
     saturation: f32,
     palette_mix: f32,
+    /// Hard palette bands and their contour (ADR-0078), raw as the preset
+    /// bound them -- `palette::band_steps` / `band_contour` condition them on
+    /// the way to the sample site.
+    palette_steps: f32,
+    palette_contour: f32,
     zoom: f32,
     pan_x: f32,
     pan_y: f32,
@@ -862,6 +869,8 @@ impl EmitterScene {
             hue_center: DEFAULT_HUE_CENTER,
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
+            palette_steps: palette::DEFAULT_PALETTE_STEPS,
+            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
@@ -931,6 +940,8 @@ impl Scene for EmitterScene {
         self.hue_center = DEFAULT_HUE_CENTER;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
+        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
+        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
@@ -957,6 +968,8 @@ impl Scene for EmitterScene {
             "hue_center" => self.hue_center = value,
             "saturation" => self.saturation = value,
             "palette_mix" => self.palette_mix = value,
+            "palette_steps" => self.palette_steps = value,
+            "palette_contour" => self.palette_contour = value,
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
@@ -1003,8 +1016,14 @@ impl Scene for EmitterScene {
                 unit(object.seed, channel::HUE),
                 self.hue,
             );
+            // Hard bands on the palette coordinate (ADR-0078), the canonical
+            // `palette::band_coord` called rather than copied. `palette_steps <= 1`
+            // returns it untouched, so an unbound preset is byte-unchanged.
             let base = palette::desaturate(
-                self.palette.sample(coord, self.palette_mix),
+                self.palette.sample(
+                    palette::band_coord(coord, self.palette_steps),
+                    self.palette_mix,
+                ),
                 self.saturation,
             );
             let bright = brightness * envelope(u) * twinkle_factor(object.seed, time, twinkle);
