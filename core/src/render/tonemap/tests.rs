@@ -420,27 +420,64 @@ const MARKERS: &[(&str, Kind, Vis)] = &[
 /// entry for a pair that was *deliberately separated*, recording a fix as a
 /// tolerated collision.
 ///
-/// `min_binding_size` is deliberately **not** in the shape. The emitter's fix
-/// changed both at once, so which of the two did the work is not established,
-/// and folding in the one whose effect is unmeasured would split pairs on an
-/// assumption. Visibility is in because it is a structural property of the
-/// layout; the size is left out and guarded by the comment at its site.
+/// **`min_binding_size` is in the shape too, and that was measured rather than
+/// assumed** (Plan 0053 Phase 3). Phase 2 left it out because the emitter's fix
+/// moved the mask and the size together, so which one did the work was not
+/// established. Phase 3 established it, twice and independently: adding an
+/// explicit size — and *nothing else* — to `background-bind-layout` and to
+/// `blend-bind-layout` moved WARP onto the hardware adapter's numbers in three
+/// configurations that were rendering the wrong picture. Both sites carry the
+/// before/after tables.
+///
+/// So an explicit size is a real separation, and this shape says so: the two
+/// fixes are load-bearing, and dropping either back to a bare `gpu::uniform`
+/// re-collides its pair and fails the assertion below.
 struct Layout {
     /// The file the layout is built in — for the failure messages, not the key.
     file: String,
     /// The descriptor's `label`, or a synthetic one for a computed label.
     label: String,
-    /// `(what it binds, which stages see it)`, in binding order.
-    shape: Vec<(Kind, String)>,
+    /// `(what it binds, which stages see it, whether it declares a minimum
+    /// size)`, in binding order.
+    shape: Vec<Binding>,
 }
 
-/// `[Uniform:FRAGMENT, Texture:FRAGMENT]` — the form the messages print.
-fn shape_str(shape: &[(Kind, String)]) -> String {
+/// One entry's contribution to a [`Layout::shape`]: kind, visibility, and
+/// **whether** it declares a `min_binding_size` — deliberately not *which*.
+///
+/// Recording the value would split two layouts whose sizes are spelled
+/// differently but equal, and a false split is the one direction of error this
+/// scan must not make: it would silently stop reporting a pair that does
+/// collide. "Declares one" over-reports instead, which is the safe way to be
+/// wrong.
+type Binding = (Kind, String, bool);
+
+/// `[Uniform:FRAGMENT+size, Texture:FRAGMENT]` — the form the messages print.
+fn shape_str(shape: &[Binding]) -> String {
     let parts: Vec<String> = shape
         .iter()
-        .map(|(kind, vis)| format!("{kind:?}:{vis}"))
+        .map(|(kind, vis, sized)| format!("{kind:?}:{vis}{}", if *sized { "+size" } else { "" }))
         .collect();
     format!("[{}]", parts.join(", "))
+}
+
+/// Whether the entry a marker at `at` opens declares a `min_binding_size`.
+///
+/// Only a **buffer** entry has the field at all, and only the full-literal
+/// spelling can set it — every helper in `MARKERS` passes `None`. So this looks
+/// for the first `min_binding_size:` after the marker, which is inside that
+/// entry's own `BindingType::Buffer { … }` block.
+fn declares_min_size(body: &str, at: usize, kind: Kind, rule: Vis) -> bool {
+    const FIELD: &str = "min_binding_size:";
+    if !matches!(kind, Kind::Uniform | Kind::Storage) || !matches!(rule, Vis::Preceding) {
+        return false;
+    }
+    match body[at..].find(FIELD) {
+        Some(hit) => !body[at + hit + FIELD.len()..]
+            .trim_start()
+            .starts_with("None"),
+        None => false,
+    }
 }
 
 /// The `ShaderStages::` identifier at or after `from`, and where it starts.
@@ -588,7 +625,11 @@ fn layouts_in(text: &str, file: &str) -> Vec<Layout> {
                 .find(|(marker, ..)| body.as_bytes()[index..].starts_with(marker.as_bytes()));
             match matched {
                 Some((marker, kind, rule)) => {
-                    shape.push((*kind, visibility(body, index, *rule, &label)));
+                    shape.push((
+                        *kind,
+                        visibility(body, index, *rule, &label),
+                        declares_min_size(body, index, *kind, *rule),
+                    ));
                     index += marker.len();
                 }
                 None => index += 1,
@@ -764,67 +805,75 @@ struct AllowedCollision {
     evidence: &'static str,
 }
 
-/// The prefix an entry uses while its measurement is still owed.
-const EVIDENCE_OWED: &str = "EVIDENCE: none yet";
+/// The measurement rig every entry below was taken on, stated once.
+///
+/// Windows 11, DX12, `Renderer::new_headless` at 160x100 over 40 frames, the
+/// same `AnalysisFrame` `golden.rs` uses. "hardware" is
+/// `prefer_software: false` and "WARP" is `prefer_software: true`, with
+/// `adapter_is_software()` read back on both so neither side is a hope. Each
+/// number is the mean 8-bit channel value over the whole frame.
+///
+/// **Every entry carries a control**, because two adapters disagreeing is not
+/// by itself aliasing. The control is the same scene with the colliding
+/// pipeline absent: there the two adapters agree to **0.02 of one 8-bit level**,
+/// which is the noise floor every "agrees" below is measured against.
+const RIG: &str = "2026-08-09, DX12 hardware vs WARP, 160x100/40 frames";
 
 /// The pairs of same-shaped layouts this crate accepts (ADR-0058).
 ///
-/// Nothing may be added here without a measurement. The list is checked in both
-/// directions: a colliding pair with no entry fails, and an entry naming a pair
-/// that no longer collides fails too — so separating a pair later cannot leave a
-/// stale allowance behind that would silently cover a *different* collision if
-/// the shapes ever met again.
+/// Nothing may be added here without a measurement. The list is checked in
+/// three directions: a colliding pair with no entry fails; an entry naming a
+/// pair that no longer collides fails, so separating a pair later cannot leave
+/// a stale allowance behind that would silently cover a *different* collision
+/// if the shapes ever met again; and an entry whose `evidence` does not record
+/// a comparison fails, because an entry with no measurement is not an entry.
 const ALLOWED: &[AllowedCollision] = &[
-    // --- `[Uniform:FRAGMENT]`: four single-uniform fullscreen passes ---
-    // ADR-0058 Alternative A is rejected for exactly this group. A single
-    // fragment-visible uniform is the correct and minimal shape for a fullscreen
-    // pass, and there is no free variant of it: a uniform a fragment shader
-    // reads must be FRAGMENT- or VERTEX_FRAGMENT-visible, and the second is
-    // taken. Padding them apart means every future fullscreen pass inherits a
-    // dummy binding to work around one software adapter's bug.
-    AllowedCollision {
-        a: "background-bind-layout",
-        b: "fragment-field-uniform-layout",
-        why: "both are the minimal fullscreen shape; padding either distorts \
-              shipping code to dodge a software adapter (ADR-0058 Alt A)",
-        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
-    },
-    AllowedCollision {
-        a: "background-bind-layout",
-        b: "rd-init-layout",
-        why: "both are the minimal fullscreen shape (ADR-0058 Alt A)",
-        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
-    },
+    // --- `[Uniform:FRAGMENT]`: the fullscreen scenes' single uniforms ---
+    //
+    // `background-bind-layout` was a member of this group and is NOT any more:
+    // Phase 3 measured that collision rendering the wrong picture on WARP, and
+    // `background.rs` now declares an explicit `min_binding_size`. See its
+    // comment for the before/after. What is left is the two scenes, plus the
+    // test-only disc.
     AllowedCollision {
         a: "fragment-field-uniform-layout",
         b: "rd-init-layout",
-        why: "both are the minimal fullscreen shape (ADR-0058 Alt A); co-live \
-              only across a preset transition, never within one preset",
-        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+        why: "both are the minimal fullscreen shape and ADR-0058 Alt A rejects \
+              padding it; co-live only across a preset dissolve, never within \
+              one preset",
+        evidence: "AGREES. Measured mid-dissolve, fragment field -> \
+                   reaction-diffusion, both over a lit backdrop: hardware \
+                   116.370 169.731 151.559, WARP 116.341 169.712 151.535, \
+                   identical lit-pixel counts. Inside the 0.02-level noise \
+                   floor the no-collision controls set.",
     },
     // --- `[Uniform:FRAGMENT]`, the test-only stand-in ---
     // `disc-bind-layout` models a scene inside `post/tests.rs`. Separating it
     // would mean padding a test shader with a binding it does not use, which is
     // Alternative A again with the distortion moved into the instrument.
     AllowedCollision {
-        a: "background-bind-layout",
-        b: "disc-bind-layout",
-        why: "the disc is a test-only stand-in scene; both fragment-readable \
-              single-uniform shapes are taken, so separation means padding a \
-              test shader",
-        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
-    },
-    AllowedCollision {
         a: "disc-bind-layout",
         b: "fragment-field-uniform-layout",
-        why: "the disc is a test-only stand-in scene (see above)",
-        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+        why: "the disc is a test-only stand-in scene, and no device ever holds \
+              both: `post/tests.rs` builds the disc, a `Background` and the \
+              post stages and no scene, while only a `Renderer` builds a \
+              scene and no `Renderer` builds the disc",
+        evidence: "AGREES, and the pair is not constructible — this is the one \
+                   entry whose evidence is an argument plus a proxy rather than \
+                   the two layouts rendered together, because there is no \
+                   configuration that puts them together. Proxy: `post/tests.rs` \
+                   run on both adapters reports identical numbers for every \
+                   statistic the disc and the backdrop feed — disc x/y 1.0000 \
+                   and 1.0000, backdrop mean 0.42401, occlude 0.83148 / 0.85120 \
+                   empty-chain and 0.42279 / 0.42892 chain-active, all equal to \
+                   five decimals on hardware and WARP.",
     },
     AllowedCollision {
         a: "disc-bind-layout",
         b: "rd-init-layout",
         why: "the disc is a test-only stand-in scene (see above)",
-        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+        evidence: "AGREES, and not constructible — same argument and the same \
+                   proxy as the entry above.",
     },
     // --- `[Texture, Texture, Sampler]`: the two palette-LUT groups ---
     AllowedCollision {
@@ -832,35 +881,16 @@ const ALLOWED: &[AllowedCollision] = &[
         b: "fragment-field-lut-layout",
         why: "both sample an A/B gradient pair through one shared sampler, so \
               the shape is what the palette system is, not a choice either made",
-        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
-    },
-    // --- `[Uniform:VERTEX_FRAGMENT]`: the two vertex+fragment uniforms ---
-    // Neither mask can be narrowed: both shaders read the buffer from both
-    // stages. And the emitter's mask is itself the recorded fix for a MEASURED
-    // collision with `swarm-bind-layout` (`scenes/emitter.rs`) — narrowing it
-    // back would undo that, not separate this.
-    AllowedCollision {
-        a: "emitter-bind-layout",
-        b: "renderer.rs (computed label)",
-        why: "both shaders read the uniform from the vertex and fragment \
-              stages; the emitter's mask is the recorded fix for its measured \
-              collision with the swarm and must not be narrowed",
-        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
-    },
-    // --- `[Uniform, Texture, Texture, Sampler]`: trails and the transition ---
-    // Genuinely co-live: a cross-preset dissolve between two `trails`-binding
-    // presets puts both in one command buffer. Separation means renumbering
-    // bindings in a shipped shader on one side — and reordering the
-    // *declaration* alone would move this test without necessarily moving what
-    // the adapter keys on, which is a guard-defeating fix rather than a
-    // separation.
-    AllowedCollision {
-        a: "trails-bind-layout",
-        b: "blend-bind-layout",
-        why: "two two-texture fullscreen passes; separating means renumbering \
-              a shipped shader's bindings, and a declaration-order shuffle \
-              would move this test without provably moving the adapter",
-        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+        evidence: "AGREES, and this pair is the reason the entry is worth \
+                   having rather than obvious: it was live and colliding \
+                   THROUGHOUT the fragment-field mis-render Phase 3 found, and \
+                   fixing the uniform group alone made the frame correct — so \
+                   this pair was measurably not the one aliasing. After the \
+                   fix, fragment field over a lit backdrop: hardware 131.010 \
+                   170.559 141.381, WARP 130.989 170.538 141.359. Supersedes \
+                   the 2026-08-08 Plan 0072 measurement in `background.rs`'s \
+                   `Background` docs, which reached the same verdict from the \
+                   other side.",
     },
 ];
 
@@ -972,24 +1002,34 @@ fn no_two_layouts_share_a_shape_without_recorded_evidence() {
         stale.join(", ")
     );
 
-    // The debt, surfaced on a **passing** run. ADR-0058's rule is that an entry
-    // with no recorded measurement is not an entry; Plan 0053 Phase 2 seeds the
-    // list so the build is green and Phase 3 measures. Until then this says so
-    // out loud rather than letting a green run read as a cleared list.
+    // ADR-0058's rule, enforced rather than printed (Plan 0053 Phase 4). Phase 2
+    // seeded this list with `EVIDENCE: none yet` so the build stayed green while
+    // Phase 3 measured; Phase 3 measured, so the debt is now a failure. **An
+    // entry with no recorded measurement is not an entry** — adding a pair here
+    // to turn a red build green, without rendering the configuration on both
+    // adapters, is the suppression this whole mechanism exists to refuse.
     let owed: Vec<String> = ALLOWED
         .iter()
-        .filter(|entry| entry.evidence.starts_with(EVIDENCE_OWED))
+        .filter(|entry| !entry.evidence.starts_with("AGREES"))
         .map(|entry| format!("{} + {}", entry.a, entry.b))
         .collect();
-    if !owed.is_empty() {
-        eprintln!(
-            "ADR-0058 DEBT: {} of {} allowlist entries carry no measurement \
-             yet: {}",
-            owed.len(),
-            ALLOWED.len(),
-            owed.join(", ")
-        );
-    }
+    assert!(
+        owed.is_empty(),
+        "{} of {} allowlist entries carry no measurement: {}. Render the \
+         pair's configuration on the hardware adapter and on WARP, compare, \
+         and record the numbers in `evidence` — `RIG` describes the rig and \
+         every existing entry shows the form. A pair that does NOT agree is a \
+         defect: fix it by separation rather than by writing an entry that \
+         records the mis-render. An explicit `min_binding_size` was sufficient \
+         twice — see `background.rs` and `transition.rs`.",
+        owed.len(),
+        ALLOWED.len(),
+        owed.join(", ")
+    );
+    eprintln!(
+        "{} allowlist entries, all carrying a measurement ({RIG})",
+        ALLOWED.len()
+    );
 }
 
 /// **The bloom stage's four layouts are four distinct shapes** (ADR-0058's

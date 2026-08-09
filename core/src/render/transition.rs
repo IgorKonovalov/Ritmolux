@@ -602,10 +602,46 @@ impl Pipeline {
             gpu::FULLSCREEN_VS_UV_FLIPPED,
             SHADER,
         );
+        // **The explicit `min_binding_size` is the fix for a measured WARP
+        // mis-render, not tidiness (Plan 0053 Phase 3, ADR-0058). Do not drop it
+        // back to `gpu::uniform`.**
+        //
+        // With a bare `gpu::uniform` this layout is byte-identical to
+        // `trails-bind-layout`, and the two are live together in exactly the
+        // situation this stage exists for: a dissolve between two presets that
+        // both bind `trails`. On the DX12 WARP software adapter that collision
+        // **renders the wrong picture**. Measured mid-dissolve at 160x100:
+        //
+        // | adapter          | mean RGB                | lit pixels |
+        // |------------------|-------------------------|------------|
+        // | hardware         | 17.572 48.211 50.116    | 4168       |
+        // | WARP, bare       | 08.999 38.682 45.794    | 4001       |
+        // | WARP, this fix   | 17.573 48.215 50.129    | 4169       |
+        //
+        // The control is what makes this the collision rather than the adapter:
+        // rendered **alone**, with no dissolve running and this pipeline never
+        // built, each of the two presets agrees between the adapters to 0.014 of
+        // one 8-bit level. Only the cross-fade — the one moment both layouts are
+        // on the device — diverges, and only on WARP.
+        //
+        // This mattered nowhere in the suite because no capture test runs a
+        // dissolve between two `trails`-binding presets; `core/tests/transition.rs`
+        // uses flat static pairs.
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("blend-bind-layout"),
             entries: &[
-                gpu::uniform(0, wgpu::ShaderStages::FRAGMENT),
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: std::num::NonZeroU64::new(
+                            std::mem::size_of::<BlendUniform>() as u64,
+                        ),
+                    },
+                    count: None,
+                },
                 gpu::texture(1, true),
                 gpu::texture(2, true),
                 gpu::sampler(3),
