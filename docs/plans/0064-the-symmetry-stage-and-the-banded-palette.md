@@ -172,6 +172,37 @@ flowchart LR
   outcome** — the tile is the most likely candidate, being the most "texture" and least "figure" of
   the set.
 
+#### Phase 4 outcome — decided 2026-08-09, from the sixteen contact sheets
+
+**No term was dropped.** All five ship.
+
+| decision | value | read off |
+|---|---|---|
+| `kaleido_zoom` unit | **rescaled to periods** — `zoom = 1` advances exactly one ring at any `kaleido_radial` | not the grid — raised during Phase 3 and settled before any preset could bind the raw `log r` form |
+| `kaleido_spiral` | **ships** | set A: a clear twist at radial 1.6-2.2, nearly invisible at 1.15, subtler on sparse sources — a dependency to document, not a reason to drop |
+| `kaleido_tile` | **ships** | set C: tile 2/3 give a real wallpaper motif with the rosette as the unit; it read better than the plan predicted |
+| `kaleido_inner` default | **0.06** | set D: indistinguishable from 0 on every source, and it caps the worst minification for free |
+| `kaleido_radial` documented range | **1.3-2.2**, below ~1.2 degenerate | set A: at 1.15 the rings are dense enough to read as a radial starburst rather than as rings, and it is also where minification is worst |
+| `palette_steps` / `palette_contour` | **4-12** and **0-0.5** | set B: 16+ approaches the smooth ramp, 0.8 is a deliberate topographic look — both documented as regions rather than as limits |
+
+**The aliasing number Phase 4 was supposed to read off an image does not exist**, and that is the
+honest outcome rather than a skipped step: set D shows **no visible aliasing onset** at any of the six
+cutoffs on any of the three sources at capture resolution. `kaleido_inner` is therefore shipping as a
+**styling control with a protective side effect**, not as the rescue the plan expected it to be. The
+0.06 default is chosen for costing nothing, not for fixing something visible.
+
+**Two findings from reading the grid, neither of which changes a decision:**
+
+- **The portrait half of the field rows is uninformative.** Every portrait cell of `fragment_kaleido`
+  is a magnified centre rather than the rosette. Confirmed **pre-existing on clean `main`** by a
+  control render at both sizes, so it is upstream of this plan — but it means the "every row at both
+  aspects" requirement is satisfied mechanically while the field's portrait rows answer nothing.
+  Related to [design-backlog 0010](../design-backlog.md).
+- **The attractor sheets are near-black** because `trails = 0` was set globally, and an attractor *is*
+  its accumulation. Written up as
+  [backlog 0079](../design-backlog.md#0079--an-accumulating-figure-rendered-with-trails--0-is-not-a-sparse-source-it-is-a-blank-one-and-a-whole-third-of-a-decision-grid-was-unreadable-because-of-it);
+  it cost the plan its sparse-source evidence, which Phase 6 had to answer live instead.
+
 ### Phase 5 — lock it in: a fixture that would notice, and the doc sweep
 
 - **Owner skill:** dev

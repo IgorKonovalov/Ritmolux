@@ -1653,4 +1653,96 @@ one: a link checker that silently passes is worse than none.
 resolve, so nothing is broken today — it is *unguarded*, and it re-accumulates on exactly the
 close-ceremony `git mv` that Plan 0060 already proved nobody catches by eye.
 
+---
+
+## Entries 0078-0079 — from Plan 0064's Phase 4 and Phase 6 (2026-08-09), the symmetry stage
+
+## 0078 — `kaleido_tile` is a discrete quantity that is not quantized, so it is the one term of the composed map an author cannot bind
+
+**Raised by:** `preset-author`, at [Plan 0064](plans/0064-the-symmetry-stage-and-the-banded-palette.md)
+Phase 6. **Owner if taken:** `dev` — it is a CPU-side quantization in
+`core/src/render/kaleidoscope.rs`, beside the one `kaleido_spiral` already has.
+
+### The finding
+
+The composed map ships three discrete quantities. Two of them are quantized to integers CPU-side
+before the uniform is packed, for the reason this project has already written down twice — an eased
+parameter is continuous even when its math needs integers, so the smoothing sweeps it through values
+that are not merely wrong but meaningless. `kaleido_spiral` is quantized because a fractional winding
+number draws a visible seam. `palette_steps` is quantized because a fractional band count is not a
+band count.
+
+**`kaleido_tile` is the same kind of quantity and did not get the same treatment.** It is cells
+across the frame, with alternate cells mirrored. A fractional value splits a cell at the frame edge,
+so the mirroring no longer meets and the wallpaper stops being seamless — which is the entire
+property that makes the tile read as a pattern rather than a grid of stamps.
+
+The practical consequence is narrow and complete: **a preset can only ever bind `kaleido_tile` to a
+constant.** `fragment_tiled.toml` does exactly that and says so in its header. Every other term of
+the composed map is audio-bindable; this one is decoration you set once.
+
+### Why it is worth an entry rather than a comment
+
+Phase 4 decided the tile **ships** — it was the term the plan named as most likely to drop, and the
+rendered grid earned it a place. So this is now an author-facing param whose most natural binding
+(a fold count that responds to the music, exactly as `kaleido_order` does) is unavailable, and
+nothing warns: the param *is* known, so ADR-0020's unknown-parameter warning cannot catch it, and a
+swept value renders a plausible-looking broken picture rather than failing.
+
+### What a fix would be
+
+Quantize `tile` where `spiral` is quantized, and say so in `presets/README.md` alongside the existing
+note for the other two. The open question a fix has to answer is what a *transition* between two
+integer tile counts should look like — `kaleido_order` has the same problem and solves it with a long
+`[smoothing]` constant so the change is rare rather than smooth, which works because the fold count
+changes the motif in place. A tile count changes the layout, so the same trick may read as a jump.
+
+### Priority
+
+**Low-medium.** Nothing is broken and the constant binding is honest. It is the gap between "the
+stage has five new terms" and "the stage has four new terms you can drive with audio", which is the
+difference an author meets on their first attempt.
+
+## 0079 — an accumulating figure rendered with `trails = 0` is not a sparse source, it is a blank one, and a whole third of a decision grid was unreadable because of it
+
+**Raised by:** `architect`, reading [Plan 0064](plans/0064-the-symmetry-stage-and-the-banded-palette.md)
+Phase 3's sample set at Phase 4. **Owner if taken:** whoever next builds a capture grid — this is a
+methodology note, not a code change.
+
+### The finding
+
+Phase 3 rendered its grid with `trails = 0` in every cell, on sound reasoning that is written into
+the set's own index: a trail averages frames, and each cell is a judgement about **one frame's**
+coordinate map. That is correct for `fragment_field` and for `star_pattern`.
+
+It is wrong for `attractor_lorenz`, and the six attractor sheets came out **near-black**. An
+attractor *is* its accumulation — the figure exists only as the deposit of many frames — so removing
+the trail does not make it sparse, it removes the picture. Four of the twelve cells in each attractor
+sheet have no legible content at all.
+
+### Why it matters beyond one grid
+
+The attractor was in the set **for a specific reason** the plan states: a coordinate map behaves
+completely differently on a texture that fills the frame and on one that is mostly empty. So the
+sparse-source question is exactly the one those sheets were rendered to answer, and they are the only
+cells that could have answered it. Phase 6 then asks the same question again in its own words — does
+the mandala hold up on a sparse source, or only on a full-frame field — and had to be answered live
+because the grid could not.
+
+The general form: **a capture-hygiene rule that is right for most scenes can be wrong for one
+family**, and the failure is silent, because a near-black cell looks like a preset that renders dark
+rather than like a broken measurement.
+
+### What a fix would be
+
+Nothing in code. When a grid spans scene families, set the accumulation **per source** rather than
+globally — trails off for scenes whose figure is present in one frame, trails at the preset's own
+value for scenes whose figure *is* the accumulation — and state the difference in the index, so a
+reader knows the cells are not directly comparable and why.
+
+### Priority
+
+**Low**, and it is a note for the next person building a grid rather than work to schedule. It cost
+this plan one unanswered question, which Phase 6 absorbed.
+
 [0048]: plans/done/0048-analysis-v2-and-the-retune.md
