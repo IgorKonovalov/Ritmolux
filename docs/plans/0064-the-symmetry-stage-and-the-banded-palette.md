@@ -1,6 +1,6 @@
 # 0064 — The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, **after [Plan 0055](done/0055-the-fold-edge-becomes-a-choice.md)**.
+> **Status:** **in-progress** (approved 2026-08-04) — **after [Plan 0055](done/0055-the-fold-edge-becomes-a-choice.md)**.
 > Both live in `kaleidoscope.rs`; 0055 is smaller, older and branches on the *destination* radius,
 > which this plan's composed map does not touch, so taking it first costs nothing and taking it
 > second means rebasing onto a rewritten shader. Phases 1-3 are `dev` and run start-to-finish;

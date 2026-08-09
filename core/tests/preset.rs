@@ -1211,6 +1211,13 @@ fn declared_params_match_set_param() {
                 "kaleido_center_x",
                 "kaleido_center_y",
                 "kaleido_edge",
+                // ADR-0077's composed map, in the order the stage applies it
+                // (destination-to-source): tile -> fold -> radial -> spiral.
+                "kaleido_tile",
+                "kaleido_radial",
+                "kaleido_spiral",
+                "kaleido_zoom",
+                "kaleido_inner",
             ],
         ),
         (

@@ -1126,6 +1126,54 @@ Two things follow that are easy to get wrong:
   that disagree about the edge cross-fade cleanly; one preset easing across the
   boundary does not.
 
+### The symmetry stage — `kaleido_tile`, `kaleido_radial`, `kaleido_spiral`, `kaleido_zoom`, `kaleido_inner`
+
+The fold above is **one term of a composed coordinate map**
+([ADR-0077](../docs/adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md)). Five
+more terms ride in the same stage, at the same single texture read, so turning them
+all on costs no more sharpness than the fold alone.
+
+| Param | Default (off) | What it does |
+|---|---|---|
+| `kaleido_tile` | `1` | mirrored wallpaper cells across the frame |
+| `kaleido_radial` | `1` | the **scale ratio between successive rings** — concentric shrinking copies |
+| `kaleido_spiral` | `0` | an **integer winding number** — the Droste shear |
+| `kaleido_zoom` | `0` | an offset along `log r` — travel through the rings |
+| `kaleido_inner` | `0` | where the repeat stops, as a fraction of the disc radius |
+
+**The composed order is fixed: `tile` → fold → `radial` → `spiral`.** It is not
+author-selectable — that is what keeps the whole stage one pipeline. Read forwards
+it means the polar rosette is the motif the tile replicates.
+
+**`kaleido_radial` is a ratio, not a count.** `2.0` means each ring is half the size
+of the one outside it; `1.3` gives fine dense rings. Across a 10:1 radius span,
+`1.3` draws about **9** rings and `2.0` about **3**. `<= 1` is off. This is the term
+that turns a flat rosette into a mandala, and it works on **any** scene, with or
+without a fold: `kaleido_radial = 1.3` on a preset that binds no `kaleido_order` at
+all still repeats.
+
+**`kaleido_spiral` is stepped, like `kaleido_order` and `kaleido_edge`.** It is a
+winding number: one revolution shears `log r` by exactly that many whole rings, and
+only a whole number closes the image. A fractional winding draws a visible seam
+along the same leftward ray a fractional `kaleido_order` tears along, so the engine
+rounds it.
+
+**`kaleido_zoom` loops seamlessly, and its unit is `log r`.** The map is periodic in
+`log r` with period `ln(kaleido_radial)`, so an offset of exactly that period is the
+*identity* — a `kaleido_zoom = "time * 0.1"` is an endless tunnel with no reset and
+no crossfade. One ring is `ln(kaleido_radial)`, **not** 1: at `kaleido_radial = 1.3`
+a ring is 0.26, so `"bar_phase * 0.2624"` advances exactly one ring per bar.
+
+**`kaleido_inner` is an aliasing control, not polish.** The repeat *minifies* toward
+the centre: at `kaleido_radial = 2`, five rings in, a thousand source pixels land
+under one destination pixel, and the inner rings turn to moire. `kaleido_inner`
+freezes the repeat below that radius, which leaves a clean disc at the centre — the
+bright hub you see at the middle of a reference zoom tunnel. Raise it until the
+churn at the centre stops.
+
+**With `kaleido_radial` active, `kaleido_edge` does nothing.** The repeat lands every
+radius inside the disc by construction, so there is no outside left to treat.
+
 ### Mirror or kaleidoscope? They are not the same cost
 
 `mirror_*` and `kaleido_*` both give you N-fold symmetry, and on a line scene they
