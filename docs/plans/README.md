@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0076** (ADRs are a separate sequence — next free there is **0090**.)
+**Next free number: 0077** (ADRs are a separate sequence — next free there is **0091**.)
 
 ## Active roster
 
@@ -22,7 +22,8 @@ someone who picked it up is reading.
 | [0067](0067-the-curation-route.md) | The curation route | **approved 2026-08-04** | dev, human | Phase 1 first makes the gate worth trusting — all five preset gates synthesize `AnalysisFrame` and none runs the analyzer. Its Phase 1 touches `core/tests/reactivity.rs`, which [0061] moved into the `coverage` job's sole ownership (ADR-0073) — a change there is now proved by one CI job, not two. |
 | [0068](0068-why-the-downbeat-rarely-locks.md) | Why the downbeat rarely locks | **approved 2026-08-04** | dev, human | Ships a diagnosis and **no fix** on purpose; `CONFIDENCE_THRESHOLD` does not move. Shares no file with anything; Phase 3 is `human` and mid-plan. |
 | [0071](0071-light-that-adds-without-covering.md) | Light that adds without covering (`occlude`) | **approved 2026-08-04** | dev, human | One scalar at the backdrop composite; default `1.0` is byte-identical. Phase 3 is `human` and mid-plan — the default is decided over a **lit** backdrop, because at `bg_bright = 0` the two models are identical. **[0072] has closed underneath it**: a lit backdrop is now the preset's own gradient, so the Phase 3 look decision is taken over sixteen skies that just moved. |
-| [0075](0075-the-content-renaissance.md) | The content renaissance: the library is rebuilt as worlds, by replacement cohorts | **approved 2026-08-09** | dev, human | The R6 rebuild, decided 2026-08-09 ([ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md): replacement cohorts under a fresh-slate rule — the user's delete-all proposal was considered and rejected there). Phases 1-3 (gate + trap + doc fixes the new library is authored against) are **gated by nothing** and can interleave now; Phases 4+ wait for [0071], [0064], [0046] and [0067]. |
+| [0075](0075-the-content-renaissance.md) | The content renaissance: the library is rebuilt as worlds, by replacement cohorts | **approved 2026-08-09** | dev, human | The R6 rebuild, decided 2026-08-09 ([ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md): replacement cohorts under a fresh-slate rule — the user's delete-all proposal was considered and rejected there). Phases 1-3 (gate + trap + doc fixes the new library is authored against) are **gated by nothing** and can interleave now; Phases 4+ wait for [0071], [0064], [0046] and [0067]. Prefers [0076] landed first so the brief can assign layered worlds, but does not hard-gate on it. |
+| [0076](0076-the-second-layer.md) | The second layer: a preset composes two scenes (R3) | **approved 2026-08-09** | dev, human | [ADR-0090](../adrs/0090-a-preset-composes-two-scene-layers.md), all four open choices user-decided by interview (incl. **per-layer scene instances from the start** — same-system pairs are in scope, and Phase 2's registry migration is the plan's real risk). Touches `render/mod.rs`/`post.rs`, which the live [0071] lane is editing — **do not start until 0071 lands or the seam is coordinated.** |
 
 ## Recommended execution sequence
 
@@ -40,7 +41,8 @@ that criterion.
 | 4 | [0068] | Blocks nobody. Late because it ships no fix, not because it is unimportant. |
 | 5 | [0067] | The curation route. `reactivity.rs` now runs only in `coverage` (ADR-0073), so a break there shows up in one job. |
 | 6 | [0046] | Touches the attractor's feedback path, cheapest once that file has settled. |
-| 7 | [0075] | **Last by design** (ADR-0089): the fresh library is authored once, against the engine [0046]/[0064]/[0071] finish and through the gate [0067] makes trustworthy. Its Phases 1-3 are the exception — ungated instrument/doc fixes, take them whenever a session has room. |
+| 7 | [0076] | After [0071] lands (shared files: `render/mod.rs`, `post.rs`) and best after [0046] (both touch the chain). Before [0075]'s cohorts by preference, so the brief can assign layered worlds. |
+| 8 | [0075] | **Last by design** (ADR-0089): the fresh library is authored once, against the engine [0046]/[0064]/[0071]/[0076] finish and through the gate [0067] makes trustworthy. Its Phases 1-3 are the exception — ungated instrument/doc fixes, take them whenever a session has room. |
 
 [0045]: done/0045-linear-light-and-bloom.md
 [0046]: 0046-transformed-feedback.md
@@ -58,6 +60,7 @@ that criterion.
 [0071]: 0071-light-that-adds-without-covering.md
 [0072]: done/0072-the-backdrop-joins-the-palette.md
 [0075]: 0075-the-content-renaissance.md
+[0076]: 0076-the-second-layer.md
 [backlog 0038]: ../design-backlog.md
 [backlog 0058]: ../design-backlog.md
 
