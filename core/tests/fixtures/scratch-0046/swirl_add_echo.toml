@@ -1,0 +1,68 @@
+# SCRATCH PRESET - Plan 0046 Phase 5 (human). Not shipped content: it is here for
+# one judgement call, on a wall, with music playing. See README.md beside it.
+#
+# THE ECHO. The fragment field under a `swirl` warp and the `add` deposit, so the
+# past does not merely dim - it winds into a vortex while overlapping echoes SUM.
+# This is the half of ADR-0048 that only works because the composite runs in
+# linear light: additive echoes at this decay reach many times the source's
+# brightness and roll off through the tonemap instead of clipping to white.
+#
+# What to look at: does the summing read as LIGHT - filaments, smoke, a bloom of
+# where the field has been - or as a blown-out wash? Does the vortex read as flow
+# rather than as a spin? And does frame time hold, given `add` puts far more of
+# the frame above the tonemap's knee than `max` ever does.
+#
+# THE PALETTE IS DOING STRUCTURAL WORK, not decoration, and this was learned the
+# hard way while authoring. The fragment field covers every pixel, and under `add`
+# a fullscreen source simply sums into a flat wash - the first three drafts of
+# this preset were an even green rectangle at every exposure tried. The narrow
+# bright band below turns the field into sparse filaments on black, and sparse is
+# what `add` is for: light adds where it overlaps and stays dark where it does
+# not. Widen the band and the wash comes back.
+system = "fragment_field"
+name   = "0046 Swirl Echo"
+
+[params]
+# The field. `warp` rides the bass, so the filaments churn on the low end.
+warp         = "1.6 + clamp(bass * 4, 0, 1.4)"
+# Low: `glow` lifts the whole field toward the palette's bright end, which is
+# exactly the wash this preset is avoiding.
+glow         = "0.05"
+hue          = "time * 0.02 + treb * 0.1"
+zoom         = "1.0"
+color_span   = "1.0"
+saturation   = "1.0"
+
+# The accumulation. Under `add` this converges to about 1/(1 - 0.93) = 14x the
+# source, and `exposure` below is what brings that back to a viewable range.
+trails       = "0.93"
+
+# The vortex. `fb_warp` is rad/s at the CENTRE and falls off toward the rim, so
+# the middle winds while the corners barely turn - which is what separates it
+# from `fb_rotate`, and what makes it read as flow rather than as a spin.
+fb_warp      = "2.2 + clamp(bass * 3, 0, 1.6)"
+# A whisper of outward drift under the swirl, so the vortex is not stationary.
+fb_zoom      = "1.05"
+
+# Tuned AGAINST the 14x above, not chosen for the field alone. If you raise
+# `trails`, drop this.
+exposure     = "1.05"
+
+[feedback]
+warp  = "swirl"
+blend = "add"
+
+[smoothing]
+fb_warp  = { attack = 0.05, release = 0.45 }
+warp     = 0.12
+
+[palette]
+# Black everywhere except a narrow band - see the note in the header. This is
+# what makes the field sparse enough for `add` to read as light.
+stops = [
+  { at = 0.00, color = "#000000" },
+  { at = 0.42, color = "#000000" },
+  { at = 0.50, color = "#2ad4ff" },
+  { at = 0.58, color = "#000000" },
+  { at = 1.00, color = "#000000" },
+]

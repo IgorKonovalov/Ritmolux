@@ -99,8 +99,9 @@ Beyond `[params]`, a preset may carry optional tables — `[curve]` / `[generato
 (structural config for the line systems), `[particles]` (attractor family and
 sample density),
 `[spectrum]` (the readout's element count, layout and per-element easing —
-summarised [below](#the-spectrum-table)), `[smoothing]` (per-parameter easing),
-and `[palette]` / `[palette_b]` (colour). All are documented in
+summarised [below](#the-spectrum-table)), `[feedback]` (how an accumulation reads
+its own past — [below](#the-feedback-table)), `[smoothing]` (per-parameter
+easing), and `[palette]` / `[palette_b]` (colour). All are documented in
 [`presets/README.md`](../presets/README.md) and
 [`docs/preset-palettes.md`](preset-palettes.md).
 
@@ -253,6 +254,51 @@ parameters (`radius` on the ring; `span` and `baseline` on `bars`/`polyline`), a
 the `curve`↔`scale` retune a level curve costs — a **5.8x** amplitude change at
 `curve = 0.5` against measured typical band levels, which is the reason the
 default is exactly linear.
+
+### The `[feedback]` table
+
+The engine has **two accumulation buffers** — the `trails` post stage, which every
+scene composites through, and the `attractor` scene's own internal trail field —
+and both read their past through the same transform
+([ADR-0048](adrs/0048-transformed-feedback.md)). The moving parts of that
+transform are ordinary bindables (`fb_zoom`, `fb_rotate`, `fb_dx`, `fb_dy`,
+`fb_center_x`, `fb_center_y`, `fb_warp`, all documented in
+[`presets/README.md`](../presets/README.md#transformed-feedback--fb_zoom-fb_rotate-fb_dx-fb_dy-fb_center_x-fb_center_y));
+the two **structural** choices are this table:
+
+```toml
+[feedback]
+warp  = "swirl"   # none (default) | swirl | ripple | fisheye
+blend = "add"     # max (default)  | add
+```
+
+| Key | Values | Notes |
+|-----|--------|-------|
+| `warp` | `none`, `swirl`, `ripple`, `fisheye` | Which curated procedural distortion rides on top of the affine. Its *strength* is the bindable `fb_warp`. Default `none`. |
+| `blend` | `max`, `add` | How this frame's light lands on the faded past. Default `max` — the engine's only blend until this table existed. |
+
+Both keys are optional and so is the table. An unknown value is a **surfaced load
+error** naming what it expected, like every other structural table — a warp kind
+selects a shader path, and quietly falling back to `none` would render a look you
+never asked for with nothing on screen to say so.
+
+Two things about this table surprise people, and both are consequences of there
+being two buffers rather than one:
+
+- **One vocabulary, two sinks.** A single `fb_rotate` on an `attractor` preset
+  that also binds `trails` turns **both** accumulations — the scene's field and
+  the stage's — each about its own buffer, neither about the other's. That is
+  deliberate (one thing to learn, and it transfers), but if you have both live and
+  are attributing the motion to one of them, you are attributing half of it wrong.
+  Turn `trails` off to see the scene's own.
+- **`blend` reaches the trails stage only.** The attractor's deposit has been
+  additive since the scene was written — its points draw through an additive
+  pipeline over the decayed bed — so there is no `max` to select there. `warp`
+  reaches both.
+
+The transform applies to the **past**, never to the light being deposited this
+frame: the fresh figure is always where the scene put it, and only the trail
+behind it travels.
 
 ### Transitions between presets
 

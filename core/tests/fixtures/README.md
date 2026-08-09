@@ -323,3 +323,51 @@ beside the defect on an absolute scale.
 inside the frame would leave the gate's assertion true of nothing at all. The one
 binding that matters in each is `scale` (`3.80` and `5.20`), and each header
 records the arithmetic that makes it wrong.
+
+## The `feedback_*` / `composite_warp_*` / `attractor_fb_*` families pin a *motion*
+
+Eleven files, Plan 0046 / [ADR-0048](../../../docs/adrs/0048-transformed-feedback.md),
+belonging to `core/tests/feedback.rs` and (for the three `composite_warp_*`) to
+`core/tests/composite.rs` as well. What they exist to test is that an accumulation
+**moves** — which is the one thing a baseline cannot say, since a baseline asks
+whether a picture is the picture it was last time.
+
+So most of them pin no pixels. They are read in **matched pairs and quartets**
+where the members differ in exactly one key, and the guards compare a run against
+itself or one fixture against its control:
+
+- `feedback_still` / `feedback_identity` — the same preset binding no `fb_*` and
+  binding all six to their documented defaults. Asserted **byte-identical**, which
+  is ADR-0048's whole identity claim in one comparison.
+- `feedback_zoom` / `feedback_rotate` — `feedback_still` plus one rate each, read
+  as radial against tangential displacement.
+- `feedback_ring` — the rotation, spun into a closed ring, whose pixel bounding
+  box states an aspect claim (ADR-0037).
+- `feedback_add` / `feedback_max` — one `[feedback] blend` key apart.
+- `composite_warp_swirl` / `_ripple` / `_fisheye` — `composite_trails.toml` param
+  for param plus one `[feedback] warp` key. These three **do** carry baselines,
+  because a drift guard on each is worth having; that the three are *distinct from
+  each other* is asserted in `feedback.rs` instead, since three identical
+  baselines would pin perfectly happily.
+- `attractor_fb_control` / `_rotate` and `attractor_trails_control` / `_fb_both` —
+  the second accumulation sink, alone and alongside the engine stage.
+
+"Do not tune" bites in a specific direction here, and it has already bitten:
+**several of these values exist to stop a comparison being vacuous, not to make a
+picture.** Two pairs measured `0.000000` apart during authoring, for two reasons
+that both look exactly like a passing test — `max(cur, prev * fade)` over a
+stationary figure is exactly `cur`, and so is a `trails` stage whose tail is
+shorter than the scene's own `fade`. That is why the attractors carry a `spin` and
+why `trails = 0.98` sits above their `fade = 0.6`, and each header records the
+arithmetic. A "simplification" that removes either restores a green test that
+measures nothing.
+
+## `scratch-0046/` is not a fixture directory at all
+
+Two presets and a README, left for Plan 0046 Phase 5 — a **human** phase whose
+whole content is looking at transformed feedback fullscreen, with music, and
+saying whether it reads. Nothing includes them, no test names them, `LMV_BLESS`
+does not touch them, and `core/build.rs` cannot see them (it globs
+`presets/*.toml` only). They live here because a phase that needs a preset needs
+somewhere to keep one; `scratch-0046/README.md` has the run command and the
+tuning traps found while authoring them.
