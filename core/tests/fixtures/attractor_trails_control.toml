@@ -1,0 +1,27 @@
+# FEEDBACK FIXTURE - do not tune; the second-sink guards in core/tests/feedback.rs
+# read it. Plan 0046 Phase 3, ADR-0048.
+#
+# `attractor_fb_both.toml` minus the `fb_rotate` - both accumulations live, neither
+# transformed. The control that makes "both moved" a measurement rather than a
+# claim about one of them.
+system = "attractor"
+name   = "fixture_attractor_trails_control"
+
+[params]
+size  = "1.0"
+hue   = "0.3"
+# SHORT, deliberately. This is the scene's OWN trail, and the pair of fixtures
+# with `trails` on need the engine stage to carry a longer tail than this one -
+# see the note there. A few frames of history is still plenty for the transform
+# to sweep at the rate below.
+fade  = "0.6"
+# The figure moves, so the accumulations have something to hold that this frame
+# does not already show.
+spin  = "0.6"
+# Comfortably longer than the scene's own `fade` above, and that relation is the
+# whole reason this fixture works. **The engine stage only shows up when its tail
+# OUTLASTS the scene's.** Over a `fade` = 0.95 field, `trails` = 0.9 makes the
+# stage's `max(cur, prev * 0.9)` exactly `cur` at every pixel - a bit-for-bit
+# passthrough, measured at 0.000000 against a fixture binding no `trails` at all,
+# which would have made "both sinks moved" a claim about one of them.
+trails = "0.98"

@@ -78,6 +78,11 @@ const CONVERGE_FRAMES: usize = 360;
 /// The window, in frames, each end of the convergence guard measures over.
 const CONVERGE_WINDOW: usize = 60;
 
+/// Frames the attractor's second-sink guards run for — enough that its trail
+/// field carries real history for `fb_rotate` to sweep, and short enough that the
+/// per-frame readback stays cheap.
+const ATTRACTOR_FRAMES: usize = 90;
+
 const STILL: (&str, &str) = (
     "fixture_feedback_still",
     include_str!("fixtures/feedback_still.toml"),
@@ -130,6 +135,25 @@ const WARPS: [(&str, &str); 3] = [
         include_str!("fixtures/composite_warp_fisheye.toml"),
     ),
 ];
+
+/// The **second sink** (ADR-0048, Plan 0046 Phase 3): the attractor's own trail
+/// field. Each of the four differs from its control in exactly one key.
+const ATTRACTOR_CONTROL: (&str, &str) = (
+    "fixture_attractor_fb_control",
+    include_str!("fixtures/attractor_fb_control.toml"),
+);
+const ATTRACTOR_ROTATE: (&str, &str) = (
+    "fixture_attractor_fb_rotate",
+    include_str!("fixtures/attractor_fb_rotate.toml"),
+);
+const ATTRACTOR_TRAILS_CONTROL: (&str, &str) = (
+    "fixture_attractor_trails_control",
+    include_str!("fixtures/attractor_trails_control.toml"),
+);
+const ATTRACTOR_BOTH: (&str, &str) = (
+    "fixture_attractor_fb_both",
+    include_str!("fixtures/attractor_fb_both.toml"),
+);
 
 /// How far apart two renders of the same figure must be before this file will
 /// call them different pictures — mean per-channel difference, 0..1.
@@ -513,6 +537,90 @@ fn the_deposit_blend_selector_reaches_the_shader() {
          under `add` against {} under `max`",
         peak(&additive),
         peak(&maximum)
+    );
+}
+
+/// **The transform reaches the attractor's own accumulation, and only the past
+/// in it** (ADR-0048's second sink).
+///
+/// Two halves, and the first is the interesting one. The rotating fixture binds
+/// **no `trails`**, so the engine stage is off entirely and there is no second
+/// buffer in the frame — anything that differs from the control moved inside the
+/// scene's internal trail field.
+///
+/// The second half is Phase 3's "the fresh deposit does not lag", stated exactly:
+/// on the **first** frame the field has just been cleared, so there is no past to
+/// transform, and the two runs must be **byte-identical**. A stage that
+/// transformed the whole pass rather than only the decayed bed would rotate that
+/// first frame's freshly-projected points by one `dt` — 0.1 rad here — and this
+/// is what refuses it.
+#[test]
+fn the_attractor_transforms_its_own_past_and_not_its_deposit() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let control = run(&mut renderer, ATTRACTOR_CONTROL, ATTRACTOR_FRAMES);
+    let rotated = run(&mut renderer, ATTRACTOR_ROTATE, ATTRACTOR_FRAMES);
+
+    let first_control = control.first().expect("first frame");
+    let first_rotated = rotated.first().expect("first frame");
+    assert_eq!(
+        first_control.rgba, first_rotated.rgba,
+        "the first frame of a cleared field has no past to transform, so \
+         `fb_rotate` must change nothing in it. That it did means the transform \
+         is reaching this frame's freshly-deposited points, not only the trail \
+         they are drawn over."
+    );
+
+    let last_control = control.last().expect("last frame");
+    let last_rotated = rotated.last().expect("last frame");
+    let mean = frame_diff(last_control, last_rotated);
+    println!("attractor own sink: mean {mean:.4} after {ATTRACTOR_FRAMES} frames");
+    assert!(
+        mean > DISTINCT_MEAN,
+        "`fb_rotate` did not move the attractor's own trail field (mean \
+         {mean:.4}). With no `trails` bound there is no engine accumulation in \
+         this frame at all, so the scene is the only sink there is."
+    );
+}
+
+/// **One binding, two buffers** — the routing contract with both sinks live
+/// (ADR-0048).
+///
+/// An attractor preset with `trails` on has *two* accumulations in the frame, and
+/// a single `fb_rotate` turns both. The guard is in two steps because the second
+/// alone would not be a claim about two sinks at all:
+///
+/// 1. turning `trails` on **must change the picture**, or there is no engine
+///    accumulation in the frame to speak of and the whole test is about the
+///    attractor's field a second time. This is not hypothetical — over a
+///    *stationary* figure `max(cur, prev * fade)` is exactly `cur`, and these
+///    fixtures measured 0.000000 apart until they were given a `spin`;
+/// 2. then, with both live, the single `fb_rotate` moves the frame.
+///
+/// `resolve_route`'s own guard in `render/tests.rs` pins the fan-out that delivers
+/// the binding to both.
+#[test]
+fn one_binding_moves_both_accumulations() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let scene_only = last_frame(&mut renderer, ATTRACTOR_CONTROL, ATTRACTOR_FRAMES);
+    let control = last_frame(&mut renderer, ATTRACTOR_TRAILS_CONTROL, ATTRACTOR_FRAMES);
+    let both = last_frame(&mut renderer, ATTRACTOR_BOTH, ATTRACTOR_FRAMES);
+
+    let stage_contributes = frame_diff(&scene_only, &control);
+    println!("both sinks: `trails` alone moves the frame by {stage_contributes:.4}");
+    assert!(
+        stage_contributes > DISTINCT_MEAN,
+        "turning `trails` on changed the frame by only {stage_contributes:.4}, so          there is no second accumulation in it and what follows would be a claim          about the attractor's own field twice over"
+    );
+
+    let mean = frame_diff(&control, &both);
+    println!("both sinks: one `fb_rotate` moves it by {mean:.4}");
+    assert!(
+        mean > DISTINCT_MEAN,
+        "one `fb_rotate` over an attractor with `trails` on must move both          accumulations; it moved the frame by {mean:.4}"
     );
 }
 

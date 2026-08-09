@@ -153,6 +153,15 @@ pub(super) struct DrawUniform {
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct DecayUniform {
     pub(super) k: [f32; 4],
+    /// The ADR-0048 feedback transform, exactly as
+    /// [`feedback::Transform::pack`](crate::render::feedback::Transform::pack)
+    /// returns it. Read by the decay pass; the present pass declares only `k` over
+    /// the same buffer, which is legal — a uniform binding may be wider than the
+    /// struct a shader lays over it — and deliberate, because the present's
+    /// bind-group layout *shape* is what the WARP adapter is sensitive to.
+    pub(super) xf: [f32; 4],
+    pub(super) tr: [f32; 4],
+    pub(super) wp: [f32; 4],
 }
 
 /// The GPU-side state, built lazily on first render (see the module docs), split
@@ -312,11 +321,14 @@ impl PipelineResources {
             label: Some("attractor-draw-shader"),
             source: wgpu::ShaderSource::Wgsl(DRAW_SHADER.into()),
         });
+        // ADR-0048's transform, concatenated in: the same WGSL the engine trails
+        // stage compiles, so the two accumulation sinks cannot drift apart on what
+        // `fb_rotate` means.
         let decay_shader = gpu::fullscreen_shader(
             device,
             "attractor-decay-shader",
             gpu::FULLSCREEN_VS_UV_FLIPPED,
-            DECAY_SHADER,
+            &format!("{}{DECAY_SHADER}", crate::render::feedback::TRANSFORM_WGSL),
         );
         let present_shader = gpu::fullscreen_shader(
             device,

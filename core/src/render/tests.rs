@@ -79,16 +79,18 @@ fn each_namespace_resolves_to_its_owner() {
         "the ink vocabulary covers both the ink_* and paper_* halves"
     );
 
-    // Everything a system declares goes to its scene — checked for **every**
+    // Everything a system declares reaches its scene — checked for **every**
     // system, so a family whose names happened to collide with a global
-    // namespace could not slip through. The two shared colour modulations are
-    // the one exception, and they are a **fan-out** rather than a transfer: the
-    // scene still receives them, the backdrop receives them too (ADR-0086).
+    // namespace could not slip through. There are two exceptions and both are
+    // **fan-outs** rather than transfers, so the scene still receives the value:
+    // the shared colour modulations also reach the backdrop (ADR-0086), and the
+    // `fb_*` seven also reach the trails stage (ADR-0048).
     for system in SystemKind::ALL {
         for name in system.param_names() {
-            let shared = crate::render::background::SHARED_COLOUR_PARAMS.contains(name);
-            let want = if shared {
+            let want = if crate::render::background::SHARED_COLOUR_PARAMS.contains(name) {
                 ParamRoute::SceneAndBackdrop
+            } else if crate::render::feedback::PARAMS.contains(name) {
+                ParamRoute::StageAndScene(TRAILS)
             } else {
                 ParamRoute::Scene
             };
@@ -113,6 +115,31 @@ fn each_namespace_resolves_to_its_owner() {
             !crate::render::background::PARAMS.contains(name),
             "`{name}` must stay out of the backdrop's own vocabulary — claiming \
              it there would take it off the scene"
+        );
+    }
+
+    // **One vocabulary, two sinks** (ADR-0048). The `fb_*` seven belong to the
+    // trails stage, and reach the *scene* as well on a system whose scene owns an
+    // accumulation buffer of its own — today only the attractor. On every other
+    // system the same name is a plain stage route, because there is no second
+    // buffer for it to move.
+    for name in crate::render::feedback::PARAMS {
+        assert_eq!(
+            resolve_route(name, SystemKind::Attractor),
+            ParamRoute::StageAndScene(TRAILS),
+            "`{name}` must reach BOTH accumulations on the attractor"
+        );
+        assert_eq!(
+            resolve_route(name, swarm),
+            ParamRoute::Stage(TRAILS),
+            "`{name}` reaches only the trails stage on a scene with no \
+             accumulation of its own"
+        );
+        assert!(
+            crate::render::trails::PARAMS.contains(name),
+            "`{name}` must stay in the trails stage's vocabulary — the fan-out is \
+             resolved from the stage side, so dropping it there would take the \
+             param off both sinks"
         );
     }
 

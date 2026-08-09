@@ -126,6 +126,244 @@ pub struct FeedbackConfig {
     pub blend: Deposit,
 }
 
+/// `fb_zoom` default — a factor of `1.0` **per second**, i.e. no scaling however
+/// long the frame is.
+pub(crate) const DEFAULT_FB_ZOOM: f32 = 1.0;
+/// `fb_rotate` / `fb_dx` / `fb_dy` / `fb_warp` default — zero rad/s, zero units/s.
+pub(crate) const DEFAULT_FB_RATE: f32 = 0.0;
+/// `fb_center_x` / `fb_center_y` default — the middle of the frame, in uv.
+pub(crate) const DEFAULT_FB_CENTER: f32 = 0.5;
+
+/// **The** `fb_*` vocabulary, in one place (ADR-0048).
+///
+/// Both sinks declare these names in their own `PARAMS` — the trails stage as
+/// part of the composite's global vocabulary, the attractor as part of its
+/// system's — because each has a `set_param` match that must be checkable against
+/// its own list (`core/tests/preset.rs`'s drift guard reads the source text). This
+/// const is what those two lists are checked *against*, so "one vocabulary" is a
+/// test rather than a comment.
+pub(crate) const PARAMS: &[&str] = &[
+    "fb_zoom",
+    "fb_rotate",
+    "fb_dx",
+    "fb_dy",
+    "fb_center_x",
+    "fb_center_y",
+    "fb_warp",
+];
+
+/// The `fb_*` transform as a preset states it: rates per second, centre in uv.
+///
+/// Shared by **both** accumulation sinks (ADR-0048), which is the point: the
+/// trails stage and the attractor's internal trail resolve identical params
+/// through identical arithmetic into identical uniform bytes, and then transform
+/// their own buffer with the same shader snippet ([`TRANSFORM_WGSL`]). A second
+/// copy of this maths is how the two would drift apart.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Transform {
+    /// Scale factor **per second**, applied as `zoom^dt`.
+    pub(crate) zoom: f32,
+    /// Radians per second.
+    pub(crate) rotate: f32,
+    /// Translation per second, in units of the target's **height** (so a `1.0`
+    /// crosses the frame vertically in a second, and the same value crosses it
+    /// horizontally in `aspect` seconds — one isotropic vocabulary).
+    pub(crate) dx: f32,
+    pub(crate) dy: f32,
+    /// The fixed point everything above turns about, in uv.
+    pub(crate) centre_x: f32,
+    pub(crate) centre_y: f32,
+    /// `fb_warp` — the strength of whichever [`Warp`] the preset selected, per
+    /// second like every other rate here. Inert at `0`, and inert at any value
+    /// when the selected kind is [`Warp::None`].
+    pub(crate) warp: f32,
+}
+
+impl Transform {
+    /// Every `fb_*` at its default: the past sits still, exactly as it did before
+    /// ADR-0048.
+    pub(crate) const IDENTITY: Self = Self {
+        zoom: DEFAULT_FB_ZOOM,
+        rotate: DEFAULT_FB_RATE,
+        dx: DEFAULT_FB_RATE,
+        dy: DEFAULT_FB_RATE,
+        centre_x: DEFAULT_FB_CENTER,
+        centre_y: DEFAULT_FB_CENTER,
+        warp: DEFAULT_FB_RATE,
+    };
+
+    /// Apply one `fb_*` name, returning whether this type owned it. A sink's
+    /// `set_param` delegates here rather than matching the seven names itself, so
+    /// the two sinks cannot disagree about what `fb_dx` means.
+    pub(crate) fn set_param(&mut self, name: &str, value: f32) -> bool {
+        match name {
+            "fb_zoom" => self.zoom = value,
+            "fb_rotate" => self.rotate = value,
+            "fb_dx" => self.dx = value,
+            "fb_dy" => self.dy = value,
+            "fb_center_x" => self.centre_x = value,
+            "fb_center_y" => self.centre_y = value,
+            "fb_warp" => self.warp = value,
+            _ => return false,
+        }
+        true
+    }
+
+    /// Whether this frame's transform moves nothing — the flag the shader
+    /// `select`s on, and the whole basis of ADR-0048's byte-identity claim.
+    ///
+    /// `kind` is the preset's `[feedback] warp`: `fb_warp` alone moves nothing
+    /// when no kind is selected, and no kind moves anything at zero strength, so
+    /// both have to be off their defaults before the warp is live.
+    ///
+    /// The centre is deliberately **not** tested: it is the fixed point, so with
+    /// no scale, rotation, translation or warp it names a point nothing moves
+    /// about. A non-finite term counts as identity for the same reason a decay
+    /// factor is clamped — a `NaN` uv would sample garbage for the rest of the run.
+    pub(crate) fn is_identity(&self, kind: Warp) -> bool {
+        let finite = self.zoom.is_finite()
+            && self.rotate.is_finite()
+            && self.dx.is_finite()
+            && self.dy.is_finite()
+            && self.centre_x.is_finite()
+            && self.centre_y.is_finite()
+            && self.warp.is_finite();
+        !finite
+            || (self.zoom == DEFAULT_FB_ZOOM
+                && self.rotate == DEFAULT_FB_RATE
+                && self.dx == DEFAULT_FB_RATE
+                && self.dy == DEFAULT_FB_RATE
+                && (kind == Warp::None || self.warp == DEFAULT_FB_RATE))
+    }
+
+    /// Pack `dt` seconds of this transform for [`TRANSFORM_WGSL`], about `aspect`
+    /// — **the render target's**, never an internal grid's (ADR-0037).
+    ///
+    /// Returns the three `vec4`s the snippet reads, in its order: `xf`, `tr`, `wp`.
+    pub(crate) fn pack(&self, dt: f32, aspect: f32, kind: Warp) -> [[f32; 4]; 3] {
+        let theta = self.rotate * dt;
+        let (sin, cos) = theta.sin_cos();
+        // `zoom^dt`: a factor per second, so two half-length frames scale the
+        // past by exactly what one full-length frame would.
+        let scale = self.zoom.powf(dt);
+        // Guard the reciprocal: a preset may sweep `fb_zoom` through 0 (a
+        // `[smoothing]` ease is continuous), and `1/0` is `inf` — every pixel
+        // would then sample the same texel forever.
+        let inv_scale = if scale.is_finite() && scale.abs() > f32::MIN_POSITIVE {
+            1.0 / scale
+        } else {
+            1.0
+        };
+        [
+            [cos, sin, inv_scale, aspect],
+            [self.dx * dt, self.dy * dt, self.centre_x, self.centre_y],
+            // Strength per second like the rest, so a warp's advance per frame is
+            // the same wall-clock gesture at any refresh. Zeroed when no kind is
+            // selected, so the shader's `kind` branch is the only thing that has
+            // to agree with the preset.
+            [
+                kind.code(),
+                if kind == Warp::None {
+                    0.0
+                } else {
+                    self.warp * dt
+                },
+                0.0,
+                0.0,
+            ],
+        ]
+    }
+}
+
+/// **The** transform, as WGSL — concatenated into the feedback body of *both*
+/// accumulation sinks (ADR-0048).
+///
+/// Written as free functions over explicit `vec4` arguments rather than against a
+/// named uniform, because the two sinks pack these terms into different uniform
+/// structs (the trails stage's carries a decay factor and an occlude; the
+/// attractor's carries a retention factor and an occlude). What they share is the
+/// arithmetic, and this is it — the alternative, ADR-0048's own "the cost is a
+/// second shader", would be two copies of a rotation that must agree forever.
+///
+/// The caller supplies `xf`, `tr` and `wp` exactly as [`Transform::pack`] returns
+/// them, and is responsible for the `select` that keeps the identity path on the
+/// literal sample uv.
+pub(crate) const TRANSFORM_WGSL: &str = r#"
+// The `[feedback] warp` roster, as the CPU writes it — keep in step with
+// `feedback::Warp::code`.
+const LMV_WARP_SWIRL:   f32 = 1.0;
+const LMV_WARP_RIPPLE:  f32 = 2.0;
+const LMV_WARP_FISHEYE: f32 = 3.0;
+
+// Radius (in frame-heights) at which the swirl has faded to ~1/e of its centre
+// strength. Just over half a frame-height, so the vortex is a whole-frame gesture
+// that still leaves the corners nearly still.
+const LMV_SWIRL_SIGMA: f32 = 0.35;
+// Ripple spatial frequency, rad per frame-height: ~2.9 wave crests between the
+// centre and the top edge.
+const LMV_RIPPLE_FREQ: f32 = 18.0;
+
+// The curated procedural warp, in the same centred isotropic space the affine
+// works in and about the same `fb_center_*`. Displaces the SOURCE coordinate, so
+// a positive strength moves the past the way the docs say.
+//
+// A `kind` selector rather than four pipelines: coexisting pipelines with matching
+// bind-group layouts mis-render on the DX12 WARP software adapter (ADR-0058), and
+// the branch here is uniform across the draw anyway.
+fn lmv_warp_source(p: vec2<f32>, wp: vec4<f32>) -> vec2<f32> {
+    let kind = wp.x;
+    let k = wp.y;
+    let r = length(p);
+    if (kind == LMV_WARP_SWIRL) {
+        // Rotate by an angle that falls off as a Gaussian in radius — smooth
+        // everywhere, unlike a linear falloff's kink at the cutoff radius.
+        let a = k * exp(-(r * r) / (2.0 * LMV_SWIRL_SIGMA * LMV_SWIRL_SIGMA));
+        let c = cos(a);
+        let s = sin(a);
+        return vec2<f32>(p.x * c + p.y * s, p.y * c - p.x * s);
+    }
+    if (kind == LMV_WARP_RIPPLE) {
+        // Radial displacement by a standing wave in r. The guarded divide keeps
+        // the direction defined at the exact centre, where there is no direction.
+        let dir = p / max(r, 1e-4);
+        return p - dir * (k * sin(r * LMV_RIPPLE_FREQ));
+    }
+    if (kind == LMV_WARP_FISHEYE) {
+        return p * (1.0 + k * r * r);
+    }
+    return p;
+}
+
+// Where the pixel at `uv` was one frame ago — the INVERSE of the motion the params
+// name, because a destination pixel asks where its content came from.
+//
+// The centred coordinate is made isotropic by scaling x by `xf.w`, which is the
+// RENDER TARGET's aspect and never the accumulation grid's (ADR-0037), so the
+// rotation is a rotation and not a shear; the scale-back on the way out cancels it.
+fn lmv_source_uv(uv: vec2<f32>, xf: vec4<f32>, tr: vec4<f32>, wp: vec4<f32>) -> vec2<f32> {
+    let aspect = xf.w;
+    let centre = tr.zw;
+    var p = uv - centre;
+    p.x = p.x * aspect;
+    // Undo this frame's translation, then its rotation (by -theta: the transpose
+    // of R(theta)), then its scale — and last the warp, which therefore rides on
+    // top of the affine rather than being carried through it.
+    p = p - tr.xy;
+    p = vec2<f32>(p.x * xf.x + p.y * xf.y, p.y * xf.x - p.x * xf.y);
+    p = p * xf.z;
+    p = lmv_warp_source(p, wp);
+    p.x = p.x / aspect;
+    return p + centre;
+}
+
+// The transparent-border edge policy: `1.0` inside the accumulation, `0.0`
+// outside it. Off-frame reads contribute NOTHING — clamping would re-deposit the
+// border texel every frame until the edge became a permanent bar of colour.
+fn lmv_inside(uv: vec2<f32>) -> f32 {
+    return f32(all(uv >= vec2<f32>(0.0)) && all(uv <= vec2<f32>(1.0)));
+}
+"#;
+
 /// Two offscreen textures a feedback scene ping-pongs between. Held by named
 /// fields (not a `[_; 2]`) so read/write selection needs no array indexing on
 /// the hot path.
@@ -218,5 +456,153 @@ impl PingPongField {
     /// Flip read and write — call once after each sub-step's render pass.
     pub(crate) fn swap(&mut self) {
         self.reading_a = !self.reading_a;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! The **one vocabulary, two buffers** contract (ADR-0048). GPU-free: these are
+    //! facts about the rosters and the arithmetic, not about pixels.
+    #![allow(clippy::panic)]
+
+    use super::{PARAMS, Transform, Warp};
+
+    /// Both sinks declare **exactly** the shared `fb_*` vocabulary — no more, no
+    /// less.
+    ///
+    /// `core/tests/preset.rs`'s drift guard cannot see these names: it reads
+    /// `set_param`'s match arms out of the source text, and both sinks *delegate*
+    /// the seven to [`Transform::set_param`] rather than matching them. That is the
+    /// right factoring — one implementation of what `fb_dx` means — and this is
+    /// what replaces the coverage it costs.
+    #[test]
+    fn both_sinks_declare_exactly_the_shared_fb_vocabulary() {
+        let sinks: [(&str, &[&str]); 2] = [
+            ("trails stage", crate::render::trails::PARAMS),
+            ("attractor scene", crate::render::scenes::particles::PARAMS),
+        ];
+        for (label, declared) in sinks {
+            for name in PARAMS {
+                assert!(
+                    declared.contains(name),
+                    "the {label} does not declare `{name}`, so a preset binding it \
+                     would only reach the other sink — see ADR-0048's routing \
+                     contract"
+                );
+            }
+            // ...and nothing `fb_`-shaped that the shared roster does not know
+            // about, which would be a name only one sink answered.
+            for name in declared.iter().filter(|n| n.starts_with("fb_")) {
+                assert!(
+                    PARAMS.contains(name),
+                    "the {label} declares `{name}`, which is not in the shared \
+                     `feedback::PARAMS` roster — either add it there (so BOTH \
+                     sinks get it) or it does not belong in an `fb_` namespace"
+                );
+            }
+        }
+    }
+
+    /// [`Transform::set_param`] answers exactly the roster — the other half of the
+    /// guard above, since a declared name that the shared setter drops would be a
+    /// param both sinks list and neither applies.
+    #[test]
+    fn the_shared_setter_answers_exactly_the_roster() {
+        let mut t = Transform::IDENTITY;
+        for name in PARAMS {
+            assert!(
+                t.set_param(name, 0.25),
+                "`{name}` is in the roster but `Transform::set_param` drops it"
+            );
+        }
+        assert!(
+            !t.set_param("trails", 0.5),
+            "`trails` belongs to the stage, not to the shared transform"
+        );
+        assert!(!t.set_param("fb_nonsense", 1.0));
+    }
+
+    /// The identity is the whole basis of ADR-0048's byte-identity claim, so it is
+    /// asserted directly: every default moves nothing, and each term on its own
+    /// moves something.
+    #[test]
+    fn the_identity_is_exactly_the_defaults() {
+        assert!(Transform::IDENTITY.is_identity(Warp::None));
+
+        for name in PARAMS {
+            let mut t = Transform::IDENTITY;
+            t.set_param(name, 0.75);
+            // Two of the seven are still the identity on their own, and for
+            // different reasons. `fb_center_*` names the fixed *point*, and with
+            // nothing moving there is nothing for it to be the fixed point of.
+            // `fb_warp` is a strength for a kind this call does not select.
+            let inert_alone = name.starts_with("fb_center") || *name == "fb_warp";
+            assert_eq!(
+                t.is_identity(Warp::None),
+                inert_alone,
+                "with only `{name}` off its default, is_identity should be \
+                 {inert_alone}"
+            );
+        }
+
+        // `fb_warp` alone is inert — a strength with no kind selected — and comes
+        // alive the moment the preset names one.
+        let mut warped = Transform::IDENTITY;
+        warped.set_param("fb_warp", 2.0);
+        assert!(
+            warped.is_identity(Warp::None),
+            "a warp strength with no `[feedback] warp` kind selected moves nothing"
+        );
+        assert!(!warped.is_identity(Warp::Swirl));
+        assert!(
+            Transform::IDENTITY.is_identity(Warp::Swirl),
+            "a selected kind at zero strength moves nothing either"
+        );
+
+        // A non-finite term reads as identity rather than poisoning the sample uv
+        // for the rest of the run.
+        let mut broken = Transform::IDENTITY;
+        broken.set_param("fb_rotate", f32::NAN);
+        assert!(broken.is_identity(Warp::None));
+    }
+
+    /// The rates are **per second** (ADR-0019): at the capture step the packed
+    /// terms are exactly what one 1/60 s frame of the stated rate should be, and
+    /// the identity packs to a literal identity.
+    #[test]
+    fn the_pack_is_per_second_and_aspect_correcting() {
+        let dt = crate::render::scenes::FALLBACK_DT;
+        let [xf, tr, wp] = Transform::IDENTITY.pack(dt, 1.6, Warp::None);
+        assert_eq!(
+            xf,
+            [1.0, 0.0, 1.0, 1.6],
+            "identity: no rotation, unit scale"
+        );
+        assert_eq!(tr, [0.0, 0.0, 0.5, 0.5], "identity: no shift, centred");
+        assert_eq!(wp, [0.0; 4], "identity: no warp");
+
+        // `fb_zoom` is a factor per second, so a 1/60 s frame takes its 60th root.
+        let mut zoomed = Transform::IDENTITY;
+        zoomed.set_param("fb_zoom", 2.0);
+        let [xf, _, _] = zoomed.pack(dt, 1.0, Warp::None);
+        let scale = 1.0 / xf[2];
+        assert!(
+            (scale.powf(60.0) - 2.0).abs() < 1e-3,
+            "sixty frames of `fb_zoom = 2` must double the past, got {}",
+            scale.powf(60.0)
+        );
+
+        // Two half-length frames compose to one full-length one — the property
+        // that makes the look identical at 120 Hz and 60 Hz.
+        let [half, _, _] = zoomed.pack(dt / 2.0, 1.0, Warp::None);
+        let composed = (1.0 / half[2]) * (1.0 / half[2]);
+        assert!((composed - scale).abs() < 1e-6);
+
+        // `fb_zoom = 0` cannot produce an infinite reciprocal: a `[smoothing]`
+        // ease sweeps continuously and would pass through it.
+        let mut collapsed = Transform::IDENTITY;
+        collapsed.set_param("fb_zoom", 0.0);
+        let [xf, _, _] = collapsed.pack(dt, 1.0, Warp::None);
+        assert!(xf[2].is_finite(), "a zero zoom must not pack an infinity");
     }
 }
