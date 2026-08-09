@@ -324,6 +324,11 @@ pub struct SwarmScene {
     saturation: f32,
     /// A/B palette crossfade position (Plan 0020 Phase 4); 0 = palette A.
     palette_mix: f32,
+    /// Hard palette bands and their contour (ADR-0078), raw as the preset
+    /// bound them -- `palette::band_steps` / `band_contour` condition them on
+    /// the way to the sample site.
+    palette_steps: f32,
+    palette_contour: f32,
     /// The mark silhouette and its point count, **as bound** (ADR-0084). Both
     /// are quantized on the way to the uniform rather than here, so a
     /// `[smoothing]`-eased binding still eases — it just steps at the midpoints
@@ -461,6 +466,8 @@ impl SwarmScene {
             hue_center: DEFAULT_HUE_CENTER,
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
+            palette_steps: palette::DEFAULT_PALETTE_STEPS,
+            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             shape: DEFAULT_SHAPE,
             points: DEFAULT_POINTS,
         }
@@ -524,6 +531,8 @@ pub const PARAMS: &[&str] = &[
     "hue_center",
     "saturation",
     "palette_mix",
+    "palette_steps",
+    "palette_contour",
     // The shared mark silhouette (ADR-0084) — the same two names the emitter
     // carries; `marks::PARAMS` is the single statement of the pair.
     "shape",
@@ -564,6 +573,8 @@ impl Scene for SwarmScene {
         self.hue_center = DEFAULT_HUE_CENTER;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
+        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
+        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.shape = DEFAULT_SHAPE;
         self.points = DEFAULT_POINTS;
     }
@@ -584,6 +595,8 @@ impl Scene for SwarmScene {
             "hue_center" => self.hue_center = value,
             "saturation" => self.saturation = value,
             "palette_mix" => self.palette_mix = value,
+            "palette_steps" => self.palette_steps = value,
+            "palette_contour" => self.palette_contour = value,
             "shape" => self.shape = value,
             "points" => self.points = value,
             _ => {}
@@ -665,8 +678,14 @@ impl Scene for SwarmScene {
             // mapped into the `hue_spread`/`hue_center` band, then desaturated by
             // the shared `saturation`. Defaults reproduce the prior full-wheel look.
             let coord = hue_coord(self.hue_center, self.hue_spread, p.hue, self.hue);
+            // Hard bands on the palette coordinate (ADR-0078), the canonical
+            // `palette::band_coord` called rather than copied. `palette_steps <= 1`
+            // returns it untouched, so an unbound preset is byte-unchanged.
             let base = palette::desaturate(
-                self.palette.sample(coord, self.palette_mix),
+                self.palette.sample(
+                    palette::band_coord(coord, self.palette_steps),
+                    self.palette_mix,
+                ),
                 self.saturation,
             );
             // Depth, resolved into the three visual terms it drives (Plan 0043
