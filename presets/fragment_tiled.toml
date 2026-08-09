@@ -1,0 +1,107 @@
+# Tiled Rosette - the third of Plan 0064 Phase 6's reference looks: the polar
+# rosette taken as a WALLPAPER MOTIF rather than as a single centred figure.
+#
+# HOW THE TILE COMPOSES. `kaleido_tile` is applied FIRST in the
+# destination-to-source chain, which read forwards means the folded rosette is
+# the motif that gets replicated - not the other way round. Alternate cells are
+# mirrored, so adjacent tiles meet edge-to-edge without a seam and the result
+# reads as a continuous pattern instead of a grid of stamps.
+#
+# WHAT MAKES IT A DIFFERENT LOOK FROM THE OTHER TWO. The radial repeat is OFF
+# here (`kaleido_radial = 1` takes the unmapped path). All three presets share
+# one stage, and if all three also used the radial term they would be three
+# tunings of one look rather than three looks. This one is flat, graphic and
+# planar - closer to printed cloth than to depth.
+#
+# THE TILE COUNT IS FIXED AT 2, AND THAT IS A LIMITATION RATHER THAN A CHOICE -
+# see the note in the Phase 6 feedback. A tile count is a discrete quantity like
+# `kaleido_spiral` and `palette_steps`, but unlike those two it is NOT quantized
+# CPU-side, so an eased or audio-driven binding would sweep it through
+# fractional values and split cells at the frame edge. Until it is quantized, a
+# constant is the only safe binding.
+system = "fragment_field"
+name = "Tiled Rosette"
+
+[palette]
+# Five hard bands over a warm, near-flat set of stops: this look wants to read
+# as a print with a limited ink count, so the palette is chosen to survive being
+# cut to five and to look deliberate at that count.
+stops = [
+  { at = 0.00, color = "#231a3d" },
+  { at = 0.28, color = "#3f6f7a" },
+  { at = 0.52, color = "#8bbf7e" },
+  { at = 0.76, color = "#e8c46a" },
+  { at = 1.00, color = "#d9615a" },
+]
+
+[palette_b]
+name = "ember"
+
+[params]
+# BAND MAP
+#   bass  -> `warp` (how the motif deforms) + `palette_mix`
+#   mid   -> `color_span` + `glow`
+#   treb  -> `zoom` (motif fineness) + `saturation`
+#   onset -> `flash`
+#   sum   -> `kaleido_order`, the rosette's fold count
+#
+# The reactive structure here is the MOTIF's symmetry, not the layout. The grid
+# holds still and what sits in each cell changes, which is the behaviour a
+# printed pattern would have if it were alive.
+
+# THE TILING.
+kaleido_tile   = "2"
+kaleido_radial = "1"
+kaleido_inner  = "0.06"
+kaleido_angle  = "time * 0.05"
+# A two-rung ladder rather than a continuous term: the fold count is an integer
+# and a swept value is meaningless between rungs. Placed so a normal passage
+# sits at 6 and real peaks reach 12. Eased hard in [smoothing] so the change
+# reads as the motif growing petals rather than as a cut.
+kaleido_order  = "select(bass + mid + treb > 1.55, 12, 6)"
+# `tile` reads through MirrorRepeat, so the edge treatment has nothing left to
+# do - every destination coordinate lands inside a mirrored cell by
+# construction. Left at the default rather than bound to a value that would not
+# change the picture.
+
+# COLOUR - the fewest bands of the three, and the strongest contour. This is the
+# most graphic of the set on purpose.
+palette_steps   = "5"
+palette_contour = "0.50"
+
+# FIELD.
+warp  = "0.60 + sin(time * 0.037) * 0.12 + clamp(bass * 0.318, 0, 0.27)"
+zoom  = "1.20 + clamp(treb * 0.30, 0, 0.18)"
+pan_x = "sin(time * 0.013) * 0.06"
+pan_y = "cos(time * 0.017) * 0.05"
+
+glow  = "0.46 + clamp(mid * 0.153, 0, 0.13)"
+flash = "clamp(onset * 0.217, 0, 0.13)"
+
+hue          = "0.08 + time * 0.011"
+# Wraps, for the reason written out in `mandala_banded.toml`. Lower than the
+# other two on purpose: five bands over a wider span start to read as five
+# unrelated colours rather than as a limited ink set, and this look wants the
+# second. 1.35 is the point where the five stay a family.
+color_span   = "1.35 + clamp(mid * 0.176, 0, 0.15)"
+color_center = "sin(time * 0.029) * 0.10"
+saturation   = "1.18 + clamp(treb * 0.283, 0, 0.17)"
+palette_mix  = "clamp(bass * 0.412, 0, 0.35)"
+
+# Bloom lowest of the three - five bands is the coarsest quantization in the set
+# and therefore the one the bright pass damages most.
+bloom_amount = "0.08"
+trails       = "0.12"
+
+[smoothing]
+# The fold ladder gets the longest constant in the file: the gate reads a sum of
+# three bands, which hovers near its boundary for whole passages, and a short
+# constant would flicker the motif between two figures in every cell at once.
+kaleido_order = 1.1
+
+warp        = 0.38
+zoom        = 0.32
+glow        = 0.30
+flash       = { attack = 0.08, release = 0.55 }
+color_span  = 0.36
+palette_mix = 0.75
