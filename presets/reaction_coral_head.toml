@@ -71,7 +71,13 @@ palette_mix  = "0.30 + sin(time * 0.0063) * 0.28"
 # COMPOSITE - a long feedback so the drifting mass smears, plus the backdrop
 # showing through the interior holes.
 trails      = "0.50 + clamp(mid * 0.141, 0, 0.12)"
-bg_hue      = "0.56 + sin(time * 0.0083) * 0.05"
+# bg_hue is a coordinate in THIS preset's gradient now (ADR-0086), and 0.56 landed
+# in the bright orange at at=0.40..0.70 - the same warm value the coral itself
+# draws in, so the frame went to khaki mud. 0.12 sits in the deep sea-green
+# between at=0.00 and at=0.18: a cool dark ground under warm coral, which is the
+# relationship the old shared cosine gave by accident and this gradient can give
+# on purpose.
+bg_hue      = "0.12 + sin(time * 0.0083) * 0.04"
 bg_bright   = "0.024 + clamp(mid * 0.0176, 0, 0.015)"
 bg_vignette = "0.70"
 
