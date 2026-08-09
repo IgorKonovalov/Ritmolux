@@ -1134,6 +1134,43 @@ vortex rather than a spin.
 20x its own brightness once the tail settles. Start by dropping `brightness` (or
 `exposure`) by roughly `1 - trails` and tune up from there.
 
+### One vocabulary, two buffers — read this before debugging a feedback preset
+
+**The engine has two accumulations, and `fb_*` drives both.**
+
+- The **`trails` stage**, which every scene composites through. Off unless the
+  preset binds `trails`.
+- The **`attractor` scene's own internal trail field**, the one its `fade` param
+  has always controlled. Always on for that system.
+
+They answer the same seven `fb_*` names and the same `[feedback] warp`, and each
+transforms **only its own buffer**. So on an `attractor` preset that also binds
+`trails`, a single `fb_rotate = "0.8"` turns *two* things at once — the scene's
+field about its centre, and the composited frame about its own — and what you see
+is one motion on top of another.
+
+That is the design (learn it once, use it in both places), but it is also the
+likeliest way to be confused by your own preset. When a feedback look is not
+behaving:
+
+1. **Drop `trails` to `0`.** Whatever still moves is the attractor's own field,
+   driven by `fade`. Tune that first.
+2. **Then bring `trails` back.** Whatever is added on top is the stage.
+
+Two asymmetries between the sinks are worth knowing:
+
+- **`[feedback] blend` reaches the trails stage only.** The attractor's deposit is
+  additive by construction — its points draw through an additive pipeline over the
+  decayed bed — so there is no `max` to choose there. `warp` reaches both.
+- **The stage only shows up when its tail outlasts the scene's.** Over an
+  attractor at `fade = 0.95`, a `trails = 0.9` stage is an exact passthrough:
+  `max(cur, prev * 0.9)` is `cur` at every pixel, because the scene already dimmed
+  the frame by more than the stage would. If turning `trails` on appears to do
+  nothing, raise it above the scene's `fade` rather than assuming it is broken.
+
+Every other system has no accumulation of its own, so there `fb_*` means the
+trails stage and nothing else.
+
 ### Screen-space kaleidoscope — `kaleido_order`, `kaleido_angle`, `kaleido_center_x`, `kaleido_center_y`, `kaleido_edge`
 
 Folds the finished frame into `kaleido_order` mirrored wedges before present.

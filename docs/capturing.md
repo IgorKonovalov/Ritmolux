@@ -924,11 +924,14 @@ LMV_BLESS=1 cargo test -p lmv-core --test composite     # the post-stage baselin
 LMV_BLESS=1 cargo test -p lmv-core --test line_joints   # the joined-polyline baseline
 ```
 
-Only the first of those owns the per-`SystemKind` roster. The four
-`composite_*.png` belong to the `composite` test and `line_joint_zigzag.png` to
+Only the first of those owns the per-`SystemKind` roster. Every
+`composite_*.png` belongs to the `composite` test and `line_joint_zigzag.png` to
 `line_joints`; blessing by binary is what keeps the scopes from rewriting each
 other. `line_joints` additionally refuses to bless at all while its
 local-minimum claim is failing, so a reopened notch cannot be baselined in.
+`core/tests/feedback.rs` is deliberately absent from that list: it pins no
+baseline at all — see
+[Asserting that something *moved*](#asserting-that-something-moved--the-feedback-fixtures-plan-0046).
 
 **Eyeball the regenerated PNGs before committing** — the first baseline is easy
 to enshrine wrong. The compare tolerates minor cross-GPU rasterization drift; a
@@ -1047,6 +1050,57 @@ directly rather than trusting a baseline to notice.
 > baselines your change had no business moving; committing an incidental re-bless
 > silently retires the drift guard for that scene. (Learned the hard way in Plan
 > 0027, where an over-broad bless moved `fragment_field` and `swarm`.)
+
+### Asserting that something *moved* — the feedback fixtures (Plan 0046)
+
+**A baseline cannot say a picture moved.** It says a picture is the picture it was
+last time, which is the opposite question. When the thing under test is a motion —
+ADR-0048's transformed feedback, where an accumulation is resampled through an
+affine every frame — the guard has to compare **frames of one run against each
+other**, and `core/tests/feedback.rs` is where that shape lives. The next author of
+a motion test should copy its habits rather than reinvent them.
+
+**Make the figure static, so the only thing that can move is the thing under
+test.** Its motion fixtures are all one Maurer rose at `spin = 0`, parked
+off-centre with `pan_x`. If the scene animated, a displacement measurement could
+not attribute what it found.
+
+**Measure in the coordinate the claim is about.** These transforms are radial and
+tangential, so the guards convert every lit pixel to `(radius, angle)` about the
+frame centre **in pixels** and compare *extents*: `fb_zoom` must grow the radial
+span faster than the angular one, `fb_rotate` the reverse. Two details that cost
+real time to rediscover — an angular span has to be computed as `2π` minus the
+widest empty gap, or a set straddling the `atan2` branch cut reads as the whole
+circle; and "lit" is a fraction of *that frame's own peak*, never an absolute
+byte, because the tail of a decaying trail is dim by construction and how dim
+depends on the tonemap, the palette and the adapter.
+
+**Assert a ratio, not a number.** Every claim there is one run against itself —
+late frame over early frame, or one axis' growth against the other's. There is no
+pixel count to re-tune when a shader changes by a byte, and no threshold that
+encodes the capture size.
+
+**Say what a broken version would look like, then check the guard sees it.** The
+shear guard rotates the figure into a closed ring and asserts its pixel bounding
+box is square, because a ring about the frame centre is round *on screen* whatever
+the target's shape. It was verified by breaking it: with the transform's aspect
+forced to `1.0` the box goes from **45x46 to 44x71** at the file's 100x160 portrait
+target. Which is also why that target is portrait — see the file's own header, and
+ADR-0047.
+
+Two more habits from the same file, for the deposit rather than the motion:
+
+- **A convergence claim needs both ends.** "The frame stopped changing" is also
+  what a stage that never accumulated would say, so the additive guard asserts
+  that the *first* window moved a lot (97 bytes) and the last did not (0) — and
+  compares them as a ratio, since an unbounded accumulation moves the late window
+  by about what it moved the early one.
+- **A one-key comparison is only controlled if the key does something.** Two of
+  these fixtures measured `0.000000` apart before they were tuned, for two
+  different reasons that both look like a passing test: `max(cur, prev * fade)`
+  over a *stationary* figure is exactly `cur`, and so is a `trails` stage whose
+  tail is shorter than the scene's own `fade`. Where a guard's premise is "this key
+  changes the picture", assert that premise before asserting anything on top of it.
 
 ### The in-frame geometry fraction, and the four things it cannot see (Plan 0069)
 

@@ -1,0 +1,50 @@
+# SCRATCH PRESET - Plan 0046 Phase 5 (human). Not shipped content: it is here for
+# one judgement call, on a wall, with music playing. See README.md beside it.
+#
+# THE TUNNEL. A star rosette under a long trail whose past is pushed outward every
+# frame, so each frame's figure is left behind as a slightly larger copy of itself
+# and the stack of them reads as depth. `fb_zoom` rides the beat, so the tunnel
+# lunges on the kick and coasts between.
+#
+# What to look at: does the receding stack read as DEPTH, or as a smear? Does the
+# lunge land ON the beat or a frame late? Does the frame time hold at the Rich
+# tier, fullscreen?
+system = "star_pattern"
+name   = "0046 Beat Tunnel"
+
+[generator]
+tiling            = "12"
+contact_angle_deg = 32
+
+[params]
+# A crisp, mid-sized rosette. Small enough that there is frame left for the tunnel
+# to travel into - a figure filling the screen has nowhere to recede to.
+variant       = "1"
+scale         = "0.30"
+thickness     = "2.6"
+brightness    = "0.85 + clamp(bass * 2.5, 0, 0.5)"
+draw_progress = "1"
+rotation      = "time * 0.08"
+hue           = "0.58 + mid * 0.12"
+hue_spread    = "0.25"
+
+# The accumulation. LONG, because the tunnel IS the tail - every ring you see is
+# an older frame. At 0.965 a copy is still a tenth of its brightness a second
+# later, which is about as deep as the eye reads before the rings merge.
+trails        = "0.965"
+
+# The tunnel itself, and the number that decides whether this reads as DEPTH or as
+# a blur. Slower than about 2/s and the expanding copies overlap into one soft
+# halo; at 3.2 they separate into distinct rays streaming outward. The beat term
+# nearly doubles it for the length of a kick, and `beat` is a decaying envelope,
+# so that is a lunge which settles rather than a step.
+fb_zoom       = "3.2 + clamp(beat, 0, 1) * 2.5"
+
+[smoothing]
+# Snap into the lunge, glide out of it. Without the release the tunnel stops dead
+# when the envelope does, which reads as a stutter rather than as momentum.
+fb_zoom    = { attack = 0.02, release = 0.35 }
+brightness = { attack = 0.03, release = 0.25 }
+
+[palette]
+name = "ice"
