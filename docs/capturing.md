@@ -826,11 +826,11 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 
 | test | kind | asserts |
 |------|------|---------|
-| `reactivity` | HARD | every preset moves for at least one band (bass/mid/treb/onset); prints the per-band vector so a dead single binding — e.g. treble — is visible |
-| `animation` | HARD | every preset changes between frame N and N+k at fixed audio (not frozen) |
+| `reactivity` | HARD | every preset moves for at least one band (bass/mid/treb/onset), driven by **PCM through the real analyzer** (Plan 0067 Phase 1 — see [what the gates can and cannot see](#what-the-five-preset-gates-can-and-cannot-see) below); prints the per-band vector so a dead single binding — e.g. treble — is visible |
+| `animation` | HARD | every preset changes between frame N and N+k at fixed audio (not frozen). Carries an `#[ignore]`d **resolution ladder** (Plan 0067 Phase 1d) that measured the two designs this gate is documented to penalize at 96 / 192 / 384 and found resolution changes nothing — the numbers are in that test's doc comment, and they are why `SIZE` and `ANIM_FLOOR` did not move |
 | `sanity` | HARD | every preset lights a minimum coverage, spans ≥2 quadrants **against its own background** (not blank, not a dot), and has some **tonal structure** — no more than 90 % of its lit pixels inside one of 16 luminance bands (not a blot). The third check is Plan 0056 Phase 5: a saturated single-tone mass satisfies the first two completely, which is how four attractor presets shipped flat. Threshold measured from the library's own distribution, printed on every run. `Spectrum Ridge` is listed in `KNOWN_FLAT` — it measures `1.000` today, and the test says so rather than gating on it |
 | `beat` | HARD | a 120 BPM click track through the **real** DSP makes a beat-accent preset render differently on-beat vs off-beat; a zeroed beat binding does not |
-| `distinctness` | ADVISORY | prints per-family pixel + shape pairwise matrices and flags near-duplicate geometry; never asserts |
+| `distinctness` | ADVISORY | prints per-family pixel + shape pairwise matrices and flags near-duplicate geometry; never asserts. Covers **all nine** families since Plan 0067 Phase 1c — the family list is still a plain array and a new `SystemKind` will not appear in it on its own |
 | `golden` | HARD (tolerance) | one **frozen fixture per system**, plus the `EXTRA_FIXTURES` escape hatch below, matches its committed baseline PNG within a mean + max-outlier tolerance ([ADR-0023](adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)) |
 | `composite` | HARD (tolerance) | the **post stages**, one fixture each and never all at once — `trails`, `kaleido_*`, `bloom_*`, plus one that binds **no** stage and guards the composite's *arithmetic* (its assertion is that no channel of *that fixture* reaches 255 — a claim about the fixture, not a general property of the curve; see the re-bless note below). Captured at **160x100**, a size whose internal grid is *not* the target's shape, so an aspect error is visible ([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) |
 | `bloom` | HARD (relative) | the bloom stage's behaviour, beside its baseline rather than in it: halo **energy** rises with `bloom_amount`, halo **extent** rises with `bloom_radius`, the rich tier's deeper pyramid reaches further than the floor's, and the halo is **round**. Captured at **256x256** — square, and load-bearing: the roundness guard is what catches a separable kernel whose two passes step in different units, and it reads 1.001 today against 7.05 under the defect it was written for. No magic numbers: every assertion compares two captures of one fixture differing in one bound param |
@@ -873,6 +873,44 @@ ADR-0023 rests on that and this does not weaken it.
 shared by the tests and the CLI report, plus the step-response pair
 `frames_to_settle` / `step_response` and the `segment_settled` gate that says
 whether either of those two is worth reading.
+
+### What the five preset gates can and cannot see
+
+A preset ships when the behavioral suite is green
+([ADR-0081](adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)), so
+what "green" is evidence *of* is worth stating rather than inferring. Five gates
+sweep the shipped set, and **one of them drives real audio**:
+
+| gate | where its numbers come from | would it notice a preset that ignores the music? |
+|------|------------------------------|--------------------------------------------------|
+| `reactivity` | **PCM → the real analyzer** — four `core::signal` clips (60 Hz sine, a mid chord, a 12 kHz tone, a 240 BPM click track) pushed hop-by-hop through `Analyzer` and rendered frame by frame via `Renderer::capture_audio` | **Yes.** This is the only one. A preset that reads no band moves identically under all four clips and fails |
+| `sanity` | one synthesized `AnalysisFrame` | No — it asks whether the frame is lit, spread and tonally structured |
+| `animation` | a **zeroed** `AnalysisFrame` held constant | No, by design — it asks whether the scene clock moves, with audio deliberately held out |
+| `distinctness` | one synthesized `AnalysisFrame`, shared across a family | No — it asks whether two presets look alike |
+| `golden` | frozen fixtures with constant params | No — it asks whether the renderer still draws what it drew |
+
+**Four of the five are right to synthesize.** Their questions are about the
+*frame* — is it lit, does it move, is it distinct, does it match its baseline —
+and a made-up analysis frame answers those correctly and several times faster
+than pushing samples would. Converting them would buy nothing and cost the sweep
+another ~1.8x each. That is a decision, not an omission
+([Plan 0067](plans/0067-the-curation-route.md), "What this plan does NOT do").
+
+**So read a green suite as: the renderer produced a plausible, distinct, moving
+frame, and the preset responds to at least one band of real audio.** What it
+still does not say is that the preset responds *well* — `reactivity` compares a
+driven band against silence, and against silence a binding that saturates just
+above the noise floor is maximally responsive. That gap is `saturation`'s
+(a CPU-only expression walk over a 12 s `dynamic:110` probe), and it is the
+second gate that sees real signal even though it renders nothing. `beat`,
+`chain` and `dsp` also push PCM, but they test fixtures and the DSP itself rather
+than the shipped set.
+
+If one of the other four ever needs to answer an audio question, `reactivity.rs`
+is the pattern: synthesize with `core::signal`, drive `Renderer::capture_audio`,
+and keep the clip only as long as the analyzer's window needs to fill —
+`WARMUP_HOPS` of the ~40-hop clip publish nothing at all, and they are most of
+what the change costs.
 
 ### Golden baselines
 
