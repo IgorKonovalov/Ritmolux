@@ -1,0 +1,119 @@
+# Banded Mandala - the first of Plan 0064 Phase 6's three reference looks: a
+# radial mandala of concentric shrinking copies, coloured in hard graphic bands
+# rather than a smooth ramp.
+#
+# WHAT IS NEW HERE, and it is the whole point of the preset: `kaleido_radial`
+# makes the fold periodic in `log r` as well as in theta, so the rosette repeats
+# INWARD as a sequence of shrinking copies of itself. Without it this file is a
+# flat rosette, which is what every kaleido preset in the library looked like
+# before the symmetry stage landed.
+#
+# THE BAND COUNT IS THE EXPERIMENT. `palette_steps` is latched to the beat -
+# 6 bands at rest, 9 on a hit, eased out over half a second. Phase 6 asks
+# whether that reads as a RESPONSE or as a STROBE, and it cannot be answered
+# from a still: quantizing colour is a global change to every pixel at once,
+# which is exactly the shape a strobe has. If it reads badly, the fix is to move
+# the beat term onto `kaleido_radial` instead and let the band count sit still.
+system = "fragment_field"
+name = "Banded Mandala"
+
+[palette]
+# Six stops chosen to survive quantization: each is a distinct HUE, not a
+# lightness step, so the hard edges read as a graphic device rather than as
+# banding artifacts in a gradient. A ramp that only changes lightness looks
+# broken when you posterize it; one that changes hue looks designed.
+stops = [
+  { at = 0.00, color = "#120024" },
+  { at = 0.22, color = "#5b1668" },
+  { at = 0.44, color = "#c33149" },
+  { at = 0.62, color = "#f0793a" },
+  { at = 0.82, color = "#ffd98a" },
+  { at = 1.00, color = "#7de8d8" },
+]
+
+[palette_b]
+name = "ember"
+
+[params]
+# BAND MAP
+#   bass  -> `kaleido_radial` (how many rings) + `warp` + `palette_mix`
+#   mid   -> `color_span` (how much colour each ring carries)
+#   treb  -> `zoom` + `saturation`
+#   onset -> `flash`
+#   beat  -> `palette_steps`, the band count
+#
+# Peak energy goes to STRUCTURE - the ring count - not to luminance. The fold
+# replicates whatever light the wedge holds, and the radial repeat then
+# replicates it again per ring, so a bright term here is multiplied twice.
+
+# STRUCTURE. `kaleido_radial` is the scale ratio between successive rings, so
+# 1.45 is roughly six rings across the frame and 1.90 is about four larger ones.
+# Loud music makes the rings BIGGER and fewer, which reads as the mandala
+# breathing outward. Cap 0.45 at the house gain for bass (cap / 0.85).
+kaleido_radial = "1.45 + clamp(bass * 0.529, 0, 0.45)"
+kaleido_order  = "8"
+# ROTATION OFF, AND IT IS A DELIBERATE ZERO RATHER THAN AN OMISSION. This drew
+# `time * 0.07` and it was wrong for the look: a mandala is a figure you read
+# for its symmetry, and a rosette that turns invites the eye to track the
+# rotation instead of the structure. Judged live at Plan 0064 Phase 6 - the
+# still frames were no help here, because a rotation is exactly the thing a
+# capture cannot show. The ring count still breathes on bass, so the figure is
+# not static; it just no longer spins.
+kaleido_angle  = "0"
+# 0.06 is the Phase 4 default: a frozen hub below this radius, visually
+# indistinguishable from 0 but it caps the worst minification for free.
+kaleido_inner  = "0.06"
+# `squash` - this is a border-filling field, so compress the outside back into
+# the disc rather than cropping to one (the Plan 0055 A/B chose this for fields).
+kaleido_edge   = "2"
+
+# COLOUR - the hard edges.
+palette_steps   = "6 + beat * 3"
+palette_contour = "0.40"
+
+# FIELD. Modest warp: the radial repeat is already doing the structural work and
+# a turbulent source turns the rings to mush.
+warp  = "0.55 + sin(time * 0.041) * 0.10 + clamp(bass * 0.294, 0, 0.25)"
+zoom  = "1.30 + clamp(treb * 0.333, 0, 0.20)"
+pan_x = "sin(time * 0.019) * 0.10"
+pan_y = "cos(time * 0.025) * 0.08"
+
+# LUMINANCE - held nearly flat, for the doubled-replication reason above.
+glow  = "0.44 + clamp(mid * 0.141, 0, 0.12)"
+flash = "clamp(onset * 0.25, 0, 0.15)"
+
+hue          = "0.18 + time * 0.017"
+# SPAN HAS TO WRAP THE LUT, and this is the one number that decides whether the
+# preset reads as banded at all. The palette is repeat-addressed, so a span near
+# 0.5 walks half the gradient and six quantized bands land on six NEIGHBOURING
+# hues - which renders as two tans and a sage, exactly what the first draft did.
+# Above 1.0 the coordinate wraps, so the six bands land on six genuinely
+# different colours. Measured, not guessed: Plan 0064's own golden fixture hit
+# this and needed 1.6 for the same reason.
+color_span   = "1.55 + clamp(mid * 0.212, 0, 0.18)"
+color_center = "sin(time * 0.033) * 0.12"
+saturation   = "1.25 + clamp(treb * 0.25, 0, 0.15)"
+palette_mix  = "clamp(bass * 0.47, 0, 0.40)"
+
+# COMPOSITE. Bloom deliberately LOW - ADR-0046's bright pass blurs exactly the
+# hard edges this preset exists to produce, so crisp bands and heavy bloom are
+# mutually exclusive. Plan 0064 names this and it is not solvable in content.
+bloom_amount = "0.12"
+trails       = "0.18"
+
+[smoothing]
+# The ring count is the slowest thing in the file. A radial repeat that snaps
+# reads as the whole picture jumping scale, because every ring moves at once.
+kaleido_radial = 0.45
+
+# The band-count latch: fast in, slow out. This is the shape that decides
+# whether the beat term is a response or a strobe - a symmetric constant here
+# would flicker, and no constant at all would be unwatchable.
+palette_steps = { attack = 0.05, release = 0.55 }
+
+warp        = 0.35
+zoom        = 0.30
+glow        = 0.30
+flash       = { attack = 0.08, release = 0.55 }
+color_span  = 0.35
+palette_mix = 0.70

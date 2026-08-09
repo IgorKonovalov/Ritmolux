@@ -42,7 +42,7 @@ use super::{
     ViewTransform, curves, replicate_mirror,
 };
 use crate::dsp::AnalysisFrame;
-use crate::render::palette::Palette;
+use crate::render::palette::{self, Palette};
 
 /// Maps the `thickness` parameter (a small integer-ish stroke weight) to an
 /// NDC-y half-width; `thickness = 2` gives a comfortably thick projector line.
@@ -121,6 +121,11 @@ pub struct ParametricCurveScene {
     hue_spread: f32,
     saturation: f32,
     palette_mix: f32,
+    /// Hard palette bands and their contour (ADR-0078), raw as the preset
+    /// bound them -- `palette::band_steps` / `band_contour` condition them on
+    /// the way to the sample site.
+    palette_steps: f32,
+    palette_contour: f32,
     spin: f32,
     scale: f32,
     brightness: f32,
@@ -158,6 +163,8 @@ impl ParametricCurveScene {
             hue_spread: DEFAULT_HUE_SPREAD,
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
+            palette_steps: palette::DEFAULT_PALETTE_STEPS,
+            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             spin: DEFAULT_SPIN,
             scale: DEFAULT_SCALE,
             brightness: DEFAULT_BRIGHTNESS,
@@ -207,6 +214,8 @@ pub const PARAMS: &[&str] = &[
     "hue_spread",
     "saturation",
     "palette_mix",
+    "palette_steps",
+    "palette_contour",
     "spin",
     "scale",
     "brightness",
@@ -239,6 +248,8 @@ impl Scene for ParametricCurveScene {
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
+        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
+        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.spin = DEFAULT_SPIN;
         self.scale = DEFAULT_SCALE;
         self.brightness = DEFAULT_BRIGHTNESS;
@@ -263,6 +274,8 @@ impl Scene for ParametricCurveScene {
             "hue_spread" => self.hue_spread = value,
             "saturation" => self.saturation = value,
             "palette_mix" => self.palette_mix = value,
+            "palette_steps" => self.palette_steps = value,
+            "palette_contour" => self.palette_contour = value,
             "spin" => self.spin = value,
             "scale" => self.scale = value,
             "brightness" => self.brightness = value,
@@ -316,6 +329,7 @@ impl Scene for ParametricCurveScene {
             hue: self.hue,
             hue_spread: self.hue_spread,
             palette_mix: self.palette_mix,
+            palette_steps: self.palette_steps,
             saturation: self.saturation,
             brightness: self.brightness,
         };
@@ -413,6 +427,7 @@ mod tests {
             hue: DEFAULT_HUE,
             hue_spread,
             palette_mix: DEFAULT_PALETTE_MIX,
+            palette_steps: palette::DEFAULT_PALETTE_STEPS,
             saturation: DEFAULT_SATURATION,
             brightness: DEFAULT_BRIGHTNESS,
         }

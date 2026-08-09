@@ -402,9 +402,9 @@ struct Draw {
     //    their `age` is identically zero, so a bare `age * rate` would black them
     //    out. Two numbers rather than a branch, and the multiply by a literal 1.0
     //    is the identity in IEEE-754, so no existing capture moves.
-    //    z and w are FREE since Plan 0074 Phase 3: z carried the reciprocal of
-    //    the longest reachable lifetime, which only the retired age colour
-    //    channel read.
+    //    z is `palette_steps` (ADR-0078) - it and w were FREE since Plan 0074
+    //    Phase 3, when z stopped carrying the reciprocal of the longest
+    //    reachable lifetime that only the retired age colour channel read.
     v: vec4<f32>,
     w: vec4<f32>,
     u: vec4<f32>,
@@ -542,6 +542,16 @@ const MAP_SPAN: f32 = 3.0;
 // both palette-coordinate routes the arithmetic identity at their defaults.
 fn channel_shift(unit: f32, amount: f32) -> f32 {
     return amount * (unit - 0.5);
+}
+
+// Shared `palette_steps` (mirrors core/src/render/palette.rs::band_coord
+// verbatim, ADR-0078): snap the palette coordinate to a band centre before the
+// LUT read. Below 1.5 steps it is the exact identity, not a one-band degenerate.
+fn band_coord(t: f32, steps: f32) -> f32 {
+    if (steps < 1.5) {
+        return t;
+    }
+    return (floor(t * steps) + 0.5) / steps;
 }
 
 // Standard RGB->HSV, the inverse of `hsv2rgb` below (both are the iq forms; the
@@ -729,8 +739,14 @@ fn vs_main(
     let coord = hue + hue_center + (seed - 0.5) * hue_spread + depth_tint(dn)
         + channel_shift(map01, draw.ch.x)
         + draw.ch.z * root01;
-    let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
-    let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(coord, 0.5), 0.0).rgb;
+    // Hard bands (ADR-0078). NO contour here and that is the honest scoping,
+    // not an omission: this is the VERTEX stage, `fwidth` does not exist in it,
+    // and a point sprite carries a single palette coordinate - so there is no
+    // gradient across it for a contour to sit in. `palette_contour` is inert on
+    // this scene and `presets/README.md` says so.
+    let banded = band_coord(coord, draw.em.z);
+    let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(banded, 0.5), 0.0).rgb;
+    let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(banded, 0.5), 0.0).rgb;
     // ...and each channel's OTHER route, which shifts the hue of whatever colour
     // the palette produced instead of moving where it was sampled. Before
     // `apply_saturation`, so `saturation` stays the last word on colour.

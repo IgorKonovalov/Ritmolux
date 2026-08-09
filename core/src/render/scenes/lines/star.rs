@@ -146,7 +146,7 @@ use super::{
     replicate_mirror, transform_cached, turtle,
 };
 use crate::dsp::AnalysisFrame;
-use crate::render::palette::Palette;
+use crate::render::palette::{self, Palette};
 
 /// Maps `thickness` to an NDC-y half-width (see the parametric scene).
 const WIDTH_SCALE: f32 = 0.003;
@@ -260,6 +260,11 @@ pub struct StarPatternScene {
     hue_spread: f32,
     saturation: f32,
     palette_mix: f32,
+    /// Hard palette bands and their contour (ADR-0078), raw as the preset
+    /// bound them -- `palette::band_steps` / `band_contour` condition them on
+    /// the way to the sample site.
+    palette_steps: f32,
+    palette_contour: f32,
     draw_progress: f32,
     thickness: f32,
     scale: f32,
@@ -307,6 +312,8 @@ impl StarPatternScene {
             hue_spread: DEFAULT_HUE_SPREAD,
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
+            palette_steps: palette::DEFAULT_PALETTE_STEPS,
+            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             draw_progress: DEFAULT_DRAW_PROGRESS,
             thickness: DEFAULT_THICKNESS,
             scale: DEFAULT_SCALE,
@@ -1027,6 +1034,8 @@ pub const PARAMS: &[&str] = &[
     "hue_spread",
     "saturation",
     "palette_mix",
+    "palette_steps",
+    "palette_contour",
     "draw_progress",
     "thickness",
     "scale",
@@ -1060,6 +1069,8 @@ impl Scene for StarPatternScene {
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
+        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
+        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.draw_progress = DEFAULT_DRAW_PROGRESS;
         self.thickness = DEFAULT_THICKNESS;
         self.scale = DEFAULT_SCALE;
@@ -1083,6 +1094,8 @@ impl Scene for StarPatternScene {
             "hue_spread" => self.hue_spread = value,
             "saturation" => self.saturation = value,
             "palette_mix" => self.palette_mix = value,
+            "palette_steps" => self.palette_steps = value,
+            "palette_contour" => self.palette_contour = value,
             "draw_progress" => self.draw_progress = value,
             "thickness" => self.thickness = value,
             "scale" => self.scale = value,
@@ -1181,6 +1194,7 @@ impl Scene for StarPatternScene {
             hue: self.hue,
             hue_spread: self.hue_spread,
             palette_mix: self.palette_mix,
+            palette_steps: self.palette_steps,
             saturation: self.saturation,
             brightness: self.brightness,
         };

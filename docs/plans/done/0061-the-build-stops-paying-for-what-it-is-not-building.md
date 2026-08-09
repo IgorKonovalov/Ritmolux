@@ -1036,7 +1036,7 @@ cost it was meant to bound is bounded by the fixture instead. Recorded in
 
 [0046]: ../0046-transformed-feedback.md
 [0053]: ../0053-the-suite-stops-blessing-what-warp-gets-wrong.md
-[0064]: ../0064-the-symmetry-stage-and-the-banded-palette.md
+[0064]: 0064-the-symmetry-stage-and-the-banded-palette.md
 [0067]: ../0067-the-curation-route.md
 [0071]: ../done/0071-light-that-adds-without-covering.md
 [0072]: ../0072-the-backdrop-joins-the-palette.md

@@ -59,7 +59,8 @@ struct Params {
     b: vec4<f32>,
     // xy: pan (field-space offset, ADR-0018), z: color_center, w: saturation
     c: vec4<f32>,
-    // x: palette_mix (A/B crossfade), y: occlude (ADR-0085), zw: unused
+    // x: palette_mix (A/B crossfade), y: occlude (ADR-0085),
+    // z: palette_steps (integral, quantized CPU-side), w: palette_contour (ADR-0078)
     d: vec4<f32>,
 }
 
@@ -81,6 +82,31 @@ fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
     return vec3<f32>(luma) + (c - vec3<f32>(luma)) * s;
 }
 
+// Shared `palette_steps` (mirrors core/src/render/palette.rs::band_coord
+// verbatim, ADR-0078): snap the palette coordinate to a band centre before the
+// LUT read. Below 1.5 steps it is the exact identity, not a one-band degenerate.
+fn band_coord(t: f32, steps: f32) -> f32 {
+    if (steps < 1.5) {
+        return t;
+    }
+    return (floor(t * steps) + 0.5) / steps;
+}
+
+// Shared `palette_contour` (ADR-0078; the WGSL is the implementation, copied
+// verbatim at each fragment-stage site — palette.rs has no CPU counterpart to be
+// canonical, since `fwidth` exists only here). Darkens within one PIXEL of a band
+// edge, so the line has the same weight where the field is shallow and where it
+// is steep.
+fn band_contour(t: f32, steps: f32, amount: f32) -> f32 {
+    let f = t * steps;
+    let w = max(fwidth(f), 1e-5);
+    if (steps < 1.5 || amount <= 0.0) {
+        return 1.0;
+    }
+    let d = min(fract(f), 1.0 - fract(f));
+    return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d));
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let t = params.a.x;
@@ -95,6 +121,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let color_center = params.c.z;
     let saturation = params.c.w;
     let palette_mix = params.d.x;
+    let palette_steps = params.d.z;
+    let palette_contour = params.d.w;
 
     var uv = in.ndc;
     uv.x = uv.x * aspect;
@@ -116,11 +144,16 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // (was a fixed 0.6), `color_center`/`hue` slide the window. Linear-filtered,
     // repeat-addressed (a hue rotation wraps like the cosine wheel).
     let coord = field * color_span + color_center + hue;
+    // Hard bands, then the contour drawn from the SAME coordinate (ADR-0078), so
+    // the dark line follows the field's iso-lines and reads as structure rather
+    // than as an outline of the picture's brightness.
+    let banded = band_coord(coord, palette_steps);
     // Sample both palettes and crossfade by `palette_mix` (0 = A, 1 = B). When a
     // preset declares no [palette_b] the two LUTs are identical, so mix is a no-op.
-    let ca = textureSample(lut_a, lut_samp, vec2<f32>(coord, 0.5)).rgb;
-    let cb = textureSample(lut_b, lut_samp, vec2<f32>(coord, 0.5)).rgb;
+    let ca = textureSample(lut_a, lut_samp, vec2<f32>(banded, 0.5)).rgb;
+    let cb = textureSample(lut_b, lut_samp, vec2<f32>(banded, 0.5)).rgb;
     var col = mix(ca, cb, clamp(palette_mix, 0.0, 1.0));
+    col = col * band_contour(coord, palette_steps, palette_contour);
     col = apply_saturation(col, saturation);
 
     let r = length(uv);
@@ -175,6 +208,11 @@ pub struct FragmentFieldScene {
     saturation: f32,
     /// A/B palette crossfade position (Plan 0020 Phase 4); 0 = palette A.
     palette_mix: f32,
+    /// Hard palette bands and their contour (ADR-0078), raw as the preset
+    /// bound them -- `palette::band_steps` / `band_contour` condition them on
+    /// the way to the sample site.
+    palette_steps: f32,
+    palette_contour: f32,
     /// How much of this field's (total) coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame through
     /// [`Scene::set_occlude`](super::Scene::set_occlude) — **not** a named param,
@@ -277,6 +315,8 @@ impl FragmentFieldScene {
             color_center: DEFAULT_COLOR_CENTER,
             saturation: DEFAULT_SATURATION,
             palette_mix: DEFAULT_PALETTE_MIX,
+            palette_steps: palette::DEFAULT_PALETTE_STEPS,
+            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
@@ -299,6 +339,8 @@ pub const PARAMS: &[&str] = &[
     "color_center",
     "saturation",
     "palette_mix",
+    "palette_steps",
+    "palette_contour",
 ];
 
 impl Scene for FragmentFieldScene {
@@ -333,6 +375,8 @@ impl Scene for FragmentFieldScene {
         self.color_center = DEFAULT_COLOR_CENTER;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
+        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
+        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -348,6 +392,8 @@ impl Scene for FragmentFieldScene {
             "color_center" => self.color_center = value,
             "saturation" => self.saturation = value,
             "palette_mix" => self.palette_mix = value,
+            "palette_steps" => self.palette_steps = value,
+            "palette_contour" => self.palette_contour = value,
             _ => {}
         }
     }
@@ -376,7 +422,12 @@ impl Scene for FragmentFieldScene {
             a: [self.time, aspect.max(0.1), self.warp, self.hue],
             b: [self.zoom, self.glow, self.flash, self.color_span],
             c: [self.pan_x, self.pan_y, self.color_center, self.saturation],
-            d: [self.palette_mix, self.occlude, 0.0, 0.0],
+            d: [
+                self.palette_mix,
+                self.occlude,
+                palette::band_steps(self.palette_steps),
+                palette::band_contour(self.palette_contour),
+            ],
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
 
