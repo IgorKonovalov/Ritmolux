@@ -7,6 +7,14 @@
 //! content work (a Plan 0013 followup).
 //!
 //! Run with: `cargo test -p lmv-core --test distinctness -- --nocapture`
+//!
+//! **Cost, measured at Plan 0067 Phase 1c** when the family list went from six
+//! to all nine: 25 captures -> 41, and the wall clock **22 s -> 41 s**
+//! (interleaved runs on one machine, software adapter). That is +82 % for +64 %
+//! more presets, because the two families added are the expensive ones —
+//! `attractor` is a compute-particle scene and `reaction_diffusion` a
+//! stateful-feedback one, and both cost more per frame than the six line and
+//! fragment families that were already here.
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::{SystemKind, default_presets};
@@ -86,20 +94,27 @@ fn report_family_distinctness() {
     };
     let frame = fixed_frame();
 
-    // THIS LIST IS CURATED, NOT EXHAUSTIVE, and the omissions are deliberate.
-    // It is a plain array rather than a match over `SystemKind`, so adding a
-    // scene does not force a decision here — which is exactly why the reasoning
-    // has to be written down instead of inferred from the absence.
+    // THIS LIST IS CURATED, NOT EXHAUSTIVE. It is a plain array rather than a
+    // match over `SystemKind`, so adding a scene does not force a decision here
+    // — which is exactly why the reasoning has to be written down instead of
+    // inferred from an absence.
+    //
+    // **As of Plan 0067 Phase 1c it happens to cover all nine families**, and
+    // nothing about that is automatic: a new `SystemKind` will not appear here
+    // and nothing will fail. If a family is ever taken back out, the mechanical
+    // reason belongs in this comment.
     //
     // The report's unit is a PAIRWISE matrix within a family, so a family needs
-    // at least two shipped presets before it can say anything at all.
-    // `attractor` and `reaction_diffusion` have been absent since this test was
-    // written; `emitter` joins them at Plan 0052, which ships exactly one preset
-    // (`Sparks`) and would therefore print a 1x1 matrix of one preset against
-    // itself. That is left out for that reason — not lowered, not waived, and
-    // not because the scene was overlooked. **The moment a second preset lands
-    // in any of these three families, add it here**; the measurement becomes
-    // meaningful at two and the family is worth watching from then on.
+    // at least two shipped presets before it can say anything at all. That —
+    // and only that — is why `attractor`, `reaction_diffusion` and `emitter`
+    // were absent from this list for so long. The premise had gone stale by a
+    // wide margin before anyone re-read it: at the time they were added,
+    // `attractor` had **eight** presets (28 pairs this report had never
+    // measured), `reaction_diffusion` six (15 pairs) and `emitter` two (1) —
+    // and `attractor` is the family with three plans of shape work behind it
+    // (0057, 0059, 0063) and therefore the most likely in the library to have
+    // converged. A count is a fine reason to leave a family out and a terrible
+    // one to leave written down, because it stops being true silently.
     for (system, label) in [
         (SystemKind::FragmentField, "fragment_field"),
         (SystemKind::Swarm, "swarm"),
@@ -107,6 +122,9 @@ fn report_family_distinctness() {
         (SystemKind::LSystem, "lsystem"),
         (SystemKind::StarPattern, "star_pattern"),
         (SystemKind::Spectrum, "spectrum"),
+        (SystemKind::Attractor, "attractor"),
+        (SystemKind::ReactionDiffusion, "reaction_diffusion"),
+        (SystemKind::Emitter, "emitter"),
     ] {
         let names: Vec<String> = default_presets()
             .into_iter()
