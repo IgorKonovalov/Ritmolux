@@ -30,13 +30,37 @@ any plan above. **No plan here closes in one session** — every remaining one
 carries a `human` phase, so plan on bringing the user in rather than picking on
 that criterion.
 
+**Re-ordered 2026-08-09, and the reason matters more than the order.** The previous
+table was written before [0071], [0064] and [0067] closed within a week of each
+other. Those three were three of [0075]'s four prerequisites, which leaves **[0046]
+as the sole remaining engine gate on the renaissance** — every other plan on this
+roster says in its own row that it blocks nobody. The user's call from that reading:
+run **[0046] and [0068] as two parallel worktree lanes**.
+
 | # | Plan | Why here |
 |---|------|----------|
-| 1 | [0053] | Protective rather than additive; moves no pixels. Now carries one more layout pair to allowlist, and **[0071] emptied its headline collision group** — see its row above. |
-| 2 | [0068] | Blocks nobody. Late because it ships no fix, not because it is unimportant. |
-| 3 | [0046] | Touches the attractor's feedback path, cheapest once that file has settled. |
-| 4 | [0076] | Unblocked — [0071] has landed (shared files: `render/mod.rs`, `post.rs`). Best after [0046] (both touch the chain). Before [0075]'s cohorts by preference, so the brief can assign layered worlds. |
-| 5 | [0075] | **Last by design** (ADR-0089): the fresh library is authored once, against the engine [0046]/[0071]/[0076] finish ([0064] has landed) and through the gate [0067] has made trustworthy. Its Phases 1-3 are the exception — ungated instrument/doc fixes, take them whenever a session has room. |
+| 1 | [0046] | **The critical path.** The last of [0075]'s four prerequisites still open; [0076] wants it landed first (both edit the composite chain). Its `human` phase is short — run the standalone against two scratch presets and judge — so unlike the rest of this roster it can plausibly close in one sitting. |
+| 1 | [0068] | **Parallel with [0046], and the only plan here that can be.** It touches `core/src/dsp/downbeat.rs` plus its own probe test and **shares no file with anything on the roster** — the merge is free. It advances nothing downstream (it ships a diagnosis and no fix, on purpose), which is exactly why it is the right passenger rather than the right driver. |
+| 2 | [0053] | Protective rather than additive; moves no pixels. Now carries one more layout pair to allowlist, and **[0071] emptied its headline collision group** — see its row above. **Take it before [0076], not after:** that plan adds a blend pass and duplicated stateful pipelines, which is precisely the bind-group-layout pressure this one guards, and its own Risks section predicts needing this allowlist. Landing the guard first means the blend layout earns its evidence when it is written instead of retro-derived. |
+| 3 | [0076] | Unblocked — [0071] has landed (shared files: `render/mod.rs`, `post.rs`). Best after [0046] (both touch the chain) **and after [0053]** (see that row). Before [0075]'s cohorts by preference, so the brief can assign layered worlds. |
+| 4 | [0075] | **Last by design** (ADR-0089): the fresh library is authored once, against the engine [0046]/[0071]/[0076] finish ([0064] has landed) and through the gate [0067] has made trustworthy. Its Phases 1-3 are the exception — ungated instrument/doc fixes, take them whenever a session has room. |
+
+### Two collisions this ordering is dodging, recorded so a re-order does not walk into them
+
+- **[0053] and [0046] must not run concurrently.** [0053] Phase 1 lands a new
+  **attractor-with-trails** golden fixture; [0046] Phases 1 and 3 rewrite exactly
+  that path while claiming every golden stays byte-identical. Run in parallel, that
+  identity claim is never measured against the fixture landing beside it. Sequential
+  in either order is fine — and [0053] first is better, because [0046] then proves
+  identity across the new fixture too. Whichever runs second re-runs the
+  bless-against-a-clean-`main`-control (the [0071] form; a naive diff against the
+  committed baselines convicts three files that drift on this box regardless).
+- **[0046] should precede [0075] Phase 3.** That phase documents
+  [backlog 0063](../design-backlog.md)'s `spin`x`fade` smear ceiling in **frames**
+  ("`fade = 0.932` is about 15 frames"). [0046] Phase 1 normalizes the decay to
+  `fade^(dt*60)`, which makes it time-based: the measured numbers stay correct at
+  60 Hz and at capture `dt`, but the honest phrasing becomes seconds. Landing [0046]
+  first means that paragraph gets written once against final semantics.
 
 [0045]: done/0045-linear-light-and-bloom.md
 [0046]: 0046-transformed-feedback.md
