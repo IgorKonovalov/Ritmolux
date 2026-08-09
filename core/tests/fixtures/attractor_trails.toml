@@ -1,0 +1,42 @@
+# CO-LIVE PIPELINE FIXTURE - do not tune; editing this invalidates the drift
+# baseline (Plan 0053 Phase 1, ADR-0058).
+#
+# BLESS IT BY ITS OWN FILTER:
+#   LMV_BLESS=1 cargo test -p lmv-core --test attractor_trails
+# It has its own test binary for exactly that reason - `LMV_BLESS` is not scoped
+# to a fixture, so blessing this one from `--test golden` or the whole suite
+# would rewrite every other baseline in `core/tests/golden/` at the same time.
+# Check `git status` afterwards regardless. Same posture `line_joints` documents.
+#
+# WHY IT EXISTS. `attractor_clifford.toml` and `attractor_leviathan.toml` bind
+# the engine `trails` stage on the attractor, which puts the attractor's four
+# pipelines (compute, draw, decay, present) and the trails stage's two in ONE
+# command buffer. Until this fixture, NO capture in the suite rendered that
+# combination against a committed baseline: `attractor.toml` binds no trails and
+# every `composite_*` fixture is a line scene. So the one configuration where the
+# most pipelines coexist on the software adapter - which is what ADR-0058's
+# hazard keys on - was pinned by nothing. This is coverage, NOT evidence of
+# correctness: a baseline blessed on WARP is a picture of whatever WARP did.
+# ADR-0058's hardware-vs-WARP comparison is the check.
+#
+# `fade` IS SHORTER THAN `trails`, AND THAT RELATION IS THE POINT. The attractor
+# owns its own accumulation buffer and decays it by `fade`; the engine stage
+# accumulates on top with `max(cur, prev * trails)`. If the scene's tail outlasts
+# the stage's, the stage's max is exactly `cur` at every pixel - a bit-for-bit
+# passthrough - and this fixture would pin a picture the trails pipelines never
+# touched. Same trap `attractor_trails_control.toml`'s header records.
+#
+# `spin` turns the figure, so both accumulations hold history this frame does not
+# already show. A static figure makes a trail indistinguishable from a
+# passthrough. Determinism is unaffected: the particle init is seeded (NFR 6),
+# the compute step is deterministic, and the capture steps a fixed dt.
+system = "attractor"
+name   = "fixture_attractor_trails"
+
+[params]
+size = "1.0"
+hue  = "0.3"
+fade = "0.6"
+spin = "0.6"
+
+trails = "0.98"

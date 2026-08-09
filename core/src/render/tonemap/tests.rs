@@ -511,8 +511,8 @@ fn layouts_in(text: &str, file: &str) -> Vec<(String, Vec<Kind>)> {
 /// `[texture, sampler, uniform]` with a note saying no other live pipeline had
 /// that shape; `attractor-decay` had had it all along, built from the same
 /// three helpers. Nothing could catch that, because the claim was prose on a
-/// hazard surface (ADR-0021 / Plan 0020: WARP hands a pipeline whose layout
-/// matches another live one *the other pass's* resources).
+/// hazard surface (ADR-0058: WARP hands a pipeline whose layout matches another
+/// live one *the other pass's* resources).
 ///
 /// Only the tonemap is asserted on. Several older layouts genuinely do
 /// collide — `ink` with the fold, `trails` with the blend, four separate
