@@ -105,10 +105,18 @@ change to the gate.
   explicitly *not* as an argument that the gate should change. This update does not make that
   argument either, but it does retire the phrase "informational": the gate is now shaping shipped
   content rather than only measuring it.
-- **ROUTED 2026-08-04 → [Plan 0067](plans/0067-the-curation-route.md) Phase 1d**, as a bounded
+- **ROUTED 2026-08-04 → [Plan 0067](plans/done/0067-the-curation-route.md) Phase 1d**, as a bounded
   measurement rather than a redesign. The user's call, from the two options put to them: raise the
   gate's resolution and re-baseline the floor if the measurement supports it, rather than design a
   coverage-aware successor statistic.
+- **MEASURED 2026-08-09, and the answer is negative — which sharpens this entry rather than closing
+  it.** Phase 1d rendered both cases plus a static control at 96 / 192 / 384. **The ladder is flat.**
+  `frame_diff` scores **occupancy**, and occupancy is scale-invariant, so no resolution separates
+  *sparse but moving* from *static*. `ANIM_FLOOR` and `SIZE` did not move; the ladder ships
+  `#[ignore]`d as a recorded measurement, at zero CI cost. The route the user chose is therefore
+  **closed off**, and what remains is the alternative that was explicitly not taken: this gate needs
+  a **coverage-aware statistic**, not a bigger render. That question is now *earned* rather than
+  speculative, and it is the live form of this entry.
 
 **The measurement, from the preset's own header.** Squall's second draft was the shipped geometry at
 **a fifth of the density** — "far better looking, individual parabolas, lots of dark" — and it
@@ -393,7 +401,7 @@ tuples, each its own shape. Nothing in the current surface walks between them wi
 ## 0056 — a user-authored preset has been living outside the repo for six weeks, and it is a curation candidate the boundary has no route for
 
 - **PROMOTED 2026-08-04 → [ADR-0081](adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) +
-  [Plan 0067](plans/0067-the-curation-route.md)** — both halves the entry asks for. The owed
+  [Plan 0067](plans/done/0067-the-curation-route.md)** — both halves the entry asks for. The owed
   ADR-0017 supplement is written and the boundary moves: **`preset-author` lands presets directly,
   `architect` curates the set**, with the curation pass hooked to the close of any plan that touched
   `presets/` (a standing cadence was rejected on this project's own evidence — the version bump).
@@ -522,7 +530,7 @@ a re-tune and not a no-op. Plan 0072 owns that pass.
 
 - **Raised:** 2026-08-04, from `preset-author`, at the fold-edge content pass — as a *pattern*
   rather than a defect, with two instances and a specific ask.
-- **ROUTED 2026-08-04 → [Plan 0067](plans/0067-the-curation-route.md) Phase 4**, which is already
+- **ROUTED 2026-08-04 → [Plan 0067](plans/done/0067-the-curation-route.md) Phase 4**, which is already
   installing a close-ceremony duty hooked to "this plan touched `presets/`". This is a second
   trigger on the same step: "this plan fixed something a preset could have been framed around".
 - **Verified against code:** yes — both instances are readable in the shipped files today.
@@ -1746,3 +1754,92 @@ reader knows the cells are not directly comparable and why.
 this plan one unanswered question, which Phase 6 absorbed.
 
 [0048]: plans/done/0048-analysis-v2-and-the-retune.md
+
+## 0080 — the reactivity gate pays 1.8x to render frames it throws away, because warm-up and measurement share one capture path
+
+**Raised by:** `architect`, at [Plan 0067](plans/done/0067-the-curation-route.md)'s close.
+**Owner if taken:** `dev` — `core/tests/reactivity.rs` and whatever `Renderer::capture_audio` needs
+to grow to express "advance without rasterizing".
+
+### The finding
+
+Plan 0067 Phase 1 moved the reactivity gate onto real PCM through the real analyzer, which was the
+right call and is the only reason a green suite now says anything about audio at all. It cost
+**86 s → 167 s** over 41 presets, measured interleaved on one machine, and the lane declined to
+absorb the number silently.
+
+**About 85 % of that growth is warm-up.** Each capture runs `WARMUP_HOPS + SIGNAL_HOPS` hops, and
+the warm-up exists so the analyzer's window is full before anything is measured — an FFT and an
+onset envelope need history. But `capture_audio` **renders every hop**, warm-up included, and those
+frames are discarded. The gate is paying for a full rasterization pass per warm-up hop to obtain a
+DSP state that needs no pixels.
+
+### Why it is worth an entry rather than a comment
+
+The cheap fix was already tried and correctly rejected: `SIGNAL_HOPS = 16` cut the cost but dropped
+`emitter_squall` to 10 % headroom, which is a gate that fails on someone else's machine rather than
+a gate that is faster. So the *measured* budget is not negotiable downward — which leaves the
+discarded work as the only slack, and makes this the one place the cost can come from.
+
+It also compounds. This is the pattern Plan 0067 explicitly nominates as the one to copy if another
+gate ever needs to answer an audio question, and each copy would inherit the same waste.
+
+### What a fix would be
+
+Split "advance the analyzer" from "capture a frame" in the capture path, so warm-up hops push
+samples and step the DSP without a render pass, and only the measured window rasterizes. The
+property to preserve is the one the plan already leans on: determinism. The analysis must remain a
+pure function of its window, so a warm-up that skips rendering has to produce byte-identical
+analyzer state to one that does not — which is testable directly, and is the assertion that would
+make the change safe.
+
+### Priority
+
+**Medium.** Nothing is wrong; CI is simply slower than it needs to be on a job this project already
+pays for more than once per push. Worth taking the next time anyone is in that file.
+
+## 0081 — the house gain rule lives only in preset headers, so the exception the Coral Oracle found has nothing to be an exception to
+
+**Raised by:** `architect`, at [Plan 0067](plans/done/0067-the-curation-route.md)'s close, from the
+`chthonic_coral_oracle.toml` commit. **Owner if taken:** `architect` (the rule is a doc), with
+`preset-author` review.
+
+### The finding
+
+This project applies a consistent convention when gaining a band term into a clamped range: derive
+the gain from the cap so a typical passage reaches about half of it and a peak reaches it —
+`cap / 0.85` for `bass` and `mid`, `cap / 0.60` for `treb` and `onset`. It is applied across the
+library and it is the reason a clamp is meaningful rather than decorative.
+
+**It is written down nowhere.** It is not in `presets/README.md`, not in `docs/presets.md`. It
+propagates by being copied from one preset header to the next, which is how the Coral Oracle's
+author found it and re-derived every gain from it.
+
+And then that preset found a case where the rule is **actively wrong**. For a Gray-Scott regime the
+cap is a **death state**: feed high and kill low is the filled regime, where the gaps close and the
+picture becomes a flat wash with no contour left to draw. Gains derived by the rule (feed cap 0.059,
+kill floor 0.0595) put the field there on a sustained loud passage and rendered as flat mustard. So
+`feed` and `kill` are deliberately gentle, with caps pulled inside the labyrinth regime at **both**
+ends — a small reactive span on purpose, a drift between two living states rather than a sweep to
+the edge of the parameter space.
+
+### Why it is worth an entry rather than a comment
+
+The exception is already recorded, in the one file it applies to. The gap is structural: a
+convention that exists only as folklore cannot carry an exception, because the next author meets
+the *rule* (copied from a neighbouring preset) without ever meeting the *reason* it has limits.
+Both halves are load-bearing for the `preset-author` lane, which keeps no catalogue of its own and
+reads `presets/README.md` as the authority.
+
+### What a fix would be
+
+One short section in `presets/README.md`: the rule, the two constants and why they differ, and the
+exception class the Oracle names — **a param whose cap is a failure state rather than a maximum**
+gets its range pulled in at both ends instead. Gray-Scott `feed`/`kill` is the worked example; it is
+unlikely to be the only member of that class, and naming the class is what makes the entry useful
+beyond one preset.
+
+### Priority
+
+**Medium.** Cheap, and it converts a piece of folklore plus a one-file exception into a rule an
+author can apply and know the limits of.

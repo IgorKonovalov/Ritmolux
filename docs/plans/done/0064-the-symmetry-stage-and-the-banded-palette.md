@@ -9,7 +9,7 @@
 > `composite_symmetry.png` added; every test this plan named present, each carrying a non-vacuity
 > guard the plan did not ask for; every numeric assertion an exact property of a pure clamp or
 > quantizer (ADR-0071 clean). Gate green on the branch: fmt, clippy, **623/623 nextest**.
-> **Close-ceremony step 3b** (first run of the step [Plan 0067](../0067-the-curation-route.md) installed)
+> **Close-ceremony step 3b** (first run of the step [Plan 0067](0067-the-curation-route.md) installed)
 > is recorded under "Curation verdict" at the foot of this file.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
@@ -294,7 +294,7 @@ cutoffs on any of the three sources at capture resolution. `kaleido_inner` is th
 
 ## Curation verdict — close-ceremony step 3b, 2026-08-09
 
-The first run of the step [Plan 0067](../0067-the-curation-route.md) Phase 4 installed. Both triggers
+The first run of the step [Plan 0067](0067-the-curation-route.md) Phase 4 installed. Both triggers
 fired: this plan touched `presets/` (three new files) and it closed engine gaps.
 
 **What landed — the three ship, and the set absorbs them.** `shot --presets presets --report` flags

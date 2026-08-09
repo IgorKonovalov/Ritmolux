@@ -894,7 +894,7 @@ sweep the shipped set, and **one of them drives real audio**:
 and a made-up analysis frame answers those correctly and several times faster
 than pushing samples would. Converting them would buy nothing and cost the sweep
 another ~1.8x each. That is a decision, not an omission
-([Plan 0067](plans/0067-the-curation-route.md), "What this plan does NOT do").
+([Plan 0067](plans/done/0067-the-curation-route.md), "What this plan does NOT do").
 
 **So read a green suite as: the renderer produced a plausible, distinct, moving
 frame, and the preset responds to at least one band of real audio.** What it

@@ -1,8 +1,8 @@
 # ADR-0081 — The content lane lands presets; `architect` curates the shipped set
 
-> **Status:** proposed
+> **Status:** accepted (Plan 0067, closed 2026-08-09 — see the Outcome section)
 > **Date:** 2026-08-04
-> **Related plan(s):** [0067](../plans/0067-the-curation-route.md)
+> **Related plan(s):** [0067](../plans/done/0067-the-curation-route.md)
 > **Supplements:** [ADR-0017](0017-preset-author-skill-lane.md)
 
 ## Context
@@ -74,7 +74,7 @@ bump sat still across five plans), and a cadence nobody can name is a cadence no
 - **The gate authorizing all this is weaker than it reads.** Green means the renderer produced a
   plausible frame from synthesized analysis. It does not mean the preset reacts to music. Until at
   least one preset gate drives real PCM through the analyzer, "gated on the suite" is a partial
-  claim and should be stated as one — [Plan 0067](../plans/0067-the-curation-route.md) Phase 1
+  claim and should be stated as one — [Plan 0067](../plans/done/0067-the-curation-route.md) Phase 1
   exists to stop that from staying true.
 - **The lane self-approves the individual file.** That is the trade: per-file judgement moves to
   the author, set-level judgement moves to `architect`. A bad preset can ship and live until the
@@ -123,3 +123,32 @@ an existing ritual get run; calendars do not.
   judging it.
 - The gate-strength problem is not new here and is not this ADR's to solve; it is recorded so that
   "gated on the suite" is never quoted as stronger than it is.
+
+## Outcome — 2026-08-09, at Plan 0067's close
+
+Accepted as decided; the boundary moved and both skills describe it. Two things this ADR recorded
+have changed, and one of them was wrong when written.
+
+**The gate-strength Negative is discharged, and it should stop being quoted as open.** It read
+"until at least one preset gate drives real PCM through the analyzer, 'gated on the suite' is a
+partial claim". Plan 0067 Phase 1 made `reactivity` do exactly that: PCM through `Analyzer` via
+`Renderer::capture_audio`, with a non-vacuity test proving a preset whose only band binding is
+deleted now **fails**. The claim is no longer partial in the way this bullet meant. What replaces it
+is narrower and is written down in [`docs/capturing.md`](../capturing.md): **one** of the five gates
+sees audio, the other four synthesize by design, and green means *the preset reacts to at least one
+band* — not that it reacts *well*, since `reactivity` compares a driven band against silence.
+
+**The `bar` claim in the Notes is false and is struck.** This ADR repeated Plan 0067's error that
+`bar` "is no longer a variable". It is `VAR_NAMES[5]` and is live: the **beat** phase in `[0, 1)`, a
+misnomer kept for compatibility, with `bar_phase` — which ADR-0050 *added alongside* it — being the
+genuine bar position. The Coral Oracle pass verified this against the code and left the binding as
+authored. Only the `kaleido_order` easing was real rot. The lesson is the one this project keeps
+relearning: a claim about the current surface, repeated from a plan into an ADR, inherits the plan's
+error and outlives it.
+
+**The recurring-duty Negative stands and has one data point.** Step 3b ran twice on the day it
+landed — at [Plan 0064](../plans/done/0064-the-symmetry-stage-and-the-banded-palette.md)'s close and
+at this one. Both found a clean set. The one adjustment it needs is mechanical rather than
+structural: the workaround grep as specified returns dozens of hits, because this project cites
+plans and ADRs as *rationale* far more often than as dodges, so the sweep needs a narrowing pass
+before its output is readable.
