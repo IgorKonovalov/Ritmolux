@@ -1,0 +1,34 @@
+# FEEDBACK FIXTURE - do not tune; the motion guards in core/tests/feedback.rs
+# read it. Plan 0046 Phase 1.
+#
+# `feedback_still.toml`, with all six `fb_*` bound EXPLICITLY TO THEIR DEFAULTS.
+# It must render byte-for-byte what its sibling renders while binding none of
+# them. That is the identity claim ADR-0048 rests on, asserted rather than
+# assumed: the transform's aspect round-trip is not the identity in f32, so the
+# stage `select`s the literal sample uv whenever every term sits at its default,
+# and this fixture is what would catch that select going wrong.
+system = "parametric_curve"
+name   = "fixture_feedback_identity"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "4"
+d             = "97"
+samples       = "181"
+scale         = "0.05"
+pan_x         = "0.2"
+spin          = "0"
+hue           = "0.55"
+thickness     = "2.0"
+brightness    = "1.0"
+draw_progress = "1"
+
+trails        = "0.96"
+fb_zoom       = "1"
+fb_rotate     = "0"
+fb_dx         = "0"
+fb_dy         = "0"
+fb_center_x   = "0.5"
+fb_center_y   = "0.5"

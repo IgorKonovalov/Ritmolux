@@ -221,6 +221,22 @@ pub(crate) trait PostStage {
     /// remember to ignore it.
     fn set_exposure(&mut self, _exposure: f32) {}
 
+    /// Hand this stage the frame's **real elapsed seconds** (ADR-0019/ADR-0048).
+    ///
+    /// Travels the same one-way route as [`set_exposure`](Self::set_exposure), and
+    /// for the same reason: it is not a preset param — no author binds it, no
+    /// expression produces it, and no stage may change it. It is the frontend's
+    /// measurement, and the composite's mirror of
+    /// [`Scene::advance`](super::scenes::Scene::advance).
+    ///
+    /// Only the trails stage reads it, because only the trails stage carries state
+    /// *between* frames: its `fade` decay and every `fb_*` rate are per-second, so
+    /// without this the same preset would decay three times faster at 144 Hz than
+    /// at 48. The kaleidoscope and bloom are pure functions of one frame and have
+    /// nothing to advance. Defaulted to a no-op so a stage added later opts in
+    /// rather than remembers to ignore it.
+    fn set_dt(&mut self, _dt: f32) {}
+
     /// Whether this stage runs this frame. `false` skips it entirely — the
     /// passthrough that keeps an unbound preset paying nothing.
     fn active(&self) -> bool;
@@ -573,6 +589,18 @@ impl PostChain {
     pub(crate) fn set_exposure(&mut self, exposure: f32) {
         for stage in self.stages.iter_mut() {
             stage.set_exposure(exposure);
+        }
+    }
+
+    /// Hand every stage this frame's real elapsed seconds (see
+    /// [`PostStage::set_dt`]). Only the trails stage reads it.
+    ///
+    /// Called once per side per frame, beside `Scene::advance` — the chain and the
+    /// scene advance on the same measured `dt`, which is the whole basis of
+    /// ADR-0019's frame-rate independence.
+    pub(crate) fn set_dt(&mut self, dt: f32) {
+        for stage in self.stages.iter_mut() {
+            stage.set_dt(dt);
         }
     }
 

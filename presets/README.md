@@ -1039,8 +1039,54 @@ scene runs, is reported on stderr once when it starts and once when it clears.
 
 Routes the composited frame through a fade-and-accumulate feedback (max-decay), so
 moving shapes leave light trails. `trails = 0` (default) is off; `0 < trails < 1`
-sets the per-frame decay (higher = longer trails). Best on a scene with real
-motion (a spinning curve, a drifting swarm).
+sets the decay (higher = longer trails). Best on a scene with real motion (a
+spinning curve, a drifting swarm).
+
+**`trails` is retention per 1/60 s, not per frame** (Plan 0046). The stage raises it
+to the `dt`-relative power, so a `trails = 0.9` tail lasts the same *wall-clock*
+time on a 48 Hz laptop and a 144 Hz monitor. It used to be applied once per frame,
+which made the same preset's trails a third as long at 144 Hz. Captures are
+unaffected: the harness steps a fixed 1/60 s, where the exponent is exactly 1.
+
+### Transformed feedback — `fb_zoom`, `fb_rotate`, `fb_dx`, `fb_dy`, `fb_center_x`, `fb_center_y`
+
+The trails stage does not only *dim* the past — it **moves** it. Each frame the
+accumulation is resampled through a transform before this frame's light is
+deposited on top, so the tail travels while it fades:
+
+| param | default | unit | what it does |
+|---|---|---|---|
+| `fb_zoom` | `1` | factor **per second** | `> 1` pushes the past outward — a tunnel; `< 1` pulls it in |
+| `fb_rotate` | `0` | radians **per second** | spins the past — a spiral |
+| `fb_dx` | `0` | frame-heights **per second** | slides the past sideways |
+| `fb_dy` | `0` | frame-heights **per second** | slides the past vertically |
+| `fb_center_x` | `0.5` | uv (`0`..`1`, left to right) | the fixed point the three above turn about |
+| `fb_center_y` | `0.5` | uv (`0`..`1`, top to bottom) | the same, vertically |
+
+Every default is the identity, so a preset that binds none of these renders exactly
+what it did before they existed — and `trails` must be **on** for any of them to do
+anything, since they transform the accumulation the trails stage owns.
+
+They are ordinary bindables, which is the point: `fb_zoom = "1 + beat * 0.8"` is a
+light tunnel that kicks on the beat.
+
+**The rates are per second, and they compose with `dt`.** `fb_zoom = 2` doubles the
+past's scale every second however long a frame is; `fb_rotate = 6.28` is one
+revolution a second. Do not reach for "per frame" values here — a `1.02` you tuned
+as a per-frame zoom is a barely-visible 2 %/s.
+
+**Translation is measured in frame *heights*, on both axes.** `fb_dx = 1` crosses a
+16:9 frame horizontally in 1.78 s while `fb_dy = 1` crosses it vertically in 1.0 s.
+That is deliberate: one isotropic vocabulary is what makes a diagonal drift a
+straight line and a rotation a rotation — not a shear — whatever the display's
+shape.
+
+**What lies beyond the frame is nothing.** A zoom-out, a drift, or a rotation about
+an off-centre point all pull in from outside the accumulation, and what arrives is
+**transparent** — the backdrop, showing through. It is not a smear of the edge
+pixel: that would compound into a permanent bar of colour along the border. So an
+`fb_zoom < 1` reads as the picture receding into empty space, which is the depth cue
+you want; if you want something *in* that space, put it in `bg_*`.
 
 ### Screen-space kaleidoscope — `kaleido_order`, `kaleido_angle`, `kaleido_center_x`, `kaleido_center_y`, `kaleido_edge`
 

@@ -494,6 +494,10 @@ fn evaluate_preset(
 ) {
     scene.set_time(time);
     scene.advance(dt);
+    // The composite advances on the same measured `dt` the scene does (ADR-0048):
+    // the trails accumulation is the one post stage with state between frames, and
+    // its decay and `fb_*` rates are per-second.
+    side.chain.set_dt(dt);
     side.reset_params();
     scene.reset_params();
     let mut terminal = terminal;

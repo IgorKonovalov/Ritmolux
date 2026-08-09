@@ -33,6 +33,51 @@
 //! rasterized at full resolution was thrown away and came back soft, and the
 //! preset lane's only recourse was to drop `trails` from every line preset to get
 //! its sharpness back. Following the target is what lets those presets keep both.
+//!
+//! # The past moves: the accumulation is read through a transform (ADR-0048)
+//!
+//! The feedback pass no longer samples `prev` at the identical uv. It samples it
+//! through an **inverse per-frame affine** — `fb_zoom`, `fb_rotate`, `fb_dx`,
+//! `fb_dy` about the bindable centre `fb_center_x`/`fb_center_y` — so a zoom is a
+//! tunnel, a rotation a spiral, a translation a directional smear. Inverse,
+//! because a destination pixel asks "where was I last frame"; the forward motion
+//! the eye sees is the one the params name.
+//!
+//! Three properties hold that up, and each is load-bearing:
+//!
+//! - **Every rate is per-second, on the injected real `dt`** (ADR-0019): `fb_zoom`
+//!   is a factor per second applied as `zoom^dt`, `fb_rotate` is rad/s, `fb_dx`/
+//!   `fb_dy` are units/s. The same edit normalizes `fade` to `fade^(dt / (1/60))`,
+//!   the form the attractor's trail has always used — this stage applied it once
+//!   per *frame*, so its trails were a third as long at 144 Hz as at 48 Hz. At the
+//!   capture `dt` the exponent is exactly `1.0` and the factor is exactly `fade`,
+//!   which is why no golden moved.
+//! - **The transform is aspect-corrected from the RENDER TARGET** (ADR-0037). The
+//!   accumulation grid is quantized to a 256 px step, so its own aspect is not the
+//!   target's; a rotation computed in grid-uv space would shear. The centred
+//!   coordinate has its `x` scaled by `surface.0 / surface.1` — the value
+//!   [`resolve`](PostStage::resolve) is handed, never anything derived from
+//!   [`Resources::size`] — rotated there, and scaled back on the way out.
+//! - **Identity is bit-exact, not approximately so.** Round-tripping a uv through
+//!   `* aspect` and `/ aspect` is not the identity in `f32`, so the shader
+//!   `select`s between the transformed uv and `in.uv` on a CPU-computed flag that
+//!   is `0` whenever every `fb_*` sits at its default. An unbound preset therefore
+//!   samples the literal `in.uv` it always did.
+//!
+//! **Off-frame reads are transparent, not clamped** (the edge policy ADR-0048
+//! leaves to this plan). A zoom-out, a pan, or a rotation about an off-centre
+//! `fb_center_*` all reach outside the accumulation, and the two candidates read
+//! very differently: `ClampToEdge` re-deposits the border texel every frame, so
+//! the edge row smears inward and compounds into a permanent bar of colour — the
+//! same defect ADR-0047 had to clamp out of the kaleidoscope's fold. Evaluated at
+//! a **portrait** target (ADR-0047's lesson: a non-16:9 shape is where an edge
+//! policy shows), the clamp streaks the two long edges hardest, precisely where a
+//! tunnel wants empty space to travel into. Sampling outside the unit square
+//! therefore contributes **nothing** — the past ends at the frame's edge, and what
+//! lies beyond it is the backdrop showing through, which is what makes a zoom-out
+//! read as depth. It is a shader test rather than `AddressMode::ClampToBorder`
+//! because that address mode is an optional wgpu feature and this must work on
+//! every adapter we ship.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). The trails stage encodes its passes every displayed frame.
@@ -55,21 +100,83 @@ const DEFAULT_TRAILS: f32 = 0.0;
 /// smear), so keep it strictly below.
 const MAX_FADE: f32 = 0.98;
 
+/// `fb_zoom` default — a factor of `1.0` **per second**, i.e. no scaling however
+/// long the frame is. The identity, so an unbound preset is unaffected.
+const DEFAULT_FB_ZOOM: f32 = 1.0;
+/// `fb_rotate` / `fb_dx` / `fb_dy` default — zero rad/s and zero units/s.
+const DEFAULT_FB_RATE: f32 = 0.0;
+/// `fb_center_x` / `fb_center_y` default — the middle of the frame, in uv.
+const DEFAULT_FB_CENTER: f32 = 0.5;
+
+/// The reference frame duration the `fade` exponent is expressed against: `fade`
+/// is retention **per 1/60 s**, so the per-frame factor is `fade^(dt / this)`.
+///
+/// This is the attractor trail's long-standing form
+/// ([`particles::encode`](super::scenes::particles)), adopted here rather than
+/// invented: one vocabulary, two buffers (ADR-0048). Written as a division by
+/// [`FALLBACK_DT`](super::scenes::FALLBACK_DT) rather than a multiplication by 60
+/// so the exponent at the capture `dt` is `x / x` — **exactly** `1.0` in IEEE,
+/// never `1.0000001`.
+const FADE_REFERENCE_DT: f32 = super::scenes::FALLBACK_DT;
+
 /// Fade-and-accumulate body. `VsOut`/`vs_main` come from
 /// [`gpu::FULLSCREEN_VS_UV_FLIPPED`] — this pass samples what another pass
 /// rendered, so it needs the Y flip.
 const TRAILS_SHADER: &str = r#"
-struct Fade { v: vec4<f32> } // x: fade factor, y: occlude (present pass only)
+struct Feedback {
+    // x: decay factor, y: occlude (present pass only), z: transform-active flag
+    v:  vec4<f32>,
+    // x: cos(theta), y: sin(theta), z: 1/scale, w: render-target aspect
+    xf: vec4<f32>,
+    // x,y: this frame's translation in isotropic units, z,w: the centre in uv
+    tr: vec4<f32>,
+}
 
-@group(0) @binding(0) var<uniform> u: Fade;
+@group(0) @binding(0) var<uniform> u: Feedback;
 @group(0) @binding(1) var t_composited: texture_2d<f32>;
 @group(0) @binding(2) var t_accum: texture_2d<f32>;
 @group(0) @binding(3) var samp: sampler;
 
+// Where the pixel at `uv` was one frame ago — the INVERSE of the motion the
+// params name, because a destination pixel asks where its content came from.
+//
+// The centred coordinate is made isotropic by scaling x by the RENDER TARGET's
+// aspect (never the accumulation grid's — ADR-0037), so the rotation below is a
+// rotation and not a shear, and the scale-back on the way out cancels it.
+fn source_uv(uv: vec2<f32>) -> vec2<f32> {
+    let aspect = u.xf.w;
+    let centre = u.tr.zw;
+    var p = uv - centre;
+    p.x = p.x * aspect;
+    // Undo this frame's translation, then its rotation (by -theta: the transpose
+    // of R(theta)), then its scale.
+    p = p - u.tr.xy;
+    p = vec2<f32>(p.x * u.xf.x + p.y * u.xf.y, p.y * u.xf.x - p.x * u.xf.y);
+    p = p * u.xf.z;
+    p.x = p.x / aspect;
+    return p + centre;
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let cur = textureSample(t_composited, samp, in.uv);
-    let prev = textureSample(t_accum, samp, in.uv);
+
+    // `select`, not `if`: the identity path must sample the LITERAL `in.uv`, and
+    // `(x * aspect) / aspect` is not `x` in f32. Both arms are pure arithmetic on
+    // uniforms, so evaluating the unused one costs a few ALU and no divergence —
+    // which also keeps `textureSample` out of non-uniform control flow.
+    let moved = u.v.z != 0.0;
+    let suv = select(in.uv, source_uv(in.uv), moved);
+    // Off-frame reads contribute NOTHING (the transparent-border edge policy —
+    // see the module docs). Clamping would re-deposit the border texel every
+    // frame until the edge became a permanent bar.
+    let inside = select(
+        1.0,
+        f32(all(suv >= vec2<f32>(0.0)) && all(suv <= vec2<f32>(1.0))),
+        moved,
+    );
+    let prev = textureSample(t_accum, samp, suv) * inside;
+
     // Max-decay: the current frame at full brightness, the past fading by `fade`.
     //
     // On ALL FOUR channels (ADR-0055). Alpha is coverage and it decays on the same
@@ -81,6 +188,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 "#;
 
 /// Present body; same Y-flipped prelude as [`TRAILS_SHADER`].
+///
+/// It binds the **same buffer** the feedback pass reads, and declares only the
+/// first `vec4` of it. That is legal and deliberate: a uniform binding may be
+/// larger than the struct a shader declares over it, so ADR-0048's transform
+/// terms cost this pass nothing and its bind-group layout — whose *shape* is the
+/// WARP-sensitive part (see below) — is untouched by them.
 const PRESENT_SHADER: &str = r#"
 struct Fade { v: vec4<f32> } // x: fade factor (unread here), y: occlude
 
@@ -114,10 +227,91 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 "#;
 
+/// The one uniform both passes read — see [`TRAILS_SHADER`] for the component
+/// map. One buffer, one write per frame, two shaders taking different parts of it.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct Fade {
+struct Feedback {
     v: [f32; 4],
+    xf: [f32; 4],
+    tr: [f32; 4],
+}
+
+/// The `fb_*` transform as a preset states it: rates per second, centre in uv.
+/// Resolved into [`Feedback`]'s packed form once per frame in
+/// [`resolve`](PostStage::resolve), against that frame's real `dt`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Transform {
+    /// Scale factor **per second**, applied as `zoom^dt`.
+    zoom: f32,
+    /// Radians per second.
+    rotate: f32,
+    /// Translation per second, in units of the target's **height** (so a `1.0`
+    /// crosses the frame vertically in a second, and the same value crosses it
+    /// horizontally in `aspect` seconds — one isotropic vocabulary).
+    dx: f32,
+    dy: f32,
+    /// The fixed point everything above turns about, in uv.
+    centre_x: f32,
+    centre_y: f32,
+}
+
+impl Transform {
+    /// Every `fb_*` at its default: the past sits still, exactly as it did before
+    /// ADR-0048.
+    const IDENTITY: Self = Self {
+        zoom: DEFAULT_FB_ZOOM,
+        rotate: DEFAULT_FB_RATE,
+        dx: DEFAULT_FB_RATE,
+        dy: DEFAULT_FB_RATE,
+        centre_x: DEFAULT_FB_CENTER,
+        centre_y: DEFAULT_FB_CENTER,
+    };
+
+    /// Whether this frame's transform moves nothing — the flag the shader
+    /// `select`s on, and the whole basis of the byte-identity claim.
+    ///
+    /// The centre is deliberately **not** tested: it is the fixed point, so with
+    /// no scale, rotation or translation it names a point nothing moves about.
+    /// A non-finite rate counts as identity for the same reason the `fade` clamp
+    /// exists — a `NaN` uv would sample garbage for the rest of the run.
+    fn is_identity(&self) -> bool {
+        let finite = self.zoom.is_finite()
+            && self.rotate.is_finite()
+            && self.dx.is_finite()
+            && self.dy.is_finite()
+            && self.centre_x.is_finite()
+            && self.centre_y.is_finite();
+        !finite
+            || (self.zoom == DEFAULT_FB_ZOOM
+                && self.rotate == DEFAULT_FB_RATE
+                && self.dx == DEFAULT_FB_RATE
+                && self.dy == DEFAULT_FB_RATE)
+    }
+
+    /// Pack this frame's motion for the shader: `dt` seconds of it, about
+    /// `aspect` (the **render target's**, ADR-0037).
+    ///
+    /// Returns `(xf, tr)` — the second and third `vec4` of [`Feedback`].
+    fn pack(&self, dt: f32, aspect: f32) -> ([f32; 4], [f32; 4]) {
+        let theta = self.rotate * dt;
+        let (sin, cos) = theta.sin_cos();
+        // `zoom^dt`: a factor per second, so two half-length frames scale the
+        // past by exactly what one full-length frame would.
+        let scale = self.zoom.powf(dt);
+        // Guard the reciprocal: a preset may sweep `fb_zoom` through 0 (a
+        // `[smoothing]` ease is continuous), and `1/0` is `inf` — every pixel
+        // would then sample the same texel forever.
+        let inv_scale = if scale.is_finite() && scale.abs() > f32::MIN_POSITIVE {
+            1.0 / scale
+        } else {
+            1.0
+        };
+        (
+            [cos, sin, inv_scale, aspect],
+            [self.dx * dt, self.dy * dt, self.centre_x, self.centre_y],
+        )
+    }
 }
 
 /// The trails GPU resources, built lazily on the first active frame and rebuilt
@@ -131,7 +325,7 @@ struct Resources {
     _composited: wgpu::Texture,
     composited_view: wgpu::TextureView,
     accum: PingPongField,
-    fade_uniform: wgpu::Buffer,
+    feedback_uniform: wgpu::Buffer,
     trails_pipeline: wgpu::RenderPipeline,
     // One bind group per accumulation read-side (composited + accum read + fade + sampler).
     trails_bg_a: wgpu::BindGroup,
@@ -166,9 +360,9 @@ impl Resources {
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
-        let fade_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("trails-fade"),
-            size: std::mem::size_of::<Fade>() as u64,
+        let feedback_uniform = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("trails-feedback"),
+            size: std::mem::size_of::<Feedback>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -195,7 +389,7 @@ impl Resources {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: fade_uniform.as_entire_binding(),
+                        resource: feedback_uniform.as_entire_binding(),
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
@@ -252,7 +446,7 @@ impl Resources {
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: fade_uniform.as_entire_binding(),
+                        resource: feedback_uniform.as_entire_binding(),
                     },
                     wgpu::BindGroupEntry {
                         binding: 2,
@@ -282,7 +476,7 @@ impl Resources {
             _composited: composited,
             composited_view,
             accum,
-            fade_uniform,
+            feedback_uniform,
             trails_pipeline,
             trails_bg_a,
             trails_bg_b,
@@ -332,6 +526,17 @@ pub struct Trails {
     surface_format: wgpu::TextureFormat,
     res: Option<Resources>,
     amount: f32,
+    /// This frame's `fb_*` transform (ADR-0048), reset to
+    /// [`Transform::IDENTITY`] each frame with every other param.
+    transform: Transform,
+    /// The real elapsed seconds of the frame being resolved, injected by
+    /// [`PostChain::set_dt`](super::post::PostChain::set_dt).
+    ///
+    /// Every rate this stage applies — the `fade` decay and all of `fb_*` — is
+    /// per-second and scaled by it, so the look is the same at 48 and 144 Hz
+    /// (ADR-0019). Defaulted to the capture step so a stage driven by a test that
+    /// never injects one behaves exactly as the pre-ADR-0048 stage did.
+    dt: f32,
     /// The active tier's cap on this stage's internal grid
     /// ([`TierConfig::post_cap`](super::TierConfig::post_cap)), resolved once at
     /// construction. A field rather than a constant so the tier can raise it, and
@@ -348,7 +553,20 @@ pub struct Trails {
 
 /// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &["trails"];
+///
+/// `trails` is the amount; the `fb_*` six are ADR-0048's transform on what the
+/// accumulation already holds. They are declared here — on the stage that owns the
+/// buffer — and every one of them defaults to the identity, so a preset binding
+/// none of them renders exactly what it rendered before they existed.
+pub const PARAMS: &[&str] = &[
+    "trails",
+    "fb_zoom",
+    "fb_rotate",
+    "fb_dx",
+    "fb_dy",
+    "fb_center_x",
+    "fb_center_y",
+];
 
 impl Trails {
     /// Store the device/format for a lazy build; no GPU resources yet.
@@ -362,6 +580,8 @@ impl Trails {
             surface_format,
             res: None,
             amount: DEFAULT_TRAILS,
+            transform: Transform::IDENTITY,
+            dt: FADE_REFERENCE_DT,
             post_cap,
             builds: 0,
         }
@@ -379,19 +599,35 @@ impl PostStage for Trails {
         "trails"
     }
 
-    /// Reset the `trails` amount to its default (each frame, before the active
-    /// preset's bindings are routed).
+    /// Reset the `trails` amount and the `fb_*` transform to their defaults (each
+    /// frame, before the active preset's bindings are routed).
     fn reset_params(&mut self) {
         self.amount = DEFAULT_TRAILS;
+        self.transform = Transform::IDENTITY;
     }
 
-    /// Apply one named parameter, returning whether it was the `trails` param.
+    /// Apply one named parameter, returning whether this stage owned the name.
     fn set_param(&mut self, name: &str, value: f32) -> bool {
-        if name == "trails" {
-            self.amount = value;
-            true
-        } else {
-            false
+        match name {
+            "trails" => self.amount = value,
+            "fb_zoom" => self.transform.zoom = value,
+            "fb_rotate" => self.transform.rotate = value,
+            "fb_dx" => self.transform.dx = value,
+            "fb_dy" => self.transform.dy = value,
+            "fb_center_x" => self.transform.centre_x = value,
+            "fb_center_y" => self.transform.centre_y = value,
+            _ => return false,
+        }
+        true
+    }
+
+    /// Take this frame's real elapsed seconds — the base every per-second rate
+    /// here is scaled by (ADR-0019/ADR-0048). Non-finite or negative values are
+    /// dropped rather than stored: a `NaN` would poison the decay exponent, and
+    /// the previous frame's step is a far better guess than a broken one.
+    fn set_dt(&mut self, dt: f32) {
+        if dt.is_finite() && dt >= 0.0 {
+            self.dt = dt;
         }
     }
 
@@ -452,30 +688,52 @@ impl PostStage for Trails {
     /// target, when [`active`](PostStage::active). Returns the two passes it
     /// encodes (feedback + present).
     ///
-    /// `surface` is unused: neither pass computes geometry, so this stage has no
-    /// aspect to get wrong (ADR-0037). Both are normalized fullscreen blits, and
-    /// the present's stretch back to the target is precisely what cancels the
-    /// grid's shape out of the picture.
+    /// `surface` is **the render target's size, and the only aspect this stage may
+    /// take** (ADR-0037). Both blits are still normalized stretches with no
+    /// geometry of their own, but ADR-0048's transform rotates in a centred
+    /// coordinate, and a rotation is only a rotation in isotropic units: reading
+    /// the shape off [`Resources::size`] — a 256 px-quantized grid whose aspect is
+    /// *not* the target's — would shear the accumulation on any target the policy
+    /// does not return aspect-exact. That is the mistake ADR-0037 exists for.
     fn resolve(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         out: &wgpu::TextureView,
-        _surface: (u32, u32),
+        surface: (u32, u32),
         fold: Fold,
     ) -> u32 {
+        let dt = self.dt;
+        let transform = self.transform;
+        let aspect = surface.0 as f32 / surface.1.max(1) as f32;
         let Some(res) = self.res.as_mut() else {
             return 0;
         };
         let fade = self.amount.clamp(0.0, MAX_FADE);
+        // Retention per 1/60 s, raised to the `dt`-relative power, so a trail runs
+        // the same wall-clock length at any refresh (ADR-0048 — the form the
+        // attractor's trail has always used). The `== 1.0` arm is not an
+        // optimization: `powf` is not required to return `x` for an exponent of
+        // exactly one, and the whole golden suite rests on this factor being
+        // *bit*-identical to `fade` at the capture step.
+        let exponent = dt / FADE_REFERENCE_DT;
+        let decay = if exponent == 1.0 {
+            fade
+        } else {
+            fade.powf(exponent)
+        };
+        let moved = !transform.is_identity();
+        let (xf, tr) = transform.pack(dt, aspect);
         queue.write_buffer(
-            &res.fade_uniform,
+            &res.feedback_uniform,
             0,
-            bytemuck::bytes_of(&Fade {
-                // One write, two passes: `fade` for the feedback below, `occlude`
+            bytemuck::bytes_of(&Feedback {
+                // One write, two passes: `decay` for the feedback below, `occlude`
                 // for the present at the bottom (ADR-0085). The present applies it
                 // unconditionally — `Fold::Own` is a literal 1.0.
-                v: [fade, fold.alpha_scale(), 0.0, 0.0],
+                v: [decay, fold.alpha_scale(), f32::from(u8::from(moved)), 0.0],
+                xf,
+                tr,
             }),
         );
 
