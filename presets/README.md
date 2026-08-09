@@ -19,6 +19,21 @@ cargo run -p standalone --example shot -- --preset-file presets/<name>.toml --ou
 See [`../docs/presets.md`](../docs/presets.md#a-custom-preset-folder-lmv_preset_dir)
 and [`../docs/capturing.md`](../docs/capturing.md#editing-presets-live).
 
+**A preset ships when the behavioral suite is green
+([ADR-0081](../docs/adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)),
+so know what green is evidence of.** Five gates sweep this folder and **one of them
+plays audio**: `reactivity` drives four `core::signal` clips through the real FFT,
+band split and onset detector (Plan 0067 Phase 1), so it is the only one that would
+notice a preset ignoring the music. `sanity`, `animation`, `distinctness` and
+`golden` construct an analysis frame directly — deliberately, because their
+questions are about the *frame* — and would pass a preset with every band binding
+deleted. The full table is in
+[`../docs/capturing.md`](../docs/capturing.md#what-the-five-preset-gates-can-and-cannot-see).
+Two things green still does not say: that the preset reacts *well* — see
+[the `[occupancy]` table](#a-clamp-is-a-limit-not-a-gain--the-occupancy-table)
+below, which is the gate for that — and that the **library** needs another one of
+these, which is `architect`'s judgement at the next plan close.
+
 **Author against the floor tier.** Shipped presets are authored and gated on
 `Floor` — every `shot` capture and every CI gate (`sanity` / `reactivity` /
 `animation` / `distinctness`) pins it (Plan 0044 /
@@ -1490,6 +1505,14 @@ it as **perfectly reactive**, because they all compare a driven band against
 *silence*, and against silence a binary switch is maximally responsive. Plan 0048
 Phase 7 measured what that costs: 263 of 332 clamped band terms in exactly this
 state, 14 presets with no live audio term at all, behind a fully green suite.
+
+**Plan 0067 Phase 1 did not change this, and it is worth being explicit about
+why.** `reactivity` now drives real PCM through the real analyzer instead of
+hand-built frames — but it still compares a driven band against **silence**, and
+that is the property this section is about. A saturating clamp is maximally
+reactive against silence whether the "driven" number came from an FFT or from a
+literal. `saturation` remains the only gate that asks the question this section
+asks.
 
 The fix is always the same arithmetic: **divide the gain until the bound is
 reached only on peaks.** With `bass` averaging `0.661`, `clamp(bass * 0.45, 0,
