@@ -124,6 +124,22 @@ pan_y       = "cos(time * 0.0130) * 0.04"
 # flat paint - raising `thickness` against it only made the fern FATTER, never
 # brighter. Dropping the floor and deepening the vignette is what gives the
 # halo somewhere to fall off into; the stroke values above only work over this.
+#
+# THAT WAS A REAL EFFECT AND IT WAS NOT THE WHOLE STORY, which is worth saying
+# because this comment was the evidence ADR-0085 was written from. A second
+# thing was happening at the same time: every stroke emitted a constant alpha
+# across its whole quad while only its colour carried the falloff, so the line
+# renderer drew itself a BLACK RIM over any lit backdrop - wider the fatter the
+# stroke, and invisible at a near-black floor. So "raising thickness only made
+# it fatter" was half washed-out halo and half rim. ADR-0056 fixed the rim (the
+# alpha is the coverage now), and ADR-0085 made the remaining limit adjustable:
+# `occlude` decides how much of the backdrop the figure holds out at all.
+#
+# Neither of those re-tuned the values below. This floor is still the old
+# decision, taken against the old arithmetic, and it is one of the presets Plan
+# 0071 Phase 5 exists to walk with backlog 0038 and 0058. If you raise it, raise
+# it over a rendered sweep and watch the `glow`-dimmed outer stems - they are
+# where this family shows the ceiling first.
 bg_hue      = "0.55 + sin(time * 0.0091) * 0.05"
 bg_bright   = "0.012 + clamp((bass + mid) * 0.0094, 0, 0.016)"
 bg_vignette = "0.88"

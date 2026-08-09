@@ -239,8 +239,8 @@ the trailing group on the palette-coloured scenes (the four shader ones, plus
 `spectrum` since Plan 0034) is the shared **palette** colour surface (Plan 0020) —
 see [Colour — the palette surface](#colour--the-palette-surface-plan-0020).
 Every system additionally accepts the engine-stage params `bg_*`, `trails`,
-`kaleido_*`, `bloom_*`, `exposure`, and the final `ink_*`/`paper_*` remap
-documented there.
+`kaleido_*`, `bloom_*`, `occlude`, `exposure`, and the final `ink_*`/`paper_*`
+remap documented there.
 
 > **The `attractor` roster is the one place a param's meaning depends on the
 > family.** `a b c d` mean different things per family and mean *nothing* on the
@@ -933,22 +933,80 @@ families sit at a near-black floor. That constraint is gone
 ([ADR-0056](../docs/adrs/0056-additive-scenes-emit-premultiplied-alpha.md)); the
 values themselves were not re-tuned.
 
-**The ceiling on `bg_bright` moved rather than disappeared, and the new one is
-worth knowing before you raise it.** A scene that draws into the chain occludes
-the backdrop by its **coverage**, whatever light it emits — the frame resolves
-`c * g + bg * (1 - g)`, so a fragment *darkens* the backdrop wherever its own
-light `c` is dimmer than the backdrop `bg`. Raise `bg_bright` past the **dimmest**
-emitted luminance in the figure and the dim parts stop fading out and start
-reading as dark speckle: on the swarm, the depth-parallaxed far particles go
-first; on a line scene, a stroke dimmed by `glow` or by a low-amplitude band.
-Rendered at `bg_bright = 0.35`, a swarm at `brightness = 0.02` is black specks on
-a lit field. So the working limit is the darkest part of the figure you still
-want visible, not a fixed number — sweep it and look, do not assume.
+**The ceiling on `bg_bright` moved rather than disappeared — and since Plan 0071
+it is a choice rather than a property of the engine.** A scene that draws into
+the chain occludes the backdrop by its **coverage**, whatever light it emits: the
+frame resolves `c * g + bg * (1 - g)`, so a fragment *darkens* the backdrop
+wherever its own light `c` is dimmer than the backdrop `bg`. Raise `bg_bright`
+past the **dimmest** emitted luminance in the figure and the dim parts stop
+fading out and start reading as dark speckle: on the swarm, the depth-parallaxed
+far particles go first; on a line scene, a stroke dimmed by `glow` or by a
+low-amplitude band. Rendered at `bg_bright = 0.35`, a swarm at
+`brightness = 0.02` is black specks on a lit field. The working limit is the
+darkest part of the figure you still want visible, not a fixed number — sweep it
+and look, do not assume.
+
+**The one knob for it is [`occlude`](#backdrop-occlusion--occlude), below.** It
+is what decides whether that limit binds at all.
 
 None of this is worse than before: pre-fix the whole sprite quad held the
-backdrop out, so every value is brighter now than it was. The question of whether
-additive light should occlude *at all* is a look decision left open in ADR-0056
-and carried in [`docs/design-backlog.md`](../docs/design-backlog.md).
+backdrop out, so every value is brighter now than it was.
+
+### Backdrop occlusion — `occlude`
+
+**How much of the scene's coverage the backdrop resolves against**
+([ADR-0085](../docs/adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md)),
+engine-wide and bindable, in `[0, 1]`:
+
+```
+out = scene + bg * (1 - alpha * occlude)
+```
+
+| value | what the figure does to the sky |
+|---|---|
+| **`1.0`** (default) | covers it by its own coverage — the arithmetic every frame ran before this existed |
+| `0.5` | half of that; the resolve is affine in `occlude`, so a mid value is a genuine blend of the two models and not a switch between them |
+| `0.0` | never covers it. Light *adds*; the backdrop arrives whole under the figure |
+
+At the default this multiplies by a literal `1.0`, so a preset that does not bind
+it renders **byte-identically** to one written before it existed.
+
+**You cannot see what this does at the floor most presets are authored at**, and
+that is the trap worth stating outright. At `bg_bright = 0.01` a black backdrop
+times any coverage is still black, so both models look identical and `occlude`
+appears to do nothing. It only separates over a **lit** backdrop — which is
+exactly the configuration the shipped library uses least and a raised
+`bg_bright` uses most. If you are reaching for this, raise the backdrop first.
+
+Three things to weigh before setting it to `0`:
+
+- **A dimming depth cue stops reading as depth.** The swarm's far particles and a
+  `glow`-dimmed stroke are *drawn* dim to read as distant. Take the occlusion
+  away and they read as transparent instead. On a scene whose depth model is
+  luminance that is a real loss, and it is the thing to judge in motion.
+- **It lifts the floor rather than removing the problem.** Light that never
+  covers is light that always adds, so over a bright backdrop the frame blows
+  out. The tonemap rolls that off ([ADR-0046](../docs/adrs/0046-linear-light-hdr-composite-bloom-tonemap.md))
+  rather than clipping it, so it degrades softly — but the dark speckle is traded
+  for a raised floor, not eliminated.
+- **It eases.** Unlike `kaleido_order` or a shape's `points` there is no
+  quantization seam, so a `[smoothing]` entry on it is a real blend and a preset
+  may drive it off audio if that turns out to be interesting.
+
+**The default stayed at `1.0`, decided by looking** rather than by argument (Plan
+0071 Phase 3): two scenes with different depth models, at `occlude` 1.0 / 0.5 /
+0.0, over backdrops at 0.35 and 0.60, judged in motion. The verdict was that at
+shipped brightnesses the difference is almost negligible — which is the same fact
+the ceiling above states from the other side, since the ceiling binds only where
+the figure is *dim*. No shipped preset binds `occlude` today.
+
+**The additive families are already unoccluded when no post stage is active.**
+The swarm, line and emitter scenes blend colour `One`/`One`, so with an empty
+chain their backdrop survives in full whatever `occlude` says — there is no
+occlusion at that seam for it to scale. It reaches them through the chain's last
+stage instead, which every shipped preset in those families has. The scenes that
+present premultiplied over the backdrop (reaction-diffusion, attractor, fragment
+field) consume it directly on the empty-chain path.
 
 ### Geometry mirror (line systems) — `mirror_order`, `mirror_reflect`
 
