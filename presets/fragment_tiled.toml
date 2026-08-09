@@ -97,11 +97,18 @@ trails       = "0.12"
 # The fold ladder gets the longest constant in the file: the gate reads a sum of
 # three bands, which hovers near its boundary for whole passages, and a short
 # constant would flicker the motif between two figures in every cell at once.
-kaleido_order = 1.1
+# Lengthened at the live pass - a tiled layout shows a ladder step in every cell
+# simultaneously, so the change wants to arrive as a settling rather than as an
+# event.
+kaleido_order = 1.9
 
-warp        = 0.38
-zoom        = 0.32
-glow        = 0.30
-flash       = { attack = 0.08, release = 0.55 }
-color_span  = 0.36
-palette_mix = 0.75
+# All raised about half again at the live pass. The tiling multiplies motion the
+# same way the fold multiplies luminance: whatever one cell does, four do at
+# once, and the eye reads the sum. What looked lively unfolded reads as busy
+# here.
+warp        = 0.60
+zoom        = 0.50
+glow        = 0.46
+flash       = { attack = 0.10, release = 0.80 }
+color_span  = 0.55
+palette_mix = 1.05
