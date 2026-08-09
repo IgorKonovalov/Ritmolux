@@ -1,6 +1,6 @@
 # 0068 — Why the downbeat rarely locks: an instrument, an ablation, and a verdict
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing and sharing no file with
+> **Status:** **in-progress 2026-08-09** — ready for `dev`, gated by nothing and sharing no file with
 > any other plan in the roster. Phases 1-2 are `dev` and run start-to-finish; **Phase 3 is `human`**
 > (a listening pass on known-4/4 material, reading the 1 Hz log rather than judging by ear) and
 > gates Phase 4, so the plan does not close in one session. **Ships a diagnosis and no fix, on
