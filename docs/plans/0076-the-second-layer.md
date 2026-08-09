@@ -182,7 +182,7 @@ walk, not a reorderable stage.
 - **WARP's pipeline-count sensitivity** (the documented mis-render pressure against adding
   pipelines) applies to the new blend pass and any duplicated stateful pipelines. Compare
   adapters before blessing anything (the standing rule), and expect
-  [Plan 0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md)'s allowlist to need the
+  [Plan 0053](done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)'s allowlist to need the
   new layouts if their shapes collide with live ones (ADR-0058's evidence duty).
 - **Gate cost.** Layered fixtures roughly double per-fixture render cost in the suites that
   sweep them. Measured in Phase 4; if the wall-clock grows materially, that is a finding for

@@ -16,7 +16,7 @@
 > for**: `0.036542` landed on the **CI WARP** reading, not the local one — matching to three figures
 > on the ratio and **five on the control**. So WARP 10.0.26100 behaves like hardware and **this
 > box's WARP 10.0.19041 is the outlier**, which inverts the mechanism ADR-0074 recorded and hands
-> Plan [0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md) a sharper question than the one
+> Plan [0053](../done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) a sharper question than the one
 > it was given. Recorded in ADR-0074's **Outcome** section; see Followups.
 > **Verified at close:** `fmt` clean, `clippy -D warnings` clean, full `nextest` green on `main`,
 > both dual-live reports reproduced under `--no-capture`, no golden baseline moved, no shipped code
@@ -243,7 +243,7 @@ from.
   belongs in the test rather than only here. Record both readings and the 11.3x signal spread in
   the comment, and point at ADR-0074. Change no assertion **in the WARP test**.
   **Landed as `a324b21`, with one thing now stale in it.** That commit sent the magnitude claim to
-  Plan [0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3, which was this plan's
+  Plan [0053](../done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3, which was this plan's
   instruction at the time and was superseded hours later when ADR-0074's premise was corrected. The
   pointer sits at `core/src/render/mod.rs:3223-3225` and is re-pointed by the hardware item below —
   **it is not a second thing to decide.**
@@ -380,7 +380,7 @@ narrower than they read. Carried in ADR-0074's **Outcome** section and in Follow
   work and this plan would only have hidden it behind a threshold.
 - **It does not add a per-target constant table**, which is ADR-0071's Alternative A.
 - **It does not revisit `MEAN_TOL`, the golden baselines, or the WARP-trust work in Plan
-  [0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md).** 0053 owns whether WARP's output
+  [0053](../done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md).** 0053 owns whether WARP's output
   should be trusted at all; this plan only stops two thresholds from depending on which WARP ran.
   They touch in one place worth knowing: if 0053's Phase 3 hardware access materializes, the
   hardware-only fallback above becomes cheaper to accept.
@@ -409,7 +409,7 @@ narrower than they read. Carried in ADR-0074's **Outcome** section and in Follow
   outlier**, inflating the numerator. The consequence is larger than the original entry's, because
   the golden suite blesses on this box: a `frozen`-only sequence with no dual-live asymmetry in it
   renders 1.54x differently here than on either other configuration, and nothing has looked at what
-  else that moves. **This is Plan [0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md)'s
+  else that moves. **This is Plan [0053](../done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)'s
   question** — it owns whether WARP's output should be trusted at all — and it is now a sharper one
   than the plan was written against. Recorded in ADR-0074's Outcome section.
 - **`dissolve_at`'s doc comment states a machine-specific behaviour as a property of "the DX12 WARP

@@ -116,7 +116,7 @@ flowchart LR
   - `Step`'s uniform grows to carry the table: four `vec4` linear parts, two `vec4` packing the
     four `(e, f)` translations, one `vec4` of cumulative probabilities — 144 bytes total, from 32.
     The bind-group layout gains **no new binding**, so nothing about the layout-collision surface
-    [Plan 0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md) reasons about changes shape.
+    [Plan 0053](../done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) reasons about changes shape.
   - The shader draws `mix32(bitcast<u32>(seed) ^ (step_index * PRIME))` as a unit uniform, compares
     against the cumulative table, and applies the chosen map through an **unrolled four-way
     branch** — not a dynamically-indexed uniform array, matching the reason `Basis::masks`
