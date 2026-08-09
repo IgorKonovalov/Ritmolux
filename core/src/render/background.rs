@@ -45,8 +45,17 @@
 //! costs nothing), and — like the reaction-diffusion / attractor scenes' lazy
 //! resources — it keeps a second fullscreen fragment pipeline off the device
 //! during the headless no-bg captures, where the DX12 WARP software adapter would
-//! otherwise mis-render the coexisting scene pipelines (a documented quirk with no
-//! validation error; real hardware is unaffected).
+//! otherwise mis-render the coexisting scene pipelines.
+//!
+//! **That second reason used to end "a documented quirk with no validation error"
+//! — it is neither undocumented nor a quirk any more.** Plan 0053 Phase 3
+//! reproduced it, isolated it against a control, and fixed it: the quirk was this
+//! pass's `[Uniform:FRAGMENT]` bind-group layout colliding with the fullscreen
+//! scenes' (ADR-0058), and the explicit `min_binding_size` in
+//! [`Resources::build`] separates them. The laziness above is still worth having
+//! for its own reason, but it is no longer load-bearing against a mis-render.
+//! Real hardware was never affected, which is exactly what made it expensive: the
+//! whole golden suite captures on WARP.
 //!
 //! The **fragment field** is the one scene that still draws opaquely over the
 //! backdrop, so its bg params have no visible effect. Every other scene composites
@@ -160,9 +169,45 @@ impl Resources {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        // **The explicit `min_binding_size` is the fix for a measured WARP
+        // mis-render, not tidiness (Plan 0053 Phase 3, ADR-0058). Do not drop it
+        // back to `gpu::uniform`.**
+        //
+        // A bare `[Uniform:FRAGMENT]` here is byte-identical to
+        // `fragment-field-uniform-layout` and `rd-init-layout`, and on the DX12
+        // WARP software adapter that collision **renders the wrong picture**.
+        // Measured at 160x100 against the same frame on the hardware adapter:
+        //
+        // | configuration              | hardware (mean RGB)     | WARP, bare      |
+        // |----------------------------|-------------------------|-----------------|
+        // | fragment field + backdrop  | 131.010 170.559 141.381 | 142.712 x3      |
+        // | reaction-diffusion + bdrop | 087.612 165.165 156.168 | 087.543 064.538 |
+        //
+        // The fragment field came back a **flat grey** — every channel the same
+        // number, its colour gone. The control is what makes this the layout
+        // rather than the adapter: with `bg_bright = 0` the gradient pipeline is
+        // never built (see the module docs), and there the two adapters agree to
+        // **0.02 of one 8-bit level**. Adding this one field moves WARP onto the
+        // hardware numbers to the same 0.02, with no shader change and no
+        // visibility change.
+        //
+        // The size is genuinely known, so the field is honest on its own terms —
+        // the same argument `scenes/emitter.rs` makes for the same fix. This is
+        // the measurement that **isolates** it: the emitter changed the
+        // visibility mask and the size together, so which one did the work was
+        // never established. Here the size alone is sufficient.
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("background-bind-layout"),
-            entries: &[gpu::uniform(0, wgpu::ShaderStages::FRAGMENT)],
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: std::num::NonZeroU64::new(std::mem::size_of::<Bg>() as u64),
+                },
+                count: None,
+            }],
         });
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("background-bind-group"),
@@ -262,6 +307,17 @@ impl Resources {
 ///   probes at `11.817 11.716 11.663` and `0.000 0.000 0.000` against hardware's
 ///   values above. It is a different flavour of wrong afterwards; it was not
 ///   *made* wrong here.
+///
+///   **That "unrelated reason" has since been identified, and it was not
+///   unrelated** (Plan 0053 Phase 3). It was the *other* ADR-0058 collision this
+///   pass was in — its single-uniform layout against the fullscreen scenes' —
+///   and the explicit `min_binding_size` in [`Resources::build`] fixes it. A
+///   fragment field over a lit backdrop now renders `130.989 170.538 141.359` on
+///   WARP against `131.010 170.559 141.381` on hardware. So the bullet below
+///   still stands and this one is discharged: the LUT pair was live and
+///   colliding throughout, and fixing only the uniform group made the frame
+///   correct — which is a stronger statement of "this pair does not alias" than
+///   the original measurement could make.
 /// - **Every probe whose scene is not the fragment field agrees between the two
 ///   adapters to under 0.15 of one 8-bit level**, before and after — swarm with no
 ///   palette, with a flat palette, desaturated, and over `ember` with trails.
