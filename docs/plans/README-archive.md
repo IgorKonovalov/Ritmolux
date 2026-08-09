@@ -13,6 +13,117 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0046 — Transformed feedback: the past learns to move](done/0046-transformed-feedback.md)
+  — **done 2026-08-09**, Mode 4 review **no blockers, no majors, four minors, two nits**. Five phases
+  as `f2e6ed6` / `24f4bfc` / `0816516` / `429396d` / `16802ae` (the Phase 5 verdict), in the
+  `lmv-plan-0046` worktree. Full gate re-run at the close **after `git merge main`** — the first
+  moment this lane's code met Plan 0068's, which had landed an hour earlier at `v0.48.1`: doc links,
+  `fmt`, `clippy --workspace --all-targets -D warnings`, `nextest --workspace`. Closed **second** by
+  design, so it merged an already-advanced `main` and took its own bump.
+
+  **What landed.** Both accumulation buffers — the engine `trails` stage and the attractor scene's
+  internal trail — stop sampling the previous frame at the identical uv and sample it through an
+  **inverse per-frame transform** instead: the affine `fb_zoom`/`fb_rotate`/`fb_dx`/`fb_dy` about a
+  bindable `fb_center_x`/`fb_center_y`, plus a curated `[feedback] warp` family
+  (`swirl`/`ripple`/`fisheye`) whose strength is the bindable `fb_warp`, plus a selectable
+  `[feedback] blend` (`max` default, `add` for summing echoes under ADR-0046's headroom). Every rate
+  is per-second on the injected real `dt`. Phase 5 judged it on the wall at Rich tier over live
+  audio: **passed**, *"very good"* on the `swirl` + `add` echo — the vortex reads as depth and flow,
+  which is the reference look R2 exists to reach — with fps median 165.0, minimum 114.3, **zero** of
+  158 rows below the NFR §1 floor and **zero** of 28 698 frames dropped.
+
+  **The standing defect it retired on the way past.** `trails` `fade` was applied once **per frame**,
+  so a `0.9` tail ran a third as long at 144 Hz as at 48. It is now retention per 1/60 s raised to
+  the `dt`-relative power. The exponent is written `dt / FALLBACK_DT` rather than `dt * 60` so it is
+  `x / x` — exactly `1.0` in IEEE — and the `== 1.0` arm short-circuits `powf`, which is not required
+  to return `x` for an exponent of one. That is *stricter* than the plan asked for and stricter than
+  the attractor's own long-standing `powf(dt * 60.0)`, which keeps neither guard: harmless today
+  (`(1/60f32) * 60.0` does round to `1.0`, and every attractor baseline is hash-identical) but the
+  two sinks are **not** using the same form, which is the opposite of what the plan and the ADR both
+  say. Recorded as a minor rather than repaired — it is a pre-existing line this plan did not write.
+
+  **ADR-0037, for the third time, and this one has a negative control.** `Trails::resolve` had been
+  **ignoring its `surface` argument**, on a premise that was documented, reasoned and — until this
+  change — true: neither of its passes computed geometry. A rotation does. The aspect now comes from
+  the render target on both sinks (the attractor's is `Scene::render`'s own `aspect` parameter), and
+  the guard is a measurement rather than a claim: a rotation spun into a closed ring at a **portrait
+  100x160** target boxes **45x46**, against **44x71** with the transform's aspect deliberately forced
+  to `1.0`. That is the shape this rule needs every time — a value sourced from two places that agree
+  at 16:9 cannot be tested at 16:9, which is precisely how it shipped twice before.
+
+  **One contract narrowed, and the code is what stands.** Phase 3 promised "one vocabulary, two
+  buffers". True of the seven `fb_*` params and of `warp`; **not true of `blend`**. The attractor's
+  deposit has been additive since the scene was written — its points draw through an additive
+  pipeline over the decayed bed, in one pass — so there is no `max` to select without a **second draw
+  pipeline**, which is exactly the coexisting-pipelines-with-matching-bind-layouts shape
+  ([ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md)) the one-shader warp
+  family exists to avoid. Paying a known WARP hazard to make a sentence literally true is the wrong
+  trade, so the sentence changed. The asymmetry is documented where an author meets it, and is in
+  [ADR-0048](../adrs/0048-transformed-feedback.md)'s `Outcome`.
+
+  **The ADR overcharged for including the attractor, and that is the transferable finding.**
+  Alternative D accepted the attractor at a stated price of "a second shader and test surface". It
+  cost neither. The arithmetic, the seven names, the identity predicate and the aspect correction all
+  live **once**, in `core/src/render/feedback.rs` — which is **not a new file**: it already existed as
+  the `PingPongField` home, the ADR-0012 seam ADR-0048's own Supplements line says this was always
+  for. The WGSL is one snippet concatenated into both shaders, and both sinks delegate `set_param` to
+  the shared `Transform` rather than matching seven names each. So the two buffers cannot drift on
+  what `fb_rotate` means **by construction**, which is more than Alternative D was promised.
+
+  **The identity claim, and how it was proved.** `(x * aspect) / aspect` is not `x` in `f32`, so the
+  shader `select`s the literal `in.uv` on a CPU-computed flag whenever every `fb_*` sits at its
+  default and no warp kind is live. Measured the [0071] way at every phase and again at this close:
+  `LMV_BLESS` on clean `main` against `LMV_BLESS` on the merged branch, hash-for-hash across
+  `--test golden --test composite --test line_joints` — **all 20 pre-existing baselines identical,
+  exactly three added** (`composite_warp_swirl/_ripple/_fisheye.png`). This is the form to reuse and
+  the naive `git diff` is not: **8 of 20 baselines drift from their committed bytes under a bless on
+  clean `main` on this box**, so a diff convicts eight files no change touched.
+
+  **Seven deviations, all self-reported in the phase commits.** The two that changed a contract are
+  above. The other five: the motion guards live in a new `core/tests/feedback.rs` rather than in
+  `composite.rs` (a separate binary because building GPU resources mid-run perturbs what the trails
+  stage resolves to on WARP, and these guards need a portrait target and several consecutive
+  multi-frame runs — the exact perturbation `composite.rs`'s own module docs warn about; it pins no
+  baseline); routing grew `ParamRoute::StageAndScene(usize)`, the enum's second fan-out and the
+  mirror of `SceneAndBackdrop`; `PostStage` grew `set_dt` and `set_feedback` and `Scene` grew
+  `set_feedback`; docs were written incrementally rather than all in Phase 4 (forced, and correctly:
+  `core/tests/preset.rs` asserts every declared param appears in `presets/README.md`, so a phase that
+  adds a param cannot leave the suite green without documenting it); and Phase 1's file list named
+  `scenes/mod.rs` for param routing, which was simply wrong — it is `render/mod.rs` plus `post.rs`.
+  All corrected in the plan text at the close.
+
+  **The edge policy the ADR left open: transparent border, by shader rather than by sampler.**
+  `ClampToEdge` re-deposits the border texel every frame and compounds it into a permanent bar of
+  colour along the two long edges — worst at exactly the portrait shape a tunnel wants empty space to
+  travel into (ADR-0047's lesson, applied). Off-frame reads contribute nothing, implemented as a
+  shader test because `AddressMode::ClampToBorder` is an **optional wgpu feature** this project
+  cannot require on every adapter it ships to.
+
+  **Two minors that are measurements rather than defects, both now backlog entries.**
+  [0082](../design-backlog.md): `frame_ms_p99` spikes to **25.0 ms** on preset switches and the
+  fullscreen toggle while `frame_ms_avg` never passes 8.7 ms and no frame drops — GPU resource
+  rebuilds, not steady-state cost, but **the not-yet-built quality governor is specified to read that
+  column**, and it would demote a preset running at 165 fps. [0083](../design-backlog.md): RSS grew
+  **385 → 663 MB** over three minutes against ADR-0010's ~327 MB driver floor — too short and too
+  switch-heavy a window to call a leak, and this plan adds two accumulation buffers so *some* growth
+  is expected, but it was **never measured against a no-feedback control**, which is what makes it
+  worth keeping rather than quoting either way.
+
+  **One finding routed to the content lane, and it is R6's to resolve.** The scratch echo fixture
+  needed a **narrow palette band** to keep `add` from flattening the fragment field — three drafts of
+  it were an even green rectangle, because a fullscreen source under an additive deposit sums into a
+  flat wash at every exposure. So `blend = "add"` and a rich palette pull against each other, no
+  shipped preset has had to resolve that trade, and [0075]'s feedback cohort is where it gets
+  resolved. Its sibling fixture's *"needs more colours and saturation"* is the same finding seen from
+  the other side; nothing there asks for an engine change, since `[palette]`, `saturation` and
+  `palette_mix` all already reach this surface.
+
+  **Close-ceremony step 3b.** The plan touched `presets/` only through `presets/README.md` — no
+  `.toml` landed, so there is no new content to judge against the set. The staleness sweep was run:
+  no shipped preset is working around either defect this plan fixed (the `fade` frame-rate
+  dependence is invisible at capture `dt` and no preset compensates for it; the `resolve` aspect bug
+  was unreachable before a transform existed). **Verdict: nothing to curate, nothing stale.**
+
 - [0068 — Why the downbeat rarely locks: an instrument, an ablation, and a verdict](done/0068-why-the-downbeat-rarely-locks.md)
   — **done 2026-08-09**, Mode 4 review **no blockers, no majors, two minors, one nit**. Four phases as
   `be39985` (the probe) / `c6a7de3` (the ladder) / `62ade74` (the verdict and the doc qualification),

@@ -1864,3 +1864,86 @@ beyond one preset.
 
 **Medium.** Cheap, and it converts a piece of folklore plus a one-file exception into a rule an
 author can apply and know the limits of.
+
+---
+
+## 0082 — the quality governor reads `frame_ms_p99`, and a preset switch spikes p99 to 25 ms while nothing is dropped
+
+**Raised by:** `architect`, at [Plan 0046](plans/done/0046-transformed-feedback.md)'s close, from
+that plan's Phase 5 measurement. **Owner if taken:** `dev`, after an `architect` call on what the
+governor should do about it.
+
+### The finding
+
+Three minutes of the standalone at Rich tier, 1080p, two feedback presets with switching and a
+fullscreen toggle — 158 audible 1 Hz rows:
+
+| | value |
+|---|---|
+| fps median / min | 165.0 / **114.3** |
+| rows below the NFR §1 60 fps floor | **0 of 158** |
+| `frame_ms_avg` median / max | 6.061 / **8.749** ms |
+| `frame_ms_p99` median / max | 6.866 / **25.037** ms (p95 of that column: 18.1) |
+| frames dropped | **0 of 28 698** |
+
+So the frame budget holds with roughly 2.7x headroom and the transform costs nothing measurable.
+**But `frame_ms_p99` exceeds the 16.67 ms budget while `frame_ms_avg` never passes 8.7 ms and no
+frame is dropped.** The spikes coincide with preset switches and the fullscreen toggle — GPU
+resource rebuilds, not steady-state cost.
+
+### Why it is worth an entry
+
+**The adaptive-quality governor is specified to read p99** (roadmap item 3 / R0, not yet built). A
+demotion decision reading this column would see 25 ms during a preset switch and demote a preset
+that is in fact running at 165 fps — and demotion changes what the audience sees, on the one event
+that is already visually disruptive. The measurement is not a defect; the *instrument the governor
+will read* is what needs the qualification, and the cheapest time to know is before the governor
+exists.
+
+### What a fix would be
+
+One of three, and choosing is the design question: exclude the frames following a preset switch or
+a surface reconfigure from the governor's window; make the governor require N consecutive bad
+windows rather than one; or give it a separate steady-state statistic and leave p99 as the
+diagnostic it is today. Whatever is chosen, this measurement is the test case.
+
+### Priority
+
+**Medium — but it must be read before R0's governor is designed**, not after.
+
+---
+
+## 0083 — RSS grew 385 to 663 MB over three minutes of preset switching, and there is no no-feedback control to compare it against
+
+**Raised by:** `architect`, at [Plan 0046](plans/done/0046-transformed-feedback.md)'s close, from
+that plan's Phase 5 measurement. **Owner if taken:** `dev` (a measurement first, not a fix).
+
+### The finding
+
+Over the same three-minute Phase 5 run, resident set grew **385 MB to 663 MB** (max 663), against
+the ~327 MB driver-dominated floor [ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md)
+established and the NFR §12 working-set target.
+
+**This is not yet evidence of a leak, and it is important not to record it as one.** Three minutes
+is short, the run switched presets repeatedly (each switch builds a side's GPU resources), and this
+plan adds two accumulation buffers, so *some* growth is expected. What makes it worth keeping is
+the other half: **it was never measured against a no-feedback control**, so nothing separates
+"expected cost of what landed" from "growth that does not stop".
+
+### Why it is worth an entry
+
+R6 ([Plan 0075](plans/0075-the-content-renaissance.md)) will ship feedback presets, and the live-show
+use case runs for hours — the exact regime three minutes cannot speak to. A number with no control
+beside it is the kind of observation that gets quoted later as either a clean bill of health or a
+known leak, depending on who is quoting it, and it supports neither.
+
+### What a fix would be
+
+The measurement, not a change: two runs of equal length and equal switching, one on feedback
+presets and one on a no-feedback control, reading the same RSS column — and one longer run
+(tens of minutes, no switching) to separate per-switch cost from monotone growth. Only if the
+control run also climbs is there something to fix.
+
+### Priority
+
+**Medium.** Cheap to run, and it is owed *before* R6 ships long-running feedback content.

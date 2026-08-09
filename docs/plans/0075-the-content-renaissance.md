@@ -20,7 +20,7 @@
 > [0063](../design-backlog.md#0063--spins-usable-ceiling-is-set-by-fade-not-by-taste-and-the-pair-is-undocumented)
 > **Gated on (Phases 4+ only):** [0071](done/0071-light-that-adds-without-covering.md),
 > [0064](done/0064-the-symmetry-stage-and-the-banded-palette.md),
-> [0046](0046-transformed-feedback.md), and [0067](done/0067-the-curation-route.md)'s Phases 1-2
+> [0046](done/0046-transformed-feedback.md), and [0067](done/0067-the-curation-route.md)'s Phases 1-2
 > and 4. **Phases 1-3 are gated by nothing** and can interleave with the roster any time.
 
 ## TL;DR

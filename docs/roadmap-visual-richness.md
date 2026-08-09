@@ -285,7 +285,7 @@ phrase, cellular fields that crack open on the bass.
    [Plan 0045](plans/done/0045-linear-light-and-bloom.md) (2026-07-31), with
    [Plan 0051](plans/done/0051-the-scene-seam-emits-premultiplied-alpha.md) closing the alpha
    seam R1 made load-bearing.
-3. **R2 is now the one to run** ([Plan 0046](plans/0046-transformed-feedback.md) — it renders
+3. **R2 is now the one to run** ([Plan 0046](plans/done/0046-transformed-feedback.md) — it renders
    *into* the R1 pipeline, and is unblocked now that R1 has landed), with 0010/0011 folded in.
 
 R4 items 1-2 are small enough to interleave whenever a gap opens; **R5 is substantially
