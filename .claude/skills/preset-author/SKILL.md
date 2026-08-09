@@ -260,12 +260,35 @@ Whenever you *wanted* something the surface couldn't do — a curve family that 
 per-bin spectrum read, a stateful expression — note it. At the end, hand `architect` a short
 feedback note (`references/api-feedback.md`).
 
-### 7 — Flag curation candidates
+### 7 — Land the preset yourself, gated on the suite
 A preset dropped into `presets/` **is** the shipped set: `core/build.rs` globs the folder and embeds
-it, so there is no array to edit and no count to bump (ADR-0022). That makes shipping a preset a
-content commit — but the *decision* to ship is still not yours alone: name the candidate and hand
-off, and note that an embedded preset must survive the behavioral gates (`sanity`, `reactivity`,
-`animation` iterate the whole embedded set, so a dead or blank preset fails CI for everyone).
+it, so there is no array to edit and no count to bump (ADR-0022).
+
+**You commit it — `dev` does not courier content any more.**
+[ADR-0081](../../../docs/adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)
+moved that boundary. ADR-0017 had put curation at "`dev` embeds a curated preset" because embedding
+once meant editing Rust in two coupled spots; ADR-0022 retired that premise and the boundary stood
+on it anyway. The lane lands presets; **`architect` curates the *set*** at plan-close cadence.
+
+**The gate is what authorizes it, so run it and read it.** An embedded preset must survive the
+behavioral suite — `sanity`, `reactivity`, `animation` and `distinctness` all iterate the whole
+embedded set, so a dead or blank preset fails CI for everyone:
+
+```sh
+cargo nextest run -p lmv-core
+```
+
+Know what that green actually covers, because it is weaker than it reads and
+[`docs/capturing.md`](../../../docs/capturing.md) now spells it out: **`reactivity` is the only one
+of the five that drives PCM through the real analyzer** (Plan 0067 Phase 1). The other four
+synthesize their analysis frames — correctly and more cheaply, since their questions are about the
+frame rather than about audio — which means they would **not** notice a preset that ignores the
+music. Green says the preset draws, animates, is distinct, and reacts to at least one band. It does
+not say the preset reacts *well*; that judgement is still yours, in motion, in the running app.
+
+Still hand off two things rather than deciding them alone: a look you think belongs in the **curated
+rotation** (`architect` weighs it against what already ships), and anything you hit that the grammar
+could not express (`references/api-feedback.md`).
 
 ## The footguns that ruin presets
 
