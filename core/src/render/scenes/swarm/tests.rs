@@ -868,7 +868,7 @@ fn a_lit_backdrop_survives_where_the_swarm_drew_nothing() {
     /// a second live device in a binary is what the software adapter falls
     /// over on, and building GPU resources mid-run shifts what the trails
     /// stage resolves to on WARP.
-    fn linear_composite(bg_bright: f32, size: f32) -> Option<Vec<f32>> {
+    fn linear_composite(bg_bright: f32, size: f32, brightness: Option<f32>) -> Option<Vec<f32>> {
         let mut renderer = match Renderer::new_headless(HeadlessOptions {
             width: CAPTURE_SIZE,
             height: CAPTURE_SIZE,
@@ -881,17 +881,22 @@ fn a_lit_backdrop_survives_where_the_swarm_drew_nothing() {
             }
             Err(e) => panic!("headless renderer build failed: {e}"),
         };
-        // Both keys live in `[params]`, which is the fixture's last table, so
-        // stripping them and appending the overrides keeps them in it.
+        // All three keys live in `[params]`, which is the fixture's last table,
+        // so stripping them and appending the overrides keeps them in it.
         let base: String = LIT_FIXTURE
             .lines()
             .filter(|line| {
                 let line = line.trim_start();
-                !line.starts_with("bg_bright") && !line.starts_with("size")
+                !line.starts_with("bg_bright")
+                    && !line.starts_with("size")
+                    && !line.starts_with("brightness")
             })
             .collect::<Vec<_>>()
             .join("\n");
-        let toml = format!("{base}\nbg_bright = \"{bg_bright}\"\nsize = \"{size}\"\n");
+        let mut toml = format!("{base}\nbg_bright = \"{bg_bright}\"\nsize = \"{size}\"\n");
+        if let Some(brightness) = brightness {
+            toml.push_str(&format!("brightness = \"{brightness}\"\n"));
+        }
         let preset = Preset::from_toml_str(&toml)
             .expect("the lit-backdrop swarm fixture parses with overrides");
         let name = preset.name.clone();
@@ -936,13 +941,20 @@ fn a_lit_backdrop_survives_where_the_swarm_drew_nothing() {
     // backdrop with the scene contributing nothing — zero-area sprite quads
     // rasterize no fragments, so the chain resolves fully transparent and
     // this is the backdrop alone, through the same pipeline as `L`.
-    let Some(lit) = linear_composite(backdrop, sprite) else {
+    let Some(lit) = linear_composite(backdrop, sprite, None) else {
         return;
     };
-    let Some(dark) = linear_composite(0.0, sprite) else {
+    let Some(dark) = linear_composite(0.0, sprite, None) else {
         return;
     };
-    let Some(backdrop_only) = linear_composite(backdrop, 0.0) else {
+    let Some(backdrop_only) = linear_composite(backdrop, 0.0, None) else {
+        return;
+    };
+    // `U`: the fourth capture (Plan 0053 Phase 4), the same one the line guard
+    // takes. At `brightness = 0` the per-particle colour is zero, so `in.color *
+    // g` is zero everywhere and the frame is exactly `backdrop * (1 - a)` — a
+    // direct readout of alpha, which is what this guard is actually about.
+    let Some(unlit_sprites) = linear_composite(backdrop, sprite, Some(0.0)) else {
         return;
     };
     assert_eq!(dark.len(), lit.len(), "the captures differ in size");
@@ -1008,7 +1020,33 @@ fn a_lit_backdrop_survives_where_the_swarm_drew_nothing() {
          black, which any alpha would pass"
     );
 
-    // --- The property. ---
+    // --- The second, wider property (Plan 0053 Phase 4). ---
+    //
+    // The swarm's exact arm is not the thin one — its zero-colour region is
+    // four hard-edged corners per sprite and the revert moves 9 594 channels —
+    // so this arm costs one more call to a harness that already exists and buys
+    // the *same* property on both seams rather than two different ones. Where
+    // the sprites emit nothing the frame is `backdrop * (1 - a)`, so a fully
+    // extinguished pixel is one where alpha reached 1.
+    //
+    // Measured before the assertions, like the line guard's, so a failing run
+    // prints both counts instead of short-circuiting on the first.
+    let extinguished: usize = (0..total)
+        .filter(|&pixel| {
+            let base = pixel * 4;
+            backdrop_only[base..base + 3]
+                .iter()
+                .any(|&c| c > BACKDROP_PRESENT)
+                && (0..3).all(|c| unlit_sprites[base + c] <= backdrop_only[base + c] * 0.02)
+        })
+        .count();
+    eprintln!(
+        "swarm brightness = 0: {extinguished} of {drawn} footprint pixels fully \
+         extinguished ({:.2} %); the exact arm moved {violations} channels",
+        extinguished as f32 / drawn.max(1) as f32 * 100.0
+    );
+
+    // --- The first property, unchanged and still exact. ---
     assert_eq!(
         violations, 0,
         "{violations} channels differ between the lit frame and the backdrop \
@@ -1017,5 +1055,41 @@ fn a_lit_backdrop_survives_where_the_swarm_drew_nothing() {
          nothing was drawn the backdrop must arrive intact — a difference \
          here is a sprite emitting coverage it does not have, holding the \
          backdrop out of pixels it never painted"
+    );
+
+    // Non-vacuity: the fourth capture has to be an alpha readout. If
+    // `brightness = 0` stopped zeroing the emitted colour, this would be
+    // measuring something else.
+    let sprite_light: usize = (0..total)
+        .filter(|&pixel| {
+            let base = pixel * 4;
+            let drew = dark[base] != 0.0 || dark[base + 1] != 0.0 || dark[base + 2] != 0.0;
+            drew && (0..3).any(|c| unlit_sprites[base + c] > backdrop_only[base + c])
+        })
+        .count();
+    assert_eq!(
+        sprite_light, 0,
+        "{sprite_light} pixels are BRIGHTER than the backdrop alone in the \
+         `brightness = 0` capture, so the sprites are still emitting light \
+         there — that capture's whole purpose is to make the frame \
+         `backdrop * (1 - a)` and nothing else"
+    );
+
+    // A tenth of the footprint, the same ceiling the line guard uses. Measured
+    // on this fixture: the fixed shader gives **1 of 12 880 (0.01 %)** and the
+    // pre-fix one gives **16 052 (124.63 %)**. Over 100 % is expected here and
+    // is the defect's own signature — the footprint is counted from where the
+    // sprites put *colour*, and the corners outside the inscribed disc (~21 % of
+    // every quad) are exactly the region that draws nothing and, pre-fix,
+    // extinguished the backdrop anyway.
+    assert!(
+        extinguished * 10 < drawn,
+        "{extinguished} of the sprites' {drawn} footprint pixels are fully \
+         extinguished with `brightness = 0` — the frame there is \
+         `backdrop * (1 - a)`, so that is alpha at 1 across the sprite quads \
+         rather than only at their centres. A premultiplied sprite carries its \
+         coverage in alpha (ADR-0056); a constant alpha 1 punches the backdrop \
+         out of every quad's corners. The exact arm moved {violations} channels \
+         on the same run"
     );
 }

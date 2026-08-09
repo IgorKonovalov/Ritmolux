@@ -254,6 +254,21 @@ fn half_slack(value: f32) -> f32 {
 /// nearly a hairline — which is why the swarm was reported and this was not,
 /// and why the fixture uses a deliberately fat stroke.
 ///
+/// # Two properties, on four captures (Plan 0053 Phase 4)
+///
+/// The consequence of that geometry was a guard that *worked* and barely
+/// discriminated: reverting the shader moved the exact arm on **15 channels**,
+/// about five pixels (design-backlog 0041). The magnitude was unambiguous and
+/// the region was a thread.
+///
+/// The fourth capture fixes that by changing the property rather than the
+/// fixture. At `glow = 0` the stroke draws its whole geometry and emits no
+/// light, so the frame is exactly `bg * (1 - a)` and the composite becomes a
+/// **direct readout of alpha**. Pre-fix the fully-extinguished set is the whole
+/// quad footprint (28 178 pixels); post-fix it is the centreline (779). Both
+/// arms stay: the first is exact and says the backdrop arrives *intact*, the
+/// second is wide and says alpha is *coverage*. Neither replaces the other.
+///
 /// One edit and one guard cover all four line scenes: `parametric_curve`,
 /// `lsystem`, `star_pattern` and `spectrum` all stroke through this renderer.
 ///
@@ -303,13 +318,19 @@ fn a_lit_backdrop_survives_where_the_strokes_drew_nothing() {
     );
 
     /// The linear composite the tonemap is about to map, at a given backdrop
-    /// brightness and reveal fraction.
+    /// brightness and reveal fraction, optionally overriding `glow`.
     ///
-    /// Builds and drops **one** renderer per call rather than holding three:
+    /// `glow: None` appends nothing, so the three original captures render
+    /// exactly the configuration they always did — the existing arm below is a
+    /// proven assertion and this must not move it. `Some(0.0)` is the fourth
+    /// capture (Plan 0053 Phase 4): the stroke draws its whole geometry and
+    /// emits no light.
+    ///
+    /// Builds and drops **one** renderer per call rather than holding four:
     /// a second live device in a binary is what the software adapter falls
     /// over on, and building GPU resources mid-run shifts what the trails
     /// stage resolves to on WARP.
-    fn linear_composite(bg_bright: f32, draw_progress: f32) -> Option<Vec<f32>> {
+    fn linear_composite(bg_bright: f32, draw_progress: f32, glow: Option<f32>) -> Option<Vec<f32>> {
         let mut renderer = match Renderer::new_headless(HeadlessOptions {
             width: CAPTURE_SIZE,
             height: CAPTURE_SIZE,
@@ -322,18 +343,23 @@ fn a_lit_backdrop_survives_where_the_strokes_drew_nothing() {
             }
             Err(e) => panic!("headless renderer build failed: {e}"),
         };
-        // Both keys live in `[params]`, which is the fixture's last table, so
-        // stripping them and appending the overrides keeps them in it.
+        // All three keys live in `[params]`, which is the fixture's last table,
+        // so stripping them and appending the overrides keeps them in it.
         let base: String = LIT_FIXTURE
             .lines()
             .filter(|line| {
                 let line = line.trim_start();
-                !line.starts_with("bg_bright") && !line.starts_with("draw_progress")
+                !line.starts_with("bg_bright")
+                    && !line.starts_with("draw_progress")
+                    && !line.starts_with("glow")
             })
             .collect::<Vec<_>>()
             .join("\n");
-        let toml =
+        let mut toml =
             format!("{base}\nbg_bright = \"{bg_bright}\"\ndraw_progress = \"{draw_progress}\"\n");
+        if let Some(glow) = glow {
+            toml.push_str(&format!("glow = \"{glow}\"\n"));
+        }
         let preset = Preset::from_toml_str(&toml)
             .expect("the lit-backdrop line fixture parses with overrides");
         let name = preset.name.clone();
@@ -378,13 +404,22 @@ fn a_lit_backdrop_survives_where_the_strokes_drew_nothing() {
     // backdrop with the scene contributing nothing — at `draw_progress = 0`
     // the curve yields zero segments and the renderer returns without a draw
     // call, so this is the backdrop alone through the same pipeline as `L`.
-    let Some(lit) = linear_composite(backdrop, progress) else {
+    let Some(lit) = linear_composite(backdrop, progress, None) else {
         return;
     };
-    let Some(dark) = linear_composite(0.0, progress) else {
+    let Some(dark) = linear_composite(0.0, progress, None) else {
         return;
     };
-    let Some(backdrop_only) = linear_composite(backdrop, 0.0) else {
+    let Some(backdrop_only) = linear_composite(backdrop, 0.0, None) else {
+        return;
+    };
+    // `U`: the fourth capture (Plan 0053 Phase 4). Same scene, same backdrop,
+    // `glow = 0` — the stroke rasterizes its whole quad and multiplies its
+    // colour by zero, so `src.rgb` is 0 everywhere and the frame is exactly
+    // `backdrop * (1 - a)`. That turns the composite into a **direct readout of
+    // alpha**, which is the quantity this guard is actually about and the one
+    // the lit capture can only see indirectly.
+    let Some(unlit_stroke) = linear_composite(backdrop, progress, Some(0.0)) else {
         return;
     };
     assert_eq!(dark.len(), lit.len(), "the captures differ in size");
@@ -491,7 +526,61 @@ fn a_lit_backdrop_survives_where_the_strokes_drew_nothing() {
          black, which any alpha would pass"
     );
 
-    // --- The property. ---
+    // --- The second, wider property (Plan 0053 Phase 4). ---
+    //
+    // **Measured before either assertion**, so a run that trips the exact arm
+    // below still prints both counts. The whole point of this arm is the size
+    // of the region it reaches against the size of the region the exact one
+    // does, and a short-circuit that hid the comparison would retire the
+    // evidence while keeping the code.
+    //
+    // The arm above is exact and it is *narrow*: it speaks only where the
+    // falloff is identically zero, which for a 1-D quadratic falloff is the
+    // outermost sub-pixel sliver of the quad. Reverting the shader at Plan
+    // 0051's close moved it on **15 channels**. The magnitude was unambiguous
+    // (0.4944, very nearly the whole backdrop) but five pixels is a thin thread
+    // to hang a regression guard on, and no choice of `samples` / `scale` /
+    // `thickness` widens it (design-backlog 0041).
+    //
+    // The `glow = 0` capture changes the *property* rather than the fixture.
+    // With the stroke emitting nothing the frame is exactly `backdrop * (1 - a)`,
+    // so a pixel is fully extinguished exactly where `a = 1`:
+    //
+    // - **Pre-fix**, alpha was the literal `1.0` over the whole quad, so the
+    //   extinguished set is the entire stroke footprint — a 2-D region.
+    // - **Post-fix**, alpha is the coverage `g`, which reaches 1 only on the
+    //   centreline, so the extinguished set is a curve through it.
+    //
+    // That is three orders of magnitude of margin instead of five pixels, and
+    // it needs no shader change and no new fixture.
+    let extinguished = |limit: f32| -> usize {
+        (0..total)
+            .filter(|&pixel| {
+                let base = pixel * 4;
+                // Only where there was backdrop to lose; elsewhere "dark" is
+                // not evidence of anything.
+                backdrop_only[base..base + 3]
+                    .iter()
+                    .any(|&c| c > BACKDROP_PRESENT)
+                    && (0..3).all(|c| unlit_stroke[base + c] <= backdrop_only[base + c] * limit)
+            })
+            .count()
+    };
+    // "Fully extinguished" = at most 2 % of the backdrop survives, i.e. `a` is
+    // 0.98 or above. A hard `== 0` would be an empty set post-fix for a reason
+    // that has nothing to do with the defect: `g` reaches exactly 1 only at
+    // `d = 0`, which no sample point need land on.
+    const EXTINGUISHED: f32 = 0.02;
+    let killed = extinguished(EXTINGUISHED);
+    // The stroke's own footprint, from the capture that shows where it drew.
+    let footprint = drawn;
+    eprintln!(
+        "lines glow = 0: {killed} of {footprint} footprint pixels fully \
+         extinguished ({:.2} %); the exact arm above moved {violations} channels",
+        killed as f32 / footprint.max(1) as f32 * 100.0
+    );
+
+    // --- The first property, unchanged and still exact. ---
     assert_eq!(
         violations, 0,
         "{violations} channels differ between the lit frame and the backdrop \
@@ -500,5 +589,49 @@ fn a_lit_backdrop_survives_where_the_strokes_drew_nothing() {
          nothing was drawn the backdrop must arrive intact — a difference \
          here is a stroke emitting coverage it does not have, rimming itself \
          in backdrop it never painted over"
+    );
+
+    // Non-vacuity: the fourth capture must actually be an alpha readout. If
+    // `glow = 0` stopped zeroing the emitted light the frame would carry stroke
+    // colour again and this arm would be measuring something else.
+    let stroke_light: usize = (0..total)
+        .filter(|&pixel| {
+            let base = pixel * 4;
+            lit_mask[pixel] && (0..3).any(|c| unlit_stroke[base + c] > backdrop_only[base + c])
+        })
+        .count();
+    assert_eq!(
+        stroke_light, 0,
+        "{stroke_light} pixels are BRIGHTER than the backdrop alone in the \
+         `glow = 0` capture, so the stroke is still emitting light there. That \
+         capture's whole purpose is to make the frame `backdrop * (1 - a)` and \
+         nothing else — check that `glow` still scales the emitted colour and \
+         not the coverage"
+    );
+
+    // A tenth of the footprint. Measured on this fixture: the fixed shader gives
+    // **779 of 28 173 (2.77 %)** — the centreline — and the pre-fix one gives
+    // **28 178 (100.02 %)**, the whole quad. So this arm reaches ~84 500
+    // channels on the defect against the exact arm's **15**, which is the
+    // three-orders-of-magnitude widening design-backlog 0041 asked for.
+    //
+    // Over 100 % is not a bug in the ratio: the footprint is counted from the
+    // `dark` capture's strictly-non-zero colour, and a few anti-aliased edge
+    // pixels round their colour to zero while still carrying alpha. They belong
+    // to the quad; they just do not register as "drawn".
+    //
+    // The ceiling sits an order of magnitude below the defect and ~3.6x above
+    // the passing value, so it is a floor on the *margin* rather than a tuned
+    // constant.
+    assert!(
+        killed * 10 < footprint,
+        "{killed} of the stroke's {footprint} footprint pixels are fully \
+         extinguished with `glow = 0` — the frame there is `backdrop * (1 - a)`, \
+         so that is alpha at 1 over a 2-D region rather than on the centreline. \
+         A premultiplied stroke carries its coverage in alpha (ADR-0056); a \
+         constant alpha 1 discards the backdrop across the whole quad and rims \
+         the figure in black. The exact arm above moved {violations} channels on \
+         the same run — it reaches 15 on this defect, which is why this wider \
+         arm exists"
     );
 }

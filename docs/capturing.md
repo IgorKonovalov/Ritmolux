@@ -839,7 +839,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `line_joints` | HARD (+ tolerance) | a **flagged joint stops leaving a hole** in the stroke ([ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)): against a purpose-built zigzag `polyline`, a vertex is not a local luminance minimum relative to the segment interiors either side of it. Threshold-free, and captured at **512x512** because the wedge it measures is a fraction of a stroke-width across. The same capture is then pinned to a committed baseline (Plan 0040), since the reported defect had no pixel guard anywhere; the relative claim runs **first, even under `LMV_BLESS`**, so the notch cannot be blessed back in. Bless with `--test line_joints`, which cannot reach the golden roster |
 | `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
 | `geometry_extent` | HARD | the **in-frame geometry fraction**, for the four line families *only* ([ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)): that the diagnostic is **byte-identical** to having it off, and that each of the two frozen over-scaled configurations measures below the shipped preset it was recovered from. **Neither engine-wide nor a threshold** — read the section below before using its numbers |
-| lit-backdrop guards (**in-crate**, `--lib`) | HARD (exact) | one per **draw seam**, three of them: `swarm.rs`'s `a_lit_backdrop_survives_where_the_swarm_drew_nothing`, `lines/renderer.rs`'s `a_lit_backdrop_survives_where_the_strokes_drew_nothing`, and `emitter.rs`'s `a_lit_backdrop_survives_where_the_emitter_drew_nothing` ([ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md)). Each captures `swarm_lit_backdrop.toml` / `lines_lit_backdrop.toml` / `emitter_lit_backdrop.toml` three ways — lit backdrop, black backdrop, backdrop with the scene contributing nothing — and asserts that wherever the scene wrote no light the backdrop arrives **intact**. Bound **0** rather than a tolerance, because it reads the linear composite; see the section below |
+| lit-backdrop guards (**in-crate**, `--lib`) | HARD (exact) | one per **draw seam**, three of them: `swarm.rs`'s `a_lit_backdrop_survives_where_the_swarm_drew_nothing`, `lines/renderer.rs`'s `a_lit_backdrop_survives_where_the_strokes_drew_nothing`, and `emitter.rs`'s `a_lit_backdrop_survives_where_the_emitter_drew_nothing` ([ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md)). Each captures `swarm_lit_backdrop.toml` / `lines_lit_backdrop.toml` / `emitter_lit_backdrop.toml` three ways — lit backdrop, black backdrop, backdrop with the scene contributing nothing — and asserts that wherever the scene wrote no light the backdrop arrives **intact**. Bound **0** rather than a tolerance, because it reads the linear composite; see the section below. The swarm's and the lines' take a **fourth** capture at zero emitted light (Plan 0053 Phase 4), which turns the frame into a direct readout of alpha and widens the line guard's reach from 15 channels to the whole stroke footprint |
 | emitter burst (**in-crate**, `--lib`) | HARD (relative) | the emitter is the first scene whose **population** varies, so `emitter.rs`'s `a_spawn_rate_on_onset_bursts_and_then_idles` drives `emitter_onset.toml` through `capture_preset_over` with a silent lead, a six-frame transient and a second of silence, and asserts the frame is dark before, lit after, and dark again by the end. `capture_preset` cannot ask this: it holds one analysis frame for every step, so it can show that a binding is live but never that the shower **empties** when the transient passes ([ADR-0057](adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)) |
 | `background_composite` | HARD (**hardware only**) | RD / attractor presents alpha-blend over the `bg_*` backdrop; **skipped** on a software adapter, which mis-renders that pipeline set |
 | `transition` | HARD | every switch path (cycle **and** select) renders intermediate blended frames as a ramp, reproducibly from the injected `dt`; each blend kind shows its own signature; a switch arriving mid-dissolve lands on the last index requested; a hot-reload mid-dissolve cancels cleanly; the heavy attractor ↔ reaction-diffusion pair dissolves on the freeze fallback (set `LMV_TRANSITION_STRIP=<dir>` to also dump filmstrips) |
@@ -1037,6 +1037,43 @@ the bloom guard does: `capture::read_back_linear` is `pub(crate)`, and the
 assertion has to be made upstream of the tonemap where it is exact (see the
 previous section's second bullet for why a display-byte version cannot be
 written). Follow that precedent for a **fourth** draw seam, if one is ever added.
+
+#### The fourth capture, at zero emitted light — do not "simplify" it away
+
+The swarm and line guards take a **fourth** capture (Plan 0053 Phase 4), and it
+is not a variant of the other three. It renders the same scene over the same
+backdrop with the stroke or sprite emitting **no light** — `glow = 0` for the
+lines, `brightness = 0` for the swarm — so `src.rgb` is zero everywhere and the
+composite reduces to exactly `bg * (1 - a)`. **The frame becomes a direct readout
+of alpha**, which is the quantity these guards are actually about and the one the
+lit capture can only reach indirectly.
+
+It exists because the line guard's exact arm was nearly vacuous
+([design-backlog 0041](design-backlog.md)). The line falloff is one-dimensional
+and quadratic, so the region where it is *identically* zero is the outermost
+sub-pixel sliver of the quad: reverting the shader moved that arm on **15
+channels**, about five pixels, and no choice of `samples` / `scale` / `thickness`
+widens it. The fourth capture changes the property instead of the fixture. A
+pixel is fully extinguished exactly where `a = 1`, which pre-fix is the whole
+quad footprint and post-fix is the centreline:
+
+| guard | fixed shader | pre-fix shader | the exact arm, pre-fix |
+|---|---|---|---|
+| lines, `glow = 0` | 779 of 28 173 (2.77 %) | 28 178 (100.02 %) | 15 channels |
+| swarm, `brightness = 0` | 1 of 12 880 (0.01 %) | 16 052 (124.63 %) | 9 627 channels |
+
+Both arms stay, and neither replaces the other: the exact one says the backdrop
+arrives **intact** where nothing was drawn, the wide one says alpha **is
+coverage**. Both were confirmed in the reverted direction, and the wide arm's
+count is measured *before* either assertion so a failing run prints both rather
+than short-circuiting on the first — the comparison between the two regions is
+the evidence, and hiding it would retire the improvement while keeping the code.
+
+A ratio above 100 % is expected rather than a bug: the footprint is counted from
+where the scene put *colour*, and the regions that draw no colour but still cover
+a pixel — a sprite quad's corners, an anti-aliased stroke edge — belong to the
+quad without registering as drawn. On the swarm that over-count *is* the defect's
+signature.
 
 **One existing baseline was positioned to see this and did not.**
 `composite_kaleido.toml` is a line scene over a lit vignette — the exception to
