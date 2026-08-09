@@ -3032,3 +3032,54 @@ question, and no calibration of it will help.
 - **Non-vacuity is already available.** `core/tests/sanity.rs` carries `pre_repair_spectrum_ridge`
   as a frozen fixture, and `git show 2efb80e^:presets/spectrum_comb.toml` is the partial case. Any
   instrument proposed here can be tested against both before it is trusted.
+
+---
+
+## 0040 — additive light occludes by geometry, so a dim figure over a lit backdrop reads as dark speckle
+
+- **CLOSED 2026-08-09** at [Plan 0071](plans/done/0071-light-that-adds-without-covering.md)'s close ceremony. `occlude` shipped as a bindable scalar
+  at the backdrop composite and **the default stayed at `1.0`**, decided by the user in the running
+  app over a lit backdrop at 0.35 and 0.60 rather than by the argument below. So the entry got its
+  mechanism and its samples, and the answer to "is coverage the right model" was *yes, keep it, and
+  make the exception reachable*. The entry's question therefore closes; what it opened does not —
+  the retune it invites is Plan 0071 Phase 5, still outstanding and grouped with
+  [0038](design-backlog.md#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned).
+  Three claims in ADR-0085 were falsified by the implementation and are recorded in its Outcome.
+
+- **PROMOTED 2026-08-04 → [ADR-0085](adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) +
+  [Plan 0071](plans/done/0071-light-that-adds-without-covering.md)** — `occlude`, a bindable scalar at
+  the backdrop composite, so the resolve is `scene + bg * (1 - alpha * occlude)`. The entry's
+  "per-preset opt-in" shape was taken, as a **continuous** scalar rather than the two-valued enum it
+  suggested: the scalar contains both endpoints at identical cost and avoids a fourth quantization
+  seam. Default `1.0` is byte-identical to today; whether it stays there is Phase 3's `human` call
+  from a rendered sample set over a **lit** backdrop, per this entry's own instruction that the
+  question wants samples rather than an argument.
+- **Raised:** 2026-08-01, from `architect`, at Plan 0051's Mode 4 review.
+- **Verified against code:** yes — rendered. `swarm_storm` over `bg_bright = 0.35` at
+  `brightness = 0.02` renders as black specks on the backdrop; at the shipped-value backdrop the
+  same run's darkest pixel is (71,13,22) against a backdrop of (138,67,56).
+- **For:** `architect` (a look decision, ADR-worthy if taken), informed by `preset-author`.
+
+[ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md) made a scene emit alpha equal to
+its **coverage**, which fixed the black notches and rims. Its last Negative bullet left one thing
+open: coverage-as-alpha means a fragment occludes the backdrop **whatever light it emits**. The
+resolve is `c * g + bg * (1 - g)`, so a fragment darkens the backdrop wherever `c < bg`.
+
+At the shipped near-black floors this is unobservable — all sixteen affected presets sit between
+`bg_bright` 0.009 and 0.070. It matters because **the fix invites raising them**: the black rim was
+the reason the swarm and line families were floored (`lsystem_fern.toml:98-103` records the
+symptom, misattributing it to the lifted floor washing out the additive halo — a real effect, but
+the rim was contributing and the tradeoff has changed). An author acting on that invitation meets a
+new ceiling: `bg_bright` can rise only to the **dimmest emitted luminance in the figure**. Past it,
+the depth-parallaxed far particles and the `glow`-dimmed strokes stop fading out and start reading
+as dark speckle. `presets/README.md` now states this.
+
+**The open question is whether that is the right model.** An additive look arguably wants *no*
+occlusion — light adds, it does not cover — which would mean deriving the seam's alpha from
+something other than pure geometric coverage, or giving the scene a bindable choice between the two
+semantics. ADR-0056 rejected deriving coverage centrally from luminance (a legitimately dark
+covered pixel would go transparent, and it puts scene judgement in a shared pass); a per-scene or
+per-preset *opt-in* is a different proposal and is not covered by that rejection. Nothing is broken
+today — post-fix is brighter than pre-fix at every pixel — so this is a look decision, not a defect.
+Settling it wants rendered samples of the same preset under both semantics at a raised backdrop,
+per the concrete-examples workflow, not an argument.

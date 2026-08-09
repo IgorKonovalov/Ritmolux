@@ -113,7 +113,7 @@ flowchart LR
 - **Note:** `bg_bright` across all fifteen is between 0.008 and 0.039 including the audio term, so
   this is a dim wash and the judgement is subtle. It pairs naturally with
   [backlog 0038](../../design-backlog.md) (the tonemap knee retune) and
-  [backlog 0040](../../design-backlog.md) / [Plan 0071](../0071-light-that-adds-without-covering.md),
+  [backlog 0040](../../design-backlog.md) / [Plan 0071](../done/0071-light-that-adds-without-covering.md),
   which are the other two retunes of the same set against a composite that moved underneath it —
   and 0040's whole question is *how bright a backdrop can get*, which is the same fifteen files.
   If Plan 0071 has landed, do them together.

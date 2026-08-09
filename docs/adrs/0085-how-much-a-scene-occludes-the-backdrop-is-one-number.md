@@ -1,8 +1,10 @@
 # ADR-0085 — How much a scene occludes the backdrop is one number, at one seam
 
-> **Status:** proposed
+> **Status:** **accepted** (Plan 0071, closed 2026-08-09) — with an
+> [Outcome](#outcome-2026-08-09-after-plan-0071) recording three claims in the body that the
+> implementation falsified. The body is unedited; read the Outcome before quoting it.
 > **Date:** 2026-08-04
-> **Related plan(s):** [0071](../plans/0071-light-that-adds-without-covering.md)
+> **Related plan(s):** [0071](../plans/done/0071-light-that-adds-without-covering.md)
 > **Supplements:** [ADR-0056](0056-additive-scenes-emit-premultiplied-alpha.md)
 
 ## Context
@@ -134,3 +136,61 @@ documented ceiling on an invited change is a trap with a sign on it rather than 
   ADR-0061's Notes records for the fold edge.
 - `lsystem_fern.toml:98-103` carries a comment attributing its floor to the wrong cause. Whatever
   this decides, that comment should stop being wrong.
+
+## Outcome (2026-08-09, after Plan 0071)
+
+The decision held: `occlude` shipped as a bindable scalar in `[0, 1]` at the backdrop composite,
+the resolve is `scene + bg * (1 - alpha * occlude)`, and **the default stayed at `1.0`** — decided
+by the user in the running app over a sample set at `bg_bright` 0.35 and 0.60, on the grounds that
+at shipped brightnesses the difference is almost negligible. No preset binds it; no golden baseline
+moved, measured as byte-identity against a clean-`main` bless rather than argued from the literal
+`1.0`.
+
+**Three claims in the body above are false, and all three are in the same sentence-family — the one
+that said this was cheap because it was central.**
+
+1. **"One uniform and one multiply in one place"** (Decision) and the plan's "one seam in
+   `post.rs:585`" are both wrong: there is no such seam. `post.rs` chooses a *load op*; the
+   arithmetic is fixed-function blending in whichever pass lands on the backdrop, and the alpha that
+   blend consumes is emitted by that pass's own shader. The factor is applied in **six** places —
+   the three post stages through a new `Fold::Over { occlude }`, and the three premultiplied-present
+   scenes through a new `Scene::set_occlude`. Four shader bodies were edited, not zero.
+
+2. **"No widening of the `Scene` trait"** (Consequences → Positive) is false. The trait gained
+   `set_occlude`, its **fourth** optional method and its **second** per-frame one. That is
+   [ADR-0030](0030-scene-target-size-hot-path-hook.md)'s territory, and its three conditions were
+   never applied during design. Applied at the Plan 0071 close, the hook **passes all three**: the
+   effective value is renderer-held state no scene can reach (it is a literal `1.0` whenever a post
+   stage is active, which depends on `Routing::scene_stage`, not on the preset); the implementors
+   store an `f32` and do no GPU work; and the default is a no-op, so ISP holds and every scene stays
+   substitutable. Recorded here rather than left implicit, because ADR-0030 says in as many words
+   that the conditions are a review obligation and not a compile-time one — and because this ADR
+   claimed the widening would not happen at all.
+
+3. **"No risk of the families drifting"** (same bullet) is false, and the plan's matching assumption
+   that the two composite paths do the same arithmetic is false with it. The additive families
+   (swarm, lines, emitter) blend colour `One`/`One`, so **with an empty chain their backdrop already
+   survives whole** — there is no occlusion at that seam for `occlude` to scale, and those presets
+   behave as `occlude = 0` whatever they bind. It reaches them only through the chain's last stage,
+   which every shipped preset in those families happens to have. So the engine has one documented
+   default and two behaviours, and the asymmetry is now stated in `presets/README.md` and in
+   `Scene::set_occlude`'s doc comment rather than discovered.
+
+**One thing the ADR did not anticipate and the implementation had to buy: two bind-group layouts.**
+The trails present and the attractor present carried no uniform, and `occlude` needed one. The first
+attempt gave each a second group holding the uniform alone — `[Uniform]`, which is
+`background-bind-layout`'s shape — and on the DX12 WARP software adapter the trails present then
+read *the backdrop's* buffer: `occlude` moved 0 of 196 608 channels there while moving 3 307 on the
+hardware adapter, with the whole capture suite green over it. That is
+[ADR-0058](0058-bind-group-layout-collisions-carry-evidence.md)'s hazard, reproduced a fourth time.
+Both layouts now use shapes the crate does not otherwise have (`[Sampler, Uniform, Texture]` for
+trails; `[Texture, Sampler, Uniform, Sampler]` — the sampler bound twice — for the attractor), and
+both are asserted against the crate-wide enumeration in `tonemap/tests.rs`. **A side effect worth
+carrying forward: this empties ADR-0058's `[Texture, Sampler]` collision group entirely**, which was
+the pair that ADR named as live on shipped content and made a Positive bullet of covering. Plan 0053
+must derive its allowlist from the code.
+
+**Still outstanding:** Plan 0071 Phase 5, the `preset-author` retune this unblocks, is deliberately
+undone. The plan groups it with design-backlog 0038 **and 0058** as one pass over the shipped set;
+0058 closed by content on 2026-08-04, before the plan reached that phase, so it is a two-way pass
+with 0038 alone. Tracked in `docs/plans/README.md` → Standing.
