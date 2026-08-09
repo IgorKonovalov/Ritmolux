@@ -128,6 +128,8 @@ the audio vocabulary (`bass mid treb onset beat bar time` …) — only the grad
 | `hue`        | `0.0` | Rotates the gradient sample coordinate (the pre-existing hue knob). Scene only. |
 | `saturation` | `1.0` | Scales chroma toward luma. `1` unchanged, `0` grayscale, `>1` oversaturated. |
 | `palette_mix`| `0.0` | A/B crossfade position (see below); `0` = palette A. |
+| `palette_steps` | `0.0` (off) | Quantizes the gradient into that many hard bands — see [Hard bands](#hard-bands--palette_steps-and-palette_contour). |
+| `palette_contour` | `0.0` (off) | Darkens a hairline at each band edge. **Fragment-field and reaction-diffusion only**; inert elsewhere — same section. |
 
 `saturation` and `palette_mix` are **one binding with two consumers**: the active scene and the
 background pre-pass. You write them once and the whole frame answers — see
@@ -356,6 +358,136 @@ that coordinate, which is usually the point and occasionally a surprise.
 
 ---
 
+## Hard bands — `palette_steps` and `palette_contour`
+
+Everything above treats the gradient as a **smooth ramp**: a scene computes a
+palette coordinate, the LUT is sampled with linear filtering, and the result is a
+continuous blend. `palette_steps` breaks that ramp into hard graphic **bands**, and
+`palette_contour` draws a darkened hairline where the picture crosses from one band
+to the next ([ADR-0078](adrs/0078-banding-is-a-palette-coordinate-operation.md)).
+
+This is the difference between a field that reads as a *gradient* and one that
+reads as *designed* — flat areas of colour with drawn edges, the way a printed
+poster or a topographic map does.
+
+| Param | Default | Range that reads | Accepted |
+|-------|---------|------------------|----------|
+| `palette_steps`   | `0` (off) | **`4`–`12`** | `0` = smooth, integers up to `64` |
+| `palette_contour` | `0` (off) | **`0`–`0.5`** | `0` = none, up to `1` |
+
+```toml
+[params]
+palette_steps   = "6"                     # six flat bands
+palette_contour = "0.35"                  # a drawn edge between them
+color_span      = "1.4"                   # walk enough gradient that the bands differ
+```
+
+### What it does to the coordinate
+
+The **palette coordinate is quantized, not the baked LUT**:
+
+```text
+t' = (floor(t * N) + 0.5) / N
+```
+
+immediately before the sample, landing on each band's *centre* — so a band takes the
+colour the smooth ramp had in the middle of it, not at its edge. The `[palette]`
+bake is untouched, which is the whole point: the band count has to be **bindable to
+audio**, and re-baking a 256-entry LUT every frame is exactly the work the bake
+exists to remove. Bind `palette_steps` to `bar` or latch it on a beat and the
+picture re-quantizes per frame at no cost.
+
+Two consequences worth having up front:
+
+- **`palette_steps` is stepped.** It rounds to a whole number, like `kaleido_order`.
+  A fractional band count does not step — it leaves every boundary *crawling* across
+  the field one frame at a time, which reads as shimmer rather than as colour. An
+  eased or bound `palette_steps` still eases; it snaps at each half-integer.
+- **Off is the exact identity.** `palette_steps <= 1` and `palette_contour = 0` take
+  the unquantized path bit-for-bit, so adding these to an existing preset changes
+  nothing until you actually turn them on.
+
+### The ranges, and what is outside them
+
+Plan 0064 Phase 4 picked these off a rendered sweep. Outside them nothing breaks —
+it stops being the *graphic* look:
+
+- **`4`–`12` bands** is where the field reads as flat areas with real edges.
+- **`16` and up approaches the smooth ramp again.** The bands become narrower than
+  the eye separates them at, so the picture converges back on the unbanded
+  gradient. A legitimate destination if you want *almost* continuous with a hint of
+  structure — not what to bind if you want bands.
+- **`palette_contour` up to about `0.5`** is an edge between two colours.
+- **`0.8` is a deliberate topographic look**, not an error: past roughly `0.5` the
+  dark line stops being an edge and becomes the dominant mark, and the field reads
+  as a contour map with colour fill. Arrive there on purpose, not by easing.
+
+### `color_span` decides whether banding is visible at all
+
+`palette_steps` quantizes the **coordinate**, so it can only separate colours the
+coordinate actually reaches. A `fragment_field` at its default `color_span` of `0.6`
+walks barely half the gradient, and six bands there land on six *neighbouring*
+shades — technically banded, visually a texture. Widen the window and the same six
+bands become six distinct colours. Since the LUT is repeat-addressed, a
+`color_span` above `1` wraps and walks the whole gradient (see the
+[cyclic-wrap caution](#the-palette-table) — on the four stop-list palettes the wrap
+is the sharpest transition there is, which under banding becomes a visible seam
+rather than a soft one).
+
+**So tune `color_span` and `palette_steps` together.** If banding "isn't doing
+anything", the span is the first thing to check.
+
+### The scene scoping — banding reaches every scene, contours do not
+
+> [!IMPORTANT]
+> **`palette_contour` is inert on `attractor`, `swarm`, `emitter` and the four line
+> scenes, and nothing warns you.** The parameter is accepted there because it *is* a
+> known name, so no unknown-parameter warning fires (ADR-0020). This section is the
+> warning.
+
+A contour needs a **gradient across a fragment** to sit in — its width comes from
+`fwidth`, which measures how fast a value changes between neighbouring pixels and
+**exists only in a fragment shader**. That is what keeps the hairline a constant
+width on screen instead of thick where the field is flat and invisible where it is
+steep.
+
+Where the LUT is sampled decides whether that derivative exists at all:
+
+| Scene | Where it samples the LUT | `palette_steps` | `palette_contour` |
+|-------|--------------------------|-----------------|-------------------|
+| `fragment_field` | per pixel, fragment stage | ✅ | ✅ |
+| `reaction_diffusion` | per pixel, fragment stage | ✅ | ✅ |
+| `attractor` | per particle, **vertex** stage | ✅ | ❌ inert |
+| `swarm` | per particle, on the CPU | ✅ | ❌ inert |
+| `emitter` | per particle, on the CPU | ✅ | ❌ inert |
+| `spectrum`, `parametric_curve`, `lsystem`, `star_pattern` | per segment, on the CPU | ✅ | ❌ inert |
+
+A point sprite or a stroke segment carries **one** palette coordinate for its whole
+extent, so there is no crossing from one band to the next *within* it to draw a line
+at. This is a fact about the pipeline, not a policy someone chose, and it is not
+fixable by turning the parameter up.
+
+**So: banding reaches every scene; contours reach the continuous-field scenes.** If
+you want drawn edges on a particle or line look, the mark's own geometry is where
+they come from — the swarm's `shape`, a line scene's `thickness` — not from
+`palette_contour`.
+
+### Banding fights bloom
+
+The bright pass blurs exactly the hard edges banding creates
+([ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)), so a preset cannot have crisp
+bands *and* heavy `bloom_amount` at full strength. Pick one, or keep the bloom low
+enough that it haloes the bright bands without softening their edges.
+
+### This is not how you get a cyclic look
+
+The cyclic-hue character of a banded reference image is already reachable without
+any of this: the LUT is repeat-addressed, so a `color_span` above `1` wraps it and
+repeats the whole gradient across the field. `palette_steps` adds only the **hard
+edge** between one cycle's colours and the next.
+
+---
+
 ## The line scenes' cosine ramp — what `hue` actually looks like
 
 This is the **default** palette — what a line scene colours through when its
@@ -481,6 +613,9 @@ Low `color_span` over a warm custom gradient holds the whole field in one family
 
 - [ADR-0021 — Shared palette system](adrs/0021-shared-palette-system.md): the
   baked-LUT decision and the rejected alternatives.
+- [ADR-0078 — Banding is a palette coordinate operation](adrs/0078-banding-is-a-palette-coordinate-operation.md):
+  why `palette_steps` quantizes the coordinate rather than the bake, and why an RGB
+  posterize post stage was rejected.
 - [Plan 0020 — Shared palette system](plans/done/0020-shared-palette-system.md): the
   phased implementation.
 - `docs/presets.md`: the main preset authoring guide (systems, expressions, file

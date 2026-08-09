@@ -133,6 +133,26 @@ extreme stop with a scene level that compensates for it, so the tonemap sees the
 frame it always saw and only the bright-pass's input has moved. Its header
 carries the measurement that says the guard bites.
 
+`composite_symmetry.toml` (Plan 0064 Phase 5, ADR-0077 + ADR-0078) is the **third**
+kaleidoscope fixture, and it is not a third opinion about the fold. The stage grew
+five coordinate terms — `kaleido_tile`, `_radial`, `_spiral`, `_zoom`, `_inner` —
+and the palette grew `palette_steps` and `palette_contour`, and **not one fixture in
+this directory bound any of them**: `composite_kaleido` binds the order and the
+angle, its squash sibling adds the edge, and every other baseline in the suite
+leaves the whole radial group at its identity. So the log-radius wrap, the spiral's
+closure across `atan2`'s branch cut, the inner freeze and the zoom's scaling by the
+log period could all have been broken with the suite green. It binds all eight, each
+off its default, over a border-filling `fragment_field`.
+
+Two of its values are measured rather than picked, and its header carries the
+reasoning: `kaleido_zoom = 0.35` (at `0` the ring-unit parameterization is
+indistinguishable from the raw `log r` one it replaced, so a zero would pin nothing
+about it) and `color_span = 1.6` (at `fragment_field`'s default `0.6` the field
+walks half the gradient and six bands collapse to three neighbouring olives — a
+faint texture rather than a pin on `band_coord`). It runs **no lit backdrop**,
+unlike `composite_kaleido`: `fragment_field` over one is a WARP mis-render that
+pre-exists this plan on `main`.
+
 They are otherwise governed by everything above: do not tune, bless on WARP,
 eyeball before committing.
 

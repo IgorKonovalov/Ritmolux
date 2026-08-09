@@ -1,0 +1,117 @@
+# COMPOSITE FIXTURE - do not tune; editing this invalidates the drift baseline.
+# Plan 0064 Phase 5, the third kaleidoscope fixture. See composite_kaleido.toml
+# for the first and composite_kaleido_squash.toml for the second, and
+# composite_trails.toml for why these live outside the per-SystemKind golden
+# roster.
+#
+# THIS FIXTURE EXISTS BECAUSE NEITHER SIBLING BINDS A SINGLE ONE OF THE COMPOSED
+# MAP'S NEW TERMS. ADR-0077 grew the fold into the symmetry stage - one
+# destination-to-source coordinate map composed tile -> fold -> radial -> spiral,
+# evaluated before the stage's single texture read - and ADR-0078 put hard bands
+# on the palette coordinate. composite_kaleido.toml pins the fold's ARTIFACT on
+# purpose (design-backlog 0010) and binds `kaleido_order` and `kaleido_angle` and
+# nothing else; composite_kaleido_squash.toml adds `kaleido_edge` and nothing
+# else. So before this file the entire radial group could have been broken - the
+# log wrap, the spiral's branch-cut closure, the inner freeze, the zoom's scaling
+# by the period - and every baseline in the suite would still have been
+# byte-identical, because every one of them leaves those terms at their identity.
+# A green suite would have blessed a broken radial repeat silently.
+#
+# WHAT IT BINDS, and every value is deliberately OFF its default, because a term
+# resting at its identity is a term this baseline cannot see:
+#
+#   kaleido_tile    2      mirrored wallpaper cells, applied FIRST
+#   kaleido_order   5      the dihedral fold, second
+#   kaleido_radial  1.6    the log-radius repeat, third - the ring ratio
+#   kaleido_spiral  1      the Droste shear, fourth - one whole winding
+#   kaleido_zoom    0.35   travel along the rings, in RINGS (see below)
+#   kaleido_inner   0.12   where the repeat freezes, as a fraction of r_max
+#   palette_steps   6      the palette coordinate quantized to 6 hard bands
+#   palette_contour 0.4    a darkened hairline at each band edge
+#
+# A BORDER-FILLING SOURCE, for composite_kaleido_squash.toml's reason: the repeat
+# maps the WHOLE plane into the source's canonical annulus, so a source that is
+# mostly empty would replicate mostly-empty content and the rings would be
+# invisible. `fragment_field` paints the frame edge to edge. Its five shape params
+# are the golden fixture's own values verbatim, so any drift here is the stage's
+# and not the field's; the one value that departs is `color_span`, and its own
+# note below says why.
+#
+# NO LIT BACKDROP, deliberately, and unlike composite_kaleido.toml: this is a
+# `fragment_field` capture, and `fragment_field` over a lit backdrop is a known
+# WARP mis-render that pre-exists this plan on main. The sibling that DOES light
+# its backdrop is a line scene, where the combination is fine.
+#
+# `kaleido_zoom` IS BOUND BECAUSE ITS UNIT IS A DECISION, not because a static
+# capture needs travel. Plan 0064 Phase 4 made the authored value a count of
+# RINGS - the shader multiplies by the log period itself - so `kaleido_zoom = 1`
+# advances exactly one ring at every `kaleido_radial` and an author binds
+# "bar_phase * 1.0" without writing a logarithm. 0.35 is a third of a ring and
+# therefore lands the ring phase somewhere the identity would not: a regression
+# that dropped the multiply, or reinstated the raw log-r parameterization, moves
+# this capture. At `kaleido_zoom = 0` the two are indistinguishable, which is
+# exactly why it is not 0 here.
+#
+# `kaleido_inner` IS 0.12 AND NOT ITS DEFAULT, for the same shape of reason. Phase
+# 4 set the default to 0.06 rather than 0 - the one resting value on this stage
+# that is not the identity, because the repeat minifies without bound toward the
+# axis and 0 is the one setting guaranteed to alias. A fixture sitting on the
+# default would pin the default rather than the term.
+#
+# `palette_contour` IS LIVE HERE AND INERT ON MOST SCENES. It is drawn from
+# `fwidth`, which exists only in a fragment shader, so it reaches `fragment_field`
+# and `reaction_diffusion` and nothing else (ADR-0078; the scoping is written up
+# in docs/preset-palettes.md). This fixture is one of the two scenes that can see
+# it, which is a second reason the source is a field.
+#
+# WHAT THIS BASELINE IS SENSITIVE TO, so a future failure is attributable: the
+# composed map's ORDER (tile before the fold, the fold before the repeat, the
+# repeat before the shear - reorder any pair and the picture is a different one),
+# the log wrap's canonical band, the spiral's closure across atan2's branch cut,
+# the inner freeze, the zoom's scaling by the period, and the banding + contour
+# arithmetic at the fragment field's LUT sample site. It is NOT the guard for the
+# fold's bare geometry (composite_kaleido.png) or for the edge treatment
+# (composite_kaleido_squash.png) - with `kaleido_radial` active the repeat
+# subsumes the edge entirely, so `kaleido_edge` is inert in this capture by
+# construction.
+system = "fragment_field"
+name   = "fixture_composite_symmetry"
+
+[params]
+# The source, held constant. Same values as the `fragment_field` golden fixture -
+# except `color_span`, whose own note is at the bottom of this table.
+warp  = "0.5"
+hue   = "0.15"
+zoom  = "0.9"
+glow  = "0.7"
+flash = "0.2"
+
+# The symmetry stage (ADR-0077). `kaleido_angle` is held at 0 for
+# composite_kaleido.toml's reason - the wedge boundaries then sit on the frame
+# axes, so a mis-folded frame is obvious by eye in the PNG rather than only in the
+# drift number.
+kaleido_order  = "5"
+kaleido_angle  = "0"
+kaleido_tile   = "2"
+kaleido_radial = "1.6"
+kaleido_spiral = "1"
+kaleido_zoom   = "0.35"
+kaleido_inner  = "0.12"
+
+# The banded palette (ADR-0078). 6 bands is inside the 4-12 region Plan 0064
+# Phase 4 documented as the one that reads as graphic; 0.4 is a contour past a
+# hint and short of the topographic look.
+palette_steps   = "6"
+palette_contour = "0.4"
+
+# A WIDE COLOUR WINDOW, and this one IS a departure from the golden fixture's
+# values - measured rather than chosen. At `fragment_field`'s default
+# `color_span` of 0.6 the field walks barely half the gradient, so 6 bands
+# collapse to three neighbouring olives and the capture pins the banding only as
+# a faint texture. Above 1 the LUT is repeat-addressed and wraps, so the field
+# walks the whole cyclic `spectrum` gradient and then some: the 6 bands land on 6
+# clearly distinct hues, each contour edge separates two of them, and a drift in
+# `band_coord` moves whole regions of the frame rather than a few grey levels.
+# The field itself is unchanged - this is the colour window over it, not the
+# source - so drift here is still attributable to the stage.
+color_span = "1.6"

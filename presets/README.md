@@ -1133,17 +1133,23 @@ The fold above is **one term of a composed coordinate map**
 more terms ride in the same stage, at the same single texture read, so turning them
 all on costs no more sharpness than the fold alone.
 
-| Param | Default (off) | What it does |
-|---|---|---|
-| `kaleido_tile` | `1` | mirrored wallpaper cells across the frame |
-| `kaleido_radial` | `1` | the **scale ratio between successive rings** — concentric shrinking copies |
-| `kaleido_spiral` | `0` | an **integer winding number** — the Droste shear |
-| `kaleido_zoom` | `0` | an offset along `log r` — travel through the rings |
-| `kaleido_inner` | `0` | where the repeat stops, as a fraction of the disc radius |
+| Param | Default | Accepted | What it does |
+|---|---|---|---|
+| `kaleido_tile` | `1` (off) | `1`–`16` cells | mirrored wallpaper cells across the frame |
+| `kaleido_radial` | `1` (off) | `1.02`–`8`, **`1.3`–`2.2` reads** | the **scale ratio between successive rings** — concentric shrinking copies |
+| `kaleido_spiral` | `0` (off) | integers `-8`–`8` | an **integer winding number** — the Droste shear |
+| `kaleido_zoom` | `0` | any | travel through the rings, **in rings** — `1` is exactly one |
+| `kaleido_inner` | **`0.06`** | `0`–`1` of the disc radius | where the repeat freezes |
+
+The default and the reads-well range came off Plan 0064 Phase 4's rendered grid —
+`kaleido_radial` × `kaleido_spiral` on a full-frame field, an accumulating attractor
+and a sparse line figure, at two aspects — not off the arithmetic. Nothing outside
+them is forbidden; the notes below say what you get out there.
 
 **The composed order is fixed: `tile` → fold → `radial` → `spiral`.** It is not
-author-selectable — that is what keeps the whole stage one pipeline. Read forwards
-it means the polar rosette is the motif the tile replicates.
+author-selectable — that is what keeps the whole stage one pipeline and one
+resample however many terms are live. Read forwards it means the polar rosette is
+the motif the tile replicates.
 
 **`kaleido_radial` is a ratio, not a count.** `2.0` means each ring is half the size
 of the one outside it; `1.3` gives fine dense rings. Across a 10:1 radius span,
@@ -1152,24 +1158,59 @@ that turns a flat rosette into a mandala, and it works on **any** scene, with or
 without a fold: `kaleido_radial = 1.3` on a preset that binds no `kaleido_order` at
 all still repeats.
 
+- **`1.3`–`2.2` is where it reads as rings.** Below about **`1.2` it stops reading
+  as concentric copies at all** — the rings are packed so densely that the eye
+  resolves them as a radial *starburst* out of the centre, and it is also where the
+  minification is worst, so it is the region that most needs `kaleido_inner`. That
+  is a degenerate look, not a forbidden one: bind it deliberately if a starburst is
+  what you want, and know that is what you asked for.
+- Above `2.2` there is barely more than one ring in the frame, and the term stops
+  earning its cost.
+
 **`kaleido_spiral` is stepped, like `kaleido_order` and `kaleido_edge`.** It is a
 winding number: one revolution shears `log r` by exactly that many whole rings, and
 only a whole number closes the image. A fractional winding draws a visible seam
 along the same leftward ray a fractional `kaleido_order` tears along, so the engine
 rounds it.
 
-**`kaleido_zoom` loops seamlessly, and its unit is `log r`.** The map is periodic in
-`log r` with period `ln(kaleido_radial)`, so an offset of exactly that period is the
-*identity* — a `kaleido_zoom = "time * 0.1"` is an endless tunnel with no reset and
-no crossfade. One ring is `ln(kaleido_radial)`, **not** 1: at `kaleido_radial = 1.3`
-a ring is 0.26, so `"bar_phase * 0.2624"` advances exactly one ring per bar.
+**And it only reads as a twist if `kaleido_radial` gives it something to twist.**
+The shear is measured *in rings*, so how visible one winding is depends entirely on
+how far apart the rings are:
 
-**`kaleido_inner` is an aliasing control, not polish.** The repeat *minifies* toward
-the centre: at `kaleido_radial = 2`, five rings in, a thousand source pixels land
-under one destination pixel, and the inner rings turn to moire. `kaleido_inner`
-freezes the repeat below that radius, which leaves a clean disc at the centre — the
-bright hub you see at the middle of a reference zoom tunnel. Raise it until the
-churn at the centre stops.
+| `kaleido_radial` | what `kaleido_spiral = 1` looks like |
+|---|---|
+| `1.6`–`2.2` | a clear Droste twist — this is the pairing to reach for |
+| `1.3` | present, readable, milder |
+| `1.15` | **nearly invisible** — the rings are so close that a whole winding barely displaces anything |
+
+Subtler still on a **sparse** source (a low-`density` attractor, a thin line
+figure): the twist is carried by content crossing ring boundaries, and a mostly
+empty frame has little to carry it. If the spiral seems to do nothing, raise
+`kaleido_radial` before raising `kaleido_spiral`.
+
+**`kaleido_zoom` loops seamlessly, and its unit is the ring.** The map is periodic
+in `log r`, so an offset of exactly one ring is the *identity* — a
+`kaleido_zoom = "time * 0.1"` is an endless tunnel with no reset and no crossfade.
+**`1` is one ring at every `kaleido_radial`**: the engine multiplies by the log
+period itself, so `"bar_phase * 1.0"` advances exactly one ring per bar and keeps
+doing so after you re-tune the ratio. (It used to be a raw `log r` offset, which
+meant writing `ln(kaleido_radial)` by hand and silently losing the loop the moment
+the ratio changed. If you find a preset binding a number like `0.2624`, it is from
+before this and wants to be `1.0`.)
+
+**`kaleido_inner` is an aliasing control, not polish — and it is the one term here
+whose default is not the identity.** The repeat *minifies* toward the centre: at
+`kaleido_radial = 2`, five rings in, a thousand source pixels land under one
+destination pixel, and the inner rings turn to moire. `kaleido_inner` freezes the
+repeat below that radius, which leaves a clean disc at the centre — the bright hub
+you see at the middle of a reference zoom tunnel.
+
+It rests at **`0.06`** rather than `0` because `0` is the one setting guaranteed to
+alias, and Phase 4's grid could not tell `0.06` from `0` on any source it rendered:
+it caps the worst case for free. Raise it until the churn at the centre stops, and
+keep raising it if you want the hub itself as a graphic element — it grows into a
+flat disc, so it is a look as well as a fix. Write `kaleido_inner = "0"` if you want
+the repeat all the way to the axis; nothing floors it.
 
 **With `kaleido_radial` active, `kaleido_edge` does nothing.** The repeat lands every
 radius inside the disc by construction, so there is no outside left to treat.
@@ -1478,10 +1519,23 @@ LUT read. `palette_contour` then darkens a hairline where the coordinate crosses
 band edge. Both default to `0` (off), and off is the *exact* identity, so adding
 them to an existing preset is the only thing that changes it.
 
-| Param | Default | Range that reads |
-|---|---|---|
-| `palette_steps` | `0` (off) | `0` = smooth, `4`–`16` graphic, up to `64` |
-| `palette_contour` | `0` (none) | `0` = none, `0.3` a hint, `1` a solid dark line |
+| Param | Default | Range that reads | Accepted |
+|---|---|---|---|
+| `palette_steps` | `0` (off) | **`4`–`12`** | `0` = smooth, up to `64` |
+| `palette_contour` | `0` (none) | **`0`–`0.5`** | `0` = none, up to `1` |
+
+Those two ranges are Plan 0064 Phase 4's, read off a rendered sweep rather than
+argued. Outside them nothing breaks — it just stops being the *graphic* look:
+
+- **`palette_steps` 16 and up approaches the smooth ramp again.** The bands get
+  narrower than the eye separates them at, so the picture converges on the
+  unbanded gradient. That is a legitimate destination if you want *almost*
+  continuous with a hint of structure; it is not what to bind if you want bands.
+  `4`–`12` is where the field reads as flat graphic areas.
+- **`palette_contour` 0.8 is a deliberate topographic look, not a mistake.** Past
+  about `0.5` the dark line stops being an edge between two colours and becomes
+  the dominant mark — the field reads as a contour map with colour fill. Bind it
+  on purpose or not at all; do not arrive there by easing.
 
 Three things to know before binding them:
 
