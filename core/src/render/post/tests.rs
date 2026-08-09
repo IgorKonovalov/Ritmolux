@@ -1047,7 +1047,7 @@ const NO_STAGE_FIXTURE: &str =
 const OCCLUDE_CAPTURE_SIZE: u32 = 256;
 
 /// Frames per capture. Long enough for the swarm's seeded velocities to damp
-/// and the reaction-diffusion field to develop structure.
+/// and the attractor's cloud to accumulate a deposit worth occluding.
 const OCCLUDE_CAPTURE_FRAMES: u32 = 40;
 
 /// Slack for half-precision rounding, the same shape the two lit-backdrop
@@ -1337,7 +1337,7 @@ fn occlude_releases_the_backdrop_with_no_post_stage_active() {
     let backdrop = fixture_value(NO_STAGE_FIXTURE, "bg_bright");
     assert!(
         backdrop > 0.0,
-        "rd_lit_backdrop_no_stage.toml no longer lights its backdrop \
+        "attractor_lit_backdrop_no_stage.toml no longer lights its backdrop \
          (bg_bright = {backdrop})"
     );
     // The whole point of this fixture is that the chain is EMPTY. A stage
@@ -1347,9 +1347,9 @@ fn occlude_releases_the_backdrop_with_no_post_stage_active() {
         for name in stage_params.iter() {
             assert!(
                 fixture_value(NO_STAGE_FIXTURE, name).is_nan(),
-                "rd_lit_backdrop_no_stage.toml now binds `{name}`, so a post \
-                 stage is active and the scene no longer presents onto the \
-                 backdrop — which is the seam this fixture exists to reach"
+                "attractor_lit_backdrop_no_stage.toml now binds `{name}`, so a \
+                 post stage is active and the scene no longer presents onto \
+                 the backdrop — which is the seam this fixture exists to reach"
             );
         }
     }
