@@ -1,6 +1,7 @@
 # 0067 — The curation route: a gate worth trusting, and the preset that has been waiting six weeks
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing. Phases 1, 1c, 1d and 2
+> **Status:** **in-progress 2026-08-09** — Phases 1, 1c, 1d and 2 are landed; Phase 3 (`human`) is
+> next and gates Phase 4. Phases 1, 1c, 1d and 2
 > are `dev`; **Phase 3 is `human`** (the Coral Oracle pass — declining it is a successful outcome)
 > and gates Phase 4, so the plan does not close in one session. Phase 1 touches
 > `core/tests/reactivity.rs`, adjacent to
