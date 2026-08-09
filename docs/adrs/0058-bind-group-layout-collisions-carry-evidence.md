@@ -1,8 +1,10 @@
 # ADR-0058 — Two bind-group layouts that can be live in one frame may not share a shape unless an allowlist carries per-pair evidence
 
-> **Status:** proposed
+> **Status:** **accepted** (Plan 0053, closed 2026-08-09) — **carries an `Outcome` section**: the
+> decision held and the mechanism worked, but the ADR's premise that nothing was currently broken
+> was false, and the shape it assumed was too coarse.
 > **Date:** 2026-08-01
-> **Related plan(s):** [0053](../plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)
+> **Related plan(s):** [0053](../plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)
 > **Supplements:** [0016](0016-gpu-tests-opt-in-ci-scope.md) (the adapter policy that puts the
 > whole golden suite on WARP). **This ADR is the first record of the WARP aliasing hazard itself** —
 > see the Context; the hazard has been cited for five plans as "ADR-0021 / Plan 0020", and that is
@@ -177,3 +179,60 @@ check is precisely how this class of defect keeps shipping.
 up, mix). The existing enumeration's printout shows it holds today, so converting that claim from
 prose to assertion is a few lines and is worth doing while in the file — a cheap instance of
 exactly what this ADR is about.
+
+## Outcome — 2026-08-09, at Plan 0053's close
+
+The decision held: the assertion, the allowlist and the evidence rule all shipped and all work.
+Four things this ADR recorded turned out to be wrong, and the first is the one that matters.
+
+**1. "Nothing is observed to be wrong" was false, and so was "it fixes nothing that is currently
+broken."** Both appear above — the first closing the Context, the second as the last Negative
+consequence. Plan 0053 Phase 3 rendered each colliding pair's configuration on both adapters and
+**two of them were aliasing in shipped code**:
+
+| pair | configuration | hardware (mean RGB) | WARP, colliding |
+|---|---|---|---|
+| `background` + fullscreen scenes | fragment field over a lit backdrop | `131.010 170.559 141.381` | `142.712` on all three — a **flat grey**, the colour gone |
+| `background` + fullscreen scenes | reaction-diffusion over a lit backdrop | `087.612 165.165 156.168` | `087.543 064.538 …` |
+| `blend` + `trails` | mid-dissolve between two `trails`-binding presets | `17.572 48.211 50.116`, 4168 lit | `08.999 38.682 45.794`, 4001 lit |
+
+Each was isolated against a control — the same scene with the colliding pipeline absent, where the
+two adapters agree to **0.02 of one 8-bit level** — so the divergence is the collision and not the
+adapter. Both are fixed by an explicit `min_binding_size` in `background.rs` and `transition.rs`,
+which is a real separation and not a padding: the size is genuinely known at both sites. This is the
+**fourth and fifth** recorded instances of the mechanism. The ADR's estimate of its own value was
+therefore too low in exactly the direction that matters: it argued for the ability to *notice*, and
+what it bought was two fixes.
+
+**2. The shape is not the ordered list of binding kinds.** This ADR's tables and its whole framing
+say "share a shape" meaning kinds in order. That is coarser than what the hazard keys on, and the
+boxed note above already contained the counterexample: `emitter-bind-layout` was separated from
+`swarm-bind-layout` by a wider visibility mask and an explicit size, and under a kinds-only shape
+those two still read as colliding — so the assertion would have demanded an allowlist entry for a
+pair that was *deliberately separated*, recording a fix as a tolerated collision. The shipped shape
+is therefore `(kind, visibility, declares-a-min-size)` per binding. The second component was
+**measured rather than assumed**: the emitter's fix moved mask and size together, so Plan 0053
+established the size alone is sufficient, twice and independently.
+
+**3. The collision tables above are stale, and were stale before the plan started.** The boxed note
+records Plans 0052 and 0055 moving two groups. Plans 0071 and 0072 moved two more after it was
+written — 0071 **emptied** the `[Texture, Sampler]` group entirely, which is the pair this ADR named
+as live on two shipped presets and made a Positive bullet of covering. The allowlist was derived
+from a live run rather than from anything written here. **Treat every table in this ADR as history.**
+The eleven collisions became **four** allowlisted pairs over five layouts, well inside the "if it
+grows past roughly eleven, the assertion's shape is wrong" tripwire.
+
+**4. The Positive bullet "the riskiest pair gets covered where it actually ships" survived its own
+premise's removal.** `attractor-present` + `trails-present` no longer collide, but the fixture Plan
+0053 Phase 1 added for them — `core/tests/attractor_trails.rs`, its own test binary — is worth
+having anyway: it is the densest pipeline coexistence any shipped preset produces (six pipelines in
+one command buffer) and nothing pinned it. It is coverage, not evidence of correctness, and says so.
+
+**One cost this ADR named came due immediately, and one it did not name.** The named one: the
+evidence is human-produced, recorded, and thereafter trusted rather than re-derived. The unnamed
+one is sharper — **`RIG` records "DX12 hardware vs WARP" and names neither adapter**, while
+[ADR-0074](0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md)'s `Outcome`,
+written five days earlier, established that *this box's WARP 10.0.19041 is the outlier* and CI's
+10.0.26100 behaves like hardware. The golden suite captures on both. So the four `AGREES` entries
+grant standing permission on a build they were never measured against, and a later re-measure
+cannot tell whether it is on the same rig. Filling those identities in is owed.

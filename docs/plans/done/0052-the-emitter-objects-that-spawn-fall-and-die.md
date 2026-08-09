@@ -253,7 +253,7 @@ grammar.
   the first content pass immediately wants swirl or drag, that is the ADR's stated price being
   paid, and the answer is a superseding ADR rather than sneaking an accumulator in.
 - **The new scene widens the WARP bind-group-layout collision surface** that
-  [design-backlog 0039](../../design-backlog.md) and [Plan 0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md)
+  [design-backlog 0039](../../design-backlog.md) and [Plan 0053](../done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)
   are about: an emitter uniform group shaped `[Uniform]` joins six existing ones. If 0053 lands
   first, its assertion will name this scene; if this lands first, 0053 inherits one more entry.
   Neither ordering is wrong — they should just not surprise each other.

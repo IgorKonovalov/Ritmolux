@@ -147,7 +147,7 @@ because that scene draws opaquely over the backdrop); on hardware the fragment-f
 byte-identical before and after; and on WARP that configuration was **already** wrong beforehand for
 the separate, documented fullscreen-scene/background-pipeline reason. The measurement lives in
 `core/src/render/background.rs`'s `Background` doc comment, and
-[Plan 0053](../plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 1's allowlist must
+[Plan 0053](../plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 1's allowlist must
 pick this pair up when it derives itself from the code.
 
 ## Alternatives considered

@@ -1944,7 +1944,7 @@ screenshots of the running app then reversed.
 ## ~~0039 — four bind-group layouts in `core/src` are shared by pipelines that go live in the same frame, and only the tonemap's uniqueness is asserted~~
 
 - **PROMOTED 2026-08-01 → [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md) +
-  [Plan 0053](plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)** — the collision
+  [Plan 0053](plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)** — the collision
   property gets asserted, with an allowlist carrying dated hardware-vs-WARP evidence per pair.
   **One correction to the entry below:** it cites the hazard as "ADR-0021 / Plan 0020's
   documented hazard", and so do five code comments — ADR-0021 is the **shared palette system**.
@@ -2005,7 +2005,7 @@ four lines.
 
 ## ~~0041 — the line seam's lit-backdrop guard discriminates on ~5 pixels, and a stronger property is available~~
 
-- **PROMOTED 2026-08-01 → [Plan 0053](plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)
+- **PROMOTED 2026-08-01 → [Plan 0053](plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)
   Phase 4** — the `glow = 0` fourth capture sketched below is taken as written, plus the same
   shape at `brightness = 0` for the swarm guard. No ADR: the property is a better test, not a
   decision with a rejected alternative. Notes below retained as the origin record.

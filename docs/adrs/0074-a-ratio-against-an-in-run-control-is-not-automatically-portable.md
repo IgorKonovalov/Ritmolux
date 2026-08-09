@@ -78,7 +78,7 @@ asserts a magnitude there (`CARRIES = 1.5`), so the shape is established.
 
 **Corrected — the hardware is this box, and the claim is owed now rather than someday.** This
 paragraph originally sent the measurement to Plan
-[0053](../plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3, on the belief that
+[0053](../plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3, on the belief that
 a `human` phase gated on a machine we lacked was the next time real hardware would see this suite.
 That belief was wrong and cheap to check: the gate in the code is
 `Renderer::adapter_is_software()` — `device_type == DeviceType::Cpu`
@@ -221,7 +221,7 @@ direction. The conclusion that survives is narrower and still sufficient: the nu
 contaminated on at least one rasterizer build, so the ratio is not portable across builds. What does
 not survive is the claim about *which* build, and that claim was doing work.
 
-**Two things follow, both for Plan [0053](../plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md),
+**Two things follow, both for Plan [0053](../plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md),
 which owns whether WARP's output should be trusted at all.**
 
 - The Negative bullet above — *"if the newer WARP is losing more trail history than the older one,

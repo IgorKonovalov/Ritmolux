@@ -208,7 +208,7 @@ flowchart TB
   arm, the draw shader), `core/src/render/scenes/particles/ifs.rs` (packing).
 - **The uniform grows from 160 to 192 bytes** — two `vec4` carrying four `(x, y)` fixed points,
   packed two per row exactly as `translate` already is. **The bind-group layout gains no binding**,
-  so the collision surface [Plan 0053](../0053-the-suite-stops-blessing-what-warp-gets-wrong.md) and
+  so the collision surface [Plan 0053](../done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) and
   [ADR-0058](../../adrs/0058-bind-group-layout-collisions-carry-evidence.md) reason about does not
   change shape.
 - **Why the emergence ramp is load-bearing rather than polish.** At the 150 000-particle ceiling a
