@@ -189,7 +189,12 @@ brightness = "0.80 + clamp(bass * 0.212, 0, 0.18)"
 zoom  = "1.00 + sin(time * 0.23) * 0.05"
 pan_y = "0.02"
 
-bg_hue      = "0.44 + sin(time * 0.008) * 0.05"
+# bg_hue reads THIS preset's gradient now (ADR-0086). `aurora` peaks green at
+# at=0.40, so 0.44 painted the whole frame the same bright green the ridge draws
+# in and the lines lost their ground. `hue_spread = 1.00` means the figure walks
+# the entire gradient, so there is no unused region to put the sky in - it has to
+# go dark. 0.06 is the deep green-black near at=0.00.
+bg_hue      = "0.06 + sin(time * 0.008) * 0.04"
 bg_bright   = "0.020 + clamp(treb * 0.0233, 0, 0.014)"
 bg_vignette = "0.80"
 

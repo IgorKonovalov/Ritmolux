@@ -121,7 +121,13 @@ kaleido_order = "select(min(tempo > 132, bass + mid > 0.88), 3, 1)"
 # visibly duplicated spike clusters into the corners. The fade keeps them honest.
 kaleido_edge  = "0"
 kaleido_angle = "time * 0.13"
-bg_hue        = "0.965 + clamp(bass * 0.0353, 0, 0.030)"
+# 0.965 was picked to sit on the shared cosine's vermilion - the author wanted a
+# red ground. Since ADR-0086 bg_hue reads THIS gradient, where red lives at the
+# BOTTOM and 0.965 is the near-white #fff3d2 at the top, so the storm gained a
+# cream haze. Same intent, different coordinate: 0.08 is the deep blood-red
+# between at=0.00 and at=0.30. The bass term now deepens toward the #8f0f14
+# crimson on a hit instead of washing further toward white.
+bg_hue        = "0.08 + clamp(bass * 0.0353, 0, 0.030)"
 bg_bright     = "0.009 + clamp(mid * 0.0165, 0, 0.014)"
 bg_vignette   = "0.82"
 
