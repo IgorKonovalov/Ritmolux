@@ -128,14 +128,19 @@
 //! keeps the whole stage one pipeline and one resample however many terms are live.
 //! Read forwards it means the polar rosette is the motif the tile replicates.
 //!
-//! | Param | Identity | What it is |
-//! |---|---|---|
-//! | `kaleido_tile` | `1` | mirrored wallpaper cells across the frame |
-//! | `kaleido_order` | `1` | the dihedral fold above |
-//! | `kaleido_radial` | `1` | the **scale ratio between successive rings** (2 = each ring half the last) |
-//! | `kaleido_spiral` | `0` | an **integer winding number** — the Droste shear |
-//! | `kaleido_zoom` | `0` | an offset along `log r` |
-//! | `kaleido_inner` | `0` | where the repeat stops, as a fraction of `r_max` |
+//! | Param | Identity | Default | What it is |
+//! |---|---|---|---|
+//! | `kaleido_tile` | `1` | `1` | mirrored wallpaper cells across the frame |
+//! | `kaleido_order` | `1` | `1` | the dihedral fold above |
+//! | `kaleido_radial` | `1` | `1` | the **scale ratio between successive rings** (2 = each ring half the last) |
+//! | `kaleido_spiral` | `0` | `0` | an **integer winding number** — the Droste shear |
+//! | `kaleido_zoom` | `0` | `0` | travel along `log r`, **in rings** — 1 is exactly one |
+//! | `kaleido_inner` | `0` | **`0.06`** | where the repeat stops, as a fraction of `r_max` |
+//!
+//! The two columns agree on every row but the last, and that one disagreement is
+//! deliberate — see [`DEFAULT_INNER`]. It costs nothing while the repeat is off,
+//! since the whole radial group is skipped then, so no preset written before
+//! ADR-0077 can see it.
 //!
 //! Three facts about the composition are worth having before reading the shader:
 //!
@@ -144,11 +149,16 @@
 //!   nothing is ever outside the disc, nothing is clamped, nothing fades, and
 //!   `kaleido_edge` is inert. That is ADR-0077's "one radius policy" in one line:
 //!   the repeat *is* a radius policy, and two of them would fight.
-//! - **The zoom's period is exact.** The map is periodic in `log r` with period
-//!   `L = ln(radial)`, so an offset of exactly `L` is the identity map rather than
-//!   an approximation of it — an audio- or time-driven `kaleido_zoom` is an endless
-//!   tunnel with no reset and no crossfade. `kaleido_zoom` is in **`log r` units**,
-//!   so one ring is `ln(kaleido_radial)`, not 1.
+//! - **The zoom's period is exact, and its unit is the ring.** The map is periodic
+//!   in `log r` with period `L = ln(radial)`, so an offset of exactly `L` is the
+//!   identity map rather than an approximation of it — an audio- or time-driven
+//!   `kaleido_zoom` is an endless tunnel with no reset and no crossfade.
+//!   `kaleido_zoom` is authored in **rings**, not in `log r`: the shader multiplies
+//!   it by `L` itself ([`fold_zoom`]), so `kaleido_zoom = 1` advances exactly one
+//!   ring at **every** `kaleido_radial`. That is Plan 0064 Phase 4's decision, and
+//!   it is the whole difference between `"bar_phase * 1.0"` and asking an author to
+//!   write a logarithm of a ratio they chose by eye — the two are the same map, but
+//!   only one of them survives re-tuning `kaleido_radial`.
 //! - **The spiral's winding number is quantized CPU-side, and must be.** Shearing
 //!   `log r` by `k·θ` shifts the radius by `2πk` over one revolution, so the image
 //!   closes only when `2πk` is a whole multiple of `L` — that is, `k = m·L/(2π)`
@@ -165,6 +175,13 @@
 //! at the cutoff, since `r_eff = max(r, inner·r_max)` agrees with `r` there) and
 //! therefore alias-free. The proper answer is a mip chain with an LOD from the
 //! map's Jacobian; the post chain's offscreens are single-level, so it is deferred.
+//!
+//! **So its default is [`DEFAULT_INNER`] = 0.06 rather than 0**, which is the one
+//! place on this stage where the resting value is not the identity. Plan 0064
+//! Phase 4 read the sweep and found 0.06 indistinguishable from 0 on every source
+//! rendered — full-frame field, accumulating attractor, sparse line figure — while
+//! it caps the worst minification for free. A preset that wants the repeat all the
+//! way to the axis writes `kaleido_inner = "0"` and gets it; nothing clamps it up.
 //!
 //! **With the fold inactive the stage can still be active** — a preset binding only
 //! `kaleido_radial` or only `kaleido_tile` gets those terms and no fold. The
@@ -260,7 +277,7 @@ const DEFAULT_SPIRAL: f32 = 0.0;
 /// revolution; past a handful the rings are a vortex with no readable motif.
 const MAX_SPIRAL: f32 = 8.0;
 
-/// `kaleido_zoom` default — 0 = no offset along `log r`.
+/// `kaleido_zoom` default — 0 rings travelled, so no offset along `log r`.
 const DEFAULT_ZOOM: f32 = 0.0;
 
 /// `kaleido_tile` default — 1 cell across, the identity.
@@ -272,8 +289,20 @@ const MIN_ACTIVE_TILE: f32 = 1.0;
 /// which is already less than the motif needs.
 const MAX_TILE: f32 = 16.0;
 
-/// `kaleido_inner` default — 0 = the repeat runs all the way to the fold axis.
-const DEFAULT_INNER: f32 = 0.0;
+/// `kaleido_inner` default — **0.06**, not 0, and the only resting value on this
+/// stage that is not the identity (Plan 0064 Phase 4).
+///
+/// The repeat minifies toward the axis without bound, so the identity here is the
+/// one setting guaranteed to alias. Phase 4's sweep — the ratio × winding grid on a
+/// full-frame field, an accumulating attractor and a sparse line figure, at two
+/// aspects — could not tell 0.06 from 0 on any source, while it caps the worst
+/// minification: the frozen interior covers `0.06^2` ≈ 0.4 % of the disc's area and
+/// bounds the compression there at `1/0.06` ≈ 17x instead of unbounded.
+///
+/// It costs an author nothing to opt out — `kaleido_inner = "0"` is honoured
+/// exactly ([`fold_inner`] clamps but does not floor) — and it costs the stage
+/// nothing when the repeat is off, since the whole radial group is skipped then.
+const DEFAULT_INNER: f32 = 0.06;
 /// Ceiling on the inner cutoff: `r_max` itself, at which the whole disc is the
 /// frozen innermost ring and the repeat shows nothing.
 const MAX_INNER: f32 = 1.0;
@@ -398,20 +427,29 @@ fn spiral_shear(spiral: f32, log_period: f32) -> f32 {
     spiral * log_period / std::f32::consts::TAU
 }
 
-/// The `log r` offset the shader is handed, **wrapped into one period**.
+/// The zoom the shader is handed, **in rings**, wrapped into one ring.
+///
+/// The unit is the decision Plan 0064 Phase 4 made and the reason this function
+/// does not see `log_period` at all: the shader multiplies by `L` itself, so the
+/// authored value is a **ring count** and `kaleido_zoom = 1` advances exactly one
+/// ring at every `kaleido_radial`. Authored in raw `log r` it would have been
+/// `ln(kaleido_radial)` — a number an author has to recompute every time they
+/// re-tune the ratio, and one that silently stops looping when they forget.
 ///
 /// The wrap is not the periodicity — the map is periodic in `log r` whatever
 /// offset it is given, and that is asserted on the map itself. It is precision
 /// hygiene for the common binding: `kaleido_zoom = "time * k"` grows without
-/// bound, and by the time it reaches a few thousand an f32's ulp is coarser than
-/// the band, so the tunnel would visibly step. Reducing it here keeps the uniform
-/// in `[0, L)` and the shader's arithmetic at full precision indefinitely.
-fn fold_zoom(zoom: f32, log_period: f32) -> f32 {
-    if !zoom.is_finite() {
-        return DEFAULT_ZOOM;
-    }
-    if log_period > 0.0 {
-        zoom.rem_euclid(log_period)
+/// bound, and by the time it reaches a few thousand an f32's ulp is a visible
+/// fraction of a ring, so the tunnel would step. Reducing it here keeps the
+/// uniform in `[0, 1)` and the shader's arithmetic at full precision indefinitely
+/// — and reducing *before* the multiply by `L`, rather than after it as the raw
+/// `log r` parameterization had to, is strictly the more precise order.
+///
+/// No `log_period` guard either: with the repeat off the shader never reaches the
+/// arm that reads this, so there is nothing to protect against.
+fn fold_zoom(zoom: f32) -> f32 {
+    if zoom.is_finite() {
+        zoom.rem_euclid(1.0)
     } else {
         DEFAULT_ZOOM
     }
@@ -435,7 +473,12 @@ fn fold_tile(tile: f32) -> f32 {
 }
 
 /// The inner cutoff the shader is handed, as a fraction of `r_max`: clamped into
-/// `[0, 1]`, with a non-finite binding falling back to no cutoff.
+/// `[0, 1]`, with a non-finite binding falling back to [`DEFAULT_INNER`].
+///
+/// Clamped, never floored: the default is 0.06 rather than 0 (Plan 0064 Phase 4),
+/// and an author who writes `kaleido_inner = "0"` gets exactly that. A default is a
+/// resting value, not a minimum — the same distinction `fold_edge` draws between
+/// clamping an out-of-range binding and falling back on a broken one.
 ///
 /// Below `inner · r_max` the repeat is *frozen* rather than skipped — the shader
 /// takes `r_eff = max(r, inner·r_max)`, which agrees with `r` at the cutoff, so the
@@ -488,8 +531,9 @@ fn edge_sample_radius(edge: f32, m: f32) -> f32 {
 /// exact arithmetic rather than pixels, and asserting them here says what is
 /// guaranteed instead of measuring what a rasterizer happened to produce:
 ///
-/// - offsetting `zoom` by exactly one period `L` is the **identity**, which is why
-///   a driven `kaleido_zoom` is an endless tunnel with no reset;
+/// - offsetting `zoom` by exactly **1** — one ring, since Plan 0064 Phase 4 made
+///   the ring the authored unit — is the **identity**, which is why a driven
+///   `kaleido_zoom` is an endless tunnel with no reset;
 /// - the map agrees at `θ` and `θ + 2π` for every **integer** winding number and
 ///   disagrees for a fractional one, which is why [`fold_spiral`] rounds.
 ///
@@ -516,7 +560,9 @@ fn repeat_sample_radius(
     // Freeze the repeat below the cutoff. `max` rather than a branch: it agrees
     // with `r` at the cutoff, so the map is continuous there.
     let r_eff = r.max(inner * r_max);
-    let lr = r_eff.max(MIN_LOG_RADIUS).ln() + zoom + shear * theta;
+    // `zoom` is in RINGS and is scaled by the period here, mirroring the shader —
+    // see `fold_zoom`. That is what makes an offset of exactly 1 the identity.
+    let lr = r_eff.max(MIN_LOG_RADIUS).ln() + zoom * log_period + shear * theta;
     let lm = r_max.ln();
     // Wrap into the canonical band (r_max/radial, r_max] — the annulus of the
     // source the whole plane is a self-similar copy of.
@@ -531,7 +577,7 @@ struct K {
                   //   w: edge treatment (ADR-0061; integral, quantized CPU-side)
     m: vec4<f32>, // ADR-0077's composed map. x: log period L (0 = repeat OFF),
                   //   y: spiral shear k (= m*L/2pi, m integral CPU-side),
-                  //   z: zoom (offset along log r, pre-wrapped into [0, L)),
+                  //   z: zoom in RINGS (scaled by L below; pre-wrapped into [0,1)),
                   //   w: tile cells across the frame (1 = OFF)
     n: vec4<f32>, // x: inner cutoff (fraction of r_max), yzw: unused
 }
@@ -639,7 +685,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // reference tunnel's bright central disc and the anti-aliasing control: a
         // map with no radial derivative cannot minify (module docs).
         let r_eff = max(r, inner * r_max);
-        let lr = log(max(r_eff, 1e-8)) + zoom + shear * a_raw;
+        // `zoom` arrives in RINGS and is scaled by the period HERE, which is what
+        // makes `kaleido_zoom = 1` exactly one ring at every `kaleido_radial`
+        // (Plan 0064 Phase 4). The CPU side pre-wraps it into [0,1), so this
+        // product stays inside one period however long a `time` binding has run.
+        let lr = log(max(r_eff, 1e-8)) + zoom * log_period + shear * a_raw;
         let lm = log(r_max);
         // PRECONDITION: `log_period > 0` selects this arm, so the divide is safe;
         // and `shear = m * log_period / 2pi` for an INTEGER m (`fold_spiral`), so
@@ -1054,7 +1104,8 @@ impl PostStage for Kaleidoscope {
         // it rather than sent raw: neither means anything without a period.
         let log_period = fold_radial(self.radial);
         let shear = spiral_shear(fold_spiral(self.spiral), log_period);
-        let zoom = fold_zoom(self.zoom, log_period);
+        // In rings; the shader scales by `log_period` (`fold_zoom`).
+        let zoom = fold_zoom(self.zoom);
         // The **render target's** ratio, not this stage's input grid's (ADR-0037).
         // The fold happens in the destination's space and the frame it samples was
         // drawn pre-squashed at this same aspect, so both the output geometry and
@@ -1388,10 +1439,19 @@ mod tests {
         assert_eq!(fold_radial(1e9), MAX_RADIAL.ln());
     }
 
-    /// **The seamless-loop property.** Offsetting `kaleido_zoom` by exactly one
-    /// log period is the identity map, at every destination coordinate — which is
-    /// what makes a driven zoom an endless tunnel with no reset and no crossfade,
-    /// rather than a loop with a hidden cut.
+    /// **The seamless-loop property.** Offsetting `kaleido_zoom` by exactly
+    /// **1.0** is the identity map, at every destination coordinate and at every
+    /// ring ratio — which is what makes a driven zoom an endless tunnel with no
+    /// reset and no crossfade, rather than a loop with a hidden cut.
+    ///
+    /// The identity offset was `L = ln(kaleido_radial)` when Phase 1 landed this,
+    /// because the parameter was a raw `log r` offset. Plan 0064 Phase 4 made the
+    /// **ring** the authored unit, and the assertion got strictly stronger for it:
+    /// `1.0` is a constant rather than a function of the ratio, so the loop closes
+    /// at the *same* authored number however the ratio is re-tuned — which is the
+    /// property an author binding `"bar_phase * 1.0"` is actually relying on. A
+    /// regression that reintroduced the raw-`log r` parameterization would fail
+    /// here at every ratio except the one where `ln(ratio)` happens to be 1.
     #[test]
     fn a_zoom_offset_of_one_period_is_the_identity_map() {
         for ratio in [1.15f32, 1.3, 2.0, 3.5] {
@@ -1403,17 +1463,30 @@ mod tests {
                     // property is of the whole map and not of a stripped one.
                     let shear = spiral_shear(2.0, l);
                     let base = repeat_sample_radius(r, R_MAX, l, shear, 0.0, 0.05, theta);
-                    let shifted = repeat_sample_radius(r, R_MAX, l, shear, l, 0.05, theta);
+                    let shifted = repeat_sample_radius(r, R_MAX, l, shear, 1.0, 0.05, theta);
                     assert_close(
                         base,
                         shifted,
                         &format!(
-                            "ratio {ratio}, r {r}, theta {theta}: zoom + L is not the identity"
+                            "ratio {ratio}, r {r}, theta {theta}: zoom + 1 ring is not the identity"
                         ),
                     );
                 }
             }
         }
+
+        // Non-vacuity, and the guard against the offset being ignored outright: a
+        // HALF ring must move the map. Checked at a radius the inner cutoff does
+        // not freeze, and away from the exact powers of the ratio where the
+        // self-similarity maps a shifted radius back onto itself.
+        let l = fold_radial(2.0);
+        let base = repeat_sample_radius(0.3, R_MAX, l, 0.0, 0.0, 0.05, 0.4);
+        let half = repeat_sample_radius(0.3, R_MAX, l, 0.0, 0.5, 0.05, 0.4);
+        assert!(
+            (base / half - 1.0).abs() > 0.05,
+            "half a ring left the map unchanged ({base} vs {half}) — the zoom term \
+             is not reaching the map at all"
+        );
     }
 
     /// **The seam condition, and the reason [`fold_spiral`] rounds.** Across
@@ -1583,25 +1656,29 @@ mod tests {
         );
     }
 
-    /// `kaleido_zoom` reaches the shader reduced into one period, and the
-    /// reduction is exact enough to be invisible: it is precision hygiene for a
-    /// `time`-driven binding, not a change to the map.
+    /// `kaleido_zoom` reaches the shader reduced into **one ring** — `[0, 1)` —
+    /// and the reduction is exact enough to be invisible: it is precision hygiene
+    /// for a `time`-driven binding, not a change to the map.
+    ///
+    /// The unit is what changed at Plan 0064 Phase 4, and the reduction got
+    /// cheaper for it: reducing in rings happens *before* the multiply by `L`, so
+    /// the truncation is against a period of exactly 1 rather than against
+    /// whatever `ln(ratio)` came out to.
     #[test]
-    fn the_zoom_offset_is_reduced_into_one_period() {
+    fn the_zoom_offset_is_reduced_into_one_ring() {
         let l = fold_radial(1.3);
         for raw in [0.0f32, 0.1, 1.0, 7.5, 1000.0, -3.25] {
-            let z = fold_zoom(raw, l);
+            let z = fold_zoom(raw);
             assert!(
-                (0.0..l).contains(&z),
-                "fold_zoom({raw}) = {z} is outside [0, {l})"
+                (0.0..1.0).contains(&z),
+                "fold_zoom({raw}) = {z} is outside [0, 1)"
             );
-            // Same map, whatever multiple of the period was handed in. The
+            // Same map, whatever whole number of rings was handed in. The
             // tolerance is looser than [`MAP_REL_TOL`] on purpose and in the
             // direction the reduction exists to fix: at raw = 1000 an f32's ulp is
-            // 6e-5, a quarter of a per-mille of the 0.262 period, so the
-            // *unreduced* side is the imprecise one. That drift is the whole
-            // argument for reducing, and asserting it away would delete the
-            // motive.
+            // 6e-5, a fifteenth of a per-mille of a ring, so the *unreduced* side
+            // is the imprecise one. That drift is the whole argument for reducing,
+            // and asserting it away would delete the motive.
             assert_close_tol(
                 repeat_sample_radius(0.2, R_MAX, l, 0.0, raw, 0.0, 0.3),
                 repeat_sample_radius(0.2, R_MAX, l, 0.0, z, 0.0, 0.3),
@@ -1609,10 +1686,14 @@ mod tests {
                 &format!("reducing zoom {raw} changed the map"),
             );
         }
-        // With the repeat off there is no period to reduce into, and no map to
-        // offset either.
-        assert_eq!(fold_zoom(4.0, 0.0), DEFAULT_ZOOM);
-        assert_eq!(fold_zoom(f32::NAN, l), DEFAULT_ZOOM);
+        // The reduction does not consult the ring ratio at all — the shader owns
+        // the multiply — so a whole number of rings reduces to nothing whatever
+        // the repeat is set to, which is exactly what makes 1.0 the identity
+        // offset at every ratio.
+        assert_eq!(fold_zoom(3.0), 0.0);
+        assert_eq!(fold_zoom(-2.0), 0.0);
+        assert_eq!(fold_zoom(f32::NAN), DEFAULT_ZOOM);
+        assert_eq!(fold_zoom(f32::INFINITY), DEFAULT_ZOOM);
     }
 
     /// The wallpaper tile is off at one cell and capped above, and — unlike the
@@ -1630,13 +1711,37 @@ mod tests {
     }
 
     /// The inner cutoff is a fraction of `r_max`, clamped, with a broken binding
-    /// meaning no cutoff.
+    /// falling back to the **default** — which since Plan 0064 Phase 4 is 0.06 and
+    /// not the identity, so "clamped" and "defaulted" are two different answers
+    /// here the way they already are for `kaleido_edge`.
     #[test]
     fn fold_inner_is_a_clamped_fraction_of_r_max() {
-        assert_eq!(fold_inner(0.0), DEFAULT_INNER);
+        // An explicit 0 is honoured exactly: the default is a resting value, not a
+        // floor. A preset that wants the repeat running to the fold axis says so
+        // and gets it.
+        assert_eq!(fold_inner(0.0), 0.0);
         assert_eq!(fold_inner(0.35), 0.35);
         assert_eq!(fold_inner(-1.0), 0.0);
         assert_eq!(fold_inner(4.0), MAX_INNER);
         assert_eq!(fold_inner(f32::NAN), DEFAULT_INNER);
+        assert_eq!(fold_inner(f32::INFINITY), DEFAULT_INNER);
+
+        // ...and the default is the non-identity Phase 4 chose. Asserted rather
+        // than assumed, because every other term on this stage rests at its
+        // identity and a future tidy-up would "fix" this one by reflex. A `const`
+        // block, so it fails at compile time rather than at run time — the claim is
+        // about a constant and nothing at run time can change the answer.
+        const {
+            assert!(
+                DEFAULT_INNER > 0.0,
+                "kaleido_inner's default is back at the identity — that is the one \
+                 setting the repeat is guaranteed to alias at (module docs)"
+            );
+        }
+        assert_ne!(
+            fold_inner(0.0),
+            DEFAULT_INNER,
+            "clamping and the non-finite fallback must stay distinguishable"
+        );
     }
 }

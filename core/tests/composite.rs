@@ -107,11 +107,21 @@ const MAX_OUTLIER: u8 = 48;
 /// the identity, which is exactly what makes that baseline byte-identical across
 /// this change and exactly what makes it blind to it.
 ///
+/// `composite_symmetry` (Plan 0064 Phase 5, ADR-0077 + ADR-0078) is the **third**
+/// on the kaleidoscope, and it is not a third opinion about the fold. The stage
+/// grew five coordinate terms and the palette grew two, and **neither existing
+/// fixture binds one of them** — `composite_kaleido` binds `kaleido_order` and
+/// `kaleido_angle`, `composite_kaleido_squash` adds `kaleido_edge`, and every other
+/// baseline in the suite leaves the whole radial group at its identity. So the log
+/// wrap, the spiral's branch-cut closure, the inner freeze and the zoom's scaling
+/// by the period could all have been broken with the suite green. Its own header
+/// carries the rest, including why every bound value is off its default.
+///
 /// **Appended, never inserted**, for the reason `golden.rs`'s `EXTRA_FIXTURES`
 /// records: every pre-existing baseline is then rendered from the device state it
 /// always was, which matters on WARP where building GPU resources mid-run changes
 /// what a later capture resolves to.
-const FIXTURES: [(&str, &str); 6] = [
+const FIXTURES: [(&str, &str); 7] = [
     (
         "composite_trails",
         include_str!("fixtures/composite_trails.toml"),
@@ -135,6 +145,10 @@ const FIXTURES: [(&str, &str); 6] = [
     (
         "composite_bloom_exposed",
         include_str!("fixtures/composite_bloom_exposed.toml"),
+    ),
+    (
+        "composite_symmetry",
+        include_str!("fixtures/composite_symmetry.toml"),
     ),
 ];
 
