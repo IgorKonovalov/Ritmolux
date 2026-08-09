@@ -5,11 +5,20 @@
 //! test is the shared scene clock, not an audio edge.
 //!
 //! Software adapter so it holds on any CI GPU.
+//!
+//! The resolution ladder at the bottom of this file (Plan 0067 Phase 1d) is a
+//! **measurement, not a gate** — it is `#[ignore]`d and records why [`SIZE`] and
+//! [`ANIM_FLOOR`] did not move.
 
 use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::{SystemKind, default_presets};
+use lmv_core::preset::{Preset, SystemKind, default_presets};
 use lmv_core::render::{HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
 
+/// Capture size for the gate.
+///
+/// **Measured against the two designs it penalizes at Plan 0067 Phase 1d and
+/// deliberately left alone** — see [`the_resolution_ladder_against_the_two_designs_it_penalizes`]
+/// for the ladder and the numbers.
 const SIZE: u32 = 96;
 /// The earlier and later capture points (frames). The ~0.4 s gap at the fixed
 /// 60 fps `SCENE_DT` is ample for any live scene to move visibly.
@@ -17,6 +26,14 @@ const FRAME_A: u32 = 24;
 const FRAME_B: u32 = 48;
 /// Minimum motion (mean-abs RGB, 0..1) between the two frames. Catches a
 /// *frozen* scene, not a subtly-animated one.
+///
+/// **Not moved by Plan 0067 Phase 1d, on that phase's own measurement.** The
+/// ladder below drove the sparse draft this floor rejected, the symmetric design
+/// it is documented to penalize, and a genuinely static control through 96 /
+/// 192 / 384, and resolution does not separate them: see that test's doc comment
+/// for the table. Raising the resolution would cost the whole shipped-set sweep
+/// 4x or 16x the pixels and buy no separation, so the constant stays and the
+/// negative result is recorded rather than a threshold forced.
 const ANIM_FLOOR: f32 = 0.01;
 
 fn system_name(system: SystemKind) -> &'static str {
@@ -33,13 +50,13 @@ fn system_name(system: SystemKind) -> &'static str {
     }
 }
 
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-/// Any other build error still panics loudly.
-fn headless() -> Option<Renderer> {
+/// Build a headless `Renderer` at `size`, or `None` (a logged skip) when the
+/// runner exposes no GPU adapter — macOS has no software Metal fallback
+/// (ADR-0016). Any other build error still panics loudly.
+fn headless_at(size: u32) -> Option<Renderer> {
     match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
+        width: size,
+        height: size,
         prefer_software: true,
     }) {
         Ok(r) => Some(r),
@@ -51,22 +68,28 @@ fn headless() -> Option<Renderer> {
     }
 }
 
+/// The statistic the gate is: whole-frame difference between the two capture
+/// points, at silent audio.
+fn motion(renderer: &mut Renderer, name: &str) -> f32 {
+    let audio = AnalysisFrame::default();
+    let early = renderer
+        .capture_preset(name, &audio, FRAME_A)
+        .expect("capture early frame");
+    let late = renderer
+        .capture_preset(name, &audio, FRAME_B)
+        .expect("capture late frame");
+    frame_diff(&early, &late)
+}
+
 #[test]
 fn every_preset_animates_over_time() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = headless_at(SIZE) else {
         return;
     };
-    let audio = AnalysisFrame::default();
 
     let mut failures = Vec::new();
     for preset in default_presets() {
-        let early = renderer
-            .capture_preset(&preset.name, &audio, FRAME_A)
-            .expect("capture early frame");
-        let late = renderer
-            .capture_preset(&preset.name, &audio, FRAME_B)
-            .expect("capture late frame");
-        let motion = frame_diff(&early, &late);
+        let motion = motion(&mut renderer, &preset.name);
         println!(
             "[{}] {:<12} frame {FRAME_A} vs {FRAME_B}: {motion:.4}",
             system_name(preset.system),
@@ -80,5 +103,249 @@ fn every_preset_animates_over_time() {
     assert!(
         failures.is_empty(),
         "these presets do not animate above {ANIM_FLOOR}: {failures:#?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The resolution ladder (Plan 0067 Phase 1d) — a measurement, not a gate
+// ---------------------------------------------------------------------------
+
+/// Rungs of the ladder. 384 is 16x the pixels of 96, which is why this is not
+/// something the shipped-set sweep above can afford to run at.
+const LADDER: [u32; 3] = [96, 192, 384];
+
+const SQUALL_SRC: &str = include_str!("../../presets/emitter_squall.toml");
+const ROSETTE_SRC: &str = include_str!("../../presets/star_rosette.toml");
+
+/// A 12-fold Hankin rosette whose **only** motion is rotation — design-backlog
+/// 0009's symmetric case, isolated. `star_rosette` as shipped works around the
+/// problem by sweeping `draw_progress` radially and breathing `scale`; this
+/// probe removes the workaround so what is measured is the rotation alone.
+const STAR_SPIN: &str = r#"
+system = "star_pattern"
+name   = "probe_star_spin"
+
+[generator]
+tiling            = "12"
+contact_angle_deg = 20
+
+[params]
+variant       = "1"
+rotation      = "0.80 * time"
+hue           = "0.5"
+draw_progress = "1"
+thickness     = "1.7"
+scale         = "0.58"
+brightness    = "0.9"
+"#;
+
+/// The static control: [`STAR_SPIN`] with the rotation taken out, so nothing in
+/// it reads `time` or any band. It must keep failing the floor at every rung —
+/// a resolution that lets *this* through would have made the gate worthless.
+const STAR_FROZEN: &str = r#"
+system = "star_pattern"
+name   = "probe_star_frozen"
+
+[generator]
+tiling            = "12"
+contact_angle_deg = 20
+
+[params]
+variant       = "1"
+rotation      = "0"
+hue           = "0.5"
+draw_progress = "1"
+thickness     = "1.7"
+scale         = "0.58"
+brightness    = "0.9"
+"#;
+
+/// The `key = "<expr>"` line of a preset source, split into (line, expr).
+/// Panics when the key is absent, so a rename upstream fails this probe loudly
+/// instead of silently measuring the shipped preset twice.
+fn param_line<'a>(src: &'a str, key: &str) -> (&'a str, &'a str) {
+    let line = src
+        .lines()
+        .find(|l| {
+            l.trim_start()
+                .strip_prefix(key)
+                .is_some_and(|rest| matches!(rest.trim_start().chars().next(), Some('=')))
+        })
+        .unwrap_or_else(|| panic!("`{key}` is not a param of this preset source"));
+    let expr = line
+        .split_once('=')
+        .map(|(_, rest)| rest.trim().trim_matches('"'))
+        .unwrap_or_else(|| panic!("`{key}` has no value"));
+    (line, expr)
+}
+
+/// Rewrite one `key = "..."` line's value, keeping the rest of the file byte for
+/// byte. The probes are built out of the shipped sources this way so they cannot
+/// drift into being a different preset than the one 0009 is about.
+fn with_param(src: &str, key: &str, value: &str) -> String {
+    let (line, _) = param_line(src, key);
+    src.replace(line, &format!("{key} = \"{value}\""))
+}
+
+/// The five probes, as `(label, note, source)`.
+fn probes() -> Vec<(&'static str, &'static str, String)> {
+    let (_, spawn) = param_line(SQUALL_SRC, "spawn_rate");
+    let sparse = with_param(
+        &with_param(SQUALL_SRC, "spawn_rate", &format!("({spawn}) * 0.2")),
+        "name",
+        "probe_squall_sparse",
+    );
+    let squall = with_param(SQUALL_SRC, "name", "probe_squall_shipped");
+    let rosette = with_param(ROSETTE_SRC, "name", "probe_rosette_shipped");
+    vec![
+        (
+            "squall_shipped",
+            "the density that clears the floor",
+            squall,
+        ),
+        (
+            "squall_sparse",
+            "THE REJECTED DRAFT — spawn_rate at a fifth",
+            sparse,
+        ),
+        (
+            "rosette_shipped",
+            "the symmetric design, with its radial workaround",
+            rosette,
+        ),
+        (
+            "rosette_spin_only",
+            "THE SYMMETRIC CASE — rotation is the only motion",
+            STAR_SPIN.to_string(),
+        ),
+        (
+            "star_frozen",
+            "STATIC CONTROL — must fail at every rung",
+            STAR_FROZEN.to_string(),
+        ),
+    ]
+}
+
+/// **The Plan 0067 Phase 1d measurement, and its answer: resolution does not
+/// separate a sparse-but-moving frame from a static one.** `#[ignore]`d because
+/// it is an instrument rather than a gate — the 384 rung alone is 16x the pixels
+/// of the sweep above. Run it with:
+///
+/// ```bash
+/// cargo nextest run -p lmv-core --test animation --run-ignored all --no-capture
+/// ```
+///
+/// Measured 2026-08-09, DX12 software adapter (`frame_diff`, frames 24 vs 48,
+/// silent audio; `ANIM_FLOOR` is 0.01). Whole run: **7.6 s**.
+///
+/// ```text
+/// probe                    96      192      384   change over 16x the pixels
+/// squall_shipped       0.0187   0.0187   0.0188   +0.0001
+/// squall_sparse        0.0051   0.0051   0.0049   -0.0002   THE REJECTED DRAFT
+/// rosette_shipped      0.0218   0.0212   0.0208   -0.0010
+/// rosette_spin_only    0.0103   0.0100   0.0103    0.0000   THE SYMMETRIC CASE
+/// star_frozen          0.0000   0.0000   0.0000    0.0000   STATIC CONTROL
+/// ```
+///
+/// **Every row is flat.** Across a 16x change in pixel count no probe moves by
+/// more than 0.001, and none crosses the floor. The two rows the phase exists
+/// for — the rejected sparse draft at 0.005 and the isolated symmetric case at
+/// 0.010 — sit exactly where they sat at 96. Resolution is not the lever.
+///
+/// **Half of that was settled before a pixel was rendered.** A figure invariant
+/// under rotation by `2*pi/k` renders an identical image under that rotation, so
+/// its whole-frame difference is zero at *every* resolution and no ladder could
+/// rescue it. `rosette_spin_only` is the empirical half: a 12-fold rosette turns
+/// ~18 degrees between the two capture points, which is not a symmetry of the
+/// figure, so it does not read zero — it reads 0.0103, clearing the floor by
+/// 3 % where the shipped `star_rosette` clears it by 118 %. The penalty
+/// design-backlog 0009 describes is real and it is roughly a halving; what it is
+/// not is a sampling artifact.
+///
+/// **The sparse case was the one plausibly resolution-bound, and it is not.**
+/// The hypothesis was that a mark smaller than a pixel at 96x96 is lost rather
+/// than area-averaged, so rendering larger would recover its motion. Squall's
+/// rejected draft reads 0.0051 at 96 and 0.0049 at 384 — very slightly *worse*,
+/// which is the mechanism showing through: `frame_diff` is a **mean over the
+/// frame**, so the marks and the dark they are averaged against grow together.
+/// Both of 0009's designs fail for the same reason and it is not resolution — a
+/// mean-over-the-frame statistic scores **occupancy**, and occupancy is
+/// scale-invariant.
+///
+/// **So neither [`SIZE`] nor [`ANIM_FLOOR`] moves, and the CI cost of that choice
+/// is zero.** 192 would have cost the whole-library sweep 4x the pixels and 384
+/// 16x, for a reading that changes in the third decimal place.
+///
+/// **One thing the table shows that is deliberately not acted on.** The sparse
+/// draft (0.0051) and the static control (0.0000) *are* separated, so a floor
+/// near 0.004 would pass the draft and still convict the control. That is not a
+/// finding this phase may spend: the control here is a *perfectly* frozen figure
+/// and a real near-frozen preset lands somewhere between the two, so the gap is
+/// an upper bound on the headroom rather than the headroom. 0009 says the same
+/// thing in its own words — "a floor that a genuinely static preset can clear is
+/// worth nothing" — and lowering it on one synthetic control would be exactly
+/// the blind give-away it warns against.
+///
+/// Per the phase, this is a **successful negative result**: it forecloses the
+/// cheap fix and leaves standing 0009's real successor — a coverage-aware
+/// statistic that normalizes motion by the **lit area** rather than by the frame.
+/// That was explicitly out of this plan's scope; this table is the evidence that
+/// it is now the only remaining option.
+///
+/// **Being `#[ignore]`d has a cost worth naming:** the two probes rebuilt from
+/// shipped sources go through [`param_line`], which panics if `spawn_rate` or
+/// `name` is renamed — and a panic in an ignored test is silent. If this is run
+/// after a preset edit and it panics, the probe needs updating, not the preset.
+#[test]
+#[ignore = "measurement, not a gate: the 384 rung is 16x the pixels of the sweep"]
+fn the_resolution_ladder_against_the_two_designs_it_penalizes() {
+    let probes = probes();
+    let mut rows: Vec<(&str, &str, Vec<f32>)> = probes
+        .iter()
+        .map(|(label, note, _)| (*label, *note, Vec::new()))
+        .collect();
+
+    for size in LADDER {
+        let Some(mut renderer) = headless_at(size) else {
+            return;
+        };
+        let presets: Vec<Preset> = probes
+            .iter()
+            .map(|(label, _, src)| {
+                Preset::from_toml_str(src).unwrap_or_else(|e| panic!("probe `{label}` parses: {e}"))
+            })
+            .collect();
+        let names: Vec<String> = presets.iter().map(|p| p.name.clone()).collect();
+        renderer.set_presets(presets);
+        for (row, name) in rows.iter_mut().zip(names.iter()) {
+            row.2.push(motion(&mut renderer, name));
+        }
+    }
+
+    print!("\n{:<20}", "probe");
+    for size in LADDER {
+        print!("{size:>9}");
+    }
+    println!("   note");
+    for (label, note, values) in &rows {
+        print!("{label:<20}");
+        for v in values {
+            print!("{v:>9.4}");
+        }
+        println!("   {note}");
+    }
+    println!("\n(ANIM_FLOOR = {ANIM_FLOOR})");
+
+    // The one thing this measurement must not be allowed to be quietly wrong
+    // about: if the static control ever animates, every row above is noise.
+    let frozen = rows
+        .iter()
+        .find(|(label, _, _)| *label == "star_frozen")
+        .map(|(_, _, v)| v.clone())
+        .unwrap_or_default();
+    assert!(
+        frozen.iter().all(|&v| v < ANIM_FLOOR),
+        "the static control animates at some rung — the ladder is measuring \
+         something other than motion: {frozen:?}"
     );
 }
