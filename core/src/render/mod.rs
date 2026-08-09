@@ -1293,6 +1293,12 @@ impl Renderer {
         // given, until `promote_incoming_side` makes the incoming one *the* side.
         let live = incoming_side.as_mut().unwrap_or(side);
         live.background.set_palette(&baked);
+        // The `[feedback]` table (ADR-0048), to the same side and for the same
+        // reason: it is this preset's structural choice, and the outgoing side
+        // keeps the one it is still painting with. Handed over unconditionally —
+        // a preset with no table hands the default, which is what stops the
+        // previous preset's warp surviving a switch.
+        live.chain.set_feedback(preset.feedback);
         // Structural config (ADR-0007), if any: capture segment-cap truncation so
         // the frontend can surface it (never a silent cut). `None` for the
         // fit/no-config case.

@@ -1088,6 +1088,52 @@ pixel: that would compound into a permanent bar of colour along the border. So a
 `fb_zoom < 1` reads as the picture receding into empty space, which is the depth cue
 you want; if you want something *in* that space, put it in `bg_*`.
 
+### The `[feedback]` table — the warp family and the deposit blend
+
+Two **structural** choices about the same accumulation, in a table rather than as
+params because each selects a code path rather than a quantity — `[curve] family`'s
+rule (and see [Structural config](#structural-config-line-systems-and-the-attractor)
+for the others). An unknown value is a **load error**: the preset is rejected with a
+message naming what was expected, rather than quietly rendering the default.
+
+```toml
+[feedback]
+warp  = "swirl"   # none (default) | swirl | ripple | fisheye
+blend = "add"     # max (default)  | add
+```
+
+**`warp` picks a curated procedural distortion** that rides on top of the `fb_*`
+affine, about the same `fb_center_*`. Its *strength* is the bindable **`fb_warp`**
+(default `0`, so a selected warp does nothing until you drive it) — and, like every
+other rate here, it is **per second**.
+
+| `warp` | what it does to the past | `fb_warp` reads as |
+|---|---|---|
+| `none` | nothing — the affine alone | inert |
+| `swirl` | a vortex: rotates about the centre, strongest in the middle and faded by the rim | rad/s at the centre |
+| `ripple` | concentric standing waves in radius — the past breathes in rings | frame-heights/s of radial push |
+| `fisheye` | a radial magnification growing with radius | positive draws the periphery in, negative pushes it out |
+
+`swirl` and `fb_rotate` are not the same gesture: `fb_rotate` turns the whole frame
+rigidly, `swirl` turns the middle faster than the edge, which is what makes a
+vortex rather than a spin.
+
+**`blend` picks how this frame's light lands on the faded past.**
+
+- `max` (default) — `max(current, past * trails)`. A bright head with a fading
+  tail; the accumulation can never exceed the brightest thing in it. This is what
+  the stage did before the choice existed.
+- `add` — `current + past * trails`. Overlapping echoes **sum**, so a figure
+  crossing its own tail lights up where they meet. Bounded, despite appearances:
+  the series converges to `1 / (1 - trails)`, i.e. at most 50x at the `0.98`
+  ceiling, and the extra rolls off through the tonemap instead of clipping —
+  which only works because the composite runs in linear light (see
+  [Linear light and `exposure`](#linear-light-and-exposure-plan-0045)).
+
+`add` wants a *dimmer* preset than `max`: with `trails = 0.95` a figure is already
+20x its own brightness once the tail settles. Start by dropping `brightness` (or
+`exposure`) by roughly `1 - trails` and tune up from there.
+
 ### Screen-space kaleidoscope — `kaleido_order`, `kaleido_angle`, `kaleido_center_x`, `kaleido_center_y`, `kaleido_edge`
 
 Folds the finished frame into `kaleido_order` mirrored wedges before present.

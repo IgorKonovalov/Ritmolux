@@ -1214,6 +1214,9 @@ fn declared_params_match_set_param() {
                 "fb_dy",
                 "fb_center_x",
                 "fb_center_y",
+                // The strength of whichever `[feedback] warp` the preset selected;
+                // the kind itself is structural and never a param.
+                "fb_warp",
             ],
         ),
         (
@@ -1435,6 +1438,68 @@ fn bad_presets_are_rejected() {
     assert!(
         Preset::from_toml_str("system = \"lsystem\"").is_err(),
         "an lsystem with no [generator] table must be rejected"
+    );
+}
+
+/// The `[feedback]` table (ADR-0048) is two **closed rosters**, validated at the
+/// load boundary: an unknown warp kind or blend mode rejects the preset with a
+/// message naming what was expected.
+///
+/// A load error rather than an ADR-0020 warning, and the difference is the point.
+/// An unknown *param* name is a warning because one typo must not discard an
+/// otherwise-good preset, and the binding it names simply reaches nobody. A
+/// structural key selects a **code path**: falling back to the default here would
+/// render a look the author never asked for, with nothing on screen to say so.
+#[test]
+fn the_feedback_table_parses_its_rosters_and_rejects_anything_else() {
+    use lmv_core::render::feedback::{Deposit, Warp};
+
+    // Absent table: both defaults, i.e. the identity in both fields.
+    let bare = Preset::from_toml_str("system = \"swarm\"").expect("valid");
+    assert_eq!(bare.feedback.warp, Warp::None);
+    assert_eq!(bare.feedback.blend, Deposit::Max);
+
+    // Every kind in the roster round-trips through its declared name.
+    for kind in Warp::ALL {
+        let src = format!(
+            "system = \"swarm\"\n[feedback]\nwarp = \"{}\"\n",
+            kind.as_str()
+        );
+        let preset = Preset::from_toml_str(&src)
+            .unwrap_or_else(|e| panic!("warp '{}' must parse: {e}", kind.as_str()));
+        assert_eq!(preset.feedback.warp, kind);
+        assert_eq!(
+            preset.feedback.blend,
+            Deposit::Max,
+            "a table naming only `warp` still defaults its blend"
+        );
+    }
+
+    // Both blends, likewise.
+    for (name, want) in [("max", Deposit::Max), ("add", Deposit::Add)] {
+        let src = format!("system = \"swarm\"\n[feedback]\nblend = \"{name}\"\n");
+        let preset = Preset::from_toml_str(&src)
+            .unwrap_or_else(|e| panic!("blend '{name}' must parse: {e}"));
+        assert_eq!(preset.feedback.blend, want);
+        assert_eq!(preset.feedback.warp, Warp::None);
+    }
+
+    // An unknown value is a surfaced load error, and the message says what was
+    // expected — the author has to be able to find the roster from the failure.
+    let bad_warp = Preset::from_toml_str("system = \"swarm\"\n[feedback]\nwarp = \"vortex\"\n")
+        .expect_err("an unknown warp kind must be rejected");
+    let text = bad_warp.to_string();
+    assert!(
+        text.contains("vortex") && text.contains("swirl"),
+        "the rejection must name the bad value and the roster, got: {text}"
+    );
+
+    let bad_blend = Preset::from_toml_str("system = \"swarm\"\n[feedback]\nblend = \"screen\"\n")
+        .expect_err("an unknown blend must be rejected");
+    let text = bad_blend.to_string();
+    assert!(
+        text.contains("screen") && text.contains("add"),
+        "the rejection must name the bad value and the roster, got: {text}"
     );
 }
 

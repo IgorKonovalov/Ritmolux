@@ -13,6 +13,7 @@ use std::fmt;
 use serde::Deserialize;
 
 use super::expr::{self, Expr, ExprError};
+use crate::render::feedback::{Deposit, FeedbackConfig, Warp};
 use crate::render::palette::{NamedPalette, PaletteConfig};
 use crate::render::scenes::lines::star::{DEFAULT_RING_SCALE, MAX_RING_COUNT, Motif, RingSpec};
 use crate::render::scenes::lines::{
@@ -317,6 +318,16 @@ pub struct Preset {
     /// renderer bakes it into a LUT and hands it to the active scene via
     /// `Scene::set_palette` on each preset switch.
     pub palette: Option<PaletteConfig>,
+    /// The `[feedback]` structural table (ADR-0048): which curated warp the
+    /// accumulation buffers resample their past through, and how this frame's
+    /// light is deposited onto it.
+    ///
+    /// Not an `Option`: the absent table and the all-defaults table mean the same
+    /// thing, and a plain value is what lets the renderer hand it over on **every**
+    /// preset switch — so the outgoing preset's warp can never survive into the
+    /// incoming one. Load-time by `[curve] family`'s reasoning; the strength that
+    /// rides on it is the bindable `fb_warp`.
+    pub feedback: FeedbackConfig,
     /// Optional **second** palette (ADR-0021 / Plan 0020 Phase 4), from a
     /// `[palette_b]` table. When present, the renderer bakes an A/B pair and a
     /// bindable `palette_mix` param crossfades between them per frame. `None`
@@ -436,6 +447,11 @@ impl Preset {
             raw.spectrum,
         )?;
 
+        // The `[feedback]` table (ADR-0048): two closed rosters, validated here so
+        // an unknown warp or blend is a surfaced load error rather than a preset
+        // that quietly renders unwarped. Absent means both defaults.
+        let feedback = raw.feedback.unwrap_or_default().into_config()?;
+
         // Easing time constants (ADR-0019, ADR-0035): validated non-negative +
         // finite at the load boundary, then trusted by the render-layer smoother.
         // A bad value is a surfaced load error, never a panic. Both sides of an
@@ -501,6 +517,7 @@ impl Preset {
             system,
             params,
             config,
+            feedback,
             palette,
             palette_b,
             salt,
@@ -621,6 +638,10 @@ struct RawPreset {
     /// count, layout and per-element easing of the spectrum readout.
     #[serde(default)]
     spectrum: Option<RawSpectrum>,
+    /// The optional `[feedback]` structural-config table (ADR-0048): the warp
+    /// kind and deposit blend both accumulation buffers read their past through.
+    #[serde(default)]
+    feedback: Option<RawFeedback>,
     /// The optional `[smoothing]` table (ADR-0019, ADR-0035): per-parameter
     /// easing time constants in seconds, each a scalar or an
     /// `{ attack, release }` pair. Absent means every param is applied instantly.
@@ -639,6 +660,55 @@ struct RawPreset {
     /// every clamp in this preset is held to it.
     #[serde(default)]
     occupancy: Option<RawOccupancy>,
+}
+
+/// The `[feedback]` table, before validation (ADR-0048).
+///
+/// Both keys are optional and both default to the identity, so `[feedback]` with
+/// only one of them set is a perfectly good table.
+#[derive(Debug, Default, Deserialize)]
+struct RawFeedback {
+    /// `none` | `swirl` | `ripple` | `fisheye`.
+    #[serde(default)]
+    warp: Option<String>,
+    /// `max` | `add`.
+    #[serde(default)]
+    blend: Option<String>,
+}
+
+impl RawFeedback {
+    /// Validate the two closed rosters. An unknown value **rejects the preset**
+    /// rather than warning: unlike an unknown *param* name — which ADR-0020 keeps
+    /// as a warning so one typo cannot discard a good preset — a structural key
+    /// selects a code path, and silently taking the default here would render a
+    /// look the author never asked for with nothing on screen to say so. That is
+    /// `[curve] family`'s rule, applied to `[curve] family`'s kind of key.
+    fn into_config(self) -> Result<FeedbackConfig, PresetError> {
+        let warp = match self.warp.as_deref() {
+            None => Warp::default(),
+            Some(name) => Warp::from_name(name).ok_or_else(|| {
+                PresetError::Config(format!(
+                    "unknown [feedback] warp '{name}' (expected one of: {})",
+                    Warp::ALL
+                        .iter()
+                        .map(|w| w.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ))
+            })?,
+        };
+        let blend = match self.blend.as_deref() {
+            None => Deposit::default(),
+            Some("max") => Deposit::Max,
+            Some("add") => Deposit::Add,
+            Some(name) => {
+                return Err(PresetError::Config(format!(
+                    "unknown [feedback] blend '{name}' (expected one of: max, add)"
+                )));
+            }
+        };
+        Ok(FeedbackConfig { warp, blend })
+    }
 }
 
 /// The `[occupancy]` table, before validation.

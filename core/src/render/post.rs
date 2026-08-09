@@ -237,6 +237,15 @@ pub(crate) trait PostStage {
     /// rather than remembers to ignore it.
     fn set_dt(&mut self, _dt: f32) {}
 
+    /// Take the active preset's `[feedback]` structural table (ADR-0048).
+    ///
+    /// **Once at preset load, off the hot path** — the composite's counterpart of
+    /// [`Scene::configure`](super::scenes::Scene::configure), and load-time for the
+    /// same reason: a warp kind and a deposit blend are shader paths, not scalars,
+    /// and ADR-0021 already rejected bindable discrete indexes. Only the trails
+    /// stage reads it. Defaulted to a no-op.
+    fn set_feedback(&mut self, _cfg: super::feedback::FeedbackConfig) {}
+
     /// Whether this stage runs this frame. `false` skips it entirely — the
     /// passthrough that keeps an unbound preset paying nothing.
     fn active(&self) -> bool;
@@ -601,6 +610,19 @@ impl PostChain {
     pub(crate) fn set_dt(&mut self, dt: f32) {
         for stage in self.stages.iter_mut() {
             stage.set_dt(dt);
+        }
+    }
+
+    /// Hand every stage the active preset's `[feedback]` table (see
+    /// [`PostStage::set_feedback`]). Only the trails stage reads it.
+    ///
+    /// Called from the renderer's preset-switch path beside `Scene::configure` and
+    /// `Scene::set_palette`, and **unconditionally** — a preset that declares no
+    /// `[feedback]` table hands over the default, which is what stops the previous
+    /// preset's warp from surviving a switch.
+    pub(crate) fn set_feedback(&mut self, cfg: super::feedback::FeedbackConfig) {
+        for stage in self.stages.iter_mut() {
+            stage.set_feedback(cfg);
         }
     }
 
