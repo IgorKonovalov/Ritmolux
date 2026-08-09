@@ -181,8 +181,7 @@ pub(crate) const ADDITIVE_LIGHT_SATURATING_COVERAGE: wgpu::BlendState = wgpu::Bl
 /// `bind_layouts` is a slice because the fragment field splits its uniforms and
 /// its palette LUT across **two** groups — deliberately, to keep its pipeline
 /// layout structurally distinct from the kaleidoscope's and dodge a DX12 WARP
-/// identical-layout mis-render (ADR-0021 / Plan 0020). Every other caller passes
-/// one.
+/// identical-layout mis-render (ADR-0058). Every other caller passes one.
 pub(crate) fn fullscreen_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,

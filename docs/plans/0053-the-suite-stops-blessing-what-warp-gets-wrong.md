@@ -1,6 +1,6 @@
 # 0053 — The suite stops blessing what WARP gets wrong, and two guards start biting
 
-> **Status:** **approved 2026-08-02** — ready for `dev`. Four phases; Phase 3 is `human` and gates
+> **Status:** **in-progress 2026-08-09** — four phases; Phase 3 is `human` and gates
 > Phase 4's allowlist entries.
 > **Premise correction, 2026-08-04 (at Plan [0060](done/0060-a-test-number-states-a-property-or-names-its-machine.md)'s
 > close): this plan is not blocked, and Phase 3 may be much cheaper than written.** The header said

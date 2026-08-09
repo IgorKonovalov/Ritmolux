@@ -105,6 +105,35 @@ three line-scene PNGs it rewrote (`lsystem`, `parametric_curve`,
 baselines, i.e. WARP's own rasterization noise) were restored before committing.
 Check `git status` after any bless here and do the same.
 
+## `attractor_trails.toml` has its own test binary, and that is the point of it
+
+Plan 0053 Phase 1, [ADR-0058](../../../docs/adrs/0058-bind-group-layout-collisions-carry-evidence.md).
+It belongs to `core/tests/attractor_trails.rs` and to nothing else, so
+`LMV_BLESS=1 cargo test -p lmv-core --test attractor_trails` rewrites **one**
+file. That is deliberate: `LMV_BLESS` is not scoped to a fixture, so adding this
+to `golden.rs`'s `EXTRA_FIXTURES` would have meant rewriting all 12 of that
+binary's baselines to add one — and three of them (`lsystem`, `parametric_curve`,
+`star_pattern`) re-encode differently on this repository's dev box from a clean
+tree, so the diff would name files the change never touched. Same posture
+`line_joints.rs` documents.
+
+**What it covers is a pipeline coexistence no other capture produced.**
+`attractor_clifford` and `attractor_leviathan` bind the engine `trails` stage on
+the attractor, putting that scene's four pipelines and the stage's two in one
+command buffer. `attractor.toml` binds no trails and every `composite_*` fixture
+is a line scene, so the densest coexistence any shipped preset creates was pinned
+by nothing. Its own binary also keeps those six pipelines off the devices the
+other two capture binaries build, which is the rule `composite.rs` states.
+
+It is **coverage, not evidence of correctness** — the baseline is blessed on WARP
+like every other one here, so if this configuration aliases, the PNG is a picture
+of the wrong thing. ADR-0058's hardware-vs-WARP comparison is the check; this is
+the drift guard.
+
+`fade = 0.6` under `trails = 0.98` is load-bearing for the reason the
+`attractor_*_fb_*` family's header gives at the bottom of this file, and the
+binary asserts the relation rather than trusting it.
+
 ## The `composite_*` fixtures are a different guard
 
 `composite_trails.toml` and `composite_kaleido.toml` are **not** part of the

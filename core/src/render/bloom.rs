@@ -62,11 +62,12 @@
 //! # The bind layouts are chosen, not stylistic
 //!
 //! The DX12 WARP software adapter hands a pipeline whose bind-group layout matches
-//! another live one *the other pass's resources* — twice-observed before this
-//! stage (ADR-0021 / Plan 0020, then the tonemap in Phase 3, where the wrong
-//! uniform reproduced to the byte) and a third time here, on the blur, which is
-//! why it now binds none (see [`Resources`]). Every layout this stage adds is a
-//! shape no other live pipeline in the engine has:
+//! another live one *the other pass's resources*. The hazard itself is recorded in
+//! ADR-0058; it was twice-observed before this stage — first during Plan 0020's
+//! palette work, then on the tonemap in Plan 0045 Phase 3, where the wrong uniform
+//! reproduced to the byte — and a third time here, on the blur, which is why it now
+//! binds none (see [`Resources`]). Every layout this stage adds is a shape no other
+//! live pipeline in the engine has:
 //!
 //! | pass                     | layout                               |
 //! |--------------------------|--------------------------------------|
@@ -444,8 +445,8 @@ struct Level {
 /// direction's step in turn — with the vertical step at zero the horizontal one
 /// changed nothing, on a square grid where the two numbers are equal.
 ///
-/// That is the ADR-0021 / Plan 0020 hazard again, and the tonemap hit its
-/// uniform-shaped variant in Phase 3. Rather than guess at which resource WARP
+/// That is the ADR-0058 hazard again, and the tonemap hit its uniform-shaped
+/// variant in Plan 0045 Phase 3. Rather than guess at which resource WARP
 /// aliases, the shape here removes the surface: the blur passes have **no
 /// uniform**, and the three that remain — bright, up, mix — are each shared by
 /// passes that all want the same value, so there is nothing left for a mix-up to

@@ -236,8 +236,8 @@ impl Resources {
             gpu::FULLSCREEN_VS_UV_FLIPPED,
             SHADER,
         );
-        // **The binding order here is deliberate, not stylistic (ADR-0021 /
-        // Plan 0020).** On the DX12 WARP software adapter a pipeline whose
+        // **The binding order here is deliberate, not stylistic (ADR-0058).**
+        // On the DX12 WARP software adapter a pipeline whose
         // bind-group layout matches another live one is handed the *other* pass's
         // resources, and this pass is uniquely exposed: it runs on every frame
         // alongside whatever the preset has switched on.
