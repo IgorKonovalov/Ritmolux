@@ -355,18 +355,35 @@ fn encode_srgb(x: f32) -> f32 {
 }
 
 // -----------------------------------------------------------------------
-// The bind-group layout enumeration (Plan 0045 Phase 4b)
+// The bind-group layout enumeration (Plan 0045 Phase 4b; generalized into the
+// ADR-0058 collision property by Plan 0053 Phase 2)
 // -----------------------------------------------------------------------
 
-/// What one binding contributes to a layout's *shape*. Two layouts collide —
-/// in the sense the DX12 WARP aliasing hazard cares about — when their kinds
-/// match in order.
+/// What one binding contributes to a layout's *shape*.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Kind {
     Texture,
     Sampler,
     Uniform,
     Storage,
+}
+
+/// Where a marker's **visibility** is written, relative to the marker itself.
+///
+/// Visibility is part of the shape (see [`Layout`]), so the scan has to recover
+/// it, and the spellings this repository uses do not put it in one place.
+#[derive(Clone, Copy)]
+enum Vis {
+    /// A helper whose visibility is a constant in its own body, out of reach of
+    /// the descriptor the scan is reading. Asserted against the helpers by
+    /// [`the_scan_reads_the_visibility_the_helpers_actually_set`].
+    Fixed(&'static str),
+    /// A full `BindGroupLayoutEntry` literal: `visibility:` is a field, and it
+    /// comes **before** the `ty:` field the marker matches.
+    Preceding,
+    /// `gpu::uniform(binding, visibility)`: the second argument, so it comes
+    /// **after** the marker.
+    Following,
 }
 
 /// Every spelling of an entry this repository uses, **longest first**. The
@@ -376,17 +393,94 @@ enum Kind {
 /// A new spelling belongs here. Leaving it out does not weaken the guard
 /// silently: the per-layout entry count below is derived independently, and a
 /// marker the scan missed makes the two disagree and fails the test.
-const MARKERS: &[(&str, Kind)] = &[
-    ("BufferBindingType::Uniform", Kind::Uniform),
-    ("BufferBindingType::Storage", Kind::Storage),
-    ("BindingType::Sampler", Kind::Sampler),
-    ("BindingType::Texture", Kind::Texture),
-    ("lut_vertex_texture(", Kind::Texture),
-    ("storage_entry(", Kind::Storage),
-    ("gpu::texture(", Kind::Texture),
-    ("gpu::sampler(", Kind::Sampler),
-    ("gpu::uniform(", Kind::Uniform),
+const MARKERS: &[(&str, Kind, Vis)] = &[
+    ("BufferBindingType::Uniform", Kind::Uniform, Vis::Preceding),
+    ("BufferBindingType::Storage", Kind::Storage, Vis::Preceding),
+    ("BindingType::Sampler", Kind::Sampler, Vis::Preceding),
+    ("BindingType::Texture", Kind::Texture, Vis::Preceding),
+    ("lut_vertex_texture(", Kind::Texture, Vis::Fixed("VERTEX")),
+    ("storage_entry(", Kind::Storage, Vis::Fixed("COMPUTE")),
+    ("gpu::texture(", Kind::Texture, Vis::Fixed("FRAGMENT")),
+    ("gpu::sampler(", Kind::Sampler, Vis::Fixed("FRAGMENT")),
+    ("gpu::uniform(", Kind::Uniform, Vis::Following),
 ];
+
+/// One bind-group layout as the scan sees it.
+///
+/// # The shape carries visibility, and that is a Plan 0053 decision
+///
+/// Plan 0045 Phase 4b's shape was the ordered list of binding *kinds* alone.
+/// That is coarser than what the hazard keys on, and the codebase already
+/// carries the measurement that proves it: `emitter-bind-layout` was first
+/// written byte-identical to `swarm-bind-layout`, WARP handed the swarm the
+/// emitter's uniform, and **distinguishing the descriptor by a wider visibility
+/// mask and an explicit `min_binding_size` restored it**
+/// (`scenes/emitter.rs`, ADR-0058). Under a kinds-only shape those two still
+/// read as colliding — so the assertion below would have demanded an allowlist
+/// entry for a pair that was *deliberately separated*, recording a fix as a
+/// tolerated collision.
+///
+/// `min_binding_size` is deliberately **not** in the shape. The emitter's fix
+/// changed both at once, so which of the two did the work is not established,
+/// and folding in the one whose effect is unmeasured would split pairs on an
+/// assumption. Visibility is in because it is a structural property of the
+/// layout; the size is left out and guarded by the comment at its site.
+struct Layout {
+    /// The file the layout is built in — for the failure messages, not the key.
+    file: String,
+    /// The descriptor's `label`, or a synthetic one for a computed label.
+    label: String,
+    /// `(what it binds, which stages see it)`, in binding order.
+    shape: Vec<(Kind, String)>,
+}
+
+/// `[Uniform:FRAGMENT, Texture:FRAGMENT]` — the form the messages print.
+fn shape_str(shape: &[(Kind, String)]) -> String {
+    let parts: Vec<String> = shape
+        .iter()
+        .map(|(kind, vis)| format!("{kind:?}:{vis}"))
+        .collect();
+    format!("[{}]", parts.join(", "))
+}
+
+/// The `ShaderStages::` identifier at or after `from`, and where it starts.
+fn stages_at(body: &str, from: usize) -> Option<(usize, String)> {
+    const TAG: &str = "ShaderStages::";
+    let hit = body[from..].find(TAG)? + from;
+    let rest = &body[hit + TAG.len()..];
+    let end = rest
+        .find(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+        .unwrap_or(rest.len());
+    Some((hit, rest[..end].to_string()))
+}
+
+/// The visibility a marker at `at` declares, by its [`Vis`] rule.
+fn visibility(body: &str, at: usize, rule: Vis, label: &str) -> String {
+    match rule {
+        Vis::Fixed(vis) => vis.to_string(),
+        Vis::Following => {
+            stages_at(body, at)
+                .unwrap_or_else(|| {
+                    panic!("`{label}`: no ShaderStages after the entry at byte {at}")
+                })
+                .1
+        }
+        Vis::Preceding => {
+            let mut best = None;
+            let mut cursor = 0usize;
+            while let Some((hit, vis)) = stages_at(body, cursor) {
+                if hit >= at {
+                    break;
+                }
+                best = Some(vis);
+                cursor = hit + 1;
+            }
+            best.unwrap_or_else(|| {
+                panic!("`{label}`: no ShaderStages before the entry at byte {at}")
+            })
+        }
+    }
+}
 
 fn rs_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
     for entry in std::fs::read_dir(dir).expect("read a core/src directory") {
@@ -443,8 +537,8 @@ fn entry_count(body: &str) -> usize {
     count
 }
 
-/// `(label, kinds)` for every `create_bind_group_layout` call in one file.
-fn layouts_in(text: &str, file: &str) -> Vec<(String, Vec<Kind>)> {
+/// Every `create_bind_group_layout` call in one file, as a [`Layout`].
+fn layouts_in(text: &str, file: &str) -> Vec<Layout> {
     // Split so the constant does not match **itself** — this scan reads its
     // own file, and an anchor spelled whole here would open a "descriptor"
     // that runs to the end of the module.
@@ -474,33 +568,89 @@ fn layouts_in(text: &str, file: &str) -> Vec<(String, Vec<Kind>)> {
         let entries_at = desc.find(ENTRIES).expect("a layout declares entries") + ENTRIES.len();
         let body = balanced(&desc[entries_at..], b'[', b']');
 
-        let mut kinds = Vec::new();
+        // A combined mask would read as its first flag alone and split a pair
+        // that does collide — the one direction of error this scan must not
+        // make silently.
+        assert!(
+            !body.contains('|'),
+            "{file}: `{label}` combines flags with `|`. The visibility scan \
+             takes the identifier after `ShaderStages::` and would read \
+             `VERTEX | FRAGMENT` as `VERTEX`, which is a DIFFERENT shape from \
+             `VERTEX_FRAGMENT` and would hide a collision. Teach the scan the \
+             combined spelling, or spell it `VERTEX_FRAGMENT`."
+        );
+
+        let mut shape = Vec::new();
         let mut index = 0usize;
         while index < body.len() {
             let matched = MARKERS
                 .iter()
-                .find(|(marker, _)| body.as_bytes()[index..].starts_with(marker.as_bytes()));
+                .find(|(marker, ..)| body.as_bytes()[index..].starts_with(marker.as_bytes()));
             match matched {
-                Some((marker, kind)) => {
-                    kinds.push(*kind);
+                Some((marker, kind, rule)) => {
+                    shape.push((*kind, visibility(body, index, *rule, &label)));
                     index += marker.len();
                 }
                 None => index += 1,
             }
         }
         assert_eq!(
-            kinds.len(),
+            shape.len(),
             entry_count(body),
             "{file}: `{label}` declares {} entries but the scan recognized {} \
              of them. Teach `MARKERS` the spelling this layout uses — an \
              unrecognized entry would make the uniqueness check below blind \
              to a real collision.",
             entry_count(body),
-            kinds.len(),
+            shape.len(),
         );
-        found.push((label, kinds));
+        found.push(Layout {
+            file: file.to_string(),
+            label,
+            shape,
+        });
     }
     found
+}
+
+/// Every bind-group layout in `core/src`, sorted by file for a stable printout.
+fn all_layouts() -> Vec<Layout> {
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut files = Vec::new();
+    rs_files(&src, &mut files);
+    files.sort();
+
+    let mut all = Vec::new();
+    for file in &files {
+        let text = std::fs::read_to_string(file).expect("read a core source file");
+        let name = file
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("?")
+            .to_string();
+        all.extend(layouts_in(&text, &name));
+    }
+    all
+}
+
+/// How many layouts `core/src` held when Plan 0053 Phase 2 landed.
+///
+/// A **floor**, not an equality: adding a pass is ordinary and the collision
+/// property below is what guards that. What this catches is the opposite — a
+/// refactor that moves a layout into a spelling the scan cannot see, which
+/// would shrink the enumeration and make every assertion here quietly weaker on
+/// a shorter list. Lower it only when a pass was genuinely removed, and say so.
+const LAYOUTS_AT_PLAN_0053: usize = 25;
+
+/// The scan sees the whole crate, and says how much of it it saw.
+fn assert_scan_is_whole(all: &[Layout]) {
+    assert!(
+        all.len() >= LAYOUTS_AT_PLAN_0053,
+        "the scan found {} bind-group layouts across core/src, against the \
+         {LAYOUTS_AT_PLAN_0053} present when this floor was set. A layout the \
+         scan cannot see is one the collision property below cannot check.",
+        all.len()
+    );
 }
 
 /// **The tonemap's bind-group layout is a shape nothing else in `core/src`
@@ -514,58 +664,33 @@ fn layouts_in(text: &str, file: &str) -> Vec<(String, Vec<Kind>)> {
 /// hazard surface (ADR-0058: WARP hands a pipeline whose layout matches another
 /// live one *the other pass's* resources).
 ///
-/// Only the tonemap is asserted on. Several older layouts genuinely do
-/// collide — `ink` with the fold, `trails` with the blend, four separate
-/// single-uniform groups — and those pairs are load-bearing history rather
-/// than this phase's business; they are printed so the picture is visible.
+/// It is kept beside the general property below rather than folded into it
+/// (ADR-0058: "the tonemap's existing single-layout assertion is subsumed
+/// rather than replaced"). The general one would pass if someone allowlisted
+/// this pair; this one says why that would be the wrong entry to write.
 #[test]
 fn the_tonemap_layout_is_a_shape_no_other_layout_in_core_has() {
-    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut files = Vec::new();
-    rs_files(&src, &mut files);
-    files.sort();
-
-    let mut all: Vec<(String, Vec<Kind>)> = Vec::new();
-    for file in &files {
-        let text = std::fs::read_to_string(file).expect("read a core source file");
-        let name = file
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("?")
-            .to_string();
-        all.extend(layouts_in(&text, &name));
-    }
-
-    for (label, kinds) in &all {
-        eprintln!("{label:<34} {kinds:?}");
-    }
-    // The scan is the whole evidence, so a scan that found (nearly) nothing
-    // must not read as a pass.
-    assert!(
-        all.len() >= 20,
-        "only {} bind-group layouts found across core/src — the scan is not \
-         seeing the crate",
-        all.len()
-    );
+    let all = all_layouts();
+    assert_scan_is_whole(&all);
 
     let mine = all
         .iter()
-        .find(|(label, _)| label == "tonemap-bind-layout")
+        .find(|layout| layout.label == "tonemap-bind-layout")
         .expect("the tonemap's own layout is in the enumeration");
     let sharers: Vec<&str> = all
         .iter()
-        .filter(|(label, kinds)| kinds == &mine.1 && label != &mine.0)
-        .map(|(label, _)| label.as_str())
+        .filter(|layout| layout.shape == mine.shape && layout.label != mine.label)
+        .map(|layout| layout.label.as_str())
         .collect();
     assert!(
         sharers.is_empty(),
-        "`tonemap-bind-layout` is {:?}, and so is {sharers:?}. This pass runs \
+        "`tonemap-bind-layout` is {}, and so is {sharers:?}. This pass runs \
          on every frame beside whatever the preset switched on, so it is the \
          most exposed pipeline in the engine to the WARP identical-layout \
          aliasing hazard. Move it to a shape this enumeration shows is free — \
          and fix the comment in `Resources::build`, which is the thing that \
          was wrong last time.",
-        mine.1
+        shape_str(&mine.shape)
     );
 }
 
@@ -589,43 +714,368 @@ fn the_tonemap_layout_is_a_shape_no_other_layout_in_core_has() {
 /// preset can be live in the same session.
 #[test]
 fn the_two_present_layouts_added_for_occlude_are_shapes_nothing_else_has() {
-    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut files = Vec::new();
-    rs_files(&src, &mut files);
-    files.sort();
-
-    let mut all: Vec<(String, Vec<Kind>)> = Vec::new();
-    for file in &files {
-        let text = std::fs::read_to_string(file).expect("read a core source file");
-        let name = file
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("?")
-            .to_string();
-        all.extend(layouts_in(&text, &name));
-    }
-    assert!(all.len() >= 20, "the scan is not seeing the crate");
+    let all = all_layouts();
+    assert_scan_is_whole(&all);
 
     for label in ["trails-present-bind-layout", "attractor-present-layout"] {
         let mine = all
             .iter()
-            .find(|(found, _)| found == label)
+            .find(|layout| layout.label == label)
             .unwrap_or_else(|| panic!("`{label}` is in the enumeration"));
         let sharers: Vec<&str> = all
             .iter()
-            .filter(|(found, kinds)| kinds == &mine.1 && found != &mine.0)
-            .map(|(found, _)| found.as_str())
+            .filter(|layout| layout.shape == mine.shape && layout.label != mine.label)
+            .map(|layout| layout.label.as_str())
             .collect();
         assert!(
             sharers.is_empty(),
-            "`{label}` is {:?}, and so is {sharers:?}. This pass carries \
+            "`{label}` is {}, and so is {sharers:?}. This pass carries \
              `occlude` (ADR-0085), and a colliding layout is why an earlier \
              shape of it silently did nothing on WARP while working on \
              hardware. The odd-looking arrangement — a sampler before the \
              uniform in one, a sampler bound twice in the other — is what buys \
              the uniqueness this asserts; pick another free shape rather than \
              tidying it away.",
-            mine.1
+            shape_str(&mine.shape)
+        );
+    }
+}
+
+// -----------------------------------------------------------------------
+// The collision property (Plan 0053 Phase 2, ADR-0058)
+// -----------------------------------------------------------------------
+
+/// One accepted layout collision, with the evidence that it does not alias.
+///
+/// **An entry is not a suppression.** ADR-0058's rule is that an entry with no
+/// recorded measurement is not an entry: [`evidence`](Self::evidence) carries
+/// the same configuration rendered on the hardware adapter and on WARP, and the
+/// date it was taken. Where separating a pair is cheap, separating it is
+/// preferred — a layout that cannot collide needs no evidence and no
+/// maintenance.
+struct AllowedCollision {
+    /// A layout label, as the enumeration prints it. Order does not matter.
+    a: &'static str,
+    b: &'static str,
+    /// One line: why separation is the worse cure for this pair.
+    why: &'static str,
+    /// The measurement, and when it was taken. Printed on every run so the
+    /// debt is visible while it lasts, and re-printed in any failure message.
+    evidence: &'static str,
+}
+
+/// The prefix an entry uses while its measurement is still owed.
+const EVIDENCE_OWED: &str = "EVIDENCE: none yet";
+
+/// The pairs of same-shaped layouts this crate accepts (ADR-0058).
+///
+/// Nothing may be added here without a measurement. The list is checked in both
+/// directions: a colliding pair with no entry fails, and an entry naming a pair
+/// that no longer collides fails too — so separating a pair later cannot leave a
+/// stale allowance behind that would silently cover a *different* collision if
+/// the shapes ever met again.
+const ALLOWED: &[AllowedCollision] = &[
+    // --- `[Uniform:FRAGMENT]`: four single-uniform fullscreen passes ---
+    // ADR-0058 Alternative A is rejected for exactly this group. A single
+    // fragment-visible uniform is the correct and minimal shape for a fullscreen
+    // pass, and there is no free variant of it: a uniform a fragment shader
+    // reads must be FRAGMENT- or VERTEX_FRAGMENT-visible, and the second is
+    // taken. Padding them apart means every future fullscreen pass inherits a
+    // dummy binding to work around one software adapter's bug.
+    AllowedCollision {
+        a: "background-bind-layout",
+        b: "fragment-field-uniform-layout",
+        why: "both are the minimal fullscreen shape; padding either distorts \
+              shipping code to dodge a software adapter (ADR-0058 Alt A)",
+        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+    },
+    AllowedCollision {
+        a: "background-bind-layout",
+        b: "rd-init-layout",
+        why: "both are the minimal fullscreen shape (ADR-0058 Alt A)",
+        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+    },
+    AllowedCollision {
+        a: "fragment-field-uniform-layout",
+        b: "rd-init-layout",
+        why: "both are the minimal fullscreen shape (ADR-0058 Alt A); co-live \
+              only across a preset transition, never within one preset",
+        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+    },
+    // --- `[Uniform:FRAGMENT]`, the test-only stand-in ---
+    // `disc-bind-layout` models a scene inside `post/tests.rs`. Separating it
+    // would mean padding a test shader with a binding it does not use, which is
+    // Alternative A again with the distortion moved into the instrument.
+    AllowedCollision {
+        a: "background-bind-layout",
+        b: "disc-bind-layout",
+        why: "the disc is a test-only stand-in scene; both fragment-readable \
+              single-uniform shapes are taken, so separation means padding a \
+              test shader",
+        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+    },
+    AllowedCollision {
+        a: "disc-bind-layout",
+        b: "fragment-field-uniform-layout",
+        why: "the disc is a test-only stand-in scene (see above)",
+        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+    },
+    AllowedCollision {
+        a: "disc-bind-layout",
+        b: "rd-init-layout",
+        why: "the disc is a test-only stand-in scene (see above)",
+        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+    },
+    // --- `[Texture, Texture, Sampler]`: the two palette-LUT groups ---
+    AllowedCollision {
+        a: "background-lut-layout",
+        b: "fragment-field-lut-layout",
+        why: "both sample an A/B gradient pair through one shared sampler, so \
+              the shape is what the palette system is, not a choice either made",
+        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+    },
+    // --- `[Uniform:VERTEX_FRAGMENT]`: the two vertex+fragment uniforms ---
+    // Neither mask can be narrowed: both shaders read the buffer from both
+    // stages. And the emitter's mask is itself the recorded fix for a MEASURED
+    // collision with `swarm-bind-layout` (`scenes/emitter.rs`) — narrowing it
+    // back would undo that, not separate this.
+    AllowedCollision {
+        a: "emitter-bind-layout",
+        b: "renderer.rs (computed label)",
+        why: "both shaders read the uniform from the vertex and fragment \
+              stages; the emitter's mask is the recorded fix for its measured \
+              collision with the swarm and must not be narrowed",
+        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+    },
+    // --- `[Uniform, Texture, Texture, Sampler]`: trails and the transition ---
+    // Genuinely co-live: a cross-preset dissolve between two `trails`-binding
+    // presets puts both in one command buffer. Separation means renumbering
+    // bindings in a shipped shader on one side — and reordering the
+    // *declaration* alone would move this test without necessarily moving what
+    // the adapter keys on, which is a guard-defeating fix rather than a
+    // separation.
+    AllowedCollision {
+        a: "trails-bind-layout",
+        b: "blend-bind-layout",
+        why: "two two-texture fullscreen passes; separating means renumbering \
+              a shipped shader's bindings, and a declaration-order shuffle \
+              would move this test without provably moving the adapter",
+        evidence: "EVIDENCE: none yet — Plan 0053 Phase 3",
+    },
+];
+
+/// **No two bind-group layouts that could be live in one frame share a shape,
+/// unless [`ALLOWED`] carries the measurement that says they do not alias**
+/// (Plan 0053 Phase 2, ADR-0058).
+///
+/// This is the general form of the two assertions above. Plan 0045 Phase 4b
+/// enumerated the crate's layouts and asserted on the tonemap alone, **printing
+/// three collision groups it asserted nothing about** under a docstring calling
+/// them "older and deliberate" — a claim with nothing behind it, which is the
+/// exact failure mode that enumeration existed to retire.
+///
+/// # "Can be live in one frame" is approximated, and the approximation is coarse
+///
+/// Whether two layouts co-exist depends on which stages a preset composes, which
+/// this test cannot know, so it treats **any** two layouts in `core/src` as
+/// potentially co-live. That over-reports, and ADR-0058 accepts the cost. Two
+/// things worth knowing before dismissing a flagged pair as unreachable:
+///
+/// - **A preset transition puts two scenes live at once.** `blend-bind-layout`
+///   exists to cross-fade one preset into another, so "one scene per preset"
+///   does not make two scene layouts mutually exclusive.
+/// - **A layout built inside a unit test is live in that test's own process.**
+///   `disc-bind-layout` is built in `post/tests.rs`, and a test that blesses a
+///   mis-render is precisely what this hazard costs.
+///
+/// If this list grows much past the twelve layouts it covers today, the
+/// approximation is wrong and the *shape* of this assertion should be revisited
+/// rather than the list extended (Plan 0053's own risk note).
+#[test]
+fn no_two_layouts_share_a_shape_without_recorded_evidence() {
+    let all = all_layouts();
+    for layout in &all {
+        eprintln!(
+            "{:<34} {:<22} {}",
+            layout.label,
+            layout.file,
+            shape_str(&layout.shape)
+        );
+    }
+    eprintln!("{} bind-group layouts walked across core/src", all.len());
+    assert_scan_is_whole(&all);
+
+    let allowed = |x: &str, y: &str| {
+        ALLOWED
+            .iter()
+            .find(|entry| (entry.a == x && entry.b == y) || (entry.a == y && entry.b == x))
+    };
+
+    let mut unrecorded = Vec::new();
+    let mut covered = Vec::new();
+    for (i, one) in all.iter().enumerate() {
+        for other in all.iter().skip(i + 1) {
+            if one.shape != other.shape {
+                continue;
+            }
+            match allowed(&one.label, &other.label) {
+                Some(entry) => {
+                    covered.push((entry.a, entry.b));
+                    eprintln!(
+                        "  allowed  {} + {}  {}\n           why: {}\n           evidence: {}",
+                        one.label,
+                        other.label,
+                        shape_str(&one.shape),
+                        entry.why,
+                        entry.evidence
+                    );
+                }
+                None => unrecorded.push(format!(
+                    "{} ({}) + {} ({}) both {}",
+                    one.label,
+                    one.file,
+                    other.label,
+                    other.file,
+                    shape_str(&one.shape)
+                )),
+            }
+        }
+    }
+
+    assert!(
+        unrecorded.is_empty(),
+        "{} layout pair(s) share a shape with no ADR-0058 allowlist entry:\n  \
+         {}\n\nOn the DX12 WARP software adapter a pipeline whose bind-group \
+         layout matches another live one is handed the OTHER pass's resources, \
+         and the whole golden suite captures on WARP — so a mis-render there is \
+         not caught, it is blessed. Either separate the pair (preferred where \
+         cheap: a layout that cannot collide needs no evidence) or add an \
+         `ALLOWED` entry carrying a hardware-vs-WARP comparison of the same \
+         configuration. An entry with no recorded measurement is not an entry.",
+        unrecorded.len(),
+        unrecorded.join("\n  ")
+    );
+
+    // The other direction: an entry that no longer describes a real collision.
+    let stale: Vec<String> = ALLOWED
+        .iter()
+        .filter(|entry| !covered.contains(&(entry.a, entry.b)))
+        .map(|entry| format!("{} + {}", entry.a, entry.b))
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "{} allowlist entr(y/ies) name pairs that no longer share a shape: {}. \
+         Delete them. A stale allowance is a standing permission for a \
+         collision nobody has measured, waiting for the two shapes to meet \
+         again.",
+        stale.len(),
+        stale.join(", ")
+    );
+
+    // The debt, surfaced on a **passing** run. ADR-0058's rule is that an entry
+    // with no recorded measurement is not an entry; Plan 0053 Phase 2 seeds the
+    // list so the build is green and Phase 3 measures. Until then this says so
+    // out loud rather than letting a green run read as a cleared list.
+    let owed: Vec<String> = ALLOWED
+        .iter()
+        .filter(|entry| entry.evidence.starts_with(EVIDENCE_OWED))
+        .map(|entry| format!("{} + {}", entry.a, entry.b))
+        .collect();
+    if !owed.is_empty() {
+        eprintln!(
+            "ADR-0058 DEBT: {} of {} allowlist entries carry no measurement \
+             yet: {}",
+            owed.len(),
+            ALLOWED.len(),
+            owed.join(", ")
+        );
+    }
+}
+
+/// **The bloom stage's four layouts are four distinct shapes** (ADR-0058's
+/// closing note, Plan 0053 Phase 2).
+///
+/// `bloom.rs`'s module docs carried the same prose uniqueness claim the tonemap
+/// comment did, in a table, for four layouts — and the tonemap's version of that
+/// claim was false while it sat there reading as reassurance. This converts it.
+/// The general property above would catch two bloom layouts colliding with each
+/// other only in the sense that it catches *any* collision; this one says whose
+/// invariant it is and where the table to fix lives.
+///
+/// It lives here rather than in `bloom/tests.rs` because the crate-wide scan
+/// does, and duplicating that machinery to move one assertion closer to its
+/// subject would be the more expensive mistake.
+#[test]
+fn the_bloom_layouts_are_four_shapes_nothing_else_shares() {
+    const BLOOM: [&str; 4] = [
+        "bloom-bright-layout",
+        "bloom-blur-layout",
+        "bloom-up-layout",
+        "bloom-mix-layout",
+    ];
+    let all = all_layouts();
+    assert_scan_is_whole(&all);
+
+    for label in BLOOM {
+        let mine = all
+            .iter()
+            .find(|layout| layout.label == label)
+            .unwrap_or_else(|| panic!("`{label}` is in the enumeration"));
+        let sharers: Vec<&str> = all
+            .iter()
+            .filter(|layout| layout.shape == mine.shape && layout.label != mine.label)
+            .map(|layout| layout.label.as_str())
+            .collect();
+        assert!(
+            sharers.is_empty(),
+            "`{label}` is {}, and so is {sharers:?}. The bright / blur / up / \
+             mix layouts look arbitrary because they are — the requirement is \
+             only that they be distinct, and the natural orderings were all \
+             taken. Pick another free shape, and fix the table in `bloom.rs`'s \
+             module docs, which is the thing that would otherwise still claim \
+             this.",
+            shape_str(&mine.shape)
+        );
+    }
+}
+
+/// The visibilities [`MARKERS`] hard-codes are the ones the helpers set.
+///
+/// [`Vis::Fixed`] exists because three helpers put their `visibility` in their
+/// own body, out of reach of the descriptor the scan reads — so the scan states
+/// it instead. A restated constant is a claim, and this is the kind of claim
+/// this whole section exists to stop trusting: if `gpu::texture` ever became
+/// `VERTEX_FRAGMENT`, every texture in the enumeration would carry the wrong
+/// visibility and pairs would split or merge on it silently.
+#[test]
+fn the_scan_reads_the_visibility_the_helpers_actually_set() {
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut files = Vec::new();
+    rs_files(&src, &mut files);
+    let mut crate_text = String::new();
+    for file in &files {
+        crate_text.push_str(&std::fs::read_to_string(file).expect("read a core source file"));
+    }
+
+    // `(the helper's definition, the visibility MARKERS says it sets)`. Each
+    // definition is matched to the first `ShaderStages::` inside it.
+    for (definition, expected) in [
+        ("pub(crate) fn texture(", "FRAGMENT"),
+        ("pub(crate) fn sampler(", "FRAGMENT"),
+        ("pub(super) fn storage_entry(", "COMPUTE"),
+        ("let lut_vertex_texture = |binding: u32|", "VERTEX"),
+    ] {
+        let at = crate_text
+            .find(definition)
+            .unwrap_or_else(|| panic!("`{definition}` is still in core/src"));
+        let (_, found) = stages_at(&crate_text, at)
+            .unwrap_or_else(|| panic!("`{definition}` sets a visibility"));
+        assert_eq!(
+            found, expected,
+            "`{definition}` now sets ShaderStages::{found}, but MARKERS says \
+             its entries are {expected}-visible. Update the Vis::Fixed value — \
+             until then every layout using it carries the wrong visibility, and \
+             collision pairs split or merge on a stale constant."
         );
     }
 }

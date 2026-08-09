@@ -67,7 +67,10 @@
 //! palette work, then on the tonemap in Plan 0045 Phase 3, where the wrong uniform
 //! reproduced to the byte — and a third time here, on the blur, which is why it now
 //! binds none (see [`Resources`]). Every layout this stage adds is a shape no other
-//! live pipeline in the engine has:
+//! live pipeline in the engine has — **asserted, not claimed**, by
+//! `the_bloom_layouts_are_four_shapes_nothing_else_shares` in `tonemap/tests.rs`
+//! (Plan 0053 Phase 2). This table used to make that claim in prose, which is the
+//! same thing the tonemap's comment did while the claim was false:
 //!
 //! | pass                     | layout                               |
 //! |--------------------------|--------------------------------------|
