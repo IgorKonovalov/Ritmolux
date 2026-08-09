@@ -114,6 +114,54 @@ flowchart LR
 - **Done when:** verdict recorded in this plan (impressions + frame time). No stopping
   condition — `fb_*` are continuous and content-tunable; a disappointing look routes to
   the content lane, not back to the ADR, unless a warp kind is fundamentally wrong.
+- **VERDICT — run 2026-08-09**, `v0.48.0` lane build, Rich tier pinned, loopback audio,
+  both scratch presets via `LMV_PRESET_DIR`. **Passed. No warp kind is fundamentally
+  wrong and nothing routes back to [ADR-0048](../adrs/0048-transformed-feedback.md).**
+
+  **The look.** `swirl_add_echo` — *"very good."* The vortex reads as depth and flow, which
+  is the reference look this plan exists to reach, and the `add` deposit did not wash out
+  over live music. `tunnel_beat_zoom` — the rosette core *"looks more like a lit rosette"*
+  in motion; **the black centre visible in a still is an artifact of capturing with `beat`
+  pinned at 1**, not a defect, and a future reader comparing a headless still against this
+  verdict should know that. Its one criticism is colour: *"maybe needs more colours and
+  saturation."*
+
+  **That criticism is content, and it routes to the content lane as this phase specifies.**
+  These two presets are fixtures, not library content — Plan 0046's "What this plan does
+  NOT do" reserves adoption for R6, and [Plan 0075](0075-the-content-renaissance.md)'s
+  cohorts are where a feedback preset gets a real palette. Nothing here asks for an engine
+  change: `[palette]`, `saturation` and `palette_mix` already reach this surface
+  ([ADR-0086](../adrs/0086-the-backdrop-colours-through-the-preset-palette.md)), and the
+  scratch preset's narrow band was chosen to keep `add` from flattening, which trades
+  colour away deliberately. **The finding for R6 is that `blend = "add"` and a rich palette
+  pull against each other, and no shipped preset has yet had to resolve that.**
+
+  **Frame time — measured, not impressionistic.** 158 audible 1 Hz rows, ~3 minutes,
+  1080p windowed and fullscreen, both presets, with preset switching:
+
+  | | value |
+  |---|---|
+  | fps median / mean | **165.0** / 162.3 |
+  | fps minimum | **114.3** |
+  | rows below the NFR §1 60 fps floor | **0 of 158 (0.00 %)** |
+  | `frame_ms_avg` median / max | 6.061 / 8.749 ms |
+  | `frame_ms_p99` median / max | 6.866 / **25.037** ms |
+  | frames dropped | **0 of 28 698 (0.000 %)** |
+
+  So the §1 floor holds with roughly 2.7x headroom on this box, and the `add` +
+  transform + tonemap path the Risks section called "new territory" costs nothing
+  measurable. **Two observations that are not failures but should not be lost:**
+  - **`frame_ms_p99` spikes to 25.0 ms** (p95 of the p99 column is 18.1 ms), above the
+    16.67 ms budget, while `frame_ms_avg` never exceeds 8.7 ms and no frame is dropped.
+    The spikes coincide with preset switches and the fullscreen toggle — GPU resource
+    rebuilds, not steady-state cost. Worth a glance from whoever next touches the
+    quality governor, since a demotion decision reading p99 would see these.
+  - **RSS grew 385 MB → 663 MB over the three minutes** (max 663 MB), against the
+    ~327 MB driver-dominated floor [ADR-0010](../adrs/0010-accept-gpu-driver-memory-floor.md) established.
+    Three minutes with repeated preset switching is too short and too atypical to call
+    this a leak, and this plan adds two accumulation buffers so *some* growth is
+    expected — but it is unmeasured against a no-feedback control and should be, before
+    R6 ships feedback presets that run for hours. Not a blocker for this plan.
 
 ## Data shapes
 
