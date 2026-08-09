@@ -1,14 +1,28 @@
 # 0068 — Why the downbeat rarely locks: an instrument, an ablation, and a verdict
 
-> **Status:** **approved 2026-08-04** — ready for `dev`, gated by nothing and sharing no file with
-> any other plan in the roster. Phases 1-2 are `dev` and run start-to-finish; **Phase 3 is `human`**
-> (a listening pass on known-4/4 material, reading the 1 Hz log rather than judging by ear) and
-> gates Phase 4, so the plan does not close in one session. **Ships a diagnosis and no fix, on
-> purpose** — the repair is a follow-on plan written against the named cause. **Moves no pixels.**
+> **Status:** **done 2026-08-09** — all four phases landed as `be39985` (the probe) / `c6a7de3`
+> (the ladder) / `62ade74` (the verdict and the doc qualification), with **Phase 3 run by the user
+> on 2026-08-09** (98 minutes, two genres, results in place below). Mode 4 review at the close:
+> **no blockers, no majors, two minors, one nit.** Verified rather than taken on trust: nothing was
+> tuned — `CONFIDENCE_THRESHOLD` is still `0.25`, `BASS_WEIGHT` still `0.7`, and the 4/4 fold and
+> the confidence measure are unchanged; the `effect_size` split into `effect` is arithmetic-identical
+> on every branch; `terms()` takes `&self`, allocates nothing, reads no clock, writes no field and
+> adds no under-test branch to `process`; the bit-for-bit claim is a real `to_bits()` assertion
+> against the published `BarClock::confidence` on all six cases; and the Phase 2 ladder asserts only
+> comparative, dimensionless facts, printing every absolute confidence. **One deviation, accepted:**
+> `.config/nextest.toml` gained a third and fourth named override so the probe's output survives a
+> passing run — outside the phase file lists, but the same reasoning the file already carries for
+> two existing reporting tests, and here it is stronger, because the printed decomposition *is* the
+> deliverable. **Ships a diagnosis and no fix, on purpose.** **Moved no pixels** — no render file
+> touched, no baseline in scope.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0082](../adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md), supplementing [0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md)
-> **Closes:** [design-backlog 0042](../design-backlog.md#0042--the-downbeat-estimator-locks-on-3--of-audible-time-so-the-gated-bar-variables-are-almost-always-fallback)
+> **Related ADRs:** [0082](../../adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md) (**accepted** at this close, carrying the dated `Outcome` this plan wrote), supplementing [0050](../../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md)
+> **Closes:** [design-backlog 0042](../../design-backlog.md#0042--the-downbeat-estimator-locks-on-3--of-audible-time-so-the-gated-bar-variables-are-almost-always-fallback) — answered in place, append-only, original entry untouched.
+> **Leaves open:** the repair itself. A downbeat cue that is not bass energy has **no ADR and no
+> plan**; it stays a backlog pointer until someone takes it, because the fork it would decide
+> (a stronger accent feature versus a longer history window) is not yet a real fork — ADR-0082's
+> `Outcome` already names the route and exonerates the other two terms.
 
 ## TL;DR
 
@@ -17,7 +31,7 @@ are counter-derived almost always. Three terms could be responsible — the acce
 fold, the confidence measure — and nobody has distinguished them, because the only instrument is a
 1 Hz column printing the *outcome*. This plan builds an instrument that prints the terms, degrades a
 known-good pattern until the lock is lost, and ends with a named cause. **It deliberately ships no
-fix**: per [ADR-0082](../adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md)
+fix**: per [ADR-0082](../../adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md)
 the gate does not move to buy lock rate, and the repair belongs to a plan written against a
 diagnosis rather than against a symptom.
 
@@ -80,6 +94,12 @@ flowchart LR
   new allocation and no wall-clock read** — this module is on the analysis path and is pure and
   allocation-free after construction by design), `core/tests/dsp.rs` or a new
   `core/tests/downbeat_probe.rs`.
+  **Corrected at the close:** the accessor shipped as `pub fn terms()` returning a `pub struct
+  DownbeatTerms`, not `#[cfg(test)]` and not crate-internal. That is forced by the other half of
+  this same line — the probe lives in `core/tests/downbeat_probe.rs`, an integration test that links
+  the rlib as an external crate and cannot see a `pub(crate)` item. So it is a widening of `core`'s
+  Rust API surface (not of the C ABI, and not of the grammar), which the type's own doc comment says
+  in as many words. The constraints the phase actually cared about all hold.
 - **Done when:** feeding a clean synthetic 4/4 with a strong accent on beat 1 prints four alignment
   scores in which the true alignment is the largest, and a confidence above the gate; feeding an
   unaccented click train prints four near-equal scores and a confidence near zero. Both claims are
@@ -99,7 +119,7 @@ flowchart LR
   *which axis is steep*. The claim this phase can support is comparative and dimensionless ("the
   estimator tolerates X of jitter and only Y of contrast loss"), so it does not depend on the
   machine and can be asserted; an absolute confidence value at a given rung is a measurement and is
-  printed rather than asserted ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
+  printed rather than asserted ([ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
 - **Why this separates the candidates:** if confidence collapses on contrast loss, the accent
   feature is the weak term. If it survives contrast loss but collapses on dropouts, the fold's
   history window is. If it stays high across the ladder while the *published* value does not, the
@@ -115,6 +135,32 @@ flowchart LR
 - **Done when:** there is a lock-rate figure for material that is unambiguously 4/4 with a clear
   downbeat, and a statement of which degradation axis real material most resembles. **Do not
   re-measure by ear** — the log column is the instrument.
+- **RESULT — run 2026-08-09**, `v0.48.0` release build, loopback, tier `rich`, two materials in one
+  session, segmented by timestamp. 5900 audible rows / 98 minutes.
+
+  | material | audible rows | lock rate | conf mean | conf median | conf peak | 30 s windows cleared |
+  |---|---|---|---|---|---|---|
+  | four-on-the-floor techno | 5173 (86.2 min) | **6.79 %** (351) | 0.0587 | 0.0000 | 0.9494 | 50 of 176 (28 %) |
+  | backbeat rock/pop | 727 (12.1 min) | **0.14 %** (1) | 0.0249 | 0.0000 | 0.2664 | 1 of 25 (4 %) |
+  | **combined** | **5900** | **5.97 %** (352) | — | — | — | — |
+
+  **Which axis:** the **contrast** axis, at its extreme — not the dropout axis Phase 2 predicted.
+  Rock (0.0249 / 0.14 %) lands almost exactly on contrast rung 1.00's ladder values (0.032 / 0 %);
+  techno sits slightly above it, consistent with its **bimodal** distribution (median exactly
+  `0.0000`, peak `0.9494` — the fills and breakdowns that do carry four-beat accent structure).
+
+  **The finding that names the cause is that backbeat material is 48x worse, not better.** A snare on
+  2 and 4 is the clearest loudness accent in popular music, and it made things worse — because the
+  accent is 70 % bass (`BASS_WEIGHT`), and a backbeat's kick pattern is a **two**-beat periodicity
+  that makes alignments 0 and 2 tie. Four-on-the-floor is flat for the complementary reason: the kick
+  is on every beat. So the named cause is the **accent feature**; the fold and the confidence measure
+  are exonerated as the primary term. Written up with its limits in ADR-0082's `Outcome`.
+
+  **Two methodological notes for whoever re-runs this.** The audible-row filter is not load-bearing —
+  the rate is identical at every floor from `0.00` to `0.10`, so Plan 0048's undefined "with signal"
+  cut never mattered. And a 13-minute sample of the techno gave 2.8 %, against 6.79 % over the full
+  86 minutes: **this measurement needs tens of minutes per genre**, because the lock events are
+  clustered in structural passages rather than spread evenly.
 
 ### Phase 4 — The verdict, and the docs stop offering two layers as equals
 
