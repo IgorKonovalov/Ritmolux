@@ -43,13 +43,22 @@ the behavior to avoid.
   when you're deciding what to design next; when an entry graduates, strike it through with a
   pointer to the ADR/plan it became.
 
-  **The curation boundary is an open question.** ADR-0017 put it at "`dev` embeds a curated preset"
-  because embedding meant editing Rust in two coupled spots. [ADR-0022](../../../docs/adrs/0022-build-time-preset-embedding.md)
-  removed that premise — `core/build.rs` globs `presets/*.toml`, so shipping a preset is now just
-  committing a `.toml`. Either the boundary moves (the content lane lands curated presets directly,
-  gated on the `sanity`/`reactivity`/`animation` behavioral tests) or it gets re-justified on other
-  grounds. That's an ADR-0017 supplement someone owes; until it's written, `preset-author` names
-  candidates and hands off rather than deciding unilaterally.
+  **The curation boundary moved, and it is settled.** ADR-0017 put it at "`dev` embeds a curated
+  preset" because embedding meant editing Rust in two coupled spots.
+  [ADR-0022](../../../docs/adrs/0022-build-time-preset-embedding.md) removed that premise —
+  `core/build.rs` globs `presets/*.toml` — and the boundary went on standing on it for another
+  fifteen plans.
+  [ADR-0081](../../../docs/adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)
+  finished the move: **`preset-author` lands presets directly, gated on the behavioral suite, and
+  you curate the *set*** at plan-close cadence — step 3b of the close-ceremony bookkeeping below.
+  `dev` still edits presets when an engine change forces it (a renamed param, a retired default);
+  what it no longer does is courier new content.
+
+  **Know what that gate is worth when you lean on it.** Of the five gates a preset passes,
+  **only `reactivity` drives PCM through the real analyzer** (Plan 0067 Phase 1); `sanity`,
+  `animation`, `distinctness` and `golden` synthesize their analysis frames, which is correct for
+  the questions they ask and means none of them would notice a preset that ignores the music.
+  [`docs/capturing.md`](../../../docs/capturing.md) carries the table.
 
 That's the whole ecosystem: you design, `dev` builds, `preset-author` composes content. The handoffs
 are `architect → dev` (the user's "go"), `dev → architect` (the close ceremony), and
@@ -378,6 +387,32 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    recorded, accept it **with a dated `Outcome` section** (the ADR-0054 and ADR-0074 precedent)
    rather than editing the body or leaving the stale claim standing.
 3. **Refresh `docs/plans/README.md`**: roster → recently-closed, execution order, next-free-number.
+3b. **Curate the preset set — trigger: the plan touched `presets/`.** Since
+   [ADR-0081](../../../docs/adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)
+   the `preset-author` lane commits presets directly, gated on the behavioral suite; curating the
+   *set* is yours, at this cadence. **Output: a one-line verdict in the close notes** — a duty with
+   no stated trigger and no stated output is the kind this project has already proved gets skipped.
+   Two sweeps, both cheap:
+   - **What landed.** Does the new content earn its place against what already ships — or did a
+     family just converge? `shot --presets presets --report` prints the near-duplicate flags and the
+     per-band reactivity in one command; `--report family=<name>` narrows it.
+   - **What the plan made stale — trigger: the plan fixed an engine defect.** A preset written to
+     work *around* that defect keeps paying for it after the fix lands, and **no instrument in this
+     repo can see it**: nothing is wrong, the workaround renders fine and passes every gate. Three
+     known instances were each found only by a human opening a comment — `attractor_leviathan`'s
+     `zoom` pinned at 0.72 to stay inside the fold's disc (lifted to 1.80 a plan *after* ADR-0061
+     made it unnecessary), `attractor_clifford`'s framing cut for the same reason with a header that
+     ended *"the general fix is a per-preset edge treatment — Plan 0055, approved, not built"* and
+     stayed cut after it was built, and `swarm_dense`'s `kaleido_order = 1` dodging a smear ADR-0047
+     had already fixed. It is **one grep**, because this project's preset headers name what they are
+     dodging:
+
+     ```sh
+     grep -rn "ADR-00NN\|Plan 00NN\|design-backlog 00NN" presets/*.toml
+     ```
+
+     The output is a **list for the close notes, not a re-tune** — judging the look is content work
+     and stays in the `preset-author` lane.
 4. **Bump the application version.** This is the step that chronically gets skipped (the version
    sat at `0.2.0` across five feature plans that each forgot it), so treat it as non-optional and
    decide it deliberately every close. Per
