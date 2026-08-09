@@ -128,6 +128,15 @@ pub(crate) struct ColorRamp {
     pub hue_spread: f32,
     /// A/B crossfade position (`0` = palette A alone).
     pub palette_mix: f32,
+    /// Hard palette bands (ADR-0078), already quantized to an integer.
+    ///
+    /// **No `palette_contour` counterpart, and that is the honest scoping rather
+    /// than an omission.** A contour is drawn from `fwidth` across a *fragment's*
+    /// gradient; a stroke takes one palette sample for a whole segment, so there
+    /// is no gradient here for a contour to sit in. Banding reaches every scene,
+    /// contours reach the continuous-field scenes — see `palette.rs`'s module
+    /// docs.
+    pub palette_steps: f32,
     /// Shared saturation modulation, applied to the sampled colour.
     pub saturation: f32,
     /// Stroke brightness, folded in here because these scenes carry it in the
@@ -139,8 +148,13 @@ impl ColorRamp {
     /// The stroke colour at normalized position `u` along the scene's own axis.
     /// Allocation-free; runs per segment (or per generation) on the hot path.
     pub(crate) fn at(self, pal: &crate::render::palette::Palette, u: f32) -> [f32; 3] {
+        // `band_coord` is the canonical banding definition (ADR-0078) — called,
+        // not copied, because this site is Rust. `palette_steps <= 1` returns the
+        // coordinate untouched, so an unbound preset is byte-unchanged.
+        let coord =
+            crate::render::palette::band_coord(self.hue + self.hue_spread * u, self.palette_steps);
         let rgb = crate::render::palette::desaturate(
-            pal.sample(self.hue + self.hue_spread * u, self.palette_mix),
+            pal.sample(coord, self.palette_mix),
             self.saturation,
         );
         [

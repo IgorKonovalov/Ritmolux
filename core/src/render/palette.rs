@@ -34,6 +34,30 @@
 //!
 //! `hue` is the other shared modulation: it offsets the LUT *sample coordinate*
 //! (pre-sample), so it is applied where the coordinate is computed, not here.
+//!
+//! ## Banding (ADR-0078) — the other single source of truth
+//!
+//! `palette_steps` turns the smooth ramp into hard graphic bands by quantizing the
+//! **palette coordinate** rather than the baked LUT: `t' = (floor(t·N) + 0.5)/N`
+//! immediately before the sample. The bake above is untouched, which is the whole
+//! point — the band count has to be *bindable to audio*, and quantizing during the
+//! bake would cost a re-bake and a texture upload every frame, exactly the
+//! per-frame work the bake exists to remove.
+//!
+//! [`band_coord`] is the canonical definition and every sample site mirrors it —
+//! the CPU sites call it, the WGSL sites carry a commented verbatim copy, the way
+//! `apply_saturation` mirrors [`desaturate`]. A test in this module asserts the
+//! copies have not drifted.
+//!
+//! **`palette_contour` is scoped, and the scoping is a fact about the pipeline
+//! rather than a policy.** A screen-constant contour width needs `fwidth`, which
+//! exists only in a fragment shader — and the attractor and the swarm sample the
+//! LUT once *per particle*, in the vertex stage and on the CPU respectively, where
+//! a point sprite has a single palette coordinate and so there is no gradient
+//! across it to contour. So **banding reaches every scene; contours reach the
+//! continuous-field scenes** (the fragment field and reaction-diffusion).
+//! `palette_contour` elsewhere is inert and nothing warns, because the param *is*
+//! known — which is why `presets/README.md` says so beside it.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). `sample` runs per particle per frame in the swarm.
@@ -339,6 +363,74 @@ pub fn write_lut(queue: &wgpu::Queue, texture: &wgpu::Texture, bytes: &[u8; LUT_
     );
 }
 
+// --- Banding (ADR-0078) -----------------------------------------------------
+
+/// `palette_steps` default — 0, which is off: the smooth ramp every preset drew
+/// before this existed.
+pub const DEFAULT_PALETTE_STEPS: f32 = 0.0;
+/// `palette_contour` default — 0, no contour.
+pub const DEFAULT_PALETTE_CONTOUR: f32 = 0.0;
+/// At or below this band count the banding is **off**, and off is the exact
+/// identity rather than a degenerate case of the quantized path: one band would
+/// snap the whole palette to `(0 + 0.5)/1`, a single flat colour.
+pub const MIN_ACTIVE_STEPS: f32 = 1.0;
+/// Ceiling on the band count. Past a few dozen bands over the range a preset's
+/// `color_span` covers, the steps are narrower than the gradient's own 256-entry
+/// resolution and the banding stops being visible as banding.
+pub const MAX_PALETTE_STEPS: f32 = 64.0;
+
+/// The band count the sample sites are handed: clamped into `[0, MAX]`, then
+/// **rounded to an integer**, with a non-finite binding falling back to off.
+///
+/// This is `kaleidoscope.rs`'s `fold_order` treatment for `fold_order`'s reason,
+/// on a different seam. `[smoothing]` and preset dissolves sweep a binding
+/// *continuously* between two settings, and a fractional band count does not step
+/// — it leaves every band boundary crawling across the field, one per frame, which
+/// reads as shimmer rather than as a colour change. Rounding on the CPU keeps that
+/// precondition on the CPU, where it is visible.
+pub fn band_steps(steps: f32) -> f32 {
+    if steps.is_finite() {
+        steps.clamp(0.0, MAX_PALETTE_STEPS).round()
+    } else {
+        DEFAULT_PALETTE_STEPS
+    }
+}
+
+/// Quantize a palette coordinate onto `steps` hard bands — **the canonical
+/// definition** every LUT sample site in the engine mirrors (module docs).
+///
+/// `t' = (floor(t·N) + 0.5)/N` lands on each band's *centre*, so the colour a band
+/// takes is the one the smooth ramp had in the middle of it rather than at its
+/// edge. Below [`MIN_ACTIVE_STEPS`] (tested as `< 1.5`, since [`band_steps`] has
+/// already rounded) the coordinate passes through **untouched** — the exact
+/// identity, which is what keeps every shipped preset and every golden baseline
+/// byte-identical.
+///
+/// Negative and above-1 coordinates are fine and are the common case: the LUT is
+/// repeat-addressed, so a `color_span` above 1 wraps it, and `floor` keeps the
+/// quantization aligned across every wrap.
+pub fn band_coord(t: f32, steps: f32) -> f32 {
+    if steps < 1.5 {
+        return t;
+    }
+    ((t * steps).floor() + 0.5) / steps
+}
+
+/// The contour depth the fragment sites are handed: clamped to `[0, 1]`, with a
+/// non-finite binding falling back to none.
+///
+/// The contour itself has no CPU definition to be canonical — it is drawn from
+/// `fwidth`, which exists only in a fragment shader — so the WGSL is the
+/// implementation and its two copies are what the drift test compares. This is the
+/// part of it that *can* live on the CPU.
+pub fn band_contour(contour: f32) -> f32 {
+    if contour.is_finite() {
+        contour.clamp(0.0, 1.0)
+    } else {
+        DEFAULT_PALETTE_CONTOUR
+    }
+}
+
 /// Apply the shared `saturation` modulation to a sampled color — the canonical
 /// CPU definition the WGSL mirrors (see the module docs). `1.0` is unchanged,
 /// `0.0` is grayscale, `> 1.0` oversaturates.
@@ -542,5 +634,161 @@ mod tests {
                 "mix=0.5 is the A/B midpoint"
             );
         }
+    }
+
+    // --- Banding (ADR-0078) ---------------------------------------------
+
+    /// `palette_steps = N` leaves exactly `N` distinct palette coordinates over
+    /// the gradient's range — the plan's done-when, asserted on the CPU-side
+    /// expression rather than on a capture, because a pixel count would also see
+    /// the bloom, the backdrop and the 8-bit round-trip.
+    #[test]
+    fn six_steps_leave_exactly_six_palette_coordinates() {
+        for n in [2.0f32, 4.0, 6.0, 8.0, 16.0] {
+            let mut seen: Vec<f32> = Vec::new();
+            // A dense sweep of the unit range, which is what a field level
+            // multiplied by a `color_span` of 1 delivers.
+            for i in 0..10_000 {
+                let t = i as f32 / 10_000.0;
+                let q = band_coord(t, n);
+                if !seen.iter().any(|v| (v - q).abs() < 1e-6) {
+                    seen.push(q);
+                }
+            }
+            assert_eq!(
+                seen.len(),
+                n as usize,
+                "palette_steps = {n} produced {} distinct coordinates, not {n}",
+                seen.len()
+            );
+            // ...and each one is a band CENTRE, not an edge.
+            for (k, q) in seen.iter().enumerate() {
+                let _ = k;
+                let centre = ((q * n).floor() + 0.5) / n;
+                assert!(
+                    (q - centre).abs() < 1e-6,
+                    "quantized coordinate {q} is not a band centre at N = {n}"
+                );
+            }
+        }
+    }
+
+    /// Off is the **exact** identity, which is what keeps every shipped preset
+    /// and every golden baseline byte-identical. Not approximately: the
+    /// coordinate is returned untouched rather than run through a one-band
+    /// quantization, which would snap the whole palette to a single colour.
+    #[test]
+    fn banding_below_two_steps_is_the_exact_identity() {
+        for steps in [0.0f32, 1.0] {
+            for i in -50..150 {
+                let t = i as f32 / 100.0;
+                assert_eq!(
+                    band_coord(t, steps),
+                    t,
+                    "palette_steps = {steps} is not the identity at t = {t}"
+                );
+            }
+        }
+        // The quantization does reach a coordinate at 2, or the above is a
+        // statement about a function that never does anything.
+        assert_ne!(band_coord(0.1, 2.0), 0.1);
+    }
+
+    /// The band count never reaches a sample site fractional, for
+    /// `kaleidoscope.rs`'s `fold_order` reason: an eased binding sweeps
+    /// continuously, and a fractional band count leaves every boundary crawling
+    /// rather than stepping.
+    #[test]
+    fn band_steps_is_always_integral_and_in_range() {
+        for &raw in &[-9.0f32, 0.0, 0.4, 3.5, 6.0, 6.4, 6.6, 1e9] {
+            let n = band_steps(raw);
+            assert_eq!(n, n.round(), "band_steps({raw}) = {n} is not an integer");
+            assert!((0.0..=MAX_PALETTE_STEPS).contains(&n));
+        }
+        assert_eq!(band_steps(6.4), 6.0);
+        assert_eq!(band_steps(6.6), 7.0);
+        assert_eq!(band_steps(f32::NAN), DEFAULT_PALETTE_STEPS);
+        assert_eq!(band_steps(f32::INFINITY), DEFAULT_PALETTE_STEPS);
+        assert_eq!(band_contour(2.0), 1.0);
+        assert_eq!(band_contour(-1.0), 0.0);
+        assert_eq!(band_contour(f32::NAN), DEFAULT_PALETTE_CONTOUR);
+    }
+
+    // --- The WGSL copies have not drifted --------------------------------
+    //
+    // ADR-0078's accepted cost: this project has no shader include mechanism, so
+    // the banding expression is a commented verbatim copy at every WGSL sample
+    // site, exactly as `apply_saturation` mirrors `desaturate`. This is the
+    // mitigation, and it is weaker than not having copies — it can only see that
+    // the copies agree with the text below, not that the text is right.
+    //
+    // The scene sources are pulled in with `include_str!` rather than read from
+    // disk, so a moved or renamed file fails to COMPILE here instead of silently
+    // checking nothing.
+
+    /// The canonical WGSL banding function. Must appear byte-for-byte in every
+    /// shader that samples the LUT.
+    const BAND_COORD_WGSL: &str = "\
+fn band_coord(t: f32, steps: f32) -> f32 {
+    if (steps < 1.5) {
+        return t;
+    }
+    return (floor(t * steps) + 0.5) / steps;
+}";
+
+    /// The canonical WGSL contour function. **Fragment stage only** — it calls
+    /// `fwidth`.
+    const BAND_CONTOUR_WGSL: &str = "\
+fn band_contour(t: f32, steps: f32, amount: f32) -> f32 {
+    let f = t * steps;
+    let w = max(fwidth(f), 1e-5);
+    if (steps < 1.5 || amount <= 0.0) {
+        return 1.0;
+    }
+    let d = min(fract(f), 1.0 - fract(f));
+    return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d));
+}";
+
+    const FRAGMENT_FIELD_SRC: &str = include_str!("scenes/fragment_field.rs");
+    const REACTION_DIFFUSION_SRC: &str = include_str!("scenes/reaction_diffusion.rs");
+    const PARTICLE_SHADERS_SRC: &str = include_str!("scenes/particles/shaders.rs");
+
+    #[test]
+    fn every_wgsl_sample_site_carries_the_same_banding_expression() {
+        for (name, src) in [
+            ("fragment_field.rs", FRAGMENT_FIELD_SRC),
+            ("reaction_diffusion.rs", REACTION_DIFFUSION_SRC),
+            ("particles/shaders.rs", PARTICLE_SHADERS_SRC),
+        ] {
+            assert!(
+                src.contains(BAND_COORD_WGSL),
+                "{name}'s copy of the WGSL `band_coord` has drifted from \
+                 palette.rs::band_coord — the two must stay one function written \
+                 twice, not two functions that agree on some inputs"
+            );
+        }
+    }
+
+    /// ...and the contour reaches the **fragment-stage** scenes only. Asserted,
+    /// not merely documented: the attractor's LUT read is in the vertex stage,
+    /// where `fwidth` does not exist, so a copy landing there is a compile error
+    /// at best and a silent nothing at worst.
+    #[test]
+    fn the_contour_reaches_the_fragment_sites_and_not_the_vertex_one() {
+        for (name, src) in [
+            ("fragment_field.rs", FRAGMENT_FIELD_SRC),
+            ("reaction_diffusion.rs", REACTION_DIFFUSION_SRC),
+        ] {
+            assert!(
+                src.contains(BAND_CONTOUR_WGSL),
+                "{name}'s copy of the WGSL `band_contour` has drifted"
+            );
+        }
+        assert!(
+            !PARTICLE_SHADERS_SRC.contains("fn band_contour"),
+            "particles/shaders.rs grew a `band_contour` — its LUT read is in the \
+             VERTEX stage, which has no derivatives and no gradient across a point \
+             sprite to contour (ADR-0078)"
+        );
     }
 }

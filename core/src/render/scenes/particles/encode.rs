@@ -61,6 +61,11 @@ pub(super) struct UniformInputs {
     pub(super) hue_center: f32,
     pub(super) saturation: f32,
     pub(super) palette_mix: f32,
+    /// Hard palette bands (ADR-0078), already quantized to an integer. No
+    /// `palette_contour` counterpart: this scene's LUT read is in the VERTEX
+    /// stage, which has no derivatives, and a point sprite has one palette
+    /// coordinate — so there is no gradient across it to contour.
+    pub(super) palette_steps: f32,
     pub(super) zoom: f32,
     pub(super) pan: [f32; 2],
     pub(super) perspective: f32,
@@ -273,10 +278,20 @@ pub(super) fn upload_uniforms(
             // 1.0 rather than a rate they would read as zero and black
             // themselves out with. `z`/`w` are unused since the age colour
             // channel retired.
+            // `z` carries `palette_steps` (ADR-0078). It has been FREE since
+            // Plan 0074 Phase 3 retired the age colour channel, and it is
+            // family-independent — banding is a property of the palette, not of
+            // the attractor — so it is written the same in both arms rather than
+            // joining the `figure()` branch above.
             em: if inputs.family.figure().is_some() {
-                [emergence_rate(inputs.emergence), 0.0, 0.0, 0.0]
+                [
+                    emergence_rate(inputs.emergence),
+                    0.0,
+                    palette::band_steps(inputs.palette_steps),
+                    0.0,
+                ]
             } else {
-                [0.0, 1.0, 0.0, 0.0]
+                [0.0, 1.0, palette::band_steps(inputs.palette_steps), 0.0]
             },
         }),
     );

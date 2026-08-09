@@ -1,8 +1,8 @@
 # ADR-0077 — The symmetry stage owns one coordinate map, applied at one sample
 
-> **Status:** proposed
+> **Status:** accepted (Plan 0064, closed 2026-08-09)
 > **Date:** 2026-08-04
-> **Related plan(s):** [0064](../plans/0064-the-symmetry-stage-and-the-banded-palette.md)
+> **Related plan(s):** [0064](../plans/done/0064-the-symmetry-stage-and-the-banded-palette.md)
 > **Supplements:** [0047](0047-kaleidoscope-fold-domain-disc-with-falloff.md),
 > [0061](0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)
 
@@ -148,3 +148,26 @@ a thousand source texels per destination pixel against a bilinear sampler's four
 
 The zoom's exactness is the same identity read differently: the map is periodic in `log r` with
 period `L`, so an offset of `L` is the identity map, not an approximation of it.
+
+## Outcome — 2026-08-09, at Plan 0064's close
+
+Accepted as decided. One claim in the Context did not survive contact with the rendered grid, and it
+is recorded here rather than edited out of the body.
+
+**"The inner rings alias severely" was not observed.** The minification arithmetic in the Notes is
+correct — a linear compression of 32 at `radial = 2` after five repeats is real — but Plan 0064's
+Phase 4 contact sheets show **no visible aliasing onset** at any of six `kaleido_inner` cutoffs, on
+any of three structurally different sources, at capture resolution. The severity was inferred from
+the texel ratio and never measured, and the ratio turned out not to predict what the eye sees: the
+inner rings are also the *smallest* and *dimmest* part of the picture, so the noise lands where
+there is least signal to corrupt.
+
+`kaleido_inner` therefore ships as a **styling control with a protective side effect**, not as the
+rescue this ADR expected it to be, and its `0.06` default is chosen for costing nothing rather than
+for fixing something visible. The "one radius policy" argument that put the cutoff inside this stage
+is untouched — it is a policy question, not an aliasing one, and the repeat subsuming
+`kaleido_edge` (which the implementation confirmed) is the stronger half of it.
+
+This does **not** revive Alternative C. The cutoff still costs nothing and still matches the
+reference's bright central disc; what changed is only the reason to keep it. The deferred mip
+chain with a Jacobian LOD stays deferred, and is now unmotivated by anything anyone has seen.
