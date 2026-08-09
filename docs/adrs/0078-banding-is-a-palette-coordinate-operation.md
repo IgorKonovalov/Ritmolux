@@ -1,8 +1,8 @@
 # ADR-0078 — Banding is an operation on the palette coordinate, not on the baked LUT
 
-> **Status:** proposed
+> **Status:** accepted (Plan 0064, closed 2026-08-09)
 > **Date:** 2026-08-04
-> **Related plan(s):** [0064](../plans/0064-the-symmetry-stage-and-the-banded-palette.md)
+> **Related plan(s):** [0064](../plans/done/0064-the-symmetry-stage-and-the-banded-palette.md)
 > **Supplements:** [0021](0021-shared-palette-system.md)
 
 ## Context

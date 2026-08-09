@@ -1659,7 +1659,7 @@ close-ceremony `git mv` that Plan 0060 already proved nobody catches by eye.
 
 ## 0078 — `kaleido_tile` is a discrete quantity that is not quantized, so it is the one term of the composed map an author cannot bind
 
-**Raised by:** `preset-author`, at [Plan 0064](plans/0064-the-symmetry-stage-and-the-banded-palette.md)
+**Raised by:** `preset-author`, at [Plan 0064](plans/done/0064-the-symmetry-stage-and-the-banded-palette.md)
 Phase 6. **Owner if taken:** `dev` — it is a CPU-side quantization in
 `core/src/render/kaleidoscope.rs`, beside the one `kaleido_spiral` already has.
 
@@ -1705,7 +1705,7 @@ difference an author meets on their first attempt.
 
 ## 0079 — an accumulating figure rendered with `trails = 0` is not a sparse source, it is a blank one, and a whole third of a decision grid was unreadable because of it
 
-**Raised by:** `architect`, reading [Plan 0064](plans/0064-the-symmetry-stage-and-the-banded-palette.md)
+**Raised by:** `architect`, reading [Plan 0064](plans/done/0064-the-symmetry-stage-and-the-banded-palette.md)
 Phase 3's sample set at Phase 4. **Owner if taken:** whoever next builds a capture grid — this is a
 methodology note, not a code change.
 
