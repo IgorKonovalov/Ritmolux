@@ -293,7 +293,7 @@ correction.
 ## 0042 — the downbeat estimator locks on ~3 % of audible time, so the gated bar variables are almost always fallback
 
 - **PROMOTED 2026-08-04 → [ADR-0082](adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md) +
-  [Plan 0068](plans/0068-why-the-downbeat-rarely-locks.md)** — as a **diagnosis**, not a fix. The
+  [Plan 0068](plans/done/0068-why-the-downbeat-rarely-locks.md)** — as a **diagnosis**, not a fix. The
   ADR records the one thing this entry insists on: `CONFIDENCE_THRESHOLD` does not move to buy lock
   rate, because adjusting a safety gate using data collected while the gate was closed is circular.
   The plan builds the decomposition the 1 Hz column cannot give (four alignment scores, raw and
