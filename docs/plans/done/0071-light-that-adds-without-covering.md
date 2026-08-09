@@ -1,15 +1,22 @@
 # 0071 — Light that adds without covering: `occlude`, decided from a sample set
 
-> **Status:** **in-progress 2026-08-09** (was approved 2026-08-04) — gated by nothing. It touches `post.rs`'s
-> backdrop composite, which [0064](0064-the-symmetry-stage-and-the-banded-palette.md) does not (that
-> is the fold shader). Phases 1-2 are `dev` and end in a rendered grid; **Phase 3 is `human`** (the
-> user picks the default, in motion, over a **lit** backdrop — at `bg_bright = 0` the two models are
-> identical) and gates Phases 4-5, so the plan does not close in one session. **Moves no golden
-> baseline at the default `1.0`**; if Phase 3 moves the default, the re-bless is priced there first.
+> **Status:** **done 2026-08-09** — Phases 1-4 shipped as `05b7c7c` (the mechanism) / `21d50bf` (the
+> sample-set note) / `b4e7611` (the docs). **Phase 5 is `human` and deliberately outstanding**: it is
+> the `preset-author` retune, to run as one pass with design-backlog 0038 (the plan's text says "0038
+> and 0058"; 0058 closed by content on 2026-08-04, corrected at the phase below), and closing this
+> plan does not discharge it — see `docs/plans/README.md` → Standing.
+> Mode 4 review: **no blockers, two majors, three minors, two nits**; the majors are bookkeeping the
+> implementation earned rather than defects, and both are repaired at this close. **Phase 3's
+> verdict: the default stays `1.0`**, judged live in the app at the rich tier over `bg_bright` 0.35
+> and 0.60, on the grounds that the difference is almost negligible across the sampled
+> configurations; **no per-preset values yet**, so the re-bless the phase priced was never incurred
+> and **no golden baseline moved** — measured as byte-identity against a clean-`main` bless of all 19
+> baselines, not merely within tolerance. Three ADR-0085 claims were falsified and are recorded in
+> that ADR's [Outcome](../../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md#outcome-2026-08-09-after-plan-0071).
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0085](../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md), supplementing [0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)
-> **Closes:** [design-backlog 0040](../design-backlog.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle)
+> **Related ADRs:** [0085](../../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md), supplementing [0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)
+> **Closes:** [design-backlog 0040](../../design-backlog-archive.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle)
 
 ## TL;DR
 
@@ -42,7 +49,7 @@ looking.
 
 ## Decision
 
-Per [ADR-0085](../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md): `occlude`, a
+Per [ADR-0085](../../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md): `occlude`, a
 bindable scalar in `[0, 1]` at the backdrop composite, default `1.0`. We rejected a two-valued enum
 (less expressive at identical cost, and it would add a fourth quantization seam to a codebase that
 has already been bitten by three), deriving alpha from luminance centrally (ADR-0056's standing
@@ -88,6 +95,20 @@ flowchart TD
   two, which is what makes it a blend rather than a switch. **Both composite paths are tested** — a
   preset with no active post stage and one with the full chain, since a factor applied to only one
   of them is the bug this phase can most plausibly ship.
+
+> **Corrected at the close (2026-08-09): "the one seam" does not exist, and neither does "both paths
+> take the same factor".** `post.rs:585` chooses a *load op*; the arithmetic is fixed-function
+> blending in whichever pass lands on the backdrop, and the alpha that blend consumes is emitted by
+> that pass's own shader. The factor landed in **six** places — the three post stages through a new
+> `Fold::Over { occlude }`, and the three premultiplied-present scenes through a new
+> `Scene::set_occlude` (the trait's fourth optional method; it meets
+> [ADR-0030](../../adrs/0030-scene-target-size-hot-path-hook.md)'s three conditions, checked at this
+> close). The scope expansion was taken with the user's explicit approval mid-phase. And the two
+> composite paths do **not** do the same arithmetic: the additive families blend colour `One`/`One`,
+> so with an empty chain their backdrop already survives whole and there is nothing there for
+> `occlude` to scale — which is why the empty-chain half of this done-when is met with a
+> premultiplied-present scene rather than an additive one. All three corrections are in
+> [ADR-0085's Outcome](../../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md#outcome-2026-08-09-after-plan-0071).
 
 ### Phase 2 — The sample set, over a lit backdrop, at both ends and between
 
@@ -166,11 +187,16 @@ Two observations, offered as orientation and **not** as the Phase 3 verdict:
   ceiling is adjustable.
 - **Files touched:** presets under `presets/`.
 - **Done when:** judged in motion. **Worth running together with
-  [backlog 0038](../design-backlog.md#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned)
-  and [0058](../design-backlog.md#0058--thirteen-presets-bind-the-fold-and-eleven-of-them-have-not-chosen-an-edge-treatment-because-until-now-there-was-nothing-to-choose)**
+  [backlog 0038](../../design-backlog.md#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned)
+  and [0058](../../design-backlog.md#0058--thirteen-presets-bind-the-fold-and-eleven-of-them-have-not-chosen-an-edge-treatment-because-until-now-there-was-nothing-to-choose)**
   — all three are retunes of the same shipped set against a composite that moved underneath it, all
   three are judged over a lit backdrop, and doing them separately means walking the same presets
   three times.
+
+> **Corrected at the close (2026-08-09): backlog 0058 had already closed when this was written.** It
+> was closed by content on 2026-08-04 (`859ec66` — all thirteen fold-binding presets now name a
+> `kaleido_edge`), four days before this plan's `dev` session. The pass is **this phase plus backlog
+> 0038**, not three entries. Carried in `docs/plans/README.md` → Standing.
 
 ## Data shapes
 

@@ -65,6 +65,7 @@ cannot express them.
 | 0036 | Does the fold stop folding the backdrop, and does that lose a look? | **Retired unfired 2026-08-04.** [ADR-0055](adrs/0055-backdrop-leaves-the-post-chain.md) shipped 2026-07-31; three full-library content passes have run since and no preset was reported worse. The way back is recorded in the archived body if it ever bites |
 | 0037 | The fold covers a disc, and on a field scene that reads worse | [ADR-0061](adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md) + [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md) |
 | 0039 | Four bind-group layouts are shared by pipelines live in one frame | [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md) + [Plan 0053](plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) |
+| 0040 | Additive light occludes by geometry, so a dim figure over a lit backdrop reads as dark speckle | [ADR-0085](adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) + [Plan 0071](plans/done/0071-light-that-adds-without-covering.md). **Closed 2026-08-09.** `occlude` shipped as a bindable scalar at the backdrop composite and **the default stayed at `1.0`** — decided by the user in the running app over a lit backdrop at 0.35 and 0.60, not by the argument. So the answer to "is coverage the right model" was *yes, keep it, and make the exception reachable*. **The retune it invites is NOT closed** — Plan 0071 Phase 5, still outstanding, grouped with [0038](#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned) |
 | 0041 | The line seam's lit-backdrop guard discriminates on ~5 pixels | [Plan 0053](plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) |
 | 0043 | Every reactivity instrument diffs against **silence** | [ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) + [Plan 0056](plans/done/0056-clamp-occupancy-and-the-axis-anchor.md) |
 | 0044 | The axis rebuild silently re-pointed every sub-crossover `bin()` probe | [ADR-0063](adrs/0063-address-the-spectrum-by-frequency.md) + [Plan 0056](plans/done/0056-clamp-occupancy-and-the-axis-anchor.md) |
@@ -247,7 +248,7 @@ point this entry is the starting measurement rather than a fresh investigation.
 - **For:** `preset-author`. This is genuinely content-lane work; the engine behaved as designed.
 - **ROUTED 2026-08-01 → `preset-author`, as a content pass rather than a plan.** The user's
   call at the Plan 0051 close: this needs no engine change and no ADR, so it goes to the lane
-  directly. It pairs naturally with [0040](#0040) — both are retunes of the same shipped set
+  directly. It pairs naturally with [0040](design-backlog-archive.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle) (**closed 2026-08-09**; its retune half is Plan 0071 Phase 5, which this should run with) — both are retunes of the same shipped set
   against a composite whose behaviour has changed under them.
 
 The user's report was "clifford is really dim". Rendering `attractor_clifford` at an identical
@@ -278,52 +279,6 @@ premise retired with Plan 0045. The *conclusion* stands and is if anything stron
 still has somewhere to go when luminance does not — but the mechanism is now a roll-off, not a
 clip. Per this file's append-only rule the passage is left standing; this paragraph is the
 correction.
-
----
-
-## Entries 0040-0041 — from the Plan 0051 Mode 4 review (2026-08-01)
-
----
-
-## 0040 — additive light occludes by geometry, so a dim figure over a lit backdrop reads as dark speckle
-
-- **PROMOTED 2026-08-04 → [ADR-0085](adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) +
-  [Plan 0071](plans/0071-light-that-adds-without-covering.md)** — `occlude`, a bindable scalar at
-  the backdrop composite, so the resolve is `scene + bg * (1 - alpha * occlude)`. The entry's
-  "per-preset opt-in" shape was taken, as a **continuous** scalar rather than the two-valued enum it
-  suggested: the scalar contains both endpoints at identical cost and avoids a fourth quantization
-  seam. Default `1.0` is byte-identical to today; whether it stays there is Phase 3's `human` call
-  from a rendered sample set over a **lit** backdrop, per this entry's own instruction that the
-  question wants samples rather than an argument.
-- **Raised:** 2026-08-01, from `architect`, at Plan 0051's Mode 4 review.
-- **Verified against code:** yes — rendered. `swarm_storm` over `bg_bright = 0.35` at
-  `brightness = 0.02` renders as black specks on the backdrop; at the shipped-value backdrop the
-  same run's darkest pixel is (71,13,22) against a backdrop of (138,67,56).
-- **For:** `architect` (a look decision, ADR-worthy if taken), informed by `preset-author`.
-
-[ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md) made a scene emit alpha equal to
-its **coverage**, which fixed the black notches and rims. Its last Negative bullet left one thing
-open: coverage-as-alpha means a fragment occludes the backdrop **whatever light it emits**. The
-resolve is `c * g + bg * (1 - g)`, so a fragment darkens the backdrop wherever `c < bg`.
-
-At the shipped near-black floors this is unobservable — all sixteen affected presets sit between
-`bg_bright` 0.009 and 0.070. It matters because **the fix invites raising them**: the black rim was
-the reason the swarm and line families were floored (`lsystem_fern.toml:98-103` records the
-symptom, misattributing it to the lifted floor washing out the additive halo — a real effect, but
-the rim was contributing and the tradeoff has changed). An author acting on that invitation meets a
-new ceiling: `bg_bright` can rise only to the **dimmest emitted luminance in the figure**. Past it,
-the depth-parallaxed far particles and the `glow`-dimmed strokes stop fading out and start reading
-as dark speckle. `presets/README.md` now states this.
-
-**The open question is whether that is the right model.** An additive look arguably wants *no*
-occlusion — light adds, it does not cover — which would mean deriving the seam's alpha from
-something other than pure geometric coverage, or giving the scene a bindable choice between the two
-semantics. ADR-0056 rejected deriving coverage centrally from luminance (a legitimately dark
-covered pixel would go transparent, and it puts scene judgement in a shared pass); a per-scene or
-per-preset *opt-in* is a different proposal and is not covered by that rejection. Nothing is broken
-today — post-fix is brighter than pre-fix at every pixel — so this is a look decision, not a defect.
-Settling it wants rendered samples of the same preset under both semantics at a raised backdrop,
-per the concrete-examples workflow, not an argument.
 
 ---
 
@@ -1157,7 +1112,7 @@ ordering or sorting story the additive pipeline has never required — a filled 
 nothing in this engine has ever had to decide what is in front. That is why
 [ADR-0084](adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) rejected it as a
 bundled decision (Alternative B) rather than on its merits. It also sits adjacent to
-[0040](#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle)
+[0040](design-backlog-archive.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle)
 and its plan, which is the *other* place the additive model's occlusion behaviour is being
 questioned — anyone taking this should read that first.
 

@@ -192,7 +192,7 @@ walk, not a reorderable stage.
   content wants to be post-bloom (fully dry), the junction moves — it is one position in a
   compile-time walk — and ADR-0090 gains an Outcome line.
 - **Sequencing against the live roster.** This plan touches `core/src/render/mod.rs` and
-  `post.rs`, which the in-flight [0071](0071-light-that-adds-without-covering.md) lane is
+  `post.rs`, which the in-flight [0071](done/0071-light-that-adds-without-covering.md) lane is
   also editing. Do not start Phase 1 in a worktree until 0071's lane has landed or the seam
   is coordinated.
 

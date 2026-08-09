@@ -141,8 +141,9 @@ list; `ls presets/*.toml` is the count.
 Beyond a system's own parameters, **every** preset may also bind the engine-wide
 compositing controls — the shared view transform (`zoom`, `pan_x`, `pan_y`), the
 background pass (`bg_*`), feedback `trails`, the screen-space kaleidoscope
-(`kaleido_*`), `bloom_*`, the frame `exposure`, and the final ink-on-paper remap
-(`ink_*` / `paper_*`). Those are documented under
+(`kaleido_*`), `bloom_*`, `occlude` (how much of the figure's coverage the
+backdrop resolves against), the frame `exposure`, and the final ink-on-paper
+remap (`ink_*` / `paper_*`). Those are documented under
 [Engine-wide controls](../presets/README.md#engine-wide-controls-plan-0018).
 
 They run in a fixed order, which is worth knowing when a look does not compose the
