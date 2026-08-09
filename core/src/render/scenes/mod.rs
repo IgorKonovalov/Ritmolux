@@ -246,6 +246,27 @@ pub(crate) trait Scene {
     /// Phase 2, the third and first hot-path widening — ADR-0030).
     fn set_target_size(&mut self, _width: u32, _height: u32) {}
 
+    /// How much of this scene's coverage the **backdrop** resolves against, for
+    /// the frame it is about to render (ADR-0085). `1.0` is coverage-as-occlusion
+    /// — what every frame did before `occlude` existed — and `0.0` is light that
+    /// adds without covering.
+    ///
+    /// **Called unconditionally every frame**, immediately before
+    /// [`render`](Self::render), in the same spirit as
+    /// [`set_target_size`](Self::set_target_size). The renderer hands a literal
+    /// `1.0` whenever a post stage is active, because then the scene draws into a
+    /// scratch offscreen with no backdrop under it and the chain's last stage owns
+    /// the seam instead — a scene must never apply this twice.
+    ///
+    /// Only a scene that **presents premultiplied over the backdrop** (ADR-0026 —
+    /// the reaction-diffusion, attractor and fragment-field presents) has anything
+    /// to do here. The additive families draw through
+    /// [`gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`](crate::render::gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
+    /// whose colour destination factor is `One`: with no stage active their light
+    /// already adds to the backdrop rather than replacing it, so there is no
+    /// occlusion at that seam for this to scale. Default no-op.
+    fn set_occlude(&mut self, _occlude: f32) {}
+
     /// Advance simulation state by `dt` real seconds (Plan 0014 Phase 2). The
     /// renderer injects the elapsed time each frame; a feedback scene steps its
     /// fixed-timestep accumulator here and a CPU-integrated scene (the swarm)

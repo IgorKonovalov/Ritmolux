@@ -692,6 +692,11 @@ pub struct AttractorScene {
     /// reach for does not.
     brightness: f32,
     fade: f32,
+    /// How much of this cloud's coverage the backdrop resolves against
+    /// (ADR-0085). Set by the renderer every frame through
+    /// [`Scene::set_occlude`](super::Scene::set_occlude) — not a named param, so
+    /// `reset_params` leaves it alone.
+    occlude: f32,
     /// Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5): the per-particle
     /// seed jitter band + shared desaturation + A/B crossfade.
     hue_spread: f32,
@@ -825,6 +830,7 @@ impl AttractorScene {
             hue: DEFAULT_HUE,
             brightness: DEFAULT_BRIGHTNESS,
             fade: DEFAULT_FADE,
+            occlude: crate::render::post::DEFAULT_OCCLUDE,
             hue_spread: DEFAULT_HUE_SPREAD,
             hue_center: DEFAULT_HUE_CENTER,
             saturation: DEFAULT_SATURATION,
@@ -1116,6 +1122,10 @@ impl Scene for AttractorScene {
         "attractor"
     }
 
+    fn set_occlude(&mut self, occlude: f32) {
+        self.occlude = occlude;
+    }
+
     fn advance(&mut self, dt: f32) {
         self.dt = dt;
         // Drain the accumulator one fixed step at a time, clamped so a long stall
@@ -1340,6 +1350,7 @@ impl Scene for AttractorScene {
             hue,
             brightness,
             fade,
+            occlude,
             hue_spread,
             hue_center,
             saturation,
@@ -1402,6 +1413,7 @@ impl Scene for AttractorScene {
                 hue: *hue,
                 brightness: *brightness,
                 fade: *fade,
+                occlude: *occlude,
                 hue_spread: *hue_spread,
                 hue_center: *hue_center,
                 saturation: *saturation,

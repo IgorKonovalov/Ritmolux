@@ -189,7 +189,7 @@ struct Present {
     a: vec4<f32>,
     // x: color_span, y: color_center, z: saturation, w: palette_mix
     b: vec4<f32>,
-    // x: zoom, yz: pan (field-space view transform, ADR-0018), w: unused
+    // x: zoom, yz: pan (field-space view transform, ADR-0018), w: occlude (ADR-0085)
     c: vec4<f32>,
 }
 @group(0) @binding(0) var present_field: texture_2d<f32>;
@@ -346,7 +346,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // backdrop, so bright contours keep full brightness), and alpha only gates how
     // much backdrop reveals. Over the default black backdrop this is byte-identical
     // to the prior opaque present.
-    return vec4<f32>(out_col, structure);
+    //
+    // `occlude` (pp.c.w) scales that coverage: how much of the backdrop the field
+    // holds out where it does have presence (ADR-0085). Reached only when no post
+    // stage is active — the chain's last stage owns the seam otherwise, and the
+    // renderer hands a literal 1.0 here.
+    return vec4<f32>(out_col, structure * pp.c.w);
 }
 "#;
 
@@ -373,7 +378,7 @@ struct PresentParams {
     a: [f32; 4],
     /// x: color_span, y: color_center, z: saturation, w: palette_mix.
     b: [f32; 4],
-    /// x: zoom, yz: pan (view transform, ADR-0018), w: unused.
+    /// x: zoom, yz: pan (view transform, ADR-0018), w: occlude (ADR-0085).
     c: [f32; 4],
 }
 
@@ -651,6 +656,11 @@ pub struct ReactionDiffusionScene {
     zoom: f32,
     pan_x: f32,
     pan_y: f32,
+    /// How much of this field's coverage the backdrop resolves against
+    /// (ADR-0085). Set by the renderer every frame through
+    /// [`Scene::set_occlude`](super::Scene::set_occlude) — not a named param, so
+    /// `reset_params` leaves it alone.
+    occlude: f32,
     /// The active baked palette pair; uploaded to the present LUT textures when
     /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
     palette: Palette,
@@ -702,6 +712,7 @@ impl ReactionDiffusionScene {
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
+            occlude: crate::render::post::DEFAULT_OCCLUDE,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
         }
@@ -811,6 +822,10 @@ impl Scene for ReactionDiffusionScene {
         self.time = time;
     }
 
+    fn set_occlude(&mut self, occlude: f32) {
+        self.occlude = occlude;
+    }
+
     fn set_palette(&mut self, palette: &Palette) {
         // Uploaded to the present LUT textures in `render` (deferred — resources
         // build lazily on first render). Cheap array copy, off the hot path.
@@ -907,6 +922,7 @@ impl Scene for ReactionDiffusionScene {
             zoom,
             pan_x,
             pan_y,
+            occlude,
             palette,
             palette_dirty,
             ..
@@ -929,7 +945,7 @@ impl Scene for ReactionDiffusionScene {
             bytemuck::bytes_of(&PresentParams {
                 a: [*hue, *contour, *hatch, *glow],
                 b: [*color_span, *color_center, *saturation, *palette_mix],
-                c: [*zoom, *pan_x, *pan_y, 0.0],
+                c: [*zoom, *pan_x, *pan_y, *occlude],
             }),
         );
 

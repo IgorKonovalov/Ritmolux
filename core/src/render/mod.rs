@@ -40,7 +40,10 @@ pub mod metrics;
 pub mod overlay;
 mod overlay_font;
 pub mod palette;
-mod post;
+// `pub(crate)` for the same reason the stage modules are: the preset loader's
+// typo check unions every global vocabulary, and since ADR-0085 one of them —
+// `occlude` — belongs to the chain rather than to a stage inside it.
+pub(crate) mod post;
 pub mod scenes;
 #[cfg(feature = "text")]
 pub mod text;
@@ -163,6 +166,14 @@ enum ParamRoute {
     Background,
     /// A post-composite stage, by its fixed index in the chain (ADR-0031).
     Stage(usize),
+    /// The **composite seam** itself (`occlude`, ADR-0085) — how much of the
+    /// scene's coverage the backdrop resolves against.
+    ///
+    /// Not a [`Stage`](Self::Stage) because it belongs to no stage: it reaches
+    /// whichever stage folds onto the backdrop this frame *and*, when none does,
+    /// the scene's own present. So a preset that switches bloom off does not
+    /// thereby change how much of its sky the figure covers.
+    Composite,
     /// The terminal engine-wide ink pass (`ink_*` / `paper_*`), outside the chain
     /// (ADR-0032).
     Ink,
@@ -201,6 +212,11 @@ enum ParamRoute {
 fn resolve_route(name: &str, system: SystemKind) -> ParamRoute {
     if background::PARAMS.contains(&name) {
         return ParamRoute::Background;
+    }
+    // Ahead of the stages, and disjoint from them: a chain-level name has no stage
+    // index to route to (ADR-0085).
+    if post::CHAIN_PARAMS.contains(&name) {
+        return ParamRoute::Composite;
     }
     if let Some(stage) = post::stage_for(name) {
         return ParamRoute::Stage(stage);
@@ -531,6 +547,9 @@ fn evaluate_preset(
             ParamRoute::Stage(stage) => {
                 side.chain.set_stage_param(stage, &binding.name, value);
             }
+            ParamRoute::Composite => {
+                side.chain.set_chain_param(&binding.name, value);
+            }
             ParamRoute::Tonemap => {
                 if let Some(terminal) = terminal.as_mut() {
                     terminal.tonemap.set_param(&binding.name, value);
@@ -586,6 +605,18 @@ fn composite_into(
     // than a fixed grid (Plan 0027 Phase 2). A no-op for every other scene, and a
     // cheap unchanged-compare for the attractor.
     scene.set_target_size(target.size.0, target.size.1);
+    // `occlude` reaches whichever pass lands on the backdrop, and that is the
+    // chain's last stage whenever one is active (ADR-0085). With an empty chain
+    // the scene draws straight onto `destination` and owns the seam itself, so the
+    // factor goes to the scene *instead* — never to both, which would apply it
+    // twice. A scene that presents premultiplied (reaction-diffusion, attractor,
+    // fragment field) consumes it; the additive families ignore it, their colour
+    // blend having no occlusion to scale.
+    scene.set_occlude(if target.routing.scene_stage().is_some() {
+        post::DEFAULT_OCCLUDE
+    } else {
+        side.chain.occlude()
+    });
     scene.render(&ctx.queue, encoder, &target.view, target.aspect);
     // The backdrop and the scene, plus whatever the active chain stages encode on
     // their way down.

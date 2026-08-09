@@ -53,6 +53,10 @@ pub(super) struct UniformInputs {
     /// packed, not here, so the guard has exactly one site.
     pub(super) brightness: f32,
     pub(super) fade: f32,
+    /// How much of the cloud's coverage the backdrop resolves against (ADR-0085),
+    /// carried to the present pass through the decay uniform's second component.
+    /// Not a named param — the renderer sets it on the scene every frame.
+    pub(super) occlude: f32,
     pub(super) hue_spread: f32,
     pub(super) hue_center: f32,
     pub(super) saturation: f32,
@@ -287,7 +291,9 @@ pub(super) fn upload_uniforms(
         &pipelines.decay_uniform,
         0,
         bytemuck::bytes_of(&DecayUniform {
-            k: [decay, 0.0, 0.0, 0.0],
+            // y: `occlude` — the present pass reads it out of this same buffer
+            // (ADR-0085), so one write feeds the decay and the composite seam.
+            k: [decay, inputs.occlude, 0.0, 0.0],
         }),
     );
 }

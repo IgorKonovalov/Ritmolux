@@ -166,11 +166,15 @@ fn variant_roster_reminder(system: SystemKind) {
 /// pass (ADR-0032); only `bg_*` goes to a pass the renderer drives directly. The
 /// *names* are what this const is about — see `render::ParamRoute` for who
 /// actually owns each.
-pub const GLOBAL_PARAMS: [&[&str]; 6] = [
+pub const GLOBAL_PARAMS: [&[&str]; 7] = [
     crate::render::background::PARAMS,
     crate::render::trails::PARAMS,
     crate::render::kaleidoscope::PARAMS,
     crate::render::bloom::PARAMS,
+    // The composite seam's own vocabulary (`occlude`, ADR-0085) — owned by the
+    // chain rather than by any stage in it, which is why it is a seventh entry
+    // and not part of one of the three above.
+    crate::render::post::CHAIN_PARAMS,
     crate::render::tonemap::PARAMS,
     crate::render::ink::PARAMS,
 ];

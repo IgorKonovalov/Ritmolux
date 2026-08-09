@@ -375,7 +375,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// Recombine body: the untouched source plus the finest pyramid level, scaled.
 /// Same prelude.
 const MIX_SHADER: &str = r#"
-struct Mix { v: vec4<f32> } // x: amount / the pyramid's geometric sum
+struct Mix { v: vec4<f32> } // x: amount / the pyramid's geometric sum, y: occlude
 
 @group(0) @binding(0) var samp: sampler;
 @group(0) @binding(1) var t_src: texture_2d<f32>;
@@ -394,7 +394,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // draw blends OVER the backdrop, and a source alpha past 1 makes the blend's
     // `1 - src.a` factor negative, which *subtracts* the backdrop under exactly
     // the frame's brightest regions. Clamp the coverage, keep the light.
-    return vec4<f32>(sum.rgb, clamp(sum.a, 0.0, 1.0));
+    //
+    // Then `occlude` scales the clamped coverage — how much of it the backdrop
+    // resolves against (ADR-0085). Applied AFTER the clamp, so it can only ever
+    // reduce what the blend holds out, never restore an over-range alpha.
+    return vec4<f32>(sum.rgb, clamp(sum.a, 0.0, 1.0) * u.v.y);
 }
 "#;
 
@@ -1047,7 +1051,10 @@ impl PostStage for Bloom {
             &res.mix_uniform,
             0,
             bytemuck::bytes_of(&V4 {
-                v: [amount / norm, 0.0, 0.0, 0.0],
+                // y: `occlude` — the recombine is this stage's only pass that
+                // writes outside itself, so it is the one that lands on the
+                // backdrop (ADR-0085). 1.0 folding into a scratch offscreen.
+                v: [amount / norm, fold.alpha_scale(), 0.0, 0.0],
             }),
         );
 
