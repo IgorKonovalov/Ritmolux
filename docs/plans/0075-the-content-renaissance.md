@@ -1,6 +1,6 @@
 # 0075 — The content renaissance: the library is rebuilt as worlds, by replacement cohorts
 
-> **Status:** **approved 2026-08-09** — direction decided as
+> **Status:** **in-progress 2026-08-09** — direction decided as
 > [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md), phase roster
 > user-approved the same day. The named guesses (cohort size, cohort count, keep-list
 > criteria) stand as defaults; Phase 4's brief is where they get re-decided cheaply if the
