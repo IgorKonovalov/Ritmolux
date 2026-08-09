@@ -1,10 +1,24 @@
 # 0046 — Transformed feedback: the past learns to move
 
-> **Status:** in-progress 2026-08-09 — `dev` implementing (runs after Plan 0045; same render files)
+> **Status:** **done 2026-08-09** — all five phases landed as `f2e6ed6` (the affine + the `dt` fix) /
+> `24f4bfc` (the `[feedback]` table) / `0816516` (the attractor joins) / `429396d` (the docs) /
+> `16802ae` (the Phase 5 verdict, **run by the user on 2026-08-09**). Mode 4 review at the close:
+> **no blockers, no majors, four minors, two nits.** Verified rather than taken on trust: the
+> transform's aspect comes from the **render target** on both sinks (`trails.rs`'s `resolve` now
+> takes `surface`, which it had been ignoring; the attractor's is `Scene::render`'s `aspect`
+> parameter) — this is ADR-0037's third repeat, and the fix carries a negative control, 45x46
+> shipped against 44x71 with the aspect forced to `1.0`; the identity is a CPU-computed `select` on
+> the literal `in.uv` rather than an arithmetic round-trip; the `[feedback]` rosters are closed and
+> reject at load; and **all 20 pre-existing golden baselines are hash-identical to a clean-`main`
+> bless, with exactly three files added** (`composite_warp_swirl/_ripple/_fisheye.png`) —
+> re-measured at this close, after the merge that first put this lane's code beside Plan 0068's.
+> **Seven deviations, all self-reported in the phase commits; the two that changed a contract are
+> corrected in the phase text below.**
 > **Created:** 2026-07-30
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0048](../adrs/0048-transformed-feedback.md).
-> [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md) R2.
+> **Related ADRs:** [0048](../../adrs/0048-transformed-feedback.md) (**accepted** at this close,
+> carrying a dated `Outcome` for the `blend` narrowing).
+> [docs/roadmap-visual-richness.md](../../roadmap-visual-richness.md) R2.
 
 ## TL;DR
 
@@ -54,12 +68,31 @@ flowchart LR
 - **What:** the trails read samples `prev` through the inverse affine (`fb_zoom`,
   `fb_rotate`, `fb_dx`, `fb_dy`, `fb_center_x`, `fb_center_y`), all rates per-second scaled
   by `dt`; `fade` normalized to `fade^(dt*60)` (identity at the capture `dt`, matching the
-  attractor's existing form). Pick and implement the off-frame edge policy (ADR-0048 names
+  attractor's existing form).
+  **Shipped stricter than that, and the difference is worth knowing.** The trails exponent is
+  written `dt / FALLBACK_DT` rather than `dt * 60`, so at the capture step it is `x / x` — exactly
+  `1.0` in IEEE with no reliance on rounding — and the `exponent == 1.0` arm short-circuits `powf`,
+  which is not required to return `x` for an exponent of one. **The attractor's decay keeps the
+  older `powf((dt * 60.0).max(0.0))` with neither guard** (`particles/encode.rs`), so "matching the
+  attractor's existing form" reads backwards: the new sink is the safer one. Nothing is wrong today
+  — `(1/60f32) * 60.0` does round to exactly `1.0`, and every attractor baseline is hash-identical
+  — but the guard the trails comment argues for is absent on the sink that shares the vocabulary,
+  and a future change to `FALLBACK_DT` or to the capture step would break the two apart silently.
+  Recorded, not repaired: it is a pre-existing line this plan did not introduce.
+  Pick and implement the off-frame edge policy (ADR-0048 names
   transparent-border vs clamp; evaluate at a portrait aspect per ADR-0047's lesson). The
   transform is aspect-corrected — a rotation must not shear on a non-square target
   (ADR-0037: aspect from the render target).
-- **Files touched:** `core/src/render/trails.rs`, `core/src/render/scenes/mod.rs` (param
-  routing), `core/tests/composite.rs`.
+- **Files touched:** `core/src/render/trails.rs`, ~~`core/src/render/scenes/mod.rs` (param
+  routing)~~ — **corrected at the close: param routing lives in `core/src/render/mod.rs`**
+  (`ParamRoute` / `resolve_route`) **and `core/src/render/post.rs`** (the `set_dt` / `set_feedback`
+  one-way pushes). `scenes/mod.rs` was edited, but in Phase 3 and for the `Scene::set_feedback`
+  trait method, not for routing. ~~`core/tests/composite.rs`~~ — **the motion guards landed in a new
+  `core/tests/feedback.rs` instead**, and the reason is load-bearing rather than cosmetic: they need
+  a portrait target and several consecutive multi-frame runs, and `composite.rs` is a separate test
+  binary precisely because building GPU resources mid-run perturbs what the trails stage resolves to
+  on WARP — the exact perturbation its own module docs warn about. The new file pins no baseline;
+  every assertion in it is a ratio of one run against itself.
 - **Done when:** all `fb_*` at defaults ⇒ every golden **byte-identical** (the identity
   claim, proven the Plan 0038 way); a fixture binding `fb_zoom` shows the accumulated
   streak displaced radially between two captured frames and a `fb_rotate` fixture shows it
@@ -88,8 +121,24 @@ flowchart LR
   `[feedback]` table through `Scene::set_param`/`configure`, transforming its own field.
   The routing contract is stated in code and docs: one vocabulary, two buffers, both may be
   active, each transforms only its own accumulation.
+  **Narrowed at the close, and the code is what stands, not this sentence.** The seven `fb_*` params
+  and `[feedback] warp` reach both sinks; **`[feedback] blend` reaches the trails stage only.** The
+  attractor's deposit has been additive since the scene was written — its points draw through an
+  additive pipeline over the decayed bed, in one pass — so there is no `max` to select there without
+  a **second draw pipeline**, which is exactly the coexisting-matching-bind-layout shape
+  ([ADR-0058](../../adrs/0058-bind-group-layout-collisions-carry-evidence.md)) the warp family was
+  kept to one shader to avoid. Paying a known WARP hazard to make one sentence literally true is the
+  wrong trade; the asymmetry is instead **documented where an author meets it**
+  (`presets/README.md`, "One vocabulary, two buffers"), and recorded in
+  [ADR-0048](../../adrs/0048-transformed-feedback.md)'s `Outcome`.
 - **Files touched:** `core/src/render/scenes/particles/mod.rs`,
-  `core/src/render/scenes/mod.rs`, `core/tests/golden.rs` fixtures.
+  `core/src/render/scenes/mod.rs`, `core/tests/golden.rs` fixtures — **plus
+  `core/src/render/feedback.rs`**, which is where the shared `Transform`, the `[feedback]` types and
+  the one WGSL snippet both sinks compile actually live. **Not a new file:** it already existed as
+  the `PingPongField` home — the seam [ADR-0012](../../adrs/0012-stateful-feedback-render-system.md) built
+  and ADR-0048 says this was always for. That is a better home than either sink, and it is what
+  makes "one vocabulary" structural rather than a convention two `set_param` matches have to keep
+  agreeing on.
 - **Done when:** attractor defaults ⇒ its goldens byte-identical; an attractor fixture with
   `fb_rotate` shows the trail field rotating while the freshly-deposited points do not lag
   (the transform applies to the past, not the present deposit); the shared-vocabulary
@@ -116,7 +165,7 @@ flowchart LR
   the content lane, not back to the ADR, unless a warp kind is fundamentally wrong.
 - **VERDICT — run 2026-08-09**, `v0.48.0` lane build, Rich tier pinned, loopback audio,
   both scratch presets via `LMV_PRESET_DIR`. **Passed. No warp kind is fundamentally
-  wrong and nothing routes back to [ADR-0048](../adrs/0048-transformed-feedback.md).**
+  wrong and nothing routes back to [ADR-0048](../../adrs/0048-transformed-feedback.md).**
 
   **The look.** `swirl_add_echo` — *"very good."* The vortex reads as depth and flow, which
   is the reference look this plan exists to reach, and the `add` deposit did not wash out
@@ -128,10 +177,10 @@ flowchart LR
 
   **That criticism is content, and it routes to the content lane as this phase specifies.**
   These two presets are fixtures, not library content — Plan 0046's "What this plan does
-  NOT do" reserves adoption for R6, and [Plan 0075](0075-the-content-renaissance.md)'s
+  NOT do" reserves adoption for R6, and [Plan 0075](../0075-the-content-renaissance.md)'s
   cohorts are where a feedback preset gets a real palette. Nothing here asks for an engine
   change: `[palette]`, `saturation` and `palette_mix` already reach this surface
-  ([ADR-0086](../adrs/0086-the-backdrop-colours-through-the-preset-palette.md)), and the
+  ([ADR-0086](../../adrs/0086-the-backdrop-colours-through-the-preset-palette.md)), and the
   scratch preset's narrow band was chosen to keep `add` from flattening, which trades
   colour away deliberately. **The finding for R6 is that `blend = "add"` and a rich palette
   pull against each other, and no shipped preset has yet had to resolve that.**
@@ -157,7 +206,7 @@ flowchart LR
     rebuilds, not steady-state cost. Worth a glance from whoever next touches the
     quality governor, since a demotion decision reading p99 would see these.
   - **RSS grew 385 MB → 663 MB over the three minutes** (max 663 MB), against the
-    ~327 MB driver-dominated floor [ADR-0010](../adrs/0010-accept-gpu-driver-memory-floor.md) established.
+    ~327 MB driver-dominated floor [ADR-0010](../../adrs/0010-accept-gpu-driver-memory-floor.md) established.
     Three minutes with repeated preset switching is too short and too atypical to call
     this a leak, and this plan adds two accumulation buffers so *some* growth is
     expected — but it is unmeasured against a no-feedback control and should be, before

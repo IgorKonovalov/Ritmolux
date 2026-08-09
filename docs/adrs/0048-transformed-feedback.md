@@ -1,8 +1,8 @@
 # ADR-0048 — Transformed feedback: the accumulation buffers resample the past through a bindable affine + curated-warp transform, with a selectable deposit blend
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-07-30
-> **Related plan(s):** 0046-transformed-feedback (R2 of [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md))
+> **Related plan(s):** [0046](../plans/done/0046-transformed-feedback.md) (R2 of [docs/roadmap-visual-richness.md](../roadmap-visual-richness.md))
 > **Supplements:** 0012 (the `PingPongField` seam this was always for), 0018/0031 (the trails stage), 0046 (the HDR headroom additive echoes need)
 
 ## Context
@@ -109,3 +109,84 @@ The transform is a pure function of params and `dt` — determinism holds. The `
 table's structural keys are load-time by the same reasoning as `[curve] family`: a warp kind
 is a pipeline/shader-path choice, not a scalar, and ADR-0021 already rejected bindable
 discrete indexes for the flicker/hard-cut class of reasons.
+
+## Outcome — 2026-08-09, at Plan 0046's close
+
+The design shipped as decided and the look passed on the wall (Phase 5: *"very good"* on the
+`swirl` + `add` echo, which is the reference look this ADR exists to reach; no warp kind is
+fundamentally wrong, and nothing routed back here). **Every `fb_*` default is the identity and no
+golden moved** — all 20 pre-existing baselines hash-identical to a clean-`main` bless, three added.
+Five things this ADR asserted came back different, and one of them narrows the Decision.
+
+### The Decision's "one vocabulary, two buffers" is true of everything except `blend`
+
+The seven `fb_*` params and `[feedback] warp` reach **both** sinks. **`[feedback] blend` reaches
+the trails stage only.** The attractor's deposit has been additive since the scene was written —
+its points draw through an additive pipeline over the decayed bed, in one pass — so there is no
+`max` to select there without a **second draw pipeline**, which is precisely the
+coexisting-pipelines-with-matching-bind-layouts shape
+([ADR-0058](0058-bind-group-layout-collisions-carry-evidence.md)) that Alternative B's rejection and
+the one-shader warp family both exist to avoid. Paying a known WARP hazard to make one sentence
+literally true is the wrong trade, so the sentence is what changes. The asymmetry is documented
+where an author meets it (`presets/README.md`, "One vocabulary, two buffers"), alongside the second
+one measurement turned up: **the trails stage is invisible unless its tail outlasts the scene's own
+`fade`** — over a `fade = 0.95` attractor, `trails = 0.9` is a bit-for-bit passthrough.
+
+### Alternative D's price was overestimated, and that is the more interesting half
+
+Including the attractor was accepted at a stated cost of "a second shader and test surface". It
+cost rather less. The transform's arithmetic, the seven param names, the identity predicate and
+the aspect correction all live **once**, in `core/src/render/feedback.rs` — the existing
+`PingPongField` module, i.e. the ADR-0012 seam this ADR's own Supplements line says it was always
+for — and the WGSL is **one snippet concatenated into both shaders**. Both sinks delegate
+`set_param` to the shared `Transform` rather than matching seven names each. So the two buffers
+cannot drift apart on what `fb_rotate` means by construction rather than by discipline, which is
+the outcome Alternative D was worried about not getting.
+
+### The `Scene` seam widened again, and the routing grew a second fan-out
+
+The Decision says the attractor consumes the vocabulary through "its `Scene::set_param`". That is
+true of the *params* and not of the *table*: the structural `[feedback]` choice needed a new
+`Scene::set_feedback`, a default-no-op fourth optional trait method, and `PostStage` needed two —
+`set_feedback` and `set_dt`, both one-way pushes on `set_exposure`'s established route. Routing
+grew `ParamRoute::StageAndScene(usize)`, the enum's second fan-out and the mirror of
+`SceneAndBackdrop`: there the name belongs to the system and reaches the sky as a courtesy, here it
+belongs to a stage and reaches the scene because the scene declared it. Recorded because
+[ADR-0085](0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md)'s `Outcome` had to record
+the same kind of widening one plan earlier, and "the `Scene` trait stays thin" (ADR-0002) is a claim
+that is now being paid for in small instalments.
+
+### ADR-0037 was caught here for the third time, and the fix carries a negative control
+
+`Trails::resolve` had been **ignoring its `surface` argument** on a documented and, until this
+change, correct premise: neither of its passes computed geometry. A rotation does. The transform
+now takes its aspect from the render target, and the guard is not a claim but a measurement — a
+rotation spun into a closed ring at a **portrait 100x160** target has a pixel bounding box of
+**45x46**, against **44x71** with the aspect deliberately forced to `1.0`. That is the shape this
+rule needs every time: a value sourced from two places that agree at 16:9 cannot be tested at 16:9.
+
+### The edge policy the Negative left open: transparent border, by shader rather than by sampler
+
+Evaluated at portrait per ADR-0047's lesson. `ClampToEdge` re-deposits the border texel every frame
+and compounds it into a permanent bar of colour along the two long edges — worst exactly where a
+tunnel wants empty space to travel into. Off-frame reads therefore contribute **nothing**, and it is
+implemented as a **shader test** rather than `AddressMode::ClampToBorder`, which is an optional wgpu
+feature this project cannot require on every adapter it ships to.
+
+### Two smaller corrections
+
+The `fade` normalization shipped as `fade^(dt / FALLBACK_DT)` with an `exponent == 1.0`
+short-circuit, not the `fade^(dt*60)` written above: `x / x` is exactly `1.0` in IEEE, and `powf` is
+not required to return `x` for an exponent of one. **The attractor's decay keeps the older
+`powf(dt * 60.0)` with neither guard** — harmless today and hash-identical, but the two sinks are
+not in fact using the same form, which is the opposite of what the Decision says. And the
+`add`-mode convergence property held as specified: 360 frames of a static bright source move the
+frame by 97 bytes over the first 60 and **0** over the last 60.
+
+### What Phase 5 measured that is not this ADR's business but should not be lost
+
+`frame_ms_p99` spikes to 25.0 ms on preset switches while `frame_ms_avg` never passes 8.7 ms and no
+frame drops — [backlog 0082](../design-backlog.md), because the not-yet-built quality governor is
+specified to read that column. And RSS grew 385 to 663 MB over three minutes of switching, with **no
+no-feedback control beside it** — [backlog 0083](../design-backlog.md). Neither blocks this ADR;
+both are owed before R6 ships long-running feedback content.

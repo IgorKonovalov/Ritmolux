@@ -95,7 +95,7 @@ median of the four corners, or fit and subtract the radial vignette. **Rejected 
 the symptom rather than the definition.** The defect is not that the reference pixel is badly
 chosen; it is that a lit backdrop is not a figure and no reference pixel makes it one. A fitted
 model would also have to keep pace with every future backdrop shape (`bg_hue` gradients today, and
-[Plan 0046](../plans/0046-transformed-feedback.md)'s transformed feedback will add more), and it degrades
+[Plan 0046](../plans/done/0046-transformed-feedback.md)'s transformed feedback will add more), and it degrades
 silently when it stops fitting — the exact failure mode being fixed.
 
 **An in-frame geometry fraction** — ask the scene what share of its geometry landed inside the

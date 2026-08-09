@@ -16,54 +16,64 @@ someone who picked it up is reading.
 
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0046](0046-transformed-feedback.md) | Transformed feedback: the past learns to move | **approved 2026-07-30** | dev, human | Unblocked — [0045] landed, so the linear-light pipeline exists. Cheaper after the attractor plans settled `particles/`. |
 | [0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md) | The suite stops blessing what WARP gets wrong | **approved 2026-08-02** | dev, human | Phase 3 is `human` and gates Phase 4; it **is** runnable on this box (the gate is `device_type == Cpu`, not "discrete"). Read [0052]'s and [0055]'s archive entries first — each moved a bind-group layout this plan asserts on, and [0072] added one: **`background-lut-layout` now shares `[Texture, Texture, Sampler]` with `fragment-field-lut-layout`**, with its per-pair evidence already measured and recorded in `core/src/render/background.rs`'s `Background` doc comment. Phase 1's allowlist must be derived from the code and pick that entry up. **[0071] moved the table again, in the other direction: the `[Texture, Sampler]` group is now EMPTY** — `attractor-present` is `[Texture, Sampler, Uniform, Sampler]` and `trails-present` is `[Sampler, Uniform, Texture]`, so the pair [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md) named as live on two shipped presets, and made a Positive bullet of covering, no longer collides. It also reproduced the hazard a fourth time, measured (`occlude` moved 0 of 196 608 channels on WARP against 3 307 on hardware, whole suite green). **Phase 1's citation sweep is four lines in three files, not the five sites [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md) lists** — verified on disk at `9fe4225`: `bloom.rs:66`, `bloom.rs:447`, `gpu.rs:184`, `tonemap/tests.rs:514`. The ADR's two `tonemap.rs` entries have since collapsed into the one in its test module, and the two [0071] added were corrected at its close. **Three are a substitution and the fourth is not:** `gpu.rs`, `tonemap/tests.rs` and `bloom.rs:447` cite ADR-0021 as *the record of the hazard*, so they take ADR-0058 directly; `bloom.rs:66` cites it as *when it was first seen* ("twice-observed before this stage"), which is true — that one wants rewording, not substitution. **And six other `ADR-0021 / Plan 0020` citations in the crate are correct and must survive**: `preset/schema.rs:313,320`, `particles/mod.rs:212,700`, `reaction_diffusion.rs:87,649` are the shared palette system, which is genuinely what ADR-0021 decided. A sweep done by grepping the string would break six true citations to fix four false ones. |
-| [0075](0075-the-content-renaissance.md) | The content renaissance: the library is rebuilt as worlds, by replacement cohorts | **approved 2026-08-09** | dev, human | The R6 rebuild, decided 2026-08-09 ([ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md): replacement cohorts under a fresh-slate rule — the user's delete-all proposal was considered and rejected there). Phases 1-3 (gate + trap + doc fixes the new library is authored against) are **gated by nothing** and can interleave now; Phases 4+ wait for [0046] — **[0067] has landed too** — **[0064] has landed**, and the symmetry stage plus the banded palette are levers the cohorts can now author against — **[0071] has landed**, and it left the cohorts one more lever (`occlude`) and one more retune owed (its Phase 5, with [backlog 0038]). Prefers [0076] landed first so the brief can assign layered worlds, but does not hard-gate on it. |
-| [0076](0076-the-second-layer.md) | The second layer: a preset composes two scenes (R3) | **approved 2026-08-09** | dev, human | [ADR-0090](../adrs/0090-a-preset-composes-two-scene-layers.md), all four open choices user-decided by interview (incl. **per-layer scene instances from the start** — same-system pairs are in scope, and Phase 2's registry migration is the plan's real risk). Touches `render/mod.rs`/`post.rs` — **[0071] has landed, so that block is lifted**, but read what it left there first: `post.rs` now owns a chain-level param vocabulary (`CHAIN_PARAMS`) routed as `ParamRoute::Composite`, `Fold::Over` carries a payload, and `composite_into` decides per frame whether the seam belongs to the chain's last stage or to the scene. A second layer has to answer what `occlude` means when two scenes share one backdrop. |
+| [0075](0075-the-content-renaissance.md) | The content renaissance: the library is rebuilt as worlds, by replacement cohorts | **approved 2026-08-09** | dev, human | The R6 rebuild, decided 2026-08-09 ([ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md): replacement cohorts under a fresh-slate rule — the user's delete-all proposal was considered and rejected there). **Every engine prerequisite has landed** — [0071], [0064], [0067] and now [0046] — so **Phases 4+ are unblocked and the whole plan is takeable**; Phases 1-3 (gate + trap + doc fixes) were always ungated. What the four left the cohorts to author against: the symmetry stage and the banded palette ([0064]), `occlude` ([0071], plus one retune owed — its Phase 5, with [backlog 0038]), a gate that actually drives PCM through the analyzer ([0067]), and now **transformed feedback** ([0046]: `fb_zoom` / `fb_rotate` / `fb_dx` / `fb_dy` / `fb_warp`, the `[feedback] warp` family and the `add` deposit, on both accumulation buffers). **One content finding is owed to R6 specifically, from [0046] Phase 5:** `blend = "add"` and a rich palette pull against each other — a fullscreen source under `add` sums into a flat wash, and the scratch fixture bought its vortex by narrowing the palette band deliberately. No shipped preset has had to resolve that trade yet, and a feedback cohort is where it gets resolved. Prefers [0076] landed first so the brief can assign layered worlds, but does not hard-gate on it. |
+| [0076](0076-the-second-layer.md) | The second layer: a preset composes two scenes (R3) | **approved 2026-08-09** | dev, human | [ADR-0090](../adrs/0090-a-preset-composes-two-scene-layers.md), all four open choices user-decided by interview (incl. **per-layer scene instances from the start** — same-system pairs are in scope, and Phase 2's registry migration is the plan's real risk). Touches `render/mod.rs`/`post.rs` — **[0071] and [0046] have both landed, so that block is lifted and its "wants [0046] first" preference is discharged**. Read what the two left there first: `post.rs` now owns a chain-level param vocabulary (`CHAIN_PARAMS`) routed as `ParamRoute::Composite`, `Fold::Over` carries a payload, and `composite_into` decides per frame whether the seam belongs to the chain's last stage or to the scene. A second layer has to answer what `occlude` means when two scenes share one backdrop — and now also what `fb_*` means when two scenes share one trails accumulation, since [0046] routed those names through `ParamRoute::StageAndScene` and gave `PostStage` a `set_dt` / `set_feedback` pair on the same one-way route as `set_exposure`. |
 
 ## Recommended execution sequence
 
-Preference, not constraint: **the one hard ordering constraint has been
-discharged** ([0055] preceded [0064] and [0055] has closed), so a session may take
-any plan above. **No plan here closes in one session** — every remaining one
-carries a `human` phase, so plan on bringing the user in rather than picking on
-that criterion.
+**Rewritten 2026-08-09, at [0046]'s close, because the shape of this roster changed rather than
+its order.** The previous sequence was written when [0075] had four open engine prerequisites, and
+it opened by naming [0046] "the critical path". **All four have now landed** — [0071], [0064]
+and [0067] within a week of each other, and [0046] at this close. [0068] landed the same day and
+changes nothing downstream by construction (it shipped a diagnosis and no fix, on purpose).
 
-**Re-ordered 2026-08-09, and the reason matters more than the order.** The previous
-table was written before [0071], [0064] and [0067] closed within a week of each
-other. Those three were three of [0075]'s four prerequisites, which leaves **[0046]
-as the sole remaining engine gate on the renaissance** — every other plan on this
-roster says in its own row that it blocks nobody. The user's call from that reading:
-run **[0046] and [0068] as two parallel worktree lanes**. **[0068] has since closed** (2026-08-09),
-which changes nothing downstream by construction — it shipped a diagnosis and no fix — so [0046]
-is now the whole of the critical path.
+**So there is no critical path any more, and that is the headline.** What is left is three plans
+that no longer gate each other on capability — only on *file contention* and on one deliberate
+preference. Two consequences worth stating plainly, because a reader skimming rows would miss both:
+
+- **[0075]'s Phases 4+ are unblocked.** The renaissance was waiting on this and nothing else. Its
+  Phases 1-3 were already ungated; the whole plan is now takeable.
+- **The [0053]/[0046] concurrency collision is discharged**, not deferred. It existed because both
+  touched the attractor-with-trails golden path at once. [0046] landed first, so [0053] is now the
+  one running second — see the note below for what that obliges it to do.
+
+**No plan here closes in one session** — every remaining one carries a `human` phase, so plan on
+bringing the user in rather than picking on that criterion.
 
 | # | Plan | Why here |
 |---|------|----------|
-| 1 | [0046] | **The critical path.** The last of [0075]'s four prerequisites still open; [0076] wants it landed first (both edit the composite chain). Its `human` phase is short — run the standalone against two scratch presets and judge — so unlike the rest of this roster it can plausibly close in one sitting. |
-| 2 | [0053] | Protective rather than additive; moves no pixels. Now carries one more layout pair to allowlist, and **[0071] emptied its headline collision group** — see its row above. **Take it before [0076], not after:** that plan adds a blend pass and duplicated stateful pipelines, which is precisely the bind-group-layout pressure this one guards, and its own Risks section predicts needing this allowlist. Landing the guard first means the blend layout earns its evidence when it is written instead of retro-derived. |
-| 3 | [0076] | Unblocked — [0071] has landed (shared files: `render/mod.rs`, `post.rs`). Best after [0046] (both touch the chain) **and after [0053]** (see that row). Before [0075]'s cohorts by preference, so the brief can assign layered worlds. |
-| 4 | [0075] | **Last by design** (ADR-0089): the fresh library is authored once, against the engine [0046]/[0071]/[0076] finish ([0064] has landed) and through the gate [0067] has made trustworthy. Its Phases 1-3 are the exception — ungated instrument/doc fixes, take them whenever a session has room. |
+| 1 | [0053] | **First by contention, not by importance.** Protective rather than additive; moves no pixels. It is placed ahead of [0076] because that plan adds a blend pass and duplicated stateful pipelines — precisely the bind-group-layout pressure this one guards, and its own Risks section predicts needing this allowlist. Landing the guard first means the blend layout earns its evidence when it is written instead of retro-derived. See its row for the three layout changes it must pick up. |
+| 2 | [0076] | Unblocked on every axis — [0071] and now [0046] have both landed (shared files: `render/mod.rs`, `post.rs`, and [0046] edited both). Best after [0053] (see that row). Before [0075]'s cohorts by preference, so the brief can assign layered worlds — a preference, not a gate. |
+| 3 | [0075] | **Last by design** (ADR-0089): the fresh library is authored once, against a finished engine. Its four prerequisites are all landed, so this is now a scheduling choice rather than a wait. Its Phases 1-3 remain the exception — ungated instrument/doc fixes, take them whenever a session has room. |
 
-### Two collisions this ordering is dodging, recorded so a re-order does not walk into them
+### What [0053] inherits from [0046], now that it is the one running second
 
-- **[0053] and [0046] must not run concurrently.** [0053] Phase 1 lands a new
-  **attractor-with-trails** golden fixture; [0046] Phases 1 and 3 rewrite exactly
-  that path while claiming every golden stays byte-identical. Run in parallel, that
-  identity claim is never measured against the fixture landing beside it. Sequential
-  in either order is fine — and [0053] first is better, because [0046] then proves
-  identity across the new fixture too. Whichever runs second re-runs the
-  bless-against-a-clean-`main`-control (the [0071] form; a naive diff against the
-  committed baselines convicts three files that drift on this box regardless).
-- **[0046] should precede [0075] Phase 3.** That phase documents
-  [backlog 0063](../design-backlog.md)'s `spin`x`fade` smear ceiling in **frames**
-  ("`fade = 0.932` is about 15 frames"). [0046] Phase 1 normalizes the decay to
-  `fade^(dt*60)`, which makes it time-based: the measured numbers stay correct at
-  60 Hz and at capture `dt`, but the honest phrasing becomes seconds. Landing [0046]
-  first means that paragraph gets written once against final semantics.
+The recorded collision "**[0053] and [0046] must not run concurrently**" is **moot** — [0046] has
+landed. Two obligations transfer to [0053] as the second mover:
+
+- **It re-runs the bless-against-a-clean-`main` control**, not a `git diff` of the committed
+  baselines. On this box **8 of 20 baselines drift from their committed bytes under `LMV_BLESS` on
+  clean `main`** (`composite_bloom`, `composite_kaleido`, `composite_overlap`, `composite_trails`,
+  `line_joint_zigzag`, `lsystem`, `parametric_curve`, `star_pattern`), so a naive diff convicts
+  eight files the change never touched. Bless every binary in scope (`--test golden --test
+  composite --test line_joints`), hash-for-hash against a clean-`main` bless, and
+  `git checkout -- core/tests/golden` after each.
+- **[0046] added three new composite baselines** — `composite_warp_swirl.png`,
+  `composite_warp_ripple.png`, `composite_warp_fisheye.png` — and a new `core/tests/feedback.rs`
+  that pins **no** baseline at all. [0053] Phase 1's allowlist is derived from the code and must
+  see the three; the new test binary is a case its scan should be checked against rather than
+  assumed to cover.
+
+The other recorded collision, "**[0046] should precede [0075] Phase 3**", is **discharged**: that
+phase documents [backlog 0063](../design-backlog.md)'s `spin`x`fade` smear ceiling in *frames*, and
+[0046] has now made the decay time-based, so the paragraph gets written once against final
+semantics. The honest phrasing there is seconds rather than frames — and note the shipped
+exponent is `fade^(dt / FALLBACK_DT)`, exactly `1.0` at the capture step, so every number measured
+at 60 Hz or at capture `dt` stays correct as written.
 
 [0045]: done/0045-linear-light-and-bloom.md
-[0046]: 0046-transformed-feedback.md
+[0046]: done/0046-transformed-feedback.md
 [0052]: done/0052-the-emitter-objects-that-spawn-fall-and-die.md
 [0053]: 0053-the-suite-stops-blessing-what-warp-gets-wrong.md
 [0055]: done/0055-the-fold-edge-becomes-a-choice.md
@@ -167,6 +177,7 @@ each close recorded, the properties that outlived the plan — moved verbatim to
 [README-archive.md](README-archive.md)** (Plan 0061 Phase 7b). Nothing was
 deleted; it simply stopped being loaded into every session's context.
 
+- [0046 — Transformed feedback: the past learns to move](done/0046-transformed-feedback.md) — closed 2026-08-09. Review: **no blockers, no majors, four minors, two nits**. **R2 lands, and with it the last engine gate on [0075]** — both accumulation buffers now resample their past through one shared transform, so a zoom is a tunnel and a rotation a spiral, and the standing `trails` frame-rate defect (a `fade` applied once per *frame*, a third as long at 144 Hz as at 48) is retired en route. **Zero pixels moved without opt-in**: all 20 pre-existing baselines hash-identical to a clean-`main` bless, three added, re-measured at this close after the merge. **[ADR-0037] was caught for the third time here** — `Trails::resolve` had been ignoring its `surface` argument on a premise a rotation falsifies — and the fix carries the negative control this rule has always needed: a spun ring boxes **45x46** at a portrait 100x160 target, against **44x71** with the aspect forced to `1.0`. **One contract narrowed:** `[feedback] blend` reaches the trails stage only, because the attractor deposits additively in one pass and a `max` there would cost a second pipeline — the exact WARP hazard the one-shader warp family avoids. The plan sentence changed, not the code. **Alternative D was overcharged**: including the attractor cost one shared `Transform` and one WGSL snippet concatenated into both shaders, not "a second shader and test surface". Two Phase 5 observations became [backlog 0082](../design-backlog.md) (`frame_ms_p99` spikes to 25.0 ms on preset switches, and the not-yet-built quality governor is specified to read that column) and [backlog 0083](../design-backlog.md) (RSS 385 → 663 MB over three minutes, with no no-feedback control beside it).
 - [0068 — Why the downbeat rarely locks](done/0068-why-the-downbeat-rarely-locks.md) — closed 2026-08-09. Review: **no blockers, no majors, two minors, one nit**. **It shipped the diagnosis and no fix, as designed, and that was verified rather than assumed** — `CONFIDENCE_THRESHOLD` is still `0.25`, `BASS_WEIGHT` still `0.7`, the fold and the confidence measure are untouched, and the `effect_size` split is arithmetic-identical on every branch. The probe reads the gate rather than second-guessing it: `terms()` is `&self`, allocation-free, clock-free, and its `to_bits()` equality against the published `BarClock::confidence` is asserted on all six cases. **The named cause is the accent feature's bass weighting**, and the finding that names it is that backbeat rock/pop locks **48x worse** than four-on-the-floor — 0.14 % against 6.79 % over 98 minutes — because a bass accent marks every beat in one and the half-bar in the other, so it hardly ever marks the *bar*. [ADR-0082](../adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md) is **accepted** carrying that dated `Outcome`, including the limit that matters most: the 1 Hz log records **band levels, not per-beat accents**, so this is a ladder match plus a construction argument and *not* a direct measurement of the four alignment scores on real audio. **The repair has no ADR and no plan**, and that is a decision taken at this close rather than an omission: the route is named ([design-backlog 0042](../design-backlog.md), answered in place) but the fork an ADR would decide — a stronger accent feature versus a longer history window — is not yet a real fork, because ADR-0082's `Outcome` exonerates the fold and the confidence measure. It stays a backlog pointer until someone takes it.
 - [0067 — The curation route](done/0067-the-curation-route.md) — closed 2026-08-09. Review: **no blockers and no code findings**. The one substantive item was a **factual error in the plan** — its claim that `bar` "stopped being a variable at ADR-0050" is false (`bar` is `VAR_NAMES[5]`, the beat phase in `[0, 1)`; ADR-0050 *added* `bar_phase` alongside it) — struck in the plan and in [ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)'s `Outcome`, which repeated it. **The gate is now worth leaning on**: `reactivity` drives PCM through the real analyzer, with a non-vacuity test that has a positive control, and ADR-0081's gate-strength Negative is discharged. **Phase 1d is a recorded negative result** — the resolution ladder is flat because `frame_diff` scores occupancy and occupancy is scale-invariant, so `ANIM_FLOOR` and `SIZE` did not move and CI pays nothing; [backlog 0009](../design-backlog.md) now needs a coverage-aware statistic, which is the earned question. Two costs the lane refused to absorb went to [backlog 0080](../design-backlog.md) (reactivity 1.8x, ~85 % of it warm-up hops that are rendered and thrown away) and the Coral Oracle's gain exception to [backlog 0081](../design-backlog.md) (the house gain rule is written down nowhere).
 - [0064 — The symmetry stage and the banded palette](done/0064-the-symmetry-stage-and-the-banded-palette.md) — closed 2026-08-09. Review: **no blockers and no code findings**; the three items raised were all stale text in the plan itself, corrected at the close (its "fourteen" baselines are **19**, its five LUT sample sites are **seven**, and its "duplicated at five sites" risk is **three** WGSL copies plus four calls into the one Rust function). ADR-0037 verified clean at `kaleidoscope.rs:1116` — the aspect comes from the render target, in the stage that has shipped that bug twice. All 19 pre-existing baselines byte-identical. **[ADR-0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) was accepted with an [Outcome](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md#outcome--2026-08-09-at-plan-0064s-close): its "the inner rings alias severely" was inferred from a texel ratio and never observed** — six cutoffs, three sources, no visible onset — so `kaleido_inner` ships as styling with a protective side effect, not as the rescue. **First run of close-ceremony step 3b**: no near-duplicate geometry in any of the nine families, and nothing in `presets/` still pays for a fixed defect.

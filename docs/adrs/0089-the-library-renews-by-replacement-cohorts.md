@@ -44,7 +44,7 @@ then rebuild) has costs the instinct does not see:
   problem, and `rm` is not a discipline.
 
 One more force: the two engine capabilities that most enable the target look — transformed
-feedback ([Plan 0046](../plans/0046-transformed-feedback.md), the tunnels/spirals/echo family)
+feedback ([Plan 0046](../plans/done/0046-transformed-feedback.md), the tunnels/spirals/echo family)
 and the symmetry stage ([Plan 0064](../plans/done/0064-the-symmetry-stage-and-the-banded-palette.md))
 — are approved but not landed. A library authored from scratch *today* would be authored
 against yesterday's engine, which is precisely the defect being escaped.
