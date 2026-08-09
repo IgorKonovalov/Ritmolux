@@ -52,7 +52,14 @@ name = "ember"
 # breathing outward. Cap 0.45 at the house gain for bass (cap / 0.85).
 kaleido_radial = "1.45 + clamp(bass * 0.529, 0, 0.45)"
 kaleido_order  = "8"
-kaleido_angle  = "time * 0.07"
+# ROTATION OFF, AND IT IS A DELIBERATE ZERO RATHER THAN AN OMISSION. This drew
+# `time * 0.07` and it was wrong for the look: a mandala is a figure you read
+# for its symmetry, and a rosette that turns invites the eye to track the
+# rotation instead of the structure. Judged live at Plan 0064 Phase 6 - the
+# still frames were no help here, because a rotation is exactly the thing a
+# capture cannot show. The ring count still breathes on bass, so the figure is
+# not static; it just no longer spins.
+kaleido_angle  = "0"
 # 0.06 is the Phase 4 default: a frozen hub below this radius, visually
 # indistinguishable from 0 but it caps the worst minification for free.
 kaleido_inner  = "0.06"

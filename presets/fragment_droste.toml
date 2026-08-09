@@ -8,19 +8,26 @@
 # without bound is a seamless tunnel: it passes through the identity every time
 # it crosses a whole number, and nothing has to be faded or restarted.
 #
-# THE TEMPO LOCK, AND WHY IT IS NOT ON `bar_phase`. The plan asks for a tunnel
-# "locked to the bar". The honest way to do that today is NOT `bar_phase`: the
-# downbeat estimator locks about 3 % of the time on real music (backlog 0042),
-# so a tunnel riding it would stall and lurch as the estimate came and went.
-# `time * (tempo / 240)` advances exactly one ring per four beats using only the
-# tempo scalar, which is stable. It is bar-locked in FEEL without depending on
-# the estimator - and if the downbeat ever becomes reliable, this one line is
-# where the upgrade goes.
+# THE TRAVEL IS ON A CONSTANT RATE, AND THIS IS THE ONE THING THE LIVE PASS
+# CHANGED. The draft rode `time * (tempo / 240)` - one ring per four beats,
+# reasoned out as a way to lock the tunnel to the music without touching
+# `bar_phase`, whose downbeat estimator locks about 3 % of the time on real
+# music (backlog 0042).
 #
-# PHASE 6 ASKS: does this read as endless travel, or as a loop you can feel? A
-# capture cannot answer it. Watch it for a full minute - the failure mode is
-# recognizing the same ring arriving again, which takes longer than any
-# filmstrip.
+# It was wrong, and only watching it showed why. A tempo ESTIMATE is not a
+# tempo: it wanders by a few BPM from passage to passage, and because it
+# multiplies a term that grows without bound, every wander is a change in the
+# rate of travel. So the tunnel surged and eased - which reads as the zoom
+# REACTING to the music, and a Droste tunnel that reacts is a Droste tunnel that
+# is broken. The whole appeal is a descent so steady you stop noticing it.
+#
+# `time * 0.055` is one ring per about eighteen seconds, on the frame clock,
+# with nothing audio-derived in it at all. Slow enough that the travel is felt
+# rather than watched. If a tempo lock is ever wanted back it needs a SMOOTHED
+# rate, not a smoothed position - and that is a different design, not a retune.
+#
+# PHASE 6 ASKED: does this read as endless travel, or as a loop you can feel?
+# Answered live at the same sitting - endless, once the rate stopped moving.
 system = "fragment_field"
 name = "Droste Descent"
 
@@ -55,7 +62,7 @@ name = "aurora"
 # is the best reactive lever in the file.
 
 # THE TUNNEL.
-kaleido_zoom   = "time * (tempo / 240)"
+kaleido_zoom   = "time * 0.055"
 kaleido_radial = "1.85"
 # One turn of shear per revolution - the Droste twist. Integer by construction:
 # a fractional winding number draws a visible seam where the map fails to close.
@@ -63,7 +70,7 @@ kaleido_radial = "1.85"
 # intent survives anyone adding a `[smoothing]` entry for it later.
 kaleido_spiral = "1"
 kaleido_order  = "6"
-kaleido_angle  = "time * 0.04"
+kaleido_angle  = "time * 0.012"
 # Higher than the 0.06 default ON PURPOSE. This is the reference tunnel's bright
 # central disc: below this radius the repeat freezes, so the hub is a clean
 # radially-constant pool instead of a thousand source texels per pixel.
@@ -75,8 +82,12 @@ palette_steps   = "8"
 palette_contour = "0.30"
 
 # FIELD. Slow and smooth - the travel is the motion, and a busy source competes
-# with it.
-warp  = "0.42 + sin(time * 0.031) * 0.08 + clamp(bass * 0.212, 0, 0.18)"
+# with it. Halved at the live pass alongside the travel rate: the tunnel
+# replicates the source into every ring at once, so a bass term that is merely
+# lively on a flat field becomes the whole picture pulsing here. Reads as the
+# zoom surging even though the zoom is a constant rate - same complaint, second
+# cause.
+warp  = "0.42 + sin(time * 0.017) * 0.05 + clamp(bass * 0.106, 0, 0.09)"
 zoom  = "1.45"
 pan_x = "0"
 pan_y = "0"
@@ -102,12 +113,17 @@ bloom_amount = "0.15"
 trails       = "0"
 
 [smoothing]
-# `kaleido_zoom` is deliberately ABSENT. It is a monotonically increasing term,
-# and low-passing a ramp only delays it - but it would also make the rate lag
-# behind a tempo change, which is the one thing that could break the lock.
-warp        = 0.40
-glow        = 0.30
-flash       = { attack = 0.08, release = 0.60 }
-color_span  = 0.40
-saturation  = 0.35
-palette_mix = 0.80
+# `kaleido_zoom` is deliberately ABSENT, and now trivially so: the rate is a
+# constant, so there is nothing to low-pass. Smoothing a ramp only delays it.
+#
+# EVERYTHING ELSE IS THE LONGEST IN THE SET. This preset's failure mode is
+# motion that competes with the travel, so every constant below is roughly
+# double its value in the other two files. `warp` in particular: at 0.40 the
+# source visibly breathed with the bass, and through the ring repeat that is
+# eight breathing copies at once.
+warp        = 0.95
+glow        = 0.55
+flash       = { attack = 0.12, release = 0.90 }
+color_span  = 0.70
+saturation  = 0.60
+palette_mix = 1.20
