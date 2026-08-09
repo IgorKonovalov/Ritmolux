@@ -1,7 +1,7 @@
-# nextest configuration. Currently one job: keep two reporting tests audible.
+# nextest configuration. Currently one job: keep the reporting tests audible.
 #
 # nextest hides a passing test's output, which is right for 456 of them and wrong
-# for the two that exist partly to *report*. Per ADR-0071 a numeric assertion
+# for the few that exist partly to *report*. Per ADR-0071 a numeric assertion
 # states a property or names the machine it was measured on, and both of these
 # print what they observed on the machine they ran on: the DSP test prints the
 # four raw band levels off x86_64 (where it declines to assert their bits), and
@@ -10,10 +10,15 @@
 #
 # Those readings only exist on the CI runners - there is no arm64 box on this
 # side, and the CI WARP build is not the developer's - so if they are not in the
-# log of a green run they cannot be had at all. Scoped to the two tests by name
-# rather than set profile-wide: the point is these observations, not 458 tests'
-# worth of noise.
+# log of a green run they cannot be had at all. Scoped to named tests rather than
+# set profile-wide: the point is these observations, not 458 tests' worth of
+# noise.
+#
+# Plan 0068 adds the downbeat probe on the same grounds and more strongly: its
+# whole deliverable IS the printed decomposition (the assertions are a floor
+# under it), so a run that hides the output has run the instrument and thrown
+# away the reading.
 
 [[profile.default.overrides]]
-filter = 'test(dual_live_keeps_the_outgoing_side_animating) + test(raw_levels_are_bit_identical_to_the_pre_normalization_build)'
+filter = 'test(dual_live_keeps_the_outgoing_side_animating) + test(raw_levels_are_bit_identical_to_the_pre_normalization_build) + test(the_estimator_decomposes_into_its_terms)'
 success-output = "immediate"
