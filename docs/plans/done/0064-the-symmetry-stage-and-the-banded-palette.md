@@ -1,17 +1,22 @@
 # 0064 — The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour
 
-> **Status:** **in-progress** (approved 2026-08-04) — **after [Plan 0055](done/0055-the-fold-edge-becomes-a-choice.md)**.
-> Both live in `kaleidoscope.rs`; 0055 is smaller, older and branches on the *destination* radius,
-> which this plan's composed map does not touch, so taking it first costs nothing and taking it
-> second means rebasing onto a rewritten shader. Phases 1-3 are `dev` and run start-to-finish;
-> **Phase 4 is `human`** (pick defaults and ranges from the rendered grid) and gates Phases 5-6, so
-> the plan does not close in one session.
+> **Status:** **done** (closed 2026-08-09) — all six phases landed in the `plan-0064-symmetry-stage-banded-palette`
+> worktree, six commits `e648a02..325f2ac`, taken **after [Plan 0055](0055-the-fold-edge-becomes-a-choice.md)**
+> as this header planned. Mode 4 review: **no blockers and no code findings**; the three items raised
+> were all stale text in this plan, corrected below. Verified rather than trusted: the composed map
+> takes its aspect from the **render target** (`kaleidoscope.rs:1116`, ADR-0037 clean — the bug this
+> stage has shipped twice); all **19** pre-existing baselines byte-identical with only
+> `composite_symmetry.png` added; every test this plan named present, each carrying a non-vacuity
+> guard the plan did not ask for; every numeric assertion an exact property of a pure clamp or
+> quantizer (ADR-0071 clean). Gate green on the branch: fmt, clippy, **623/623 nextest**.
+> **Close-ceremony step 3b** (first run of the step [Plan 0067](../0067-the-curation-route.md) installed)
+> is recorded under "Curation verdict" at the foot of this file.
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) (the
-> coordinate map), [0078](../adrs/0078-banding-is-a-palette-coordinate-operation.md) (the banding),
-> supplementing [0047](../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) and
-> [0021](../adrs/0021-shared-palette-system.md)
+> **Related ADRs:** [0077](../../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) (the
+> coordinate map), [0078](../../adrs/0078-banding-is-a-palette-coordinate-operation.md) (the banding),
+> supplementing [0047](../../adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) and
+> [0021](../../adrs/0021-shared-palette-system.md)
 
 ## TL;DR
 
@@ -57,8 +62,8 @@ banding goes on the palette coordinate in-shader rather than into ADR-0021's bak
 band count must be bindable and a re-bake per frame is exactly the work that bake exists to avoid.
 Rejected alternatives — a stage per term, an authorable domain-warp expression, an RGB posterize post
 stage, and baking the bands — are in
-[ADR-0077](../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) and
-[ADR-0078](../adrs/0078-banding-is-a-palette-coordinate-operation.md).
+[ADR-0077](../../adrs/0077-the-symmetry-stage-owns-one-coordinate-map.md) and
+[ADR-0078](../../adrs/0078-banding-is-a-palette-coordinate-operation.md).
 
 ## Architecture diagram
 
@@ -110,7 +115,8 @@ flowchart LR
     thousand source texels per destination pixel against a bilinear sampler's four. The reference
     tunnel's bright central disc is exactly this cutoff.
 - **Done when:** every term at its identity (`radial = 1`, `spiral = 0`, `zoom = 0`, `tile = 1`)
-  renders **byte-identical** captures for all fourteen existing baselines. The two arithmetic
+  renders **byte-identical** captures for all ~~fourteen~~ **19** existing baselines (corrected at
+  close: the repo pins 19, and all 19 verified untouched). The two arithmetic
   properties are asserted as **CPU tests on the map**, not on pixels, because both are exact:
   - the map with `zoom` offset by exactly `L` equals the map with `zoom = 0`, to `f32` precision, at
     every sampled destination coordinate — the seamless-loop property;
@@ -124,6 +130,9 @@ flowchart LR
 - **Files touched:** `core/src/render/scenes/fragment_field.rs`,
   `core/src/render/scenes/reaction_diffusion.rs`, `core/src/render/scenes/particles/mod.rs`,
   `core/src/render/scenes/swarm.rs`, `core/src/render/scenes/lines/mod.rs`.
+  **Corrected at close: this list was incomplete, not the implementation.** There are **seven** LUT
+  sample sites, not five — `scenes/emitter.rs` and `scenes/lines/spectrum.rs` as well — and nine
+  `PARAMS` rosters carry the two new params.
 - **How:** `t' = (floor(t·N) + 0.5)/N` before the sample; the contour darkens where `fract(t·N)` is
   near a band edge, with the width taken from `fwidth` so it is constant in **screen** space.
   `palette_steps` is quantized to an integer CPU-side, for the same reason `kaleido_spiral` is.
@@ -145,7 +154,7 @@ flowchart LR
 
 - **Owner skill:** dev
 - **What:** A rendered grid of concrete variants for the user to choose defaults and ranges from —
-  the workflow that decided the fold in [Plan 0045](done/0045-linear-light-and-bloom.md) with a
+  the workflow that decided the fold in [Plan 0045](0045-linear-light-and-bloom.md) with a
   sixteen-image three-way set, and the way this user prefers to make look decisions.
 - **Files touched:** captures written under the scratch/report path; no shipped file changes.
 - **What to render, and it must be a grid rather than a list:** `kaleido_radial` across
@@ -155,8 +164,8 @@ flowchart LR
   completely differently on a texture that fills the frame and on one that is mostly empty. Then
   `palette_steps` across {0, 4, 8, 16} × `palette_contour` across {0, 0.3, 0.8} on the field source,
   and `kaleido_tile` across {1, 2, 3} once. **Every row at 16:9 and at portrait** — the fold's worst
-  behaviour is at non-16:9 aspects ([design-backlog 0010](../design-backlog.md)) and the configuration
-  this project develops at hides it ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+  behaviour is at non-16:9 aspects ([design-backlog 0010](../../design-backlog.md)) and the configuration
+  this project develops at hides it ([ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
 - **Done when:** the grid exists as image files with a plain index naming each cell's settings, and
   the `kaleido_inner` sweep specifically shows where the inner aliasing begins on each source — that
   is the number Phase 4 has to pick and it cannot be picked from arithmetic.
@@ -197,10 +206,10 @@ cutoffs on any of the three sources at capture resolution. `kaleido_inner` is th
   is a magnified centre rather than the rosette. Confirmed **pre-existing on clean `main`** by a
   control render at both sizes, so it is upstream of this plan — but it means the "every row at both
   aspects" requirement is satisfied mechanically while the field's portrait rows answer nothing.
-  Related to [design-backlog 0010](../design-backlog.md).
+  Related to [design-backlog 0010](../../design-backlog.md).
 - **The attractor sheets are near-black** because `trails = 0` was set globally, and an attractor *is*
   its accumulation. Written up as
-  [backlog 0079](../design-backlog.md#0079--an-accumulating-figure-rendered-with-trails--0-is-not-a-sparse-source-it-is-a-blank-one-and-a-whole-third-of-a-decision-grid-was-unreadable-because-of-it);
+  [backlog 0079](../../design-backlog.md#0079--an-accumulating-figure-rendered-with-trails--0-is-not-a-sparse-source-it-is-a-blank-one-and-a-whole-third-of-a-decision-grid-was-unreadable-because-of-it);
   it cost the plan its sparse-source evidence, which Phase 6 had to answer live instead.
 
 ### Phase 5 — lock it in: a fixture that would notice, and the doc sweep
@@ -210,7 +219,7 @@ cutoffs on any of the three sources at capture resolution. `kaleido_inner` is th
 - **Files touched:** `core/src/render/kaleidoscope.rs`, `core/tests/fixtures/composite_symmetry.toml`
   (new) + its baseline, `presets/README.md`, `docs/preset-palettes.md`.
 - **Why a new fixture:** `composite_kaleido.toml` pins the fold's *artifact* on purpose
-  ([design-backlog 0010](../design-backlog.md)) and binds none of the new terms, so it would bless a
+  ([design-backlog 0010](../../design-backlog.md)) and binds none of the new terms, so it would bless a
   broken radial repeat silently. The new fixture binds `radial`, `spiral`, `tile`, `inner`, `steps`
   and `contour` all non-identity.
 - **Docs the sweep owes:** `presets/README.md` gains the five `kaleido_*` terms with the composed
@@ -220,8 +229,10 @@ cutoffs on any of the three sources at capture resolution. `kaleido_inner` is th
   contours are inert on the attractor and swarm and why. Both files are load-bearing for the
   `preset-author` lane, which keeps no catalogue of its own. `docs/presets.md` is **not** touched: no
   grammar change.
-- **Done when:** the new baseline exists and the other fourteen are verified untouched. Standing
-  trap: `LMV_BLESS` rewrites **all** baselines rather than the one you meant.
+- **Done when:** the new baseline exists and the other ~~fourteen~~ **19** are verified untouched.
+  Standing trap: `LMV_BLESS` rewrites **all** baselines rather than the one you meant. (Closed: only
+  `composite_symmetry.png` was added; `git diff` over `core/tests/golden/` reports zero
+  modifications, which settles it without needing a control bless.)
 
 ### Phase 6 — build the reference looks
 
@@ -236,7 +247,7 @@ cutoffs on any of the three sources at capture resolution. `kaleido_inner` is th
 
 ## Risks & open questions
 
-- **[Plan 0055](done/0055-the-fold-edge-becomes-a-choice.md) is approved and lives in this shader.** One
+- **[Plan 0055](0055-the-fold-edge-becomes-a-choice.md) is approved and lives in this shader.** One
   of the two inherits the other's file. They touch different parts — 0055's `kaleido_edge` is a
   uniform branch on the **destination** radius, which the composed map does not touch — and 0055 is
   the smaller and older, so **taking 0055 first is the cheaper order**. Neither is wrong.
@@ -250,11 +261,16 @@ cutoffs on any of the three sources at capture resolution. `kaleido_inner` is th
 - **The banding expression is duplicated at five sample sites.** This project has no shader include
   mechanism and the existing practice is a commented verbatim copy. The drift test in Phase 2 is
   weaker than not having copies, and that is the accepted cost.
+  **Closed cheaper than priced.** Of the seven sample sites only **three** are WGSL copies
+  (`fragment_field.rs`, `reaction_diffusion.rs`, `particles/shaders.rs`); the other four call the one
+  Rust `palette::band_coord` and cannot drift at all. The drift test covers all three copies, and its
+  negative half asserts `particles/shaders.rs` never grows a `band_contour` — a vertex-stage site has
+  no derivative to contour with.
 - **Phase 4 is `human` and gates Phases 5-6**, so this plan does not close in one session by
   construction. Phases 1-3 are a full `dev` session.
 - **The `PostStage::internal_size` policy is unchanged and must stay unchanged.** Nothing here reads
   a grid's aspect; the stage's aspect comes from the render target, per
-  [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md). Grep the diff for `aspect`
+  [ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md). Grep the diff for `aspect`
   at review — a value derived from the stage's internal size is the bug this project has shipped
   twice.
 
@@ -269,9 +285,45 @@ cutoffs on any of the three sources at capture resolution. `kaleido_inner` is th
 - **No change to ADR-0021's LUT bake**, no new post stage, no `Scene` trait change, no C ABI change,
   no new dependency.
 - **Not the drawn mandala.** The fourth reference image is line geometry and is
-  [Plan 0065](done/0065-the-mandala-interior.md).
+  [Plan 0065](0065-the-mandala-interior.md).
 
 ## Followups (after this lands)
 
 - Mip-chained post offscreens with an explicit LOD, if Phase 6 finds `kaleido_inner` too blunt.
 - Whether the composed order should be author-selectable, if Phase 6 wants tile-after-fold.
+
+## Curation verdict — close-ceremony step 3b, 2026-08-09
+
+The first run of the step [Plan 0067](../0067-the-curation-route.md) Phase 4 installed. Both triggers
+fired: this plan touched `presets/` (three new files) and it closed engine gaps.
+
+**What landed — the three ship, and the set absorbs them.** `shot --presets presets --report` flags
+**no near-duplicate geometry in any of the nine families** ("none below shape 0.08"), so Droste
+Descent, Banded Mandala and Tiled Rosette are structurally distinct from the eight fragment presets
+that preceded them and from each other. No gate, ceiling or occlusion flags on any of the three.
+
+Two set-level observations, both content notes rather than objections:
+
+- **`fragment_field` is now 11 of 44 presets** — a quarter of the library in one family, against 8
+  for the next largest (`attractor`). The symmetry stage is a *screen-space* post effect that reaches
+  every scene, so the next presets built on it should probably be built on a different source; the
+  reference looks landing on the family that was already largest is an accident of which source
+  renders a rosette most legibly, not a property of the stage.
+- **All three are the quietest presets in their family at realistic levels** — treble 0.009-0.011 and
+  onset 0.005-0.012, bottom of the fragment table — and Droste Descent and Tiled Rosette have low
+  coverage (0.229 and 0.438). They clear every gate; the tunnel and the tiling are *deliberately*
+  slow, drifting looks. Worth the content lane's attention if a later pass wants them to answer a
+  transient.
+
+**What this plan made stale: nothing.** All three instances the workaround sweep was written against
+are already resolved in their own headers — `attractor_leviathan` and `attractor_clifford` restored
+their framing once Plan 0055 shipped `squash`, and `swarm_dense` is at `kaleido_order = "3"`.
+`reaction_coral`'s `flow` workaround is explicitly retired. Nothing in `presets/` is still paying for
+a defect that has been fixed.
+
+**One note on running the step**, since this was its first use: the bare
+`grep -rn "ADR-00NN\|Plan 00NN\|design-backlog 00NN" presets/*.toml` the skill prescribes returns
+**dozens** of hits, because this project's headers cite plans and ADRs as *rationale* far more often
+than as dodges. The sweep needs a narrowing pass — grep for the resolution words (`not built`,
+`until`, `workaround`) and for params pinned at an identity value — or the signal is lost in its own
+output.
