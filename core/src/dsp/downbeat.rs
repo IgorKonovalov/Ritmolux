@@ -93,6 +93,50 @@ pub struct BarClock {
     pub locked: bool,
 }
 
+/// A read-only decomposition of what the estimator currently believes
+/// (Plan 0068's instrument).
+///
+/// The 1 Hz diagnostic column publishes the *outcome* — locked or not, and one
+/// confidence number — which is why "the accent feature is weak", "eight bars is
+/// the wrong window" and "the confidence measure under-reports" are three
+/// stories that fit the same reading. This is the decomposition that tells them
+/// apart.
+///
+/// **Diagnostics only.** It is not a grammar variable, not on the C ABI, and
+/// nothing on the analysis path reads it — [`DownbeatTracker::terms`] recomputes
+/// from state that already exists rather than caching anything, so the estimator
+/// behaves identically whether or not anyone is looking.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct DownbeatTerms {
+    /// Mean accent per candidate beat-1 alignment — the fold's own output.
+    pub scores: [f32; BEATS_PER_BAR as usize],
+    /// The alignment the fold currently favours (first `argmax` of `scores`).
+    pub best: u32,
+    /// The alignment actually held, which lags `best` by the hysteresis.
+    pub held: u32,
+    /// Between-group share of accent variance, **before** the noise correction.
+    pub effect_raw: f32,
+    /// The share four groups would explain by chance alone at this history
+    /// length — what `effect_raw` is discounted by.
+    pub null_share: f32,
+    /// What the gate compares: `effect_raw` corrected for `null_share`.
+    pub effect_corrected: f32,
+    /// Accents recorded, against `MIN_BEATS` and saturating at `ACCENT_HISTORY`.
+    pub beats_seen: u32,
+    /// Whether these terms publish — the evidence floor **and** the gate.
+    pub locked: bool,
+}
+
+/// The three numbers behind one confidence reading. Split out so the probe can
+/// see the correction rather than only its result; `effect_size` is still the
+/// one caller on the analysis path and still returns a single `f32`.
+#[derive(Debug, Clone, Copy)]
+struct Effect {
+    raw: f32,
+    null: f32,
+    corrected: f32,
+}
+
 /// Folds per-beat accents over the four 4/4 alignments and publishes a bar
 /// position when the winner is convincing enough.
 pub struct DownbeatTracker {
@@ -159,6 +203,39 @@ impl DownbeatTracker {
             bar_phase: (beat_in_bar as f32 + phase) / BEATS_PER_BAR as f32,
             confidence: self.confidence,
             locked,
+        }
+    }
+
+    /// Read the terms behind the current estimate — Plan 0068's instrument.
+    ///
+    /// **Changes nothing.** It takes `&self`, recomputes the fold and the effect
+    /// size from state `process` already keeps, and returns them by value in
+    /// fixed-size arrays: no heap allocation, no clock, no field written, and no
+    /// branch inside `process` that differs depending on whether anyone calls
+    /// this. The recomputation is a pure function of the same state that
+    /// produced the last published `BarClock::confidence`, so between hops the
+    /// two agree bit for bit — which is what makes this a reading of the gate
+    /// rather than a second opinion about it.
+    pub fn terms(&self) -> DownbeatTerms {
+        let scores = self.scores();
+        let mut best = 0u32;
+        let mut best_score = f32::NEG_INFINITY;
+        for (a, &s) in scores.iter().enumerate() {
+            if s > best_score {
+                best_score = s;
+                best = a as u32;
+            }
+        }
+        let effect = self.effect(&scores);
+        DownbeatTerms {
+            scores,
+            best,
+            held: self.alignment,
+            effect_raw: effect.raw,
+            null_share: effect.null,
+            effect_corrected: effect.corrected,
+            beats_seen: self.filled as u32,
+            locked: self.filled >= MIN_BEATS && effect.corrected >= CONFIDENCE_THRESHOLD,
         }
     }
 
@@ -233,9 +310,24 @@ impl DownbeatTracker {
     /// evidence accumulates the same effect size becomes significant. No separate
     /// "minimum evidence" tuning is doing that work.
     fn effect_size(&self, means: &[f32; BEATS_PER_BAR as usize]) -> f32 {
+        self.effect(means).corrected
+    }
+
+    /// `effect_size` with its working shown — the raw between-group share, the
+    /// null share it is discounted by, and the corrected value the gate reads.
+    /// Same arithmetic on the same inputs; the split exists so [`Self::terms`]
+    /// can report the correction separately from its result.
+    fn effect(&self, means: &[f32; BEATS_PER_BAR as usize]) -> Effect {
         let n = self.filled;
+        // Share four groups would explain by chance alone over n observations.
+        let null = (BEATS_PER_BAR as f32 - 1.0) / (n as f32 - 1.0).max(1.0);
+        let nothing = Effect {
+            raw: 0.0,
+            null,
+            corrected: 0.0,
+        };
         if n <= BEATS_PER_BAR as usize {
-            return 0.0;
+            return nothing;
         }
         let values = self.values.iter().take(n);
         let grand = values.clone().sum::<f32>() / n as f32;
@@ -261,15 +353,21 @@ impl DownbeatTracker {
 
         let total = between + within;
         if total <= f32::EPSILON {
-            return 0.0;
+            return nothing;
         }
         let eta_sq = between / total;
-        // Share four groups would explain by chance alone over n observations.
-        let null = (BEATS_PER_BAR as f32 - 1.0) / (n as f32 - 1.0).max(1.0);
         if null >= 1.0 {
-            return 0.0;
+            return Effect {
+                raw: eta_sq,
+                null,
+                corrected: 0.0,
+            };
         }
-        ((eta_sq - null) / (1.0 - null)).clamp(0.0, 1.0)
+        Effect {
+            raw: eta_sq,
+            null,
+            corrected: ((eta_sq - null) / (1.0 - null)).clamp(0.0, 1.0),
+        }
     }
 
     /// Mean accent for each of the four alignments over the recorded history.

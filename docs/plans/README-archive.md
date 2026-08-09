@@ -13,6 +13,80 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0068 — Why the downbeat rarely locks: an instrument, an ablation, and a verdict](done/0068-why-the-downbeat-rarely-locks.md)
+  — **done 2026-08-09**, Mode 4 review **no blockers, no majors, two minors, one nit**. Four phases as
+  `be39985` (the probe) / `c6a7de3` (the ladder) / `62ade74` (the verdict and the doc qualification),
+  in the `lmv-plan-0068` worktree, with **Phase 3 run by the user on 2026-08-09**. Full gate re-run at
+  the close after `git merge main` (a no-op — the lane branched from `main`'s tip and `main` had not
+  moved): doc links, `fmt`, `clippy --workspace --all-targets -D warnings`, `nextest --workspace`.
+  **No render file touched and no baseline in scope**, so the golden control was not owed here.
+
+  **The plan shipped a diagnosis and no fix, on purpose, and the close verified the "no fix" half
+  rather than taking it on trust.** `CONFIDENCE_THRESHOLD` is still `0.25` (`downbeat.rs:55`),
+  `BASS_WEIGHT` still `0.7` (`:71`), and the 4/4 fold and the confidence measure are unchanged. The
+  one production edit is a refactor: `effect_size` now delegates to a new private `effect` returning
+  the raw share, the null share and the corrected value — checked branch by branch at the close as
+  arithmetic-identical to what it replaced, including both early returns and the `null >= 1.0` arm.
+
+  **The probe reads the gate rather than offering a second opinion about it**, which is the property
+  that makes the whole plan trustworthy. `DownbeatTracker::terms()` takes `&self`, recomputes from
+  state `process` already keeps, returns fixed-size arrays by value: no heap allocation, no clock, no
+  field written, and no under-test branch anywhere in `process`. Its bit-for-bit claim is **a real
+  assertion, not a comment** — `terms.effect_corrected.to_bits() == clock.confidence.to_bits()` on all
+  four clean rotations and both unaccented cases.
+
+  **ADR-0071 was respected exactly where it is easiest to break.** Every absolute confidence value in
+  both tests is *printed*; every `assert` is comparative and dimensionless and taken inside one run —
+  the fold-spread ratio (clean vs unaccented), "every axis degrades", "dropouts are steeper than
+  contrast" swept across four assumed noise floors, and "the fold still names the true alignment at
+  the rung where the gate shuts on it". The ratios pass ADR-0074's same-kind test: both terms of each
+  are fractions of the same axis or of the same fold.
+
+  **The verdict, and the reason it is more than a lock-rate number.** Phase 3 measured 98 minutes of
+  unambiguous 4/4 through the live app on `v0.48.0`: 352 locked rows of 5900, **6.0 %** — which
+  *sharpens* Plan 0048's approximate ~6 % rather than moving it, and establishes it as a ceiling, not
+  a floor to improve on by picking better material. Split by genre it is **6.79 %** on
+  four-on-the-floor techno and **0.14 %** on backbeat rock/pop. **That 48x inversion is the finding.**
+  The intuition says the genre with the clearest loudness accent should do better; it does 48x worse,
+  because the accent is 70 % bass and a backbeat's kick carries a *two*-beat periodicity that makes
+  alignments 0 and 2 tie, while four-on-the-floor's kick marks every beat equally and flattens the
+  fold outright. Neither genre's kick marks the **bar**. So the named cause is the accent feature, and
+  the fold and the confidence measure are exonerated as the primary term.
+
+  **The limit that keeps this honest, and it survived into the ADR:** the 1 Hz log records **band
+  levels, not per-beat accents**. The identification therefore rests on the numeric match to contrast
+  rung 1.00 across two genres plus the construction argument — *not* on a direct reading of the four
+  alignment scores on real audio. `terms()` is the instrument that could settle it and is not wired to
+  the diagnostics log. Three further limits are stated: bands were unsaturated (so this is not an
+  input-scaling failure), two genres are not all of 4/4 (bass-marked material may well lock), and the
+  mis-accent risk ADR-0050 exists to guard is **still untested**, for the same reason as before — the
+  gate was shut ~94 % of the time here too.
+
+  **One deviation, weighed and accepted.** `.config/nextest.toml` gained a third and fourth named
+  override so the probe's output survives a *passing* run. It is outside both phases' file lists, but
+  it is the same reasoning the file already carries for two existing reporting tests, and it is
+  stronger here: this plan's deliverable **is** the printed decomposition, so a run that hides the
+  output has run the instrument and thrown the reading away. Scoped by test name rather than
+  profile-wide, as the existing entries are.
+
+  **Two minors, recorded rather than repaired.** (1) The accessor shipped as `pub fn terms()` /
+  `pub struct DownbeatTerms`, where Phase 1's file list said "`#[cfg(test)]` or crate-internal" — but
+  the same line put the probe in `core/tests/downbeat_probe.rs`, an integration test that links the
+  rlib externally and cannot see a `pub(crate)` item, so the two halves of that bullet were never
+  jointly satisfiable. It is a widening of `core`'s **Rust** surface only: not the C ABI, not the
+  grammar, and the type's doc comment says so. Corrected in the plan text at the close. (2) Phase 2's
+  synthetic ladder found **dropouts** the steep axis while Phase 3 found real material sitting on the
+  **contrast** axis at its extreme — not a contradiction (one asks which axis the estimator tolerates
+  least, the other asks where real music sits), but the two readings are easy to quote against each
+  other and ADR-0082's `Outcome` is the only place they are reconciled.
+
+  **What it deliberately did not do.** The repair — a downbeat cue that is not bass energy, evaluated
+  against the same ladder and the same two genres — has **no ADR and no plan**, decided at this close
+  rather than skipped. The fork an ADR would exist to decide (a stronger accent feature versus a
+  longer history window) is not a live fork yet: the `Outcome` exonerates the other two terms and
+  names the route. It stays a pointer in [design-backlog 0042](../design-backlog.md), whose original
+  entry is untouched and whose `ANSWERED` note is appended below it.
+
 
 - [0074 — The figure colours by how far it has come](done/0074-the-figure-colours-by-how-far-it-has-come.md)
   — **done 2026-08-08**, Mode 4 review **no blockers, four minor items (three repaired at the

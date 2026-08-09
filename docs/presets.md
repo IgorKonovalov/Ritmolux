@@ -384,7 +384,9 @@ use the `*_raw` twin and expect the old tiny magnitudes.
 The five musical-time variables come from the beat tracker, and the three
 bar-position ones sit behind a confidence gate with a counter fallback, so they are
 always periodic and never confidently wrong about the music (ADR-0050). 4/4 is
-assumed.
+assumed. **They are not equals in practice: the gate is shut about 94 % of audible
+time on real 4/4, so the bar trio is usually the counter fallback** — measured, and
+diagnosed, in [Musical time](#musical-time) below. Build structure on `beat_index`.
 
 > **`tempo` is the one variable that is not roughly `0–1`.** It is `0` until the
 > tempo tracker warms up (the first several seconds of audio), then jumps to a
@@ -764,6 +766,28 @@ publishes **only while it is confident**, and falls back to plain `beat_index`
 counters otherwise. So they are always periodic and always usable, and never
 confidently wrong about where the bar starts — you cannot see which mode is
 active, deliberately, and you do not need to. 4/4 is assumed.
+
+> **How often is it actually locked? About 6 % of audible time.** Measured over
+> 98 minutes of *unambiguous* 4/4 through the live app (Plan 0068 Phase 3):
+> **6.8 %** on four-on-the-floor techno, **0.14 %** on backbeat rock/pop — 352
+> locked rows in 5900. Restricting to clear 4/4 does not rescue it; the older
+> "roughly 6 %" estimate was right, and it is the ceiling rather than a floor to
+> improve from by picking better material.
+>
+> The cause is diagnosed, not mysterious. The accent the estimator folds is 70 %
+> bass band, on the assumption that the kick marks the bar. In four-on-the-floor
+> the kick marks *every beat*; in a backbeat it marks *1 and 3*, a half-bar, which
+> is why the genre with the clearer accent scores worse. See
+> [ADR-0082](adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md)'s
+> `Outcome`.
+>
+> **What this means when you write a preset:** the four one-liners above are all
+> still correct and safe, but on most material `beat_in_bar == 0` fires on a beat
+> the counter chose rather than one the music did, and it will not agree with
+> where *you* hear the downbeat. If a look must land on the real bar line, it
+> cannot today. If it only needs a periodic four-beat pulse, these deliver it —
+> just do not read the names as a promise about the music. `mod(beat_index, 16)`
+> is the honest way to write "four bars of four".
 
 **`bar_index` is monotone except across an alignment change.** It is
 `(beat_index - alignment) / 4`, and `alignment` moves on the beat the estimator
