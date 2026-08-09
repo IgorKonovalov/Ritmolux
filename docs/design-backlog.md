@@ -510,8 +510,14 @@ update above) and are resolved where they belong. These two are design.
 
 ## 0059 — the backdrop is the one surface left that does not colour through the shared palette, and nothing says so
 
+- **CLOSED 2026-08-09 — [Plan 0072](plans/done/0072-the-backdrop-joins-the-palette.md) landed.** The
+  backdrop samples the preset's baked LUT, `background.rs` carries no cosine copy, and
+  `saturation` / `palette_mix` reach the sky through one binding. `docs/preset-palettes.md` has its
+  own backdrop section and the roster row; `presets/README.md`'s sentence is true rather than
+  corrected. Three of the sixteen in-scope presets were re-tuned. **Everything below is the entry as
+  raised** and describes the pre-plan engine — read it as history, not as behaviour.
 - **PROMOTED 2026-08-04 → [ADR-0086](adrs/0086-the-backdrop-colours-through-the-preset-palette.md) +
-  [Plan 0072](plans/0072-the-backdrop-joins-the-palette.md)** — same day it was raised, because the
+  [Plan 0072](plans/done/0072-the-backdrop-joins-the-palette.md)** — same day it was raised, because the
   entry's own verification turned a documentation gap into a coherence gap. The doc half is not
   waiting for the plan: `docs/preset-palettes.md` gains the backdrop now, describing today's
   behaviour, and `presets/README.md`'s sentence is corrected.

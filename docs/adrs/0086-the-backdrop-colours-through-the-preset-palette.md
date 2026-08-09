@@ -1,8 +1,9 @@
 # ADR-0086 — The backdrop colours through the preset's palette
 
-> **Status:** proposed
+> **Status:** **accepted 2026-08-09** (with an `Outcome` section — two claims below were falsified
+> by the implementation; the body is left standing per the append-only rule)
 > **Date:** 2026-08-04
-> **Related plan(s):** [0072](../plans/0072-the-backdrop-joins-the-palette.md)
+> **Related plan(s):** [0072](../plans/done/0072-the-backdrop-joins-the-palette.md)
 > **Supplements:** [ADR-0021](0021-shared-palette-system.md) (the last surface it did not reach),
 > [ADR-0018](0018-engine-wide-scene-compositing.md) (which introduced `bg_hue`)
 
@@ -105,6 +106,49 @@ custom gradient, so this is a re-tune. Plan 0072 owns it as its own phase, judge
 - A pass that was one uniform and no bindings becomes a pass that owns two textures and a sampler.
   The cost is real but bounded — they are the same 256x1 textures already resident for the scene,
   and the pass still does not run at all when `bg_bright <= 0`.
+
+## Outcome (2026-08-09, at [Plan 0072](../plans/done/0072-the-backdrop-joins-the-palette.md)'s close)
+
+The decision held: the pass samples the baked LUT pair, `background.rs` carries no cosine constant,
+and `saturation` / `palette_mix` reach the sky through one binding
+(`ParamRoute::SceneAndBackdrop` — a fan-out, so `background::PARAMS` is unchanged and no system lost
+a param). `core/tests/backdrop_palette.rs` proves both halves as differentials against captures
+through the same pipeline. **Four things this ADR asserted did not survive contact, all recorded
+here rather than edited above.**
+
+- **"Two golden fixtures move visibly and must be re-blessed" is false.**
+  `emitter_lit_backdrop.toml` and `swarm_lit_backdrop.toml` **pin no pixels and have no committed
+  baseline** — they are ADR-0056 lit-backdrop guard fixtures whose own headers say so, and their
+  tests are three-way differentials that a tint change cannot move. The only golden baseline that
+  lights a backdrop at all is `composite_kaleido.png`, which declares no `[palette]` and is the
+  sub-LSB case. **Zero baselines moved and none was re-blessed.** The general lesson: "which
+  fixtures move" was reasoned from the fixture *files* without checking which of them own a `.png`.
+- **The positive proof needed a new suite, not the existing fixtures.** This ADR and the plan both
+  expected `#ffcf80` to be demonstrated through fixtures that turn out to assert nothing about
+  colour. `core/tests/backdrop_palette.rs` supplies it directly — and is better placed, because a
+  flat two-stop palette makes `bg_hue` a provable no-op at every coordinate including past the wrap.
+- **"Fifteen re-tint" is 18 by this ADR's own anchored grep, and 16 in scope.** Three presets joined
+  the intersection between drafting and landing (`attractor_dissolve`, `attractor_fern`,
+  `swarm_starfield`). Two of the 18 are dead on this axis and were left: `swarm_starfield` runs
+  `bg_bright = 0` and binds no `bg_hue`, `attractor_lorenz` caps `bg_bright` at 0.0009. **Three of
+  the sixteen needed moving** — `reaction_coral_head` 0.56 → 0.12, `spectrum_ridge` 0.44 → 0.06,
+  `swarm_storm` 0.965 → 0.08 — each because the old coordinate landed on the same value the figure
+  draws in, or (in `swarm_storm`'s case) at the opposite end of the gradient from the colour the
+  author had been aiming at. The other 13 were judged and left.
+- **The `[palette_bg]` rejection held, and was tested by the nearest case.** No preset wanted a sky
+  its own gradient could not supply; `reaction_coral_head` — the one that came closest — was served
+  by the opposite end of its own stops.
+
+**The ADR-0058 hazard did not fire, and the pair now carries evidence.** `background-lut-layout` is
+`[Texture, Texture, Sampler]`, shape-identical to `fragment-field-lut-layout` and the only other
+layout with that shape. Measured 2026-08-08 on this repo's dev box across both DX12 adapters: no
+shipped preset or fixture can put the pair in one frame (no fragment-field preset binds `bg_bright`,
+because that scene draws opaquely over the backdrop); on hardware the fragment-field probes are
+byte-identical before and after; and on WARP that configuration was **already** wrong beforehand for
+the separate, documented fullscreen-scene/background-pipeline reason. The measurement lives in
+`core/src/render/background.rs`'s `Background` doc comment, and
+[Plan 0053](../plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 1's allowlist must
+pick this pair up when it derives itself from the code.
 
 ## Alternatives considered
 

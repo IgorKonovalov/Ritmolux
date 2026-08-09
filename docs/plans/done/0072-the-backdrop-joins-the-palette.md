@@ -1,10 +1,18 @@
 # Plan 0072 — The backdrop joins the palette
 
-> **Status:** **in-progress 2026-08-08** — Phases 1 and 3 are `dev`;
-> Phase 2 is `human` (a `preset-author` pass, landing directly per
-> [ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)).
-> **ADR:** [0086](../adrs/0086-the-backdrop-colours-through-the-preset-palette.md)
-> **Raised by:** [design-backlog 0059](../design-backlog.md#0059--the-backdrop-is-the-one-surface-left-that-does-not-colour-through-the-shared-palette-and-nothing-says-so)
+> **Status:** **done 2026-08-09** — all three phases landed: Phase 1 `ff04fd4`
+> (the pass samples the baked LUT pair, `saturation`/`palette_mix` fan out through
+> `ParamRoute::SceneAndBackdrop`, `core/tests/backdrop_palette.rs` carries the proof),
+> Phase 3 `7fe0a65` (the colour docs gain the backdrop), Phase 2 `ebe4170` (three of
+> sixteen re-tuned). Mode 4 review 2026-08-09: **no blockers, no majors, four minors,
+> three nits**. Verified: `fmt` + `clippy --workspace --all-targets -D warnings` +
+> `nextest --workspace` (604/604) + `check-doc-links.mjs`, all green; the three new
+> backdrop tests **run** on this box rather than skipping; no golden baseline moved.
+> **Two of this plan's own claims were falsified and are recorded in ADR-0086's
+> `Outcome`** — the two fixtures it ordered re-blessed pin no pixels, and its
+> "fifteen" is 18 by its own grep.
+> **ADR:** [0086](../../adrs/0086-the-backdrop-colours-through-the-preset-palette.md)
+> **Raised by:** [design-backlog 0059](../../design-backlog.md#0059--the-backdrop-is-the-one-surface-left-that-does-not-colour-through-the-shared-palette-and-nothing-says-so)
 > **Owner skill(s):** dev, human
 
 ## TL;DR
@@ -17,11 +25,11 @@ has never appeared at all.
 
 ## Context & problem
 
-Full argument in [ADR-0086](../adrs/0086-the-backdrop-colours-through-the-preset-palette.md). The
+Full argument in [ADR-0086](../../adrs/0086-the-backdrop-colours-through-the-preset-palette.md). The
 three facts that set the scope, all measured:
 
 - **`background.rs:70` is the third copy of `d = (0.10, 0.42, 0.62)`** — the constant
-  [ADR-0021](../adrs/0021-shared-palette-system.md) was written to de-duplicate. The pass binds one
+  [ADR-0021](../../adrs/0021-shared-palette-system.md) was written to de-duplicate. The pass binds one
   uniform and no textures.
 - **26 of 37 shipped presets light a backdrop.** Eleven declare no `[palette]` and provably cannot
   move (the default gradient *is* that cosine, and the difference is sub-LSB — the arithmetic is in
@@ -104,8 +112,8 @@ flowchart LR
   because a backdrop drawn from the figure's own gradient is the coherence this change is for.
 - **Note:** `bg_bright` across all fifteen is between 0.008 and 0.039 including the audio term, so
   this is a dim wash and the judgement is subtle. It pairs naturally with
-  [backlog 0038](../design-backlog.md) (the tonemap knee retune) and
-  [backlog 0040](../design-backlog.md) / [Plan 0071](0071-light-that-adds-without-covering.md),
+  [backlog 0038](../../design-backlog.md) (the tonemap knee retune) and
+  [backlog 0040](../../design-backlog.md) / [Plan 0071](../0071-light-that-adds-without-covering.md),
   which are the other two retunes of the same set against a composite that moved underneath it —
   and 0040's whole question is *how bright a backdrop can get*, which is the same fifteen files.
   If Plan 0071 has landed, do them together.
@@ -116,8 +124,8 @@ flowchart LR
 - **What:** `docs/preset-palettes.md` gains the backdrop in its "Bindable colour parameters" roster
   and its own short section; `presets/README.md`'s background-pass paragraph stops saying "the
   shared cosine palette" and says what is true after Phase 1.
-- **Files touched:** [`docs/preset-palettes.md`](../preset-palettes.md),
-  [`presets/README.md`](../../presets/README.md).
+- **Files touched:** [`docs/preset-palettes.md`](../../preset-palettes.md),
+  [`presets/README.md`](../../../presets/README.md).
 - **Done when:** an author reading the colour doc can tell (a) that `bg_hue` is a coordinate in the
   preset's gradient, cyclic, with the same wrap trap `color_center` documents; (b) that `saturation`
   and `palette_mix` move the backdrop too; and (c) that the swatch table already in that file —
@@ -133,7 +141,7 @@ flowchart LR
 
 - **The WARP aliasing hazard is the real risk in this plan**, not the arithmetic. The failure mode
   is a green suite over a wrong picture, and this repo has been bitten by it twice
-  ([ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md)). If the comparison shows
+  ([ADR-0058](../../adrs/0058-bind-group-layout-collisions-carry-evidence.md)). If the comparison shows
   a divergence, that is a finding to report, not a baseline to bless.
 - **Phase 2 may find that some `bg_hue` values were load-bearing against the cosine specifically** —
   a preset whose sky deliberately contrasted its figure. A preset that genuinely wants an unrelated
@@ -146,9 +154,9 @@ flowchart LR
 ## What this plan does NOT do
 
 - **It does not touch `bg_bright` or `bg_vignette`.** Only the colour source moves. How bright a
-  backdrop may be is [backlog 0040](../design-backlog.md) / Plan 0071's question.
+  backdrop may be is [backlog 0040](../../design-backlog.md) / Plan 0071's question.
 - **It does not give the backdrop its own gradient.** Rejected in the ADR.
-- **It does not move the backdrop in the chain.** [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md)
+- **It does not move the backdrop in the chain.** [ADR-0055](../../adrs/0055-backdrop-leaves-the-post-chain.md)
   put it under the post chain deliberately; nothing here disturbs that.
 - **It does not re-tune the eleven default-palette presets.** They cannot move by more than a
   rounding of the final 8-bit write, and asking a content pass to look at them would waste the pass.
