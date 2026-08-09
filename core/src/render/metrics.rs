@@ -153,6 +153,84 @@ pub fn tonal_flatness(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
     buckets.iter().copied().max().unwrap_or(0) as f32 / lit as f32
 }
 
+/// Concentric annuli [`radial_shell_occupancy`] divides the frame's inscribed
+/// disc into. Ten equal-radius shells is the granularity the Plan 0065 lane's
+/// one-off prototype measured with when it separated the four-ring mandala from
+/// the bare rosette (9 shells against 1, design-backlog 0072), and it is kept:
+/// coarse enough that a 96×96 capture gives the innermost shell a usable pixel
+/// count (~70), fine enough that "occupies most shells" cannot be satisfied by
+/// one ring and a halo.
+pub const RADIAL_SHELLS: usize = 10;
+
+/// Minimum share of a shell's own pixels that must be lit for the shell to
+/// count as occupied in [`radial_shell_occupancy`].
+///
+/// **Checked against both sides by measurement** (Plan 0075 Phase 1). The
+/// failure this guards against is a stray near-threshold pixel marking an
+/// empty shell occupied; the content it must not disenfranchise is a hairline
+/// stroke crossing a shell. At the sanity suite's 96×96 capture, shell `k`
+/// holds ~72·(2k+1) pixels (~72 innermost, ~1370 outermost), so 2 % asks for
+/// roughly 2–28 lit pixels per shell — above stray-pixel scale, far below any
+/// real stroke. Measured at this threshold: the three honest ring-mandala
+/// tunings (backlog 0072's evidence — `glow = 1.0`, no `trails`) read
+/// **10 / 10 / 9** occupied shells, every shipped preset reads ≥ 3, and the
+/// frozen renders-nothing defect (the pre-repair `spectrum_ridge`, its contour
+/// off frame) reads exactly **0** — the threshold separates honest-thin from
+/// absent by the measure's whole range.
+pub const MIN_SHELL_LIT: f32 = 0.02;
+
+/// How many of [`RADIAL_SHELLS`] concentric equal-radius annuli over the
+/// frame's inscribed disc contain a meaningful share of lit pixels
+/// (`0..=RADIAL_SHELLS`) — a **structural occupancy** measure: *at how many
+/// radii does this picture exist?*
+///
+/// [`coverage`] counts lit pixels, which at capture size measures a thin-stroke
+/// figure's halo rather than its geometry: at 96×96 the bare rosette and a
+/// 46×-denser four-ring mandala score identically, and 54 % more geometry moves
+/// the number 2.6 % (design-backlog 0072). This asks the question that actually
+/// separates them — the mandala exists at nine of ten radii, the rosette's
+/// interlace band at one to three — and it cannot be bought with `glow` or
+/// `trails`, because inflating the halo around a stroke does not move which
+/// shells the stroke lives in.
+///
+/// Pixels outside the inscribed disc (the frame's corners) are ignored: the
+/// measure is radial, and the corners exist at radii only a diagonal figure
+/// reaches. `0` for a frame with no lit pixels — a scene that renders nothing
+/// occupies nothing, which is the one conviction the coverage floor demonstrably
+/// gets right and this measure must preserve.
+pub fn radial_shell_occupancy(img: &CaptureImage, bg: [u8; 4], eps: u8) -> usize {
+    let w = img.width as usize;
+    let h = img.height as usize;
+    if w == 0 || h == 0 {
+        return 0;
+    }
+    let (cx, cy) = (w as f32 * 0.5, h as f32 * 0.5);
+    let radius = w.min(h) as f32 * 0.5;
+    let mut lit = [0u32; RADIAL_SHELLS];
+    let mut total = [0u32; RADIAL_SHELLS];
+    for (i, px) in img.rgba.chunks_exact(4).enumerate() {
+        let x = (i % w) as f32 + 0.5;
+        let y = (i / w) as f32 + 0.5;
+        let r = ((x - cx).powi(2) + (y - cy).powi(2)).sqrt() / radius;
+        if r >= 1.0 {
+            continue;
+        }
+        let shell = ((r * RADIAL_SHELLS as f32) as usize).min(RADIAL_SHELLS - 1);
+        if let Some(t) = total.get_mut(shell) {
+            *t += 1;
+        }
+        if is_lit(px, bg, eps)
+            && let Some(l) = lit.get_mut(shell)
+        {
+            *l += 1;
+        }
+    }
+    lit.iter()
+        .zip(total.iter())
+        .filter(|&(&l, &t)| t > 0 && l as f32 / t as f32 >= MIN_SHELL_LIT)
+        .count()
+}
+
 // ---------------------------------------------------------------------------
 // Step response — how fast the frame reaches its new steady state (Plan 0037)
 // ---------------------------------------------------------------------------

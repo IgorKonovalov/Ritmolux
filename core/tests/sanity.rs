@@ -61,7 +61,10 @@ use lmv_core::{
     preset::{Preset, SystemKind, default_presets},
     render::{
         HeadlessOptions, RenderError, Renderer,
-        metrics::{TONE_BANDS, coverage, quadrant_spread, tonal_flatness},
+        metrics::{
+            RADIAL_SHELLS, TONE_BANDS, coverage, quadrant_spread, radial_shell_occupancy,
+            tonal_flatness,
+        },
     },
 };
 
@@ -177,6 +180,69 @@ const MAX_TONAL_FLATNESS: f32 = 0.90;
 /// Phase 1's change put no preset back over the ceiling, and if one ever goes
 /// over, that is a defect to route, not an entry to re-add.
 const KNOWN_FLAT: &[&str] = &[];
+
+/// The fewest of [`RADIAL_SHELLS`] concentric annuli a preset under its
+/// system's coverage floor must occupy to pass anyway — the **structural
+/// rescue** (Plan 0075 Phase 1, design-backlog 0072).
+///
+/// # Why a structural measure and not a per-family floor
+///
+/// Backlog 0072 proved the coverage statistic cannot see a dense thin-stroke
+/// figure at this test's 96×96: the bare rosette and a 46×-denser four-ring
+/// mandala score **identically** (0.403 in a controlled A/B), 54 % more
+/// geometry moves the number 2.6 %, and the only lever that clears the floor is
+/// inflating `glow`/`trails` — the washed-out look the user rejected in the
+/// running app. **The gate was selecting for the defect.** The entry named two
+/// candidate mechanisms, and this file takes the structural one, for two
+/// reasons recorded here rather than re-derived:
+///
+/// 1. **A per-family thin-stroke floor is still the halo-meter, recalibrated.**
+///    Lowering `star_pattern`'s floor to what honest thin strokes render
+///    (`0.2442 / 2 = 0.12`) keeps measuring the halo — it just demands less of
+///    it — so the next *denser* mandala meets the same wall at a new number.
+///    It also cannot coexist with [`MAX_FLOOR_SLACK`]: the shipped family
+///    minimum is `0.6908` (Star Lantern), and a defect-shaped `0.12` floor sits
+///    `5.75×` under it, which [`report_coverage_distribution`] rightly fails.
+///    The floor machinery is calibrated to *shipped* content; the defect lives
+///    in content that could not ship because of it.
+/// 2. **Shell occupancy sees the figure, and cannot be bought with glow.** The
+///    Plan 0065 lane's prototype separated the pair the coverage statistic
+///    could not: 9 of 10 radial shells occupied against 1. Inflating the halo
+///    around a stroke does not move which shells the stroke lives in, so the
+///    rescue removes the incentive the old floor created instead of repricing
+///    it.
+///
+/// # How it applies
+///
+/// A preset under its coverage floor is not failed if it occupies at least this
+/// many shells. Everything else stands unchanged: the quadrant check still
+/// fails a dot, [`MAX_TONAL_FLATNESS`] still fails a blot, the floors and
+/// [`MAX_FLOOR_SLACK`] still run against shipped content (which all clears them
+/// — no shipped preset needs the rescue today), and a scene that renders
+/// **nothing** occupies zero shells and still fails, which is the one job the
+/// old floor demonstrably did
+/// ([`the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one`] asserts it
+/// on the frozen defect).
+///
+/// # Derivation
+///
+/// Half the sparsest legitimate content, the same ceremony every coverage floor
+/// in this file follows (ADR-0071: a constant states its derivation next to
+/// itself). The honest mandala tunings — the three retired presets at
+/// `glow = 1.0` with no `trails`, frozen from `654304a^` below — measure
+/// **10 / 10 / 9** of 10 shells
+/// ([`the_honest_mandala_tunings_pass_the_structural_measure`] prints them on
+/// every run), so the bar is `9 / 2 = 4` (integer floor, the conservative
+/// side), against defect fixtures that measure exactly `0`. A figure occupying
+/// four annuli is structurally *present* — what it may still be is washed out,
+/// mis-toned or dot-like, and those remain the other checks' verdicts.
+///
+/// This is a rescue bar, **not** a general structural floor over the library:
+/// shipped presets that clear their coverage floors legitimately sit under it
+/// (`Spectrum Ridge` occupies 3 shells, `Rose Trails` and `Spectrum Corona`
+/// 5 — the main gate prints every preset's count). A sparse readout that
+/// passes on coverage never consults this number.
+const MIN_STRUCTURAL_SHELLS: usize = 4;
 
 /// The most the lowest-scoring preset in a system may sit above that system's
 /// floor before the floor has stopped doing anything (Plan 0058 Phase 2).
@@ -495,17 +561,35 @@ fn every_preset_draws_a_real_shape() {
         let cov = coverage(&img, BLACK, EPS);
         let spread = quadrant_spread(&img, BLACK, EPS);
         let flat = tonal_flatness(&img, BLACK, EPS);
+        let shells = radial_shell_occupancy(&img, BLACK, EPS);
         let floor = coverage_floor(system);
         println!(
             "[{}] {name:<12} coverage={cov:.4} (floor {floor:.2}) quadrants={spread} \
-             flatness={flat:.4} (max {MAX_TONAL_FLATNESS:.2})",
+             flatness={flat:.4} (max {MAX_TONAL_FLATNESS:.2}) shells={shells}/{RADIAL_SHELLS}",
             system_name(system),
         );
         let known_flat = KNOWN_FLAT.contains(&name);
         flatness.push((flat, name.to_string(), known_flat));
         by_system.push((system, cov, name.to_string()));
         if cov < floor {
-            failures.push(format!("{name} blank: coverage {cov:.4} < {floor:.2}"));
+            // The structural rescue (Plan 0075 Phase 1): a dense thin-stroke
+            // figure aliases to almost no coverage at this capture size, so a
+            // preset under its floor is asked the structural question before
+            // being convicted — see MIN_STRUCTURAL_SHELLS for the mechanism
+            // and the derivation.
+            if shells >= MIN_STRUCTURAL_SHELLS {
+                println!(
+                    "  {name} is under its coverage floor ({cov:.4} < {floor:.2}) but \
+                     structurally present: {shells}/{RADIAL_SHELLS} radial shells occupied \
+                     (min {MIN_STRUCTURAL_SHELLS}) — a thin-stroke figure, not a blank frame"
+                );
+            } else {
+                failures.push(format!(
+                    "{name} blank: coverage {cov:.4} < {floor:.2} and only \
+                     {shells}/{RADIAL_SHELLS} radial shells occupied \
+                     (min {MIN_STRUCTURAL_SHELLS})"
+                ));
+            }
         }
         if spread < MIN_QUADRANTS {
             failures.push(format!(
@@ -793,14 +877,25 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
         .expect("capture the pre-repair ridge without its backdrop");
     let cov = coverage(&scene, BLACK, EPS);
     let spread = quadrant_spread(&scene, BLACK, EPS);
+    let shells = radial_shell_occupancy(&scene, BLACK, EPS);
     println!(
-        "[pre-repair ridge] new gate: coverage={cov:.4} (floor {floor:.2}) quadrants={spread}"
+        "[pre-repair ridge] new gate: coverage={cov:.4} (floor {floor:.2}) quadrants={spread} \
+         shells={shells}/{RADIAL_SHELLS}"
     );
     assert!(
         cov < floor,
         "a contour drawn 3.3 world units off a frame of half-height 1.0 must FAIL the \
          coverage floor once the vignette stops counting as a figure: coverage {cov:.4} \
          >= {floor:.2}"
+    );
+    // Catching a scene that renders nothing is the one job the coverage floor
+    // demonstrably did, and the structural rescue (Plan 0075 Phase 1) must not
+    // reopen it: a figure that is not there occupies no shell, so the rescue
+    // cannot reach it.
+    assert!(
+        shells < MIN_STRUCTURAL_SHELLS,
+        "a scene that renders nothing must fail the structural rescue too: \
+         {shells}/{RADIAL_SHELLS} shells >= {MIN_STRUCTURAL_SHELLS}"
     );
     assert!(
         old_cov > cov * 10.0,
@@ -826,6 +921,224 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
         "the pre-repair ridge is off frame at a realistic level too, so it must fail the \
          moderate-excitation sentinel: coverage {mid_cov:.4} >= {MODERATE_MIN_COVERAGE:.2}"
     );
+}
+
+/// **The three retired ring mandalas at their honest tunings**, recovered from
+/// `git show 654304a^:presets/star_mandala.toml` (and siblings) — every
+/// `[generator]` table and every binding byte-for-byte, comments stripped and
+/// the names suffixed so the output reads clearly. Nothing here is tunable:
+/// these are backlog 0072's evidence, frozen.
+///
+/// "Honest" means what Plan 0065 Phase 5 shipped when it was told not to buy
+/// coverage with `glow` and `trails`, and did not: tuned by eye at 1280×720,
+/// `glow` at the engine's 1.0, no `trails` binding at all. All three **failed**
+/// the 0.34 coverage floor at this test's 96×96 — `0.2442` / `0.2505` /
+/// `0.2544`, pinned in the backlog entry — because a hairline over a 46-fold
+/// ornament aliases to nothing at that size and `coverage` was measuring the
+/// halo. The presets were later retired for an unrelated defect (sampled
+/// polylines show their vertices, backlog 0073), which is why they are fixtures
+/// here rather than members of the shipped roster.
+fn retired_mandalas() -> Vec<Preset> {
+    let star_mandala = r#"
+system = "star_pattern"
+name   = "Star Mandala (retired)"
+
+[generator]
+tiling = "none"
+
+rings = [
+  { motif = "trefoil",  count = 1,  radius = 0.00, scale = 0.46 },
+  { motif = "diamond",  count = 12, radius = 0.30, scale = 0.20 },
+  { motif = "petal",    count = 18, radius = 0.52, scale = 0.26, phase = 0.09 },
+  { motif = "circle",   count = 24, radius = 0.70, scale = 0.13 },
+]
+
+[params]
+ring_phase = "time * 0.085 + clamp(bass * 0.22, 0, 0.18)"
+ring_spread = "1.00 + sin(time * 0.83) * 0.075 + clamp(bass * 0.13, 0, 0.11)"
+ring_scale  = "1.00 + sin(time * 0.61) * 0.115 + clamp(mid * 0.20, 0, 0.17)"
+rotation = "0.09 * time"
+scale    = "1.06 + sin(time * 0.22) * 0.045"
+zoom     = "1.02 + sin(time * 0.15) * 0.035"
+thickness  = "3.10 + clamp(bass * 1.60, 0, 1.30) + beat * 0.45"
+brightness = "0.95 + clamp(treb * 0.40, 0, 0.34)"
+hue        = "0.58 + time * 0.011 + clamp(treb * 0.38, 0, 0.28)"
+hue_spread = "0.60 + clamp(mid * 0.22, 0, 0.18)"
+saturation = "0.94"
+bg_hue      = "0.68 + sin(time * 0.0085) * 0.05"
+bg_bright   = "0.016 + clamp(mid * 0.012, 0, 0.010)"
+bg_vignette = "0.80"
+
+[smoothing]
+ring_phase  = 0.25
+ring_spread = 0.35
+ring_scale  = 0.40
+rotation    = 0.20
+scale       = 0.45
+zoom        = 0.22
+thickness   = { attack = 0.02, release = 0.32 }
+hue         = 0.40
+hue_spread  = 0.55
+bg_bright   = 0.40
+"#;
+    let mandala_six = r#"
+system = "star_pattern"
+name   = "Mandala Six (retired)"
+
+[generator]
+tiling = "none"
+
+rings = [
+  { motif = "trefoil",  count = 1,  radius = 0.00, scale = 0.34 },
+  { motif = "circle",   count = 8,  radius = 0.22, scale = 0.143 },
+  { motif = "diamond",  count = 14, radius = 0.38, scale = 0.144 },
+  { motif = "petal",    count = 20, radius = 0.55, scale = 0.146, phase = 0.08 },
+  { motif = "chevron",  count = 28, radius = 0.70, scale = 0.133 },
+  { motif = "circle",   count = 36, radius = 0.82, scale = 0.122 },
+]
+
+[params]
+ring_phase = "time * 0.062 + clamp(bass * 0.17, 0, 0.14)"
+ring_spread = "1.00 + sin(time * 0.71) * 0.095 + clamp(bass * 0.15, 0, 0.13)"
+ring_scale  = "1.00 + sin(time * 0.49) * 0.100 + clamp(mid * 0.18, 0, 0.15)"
+rotation = "-0.06 * time"
+scale    = "0.94 + sin(time * 0.19) * 0.040"
+zoom     = "1.02 + sin(time * 0.13) * 0.030"
+thickness  = "2.70 + clamp(bass * 1.40, 0, 1.15) + beat * 0.40"
+brightness = "0.95 + clamp(treb * 0.38, 0, 0.32)"
+hue        = "0.12 + time * 0.009 + clamp(treb * 0.34, 0, 0.26)"
+hue_spread = "0.78 + clamp(mid * 0.18, 0, 0.15)"
+saturation = "0.90"
+bg_hue      = "0.10 + sin(time * 0.0070) * 0.04"
+bg_bright   = "0.014 + clamp(mid * 0.010, 0, 0.008)"
+bg_vignette = "0.82"
+
+[smoothing]
+ring_phase  = 0.25
+ring_spread = 0.35
+ring_scale  = 0.40
+rotation    = 0.20
+scale       = 0.45
+zoom        = 0.22
+thickness   = { attack = 0.02, release = 0.32 }
+hue         = 0.40
+hue_spread  = 0.55
+bg_bright   = 0.40
+"#;
+    let mandala_weave = r#"
+system = "star_pattern"
+name   = "Mandala Weave (retired)"
+
+[generator]
+tiling            = "12"
+contact_angle_deg = 26
+
+rings = [
+  { motif = "trefoil",  count = 1,  radius = 0.00, scale = 0.46 },
+  { motif = "diamond",  count = 12, radius = 0.30, scale = 0.20 },
+  { motif = "petal",    count = 18, radius = 0.52, scale = 0.26, phase = 0.09 },
+  { motif = "circle",   count = 24, radius = 0.70, scale = 0.13 },
+]
+
+[params]
+variant = "2 * abs(mod(0.5 + time * 0.012 + clamp(bass * 0.26, 0, 0.22), 2) - 1)"
+ring_phase = "time * 0.070 + clamp(bass * 0.20, 0, 0.16)"
+ring_spread = "1.00 + sin(time * 0.77) * 0.055 + clamp(bass * 0.10, 0, 0.085)"
+ring_scale  = "1.00 + sin(time * 0.53) * 0.090 + clamp(mid * 0.16, 0, 0.14)"
+rotation = "0.075 * time"
+scale    = "0.90 + sin(time * 0.20) * 0.040"
+zoom     = "1.02 + sin(time * 0.14) * 0.030"
+thickness  = "3.30 + clamp(bass * 1.55, 0, 1.25) + beat * 0.45"
+brightness = "0.95 + clamp(treb * 0.40, 0, 0.34)"
+hue        = "0.86 + time * 0.010 + clamp(treb * 0.36, 0, 0.28)"
+hue_spread = "0.66 + clamp(mid * 0.20, 0, 0.16)"
+saturation = "0.92"
+bg_hue      = "0.58 + sin(time * 0.0080) * 0.05"
+bg_bright   = "0.016 + clamp(mid * 0.012, 0, 0.010)"
+bg_vignette = "0.80"
+
+[smoothing]
+variant     = 1.6
+ring_phase  = 0.25
+ring_spread = 0.35
+ring_scale  = 0.40
+rotation    = 0.20
+scale       = 0.45
+zoom        = 0.22
+thickness   = { attack = 0.02, release = 0.32 }
+hue         = 0.40
+hue_spread  = 0.55
+bg_bright   = 0.40
+"#;
+    [star_mandala, mandala_six, mandala_weave]
+        .into_iter()
+        .map(|toml| Preset::from_toml_str(toml).expect("a retired mandala fixture parses"))
+        .collect()
+}
+
+/// **Plan 0075 Phase 1's done-when, asserted on the frozen evidence.** The
+/// honest tunings that failed the old floor pass the new measure:
+///
+/// 1. Each retired mandala still **fails** the `star_pattern` coverage floor —
+///    the defect is real and unrepaired, so the rescue is doing work rather
+///    than decorating. If this half ever fails, the coverage statistic has
+///    started seeing thin strokes at 96×96 (a capture-size or measurement
+///    change), and [`MIN_STRUCTURAL_SHELLS`] should be re-examined rather than
+///    this assertion loosened.
+/// 2. Each occupies at least [`MIN_STRUCTURAL_SHELLS`] radial shells, so the
+///    full gate would now pass it — with the halo levers at `glow = 1.0` and no
+///    `trails`, which is the tuning the old floor rejected and the user asked
+///    for.
+/// 3. Each still clears the checks the rescue must **not** bypass: quadrant
+///    spread and tonal flatness. The rescue answers "blank", not "dot" or
+///    "blot".
+#[test]
+fn the_honest_mandala_tunings_pass_the_structural_measure() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let frame = loud();
+    let fixtures: Vec<Preset> = retired_mandalas()
+        .into_iter()
+        .map(without_backdrop)
+        .collect();
+    let names: Vec<String> = fixtures.iter().map(|p| p.name.clone()).collect();
+    renderer.set_presets(fixtures);
+    let floor = coverage_floor(SystemKind::StarPattern);
+
+    for name in &names {
+        let img = renderer
+            .capture_preset(name, &frame, FRAMES)
+            .expect("capture a retired mandala fixture");
+        let cov = coverage(&img, BLACK, EPS);
+        let spread = quadrant_spread(&img, BLACK, EPS);
+        let flat = tonal_flatness(&img, BLACK, EPS);
+        let shells = radial_shell_occupancy(&img, BLACK, EPS);
+        println!(
+            "[honest mandala] {name}: coverage={cov:.4} (floor {floor:.2}) \
+             shells={shells}/{RADIAL_SHELLS} (min {MIN_STRUCTURAL_SHELLS}) \
+             quadrants={spread} flatness={flat:.4}"
+        );
+        assert!(
+            cov < floor,
+            "{name} now clears the coverage floor ({cov:.4} >= {floor:.2}) — the defect \
+             this rescue exists for has moved; re-derive MIN_STRUCTURAL_SHELLS against \
+             whatever changed the measurement"
+        );
+        assert!(
+            shells >= MIN_STRUCTURAL_SHELLS,
+            "{name} is the honest tuning the old floor rejected and it must pass the \
+             structural measure: {shells}/{RADIAL_SHELLS} shells < {MIN_STRUCTURAL_SHELLS}"
+        );
+        assert!(
+            spread >= MIN_QUADRANTS,
+            "{name} must clear the quadrant check the rescue does not bypass: {spread}"
+        );
+        assert!(
+            flat <= MAX_TONAL_FLATNESS,
+            "{name} must clear the flatness ceiling the rescue does not bypass: {flat:.4}"
+        );
+    }
 }
 
 /// The least coverage a preset may paint at [`MODERATE`] and still be a picture

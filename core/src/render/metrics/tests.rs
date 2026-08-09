@@ -64,6 +64,44 @@ fn coverage_and_spread_extremes() {
     assert_eq!(quadrant_spread(&dot, BLACK, 8), 1);
 }
 
+#[test]
+fn radial_shell_occupancy_extremes_and_geometry() {
+    let black = solid(96, 96, BLACK);
+    let white = solid(96, 96, [255, 255, 255, 255]);
+    // Nothing lit occupies nothing; everything lit occupies every shell.
+    assert_eq!(radial_shell_occupancy(&black, BLACK, 8), 0);
+    assert_eq!(radial_shell_occupancy(&white, BLACK, 8), RADIAL_SHELLS);
+
+    // Normalized radius from the frame centre, in units of the inscribed disc.
+    let r_norm = |x: u32, y: u32| {
+        let (dx, dy) = (x as f32 + 0.5 - 48.0, y as f32 + 0.5 - 48.0);
+        (dx * dx + dy * dy).sqrt() / 48.0
+    };
+
+    // A thin ring occupies exactly the one shell its radius lives in — the
+    // structural claim: a figure at one radius is one shell, however bright.
+    let ring = image(96, 96, |x, y| {
+        let r = r_norm(x, y);
+        if (0.52..0.58).contains(&r) {
+            [255, 255, 255, 255]
+        } else {
+            BLACK
+        }
+    });
+    assert_eq!(radial_shell_occupancy(&ring, BLACK, 8), 1);
+
+    // Light outside the inscribed disc (the corners) is at radii the measure
+    // deliberately does not score.
+    let corners = image(96, 96, |x, y| {
+        if r_norm(x, y) >= 1.0 {
+            [255, 255, 255, 255]
+        } else {
+            BLACK
+        }
+    });
+    assert_eq!(radial_shell_occupancy(&corners, BLACK, 8), 0);
+}
+
 /// One frame at 60 Hz — the clock `capture_preset_over` advances by.
 const DT: f32 = 1.0 / 60.0;
 
