@@ -1,0 +1,30 @@
+# FEEDBACK FIXTURE - do not tune; the motion guards in core/tests/feedback.rs
+# read it. Plan 0046 Phase 1.
+#
+# `feedback_still.toml` under a pure TANGENTIAL feedback: `fb_rotate` carries the
+# accumulation around the frame centre, so the same static figure grows an arc at
+# a constant radius instead of a radial streak. Read against `feedback_zoom.toml`,
+# which grows the other way from the same figure.
+#
+# 3 rad/s sweeps ~2 rad over the guard's window - well short of the pi where an
+# `atan2` span would need to reason about which way round the gap lies.
+system = "parametric_curve"
+name   = "fixture_feedback_rotate"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "4"
+d             = "97"
+samples       = "181"
+scale         = "0.05"
+pan_x         = "0.2"
+spin          = "0"
+hue           = "0.55"
+thickness     = "2.0"
+brightness    = "1.0"
+draw_progress = "1"
+
+trails        = "0.96"
+fb_rotate     = "3"

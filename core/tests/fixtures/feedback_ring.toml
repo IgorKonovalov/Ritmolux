@@ -1,0 +1,33 @@
+# FEEDBACK FIXTURE - do not tune; the SHEAR guard in core/tests/feedback.rs reads
+# it. Plan 0046 Phase 1.
+#
+# The rotation, spun fast enough and held long enough that the accumulated arc
+# closes into a full RING - the one figure whose bounding box states an aspect
+# claim. A ring drawn about the frame centre is round on screen, so its pixel
+# bounding box is square, at every target shape; a transform that took its aspect
+# from the 256 px-quantized accumulation grid instead of the render target
+# (ADR-0037) traces an ellipse, and at the guard's portrait target that box is
+# 1.6x taller than it is wide.
+#
+# `trails` sits at the MAX_FADE ceiling so the tail survives the ~0.7 s a full
+# revolution takes at 9 rad/s.
+system = "parametric_curve"
+name   = "fixture_feedback_ring"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "4"
+d             = "97"
+samples       = "181"
+scale         = "0.05"
+pan_x         = "0.2"
+spin          = "0"
+hue           = "0.55"
+thickness     = "2.0"
+brightness    = "1.0"
+draw_progress = "1"
+
+trails        = "0.98"
+fb_rotate     = "9"

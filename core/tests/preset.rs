@@ -1202,7 +1202,20 @@ fn declared_params_match_set_param() {
             src.join("render/background.rs"),
             &["bg_hue", "bg_bright", "bg_vignette"],
         ),
-        (src.join("render/trails.rs"), &["trails"]),
+        (
+            src.join("render/trails.rs"),
+            &[
+                "trails",
+                // ADR-0048's transform on the accumulation this stage already
+                // owns: the affine, then the centre it turns about.
+                "fb_zoom",
+                "fb_rotate",
+                "fb_dx",
+                "fb_dy",
+                "fb_center_x",
+                "fb_center_y",
+            ],
+        ),
         (
             src.join("render/kaleidoscope.rs"),
             &[

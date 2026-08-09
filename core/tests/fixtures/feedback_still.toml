@@ -1,0 +1,30 @@
+# FEEDBACK FIXTURE - do not tune; the motion guards in core/tests/feedback.rs
+# read it. Plan 0046 Phase 1.
+#
+# The control: a compact, STATIC figure parked off-centre under a long trail, with
+# no `fb_*` bound at all. Static is the point - the only thing that can move the
+# accumulation in its siblings is the feedback transform itself, so a displacement
+# measured against this one cannot be the scene animating.
+#
+# The figure is a small Maurer rose panned along +x: compact enough that its own
+# angular width about the frame centre is small, which is what lets a radial
+# displacement and a tangential one be told apart.
+system = "parametric_curve"
+name   = "fixture_feedback_still"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "4"
+d             = "97"
+samples       = "181"
+scale         = "0.05"
+pan_x         = "0.2"
+spin          = "0"
+hue           = "0.55"
+thickness     = "2.0"
+brightness    = "1.0"
+draw_progress = "1"
+
+trails        = "0.96"

@@ -1,0 +1,29 @@
+# FEEDBACK FIXTURE - do not tune; the motion guards in core/tests/feedback.rs
+# read it. Plan 0046 Phase 1.
+#
+# `feedback_still.toml` under a pure RADIAL feedback: `fb_zoom > 1` pushes the
+# accumulation outward from the frame centre every frame, so the static figure
+# grows a streak pointing away from the centre. Nothing else moves.
+#
+# The rate is per second (ADR-0048), so 1.9 is a near-doubling of the past's
+# scale each second - visible within the ~0.7 s the guard captures over.
+system = "parametric_curve"
+name   = "fixture_feedback_zoom"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "4"
+d             = "97"
+samples       = "181"
+scale         = "0.05"
+pan_x         = "0.2"
+spin          = "0"
+hue           = "0.55"
+thickness     = "2.0"
+brightness    = "1.0"
+draw_progress = "1"
+
+trails        = "0.96"
+fb_zoom       = "1.9"
