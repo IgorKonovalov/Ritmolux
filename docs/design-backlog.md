@@ -346,6 +346,27 @@ layer 2 as decorative — recorded in that plan's Phase 6 results. **Do not re-m
 1 Hz `downbeat_locked` column is the instrument, and a targeted pass on known-4/4 material only
 would sharpen the 6 % figure the half-and-half split leaves approximate.
 
+**ANSWERED 2026-08-09 by Plan 0068 Phase 3 (the targeted pass this entry asked for).** 98 minutes of
+unambiguous 4/4 through the live app on `v0.48.0`, 5900 audible rows: **352 locked — 6.0 %**. Split by
+genre it is **6.79 %** on four-on-the-floor techno (5173 rows) and **0.14 %** on backbeat rock/pop
+(727 rows, one single locked row, peak confidence 0.2664 against the 0.25 gate). Two things this
+settles:
+
+- **The ~6 % estimate was right, and it is a ceiling rather than a floor.** Restricting to clear 4/4
+  does not rescue the rate — the material was never the problem.
+- **Backbeat material is 48x *worse* than four-on-the-floor**, which is the opposite of the intuition
+  and is what names the cause. The accent is 70 % bass band (`BASS_WEIGHT`); the kick marks every
+  beat in four-on-the-floor and the half-bar in a backbeat, so it hardly ever marks the *bar*. The
+  named cause is the accent feature, not the fold and not the confidence measure — full reasoning,
+  the ladder placement and the limits are in
+  [ADR-0082](adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md)'s `Outcome`.
+
+The authoring-doc qualification this entry called for is done (`presets/README.md`, `docs/presets.md`,
+both now stating the measured rate). **The repair — a downbeat cue that is not bass energy — is not
+written and has no plan**; it is the open work this entry now points at. The mis-accent question
+ADR-0050 guards is *still* untested, for the same reason as before: the gate was shut ~94 % of the
+time here too.
+
 ---
 
 ## 0055 — the attractor's shape vocabulary is "breathe and bend", and the reference figures ask for more

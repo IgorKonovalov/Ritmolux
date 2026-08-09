@@ -115,6 +115,32 @@ flowchart LR
 - **Done when:** there is a lock-rate figure for material that is unambiguously 4/4 with a clear
   downbeat, and a statement of which degradation axis real material most resembles. **Do not
   re-measure by ear** — the log column is the instrument.
+- **RESULT — run 2026-08-09**, `v0.48.0` release build, loopback, tier `rich`, two materials in one
+  session, segmented by timestamp. 5900 audible rows / 98 minutes.
+
+  | material | audible rows | lock rate | conf mean | conf median | conf peak | 30 s windows cleared |
+  |---|---|---|---|---|---|---|
+  | four-on-the-floor techno | 5173 (86.2 min) | **6.79 %** (351) | 0.0587 | 0.0000 | 0.9494 | 50 of 176 (28 %) |
+  | backbeat rock/pop | 727 (12.1 min) | **0.14 %** (1) | 0.0249 | 0.0000 | 0.2664 | 1 of 25 (4 %) |
+  | **combined** | **5900** | **5.97 %** (352) | — | — | — | — |
+
+  **Which axis:** the **contrast** axis, at its extreme — not the dropout axis Phase 2 predicted.
+  Rock (0.0249 / 0.14 %) lands almost exactly on contrast rung 1.00's ladder values (0.032 / 0 %);
+  techno sits slightly above it, consistent with its **bimodal** distribution (median exactly
+  `0.0000`, peak `0.9494` — the fills and breakdowns that do carry four-beat accent structure).
+
+  **The finding that names the cause is that backbeat material is 48x worse, not better.** A snare on
+  2 and 4 is the clearest loudness accent in popular music, and it made things worse — because the
+  accent is 70 % bass (`BASS_WEIGHT`), and a backbeat's kick pattern is a **two**-beat periodicity
+  that makes alignments 0 and 2 tie. Four-on-the-floor is flat for the complementary reason: the kick
+  is on every beat. So the named cause is the **accent feature**; the fold and the confidence measure
+  are exonerated as the primary term. Written up with its limits in ADR-0082's `Outcome`.
+
+  **Two methodological notes for whoever re-runs this.** The audible-row filter is not load-bearing —
+  the rate is identical at every floor from `0.00` to `0.10`, so Plan 0048's undefined "with signal"
+  cut never mattered. And a 13-minute sample of the techno gave 2.8 %, against 6.79 % over the full
+  86 minutes: **this measurement needs tens of minutes per genre**, because the lock events are
+  clustered in structural passages rather than spread evenly.
 
 ### Phase 4 — The verdict, and the docs stop offering two layers as equals
 
