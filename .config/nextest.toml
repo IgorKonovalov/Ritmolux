@@ -20,5 +20,5 @@
 # away the reading.
 
 [[profile.default.overrides]]
-filter = 'test(dual_live_keeps_the_outgoing_side_animating) + test(raw_levels_are_bit_identical_to_the_pre_normalization_build) + test(the_estimator_decomposes_into_its_terms)'
+filter = 'test(dual_live_keeps_the_outgoing_side_animating) + test(raw_levels_are_bit_identical_to_the_pre_normalization_build) + test(the_estimator_decomposes_into_its_terms) + test(the_degradation_ladder_says_which_axis_is_steep)'
 success-output = "immediate"
