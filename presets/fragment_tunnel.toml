@@ -1,0 +1,45 @@
+# Neon Tunnel — a fragment_field filament source flown through transformed feedback,
+# folded six ways and bloomed (cohort 2, Plan 0075). Fresh slate (ADR-0089).
+# Mechanism: the palette is mostly black floor with two narrow neon spikes, so the
+# frame is dark filaments on darkness — and the trails accumulation shows through
+# that darkness while fb_zoom > 1 throws each frame's filaments outward: a tunnel
+# bore under a kaleido fold. Bloom feeds on glow pushed past 1.0 on a bass peak.
+# Drives: bass is tunnel speed and filament heat, mid turns the fold, onset blooms.
+system = "fragment_field"
+name = "Neon Tunnel"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#010108" },
+  { at = 0.26, color = "#010108" },
+  { at = 0.30, color = "#00e8ff" },  # electric cyan filament
+  { at = 0.34, color = "#010108" },
+  { at = 0.58, color = "#020212" },
+  { at = 0.62, color = "#ff2fd6" },  # magenta filament
+  { at = 0.66, color = "#020212" },
+  { at = 1.00, color = "#0d0620" },  # faint violet haze floor
+]
+
+[params]
+warp = "1.6 + clamp(bass * 1.18, 0, 1.0) + beat * 0.3"
+zoom = "1.3"
+hue = "time * 0.01 + clamp(treb * 0.17, 0, 0.1)"   # treble shimmers the filament colour
+glow = "0.55 + clamp(bass * 0.82, 0, 0.7)"   # peaks ~1.25 — just over range, bloom fuel
+flash = "0"
+color_span = "1.0"
+saturation = "1.15"
+trails = "0.94"
+fb_zoom = "1.4 + clamp(bass * 1.29, 0, 1.1)"
+fb_rotate = "0.15"
+kaleido_order = "6"
+kaleido_angle = "time * 0.06 + clamp(mid * 0.35, 0, 0.3)"
+kaleido_edge = "1"     # tile: border-filling field, no crop (falloff would crop 56 %)
+bloom_amount = "0.5 + clamp(onset * 1.5, 0, 0.9)"
+bloom_threshold = "0.85"  # filament peak channel x glow rides just under 1.0 at realistic bass
+bloom_radius = "1.2 + clamp(treb * 0.67, 0, 0.4)"   # treble widens the halo scatter
+
+[smoothing]
+glow = 0.2
+fb_zoom = 0.3
+bloom_amount = 0.15
+warp = { attack = 0.05, release = 0.4 }
