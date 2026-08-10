@@ -115,7 +115,48 @@ fn every_preset_animates_over_time() {
 const LADDER: [u32; 3] = [96, 192, 384];
 
 const SQUALL_SRC: &str = include_str!("../../presets/emitter_squall.toml");
-const ROSETTE_SRC: &str = include_str!("../../presets/star_rosette.toml");
+
+/// **`Star Rosette` exactly as it shipped**, frozen here when Plan 0075's
+/// cohort one retired the file (recover the commented original with
+/// `git log --diff-filter=D -- presets/star_rosette.toml`). The ladder is a
+/// *measurement* whose rungs must stay comparable across runs, so its probe
+/// subject is frozen content, not the live library — the same reasoning that
+/// froze the sanity suite's mandalas and ADR-0023's golden fixtures. When
+/// cohort 4 retires `emitter_squall`, `SQUALL_SRC` above takes this same
+/// treatment.
+const ROSETTE_SRC: &str = r#"
+system = "star_pattern"
+name = "Star Rosette"
+[generator]
+tiling            = "12"
+contact_angle_deg = 20
+[params]
+variant = "2 * abs(mod(0.5 + time * 0.021 + clamp(bass * 0.41, 0, 0.35), 2) - 1)"
+rotation = "0.80 * time + sin(time * 0.031) * 0.26"
+draw_progress = "clamp(0.52 + sin(time * 0.20) * 0.42 + bar * 0.20 + clamp(onset * 0.333, 0, 0.20), 0, 1)"
+thickness  = "1.70 + clamp(bass * 3.06, 0, 2.6) + beat * 0.40"
+brightness = "0.66 + clamp(mid * 0.53, 0, 0.45)"
+scale      = "0.58 + sin(time * 0.14) * 0.13 + bar * 0.05 + clamp(bass * 0.47, 0, 0.40)"
+hue        = "0.50 + time * 0.023 + clamp(treb * 0.75, 0, 0.45)"
+mirror_order   = "select(mid > 0.58, 7, 5)"
+mirror_reflect = "0"
+zoom        = "1.06 + bar * 0.06 + clamp(bass * 0.176, 0, 0.15)"
+pan_x       = "sin(time * 0.0170) * 0.05"
+bg_hue      = "0.10 + sin(time * 0.0091) * 0.06"
+bg_bright   = "0.018 + clamp(mid * 0.0153, 0, 0.013)"
+bg_vignette = "0.82"
+trails = "0.34 + clamp(mid * 0.082, 0, 0.07)"
+[smoothing]
+mirror_order  = 2.5
+variant       = 1.5
+rotation      = 0.18
+thickness     = { attack = 0.02, release = 0.34 }
+scale         = 0.55
+hue           = 0.42
+zoom          = 0.18
+bg_bright     = 0.40
+trails       = 0.55
+"#;
 
 /// A 12-fold Hankin rosette whose **only** motion is rotation — design-backlog
 /// 0009's symmetric case, isolated. `star_rosette` as shipped works around the
