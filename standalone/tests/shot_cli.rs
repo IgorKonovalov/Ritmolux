@@ -42,8 +42,8 @@ const NO_ADAPTER: &str = "no suitable GPU adapter";
 
 /// A shipped preset used for the library-resolution cases. If it is ever renamed,
 /// these tests fail with a message saying so rather than something cryptic.
-const SHIPPED_PRESET_FILE: &str = "presets/fragment_aurora.toml";
-const SHIPPED_PRESET_NAME: &str = "Aurora";
+const SHIPPED_PRESET_FILE: &str = "presets/fragment_supernova.toml";
+const SHIPPED_PRESET_NAME: &str = "Supernova";
 
 /// A shipped preset whose `zoom` is gated on `tempo` — the evidence that
 /// `--set tempo=` reaches the grammar rather than merely being accepted.
