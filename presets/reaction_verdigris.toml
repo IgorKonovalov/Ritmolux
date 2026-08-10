@@ -1,0 +1,47 @@
+# Verdigris — crawling Gray-Scott worms under an eight-fold screen fold
+# (cohort 3, Plan 0075). Fresh slate (ADR-0089): the fold mechanism Gilt carried
+# is re-earned here on a regime no coral occupied — F 0.0540 / K 0.0635, the worm
+# band, where filaments crawl and never settle. Folded eight ways the worms read
+# as an aging bronze rosette growing patina from its centre. The fold does not
+# turn (user verdict 2026-08-10 on cohort 2: rotation reads as noise) — all the
+# motion is the simulation's own crawl.
+# Drives: bass feeds the worms, mid tilts the regime, treble races the sim,
+# a strong onset stamps a new growth into the fold.
+system = "reaction_diffusion"
+name = "Verdigris"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#0d0a06" },  # dark bronze ground
+  { at = 0.30, color = "#3a2a12" },  # umber
+  { at = 0.55, color = "#7a5a22" },  # bronze
+  { at = 0.80, color = "#2e8a6e" },  # verdigris green
+  { at = 1.00, color = "#d8f0c8" },  # pale patina
+]
+
+[params]
+feed = "0.0540 + noise(time * 0.045) * 0.0015 + clamp(bass * 1.18, 0, 1) * 0.0018"
+kill = "0.0635 + noise(time * 0.035 + 80) * 0.0006 + clamp(mid * 1.18, 0, 1) * 0.0006"
+flow = "1.8 + max(0, 1.0 - time * 0.2) + clamp(treb * 1.0, 0, 0.6)"   # a hot start: the first worms develop fast, then the crawl settles
+inject = "max((onset > 0.6) * (bar < 0.25), noise(time * 1.4 + 9) > 0.6)"   # strong onsets bite as pulses; a slow clock keeps the patina growing
+glow = "0.95 + clamp(bass * 0.41, 0, 0.35)"
+contour = "7"
+hatch = "3"
+kaleido_order = "8"
+kaleido_angle = "0"
+zoom = "1.0 + noise(time * 0.25) * 0.07"   # a slow breathe keeps the rosette alive in silence
+color_span = "2.2"
+color_center = "0.05"
+saturation = "1.0"
+trails = "0.55"
+fb_zoom = "1.03"                   # the patina's aura creeps outward — no rotation, just growth
+bg_hue = "0.09"                     # dim bronze under the voids — the rosette reads against it
+bg_bright = "0.08 + noise(time * 1.0) * 0.025 + clamp(bass * 0.07, 0, 0.06)"   # halved: the add-blend accumulation settles at ~2x
+bg_vignette = "0.55"
+
+[feedback]
+blend = "add"   # dim monochrome aura — the narrow case the Whorl A/B cleared for add
+
+[smoothing]
+flow = 0.3
+glow = 0.25

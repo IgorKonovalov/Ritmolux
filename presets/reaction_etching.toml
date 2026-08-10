@@ -1,0 +1,44 @@
+# Etching — Gray-Scott stripes as an engraver's plate, sepia line on cream
+# (cohort 3, Plan 0075). Fresh slate (ADR-0089). F 0.0420 / K 0.0600 sits in the
+# stripe-loop band no coral occupied; contour and heavy hatch turn the field into
+# burin lines. The family's first dark-on-light world.
+#
+# THE DUOTONE IS PAINTED IN THE PALETTE, NOT THE INK STAGE, AND THAT IS A MEASURED
+# DECISION (2026-08-10): under ink_amount = 1 this field printed faint grey, and
+# glow 0.65 / 0.5 / 0.15 rendered pixel-identical — two causes compound: RD's
+# `glow` is a weak additive halo (col * v * glow * 0.22 in the shader), not a
+# level, and the ink remap gives a mid-contrast field no contrast lever of its
+# own (filed as engine feedback). A dark-low palette over a cream backdrop
+# prints the same structure bold, so the duotone lives here instead.
+# Drives: bass presses the plate (regime + rate), mid tilts the stripe spacing,
+# treble quivers the hatching, a strong onset bites a fresh figure into the plate.
+system = "reaction_diffusion"
+name = "Etching"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#2c1a0c" },  # deep sepia — the cut line
+  { at = 0.45, color = "#8a6a42" },  # mid sepia wash
+  { at = 1.00, color = "#f6efdd" },  # cream — stripe cores vanish into the paper
+]
+
+[params]
+feed = "0.0420 + noise(time * 0.04) * 0.0014 + clamp(bass * 1.18, 0, 1) * 0.0016"
+kill = "0.0600 + noise(time * 0.03 + 30) * 0.0005 + clamp(mid * 1.18, 0, 1) * 0.0006"
+flow = "1.1 + clamp(bass * 0.83, 0, 0.7)"
+inject = "max((onset > 0.7) * (bar < 0.25), noise(time * 1.2 + 40) > 0.64)"
+glow = "0.85"
+contour = "10 + (onset > 0.6) * 2"           # a hit double-strikes the line work
+hatch = "10 + clamp(treb * 3.3, 0, 2)"
+zoom = "1.05"
+color_span = "2.3"                  # RD's field tops out near 0.4 — span 2+ reaches the cream end
+saturation = "0.9 + clamp(mid * 0.29, 0, 0.25)"   # mid enriches the sepia
+bg_hue = "0.11"                     # the paper: warm cream backdrop under the field's voids
+bg_bright = "0.75 + clamp(bass * 0.18, 0, 0.15)"  # bass presses the plate into the paper
+bg_vignette = "0.25"
+
+[smoothing]
+flow = 0.25
+hatch = 0.2
+contour = { attack = 0.05, release = 0.45 }
+bg_bright = 0.2
