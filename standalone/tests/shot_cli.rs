@@ -47,7 +47,17 @@ const SHIPPED_PRESET_NAME: &str = "Aurora";
 
 /// A shipped preset whose `zoom` is gated on `tempo` — the evidence that
 /// `--set tempo=` reaches the grammar rather than merely being accepted.
-const TEMPO_GATED_PRESET_FILE: &str = "presets/rose_zoom.toml";
+/// A minimal tempo-gated preset the tempo test writes to its own scratch dir.
+/// It used to point at a *shipped* tempo-gated preset (`rose_zoom`), which
+/// coupled a CLI-plumbing assertion to the content library — and broke the
+/// day Plan 0075's cohort one retired the file. The probe owns its subject
+/// now: two tempos, two camera depths, no dependency on what ships.
+const TEMPO_GATED_SRC: &str = r#"
+system = "fragment_field"
+name = "probe_tempo_gate"
+[params]
+zoom = "select(tempo > 130, 1.9, 1.1)"
+"#;
 
 /// `core/tests/reactivity.rs`'s floor: below this, a difference is rasterization
 /// noise rather than a preset responding.
@@ -280,8 +290,8 @@ fn the_presets_flag_is_reported_as_the_source() {
 }
 
 /// `--set tempo=` must reach the expression grammar, not just be accepted by the
-/// parser. `rose_zoom` gates its `zoom` on `select(tempo > 130, 1.45, 1.10)`, so
-/// a slow and a fast setting are two different camera depths — and the frames
+/// parser. The probe preset gates its `zoom` on `select(tempo > 130, 1.9, 1.1)`,
+/// so a slow and a fast setting are two different camera depths — and the frames
 /// have to differ by more than `core/tests/reactivity.rs`'s floor, or the flag is
 /// decorative. This is the gap that kept `tempo` out of nearly every preset: an
 /// author could not see it move.
@@ -290,14 +300,15 @@ fn set_tempo_reaches_the_grammar_and_changes_the_render() {
     let dir = scratch("tempo");
     let slow = dir.join("slow.png");
     let fast = dir.join("fast.png");
+    let probe = dir.join("tempo_gate.toml");
+    std::fs::write(&probe, TEMPO_GATED_SRC).expect("write the tempo probe preset");
 
-    // 60 frames at the fixed 1/60 s capture step is a full second — several time
-    // constants of `rose_zoom`'s 0.31 s `zoom` smoothing, so both captures have
-    // settled on their gated value rather than still travelling toward it.
+    // 60 frames at the fixed 1/60 s capture step is a full second; the probe
+    // binds no `[smoothing]`, so both captures sit on their gated value.
     let shot_at = |tempo: &str, out: &Path| {
         run(&[
             "--preset-file",
-            TEMPO_GATED_PRESET_FILE,
+            &probe.to_string_lossy(),
             "--set",
             &format!("tempo={tempo}"),
             "--size",
@@ -315,7 +326,7 @@ fn set_tempo_reaches_the_grammar_and_changes_the_render() {
     }
     assert!(
         out.status.success(),
-        "--set tempo=90 failed (is `{TEMPO_GATED_PRESET_FILE}` still tempo-gated?)\n\
+        "--set tempo=90 failed (does the probe preset still parse?)\n\
          stdout: {}\nstderr: {}",
         stdout(&out),
         stderr(&out)
