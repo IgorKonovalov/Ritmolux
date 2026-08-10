@@ -1,0 +1,89 @@
+# Vellum - recursive line-art drawn in ink on cream paper (Plan 0075, cohort 1).
+# The roadmap's "recursive subdivision line art on paper" reference, authored
+# fresh-slate: a Gosper meander (a space-filling curve whose turns read as a
+# woven Greek key) rendered through the terminal ink remap, so the figure is a
+# DRAWING - sepia ink on warm paper - not a glow.
+#
+# WHAT DRIVES WHAT. The figure deepens one whole iteration on a loud passage
+# (visible_depth steps 3 -> 4 at bass ~0.85, a fraction only a real peak
+# reaches), the stroke leans into the bass and ticks on the beat, and the whole
+# sheet sways and breathes slowly so silence still reads as a living page. In
+# ink mode the palette shapes LUMINANCE only, so the dark-to-light ramp under
+# hue_spread shades the strokes by generation depth: construction-pale where
+# the curve is old, fully inked at the growing edge.
+#
+# SEGMENT BUDGET: the Gosper rewrite is 7x per iteration, so max_depth 4 is
+# 7^4 = 2401 drawn segments of the floor tier's 20 000 - deep enough to read
+# as engraving, an order under the silent-truncation cap.
+system = "lsystem"
+name   = "Vellum"
+
+[generator]
+axiom     = "F"
+rules     = { F = "F-G--G+F++FF+G-", G = "+F-GG--G-F++F+G" }
+angle_deg = 60
+max_depth = 4
+
+[palette]
+stops = [
+  { at = 0.0, color = "#2a2118" },
+  { at = 0.45, color = "#6b5844" },
+  { at = 0.75, color = "#a8927a" },
+  { at = 1.0, color = "#e8dcc8" },
+]
+
+[params]
+# One whole iteration of growth, bought only by a genuine peak.
+visible_depth = "3 + floor(clamp(bass * 1.6, 0, 1.35))"
+
+# The page turns almost imperceptibly and the pen never quite rests: the last
+# stretch of the curve draws and undraws continuously, so the growing edge is
+# always alive even in silence.
+rotation      = "0.02 * time + sin(time * 0.21) * 0.085"
+zoom          = "1.05 + sin(time * 0.13) * 0.05"
+scale         = "1.0"
+draw_progress = "0.93 + sin(time * 0.4) * 0.07"
+
+# The pen: a modest nib that presses on the bass and ticks on the beat.
+thickness  = "2.3 + clamp(bass * 1.06, 0, 0.9) + beat * 0.3"
+glow       = "1.0"
+brightness = "1.05 + clamp(mid * 0.47, 0, 0.4)"
+
+# The ink lever (presets/README.md): exposure sits UPSTREAM of the remap, so
+# it is what pushes a hairline stroke's mid luminance down the ramp into real
+# ink instead of construction-grey (at exposure 1.0 this file's first draft
+# read pale). Bound to the bass, it is also the page's LEVEL response: the
+# whole drawing presses darker with the low end, which a hairline figure on
+# paper needs - thickness alone moves too few pixels to read as reactive.
+exposure = "2.2 + clamp(bass * 1.06, 0, 0.9)"
+
+# Generation shading through the luminance ramp (see header).
+hue        = "0.2 + sin(time * 0.05) * 0.1"
+hue_spread = "0.75"
+saturation = "0.9"
+
+# The drawing surface: warm cream paper, walnut-sepia ink. The paper itself
+# breathes with the low end - candlelight on the page - which is also what
+# lets a hairline figure read as reactive at all: the strokes are a few
+# percent of the frame, the page is the rest.
+ink_amount   = "1"
+paper_hue    = "0.11"
+paper_sat    = "0.10"
+paper_bright = "0.97 - clamp(bass * 0.12, 0, 0.1)"
+ink_hue      = "0.07"
+ink_sat      = "0.55"
+ink_bright   = "0.16"
+
+[smoothing]
+# 0.15, not slower: the scene floors the eased value to pick an iteration, so
+# a long ease parks the param below the flip for its whole travel and the
+# growth gesture never lands (the eased-through-invalid-values trap). At 0.15
+# the flip arrives ~0.1 s after a sustained peak and short transients still
+# do not flicker it.
+visible_depth = 0.15
+thickness     = { attack = 0.03, release = 0.35 }
+brightness    = 0.3
+rotation      = 0.3
+zoom          = 0.25
+exposure      = { attack = 0.05, release = 0.4 }
+paper_bright  = { attack = 0.04, release = 0.5 }
