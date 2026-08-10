@@ -1,0 +1,73 @@
+# Nightbloom - the Maurer world that succeeds the rose family (Plan 0075,
+# cohort 1). One flower, midnight-violet into coral and gold, that MORPHS ITS
+# SHAPE on the music instead of only its brightness: phase reshapes the petals
+# continuously, radial_offset opens the bloom off-origin on the bass, and every
+# fourth beat the Maurer step angle re-cuts to a new chord pattern - a latched
+# structural change, softened by the trail, so the flower is never the same
+# figure two phrases running.
+#
+# WHAT DRIVES WHAT. phase = slow morph + bass lean (petals twist toward the
+# low end); radial_offset = breath + bass opening; d = hash-latched per 4
+# beats across {27,29,31,33,35} - five genuinely different chord figures;
+# treb tips the stroke; beat ticks it. spin stays a small CONSTANT: on this
+# scene rotation = spin * time, so an audio-driven spin multiplies absolute
+# time and jerks - the morph carries the motion instead.
+system = "parametric_curve"
+name   = "Nightbloom"
+
+[curve]
+family = "maurer_rose"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#1a0f33" },
+  { at = 0.35, color = "#5b2a86" },
+  { at = 0.62, color = "#c94277" },
+  { at = 0.85, color = "#f2854b" },
+  { at = 1.0, color = "#f7d488" },
+]
+
+[params]
+n = "7"
+# The re-cut: a new Maurer step angle every four beats, from the seeded hash.
+# The three angles are chosen COPRIME TO 360 on purpose - a step angle sharing
+# a factor with 360 closes the path after 360/gcd steps (d = 27 closes in 40
+# chords and renders as a string-art star, measured on this file's own first
+# draft), while 29 / 37 / 43 each walk the full 360-chord web before closing.
+d = "select(hash(floor(beat_index / 4)) < 0.33, 29, select(hash(floor(beat_index / 4)) < 0.66, 37, 43))"
+
+# The shape morph - the family's own levers, not brightness.
+phase         = "time * 0.11 + clamp(bass * 0.82, 0, 0.7)"
+radial_offset = "0.06 + sin(time * 0.23) * 0.05 + clamp(bass * 0.29, 0, 0.25)"
+
+samples = "720"
+spin    = "0.06"
+scale   = "0.62"
+zoom    = "1.06"
+
+# A fine filament - the lace is 360 crossing chords, so the stroke must be
+# thin or the web reads as a mat.
+thickness  = "1.3 + clamp(treb * 0.83, 0, 0.5) + beat * 0.2"
+glow       = "0.85"
+brightness = "0.55 + clamp(mid * 0.35, 0, 0.3)"
+
+# Colour travels along the drawn path itself - nearly the whole ramp.
+hue        = "0.5 + time * 0.008"
+hue_spread = "0.85 + clamp(treb * 0.17, 0, 0.1)"
+saturation = "0.95"
+
+# The petal afterimage: enough tail to soften each re-cut into a bloom.
+trails = "0.5 + clamp(bass * 0.18, 0, 0.15)"
+
+bg_hue      = "0.72 + sin(time * 0.007) * 0.04"
+bg_bright   = "0.016 + clamp(bass * 0.012, 0, 0.01)"
+bg_vignette = "0.8"
+
+[smoothing]
+phase         = 0.25
+radial_offset = 0.35
+thickness     = { attack = 0.02, release = 0.3 }
+brightness    = 0.3
+trails        = 0.5
+hue_spread    = 0.45
+bg_bright     = 0.4

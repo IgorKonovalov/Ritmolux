@@ -1,0 +1,74 @@
+# Wildwood - dense organic line-growth (Plan 0075, cohort 1). The roadmap's
+# "dense organic line-growth" reference: a branching thicket that GROWS on the
+# music - per-generation colour walks trunk-moss into blossom-amber at the
+# tips, and loud passages buy whole new generations of branches.
+#
+# WHAT DRIVES WHAT. visible_depth is the growth lever: 5 at rest, 7 at a true
+# peak (the gain reaches its cap at bass = 0.85, per the house rule), eased so
+# a new generation unfurls rather than pops. The wind is noise(), not summed
+# sines - one seeded wander on rotation, a slower one on zoom. Beat is a pulse
+# of sap: thickness and brightness tick together.
+#
+# SEGMENT BUDGET: this grammar draws 1330 segments at depth 6 and 4118 at
+# depth 7 - a fifth of the floor tier's cap at full growth.
+system = "lsystem"
+name   = "Wildwood"
+
+[generator]
+axiom     = "X"
+rules     = { X = "F[+X][-X]FX", F = "FF" }
+angle_deg = 24
+max_depth = 7
+seed      = 7
+
+[palette]
+stops = [
+  { at = 0.0, color = "#123322" },
+  { at = 0.35, color = "#2e6b3f" },
+  { at = 0.62, color = "#7fae3e" },
+  { at = 0.85, color = "#e0b545" },
+  { at = 1.0, color = "#f2d98a" },
+]
+
+[params]
+# Growth: two more generations between rest and a real peak.
+visible_depth = "5 + floor(clamp(bass * 2.35, 0, 2))"
+
+# Wind - a seeded wander, decorrelated from the breath by the offset. The
+# gust rate (0.5) is what keeps the thicket alive in silence: the first draft
+# wandered at 0.16 and measured all but frozen (0.0011 over the animation
+# gate's 0.4 s window). A slow hue drift walks the generation shading too, so
+# the canopy's colour is always travelling a little.
+rotation = "(noise(time * 0.7) - 0.5) * 0.28"
+zoom     = "1.2 + sin(time * 0.45) * 0.045 + (noise(time * 0.07 + 50) - 0.5) * 0.06"
+scale    = "1.0"
+pan_x    = "sin(time * 0.5) * 0.012"
+pan_y    = "-0.15"
+
+thickness  = "1.5 + clamp(bass * 1.3, 0, 1.1) + beat * 0.25"
+glow       = "0.85"
+brightness = "0.85 + clamp(mid * 0.53, 0, 0.45)"
+
+# Trunk-to-blossom along generation depth; slow seasonal drift in the base.
+hue        = "0.35 + time * 0.05"
+hue_spread = "0.65 + clamp(treb * 0.33, 0, 0.2)"
+saturation = "0.92"
+
+# A dusk clearing behind the thicket - and the frame's own slow breath: the
+# strokes are a few percent of the pixels, so the idle motion the eye (and the
+# animation gate) reads comes as much from the sky as from the sway.
+bg_hue      = "0.62 + time * 0.015"
+bg_bright   = "0.02 + sin(time * 0.55) * 0.007 + clamp(mid * 0.013, 0, 0.011)"
+bg_vignette = "0.78"
+
+# A short memory of where the branches were - motion blur, not haze.
+trails = "0.35"
+
+[smoothing]
+visible_depth = 0.5
+thickness     = { attack = 0.025, release = 0.3 }
+brightness    = 0.28
+rotation      = 0.35
+zoom          = 0.3
+hue_spread    = 0.5
+bg_bright     = 0.4

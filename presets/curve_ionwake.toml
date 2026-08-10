@@ -1,0 +1,66 @@
+# Ion Wake - the neon line tunnel (Plan 0075, cohort 1). A small five-petal
+# figure spins at the centre; TRANSFORMED FEEDBACK does the rest: every frame
+# the accumulation is pushed outward (fb_zoom), turned (fb_rotate) and stirred
+# (swirl warp), so the figure's past rushes away as a glowing helical tunnel.
+# The deposit is blend = "add", so echoes crossing their own tails SUM and the
+# tunnel walls light up where they braid.
+#
+# WHAT DRIVES WHAT. The kick is the throttle: fb_zoom rests at 1.35x/s and a
+# bass peak more than doubles the rush, with a beat spike on top; onset stirs
+# the swirl. Under "add" the resting picture must be DIM - the series
+# converges near 1/(1-trails) ~ 14x here - so brightness sits low and the
+# palette band is deliberately narrow (Plan 0046 Phase 5's finding: add plus a
+# rich palette sums to a flat wash; a narrow cold band keeps the braid
+# legible). Loud buys STRUCTURE - speed, twist, braid density - not white.
+system = "parametric_curve"
+name   = "Ion Wake"
+
+[curve]
+family = "maurer_rose"
+
+[feedback]
+warp  = "swirl"
+blend = "add"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#040b1f" },
+  { at = 0.45, color = "#0a3d6b" },
+  { at = 0.75, color = "#19b8d6" },
+  { at = 1.0, color = "#c8f4ff" },
+]
+
+[params]
+n = "5"
+d = "2"
+samples = "240"
+spin    = "0.45"
+scale   = "0.32"
+zoom    = "1.0"
+
+# The tunnel: outward rush, steady turn, a stirred core.
+fb_zoom   = "1.35 + clamp(bass * 0.94, 0, 0.8) + beat * 0.5"
+fb_rotate = "-0.22"
+fb_warp   = "0.35 + clamp(onset * 0.5, 0, 0.3)"
+
+trails = "0.93"
+
+# Dim source - the accumulation does the lighting (see header). Brightness
+# rides the KICK with a fast attack: the tunnel's rate levers (fb_zoom, warp)
+# integrate over seconds, so the immediate pixel response a listener reads as
+# "it heard that" comes from this level term.
+thickness  = "2.2"
+glow       = "1.0"
+brightness = "0.14 + clamp(bass * 0.42, 0, 0.36)"
+
+# A narrow cold band, drifting slowly; treb flicks the crest.
+hue        = "0.55 + time * 0.015"
+hue_spread = "0.15 + clamp(treb * 0.17, 0, 0.1)"
+saturation = "0.9"
+
+[smoothing]
+fb_zoom    = { attack = 0.03, release = 0.5 }
+fb_warp    = 0.3
+brightness = { attack = 0.03, release = 0.35 }
+trails     = 0.5
+hue_spread = 0.4

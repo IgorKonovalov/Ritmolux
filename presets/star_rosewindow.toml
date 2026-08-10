@@ -1,0 +1,61 @@
+# Rose Window - the interlace successor (Plan 0075, cohort 1). The Hankin
+# interlace kept at the scale it is honest at (long straight chords - no
+# sampled-curve motifs, which is the vertex ceiling that retired the mandalas,
+# backlog 0073) and multiplied by the SYMMETRY STAGE instead: kaleido_radial
+# repeats the rosette as concentric shrinking rings and one winding of
+# kaleido_spiral shears them into a Droste twist - an infinite stained-glass
+# window, travelling slowly inward forever.
+#
+# WHAT DRIVES WHAT. variant sweeps the contact angle continuously (the morph
+# is engine-quantized to 0.1 degrees, so it rebuilds cleanly); kaleido_zoom is
+# the endless travel, one ring every ~14 s plus a push on the bass; the stroke
+# presses on the bass and ticks on the beat; treb warms the glass. The stage's
+# axis stays frame-centred, so nothing here pans (kaleido folds fight pan).
+system = "star_pattern"
+name   = "Rose Window"
+
+[generator]
+tiling            = "12"
+contact_angle_deg = 24
+
+[palette]
+stops = [
+  { at = 0.0, color = "#0d1b4b" },
+  { at = 0.4, color = "#27408b" },
+  { at = 0.65, color = "#8b1e3f" },
+  { at = 0.85, color = "#d4972e" },
+  { at = 1.0, color = "#f2e2b3" },
+]
+
+[params]
+# The contact angle breathes across most of its legal sweep; bass sharpens it.
+variant = "1 + sin(time * 0.09) * 0.8 + clamp(bass * 0.35, 0, 0.3)"
+
+rotation = "0.04 * time"
+scale    = "0.95"
+zoom     = "1.0"
+
+# The window multiplied: rings at 1.7, one Droste winding, endless travel.
+kaleido_radial = "1.7"
+kaleido_spiral = "1"
+kaleido_zoom   = "time * 0.07 + clamp(bass * 0.35, 0, 0.3)"
+kaleido_inner  = "0.1"
+
+thickness  = "2.6 + clamp(bass * 1.3, 0, 1.1) + beat * 0.4"
+glow       = "1.1"
+brightness = "0.9 + clamp(mid * 0.47, 0, 0.4)"
+
+# Cobalt glass warming toward ruby and gold on the high end.
+hue        = "0.25 + time * 0.008 + clamp(treb * 0.66, 0, 0.4)"
+saturation = "0.95"
+
+bg_hue      = "0.63"
+bg_bright   = "0.012"
+bg_vignette = "0.85"
+
+[smoothing]
+variant    = 0.4
+thickness  = { attack = 0.02, release = 0.32 }
+brightness = 0.3
+hue        = 0.4
+kaleido_zoom = 0.3
