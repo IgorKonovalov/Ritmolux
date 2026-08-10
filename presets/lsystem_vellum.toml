@@ -41,13 +41,15 @@ visible_depth = "3 + floor(clamp(bass * 1.6, 0, 1.35))"
 # always alive even in silence.
 rotation      = "0.02 * time + sin(time * 0.21) * 0.085"
 zoom          = "1.05 + sin(time * 0.13) * 0.05"
-scale         = "1.0"
+scale         = "1.15"
 draw_progress = "0.93 + sin(time * 0.4) * 0.07"
 
-# The pen: a modest nib that presses on the bass and ticks on the beat.
-thickness  = "2.3 + clamp(bass * 1.06, 0, 0.9) + beat * 0.3"
-glow       = "1.0"
-brightness = "1.05 + clamp(mid * 0.47, 0, 0.4)"
+# The pen: a gilder's nib. Not heavier - at 3.0 the meander's strokes touched
+# and the figure filled to a solid gold slab (rendered and rejected); the gold
+# reads as gold only while the parchment shows between the strokes.
+thickness  = "2.0 + clamp(bass * 0.94, 0, 0.8) + beat * 0.3"
+glow       = "1.1"
+brightness = "1.1 + clamp(mid * 0.47, 0, 0.4)"
 
 # The ink lever (presets/README.md): exposure sits UPSTREAM of the remap, so
 # it is what pushes a hairline stroke's mid luminance down the ramp into real
@@ -62,17 +64,22 @@ hue        = "0.2 + sin(time * 0.05) * 0.1"
 hue_spread = "0.75"
 saturation = "0.9"
 
-# The drawing surface: warm cream paper, walnut-sepia ink. The paper itself
-# breathes with the low end - candlelight on the page - which is also what
-# lets a hairline figure read as reactive at all: the strokes are a few
-# percent of the frame, the page is the rest.
+# The drawing surface, GOLD ON MIDNIGHT: the poles are deliberately swapped -
+# near-black indigo parchment, luminous gold ink - which the ink stage's own
+# docs say works exactly here, on a line figure whose pixels sit near 0 and 1
+# (a continuous field would land mid-ramp and grey out; a stroke on black
+# does not). The page still breathes with the low end: bass lifts the
+# parchment from near-black toward deep violet, candlelight from below.
+# The poles are LINEAR values encoded to sRGB on the way out, so a "dark"
+# paper needs a far smaller number than the display value suggests: 0.07
+# rendered as a mid violet (measured), 0.015 is the true near-black.
 ink_amount   = "1"
-paper_hue    = "0.11"
-paper_sat    = "0.10"
-paper_bright = "0.97 - clamp(bass * 0.12, 0, 0.1)"
-ink_hue      = "0.07"
-ink_sat      = "0.55"
-ink_bright   = "0.16"
+paper_hue    = "0.68"
+paper_sat    = "0.65"
+paper_bright = "0.015 + clamp(bass * 0.024, 0, 0.02)"
+ink_hue      = "0.115"
+ink_sat      = "0.88"
+ink_bright   = "0.98"
 
 [smoothing]
 # 0.15, not slower: the scene floors the eased value to pick an iteration, so
