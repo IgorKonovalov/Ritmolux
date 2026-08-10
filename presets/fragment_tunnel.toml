@@ -4,7 +4,9 @@
 # frame is dark filaments on darkness — and the trails accumulation shows through
 # that darkness while fb_zoom > 1 throws each frame's filaments outward: a tunnel
 # bore under a kaleido fold. Bloom feeds on glow pushed past 1.0 on a bass peak.
-# Drives: bass is tunnel speed and filament heat, mid turns the fold, onset blooms.
+# Drives: bass is tunnel speed and filament heat, mid pulses chroma, onset blooms.
+# No rotation by user verdict (2026-08-10): the bore flies straight — fb_rotate and
+# kaleido_angle both stay unbound.
 system = "fragment_field"
 name = "Neon Tunnel"
 
@@ -27,12 +29,10 @@ hue = "time * 0.01 + clamp(treb * 0.17, 0, 0.1)"   # treble shimmers the filamen
 glow = "0.55 + clamp(bass * 0.82, 0, 0.7)"   # peaks ~1.25 — just over range, bloom fuel
 flash = "0"
 color_span = "1.0"
-saturation = "1.15"
+saturation = "1.05 + clamp(mid * 0.35, 0, 0.3)"   # mid pulses the chroma (was on the fold angle)
 trails = "0.94"
 fb_zoom = "1.4 + clamp(bass * 1.29, 0, 1.1)"
-fb_rotate = "0.15"
 kaleido_order = "6"
-kaleido_angle = "time * 0.06 + clamp(mid * 0.35, 0, 0.3)"
 kaleido_edge = "1"     # tile: border-filling field, no crop (falloff would crop 56 %)
 bloom_amount = "0.5 + clamp(onset * 1.5, 0, 0.9)"
 bloom_threshold = "0.85"  # filament peak channel x glow rides just under 1.0 at realistic bass
