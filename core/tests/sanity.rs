@@ -275,7 +275,7 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// parametric_curve    0.33    0.6722  Rose Trails        2.04
 /// lsystem             0.32    0.6413  Fern Grow          2.00
 /// star_pattern        0.34    0.6908  Star Lantern       2.03
-/// reaction_diffusion  0.07    0.1420  Coral              2.03
+/// reaction_diffusion  0.09    0.1910  Verdigris          2.12
 /// attractor           0.18    0.3442  Leviathan          1.91
 /// spectrum            0.06    0.1189  Spectrum Ridge     1.98
 /// ```
@@ -398,7 +398,10 @@ fn coverage_floor(system: SystemKind) -> f32 {
         SystemKind::StarPattern => 0.34,
         // Reaction-diffusion paints a real pattern across the frame, but the
         // present maps only the sparse V species, so the lit fraction is modest.
-        SystemKind::ReactionDiffusion => 0.07,
+        // Raised from 0.07 when cohort three (Plan 0075) retired the corals:
+        // the family minimum moved up to Verdigris at 0.1910, and the old
+        // floor sat 2.73x below it — over this file's 2.2x slack.
+        SystemKind::ReactionDiffusion => 0.09,
         // The attractor cloud is the widest-spread family: Leviathan's sheet at
         // 0.3785 against two members that fill the frame. Raised from 0.12 at
         // Plan 0057 Phase 6 — see the table above for why the minimum moved

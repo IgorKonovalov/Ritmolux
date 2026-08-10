@@ -22,8 +22,10 @@ use lmv_core::render::{
 };
 
 const SIZE: u32 = 96;
-/// The RD preset shipped in the embedded set.
-const PRESET: &str = "Coral";
+/// The RD preset shipped in the embedded set. Mitosis is the family's
+/// beat-driven world (its `inject` stamps a cell per beat), which the
+/// beat-perturbation check below relies on.
+const PRESET: &str = "Mitosis";
 /// A pixel counts as lit if any RGB channel differs from the sampled background
 /// by more than this.
 const EPS: u8 = 10;
@@ -85,7 +87,7 @@ fn reaction_diffusion_contract() {
     // --- Shape sanity: a warmed field is neither blank nor a single dot. ---
     let warm = renderer
         .capture_preset(PRESET, &lively, 60)
-        .expect("capture Coral @60");
+        .expect("capture Mitosis @60");
     let bg = background(&warm);
     let cov = coverage(&warm, bg, EPS);
     let spread = quadrant_spread(&warm, bg, EPS);
