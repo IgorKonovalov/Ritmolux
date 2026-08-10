@@ -299,26 +299,28 @@ longer trail — so use them when that is what you want.
 
 ### Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin` (Plan 0063)
 
-**Two of these four are inert on every flat family**, the same way `a b c d`
-already carry family-specific meanings. `perspective` and `depth_hue` do
-something only on the **3-D families — `thomas` and `lorenz`.** On `de_jong`,
-`clifford` and the five IFS figures they are *exactly* the identity: those maps
-have no third coordinate, so the engine hands the shader a depth extent of zero
-and both cues collapse to a no-op. Binding them there is not an error and
-produces no warning — it produces nothing at all. (Verified by capture: at any
-setting, **zero pixels** differ.)
+**Three of these four are exact no-ops on every flat family**, the same way
+`a b c d` already carry family-specific meanings. `perspective`, `depth_fade`
+and `depth_hue` do something only on the **3-D families — `thomas` and
+`lorenz`.** On `de_jong`, `clifford` and the five IFS figures they are
+*exactly* the identity: those maps have no third coordinate, so the engine
+hands the shader a depth extent of zero and every cue collapses to a no-op.
+Binding them there is not an error and produces no warning — it produces
+nothing at all. (Verified by capture: at any setting, **zero pixels** differ —
+asserted for all three in `core/tests/attractor.rs`.)
 
-> **`depth_fade` is the exception, and it is not a no-op on a flat family — it
-> is a uniform dimmer.** The haze is `1 − depth_fade · (1 − depth01(dn))`, and a
-> flat family's `dn` is `0`, which puts `depth01` at `0.5` rather than `1`. So
-> the multiplier lands at `1 − depth_fade/2`: at `depth_fade = 0.9` a flat
-> figure is dimmed **45 %** everywhere, with no depth gradient at all. Measured
-> on `attractor_dissolve`: 20 % of pixels move, max channel delta 97.
->
-> Nothing is broken by this — but it is a trap in both directions. Do not reach
-> for `depth_fade` expecting nothing to happen on a 2-D family, and do not reach
-> for it *as* a dimmer: `brightness` is the parameter for that and says what it
-> means. See [design-backlog 0067](../docs/design-backlog.md).
+> **`depth_fade` joined the other two on 2026-08-09** (Plan 0075 Phase 2,
+> [design-backlog 0067](../docs/design-backlog.md)). Until then it was the one
+> exception — a uniform dimmer rather than a no-op: the haze is
+> `1 − depth_fade · (1 − depth01(dn))`, and a flat family's `dn ≡ 0` put the
+> multiplier at `1 − depth_fade/2`, so `depth_fade = 0.9` dimmed a flat figure
+> **45 %** everywhere with no depth gradient (measured on `attractor_dissolve`:
+> 20.1 % of pixels moved, max channel delta 97, while `perspective` and
+> `depth_hue` moved **zero**). The fade term is now multiplied by the family's
+> has-depth flag, so all three cues are the identity together. If an old draft
+> leaned on the dimming as an undocumented brightness trim on a flat family, it
+> silently brightened back — `exposure` is the parameter that means "dimmer"
+> and says so.
 
 `spin` is the exception and reaches **every** family. The flat ones rotate
 in-plane through the same angle, so an audio-driven `spin` is a real look on
@@ -365,14 +367,31 @@ Four things you cannot discover by binding them:
   visibly slides around the frame instead of turning in place, which is a worse
   artifact than the flatness `perspective` was bought to fix. The clamp is not
   where the projection breaks; at `0.8` it is still a true perspective divide and
-  reads as a strong wide angle, not a fisheye. Fixing this properly is
-  [design-backlog 0061](../docs/design-backlog.md) and unowned.
-- **`spin` is a multiplier on 0.18 rad/s**, i.e. `spin = 1` is one revolution per
-  **34.9 seconds**. That is slow enough that a viewer never accumulates motion
-  evidence about which way a 3-D figure is turning, which is part of why they
-  read as flat; `2`–`4` is where the rotation starts being legible. The phase is
+  reads as a strong wide angle, not a fisheye. This ceiling note is
+  [design-backlog 0061](../docs/design-backlog.md)'s documented resolution
+  (Plan 0075); the deeper fix — re-centring the projection on the figure's
+  projected centroid — remains unowned.
+- **`spin` is a multiplier on 0.18 rad/s** (`spin = 1` is one revolution per
+  **34.9 seconds**), and **its usable ceiling is set by `fade`, not by taste —
+  `spin` and `fade` are one look.** A frame of trail drawn while the figure
+  turns is a frame of *rotational smear*: push the pair too far and the
+  accumulation stops being a trace of the trajectory and becomes concentric
+  arcs, which destroys exactly the volume `perspective` was bought to buy.
+  **Measured** at Plan 0063 Phase 5: at `fade = 0.932` (~15 frames of trail)
+  the rendered ladder `1 / 2 / 3 / 5 / 8` reads *crisp, crisp, softening,
+  smeared, scribble* — usable peak about **1.9**; `attractor_thomas` runs
+  `fade = 0.955` (~22 frames) and its ceiling is correspondingly lower, about
+  **1.3**. The arithmetic agrees: holding the smear under ~5° needs
+  `rate < 0.087 / (frames / 60)` rad/s, so the ceiling *falls* as `fade`
+  rises. (This bullet used to say `2`–`4` is where the rotation becomes
+  legible — true for a trail-free scene, wrong for every attractor preset that
+  ships; [design-backlog 0063](../docs/design-backlog.md).) The phase is
   integrated, so a `spin` bound to audio *accelerates* the figure rather than
-  snapping it to a new angle.
+  snapping it to a new angle — but the integration fixes the discontinuity,
+  not the range: a wide binding like `1 + bass * 5` swings the figure through
+  most of a revolution between transients and reads as tumbling, not drive.
+  Both shipped 3-D presets modulate narrowly (Lorenz `1.0`–`1.8`, Thomas
+  `1.0`–`1.3`).
 - **The illusion has a density limit and haze does not remove it.** Nothing
   occludes anything here — two strands crossing simply sum — so as
   `[particles] density` rises the figure reads more and more as X-ray whatever

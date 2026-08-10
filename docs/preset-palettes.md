@@ -183,6 +183,39 @@ Particle hues occupy `hue_center + (particle_seed - 0.5) * hue_spread`. `hue_cen
 is cyclic for the same reason `color_center` is — a negative centre wraps into the
 bright end of the gradient, it does not clamp toward the dark one.
 
+**`depth_hue` rides this same coordinate on the two 3-D attractor flows, and what
+it does is whatever moving along *your* ramp does** — it has three regimes, none
+discoverable from the roster (measured at the Plan 0063 content pass,
+[design-backlog 0062](design-backlog.md)):
+
+1. **It reads as a hue cue only on a ramp that travels in hue at roughly constant
+   lightness.** Rendered side by side at `perspective = 0.5`: against
+   `attractor_lorenz`'s shipped night-blue → teal → mint → solar-white ramp, a
+   `depth_hue` of `0.4` reads as the near material getting **brighter** — a second
+   contrast lever pointing the same way as `depth_fade`, not an independent cue.
+   Against a constant-lightness hue-travel ramp (blue → cyan → gold → orange →
+   rose) the identical figure at the identical value puts a cool cyan on the far
+   wing and warm gold on the near one, which is the atmospheric reading the
+   parameter was built for. A dark-to-light ramp is what an additive glow scene
+   is normally tuned for, so this is the trap the *default* tuning walks into.
+2. **It wraps, and the wrap can make far material look near.** The offset is
+   `±depth_hue/2` on a coordinate the LUT sampler **repeats** — keep it under
+   **`2 * min(hue_center, 1 - hue_center)`** or one end walks off the ramp and
+   wraps to the other. `attractor_lorenz`'s `hue_center` runs as low as `0.13`,
+   so a `depth_hue` much above `0.26` sends the far end negative and lands the
+   far material on the same bright mint as the near — the cue inverts into a
+   collision. At `depth_hue = 1.0` with `hue_center = 0.20`, both ends of the
+   depth range sample the *same* coordinate (`0.70`, and `-0.30` which wraps to
+   `0.70`). The repeat is the LUT's documented behaviour everywhere else in the
+   colour surface, so it is not clamped specially here.
+3. **It is structurally dead under `ink_amount = 1`**, like `saturation`: the
+   terminal remap keys on luminance and discards hue, and a depth *tint* is
+   exactly the cue an ink preset cannot show. Not quite inert on a `mono`
+   palette (the coordinate shift moves lightness, which the remap does see),
+   but measured at `depth_hue = 0.4` it moves 42 % of pixels by a **mean of
+   2/255** — a rounding error against what `depth_fade` does deliberately on
+   the same frame.
+
 **On the five IFS figures that coordinate has two more terms**, and they are the
 reason a wide `hue_spread` can make them look broken (Plan 0073,
 [ADR-0087](adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md); Plan
