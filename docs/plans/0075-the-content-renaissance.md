@@ -175,6 +175,10 @@ flowchart TD
   3. **Cohort briefs** — one line per new world naming its reference look and mechanism.
      Guess: **three cohorts of 4-6 worlds**, target library **~18-24 worlds** total.
 - **Done when:** the three lists exist in this file and the user has said "go" on cohort one.
+- **Decided 2026-08-10** — the three lists are appended below
+  ([The Phase 4 brief](#the-phase-4-brief--decided-2026-08-10)); the user designated the
+  line families as cohort one. Authoring starts on the user's "go" in a fresh
+  content-lane session.
 
 ### Phase 5 — the cohorts (repeat until the retirement roster is empty)
 
@@ -249,3 +253,90 @@ flowchart TD
 - If the renaissance ends with a family empty (no world earned its scene), that is a finding
   about the scene, and it goes to `architect` as a scene-retirement question rather than
   quietly shipping a dead code path.
+
+---
+
+## The Phase 4 brief — decided 2026-08-10
+
+Decided by the user from the rendered evidence: a contact sheet of all 45 shipped presets
+under the report's own measured realistic stimulus (`bass 0.661 / mid 0.575 / treb 0.281 /
+onset 0.145` + beat, 150 warm-up frames, floor tier), with the spectrum family supplemented
+by real-audio `dynamic:110` filmstrips because a held `--set` cannot fill the band array.
+Supporting measurements: `shot --presets presets --report` flags **zero near-duplicates**
+across the library, so the case for replacement is idiom and era rather than geometry; git
+provenance splits the set at 2026-08-04 (the post-craft era), and the user's keep list
+deliberately cuts across that line — it was judged by look, not by date.
+
+**The direction, in the user's own framing:** recreate the presets from scratch, family by
+family — most were created against a limited engine, and the families themselves stay
+supported. The plan's cohort-size guess (three cohorts of 4–6) is superseded by this
+family-by-family structure; the ~18–24-world target stands (9 keeps + roughly 3–5 new worlds
+per major family).
+
+### The keep list (9)
+
+| Family | Survives |
+|---|---|
+| `attractor` | Clifford, Barnsley Fern, Ink on Paper, Leviathan, Thomas |
+| `fragment_field` | Supernova, Tiled Rosette, Banded Mandala |
+| `swarm` | Drift |
+
+### The retirement roster (36), grouped into family cohorts
+
+Every retirement lands in the same commit series as its cohort's replacement worlds
+(ADR-0089). **The newest wave retires too** — Chthonic Coral Oracle (the Plan 0067 curation
+preset), Gilt, Droste Descent, Order Into Life, Starfield, Sparks and Squall — confirmed
+deliberate by the user when asked explicitly; their measured knowledge stays findable in git
+history.
+
+| Cohort | Families | Retires |
+|---|---|---|
+| **1 — next** | `parametric_curve` + `lsystem` + `star_pattern` | Cathedral, Rose Draw, Rose Overflow, Rose Trails, Rose Web, Rose Zoom, Arrowhead, Fern Grow, Star Lantern, Star Rosette (10) |
+| 2 | `fragment_field` | Aurora, Droste Descent, Ember, Glacier, Kaleido Field, Pulse Field, Smooth Pulse, Warp Drive (8) |
+| 3 | `reaction_diffusion` | Chthonic Coral Oracle, Coral, Coral Bloom, Coral Head, Gilt, Reef, Reliquary (7) |
+| 4 | `swarm` + `emitter` + `spectrum` | Dense, Storm, Starfield, Sparks, Squall, Spectrum Comb, Spectrum Corona, Spectrum Ridge (8) |
+| 5 | `attractor` | De Jong, Order Into Life, Lorenz (3) |
+| 6 | the collage | none of its own — gated on [Plan 0076](0076-the-second-layer.md) landing |
+
+### Cohort briefs — one line per world, reference look → mechanism
+
+`ROUTED` marks a capability that does not exist: a backlog promotion on demonstrated want,
+per this plan's Decision — never a workaround, never absorbed here.
+
+**Cohort 1 — the line families** (fully fresh; no keeps):
+
+- Recursive subdivision line-art on paper — `lsystem` + ink mode; the roadmap's
+  "nearly reachable today" look.
+- Dense organic line-growth — a growth grammar under per-segment palette colour
+  (Plan 0054), phrase-timed on `beat_index`.
+- A rose successor — one Maurer world that earns the whole family's slot; the
+  scalloped-curve primitive is ROUTED (backlog 0071) if the look demands it.
+- An interlace successor — Hankin chords + ring levers under the symmetry stage; mind
+  backlog 0073 (sampled motifs show vertices at ornament scale — stay at interlace scale
+  or route the curve primitive).
+- A neon line tunnel — a line source echoed into depth through `fb_zoom`/`fb_rotate`,
+  bloom on the drop.
+
+**Cohort 2 — fragment_field:** marbled fluid strata (domain warp under a terraced banded
+palette, Plan 0064); neon kaleidoscopic tunnel (field source through transformed feedback +
+kaleido fold + bloom); fractal glowing spiral (`fb_rotate` + `fb_zoom` echo of a warped
+source). Resolve here the `blend = "add"` vs rich-palette trade Plan 0046 Phase 5 owed R6.
+
+**Cohort 3 — reaction_diffusion:** two or three Gray-Scott worlds in regimes none of the
+retiring corals occupied — feed/kill/flow extremes, one folded (the Gilt mechanism re-earned
+fresh), one dark-on-light through ink; molten cellular field is ROUTED (roadmap R4), with a
+folded RD maze as the substitute if unpromoted.
+
+**Cohort 4 — swarm + emitter + spectrum:** particle shatter on light ground (shaped marks +
+the ink inversion, beat-latched); a sky that twinkles — per-mark variation is ROUTED
+(backlog 0068; the movable emitter source is the other half of that entry); a real spectrum
+world (radial ring, `bin()` edges over band-scalar body; the waveform mesh stays ROUTED,
+roadmap R5).
+
+**Cohort 5 — attractor:** one or two new figure-worlds at coefficient tuples none of the
+keeps occupy; the tuple roster stays ROUTED (backlog 0055) unless the cross-preset dissolve
+plus per-preset tuples prove insufficient — that entry's own re-check (2026-08-10) says the
+Plan 0059 levers likely closed most of the gap.
+
+**Cohort 6 — the collage:** layered translucent worlds, R3's own acceptance evidence.
+Briefs are written when Plan 0076 lands; deferred, not dropped.
