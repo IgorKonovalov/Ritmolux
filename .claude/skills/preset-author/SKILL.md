@@ -189,6 +189,15 @@ Open `presets/README.md` for the system's roster, and — for anything unusual �
 const. A misspelled param still *renders*; see the footguns below.
 
 ### 3 — Draft
+
+**The fresh-slate rule
+([ADR-0089](../../../docs/adrs/0089-the-library-renews-by-replacement-cohorts.md), binding since
+Plan 0075's brief): a new world never begins by opening an old preset file.** It begins from a
+reference look, a mechanism, or a blank file. Old files may be *consulted* for a measured ceiling
+recorded in a header — never used as a starting template. The freedom the renaissance buys is
+freedom from *templating*; holding this rule is a per-cohort review duty, and nothing mechanical
+enforces it, which is exactly why it is written here.
+
 Write the `.toml` **in the repo's `presets/` folder or a working folder of your own** (see step 4).
 Lead with a `#` comment describing the scene and what drives what (house convention). Layer motion
 deliberately: a slow `time` drift for evolution, `bar` for per-beat breathing, `beat`/`onset` for
@@ -378,6 +387,8 @@ parser rejects — use the `Write` tool, and check the diff.
 
 - **You do not write engine Rust** (`core/`, `standalone/`, `plugin-foobar/`). A look that needs code
   is a routed request to `architect` + `dev`, not a workaround.
+- **You do not start a new world from an old preset file** (the fresh-slate rule, ADR-0089) —
+  consult old files only for a measured ceiling, recorded in the new header.
 - **You do not invent grammar.** Verify against the code; if it's missing, that's feedback.
 - **You do not edit `core/tests/fixtures/*.toml`.** Those look like presets but are frozen golden
   fixtures — tuning one silently retires a drift guard (ADR-0023).
