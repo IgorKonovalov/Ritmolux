@@ -1,0 +1,50 @@
+# Mitosis — Gray-Scott at the spot-division regime (cohort 3, Plan 0075).
+# Fresh slate (ADR-0089): authored from the Pearson regime map, not from any retiring
+# coral (whose bindings all sat at feed 0.022-0.034 / kill 0.054-0.0575 — everything
+# at kill >= 0.06 was unoccupied). F 0.0360 / K 0.0645: isolated cells that grow,
+# pinch, and split apart across an empty substrate — the negative space is chemistry.
+# Drives: bass races the simulation and fattens the cells, mid tilts the split rate,
+# treble slides the tonal window, every beat stamps a new cell into the dish.
+# The slow noise drift on feed/kill keeps the field from converging to stillness
+# (a settled Gray-Scott point genuinely stops moving — the old animation-gate trap).
+system = "reaction_diffusion"
+name = "Mitosis"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#06060f" },  # dish void
+  { at = 0.35, color = "#123a5c" },  # deep agar blue
+  { at = 0.60, color = "#19c8c0" },  # membrane cyan
+  { at = 0.85, color = "#e84fd0" },  # nucleus magenta
+  { at = 1.00, color = "#fff4ff" },  # dividing core
+]
+
+[params]
+feed = "0.0360 + max(0, 0.018 - time * 0.002) + noise(time * 0.05) * 0.0008 + clamp(bass * 1.18, 0, 1) * 0.0009"   # boots in the growth band, differentiates into cells over ~9 s
+kill = "0.0645 + noise(time * 0.04 + 50) * 0.0004 + clamp(mid * 1.18, 0, 1) * 0.0003"
+flow = "2.0 + clamp(bass * 0.71, 0, 0.6)"
+inject = "max(beat * (bar < 0.25), noise(time * 6) > (0.4 + min(time * 0.05, 0.35)))"   # startup burst seeds the dish in seconds, then the clock slows; every beat stamps a cell
+glow = "0.9 + clamp(mid * 0.41, 0, 0.35)"
+contour = "4"
+hatch = "0"
+zoom = "0.7 + noise(time * 0.25) * 0.05"   # tight on the colony — cells read large; the breathe is the microscope focus
+pan_x = "0.2"                              # centre the wrap-seam colony (the seed sits on the torus seam)
+pan_y = "0.5"
+color_span = "2.3"                 # RD's field tops out near 0.4 — span 2+ reaches the warm end
+color_center = "0.1 + clamp(treb * 0.33, 0, 0.2)"
+saturation = "1.05"
+bg_hue = "0.6 + noise(time * 0.5 + 20) * 0.03"   # the lit agar — a stage even before the cells arrive
+bg_bright = "0.11 + noise(time * 1.2) * 0.03 + clamp(bass * 0.07, 0, 0.06) + beat * 0.02"   # halved: the add-blend accumulation settles at ~2x; the lamp answers the kick
+bg_vignette = "0.65"
+trails = "0.5"
+fb_dx = "0.02"                     # a slow current in the dish — the light itself streams
+fb_dy = "0.012"
+
+[feedback]
+blend = "add"   # a dim monochrome glow — the narrow case the Whorl A/B cleared for add
+
+[smoothing]
+bg_bright = { attack = 0.02, release = 0.3 }
+flow = 0.25
+glow = 0.2
+color_center = 0.35
