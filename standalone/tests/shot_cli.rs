@@ -515,7 +515,28 @@ fn the_report_transient_columns_separate_the_two_easing_fixtures() {
     /// report. A cell may carry a trailing `+` meaning *at least this many*
     /// (Plan 0038 Phase 8), which is stripped before parsing and reported
     /// separately.
+    ///
+    /// The columns are located **through the header, anchored from the row's
+    /// end** — the easing fixtures are line-family presets, so their table
+    /// also carries the trailing `geom` column (Plan 0075 Phase 2), while a
+    /// family without a line seam prints without it. Counting from the end of
+    /// the header keeps the parse right in both shapes and stays indifferent
+    /// to how the preset name itself tokenizes.
     fn columns(report: &str) -> (u32, u32, bool) {
+        let header: Vec<&str> = report
+            .lines()
+            .find(|l| l.trim_start().starts_with("preset"))
+            .unwrap_or_else(|| panic!("no table header in the report:\n{report}"))
+            .split_whitespace()
+            .collect();
+        let from_end = |name: &str| {
+            let idx = header
+                .iter()
+                .position(|c| *c == name)
+                .unwrap_or_else(|| panic!("no `{name}` column in the header: {header:?}"));
+            header.len() - idx
+        };
+        let (rise_back, fall_back) = (from_end("rise"), from_end("fall"));
         let row = report
             .lines()
             .find(|l| l.trim_start().starts_with("fixture_easing"))
@@ -527,10 +548,11 @@ fn the_report_transient_columns_separate_the_two_easing_fixtures() {
                 .parse()
                 .unwrap_or_else(|_| panic!("`{s}` in {row}"))
         };
+        let fall_cell = cols[n - fall_back];
         (
-            parse(cols[n - 2]),
-            parse(cols[n - 1]),
-            cols[n - 1].ends_with('+'),
+            parse(cols[n - rise_back]),
+            parse(fall_cell),
+            fall_cell.ends_with('+'),
         )
     }
 

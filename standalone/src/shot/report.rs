@@ -23,6 +23,7 @@ use lmv_core::render::metrics::{
     StepResponse, coverage, frame_diff, quadrant_spread, segment_settled, step_response,
     struct_diff,
 };
+use lmv_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent};
 use lmv_core::render::{CaptureImage, Renderer, Tier};
 
 use crate::shot::film::FILMSTRIP_WARMUP;
@@ -83,6 +84,19 @@ struct PresetReport {
     reactivity_low: [f32; 4],
     animation: f32,
     coverage: f32,
+    /// The in-frame geometry fraction of the fully-driven capture's last frame
+    /// (Plan 0075 Phase 2, design-backlog 0070): the share of drawn segment
+    /// length inside the render target, measured at `LineRenderer::draw`
+    /// (ADR-0083). `None` for the families that build no segment list — the
+    /// column is omitted rather than printed as a fake number.
+    ///
+    /// **A number to read while tuning `scale`, never a threshold**: ADR-0083
+    /// twice proved no absolute value orders the library (two shipped presets
+    /// deliberately leave the frame and bracket a frozen defect). This puts the
+    /// fraction where the over-scale defect class is actually introduced —
+    /// under the author's eyes — which is the only place it can be caught for
+    /// new content.
+    geometry: Option<f32>,
     transient: Transient,
     /// Gates this preset's expressions never exercised under the realistic
     /// probe — suspects, not convictions (see [`probe_reachability`]).
@@ -193,7 +207,17 @@ fn build_family_report(
         let late = capture(r, name, &silent, REPORT_FRAMES_LATE)?;
         let animation = frame_diff(&base, &late);
 
+        // The in-frame geometry diagnostic rides the fully-driven capture the
+        // coverage column already takes, scoped to exactly that capture — it is
+        // asserted byte-inert (`core/tests/geometry_extent.rs`), so the only
+        // cost is a CPU loop over the segment list. `take_draw_extent` yields
+        // the last drawn frame's measurement, and nothing at all for a preset
+        // that drew through no line renderer — which is how the non-line
+        // families report `None` without a second family roster here.
+        set_extent_diagnostic(true);
         let fixed = capture(r, name, &loud, REPORT_FRAMES_LATE)?;
+        let geometry = take_draw_extent().and_then(|extent| extent.fraction());
+        set_extent_diagnostic(false);
         let bg = corner(&fixed);
         let cov = coverage(&fixed, bg, COVERAGE_EPS);
         // Belt-and-braces "not a dot" note folded into coverage via spread:
@@ -206,6 +230,7 @@ fn build_family_report(
             reactivity_low,
             animation,
             coverage: cov,
+            geometry,
             transient: transients.get(index).copied().unwrap_or(Transient {
                 response: StepResponse {
                     rise_frames: 0,
@@ -811,14 +836,20 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
             fam.system.as_str(),
             fam.presets.len()
         );
-        let _ = writeln!(
-            out,
+        // The `geom` column exists only where the measurement does: a family
+        // whose scenes build no segment list has no line seam to measure at,
+        // and a fabricated cell would read as a finding (backlog 0070).
+        let show_geometry = fam.presets.iter().any(|p| p.geometry.is_some());
+        let mut header = format!(
             "  {:<14} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5}",
             "preset", "bass", "mid", "treb", "onset", "anim", "cover", "rise", "fall"
         );
+        if show_geometry {
+            let _ = write!(header, " {:>6}", "geom");
+        }
+        let _ = writeln!(out, "{header}");
         for p in &fam.presets {
-            let _ = writeln!(
-                out,
+            let mut row = format!(
                 "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>5} {:>5}",
                 p.name,
                 p.reactivity[0],
@@ -829,6 +860,26 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
                 p.coverage,
                 transient_cell(p.transient.response.rise_frames, p.transient.rise_settled),
                 transient_cell(p.transient.response.fall_frames, p.transient.fall_settled),
+            );
+            if show_geometry {
+                match p.geometry {
+                    Some(fraction) => {
+                        let _ = write!(row, " {fraction:>6.4}");
+                    }
+                    None => {
+                        let _ = write!(row, " {:>6}", "-");
+                    }
+                }
+            }
+            let _ = writeln!(out, "{row}");
+        }
+        if show_geometry {
+            let _ = writeln!(
+                out,
+                "  geom is the in-frame geometry fraction: the share of drawn segment \
+                 length inside the frame, at the fully-driven capture (ADR-0083). Read \
+                 it while tuning `scale` — no absolute threshold orders the library, \
+                 and two shipped presets deliberately leave the frame"
             );
         }
         // The second reading, as its own block rather than four more columns:
@@ -958,6 +1009,11 @@ fn render_json(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
             ));
             out.push_str(&format!("\"animation\":{},", num(p.animation)));
             out.push_str(&format!("\"coverage\":{},", num(p.coverage)));
+            // Only where the measurement exists — the JSON mirrors the text
+            // table's omission rather than inventing a null convention.
+            if let Some(fraction) = p.geometry {
+                out.push_str(&format!("\"in_frame_geometry\":{},", num(fraction)));
+            }
             out.push_str(&format!(
                 "\"transient\":{},",
                 json_transient(

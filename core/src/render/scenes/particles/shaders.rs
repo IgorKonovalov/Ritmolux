@@ -516,8 +516,17 @@ fn depth01(dn: f32) -> f32 {
 // the far end to black and `0` is exactly 1.0 everywhere (ADR-0076).
 // `depth_fade` is clamped CPU-side to [0, 1] - past 1 this would go NEGATIVE,
 // and a negative deposit in an additive accumulation subtracts light.
+//
+// The fade term is also multiplied by whether the family HAS depth at all
+// (Plan 0075 Phase 2, design-backlog 0067). `dn` is identically 0 on a flat
+// family, which lands `depth01` on 0.5 - arithmetically "mid depth", so the
+// multiplier was a uniform `1 - depth_fade/2`: a 45% whole-figure dimmer at
+// `depth_fade = 0.9`, on the one cue that was NOT the identity at zero extent.
+// `f32(bool)` is 1.0 or 0.0 - one extra multiply, no branch, the same style
+// as the zero-extent trick in `depth_norm`.
 fn haze(dn: f32) -> f32 {
-    return 1.0 - draw.d.y * (1.0 - depth01(dn));
+    let has_depth = f32(draw.d.w != 0.0);
+    return 1.0 - draw.d.y * (1.0 - depth01(dn)) * has_depth;
 }
 
 // Distance tint: a shift of +/- depth_hue/2 in the palette coordinate across the

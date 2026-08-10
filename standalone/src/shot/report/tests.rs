@@ -35,6 +35,7 @@ fn preset_report(name: &str, gates: Vec<GateReport>) -> PresetReport {
         reactivity_low: [0.4, 0.2, 0.1, 0.05],
         animation: 0.75,
         coverage: 0.5,
+        geometry: None,
         transient: Transient {
             response: StepResponse {
                 rise_frames: 7,
@@ -248,6 +249,71 @@ fn the_text_report_emits_a_row_per_preset_with_its_transient_marks() {
     assert!(
         out.contains("every branch was taken"),
         "a gate-free family says so rather than printing nothing:\n{out}"
+    );
+}
+
+/// The `geom` column appears exactly where a line seam produced a measurement
+/// and nowhere else (Plan 0075 Phase 2, backlog 0070): a family with no
+/// `LineRenderer` in it gets no header, no cell, no `-` — the fraction is a
+/// number an author reads while tuning `scale`, and a fabricated cell on a
+/// swarm would read as a finding about a seam that does not exist.
+#[test]
+fn the_geometry_column_appears_only_for_families_with_a_line_seam() {
+    let fam = |system, presets| FamilyReport {
+        system,
+        presets,
+        pixel: vec![vec![0.0]],
+        shape: vec![vec![0.0]],
+        near_dups: Vec::new(),
+    };
+
+    // A line family: the column and the measured value are printed.
+    let mut line_preset = preset_report("rosette", vec![]);
+    line_preset.geometry = Some(0.3492);
+    let line_fam = fam(SystemKind::StarPattern, vec![line_preset]);
+    let out = text_report("src", &[line_fam], Tier::Floor);
+    // The header token, not the bare substring: "geometry" also appears in the
+    // near-duplicate summary line every family prints.
+    assert!(
+        out.contains("geom\n"),
+        "line family carries the header column:\n{out}"
+    );
+    assert!(
+        out.contains("0.3492"),
+        "the measured fraction is printed to four places:\n{out}"
+    );
+    assert!(
+        out.contains("in-frame geometry fraction"),
+        "the column explains itself:\n{out}"
+    );
+
+    // A family with no line seam: no header, no placeholder, no explainer.
+    let swarm_fam = fam(SystemKind::Swarm, vec![preset_report("drift", vec![])]);
+    let out = text_report("src", &[swarm_fam], Tier::Floor);
+    assert!(
+        !out.contains("geom\n") && !out.contains("in-frame geometry fraction"),
+        "a family with no line seam must omit the column entirely:\n{out}"
+    );
+
+    // JSON mirrors the omission: the key exists exactly when the value does.
+    let mut measured = preset_report("rosette", vec![]);
+    measured.geometry = Some(0.5);
+    let with = render_json(
+        "src",
+        &[fam(SystemKind::StarPattern, vec![measured])],
+        Tier::Floor,
+    );
+    assert!(with.contains("\"in_frame_geometry\":0.5"), "{with}");
+    let without = render_json(
+        "src",
+        &[fam(SystemKind::Swarm, vec![preset_report("drift", vec![])])],
+        Tier::Floor,
+    );
+    assert!(!without.contains("in_frame_geometry"), "{without}");
+    assert_eq!(
+        with.matches('{').count(),
+        with.matches('}').count(),
+        "braces balance with the new key: {with}"
     );
 }
 
