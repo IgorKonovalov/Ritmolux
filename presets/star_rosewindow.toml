@@ -20,11 +20,12 @@ contact_angle_deg = 24
 
 [palette]
 stops = [
-  { at = 0.0, color = "#0d1b4b" },
-  { at = 0.4, color = "#27408b" },
-  { at = 0.65, color = "#8b1e3f" },
-  { at = 0.85, color = "#d4972e" },
-  { at = 1.0, color = "#f2e2b3" },
+  { at = 0.0, color = "#1226aa" },
+  { at = 0.25, color = "#00b4d8" },
+  { at = 0.45, color = "#c81d64" },
+  { at = 0.65, color = "#ff6d00" },
+  { at = 0.85, color = "#ffd60a" },
+  { at = 1.0, color = "#7ae582" },
 ]
 
 [params]
@@ -41,13 +42,19 @@ kaleido_spiral = "1"
 kaleido_zoom   = "time * 0.07 + clamp(bass * 0.35, 0, 0.3)"
 kaleido_inner  = "0.1"
 
-thickness  = "2.6 + clamp(bass * 1.3, 0, 1.1) + beat * 0.4"
-glow       = "1.1"
-brightness = "0.9 + clamp(mid * 0.47, 0, 0.4)"
+thickness  = "3.2 + clamp(bass * 1.3, 0, 1.1) + beat * 0.5"
+glow       = "1.25"
+brightness = "1.0 + clamp(mid * 0.47, 0, 0.4)"
 
-# Cobalt glass warming toward ruby and gold on the high end.
-hue        = "0.25 + time * 0.008 + clamp(treb * 0.66, 0, 0.4)"
-saturation = "0.95"
+# EVERY BEAT LANDS A NEW PANE OF GLASS: the hue latches to a seeded position
+# on each beat, the short trail holds the outgoing colour while the rings
+# travel, and the window becomes genuinely multi-coloured - cobalt, cyan,
+# ruby, flame, gold, jade succeeding each other on the pulse. Treb tips the
+# current pane warmer between beats.
+hue        = "hash(beat_index) * 0.9 + clamp(treb * 0.17, 0, 0.1)"
+saturation = "1.0"
+
+trails = "0.45"
 
 bg_hue      = "0.63"
 bg_bright   = "0.012"
@@ -57,5 +64,6 @@ bg_vignette = "0.85"
 variant    = 0.4
 thickness  = { attack = 0.02, release = 0.32 }
 brightness = 0.3
-hue        = 0.4
+hue        = 0.12
+trails     = 0.5
 kaleido_zoom = 0.3

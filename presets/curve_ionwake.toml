@@ -18,25 +18,39 @@ name   = "Ion Wake"
 [curve]
 family = "maurer_rose"
 
+# max, not add: this preset spent three rendered iterations under add, and
+# however dim the source, the summed echoes desaturated to silver - repeated
+# addition of even a pure hue raises all three channels through the rolloff.
+# max keeps every echo at the colour it was deposited with, which is what a
+# COLOURED tunnel needs; the braid-lights-where-it-crosses trade goes with it.
 [feedback]
 warp  = "swirl"
-blend = "add"
+blend = "max"
 
 [palette]
 stops = [
-  { at = 0.0, color = "#040b1f" },
-  { at = 0.45, color = "#0a3d6b" },
-  { at = 0.75, color = "#19b8d6" },
-  { at = 1.0, color = "#c8f4ff" },
+  { at = 0.0, color = "#0a0b3d" },
+  { at = 0.3, color = "#0077ff" },
+  { at = 0.55, color = "#00e5e0" },
+  { at = 0.78, color = "#e939c8" },
+  { at = 1.0, color = "#fff3c4" },
 ]
 
 [params]
 n = "5"
 d = "2"
 samples = "240"
-spin    = "0.45"
-scale   = "0.32"
+spin    = "0.25"
+# The flower itself never rests: the petals twist continuously (phase) and
+# the figure breathes (scale) - the idle motion lives in the source, where
+# the pixels are brightest, not only in the slow water behind it.
+phase   = "time * 0.5"
+scale   = "0.46 + sin(time * 0.8) * 0.06"
 zoom    = "1.0"
+# The source orbits the centre a little, so the whole accumulation wobbles
+# even between beats - the idle tunnel is water, never a photograph.
+pan_x = "sin(time * 0.7) * 0.03"
+pan_y = "cos(time * 0.6) * 0.025"
 
 # The tunnel: outward rush, steady turn, a stirred core.
 fb_zoom   = "1.35 + clamp(bass * 0.94, 0, 0.8) + beat * 0.5"
@@ -49,18 +63,33 @@ trails = "0.93"
 # rides the KICK with a fast attack: the tunnel's rate levers (fb_zoom, warp)
 # integrate over seconds, so the immediate pixel response a listener reads as
 # "it heard that" comes from this level term.
-thickness  = "2.2"
-glow       = "1.0"
-brightness = "0.14 + clamp(bass * 0.42, 0, 0.36)"
+# THE DEPOSIT IS PULSED, and that is the whole tunnel. A continuous deposit
+# at 60 fps lays echoes 0.5% apart - they overlap into a smeared sheet, and
+# overlapping hues union toward white under either blend (measured, three
+# iterations). Flashing the figure on the BEAT instead leaves dark water
+# between echoes: each beat stamps one crisp ring that rushes outward, and
+# with the hue latched per beat below, every ring is its own colour. The
+# small continuous term keeps a dim spiral breathing under the rings so
+# silence is never a black frame.
+thickness  = "2.6"
+glow       = "1.15"
+brightness = "0.38 + (noise(time * 0.6) - 0.5) * 0.16 + beat * 1.0"
 
-# A narrow cold band, drifting slowly; treb flicks the crest.
-hue        = "0.55 + time * 0.015"
-hue_spread = "0.15 + clamp(treb * 0.17, 0, 0.1)"
-saturation = "0.9"
+# A two-tone band riding a cyan-to-magenta ramp - wider than the first draft
+# but still a BAND, not the whole wheel (the add-blend wash trade): the braid
+# reads electric blue against hot pink where echoes cross. Treb widens it.
+# A new colour every beat, riding the full electric ramp - with a slow drift
+# under it so the idle spiral's colour is never frozen between beats.
+hue        = "hash(beat_index) * 0.85 + time * 0.02"
+hue_spread = "0.25 + clamp(treb * 0.33, 0, 0.2)"
+saturation = "1.0"
 
 [smoothing]
 fb_zoom    = { attack = 0.03, release = 0.5 }
 fb_warp    = 0.3
-brightness = { attack = 0.03, release = 0.35 }
+# The flash must land inside one frame and linger briefly - a slow attack
+# would smear the ring back into the sheet this design exists to avoid.
+brightness = { attack = 0.015, release = 0.18 }
+hue        = 0.06
 trails     = 0.5
 hue_spread = 0.4
