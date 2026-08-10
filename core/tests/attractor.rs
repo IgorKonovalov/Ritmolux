@@ -546,6 +546,88 @@ fn the_ifs_tint_channels_move_colour_without_moving_the_figure() {
     }
 }
 
+/// **All three depth cues are exact identities on a flat family** (Plan 0075
+/// Phase 2, closing design-backlog 0067) — ADR-0076's stated property, asserted
+/// at the capture with byte equality.
+///
+/// The property held for `perspective` and `depth_hue` from the day they
+/// landed and was **false** for `depth_fade`: `dn` is identically 0 on a flat
+/// family, `depth01(0)` is 0.5 — arithmetically "mid depth" — so the haze
+/// multiplier was a uniform `1 - depth_fade/2`. Measured on `attractor_dissolve`
+/// before the fix: `perspective = 0.7` and `depth_hue = 0.6` each moved **0** of
+/// 921 600 pixels; `depth_fade = 0.9` moved 184 989 (20.1 %, max channel delta
+/// 97) — a 45 % whole-figure dimmer wearing a depth lever's name, trapping
+/// authors in both directions (a mysterious darkening, or an undocumented
+/// brightness trim that `exposure` already is). The haze's fade term is now
+/// multiplied by the family's has-depth flag, so all three cues collapse to the
+/// identity together.
+///
+/// Byte equality, not a tolerance: the zeroed fade term makes the multiplier
+/// **exactly** 1.0, and a multiply by 1.0 is an IEEE identity — the same
+/// standard `the_atmosphere_is_off_by_default` holds the defaults to.
+///
+/// The control half keeps the assertion honest: the identical `depth_fade`
+/// binding on a family that *has* depth (Lorenz) must move the picture, or the
+/// "no-op on flat" above would also pass a depth pipeline that no-ops
+/// everywhere.
+#[test]
+fn the_depth_cues_are_exact_no_ops_on_a_flat_family() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let lively = AnalysisFrame {
+        bass: 0.5,
+        mid: 0.4,
+        treb: 0.5,
+        ..Default::default()
+    };
+
+    renderer.set_presets(vec![
+        attractor_bare_preset("at_flat_base", "de_jong", ""),
+        attractor_bare_preset("at_flat_persp", "de_jong", "perspective = \"0.7\"\n"),
+        attractor_bare_preset("at_flat_hue", "de_jong", "depth_hue = \"0.6\"\n"),
+        attractor_bare_preset("at_flat_fade", "de_jong", "depth_fade = \"0.9\"\n"),
+        attractor_bare_preset("at_deep_base", "lorenz", ""),
+        attractor_bare_preset("at_deep_fade", "lorenz", "depth_fade = \"0.9\"\n"),
+    ]);
+
+    let base = renderer
+        .capture_preset("at_flat_base", &lively, 60)
+        .expect("capture the bare flat family");
+    let lit = lit_mask(&base).iter().filter(|&&l| l).count();
+    assert!(lit > 500, "the bare De Jong lit only {lit} pixels");
+
+    for (name, param) in [
+        ("at_flat_persp", "perspective = 0.7"),
+        ("at_flat_hue", "depth_hue = 0.6"),
+        ("at_flat_fade", "depth_fade = 0.9"),
+    ] {
+        let probed = renderer
+            .capture_preset(name, &lively, 60)
+            .expect("capture a flat family with one depth cue set");
+        assert_eq!(
+            base.rgba, probed.rgba,
+            "`{param}` alone must be pixel-identical to the unset capture on a family \
+             with no depth — ADR-0076's zero-extent identity (backlog 0067)"
+        );
+    }
+
+    // The control: the same binding on a 3-D family is alive.
+    let deep_base = renderer
+        .capture_preset("at_deep_base", &lively, 60)
+        .expect("capture the bare Lorenz");
+    let deep_fade = renderer
+        .capture_preset("at_deep_fade", &lively, 60)
+        .expect("capture Lorenz with depth_fade");
+    let moved = frame_diff(&deep_base, &deep_fade);
+    println!("depth_fade = 0.9 on Lorenz: frame_diff {moved:.4}");
+    assert!(
+        moved > 0.001,
+        "`depth_fade = 0.9` moved nothing on a family with depth ({moved:.5}) — the \
+         no-op assertions above would be vacuously true"
+    );
+}
+
 /// Mean `(R − G, G − B)` over the pixels `mask` selects — the figure's **colour**,
 /// separated from how bright it is the way [`mean_luma_over`] separates level.
 fn mean_chroma_over(img: &CaptureImage, mask: &[bool]) -> (f32, f32) {

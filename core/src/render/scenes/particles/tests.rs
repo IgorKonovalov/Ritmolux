@@ -527,13 +527,16 @@ fn the_magnification_matches_the_documented_ratio() {
 fn distance_dims_the_far_material() {
     const FADE: f32 = 0.8;
     const SAMPLES: usize = 33;
+    // A family that actually has depth: any non-zero inverse extent engages the
+    // fade; Lorenz's is the one the shipped presets ride.
+    let deep = AttractorFamily::Lorenz.inv_depth_extent();
 
     // Sample the depth range end to end. `dn = -1` is farthest, `+1` nearest.
     let dn_at = |i: usize| i as f32 / (SAMPLES - 1) as f32 * 2.0 - 1.0;
     let mean = |range: std::ops::Range<usize>| -> f32 {
         let n = range.len() as f32;
         range
-            .map(|i| projection_mirror::haze(dn_at(i), FADE))
+            .map(|i| projection_mirror::haze(dn_at(i), FADE, deep))
             .sum::<f32>()
             / n
     };
@@ -550,8 +553,8 @@ fn distance_dims_the_far_material() {
     // brightened anywhere in the middle would still pass the halves test.
     for i in 1..SAMPLES {
         let (prev, now) = (
-            projection_mirror::haze(dn_at(i - 1), FADE),
-            projection_mirror::haze(dn_at(i), FADE),
+            projection_mirror::haze(dn_at(i - 1), FADE, deep),
+            projection_mirror::haze(dn_at(i), FADE, deep),
         );
         assert!(
             now > prev,
@@ -563,12 +566,12 @@ fn distance_dims_the_far_material() {
 
     // The two ends the parameter is documented by: `depth_fade = 1` takes the
     // far end to black and leaves the near end untouched.
-    assert_eq!(projection_mirror::haze(-1.0, 1.0), 0.0);
-    assert_eq!(projection_mirror::haze(1.0, 1.0), 1.0);
+    assert_eq!(projection_mirror::haze(-1.0, 1.0, deep), 0.0);
+    assert_eq!(projection_mirror::haze(1.0, 1.0, deep), 1.0);
     // Never negative anywhere in the clamped range — a negative deposit would
     // subtract light from the additive accumulation.
     for i in 0..SAMPLES {
-        assert!(projection_mirror::haze(dn_at(i), 1.0) >= 0.0);
+        assert!(projection_mirror::haze(dn_at(i), 1.0, deep) >= 0.0);
     }
 }
 
@@ -578,14 +581,21 @@ fn distance_dims_the_far_material() {
 /// coordinate leaves its bits alone.
 #[test]
 fn the_atmosphere_is_off_by_default() {
+    let deep = AttractorFamily::Lorenz.inv_depth_extent();
     for dn in [-1.0f32, -0.5, 0.0, 0.25, 1.0] {
-        assert_eq!(projection_mirror::haze(dn, DEFAULT_DEPTH_FADE), 1.0);
+        assert_eq!(projection_mirror::haze(dn, DEFAULT_DEPTH_FADE, deep), 1.0);
         assert_eq!(projection_mirror::depth_tint(dn, DEFAULT_DEPTH_HUE), 0.0);
-        // And on a flat family the cues are inert whatever they are set to,
-        // because `d_n` is identically zero there — so both land on the
-        // mid-depth value and no De Jong particle can be tinted or dimmed.
-        let flat = projection_mirror::depth_norm(1e6, AttractorFamily::DeJong.inv_depth_extent());
-        assert_eq!(projection_mirror::haze(flat, 1.0), 0.5);
+        // And on a flat family the cues are inert whatever they are set to.
+        // For the tint that falls out of `d_n` being identically zero (it
+        // lands on the centred mid-depth value); for the haze it does NOT —
+        // mid-depth is `1 - depth_fade/2`, a uniform 45% dimmer at 0.9, which
+        // is design-backlog 0067 — so the fade term is zeroed by the family's
+        // zero inverse extent instead (Plan 0075 Phase 2). Exactly 1.0, the
+        // identity ADR-0076 always claimed.
+        let flat_extent = AttractorFamily::DeJong.inv_depth_extent();
+        assert_eq!(flat_extent, 0.0);
+        let flat = projection_mirror::depth_norm(1e6, flat_extent);
+        assert_eq!(projection_mirror::haze(flat, 1.0, flat_extent), 1.0);
         assert_eq!(projection_mirror::depth_tint(flat, 1.0), 0.0);
     }
     assert_eq!(DEFAULT_DEPTH_FADE, 0.0);

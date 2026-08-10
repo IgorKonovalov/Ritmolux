@@ -55,8 +55,14 @@ pub(super) fn depth01(dn: f32) -> f32 {
 /// the far material depends on the spin phase, so a pixel-side assertion
 /// would be measuring the clock; the multiplier is the thing the decision is
 /// about.
-pub(super) fn haze(dn: f32, depth_fade: f32) -> f32 {
-    1.0 - depth_fade * (1.0 - depth01(dn))
+///
+/// `inv_extent` is the family's inverse depth half-extent (the shader's
+/// `draw.d.w`): exactly `0.0` on a flat family, which zeroes the fade term
+/// outright (Plan 0075 Phase 2) — `dn` is identically 0 there, and without the
+/// `has_depth` factor the multiplier was a uniform `1 - depth_fade/2` dimmer.
+pub(super) fn haze(dn: f32, depth_fade: f32, inv_extent: f32) -> f32 {
+    let has_depth = if inv_extent != 0.0 { 1.0 } else { 0.0 };
+    1.0 - depth_fade * (1.0 - depth01(dn)) * has_depth
 }
 
 /// Mirrors `depth_tint()` in [`DRAW_SHADER`](super::DRAW_SHADER) — the shift
