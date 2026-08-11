@@ -758,6 +758,74 @@ fn selecting_a_preset_dissolves_like_a_cycle() {
     );
 }
 
+/// Two **layered** static presets (Plan 0076 Phase 4): a line-on-line pair on
+/// one side — the shape whose `Rc<RefCell<LineRenderer>>` borrows are exactly
+/// what ADR-0024's Alternative D was rejected over — and an `over`-join pair
+/// on the other, so a dissolve between them carries four scene instances, two
+/// per side, one of them through the blend junction.
+fn layered_pair() -> Vec<Preset> {
+    let lines = Preset::from_toml_str(
+        "system = \"parametric_curve\"\nname = \"LayerA\"\n\
+         [curve]\nfamily = \"maurer_rose\"\n\
+         [params]\nn = \"3\"\nd = \"71\"\nsamples = \"400\"\nscale = \"0.9\"\nspin = \"0\"\n\
+         [layer]\nsystem = \"spectrum\"\n\
+         [layer.params]\nscale = \"0.6\"\nthickness = \"3\"\nhue = \"0.6\"\n",
+    )
+    .expect("valid layered line-on-line preset");
+    let over = Preset::from_toml_str(
+        "system = \"fragment_field\"\nname = \"LayerB\"\n\
+         [params]\nwarp = \"0.35\"\nhue = \"0.1\"\nzoom = \"0.6\"\n\
+         [layer]\nsystem = \"swarm\"\njoin = \"over\"\nblend = \"screen\"\n\
+         [layer.params]\nsize = \"2.5\"\nbrightness = \"1.5\"\n",
+    )
+    .expect("valid layered over-join preset");
+    vec![lines, over]
+}
+
+/// **A mid-dissolve switch between two layered presets settles cleanly**
+/// (Plan 0076 Phase 4): no crash, no `RefCell` double-borrow on any shared
+/// line renderer, the roster lands where the last switch asked, and the whole
+/// interrupted sequence is reproducible — run twice from fresh renderers, the
+/// final frames are byte-identical, which a leaked blend target or a stale
+/// layer instance could not produce.
+#[test]
+fn a_switch_mid_dissolve_between_layered_presets_settles_cleanly() {
+    let run = || -> Option<(String, CaptureImage)> {
+        let mut renderer = headless_or_skip()?;
+        let frame = AnalysisFrame {
+            bass: 0.5,
+            treb: 0.4,
+            ..Default::default()
+        };
+        renderer.set_presets(layered_pair());
+        renderer.select_preset_now(0);
+        capture_run(&mut renderer, &frame, 4);
+        renderer.cycle_preset(); // LayerA -> LayerB, dissolve begins
+        capture_run(&mut renderer, &frame, DISSOLVE_FRAMES / 3);
+        renderer.cycle_preset(); // interrupts mid-blend: snap-finish, then back
+        capture_run(&mut renderer, &frame, DISSOLVE_FRAMES + 2);
+        let settled = capture_run(&mut renderer, &frame, 4);
+        Some((
+            renderer.preset_name().to_string(),
+            settled.into_iter().next_back().expect("a settled frame"),
+        ))
+    };
+    let Some((name_a, frame_a)) = run() else {
+        return;
+    };
+    let (name_b, frame_b) = run().expect("the second run has an adapter too");
+
+    assert_eq!(
+        name_a, "LayerA",
+        "the interrupted sequence lands on the last requested preset"
+    );
+    assert_eq!(name_a, name_b);
+    assert_eq!(
+        frame_a.rgba, frame_b.rgba,
+        "the interrupted layered sequence must reproduce byte-for-byte"
+    );
+}
+
 /// **A switch arriving mid-dissolve lands on the last one requested**, with no
 /// blend left running (Plan 0023 Phase 5 re-entrancy). The rule is snap-finish:
 /// the dissolve in flight completes to its own target, then the new one starts —
