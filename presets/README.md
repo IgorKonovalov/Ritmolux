@@ -2429,6 +2429,100 @@ Two attractor params behave unlike anything else in the set:
   The seed box survives where it is correct — the initial fill and a family change,
   the two places there is no existing cloud to disturb.
 
+## The second layer — the `[layer]` table (ADR-0090 / Plan 0076)
+
+A preset may compose **one** optional second scene. The `[layer]` table names its
+own system and carries a full authoring surface — params, easing, structural
+tables — while the preset's single `[palette]` colours both layers, so a world
+keeps one colour language and one baked LUT (that sharing is deliberate and not
+configurable; see `docs/preset-palettes.md`).
+
+```toml
+system = "fragment_field"      # the main scene — the ground
+
+[params]
+warp = "0.4"
+trails = "0.6"                 # compositing params live at the TOP level only
+
+[layer]                        # the second scene
+system = "swarm"               # any system — the same one twice is legal
+join   = "under"               # "under" (default) or "over"
+blend  = "screen"              # over-join only: add | screen | multiply | overlay
+mix    = "0.2 + 0.8 * bass"    # over-join only: bindable amount, 0..1
+
+[layer.params]                 # the layer scene's own params, its namespace
+size = "2.5"
+zoom = "0.9 + 0.3 * onset"
+
+[layer.smoothing]              # eases layer bindings — same vocabulary as [smoothing]
+zoom = 0.3
+mix  = { attack = 0.05, release = 0.6 }
+```
+
+### The two joins
+
+- **`under`** — the layer draws into the **same target** as the main scene,
+  before the post chain: both share trails, the kaleidoscope and bloom, and fuse
+  into one substance. A trailed, folded ground carries the layer with it. Cost:
+  one extra scene draw.
+- **`over`** — the layer renders into its **own offscreen** and blends into the
+  chain **between the kaleidoscope and bloom**: its geometry is never smeared by
+  trails nor folded by the kaleidoscope (crisp at display resolution), but it
+  still blooms and tonemaps with the frame — crisp *and* glowing. Cost: one
+  offscreen plus one blend pass.
+
+**Know your layer's coverage before picking `under`.** A fullscreen scene that
+presents with full coverage (a fragment field, reaction-diffusion at high
+density) drawn `under` will **occlude the main scene entirely** — the layer
+paints over it inside the shared target. `under` is the sparse-over-dense idiom
+(particles, lines, an emitter over a field); a fullscreen-over-fullscreen pair
+wants `join = "over"` with a blend mode.
+
+### The `over` join's blend and mix
+
+`blend` is structural (fixed at load, unknown names reject the preset):
+
+| mode | reads as |
+|---|---|
+| `add` | linear-light addition — the engine's native idiom, the brightest |
+| `screen` | bounded brightening (the default; cannot blow out) |
+| `multiply` | darkens where the layer has coverage |
+| `overlay` | multiply below mid-grey, screen above — contrast |
+
+Every mode operates **within the layer's own coverage**: a darkening mode
+darkens only where the layer actually drew. `mix` is the one bindable lever in
+the table itself — the blend's amount, clamped to `0..1`, eased through a
+`[layer.smoothing] mix` entry — so audio can surge the second layer in and a
+preset can breathe between one world and two. `mix = "0"` renders exactly the
+layerless preset. On an `under` join, `blend` is ignored (with a load warning)
+and `mix` has no junction to act at.
+
+### What the layer does and does not get
+
+- **Its own params and easing** — `[layer.params]` reaches the layer's scene
+  only, evaluated under the same clock, analysis frame and seed salt as the top
+  level. Per-element (`index`) bindings work, against the layer's own
+  `[layer.spectrum] elements`. Binding a compositing name (`trails`,
+  `kaleido_*`, `bg_*`, `ink_*`…) inside `[layer.params]` warns at load and does
+  nothing: the chain, backdrop and terminal passes belong to the preset as a
+  whole and take their values from the top level.
+- **Its own structural tables** — `[layer.curve]`, `[layer.generator]`,
+  `[layer.particles]`, `[layer.spectrum]`, with the same per-system rules (a
+  layer L-system still requires its generator table).
+- **Its own scene instance** — constructed for the preset, so the same system
+  twice is legal (two swarms in counterpoint, two fields at different zooms) and
+  a stateful layer (reaction-diffusion, the attractor) carries its own
+  simulation state.
+- **Not its own palette** (the preset's serves both), **not its own
+  `[feedback]` table** (the layer gets the defaults; the attractor-as-layer's
+  internal trail is therefore unwarped), and **no third layer** — one `[layer]`
+  table, total.
+
+Heavy-plus-heavy pairings are an authoring responsibility: both tiers render
+both layers, so an attractor ground under a reaction-diffusion layer costs what
+the two scenes cost. Measure with `--report` or the diagnostics overlay before
+shipping one.
+
 ## Finding a starting point in this folder
 
 Filenames are `<system>_<look>.toml`, so `ls` is the roster — there is no list here to

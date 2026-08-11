@@ -25,9 +25,11 @@
 //! mid-run is documented to shift what WARP resolves — Plan 0053's standing
 //! rule).
 
+use std::path::{Path, PathBuf};
+
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
 
 const WIDTH: u32 = 160;
 const HEIGHT: u32 = 100;
@@ -37,6 +39,7 @@ const FRAMES: u32 = 40;
 
 const LAYERED: &str = include_str!("fixtures/layer_under.toml");
 const CONTROL: &str = include_str!("fixtures/layer_under_control.toml");
+const OVER: &str = include_str!("fixtures/layer_over.toml");
 
 /// The fixed frame the captures run under. `bass = 0.9` on purpose: the layered
 /// fixture binds the layer's `zoom` to `bass`, and the reactivity probe below
@@ -501,6 +504,102 @@ fn an_over_layer_participates_in_bloom() {
     assert!(
         diff > 0.001,
         "the over layer must visibly contribute through bloom (diff {diff:.5})"
+    );
+}
+
+/// The two frozen golden fixtures (Plan 0076 Phase 5, ADR-0023): one pair per
+/// join, each pinned to a committed baseline PNG within `composite.rs`'s
+/// tolerances. `layer_under` is the Phase 1 walking-skeleton fixture;
+/// `layer_over` runs the junction's richest path (layer offscreen -> `screen`
+/// blend -> bloom's grid -> fold).
+///
+/// `LMV_BLESS=1 cargo test -p lmv-core --test layer` rewrites these two — and,
+/// run against the whole suite instead of this one binary, **every other
+/// baseline as well**. Bless by `--test layer` and check `git status`. Both
+/// baselines were adapter-compared before blessing (the ADR-0058 standing
+/// rule): the WARP capture agrees with the hardware adapter's within the
+/// cross-rasterizer tolerance, so the baseline pins a picture hardware also
+/// draws, not a WARP artifact.
+#[test]
+fn layered_fixtures_match_golden_baselines() {
+    const MEAN_TOL: f32 = 0.02;
+    const MAX_OUTLIER: u8 = 48;
+    let golden_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("golden");
+
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let frame = fixed_frame();
+    let bless = std::env::var_os("LMV_BLESS").is_some();
+    std::fs::create_dir_all(&golden_dir).expect("create tests/golden");
+
+    let decode = |path: &PathBuf| -> CaptureImage {
+        let img = image::open(path)
+            .unwrap_or_else(|e| panic!("decode baseline {}: {e}", path.display()))
+            .to_rgba8();
+        CaptureImage {
+            width: img.width(),
+            height: img.height(),
+            rgba: img.into_raw(),
+        }
+    };
+    let max_outlier = |a: &CaptureImage, b: &CaptureImage| -> u8 {
+        a.rgba
+            .chunks_exact(4)
+            .zip(b.rgba.chunks_exact(4))
+            .flat_map(|(pa, pb)| {
+                pa.iter()
+                    .zip(pb.iter())
+                    .take(3)
+                    .map(|(x, y)| x.abs_diff(*y))
+            })
+            .max()
+            .unwrap_or(0)
+    };
+
+    let mut failures = Vec::new();
+    for (stem, toml) in [("layer_under", LAYERED), ("layer_over", OVER)] {
+        let preset = load(toml);
+        let name = preset.name.clone();
+        renderer.set_presets(vec![preset]);
+        let fresh = renderer
+            .capture_preset(&name, &frame, FRAMES)
+            .expect("capture layered golden fixture");
+        let path = golden_dir.join(format!("{stem}.png"));
+
+        if bless {
+            let buf = image::RgbaImage::from_raw(fresh.width, fresh.height, fresh.rgba.clone())
+                .expect("capture buffer matches its declared dimensions");
+            buf.save(&path)
+                .unwrap_or_else(|e| panic!("write baseline {}: {e}", path.display()));
+            println!("blessed {}", path.display());
+            continue;
+        }
+
+        assert!(
+            path.exists(),
+            "missing baseline {} — run `LMV_BLESS=1 cargo test -p lmv-core --test layer`",
+            path.display()
+        );
+        let baseline = decode(&path);
+        let mean = frame_diff(&baseline, &fresh);
+        let outlier = max_outlier(&baseline, &fresh);
+        println!(
+            "{stem:<12} mean {mean:.4} (tol {MEAN_TOL}) max_outlier {outlier} (tol {MAX_OUTLIER})"
+        );
+        if mean > MEAN_TOL || outlier > MAX_OUTLIER {
+            failures.push(format!(
+                "{stem}: mean {mean:.4} / outlier {outlier} exceeds tolerance"
+            ));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "layered golden drift beyond tolerance — the join's routing, the blend, or a \
+         layer scene's rendering has changed. Bless with LMV_BLESS=1 only if intended: \
+         {failures:#?}"
     );
 }
 

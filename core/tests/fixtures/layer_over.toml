@@ -1,0 +1,23 @@
+# Plan 0076 Phase 5 — the frozen `over`-join golden fixture (ADR-0023: a
+# fixture, not shipped content). A swarm blends `screen` into the chain between
+# the kaleidoscope-free ground and an active bloom, so the baseline pins the
+# junction's richest path: layer offscreen -> blend -> bloom's grid -> fold.
+name = "layer_over"
+system = "fragment_field"
+
+[params]
+warp = "0.35"
+hue = "0.1"
+zoom = "0.6"
+bloom_amount = "0.5"
+
+[layer]
+system = "swarm"
+join = "over"
+blend = "screen"
+mix = "0.8"
+
+[layer.params]
+size = "2.5"
+brightness = "1.6"
+zoom = "0.9"

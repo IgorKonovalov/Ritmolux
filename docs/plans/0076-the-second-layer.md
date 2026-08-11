@@ -171,6 +171,22 @@ walk, not a reorderable stage.
   file; the two golden fixtures pin both joins; a preset author can learn the whole layer
   surface from `presets/README.md` without opening Rust.
 
+#### Phase 5 verdicts (recorded 2026-08-11)
+
+The user judged the rendered sample set (`WORK/lmv-plan-0076-samples/` — `under` vs
+`over` on one kaleidoscoped pair, the four-mode blend ladder, two same-system pairs,
+and the bass-driven `mix` surge filmstrip) and accepted it as-is ("looks fine"):
+
+- **The `over` join point stands at pre-bloom.** The crisp-but-glowing read is as
+  intended; the junction does not move, and ADR-0090 needs no Outcome correction.
+- **All four blend modes ship under their names.** None earned removal or renaming
+  before becoming author surface; `screen` remains the default.
+
+One implementation finding travels with the verdicts into the authoring docs: a
+fullscreen premultiplied layer at the `under` join occludes the main scene entirely
+(measured on fragment-over-fragment in Phase 2) — `under` is the sparse-over-dense
+idiom, and a fullscreen pair wants `over` with a blend.
+
 ## Risks & open questions
 
 - **Phase 2 is the plan's real risk.** The registry migration touches every scene family's
