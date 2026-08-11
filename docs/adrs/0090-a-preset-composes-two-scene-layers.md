@@ -3,7 +3,7 @@
 > **Status:** accepted (2026-08-09 — the four load-bearing choices were put to the user as an
 > interview and each was decided explicitly; see Decision)
 > **Date:** 2026-08-09
-> **Related plan(s):** [0076](../plans/0076-the-second-layer.md)
+> **Related plan(s):** [0076](../plans/done/0076-the-second-layer.md)
 > **Supersedes, in part:** [ADR-0018](0018-engine-wide-scene-compositing.md) Alternative A and
 > [ADR-0031](0031-post-stage-trait-instantiable-composite-chain.md) Alternative B — both rejected
 > a render graph, and both rejections **stand**; what this ADR revises is the "one scene per

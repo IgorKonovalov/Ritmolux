@@ -13,7 +13,7 @@
 > [0088](../design-backlog.md#0088--shot---reports-band-columns-cannot-see-reactivity-spent-on-bloom);
 > discharges [0086](../design-backlog.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument)'s
 > trigger with a bounded check (0086 itself stays parked)
-> **Queued:** after [Plan 0076](0076-the-second-layer.md) and Plan 0075's cohort 6, per the
+> **Queued:** after [Plan 0076](done/0076-the-second-layer.md) (landed) and Plan 0075's cohort 6, per the
 > 2026-08-11 handoff decision — nothing here gates the collage.
 
 ## TL;DR

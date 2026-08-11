@@ -224,10 +224,10 @@ flowchart TD
 
 - **R3 (layered composition) is now designed —
   [ADR-0090](../adrs/0090-a-preset-composes-two-scene-layers.md) /
-  [Plan 0076](0076-the-second-layer.md) (approved 2026-08-09) — and this plan still does not
+  [Plan 0076](done/0076-the-second-layer.md) (closed 2026-08-11) — and this plan still does not
   hard-gate on it.** The preference is 0076 landing before Phase 4's brief so cohort worlds
-  can be layered (the collage look is R3's own acceptance evidence); if it has not landed,
-  the brief marks the layered worlds as a later cohort and the renaissance proceeds.
+  can be layered (the collage look is R3's own acceptance evidence); 0076 has now landed,
+  so cohort 6 (the collage) is unblocked and the layered worlds can be authored directly.
 - **Scope gravity** (the roadmap's own warning). Phases 1-3 are deliberately the *only*
   engine work here; every capability the cohorts ask for routes out through the backlog.
   The Mode 4 review should treat any engine code beyond Phases 1-2's named items as drift.
