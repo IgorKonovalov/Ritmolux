@@ -616,6 +616,25 @@ LUTs are lerped. With no `[palette_b]`, `palette_mix` is a no-op.
 
 ---
 
+## One palette serves both layers — the `[layer]` rule (ADR-0090)
+
+A preset that composes a second scene (`[layer]`, see `presets/README.md`) has
+**no `[layer.palette]`**, deliberately: the preset's single `[palette]` (and
+`[palette_b]` pair) is baked once and handed to the main scene, the layer's
+scene and the backdrop alike. Two colour languages in one frame read as two
+presets stacked rather than one world, and a second bake would double the LUT
+work for a coherence loss, not a gain — the shared gradient is precisely what
+makes two layers *one* look. This was weighed and rejected as an alternative in
+ADR-0090, not left out.
+
+What still differs per layer is how each scene **samples** that shared
+gradient: the layer has its own `hue`, `saturation`, `color_span` /
+`hue_spread`, `palette_mix` and friends in `[layer.params]`, so the two layers
+can sit at different points of one gradient — a dim ground at the palette's
+floor under a bright figure at its crest — without leaving the family.
+
+---
+
 ## Worked example — a cohesive warm fragment field
 
 ```toml

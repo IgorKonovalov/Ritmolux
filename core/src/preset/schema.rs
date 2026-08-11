@@ -278,6 +278,109 @@ impl Default for Easing {
     }
 }
 
+/// Where a preset's second scene joins the composite (ADR-0090): before the
+/// post chain, sharing every stage with the main scene, or between the
+/// kaleidoscope and bloom in its own offscreen (Phase 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LayerJoin {
+    /// The layer draws into the same scene target as the main scene, before the
+    /// chain — one substance, shared trails/fold/bloom. The default.
+    #[default]
+    Under,
+    /// The layer renders into its own offscreen and blends into the chain
+    /// between the kaleidoscope and bloom — crisp geometry, shared glow.
+    Over,
+}
+
+impl LayerJoin {
+    /// Parse the canonical `join = "..."` value, or `None` if unknown.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "under" => LayerJoin::Under,
+            "over" => LayerJoin::Over,
+            _ => return None,
+        })
+    }
+}
+
+/// How an `over` layer blends into the chain (ADR-0090): fixed at load, like
+/// every structural key, and applied in linear light within the layer's
+/// premultiplied-alpha footprint. Parsed now; consumed by the blend pass
+/// (Plan 0076 Phase 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LayerBlend {
+    /// Linear-light addition — the engine's native compositing idiom.
+    Add,
+    /// `1 - (1-a)(1-b)`: bounded brightening. The default — ADR-0090's
+    /// illustrative mode, and the one that cannot blow out.
+    #[default]
+    Screen,
+    /// Darkens where the layer has coverage.
+    Multiply,
+    /// Multiply below mid-grey, screen above.
+    Overlay,
+}
+
+impl LayerBlend {
+    /// Every mode, for the load error's "expected one of" listing.
+    pub const ALL: [LayerBlend; 4] = [
+        LayerBlend::Add,
+        LayerBlend::Screen,
+        LayerBlend::Multiply,
+        LayerBlend::Overlay,
+    ];
+
+    /// Parse the canonical `blend = "..."` value, or `None` if unknown.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "add" => LayerBlend::Add,
+            "screen" => LayerBlend::Screen,
+            "multiply" => LayerBlend::Multiply,
+            "overlay" => LayerBlend::Overlay,
+            _ => return None,
+        })
+    }
+
+    /// The canonical name — [`from_name`](Self::from_name)'s inverse.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LayerBlend::Add => "add",
+            LayerBlend::Screen => "screen",
+            LayerBlend::Multiply => "multiply",
+            LayerBlend::Overlay => "overlay",
+        }
+    }
+}
+
+/// The optional second scene layer (ADR-0090 / Plan 0076): a full authoring
+/// surface — its own system, params, bindings, `[layer.smoothing]` and
+/// structural tables — joined to the composite at [`LayerJoin`]. The preset's
+/// single `[palette]` serves both layers (one colour language, one baked LUT),
+/// and layer params are **namespaced to the layer**: they reach the layer's
+/// scene only, never the main scene's first-owner-wins routing and never the
+/// compositing stages, which belong to the preset as a whole.
+#[derive(Debug)]
+pub struct Layer {
+    /// The built-in system this layer drives.
+    pub system: SystemKind,
+    /// Where the layer joins the composite.
+    pub join: LayerJoin,
+    /// How an `over` layer blends in (ignored, with a load warning, on an
+    /// `under` join — there is no junction for it to apply at).
+    pub blend: LayerBlend,
+    /// The bindable mix amount at the `over` join (ADR-0090): how much of the
+    /// layer the blend applies, evaluated per frame like any binding so audio
+    /// can surge the second layer. `None` — the default — is full strength.
+    pub mix: Option<Binding>,
+    /// The layer's parameter bindings, name-sorted like the preset's own.
+    pub params: Vec<Binding>,
+    /// The layer's declarative structural config (ADR-0007), from its own
+    /// `[layer.curve]` / `[layer.generator]` / `[layer.particles]` /
+    /// `[layer.spectrum]` tables — validated by the same per-system rules as
+    /// the top level.
+    pub config: Option<GeneratorConfig>,
+}
+
 /// A named parameter bound to a compiled expression.
 #[derive(Debug)]
 pub struct Binding {
@@ -372,6 +475,10 @@ pub struct Preset {
     /// (ADR-0020), and this is metadata *about* a binding rather than part of
     /// it. Harness-only — nothing per-frame reads it.
     pub occupancy_exempt: Vec<String>,
+    /// The optional second scene layer (ADR-0090 / Plan 0076), from a `[layer]`
+    /// table. `None` — the overwhelmingly common case — takes exactly the code
+    /// path a preset took before layers existed: no new pass, no new target.
+    pub layer: Option<Layer>,
     /// Non-fatal problems found while loading — today, bindings naming a
     /// parameter this system does not consume (ADR-0020). The preset loaded and
     /// its good bindings apply; these are surfaced so a typo stops failing
@@ -512,6 +619,14 @@ impl Preset {
             }
         }
 
+        // The optional second scene layer (ADR-0090 / Plan 0076), validated
+        // last so a preset with several problems reports its main-surface
+        // errors first — the layer is the optional extra, not the preset.
+        let layer = raw
+            .layer
+            .map(|l| build_layer(l, &mut warnings))
+            .transpose()?;
+
         Ok(Preset {
             name,
             system,
@@ -523,9 +638,161 @@ impl Preset {
             salt,
             pinned_salt,
             occupancy_exempt,
+            layer,
             warnings,
         })
     }
+}
+
+/// Validate a `[layer]` table (ADR-0090 / Plan 0076). Structural keys —
+/// `system`, `join`, `blend` — follow `[curve] family`'s rule: an unknown value
+/// rejects the preset, because it selects a code path and a silent default
+/// would render a look the author never asked for. Unknown *param* names warn
+/// and keep the binding, exactly like the top level (ADR-0020).
+fn build_layer(raw: RawLayer, warnings: &mut Vec<String>) -> Result<Layer, PresetError> {
+    let system = SystemKind::from_name(&raw.system)
+        .ok_or_else(|| PresetError::UnknownSystem(raw.system.clone()))?;
+    // Any pair of systems is legal — including the same system twice, and two
+    // line-family systems. The layer's scene is constructed **for the preset**
+    // (`scenes::create_layer_scene`, ADR-0090 point 4 / Plan 0076 Phase 2), so
+    // it shares no GPU state with the roster's instance of the same kind.
+
+    let join = match raw.join.as_deref() {
+        None => LayerJoin::default(),
+        Some(name) => LayerJoin::from_name(name).ok_or_else(|| {
+            PresetError::Config(format!(
+                "unknown [layer] join '{name}' (expected one of: under, over)"
+            ))
+        })?,
+    };
+    let blend = match raw.blend.as_deref() {
+        None => LayerBlend::default(),
+        Some(name) => LayerBlend::from_name(name).ok_or_else(|| {
+            PresetError::Config(format!(
+                "unknown [layer] blend '{name}' (expected one of: {})",
+                LayerBlend::ALL
+                    .iter()
+                    .map(|b| b.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))
+        })?,
+    };
+    if raw.blend.is_some() && join == LayerJoin::Under {
+        warnings.push(format!(
+            "[layer] blend = '{}' is ignored on an under join: the layer shares the \
+             main scene's composite, so there is no junction for a blend mode to \
+             apply at (blend belongs to join = \"over\")",
+            blend.as_str()
+        ));
+    }
+
+    // The layer's bindings, name-sorted off the BTreeMap like the preset's own.
+    let mut params = Vec::with_capacity(raw.params.len());
+    for (param, source) in raw.params {
+        let expr = expr::compile(&source).map_err(|err| PresetError::Expr {
+            param: format!("[layer] {param}"),
+            err,
+        })?;
+        // Layer params are namespaced to the layer's scene — they reach no
+        // compositing stage — so "known" is the layer system's own vocabulary,
+        // and a global name deserves the sharper message.
+        if !system.param_names().contains(&param.as_str()) {
+            if GLOBAL_PARAMS
+                .iter()
+                .any(|stage| stage.contains(&param.as_str()))
+            {
+                warnings.push(format!(
+                    "[layer] parameter '{param}' is a compositing parameter; a layer \
+                     binds only its own scene's params — bind it at the top level, \
+                     where it drives the whole preset (binding kept, but nothing \
+                     reads it here)"
+                ));
+            } else {
+                warnings.push(format!(
+                    "unknown [layer] parameter '{param}' for system '{}' (binding \
+                     kept, but nothing reads it)",
+                    system.as_str()
+                ));
+            }
+        }
+        params.push(Binding {
+            name: param,
+            expr,
+            tau: Easing::INSTANT,
+        });
+    }
+
+    // `[layer.smoothing]`: the same vocabulary, validation and fold as the top
+    // level (ADR-0019 / ADR-0035), against the layer's own bindings.
+    for (param, entry) in &raw.smoothing {
+        match *entry {
+            RawSmoothing::Symmetric(seconds) => {
+                check_tau(&format!("[layer] {param}"), None, seconds)?;
+            }
+            RawSmoothing::Asymmetric { attack, release } => {
+                check_tau(&format!("[layer] {param}"), Some("attack"), attack)?;
+                check_tau(&format!("[layer] {param}"), Some("release"), release)?;
+            }
+        }
+    }
+    for binding in &mut params {
+        binding.tau = raw
+            .smoothing
+            .get(&binding.name)
+            .map_or(Easing::INSTANT, |entry| entry.to_easing());
+        if binding.expr.uses_index() && raw.smoothing.contains_key(&binding.name) {
+            warnings.push(format!(
+                "[layer.smoothing] entry '{}' is ignored: the binding names `index`, \
+                 so it is evaluated per element and cannot be eased as one value \
+                 (use [layer.spectrum] smoothing for the element levels)",
+                binding.name
+            ));
+            binding.tau = Easing::INSTANT;
+        }
+    }
+
+    // The bindable mix (ADR-0090): compiled like any binding, eased through
+    // `[layer.smoothing] mix`. Parsed now; the `over` blend consumes it in
+    // Plan 0076 Phase 3.
+    let mix = raw
+        .mix
+        .as_deref()
+        .map(|source| {
+            let expr = expr::compile(source).map_err(|err| PresetError::Expr {
+                param: "[layer] mix".into(),
+                err,
+            })?;
+            Ok(Binding {
+                name: "mix".into(),
+                expr,
+                tau: raw
+                    .smoothing
+                    .get("mix")
+                    .map_or(Easing::INSTANT, |entry| entry.to_easing()),
+            })
+        })
+        .transpose()?;
+
+    // The layer's structural config, by the same per-system rules as the top
+    // level (ADR-0007) — a layer L-system still requires its `[layer.generator]`
+    // table, a layer attractor still defaults to De Jong.
+    let config = build_config(
+        system,
+        raw.curve,
+        raw.generator,
+        raw.particles,
+        raw.spectrum,
+    )?;
+
+    Ok(Layer {
+        system,
+        join,
+        blend,
+        mix,
+        params,
+        config,
+    })
 }
 
 /// Fold a declared 64-bit `[generator] seed` into the 32-bit salt the grammar's
@@ -660,6 +927,49 @@ struct RawPreset {
     /// every clamp in this preset is held to it.
     #[serde(default)]
     occupancy: Option<RawOccupancy>,
+    /// The optional `[layer]` table (ADR-0090 / Plan 0076): the second scene
+    /// layer — its system, join point, blend, bindable mix, params, smoothing
+    /// and structural tables.
+    #[serde(default)]
+    layer: Option<RawLayer>,
+}
+
+/// The `[layer]` table, before validation (ADR-0090 / Plan 0076). Everything a
+/// top-level preset has except a palette (the preset's single `[palette]`
+/// serves both layers) and the compositing tables (`[feedback]`, `[occupancy]`,
+/// `[smoothing]` for global params), which belong to the preset as a whole.
+#[derive(Deserialize)]
+struct RawLayer {
+    /// The layer's built-in system.
+    system: String,
+    /// `under` | `over`; absent means `under`.
+    #[serde(default)]
+    join: Option<String>,
+    /// `add` | `screen` | `multiply` | `overlay`; absent means `screen`.
+    /// `over`-join only — warned as ignored on `under`.
+    #[serde(default)]
+    blend: Option<String>,
+    /// The bindable mix expression at the `over` join; absent means full
+    /// strength.
+    #[serde(default)]
+    mix: Option<String>,
+    /// The layer's parameter bindings — `[layer.params]`.
+    #[serde(default)]
+    params: BTreeMap<String, String>,
+    /// Per-parameter easing for the layer's bindings — `[layer.smoothing]`,
+    /// the same vocabulary as the top-level table (ADR-0019 / ADR-0035).
+    #[serde(default)]
+    smoothing: BTreeMap<String, RawSmoothing>,
+    /// The layer's structural tables, per system (ADR-0007) — the same shapes
+    /// as the top level's.
+    #[serde(default)]
+    curve: Option<RawCurve>,
+    #[serde(default)]
+    generator: Option<RawGenerator>,
+    #[serde(default)]
+    particles: Option<RawParticles>,
+    #[serde(default)]
+    spectrum: Option<RawSpectrum>,
 }
 
 /// The `[feedback]` table, before validation (ADR-0048).

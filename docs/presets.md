@@ -101,7 +101,9 @@ sample density),
 `[spectrum]` (the readout's element count, layout and per-element easing —
 summarised [below](#the-spectrum-table)), `[feedback]` (how an accumulation reads
 its own past — [below](#the-feedback-table)), `[smoothing]` (per-parameter
-easing), and `[palette]` / `[palette_b]` (colour). All are documented in
+easing), `[palette]` / `[palette_b]` (colour), and `[layer]` (a second scene
+composed under or over the main one — ADR-0090; the expression language inside
+`[layer.params]` is exactly this document's). All are documented in
 [`presets/README.md`](../presets/README.md) and
 [`docs/preset-palettes.md`](preset-palettes.md).
 
