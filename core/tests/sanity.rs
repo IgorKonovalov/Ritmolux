@@ -277,7 +277,7 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// star_pattern        0.34    0.6908  Star Lantern       2.03
 /// reaction_diffusion  0.09    0.1910  Verdigris          2.12
 /// attractor           0.18    0.3442  Leviathan          1.91
-/// spectrum            0.06    0.1189  Spectrum Ridge     1.98
+/// spectrum            0.28    0.5843  Halo               2.09
 /// ```
 ///
 /// **This table is a snapshot and the printed distribution is authoritative.**
@@ -410,7 +410,11 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // The sparsest system in the library, and the one this plan exists
         // because of. Spectrum Ridge sets it at 0.1189 — *after* its repair; the
         // version that shipped broken scores 0.0000 here.
-        SystemKind::Spectrum => 0.06,
+        // Raised from 0.06 when cohort four (Plan 0075) retired the three
+        // spectrum presets: the family minimum moved up to Halo at 0.5843
+        // (its lit violet atmosphere and thick spokes cover what the old
+        // thin combs did not), and the old floor sat 9.7x below it.
+        SystemKind::Spectrum => 0.28,
         // A shower of small marks over an otherwise empty frame — sparse by
         // idiom, like the spectrum readout and unlike the swarm's dense cloud.
         // Measured from `Sparks`, the family's only shipped member (Plan 0052),
