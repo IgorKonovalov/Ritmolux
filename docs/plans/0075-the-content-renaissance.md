@@ -206,6 +206,21 @@ flowchart TD
   `README.md` if the preset count or family roster is named anywhere user-facing, and the
   distinctness family array's comment if any family emptied. The workaround-header sweep
   (0067 Phase 4's grep) runs once over the final set.
+
+  **Added at the cohorts 1-5 handoff (2026-08-11)** — three specific items the sweep must
+  catch, recorded here so they are not re-found:
+
+  1. `presets/README.md` still names the retired `fragment_kaleido` as the `kaleido_edge`
+     squash/tile exemplar — cohort 2 retired that preset. Re-point the exemplar at a shipped
+     world.
+  2. `presets/README.md`'s IFS `vigor` description ("bushier, deeper, denser") inverts on a
+     **space-filling** figure: on the dragon (two maps at exactly 0.7071, already
+     space-filling) vigor above 1 overfills the region and dissolves the figure into dust —
+     cohort 5 measured it on the loud frame and shipped the binding with the sign inverted.
+     One-line caveat next to the row.
+  3. For history readers, a record rather than an edit: commit `444600d`'s title says
+     "firmament", but the world it ships is **Perseids** (the commit body is correct). History
+     is never rewritten; this line is where the correction lives.
 - **Done when:** the docs describe the library that ships; no doc names a count that the next
   cohort would re-drift.
 
@@ -213,10 +228,10 @@ flowchart TD
 
 - **R3 (layered composition) is now designed —
   [ADR-0090](../adrs/0090-a-preset-composes-two-scene-layers.md) /
-  [Plan 0076](0076-the-second-layer.md) (approved 2026-08-09) — and this plan still does not
+  [Plan 0076](done/0076-the-second-layer.md) (closed 2026-08-11) — and this plan still does not
   hard-gate on it.** The preference is 0076 landing before Phase 4's brief so cohort worlds
-  can be layered (the collage look is R3's own acceptance evidence); if it has not landed,
-  the brief marks the layered worlds as a later cohort and the renaissance proceeds.
+  can be layered (the collage look is R3's own acceptance evidence); 0076 has now landed,
+  so cohort 6 (the collage) is unblocked and the layered worlds can be authored directly.
 - **Scope gravity** (the roadmap's own warning). Phases 1-3 are deliberately the *only*
   engine work here; every capability the cohorts ask for routes out through the backlog.
   The Mode 4 review should treat any engine code beyond Phases 1-2's named items as drift.

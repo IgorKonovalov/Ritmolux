@@ -372,3 +372,48 @@ fn probe_response_survives_a_capture_shorter_than_the_probe_window() {
     assert_eq!(t.response.rise_frames, 0);
     assert_eq!(t.response.fall_frames, 0);
 }
+
+/// Plan 0076 Phase 4: reachability walks the `[layer]`'s bindings — its params
+/// **and** its bindable `mix` — through the same `Binding` machinery as the
+/// top level. ADR-0090 called this a property to verify at implementation
+/// rather than new design, and this is the verification: a layer gate that
+/// never fires must flag, labeled with its namespace, while a live top-level
+/// gate on the same preset must not.
+#[test]
+fn a_dead_gate_on_a_layer_binding_flags_in_the_reachability_walk() {
+    let preset = lmv_core::preset::Preset::from_toml_str(
+        "system = \"fragment_field\"\n\
+         [params]\nwarp = \"select(onset > 0.2, 0.6, 0.3)\"\n\
+         [layer]\nsystem = \"swarm\"\njoin = \"over\"\n\
+         mix = \"select(treb > 9.0, 1.0, 0.5)\"\n\
+         [layer.params]\nzoom = \"select(bass > 9.0, 1.0, 0.4)\"\n",
+    )
+    .expect("layered probe preset loads");
+
+    // Frames that take the top-level gate both ways and can never reach the
+    // layer's impossible thresholds (band levels are 0..1-ish; 9.0 is not).
+    let frames: Vec<AnalysisFrame> = (0..8)
+        .map(|i| AnalysisFrame {
+            bass: 0.4,
+            mid: 0.3,
+            treb: 0.5,
+            onset: if i % 2 == 0 { 0.5 } else { 0.0 },
+            ..Default::default()
+        })
+        .collect();
+
+    let gates = probe_reachability(&preset, &frames);
+    let names: Vec<&str> = gates.iter().map(|g| g.param.as_str()).collect();
+    assert!(
+        names.contains(&"[layer] zoom"),
+        "the dead layer-param gate must flag, labeled with its namespace: {names:?}"
+    );
+    assert!(
+        names.contains(&"[layer] mix"),
+        "the dead mix gate must flag: {names:?}"
+    );
+    assert!(
+        !names.contains(&"warp"),
+        "the live top-level gate must not flag: {names:?}"
+    );
+}

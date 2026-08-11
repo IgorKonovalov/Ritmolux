@@ -1,17 +1,26 @@
 # 0076 — The second layer: a preset composes two scenes (R3)
 
-> **Status:** **approved 2026-08-09** — the four open design choices were decided by the user
-> in the Mode 1 interview the same day ([ADR-0090](../adrs/0090-a-preset-composes-two-scene-layers.md)
+> **Status:** **done** (closed 2026-08-11) — all five phases landed as five commits
+> (`aa737ce` schema + under join, `ada9e98` per-preset instances, `720fed9` over join + blend,
+> `d6bc968` dissolve/tier/instrument seams, `26ee35a` verdicts + goldens + operator docs); the
+> user judged the Phase 5 sample set and accepted it as-is (verdicts recorded below). Mode 4
+> review in a fresh session: **no blockers, no majors** — the done-when tests are genuinely
+> differential (the reactivity probe, the routing enumeration over all eight flag combinations,
+> the mix = 0 byte-identity through both junction positions), every measurement names this box
+> per ADR-0071, layer draws take the target's aspect (ADR-0037 clean), and the new
+> `layer_blend.rs` carries the hot-path deny pragma under the hygiene guard's scan set.
+> Approved 2026-08-09; the four open design choices were decided by the user
+> in the Mode 1 interview the same day ([ADR-0090](../../adrs/0090-a-preset-composes-two-scene-layers.md)
 > records them, including the one taken against the architect's recommendation).
 > **Created:** 2026-08-09
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0090](../adrs/0090-a-preset-composes-two-scene-layers.md) (the decision),
-> building on [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md),
-> [0024](../adrs/0024-cross-preset-transitions.md),
-> [0031](../adrs/0031-post-stage-trait-instantiable-composite-chain.md),
-> [0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)
-> **Serves:** [roadmap-visual-richness R3](../roadmap-visual-richness.md); feeds
-> [Plan 0075](0075-the-content-renaissance.md)'s cohorts (soft ordering: 0075's brief should
+> **Related ADRs:** [0090](../../adrs/0090-a-preset-composes-two-scene-layers.md) (the decision),
+> building on [0046](../../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md),
+> [0024](../../adrs/0024-cross-preset-transitions.md),
+> [0031](../../adrs/0031-post-stage-trait-instantiable-composite-chain.md),
+> [0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)
+> **Serves:** [roadmap-visual-richness R3](../../roadmap-visual-richness.md); feeds
+> [Plan 0075](../0075-the-content-renaissance.md)'s cohorts (soft ordering: 0075's brief should
 > know whether layering exists, but 0075 does not hard-gate on this plan — its own text says so)
 
 ## TL;DR
@@ -159,7 +168,7 @@ walk, not a reorderable stage.
   audio-driven `mix` surge under `--signal dynamic`. The user's verdict decides two things:
   whether the `over` join point (pre-bloom) reads as intended (crisp but glowing), and
   whether any mode earns removal or renaming before it becomes author surface. **Landing
-  shipped presets is explicitly not this phase** — that is [Plan 0075](0075-the-content-renaissance.md)'s
+  shipped presets is explicitly not this phase** — that is [Plan 0075](../0075-the-content-renaissance.md)'s
   cohorts; this phase proves the seam with fixtures.
 - **Also in this phase (dev, same commit series):** two frozen golden fixtures join the
   suite (one `under`, one `over` pair — per ADR-0023 they are fixtures, not shipped
@@ -170,6 +179,22 @@ walk, not a reorderable stage.
 - **Done when:** the user has judged the set and the verdicts are recorded in this plan
   file; the two golden fixtures pin both joins; a preset author can learn the whole layer
   surface from `presets/README.md` without opening Rust.
+
+#### Phase 5 verdicts (recorded 2026-08-11)
+
+The user judged the rendered sample set (`WORK/lmv-plan-0076-samples/` — `under` vs
+`over` on one kaleidoscoped pair, the four-mode blend ladder, two same-system pairs,
+and the bass-driven `mix` surge filmstrip) and accepted it as-is ("looks fine"):
+
+- **The `over` join point stands at pre-bloom.** The crisp-but-glowing read is as
+  intended; the junction does not move, and ADR-0090 needs no Outcome correction.
+- **All four blend modes ship under their names.** None earned removal or renaming
+  before becoming author surface; `screen` remains the default.
+
+One implementation finding travels with the verdicts into the authoring docs: a
+fullscreen premultiplied layer at the `under` join occludes the main scene entirely
+(measured on fragment-over-fragment in Phase 2) — `under` is the sparse-over-dense
+idiom, and a fullscreen pair wants `over` with a blend.
 
 ## Risks & open questions
 
@@ -182,19 +207,21 @@ walk, not a reorderable stage.
 - **WARP's pipeline-count sensitivity** (the documented mis-render pressure against adding
   pipelines) applies to the new blend pass and any duplicated stateful pipelines. Compare
   adapters before blessing anything (the standing rule), and expect
-  [Plan 0053](done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)'s allowlist to need the
+  [Plan 0053](0053-the-suite-stops-blessing-what-warp-gets-wrong.md)'s allowlist to need the
   new layouts if their shapes collide with live ones (ADR-0058's evidence duty).
 - **Gate cost.** Layered fixtures roughly double per-fixture render cost in the suites that
   sweep them. Measured in Phase 4; if the wall-clock grows materially, that is a finding for
   the CI budget (ADR-0073's `coverage`-is-longest property), said rather than absorbed.
+  *(Outcome: ~0.9 ms/frame marginal on the layered gate fixture, negligible at this library
+  size; CI wall clock unchanged because no shipped preset declares a layer yet.)*
 - **The `over` join's position is a taste decision backed by reasoning, not evidence.**
   Pre-bloom was chosen so a crisp figure still glows. If Phase 5's verdict is that `over`
   content wants to be post-bloom (fully dry), the junction moves — it is one position in a
   compile-time walk — and ADR-0090 gains an Outcome line.
 - **Sequencing against the live roster.** This plan touches `core/src/render/mod.rs` and
-  `post.rs`, which the in-flight [0071](done/0071-light-that-adds-without-covering.md) lane is
+  `post.rs`, which the in-flight [0071](0071-light-that-adds-without-covering.md) lane is
   also editing. Do not start Phase 1 in a worktree until 0071's lane has landed or the seam
-  is coordinated.
+  is coordinated. *(Resolved before implementation started: 0071 and 0046 both landed first.)*
 
 ## What this plan does NOT do
 
@@ -212,7 +239,7 @@ walk, not a reorderable stage.
 
 ## Followups (after this lands)
 
-- [Plan 0075](0075-the-content-renaissance.md) Phase 4's brief should mark which cohort
+- [Plan 0075](../0075-the-content-renaissance.md) Phase 4's brief should mark which cohort
   worlds are layered — the collage look is the acceptance evidence R3 was built for.
 - If a cohort asks for private effects on the `over` layer, or a third layer, those route
   through architect with this plan's measured costs as the starting evidence.

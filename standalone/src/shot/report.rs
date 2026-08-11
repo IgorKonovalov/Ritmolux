@@ -516,10 +516,26 @@ fn reachability_frames() -> Result<Vec<AnalysisFrame>, String> {
 
 /// Walk every binding of `preset` under `frames`, and report the gates that
 /// never went both ways.
+///
+/// **Every binding means the `[layer]`'s too** (Plan 0076 Phase 4): the layer's
+/// params and its bindable `mix` are the same `Binding` machinery as the top
+/// level — same compiled `Expr`, same `Observations` — so the walk is the same
+/// loop over a longer list, and a layer gate that never fires flags exactly
+/// like a top-level one. Layer entries are labeled `[layer] <param>` so the
+/// report says which namespace a dead gate lives in.
 fn probe_reachability(preset: &Preset, frames: &[AnalysisFrame]) -> Vec<GateReport> {
     let hop_seconds = HOP_SIZE as f32 / REACH_FORMAT.sample_rate as f32;
+    let layer_bindings = preset
+        .layer
+        .iter()
+        .flat_map(|layer| layer.params.iter().chain(layer.mix.iter()));
+    let bindings = preset
+        .params
+        .iter()
+        .map(|binding| (binding, false))
+        .chain(layer_bindings.map(|binding| (binding, true)));
     let mut out = Vec::new();
-    for binding in &preset.params {
+    for (binding, in_layer) in bindings {
         let mut obs = Observations::new();
         for (hop, frame) in frames.iter().enumerate() {
             // Through the engine's own frame binding, so the probe cannot read
@@ -546,7 +562,11 @@ fn probe_reachability(preset: &Preset, frames: &[AnalysisFrame]) -> Vec<GateRepo
         }
         for flag in binding.expr.flag_gates(&obs) {
             out.push(GateReport {
-                param: binding.name.clone(),
+                param: if in_layer {
+                    format!("[layer] {}", binding.name)
+                } else {
+                    binding.name.clone()
+                },
                 flag,
             });
         }

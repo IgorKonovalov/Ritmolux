@@ -241,10 +241,17 @@ pub fn set_extent_diagnostic(on: bool) {
 /// (or when it is off) — distinct from a recorded draw whose
 /// [`fraction`](DrawExtent::fraction) is `None` because nothing was drawn.
 ///
-/// Only one line scene draws per frame ([`scenes::shares_resources`] forbids
-/// two), so "the most recent draw" is "this frame's figure".
+/// A frame usually holds one line draw ([`scenes::shares_resources`] forbids
+/// two *roster* line scenes in a frame), and then "the most recent draw" is
+/// "this frame's figure". Since Plan 0076 a preset may layer a second line
+/// scene through its own per-preset `LineRenderer`
+/// ([`scenes::create_layer_scene`]) — the layer draws **after** the main
+/// scene, so on a layered line-on-line preset this slot holds the *layer's*
+/// figure. The harness reads this around single-figure captures; a consumer
+/// measuring a layered preset must know which draw it is measuring.
 ///
 /// [`scenes::shares_resources`]: crate::render::scenes
+/// [`scenes::create_layer_scene`]: crate::render::scenes::create_layer_scene
 pub fn take_draw_extent() -> Option<DrawExtent> {
     LAST_EXTENT.with(|slot| slot.take())
 }

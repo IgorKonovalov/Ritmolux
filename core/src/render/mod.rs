@@ -36,6 +36,9 @@ pub(crate) mod gpu;
 pub(crate) mod grid;
 pub(crate) mod ink;
 pub(crate) mod kaleidoscope;
+// The `over`-join blend pass (ADR-0090 / Plan 0076 Phase 3) — driven by the
+// `PostChain`, whose walk knows the junction; nothing else reaches it.
+pub(crate) mod layer_blend;
 pub mod metrics;
 pub mod overlay;
 mod overlay_font;
@@ -55,7 +58,7 @@ mod transition;
 use crate::audio::AudioFormat;
 use crate::diag::{AnalysisMetrics, Diag, Metrics};
 use crate::dsp::AnalysisFrame;
-use crate::preset::{Easing, Expr, Preset, SystemKind, Variables};
+use crate::preset::{Easing, Expr, Layer, LayerJoin, Preset, SystemKind, Variables};
 use background::Background;
 pub use capture::CaptureImage;
 pub use context::{RenderContext, RenderError};
@@ -425,9 +428,14 @@ impl ParamSmoother {
 /// (Plan 0034 Phase 4). Bounded by `capacity` so a config can never index past
 /// the scratch, whatever the loader admitted.
 fn element_prefix(preset: &Preset, capacity: usize) -> usize {
-    preset
-        .config
-        .as_ref()
+    config_element_prefix(preset.config.as_ref(), capacity)
+}
+
+/// [`element_prefix`] over a bare config — shared with the layer's own
+/// structural config (Plan 0076 Phase 1), which is preset data of exactly the
+/// same shape but not a whole [`Preset`].
+fn config_element_prefix(config: Option<&scenes::GeneratorConfig>, capacity: usize) -> usize {
+    config
         .map_or(0, scenes::GeneratorConfig::element_count)
         .min(capacity)
 }
@@ -603,6 +611,57 @@ fn evaluate_preset(
     scene.update(frame);
 }
 
+/// Evaluate a preset's `[layer]` bindings into the layer's scene (Plan 0076
+/// Phase 1). The layer's counterpart of [`evaluate_preset`], and deliberately
+/// narrower: layer params are **namespaced to the layer's scene** (ADR-0090) —
+/// no route dispatch, because there is nowhere else a layer binding can go. The
+/// compositing stages, the terminal passes and the backdrop all belong to the
+/// preset as a whole and take their values from the top-level bindings.
+///
+/// `series` is the renderer's per-element scratch, sliced to the **layer's own**
+/// config (a layer spectrum reads its `[layer.spectrum] elements`); empty for
+/// every layer system without a per-element surface, exactly as at the top
+/// level.
+///
+/// `chain` receives the layer's bindable `mix` (ADR-0090 / Plan 0076 Phase 3):
+/// it is the one layer binding that drives the composite rather than the
+/// scene — the `over` junction's amount — eased through its own
+/// `[layer.smoothing] mix` entry at the smoother slot one past the params
+/// (which is stable: the layer's `params` are fixed at load). Inert on an
+/// `under` join, whose target has no junction.
+#[allow(clippy::too_many_arguments)]
+fn evaluate_layer(
+    layer: &Layer,
+    scene: &mut Box<dyn Scene>,
+    chain: &mut PostChain,
+    smoother: &mut ParamSmoother,
+    vars: &Variables<'_>,
+    frame: &AnalysisFrame,
+    time: f32,
+    dt: f32,
+    series: &mut [f32],
+) {
+    scene.set_time(time);
+    scene.advance(dt);
+    scene.reset_params();
+    for (index, binding) in layer.params.iter().enumerate() {
+        if !series.is_empty() && binding.expr.uses_index() {
+            evaluate_series(&binding.expr, vars, series);
+            scene.set_param_series(&binding.name, series);
+            continue;
+        }
+        let raw = binding.expr.eval(vars);
+        let value = smoother.smooth(index, raw, binding.tau, dt);
+        scene.set_param(&binding.name, value);
+    }
+    if let Some(mix) = layer.mix.as_ref() {
+        let raw = mix.expr.eval(vars);
+        let value = smoother.smooth(layer.params.len(), raw, mix.tau, dt);
+        chain.set_layer_mix(value);
+    }
+    scene.update(frame);
+}
+
 /// Encode one preset's composite into `destination`: the backdrop pre-pass (which
 /// owns `destination`'s clear), then the scene, then the chain folded down over
 /// it. Returns the draw calls. Call after [`evaluate_preset`] has routed this
@@ -612,6 +671,14 @@ fn evaluate_preset(
 /// chain never folds `bg_*` and its last stage composites over the backdrop with
 /// premultiplied alpha. When no stage is active `target.view` *is* `destination`,
 /// which makes that path bit-for-bit what it always was.
+///
+/// The side's `under`-join layer scene, when its preset declares one (ADR-0090
+/// / Plan 0076), draws into the **same** scene target after the main scene,
+/// through the same `ViewTransform` aspect, so the two layers share every
+/// downstream stage and fuse into one substance. One extra draw — no new pass,
+/// no new target — and a layerless side encodes exactly what this function
+/// always encoded. The scene lives on `side` (per-preset since Phase 2), so
+/// whichever side is drawn brings the right layer with it.
 fn composite_into(
     ctx: &RenderContext,
     scene: &mut Box<dyn Scene>,
@@ -640,17 +707,49 @@ fn composite_into(
     // twice. A scene that presents premultiplied (reaction-diffusion, attractor,
     // fragment field) consumes it; the additive families ignore it, their colour
     // blend having no occlusion to scale.
-    scene.set_occlude(if target.routing.scene_stage().is_some() {
+    // With the `over` junction live the scene renders into the blend's chain
+    // input — a scratch — so the seam belongs to the junction's final fold,
+    // never to the scene (Plan 0076 Phase 3).
+    let scene_in_scratch = target.routing.scene_stage().is_some() || side.chain.layer_over_active();
+    scene.set_occlude(if scene_in_scratch {
         post::DEFAULT_OCCLUDE
     } else {
         side.chain.occlude()
     });
     scene.render(&ctx.queue, encoder, &target.view, target.aspect);
-    // The backdrop and the scene, plus whatever the active chain stages encode on
-    // their way down.
-    2 + side
-        .chain
-        .resolve(&ctx.queue, encoder, target.routing, destination, surface)
+    // The layer scene. `under`: into the same target as the main scene, after
+    // it, under the same seam rules — the target's own size and aspect (never
+    // a grid's, ADR-0037) and the same `occlude` answer, because the two land
+    // on the same backdrop through the same last fold (ADR-0085). `over`: into
+    // the layer's own surface-sized offscreen, crisp, with the junction owning
+    // the backdrop seam — so the scene gets the scratch answer (no occlusion
+    // to scale in a transparent offscreen).
+    let mut layer_draws = 0;
+    if let Some(layer_scene) = side.layer.as_mut() {
+        match side.chain.layer_input(encoder, surface) {
+            Some(layer_view) => {
+                layer_scene.set_target_size(surface.0, surface.1);
+                layer_scene.set_occlude(post::DEFAULT_OCCLUDE);
+                layer_scene.render(&ctx.queue, encoder, &layer_view, target.aspect);
+            }
+            None => {
+                layer_scene.set_target_size(target.size.0, target.size.1);
+                layer_scene.set_occlude(if scene_in_scratch {
+                    post::DEFAULT_OCCLUDE
+                } else {
+                    side.chain.occlude()
+                });
+                layer_scene.render(&ctx.queue, encoder, &target.view, target.aspect);
+            }
+        }
+        layer_draws = 1;
+    }
+    // The backdrop and the scene(s), plus whatever the active chain stages
+    // encode on their way down.
+    2 + layer_draws
+        + side
+            .chain
+            .resolve(&ctx.queue, encoder, target.routing, destination, surface)
 }
 
 /// The two engine-wide passes a preset's bindings reach **outside** the chain:
@@ -683,6 +782,15 @@ struct Terminal<'a> {
 struct CompositeSide {
     background: Background,
     chain: PostChain,
+    /// This side's `[layer]` scene, **constructed for the preset it draws**
+    /// (ADR-0090 point 4, Plan 0076 Phase 2) — never a roster instance, so
+    /// same-system pairs are legal and two dissolving sides' layers share
+    /// nothing. `Some` exactly when that preset declares a `[layer]`;
+    /// [`Renderer::configure_active_scene`] maintains the invariant on every
+    /// preset change. Living here rather than on the renderer gives it the
+    /// side's own lifetime for free: the outgoing side keeps its layer alive
+    /// through a dissolve, and promotion at finalize carries it over.
+    layer: Option<Box<dyn Scene>>,
 }
 
 impl CompositeSide {
@@ -692,6 +800,7 @@ impl CompositeSide {
         Self {
             background: Background::new(device, format),
             chain: PostChain::new(device, format, tier),
+            layer: None,
         }
     }
 
@@ -703,10 +812,14 @@ impl CompositeSide {
     }
 
     /// Drop the lazily-built GPU resources (capture rebuild — keeps a headless
-    /// capture a pure function of its inputs, NFR §6).
+    /// capture a pure function of its inputs, NFR §6). The layer scene goes
+    /// with them: `configure_active_scene` reconstructs it from its
+    /// deterministic seed, which is exactly the rebuild the roster scenes get
+    /// from `scenes::create_all` on the same path.
     fn reset_resources(&mut self) {
         self.background.reset_resources();
         self.chain.reset_resources();
+        self.layer = None;
     }
 }
 
@@ -816,6 +929,15 @@ pub struct Renderer {
     /// uses an empty prefix, which is what makes their path unchanged.
     series_scratch: Vec<f32>,
     param_smoother: ParamSmoother,
+    /// The active preset's **layer** easing state (Plan 0076 Phase 1) — its own
+    /// smoother because layer bindings are indexed within the layer's `params`,
+    /// which would collide with the main preset's indices in
+    /// [`param_smoother`](Self::param_smoother). Reset wherever that one is.
+    layer_smoother: ParamSmoother,
+    /// The outgoing preset's layer easing state during a dual-live dissolve —
+    /// the layer counterpart of [`outgoing_smoother`](Self::outgoing_smoother),
+    /// handed over at the same roster flip.
+    outgoing_layer_smoother: ParamSmoother,
     /// The active quality tier's capacity values, resolved **once** here at
     /// construction (ADR-0045). Read at construction and reconfigure time only —
     /// never branched on per frame.
@@ -889,6 +1011,8 @@ impl Renderer {
             cap_overflow: None,
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
             param_smoother: ParamSmoother::default(),
+            layer_smoother: ParamSmoother::default(),
+            outgoing_layer_smoother: ParamSmoother::default(),
             tier,
             tier_pinned: opts.tier.is_some(),
             tier_demoted: false,
@@ -1275,12 +1399,15 @@ impl Renderer {
         // Snap the eased params to the incoming preset's first values — no
         // cross-preset bleed, and determinism across capture rebuilds (ADR-0019).
         self.param_smoother.reset();
+        self.layer_smoother.reset();
         let Self {
+            ctx,
             scenes,
             roster,
             cap_overflow,
             side,
             incoming_side,
+            tier,
             ..
         } = self;
         *cap_overflow = None;
@@ -1333,6 +1460,42 @@ impl Renderer {
         if let Some(cfg) = preset.config.as_ref() {
             *cap_overflow = scene.configure(cfg);
         }
+        // The layer's scene is **constructed for the preset** (ADR-0090 point
+        // 4, Plan 0076 Phase 2), never resolved from the one-instance-per-
+        // system roster — same-system pairs are legal, and two dissolving
+        // sides' layers share nothing. It goes to the side that will draw this
+        // preset (`live`, exactly like the palette and feedback hand-offs
+        // above), constructed fresh at every preset change: a switch is off
+        // the hot path, and a fresh deterministic seed is the same contract
+        // the roster scenes get from the capture rebuild. Its load-time
+        // hand-offs mirror the main scene's — the **shared** palette bake (one
+        // gradient, two layers, one world), the default `[feedback]` table (a
+        // layer declares none), and its own structural config, whose cap
+        // overflow surfaces through the same channel when the main scene
+        // produced none (never a silent cut).
+        live.layer = preset.layer.as_ref().map(|layer| {
+            let mut layer_scene =
+                scenes::create_layer_scene(layer.system, &ctx.device, COMPOSITE_FORMAT, tier);
+            layer_scene.set_palette(&baked);
+            layer_scene.set_feedback(crate::render::feedback::FeedbackConfig::default());
+            if let Some(cfg) = layer.config.as_ref() {
+                let overflow = layer_scene.configure(cfg);
+                if cap_overflow.is_none() {
+                    *cap_overflow = overflow;
+                }
+            }
+            layer_scene
+        });
+        // The `over` junction's presence and blend mode (ADR-0090 / Plan 0076
+        // Phase 3), handed over unconditionally like the `[feedback]` table
+        // above: a preset with an `under` (or no) layer hands `None`, which
+        // also frees the junction's two full-frame inputs.
+        live.chain.set_layer_join(
+            preset
+                .layer
+                .as_ref()
+                .and_then(|layer| (layer.join == LayerJoin::Over).then_some(layer.blend)),
+        );
     }
 
     /// The segment-cap truncation from the active preset's last `configure`, if
@@ -1466,7 +1629,9 @@ impl Renderer {
             cap_overflow: _,
             series_scratch,
             param_smoother,
+            layer_smoother,
             outgoing_smoother,
+            outgoing_layer_smoother,
             // Resolved once at construction; the overlay names it (ADR-0045). The
             // capacity values themselves were consumed at construction time — the
             // frame path reads the tier only to print it.
@@ -1556,6 +1721,25 @@ impl Renderer {
                     dt,
                     series_scratch.get_mut(..out_elements).unwrap_or(&mut []),
                 );
+                // The outgoing preset's own layer keeps animating through a
+                // dual-live dissolve exactly as its main scene does — its scene
+                // is the outgoing side's own instance (Plan 0076 Phase 2).
+                if let (Some(layer), Some(layer_scene)) =
+                    (outgoing.layer.as_ref(), side.layer.as_mut())
+                {
+                    let n = config_element_prefix(layer.config.as_ref(), series_scratch.len());
+                    evaluate_layer(
+                        layer,
+                        layer_scene,
+                        &mut side.chain,
+                        outgoing_layer_smoother,
+                        &vars.with_salt(salt.of(outgoing)),
+                        frame,
+                        *time,
+                        dt,
+                        series_scratch.get_mut(..n).unwrap_or(&mut []),
+                    );
+                }
                 // **The outgoing preset's OWN held stop, not the crossfaded one**
                 // (ADR-0080). Two reasons, and the first is structural: the
                 // crossfade below cannot have run yet, because it interpolates
@@ -1611,6 +1795,25 @@ impl Renderer {
             dt,
             series_scratch.get_mut(..elements).unwrap_or(&mut []),
         );
+        // The `[layer]` bindings, into the layer's own scene and nowhere else
+        // (ADR-0090 / Plan 0076): evaluated under the same salt, clock and
+        // analysis frame as the top level, eased by their own smoother. The
+        // scene is this side's own per-preset instance (Phase 2).
+        if let (Some(layer), Some(layer_scene)) = (preset.layer.as_ref(), live_side.layer.as_mut())
+        {
+            let n = config_element_prefix(layer.config.as_ref(), series_scratch.len());
+            evaluate_layer(
+                layer,
+                layer_scene,
+                &mut live_side.chain,
+                layer_smoother,
+                &vars.with_salt(salt.of(preset)),
+                frame,
+                *time,
+                dt,
+                series_scratch.get_mut(..n).unwrap_or(&mut []),
+            );
+        }
 
         // Ink is one engine-wide pass over the *blended* frame (ADR-0028), but a
         // dissolve has two presets each binding their own `ink_*`/`paper_*`. Lerp
@@ -1768,6 +1971,7 @@ impl Renderer {
                 // heavily-smoothed preset keeps easing through a dual-live dissolve
                 // instead of snapping to raw values the frame it stops being active.
                 self.outgoing_smoother = std::mem::take(&mut self.param_smoother);
+                self.outgoing_layer_smoother = std::mem::take(&mut self.layer_smoother);
                 self.roster.select(index);
                 self.configure_active_scene();
             }
