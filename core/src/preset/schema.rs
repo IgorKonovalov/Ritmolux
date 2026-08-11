@@ -665,17 +665,6 @@ fn build_layer(raw: RawLayer, warnings: &mut Vec<String>) -> Result<Layer, Prese
             ))
         })?,
     };
-    // **Phase 1 restriction, deleted by Plan 0076 Phase 3**, where the `over`
-    // junction and its blend pass land. Erroring now beats silently rendering
-    // `under` — the two joins compose visibly differently.
-    if join == LayerJoin::Over {
-        return Err(PresetError::Config(
-            "[layer] join = \"over\" is not available yet (Plan 0076 Phase 3); \
-             use \"under\""
-                .into(),
-        ));
-    }
-
     let blend = match raw.blend.as_deref() {
         None => LayerBlend::default(),
         Some(name) => LayerBlend::from_name(name).ok_or_else(|| {
