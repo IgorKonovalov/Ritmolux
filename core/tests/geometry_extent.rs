@@ -201,23 +201,119 @@ fn draws_segments(system: SystemKind) -> bool {
     }
 }
 
+/// **`Spectrum Comb` and `Spectrum Corona` exactly as they shipped**, frozen
+/// here when Plan 0075's cohort four retired the files (recover the commented
+/// originals with `git log --diff-filter=D -- presets/spectrum_comb.toml` and
+/// `-- presets/spectrum_corona.toml`). The paired comparison below needs the
+/// repaired counterpart each over-scaled fixture was recovered from, and a
+/// comparison instrument's subjects must stay comparable across runs — the
+/// same reasoning that froze the animation ladder's `SQUALL_SRC` and
+/// `ROSETTE_SRC`.
+const COMB_REPAIRED_SRC: &str = r#"
+system = "spectrum"
+name   = "Spectrum Comb"
+[spectrum]
+elements = 26
+layout   = "bars"
+smoothing = { attack = 0.025, release = 0.22 }
+[params]
+base = "0.09 + sin(time * 1.5) * 0.075"
+rotation = "sin(time * 0.9) * 0.135"
+scale = "1.20"
+curve = "0.55"
+span  = "1.72"
+thickness  = "13 + clamp(bass * 4.12, 0, 3.5)"
+glow       = "0.75"
+brightness = "0.72 + clamp(mid * 0.306, 0, 0.26)"
+hue = "mod(time * 0.09 + clamp(treb * 0.233, 0, 0.14), 1)"
+zoom  = "1.05 + sin(time * 1.1) * 0.125 + clamp(bass * 0.118, 0, 0.10)"
+pan_y = "0.06 + sin(time * 0.17) * 0.03"
+bg_hue      = "0.58 + sin(time * 0.011) * 0.05"
+bg_bright   = "0.022 + clamp(mid * 0.0141, 0, 0.012)"
+bg_vignette = "0.75"
+[smoothing]
+thickness = { attack = 0.03, release = 0.30 }
+brightness = { attack = 0.04, release = 0.28 }
+hue       = 0.45
+zoom      = 0.22
+bg_bright = 0.40
+"#;
+
+const CORONA_REPAIRED_SRC: &str = r#"
+system = "spectrum"
+name   = "Spectrum Corona"
+[spectrum]
+elements = 44
+layout   = "radial_ring"
+smoothing = { attack = 0.05, release = 0.40 }
+[palette]
+stops = [
+  { at = 0.00, color = [0.05, 0.01, 0.00] },
+  { at = 0.25, color = [0.60, 0.12, 0.02] },
+  { at = 0.45, color = [1.00, 0.42, 0.06] },
+  { at = 0.55, color = [1.00, 0.86, 0.52] },
+  { at = 0.78, color = [0.70, 0.20, 0.03] },
+  { at = 1.00, color = [0.05, 0.01, 0.00] },
+]
+[palette_b]
+stops = [
+  { at = 0.00, color = [0.00, 0.05, 0.18] },
+  { at = 0.28, color = [0.09, 0.42, 0.72] },
+  { at = 0.50, color = [0.40, 0.75, 0.92] },
+  { at = 0.60, color = [0.85, 0.95, 1.00] },
+  { at = 0.82, color = [0.12, 0.45, 0.78] },
+  { at = 1.00, color = [0.00, 0.05, 0.18] },
+]
+[params]
+rotation = "time * 0.42 + sin(time * 0.05) * 0.30 + clamp(bass * 0.212, 0, 0.18)"
+radius = "0.34 + sin(time * 0.27) * 0.05 + clamp(bass * 0.165, 0, 0.14)"
+base  = "0.09 + index * 0.04 + sin(time * 1.1) * 0.07"
+scale = "0.45"
+curve = "0.58"
+hue         = "mod(time * 0.03, 1)"
+hue_spread  = "1.0"
+saturation  = "1.0"
+palette_mix = "0.5 + sin(time * 0.18) * 0.5"
+thickness  = "2.4 + clamp(treb * 3, 0, 1.8)"
+glow       = "0.68"
+brightness = "0.78 + clamp(mid * 0.282, 0, 0.24)"
+zoom  = "1.05 + bar * 0.05"
+pan_y = "0.0"
+bg_hue      = "0.06 + sin(time * 0.009) * 0.05"
+bg_bright   = "0.024 + clamp(bass * 0.0165, 0, 0.014)"
+bg_vignette = "0.86"
+trails = "0.52 + clamp(mid * 0.094, 0, 0.08)"
+[smoothing]
+rotation    = 0.15
+radius      = 0.35
+thickness   = { attack = 0.02, release = 0.32 }
+brightness  = { attack = 0.04, release = 0.28 }
+hue         = 0.40
+palette_mix = 0.60
+zoom        = 0.25
+bg_bright   = 0.40
+trails      = 0.55
+"#;
+
 /// The two frozen defective configurations, recovered from `2efb80e^`, each
-/// paired with **the shipped preset it was recovered from**. Their fixture
-/// headers say what the defect is and why pixel coverage could not see it.
+/// paired with **the frozen source of the shipped preset it was recovered
+/// from** (frozen above at cohort four, when those files retired; before that
+/// the pairing looked the live library up by name). Their fixture headers say
+/// what the defect is and why pixel coverage could not see it.
 ///
-/// The pairing is by name and is load-bearing: the two differ in exactly one
-/// binding (`scale`), so the comparison below isolates the defect rather than
-/// comparing two unrelated figures. A rename fails loudly here.
+/// The pairing is load-bearing: the two differ in exactly one binding
+/// (`scale`), so the comparison below isolates the defect rather than
+/// comparing two unrelated figures.
 const OVER_SCALED: [(&str, &str, &str); 2] = [
     (
         "spectrum_comb_over_scaled",
         include_str!("fixtures/spectrum_comb_over_scaled.toml"),
-        "Spectrum Comb",
+        COMB_REPAIRED_SRC,
     ),
     (
         "spectrum_corona_over_scaled",
         include_str!("fixtures/spectrum_corona_over_scaled.toml"),
-        "Spectrum Corona",
+        CORONA_REPAIRED_SRC,
     ),
 ];
 
@@ -346,8 +442,12 @@ fn an_over_scaled_figure_measures_below_its_repaired_counterpart() {
         .into_iter()
         .filter(|p| draws_segments(p.system))
         .collect();
+    // Re-derived from 8 at Plan 0075 cohort four: the renaissance library
+    // ships six line-family worlds (five cohort-one line worlds + Halo), so
+    // eight would fail a library that is fully covered. The guard still
+    // catches the real failure it exists for — the filter matching nothing.
     assert!(
-        shipped.len() >= 8,
+        shipped.len() >= 6,
         "only {} shipped line-family presets — this sweep has stopped covering \
          the library",
         shipped.len()
@@ -365,21 +465,17 @@ fn an_over_scaled_figure_measures_below_its_repaired_counterpart() {
     // recovered from.
     let mut defective: Vec<(String, f32)> = Vec::new();
     let mut separations: Vec<(String, f32, f32, f32)> = Vec::new();
-    for (stem, toml, repaired_name) in OVER_SCALED {
+    for (stem, toml, repaired_toml) in OVER_SCALED {
         let preset =
             Preset::from_toml_str(toml).unwrap_or_else(|e| panic!("{stem}.toml is invalid: {e}"));
         let name = preset.name.clone();
-        let repaired = measured
-            .iter()
-            .find(|(n, _)| n == repaired_name)
-            .unwrap_or_else(|| {
-                panic!(
-                    "{stem}.toml is frozen against the shipped preset {repaired_name:?}, which is \
-                     not in the library any more — the pairing is what makes this comparison \
-                     isolate the defect"
-                )
-            })
-            .1;
+        let repaired_preset = Preset::from_toml_str(repaired_toml).unwrap_or_else(|e| {
+            panic!("{stem}'s frozen repaired counterpart is invalid: {e}")
+        });
+        let repaired_name = repaired_preset.name.clone();
+        let repaired = fraction_of(&mut renderer, repaired_preset).unwrap_or_else(|| {
+            panic!("{repaired_name} drew no segment length under a fully-driven frame")
+        });
         let Some(fraction) = fraction_of(&mut renderer, preset) else {
             panic!(
                 "{name} drew no segment length at all, so it is the TOTAL case and \

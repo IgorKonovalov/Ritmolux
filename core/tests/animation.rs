@@ -114,16 +114,65 @@ fn every_preset_animates_over_time() {
 /// something the shipped-set sweep above can afford to run at.
 const LADDER: [u32; 3] = [96, 192, 384];
 
-const SQUALL_SRC: &str = include_str!("../../presets/emitter_squall.toml");
+/// **`Squall` exactly as it shipped**, frozen here when Plan 0075's cohort four
+/// retired the file (recover the commented original with
+/// `git log --diff-filter=D -- presets/emitter_squall.toml`) — the treatment
+/// `ROSETTE_SRC` below prescribed for it.
+const SQUALL_SRC: &str = r##"
+system = "emitter"
+name = "Squall"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#050a18" },
+  { at = 0.28, color = "#1d3f7a" },
+  { at = 0.58, color = "#4f8fd6" },
+  { at = 0.84, color = "#a9d4f5" },
+  { at = 1.00, color = "#f2f8ff" },
+]
+
+[params]
+spawn_rate = "470 + clamp(bass * 329, 0, 280) + clamp(onset * 424, 0, 254)"
+launch_speed = "5.60 + clamp(mid * 0.494, 0, 0.42)"
+gravity      = "6.4"
+launch_angle = "0.92 + sin(time * 0.061) * 0.13"
+spread          = "0.30 + clamp(onset * 0.20, 0, 0.12)"
+size_spread     = "0.70"
+lifetime_spread = "0.55"
+lifetime = "1.7"
+size     = "2.05 + clamp(treb * 0.633, 0, 0.38)"
+spin    = "0.85 + clamp(mid * 0.741, 0, 0.63)"
+twinkle = "0.52 + clamp(treb * 0.467, 0, 0.28)"
+brightness = "1.12 + clamp(bass * 0.400, 0, 0.34)"
+hue        = "mod(0.60 + time * 0.009, 1)"
+hue_spread = "0.38 + clamp(treb * 0.300, 0, 0.18)"
+hue_center = "0.58"
+saturation = "0.98"
+zoom  = "1.00"
+pan_x = "sin(time * 0.031) * 0.05"
+trails      = "0.44 + clamp(mid * 0.188, 0, 0.16)"
+bg_hue      = "0.30 + sin(time * 0.014) * 0.03"
+bg_bright   = "0.016 + clamp(treb * 0.0217, 0, 0.013)"
+bg_vignette = "0.68"
+
+[smoothing]
+spawn_rate   = { attack = 0.05, release = 0.58 }
+launch_speed = { attack = 0.10, release = 0.40 }
+launch_angle = 0.85
+brightness   = { attack = 0.06, release = 0.32 }
+size         = { attack = 0.07, release = 0.38 }
+hue_spread   = 0.9
+trails       = 0.50
+bg_bright    = 0.30
+"##;
 
 /// **`Star Rosette` exactly as it shipped**, frozen here when Plan 0075's
 /// cohort one retired the file (recover the commented original with
 /// `git log --diff-filter=D -- presets/star_rosette.toml`). The ladder is a
 /// *measurement* whose rungs must stay comparable across runs, so its probe
 /// subject is frozen content, not the live library — the same reasoning that
-/// froze the sanity suite's mandalas and ADR-0023's golden fixtures. When
-/// cohort 4 retires `emitter_squall`, `SQUALL_SRC` above takes this same
-/// treatment.
+/// froze the sanity suite's mandalas and ADR-0023's golden fixtures.
+/// `SQUALL_SRC` above took this same treatment at cohort four.
 const ROSETTE_SRC: &str = r#"
 system = "star_pattern"
 name = "Star Rosette"
