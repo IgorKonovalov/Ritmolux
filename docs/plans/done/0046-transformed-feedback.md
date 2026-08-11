@@ -177,7 +177,7 @@ flowchart LR
 
   **That criticism is content, and it routes to the content lane as this phase specifies.**
   These two presets are fixtures, not library content — Plan 0046's "What this plan does
-  NOT do" reserves adoption for R6, and [Plan 0075](../0075-the-content-renaissance.md)'s
+  NOT do" reserves adoption for R6, and [Plan 0075](0075-the-content-renaissance.md)'s
   cohorts are where a feedback preset gets a real palette. Nothing here asks for an engine
   change: `[palette]`, `saturation` and `palette_mix` already reach this surface
   ([ADR-0086](../../adrs/0086-the-backdrop-colours-through-the-preset-palette.md)), and the

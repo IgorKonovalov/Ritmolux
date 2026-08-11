@@ -658,7 +658,7 @@ magnitude below the full budget. Both shipped 3-D presets (0.002 and 0.02) sit a
 
 ## 0061 — `perspective` moves the figure far more than it enlarges it, so the documented way to recover the framing does not work
 
-- **PROMOTED 2026-08-09 → [Plan 0075](plans/0075-the-content-renaissance.md) Phase 3** (with
+- **PROMOTED 2026-08-09 → [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 3** (with
   [ADR-0089](adrs/0089-the-library-renews-by-replacement-cohorts.md)'s renaissance) — the
   documentation option, which this entry's own Priority section says is cheap enough to do
   without a plan; it rides the renaissance's pre-flight because the rebuild multiplies the cost
@@ -728,7 +728,7 @@ that cannot work, and the parameter's legal range is three times its usable one.
 
 ## 0062 — `depth_hue` is a *lightness* cue on a lightness ramp, it wraps at the ends, and it is structurally dead under `ink_amount`
 
-- **PROMOTED 2026-08-09 → [Plan 0075](plans/0075-the-content-renaissance.md) Phase 3** — the
+- **PROMOTED 2026-08-09 → [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 3** — the
   documentation fix (the three regimes, the `2 * min(hue_center, 1 - hue_center)` wrap bound,
   the duotone deadness), in `presets/README.md` and `docs/preset-palettes.md`. The optional
   wrap clamp stays undecided, per this entry's own reasoning that the repeat is the LUT's
@@ -787,7 +787,7 @@ in without rendering a ladder, which is what this pass did.
 
 ## 0063 — `spin`'s usable ceiling is set by `fade`, not by taste, and the pair is undocumented
 
-- **PROMOTED 2026-08-09 → [Plan 0075](plans/0075-the-content-renaissance.md) Phase 3** — the
+- **PROMOTED 2026-08-09 → [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 3** — the
   documentation fix: `spin` and `fade` are one look, the two measured ceilings, and the stale
   "2-4 is where it becomes legible" advice goes.
 - **Raised:** 2026-08-04, from `preset-author`, during the Plan 0063 Phase 5 re-tune.
@@ -1045,7 +1045,7 @@ flags it.
 
 ## 0067 — `depth_fade` is a uniform dimmer on every flat family, where the other two depth cues are exact no-ops
 
-- **PROMOTED 2026-08-09 → [Plan 0075](plans/0075-the-content-renaissance.md) Phase 2** — option
+- **PROMOTED 2026-08-09 → [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 2** — option
   2 (the true no-op: multiply the fade term by has-depth), restoring ADR-0076's stated
   invariant. Option 3 (redefine `depth01` so flat reads as nearest) stays rejected-for-now for
   the reason this entry gives: it changes what `dn = 0` means for the 3-D families too.
@@ -1220,7 +1220,7 @@ and the cost is a composite redesign. It is here so the ask survives, not becaus
 
 ## 0070 — the in-frame geometry fraction cannot gate new content, and the number it computes for every line preset is not in the author's report
 
-- **PROMOTED 2026-08-09 → [Plan 0075](plans/0075-the-content-renaissance.md) Phase 2** — the
+- **PROMOTED 2026-08-09 → [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 2** — the
   cheap half this entry names: the fraction becomes a `shot --report` column, where the
   over-scale defect is actually introduced. The distribution report in `sanity.rs`'s shape
   stays a candidate second step, not taken.
@@ -1323,7 +1323,7 @@ chosen compositions (four rings, six rings, rings in weave) carry no boundary ri
 
 ## 0072 — `sanity.rs`'s coverage floor forces dense thin-stroke line scenes into washed-out tuning, and it is measuring the halo
 
-- **PROMOTED 2026-08-09 → [Plan 0075](plans/0075-the-content-renaissance.md) Phase 1** — first
+- **PROMOTED 2026-08-09 → [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 1** — first
   phase of the content renaissance, because a gate that selects for the rejected look must not
   examine a whole new library. The mechanism (per-family thin-stroke floor vs structural
   occupancy) is chosen at implementation from this entry's two candidates; the non-vacuity
@@ -1995,7 +1995,7 @@ the other half: **it was never measured against a no-feedback control**, so noth
 
 ### Why it is worth an entry
 
-R6 ([Plan 0075](plans/0075-the-content-renaissance.md)) will ship feedback presets, and the live-show
+R6 ([Plan 0075](plans/done/0075-the-content-renaissance.md)) will ship feedback presets, and the live-show
 use case runs for hours — the exact regime three minutes cannot speak to. A number with no control
 beside it is the kind of observation that gets quoted later as either a clean bill of health or a
 known leak, depending on who is quoting it, and it supports neither.
@@ -2021,7 +2021,7 @@ updates inside [0009](#0009--the-animationrs-gate-penalizes-two-legitimate-desig
 [0055](#0055--the-attractors-shape-vocabulary-is-breathe-and-bend-and-the-reference-figures-ask-for-more)
 and [0068](#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
 rather than as new entries; the two doc drifts it carried went to
-[Plan 0075](plans/0075-the-content-renaissance.md) Phase 6's sweep list, not here. Each entry
+[Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 6's sweep list, not here. Each entry
 below carries a **handoff verdict** — promote or park — per that plan's Decision (promotion on
 demonstrated want, each through its own ADR/plan, never absorbed into 0075). Promoted items
 queue **behind Plan 0076 and cohort 6**; none of them gates the collage. All measurements below

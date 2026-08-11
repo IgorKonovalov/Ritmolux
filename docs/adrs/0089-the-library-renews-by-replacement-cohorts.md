@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-09 — the user took this decision explicitly, choosing it over
 > the delete-all reset they had proposed).
-> **Related plan(s):** [0075](../plans/0075-the-content-renaissance.md)
+> **Related plan(s):** [0075](../plans/done/0075-the-content-renaissance.md)
 > **Relates to:** [roadmap-visual-richness R6](../roadmap-visual-richness.md) (the content
 > renaissance), [ADR-0081](0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)
 > (the landing route the cohorts use), [ADR-0022](0022-build-time-preset-embedding.md) (why
@@ -70,7 +70,7 @@ deleted wholesale.** Concretely:
    principles are candidates to survive; which ones actually do is a per-cohort curation call
    (the user's, from rendered evidence), not an exemption class.
 
-[Plan 0075](../plans/0075-the-content-renaissance.md) carries the execution: the instrument
+[Plan 0075](../plans/done/0075-the-content-renaissance.md) carries the execution: the instrument
 and documentation fixes the next library will be authored against, then the brief, then the
 cohorts.
 

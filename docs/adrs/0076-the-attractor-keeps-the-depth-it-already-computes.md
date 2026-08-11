@@ -247,3 +247,23 @@ falls as the trail lengthens: ~1.9 at Lorenz's `fade = 0.932`, ~1.3 at Thomas's 
 0.05 / 0.2 / 1.0 with all three cues live: reads, reads, markedly weaker, gone, gone. ADR-0044's
 warning is correct and the usable ceiling for a preset that wants depth is about `0.01` — an order of
 magnitude below the full particle budget. Both shipped 3-D presets sit at or inside it.
+
+
+## Outcome (added at Plan 0075's close, 2026-08-11)
+
+**Falsified: "the fade multiplier is 1 ... every cue collapses to the identity."** The Decision's
+zero-extent arithmetic (`d_n = 0`, `m(0) = 1`, hue offset `0`) was checked for two of the three
+cues and asserted for all three. For `depth_fade` it was wrong: `d_n = 0` lands `depth01` on
+`0.5` — arithmetically "mid depth" — so on a flat family the haze multiplier was a uniform
+`1 - depth_fade / 2`, a 45 % whole-figure dimmer at `depth_fade = 0.9` wearing a depth lever's
+name. Measured on `attractor_dissolve` before the fix: `perspective = 0.7` and `depth_hue = 0.6`
+each moved 0 of 921 600 pixels; `depth_fade = 0.9` moved 184 989 (design-backlog 0067, raised by
+`preset-author` while hunting depth on the IFS family).
+
+Plan 0075 Phase 2 (`a6dcb51`) restored the stated invariant by construction: the fade term is
+multiplied by the family's has-depth flag (`f32(draw.d.w != 0.0)` — one multiply, no branch, the
+same style as the zero-extent trick itself). All three cues are now identities together, asserted
+at the capture with **byte equality** (`core/tests/attractor.rs`,
+`the_depth_cues_are_exact_no_ops_on_a_flat_family`), with a Lorenz `depth_fade` control so the
+no-op assertions cannot pass vacuously. No shipped preset bound `depth_fade` on a flat family
+(verified by grep at the fix), so no look moved and the golden suite passed unblessed.
