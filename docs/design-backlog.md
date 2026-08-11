@@ -139,6 +139,24 @@ constant.** The non-vacuity probe is free: the rejected draft is the shipped `em
 genuinely static preset can clear is worth nothing, and the shipped Squall sits at 1.8x the current
 floor, so the headroom is not large enough to give away blind.
 
+### Update 2026-08-11 — the Plan 0075 cohorts add a second casualty, and this one was routed out rather than tuned up
+
+- **Raised by:** `preset-author`, Plan 0075 cohort 4. A QUIET twinkling starfield — sparse marks,
+  low coverage, slow shimmer (the "Perseids' quiet sky" look) — was **routed out of the cohort
+  rather than shipped**, because the coverage/animation floors at 96x96 make a legitimately
+  sparse, slow look ungateable. (The other half of that casualty — a swarm mark has no per-mark
+  variation to twinkle — is
+  [0068](#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)'s,
+  re-raised the same day.)
+- The earned question above now has **two named casualties of two different severities**:
+  `emitter_squall` shipped at 5x the density its author preferred (the gate shaped it), and
+  Perseids did not ship at all (the gate priced the look out). The first was bent; the second
+  was lost.
+- **Handoff verdict (2026-08-11): promote** — the coverage-aware statistic, jointly with
+  [0068](#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+  as the sparse-idiom pair: one look class, two walls, and fixing either without the other
+  leaves the look unreachable.
+
 ---
 
 ## Entry 0021 — from the Plan 0038 / ADR-0040 ruling
@@ -412,6 +430,24 @@ tuples, each its own shape. Nothing in the current surface walks between them wi
   had a content pass yet (Phase 4). The reference look the user is pointing at is *sparse curves*,
   which is exactly what those two levers exist to reach — so some of this gap may close in Phase 4
   without any new capability. **Re-check this entry after Phase 4 before designing against it.**
+
+### Update 2026-08-11 — cohort 5 answers the re-check, and the concrete mechanism is per-tuple framing
+
+Plan 0075's own Risks asked for this entry to be re-checked before the brief, because the
+Plan 0059 Phase 4 levers might have closed the gap. Cohort 5 is the answer: the levers deliver
+the breathe-and-bend vocabulary as designed, and the remaining wall is not coefficient freedom —
+it is **framing**. A Lorenz at rho ≈ 100 (the torus-knot regime) was considered for the cohort
+and is unreachable: `AttractorFamily::projection()` / `seed_box()` are **per-family constants
+sized to the canonical tuple**, so a wild tuple renders off-centre and out of frame with no
+preset-side recovery (`pan` cannot span it). Cohort 5 shipped unheld IFS figures instead.
+
+This sharpens the entry's own "curated tuple roster is the cheap middle": the roster needs
+**per-tuple projection and seed boxes**, not just a list of coefficients — a tuple is only
+reachable with its framing carried beside it.
+
+**Handoff verdict (2026-08-11): promote.** The entry already names the rejected alternative
+(free coefficient binding, which exists and cuts), the mechanism is now concrete, and a cohort
+demonstrably shipped around the gap. ADR-shaped and earned.
 
 ---
 
@@ -1112,6 +1148,19 @@ first 2.5 s of a live show.
 **Medium.** One preset ships today with a documented compromise rather than a defect, so nothing is
 broken. But the emitter's `twinkle` is the single most-cited example of per-object life in the whole
 parameter surface, and the scene that most wants it cannot reach it.
+
+### Update 2026-08-11 — a second, independent want, and this time it was the whole look
+
+- **Raised by:** `preset-author`, Plan 0075 cohort 4: the quiet twinkling starfield (the
+  Perseids look). Sparse marks, low coverage, slow shimmer — the shimmer half is exactly this
+  entry's option 1 (per-mark variation on the swarm), and the look was **routed out of the
+  cohort rather than shipped**. The gate half of the same casualty is recorded in
+  [0009](#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)'s update
+  of the same date.
+- **Handoff verdict (2026-08-11): promote** — option 1, jointly with 0009's coverage-aware
+  statistic as the sparse-idiom pair (fixing either wall alone leaves the look unreachable),
+  and with [0085](#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever)
+  (swarm `reseed`) riding the same plan.
 
 ---
 
@@ -1947,3 +1996,176 @@ control run also climbs is there something to fix.
 ### Priority
 
 **Medium.** Cheap to run, and it is owed *before* R6 ships long-running feedback content.
+
+---
+
+## Entries 0084-0089 — from the Plan 0075 cohorts 1-5 handoff (2026-08-11)
+
+The renaissance's first five cohorts (28 worlds, cohort 5 judged live 2026-08-11) handed back
+one assembled feedback note. Three of its items are **re-raises** and are recorded as dated
+updates inside [0009](#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational),
+[0055](#0055--the-attractors-shape-vocabulary-is-breathe-and-bend-and-the-reference-figures-ask-for-more)
+and [0068](#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+rather than as new entries; the two doc drifts it carried went to
+[Plan 0075](plans/0075-the-content-renaissance.md) Phase 6's sweep list, not here. Each entry
+below carries a **handoff verdict** — promote or park — per that plan's Decision (promotion on
+demonstrated want, each through its own ADR/plan, never absorbed into 0075). Promoted items
+queue **behind Plan 0076 and cohort 6**; none of them gates the collage. All measurements below
+are the lane's renders, reported at the handoff — not independently re-verified here; the
+file's standing verify-before-acting rule applies.
+
+## 0084 — the ink stage has no contrast lever, and three worlds in two cohorts paid for it
+
+**Raised by:** `preset-author`, three separate times across Plan 0075 cohorts 3 and 4.
+**Owner if taken:** `architect` (a small ADR — where the response shape lives) then `dev`.
+
+### The finding
+
+The want, each time: a duotone whose dark pole bites harder **without moving the paper**. The
+reach, each time: a contrast/gamma control on the terminal ink remap (`ink_*` / `paper_*`). The
+remap keys on luminance with a fixed response, so the surface has exactly two workarounds and
+both give something up: author the duotone into `[palette]` (the Etching world did this — it
+works, and it spends the palette on what the remap should be doing), or juggle
+`brightness`/`fade`, which trades away structure to buy contrast.
+
+### Handoff verdict (2026-08-11): promote
+
+Three measurements across two cohorts, and every ink-mode world pays it — the clearest
+demonstrated want in the handoff. The obvious shape is a response exponent on the remap; the
+nameable rejected alternative is palette-side authoring, which Etching proves possible and
+which costs the palette. Where the lever lives and what it does to the existing `ink_*` roster
+is the ADR.
+
+## 0085 — `swarm` has no `reseed`, so a flow-field pile-up has no recovery lever
+
+**Raised by:** `preset-author`, Plan 0075 cohort 4 (the Shatter world). **Owner if taken:**
+`dev`, inside whatever plan takes
+[0068](#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)'s
+per-mark variation — same scene, same plan.
+
+### The finding
+
+Three live collapses before Shatter was rebuilt at engine-default dynamics: a swarm under
+minutes of sustained flow-field force piles onto the field's attractors and stays there. The
+author's reach was `reseed` — the attractor family has exactly that lever, since
+[ADR-0066](adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md), for exactly this
+class of reason (disturb the cloud rather than let it degenerate). The swarm has no equivalent,
+so the only recovery was rebuilding the world's dynamics from scratch.
+
+Note what the suite said throughout the three collapses: **green**. The failure develops over
+minutes and no capture path reaches that horizon — that half is
+[0086](#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument),
+and anyone taking this entry must read it first: a swarm `reseed` shipped without it is a lever
+whose need the suite cannot demonstrate and whose effect it cannot verify.
+
+### Handoff verdict (2026-08-11): promote, riding 0068's plan
+
+One demonstrated want with three live failures behind it, and the marginal cost inside a
+swarm-individuation plan is small. Not worth a plan of its own.
+
+## 0086 — no capture path reaches the minutes-long horizon, so a slow-accumulation failure is invisible to every instrument
+
+**Raised by:** `preset-author`, Plan 0075 cohort 4, watching Shatter collapse live three times
+while the suite stayed green. **Owner if taken:** `architect` first — this is a methodology
+question before it is code.
+
+### The finding
+
+`shot` strips and all five behavioral gates live in the first seconds of a preset's life (the
+synthetic gates capture 30 frames at 1/60 s; even the PCM-driven reactivity gate measures a few
+seconds of hops). Shatter's collapse developed over **minutes** of sustained force. Nothing
+went red and nothing was flagged — the suite is structurally blind to any failure whose
+timescale is the show rather than the capture. The class is real and now has a named member:
+any slow-divergence look (accumulating forces, feedback with net gain, populations that
+migrate) can ship green and die on stage.
+
+Adjacent, not identical:
+[0083](#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)
+wants a long-horizon RSS measurement for the same regime (hours-long live shows); the two would
+share a soak recipe.
+
+### What a fix would be
+
+**Not a gate.** A minutes-long capture per preset is not a price this suite can pay — see
+[0080](#0080--the-reactivity-gate-pays-18x-to-render-frames-it-throws-away-because-warm-up-and-measurement-share-one-capture-path)
+for what the *seconds* already cost. The honest shape is a documented soak-style spot-check: a
+`shot` mode or recipe that renders N minutes at capture cadence and reports drift statistics
+(population spread, deposit concentration), run by the lane on worlds whose mechanism has an
+accumulation axis, with the verdict recorded in the preset header the way the fold-edge
+verdicts were.
+
+### Handoff verdict (2026-08-11): park, with a trigger
+
+Park until someone ships a look with a slow-accumulation axis — and that trigger explicitly
+includes acting on
+[0085](#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever), which must
+not ship its lever verified only at the horizon the suite can see.
+
+## 0087 — `reaction_diffusion` has no glow of its own, and the engine bloom's threshold sits above where its output lives
+
+**Raised by:** `preset-author`, Plan 0075 cohort 3 (the Verdigris/Mitosis register).
+**Owner if taken:** `architect` then `dev`, if a second want arrives.
+
+### The finding
+
+The want: a glow accent on the RD field. Engine `bloom_*` acts on the composited frame, and its
+threshold sits where the RD field's mapped output rarely reaches — driving the field bright
+enough to cross it blows out the pattern first. So one cohort's RD looks were tuned around the
+absence.
+
+The route already exists as precedent:
+[ADR-0080](adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md) gave
+the attractor **its own** level and bloom thresholds when the engine-wide ones proved the wrong
+instrument for one scene's dynamic range. RD asking for the same shape is not a new argument —
+it is the same argument on a second scene.
+
+### Handoff verdict (2026-08-11): park
+
+One cohort's demonstrated want. The ADR-0080 shape is the named route when the second arrives.
+
+## 0088 — `shot --report`'s band columns cannot see reactivity spent on bloom
+
+**Raised by:** `preset-author`, Plan 0075 cohort 4, as an instrument note. **Owner if taken:**
+`dev` — `standalone/examples/shot.rs` and the report's band statistic.
+
+### The finding
+
+A preset whose reactivity is spent on `bloom_amount` reads **~0.000** in the report's band
+columns — dead, in the very instrument the lane verifies with. Mechanism as the lane reports
+it: sRGB→linear palette peaks times glow sit just under the report's threshold. House
+workaround now in use: give onset a structural lever (e.g. `flash`) alongside bloom, so the
+report has something to see.
+
+This is the third member of a family the project has fixed twice:
+[0022](design-backlog-archive.md) (the report blind to a level `curve`) and
+[0028](design-backlog-archive.md) (reachability blind to bare comparisons) were the same
+shape — the author's instrument silently under-reporting a legitimate binding class — and both
+were promoted and closed.
+
+### Handoff verdict (2026-08-11): promote, small
+
+An instrument that misreports the library it verifies earns its fix, and the family precedent
+is two for two. A single-phase plan, or ride the next plan that touches `shot --report`
+(Plan 0075 Phase 2 is already adding a column there). Likely no ADR — unless the fix wants a
+threshold, in which case ADR-0071's rule applies to wherever the number comes from.
+
+## 0089 — the dragon overruns the frame corner at the default view, and `FRAME_FILL = 0.88` promises it cannot
+
+**Raised by:** `preset-author`, Plan 0075 cohort 5, at 1280x720 — the reference aspect, not an
+odd target. **Owner if taken:** `dev` — the suspicion to check first is `FitLut` against the
+fallback `frame()` in the IFS fit path.
+
+### The finding
+
+`FRAME_FILL = 0.88` documents that the fitted figure stays inside the frame with margin. The
+dragon (two maps at exactly 0.7071, space-filling) overruns the frame **corner** at the default
+view; the shipped world works around it with `zoom = 0.92`. Small — but it contradicts a
+documented invariant, and this project does not leave a falsified stated property standing.
+The first question is which of the two fit sources mis-measures the dragon's extent: the
+`FitLut` or the fallback `frame()`.
+
+### Handoff verdict (2026-08-11): park, take opportunistically
+
+Nothing ships broken — the workaround is one line and honest, in the world's own header. Take
+it the next time anyone is in the IFS fit path, and do not close it by re-documenting the
+invariant away without knowing which source mis-fits.
