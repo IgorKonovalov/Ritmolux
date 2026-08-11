@@ -2248,3 +2248,18 @@ capture thread.
 with "it doesn't react" pays a Terminal-relaunch cycle this one log line would eliminate.
 Drops to low once a capture-device picker (the live-performance plan's Mac half) surfaces
 the state in-app anyway.
+
+### Update 2026-08-11 — the tester's log arrived, and it is this entry demonstrated
+
+The `diagnostics.log` came back: **1,249 rows spanning ~6.5 days and 12 app restarts, and
+every row has all four band columns at exactly 0.0000.** The renderer is healthy throughout
+(steady 60.0 fps, `frame_ms_avg` ~16.7, `gpu_bytes` constant at the 1080p float target; the
+scattered 0.1-fps rows coincide with multi-minute timestamp gaps — sleep/background
+throttling, not crashes). So the log *proves* capture never delivered one sample on any
+launch — which rules out "forgot to restart after granting" (twelve restarts), quiet
+music/gain (a live tap shows a noise floor eventually), and anything render-side — **and it
+cannot say why**, which is this entry's exact claim. Thirteen launches produced thirteen
+stderr lines naming the reason, and every one was discarded by Finder. The surviving
+suspects (stale/mismatched TCC grant from the ad-hoc per-build identity, macOS below 13, an
+SCK start error) are distinguishable only by the Terminal relaunch this entry exists to make
+unnecessary.
