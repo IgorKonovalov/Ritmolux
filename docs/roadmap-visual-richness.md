@@ -177,6 +177,10 @@ why R0 goes first.*
 
 ### R2 — transformed feedback: the MilkDrop gene
 
+> **Delivered:** [Plan 0046](plans/done/0046-transformed-feedback.md) (closed 2026-08-09 —
+> R2 landed): both accumulation buffers resample their past through one shared transform,
+> and the `trails` frame-rate defect retired en route.
+
 The trails accumulation gains a bindable per-frame transform: `fb_zoom`, `fb_rotate`,
 `fb_dx`/`fb_dy`, and a small procedural warp — the previous frame is sampled through the
 inverse transform before decay, exactly the "warp/feedback variant" feedback.rs:6-8 was built
@@ -268,6 +272,16 @@ plan), and the slew-release smoothing form (still parked, awaiting an author wan
 
 ### R6 — the content renaissance
 
+> **Delivered:** [ADR-0089](adrs/0089-the-library-renews-by-replacement-cohorts.md) +
+> [Plan 0075](plans/done/0075-the-content-renaissance.md) (closed 2026-08-11 — R6 landed,
+> and with it this roadmap's last theme). The pass ran as **replacement cohorts under a
+> fresh-slate rule**, not the single sweep sketched below: six family cohorts, each landing
+> new worlds through the [Plan 0067](plans/done/0067-the-curation-route.md) route and
+> retiring its named roster in the same series. The library is 27 worlds — 9 keeps, 18
+> authored fresh — including the "sometimes crazy" this paragraph asked for: a feedback
+> tunnel (Ion Wake), layered collages (Vitrail, Sumi, on R3's `[layer]`), and cellular
+> fields in regimes the retired corals never occupied.
+
 After R1-R5 land in any substantial part: a full `preset-author` pass armed with the new
 vocabulary and the two proven craft principles (geometry-first bindings per backlog 0030;
 realistic-level gains per 0020/0041). Retire the template clones — the goal is that each
@@ -285,11 +299,17 @@ phrase, cellular fields that crack open on the bass.
    [Plan 0045](plans/done/0045-linear-light-and-bloom.md) (2026-07-31), with
    [Plan 0051](plans/done/0051-the-scene-seam-emits-premultiplied-alpha.md) closing the alpha
    seam R1 made load-bearing.
-3. **R2 is now the one to run** ([Plan 0046](plans/done/0046-transformed-feedback.md) — it renders
-   *into* the R1 pipeline, and is unblocked now that R1 has landed), with 0010/0011 folded in.
+3. ~~**R2 is now the one to run** ([Plan 0046](plans/done/0046-transformed-feedback.md) — it renders
+   *into* the R1 pipeline, and is unblocked now that R1 has landed), with 0010/0011 folded in.~~
+   — **closed 2026-08-09.**
 
 R4 items 1-2 are small enough to interleave whenever a gap opens; **R5 is substantially
 delivered** (Plans 0047 + 0048) and its remainder is [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md).
+
+**2026-08-11: the sequence is spent.** R0-R3 and R6 are delivered, R5 substantially so; what
+remains open on this roadmap is R4's vocabulary items and R5's three stragglers, none of them
+sequenced here any more — `docs/plans/README.md` carries the live execution order (0077 →
+0078 → 0079, the renaissance's own feedback).
 
 **What this roadmap deliberately does not do:** reopen ADR-0001 (the Rust/wgpu/C-ABI chassis
 is an asset); take ADR-0002's author-WGSL escape hatch (revisit only if R1-R5 prove
