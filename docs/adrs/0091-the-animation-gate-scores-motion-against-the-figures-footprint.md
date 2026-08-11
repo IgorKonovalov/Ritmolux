@@ -1,6 +1,7 @@
 # ADR-0091 — The animation gate scores motion against the figure's own footprint
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-11 (user approval at the Plan 0075 handoff; Plan 0077 queued —
+> an Outcome section is owed at that plan's close if implementation falsifies anything here)
 > **Date:** 2026-08-11
 > **Related plan(s):** [0077](../plans/0077-the-quiet-sky.md)
 > **Resolves:** the live half of

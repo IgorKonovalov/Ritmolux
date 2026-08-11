@@ -1,6 +1,7 @@
 # ADR-0092 — The ink remap gains a contrast exponent
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-11 (user approval at the Plan 0075 handoff; Plan 0078 queued —
+> an Outcome section is owed at that plan's close if implementation falsifies anything here)
 > **Date:** 2026-08-11
 > **Related plan(s):** [0078](../plans/0078-the-ink-learns-to-bite.md)
 > **Resolves:** [design-backlog 0084](../design-backlog.md#0084--the-ink-stage-has-no-contrast-lever-and-three-worlds-in-two-cohorts-paid-for-it)

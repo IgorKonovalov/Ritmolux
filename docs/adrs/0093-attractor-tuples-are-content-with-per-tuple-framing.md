@@ -1,6 +1,7 @@
 # ADR-0093 — Attractor tuples are content: a curated roster with per-tuple framing, and morph paths only where measured
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-11 (user approval at the Plan 0075 handoff; Plan 0079 queued —
+> an Outcome section is owed at that plan's close if implementation falsifies anything here)
 > **Date:** 2026-08-11
 > **Related plan(s):** [0079](../plans/0079-the-attractor-learns-new-figures.md)
 > **Resolves:** [design-backlog 0055](../design-backlog.md#0055--the-attractors-shape-vocabulary-is-breathe-and-bend-and-the-reference-figures-ask-for-more)
