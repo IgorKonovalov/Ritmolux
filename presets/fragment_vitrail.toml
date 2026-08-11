@@ -1,0 +1,137 @@
+# Vitrail - the library's first layered world (ADR-0090 / Plan 0076): a crisp
+# Maurer-rose window floating OVER a folded nebula vault. The over-join is the
+# whole composition: the ground is smeared by trails, echoed into depth by
+# fb_zoom and folded six-fold by the kaleidoscope, while the rose rides ABOVE
+# all three - never smeared, never folded - then blooms and tonemaps with the
+# frame. One palette serves both (the sharing is the engine's rule): the vault
+# lives on the ramp's deep indigo half, the window line reads at its jewel top.
+#
+# The collage move the music makes: `mix` is the second world's presence, so a
+# quiet passage is nebula alone and a loud one hangs the window over it - the
+# preset breathes between one world and two (the R3 reference look's own
+# gesture). The beat re-draws the window: `draw_progress` rides the beat phase
+# so each kick traces the figure anew, a structural accent that costs no
+# luminance.
+#
+# NO ROTATION anywhere (standing verdict): the vault's depth comes from a pure
+# outward fb_zoom echo (no fb_rotate - the same de-rotation Neon Tunnel was
+# retuned to), the fold's angle is pinned, and the rose does not spin - its
+# life is phase drift plus the per-phrase `d` re-cut below.
+#
+# The window's SHAPE is beat-latched: `d` snaps to a new chord count every
+# four beats via hash(floor(beat_index/4)), deliberately UNSMOOTHED - a Maurer
+# figure at fractional d is a valid curve, but sweeping d re-shapes the whole
+# figure continuously and reads as writhing; the phrase-boundary cut reads as
+# a new window instead (the Shatter re-cut, in line vocabulary).
+system = "fragment_field"
+name = "Vitrail"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#050213" },
+  { at = 0.30, color = "#1c1060" },
+  { at = 0.55, color = "#4326b8" },
+  { at = 0.80, color = "#c93ba8" },
+  { at = 1.00, color = "#ffd9f0" },
+]
+
+[params]
+# THE VAULT - a slow dark nebula, echoed outward and folded six-fold. Kept
+# deliberately dim: it is the ground of a two-layer composition, and the house
+# additive-ceiling rule says the window's light has to have somewhere to land.
+# Terraced bands (palette_steps) are what make the vault read as architecture
+# instead of a wash - the Marbled Strata mechanism, folded. On this family a
+# HIGHER zoom shows more field.
+# Ranges consulted against the shipped field worlds (strata/whorl run warp
+# ~0.9-1.8 and glow 0.55+): a first draft at warp 0.58 / glow 0.08 rendered a
+# flat wash. The vault sits at about 60% of a solo field's level, because it
+# is a GROUND - the window's light needs headroom above it.
+warp         = "1.05 + noise(time * 0.045) * 0.45 + clamp(bass * 0.47, 0, 0.40) + clamp(mid * 0.29, 0, 0.25)"
+zoom         = "1.35"
+# Glow stays LOW on purpose - at 0.35 it lifted the whole vault into a
+# uniform lavender and the darkness that makes the window read was gone. The
+# vault's light lives in its bands and the fold, not in an ambient lift.
+glow         = "0.15 + clamp(bass * 0.176, 0, 0.15)"
+# Onset gets a structural flash, not bloom (the report is bloom-blind - house
+# note from cohort 4).
+flash        = "clamp(onset * 0.42, 0, 0.30)"
+color_span   = "0.85"
+# Treble slides the vault's light through the panes - the first report pass
+# read treb 0.001 with treble reaching only the window's hairline.
+color_center = "0.22 + noise(time * 0.025 + 200) * 0.10 + clamp(bass * 0.118, 0, 0.10) + clamp(treb * 0.25, 0, 0.15)"
+saturation   = "1.40 + clamp(mid * 0.24, 0, 0.20)"
+palette_steps   = "7"
+palette_contour = "0.30 + clamp(mid * 0.24, 0, 0.20)"
+palette_mix  = "0"
+
+# THE DEPTH - the past recedes outward, un-rotated. Trails carry the echo;
+# the beat presses the tunnel gently.
+trails  = "0.42 + clamp(bass * 0.153, 0, 0.13)"
+fb_zoom = "1.045 + beat * 0.03"
+
+# THE FOLD - a pinned six-fold vault (angle static; a moving fold reads as
+# chaos - the Leviathan lesson). The rose window above is NOT folded, which
+# is what keeps its figure legible against the rosette ground.
+kaleido_order = "6"
+kaleido_edge  = "2"
+
+bg_hue      = "0.72"
+bg_bright   = "0.006 + clamp(mid * 0.018, 0, 0.015)"
+bg_vignette = "0.88"
+
+bloom_amount    = "1.3"
+bloom_threshold = "0.9"
+bloom_radius    = "1.3"
+
+# THE WINDOW - crisp above the processed vault. `screen` cannot blow out, and
+# `mix` is the breath between one world and two: present but translucent at
+# rest, fully hung on a loud passage. G follows the house rule for bass.
+[layer]
+system = "parametric_curve"
+join   = "over"
+blend  = "screen"
+mix    = "0.42 + clamp(bass * 0.55, 0, 0.47)"
+
+[layer.curve]
+family = "maurer_rose"
+
+[layer.params]
+# A dense rose; d re-cuts per phrase (see header), n stays put so the family
+# resemblance holds across cuts.
+# Chord counts kept low (29-53) - a first draft at d 59+ rendered gauze, not
+# a window; fewer chords and a thicker line read as leading and glass.
+n             = "6"
+d             = "29 + floor(hash(floor(beat_index * 0.25)) * 5) * 6"
+phase         = "time * 0.010"
+samples       = "500"
+thickness     = "0.016 + clamp(treb * 0.013, 0, 0.008)"
+brightness    = "1.15 + clamp(treb * 0.41, 0, 0.35)"
+glow          = "0.25"
+scale         = "0.80"
+# The glass: the line walks the shared ramp from deep indigo up through
+# magenta to the pale top along its own path (hue = start position,
+# hue_spread = how far it travels), so the chords read as panes of different
+# colours rather than one pink thread.
+hue           = "0.15"
+saturation    = "1.35"
+# Each beat traces the window anew - the phase runs 0->1 inside each beat and
+# holds complete through the back half, so the draw reads as a stroke, not a
+# strobe. GUARDED for silence: `bar` is 0 until the beat tracker runs, and an
+# unguarded ride left the window entirely absent from the quiet frame - the
+# figure rests complete when no beats flow.
+draw_progress = "select(beat_index > 0, clamp(bar * 2.2, 0, 1), 1)"
+hue_spread    = "0.70"
+palette_mix   = "0"
+
+[layer.smoothing]
+mix        = { attack = 0.06, release = 0.5 }
+thickness  = 0.3
+brightness = 0.25
+
+[smoothing]
+warp         = 0.5
+glow         = 0.3
+flash        = { attack = 0.02, release = 0.20 }
+trails       = 0.45
+color_center = 0.5
+bg_bright    = 0.4
