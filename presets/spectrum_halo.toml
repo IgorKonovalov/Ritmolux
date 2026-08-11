@@ -1,0 +1,46 @@
+# Halo — the spectrum as a radial ring, a real frequency readout worn as a crown
+# (cohort 4, Plan 0075). Fresh slate (ADR-0089). The brief's "bin() edges over
+# band-scalar body": the ring's RADIUS is the body (it swells with bass), while
+# each spoke's thickness and reach ride its own element's band through bin(index)
+# and the per-element level. curve 0.5 compresses the readout like a dB meter —
+# scale is retuned down for it in the same edit (the measured ~5.8x factor).
+# 48 elements, hue_spread 1.0 so the wrap is continuous in colour; no rotation —
+# the figure's motion is its own spikes (camera moves are last-resort, user rule).
+system = "spectrum"
+name = "Halo"
+
+[spectrum]
+elements = 48
+layout = "radial_ring"
+smoothing = { attack = 0.02, release = 0.3 }
+
+[palette]
+stops = [
+  { at = 0.00, color = "#3a1c8a" },  # violet — the low end
+  { at = 0.30, color = "#0e7fc8" },  # blue
+  { at = 0.55, color = "#12b89a" },  # teal
+  { at = 0.78, color = "#e8c83c" },  # gold
+  { at = 1.00, color = "#e85a8a" },  # rose — the top
+]
+
+[params]
+base = "0.1 + noise(time * 1.4) * 0.13"   # the resting breath — the crown never freezes in silence
+curve = "0.5"                      # dB-like: quiet elements stay legible
+scale = "1.8"                      # uniform; retuned down ~5.8x for the curve, per the doc's factor
+radius = "0.34 + noise(time * 0.5) * 0.03 + clamp(bass * 0.31, 0, 0.26)"   # the body: the crown swells on bass, and drifts faintly at rest
+thickness = "3 + noise(time * 1.2 + 5) * 2.2 + clamp(bin(index) * 40, 0, 7)"   # stroke units: each spoke thickens on its own band (capped), and the whole crown pulses
+brightness = "0.85 + clamp(bin(index) * 6, 0, 1.2)"   # loud spokes cross 1.0 — bloom fuel
+hue_spread = "1.0"
+hue = "time * 0.015"               # the palette walks slowly round the ring
+glow = "0.9"
+saturation = "1.1"
+bg_hue = "0.05"                    # the palette's violet end — a deep violet atmosphere, not the mid-ramp mud
+bg_bright = "0.12 + noise(time * 1.1) * 0.06"
+bg_vignette = "0.55"
+bloom_amount = "0.5 + clamp(onset * 1.0, 0, 0.6)"
+bloom_threshold = "0.9"
+bloom_radius = "1.2"
+
+[smoothing]
+radius = { attack = 0.04, release = 0.35 }
+bloom_amount = 0.15

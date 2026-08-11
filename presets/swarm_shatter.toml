@@ -1,0 +1,52 @@
+# Shatter — the swarm as shattered stained glass (cohort 4, Plan 0075).
+# Fresh slate (ADR-0089). Tumbling triangle shards (Plan 0070), each beat bursts
+# the pane apart and re-cuts the silhouette (hash(beat_index): triangles or
+# quads), onset blooms the bright edges. Vivid glass colours over a near-black
+# ground; structure over camera throughout.
+#
+# THE BRIEF'S "shatter on LIGHT ground" IS ROUTED, NOT SHIPPED (2026-08-11):
+# dark marks on a light page need the terminal ink remap, and the ink stage has
+# no contrast lever — a brightness sweep 3.5 -> 6 printed the same mid-grey dust
+# (the same measured gap as Etching's glow sweep; see the cohort feedback note).
+# When the ink stage grows a contrast control, this world's light-ground twin
+# becomes authorable.
+# Drives: bass is the steering force, mid stirs the field, beat bursts + re-cuts,
+# treble sharpens the glass chroma.
+system = "swarm"
+name = "Shatter"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#c81e3c" },  # ruby
+  { at = 0.25, color = "#e8821e" },  # amber
+  { at = 0.45, color = "#2ea84a" },  # bottle green
+  { at = 0.65, color = "#1e6ac8" },  # cobalt
+  { at = 0.85, color = "#7a2ec8" },  # violet
+  { at = 1.00, color = "#c81e3c" },  # back to ruby — the wrap is seamless
+]
+
+[params]
+force = "2.2 + clamp(bass * 3.5, 0, 3)"
+spin = "0.5 + clamp(mid * 1.4, 0, 1.2)"
+burst = "beat * (bar < 0.25) * 9"   # a pulse, not a held state — a held burst smears the cloud to nothing
+field_freq = "1.6"
+shape = "2"                                   # polygon
+points = "3 + floor(hash(beat_index) * 1.999)"  # the shard re-cuts every beat: triangles or quads
+size = "3.0"
+brightness = "1.1"
+hue = "0"
+hue_spread = "0.8"                            # every shard its own glass colour
+hue_center = "0.5"
+saturation = "1.2 + clamp(treb * 0.5, 0, 0.3)"
+zoom = "2.2"                                  # camera IN (swarm zoom > 1): few large shards, not dust
+bg_hue = "0.65"
+bg_bright = "0.03"
+bg_vignette = "0.4"
+bloom_amount = "0.4 + clamp(onset * 1.2, 0, 0.7)"
+bloom_threshold = "0.9"
+bloom_radius = "1.1"
+
+[smoothing]
+force = 0.25
+spin = 0.3
+bloom_amount = 0.15
