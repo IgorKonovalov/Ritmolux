@@ -8,7 +8,7 @@
 
 use super::{
     BLOOM, CHAIN_PARAMS, DEFAULT_OCCLUDE, Fold, KALEIDOSCOPE, POST_GRID_STEP, PostChain, PostStage,
-    Routing, STAGE_COUNT, TRAILS, internal_grid_size, route,
+    Routing, STAGE_COUNT, TRAILS, internal_grid_size, route, split_at_bloom,
 };
 use crate::render::TierConfig;
 use crate::render::background::Background;
@@ -27,6 +27,49 @@ const POST_MAX_H: u32 = FLOOR.post_cap.1;
 /// [`internal_grid_size`] at the floor cap.
 fn floor_grid(surface: (u32, u32)) -> (u32, u32) {
     internal_grid_size(surface, FLOOR.post_cap)
+}
+
+// -----------------------------------------------------------------------
+// The `over` junction (ADR-0090 / Plan 0076 Phase 3) — GPU-free
+// -----------------------------------------------------------------------
+
+/// The junction's routing contract, enumerated over **every** combination of
+/// active flags: the pre-bloom walk keeps exactly the pre-bloom stages in
+/// chain order, bloom's own flag comes back separately, and bloom itself never
+/// appears in the pre-bloom walk — the junction sits between the two, which is
+/// ADR-0090's one addition to the compile-time order.
+///
+/// The same GPU-free treatment [`route`]'s tests give the plain walk: eight
+/// cases, no device, so a junction moved by accident fails here before any
+/// capture can be wrong.
+#[test]
+fn the_over_junction_splits_the_walk_at_bloom() {
+    for bits in 0..(1u32 << STAGE_COUNT) {
+        let active = [bits & 1 != 0, bits & 2 != 0, bits & 4 != 0];
+        let (pre, bloom) = split_at_bloom(route(&active));
+
+        assert_eq!(
+            bloom, active[BLOOM],
+            "{active:?}: the junction's bloom flag is bloom's own active flag"
+        );
+        let want: Vec<usize> = [TRAILS, KALEIDOSCOPE]
+            .into_iter()
+            .filter(|&stage| active[stage])
+            .collect();
+        assert_eq!(
+            pre.active_stages(),
+            want.as_slice(),
+            "{active:?}: the pre-bloom walk is the pre-bloom stages, in order"
+        );
+        assert!(
+            !pre.active_stages().contains(&BLOOM),
+            "{active:?}: bloom never folds before the junction"
+        );
+        // The scene's target under the junction: the first pre-bloom stage, or
+        // the blend's chain input (`None` here) — never bloom's input, which
+        // the blended result feeds instead.
+        assert_eq!(pre.scene_stage(), want.first().copied(), "{active:?}");
+    }
 }
 
 // -----------------------------------------------------------------------

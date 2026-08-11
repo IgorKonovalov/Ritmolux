@@ -97,7 +97,9 @@
 
 use super::bloom::Bloom;
 use super::kaleidoscope::Kaleidoscope;
+use super::layer_blend::LayerBlendPass;
 use super::trails::Trails;
+use crate::preset::LayerBlend;
 
 /// How many stages the chain holds. A compile-time constant, not a capacity:
 /// [`PostChain::new`] fills the array exactly, and [`Routing`] is sized from it so
@@ -425,6 +427,32 @@ impl Routing {
     }
 }
 
+/// Split one frame's routing at the **`over` junction** (ADR-0090 / Plan 0076
+/// Phase 3): the pre-bloom walk the chain still runs, and whether bloom runs
+/// after the blend. **Pure** over a [`Routing`], like [`route`] itself, so the
+/// junction's position is unit-testable without a GPU.
+///
+/// With an `over` layer active the chain becomes
+/// `scene -> [pre-bloom stages] -> blend(chain, layer) -> [bloom] -> destination`:
+/// the pre-bloom stages fold among themselves exactly as before, but the last
+/// of them lands in the blend's chain input ([`Fold::Own`]) instead of the
+/// junction's output, and the blended result feeds bloom's input (bloom
+/// active) or the destination (bloom off). The junction is a fixed position in
+/// the compile-time walk — between [`KALEIDOSCOPE`] and [`BLOOM`] — not a
+/// reorderable stage (ADR-0031).
+pub(crate) fn split_at_bloom(routing: Routing) -> (Routing, bool) {
+    let mut pre = [false; STAGE_COUNT];
+    let mut bloom = false;
+    for &stage in routing.active_stages() {
+        if stage == BLOOM {
+            bloom = true;
+        } else if let Some(slot) = pre.get_mut(stage) {
+            *slot = true;
+        }
+    }
+    (route(&pre), bloom)
+}
+
 /// **Pure**: which active stage folds into which, from the per-stage active flags
 /// alone. No GPU, no `self` — this is the composite's routing contract, and it is
 /// what the tests at the bottom of this file pin down.
@@ -504,6 +532,19 @@ pub(crate) struct PostChain {
     /// to whichever stage happens to be last this frame: a preset that turns bloom
     /// off must not thereby change how much its figure covers the sky.
     occlude: f32,
+    /// The `over`-join blend pass (ADR-0090 / Plan 0076 Phase 3). GPU-lazy:
+    /// only a preset that declares `join = "over"` ever builds its pipeline or
+    /// its two inputs.
+    layer_blend: LayerBlendPass,
+    /// `Some(mode)` while this side's preset declares an `over` layer — the
+    /// junction's presence and its blend mode, both fixed at load and handed
+    /// over at every preset switch beside `set_feedback`. **Never changes
+    /// between `begin` and `resolve` within a frame**, which is what lets both
+    /// consult it instead of threading a second value through [`SceneTarget`].
+    layer_mode: Option<LayerBlend>,
+    /// The layer's bindable `mix` (ADR-0090), reset to full each frame and
+    /// routed per frame like a param. Clamped on use.
+    layer_mix: f32,
 }
 
 impl PostChain {
@@ -531,6 +572,9 @@ impl PostChain {
                 )),
             ],
             occlude: DEFAULT_OCCLUDE,
+            layer_blend: LayerBlendPass::new(device, surface_format),
+            layer_mode: None,
+            layer_mix: 1.0,
         };
         // The array above *is* the composite order, and the routing contract is
         // written against the positions below (module docs, ADR-0018). Assert they
@@ -569,8 +613,66 @@ impl PostChain {
     /// active preset's bindings are routed).
     pub(crate) fn reset_params(&mut self) {
         self.occlude = DEFAULT_OCCLUDE;
+        self.layer_mix = 1.0;
         for stage in self.stages.iter_mut() {
             stage.reset_params();
+        }
+    }
+
+    /// Declare (or clear) this side's `over` junction — `Some(mode)` when the
+    /// active preset's `[layer]` says `join = "over"` (ADR-0090). Called at
+    /// every preset switch beside [`set_feedback`](Self::set_feedback), and
+    /// unconditionally for the same reason: a layerless preset hands `None`,
+    /// which also releases the junction's two full-frame inputs so they are
+    /// live only while a preset actually uses them.
+    pub(crate) fn set_layer_join(&mut self, mode: Option<LayerBlend>) {
+        self.layer_mode = mode;
+        if mode.is_none() {
+            self.layer_blend.release_targets();
+        }
+    }
+
+    /// Whether this side's frame runs the `over` junction. Read by the
+    /// renderer to route the layer scene into its own offscreen (and to keep
+    /// the scene's `occlude` off a scratch target).
+    pub(crate) fn layer_over_active(&self) -> bool {
+        self.layer_mode.is_some()
+    }
+
+    /// This frame's layer `mix` (ADR-0090): evaluated per frame like a param,
+    /// eased upstream, clamped where it is consumed.
+    pub(crate) fn set_layer_mix(&mut self, mix: f32) {
+        self.layer_mix = mix;
+    }
+
+    /// The view the `over` layer's scene renders into this frame — its own
+    /// surface-sized offscreen, cleared transparent here. `None` when the
+    /// junction is inactive (an `under` or absent layer), which is the caller's
+    /// signal to draw the layer into the shared scene target instead.
+    pub(crate) fn layer_input(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        surface: (u32, u32),
+    ) -> Option<wgpu::TextureView> {
+        self.layer_mode?;
+        let (_, bloom_active) = split_at_bloom(self.routing());
+        let junction = self.junction_size(bloom_active, surface);
+        let view = self.layer_blend.layer_input(junction, surface)?;
+        clear_transparent(encoder, &view, "layer-blend-layer-clear");
+        Some(view)
+    }
+
+    /// The junction output's pixel size: bloom's internal grid when bloom runs
+    /// after the blend, the destination (surface) otherwise. The blend's chain
+    /// input is sized to match, so the main content takes exactly the
+    /// resampling steps it would have taken with no layer.
+    fn junction_size(&self, bloom_active: bool, surface: (u32, u32)) -> (u32, u32) {
+        if bloom_active {
+            self.stages
+                .get(BLOOM)
+                .map_or(surface, |stage| stage.internal_size(surface))
+        } else {
+            surface
         }
     }
 
@@ -659,6 +761,7 @@ impl PostChain {
         for stage in self.stages.iter_mut() {
             stage.reset_resources();
         }
+        self.layer_blend.reset_resources();
     }
 
     /// This frame's routing, from the stages' current active flags.
@@ -690,17 +793,41 @@ impl PostChain {
         surface: (u32, u32),
     ) -> SceneTarget {
         let routing = self.routing();
-        let first = routing.scene_stage().and_then(|index| {
-            let stage = self.stages.get_mut(index)?;
-            let size = stage.internal_size(surface);
-            let view = stage.begin(encoder, surface)?;
-            // The scene loads rather than clears (the backdrop pass used to own
-            // this clear, and now owns `destination`'s instead), and a stage
-            // offscreen persists between frames — so without this the scene would
-            // accumulate onto the previous frame.
-            clear_transparent(encoder, &view, "post-chain-input-clear");
-            Some((view, size))
-        });
+        // With the `over` junction active the scene's walk stops at the blend:
+        // it renders into the first active **pre-bloom** stage's input as
+        // before, but where it would have reached bloom's input or the
+        // destination it lands in the blend's chain input instead — sized to
+        // the junction's output, so the main content resamples exactly as a
+        // layerless frame would (Plan 0076 Phase 3).
+        let first = if self.layer_mode.is_some() {
+            let (pre, bloom_active) = split_at_bloom(routing);
+            let junction = self.junction_size(bloom_active, surface);
+            let scene_stage = pre.scene_stage();
+            match scene_stage {
+                Some(index) => self.stages.get_mut(index).and_then(|stage| {
+                    let size = stage.internal_size(surface);
+                    let view = stage.begin(encoder, surface)?;
+                    clear_transparent(encoder, &view, "post-chain-input-clear");
+                    Some((view, size))
+                }),
+                None => self.layer_blend.chain_input(junction, surface).map(|view| {
+                    clear_transparent(encoder, &view, "layer-blend-chain-clear");
+                    (view, junction)
+                }),
+            }
+        } else {
+            routing.scene_stage().and_then(|index| {
+                let stage = self.stages.get_mut(index)?;
+                let size = stage.internal_size(surface);
+                let view = stage.begin(encoder, surface)?;
+                // The scene loads rather than clears (the backdrop pass used to
+                // own this clear, and now owns `destination`'s instead), and a
+                // stage offscreen persists between frames — so without this the
+                // scene would accumulate onto the previous frame.
+                clear_transparent(encoder, &view, "post-chain-input-clear");
+                Some((view, size))
+            })
+        };
         let (view, size) = first.unwrap_or_else(|| (destination.clone(), surface));
         SceneTarget {
             view,
@@ -727,6 +854,9 @@ impl PostChain {
         destination: &wgpu::TextureView,
         surface: (u32, u32),
     ) -> u32 {
+        if let Some(mode) = self.layer_mode {
+            return self.resolve_over(queue, encoder, routing, destination, surface, mode);
+        }
         let mut draw_calls = 0;
         for (stage, next_stage) in routing.edges() {
             // The next active stage's input, built lazily right before anything
@@ -746,6 +876,82 @@ impl PostChain {
             if let Some(stage) = self.stages.get_mut(stage) {
                 draw_calls += stage.resolve(queue, encoder, &out, surface, fold);
             }
+        }
+        draw_calls
+    }
+
+    /// [`resolve`](Self::resolve) with the `over` junction live (Plan 0076
+    /// Phase 3): the pre-bloom stages fold among themselves and land in the
+    /// blend's chain input, the blend joins the layer to them, and bloom (when
+    /// active) folds the blended result onto the backdrop.
+    ///
+    /// A pre-bloom fold never reaches the destination here — the junction sits
+    /// between — so every pre-bloom fold is [`Fold::Own`]; the backdrop seam
+    /// (`occlude`) belongs to whichever pass lands on the destination, exactly
+    /// as in the plain walk (ADR-0085).
+    fn resolve_over(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        routing: Routing,
+        destination: &wgpu::TextureView,
+        surface: (u32, u32),
+        mode: LayerBlend,
+    ) -> u32 {
+        let (pre, bloom_active) = split_at_bloom(routing);
+        let junction = self.junction_size(bloom_active, surface);
+        let mut draw_calls = 0;
+        for (stage, next_stage) in pre.edges() {
+            // The next pre-bloom stage's input, or the blend's chain input for
+            // the last one. If the blend cannot build its target, fall through
+            // to the destination — a degraded frame, never undefined pixels.
+            let (out, fold) = match next_stage
+                .and_then(|next| self.stages.get_mut(next)?.begin(encoder, surface))
+            {
+                Some(view) => (view, Fold::Own),
+                None => match self.layer_blend.chain_input(junction, surface) {
+                    Some(view) => (view, Fold::Own),
+                    None => (
+                        destination.clone(),
+                        Fold::Over {
+                            occlude: self.occlude,
+                        },
+                    ),
+                },
+            };
+            if let Some(stage) = self.stages.get_mut(stage) {
+                draw_calls += stage.resolve(queue, encoder, &out, surface, fold);
+            }
+        }
+        // The junction: blend into bloom's input when bloom runs, else onto
+        // the destination over the backdrop.
+        let bloom_input = bloom_active
+            .then(|| self.stages.get_mut(BLOOM)?.begin(encoder, surface))
+            .flatten();
+        let (out, fold) = match bloom_input.as_ref() {
+            Some(view) => (view.clone(), Fold::Own),
+            None => (
+                destination.clone(),
+                Fold::Over {
+                    occlude: self.occlude,
+                },
+            ),
+        };
+        draw_calls += self
+            .layer_blend
+            .resolve(queue, encoder, &out, mode, self.layer_mix, fold);
+        if bloom_input.is_some()
+            && let Some(bloom) = self.stages.get_mut(BLOOM)
+        {
+            draw_calls += bloom.resolve(
+                queue,
+                encoder,
+                destination,
+                surface,
+                Fold::Over {
+                    occlude: self.occlude,
+                },
+            );
         }
         draw_calls
     }

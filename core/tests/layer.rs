@@ -363,6 +363,147 @@ fn a_line_on_line_pair_draws_through_two_renderers() {
     );
 }
 
+/// Phase 3's skippability property: at `mix = 0` the `over` junction is
+/// pixel-identical to the layerless preset — with no stage active (the blend's
+/// chain input is surface-sized, so the main scene rasterizes exactly as it
+/// would straight into the destination) **and** with bloom active (the chain
+/// input takes bloom's internal grid, so the main content resamples exactly as
+/// a layerless frame would before folding).
+#[test]
+fn an_over_layer_at_mix_zero_is_pixel_identical_to_layerless() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let frame = fixed_frame();
+
+    let over = |name: &str, extra: &str| {
+        format!(
+            "name = \"{name}\"\nsystem = \"fragment_field\"\n\
+             [params]\nwarp = \"0.35\"\nhue = \"0.1\"\nzoom = \"0.6\"\n{extra}\
+             [layer]\nsystem = \"swarm\"\njoin = \"over\"\nmix = \"0\"\n\
+             [layer.params]\nsize = \"2.0\"\nbrightness = \"1.4\"\n"
+        )
+    };
+    let control = |name: &str, extra: &str| {
+        format!(
+            "name = \"{name}\"\nsystem = \"fragment_field\"\n\
+             [params]\nwarp = \"0.35\"\nhue = \"0.1\"\nzoom = \"0.6\"\n{extra}"
+        )
+    };
+    renderer.set_presets(vec![
+        load(&over("over_zero", "")),
+        load(&control("plain", "")),
+        load(&over("over_zero_bloom", "bloom_amount = \"0.5\"\n")),
+        load(&control("plain_bloom", "bloom_amount = \"0.5\"\n")),
+    ]);
+
+    let over_zero = renderer
+        .capture_preset("over_zero", &frame, FRAMES)
+        .expect("capture over layer at mix 0");
+    let plain = renderer
+        .capture_preset("plain", &frame, FRAMES)
+        .expect("capture layerless control");
+    assert_eq!(
+        over_zero.rgba, plain.rgba,
+        "mix = 0 with no stage active must be byte-identical to the layerless preset"
+    );
+
+    let over_bloom = renderer
+        .capture_preset("over_zero_bloom", &frame, FRAMES)
+        .expect("capture over layer at mix 0 with bloom");
+    let plain_bloom = renderer
+        .capture_preset("plain_bloom", &frame, FRAMES)
+        .expect("capture layerless bloom control");
+    assert_eq!(
+        over_bloom.rgba, plain_bloom.rgba,
+        "mix = 0 through bloom's grid must be byte-identical to the layerless preset"
+    );
+}
+
+/// Phase 3's four blend modes, pairwise distinct on one fixture pair — the
+/// GPU-checkable half of the done-when (the judged filmstrip is Phase 5's).
+/// One selector in one pipeline, so no mode adds a pipeline the others do not
+/// (the WARP pipeline-count posture, Plan 0046's precedent).
+#[test]
+fn the_four_blend_modes_render_distinct_results() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let frame = fixed_frame();
+
+    const MODES: [&str; 4] = ["add", "screen", "multiply", "overlay"];
+    let fixture = |mode: &str| {
+        format!(
+            "name = \"{mode}\"\nsystem = \"fragment_field\"\n\
+             [params]\nwarp = \"0.35\"\nhue = \"0.1\"\nzoom = \"0.6\"\n\
+             [layer]\nsystem = \"swarm\"\njoin = \"over\"\nblend = \"{mode}\"\n\
+             [layer.params]\nsize = \"3.0\"\nbrightness = \"1.6\"\n"
+        )
+    };
+    renderer.set_presets(MODES.iter().map(|m| load(&fixture(m))).collect());
+
+    let captures: Vec<_> = MODES
+        .iter()
+        .map(|mode| {
+            renderer
+                .capture_preset(mode, &frame, FRAMES)
+                .unwrap_or_else(|e| panic!("capture blend mode {mode}: {e}"))
+        })
+        .collect();
+
+    for (i, a) in captures.iter().enumerate() {
+        for (j, b) in captures.iter().enumerate().skip(i + 1) {
+            let diff = frame_diff(a, b);
+            assert!(
+                diff > 0.0005,
+                "blend modes '{}' and '{}' render indistinguishably (diff {diff:.5}) — \
+                 a selector that ignores its mode slot would pass every per-mode \
+                 capture and fail here",
+                MODES[i],
+                MODES[j]
+            );
+        }
+    }
+}
+
+/// The junction's placement — pre-bloom, so a crisp `over` figure still glows
+/// (ADR-0090): with bloom active, the layer visibly contributes through it,
+/// and the whole path stays deterministic.
+#[test]
+fn an_over_layer_participates_in_bloom() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let frame = fixed_frame();
+
+    let toml = "name = \"over_bloom\"\nsystem = \"fragment_field\"\n\
+                [params]\nwarp = \"0.35\"\nhue = \"0.1\"\nzoom = \"0.6\"\n\
+                bloom_amount = \"0.6\"\n\
+                [layer]\nsystem = \"swarm\"\njoin = \"over\"\nblend = \"add\"\n\
+                [layer.params]\nsize = \"3.0\"\nbrightness = \"1.8\"\n";
+    let control = "name = \"bloom_alone\"\nsystem = \"fragment_field\"\n\
+                   [params]\nwarp = \"0.35\"\nhue = \"0.1\"\nzoom = \"0.6\"\n\
+                   bloom_amount = \"0.6\"\n";
+    renderer.set_presets(vec![load(toml), load(control)]);
+
+    let layered = renderer
+        .capture_preset("over_bloom", &frame, FRAMES)
+        .expect("capture over layer through bloom");
+    let again = renderer
+        .capture_preset("over_bloom", &frame, FRAMES)
+        .expect("capture over layer through bloom again");
+    assert_eq!(layered.rgba, again.rgba, "the junction is deterministic");
+
+    let alone = renderer
+        .capture_preset("bloom_alone", &frame, FRAMES)
+        .expect("capture bloom-only control");
+    let diff = frame_diff(&alone, &layered);
+    assert!(
+        diff > 0.001,
+        "the over layer must visibly contribute through bloom (diff {diff:.5})"
+    );
+}
+
 /// Done-when 4 (the grammar half): the `[layer]` table's load-time validation
 /// and warnings.
 #[test]
@@ -376,15 +517,18 @@ fn the_layer_grammar_validates_at_load() {
     .unwrap_or_default();
     assert!(err.contains("unknown [layer] join"), "got: {err}");
 
-    // ...and `over` is a Phase 1 load error (deleted by Phase 3, which builds
-    // the junction).
-    let err = Preset::from_toml_str(
-        "system = \"fragment_field\"\n[layer]\nsystem = \"swarm\"\njoin = \"over\"\n",
+    // ...and `over` is a legal join (Phase 3): it loads, with its blend and
+    // mix parsed and no warning.
+    let over = Preset::from_toml_str(
+        "system = \"fragment_field\"\n[layer]\nsystem = \"swarm\"\njoin = \"over\"\n\
+         blend = \"multiply\"\nmix = \"0.5 + 0.5 * onset\"\n",
     )
-    .err()
-    .map(|e| e.to_string())
-    .unwrap_or_default();
-    assert!(err.contains("Plan 0076 Phase 3"), "got: {err}");
+    .expect("an over-join layer loads");
+    assert!(
+        over.warnings.is_empty(),
+        "a clean over-join layer warns nothing: {:?}",
+        over.warnings
+    );
 
     // `blend` is a closed roster.
     let err = Preset::from_toml_str(

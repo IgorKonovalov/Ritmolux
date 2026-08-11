@@ -36,6 +36,9 @@ pub(crate) mod gpu;
 pub(crate) mod grid;
 pub(crate) mod ink;
 pub(crate) mod kaleidoscope;
+// The `over`-join blend pass (ADR-0090 / Plan 0076 Phase 3) — driven by the
+// `PostChain`, whose walk knows the junction; nothing else reaches it.
+pub(crate) mod layer_blend;
 pub mod metrics;
 pub mod overlay;
 mod overlay_font;
@@ -55,7 +58,7 @@ mod transition;
 use crate::audio::AudioFormat;
 use crate::diag::{AnalysisMetrics, Diag, Metrics};
 use crate::dsp::AnalysisFrame;
-use crate::preset::{Easing, Expr, Layer, Preset, SystemKind, Variables};
+use crate::preset::{Easing, Expr, Layer, LayerJoin, Preset, SystemKind, Variables};
 use background::Background;
 pub use capture::CaptureImage;
 pub use context::{RenderContext, RenderError};
@@ -619,10 +622,18 @@ fn evaluate_preset(
 /// config (a layer spectrum reads its `[layer.spectrum] elements`); empty for
 /// every layer system without a per-element surface, exactly as at the top
 /// level.
+///
+/// `chain` receives the layer's bindable `mix` (ADR-0090 / Plan 0076 Phase 3):
+/// it is the one layer binding that drives the composite rather than the
+/// scene — the `over` junction's amount — eased through its own
+/// `[layer.smoothing] mix` entry at the smoother slot one past the params
+/// (which is stable: the layer's `params` are fixed at load). Inert on an
+/// `under` join, whose target has no junction.
 #[allow(clippy::too_many_arguments)]
 fn evaluate_layer(
     layer: &Layer,
     scene: &mut Box<dyn Scene>,
+    chain: &mut PostChain,
     smoother: &mut ParamSmoother,
     vars: &Variables<'_>,
     frame: &AnalysisFrame,
@@ -642,6 +653,11 @@ fn evaluate_layer(
         let raw = binding.expr.eval(vars);
         let value = smoother.smooth(index, raw, binding.tau, dt);
         scene.set_param(&binding.name, value);
+    }
+    if let Some(mix) = layer.mix.as_ref() {
+        let raw = mix.expr.eval(vars);
+        let value = smoother.smooth(layer.params.len(), raw, mix.tau, dt);
+        chain.set_layer_mix(value);
     }
     scene.update(frame);
 }
@@ -691,26 +707,41 @@ fn composite_into(
     // twice. A scene that presents premultiplied (reaction-diffusion, attractor,
     // fragment field) consumes it; the additive families ignore it, their colour
     // blend having no occlusion to scale.
-    scene.set_occlude(if target.routing.scene_stage().is_some() {
+    // With the `over` junction live the scene renders into the blend's chain
+    // input — a scratch — so the seam belongs to the junction's final fold,
+    // never to the scene (Plan 0076 Phase 3).
+    let scene_in_scratch = target.routing.scene_stage().is_some() || side.chain.layer_over_active();
+    scene.set_occlude(if scene_in_scratch {
         post::DEFAULT_OCCLUDE
     } else {
         side.chain.occlude()
     });
     scene.render(&ctx.queue, encoder, &target.view, target.aspect);
-    // The `under` layer draws into the same target, after the main scene and
-    // under the same seam rules: the target's own size and aspect (never a
-    // grid's — ADR-0037), and the same `occlude` answer, because the two scenes
-    // land on the same backdrop through the same last fold (ADR-0085).
+    // The layer scene. `under`: into the same target as the main scene, after
+    // it, under the same seam rules — the target's own size and aspect (never
+    // a grid's, ADR-0037) and the same `occlude` answer, because the two land
+    // on the same backdrop through the same last fold (ADR-0085). `over`: into
+    // the layer's own surface-sized offscreen, crisp, with the junction owning
+    // the backdrop seam — so the scene gets the scratch answer (no occlusion
+    // to scale in a transparent offscreen).
     let mut layer_draws = 0;
-    let layer_occlude = if target.routing.scene_stage().is_some() {
-        post::DEFAULT_OCCLUDE
-    } else {
-        side.chain.occlude()
-    };
     if let Some(layer_scene) = side.layer.as_mut() {
-        layer_scene.set_target_size(target.size.0, target.size.1);
-        layer_scene.set_occlude(layer_occlude);
-        layer_scene.render(&ctx.queue, encoder, &target.view, target.aspect);
+        match side.chain.layer_input(encoder, surface) {
+            Some(layer_view) => {
+                layer_scene.set_target_size(surface.0, surface.1);
+                layer_scene.set_occlude(post::DEFAULT_OCCLUDE);
+                layer_scene.render(&ctx.queue, encoder, &layer_view, target.aspect);
+            }
+            None => {
+                layer_scene.set_target_size(target.size.0, target.size.1);
+                layer_scene.set_occlude(if scene_in_scratch {
+                    post::DEFAULT_OCCLUDE
+                } else {
+                    side.chain.occlude()
+                });
+                layer_scene.render(&ctx.queue, encoder, &target.view, target.aspect);
+            }
+        }
         layer_draws = 1;
     }
     // The backdrop and the scene(s), plus whatever the active chain stages
@@ -1455,6 +1486,16 @@ impl Renderer {
             }
             layer_scene
         });
+        // The `over` junction's presence and blend mode (ADR-0090 / Plan 0076
+        // Phase 3), handed over unconditionally like the `[feedback]` table
+        // above: a preset with an `under` (or no) layer hands `None`, which
+        // also frees the junction's two full-frame inputs.
+        live.chain.set_layer_join(
+            preset
+                .layer
+                .as_ref()
+                .and_then(|layer| (layer.join == LayerJoin::Over).then_some(layer.blend)),
+        );
     }
 
     /// The segment-cap truncation from the active preset's last `configure`, if
@@ -1690,6 +1731,7 @@ impl Renderer {
                     evaluate_layer(
                         layer,
                         layer_scene,
+                        &mut side.chain,
                         outgoing_layer_smoother,
                         &vars.with_salt(salt.of(outgoing)),
                         frame,
@@ -1763,6 +1805,7 @@ impl Renderer {
             evaluate_layer(
                 layer,
                 layer_scene,
+                &mut live_side.chain,
                 layer_smoother,
                 &vars.with_salt(salt.of(preset)),
                 frame,
