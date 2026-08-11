@@ -231,8 +231,8 @@ preset folder — so while you are editing a file it re-rolls on each save.
 
 - **Prefer `noise(time * k)` to a sum of detuned sines** in new presets. The
   older files fake a wander with three or four sines whose periods do not line
-  up (`attractor_dejong` has four); one `noise` call is shorter and has no period
-  at all. Existing ones are fine as they are — this is not a rewrite.
+  up (the retired `attractor_dejong` had four); one `noise` call is shorter and
+  has no period at all. Existing ones are fine as they are — this is not a rewrite.
 - **Sum `noise` calls at different rates** for a richer wander:
   `noise(t*0.11)*0.6 + noise(t*0.43)*0.3`. There is no octave machinery and does
   not need to be.
@@ -331,7 +331,7 @@ reads as wind. That asymmetry is deliberate; do not read it as an oversight.
 |---|---|---|
 | `perspective` | Near material grows and far material shrinks, position and point size together. Segments foreshorten, because both endpoints project independently. | `0` (orthographic, the default) .. **~`0.3` in practice**; the clamp is at `0.8` and the reason to stop short of it is below |
 | `depth_fade`  | Attenuates brightness with distance — the substitute for occlusion, which this scene does not do. `1` takes the far end to black. | `0` (off) .. `1` |
-| `depth_hue`   | Shifts the palette coordinate by `±depth_hue/2` across the depth range, so distance moves *colour* as well as contrast — **on a ramp that travels in hue at roughly constant lightness.** On a dark-to-light ramp (which is what both shipped 3-D presets use) it duplicates `depth_fade` instead, and under `ink_amount = 1` it is structurally dead, like `saturation`. Measured at Plan 0063 Phase 5; [design-backlog 0062](../docs/design-backlog.md) | `0` (off) .. **`2 * min(hue_center, 1 - hue_center)`**, past which the offset wraps on the LUT's repeat sampler and far material lands on the near colour |
+| `depth_hue`   | Shifts the palette coordinate by `±depth_hue/2` across the depth range, so distance moves *colour* as well as contrast — **on a ramp that travels in hue at roughly constant lightness.** On a dark-to-light ramp (which is what the 3-D presets have shipped) it duplicates `depth_fade` instead, and under `ink_amount = 1` it is structurally dead, like `saturation`. Measured at Plan 0063 Phase 5; [design-backlog 0062](../docs/design-backlog.md) | `0` (off) .. **`2 * min(hue_center, 1 - hue_center)`**, past which the offset wraps on the LUT's repeat sampler and far material lands on the near colour |
 | `spin`        | Rate multiplier on the display rotation. `1` is unchanged, `0` holds the figure still, negative reverses it. | any |
 
 Four things you cannot discover by binding them:
@@ -361,8 +361,9 @@ Four things you cannot discover by binding them:
   swing is about **0.9 x `perspective`** in NDC; the size growth across that
   whole sweep is **6 %**. A `zoom` is a static scale, so it cannot recover a
   phase-varying translation: all it can do is shrink the figure until the orbit
-  fits inside the frame, which is what both shipped 3-D presets pay for
-  (`attractor_lorenz` went 1.32 -> 1.16, `attractor_thomas` 1.14 -> 1.02).
+  fits inside the frame, which is what the 3-D presets paid for
+  (`attractor_lorenz`, since retired, went 1.32 -> 1.16; `attractor_thomas`
+  1.14 -> 1.02).
   **So the real ceiling is ~`0.3`, not the `0.8` clamp** — past that the figure
   visibly slides around the frame instead of turning in place, which is a worse
   artifact than the flatness `perspective` was bought to fix. The clamp is not
@@ -390,8 +391,8 @@ Four things you cannot discover by binding them:
   snapping it to a new angle — but the integration fixes the discontinuity,
   not the range: a wide binding like `1 + bass * 5` swings the figure through
   most of a revolution between transients and reads as tumbling, not drive.
-  Both shipped 3-D presets modulate narrowly (Lorenz `1.0`–`1.8`, Thomas
-  `1.0`–`1.3`).
+  The 3-D presets have modulated narrowly (the since-retired Lorenz `1.0`–`1.8`,
+  Thomas `1.0`–`1.3`).
 - **The illusion has a density limit and haze does not remove it.** Nothing
   occludes anything here — two strands crossing simply sum — so as
   `[particles] density` rises the figure reads more and more as X-ray whatever
@@ -502,8 +503,8 @@ launched at `v` against gravity `g` turns over after `v / g` seconds, `v² / (2g
 world units above the source line at `y = -1.12`. **A frame is `|y| <= 1`**, so
 `v² / (2g) - 1.12` is where the crest of the shower sits. Every object shares
 `launch_speed`, so a crest *inside* the frame draws a visible horizontal ceiling
-where the population piles up at the top of its arc; `emitter_sparks.toml` puts
-its crest at `y = 1.28`, off frame, for exactly that reason.
+where the population piles up at the top of its arc; `emitter_perseids.toml` puts
+its crest at `y = 1.48` (`v = 2.6`, `g = 1.3`), off frame, for exactly that reason.
 
 `lifetime` past the flight time is wasted pool. An object that has left the frame
 is retired the moment it does, so the only thing a long `lifetime` buys is slots
@@ -747,10 +748,11 @@ a `[palette]` to an existing preset changes its colours and adding nothing
 changes nothing.
 
 **On `lsystem` the axis is the figure's own, so a grammar without branches has
-nothing to ramp along.** `lsystem_fern` reaches generation 11 at
-`visible_depth = 6`; `lsystem_arrowhead` has no `[` in its rules at all, so every
-segment of it sits at generation 0 and `hue_spread` is a no-op there however
-large. That is a property of a Sierpinski arrowhead — every segment genuinely is
+nothing to ramp along.** The retired `lsystem_fern` reached generation 11 at
+`visible_depth = 6`; the retired `lsystem_arrowhead` had no `[` in its rules at
+all, so every segment of it sat at generation 0 and `hue_spread` was a no-op
+there however large (both retired at Plan 0075 cohort 1 — the property is the
+grammar's, not the file's). That is a property of a Sierpinski arrowhead — every segment genuinely is
 at the same recursion level — not a missing feature. Such a preset still reaches
 `[palette]`; what it cannot reach is a ramp. The ramp is normalized over the
 **figure's own** deepest generation, so `hue_spread = 1` spans the palette once
@@ -763,9 +765,9 @@ the palette's first half — rather than re-tinting every chord it already drew.
 > **`hue_spread` on `star_pattern` is live if and only if the preset declares
 > `rings`, and that is measured both ways.** A Hankin rosette is `2n` congruent
 > segments about the frame centre, so every one of them occupies the *same*
-> radial interval: on `star_rosette` and `star_lantern` the spread of segment
-> radii across the whole figure measures `1.2e-7` (f32 noise) at every tiling
-> order and every contact angle. There is no range for a radial ramp to walk, so
+> radial interval: on `star_rosette` and `star_lantern` (both retired at Plan
+> 0075 cohort 1) the spread of segment radii across the whole figure measured
+> `1.2e-7` (f32 noise) at every tiling order and every contact angle. There is no range for a radial ramp to walk, so
 > the ramp collapses to the flat `hue` rather than sweeping on noise, and what
 > those presets gain from the palette surface is `[palette]` itself — the rosette
 > can be an ember or an ice figure instead of a point on the built-in cosine —
@@ -783,14 +785,16 @@ the palette's first half — rather than re-tinting every chord it already drew.
 > ornament along the rest, which is a way to separate the two figures by colour
 > rather than by brightness.
 >
-> **No preset in the shipped library uses `rings` today.** The three that did
-> (`star_mandala`, `star_mandala_six`, `star_weave`) were retired on 2026-08-06:
-> every motif is a parametric outline sampled to straight segments, so at ornament
-> scale the vertices show and a circle reads as a polygon (design-backlog 0073).
-> The capability, this documentation and the tests all stand — what is retired is
-> the *content*, and the mandala look now ships as `reaction_gilt`, which folds an
-> analytic iso-contour field with `kaleido_order` and therefore has no geometry to
-> facet. Read that before authoring the next rings preset.
+> **`star_rosewindow` (Rose Window, Plan 0075 cohort 1) is the shipped `rings`
+> preset today**, and it stays at interlace scale deliberately — the reason is
+> design-backlog 0073: every motif is a parametric outline sampled to straight
+> segments, so at ornament scale the vertices show and a circle reads as a
+> polygon. That is what retired the first three rings presets (`star_mandala`,
+> `star_mandala_six`, `star_weave`, 2026-08-06). The ornament-scale mandala
+> register moved to an analytic iso-contour fold (`reaction_gilt`, itself since
+> retired at Plan 0075 cohort 3) and now lives in `fragment_mandala` (Banded
+> Mandala), which has no geometry to facet. Read Rose Window's header before
+> authoring the next rings preset.
 
 ### `spectrum` — the frequency-axis readout (Plan 0034)
 
@@ -1230,13 +1234,15 @@ picture, and it is a choice per preset (ADR-0061).
 and the default are separate facts here, and a live A/B on a centred figure and a
 border-filling field chose differently on each.
 
-**Two shipped presets name a treatment, and they disagree on purpose.**
-`attractor_leviathan` (a centred figure) binds `tile`; `fragment_kaleido` (a
-border-filling field) binds `squash`. Both were judged in the running app in the
-same sitting, and both files carry a header comment beside the binding saying so.
-Read those two before choosing for a preset of your own — the contrast between
-them is the reason this parameter exists. Every other fold-binding preset rides
-the default for now.
+**Two shipped presets carry the instructive contrast.** `attractor_leviathan`
+(a centred figure that overruns the inscribed disc) binds `tile`;
+`attractor_clifford` (a ribbon whose wings reach past the frame edge) binds
+`squash` — and both files carry a header comment beside the binding recording
+the render that chose it. Read those two before choosing for a preset of your
+own. (`fragment_kaleido`, the border-filling half of the original A/B, retired
+at Plan 0075 cohort 2.) Several renaissance field worlds bind their own edge
+too — `fragment_mandala`, `fragment_supernova`, `fragment_tunnel`,
+`fragment_vitrail` — so the default is no longer the common case.
 
 Which to pick is a question about your scene, and the honest answer is to look:
 
@@ -1490,9 +1496,9 @@ to the same file at `bloom_amount = 0`. **Something in the frame must deliberate
 cross 1.0.** The cheapest fuel is `glow`, because it drives the stroke's *core*
 rather than its width — raising `thickness` instead spreads the same light over a
 larger quad and can move the peak the wrong way. `brightness` works too, and on
-the fullscreen scenes it is the only lever. Read `star_lantern.toml`'s header:
-that preset exists to be a worked example of this, and it records what the renders
-taught.
+the fullscreen scenes it is the only lever. (`star_lantern`, the preset that
+shipped as the worked example of this, retired at Plan 0075 cohort 1 — its
+header survives in git history, and the measurements above are its record.)
 
 ```toml
 [params]
@@ -1889,9 +1895,10 @@ Two things that will *not* save you, both learned the hard way:
   in world units and inside the frame. `clamp(bass * 3.2, 0, 3.0)` is still off
   frame; the clamp bounds the number, not the picture.
 - **Looking at it at a normal listening level does not save you either.** The
-  defect lives at the top of the range. `spectrum_comb` and `spectrum_corona`
-  clip their tallest bars off the top edge on every beat and still look fine,
-  because a comb roots each bar on a shared baseline and only the tips leave.
+  defect lives at the top of the range. The retired `spectrum_comb` and
+  `spectrum_corona` clipped their tallest bars off the top edge on every beat
+  and still looked fine, because a comb roots each bar on a shared baseline and
+  only the tips leave.
 
 Check it at the top of the range, not in the middle:
 
@@ -2082,10 +2089,11 @@ Two things worth knowing before you reach for it:
   across a dissolve. `size` and `fade` also buy level and change the picture
   while they do it — a wider nib and a longer trail are looks, not stops — so
   reach for them when you want what they do, not when you only want less light.
-  (`attractor_lorenz` ships `brightness = 0.03` at `density = 0.002` and
-  `attractor_thomas` `0.10` at `0.02` — the two worked examples of that cut. Both
-  carried the number on `exposure` until Plan 0066 moved it; if you are reading an
-  older copy, the swap is level-neutral and the value transfers unchanged.)
+  (`attractor_thomas` ships `brightness = 0.10` at `density = 0.02`, and the
+  since-retired `attractor_lorenz` shipped `0.03` at `0.002` — the worked
+  examples of that cut. Both carried the number on `exposure` until Plan 0066
+  moved it; if you are reading an older copy, the swap is level-neutral and the
+  value transfers unchanged.)
 - **The tier caps the top, it does not set the value.** `density` is a fraction
   of whatever the current quality tier allows (50 000 at the standard tier,
   150 000 at the rich one), so `density = 0.02` is 1 000 points on one and 3 000
@@ -2177,7 +2185,7 @@ way `a`..`d` already carry family-specific meanings.
 |---------|---------|--------------|
 | `morph` | `0`     | Position from `family` to `[particles] morph_to`. `0` is the named figure, `1` is the target, and every value between is a real figure — but **not a proportionally-different one**, see [below](#morph-is-a-travel-knob). Clamped; out of range pins to an endpoint. |
 | `curl`  | `0`     | Radians added to every map's rotation — fronds curl and uncurl. |
-| `vigor` | `1`     | Multiplier on the figure's contraction — a bushier, deeper, denser figure. **Has a silent ceiling; see below.** |
+| `vigor` | `1`     | Multiplier on the figure's contraction — a bushier, deeper, denser figure. **Has a silent ceiling; see below.** **Inverts on a space-filling figure:** the `dragon`'s two maps sit at exactly `0.7071`, already space-filling, so vigor *above* 1 overfills the region and dissolves the figure into dust — measured on the loud frame at Plan 0075 cohort 5; `attractor_dragon` ships the binding inverted below 1. |
 | `lean`  | `0`     | Radians every translation is rotated by — the plant bends. |
 | `bias`  | `0`     | Moves sampling weight from the trunk/body maps to the branch maps. Geometry is untouched; only the density distribution moves. Inert on `dragon`, whose two maps are both branches. |
 
@@ -2220,8 +2228,9 @@ recursion**. A cross that stays recognisably the figure you named would have to
 live under about `0.03`, which is not a lever. **So: bind `morph` when the
 preset is meant to travel, and leave it alone when it is meant to be one
 figure** — the four levers are what change a figure without leaving it.
-`attractor_fern` binds no `morph` at all; `attractor_dissolve` uses the full
-range, and travelling is its whole point.
+`attractor_fern` binds no `morph` at all; the since-retired `attractor_dissolve`
+(Plan 0075 cohort 5) used the full range, and travelling was its whole point —
+its file remains the worked example, in git history.
 
 **The `spiral` is a fine figure and a poor morph target.** Anything ending there
 thins into ragged streaks with half the frame empty: its dominant map contracts
@@ -2350,7 +2359,7 @@ or a part separation through the hue route.
 above as the tuning in the file. Rendered against each other, `root_hue` at the
 fern's *full* `map_tint = 0.46` beat the split: the body cools to jade, the
 frond origins stay warm, and the part separation Plan 0073 paid `hue_spread` for
-is not given back. Both shipped IFS presets bind `root_hue` and **neither binds
+is not given back. Every shipped IFS preset binds `root_hue` and **none binds
 `root_tint`**. The budget rule is real and the `0.22` measurement stands; the
 conclusion drawn from it is that when a coordinate is spent you take the other
 route rather than pay.
@@ -2556,12 +2565,14 @@ Presets worth reading as **worked examples** of one control each:
 
 | Preset | Shows |
 |--------|-------|
-| `rose_zoom` | the shared view **zoom** pumping on bass, with a slow sine pan |
-| `rose_web` | a scene over a vignetted **background** gradient (`bg_*`), and the **geometry mirror** with reflection toggled on a hard onset |
-| `reaction_reef` | the screen-space **kaleidoscope** turning a field into a figure |
-| `rose_trails` | **feedback trails** smearing a spinning curve into a spiral |
-| `fragment_kaleido` | the screen-space **kaleidoscope** over a fragment field |
-| `fragment_smooth` | beat-driven flash/glow **eased** through a `[smoothing]` table |
+| `swarm_drift` | the shared view **zoom** breathing with the music |
+| `attractor_dragon` | a scene over a vignetted **background** gradient (`bg_*`), and a beat-latched structural re-cut (`hash(floor(beat_index * 0.25))`) |
+| `fragment_tiled` | the screen-space **kaleidoscope** folding a field into a figure |
+| `attractor_clifford` | **feedback trails** stretching a figure into a long exposure |
+| `fragment_supernova` | beat-driven flash/glow **eased** through a `[smoothing]` table |
 | `attractor_ink` | the terminal **ink-on-paper** remap (`ink_*` / `paper_*`) |
-| `rose_overflow`, `rose_web` | the audio-morphable curve **shape** params (`phase`, `radial_offset`) |
-| `rose_draw` | `draw_progress` ridden on `bar` for a per-beat **line-draw-on** |
+| `curve_nightbloom` | the audio-morphable curve **shape** params (`phase`, `radial_offset`) |
+| `lsystem_vellum` | `draw_progress` for a **line-draw-on** |
+| `star_rosewindow` | **`rings`** — concentric motifs giving a rosette an interior |
+| `fragment_vitrail` | the **`[layer]` table** — a crisp `over` layer with a bindable `mix`, and per-beat `draw_progress` on the layer |
+| `fragment_sumi` | a **stateful layer** — the attractor as `[layer]` scene, `add`-blended over a field |

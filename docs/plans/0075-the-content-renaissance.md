@@ -311,7 +311,7 @@ history.
 | 3 | `reaction_diffusion` | Chthonic Coral Oracle, Coral, Coral Bloom, Coral Head, Gilt, Reef, Reliquary (7) |
 | 4 | `swarm` + `emitter` + `spectrum` | Dense, Storm, Starfield, Sparks, Squall, Spectrum Comb, Spectrum Corona, Spectrum Ridge (8) |
 | 5 | `attractor` | De Jong, Order Into Life, Lorenz (3) |
-| 6 | the collage | none of its own — gated on [Plan 0076](0076-the-second-layer.md) landing |
+| 6 | the collage | none of its own — gated on [Plan 0076](done/0076-the-second-layer.md) landing |
 
 ### Cohort briefs — one line per world, reference look → mechanism
 

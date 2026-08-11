@@ -1455,7 +1455,8 @@ straight segments cannot read as a drawn curve at ornament scale, and no tuning 
 content lane changes that. **All three ring-mandala presets were retired** (`star_mandala`,
 `star_mandala_six`, `star_weave`) and the `star_pattern` coverage floor reverted to `0.34` with them.
 
-**The mandala look now ships as [`presets/reaction_gilt.toml`](../presets/reaction_gilt.toml)**, by a
+**The mandala look then shipped as `presets/reaction_gilt.toml`** (itself retired at Plan 0075
+cohort 3; the register now lives in `fragment_mandala`, and the file survives in git history), by a
 different mechanism entirely: a Gray-Scott field's **analytic iso-contours** — curves evaluated per
 pixel in the shader, with no geometry and therefore no vertex at any resolution — folded into a
 10-to-18-wedge rosette by `kaleido_order`, on `kaleido_edge = 0` so it reads as an object on black.
