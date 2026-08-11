@@ -1,17 +1,21 @@
 # Shatter — the swarm as shattered stained glass (cohort 4, Plan 0075).
-# Fresh slate (ADR-0089). Tumbling triangle shards (Plan 0070), each beat bursts
-# the pane apart and re-cuts the silhouette (hash(beat_index): triangles or
-# quads), onset blooms the bright edges. Vivid glass colours over a near-black
-# ground; structure over camera throughout.
+# Fresh slate (ADR-0089), REBUILT FROM THE ENGINE DEFAULTS after three live
+# failures (2026-08-11): the first draft steered hard (force to 5.2) and the
+# cloud collapsed onto the flow field's attractor lines over minutes; the
+# rescues magnified a sub-window (zoom 1.6-2.2) where density waves read as
+# clumps and voids, then over-scattered to emptiness. This version changes
+# NOTHING about the dynamics regime the stable shipped swarm runs at — near
+# default force and spin, no field_freq override, no scatter clock, the whole
+# torus in view — and carries the identity only in the marks and the beat:
+# glass-coloured shards, a burst per beat, the silhouette re-cut per beat.
 #
-# THE BRIEF'S "shatter on LIGHT ground" IS ROUTED, NOT SHIPPED (2026-08-11):
-# dark marks on a light page need the terminal ink remap, and the ink stage has
-# no contrast lever — a brightness sweep 3.5 -> 6 printed the same mid-grey dust
-# (the same measured gap as Etching's glow sweep; see the cohort feedback note).
-# When the ink stage grows a contrast control, this world's light-ground twin
+# THE BRIEF'S "shatter on LIGHT ground" IS ROUTED, NOT SHIPPED: dark marks on
+# a light page need the ink stage, which has no contrast lever (a brightness
+# sweep 3.5 -> 6 printed the same mid-grey; the Etching glow sweep measured
+# the same gap). When ink grows a contrast control, the light-ground twin
 # becomes authorable.
-# Drives: bass is the steering force, mid stirs the field, beat bursts + re-cuts,
-# treble sharpens the glass chroma.
+# Drives: bass leans the steering, mid stirs the field, beat bursts + re-cuts,
+# treble sharpens the glass chroma, onset blooms the edges.
 system = "swarm"
 name = "Shatter"
 
@@ -26,23 +30,22 @@ stops = [
 ]
 
 [params]
-force = "2.2 + clamp(bass * 3.5, 0, 3)"
-spin = "0.5 + clamp(mid * 1.4, 0, 1.2)"
-burst = "beat * (bar < 0.25) * 9"   # a pulse, not a held state — a held burst smears the cloud to nothing
-field_freq = "1.6"
+force = "1.6 + clamp(bass * 1.4, 0, 1.2)"
+spin = "0.4 + clamp(mid * 0.9, 0, 0.75)"
+burst = "beat * (bar < 0.25) * 9"   # the shatter — a pulse per beat (a held burst smears the cloud blank in captures)
 shape = "2"                                   # polygon
 points = "3 + floor(hash(beat_index) * 1.999)"  # the shard re-cuts every beat: triangles or quads
-size = "3.0"
-brightness = "1.1"
+size = "2.2"
+brightness = "1.2"
 hue = "0"
 hue_spread = "0.8"                            # every shard its own glass colour
 hue_center = "0.5"
-saturation = "1.2 + clamp(treb * 0.5, 0, 0.3)"
-zoom = "2.2"                                  # camera IN (swarm zoom > 1): few large shards, not dust
+saturation = "1.15 + clamp(treb * 0.5, 0, 0.3)"
+zoom = "1.0"                                  # the WHOLE torus — a sub-window turns density waves into clumps and voids
 bg_hue = "0.65"
 bg_bright = "0.03"
 bg_vignette = "0.4"
-bloom_amount = "0.4 + clamp(onset * 1.2, 0, 0.7)"
+bloom_amount = "0.4 + clamp(onset * 1.0, 0, 0.5)"
 bloom_threshold = "0.9"
 bloom_radius = "1.1"
 
