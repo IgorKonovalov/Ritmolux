@@ -2200,3 +2200,51 @@ The first question is which of the two fit sources mis-measures the dragon's ext
 Nothing ships broken — the workaround is one line and honest, in the world's own header. Take
 it the next time anyone is in the IFS fit path, and do not close it by re-documenting the
 invariant away without knowing which source mis-fits.
+
+---
+
+## 0090 — the Mac build's capture verdict is stderr-only, so a Finder-launched tester cannot tell us why it hears nothing
+
+**Raised by:** `architect`, 2026-08-11, from the first external Mac tester report — "app
+works, but does not react to music; permissions were granted". **Owner if taken:** `dev` —
+`standalone/src/main.rs`'s capture startup, `diaglog.rs`, optionally `overlay.rs`.
+
+### The finding
+
+When `capture_mac::start()` fails, the app deliberately degrades: it prints one line to
+**stderr** and renders without audio (`main.rs:1023` — same shape on Windows at `:996`).
+That degradation is correct; what is wrong is that the reason exists **only on stderr**,
+which a Finder launch discards. The two artifacts a remote tester can actually send carry no
+capture verdict at all:
+
+- **`diagnostics.log`** — the file `READ-ME-FIRST.md` step 6 asks testers to send — has the
+  band columns (`bass`/`mid`/`treb`/`onset`), so it can show *whether* audio reached the
+  analyzer (all ~0.000 under playing music = capture-side), but records nothing about
+  whether capture started or which `CaptureError` it died with.
+- **The F3 overlay** has no capture field (grep confirms: no capture/audio-state string in
+  `overlay.rs`).
+
+So the README's step 3 escape hatch — relaunch from Terminal to see the message — is the
+*only* route to the reason, and it is the highest-friction ask in the whole tester loop.
+The loop stalls exactly where this report stalled: "permissions were granted" is the
+tester's entire observable, and it cannot distinguish the real candidates (not restarted
+after granting; a **stale TCC grant** — each ad-hoc-signed build is a different app to
+macOS, so the Privacy toggle can show an older build's entry as enabled while the new
+binary is denied, the pile-up the README's update note already names; macOS below 13; a
+Sequoia periodic re-approval lapse).
+
+### What a fix would be
+
+Cheap, and both halves off the audio thread. At startup, write one line into
+`diagnostics.log`: capture started (path + negotiated format) or the `CaptureError`'s
+`Display` — startup code, before the 1 Hz cadence. Optionally a capture field in the F3
+overlay (`audio: SCK 48k stereo` / `audio: NONE — <reason>`) so a tester can read the
+verdict off a screenshot. The sacred-callback rule is untouched — nothing here is on the
+capture thread.
+
+### Priority
+
+**Medium-high while external Mac testing is active** — every remote round-trip that starts
+with "it doesn't react" pays a Terminal-relaunch cycle this one log line would eliminate.
+Drops to low once a capture-device picker (the live-performance plan's Mac half) surfaces
+the state in-app anyway.
