@@ -82,6 +82,9 @@ brightness = "0.16 + clamp(bass * 0.071, 0, 0.060)"
 reseed     = "onset > 0.42"
 # A slow rock, never a revolution (see header).
 spin       = "sin(time * 0.22) * 0.24"
+# Camera in a touch - the trace is the figure, and at the default framing it
+# sat small against the smoke (user verdict, 2026-08-11 live).
+zoom       = "1.22"
 hue_spread = "0.30"
 saturation = "1.20"
 

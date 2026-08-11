@@ -34,6 +34,8 @@ bloom_radius    = "1.4"
 # THE COEFFICIENTS ARE THE INSTRUMENT. Each is a slow independent wander with a
 # band term on top, so the attractor is always mid-transformation and never
 # settles into the one shape a static preset shows.
+# No rotation (see the fold note below) - the morph is the motion.
+spin = "0"
 a = "-2.10 + sin(time * 0.0170) * 0.38 + clamp(bass * 0.4, 0, 0.34)"
 b = "-2.34 + cos(time * 0.0130) * 0.34 + clamp(mid * 0.353, 0, 0.30)"
 c = "1.28 + sin(time * 0.0091) * 0.42 + clamp(treb * 0.433, 0, 0.26)"
@@ -98,10 +100,16 @@ bg_vignette   = "0.82"
 # call), and `kaleido_order` is a STEPPED parameter, so easing it swept the
 # value through fractional wedge counts that cannot divide the circle. Pinning
 # it fixes both at once and lets the header's "cathedral of itself" be the
-# resting state instead of a rare peak event. Motion now comes from
-# `kaleido_angle` alone, which is continuous and safe to ease.
+# resting state instead of a rare peak event.
+#
+# THE ROTATION IS GONE TOO (user verdict, 2026-08-11 live, during the Plan
+# 0075 cohort-6 round): the fold angle no longer turns, and `spin` below
+# pins the cloud's own default revolution (1 = one turn per ~35 s, the
+# family default a preset inherits unless it says otherwise). The creature's
+# motion is now the coefficients alone - the four-axis morph that was always
+# this preset's instrument.
 kaleido_order = "6"
-kaleido_angle = "time * 0.055"
+kaleido_angle = "0"
 # THE EDGE TREATMENT, CHOSEN IN MOTION (2026-08-04, Plan 0055 Phase 2 / ADR-0061).
 # `1` is `tile`: past the inscribed disc the frame continues as a mirrored
 # continuation of itself instead of fading to backdrop. This preset is one of the
