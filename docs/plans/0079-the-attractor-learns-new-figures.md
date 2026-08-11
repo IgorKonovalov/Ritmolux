@@ -9,7 +9,7 @@
 > [0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) (the two
 > mechanisms the roster must carry per-tuple without breaking)
 > **Closes:** [design-backlog 0055](../design-backlog.md#0055--the-attractors-shape-vocabulary-is-breathe-and-bend-and-the-reference-figures-ask-for-more)
-> **Queued:** after [Plan 0076](0076-the-second-layer.md) and Plan 0075's cohort 6, per the
+> **Queued:** after [Plan 0076](done/0076-the-second-layer.md) (landed) and Plan 0075's cohort 6, per the
 > 2026-08-11 handoff decision; **last of the three handoff plans** — it is the largest and
 > carries the research-risk phase.
 

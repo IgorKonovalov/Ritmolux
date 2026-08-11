@@ -190,7 +190,7 @@ trivial next to R1.*
 ### R3 — composition: a second scene layer with blend modes
 
 > **Designed 2026-08-09:** [ADR-0090](adrs/0090-a-preset-composes-two-scene-layers.md) +
-> [Plan 0076](plans/0076-the-second-layer.md) (approved). The sketch below survived the
+> [Plan 0076](plans/done/0076-the-second-layer.md) (closed 2026-08-11 — R3 landed). The sketch below survived the
 > interview with one addition it did not predict — **per-layer scene instances** (same-system
 > pairs are in scope from the start, the user's call) — and one narrowing: the v1 `over`
 > layer carries no post stages of its own, so the cost is one target + one blend pass, not
