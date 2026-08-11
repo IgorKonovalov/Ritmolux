@@ -469,9 +469,8 @@ fn an_over_scaled_figure_measures_below_its_repaired_counterpart() {
         let preset =
             Preset::from_toml_str(toml).unwrap_or_else(|e| panic!("{stem}.toml is invalid: {e}"));
         let name = preset.name.clone();
-        let repaired_preset = Preset::from_toml_str(repaired_toml).unwrap_or_else(|e| {
-            panic!("{stem}'s frozen repaired counterpart is invalid: {e}")
-        });
+        let repaired_preset = Preset::from_toml_str(repaired_toml)
+            .unwrap_or_else(|e| panic!("{stem}'s frozen repaired counterpart is invalid: {e}"));
         let repaired_name = repaired_preset.name.clone();
         let repaired = fraction_of(&mut renderer, repaired_preset).unwrap_or_else(|| {
             panic!("{repaired_name} drew no segment length under a fully-driven frame")

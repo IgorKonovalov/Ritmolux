@@ -259,7 +259,10 @@ fn attractor_contract() {
     let lcov = coverage(&flow, lbg, EPS);
     let lspread = quadrant_spread(&flow, lbg, EPS);
     assert!(lcov > 0.02, "3D flow figure is blank: coverage {lcov:.4}");
-    assert!(lspread >= 2, "3D flow figure is a dot: {lspread} quadrant(s)");
+    assert!(
+        lspread >= 2,
+        "3D flow figure is a dot: {lspread} quadrant(s)"
+    );
 
     // --- View transform (Plan 0025 Phase 4, ADR-0018): `zoom`/`pan_*` scale/offset
     // the projected cloud, so binding them visibly moves the whole attractor. The
