@@ -21,7 +21,7 @@ fixed chain. The consequence, named by the visual-richness review as wrong turn 
 composition — a particle figure **over** a warped field, a crisp rose floating on a molten
 kaleidoscoped ground — is not expressible by any preset, and the layered-collage reference look
 is out of reach. The renaissance ([ADR-0089](0089-the-library-renews-by-replacement-cohorts.md) /
-[Plan 0075](../plans/0075-the-content-renaissance.md)) is about to author a fresh library; every
+[Plan 0075](../plans/done/0075-the-content-renaissance.md)) is about to author a fresh library; every
 cohort authored before this capability exists is a cohort that cannot contain a layered world.
 
 The render graph was rejected twice (ADR-0018 Alt A, ADR-0031 Alt B), correctly, on YAGNI

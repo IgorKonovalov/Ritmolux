@@ -1,37 +1,38 @@
 # 0075 — The content renaissance: the library is rebuilt as worlds, by replacement cohorts
 
-> **Status:** **in-progress 2026-08-09** — direction decided as
-> [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md), phase roster
-> user-approved the same day. The named guesses (cohort size, cohort count, keep-list
-> criteria) stand as defaults; Phase 4's brief is where they get re-decided cheaply if the
-> rendered evidence argues otherwise.
+> **Status:** **done 2026-08-11** — all six phases landed on `plan-0075-content-renaissance`
+> (`873ca0a` Phase 1, `a6dcb51` Phase 2, `0d67416` Phase 3, `d4351ad` the brief, six cohort
+> series `4cb2776`..`9ab6c36`, `bdb61f3` Phase 6). Mode 4 review: **no blockers, no majors,
+> two minors, two nits** — 665/665 green after the merge with `main`, the 27-world set
+> verified against the brief's keep list and roster, the depth-cue no-op and structural-rescue
+> test bodies read against their done-whens. Close write-up in `docs/plans/README.md`.
 > **Created:** 2026-08-09
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md) (the
-> mechanism), [0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)
+> **Related ADRs:** [0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md) (the
+> mechanism), [0081](../../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)
 > (the landing route)
-> **Serves:** [roadmap-visual-richness R6](../roadmap-visual-richness.md)
+> **Serves:** [roadmap-visual-richness R6](../../roadmap-visual-richness.md)
 > **Closes (Phases 1-3):**
-> [backlog 0072](../design-backlog.md#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo),
-> [0067](../design-backlog.md#0067--depth_fade-is-a-uniform-dimmer-on-every-flat-family-where-the-other-two-depth-cues-are-exact-no-ops),
-> [0070](../design-backlog.md#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report),
-> [0061](../design-backlog.md#0061--perspective-moves-the-figure-far-more-than-it-enlarges-it-so-the-documented-way-to-recover-the-framing-does-not-work),
-> [0062](../design-backlog.md#0062--depth_hue-is-a-lightness-cue-on-a-lightness-ramp-it-wraps-at-the-ends-and-it-is-structurally-dead-under-ink_amount),
-> [0063](../design-backlog.md#0063--spins-usable-ceiling-is-set-by-fade-not-by-taste-and-the-pair-is-undocumented)
-> **Gated on (Phases 4+ only):** [0071](done/0071-light-that-adds-without-covering.md),
-> [0064](done/0064-the-symmetry-stage-and-the-banded-palette.md),
-> [0046](done/0046-transformed-feedback.md), and [0067](done/0067-the-curation-route.md)'s Phases 1-2
+> [backlog 0072](../../design-backlog.md#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo),
+> [0067](../../design-backlog.md#0067--depth_fade-is-a-uniform-dimmer-on-every-flat-family-where-the-other-two-depth-cues-are-exact-no-ops),
+> [0070](../../design-backlog.md#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report),
+> [0061](../../design-backlog.md#0061--perspective-moves-the-figure-far-more-than-it-enlarges-it-so-the-documented-way-to-recover-the-framing-does-not-work),
+> [0062](../../design-backlog.md#0062--depth_hue-is-a-lightness-cue-on-a-lightness-ramp-it-wraps-at-the-ends-and-it-is-structurally-dead-under-ink_amount),
+> [0063](../../design-backlog.md#0063--spins-usable-ceiling-is-set-by-fade-not-by-taste-and-the-pair-is-undocumented)
+> **Gated on (Phases 4+ only):** [0071](0071-light-that-adds-without-covering.md),
+> [0064](0064-the-symmetry-stage-and-the-banded-palette.md),
+> [0046](0046-transformed-feedback.md), and [0067](0067-the-curation-route.md)'s Phases 1-2
 > and 4. **Phases 1-3 are gated by nothing** and can interleave with the roster any time.
 
 ## TL;DR
 
 The engine has outgrown the library, and the user has asked for a library that could not have
-been written by editing the old one. [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)
+been written by editing the old one. [ADR-0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md)
 sets the mechanism: **replacement cohorts under a fresh-slate rule, never a delete-all reset**.
 This plan first fixes the instruments and documentation the new library will be authored
 against (the backlog items that would otherwise shape or mislead every new world), then runs
 the brief and the cohorts. Each cohort lands a few genuinely new worlds through the
-[Plan 0067](done/0067-the-curation-route.md) route and retires a named list of old presets in the
+[Plan 0067](0067-the-curation-route.md) route and retires a named list of old presets in the
 same series — the set is never hollow, the gates never go vacuous.
 
 ## Context & problem
@@ -98,7 +99,7 @@ flowchart TD
 - **Owner skill:** dev
 - **Area:** core (tests)
 - **What:** resolve
-  [backlog 0072](../design-backlog.md#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo):
+  [backlog 0072](../../design-backlog.md#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo):
   at 96x96 the `sanity.rs` coverage statistic cannot see a dense thin-stroke figure (the bare
   rosette and a 46x-denser mandala score identically), so the only lever that clears the floor
   is inflating `glow`/`trails` — the exact look the user rejected. The entry names the two
@@ -119,14 +120,14 @@ flowchart TD
 - **Area:** core, standalone
 - **What:** the two small code items from the sweep.
   1. **`depth_fade` becomes an exact no-op on flat families**
-     ([backlog 0067](../design-backlog.md#0067--depth_fade-is-a-uniform-dimmer-on-every-flat-family-where-the-other-two-depth-cues-are-exact-no-ops),
+     ([backlog 0067](../../design-backlog.md#0067--depth_fade-is-a-uniform-dimmer-on-every-flat-family-where-the-other-two-depth-cues-are-exact-no-ops),
      its option 2): multiply the fade term by the family's has-depth flag, restoring
      ADR-0076's stated property that all three depth cues are identities at zero depth extent.
      The entry records that no shipped preset binds `depth_fade` on a flat family — verify
      with a grep at implementation; if that has changed, the affected baseline moves are
      listed in the commit.
   2. **The in-frame geometry fraction joins `shot --report`**
-     ([backlog 0070](../design-backlog.md#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report)):
+     ([backlog 0070](../../design-backlog.md#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report)):
      the number `LineRenderer::draw` already computes gets a column in the author's own
      metrics table, which is where the over-scale defect class is actually introduced and the
      only place it can be caught for new content (ADR-0083 twice proved no absolute threshold
@@ -144,13 +145,13 @@ flowchart TD
 - **Area:** docs
 - **What:** land the three measured corrections from the Plan 0063 content pass in the two
   files an author reads first:
-  [0061](../design-backlog.md#0061--perspective-moves-the-figure-far-more-than-it-enlarges-it-so-the-documented-way-to-recover-the-framing-does-not-work)
+  [0061](../../design-backlog.md#0061--perspective-moves-the-figure-far-more-than-it-enlarges-it-so-the-documented-way-to-recover-the-framing-does-not-work)
   (`perspective`'s dominant effect is a phase-varying **translation** at ~0.9x the parameter,
   a `zoom` cannot recover it, usable ceiling ~0.3 of the 0.8 legal range),
-  [0062](../design-backlog.md#0062--depth_hue-is-a-lightness-cue-on-a-lightness-ramp-it-wraps-at-the-ends-and-it-is-structurally-dead-under-ink_amount)
+  [0062](../../design-backlog.md#0062--depth_hue-is-a-lightness-cue-on-a-lightness-ramp-it-wraps-at-the-ends-and-it-is-structurally-dead-under-ink_amount)
   (`depth_hue` reads as a hue cue only on a hue-travel ramp; keep it under
   `2 * min(hue_center, 1 - hue_center)` or it wraps; inert under a duotone remap), and
-  [0063](../design-backlog.md#0063--spins-usable-ceiling-is-set-by-fade-not-by-taste-and-the-pair-is-undocumented)
+  [0063](../../design-backlog.md#0063--spins-usable-ceiling-is-set-by-fade-not-by-taste-and-the-pair-is-undocumented)
   (`spin` and `fade` are one look; the "2-4 is where rotation becomes legible" advice is wrong
   for every attractor preset that ships and goes).
 - **Files touched:** `presets/README.md` (depth section), `docs/preset-palettes.md`
@@ -185,7 +186,7 @@ flowchart TD
 - **Owner skill:** human
 - **What:** per cohort, the content lane authors its worlds under the **fresh-slate rule**
   (ADR-0089: a new world never begins by opening an old preset file), lands them through the
-  [Plan 0067](done/0067-the-curation-route.md) route, and retires that cohort's named presets in
+  [Plan 0067](0067-the-curation-route.md) route, and retires that cohort's named presets in
   the same commit series. Between cohorts, every wall the lane hit is handed to `architect`
   as backlog entries — this is the valve through which the parked capability entries (0021,
   0055, 0068, the LUT wrap, the curve primitive) get promoted **on demonstrated want**, each
@@ -227,8 +228,8 @@ flowchart TD
 ## Risks & open questions
 
 - **R3 (layered composition) is now designed —
-  [ADR-0090](../adrs/0090-a-preset-composes-two-scene-layers.md) /
-  [Plan 0076](done/0076-the-second-layer.md) (closed 2026-08-11) — and this plan still does not
+  [ADR-0090](../../adrs/0090-a-preset-composes-two-scene-layers.md) /
+  [Plan 0076](0076-the-second-layer.md) (closed 2026-08-11) — and this plan still does not
   hard-gate on it.** The preference is 0076 landing before Phase 4's brief so cohort worlds
   can be layered (the collage look is R3's own acceptance evidence); 0076 has now landed,
   so cohort 6 (the collage) is unblocked and the layered worlds can be authored directly.
@@ -311,7 +312,7 @@ history.
 | 3 | `reaction_diffusion` | Chthonic Coral Oracle, Coral, Coral Bloom, Coral Head, Gilt, Reef, Reliquary (7) |
 | 4 | `swarm` + `emitter` + `spectrum` | Dense, Storm, Starfield, Sparks, Squall, Spectrum Comb, Spectrum Corona, Spectrum Ridge (8) |
 | 5 | `attractor` | De Jong, Order Into Life, Lorenz (3) |
-| 6 | the collage | none of its own — gated on [Plan 0076](done/0076-the-second-layer.md) landing |
+| 6 | the collage | none of its own — gated on [Plan 0076](0076-the-second-layer.md) landing |
 
 ### Cohort briefs — one line per world, reference look → mechanism
 

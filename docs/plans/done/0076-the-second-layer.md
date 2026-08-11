@@ -20,7 +20,7 @@
 > [0031](../../adrs/0031-post-stage-trait-instantiable-composite-chain.md),
 > [0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)
 > **Serves:** [roadmap-visual-richness R3](../../roadmap-visual-richness.md); feeds
-> [Plan 0075](../0075-the-content-renaissance.md)'s cohorts (soft ordering: 0075's brief should
+> [Plan 0075](0075-the-content-renaissance.md)'s cohorts (soft ordering: 0075's brief should
 > know whether layering exists, but 0075 does not hard-gate on this plan — its own text says so)
 
 ## TL;DR
@@ -168,7 +168,7 @@ walk, not a reorderable stage.
   audio-driven `mix` surge under `--signal dynamic`. The user's verdict decides two things:
   whether the `over` join point (pre-bloom) reads as intended (crisp but glowing), and
   whether any mode earns removal or renaming before it becomes author surface. **Landing
-  shipped presets is explicitly not this phase** — that is [Plan 0075](../0075-the-content-renaissance.md)'s
+  shipped presets is explicitly not this phase** — that is [Plan 0075](0075-the-content-renaissance.md)'s
   cohorts; this phase proves the seam with fixtures.
 - **Also in this phase (dev, same commit series):** two frozen golden fixtures join the
   suite (one `under`, one `over` pair — per ADR-0023 they are fixtures, not shipped
@@ -239,7 +239,7 @@ idiom, and a fullscreen pair wants `over` with a blend.
 
 ## Followups (after this lands)
 
-- [Plan 0075](../0075-the-content-renaissance.md) Phase 4's brief should mark which cohort
+- [Plan 0075](0075-the-content-renaissance.md) Phase 4's brief should mark which cohort
   worlds are layered — the collage look is the acceptance evidence R3 was built for.
 - If a cohort asks for private effects on the `over` layer, or a third layer, those route
   through architect with this plan's measured costs as the starting evidence.
