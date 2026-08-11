@@ -16,26 +16,29 @@ system = "reaction_diffusion"
 name = "Etching"
 
 [palette]
+# INVERTED TO SCRATCHBOARD (user verdict 2026-08-11): bright line work on black,
+# not dark ink on cream — same burin structure, lit like gold-leaf sgraffito.
 stops = [
-  { at = 0.00, color = "#2c1a0c" },  # deep sepia — the cut line
-  { at = 0.45, color = "#8a6a42" },  # mid sepia wash
-  { at = 1.00, color = "#f6efdd" },  # cream — stripe cores vanish into the paper
+  { at = 0.00, color = "#ffd97a" },  # bright gold — the cut line glows
+  { at = 0.35, color = "#c8842a" },  # amber
+  { at = 0.60, color = "#5a3410" },  # dark bronze falloff
+  { at = 1.00, color = "#070402" },  # black — the plate's mass vanishes into the dark
 ]
 
 [params]
-feed = "0.0420 + noise(time * 0.04) * 0.0014 + clamp(bass * 1.18, 0, 1) * 0.0016"
-kill = "0.0600 + noise(time * 0.03 + 30) * 0.0005 + clamp(mid * 1.18, 0, 1) * 0.0006"
-flow = "1.1 + clamp(bass * 0.83, 0, 0.7)"
-inject = "max((onset > 0.7) * (bar < 0.25), noise(time * 1.2 + 40) > 0.64)"
+feed = "0.0420 + noise(time * 0.1) * 0.0022 + clamp(bass * 1.18, 0, 1) * 0.0016"
+kill = "0.0600 + noise(time * 0.08 + 30) * 0.0008 + clamp(mid * 1.18, 0, 1) * 0.0006"
+flow = "1.6 + clamp(bass * 0.83, 0, 0.7)"
+inject = "max((onset > 0.6) * (bar < 0.25), noise(time * 1.6 + 40) > 0.58)"
 glow = "0.85"
-contour = "10 + (onset > 0.6) * 2"           # a hit double-strikes the line work
+contour = "12 + (onset > 0.6) * 2"           # deep banding; a hit double-strikes the line work
 hatch = "10 + clamp(treb * 3.3, 0, 2)"
 zoom = "1.05"
 color_span = "2.3"                  # RD's field tops out near 0.4 — span 2+ reaches the cream end
-saturation = "0.9 + clamp(mid * 0.29, 0, 0.25)"   # mid enriches the sepia
-bg_hue = "0.11"                     # the paper: warm cream backdrop under the field's voids
-bg_bright = "0.75 + clamp(bass * 0.18, 0, 0.15)"  # bass presses the plate into the paper
-bg_vignette = "0.25"
+saturation = "1.1 + clamp(mid * 0.29, 0, 0.25)"   # the gold burns; mid heats it further
+bg_hue = "0.11"
+bg_bright = "0.0"                   # black ground — the line work carries all the light
+bg_vignette = "0"
 
 [smoothing]
 flow = 0.25
