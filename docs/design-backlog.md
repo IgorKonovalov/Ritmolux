@@ -156,6 +156,10 @@ floor, so the headroom is not large enough to give away blind.
   [0068](#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
   as the sparse-idiom pair: one look class, two walls, and fixing either without the other
   leaves the look unreachable.
+- **PROMOTED same day → [ADR-0091](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md) +
+  [Plan 0077](plans/0077-the-quiet-sky.md) Phase 1** (queued after Plan 0076 + cohort 6).
+  The rotational-symmetry case stays out of scope by arithmetic and remains this entry's
+  documented authoring constraint — the promotion covers the sparse half only.
 
 ---
 
@@ -448,6 +452,11 @@ reachable with its framing carried beside it.
 **Handoff verdict (2026-08-11): promote.** The entry already names the rejected alternative
 (free coefficient binding, which exists and cuts), the mechanism is now concrete, and a cohort
 demonstrably shipped around the gap. ADR-shaped and earned.
+
+**PROMOTED same day → [ADR-0093](adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md) +
+[Plan 0079](plans/0079-the-attractor-learns-new-figures.md)** — the roster **plus** measured
+morph paths, the stronger form, user-decided by interview (zero surviving paths is a recorded
+outcome, not a failure). Queued after Plan 0076 + cohort 6, last of the three handoff plans.
 
 ---
 
@@ -1161,6 +1170,10 @@ parameter surface, and the scene that most wants it cannot reach it.
   statistic as the sparse-idiom pair (fixing either wall alone leaves the look unreachable),
   and with [0085](#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever)
   (swarm `reseed`) riding the same plan.
+- **PROMOTED same day → [Plan 0077](plans/0077-the-quiet-sky.md) Phase 2** (option 1; the
+  gate half is that plan's Phase 1 via
+  [ADR-0091](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)).
+  Option 2 — the emitter's movable source — stays open in this entry, unpromoted.
 
 ---
 
@@ -2016,6 +2029,10 @@ file's standing verify-before-acting rule applies.
 
 ## 0084 — the ink stage has no contrast lever, and three worlds in two cohorts paid for it
 
+- **PROMOTED 2026-08-11 → [ADR-0092](adrs/0092-the-ink-remap-gains-a-contrast-exponent.md) +
+  [Plan 0078](plans/0078-the-ink-learns-to-bite.md)** — same day as filed; the response
+  exponent, endpoints invariant so the paper never moves. Queued after Plan 0076 + cohort 6.
+
 **Raised by:** `preset-author`, three separate times across Plan 0075 cohorts 3 and 4.
 **Owner if taken:** `architect` (a small ADR — where the response shape lives) then `dev`.
 
@@ -2037,6 +2054,10 @@ which costs the palette. Where the lever lives and what it does to the existing 
 is the ADR.
 
 ## 0085 — `swarm` has no `reseed`, so a flow-field pile-up has no recovery lever
+
+- **PROMOTED 2026-08-11 → [Plan 0077](plans/0077-the-quiet-sky.md) Phase 3** — same day as
+  filed, riding the swarm-individuation plan exactly as the verdict below proposed; ADR-0066
+  disturbance semantics, and the horizon caveat is carried by that plan's Phase 5.
 
 **Raised by:** `preset-author`, Plan 0075 cohort 4 (the Shatter world). **Owner if taken:**
 `dev`, inside whatever plan takes
@@ -2101,6 +2122,12 @@ includes acting on
 [0085](#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever), which must
 not ship its lever verified only at the horizon the suite can see.
 
+**Trigger status (2026-08-11, same day):** [Plan 0077](plans/0077-the-quiet-sky.md) acts on
+0085 and its Phase 5 carries the bounded check this entry's "What a fix would be" prescribes —
+one minutes-horizon observation, verdict recorded in the world's header. The entry itself
+stays **parked**: no instrument is built, and the trigger re-arms for the next
+slow-accumulation look.
+
 ## 0087 — `reaction_diffusion` has no glow of its own, and the engine bloom's threshold sits above where its output lives
 
 **Raised by:** `preset-author`, Plan 0075 cohort 3 (the Verdigris/Mitosis register).
@@ -2124,6 +2151,10 @@ it is the same argument on a second scene.
 One cohort's demonstrated want. The ADR-0080 shape is the named route when the second arrives.
 
 ## 0088 — `shot --report`'s band columns cannot see reactivity spent on bloom
+
+- **PROMOTED 2026-08-11 → [Plan 0077](plans/0077-the-quiet-sky.md) Phase 4** — same day as
+  filed, riding the sparse-idiom plan as its small instrument phase; no ADR, per the verdict
+  below.
 
 **Raised by:** `preset-author`, Plan 0075 cohort 4, as an instrument note. **Owner if taken:**
 `dev` — `standalone/examples/shot.rs` and the report's band statistic.

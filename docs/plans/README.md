@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0077** (ADRs are a separate sequence — next free there is **0091**.)
+**Next free number: 0080** (ADRs are a separate sequence — next free there is **0094**.)
 
 ## Active roster
 
@@ -17,6 +17,9 @@ someone who picked it up is reading.
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
 | [0075](0075-the-content-renaissance.md) | The content renaissance: the library is rebuilt as worlds, by replacement cohorts | **in progress** (cohorts 1-5 landed) | dev, human | The R6 rebuild ([ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md): replacement cohorts under a fresh-slate rule). **Runs in the worktree lane `WORK/lmv-plan-0075`** (branch `plan-0075-content-renaissance`, unpushed): cohorts 1-5 committed and suite-green through `767d7eb`, the library is 28 worlds, cohort 5 judged live by the user 2026-08-11 with no retunes requested. **What remains: cohort 6 (the collage), gated on [0076]**, then the Phase 6 doc sweep — do not close the lane before both. The cohorts' engine-feedback handoff was filed 2026-08-11: [backlog 0084-0089](../design-backlog.md) plus re-raises inside 0009/0055/0068, each carrying a promote/park verdict; **promoted items queue behind [0076] and cohort 6, nothing new was absorbed into this plan** (its own Decision). Phase 6 carries three handoff-recorded sweep items (the `fragment_kaleido` exemplar drift, the `vigor` space-filling caveat, the `444600d` title note). The [0046] Phase 5 content finding (`blend = "add"` vs a rich palette) stands until a feedback cohort resolves it — check the cohort records before assuming it was met. |
+| [0077](0077-the-quiet-sky.md) | The quiet sky: the sparse idiom becomes gateable and the swarm individuates | **approved 2026-08-11** | dev, human | The handoff's sparse-idiom bundle ([ADR-0091](../adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)): the animation gate's statistic normalizes by the figure's footprint, the swarm gains `twinkle`/`size_spread`/`reseed`, `shot --report` learns to see bloom-spent reactivity, and the plan's acceptance is shipping the look cohort 4 lost — Perseids' quiet sky — through the 0067 route at its author's preferred density. Closes backlog 0009 (statistic half), 0068 (option 1), 0085, 0088; discharges 0086's trigger with a bounded horizon check (0086 stays parked). **Queued after [0076] + cohort 6.** |
+| [0078](0078-the-ink-learns-to-bite.md) | The ink learns to bite: a contrast exponent on the terminal remap | **approved 2026-08-11** | dev, human | Small ([ADR-0092](../adrs/0092-the-ink-remap-gains-a-contrast-exponent.md)): `ink_gamma` on the remap's luminance key, endpoints invariant so the paper never moves, default 1.0 = identity so zero baselines move structurally. Closes backlog 0084 (hit 3x in cohorts 3-4). Ends with the content lane re-judging the ink worlds — Etching's palette-side duotone is a live backlog-0060 workaround the moment Phase 1 lands. **Queued after [0076] + cohort 6**; small enough to slot into any free session then. |
+| [0079](0079-the-attractor-learns-new-figures.md) | The attractor learns new figures: the tuple roster with per-tuple framing, and measured morph paths | **approved 2026-08-11** | dev, human | The largest of the three ([ADR-0093](../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md)): per-family curated tuple tables carrying their own projection + seed box (jitter derived per-entry so `reseed` survives — the Plan 0062 coupling), a CPU-quantized `tuple` param, the rho ≈ 100 Lorenz as the walking skeleton, user-curated roster from contact sheets, then morph-path filmstrip sweeps where **zero survivors is a legitimate recorded outcome** (user accepted the research risk by interview). Closes backlog 0055. **Queued after [0076] + cohort 6, last of the three** — two `human` curation gates inside. |
 | [0076](0076-the-second-layer.md) | The second layer: a preset composes two scenes (R3) | **approved 2026-08-09** | dev, human | [ADR-0090](../adrs/0090-a-preset-composes-two-scene-layers.md), all four open choices user-decided by interview (incl. **per-layer scene instances from the start** — same-system pairs are in scope, and Phase 2's registry migration is the plan's real risk). Touches `render/mod.rs`/`post.rs` — **[0071] and [0046] have both landed, so that block is lifted and its "wants [0046] first" preference is discharged**. Read what the two left there first: `post.rs` now owns a chain-level param vocabulary (`CHAIN_PARAMS`) routed as `ParamRoute::Composite`, `Fold::Over` carries a payload, and `composite_into` decides per frame whether the seam belongs to the chain's last stage or to the scene. A second layer has to answer what `occlude` means when two scenes share one backdrop — and now also what `fb_*` means when two scenes share one trails accumulation, since [0046] routed those names through `ParamRoute::StageAndScene` and gave `PostStage` a `set_dt` / `set_feedback` pair on the same one-way route as `set_exposure`. |
 
 ## Recommended execution sequence
@@ -46,9 +49,13 @@ bringing the user in rather than picking on that criterion.
 | 2 | [0075] | **Last by design** (ADR-0089): the fresh library is authored once, against a finished engine. Its four prerequisites are all landed, so this is now a scheduling choice rather than a wait. Its Phases 1-3 remain the exception — ungated instrument/doc fixes, take them whenever a session has room. |
 
 **Confirmed 2026-08-11, at the cohorts 1-5 handoff: [0076] remains the next execution step.**
-Cohort 6 (the collage) is gated on it, and none of the handoff's promoted backlog items
-(0084, 0088, the 0009+0068 sparse-idiom pair with 0085, the 0055 tuple-roster re-raise) queues
-ahead of it — each waits for its own ADR/plan after the renaissance, per [0075]'s Decision.
+Cohort 6 (the collage) is gated on it, and none of the handoff's promoted backlog items queues
+ahead of it. **The promoted items now have their plans** (written the same day, user-decided by
+interview): [0077](0077-the-quiet-sky.md) (sparse idiom + swarm individuation, closes
+0009/0068/0085/0088), [0078](0078-the-ink-learns-to-bite.md) (ink contrast, closes 0084),
+[0079](0079-the-attractor-learns-new-figures.md) (tuple roster + measured morph paths, closes
+0055). Execution order after [0076] and [0075]'s remainder: **0077, then 0078 (small — any free
+session), then 0079** (largest, two `human` curation gates).
 
 ### The baseline-drift control any pixel-touching plan inherits
 
