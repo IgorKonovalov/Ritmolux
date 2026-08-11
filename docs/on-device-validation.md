@@ -68,6 +68,18 @@ footprint so the vendor spread is on record.
       and back. That pair is the freeze fallback's reason for existing; on this box it should either
       stay frozen (fine) or, if it upgrades, still hold the floor. _(Plan 0023 Phase 4's done-when
       and its budget-tuning risk, extracted at that plan's close.)_
+- [ ] **The layered heavy pair (Plan 0076), on the low-end box, 1080p.** A preset may now
+      compose a second scene (`[layer]`, ADR-0090), and `Floor` renders **both** layers by
+      design — a two-layer world must not lose half its content on weak hardware. The
+      deliberately heavy pairing is an attractor main with a reaction-diffusion layer, at both
+      joins (`under`, and `over` with a blend — the `over` join adds a surface-sized
+      `Rgba16Float` offscreen pair and one blend pass). With the overlay on (`F3`), load such a
+      preset — the Plan 0076 close notes carry probe TOMLs, or write one from
+      `presets/README.md` — and report **(a)** whether fps holds ≥ 60 at 1080p for each join and
+      **(b)** the p99 against the attractor preset alone. _(Plan 0076 Phase 4's measured numbers
+      are dev-box hardware figures, not iGPU evidence; this line is where that evidence comes
+      from. If it fails, the response is authoring guidance — heavy-plus-heavy pairings are an
+      authoring responsibility per ADR-0090 — not a tier change.)_
 - [ ] **Trails at native resolution, on the low-end box, 1080p.** Plan 0033 made the two post
       stages size their internal grid from the render target instead of a fixed 1280x720
       (ADR-0034). With `trails` active that is now a **full-resolution `Rgba16Float` ping-pong

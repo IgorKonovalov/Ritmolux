@@ -813,28 +813,26 @@ impl Renderer {
             self.roster.presets.get(from).map(|p| p.system),
             self.roster.presets.get(to).map(|p| p.system),
         );
+        // **This pairwise check over the two mains IS the decision against the
+        // full set of scene instances in flight** (Plan 0076 Phase 4). A
+        // layered dual-live frame composites up to four scenes — two roster
+        // mains plus up to two `[layer]` scenes — but the layer scenes are
+        // constructed per preset (`scenes::create_layer_scene`, ADR-0090 point
+        // 4): each lives on its own `CompositeSide`, shares no `Box` with any
+        // roster instance, and a layer line scene carries its own
+        // `LineRenderer` rather than borrowing the roster's shared one. So the
+        // only objects two sides can share are the two main scenes (and, for
+        // line mains, their one shared renderer) — exactly what
+        // `shares_resources` answers; a construction the registry could not
+        // satisfy live would have to surface as sharing, and since Phase 2
+        // none can. The budget half is unchanged: layered content simply
+        // weighs more per frame, so the governor's latch freezes it more often
+        // — ADR-0090's accepted Negative, not a special case here.
         let shares = match systems {
             (Some(a), Some(b)) => scenes::shares_resources(a, b),
             // A preset we cannot even resolve is not a pair we will render twice.
             _ => true,
         };
-        // **Interim, until Plan 0076 Phase 4 decides eligibility against the
-        // full set of scene instances in flight.** A `[layer]` on either side
-        // puts up to four roster instances in one frame, and this pairwise
-        // check only sees the two mains — e.g. the outgoing preset's swarm
-        // layer against an incoming swarm main is the same `Box<dyn Scene>`
-        // rendered twice. Freeze is always correct, so a layered side takes it.
-        let layered = self
-            .roster
-            .presets
-            .get(from)
-            .is_some_and(|p| p.layer.is_some())
-            || self
-                .roster
-                .presets
-                .get(to)
-                .is_some_and(|p| p.layer.is_some());
-        let shares = shares || layered;
         if transition::dual_live_eligible(
             shares,
             self.diag.stats().frame_ms_avg(),

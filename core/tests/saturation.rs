@@ -156,17 +156,38 @@ struct Row {
 }
 
 /// Walk one preset, returning its distribution rows and its failures.
+///
+/// The walk covers the `[layer]`'s bindings too — its params and its bindable
+/// `mix` — since Plan 0076 Phase 4: they are the same `Binding` machinery, and
+/// a layer clamp pinned at its bound is the same defect in another namespace.
+/// Layer rows are labeled `[layer] <param>`; an `[occupancy] exempt` entry
+/// matches the **raw** param name in either namespace, since the table
+/// predates layers and names params, not namespaces.
 fn walk_preset(preset: &Preset, frames: &[AnalysisFrame]) -> (Vec<Row>, Vec<String>) {
     let mut rows = Vec::new();
     let mut failures = Vec::new();
-    for binding in &preset.params {
+    let layer_bindings = preset
+        .layer
+        .iter()
+        .flat_map(|layer| layer.params.iter().chain(layer.mix.iter()));
+    let bindings = preset
+        .params
+        .iter()
+        .map(|binding| (binding, false))
+        .chain(layer_bindings.map(|binding| (binding, true)));
+    for (binding, in_layer) in bindings {
+        let display = if in_layer {
+            format!("[layer] {}", binding.name)
+        } else {
+            binding.name.clone()
+        };
         let mut obs = Observations::new();
         drive(&binding.expr, frames, preset.pinned_salt, &mut obs);
         let exempt = preset.occupancy_exempt.contains(&binding.name);
         if let Some(occupancy) = peak_occupancy(&obs) {
             rows.push(Row {
                 preset: preset.name.clone(),
-                param: binding.name.clone(),
+                param: display.clone(),
                 occupancy,
                 exempt,
             });
@@ -201,7 +222,7 @@ fn walk_preset(preset: &Preset, frames: &[AnalysisFrame]) -> (Vec<Row>, Vec<Stri
                  bound is reached only on peaks, or declare `[occupancy] exempt = [\"{}\"]` \
                  if pinning is the design",
                 preset.name,
-                binding.name,
+                display,
                 flag.source,
                 occupancy * 100.0,
                 binding.name,
