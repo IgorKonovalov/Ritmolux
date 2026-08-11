@@ -189,8 +189,8 @@ discoverable from the roster (measured at the Plan 0063 content pass,
 [design-backlog 0062](design-backlog.md)):
 
 1. **It reads as a hue cue only on a ramp that travels in hue at roughly constant
-   lightness.** Rendered side by side at `perspective = 0.5`: against
-   `attractor_lorenz`'s shipped night-blue → teal → mint → solar-white ramp, a
+   lightness.** Rendered side by side at `perspective = 0.5`: against the
+   since-retired `attractor_lorenz`'s night-blue → teal → mint → solar-white ramp, a
    `depth_hue` of `0.4` reads as the near material getting **brighter** — a second
    contrast lever pointing the same way as `depth_fade`, not an independent cue.
    Against a constant-lightness hue-travel ramp (blue → cyan → gold → orange →
@@ -201,7 +201,7 @@ discoverable from the roster (measured at the Plan 0063 content pass,
 2. **It wraps, and the wrap can make far material look near.** The offset is
    `±depth_hue/2` on a coordinate the LUT sampler **repeats** — keep it under
    **`2 * min(hue_center, 1 - hue_center)`** or one end walks off the ramp and
-   wraps to the other. `attractor_lorenz`'s `hue_center` runs as low as `0.13`,
+   wraps to the other. `attractor_lorenz`'s `hue_center` ran as low as `0.13`,
    so a `depth_hue` much above `0.26` sends the far end negative and lands the
    far material on the same bright mint as the near — the cue inverts into a
    collision. At `depth_hue = 1.0` with `hue_center = 0.20`, both ends of the
@@ -254,8 +254,8 @@ within one.
 **On the fern the escape won, so the second row is a measurement rather than the
 shipped tuning.** Judged against `root_hue` — which did not exist when the split
 was measured — the fern keeps `map_tint` at its full `0.46` and takes its depth
-cue through the hue route instead, giving up nothing. Both shipped IFS presets
-bind `root_hue`; neither binds `root_tint`. The budget is real; paying it is the
+cue through the hue route instead, giving up nothing. Every shipped IFS preset
+binds `root_hue`; none binds `root_tint`. The budget is real; paying it is the
 second choice.
 
 One more trap on `root_tint` specifically: **its effective range is per figure**,
@@ -348,11 +348,13 @@ Two honest limits, both measured rather than estimated:
   at every tiling order and contact angle. There is no range to walk, and the
   normalization collapses to `u = 0` rather than sweeping on noise. The scene
   still gains `[palette]`, `saturation` and `palette_mix`, which are real. What is
-  empty is the rosette's *interior* — at `star_rosette`'s 12-fold / 20° the
-  strokes live between radius 0.54 and 0.90, so the inner 60% of the disc is bare,
-  and `star_lantern`'s 55° variant empties 87% of it. That is a generator
-  question, still open; the ramp comes alive by itself the day a construction puts
-  segments at different radii.
+  empty is the rosette's *interior* — at the retired `star_rosette`'s 12-fold /
+  20° the strokes lived between radius 0.54 and 0.90, so the inner 60% of the
+  disc was bare, and the retired `star_lantern`'s 55° variant emptied 87% of it.
+  The generator question has since been answered: `rings` puts motifs at several
+  radii, the ramp is computed over the combined figure, and on a rings preset
+  (`star_rosewindow` ships one) `hue_spread` is a real lever — see the
+  `star_pattern` notes in `presets/README.md`.
 
 ---
 
