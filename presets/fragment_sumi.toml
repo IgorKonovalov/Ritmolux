@@ -1,0 +1,101 @@
+# Sumi - glowing calligraphy over smoke: the second layered world (ADR-0090),
+# and the first to hang a STATEFUL scene as the layer. The ground is a slow,
+# dark smoke field; the layer is the Thomas flow drawn as a sparse luminous
+# pen-trace (the ADR-0069 density+fade mechanism: ~1000 particles, each a
+# followable trajectory, the segment joining its steps into a stroke),
+# floating crisp above the smoke's trails on the over-join. One palette
+# serves both, by the engine's rule: the smoke lives on the ramp's deep
+# blue-charcoal floor, the trace's dense cores climb to its amber top.
+#
+# The collage gesture: `mix` rests high - the calligraphy IS the figure - and
+# it is the SMOKE that answers the music's body (warp and glow on bass/mid)
+# while the trace answers its detail: treble bends the flow's own constant,
+# onset jitters the pen (reseed), and the beat lays a wet stroke (size).
+#
+# NO ROTATION (standing verdict): the layer's `spin` is bound to a slow rock
+# - the attractor family's default is a full revolution per ~35 s, which is
+# exactly the trap the dragon and dissolve headers document.
+system = "fragment_field"
+name = "Sumi"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#04070d" },
+  { at = 0.28, color = "#122433" },
+  { at = 0.55, color = "#2e5457" },
+  { at = 0.80, color = "#e8951f" },
+  { at = 1.00, color = "#fff3d4" },
+]
+
+[params]
+# THE SMOKE - slow, dark, structured by warp rather than lifted by glow. It
+# breathes with the bass; it never competes with the trace's luminance.
+warp         = "0.90 + noise(time * 0.035) * 0.35 + clamp(bass * 0.59, 0, 0.50)"
+zoom         = "1.25"
+glow         = "0.12 + clamp(bass * 0.141, 0, 0.12)"
+flash        = "clamp(onset * 0.35, 0, 0.25)"
+color_span   = "0.45"
+color_center = "0.20 + noise(time * 0.022 + 200) * 0.08 + clamp(mid * 0.094, 0, 0.08)"
+saturation   = "1.15 + clamp(mid * 0.24, 0, 0.20)"
+palette_mix  = "0"
+
+# The smoke drifts upward through its own trails - slow, un-rotated.
+trails = "0.50 + clamp(bass * 0.118, 0, 0.10)"
+fb_dy  = "0.04"
+
+bg_hue      = "0.60"
+bg_bright   = "0.006 + clamp(mid * 0.018, 0, 0.015)"
+bg_vignette = "0.86"
+
+bloom_amount    = "1.35"
+bloom_threshold = "0.9"
+bloom_radius    = "1.3"
+
+# THE TRACE - crisp above the smoke. `add` rather than `screen`, deliberately:
+# the trace is thin, so it cannot wash the frame, and add keeps its cores hot
+# enough for bloom to pick out. mix rests high (the calligraphy is the
+# figure) and dips only when the music leaves - the smoke alone is the rest
+# state's rest state.
+[layer]
+system = "attractor"
+join   = "over"
+blend  = "add"
+mix    = "0.70 + clamp(bass * 0.35, 0, 0.30)"
+
+[layer.particles]
+family  = "thomas"
+# The pen mechanism (ADR-0069): sparse enough that each trajectory is a
+# stroke, not a fog.
+density = 0.02
+
+[layer.params]
+# The flow's own constant - the lattice opens below ~0.17 and knots above
+# ~0.21. Treble bends the trajectory; bass tightens it a touch.
+a          = "0.190 + sin(time * 0.031) * 0.012 + clamp(treb * 0.0267, 0, 0.016) - clamp(bass * 0.0235, 0, 0.020)"
+# Long trail = the drawn line; falls under bass so a drop sharpens the nib.
+fade       = "0.93 - clamp(bass * 0.047, 0, 0.040)"
+size       = "0.50 - clamp((bass + treb) * 0.059, 0, 0.085) + beat * 0.10"
+# The level arithmetic from the family's ink preset carries: density 0.02
+# multiplies each deposit by 50 and the long fade piles ~14 frames of it, so
+# the scene's own level sits low and the ramp's gold top does the glowing.
+brightness = "0.16 + clamp(bass * 0.071, 0, 0.060)"
+reseed     = "onset > 0.42"
+# A slow rock, never a revolution (see header).
+spin       = "sin(time * 0.22) * 0.24"
+hue_spread = "0.30"
+saturation = "1.20"
+
+[layer.smoothing]
+mix        = { attack = 0.05, release = 0.45 }
+a          = 0.6
+fade       = 0.20
+size       = { attack = 0.02, release = 0.26 }
+brightness = 0.30
+
+[smoothing]
+warp         = 0.5
+glow         = 0.3
+flash        = { attack = 0.02, release = 0.20 }
+trails       = 0.45
+color_center = 0.5
+bg_bright    = 0.4
