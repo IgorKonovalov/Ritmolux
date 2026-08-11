@@ -1,7 +1,7 @@
 //! GPU compute-particle attractor contract (Plan 0016 Phase 5, HARD). The
 //! attractor scene is the engine's first *compute pipeline* + GPU-resident
 //! particle system, so beyond the generic per-preset gates (sanity / animation /
-//! reactivity, which already include the four shipped attractor presets) it gets
+//! reactivity, which already include the shipped attractor presets) it gets
 //! a focused suite here — most importantly a **seed reproducibility** check (the
 //! Phase 1 determinism done-when) and a **beat perturbation** check (Phase 3), the
 //! two properties the generic differential loops don't assert directly.
@@ -24,10 +24,16 @@ use lmv_core::render::{
 };
 
 const SIZE: u32 = 96;
-/// The 2D map preset (De Jong) and a 3D flow preset (Lorenz) from the embedded
-/// set — one of each idiom the scene supports.
-const DEJONG: &str = "De Jong";
-const LORENZ: &str = "Lorenz";
+/// A 2D map preset and a 3D flow preset from the embedded set — one of each
+/// idiom the scene supports. Repointed at Plan 0075 cohort five, which retired
+/// the De Jong and Lorenz presets: Ink on Paper carries the same `de_jong`
+/// family (and, deliberately, no trails stage, so the bit-exact
+/// reproducibility check below stays clear of WARP's trails quirks); Thomas is
+/// the remaining continuous flow. The bare inline `lorenz`-family presets
+/// further down are unaffected — the family still ships, only its preset
+/// retired.
+const MAP_2D: &str = "Ink on Paper";
+const FLOW_3D: &str = "Thomas";
 
 /// A De Jong attractor preset with an extra `[params]` line — used to isolate the
 /// view transform (Phase 4): the compute/accumulation path is identical, so any
@@ -193,24 +199,26 @@ fn attractor_contract() {
         ..Default::default()
     };
 
-    // --- Shape sanity: the De Jong cloud is neither blank nor a single dot. ---
+    // --- Shape sanity: the 2D map figure is neither blank nor a single dot.
+    // (Under Ink on Paper the sampled background is the paper, so "lit" below
+    // means the drawn strokes.) ---
     let warm = renderer
-        .capture_preset(DEJONG, &lively, 60)
-        .expect("capture De Jong @60");
+        .capture_preset(MAP_2D, &lively, 60)
+        .expect("capture the 2D map preset @60");
     let bg = background(&warm);
     let cov = coverage(&warm, bg, EPS);
     let spread = quadrant_spread(&warm, bg, EPS);
-    assert!(cov > 0.02, "De Jong cloud is blank: coverage {cov:.4}");
-    assert!(spread >= 2, "De Jong cloud is a dot: {spread} quadrant(s)");
+    assert!(cov > 0.02, "2D map figure is blank: coverage {cov:.4}");
+    assert!(spread >= 2, "2D map figure is a dot: {spread} quadrant(s)");
 
     // --- Seed reproducibility (Phase 1 determinism done-when): the seeded init +
     // deterministic compute step reproduce bit-for-bit on the same adapter — the
     // property a GPU-resident particle sim most easily loses. ---
     let a = renderer
-        .capture_preset(DEJONG, &lively, 48)
+        .capture_preset(MAP_2D, &lively, 48)
         .expect("capture A");
     let b = renderer
-        .capture_preset(DEJONG, &lively, 48)
+        .capture_preset(MAP_2D, &lively, 48)
         .expect("capture B");
     assert_eq!(
         a.rgba, b.rgba,
@@ -220,7 +228,7 @@ fn attractor_contract() {
     // --- Animation: a later frame differs from an earlier one (boiling + spin +
     // trails move it), not frozen. ---
     let early = renderer
-        .capture_preset(DEJONG, &lively, 24)
+        .capture_preset(MAP_2D, &lively, 24)
         .expect("capture @24");
     let motion = frame_diff(&early, &warm);
     assert!(motion > 0.01, "attractor is frozen: motion {motion:.4}");
@@ -234,24 +242,24 @@ fn attractor_contract() {
     };
     let beat = AnalysisFrame { beat: true, ..calm };
     let without = renderer
-        .capture_preset(DEJONG, &calm, 60)
+        .capture_preset(MAP_2D, &calm, 60)
         .expect("capture calm");
     let with = renderer
-        .capture_preset(DEJONG, &beat, 60)
+        .capture_preset(MAP_2D, &beat, 60)
         .expect("capture beat");
     let delta = frame_diff(&without, &with);
     assert!(delta > 0.003, "beat did not perturb the cloud: {delta:.4}");
 
-    // --- 3D flow: the Lorenz butterfly renders a real shape, exercising the
+    // --- 3D flow: the Thomas lattice renders a real shape, exercising the
     // continuous-family compute path (Euler integration + 3D projection). ---
-    let lorenz = renderer
-        .capture_preset(LORENZ, &lively, 90)
-        .expect("capture Lorenz @90");
-    let lbg = background(&lorenz);
-    let lcov = coverage(&lorenz, lbg, EPS);
-    let lspread = quadrant_spread(&lorenz, lbg, EPS);
-    assert!(lcov > 0.02, "Lorenz flow is blank: coverage {lcov:.4}");
-    assert!(lspread >= 2, "Lorenz flow is a dot: {lspread} quadrant(s)");
+    let flow = renderer
+        .capture_preset(FLOW_3D, &lively, 90)
+        .expect("capture the 3D flow preset @90");
+    let lbg = background(&flow);
+    let lcov = coverage(&flow, lbg, EPS);
+    let lspread = quadrant_spread(&flow, lbg, EPS);
+    assert!(lcov > 0.02, "3D flow figure is blank: coverage {lcov:.4}");
+    assert!(lspread >= 2, "3D flow figure is a dot: {lspread} quadrant(s)");
 
     // --- View transform (Plan 0025 Phase 4, ADR-0018): `zoom`/`pan_*` scale/offset
     // the projected cloud, so binding them visibly moves the whole attractor. The
@@ -849,10 +857,10 @@ fn attractor_projects_at_the_target_aspect() {
         treb: 0.5,
         ..Default::default()
     };
-    let Some(exact) = capture_at(EXACT_TARGET, DEJONG, &lively) else {
+    let Some(exact) = capture_at(EXACT_TARGET, MAP_2D, &lively) else {
         return;
     };
-    let Some(quantized) = capture_at(QUANTIZED_TARGET, DEJONG, &lively) else {
+    let Some(quantized) = capture_at(QUANTIZED_TARGET, MAP_2D, &lively) else {
         return;
     };
 
