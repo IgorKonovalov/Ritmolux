@@ -393,10 +393,64 @@ pub(crate) fn create_all(
         .map(|&kind| {
             (
                 kind,
-                create(kind, device, surface_format, &line_renderer, tier),
+                create(
+                    kind,
+                    device,
+                    surface_format,
+                    &mut || line_renderer.clone(),
+                    tier,
+                ),
             )
         })
         .collect()
+}
+
+/// A scene constructed **for one preset's `[layer]`** (ADR-0090 point 4, Plan
+/// 0076 Phase 2), never taken from the roster — which is what makes same-system
+/// pairs legal and keeps two dissolving sides' layers from sharing anything.
+/// The stateful families duplicate their GPU state by construction: their
+/// constructors are already self-contained (a second reaction-diffusion
+/// ping-pong field, a second particle buffer), so this is the same exhaustive
+/// [`create`] the roster uses, differing only in where a line scene gets its
+/// renderer.
+///
+/// # The `LineRenderer` answer, recorded (the Phase 2 discovery duty)
+///
+/// **A layer line scene gets its own `LineRenderer`; the shared one is not
+/// shareable between two live line draws in one frame.** `LineRenderer::draw`
+/// uploads its instance and uniform buffers through `Queue::write_buffer`, and
+/// queued writes are applied before the submission's passes execute — so two
+/// draws through one renderer in one frame would both rasterize the *second*
+/// draw's segments under the second draw's uniforms. Making it shareable would
+/// need a partitioned instance buffer and per-draw uniform slots — a redesign
+/// of the idiom, not constructor plumbing — so duplication is the answer, at
+/// one pipeline plus one `max_segments` instance buffer per layered line
+/// preset.
+///
+/// The duplicate is built **only when the layer is a line system**: a
+/// fragment/swarm/particle layer pays no line pipeline, and WARP's documented
+/// sensitivity to coexisting identical pipeline layouts (ADR-0058 / Plan 0053)
+/// is only ever exercised by a preset that actually declares a line layer.
+pub(crate) fn create_layer_scene(
+    kind: SystemKind,
+    device: &wgpu::Device,
+    surface_format: wgpu::TextureFormat,
+    tier: &crate::render::TierConfig,
+) -> Box<dyn Scene> {
+    create(
+        kind,
+        device,
+        surface_format,
+        &mut || {
+            Rc::new(RefCell::new(lines::LineRenderer::new(
+                device,
+                surface_format,
+                tier.max_segments,
+                "layer-lines",
+            )))
+        },
+        tier,
+    )
 }
 
 /// Whether two systems' scenes share mutable GPU state, so **one frame must not
@@ -412,6 +466,12 @@ pub(crate) fn create_all(
 /// Plan 0023's dual-live dissolve is the first caller: it composites two presets
 /// in a single frame, which is exactly what this forbids. A pair that shares
 /// resources falls back to the frozen snapshot.
+///
+/// **This is a statement about the roster's instances only.** A `[layer]`
+/// scene ([`create_layer_scene`], Plan 0076 Phase 2) is constructed per preset
+/// and shares nothing with the roster or with another preset's layer by
+/// construction — so a preset's own main-plus-layer pair never consults this,
+/// whatever the two systems are.
 pub(crate) fn shares_resources(a: SystemKind, b: SystemKind) -> bool {
     a == b || (draws_through_shared_line_renderer(a) && draws_through_shared_line_renderer(b))
 }
@@ -438,11 +498,16 @@ fn draws_through_shared_line_renderer(kind: SystemKind) -> bool {
 /// An **exhaustive** `match` with no wildcard arm — the same guard the golden
 /// drift fixtures use: adding a variant fails to compile here until its scene is
 /// constructed, so a new system cannot ship unbuilt or wired to the wrong scene.
+///
+/// `line_renderer` is a **source**, called only by the line arms: the roster
+/// hands out clones of its one shared renderer, a layer construction builds a
+/// fresh one on demand ([`create_layer_scene`]) — and a non-line kind builds
+/// none at all.
 fn create(
     kind: SystemKind,
     device: &wgpu::Device,
     surface_format: wgpu::TextureFormat,
-    line_renderer: &Rc<RefCell<lines::LineRenderer>>,
+    line_renderer: &mut dyn FnMut() -> Rc<RefCell<lines::LineRenderer>>,
     tier: &crate::render::TierConfig,
 ) -> Box<dyn Scene> {
     match kind {
@@ -456,15 +521,14 @@ fn create(
             tier.swarm_particles,
         )),
         SystemKind::ParametricCurve => Box::new(lines::ParametricCurveScene::new(
-            line_renderer.clone(),
+            line_renderer(),
             tier.max_segments,
         )),
-        SystemKind::LSystem => Box::new(lines::LSystemScene::new(
-            line_renderer.clone(),
-            tier.max_segments,
-        )),
+        SystemKind::LSystem => {
+            Box::new(lines::LSystemScene::new(line_renderer(), tier.max_segments))
+        }
         SystemKind::StarPattern => Box::new(lines::StarPatternScene::new(
-            line_renderer.clone(),
+            line_renderer(),
             tier.max_segments,
         )),
         SystemKind::ReactionDiffusion => Box::new(reaction_diffusion::ReactionDiffusionScene::new(
@@ -478,7 +542,7 @@ fn create(
             tier.attractor_trail_cap,
         )),
         SystemKind::Spectrum => Box::new(lines::SpectrumScene::new(
-            line_renderer.clone(),
+            line_renderer(),
             tier.max_segments,
         )),
         SystemKind::Emitter => Box::new(emitter::EmitterScene::new(

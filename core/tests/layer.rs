@@ -1,8 +1,8 @@
-//! The `[layer]` capability's Phase 1 contract (Plan 0076 / ADR-0090): a
-//! preset composes a second scene `under` the post chain, through the roster's
-//! existing one-instance-per-system scenes.
+//! The `[layer]` capability's contract (Plan 0076 / ADR-0090): a preset
+//! composes a second scene `under` the post chain, through a scene
+//! **constructed for the preset** (Phase 2 — never a roster instance).
 //!
-//! Four claims, matching the phase's done-when:
+//! The claims, matching the Phase 1 and Phase 2 done-whens:
 //!
 //! 1. the layered fixture renders **both** scenes, visibly (it differs from its
 //!    layerless control) and **deterministically** (two captures are
@@ -12,10 +12,9 @@
 //!    pixel-identical to a probe hard-coding the same value, and different from
 //!    a probe hard-coding another, all under one frame, so the only degree of
 //!    freedom is the binding's evaluation;
-//! 3. a pair whose scenes share GPU state — the same system twice, or two
-//!    line-family systems borrowing the shared `LineRenderer` — **fails at
-//!    load** with the Phase 1 error (deleted when Phase 2's per-layer instances
-//!    land);
+//! 3. **same-system pairs are legal and independent** (Phase 2): two fragment
+//!    fields hold two live parameter states, two swarms hold two seeded
+//!    simulations, and a line-on-line pair draws through two `LineRenderer`s;
 //! 4. the `[layer]` grammar's load-time surface holds: `join` and `blend` are
 //!    closed rosters, `blend` on an `under` join warns as ignored, and an
 //!    unknown layer param warns like a top-level one (ADR-0020).
@@ -61,6 +60,37 @@ fn headless() -> Option<Renderer> {
         height: HEIGHT,
         prefer_software: true,
     }) {
+        Ok(r) => Some(r),
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            None
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    }
+}
+
+/// The default-adapter twin of [`headless`], for the one assertion WARP cannot
+/// host. A same-system pair duplicates pipelines with **byte-identical bind
+/// layouts**, and WARP is documented to alias those (ADR-0058 / Plan 0053):
+/// measured here, the layer instance's uniform wins and the main's becomes a
+/// dead lever — on the software adapter only; hardware renders both. So this
+/// takes `background_composite.rs`'s posture: the guard runs on developer
+/// machines (hardware adapter) and skips with notice on a software-only
+/// runner, rather than asserting on an adapter that mis-renders the shape
+/// under test.
+fn headless_hardware() -> Option<Renderer> {
+    match Renderer::new_headless(HeadlessOptions {
+        width: WIDTH,
+        height: HEIGHT,
+        prefer_software: false,
+    }) {
+        Ok(r) if r.adapter_is_software() => {
+            eprintln!(
+                "skipped: only a software adapter available, and WARP aliases the \
+                 identical pipeline layouts a same-system pair duplicates (ADR-0058)"
+            );
+            None
+        }
         Ok(r) => Some(r),
         Err(RenderError::RequestAdapter(_)) => {
             eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
@@ -165,35 +195,171 @@ fn a_layer_binding_reacts_to_the_analysis_frame() {
     );
 }
 
-/// Done-when 3: the Phase 1 shared-state error. Deleted by Phase 2, which
-/// constructs layer scenes per preset.
+/// Phase 2's headline: the same system twice is a legal pair whose two
+/// instances hold **independent, simultaneously-live states**. Two swarms —
+/// an additive family, so both stay visible through the shared target: moving
+/// only the layer's zoom moves the picture, and so does moving only the
+/// main's. With one shared instance, one of the two would be a dead lever
+/// (last write wins). Deterministic throughout, so the duplicated particle
+/// simulation is seeded like the roster's.
+///
+/// On the hardware adapter (`headless_hardware`) because the "main is live
+/// too" half is exactly what WARP's layout aliasing breaks.
 #[test]
-fn a_shared_state_pair_fails_at_load_until_phase_2() {
-    // The same system twice — the same `Box<dyn Scene>` cannot render twice in
-    // one frame while layers resolve from the roster.
-    let same = Preset::from_toml_str(
-        "system = \"fragment_field\"\n[layer]\nsystem = \"fragment_field\"\n",
-    );
-    let err = same.err().map(|e| e.to_string()).unwrap_or_default();
-    assert!(
-        err.contains("Plan 0076 Phase 2"),
-        "a same-system pair names the Phase 1 restriction, got: {err}"
+fn a_same_system_pair_renders_two_independent_configurations() {
+    let Some(mut renderer) = headless_hardware() else {
+        return;
+    };
+    let frame = fixed_frame();
+
+    let pair = |name: &str, main_zoom: f32, layer_zoom: f32| {
+        format!(
+            "name = \"{name}\"\nsystem = \"swarm\"\n\
+             [params]\nzoom = \"{main_zoom}\"\nsize = \"1.5\"\n\
+             [layer]\nsystem = \"swarm\"\n\
+             [layer.params]\nzoom = \"{layer_zoom}\"\nsize = \"3.0\"\nbrightness = \"1.6\"\n"
+        )
+    };
+    renderer.set_presets(vec![
+        load(&pair("both", 0.4, 1.4)),
+        load(&pair("layer_moved", 0.4, 0.8)),
+        load(&pair("main_moved", 1.0, 1.4)),
+        load(
+            "name = \"one_swarm\"\nsystem = \"swarm\"\n\
+             [params]\nzoom = \"0.4\"\nsize = \"1.5\"\n",
+        ),
+    ]);
+
+    let both = renderer
+        .capture_preset("both", &frame, FRAMES)
+        .expect("capture same-system pair");
+    let again = renderer
+        .capture_preset("both", &frame, FRAMES)
+        .expect("capture same-system pair again");
+    assert_eq!(
+        both.rgba, again.rgba,
+        "two simulations of one system, still a pure function of the inputs"
     );
 
-    // Two *different* line-family systems share the one `LineRenderer`
-    // (`scenes::create_all`), so they are just as unrenderable together.
-    let lines =
-        Preset::from_toml_str("system = \"parametric_curve\"\n[layer]\nsystem = \"spectrum\"\n");
-    let err = lines.err().map(|e| e.to_string()).unwrap_or_default();
+    let alone = renderer
+        .capture_preset("one_swarm", &frame, FRAMES)
+        .expect("capture single swarm");
+    let visible = frame_diff(&alone, &both);
     assert!(
-        err.contains("shares GPU state"),
-        "a line-family pair shares the LineRenderer and must be rejected, got: {err}"
+        visible > 0.001,
+        "the second simulation must visibly contribute (diff {visible:.5})"
     );
 
-    // An independent-state pair loads cleanly.
+    let layer_moved = renderer
+        .capture_preset("layer_moved", &frame, FRAMES)
+        .expect("capture layer-moved variant");
+    let main_moved = renderer
+        .capture_preset("main_moved", &frame, FRAMES)
+        .expect("capture main-moved variant");
+    let layer_diff = frame_diff(&both, &layer_moved);
+    let main_diff = frame_diff(&both, &main_moved);
     assert!(
-        Preset::from_toml_str("system = \"fragment_field\"\n[layer]\nsystem = \"swarm\"\n").is_ok(),
-        "an independent-state pair is exactly what Phase 1 supports"
+        layer_diff > 0.001,
+        "moving only the layer's zoom must move the picture (diff {layer_diff:.5})"
+    );
+    assert!(
+        main_diff > 0.001,
+        "moving only the main's zoom must move the picture (diff {main_diff:.5})"
+    );
+}
+
+/// The plan's named fixture — two fragment fields at different zooms — is
+/// legal and deterministic, and the layer instance's configuration is the
+/// live one.
+///
+/// **What this deliberately does not assert**: that the *main* field stays
+/// visible. A fragment field presents premultiplied with full coverage, so an
+/// `under` layer of the same shape occludes the main scene entirely — real
+/// composite semantics, not a defect: `under` is the sparse-over-dense idiom,
+/// and a fullscreen-over-fullscreen pair is what Phase 3's `over` join and
+/// blend modes exist for. Recorded here so the Phase 5 judgement and the
+/// authoring docs inherit the finding rather than rediscover it.
+#[test]
+fn a_fragment_pair_is_legal_and_the_layer_config_is_live() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let frame = fixed_frame();
+
+    let pair = |name: &str, layer_zoom: f32| {
+        format!(
+            "name = \"{name}\"\nsystem = \"fragment_field\"\n\
+             [params]\nwarp = \"0.35\"\nhue = \"0.1\"\nzoom = \"0.4\"\n\
+             [layer]\nsystem = \"fragment_field\"\n\
+             [layer.params]\nwarp = \"0.6\"\nhue = \"0.7\"\nzoom = \"{layer_zoom}\"\n"
+        )
+    };
+    renderer.set_presets(vec![
+        load(&pair("fields", 1.6)),
+        load(&pair("fields_layer_moved", 0.9)),
+    ]);
+
+    let fields = renderer
+        .capture_preset("fields", &frame, FRAMES)
+        .expect("capture fragment pair");
+    let again = renderer
+        .capture_preset("fields", &frame, FRAMES)
+        .expect("capture fragment pair again");
+    assert_eq!(fields.rgba, again.rgba, "same-system pair is deterministic");
+
+    let moved = renderer
+        .capture_preset("fields_layer_moved", &frame, FRAMES)
+        .expect("capture layer-moved variant");
+    let diff = frame_diff(&fields, &moved);
+    assert!(
+        diff > 0.001,
+        "the layer instance's own zoom must drive the visible field (diff {diff:.5})"
+    );
+}
+
+/// A line-on-line pair draws through **two** `LineRenderer`s — the roster's
+/// shared one for the main scene, the layer's own for the layer (the Phase 2
+/// discovery, recorded in `scenes::create_layer_scene`'s docs). The pixel
+/// claims here are weak by design: WARP's sensitivity to coexisting identical
+/// pipeline layouts (ADR-0058) means this pair's *look* is judged on hardware
+/// in Phase 5, not asserted on the software adapter.
+#[test]
+fn a_line_on_line_pair_draws_through_two_renderers() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    // The spectrum layer draws its elements from the frame's band array, and
+    // the band levels of `fixed_frame` default to zero — bars of zero height
+    // draw nothing. Light the bins so the layer has a figure.
+    let mut frame = fixed_frame();
+    frame.spectrum = [0.5; lmv_core::dsp::SPECTRUM_BINS];
+
+    let toml = "name = \"curve_over_spectrum\"\nsystem = \"parametric_curve\"\n\
+                [params]\nn = \"5\"\nd = \"71\"\n\
+                [layer]\nsystem = \"spectrum\"\n\
+                [layer.params]\nscale = \"0.7\"\nthickness = \"3\"\nhue = \"0.6\"\n";
+    let control = "name = \"curve_alone\"\nsystem = \"parametric_curve\"\n\
+                   [params]\nn = \"5\"\nd = \"71\"\n";
+    renderer.set_presets(vec![load(toml), load(control)]);
+
+    let pair = renderer
+        .capture_preset("curve_over_spectrum", &frame, FRAMES)
+        .expect("capture line-on-line pair");
+    let again = renderer
+        .capture_preset("curve_over_spectrum", &frame, FRAMES)
+        .expect("capture line-on-line pair again");
+    assert_eq!(
+        pair.rgba, again.rgba,
+        "two line renderers, still deterministic"
+    );
+
+    let alone = renderer
+        .capture_preset("curve_alone", &frame, FRAMES)
+        .expect("capture curve alone");
+    let diff = frame_diff(&alone, &pair);
+    assert!(
+        diff > 0.001,
+        "the layered spectrum must visibly contribute (diff {diff:.5})"
     );
 }
 

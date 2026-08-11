@@ -624,7 +624,7 @@ impl Preset {
         // errors first — the layer is the optional extra, not the preset.
         let layer = raw
             .layer
-            .map(|l| build_layer(l, system, &mut warnings))
+            .map(|l| build_layer(l, &mut warnings))
             .transpose()?;
 
         Ok(Preset {
@@ -649,29 +649,13 @@ impl Preset {
 /// rejects the preset, because it selects a code path and a silent default
 /// would render a look the author never asked for. Unknown *param* names warn
 /// and keep the binding, exactly like the top level (ADR-0020).
-fn build_layer(
-    raw: RawLayer,
-    main: SystemKind,
-    warnings: &mut Vec<String>,
-) -> Result<Layer, PresetError> {
+fn build_layer(raw: RawLayer, warnings: &mut Vec<String>) -> Result<Layer, PresetError> {
     let system = SystemKind::from_name(&raw.system)
         .ok_or_else(|| PresetError::UnknownSystem(raw.system.clone()))?;
-
-    // **Phase 1 restriction, deleted by Plan 0076 Phase 2.** The layer renders
-    // through the roster's one-instance-per-system scenes, so a pair whose
-    // scenes share mutable GPU state — the same system twice, or two line
-    // systems borrowing the one shared `LineRenderer` — would render one
-    // object twice in a frame (`Queue::write_buffer` applies before the
-    // submission runs, so both draws would read the second write).
-    if crate::render::scenes::shares_resources(main, system) {
-        return Err(PresetError::Config(format!(
-            "[layer] system '{}' shares GPU state with the main system '{}' and cannot \
-             render in the same frame yet — per-layer scene instances arrive with \
-             Plan 0076 Phase 2; until then pick a layer system with independent state",
-            system.as_str(),
-            main.as_str()
-        )));
-    }
+    // Any pair of systems is legal — including the same system twice, and two
+    // line-family systems. The layer's scene is constructed **for the preset**
+    // (`scenes::create_layer_scene`, ADR-0090 point 4 / Plan 0076 Phase 2), so
+    // it shares no GPU state with the roster's instance of the same kind.
 
     let join = match raw.join.as_deref() {
         None => LayerJoin::default(),
