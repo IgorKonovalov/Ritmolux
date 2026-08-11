@@ -19,7 +19,9 @@ pub use expr::{
     Expr, ExprError, GateFlag, GateKind, NodeObservation, Observations, SATURATED_OCCUPANCY,
     Variables, compile,
 };
-pub use schema::{Binding, Easing, Preset, PresetError, SystemKind, is_known_param};
+pub use schema::{
+    Binding, Easing, Layer, LayerBlend, LayerJoin, Preset, PresetError, SystemKind, is_known_param,
+};
 
 // The shipped example presets, embedded at compile time so the C-ABI/foobar
 // path always has visuals without a preset directory (ADR-0006). This list is

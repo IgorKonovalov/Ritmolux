@@ -818,6 +818,23 @@ impl Renderer {
             // A preset we cannot even resolve is not a pair we will render twice.
             _ => true,
         };
+        // **Interim, until Plan 0076 Phase 4 decides eligibility against the
+        // full set of scene instances in flight.** A `[layer]` on either side
+        // puts up to four roster instances in one frame, and this pairwise
+        // check only sees the two mains — e.g. the outgoing preset's swarm
+        // layer against an incoming swarm main is the same `Box<dyn Scene>`
+        // rendered twice. Freeze is always correct, so a layered side takes it.
+        let layered = self
+            .roster
+            .presets
+            .get(from)
+            .is_some_and(|p| p.layer.is_some())
+            || self
+                .roster
+                .presets
+                .get(to)
+                .is_some_and(|p| p.layer.is_some());
+        let shares = shares || layered;
         if transition::dual_live_eligible(
             shares,
             self.diag.stats().frame_ms_avg(),

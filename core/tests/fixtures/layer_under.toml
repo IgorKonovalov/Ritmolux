@@ -1,0 +1,20 @@
+# Plan 0076 Phase 1 — the walking-skeleton layered fixture: a fragment-field
+# ground with a swarm layered `under` (the default join), sharing the composite.
+# The main scene's bindings are constants so the layer's one audio binding is
+# the only expression in the preset that reads the analysis frame — layer.rs
+# leans on that to prove layer bindings react like top-level ones.
+name = "layer_under"
+system = "fragment_field"
+
+[params]
+warp = "0.35"
+hue = "0.1"
+zoom = "0.6"
+
+[layer]
+system = "swarm"
+
+[layer.params]
+size = "2.0"
+brightness = "1.4"
+zoom = "bass"
