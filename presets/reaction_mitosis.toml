@@ -20,7 +20,7 @@ stops = [
 ]
 
 [params]
-feed = "0.0360 + max(0, 0.018 - time * 0.002) + noise(time * 0.05) * 0.0008 + clamp(bass * 1.18, 0, 1) * 0.0009"   # boots in the growth band, differentiates into cells over ~9 s
+feed = "0.0360 + max(0, 0.018 - time * 0.002) + (noise(time * 0.05 + 90) * 0.005) + clamp(bass * 1.18, 0, 1) * 0.006"   # rising feed FUSES neighbouring cells, falling feed pinches them apart; the bass term is section-slow (see smoothing) so loud PASSAGES merge and quiet ones re-divide, and the ~20 s cycle does it autonomously
 kill = "0.0645 + noise(time * 0.04 + 50) * 0.0004 + clamp(mid * 1.18, 0, 1) * 0.0003"
 flow = "2.0 + clamp(bass * 0.71, 0, 0.6)"
 inject = "max(beat * (bar < 0.25), noise(time * 6) > (0.4 + min(time * 0.05, 0.35)))"   # startup burst seeds the dish in seconds, then the clock slows; every beat stamps a cell
@@ -44,6 +44,7 @@ fb_dy = "0.012"
 blend = "add"   # a dim monochrome glow — the narrow case the Whorl A/B cleared for add
 
 [smoothing]
+feed = { attack = 2.0, release = 4.0 }   # the merge follows sections, not beats — chemistry needs a sustained push to fuse
 bg_bright = { attack = 0.02, release = 0.3 }
 flow = 0.25
 glow = 0.2

@@ -12,31 +12,31 @@ name = "Verdigris"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#0d0a06" },  # dark bronze ground
-  { at = 0.30, color = "#3a2a12" },  # umber
-  { at = 0.55, color = "#7a5a22" },  # bronze
-  { at = 0.80, color = "#2e8a6e" },  # verdigris green
-  { at = 1.00, color = "#d8f0c8" },  # pale patina
+  { at = 0.00, color = "#120b05" },  # near-black copper ground
+  { at = 0.30, color = "#6a3a14" },  # burnished copper
+  { at = 0.55, color = "#c8842a" },  # bright bronze
+  { at = 0.80, color = "#14b890" },  # vivid verdigris teal
+  { at = 1.00, color = "#eafff0" },  # pale mint highlight
 ]
 
 [params]
-feed = "0.0540 + noise(time * 0.045) * 0.0015 + clamp(bass * 1.18, 0, 1) * 0.0018"
-kill = "0.0635 + noise(time * 0.035 + 80) * 0.0006 + clamp(mid * 1.18, 0, 1) * 0.0006"
-flow = "1.8 + max(0, 1.0 - time * 0.2) + clamp(treb * 1.0, 0, 0.6)"   # a hot start: the first worms develop fast, then the crawl settles
-inject = "max((onset > 0.6) * (bar < 0.25), noise(time * 1.4 + 9) > 0.6)"   # strong onsets bite as pulses; a slow clock keeps the patina growing
+feed = "0.0505 + noise(time * 0.12) * 0.0025 + clamp(bass * 1.18, 0, 1) * 0.0018"   # sparse-worm edge: strips with real void between them
+kill = "0.0635 + noise(time * 0.09 + 80) * 0.0008 + clamp(mid * 1.18, 0, 1) * 0.0006"
+flow = "2.6 + max(0, 1.0 - time * 0.2) + clamp(treb * 1.0, 0, 0.6)"   # a hot start, then a fast crawl — the worms keep reorganizing
+inject = "max(beat * (bar < 0.25), noise(time * 1.4 + 9) > 0.62)"   # every beat bites a growth into the fold; a sparser clock keeps the patina alive in silence
 glow = "0.95 + clamp(bass * 0.41, 0, 0.35)"
-contour = "7"
+contour = "5 + clamp(bass * 3.5, 0, 3)"   # the kick packs the strip work denser — from a hollow base
 hatch = "3"
 kaleido_order = "8"
 kaleido_angle = "0"
-zoom = "1.0 + noise(time * 0.25) * 0.07"   # a slow breathe keeps the rosette alive in silence
+zoom = "1.0 + noise(time * 0.25) * 0.06"   # passive breathe only — zoom is not a reactive lever here (user verdict 2026-08-11)
 color_span = "2.2"
 color_center = "0.05"
-saturation = "1.0"
-trails = "0.55"
-fb_zoom = "1.03"                   # the patina's aura creeps outward — no rotation, just growth
+saturation = "1.15 + clamp(bass * 0.41, 0, 0.35)"   # colour heats with the bass
+trails = "0.45"                    # lighter aura — the voids stay dark
+fb_zoom = "1.06"                   # the patina's aura creeps outward — no rotation, just growth
 bg_hue = "0.09"                     # dim bronze under the voids — the rosette reads against it
-bg_bright = "0.08 + noise(time * 1.0) * 0.025 + clamp(bass * 0.07, 0, 0.06)"   # halved: the add-blend accumulation settles at ~2x
+bg_bright = "0.08 + noise(time * 1.0) * 0.025 + clamp(bass * 0.14, 0, 0.12) + beat * 0.02"   # halved vs the accumulation; the ground answers the kick too
 bg_vignette = "0.55"
 
 [feedback]
@@ -45,3 +45,6 @@ blend = "add"   # dim monochrome aura — the narrow case the Whorl A/B cleared 
 [smoothing]
 flow = 0.3
 glow = 0.25
+contour = { attack = 0.03, release = 0.4 }   # snap dense on the kick, relax back
+saturation = { attack = 0.05, release = 0.5 }
+bg_bright = { attack = 0.02, release = 0.3 }
