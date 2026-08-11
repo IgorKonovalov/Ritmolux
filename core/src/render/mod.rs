@@ -152,31 +152,6 @@ fn scene_for_mut(scenes: &mut SceneRoster, system: SystemKind) -> Option<&mut Bo
         .map(|(_, scene)| scene)
 }
 
-/// A mutable borrow of one scene in the roster — [`scene_pair_mut`]'s return
-/// halves, named so the pair's type reads as what it is.
-type SceneSlot<'a> = Option<&'a mut Box<dyn Scene>>;
-
-/// The main scene and, disjointly, the layer's — two `&mut` into one roster in
-/// one walk (Plan 0076 Phase 1). `iter_mut` yields non-overlapping borrows, so
-/// this needs no `split_at_mut` arithmetic; the `else if` makes `main == layer`
-/// structurally unable to alias, though the loader already rejects that pair.
-fn scene_pair_mut(
-    scenes: &mut SceneRoster,
-    main: SystemKind,
-    layer: Option<SystemKind>,
-) -> (SceneSlot<'_>, SceneSlot<'_>) {
-    let mut main_slot = None;
-    let mut layer_slot = None;
-    for (kind, scene) in scenes.iter_mut() {
-        if *kind == main {
-            main_slot = Some(scene);
-        } else if Some(*kind) == layer {
-            layer_slot = Some(scene);
-        }
-    }
-    (main_slot, layer_slot)
-}
-
 /// What one binding's evaluated value drives, resolved **once when the roster is
 /// loaded** (Plan 0031 Phase 3) so the frame loop dispatches on an enum instead of
 /// walking a chain of `set_param(&str, ..)` string matches to discover the owner.
@@ -681,17 +656,16 @@ fn evaluate_layer(
 /// premultiplied alpha. When no stage is active `target.view` *is* `destination`,
 /// which makes that path bit-for-bit what it always was.
 ///
-/// `layer` is the preset's evaluated `under`-join layer scene, if it declares
-/// one (ADR-0090 / Plan 0076): it draws into the **same** scene target after
-/// the main scene, through the same `ViewTransform` aspect, so the two layers
-/// share every downstream stage and fuse into one substance. One extra draw —
-/// no new pass, no new target — and `None` (the layerless case) encodes exactly
-/// what this function always encoded.
-#[allow(clippy::too_many_arguments)]
+/// The side's `under`-join layer scene, when its preset declares one (ADR-0090
+/// / Plan 0076), draws into the **same** scene target after the main scene,
+/// through the same `ViewTransform` aspect, so the two layers share every
+/// downstream stage and fuse into one substance. One extra draw — no new pass,
+/// no new target — and a layerless side encodes exactly what this function
+/// always encoded. The scene lives on `side` (per-preset since Phase 2), so
+/// whichever side is drawn brings the right layer with it.
 fn composite_into(
     ctx: &RenderContext,
     scene: &mut Box<dyn Scene>,
-    layer: Option<&mut Box<dyn Scene>>,
     side: &mut CompositeSide,
     encoder: &mut wgpu::CommandEncoder,
     destination: &wgpu::TextureView,
@@ -728,13 +702,14 @@ fn composite_into(
     // grid's — ADR-0037), and the same `occlude` answer, because the two scenes
     // land on the same backdrop through the same last fold (ADR-0085).
     let mut layer_draws = 0;
-    if let Some(layer_scene) = layer {
+    let layer_occlude = if target.routing.scene_stage().is_some() {
+        post::DEFAULT_OCCLUDE
+    } else {
+        side.chain.occlude()
+    };
+    if let Some(layer_scene) = side.layer.as_mut() {
         layer_scene.set_target_size(target.size.0, target.size.1);
-        layer_scene.set_occlude(if target.routing.scene_stage().is_some() {
-            post::DEFAULT_OCCLUDE
-        } else {
-            side.chain.occlude()
-        });
+        layer_scene.set_occlude(layer_occlude);
         layer_scene.render(&ctx.queue, encoder, &target.view, target.aspect);
         layer_draws = 1;
     }
@@ -776,6 +751,15 @@ struct Terminal<'a> {
 struct CompositeSide {
     background: Background,
     chain: PostChain,
+    /// This side's `[layer]` scene, **constructed for the preset it draws**
+    /// (ADR-0090 point 4, Plan 0076 Phase 2) — never a roster instance, so
+    /// same-system pairs are legal and two dissolving sides' layers share
+    /// nothing. `Some` exactly when that preset declares a `[layer]`;
+    /// [`Renderer::configure_active_scene`] maintains the invariant on every
+    /// preset change. Living here rather than on the renderer gives it the
+    /// side's own lifetime for free: the outgoing side keeps its layer alive
+    /// through a dissolve, and promotion at finalize carries it over.
+    layer: Option<Box<dyn Scene>>,
 }
 
 impl CompositeSide {
@@ -785,6 +769,7 @@ impl CompositeSide {
         Self {
             background: Background::new(device, format),
             chain: PostChain::new(device, format, tier),
+            layer: None,
         }
     }
 
@@ -796,10 +781,14 @@ impl CompositeSide {
     }
 
     /// Drop the lazily-built GPU resources (capture rebuild — keeps a headless
-    /// capture a pure function of its inputs, NFR §6).
+    /// capture a pure function of its inputs, NFR §6). The layer scene goes
+    /// with them: `configure_active_scene` reconstructs it from its
+    /// deterministic seed, which is exactly the rebuild the roster scenes get
+    /// from `scenes::create_all` on the same path.
     fn reset_resources(&mut self) {
         self.background.reset_resources();
         self.chain.reset_resources();
+        self.layer = None;
     }
 }
 
@@ -1381,11 +1370,13 @@ impl Renderer {
         self.param_smoother.reset();
         self.layer_smoother.reset();
         let Self {
+            ctx,
             scenes,
             roster,
             cap_overflow,
             side,
             incoming_side,
+            tier,
             ..
         } = self;
         *cap_overflow = None;
@@ -1438,16 +1429,22 @@ impl Renderer {
         if let Some(cfg) = preset.config.as_ref() {
             *cap_overflow = scene.configure(cfg);
         }
-        // The layer's scene gets the same load-time hand-offs (Plan 0076
-        // Phase 1): the **shared** palette bake — one gradient, two layers, one
-        // world (ADR-0090) — the default `[feedback]` table (a layer has no
-        // table of its own, and handing the default is what stops a warp from
-        // an earlier preset surviving on this roster instance), and its own
-        // structural config. A layer's cap overflow surfaces through the same
-        // channel when the main scene produced none — never a silent cut.
-        if let Some(layer) = preset.layer.as_ref()
-            && let Some(layer_scene) = scene_for_mut(scenes, layer.system)
-        {
+        // The layer's scene is **constructed for the preset** (ADR-0090 point
+        // 4, Plan 0076 Phase 2), never resolved from the one-instance-per-
+        // system roster — same-system pairs are legal, and two dissolving
+        // sides' layers share nothing. It goes to the side that will draw this
+        // preset (`live`, exactly like the palette and feedback hand-offs
+        // above), constructed fresh at every preset change: a switch is off
+        // the hot path, and a fresh deterministic seed is the same contract
+        // the roster scenes get from the capture rebuild. Its load-time
+        // hand-offs mirror the main scene's — the **shared** palette bake (one
+        // gradient, two layers, one world), the default `[feedback]` table (a
+        // layer declares none), and its own structural config, whose cap
+        // overflow surfaces through the same channel when the main scene
+        // produced none (never a silent cut).
+        live.layer = preset.layer.as_ref().map(|layer| {
+            let mut layer_scene =
+                scenes::create_layer_scene(layer.system, &ctx.device, COMPOSITE_FORMAT, tier);
             layer_scene.set_palette(&baked);
             layer_scene.set_feedback(crate::render::feedback::FeedbackConfig::default());
             if let Some(cfg) = layer.config.as_ref() {
@@ -1456,7 +1453,8 @@ impl Renderer {
                     *cap_overflow = overflow;
                 }
             }
-        }
+            layer_scene
+        });
     }
 
     /// The segment-cap truncation from the active preset's last `configure`, if
@@ -1661,14 +1659,9 @@ impl Renderer {
             // index, so the two cannot drift apart.
             let outgoing = outgoing_index
                 .and_then(|index| Some((roster.presets.get(index)?, roster.routes_for(index))));
-            let out_pair = outgoing.map(|(outgoing, out_routes)| {
-                let out_layer = outgoing.layer.as_ref();
-                (outgoing, out_routes, out_layer)
-            });
-            if let (Some((outgoing, out_routes, out_layer)), Some(out_view)) =
-                (out_pair, blend.snapshot_view(surface))
-                && let (Some(out_scene), out_layer_scene) =
-                    scene_pair_mut(scenes, outgoing.system, out_layer.map(|l| l.system))
+            if let (Some((outgoing, out_routes)), Some(out_view)) =
+                (outgoing, blend.snapshot_view(surface))
+                && let Some(out_scene) = scene_for_mut(scenes, outgoing.system)
             {
                 // No terminal: the outgoing side's `exposure`/`ink_*` were held at
                 // the capture frame and are crossfaded by the single engine-wide
@@ -1688,13 +1681,15 @@ impl Renderer {
                     series_scratch.get_mut(..out_elements).unwrap_or(&mut []),
                 );
                 // The outgoing preset's own layer keeps animating through a
-                // dual-live dissolve exactly as its main scene does (Plan 0076).
-                let mut out_layer_draw = None;
-                if let (Some(layer), Some(layer_scene)) = (out_layer, out_layer_scene) {
+                // dual-live dissolve exactly as its main scene does — its scene
+                // is the outgoing side's own instance (Plan 0076 Phase 2).
+                if let (Some(layer), Some(layer_scene)) =
+                    (outgoing.layer.as_ref(), side.layer.as_mut())
+                {
                     let n = config_element_prefix(layer.config.as_ref(), series_scratch.len());
                     evaluate_layer(
                         layer,
-                        &mut *layer_scene,
+                        layer_scene,
                         outgoing_layer_smoother,
                         &vars.with_salt(salt.of(outgoing)),
                         frame,
@@ -1702,7 +1697,6 @@ impl Renderer {
                         dt,
                         series_scratch.get_mut(..n).unwrap_or(&mut []),
                     );
-                    out_layer_draw = Some(layer_scene);
                 }
                 // **The outgoing preset's OWN held stop, not the crossfaded one**
                 // (ADR-0080). Two reasons, and the first is structural: the
@@ -1719,7 +1713,6 @@ impl Renderer {
                 draw_calls += composite_into(
                     ctx,
                     out_scene,
-                    out_layer_draw,
                     side,
                     encoder,
                     &out_view,
@@ -1741,10 +1734,7 @@ impl Renderer {
             }
             _ => side,
         };
-        let active_layer = preset.layer.as_ref();
-        let (scene, layer_scene) =
-            scene_pair_mut(scenes, preset.system, active_layer.map(|l| l.system));
-        let Some(scene) = scene else {
+        let Some(scene) = scene_for_mut(scenes, preset.system) else {
             return draw_calls;
         };
         tonemap.reset_params();
@@ -1765,13 +1755,14 @@ impl Renderer {
         );
         // The `[layer]` bindings, into the layer's own scene and nowhere else
         // (ADR-0090 / Plan 0076): evaluated under the same salt, clock and
-        // analysis frame as the top level, eased by their own smoother.
-        let mut live_layer = None;
-        if let (Some(layer), Some(layer_scene)) = (active_layer, layer_scene) {
+        // analysis frame as the top level, eased by their own smoother. The
+        // scene is this side's own per-preset instance (Phase 2).
+        if let (Some(layer), Some(layer_scene)) = (preset.layer.as_ref(), live_side.layer.as_mut())
+        {
             let n = config_element_prefix(layer.config.as_ref(), series_scratch.len());
             evaluate_layer(
                 layer,
-                &mut *layer_scene,
+                layer_scene,
                 layer_smoother,
                 &vars.with_salt(salt.of(preset)),
                 frame,
@@ -1779,7 +1770,6 @@ impl Renderer {
                 dt,
                 series_scratch.get_mut(..n).unwrap_or(&mut []),
             );
-            live_layer = Some(layer_scene);
         }
 
         // Ink is one engine-wide pass over the *blended* frame (ADR-0028), but a
@@ -1839,7 +1829,6 @@ impl Renderer {
         draw_calls += composite_into(
             ctx,
             scene,
-            live_layer,
             live_side,
             encoder,
             destination,
