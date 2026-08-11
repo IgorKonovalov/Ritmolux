@@ -1,0 +1,10 @@
+# Plan 0076 Phase 1 — layer_under.toml minus its [layer] table, byte-for-byte
+# otherwise. The layered capture must differ from this one (the layer visibly
+# contributes) while this one is what a layerless preset always rendered.
+name = "layer_under_control"
+system = "fragment_field"
+
+[params]
+warp = "0.35"
+hue = "0.1"
+zoom = "0.6"

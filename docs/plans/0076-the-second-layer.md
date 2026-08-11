@@ -1,6 +1,6 @@
 # 0076 — The second layer: a preset composes two scenes (R3)
 
-> **Status:** **approved 2026-08-09** — the four open design choices were decided by the user
+> **Status:** **in-progress** (implementation started 2026-08-11; approved 2026-08-09) — the four open design choices were decided by the user
 > in the Mode 1 interview the same day ([ADR-0090](../adrs/0090-a-preset-composes-two-scene-layers.md)
 > records them, including the one taken against the architect's recommendation).
 > **Created:** 2026-08-09

@@ -1408,3 +1408,70 @@ fn a_dual_live_dissolve_carries_the_outgoing_trail() {
         "the outgoing side re-renders; it does not reuse the snapshot"
     );
 }
+
+/// Encode one frame of the active preset directly through `draw_frame` and
+/// return its draw-call count — the Plan 0076 Phase 1 probe. The capture entry
+/// points discard the count, so the byte-path claim below reads it here, at the
+/// seam that produces it.
+fn drawn_calls(renderer: &mut Renderer, name: &str) -> u32 {
+    assert!(
+        renderer.select_preset_by_name_now(name),
+        "probe preset '{name}' is in the roster"
+    );
+    let (width, height) = (renderer.ctx.config.width, renderer.ctx.config.height);
+    let format = renderer.ctx.surface_format();
+    let (_texture, view) =
+        super::capture::create_target(&renderer.ctx.device, format, width, height);
+    let mut encoder = renderer
+        .ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("lmv-test-draw-calls"),
+        });
+    renderer.time += super::scenes::FALLBACK_DT;
+    let calls = renderer.draw_frame(
+        &AnalysisFrame::default(),
+        &mut encoder,
+        &view,
+        width,
+        height,
+        super::scenes::FALLBACK_DT,
+        super::SaltMode::Pinned,
+    );
+    renderer.ctx.queue.submit(std::iter::once(encoder.finish()));
+    calls
+}
+
+/// Plan 0076 Phase 1's byte-path claim, by draw-call count: a preset with no
+/// `[layer]` encodes exactly the passes it always did — backdrop, scene,
+/// tonemap — and an `under` layer adds exactly **one** draw into the same
+/// target. No new pass, no new offscreen.
+#[test]
+fn an_under_layer_is_one_draw_and_a_layerless_preset_is_unchanged() {
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 96,
+        height: 64,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    let plain = Preset::from_toml_str("system = \"fragment_field\"\nname = \"plain\"")
+        .expect("layerless probe preset is valid");
+    let pair = Preset::from_toml_str(
+        "system = \"fragment_field\"\nname = \"pair\"\n[layer]\nsystem = \"swarm\"\n",
+    )
+    .expect("layered probe preset is valid");
+    renderer.set_presets(vec![plain, pair]);
+
+    let plain_calls = drawn_calls(&mut renderer, "plain");
+    let pair_calls = drawn_calls(&mut renderer, "pair");
+    assert_eq!(
+        plain_calls, 3,
+        "a layerless preset with no active stage is backdrop + scene + tonemap"
+    );
+    assert_eq!(
+        pair_calls,
+        plain_calls + 1,
+        "an under layer is one extra scene draw into the same target"
+    );
+}
