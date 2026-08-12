@@ -1212,6 +1212,12 @@ fn declared_params_match_set_param() {
                 "bg_shade",
                 "bg_shade_end",
                 "bg_ramp_gamma",
+                // The band (ADR-0095): one gaussian swell added over that
+                // ground, across an axis of its own.
+                "bg_band_amount",
+                "bg_band_angle",
+                "bg_band_pos",
+                "bg_band_width",
             ],
         ),
         (

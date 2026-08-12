@@ -67,13 +67,39 @@
 //! Every ramp param defaults to an **arithmetic identity** with the picture that
 //! shipped before it, not to an approximation of it — see each one's constant.
 //!
+//! # It paints one soft band over that ground (ADR-0095)
+//!
+//! A galaxy is unresolved starlight **behind** the stars, so it belongs in this
+//! pre-pass rather than over the scene: the band is drawn *additively over the
+//! ground and under everything else*. It is one gaussian swell across its own
+//! axis — `bg_band_angle` names the direction **across** the band, sharing
+//! `bg_angle`'s convention, so `0` runs it horizontally — centred at
+//! `bg_band_pos` and reaching `1/e` exactly `bg_band_width` either side of that
+//! centre. That is what the half-width *means*; it is not a full width and not a
+//! hard edge.
+//!
+//! Both axes are the **same function** ([`axis_pos`] in the shader), called with
+//! two directions. One copy rather than two, precisely so
+//! [ADR-0037](../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s
+//! trap cannot be fixed in one axis and left in the other.
+//!
+//! **`bg_band_amount = 0` is an identity structurally, not arithmetically**: the
+//! shader takes a `select` arm, so the pre-band expression is the *untaken*
+//! branch and no shipped preset or baseline can move by a rounding step.
+//!
+//! **And the pass now builds for a band alone.** The build condition below
+//! widened from `bg_bright > 0` to `bg_bright > 0 || bg_band_amount > 0`,
+//! because the sky this was written for is nearly black away from the horizon —
+//! without it a galaxy over an unlit ground would silently render nothing.
+//!
 //! Driven by named params (`bg_hue`, `bg_bright`, `bg_vignette`, `bg_hue_span`) the renderer
 //! routes here before the scene's own bindings. At the defaults (`bg_bright = 0`)
 //! the backdrop is black, so a preset that binds none renders exactly as before —
 //! the migration is neutral until a preset opts into a backdrop.
 //!
-//! **When no backdrop is bound (`bg_bright <= 0`) the pass is a plain black
-//! clear** — no gradient pipeline is drawn, and the pipeline is not even built.
+//! **When no backdrop is bound at all (`bg_bright <= 0` *and*
+//! `bg_band_amount <= 0`) the pass is a plain black clear** — no gradient
+//! pipeline is drawn, and the pipeline is not even built.
 //! Two reasons: it is the NFR §1 passthrough win (an invisible black gradient
 //! costs nothing), and — like the reaction-diffusion / attractor scenes' lazy
 //! resources — it keeps a second fullscreen fragment pipeline off the device
@@ -148,16 +174,48 @@ const MAX_RAMP_GAMMA: f32 = 20.0;
 const DEFAULT_SATURATION: f32 = 1.0;
 const DEFAULT_PALETTE_MIX: f32 = 0.0;
 
+/// The band's intensity (ADR-0095). At `0.0` the band term is not added at all —
+/// the shader takes a `select` arm rather than multiplying by zero — so this
+/// default is an identity with the pre-band picture structurally rather than by
+/// arithmetic that a rounding step could perturb.
+const DEFAULT_BAND_AMOUNT: f32 = 0.0;
+/// The band's direction, in radians, naming the axis **across** the band. Shares
+/// [`DEFAULT_ANGLE`]'s convention exactly — same `sin`/`cos` pair, same
+/// `axis_pos` — so `0` runs the band horizontally.
+const DEFAULT_BAND_ANGLE: f32 = 0.0;
+/// The centreline's position along that across-axis, in the same normalized
+/// `0..1` the ramp's `s` uses: `0.5` is the middle of the frame.
+const DEFAULT_BAND_POS: f32 = 0.5;
+/// The gaussian's **`1/e` half-width**, in those same units — the envelope
+/// reaches `1/e` exactly this far either side of the centre.
+const DEFAULT_BAND_WIDTH: f32 = 0.15;
+/// The half-width's guard rails, and the reasoning [`applied_ramp_gamma`] states
+/// for its pair: the shader divides by this, so zero is a division by zero and a
+/// negative value is a mirrored band no author asked for. Both ends are far
+/// outside anything a sky wants, and both are stated in what they *do* rather
+/// than picked round:
+///
+/// - at `0.001` the half-width is about **one pixel** of a 1080-row frame
+///   (`1/1080 = 0.000926`), so the band is already a hairline there;
+/// - at `100` the envelope is within **0.0025 %** of `1` across the whole frame
+///   (the farthest a pixel can sit from a centred band is 0.5, so `z <= 0.005`),
+///   i.e. a flat wash with no band in it at all.
+const MIN_BAND_WIDTH: f32 = 0.001;
+const MAX_BAND_WIDTH: f32 = 100.0;
+
 const SHADER: &str = r#"
 struct Bg {
     // x: hue, y: bright, z: vignette, w: aspect (from the DESTINATION SURFACE)
     v: vec4<f32>,
     // x: palette_mix (A/B crossfade), y: saturation,
-    // z: bg_ramp_gamma (CPU-clamped positive), w: unused
+    // z: bg_ramp_gamma (CPU-clamped positive), w: bg_band_amount
     c: vec4<f32>,
     // The ramp (ADR-0094). x: bg_angle, y: bg_hue_span,
     // z: bg_shade, w: bg_shade_end
     g: vec4<f32>,
+    // The band (ADR-0095). x: bg_band_angle, y: bg_band_pos,
+    // z: bg_band_width (CPU-clamped positive), w: unused
+    b: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> u: Bg;
@@ -176,6 +234,25 @@ fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
     return vec3<f32>(luma) + (c - vec3<f32>(luma)) * s;
 }
 
+// The normalized position along a screen axis: 0 at the frame edge the axis
+// starts from, 1 at the edge it ends on.
+//
+// `aspect` is the **destination surface's**, and the axis is measured in
+// pixel-proportional coordinates so an authored angle is the angle seen on
+// screen. The normalizing denominator is the axis's own extent across that
+// rectangle, so the result still spans 0..1 corner to corner at any angle — and
+// it lands inside [0, 1] *by construction*, since |ndc.x| and |ndc.y| are both
+// at most 1.
+//
+// **Two axes call this** (ADR-0095): the ramp's, and the band's — which in turn
+// has an across direction and an along one. It is one function rather than
+// three copies precisely so ADR-0037's trap cannot be fixed in one and left in
+// the others.
+fn axis_pos(ndc: vec2<f32>, dir: vec2<f32>, aspect: f32) -> f32 {
+    let q = vec2<f32>(ndc.x * aspect, ndc.y);
+    return 0.5 + 0.5 * dot(q, dir) / (aspect * abs(dir.x) + abs(dir.y));
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let hue = u.v.x;
@@ -188,29 +265,23 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let hue_span = u.g.y;
     let shade = u.g.z;
     let shade_end = u.g.w;
+    let band_amount = u.c.w;
+    let band_angle = u.b.x;
+    let band_pos = u.b.y;
+    let band_width = u.b.z;
 
     // The ramp axis (ADR-0094): a normalized position along it, 0 at the frame
     // edge the ramp starts from and 1 at the edge it ends on. `bg_angle` is in
     // radians and `0` runs bottom-to-top, matching `launch_angle`'s
     // zero-is-up convention.
     //
-    // `aspect` is the **destination surface's**, and the axis is measured in
-    // pixel-proportional coordinates so an authored angle is the angle seen on
-    // screen. The normalizing denominator is the ramp's own extent across that
-    // rectangle, so `s` still spans 0..1 corner to corner at any angle.
-    //
     // **At `angle = 0` the aspect term cancels exactly**: `sin(0)` is 0 and
     // `cos(0)` is 1, so `dot(q, d)` is `ndc.y` and the denominator is
     // `aspect * 0 + 1`. That is why this reduces to the pre-ramp expression bit
     // for bit — and why no default-angle test can tell a right aspect from a
-    // wrong one, which is what Phase 4's negative control exists for.
+    // wrong one, which is what `backdrop_ramp.rs`'s negative control exists for.
     let d = vec2<f32>(sin(angle), cos(angle));
-    let q = vec2<f32>(in.ndc.x * aspect, in.ndc.y);
-    let s = clamp(
-        0.5 + 0.5 * dot(q, d) / (aspect * abs(d.x) + abs(d.y)),
-        0.0,
-        1.0,
-    );
+    let s = clamp(axis_pos(in.ndc, d, aspect), 0.0, 1.0);
 
     // The ramp is linear in screen space and light is not, so one exponent shapes
     // *where* things sit along the axis. It is applied to the position, ahead of
@@ -259,7 +330,28 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     var tint = mix(ca, cb, clamp(palette_mix, 0.0, 1.0));
     tint = apply_saturation(tint, saturation);
 
-    let col = tint * bright * grad * vig;
+    let ground = tint * bright * grad * vig;
+
+    // The band (ADR-0095): one gaussian swell across its own axis, **added over
+    // the ground**, which is what luminous unresolved starlight is. It takes its
+    // across position from the same `axis_pos` the ramp does, so `bg_band_angle`
+    // names the direction across the band exactly as `bg_angle` names the ramp's.
+    //
+    // `bg_band_width` is the **`1/e` half-width**: at `|across - centre|` equal
+    // to it the exponent is exactly `-1`. It is CPU-clamped strictly positive
+    // ([`applied_band_width`]), so this divide can be neither by zero nor by a
+    // negative.
+    let bd = vec2<f32>(sin(band_angle), cos(band_angle));
+    let band_across = clamp(axis_pos(in.ndc, bd, aspect), 0.0, 1.0);
+    let z = (band_across - band_pos) / band_width;
+    let env = exp(-z * z);
+
+    // `select(f, t, cond)` — so at `bg_band_amount <= 0` the value taken is the
+    // untouched ground and the whole band expression is the *untaken* branch.
+    // That is why the default is an identity structurally rather than
+    // arithmetically: nothing here can perturb a shipped backdrop by a rounding
+    // step (ADR-0095).
+    let col = select(ground + tint * env * band_amount, ground, band_amount <= 0.0);
     return vec4<f32>(col, 1.0);
 }
 "#;
@@ -270,6 +362,7 @@ struct Bg {
     v: [f32; 4],
     c: [f32; 4],
     g: [f32; 4],
+    b: [f32; 4],
 }
 
 /// The gradient pipeline, its uniform and its LUT pair, built lazily on the first
@@ -466,6 +559,10 @@ pub struct Background {
     shade: f32,
     shade_end: f32,
     ramp_gamma: f32,
+    band_amount: f32,
+    band_angle: f32,
+    band_pos: f32,
+    band_width: f32,
     /// The active preset's baked palette pair, re-uploaded to the LUT textures
     /// when `palette_dirty` (a preset switch, or a lazy rebuild), off the hot
     /// path. Held here rather than in [`Resources`] so a backdrop that has not
@@ -492,6 +589,10 @@ pub const PARAMS: &[&str] = &[
     "bg_shade",
     "bg_shade_end",
     "bg_ramp_gamma",
+    "bg_band_amount",
+    "bg_band_angle",
+    "bg_band_pos",
+    "bg_band_width",
 ];
 
 /// The exponent the shader will **actually apply** for a bound `bg_ramp_gamma`:
@@ -509,6 +610,18 @@ fn applied_ramp_gamma(gamma: f32) -> f32 {
         gamma.clamp(MIN_RAMP_GAMMA, MAX_RAMP_GAMMA)
     } else {
         DEFAULT_RAMP_GAMMA
+    }
+}
+
+/// The half-width the shader will **actually apply** for a bound
+/// `bg_band_width`, guarded exactly as [`applied_ramp_gamma`] is and for the
+/// same two reasons: the shader divides by it, and a NaN must never reach
+/// WGSL's `clamp`, where the result is implementation-defined.
+fn applied_band_width(width: f32) -> f32 {
+    if width.is_finite() {
+        width.clamp(MIN_BAND_WIDTH, MAX_BAND_WIDTH)
+    } else {
+        DEFAULT_BAND_WIDTH
     }
 }
 
@@ -538,6 +651,10 @@ impl Background {
             shade: DEFAULT_SHADE,
             shade_end: DEFAULT_SHADE_END,
             ramp_gamma: DEFAULT_RAMP_GAMMA,
+            band_amount: DEFAULT_BAND_AMOUNT,
+            band_angle: DEFAULT_BAND_ANGLE,
+            band_pos: DEFAULT_BAND_POS,
+            band_width: DEFAULT_BAND_WIDTH,
             // Seeded with the default `spectrum` (the cosine this pass used to
             // inline), so a backdrop painted before any `set_palette` call is the
             // colour it always was rather than black.
@@ -578,6 +695,10 @@ impl Background {
         self.shade = DEFAULT_SHADE;
         self.shade_end = DEFAULT_SHADE_END;
         self.ramp_gamma = DEFAULT_RAMP_GAMMA;
+        self.band_amount = DEFAULT_BAND_AMOUNT;
+        self.band_angle = DEFAULT_BAND_ANGLE;
+        self.band_pos = DEFAULT_BAND_POS;
+        self.band_width = DEFAULT_BAND_WIDTH;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
     }
@@ -596,6 +717,10 @@ impl Background {
             "bg_shade" => self.shade = value,
             "bg_shade_end" => self.shade_end = value,
             "bg_ramp_gamma" => self.ramp_gamma = value,
+            "bg_band_amount" => self.band_amount = value,
+            "bg_band_angle" => self.band_angle = value,
+            "bg_band_pos" => self.band_pos = value,
+            "bg_band_width" => self.band_width = value,
             _ => return false,
         }
         true
@@ -614,8 +739,9 @@ impl Background {
     }
 
     /// Own the frame clear — the first pass of the composite. With no visible
-    /// backdrop (`bg_bright <= 0`) this is a plain black clear (no pipeline); with
-    /// one, it lazily builds the gradient pipeline and paints it fullscreen.
+    /// backdrop at all (`bg_bright <= 0` *and* `bg_band_amount <= 0`) this is a
+    /// plain black clear (no pipeline); with either, it lazily builds the
+    /// gradient pipeline and paints it fullscreen.
     ///
     /// # `surface` is the **destination's** size, never an internal grid's
     ///
@@ -635,7 +761,11 @@ impl Background {
         view: &wgpu::TextureView,
         surface: (u32, u32),
     ) {
-        if self.bright <= 0.0 {
+        // **A band alone is enough to build this pass** (ADR-0095). The condition
+        // used to read `bright <= 0` alone, which would have made a galaxy over a
+        // near-black sky render nothing at all — and that is the configuration
+        // the reference photograph actually is, not an edge case.
+        if self.bright <= 0.0 && self.band_amount <= 0.0 {
             // Passthrough: a plain black clear establishes the frame without a
             // second fullscreen pipeline (module docs: NFR §1 + WARP).
             encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -678,9 +808,15 @@ impl Background {
                     self.palette_mix,
                     self.saturation,
                     applied_ramp_gamma(self.ramp_gamma),
-                    0.0,
+                    self.band_amount,
                 ],
                 g: [self.angle, self.hue_span, self.shade, self.shade_end],
+                b: [
+                    self.band_angle,
+                    self.band_pos,
+                    applied_band_width(self.band_width),
+                    0.0,
+                ],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
