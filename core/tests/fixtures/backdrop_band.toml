@@ -1,0 +1,89 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The backdrop's curved band (Plan 0081, ADR-0095). The same EXTRA_FIXTURES
+# argument `backdrop_ramp.toml` makes, one layer further out: no rostered fixture
+# lights a backdrop at all, and this plan's seven params are additionally invisible
+# on the one that does, because the band is an untaken `select` branch at
+# `bg_band_amount = 0`. Nothing else in the suite executes a line of the band.
+#
+# ALL SEVEN band params are off their defaults, on purpose, and for the reason
+# `backdrop_ramp.toml`'s header states: each default is an arithmetic identity, so
+# a fixture leaving any one alone would pin the OLD picture through the new code
+# and report no drift if the new term were dropped entirely.
+#
+#  - `bg_band_amount` off 0 is the only thing that takes the `select`'s band arm
+#  - `bg_band_angle` off 0 turns the band's across-axis away from the ramp's
+#  - `bg_band_pos`/`bg_band_width` move and narrow the envelope off centre
+#  - `bg_band_curve` off 0 is THE ONLY THING IN THE CRATE'S BASELINES that reads
+#    the along-band axis at all - with it at 0 the shader never touches `t`
+#  - `bg_band_hue`/`bg_band_hue_span` put the band on its own palette segment,
+#    swept along that same axis, rather than on one point of it
+#
+# The ramp underneath is lit and angled too, so the baseline pins the band OVER a
+# ground rather than alone: the two are added, and a regression that dropped the
+# addition would be invisible against a black plate.
+#
+# THE SEVEN VALUES WERE TUNED AGAINST THE SUITE'S OWN DRIFT TOLERANCE, not picked
+# for looks - "off its default" is not the same as "caught if it reverts". Each
+# one was reverted to its default in turn and the frame re-measured against
+# `MEAN_TOL = 0.02` (160x160, WARP):
+#
+#   bg_band_amount   -> 0     0.0253      bg_band_curve    -> 0     0.0522
+#   bg_band_angle    -> 0     0.0381      bg_band_hue      -> 0     0.0237
+#   bg_band_pos      -> 0.5   0.0442      bg_band_hue_span -> 0     0.0221
+#   bg_band_width    -> 0.15  0.0272
+#
+# All seven clear the tolerance, the tightest by 1.1x. Two of them needed the
+# tuning rather than benefitting from it. At a wide `bg_band_width` the width's
+# own revert scored 0.0055 - a quarter of the tolerance, so a regression that
+# ignored the param entirely would have passed. And the colour pair fights
+# itself through the REPEAT ADDRESSING: with a large negative span, reverting
+# `bg_band_hue` to 0 wraps the segment straight back into the palette's bright
+# half and the band barely moves. The pair that clears both is a segment
+# starting past the palette's midpoint and travelling nearly its whole length.
+#
+# The swarm is frozen (`force`/`spin`/`burst` at 0) and small, so it composites a
+# sparse figure over the backdrop without covering it.
+#
+# Blessed after comparing the adapters, which this plan owes twice over (the
+# uniform grew 48 -> 80 bytes, moving this pass's `min_binding_size`, a Plan 0053
+# fix against a MEASURED WARP mis-render). Whole-frame means at 160x160:
+# WARP 152.200 120.540 086.088 against hardware 152.198 120.550 086.114 - a worst
+# channel divergence of 0.026 of one 8-bit level.
+system = "swarm"
+name   = "fixture_backdrop_band"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#060b24" },
+  { at = 0.25, color = "#1b2a5e" },
+  { at = 0.5,  color = "#c74b1d" },
+  { at = 0.75, color = "#ff7a1f" },
+  { at = 1.0,  color = "#ffd06e" },
+]
+
+[params]
+force      = "0"
+spin       = "0"
+burst      = "0"
+brightness = "0.7"
+size       = "0.5"
+hue_spread = "0"
+hue_center = "0.15"
+
+bg_bright     = "0.5"
+bg_vignette   = "0.2"
+bg_hue        = "1.0"
+bg_hue_span   = "-1.0"
+bg_angle      = "0.35"
+bg_shade      = "1.0"
+bg_shade_end  = "0.25"
+bg_ramp_gamma = "2.0"
+
+bg_band_amount   = "0.7"
+bg_band_angle    = "0.6"
+bg_band_pos      = "0.62"
+bg_band_width    = "0.07"
+bg_band_curve    = "0.22"
+bg_band_hue      = "0.65"
+bg_band_hue_span = "0.9"
