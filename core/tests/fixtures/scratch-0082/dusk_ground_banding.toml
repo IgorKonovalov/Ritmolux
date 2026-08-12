@@ -1,0 +1,48 @@
+# SCRATCH REFERENCE - not a fixture, not shipped content, not tuned for looks.
+# Nothing includes this file, no test names it, LMV_BLESS does not touch it, and
+# core/build.rs cannot see it (it globs presets/*.toml only). See the README
+# beside it. Same arrangement as scratch-0046/.
+#
+# THE BANDING REFERENCE (Plan 0080 Phase 7 -> ADR-0096 / Plan 0082).
+#
+# This is the frame the banding verdict was measured on, kept so the SAME frame
+# can be re-measured after the dither lands. A before/after on two different
+# pictures would prove nothing.
+#
+# Of the four dusk probes it is the one with the least light - mean RGB 34.0 /
+# 42.7 / 69.5 over the frame, against 82.2 and 122.6 for the gamma 1.0 and 2.5
+# variants - and it is also the worst banding case. Both for the same reason:
+# bg_ramp_gamma = 0.4 drops the ramp fast and leaves a long dim tail, and a flat
+# tail is where a single 8-bit level lasts longest.
+#
+# The swarm is fully suppressed (size / brightness / force at 0) so nothing is
+# rasterized and the frame is the backdrop alone. That is deliberate: a figure
+# drawn over the ramp hides exactly the plateaus this exists to show.
+system = "swarm"
+name   = "Dusk Ground g0.4 BANDING REFERENCE"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#04081a" },   # zenith, near-black - the tail lives here
+  { at = 0.40, color = "#0a1338" },
+  { at = 0.66, color = "#1b2a5e" },   # deep blue
+  { at = 0.82, color = "#b0442a" },   # the ember turn
+  { at = 0.93, color = "#ff7a1f" },
+  { at = 1.00, color = "#ffd06e" },   # the hot horizon
+]
+
+[params]
+force      = "0"
+spin       = "0"
+burst      = "0"
+size       = "0"
+brightness = "0"
+
+bg_bright     = "0.85"
+bg_vignette   = "0.0"
+bg_hue        = "1.0"
+bg_hue_span   = "-1.0"
+bg_angle      = "0"
+bg_shade      = "1.0"
+bg_shade_end  = "0.15"
+bg_ramp_gamma = "0.4"

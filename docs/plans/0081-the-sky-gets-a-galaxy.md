@@ -255,12 +255,15 @@ flowchart TB
     and the answer is fbm mottling — its own ADR, its own plan, not a patch here.
   - **Does the arc's curvature read at a normal field of view**, or does it need to be pushed so far
     that the ends leave the frame?
-  - **Does it band** — both this gradient and the ramp beneath it. **Plan 0080 Phase 7's banding
-    verdict is still outstanding and is now owed on two overlapping gradients rather than one.**
-    Look at 1080p, fullscreen, on a near-black sky where the band's own falloff is the widest smooth
-    ramp in the frame. Reporting "no banding observed, at these settings" is a result. If it bands,
-    one dither decision covers both gradients and it is its own ADR — do not add one inside this
-    plan.
+  - **Does it band, with two overlapping gradients rather than one?** Plan 0080 Phase 7's verdict
+    is **answered** — it banded, measured, and [Plan 0082](0082-the-gradient-stops-banding.md)
+    dithers the display write ahead of this plan precisely so this question is asked of a chain
+    that already works. **The check runs on the kept reference frame**,
+    `core/tests/fixtures/scratch-0082/dusk_ground_banding.toml` — the darkest of the Plan 0080
+    probes and the worst pre-dither case, frozen so a before/after is taken on the *same* picture.
+    Add `bg_band_amount` to it and re-measure at 1920x1080; its README carries the numbers and the
+    run command. **Nothing else in this plan checks that the dither still holds under two
+    gradients**, which is why it is named here rather than assumed.
 
 ## Data shapes
 

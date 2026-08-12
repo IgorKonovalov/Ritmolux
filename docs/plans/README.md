@@ -236,6 +236,20 @@ the rows above.
   still explains its onset-`flash` binding by "the report is bloom-blind" (fixed by Phase 4 —
   the binding may stay for its look, but the reason is gone), and `emitter_perseids.toml`'s
   header records the routed-out quiet sky this phase exists to ship.
+- **The banding reference frame is kept in the repo, and it is owed a re-measure twice**
+  (2026-08-12). `core/tests/fixtures/scratch-0082/dusk_ground_banding.toml` — a `scratch-NNNN/`
+  in the [0046] arrangement, so nothing includes it, no test names it and `LMV_BLESS` does not
+  touch it. It is the dusk ground at `bg_ramp_gamma = 0.4`: **the darkest of the Plan 0080 probes**
+  (mean RGB 34.0 / 42.7 / 69.5, against 82.2 and 122.6 for the other two) **and** the worst banding
+  case, both for the same reason — a fast-dropping ramp leaves a long dim tail, and a flat tail is
+  where one 8-bit level lasts longest. It is committed rather than left in a session directory
+  because **a before/after taken on two different pictures would prove nothing**. Re-measure it at
+  **1920x1080** (plateau width is in pixels, so the resolution is part of the measurement) at two
+  points: after [0082](0082-the-gradient-stops-banding.md), where the widest mid-range plateau
+  should fall from **58 px** to a hairline *and* the grain replacing it must not read as texture on
+  a held frame; and after [0081](0081-the-sky-gets-a-galaxy.md), with `bg_band_amount` added, to
+  confirm the dither still holds under **two overlapping gradients** — which nothing inside 0081
+  otherwise checks. Its README carries the run command and the full pre-dither numbers.
 - **Plan [0080](done/0080-the-sky-gets-a-horizon.md) Phase 7 — ANSWERED 2026-08-12, and it
   produced a plan.** All three questions are settled; the phase is discharged and only the content
   half remains (folded into the family pass below).
