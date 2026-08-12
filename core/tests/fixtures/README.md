@@ -391,12 +391,31 @@ why `trails = 0.98` sits above their `fade = 0.6`, and each header records the
 arithmetic. A "simplification" that removes either restores a green test that
 measures nothing.
 
-## `scratch-0046/` is not a fixture directory at all
+## `scratch-NNNN/` directories are not fixture directories at all
 
-Two presets and a README, left for Plan 0046 Phase 5 — a **human** phase whose
-whole content is looking at transformed feedback fullscreen, with music, and
-saying whether it reads. Nothing includes them, no test names them, `LMV_BLESS`
-does not touch them, and `core/build.rs` cannot see them (it globs
-`presets/*.toml` only). They live here because a phase that needs a preset needs
-somewhere to keep one; `scratch-0046/README.md` has the run command and the
-tuning traps found while authoring them.
+A `scratch-NNNN/` holds presets a **human** phase of Plan NNNN needs to look at,
+plus a README. Nothing includes them, no test names them, `LMV_BLESS` does not
+touch them, and `core/build.rs` cannot see them (it globs `presets/*.toml` only).
+They live here because a phase that needs a preset needs somewhere to keep one,
+and a session's temporary directory does not survive the session.
+
+- **`scratch-0046/`** — two presets for Plan 0046 Phase 5, whose whole content is
+  looking at transformed feedback fullscreen, with music, and saying whether it
+  reads. Its README has the run command and the tuning traps found while
+  authoring them.
+- **`scratch-0082/`** — the **banding reference frame**. One preset, the dusk
+  ground at `bg_ramp_gamma = 0.4`: the darkest of the Plan 0080 probes (mean RGB
+  `34.0 / 42.7 / 69.5`) and the worst banding case, both because a fast-dropping
+  ramp leaves a long dim tail and a flat tail is where one 8-bit level lasts
+  longest. It is kept so the **same frame** can be re-measured after
+  [Plan 0082](../../../docs/plans/0082-the-gradient-stops-banding.md)'s dither
+  and again after [Plan 0081](../../../docs/plans/0081-the-sky-gets-a-galaxy.md)
+  adds a second overlapping gradient — a before/after on two different pictures
+  would prove nothing. Its README carries the run command, the 2026-08-12
+  pre-dither measurements (widest mid-range plateau **58 px at value 11**, 0 %
+  rail-pinned) and what to check at each of those two points.
+
+**A `scratch-NNNN/` preset must not be tuned**, for a different reason from the
+fixtures above: no baseline depends on it, but its whole value is being *the same
+frame* as the measurement or observation recorded beside it. To explore a
+variant, copy it.
