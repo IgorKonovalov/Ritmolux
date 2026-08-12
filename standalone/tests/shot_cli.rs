@@ -459,6 +459,111 @@ fn tiny_report_library() -> PathBuf {
     dir
 }
 
+/// A preset whose **only** audio binding is `bloom_amount` — backlog 0088's
+/// subject, written by the test so the claim cannot drift with the shipped
+/// library. The figure is static and small (coverage ~0.03 at the report
+/// size), so the bloom halo's change is concentrated: exactly the class the
+/// whole-frame mean dilutes.
+const BLOOM_ONLY_SRC: &str = r#"
+system = "star_pattern"
+name = "probe_bloom_only"
+[generator]
+tiling            = "12"
+contact_angle_deg = 20
+[params]
+variant       = "1"
+rotation      = "0.4 * time"
+hue           = "0.55"
+draw_progress = "1"
+thickness     = "1.8"
+scale         = "0.6"
+brightness    = "0.85"
+bloom_amount  = "clamp(bass * 1.2, 0, 0.9)"
+"#;
+
+/// The number following `"<band>":` inside the named object of `preset`'s JSON
+/// entry — e.g. `value_for(&json, "reactivity_footprint", "bass")`. String
+/// surgery rather than a JSON crate, deliberately: the report's JSON is
+/// hand-rolled and these tests are its only consumer-side proof.
+fn value_for(json: &str, object: &str, band: &str) -> f32 {
+    let obj_start = json
+        .find(&format!("\"{object}\":{{"))
+        .unwrap_or_else(|| panic!("`{object}` object missing from report JSON:\n{json}"));
+    let tail = &json[obj_start..];
+    let key = format!("\"{band}\":");
+    let val_start = tail
+        .find(&key)
+        .unwrap_or_else(|| panic!("`{band}` missing from `{object}`:\n{tail}"))
+        + key.len();
+    let rest = &tail[val_start..];
+    let end = rest
+        .find([',', '}'])
+        .unwrap_or_else(|| panic!("unterminated number in `{object}.{band}`"));
+    rest[..end]
+        .trim()
+        .parse::<f32>()
+        .unwrap_or_else(|e| panic!("`{object}.{band}` is not a number ({e}): {}", &rest[..end]))
+}
+
+/// **The report can tell a bloom world from a dead one** — Plan 0077 Phase 4's
+/// done-when, run the way the content lane runs it. A preset spending all its
+/// reactivity on `bloom_amount` reads ~0.000 in the mean band columns (that
+/// reading is deliberately unchanged — it is the historical statistic), and
+/// **visibly nonzero** in the footprint reading, which divides the same
+/// differential by the union of lit pixels instead of the whole frame
+/// (`metrics::footprint_diff`, ADR-0091). The `flash`-lever workaround existed
+/// only because no column could see this; this is the assertion that it is no
+/// longer necessary.
+#[test]
+fn the_footprint_reading_sees_reactivity_spent_on_bloom() {
+    let dir = scratch("bloom-only-report");
+    let file = dir.join("bloom_only.toml");
+    std::fs::write(&file, BLOOM_ONLY_SRC).expect("write the bloom-only fixture");
+    let file_arg = file.to_string_lossy().into_owned();
+
+    let out = run(&["--report", "--json", "--preset-file", &file_arg]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "--report --json on the bloom fixture failed\nstderr: {}",
+        stderr(&out)
+    );
+    let json = stdout(&out);
+
+    let mean_bass = value_for(&json, "reactivity", "bass");
+    let footprint_bass = value_for(&json, "reactivity_footprint", "bass");
+    eprintln!("bloom-only fixture: mean bass {mean_bass}, footprint bass {footprint_bass}");
+
+    // The historical column still under-reads the bloom world — sub-floor,
+    // which is the backlog's "~0.000". If this ever rises past the reactivity
+    // floor the mean statistic has changed, and the footprint block's reason
+    // to exist should be re-examined.
+    assert!(
+        mean_bass < REACTIVITY_FLOOR,
+        "the mean bass column reads {mean_bass} — no longer sub-floor, so the \
+         whole-frame statistic has changed underneath this test"
+    );
+    // The footprint reading sees it, at or past the same floor the reactivity
+    // suite counts as a real response.
+    assert!(
+        footprint_bass >= REACTIVITY_FLOOR,
+        "the footprint reading must see bloom-spent reactivity: bass reads \
+         {footprint_bass} against the {REACTIVITY_FLOOR} floor"
+    );
+    // And the structural bands the preset never binds stay dead in both
+    // readings — the instrument gained sensitivity, not noise.
+    for band in ["mid", "treb"] {
+        let v = value_for(&json, "reactivity_footprint", band);
+        assert!(
+            v < REACTIVITY_FLOOR,
+            "`{band}` is unbound in the fixture but the footprint reading \
+             claims {v} — the new block is inventing reactivity"
+        );
+    }
+}
+
 /// `--report --json` emits parseable JSON with the documented top-level shape. The
 /// report is hand-rolled (no serde), so nothing but a consumer proves it is
 /// well-formed — and the `preset-author` lane is that consumer.

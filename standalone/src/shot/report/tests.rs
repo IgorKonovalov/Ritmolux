@@ -33,6 +33,7 @@ fn preset_report(name: &str, gates: Vec<GateReport>) -> PresetReport {
         name: name.to_string(),
         reactivity: [0.5, 0.25, 0.125, 0.0625],
         reactivity_low: [0.4, 0.2, 0.1, 0.05],
+        reactivity_footprint: [0.9375, 0.4688, 0.2344, 0.1172],
         animation: 0.75,
         coverage: 0.5,
         geometry: None,
@@ -249,6 +250,60 @@ fn the_text_report_emits_a_row_per_preset_with_its_transient_marks() {
     assert!(
         out.contains("every branch was taken"),
         "a gate-free family says so rather than printing nothing:\n{out}"
+    );
+}
+
+/// The footprint block (Plan 0077 Phase 4, backlog 0088) prints beside the
+/// mean columns rather than replacing them: the mean table's values are the
+/// historical reading and stay in place, and the footprint values — the ones
+/// that can see reactivity spent on a concentrated bloom halo — appear in
+/// their own labeled block. JSON carries the same reading under its own key.
+#[test]
+fn the_footprint_reading_prints_beside_the_mean_columns_not_instead_of_them() {
+    let fam = FamilyReport {
+        system: SystemKind::StarPattern,
+        presets: vec![preset_report("bloomy", vec![])],
+        pixel: vec![vec![0.0]],
+        shape: vec![vec![0.0]],
+        near_dups: Vec::new(),
+    };
+    let out = text_report("src", &[fam], Tier::Floor);
+
+    // The mean value and the footprint value are both present — the fixture's
+    // two arrays are distinct on every band, so each number is attributable.
+    assert!(out.contains("0.500"), "the mean bass column stays:\n{out}");
+    assert!(
+        out.contains("0.938"),
+        "the footprint bass value prints in its own block:\n{out}"
+    );
+    assert!(
+        out.contains("over the lit footprint"),
+        "the block explains itself:\n{out}"
+    );
+    assert!(
+        out.contains("footprint_diff"),
+        "the block names its statistic so a reader can find the definition:\n{out}"
+    );
+
+    let json = render_json(
+        "src",
+        &[FamilyReport {
+            system: SystemKind::StarPattern,
+            presets: vec![preset_report("bloomy", vec![])],
+            pixel: vec![vec![0.0]],
+            shape: vec![vec![0.0]],
+            near_dups: Vec::new(),
+        }],
+        Tier::Floor,
+    );
+    assert!(
+        json.contains("\"reactivity_footprint\":{\"bass\":0.9375"),
+        "JSON carries the footprint reading under its own key: {json}"
+    );
+    assert_eq!(
+        json.matches('{').count(),
+        json.matches('}').count(),
+        "braces balance with the new key: {json}"
     );
 }
 

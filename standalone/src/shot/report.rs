@@ -20,8 +20,8 @@ use lmv_core::preset::{
     GateFlag, GateKind, Observations, Preset, SATURATED_OCCUPANCY, SystemKind, Variables,
 };
 use lmv_core::render::metrics::{
-    StepResponse, coverage, frame_diff, quadrant_spread, segment_settled, step_response,
-    struct_diff,
+    StepResponse, coverage, footprint_diff, frame_diff, quadrant_spread, segment_settled,
+    step_response, struct_diff,
 };
 use lmv_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent};
 use lmv_core::render::{CaptureImage, Renderer, Tier};
@@ -35,6 +35,13 @@ const REPORT_FRAMES: u32 = 24;
 const REPORT_FRAMES_LATE: u32 = 48;
 const NEAR_DUP_STRUCT: f32 = 0.08;
 const COVERAGE_EPS: u8 = 10;
+/// Lower bound on the footprint reading's denominator, as a fraction of the
+/// frame — the same guard at the same value as the animation gate's
+/// `MIN_FOOTPRINT_FRAC` (`core/tests/animation.rs`, ADR-0091), where its
+/// two-sided derivation lives. Here it bounds a *reading* rather than a gate:
+/// without it, a one-pixel flicker on a near-empty frame would print as strong
+/// reactivity.
+const FOOTPRINT_MIN_FRAC: f32 = 0.015;
 
 /// Render size for the transient probe, deliberately smaller than
 /// [`REPORT_SIZE`]. The probe reads the GPU back **once per frame** rather than
@@ -82,6 +89,28 @@ struct PresetReport {
     /// beside the full-scale triple rather than replacing it — the pair is the
     /// reading (ADR-0042).
     reactivity_low: [f32; 4],
+    /// The full-scale differentials measured over the **union of lit pixels**
+    /// instead of the whole frame (`metrics::footprint_diff`, ADR-0091) — the
+    /// reading that resolves backlog 0088 (Plan 0077 Phase 4). Reactivity
+    /// spent on `bloom_amount` moves a concentrated halo around the figure,
+    /// and the whole-frame mean dilutes it into ~0.000 — dead, in the very
+    /// instrument the content lane verifies with; the house workaround was a
+    /// `flash` lever bound only to be seen.
+    ///
+    /// **The choice this phase records:** the mean columns are untouched —
+    /// every historical `--report` number keeps meaning what it said — and
+    /// the footprint form is added *beside* them, computed from the same
+    /// capture pairs at no extra GPU cost. No threshold moves; this is a
+    /// reading, not a gate, and the denominator's only constant states its
+    /// derivation at [`FOOTPRINT_MIN_FRAC`].
+    ///
+    /// Backdrop caveat: the report deliberately renders the shipped composite
+    /// (backdrop included), so on a preset whose backdrop lights much of the
+    /// frame the union mask approaches the whole frame and this reading
+    /// approaches the mean column. It can only degrade *toward* the old
+    /// behaviour — the mask never exceeds the frame, so the reading never
+    /// sits below the mean — never lie in the new direction.
+    reactivity_footprint: [f32; 4],
     animation: f32,
     coverage: f32,
     /// The in-frame geometry fraction of the fully-driven capture's last frame
@@ -192,11 +221,18 @@ fn build_family_report(
     let mut fixed_caps = Vec::new();
     for (index, name) in names.iter().enumerate() {
         let base = capture(r, name, &silent, REPORT_FRAMES)?;
+        // The silent capture's corner, like the coverage column's: the
+        // darkest pixel a vignetted backdrop leaves, so "lit" is measured
+        // against the frame's own ground rather than absolute black.
+        let base_bg = corner(&base);
         let mut reactivity = [0.0f32; 4];
         let mut reactivity_low = [0.0f32; 4];
+        let mut reactivity_footprint = [0.0f32; 4];
         for (i, frame) in bands.iter().enumerate() {
             let lit = capture(r, name, frame, REPORT_FRAMES)?;
             reactivity[i] = frame_diff(&base, &lit);
+            reactivity_footprint[i] =
+                footprint_diff(&base, &lit, base_bg, COVERAGE_EPS, FOOTPRINT_MIN_FRAC);
         }
         // Against the same silent baseline, so the two triples differ only in
         // the stimulus level.
@@ -228,6 +264,7 @@ fn build_family_report(
             name: name.clone(),
             reactivity,
             reactivity_low,
+            reactivity_footprint,
             animation,
             coverage: cov,
             geometry,
@@ -902,6 +939,33 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
                  and two shipped presets deliberately leave the frame"
             );
         }
+        // The footprint reading (Plan 0077 Phase 4, backlog 0088), its own
+        // block for the same reason the realistic-levels one is: the table
+        // above stays un-widened and every historical number stays in place.
+        let _ = writeln!(
+            out,
+            "\n  over the lit footprint (metrics::footprint_diff, ADR-0091) — read this \
+             when a mean column above shows ~0.000: reactivity concentrated in a small \
+             footprint (a bloom halo, a sparse figure) is diluted by the whole-frame \
+             mean; here the same differential is divided by the union of lit pixels:"
+        );
+        let _ = writeln!(
+            out,
+            "  {:<14} {:>7} {:>7} {:>7} {:>7}",
+            "preset", "bass", "mid", "treb", "onset"
+        );
+        for p in &fam.presets {
+            let _ = writeln!(
+                out,
+                "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3}",
+                p.name,
+                p.reactivity_footprint[0],
+                p.reactivity_footprint[1],
+                p.reactivity_footprint[2],
+                p.reactivity_footprint[3],
+            );
+        }
+
         // The second reading, as its own block rather than four more columns:
         // the table above is already nine wide and a wide terminal is not
         // guaranteed (ADR-0042). Keeping it un-widened also means every number
@@ -1026,6 +1090,13 @@ fn render_json(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
                 num(p.reactivity_low[1]),
                 num(p.reactivity_low[2]),
                 num(p.reactivity_low[3]),
+            ));
+            out.push_str(&format!(
+                "\"reactivity_footprint\":{{\"bass\":{},\"mid\":{},\"treb\":{},\"onset\":{}}},",
+                num(p.reactivity_footprint[0]),
+                num(p.reactivity_footprint[1]),
+                num(p.reactivity_footprint[2]),
+                num(p.reactivity_footprint[3]),
             ));
             out.push_str(&format!("\"animation\":{},", num(p.animation)));
             out.push_str(&format!("\"coverage\":{},", num(p.coverage)));
