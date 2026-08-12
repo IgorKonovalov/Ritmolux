@@ -1,7 +1,7 @@
 # 0077 — The quiet sky: the sparse idiom becomes gateable and the swarm individuates
 
-> **Status:** approved 2026-08-11 (scope, grouping and the acceptance phase user-decided by
-> interview at the Plan 0075 handoff)
+> **Status:** in-progress (scope, grouping and the acceptance phase user-decided by
+> interview at the Plan 0075 handoff; approved 2026-08-11)
 > **Created:** 2026-08-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0091](../adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)
