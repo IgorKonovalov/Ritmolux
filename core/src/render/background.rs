@@ -34,7 +34,22 @@
 //! binding out to both consumers ([`ParamRoute::SceneAndBackdrop`](super::ParamRoute)),
 //! so an author writes `saturation` once and the whole frame answers.
 //!
-//! Driven by named params (`bg_hue`, `bg_bright`, `bg_vignette`) the renderer
+//! # It paints a *segment* of that palette, along one ramp axis (ADR-0094)
+//!
+//! `bg_hue` alone takes **one** point of the gradient and multiplies it by a
+//! fixed vertical brightness tilt. `bg_hue_span` makes the coordinate travel
+//! along a screen axis instead, so the smooth fade a horizon needs falls out of
+//! the `[palette]`'s own stops — and each stop's `at` position *is* the horizon's
+//! vertical placement. There is no second placement mechanism.
+//!
+//! The swept coordinate is **not clamped**: it keeps the repeat addressing every
+//! other palette coordinate in this engine uses, because two shipped presets
+//! already drive `bg_hue` outside `[0, 1]` and depend on the wrap.
+//!
+//! Every ramp param defaults to an **arithmetic identity** with the picture that
+//! shipped before it, not to an approximation of it — see each one's constant.
+//!
+//! Driven by named params (`bg_hue`, `bg_bright`, `bg_vignette`, `bg_hue_span`) the renderer
 //! routes here before the scene's own bindings. At the defaults (`bg_bright = 0`)
 //! the backdrop is black, so a preset that binds none renders exactly as before —
 //! the migration is neutral until a preset opts into a backdrop.
@@ -82,6 +97,10 @@ use crate::render::palette::{self, Palette};
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_BRIGHT: f32 = 0.0;
 const DEFAULT_VIGNETTE: f32 = 0.0;
+/// The ramp's palette travel (ADR-0094). `0.0` sweeps nowhere, so the pass takes
+/// one sample at `bg_hue` — today's picture, as an arithmetic identity rather
+/// than an approximation of it.
+const DEFAULT_HUE_SPAN: f32 = 0.0;
 /// The two shared colour modulations, at the same defaults every scene uses —
 /// `saturation` unchanged, `palette_mix` fully on palette A.
 const DEFAULT_SATURATION: f32 = 1.0;
@@ -93,6 +112,8 @@ struct Bg {
     v: vec4<f32>,
     // x: palette_mix (A/B crossfade), y: saturation, zw: unused
     c: vec4<f32>,
+    // The ramp (ADR-0094). x: unused, y: bg_hue_span, zw: unused
+    g: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> u: Bg;
@@ -118,18 +139,32 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let vig_amt = u.v.z;
     let palette_mix = u.c.x;
     let saturation = u.c.y;
+    let hue_span = u.g.y;
+
+    // The ramp axis (ADR-0094): a normalized position along it, 0 at the frame's
+    // bottom edge and 1 at its top. Bottom-to-top for now — `bg_angle` turns it
+    // in a later phase, and its zero reduces to exactly this.
+    let s = clamp(0.5 + 0.5 * in.ndc.y, 0.0, 1.0);
 
     // A gentle vertical gradient (a touch brighter toward the top) plus a radial
     // vignette that darkens the corners — the atmospheric backdrop.
-    let grad = mix(0.72, 1.0, clamp(0.5 + 0.5 * in.ndc.y, 0.0, 1.0));
+    let grad = mix(0.72, 1.0, s);
     let r = length(in.ndc);
     let vig = 1.0 - vig_amt * clamp(r * r, 0.0, 1.0);
 
     // `bg_hue` is a *coordinate* in the preset's gradient, not an offset into a
     // private cosine. Linear-filtered and repeat-addressed, so it wraps past the
     // gradient's edge exactly as `color_center` / `hue_center` do.
-    let ca = textureSample(lut_a, lut_samp, vec2<f32>(hue, 0.5)).rgb;
-    let cb = textureSample(lut_b, lut_samp, vec2<f32>(hue, 0.5)).rgb;
+    //
+    // With `bg_hue_span` the pass paints a **segment** of that gradient along the
+    // ramp rather than one point of it: `bg_hue` is the coordinate at the ramp's
+    // start and the sweep travels `bg_hue_span` from there. The coordinate is not
+    // clamped — it keeps the engine-wide repeat addressing, so a segment leaving
+    // [0, 1] wraps (ADR-0094 Alternative D: two shipped presets depend on it).
+    // At the `0.0` default this is `hue + 0.0 * s`, which is `hue` exactly.
+    let coord = hue + hue_span * s;
+    let ca = textureSample(lut_a, lut_samp, vec2<f32>(coord, 0.5)).rgb;
+    let cb = textureSample(lut_b, lut_samp, vec2<f32>(coord, 0.5)).rgb;
     var tint = mix(ca, cb, clamp(palette_mix, 0.0, 1.0));
     tint = apply_saturation(tint, saturation);
 
@@ -143,6 +178,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 struct Bg {
     v: [f32; 4],
     c: [f32; 4],
+    g: [f32; 4],
 }
 
 /// The gradient pipeline, its uniform and its LUT pair, built lazily on the first
@@ -334,6 +370,7 @@ pub struct Background {
     hue: f32,
     bright: f32,
     vignette: f32,
+    hue_span: f32,
     /// The active preset's baked palette pair, re-uploaded to the LUT textures
     /// when `palette_dirty` (a preset switch, or a lazy rebuild), off the hot
     /// path. Held here rather than in [`Resources`] so a backdrop that has not
@@ -351,7 +388,7 @@ pub struct Background {
 /// **Keep in sync with `set_param` below**; the
 /// `declared_params_match_set_param` guard in `core/tests/preset.rs` fails if
 /// the two drift.
-pub const PARAMS: &[&str] = &["bg_hue", "bg_bright", "bg_vignette"];
+pub const PARAMS: &[&str] = &["bg_hue", "bg_bright", "bg_vignette", "bg_hue_span"];
 
 /// The two colour modulations the backdrop **shares with the scene** rather than
 /// owning (ADR-0086).
@@ -374,6 +411,7 @@ impl Background {
             hue: DEFAULT_HUE,
             bright: DEFAULT_BRIGHT,
             vignette: DEFAULT_VIGNETTE,
+            hue_span: DEFAULT_HUE_SPAN,
             // Seeded with the default `spectrum` (the cosine this pass used to
             // inline), so a backdrop painted before any `set_palette` call is the
             // colour it always was rather than black.
@@ -409,6 +447,7 @@ impl Background {
         self.hue = DEFAULT_HUE;
         self.bright = DEFAULT_BRIGHT;
         self.vignette = DEFAULT_VIGNETTE;
+        self.hue_span = DEFAULT_HUE_SPAN;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
     }
@@ -422,6 +461,7 @@ impl Background {
             "bg_hue" => self.hue = value,
             "bg_bright" => self.bright = value,
             "bg_vignette" => self.vignette = value,
+            "bg_hue_span" => self.hue_span = value,
             _ => return false,
         }
         true
@@ -487,6 +527,7 @@ impl Background {
             bytemuck::bytes_of(&Bg {
                 v: [self.hue, self.bright, self.vignette, 0.0],
                 c: [self.palette_mix, self.saturation, 0.0, 0.0],
+                g: [0.0, self.hue_span, 0.0, 0.0],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
