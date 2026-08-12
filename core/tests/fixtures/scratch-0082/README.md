@@ -86,14 +86,31 @@ ramp is locally flattest, and it moves if the frame does. The synthetic guard in
 undithered control resolved in the same run, which is the form that does not
 depend on this picture.
 
+## The by-eye verdict, 2026-08-12 — **it looks fine**
+
+Plan 0082's Phase 5, the `human` one, run on this preset in the live app: release
+build, `LMV_PRESET_DIR` pointed here, `rich` tier (pinned by the operator's own
+`config.toml`, which is a *different* tier from every capture above — captures
+pin `floor`; the backdrop has no tier-dependent budget, so the ramp is the same
+one). The user's verdict on both halves was **"looks fine"**.
+
+So the two questions this file was kept to answer are closed:
+
+- **The bands are gone** at the setting where they were visible, and the
+  measurement above says the same thing independently.
+- **The grain that replaced them is not itself a problem.** This was the live
+  risk rather than a formality — the dither is a *fixed* pattern and this sky is
+  nearly still by design, which is close to the worst case for that choice, and
+  a fixed pattern on a long-held frame can resolve as texture. It does not here.
+
+**That retires [ADR-0096](../../../../docs/adrs/0096-the-display-write-dithers.md)
+Alternative F** — an animated, time-varying dither — as a followup. It was the
+answer *if* the static grain read, and it does not, so the static choice keeps
+what it was chosen for: every byte-equality test between two same-sized frames
+still passes. Alternative F is not foreclosed, but nothing is now asking for it.
+
 ## What to check, and when
 
-- **After Plan 0082, by eye** (its Phase 5, the `human` one). The measurement
-  above says the bands are gone; the remaining question is whether the grain that
-  replaced them reads as texture on a held frame. It is a *fixed* pattern, and
-  this sky is nearly still by design, which is close to the worst case for that
-  choice. If it does read, that is ADR-0096 Alternative F — an animated dither —
-  and it is one term, but it costs the byte-equality property.
 - **After [Plan 0081](../../../../docs/plans/0081-the-sky-gets-a-galaxy.md)
   (the galactic band).** The band is a *second* wide smooth gradient over this
   same near-black sky, so this frame is the natural place to add
