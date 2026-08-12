@@ -1000,8 +1000,8 @@ boundary. Two things follow for anything that reads pixels here:
 ### A lit backdrop is a distinct test configuration, not a variant (Plan 0051)
 
 **`bg_bright > 0` is its own coverage axis, and until Plan 0051 nothing in the
-suite tested it deliberately.** Every golden baseline and every scene fixture but
-one runs `bg_bright = 0` — the right call *for a baseline*, since on black every
+suite tested it deliberately.** Nearly every golden baseline and scene fixture
+runs `bg_bright = 0` — the right call *for a baseline*, since on black every
 lit pixel provably came from the scene rather than from the backdrop. It is also
 a structural blind spot: **on a black backdrop, correctly compositing over the
 backdrop and wrongly covering it are the same picture.** A stage or a scene that
@@ -1017,8 +1017,16 @@ constant alpha 1 over their whole quad (Plan 0051 / ADR-0056). Each was fixed
 with a guard of the same shape, and the guards are per-seam rather than global
 because nothing structurally forces a shader's colour and alpha to stay in step.
 
-Two fixtures exist purely for this axis, and they are **additive test surface**
-rather than re-parameterized existing files, for the reason above:
+**One golden baseline is lit, and it is the exception that proves the rule**
+(Plan 0080, ADR-0094): `core/tests/fixtures/backdrop_ramp.toml` runs
+`bg_bright = 0.6`, because the backdrop's gradient pipeline is *not even built*
+below that and no dark baseline anywhere in the suite executes a line of that
+pass. It is an `EXTRA_FIXTURES` entry rather than a rostered one, so the
+per-system roster is still uniformly dark and the sentence above still describes
+what a *drift* baseline is for.
+
+The fixtures below exist purely for this axis, and they are **additive test
+surface** rather than re-parameterized existing files, for the reason above:
 
 - **`core/tests/fixtures/swarm_lit_backdrop.toml`** — a sparse frozen swarm over
   a lit, un-vignetted backdrop. It guards the sprite pipeline, whose radial
