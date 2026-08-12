@@ -120,28 +120,16 @@ const ODE_SUBSTEPS: i32 = 4;
 // a given particle in different directions. With the seed alone every reseed
 // would apply the same displacement field, which over a session is a rigid
 // pattern rather than a disturbance.
-// One round of a bit-mixer (the lowbias32 constants), so a small change in the
-// input decorrelates the output.
-fn mix32(v: u32) -> u32 {
-    var h = v;
-    h = h ^ (h >> 16u);
-    h = h * 0x7FEB352Du;
-    h = h ^ (h >> 15u);
-    h = h * 0x846CA68Bu;
-    h = h ^ (h >> 16u);
-    return h;
-}
+//
+// `mix32` and `unit01` are NOT declared here: they moved to `gpu::HASH_WGSL` when
+// the tonemap's dither became their second caller (Plan 0082 Phase 1), and
+// `resources.rs` concatenates that text in front of this one.
 
-// The top 24 bits as a signed unit fraction in [-1, 1).
+// The same 24 bits as a SIGNED unit fraction in [-1, 1) — the reseed kick, which
+// needs a direction as well as a magnitude. The unsigned spelling this is built
+// from is the shared one.
 fn unit(h: u32) -> f32 {
-    return f32(h >> 8u) / 16777216.0 * 2.0 - 1.0;
-}
-
-// The same 24 bits as an UNSIGNED fraction in [0, 1) — the IFS's map draw, which
-// is compared against a cumulative probability table. It cannot reach 1.0, and
-// the fourth map is the `else` arm regardless, so no draw lands nowhere.
-fn unit01(h: u32) -> f32 {
-    return f32(h >> 8u) / 16777216.0;
+    return unit01(h) * 2.0 - 1.0;
 }
 
 // Unrolled rather than looped over a dynamically-indexed vector: WGSL permits

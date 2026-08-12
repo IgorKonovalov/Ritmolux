@@ -240,6 +240,49 @@ pub(crate) fn fullscreen_shader(
 }
 
 // ---------------------------------------------------------------------------
+// The shared integer hash (Plan 0082 Phase 1)
+// ---------------------------------------------------------------------------
+
+/// One round of the **lowbias32** bit-mixer and the top 24 bits as a unit
+/// fraction, as WGSL text — prepended by any shader that needs deterministic
+/// pseudo-randomness. Concatenated in like
+/// [`feedback::TRANSFORM_WGSL`](super::feedback::TRANSFORM_WGSL), for the same
+/// reason: two copies of a hash are two hashes as soon as one of them is edited.
+///
+/// # Why integer mixing and not `fract(sin(dot(p, k)) * 43758.5453)`
+///
+/// The trig idiom is the one every shader on the internet uses and it is
+/// **disqualified in this repository** (ADR-0096): `sin`'s precision is
+/// implementation-defined, so WARP and the hardware adapter would disagree on
+/// essentially every pixel — which is indistinguishable from the ADR-0058
+/// class of defect the whole golden suite exists to catch. Integer arithmetic on
+/// `u32` is exact and identical on every adapter, so a hashed pass can be held to
+/// **byte** equality across adapters rather than to a drift tolerance.
+///
+/// The attractor's step shader shipped this pair first (Plan 0073); the tonemap's
+/// dither is the second caller, and this is the promotion Plan 0082 asked for
+/// rather than a third copy. `hash_unit` in `scenes/particles/mod.rs` is the CPU
+/// mirror of exactly these two functions and must move with them.
+pub(crate) const HASH_WGSL: &str = r#"
+// One round of a bit-mixer (the lowbias32 constants), so a small change in the
+// input decorrelates the output.
+fn mix32(v: u32) -> u32 {
+    var h = v;
+    h = h ^ (h >> 16u);
+    h = h * 0x7FEB352Du;
+    h = h ^ (h >> 15u);
+    h = h * 0x846CA68Bu;
+    h = h ^ (h >> 16u);
+    return h;
+}
+
+// The top 24 bits as an unsigned fraction in [0, 1). It cannot reach 1.0.
+fn unit01(h: u32) -> f32 {
+    return f32(h >> 8u) / 16777216.0;
+}
+"#;
+
+// ---------------------------------------------------------------------------
 // Fullscreen-triangle vertex preludes (see the module docs on why three)
 // ---------------------------------------------------------------------------
 
