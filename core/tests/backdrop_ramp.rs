@@ -1000,6 +1000,122 @@ fn the_bands_centreline_bows_by_its_curve_and_stays_symmetric() {
     );
 }
 
+/// The band's along-axis coordinate at framebuffer column `i` of `width`, at the
+/// pixel's centre.
+///
+/// Derived from the convention rather than measured, as [`ramp_at_row`] is. At
+/// `bg_band_angle = 0` the along direction is `(1, 0)`, so `t` is
+/// `0.5 + 0.5 * ndc.x` and the aspect divides out — which over `W` columns is
+/// simply `(i + 0.5) / W`, left to right.
+fn band_t_at_col(col: u32, width: u32) -> f32 {
+    (col as f32 + 0.5) / width as f32
+}
+
+/// **The band's swept coordinate really is the palette's** — Plan 0080's
+/// instrument for the ramp, rotated a quarter turn onto the band's own axis.
+///
+/// `bg_band_hue` is an **absolute** coordinate in the same `[palette]` the
+/// ground samples, and `bg_band_hue_span` makes it travel *along* the band. The
+/// reference for column `i` is the **same shader** with `bg_band_hue_span = 0`
+/// and `bg_band_hue` pinned to the coordinate the sweep reaches at that column.
+/// Everything downstream of the LUT fetch — the envelope, the ground beneath it,
+/// the tonemap, the dithered 8-bit write — is identical between the two captures
+/// at that pixel, so what survives the subtraction is the coordinate and nothing
+/// else.
+///
+/// The bound is one 8-bit level rather than zero for the reason the ramp's twin
+/// states: the reference parses a decimal literal into `f32` while the sweep
+/// computes `bg_band_hue + bg_band_hue_span * t` in the shader, and the two can
+/// land an ulp apart across a rounding boundary.
+#[test]
+fn the_bands_swept_span_samples_the_palette_at_the_coordinate_its_column_implies() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    // Sampled on the band's centre row, where the envelope is strongest and a
+    // colour difference has the most room to show. `bg_band_pos = 0.5` puts the
+    // centreline at row 31.5, so either neighbour will do.
+    const ROW: u32 = 32;
+    let band = |hue: &str, span: &str| {
+        format!(
+            "{PLATE}bg_band_amount = \"{BAND_AMOUNT}\"\nbg_band_angle = \"0\"\n\
+             bg_band_pos = \"0.5\"\nbg_band_width = \"0.15\"\nbg_band_curve = \"0\"\n\
+             bg_band_hue = \"{hue}\"\nbg_band_hue_span = \"{span}\"\n"
+        )
+    };
+    // The whole dusk gradient, travelled once across the band.
+    let swept = capture(&mut renderer, DUSK, &band("0.0", "1.0"));
+
+    // Non-vacuity: the sweep has to actually change the band's colour across the
+    // frame, or every comparison below passes on a constant.
+    let (left, right) = (pixel(&swept, 2, ROW), pixel(&swept, SIZE - 3, ROW));
+    let travel = worst_channel(left, right);
+    println!(
+        "swept band: {left:?} at column 2 against {right:?} at column {}",
+        SIZE - 3
+    );
+    assert!(
+        travel > 20,
+        "the swept band is the same colour at both ends ({left:?} against \
+         {right:?}, {travel} levels apart), so pinning it against a fixed \
+         coordinate proves nothing"
+    );
+
+    for col in [4u32, 17, 31, 46, SIZE - 5] {
+        let coord = band_t_at_col(col, SIZE);
+        let reference = capture(&mut renderer, DUSK, &band(&coord.to_string(), "0"));
+        let swept_px = pixel(&swept, col, ROW);
+        let ref_px = pixel(&reference, col, ROW);
+        let worst = worst_channel(swept_px, ref_px);
+        assert!(
+            worst <= 1,
+            "at column {col} the band's sweep reaches palette coordinate \
+             {coord:.5}, so it must paint what a fixed `bg_band_hue = {coord}` \
+             paints at that same pixel — it differs by {worst} levels \
+             ({swept_px:?} vs {ref_px:?}). The band is sampling a segment other \
+             than [bg_band_hue, bg_band_hue + span], or sampling it along the \
+             wrong axis."
+        );
+    }
+}
+
+/// **The band's coordinate keeps the engine-wide repeat addressing** — no clamp,
+/// here or anywhere (ADR-0094 Alternative D, and this is the same coordinate
+/// space).
+///
+/// A segment leaving `[0, 1]` wraps rather than pinning to the gradient's end.
+/// Asserted against the wrapped coordinate itself, so the test says nothing
+/// about what the palette's colours are: `bg_band_hue = 1.3` must paint exactly
+/// what `0.3` paints, and `-0.7` must too.
+#[test]
+fn the_bands_coordinate_wraps_rather_than_clamping() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    let band = |hue: &str| {
+        format!(
+            "{PLATE}bg_band_amount = \"{BAND_AMOUNT}\"\nbg_band_angle = \"0\"\n\
+             bg_band_pos = \"0.5\"\nbg_band_width = \"0.15\"\nbg_band_hue = \"{hue}\"\n"
+        )
+    };
+    let inside = capture(&mut renderer, DUSK, &band("0.3"));
+    for driven in ["1.3", "-0.7"] {
+        let out = capture(&mut renderer, DUSK, &band(driven));
+        let worst = mid_column(&out)
+            .into_iter()
+            .zip(mid_column(&inside))
+            .map(|(a, b)| worst_channel(a, b))
+            .max()
+            .unwrap_or(0);
+        assert!(
+            worst <= 1,
+            "`bg_band_hue = {driven}` must wrap onto 0.3 and paint the same band \
+             — the mid-columns differ by {worst} levels. The coordinate is being \
+             clamped instead of repeat-addressed."
+        );
+    }
+}
+
 /// **At `bg_band_amount = 0` the band's other params do nothing whatsoever** —
 /// byte-for-byte, which is what the shader's `select` arm buys over a multiply
 /// by zero.
@@ -1025,7 +1141,7 @@ fn the_bands_geometry_is_inert_until_its_amount_is_bound() {
         DUSK,
         "bg_hue = \"1.0\"\nbg_hue_span = \"-1.0\"\nbg_band_amount = \"0\"\n\
          bg_band_angle = \"0.7\"\nbg_band_pos = \"0.2\"\nbg_band_width = \"0.05\"\n\
-         bg_band_curve = \"0.3\"\n",
+         bg_band_curve = \"0.3\"\nbg_band_hue = \"0.4\"\nbg_band_hue_span = \"0.6\"\n",
     );
     let worst = (0..SIZE)
         .map(|row| {
