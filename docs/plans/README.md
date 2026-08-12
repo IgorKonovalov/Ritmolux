@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0080** (ADRs are a separate sequence — next free there is **0094**.)
+**Next free number: 0081** (ADRs are a separate sequence — next free there is **0095**.)
 
 ## Active roster
 
@@ -16,6 +16,7 @@ someone who picked it up is reading.
 
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
+| [0080](0080-the-sky-gets-a-horizon.md) | The sky gets a horizon: the backdrop paints a directional ramp | **draft 2026-08-12** | dev, human | Small ([ADR-0094](../adrs/0094-the-backdrop-paints-a-directional-ramp.md)): the background pre-pass gains one ramp axis and paints a *segment* of the preset's palette along it (`bg_angle`, `bg_hue_span`, `bg_shade`/`bg_shade_end`), the hardcoded `mix(0.72, 1.0, ndc.y)` tilt retiring into it. Defaults are an arithmetic identity, so all 20 baselines must come back hash-identical **three times** (once per code phase) under a bless-to-bless control. **The one hazard is ADR-0037**: the aspect must come from the destination `surface`, not the `target.size` on the adjacent line, and it cancels at the default angle — Phase 3's 1.25-vs-2.0 NDC control is the only thing that can see it. Closes backlog 0091 (a user-rejected workaround, not speculation). Ends with a `human` verdict against the reference photo; the world itself ships later through the [0067] route, grouped with [0077]'s standing Phase 5. |
 | [0079](0079-the-attractor-learns-new-figures.md) | The attractor learns new figures: the tuple roster with per-tuple framing, and measured morph paths | **approved 2026-08-11** | dev, human | The largest of the three ([ADR-0093](../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md)): per-family curated tuple tables carrying their own projection + seed box (jitter derived per-entry so `reseed` survives — the Plan 0062 coupling), a CPU-quantized `tuple` param, the rho ≈ 100 Lorenz as the walking skeleton, user-curated roster from contact sheets, then morph-path filmstrip sweeps where **zero survivors is a legitimate recorded outcome** (user accepted the research risk by interview). Closes backlog 0055. **Queued after [0075]'s cohort 6, last of the three** ([0076] landed 2026-08-11) — two `human` curation gates inside. |
 
 ## Recommended execution sequence
@@ -41,7 +42,15 @@ bringing the user in rather than picking on that criterion.
 
 | # | Plan | Why here |
 |---|------|----------|
-| 1 | [0079](0079-the-attractor-learns-new-figures.md) | The last of the three promoted handoff plans. Largest, two `human` curation gates inside. |
+| 1 | [0080](0080-the-sky-gets-a-horizon.md) | Small, and it is the only plan on this roster with a look **already blocked behind it** — the workaround exists and was rejected. |
+| 2 | [0079](0079-the-attractor-learns-new-figures.md) | The last of the three promoted handoff plans. Largest, two `human` curation gates inside. |
+
+**Updated 2026-08-12, when [0080](0080-the-sky-gets-a-horizon.md) was written.** It goes first, by
+the user's call at the interview ("after 0078, before 0079" — and 0078 closed the same day). The
+reasoning is not size: it is that every other plan on this roster is capability work with nothing
+waiting on it, while this one has a demonstrated look behind it whose workaround the user has
+already rejected. The two do not contend for files — 0080 is the backdrop pre-pass and the
+composite seam, 0079 is the attractor's tuple tables.
 
 **Updated 2026-08-12, at [0078](done/0078-the-ink-learns-to-bite.md)'s close.** The second of the
 three landed — both `dev` phases, no blockers at review — so the sequence is one plan. Its Phase 3
