@@ -970,7 +970,7 @@ rectangular blocks, and any real `pan_*` walked off into them. That is why the
 shipped `reaction_*` presets are pinned near `zoom = 0.99` with a whisper of pan,
 and why those pins are now unnecessary.
 
-### Background pass — `bg_hue`, `bg_bright`, `bg_vignette`, and the ramp
+### Background pass — `bg_hue`, `bg_bright`, `bg_vignette`, the ramp and the band
 
 An audio-tintable gradient + vignette backdrop drawn *before* the scene, engine-
 wide. `bg_bright = 0` (the default) is a black backdrop; raise it to reveal the
@@ -994,8 +994,8 @@ the **sparse** scenes (lines, swarm, attractor) where the gaps show through, and
 since Plan 0025 — in the **reaction-diffusion** field's voids (both scenes now
 composite over the backdrop instead of presenting opaque). The **fragment field**
 is the one full-screen scene that still draws opaquely, so `bg_*` has no visible
-effect there — **including the whole ramp below**. A dusk ground under a
-`fragment_field` preset is not a dim ground, it is an absent one.
+effect there — **including the whole ramp and the band below**. A dusk ground
+under a `fragment_field` preset is not a dim ground, it is an absent one.
 
 #### The directional ramp — `bg_angle`, `bg_hue_span`, `bg_shade`, `bg_shade_end`, `bg_ramp_gamma`
 
@@ -1124,6 +1124,88 @@ is what decides whether that limit binds at all.
 
 None of this is worse than before: pre-fix the whole sprite quad held the
 backdrop out, so every value is brighter now than it was.
+
+#### The curved band — `bg_band_amount`, `bg_band_angle`, `bg_band_pos`, `bg_band_width`, `bg_band_curve`, `bg_band_hue`, `bg_band_hue_span`
+
+Seven params paint **one soft band of light across the sky**, over the ground the ramp paints and
+under everything else ([ADR-0095](../docs/adrs/0095-the-backdrop-paints-a-curved-band.md)). It was
+written for a Milky Way arc standing over a dusk horizon: a swell of light along a bowed diagonal,
+with the scene's own stars sitting in front of it.
+
+| Param | Default | What it does |
+|-------|---------|--------------|
+| `bg_band_amount` | `0.0` | The band's **intensity**. `0` draws no band at all. Everything else here is inert until you raise it. |
+| `bg_band_angle` | `0.0` | The direction **across** the band, in **radians** — the same axis convention `bg_angle` uses, so `0` runs the band **horizontally** and `1.5708` (π/2) runs it vertically. |
+| `bg_band_pos` | `0.5` | Where the centreline sits **along that across-axis**, in the same normalized `0..1` the ramp uses. At `bg_band_angle = 0` that axis runs bottom-to-top, so `0` is the bottom of the frame and `1` the top. |
+| `bg_band_width` | `0.15` | The **`1/e` half-width** — see below. Clamped to `0.001 .. 100`. |
+| `bg_band_curve` | `0.0` | The **arc**: how far the centreline bows, in across-axis units, at the middle of the band. `0` is exactly straight. |
+| `bg_band_hue` | `0.0` | The band's **own coordinate** in the same `[palette]` — an absolute coordinate, not an offset from the ground's. |
+| `bg_band_hue_span` | `0.0` | How far that coordinate travels **along** the band, so one end can brighten toward a galactic core. |
+
+Every default is an arithmetic identity with the picture that shipped before the band existed, so a
+preset that binds none of them renders byte-for-byte unchanged. All seven are ordinary bindable
+params.
+
+**`bg_band_width` is a `1/e` half-width, not a full width and not an edge.** The envelope is a
+gaussian: it is at full strength on the centreline and has fallen to `1/e` (about 37 %) exactly
+`bg_band_width` either side of it, still faintly visible for two or three times that. So the
+*visible* band is several times wider than the number you type. At `0.15` on a 1080-row frame with
+`bg_band_angle = 0`, the `1/e` line sits about 160 px from the centre and the band reads roughly a
+third of the frame tall. Halve it for a tight ribbon; `0.4` is a wash across the whole sky.
+
+The worked Milky Way arc, over the same dusk palette the ramp's example uses:
+
+```toml
+[params]
+bg_bright        = "0.0"    # a near-black sky: the band does not need a ground
+bg_band_amount   = "0.5"
+bg_band_angle    = "1.2"    # the across-axis tilted, so the band runs diagonally
+bg_band_pos      = "0.55"   # a little above centre
+bg_band_width    = "0.12"
+bg_band_curve    = "0.18"   # bowed — the silhouette that reads as a galaxy
+bg_band_hue      = "0.30"   # the palette's cool blue-white...
+bg_band_hue_span = "0.25"   # ...warming toward one end
+```
+
+Two levers make it operable: move `bg_band_pos` and the arc rides up or down the frame; raise
+`bg_band_curve` and it bows further. Turn the whole thing with `bg_band_angle`, remembering that
+angle names the direction **across** the band rather than along it — so the band itself runs
+perpendicular to the number you write.
+
+**`bg_band_amount > 0` is now enough on its own.** The backdrop pass used to skip drawing entirely
+below a visible `bg_bright`; it no longer does. A band over a `bg_bright = 0` sky paints, which is
+the near-black configuration this look actually wants — the reference photograph's sky *is* almost
+black away from the horizon. You do not need a lit ground to hang a galaxy on.
+
+**The band is additive over the ground and under the scene.** It adds light rather than replacing
+it, which is what unresolved starlight is — so it brightens whatever the ramp already painted rather
+than covering it, and the scene then draws over both. A fullscreen or opaque scene therefore hides
+the band exactly as it hides the ramp, and **`fragment_field` hides it completely**. A galaxy under
+a fragment-field preset is not a dim galaxy, it is an absent one.
+
+**The band shares your `[palette]` with the ground *and* the scene *and* any `[layer]`, and that is
+the one real authoring constraint this creates.** There is no second palette to reach for —
+`palette_mix` already owns the A/B pair for preset crossfade, so pinning the band to B would fight
+every dissolve. A sky with both a horizon ramp and a galaxy needs stops that hold **both** sets of
+colours: the dusk palette in the ramp's example is fully spent on the horizon, and adding an arc to
+it means finding room for the band's colours in the same list. Plan for that before tuning, not
+after. Because `bg_band_hue` is *absolute*, the band keeps one colour along its whole length
+whatever the ramp underneath it is doing — which is what makes a pale arc over a warm horizon
+authorable at all.
+
+**The band's coordinate wraps** exactly as the ramp's does: `[bg_band_hue, bg_band_hue +
+bg_band_hue_span]` is repeat-addressed, not clamped, so a segment running off either end comes back
+around the other side with a hard seam where it wraps. If the arc has a colour break you did not
+author, check whether the span left `[0, 1]`.
+
+**And the backdrop is still invisible to every behavioral gate.** This bears restating here rather
+than only under the ramp, because a *more capable* backdrop makes the temptation to lean on it
+stronger. `sanity` measures coverage against the scene with the backdrop suppressed
+([ADR-0067](../docs/adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)) and `animation`
+strips `bg_*` bindings before scoring motion
+([ADR-0091](../docs/adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)),
+so a galaxy earns a preset **nothing** at either. The figure and any `[layer]` carry both floors, no
+matter how much of the frame the sky fills.
 
 ### Backdrop occlusion — `occlude`
 
