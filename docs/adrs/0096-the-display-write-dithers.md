@@ -1,8 +1,11 @@
 # ADR-0096 — The display write dithers, in the encoded domain, from an integer hash
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-12 — **with a dated [Outcome](#outcome--2026-08-12-at-plan-0082s-close)
+> that falsifies two things below.** The Decision's "three parts, each load-bearing" is
+> **four**, and the third Positive consequence is **false**. Read the Outcome before
+> building on either.
 > **Date:** 2026-08-12
-> **Related plan(s):** [0082-the-gradient-stops-banding](../plans/0082-the-gradient-stops-banding.md)
+> **Related plan(s):** [0082-the-gradient-stops-banding](../plans/done/0082-the-gradient-stops-banding.md)
 > **Supplements:** [ADR-0046](0046-linear-light-hdr-composite-bloom-tonemap.md) (the tonemap
 > is the format boundary this decision attaches to),
 > [ADR-0094](0094-the-backdrop-paints-a-directional-ramp.md) (the gradient that exposed it),
@@ -196,3 +199,72 @@ was that the banding is visible and spoiling an otherwise working look.
   [Plan 0081](../plans/0081-the-sky-gets-a-galaxy.md) by the user's call, so the galactic band is
   born onto a chain that already dithers and its own `human` verdict is not confounded by a defect
   already known about.
+
+## Outcome — 2026-08-12, at Plan 0082's close
+
+The dither ships in the shape decided above and it works: the dusk ground's dark tail went from
+**7.5 pixels per 8-bit level and a 58-pixel plateau** to **2.1 and 20**, with wide plateaus
+collapsing from 17 to 3, and the `human` verdict on the running app was *"looks fine"* on both
+halves — the bands are gone and the static grain does not read as texture. That last one retires
+**Alternative F** as a followup; it is not foreclosed, but nothing is asking for it.
+
+**Two things above are wrong, and both were found by implementation rather than by argument.**
+
+### The Decision's three load-bearing parts are four: the dither must fade at the rails
+
+This ADR says nothing about what happens at 0 and 1, and the omission is not cosmetic. **At a rail
+the value is already exactly representable, so there is no quantization error to decorrelate — and
+the write clamps, so the half of the noise pointing off the end is discarded and what survives is a
+one-sided DC lift rather than a dither.** An exactly-black frame came back at a mean of **0.18/255**:
+a speckle of 1s over every dark frame the engine draws, and nearly every fixture in the suite runs
+`bg_bright = 0`. It was caught by two *existing* guards rather than a new one — the emitter's burst
+test (lead peak 0.1827 where it asserts empty) and bloom's roundness test.
+
+`dither_offset` in `core/src/render/tonemap.rs` now scales the amplitude by the distance to the
+nearer rail measured in **encoded levels**, clamped to 1. That fade is **exactly inert above the
+first code value**, and provably so rather than by tuning: below the knee the slope is the exact
+constant 12.92, so `min(l, 1-l) * slope * 255` *is* the encoded byte value. Every plateau this pass
+exists to dissolve sits at bytes 7 to 30, far above where the fade does anything.
+
+Anyone re-deriving this decision from the Decision section alone will rebuild the defect. That is
+why it is stated here rather than left in a shader comment.
+
+### The third Positive consequence is false: the adapters do **not** agree byte-for-byte
+
+Above: *"an integer-hash dither must produce byte-identical output on WARP and on hardware, which is
+a claim the 0.02 drift floor could never make."* **It must not, and it does not.** The reasoning
+stopped one step short of the surface. The *hash* is exact on every adapter — that part holds, and
+was measured: a flat sub-knee field resolved into a float target gives 65 536 values with **zero**
+differing bit patterns between the two. But the surface is `Rgba8UnormSrgb`, so what the eye and the
+golden suite see is the **hardware sRGB encode downstream of the hash**, and *that* is not exact.
+DX12 permits tolerance in float-to-sRGB8, and in the steep dark region WARP's approximation departs
+from the true transfer function — so a perturbation sized by the *true* slope lands two levels away
+in some places and fails to move the value at all in others.
+
+Measured across the re-bless: **212 of 2 049 408 channels move by 2**, 88 % of them below byte 20,
+every one skipping exactly one value. On hardware the bound is exactly 1 — zero of 12 288 channels
+move by 2 at either end of the range. One mechanism covers both symptoms, the 2s and the plateau
+guard reading `200 px -> 65 px` on WARP against `137 -> 19` on hardware at its darkest.
+
+Three consequences, all live:
+
+- **`round(x + n)` with `|n| <= 1` is bounded by one level, and that is a *hardware* claim, not a
+  universal one.** The shipped assertion reads its per-pixel bound off `is_software()` rather than
+  assuming one. Plan 0082's own Phase-2 done-when — *"a delta of 2 anywhere means the amplitude or
+  the slope term is wrong"* — was wrong for this reason and is corrected in that plan's close notes.
+- **Below about byte 20, a WARP capture is not a reliable instrument for one-level effects.** This
+  reaches past the dither: it is a property of the adapter this project blesses on. It is recorded
+  in [`docs/capturing.md`](../capturing.md), which is where a future measurement will meet it.
+- **The integer hash still earned its place.** Alternative C would have diverged on essentially
+  *every* pixel; this diverges on 0.01 % of them, for a reason that is the adapter's and not ours.
+  What does not exist is the sharper-than-0.02 instrument this ADR promised — do not build on it.
+
+### What was not falsified
+
+TPDF over uniform, the slope divide (measured at a mean absolute byte change of **0.3171** dark and
+**0.3408** bright against a *derived* 1/3, where a constant linear amplitude would read ~12.9 and
+~0.44), staticness (every byte-equality test in the suite still passes, including Plan 0075's
+`depth_fade` no-op against a live Lorenz control), the bounded re-bless, and the blast-radius
+rejections of Alternatives B and E all stand as written. The `mix32` / `unit01` pair was promoted
+out of the attractor's step shader into `gpu::HASH_WGSL` on the way — the shared home Plan 0077's
+close asked a third particle scene to build, arriving instead from the display write.

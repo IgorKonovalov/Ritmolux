@@ -1,8 +1,8 @@
 # 0081 — The sky gets a galaxy: the backdrop paints a curved band
 
-> **Status:** approved 2026-08-12 (user approval, same day; the structure/colour/arc forks were all
+> **Status:** in-progress 2026-08-12 (user approval, same day; the structure/colour/arc forks were all
 > decided by interview — see ADR-0095 Alternatives A, D and F)
-> **Sequenced after:** [0082](0082-the-gradient-stops-banding.md) — the band is a second wide smooth
+> **Sequenced after:** [0082](done/0082-the-gradient-stops-banding.md) — the band is a second wide smooth
 > gradient, and Phase 6's verdict must not be confounded by banding already known about
 > **Created:** 2026-08-12
 > **Owner skill(s):** dev, human
@@ -256,7 +256,7 @@ flowchart TB
   - **Does the arc's curvature read at a normal field of view**, or does it need to be pushed so far
     that the ends leave the frame?
   - **Does it band, with two overlapping gradients rather than one?** Plan 0080 Phase 7's verdict
-    is **answered** — it banded, measured, and [Plan 0082](0082-the-gradient-stops-banding.md)
+    is **answered** — it banded, measured, and [Plan 0082](done/0082-the-gradient-stops-banding.md)
     dithers the display write ahead of this plan precisely so this question is asked of a chain
     that already works. **The check runs on the kept reference frame**,
     `core/tests/fixtures/scratch-0082/dusk_ground_banding.toml` — the darkest of the Plan 0080

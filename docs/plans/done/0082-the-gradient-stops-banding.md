@@ -1,16 +1,21 @@
 # 0082 — The gradient stops banding: the display write dithers
 
-> **Status:** in-progress 2026-08-12 (user approval, same day; the dither's shape, the sequencing
-> ahead of [0081](0081-the-sky-gets-a-galaxy.md), and the decision to fix this before authoring the
-> world were all settled by interview — see ADR-0096's Alternatives)
+> **Status:** **done 2026-08-12** — all five phases landed (`b6743fa`, `ad7f39b`, `1492877`,
+> `8c3aae7`, plus the self-repair `b6b5940` and the `human` verdict `e64a61b`). Mode 4 review:
+> **no blockers, one major, five minors, three nits**. The major is this plan's own ADR — see
+> [Close notes](#close-notes--2026-08-12) below, and
+> [ADR-0096's Outcome](../../adrs/0096-the-display-write-dithers.md#outcome--2026-08-12-at-plan-0082s-close),
+> which falsifies two of its claims. Approved by interview the same day; the dither's shape, the
+> sequencing ahead of [0081](../0081-the-sky-gets-a-galaxy.md), and the decision to fix this before
+> authoring the world were all settled there — see ADR-0096's Alternatives.
 > **Created:** 2026-08-12
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0096](../adrs/0096-the-display-write-dithers.md) (this plan's decision),
-> attaches to [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (the format
-> boundary), answers [0094](../adrs/0094-the-backdrop-paints-a-directional-ramp.md)'s open banding
-> question, unblocks [0095](../adrs/0095-the-backdrop-paints-a-curved-band.md)
-> **Closes:** [Plan 0080](done/0080-the-sky-gets-a-horizon.md) Phase 7's banding half
-> **Blocks:** [Plan 0081](0081-the-sky-gets-a-galaxy.md) — sequenced first by the user's call
+> **Related ADRs:** [0096](../../adrs/0096-the-display-write-dithers.md) (this plan's decision),
+> attaches to [0046](../../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (the format
+> boundary), answers [0094](../../adrs/0094-the-backdrop-paints-a-directional-ramp.md)'s open banding
+> question, unblocks [0095](../../adrs/0095-the-backdrop-paints-a-curved-band.md)
+> **Closes:** [Plan 0080](0080-the-sky-gets-a-horizon.md) Phase 7's banding half
+> **Blocks:** [Plan 0081](../0081-the-sky-gets-a-galaxy.md) — sequenced first by the user's call
 
 ## TL;DR
 
@@ -39,7 +44,7 @@ quantized and not a tonemap clip — which also retires a suspicion raised at Pl
 `bg_bright = 0.85` was reaching the tonemap's shoulder. It is not; nothing clips.
 
 The full reasoning, the three pipeline facts that decide the shape of the fix, and the seven
-rejected alternatives are in [ADR-0096](../adrs/0096-the-display-write-dithers.md).
+rejected alternatives are in [ADR-0096](../../adrs/0096-the-display-write-dithers.md).
 
 ## Decision
 
@@ -220,9 +225,112 @@ flowchart TB
 
 ## Followups (after this lands)
 
-- **[Plan 0081](0081-the-sky-gets-a-galaxy.md) is unblocked**, and its Phase 6 verdict is no longer
+- **[Plan 0081](../0081-the-sky-gets-a-galaxy.md) is unblocked**, and its Phase 6 verdict is no longer
   confounded — the galactic band is born onto a chain that already dithers.
 - **If Phase 5 says the grain reads as texture**, Alternative F, with the observation as its
   evidence.
 - The dusk world itself, in the content lane, still grouped with Plan 0077 Phase 5 and Plan 0080
   Phase 7 — **now three standing items on one family of looks, and one pass**.
+
+## Close notes — 2026-08-12
+
+**Verdict: landed cleanly, and unusually well evidenced. No blockers, one major, five minors, three
+nits — and every finding is a consequence of something *this plan* got wrong, recorded honestly by
+`dev` rather than absorbed.** Verified at the close rather than taken on the commit messages' word:
+`fmt` clean, `clippy --workspace --all-targets` clean, doc links green; both dither tests reproduce
+their recorded numbers exactly (`132 px -> 23 px`; dark sweep mean 0.3533 worst 2, bright 0.3384
+worst 1); golden 27/27 green post-bless; `backdrop_ramp` 6/6, so the `<= 1` tolerances survived; all
+four byte-equality tests pass including Plan 0075's `depth_fade` no-op against a live Lorenz control,
+which is the property that made *static* the right choice; and the emitter burst test that caught the
+rail defect is back to passing.
+
+### The major: ADR-0096 was falsified in two places, and is accepted with a dated Outcome
+
+Both are recorded in
+[ADR-0096's Outcome](../../adrs/0096-the-display-write-dithers.md#outcome--2026-08-12-at-plan-0082s-close)
+rather than edited into its body.
+
+1. **The Decision's "three parts, each load-bearing" is four.** The ADR says nothing about the rails,
+   and as written it produces a mean `0.18/255` DC lift on an exactly-black frame — half the noise
+   discarded by the clamp at a value that was already exactly representable, over a suite where
+   nearly every fixture runs `bg_bright = 0`. `dither_offset`'s fade is the missing part, and its
+   inertness is a *property*, not a tuning: below the knee the slope is the exact constant 12.92, so
+   `min(l, 1-l) * slope * 255` **is** the encoded byte value, and the fade is exactly inert at and
+   above code value 1 — where every plateau this pass exists to dissolve lives.
+2. **The third Positive consequence is false, and it was the ADR's headline argument.** The adapters
+   do *not* agree byte-for-byte and cannot: the hash is exact (65 536 float values, zero differing
+   bit patterns), but the **hardware sRGB encode downstream of it** is not — DX12 permits tolerance
+   and WARP's approximation departs from the true curve below ~byte 20. Measured: 212 of 2 049 408
+   channels move by 2. The integer hash still earned its place (Alternative C would have diverged on
+   essentially *every* pixel), but the promised sharper-than-0.02 instrument does not exist and
+   nothing should be built on it.
+
+### Three numeric done-whens in this plan were wrong, and that is the plan's failure, not `dev`'s
+
+- **Phase 1's fourth: "the golden suite goes red here, on purpose."** It did not. Every baseline
+  moved, but the guard is a **tolerance** guard at 0.02 mean / 48 max_outlier and a one-level shift
+  reports 0.0007-0.0013 — three orders of magnitude inside it. This is the architect rule about
+  doing the arithmetic on every numeric done-when, failing on a claim about a *test outcome* rather
+  than a threshold. Phase 2 was correctly relabelled a deliberate re-pin rather than the repair of a
+  red build.
+- **Phase 2's "a delta of 2 anywhere is a finding."** Same root cause as the major's second half.
+  The correct statement is the one that landed: bounded-by-one is a **hardware** claim, and the
+  shipped assertion reads its per-pixel bound off `is_software()` rather than assuming one.
+- **This plan's TL;DR promised "hairlines."** The dusk ground's widest plateau went 58 px -> 20 px,
+  not to a hairline. What the dither actually buys on that picture is the *level count* — 7.5 px per
+  level became 2.1 — and the collapse of wide plateaus from 17 to 3.
+  [`scratch-0082/README.md`](../../../core/tests/fixtures/scratch-0082/README.md) says so in those
+  words, which is the right place for it.
+
+### Minors and nits
+
+- **The corrected WARP explanation lives in prose only.** `b6b5940` replaced a false claim (WARP
+  "never produces" bytes 17/14/11) with a true, narrower one — and the disproof, that an undithered
+  WARP ramp contains every byte from 6 to 18 with no gaps, is the entire justification for the
+  `bound = 2` branch yet nothing asserts it. Cheap to add later; the test already holds the control
+  image. **Not owed.**
+- **The two "before" figures for the dusk probe disagree by 2.3x** — `b6743fa`'s `136 px at value 80`
+  against the survey's `58 px at value 11`, both described identically. The axis each was scanned on
+  was not recorded and is not recoverable. Repaired at the close as a *stated discrepancy* rather
+  than an invented explanation, in `scratch-0082/README.md`, naming the before/after pair as the
+  comparable one because it is the same instrument on both sides.
+- **`docs/on-device-validation.md` had not learned the dither**, and here that is not a formality:
+  the pass gained three `pow` per pixel on a fullscreen draw, and Phase 5's "the grain is not
+  visible" verdict was taken on **one display** — a 6-bit + FRC panel running its own temporal
+  dither over ours is exactly the case it cannot speak to. A checklist item covering both halves
+  landed at the close.
+- *Nit.* Both dither tests request `prefer_software: true`, so on any box the automated run takes
+  the **loose** bound and the tight hardware claim rests on a doc-comment measurement. Fine as
+  landed — the mean-|delta| assertion (a *derived* 1/3, +/- 0.05) is the adapter-robust guard and it
+  is the one that catches a deleted slope term.
+- *Nit.* `core/Cargo.toml:31`'s surviving mojibake from `d442f7a`, correctly scoped out by `dev`,
+  repaired at the close. It was the last instance in the tree.
+- *Nit, both benign and both recorded by `dev` in the phase commits.* The plan named `hash_unit` /
+  `hash3` as the pair to promote; the pair actually promoted to `gpu::HASH_WGSL` is `mix32` /
+  `unit01` (`hash_unit` is their CPU mirror). And Phase 3's guard went in-crate rather than to the
+  `core/tests/` its file list named.
+
+### Two scope decisions taken at the Step-1 gate, both correct
+
+- **`mix32` / `unit01` promoted to `gpu::HASH_WGSL`** — this plan's open question, answered yes.
+  It is the shared home Plan 0077's close asked a *third particle scene* to build, arriving instead
+  from the display write. `hash_unit` in `scenes/particles/mod.rs` is documented as their CPU mirror
+  and must move with them.
+- **Phase 3's guard placed in-crate**, because an integration test cannot reach a `#[cfg(test)]`
+  field and a public off-switch is precisely what [Alternative
+  G](../../adrs/0096-the-display-write-dithers.md#alternative-g--a-dither-param-defaulting-off)
+  rejects. Routing around that to satisfy a file list would have been the error.
+
+### Bookkeeping, and what did not need doing
+
+- **No ADR-0058 entry is owed.** The dither's amplitude reuses the `Ctl` uniform's `.z`, which was
+  already a written-as-`0.0` padding slot before this plan — the layout shape and size are
+  unchanged, and the enumeration test confirms it.
+- **Two commits touched `scratch-0082/README.md` outside their phases' file lists.** Correct call,
+  no finding: that file names this re-measurement as the reason it exists, and leaving it stale
+  would have left the plan's own reference frame contradicting the plan.
+- **Curation (step 3b).** No preset content landed — only `presets/README.md` — so no near-duplicate
+  sweep is owed. The workaround grep over all 27 headers finds **nothing** citing banding or a
+  step-breaking stop workaround; no shipped preset binds the ramp params yet, so the retired
+  workaround `craft.md` now names was never landed in the library.
+- **`ADR-0096` Alternative F is retired as a followup** by the `human` verdict, not foreclosed.

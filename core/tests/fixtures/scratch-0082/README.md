@@ -74,7 +74,7 @@ belongs; this README records the numbers, not the tool.
 ## What was measured, 2026-08-12, after the dither
 
 Same preset, same size, same instrument, re-run at
-[Plan 0082](../../../../docs/plans/0082-the-gradient-stops-banding.md) Phase 4 —
+[Plan 0082](../../../../docs/plans/done/0082-the-gradient-stops-banding.md) Phase 4 —
 which is what this file was kept for.
 
 | | mean px/level | widest mid-range plateau | plateaus ≥ 16 px |
