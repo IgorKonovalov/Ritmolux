@@ -970,7 +970,7 @@ rectangular blocks, and any real `pan_*` walked off into them. That is why the
 shipped `reaction_*` presets are pinned near `zoom = 0.99` with a whisper of pan,
 and why those pins are now unnecessary.
 
-### Background pass — `bg_hue`, `bg_bright`, `bg_vignette`
+### Background pass — `bg_hue`, `bg_bright`, `bg_vignette`, and the ramp
 
 An audio-tintable gradient + vignette backdrop drawn *before* the scene, engine-
 wide. `bg_bright = 0` (the default) is a black backdrop; raise it to reveal the
@@ -994,7 +994,89 @@ the **sparse** scenes (lines, swarm, attractor) where the gaps show through, and
 since Plan 0025 — in the **reaction-diffusion** field's voids (both scenes now
 composite over the backdrop instead of presenting opaque). The **fragment field**
 is the one full-screen scene that still draws opaquely, so `bg_*` has no visible
-effect there.
+effect there — **including the whole ramp below**. A dusk ground under a
+`fragment_field` preset is not a dim ground, it is an absent one.
+
+#### The directional ramp — `bg_angle`, `bg_hue_span`, `bg_shade`, `bg_shade_end`, `bg_ramp_gamma`
+
+Five params turn that single tint into a **gradient across the frame**
+([ADR-0094](../docs/adrs/0094-the-backdrop-paints-a-directional-ramp.md)). The pass sweeps a
+*segment* of your `[palette]` along one axis instead of taking one point of it, with a brightness
+ramp on the same axis and one exponent shaping both.
+
+| Param | Default | What it does |
+|-------|---------|--------------|
+| `bg_angle` | `0.0` | The ramp's direction, in **radians**. `0` runs **bottom-to-top** — the same zero-is-up convention `launch_angle` uses. `1.5708` (π/2) runs left-to-right, `3.1416` (π) top-to-bottom. |
+| `bg_hue_span` | `0.0` | How far the palette coordinate **travels** from the ramp's start to its end. `bg_hue` keeps its meaning as the coordinate at the *start*. `0` sweeps nowhere, which is the old one-sample behaviour. |
+| `bg_shade` | `0.72` | Brightness factor at the ramp's **start**. |
+| `bg_shade_end` | `1.0` | Brightness factor at its **end**. |
+| `bg_ramp_gamma` | `1.0` | The ramp's **response exponent** — eases *where* things sit along the axis, applied ahead of both the colour and the brightness. Clamped to `0.05 .. 20`. |
+
+Every default is an **arithmetic identity** with the picture the engine drew before the ramp
+existed, not an approximation of it, so a preset that binds none of them renders byte-for-byte
+unchanged. All five are ordinary bindable params, so a breathing horizon costs nothing extra.
+
+**Placement is authored by your `[palette]` stops' own `at` positions.** There is deliberately no
+`bg_ramp_center` or `bg_ramp_width`: positions already live in the palette, and a second placement
+mechanism could disagree with it. Where the horizon sits in the frame is where its colour sits in
+your gradient. The worked dusk ground:
+
+```toml
+[palette]
+stops = [
+  { at = 0.00, color = "#060b24" },   # near-black zenith
+  { at = 0.25, color = "#1b2a5e" },   # deep blue
+  { at = 0.50, color = "#c74b1d" },   # the ember band
+  { at = 0.75, color = "#ff7a1f" },
+  { at = 1.00, color = "#ffd06e" },   # the hot horizon
+]
+
+[params]
+bg_bright     = "0.6"
+bg_hue        = "1.0"    # the ramp STARTS at the palette's hot end...
+bg_hue_span   = "-1.0"   # ...and travels backwards to its near-black end
+bg_angle      = "0"      # bottom-to-top, so hot at the bottom of the frame
+bg_shade      = "1.0"    # full brightness at the horizon...
+bg_shade_end  = "0.25"   # ...a quarter of it at the top
+bg_ramp_gamma = "2.0"    # hold the horizon, then fall away
+```
+
+Move the `at = 0.50` stop down and the ember band moves down the frame with it. Raise
+`bg_ramp_gamma` and the band holds longer before fading; drop it below `1` and the ramp falls away
+fast and leaves a long dim tail.
+
+**Why the exponent exists when stop placement can already shape the colour.** Your `[palette]` is
+**shared with the scene** (and with the `[layer]`, under
+[ADR-0090](../docs/adrs/0090-a-preset-composes-two-scene-layers.md)), so re-spacing stops to shape
+the sky's falloff re-maps the figure's colours too. `bg_ramp_gamma` shapes the *backdrop's mapping
+onto its axis* and touches nothing else. It is also the only shape control the **brightness** ramp
+has at all — `bg_shade -> bg_shade_end` is a straight line and no stop can bend it. It applies to
+the position rather than to either channel, so colour and brightness always reach their midpoints
+at the same height: it is one ramp, not two that can drift apart.
+
+**The segment wraps if it leaves `[0, 1]`.** `[bg_hue, bg_hue + bg_hue_span]` is repeat-addressed
+like every other palette coordinate in the engine, so a span that runs off either end comes back
+around the other side. `bg_hue = 0.8` with `bg_hue_span = 0.5` sweeps `0.8 -> 1.3`, which paints
+`0.8 -> 1.0` and then `0.0 -> 0.3` — putting the palette's **hot end at both ends of the sky** with
+a hard seam where it wraps. That is occasionally what you want and usually a surprise; if the ramp
+has a bright band you did not author, check whether the span left the range. It is not clamped, and
+deliberately: two shipped presets already drive `bg_hue` outside `[0, 1]` and depend on the wrap.
+
+**The old fixed brightness tilt is gone.** The pass used to multiply its tint by a hardcoded
+`0.72 -> 1.0` gradient welded to the vertical, always brighter at the top and unexplained by any
+param. `bg_shade` / `bg_shade_end` are where it went — those two numbers *are* its constants, which
+is why leaving them alone changes nothing. A backdrop can now be brighter at the **bottom**, which
+it never could be.
+
+**The backdrop is invisible to every behavioral gate, and the ramp makes that matter more.**
+`sanity` measures coverage against the *scene* with the backdrop suppressed
+([ADR-0067](../docs/adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)), and the `animation`
+gate strips `bg_*` bindings before scoring motion
+([ADR-0091](../docs/adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)).
+So a world whose *ground* is painted here earns exactly nothing at either gate: the figure and any
+`[layer]` carry the whole burden. This is correct — it is what stops a more capable backdrop being
+used to game the gates — but it means a frame that looks full to you can still read as sparse to
+`sanity`. Give the figure enough to stand on its own before reaching for the ramp to fill the frame.
 
 **Since Plan 0051 the backdrop composites correctly under every scene, and a lit
 `bg_bright` is worth revisiting on anything in the `swarm_*` and line families.**

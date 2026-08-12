@@ -367,7 +367,8 @@ colours through the same `[palette]` everything else does
 
 | Param | Default | What it does |
 |-------|---------|--------------|
-| `bg_hue` | `0.0` | Where in the preset's gradient the backdrop's tint is taken from. **Cyclic** — same wrap trap as `color_center`, below. |
+| `bg_hue` | `0.0` | Where in the preset's gradient the backdrop's tint is taken from — and, with a span, where the ramp **starts**. **Cyclic** — same wrap trap as `color_center`, below. |
+| `bg_hue_span` | `0.0` | How far that coordinate **travels** across the frame. `0` takes a single sample; anything else paints a *segment* of the gradient. |
 
 - **`bg_hue` selects a colour from the gradient you declared**, not from a fixed ramp. An `ember`
   preset draws an ember figure over an ember sky, and a custom `crimson -> gold` gradient tints its
@@ -390,6 +391,26 @@ palettes it is the sharpest transition in the gradient. To darken a backdrop, us
 preset in the library, and a value copied between two presets rendered the same sky. It no longer
 does — a `bg_hue` lifted from another preset arrives at whatever colour *your* gradient holds at
 that coordinate, which is usually the point and occasionally a surprise.
+
+**With `bg_hue_span`, your stops' `at` positions become the sky's vertical layout**
+([ADR-0094](adrs/0094-the-backdrop-paints-a-directional-ramp.md)). The backdrop sweeps the segment
+`[bg_hue, bg_hue + bg_hue_span]` along a screen axis, so the gradient you already authored *is* the
+gradient in the frame — near-black at one stop, a hot band at another — and moving a stop moves that
+band up or down the picture. There is no separate placement param, on purpose: positions already
+live here, and a second mechanism could disagree with them. The direction, the brightness ramp and
+its easing exponent live in
+[`presets/README.md`](../presets/README.md#the-directional-ramp--bg_angle-bg_hue_span-bg_shade-bg_shade_end-bg_ramp_gamma),
+with a worked dusk example.
+
+**The wrap matters much more to a span than to a point.** A single `bg_hue` that wrapped landed on
+one surprising colour; a *segment* that leaves `[0, 1]` paints the palette's far end back into the
+frame, so a `bg_hue = 0.8, bg_hue_span = 0.5` sky is hot at **both** ends with a hard seam between
+them. Same repeat addressing, much more visible surface.
+
+**One warning specific to shaping a sky through stops:** the `[palette]` is shared with the scene
+and with the `[layer]`, so re-spacing stops to bend the backdrop's falloff re-colours the figure
+too. When it is only the sky's *response* you want to shape, `bg_ramp_gamma` is the lever that
+touches nothing else.
 
 ---
 
