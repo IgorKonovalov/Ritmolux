@@ -251,7 +251,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | System            | Named `[params]`                                                         |
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
-| `swarm`           | `force` `spin` `burst` `field_freq` `hue` `brightness` `size` `size_spread` `twinkle` `shape` `points` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
+| `swarm`           | `force` `spin` `burst` `reseed` `field_freq` `hue` `brightness` `size` `size_spread` `twinkle` `shape` `points` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
@@ -447,6 +447,17 @@ whole-frame light sits still — which is what separates it from binding
 `brightness` to an oscillator, which flashes the frame as one sheet. Both
 default `0`; an unbound preset is byte-unchanged. This is the pair that makes a
 sparse starfield able to twinkle at all (backlog 0068).
+
+And since the same plan the swarm carries `reseed`, the attractor family's
+percussive accent with the attractor's semantics (ADR-0066): a rising edge past
+`0.5` **disturbs the population where it is** — a seeded kick of ±6 % of the
+domain per axis — rather than respawning it into a box, so it reads as the
+field being shaken, never erased, and the flow re-gathers it within a few
+seconds. It is edge-triggered: bind a gate (`reseed = "onset > 0.6"`), not a
+level — a held high fires once, not continuously. It is also the recovery
+lever for a sustained-force pile-up (backlog 0085); note that the *minutes*
+horizon of that recovery is outside what the test suite can see, so a world
+leaning on it owes the one-off soak check Plan 0077 Phase 5 describes.
 
 Two things the swarm does on its own, with nothing to bind.
 
