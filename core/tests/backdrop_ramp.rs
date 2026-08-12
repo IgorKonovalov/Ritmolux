@@ -129,6 +129,29 @@ fn worst_channel(a: [u8; 3], b: [u8; 3]) -> u8 {
     (0..3).map(|c| a[c].abs_diff(b[c])).max().unwrap_or(0)
 }
 
+/// The mid-column row whose colour is closest to `target`, by squared RGB
+/// distance. Used to *locate* a ramp's midpoint against a pinned control rather
+/// than to compute where it should be.
+fn closest_row(image: &CaptureImage, target: [u8; 3]) -> u32 {
+    let distance = |px: &[u8; 3]| -> i32 {
+        (0..3)
+            .map(|c| {
+                let d = i32::from(px[c]) - i32::from(target[c]);
+                d * d
+            })
+            .sum()
+    };
+    let column = mid_column(image);
+    let mut best = (0u32, i32::MAX);
+    for (row, px) in column.iter().enumerate() {
+        let d = distance(px);
+        if d < best.1 {
+            best = (row as u32, d);
+        }
+    }
+    best.0
+}
+
 /// **The swept coordinate really is the palette's, at the height the ramp puts
 /// it** — the positive proof that `bg_hue_span` paints a segment rather than
 /// merely perturbing one sample.
@@ -275,6 +298,132 @@ fn the_brightness_ramp_runs_the_way_the_preset_points_it() {
         "`bg_shade = 1.0` must reach the same full brightness the tilt's own 1.0 \
          end reached: {rev_bottom:.1} against {tilt_top:.1}"
     );
+}
+
+/// **The exponent moves both channels' midpoints, and moves them to the same
+/// height** — which is what "one ramp" means, and what a per-channel curve
+/// (ADR-0094 Alternative G, rejected) would break.
+///
+/// Each channel is isolated and then located against a **pinned control**: the
+/// colour channel sweeps the dusk palette over a flat shade ramp and is compared
+/// against a frame held at the palette's midpoint coordinate; the brightness
+/// channel runs `1.0 -> 0.0` over a flat palette and is compared against a frame
+/// held at `0.5`. The row where each capture comes closest to its control is the
+/// row where the eased position `e` crosses `0.5`. If the two channels share one
+/// position, those two rows are the same row.
+///
+/// The row also has to be in the **right place**, or "they agree" would pass with
+/// the exponent inert on both. `e = 0.5` sits at `s = 0.5^(1/g)`, and with the
+/// axis running bottom-to-top over 64 rows that is row 15.0 at `g = 2.5`, row
+/// 31.5 at `g = 1.0` and row 52.2 at `g = 0.4` — measured from the top. So the
+/// plan's two shapes are the two ends of this: at `2.5` the midpoint is high in
+/// the frame, meaning the bottom three-quarters holds near the horizon's value
+/// before falling away; at `0.4` it is low, meaning the ramp drops fast and
+/// leaves a long dim tail above it.
+#[test]
+fn the_exponent_moves_both_channels_midpoints_to_the_same_height() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    const FLAT: &str = "[palette]\nstops = [{ at = 0.0, color = \"#ffcf80\" }, \
+                        { at = 1.0, color = \"#ffcf80\" }]";
+    // Vignette off throughout: it is radial, so it varies down the column too and
+    // would blunt every argmin below.
+    const STILL: &str = "bg_vignette = \"0\"\n";
+
+    // The two controls, each a uniform frame holding its channel's midpoint.
+    let colour_mid = capture(
+        &mut renderer,
+        DUSK,
+        &format!("{STILL}bg_hue = \"0.5\"\nbg_shade = \"1\"\nbg_shade_end = \"1\"\n"),
+    );
+    let bright_mid = capture(
+        &mut renderer,
+        FLAT,
+        &format!("{STILL}bg_hue = \"0\"\nbg_shade = \"0.5\"\nbg_shade_end = \"0.5\"\n"),
+    );
+    let colour_target = mid_column(&colour_mid)[0];
+    let bright_target = mid_column(&bright_mid)[0];
+
+    // `e = 0.5` sits at `s = 0.5^(1/g)`; row `r` sits at `s = 1 - (r + 0.5)/H`.
+    for (gamma, expected) in [(2.5f32, 15.0f32), (1.0, 31.5), (0.4, 52.2)] {
+        let colour = capture(
+            &mut renderer,
+            DUSK,
+            &format!(
+                "{STILL}bg_hue = \"1.0\"\nbg_hue_span = \"-1.0\"\n\
+                 bg_shade = \"1\"\nbg_shade_end = \"1\"\nbg_ramp_gamma = \"{gamma}\"\n"
+            ),
+        );
+        let brightness = capture(
+            &mut renderer,
+            FLAT,
+            &format!(
+                "{STILL}bg_hue = \"0\"\nbg_shade = \"1.0\"\nbg_shade_end = \"0.0\"\n\
+                 bg_ramp_gamma = \"{gamma}\"\n"
+            ),
+        );
+        let colour_row = closest_row(&colour, colour_target);
+        let bright_row = closest_row(&brightness, bright_target);
+        println!(
+            "gamma {gamma}: colour midpoint at row {colour_row}, brightness at \
+             row {bright_row}, expected {expected:.1}"
+        );
+
+        assert!(
+            colour_row.abs_diff(bright_row) <= 1,
+            "at bg_ramp_gamma = {gamma} the colour reaches its midpoint at row \
+             {colour_row} and the brightness at row {bright_row}. The exponent \
+             is being applied per channel rather than to the shared position, so \
+             the two halves of one ramp disagree."
+        );
+        for (what, row) in [("colour", colour_row), ("brightness", bright_row)] {
+            let off = (row as f32 - expected).abs();
+            assert!(
+                off <= 2.0,
+                "at bg_ramp_gamma = {gamma} the {what} midpoint should sit at row \
+                 {expected:.1} (e = 0.5 at s = 0.5^(1/g)) — it is at row {row}, \
+                 {off:.1} rows away. The exponent is not shaping the position."
+            );
+        }
+    }
+}
+
+/// **An exponent driven out of range is clamped rather than allowed to render a
+/// NaN frame** — the reason the guard sits on the CPU at all.
+///
+/// A negative exponent sends the ramp's start to infinity and `pow(0, 0)` is
+/// undefined, so a binding that sweeps past either rail must land on the rail.
+/// Asserted by comparison with the rail itself, so the test says nothing about
+/// what the rails' numbers are beyond `background.rs` naming them.
+#[test]
+fn an_out_of_range_exponent_lands_on_its_rail() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    let sky = |gamma: &str| {
+        format!(
+            "bg_vignette = \"0\"\nbg_hue = \"1.0\"\nbg_hue_span = \"-1.0\"\n\
+             bg_shade = \"1.0\"\nbg_shade_end = \"0.0\"\nbg_ramp_gamma = \"{gamma}\"\n"
+        )
+    };
+    // Plain decimals: the expression grammar has no exponent notation, so `1e6`
+    // is a parse error rather than a large number.
+    for (driven, rail) in [("-3", "0.05"), ("1000000", "20")] {
+        let out = capture(&mut renderer, DUSK, &sky(driven));
+        let at = capture(&mut renderer, DUSK, &sky(rail));
+        let worst = mid_column(&out)
+            .into_iter()
+            .zip(mid_column(&at))
+            .map(|(a, b)| worst_channel(a, b))
+            .max()
+            .unwrap_or(0);
+        assert!(
+            worst <= 1,
+            "bg_ramp_gamma = {driven} must render as the {rail} rail it clamps \
+             to — the mid-columns differ by {worst} levels"
+        );
+    }
 }
 
 /// **There is no edge anywhere in the column** — the property the shipped

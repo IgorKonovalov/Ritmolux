@@ -1210,6 +1210,7 @@ fn declared_params_match_set_param() {
                 "bg_hue_span",
                 "bg_shade",
                 "bg_shade_end",
+                "bg_ramp_gamma",
             ],
         ),
         (
