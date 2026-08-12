@@ -54,6 +54,17 @@ Per-channel on this preset: R 58/56/56/55/53 px at values 7–21, G 47/42/40/39/
 px at values 17–30, B 25/24/23/22 px. Every wide plateau is in the **dark tail**,
 rows 5–436; they become hairlines as soon as the horizon brightens.
 
+**A third set of numbers for this probe exists and is not comparable to these.**
+Plan 0082's Phase 1 commit (`b6743fa`) records `136 px at value 80 -> 15 px` for
+what its message describes identically — same preset, same size, rail-pinned runs
+excluded. It is a different reading of the same picture, not a different picture,
+and the axis each was scanned on was not written down at the time. **Use the pair
+in the table below**: it is the one measured with the same instrument on both
+sides, which is the only comparison that says anything. Anyone reconciling the
+history should treat `b6743fa`'s figure as an artifact of how that run scanned,
+and the ratio it reports (9.1x) as the shape of the effect rather than a second
+measurement of this frame.
+
 The instrument was a pure-stdlib PNG decode plus a run-length count. **Plan 0082
 Phase 3 replaced it with a Rust test** —
 `the_dither_dissolves_a_dark_ramps_plateaus` in
