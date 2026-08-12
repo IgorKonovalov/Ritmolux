@@ -408,7 +408,7 @@ and a session's temporary directory does not survive the session.
   `34.0 / 42.7 / 69.5`) and the worst banding case, both because a fast-dropping
   ramp leaves a long dim tail and a flat tail is where one 8-bit level lasts
   longest. It is kept so the **same frame** can be re-measured after
-  [Plan 0082](../../../docs/plans/0082-the-gradient-stops-banding.md)'s dither
+  [Plan 0082](../../../docs/plans/done/0082-the-gradient-stops-banding.md)'s dither
   and again after [Plan 0081](../../../docs/plans/0081-the-sky-gets-a-galaxy.md)
   adds a second overlapping gradient — a before/after on two different pictures
   would prove nothing. Its README carries the run command, the 2026-08-12
