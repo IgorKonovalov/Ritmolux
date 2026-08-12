@@ -57,6 +57,47 @@
 //! ends *at this pass's input*: the tonemap writes display-referred values at the
 //! surface format into ink's input, or straight into the surface when ink is off.
 //! One pipeline, and ink's semantics are bit-for-bit what they were.
+//!
+//! # The write dithers (Plan 0082, ADR-0096)
+//!
+//! Being the one 8-bit boundary makes this the one place a **dither** belongs,
+//! and since Plan 0082 it carries one: `±1` **encoded** LSB of triangular noise,
+//! hashed from the fragment's integer coordinates, added just before the write.
+//! It is not a look and not a parameter — it is what the display write is
+//! supposed to do, so it is always on, exactly like the curve above it.
+//!
+//! Three details are load-bearing and each has an alternative that looks tidier
+//! and is wrong:
+//!
+//! - **The noise is triangular, not uniform.** Two hashed uniforms on
+//!   `[-0.5, +0.5]` summed give a TPDF on `[-1, +1]`, which fully decorrelates
+//!   the quantization error from the signal. Uniform noise leaves a
+//!   signal-dependent residual, so the plateau softens instead of dissolving.
+//! - **The hash is integer bit-mixing** ([`gpu::HASH_WGSL`]), never
+//!   `fract(sin(dot(p, k)) * 43758.5453)`. `sin`'s precision is
+//!   implementation-defined, so the common idiom would make this pass disagree
+//!   between WARP and hardware on essentially every pixel — the ADR-0058 defect
+//!   class, introduced by the fix for a different one.
+//! - **The amplitude is divided by the sRGB slope**, because the *hardware*
+//!   encodes after the shader (the surface is `Rgba8UnormSrgb`). `dE/dL` runs
+//!   from 12.92 near black to 0.44 at white, so a flat `1/255` linear amplitude
+//!   would perturb by ~12.9 encoded levels in the dark tail — visible noise,
+//!   exactly where every measured plateau was — and by 0.44 at the bright end,
+//!   too little to dither anything. The slope term is the thing most likely to
+//!   be tidied away by someone reading the shader later;
+//!   `the_dither_is_one_encoded_level_at_both_ends_of_the_range` is the guard.
+//!
+//! The dither is **static** — a pure function of pixel coordinates, with no time
+//! or frame-index term. That is what keeps every byte-equality test in the suite
+//! working: two frames rendered at the same size receive identical noise at every
+//! pixel, so a comparison of two renders is untouched by it.
+//!
+//! And it **fades to zero within one encoded level of each rail**, which
+//! ADR-0096 does not mention and which is not optional: at a rail the value is
+//! already exactly representable, and the write clamps, so half the noise is
+//! discarded and what survives is a DC lift. Without the fade an exactly-black
+//! frame came back at a mean of 0.18/255 — a speckle of 1s over every dark frame
+//! the engine draws. See `dither_offset`.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). This pass runs on every displayed frame.
@@ -119,9 +160,10 @@ pub(crate) fn map(x: f32) -> f32 {
 
 /// Exposure + tonemap body. `VsOut`/`vs_main` come from
 /// [`gpu::FULLSCREEN_VS_UV_FLIPPED`] — this pass samples what another pass
-/// rendered, so it needs the render-target orientation.
+/// rendered, so it needs the render-target orientation. [`gpu::HASH_WGSL`] is
+/// concatenated in ahead of both, for the dither's `mix32` / `unit01`.
 const SHADER: &str = r#"
-struct Ctl { v: vec4<f32> } // x: exposure, y: knee
+struct Ctl { v: vec4<f32> } // x: exposure, y: knee, z: dither amplitude
 
 // The uniform sits BETWEEN the texture and the sampler, and that is
 // load-bearing — see `Resources::build`.
@@ -137,6 +179,63 @@ fn shoulder(x: f32, k: f32) -> f32 {
     }
     let a = (1.0 - k) * (1.0 - k);
     return 1.0 - a / (x + 1.0 - 2.0 * k);
+}
+
+// The sRGB transfer function's LOCAL SLOPE, dE/dL, at a linear value.
+//
+// The surface is Rgba8UnormSrgb, so the hardware applies E(L) and rounds AFTER
+// this shader runs — which means a perturbation added here in linear space
+// arrives at the 8-bit write multiplied by this. Dividing by it is what makes the
+// dither one *encoded* level everywhere instead of 12.9 levels in the dark tail
+// and 0.44 at white (ADR-0096 Alternative D).
+//
+// Below the knee E = 12.92*L, so the slope is the constant. Above it
+// E = 1.055*L^(1/2.4) - 0.055, so dE/dL = (1.055/2.4) * L^(1/2.4 - 1).
+fn srgb_slope(l: f32) -> f32 {
+    if (l <= 0.0031308) {
+        return 12.92;
+    }
+    return (1.055 / 2.4) * pow(l, 1.0 / 2.4 - 1.0);
+}
+
+// Triangular noise on [-1, +1], in ENCODED levels, from the fragment's integer
+// framebuffer coordinates.
+//
+// Two hashed uniforms on [-0.5, +0.5] summed: TPDF at this amplitude decorrelates
+// the quantization error from the signal completely, which is what dissolves a
+// plateau rather than merely softening its edge.
+//
+// `@builtin(position)` is exact at pixel centres, so truncating to u32 recovers
+// the framebuffer column and row and the whole function is integer arithmetic
+// downstream of that — identical on every adapter, which is the property the
+// golden suite is held to.
+fn dither_tpdf(pos: vec2<f32>) -> f32 {
+    let h0 = mix32(u32(pos.x) ^ mix32(u32(pos.y) ^ 0x9E3779B9u));
+    let h1 = mix32(h0);
+    return (unit01(h0) - 0.5) + (unit01(h1) - 0.5);
+}
+
+// One channel's linear offset for a perturbation of `n` in the ENCODED domain
+// (one 8-bit level is 1/255 there) — the slope divide above, plus a fade to zero
+// within one encoded level of each rail.
+//
+// **The fade is not cosmetic.** A value AT a rail is already exactly
+// representable, so there is no quantization error to decorrelate; and the write
+// clamps, so the half of the noise that points off the end is discarded and what
+// is left is a one-sided DC lift rather than a dither. Undithered black is 0 on
+// every pixel; dithered-without-this black came back with a mean of 0.18/255,
+// which is a speckle of 1s over every dark frame the engine draws — and this
+// engine draws a lot of them (nearly every fixture runs `bg_bright = 0`).
+//
+// `min(l, 1 - l) * slope * 255` is the distance to the nearer rail measured in
+// ENCODED levels. Near black the slope is the exact constant 12.92, so the term
+// is exact where it is less than 1 and clamps to 1 everywhere else — the fade is
+// therefore inert above the first code value, which is where every plateau this
+// pass exists to dissolve lives (the measured ones sat at bytes 7 to 30).
+fn dither_offset(l: f32, n: f32) -> f32 {
+    let slope = srgb_slope(l);
+    let to_rail = min(l, 1.0 - l) * slope * 255.0;
+    return n * clamp(to_rail, 0.0, 1.0) / slope;
 }
 
 @fragment
@@ -155,6 +254,24 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // k >= 0.6, so m > k means m is comfortably non-zero.
         rgb = rgb * (shoulder(m, k) / m);
     }
+
+    // The dither, last (ADR-0096). One triangular draw per pixel rather than one
+    // per channel, so the grain is a luminance ripple rather than a coloured
+    // one — but each channel divides it by ITS OWN slope, because each sits at
+    // its own point on the transfer function.
+    //
+    // `u.v.z` is 1.0 on every shipped frame; it exists so a test can render the
+    // undithered control through this same pipeline. It is not a param and
+    // `PARAMS` does not name it.
+    let n = dither_tpdf(in.pos.xy) * u.v.z / 255.0;
+    rgb = max(
+        rgb + vec3<f32>(
+            dither_offset(rgb.r, n),
+            dither_offset(rgb.g, n),
+            dither_offset(rgb.b, n),
+        ),
+        vec3<f32>(0.0),
+    );
 
     // Alpha passes through untouched: the backdrop owns this target's clear and
     // paints it opaque (ADR-0055 put the backdrop *under* the chain), so this is
@@ -234,7 +351,9 @@ impl Resources {
             device,
             "tonemap-shader",
             gpu::FULLSCREEN_VS_UV_FLIPPED,
-            SHADER,
+            // The shared bit-mixer ahead of the body — the dither's hash, and
+            // the same text the attractor's step shader compiles (Plan 0082).
+            &format!("{}{SHADER}", gpu::HASH_WGSL),
         );
         // **The binding order here is deliberate, not stylistic (ADR-0058).**
         // On the DX12 WARP software adapter a pipeline whose
@@ -329,6 +448,17 @@ pub(crate) struct Tonemap {
     target_format: wgpu::TextureFormat,
     res: Option<Resources>,
     exposure: f32,
+    /// The dither's amplitude, in encoded levels. **1.0 on every shipped frame**
+    /// — this is not a param and nothing routes to it (ADR-0096 Alternative G:
+    /// correct quantization of the display write is not a look).
+    ///
+    /// It exists so a test can render the **undithered control through this same
+    /// pipeline**, which is the only honest way to state the plateau claim: a
+    /// bound compared against a separately-computed expectation would be a claim
+    /// about the expectation. `#[cfg(test)]`, so the shipped `Tonemap` has no
+    /// field and the shader's `u.v.z` is a literal 1.0 written at `resolve`.
+    #[cfg(test)]
+    dither: f32,
 }
 
 impl Tonemap {
@@ -339,7 +469,17 @@ impl Tonemap {
             target_format,
             res: None,
             exposure: DEFAULT_EXPOSURE,
+            #[cfg(test)]
+            dither: 1.0,
         }
+    }
+
+    /// Turn the display-write dither off, for the **control arm** of a test that
+    /// measures what it does. Test-only, and there is deliberately no shipped
+    /// route to it — see the [`dither`](Self::dither) field.
+    #[cfg(test)]
+    pub(crate) fn set_dither(&mut self, on: bool) {
+        self.dither = if on { 1.0 } else { 0.0 };
     }
 
     /// Reset `exposure` to its default (each frame, before routing).
@@ -435,11 +575,15 @@ impl Tonemap {
             return 0;
         };
         let exposure = self.applied_exposure();
+        #[cfg(test)]
+        let dither = self.dither;
+        #[cfg(not(test))]
+        let dither = 1.0;
         queue.write_buffer(
             &res.uniform,
             0,
             bytemuck::bytes_of(&Ctl {
-                v: [exposure, KNEE, 0.0, 0.0],
+                v: [exposure, KNEE, dither, 0.0],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

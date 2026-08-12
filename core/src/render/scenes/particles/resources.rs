@@ -313,9 +313,12 @@ impl PipelineResources {
         surface_format: wgpu::TextureFormat,
         count: u32,
     ) -> Self {
+        // The shared bit-mixer, concatenated in — the same WGSL the tonemap's
+        // dither compiles (Plan 0082 Phase 1), so a particle's reseed kick and a
+        // display-write LSB cannot drift apart on what the hash is.
         let step_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("attractor-step-shader"),
-            source: wgpu::ShaderSource::Wgsl(STEP_SHADER.into()),
+            source: wgpu::ShaderSource::Wgsl(format!("{}{STEP_SHADER}", gpu::HASH_WGSL).into()),
         });
         let draw_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("attractor-draw-shader"),

@@ -1,6 +1,6 @@
 # 0082 — The gradient stops banding: the display write dithers
 
-> **Status:** approved 2026-08-12 (user approval, same day; the dither's shape, the sequencing
+> **Status:** in-progress 2026-08-12 (user approval, same day; the dither's shape, the sequencing
 > ahead of [0081](0081-the-sky-gets-a-galaxy.md), and the decision to fix this before authoring the
 > world were all settled by interview — see ADR-0096's Alternatives)
 > **Created:** 2026-08-12

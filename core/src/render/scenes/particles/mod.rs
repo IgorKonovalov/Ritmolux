@@ -539,8 +539,13 @@ fn churn_lifetime(seed: f32) -> f32 {
 /// own, so two of them cannot correlate.
 const LIFETIME_SALT: u32 = 0x9E37_79B1;
 
-/// **The CPU mirror of `mix32` + `unit01` in [`STEP_SHADER`]** — one round of the
+/// **The CPU mirror of `mix32` + `unit01` in
+/// [`gpu::HASH_WGSL`](crate::render::gpu::HASH_WGSL)** — one round of the
 /// lowbias32 bit-mixer, then the top 24 bits as a fraction in `[0, 1)`.
+///
+/// The two functions used to be declared inside [`STEP_SHADER`] itself; Plan 0082
+/// promoted them to a shared home when the tonemap's dither became their second
+/// caller, and `resources.rs` concatenates that text in front of the step shader.
 ///
 /// The same discipline `projection_mirror` follows: **the WGSL is the source and
 /// this is the mirror**. It exists because `seed()` has to place a particle at a
