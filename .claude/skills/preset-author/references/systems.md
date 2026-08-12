@@ -269,6 +269,7 @@ Full parameter roster and defaults: [`presets/README.md`](../../../../presets/RE
 | `bloom_amount` / `bloom_threshold` / `bloom_radius` | `0` / `1.0` / `1.0` | `0` amount is off and free. The threshold is in **linear light**, so the default blooms exactly what the display could not have shown. The radius spreads the same energy wider rather than adding more (`0..4`). |
 | `exposure` | `1.0` | linear multiplier on the whole frame before the engine tonemap. Crossfades across a preset switch like `ink_*` does. |
 | `mirror_order` / `mirror_reflect` | `1` / `0` | **line scenes only**; folds geometry (before the segment cap), not pixels. |
-| `ink_amount` | `0` | `1` = black-on-white; `paper_*`/`ink_*` make it any duotone. Collapses the palette to two colours. |
+| `ink_amount` | `0` | `1` = black-on-white; `paper_*`/`ink_*` make it any duotone. Collapses the palette to two colours. **Not a contrast control** — a partial value is a transition, not a resting place. |
+| `ink_gamma` | `1` | the **response** between the two poles (Plan 0078). Above `1` thins the mids toward paper so only the strong strokes keep full ink; below `1` inks them for a heavier print. Neither pole moves at any value. This is the lever for "the ink should bite harder" — `exposure` (upstream) and `ink_amount` (how much remap) are the other two, and they are not interchangeable. |
 
 Details and the exact semantics: `presets/README.md`.
