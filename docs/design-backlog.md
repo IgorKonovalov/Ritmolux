@@ -157,9 +157,18 @@ floor, so the headroom is not large enough to give away blind.
   as the sparse-idiom pair: one look class, two walls, and fixing either without the other
   leaves the look unreachable.
 - **PROMOTED same day → [ADR-0091](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md) +
-  [Plan 0077](plans/0077-the-quiet-sky.md) Phase 1** (queued after Plan 0076 + cohort 6).
+  [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 1** (queued after Plan 0076 + cohort 6).
   The rotational-symmetry case stays out of scope by arithmetic and remains this entry's
   documented authoring constraint — the promotion covers the sparse half only.
+- **DELIVERED 2026-08-12 (Plan 0077 Phase 1, `698b734`).** The gate scores
+  `metrics::footprint_diff` — motion over the union of lit pixels, backdrops stripped — and
+  the entry's own casualty is the standing proof: the rejected fifth-density Squall draft
+  **passes at 0.1049** (the whole-frame statistic read it 0.0057), the static control keeps
+  failing on a zero numerator, both pinned as a non-vacuity test, and the whole-library
+  re-sweep convicted nothing. The statistic half of this entry is closed;
+  [ADR-0091's Outcome](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md#outcome--2026-08-12-at-plan-0077s-close)
+  carries the details. The rotational-symmetry case stays what it always was — a documented
+  authoring constraint no image-domain statistic can lift.
 
 ---
 
@@ -1170,10 +1179,16 @@ parameter surface, and the scene that most wants it cannot reach it.
   statistic as the sparse-idiom pair (fixing either wall alone leaves the look unreachable),
   and with [0085](#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever)
   (swarm `reseed`) riding the same plan.
-- **PROMOTED same day → [Plan 0077](plans/0077-the-quiet-sky.md) Phase 2** (option 1; the
+- **PROMOTED same day → [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 2** (option 1; the
   gate half is that plan's Phase 1 via
   [ADR-0091](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)).
   Option 2 — the emitter's movable source — stays open in this entry, unpromoted.
+- **DELIVERED 2026-08-12 (Plan 0077 Phase 2, `fae16e6`).** The swarm carries `twinkle` and
+  `size_spread` with the emitter's names and semantics — **rate and phase both off the seed**,
+  so the field shimmers while the whole-frame mean sits still, the exact property this entry
+  measured the emitter for. Both default 0 and the goldens pass unblessed (byte-identity by
+  arithmetic, not by bless). The quiet sky itself is Plan 0077 Phase 5, standing in the plans
+  README. **Option 2 remains open here.**
 
 ---
 
@@ -2056,9 +2071,16 @@ is the ADR.
 
 ## 0085 — `swarm` has no `reseed`, so a flow-field pile-up has no recovery lever
 
-- **PROMOTED 2026-08-11 → [Plan 0077](plans/0077-the-quiet-sky.md) Phase 3** — same day as
+- **PROMOTED 2026-08-11 → [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 3** — same day as
   filed, riding the swarm-individuation plan exactly as the verdict below proposed; ADR-0066
   disturbance semantics, and the horizon caveat is carried by that plan's Phase 5.
+- **DELIVERED 2026-08-12 (Plan 0077 Phase 3, `3bfc7c8`).** The swarm's `reseed` is the
+  attractor's percussive accent with ADR-0066's semantics — a seeded ±6 % domain-relative kick
+  on a rising edge past 0.5, never a box respawn — measured dispersing (frame-diff 0.153
+  against control) and re-gathering (coverage gap 0.30 % three seconds on). The caveat this
+  entry insisted on is honoured, not waved through: the *minutes-horizon* rescue is explicitly
+  unclaimed by any test, and the one-off soak observation is Phase 5's rider, standing in the
+  plans README with 0086's trigger intact.
 
 **Raised by:** `preset-author`, Plan 0075 cohort 4 (the Shatter world). **Owner if taken:**
 `dev`, inside whatever plan takes
@@ -2123,11 +2145,12 @@ includes acting on
 [0085](#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever), which must
 not ship its lever verified only at the horizon the suite can see.
 
-**Trigger status (2026-08-11, same day):** [Plan 0077](plans/0077-the-quiet-sky.md) acts on
+**Trigger status (2026-08-11, same day):** [Plan 0077](plans/done/0077-the-quiet-sky.md) acts on
 0085 and its Phase 5 carries the bounded check this entry's "What a fix would be" prescribes —
 one minutes-horizon observation, verdict recorded in the world's header. The entry itself
 stays **parked**: no instrument is built, and the trigger re-arms for the next
-slow-accumulation look.
+slow-accumulation look. (2026-08-12: the plan's `dev` scope closed; the bounded check travels
+with its Phase 5, standing in the plans README — this entry's status is unchanged.)
 
 ## 0087 — `reaction_diffusion` has no glow of its own, and the engine bloom's threshold sits above where its output lives
 
@@ -2153,9 +2176,17 @@ One cohort's demonstrated want. The ADR-0080 shape is the named route when the s
 
 ## 0088 — `shot --report`'s band columns cannot see reactivity spent on bloom
 
-- **PROMOTED 2026-08-11 → [Plan 0077](plans/0077-the-quiet-sky.md) Phase 4** — same day as
+- **PROMOTED 2026-08-11 → [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 4** — same day as
   filed, riding the sparse-idiom plan as its small instrument phase; no ADR, per the verdict
   below.
+- **DELIVERED 2026-08-12 (Plan 0077 Phase 4, `b1ca4e9`).** The mean columns stay untouched —
+  every historical `--report` number keeps meaning what it said — and a **footprint reading**
+  lands beside them (`metrics::footprint_diff` over the same capture pairs; text gets its own
+  labeled block, JSON gains `reactivity_footprint`). The bloom-only fixture reads bass 0.161
+  where the mean reads 0.004, unbound bands stay 0.000 in both readings, and the end-to-end
+  claim is pinned in `shot_cli.rs`. The family is now three for three. **The house workaround
+  is obsolete** — `fragment_vitrail.toml`'s header still cites it and is on the content lane's
+  list (Plan 0077's Standing entry).
 
 **Raised by:** `preset-author`, Plan 0075 cohort 4, as an instrument note. **Owner if taken:**
 `dev` — `standalone/examples/shot.rs` and the report's band statistic.

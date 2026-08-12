@@ -1,19 +1,23 @@
 # 0077 — The quiet sky: the sparse idiom becomes gateable and the swarm individuates
 
-> **Status:** in-progress (scope, grouping and the acceptance phase user-decided by
-> interview at the Plan 0075 handoff; approved 2026-08-11)
+> **Status:** done (closed 2026-08-12 — the four `dev` phases landed as `698b734` /
+> `fae16e6` / `3bfc7c8` / `b1ca4e9`, every done-when verified at the Mode 4 review:
+> no blockers, no majors, two minors both repaired in the close series. **Phase 5 is
+> `human` and deliberately outstanding — see the plans README's Standing section**:
+> the content lane authors Perseids' quiet sky through the Plan 0067 route, with the
+> backlog-0086 bounded horizon check, and its verdict lands in the world's header.)
 > **Created:** 2026-08-11
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0091](../adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)
-> (the statistic), [0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md)
+> **Related ADRs:** [0091](../../adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)
+> (the statistic), [0066](../../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md)
 > (the reseed semantics Phase 3 reuses)
-> **Closes:** [design-backlog 0009](../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
-> (the statistic half), [0068](../design-backlog.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
-> (option 1), [0085](../design-backlog.md#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever),
-> [0088](../design-backlog.md#0088--shot---reports-band-columns-cannot-see-reactivity-spent-on-bloom);
-> discharges [0086](../design-backlog.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument)'s
+> **Closes:** [design-backlog 0009](../../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
+> (the statistic half), [0068](../../design-backlog.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+> (option 1), [0085](../../design-backlog.md#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever),
+> [0088](../../design-backlog.md#0088--shot---reports-band-columns-cannot-see-reactivity-spent-on-bloom);
+> discharges [0086](../../design-backlog.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument)'s
 > trigger with a bounded check (0086 itself stays parked)
-> **Queued:** after [Plan 0076](done/0076-the-second-layer.md) (landed) and Plan 0075's cohort 6, per the
+> **Queued:** after [Plan 0076](0076-the-second-layer.md) (landed) and Plan 0075's cohort 6, per the
 > 2026-08-11 handoff decision — nothing here gates the collage.
 
 ## TL;DR
@@ -144,7 +148,7 @@ flowchart LR
 - **Owner skill:** human
 - **What:** the content lane authors Perseids' quiet twinkling sky — sparse marks, low
   coverage, slow shimmer on swarm `twinkle` — under the fresh-slate rule, and lands it
-  through the [Plan 0067](done/0067-the-curation-route.md) route at the author's preferred
+  through the [Plan 0067](0067-the-curation-route.md) route at the author's preferred
   density, with no glow/trail inflation bought for the gates. Two riders:
   1. **The sanity floor is read, not fought.** If the swarm-family coverage floor prices
      out the legitimately sparse sky, re-derive it by the floor's own recorded rule and

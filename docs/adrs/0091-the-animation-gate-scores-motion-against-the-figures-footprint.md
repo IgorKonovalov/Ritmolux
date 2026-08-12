@@ -1,9 +1,9 @@
 # ADR-0091 — The animation gate scores motion against the figure's own footprint
 
-> **Status:** accepted 2026-08-11 (user approval at the Plan 0075 handoff; Plan 0077 queued —
-> an Outcome section is owed at that plan's close if implementation falsifies anything here)
+> **Status:** accepted 2026-08-11 (user approval at the Plan 0075 handoff), with a dated
+> [Outcome](#outcome--2026-08-12-at-plan-0077s-close) added at Plan 0077's close
 > **Date:** 2026-08-11
-> **Related plan(s):** [0077](../plans/0077-the-quiet-sky.md)
+> **Related plan(s):** [0077](../plans/done/0077-the-quiet-sky.md)
 > **Resolves:** the live half of
 > [design-backlog 0009](../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
 
@@ -97,3 +97,32 @@ the renaissance is about to ship more of — the gate would stop gating the libr
 
 The measured record this decision rests on is pinned in backlog 0009 (the Squall numbers,
 the flat ladder) and `core/tests/animation.rs`'s own `#[ignore]`d ladder measurement.
+
+## Outcome — 2026-08-12, at Plan 0077's close
+
+Nothing in the body was falsified; the implementation (`698b734`) is recorded here for the
+two things the Decision left open or did not anticipate.
+
+- **The masked form won**, over the `frame_diff / max(occupancy, eps)` quotient, and the
+  reason is recorded on `metrics::footprint_diff`: the quotient form keeps the whole-frame
+  numerator, so backdrop drift outside the figure would leak into a statistic that claims to
+  be about the figure. The safety argument held exactly — the static control reads a
+  numerator of 0.0000, and the rejected fifth-density Squall draft reads 0.1049 (10.5x the
+  floor) against the 0.0057 whole-frame reading that priced it out. Both are pinned as a
+  standing non-vacuity test.
+- **One behaviour this ADR never mentioned proved load-bearing: the gate's roster strips
+  `bg_*` bindings** (the sanity suite's ADR-0067 lesson, re-learned here by measurement — a
+  shipped `bg_bright = 0.016` stores as ~34/255 in sRGB, over the lit threshold, so with
+  backdrops on the sparse probe's "footprint" read as 65 % of the frame and the statistic
+  went back to diluting by emptiness through another door). A deliberate semantic change
+  rides along: backdrop-only drift (a slow `bg_hue` sweep) no longer counts as animation.
+  The gate's question is whether the *scene* moves.
+- `ANIM_FLOOR` re-derived to **0.01** — half the shipped-library minimum under the new
+  statistic (Banded Mandala, 0.0205). The numeric coincidence with the old whole-frame
+  floor is called out beside the constant; the number survived, the derivation replaced.
+  The denominator's stated lower bound is `MIN_FOOTPRINT_FRAC = 0.015` (139 pixels at
+  96x96), which caps the one-pixel full-swing flicker at 0.0072 — the Negative's noise
+  amplification, bounded as required.
+- **The whole-library re-sweep convicted nothing** — the second Negative's contingency (a
+  finding to file per convicted preset) did not arise; the cohort retirements had already
+  removed the likely candidates.
