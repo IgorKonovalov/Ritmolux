@@ -1207,6 +1207,7 @@ fn declared_params_match_set_param() {
                 // The ramp (ADR-0094): a palette segment swept along one axis,
                 // with the brightness tilt that used to be hardcoded retired
                 // into the two ends of a ramp on that same axis.
+                "bg_angle",
                 "bg_hue_span",
                 "bg_shade",
                 "bg_shade_end",

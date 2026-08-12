@@ -694,7 +694,12 @@ fn composite_into(
     // downstream.
     side.chain.set_exposure(exposure);
     let target = side.chain.begin(encoder, destination, surface);
-    side.background.render(&ctx.queue, encoder, destination);
+    // `surface`, never `target.size` on the line below: the backdrop paints
+    // `destination`, which is surface-sized, while `target.size` is the chain's
+    // quantized capped internal grid (ADR-0037). The ramp's angle is only true in
+    // screen pixels if it takes the shape it is actually seen at.
+    side.background
+        .render(&ctx.queue, encoder, destination, surface);
     // Hand the scene its target size before it renders: a scene with an internal
     // accumulation field (the attractor's trails) sizes that field from here rather
     // than a fixed grid (Plan 0027 Phase 2). A no-op for every other scene, and a
