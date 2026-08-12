@@ -1,7 +1,7 @@
 # 0080 — The sky gets a horizon: the backdrop paints a directional ramp
 
-> **Status:** approved 2026-08-12 (user approval; the ease and the transparency question were
-> decided in the same review — see ADR-0094 Alternatives G and H)
+> **Status:** in-progress 2026-08-12 (approved the same day; the ease and the transparency question
+> were decided in that review — see ADR-0094 Alternatives G and H)
 > **Created:** 2026-08-12
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0094](../adrs/0094-the-backdrop-paints-a-directional-ramp.md) (this plan's

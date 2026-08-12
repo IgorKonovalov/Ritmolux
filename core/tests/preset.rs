@@ -1200,7 +1200,7 @@ fn declared_params_match_set_param() {
         // The global compositing stages, declared the same way.
         (
             src.join("render/background.rs"),
-            &["bg_hue", "bg_bright", "bg_vignette"],
+            &["bg_hue", "bg_bright", "bg_vignette", "bg_hue_span"],
         ),
         (
             src.join("render/trails.rs"),
