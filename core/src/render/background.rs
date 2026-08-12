@@ -119,6 +119,11 @@ const DEFAULT_VIGNETTE: f32 = 0.0;
 /// one sample at `bg_hue` — today's picture, as an arithmetic identity rather
 /// than an approximation of it.
 const DEFAULT_HUE_SPAN: f32 = 0.0;
+/// The ramp's direction, in radians, `0` = bottom-to-top — the axis the retired
+/// tilt already used, and `launch_angle`'s zero-is-up convention. At `0` the
+/// aspect term cancels exactly (see the shader), so the default is the identity
+/// rather than an approximation of it.
+const DEFAULT_ANGLE: f32 = 0.0;
 /// The brightness ramp's two ends, on the same axis as the colour sweep. These
 /// two numbers **are** the fixed `mix(0.72, 1.0, ·)` tilt the pass used to
 /// hardcode: the shader still runs that instruction with those constants, so the
@@ -145,12 +150,12 @@ const DEFAULT_PALETTE_MIX: f32 = 0.0;
 
 const SHADER: &str = r#"
 struct Bg {
-    // x: hue, y: bright, z: vignette, w: unused
+    // x: hue, y: bright, z: vignette, w: aspect (from the DESTINATION SURFACE)
     v: vec4<f32>,
     // x: palette_mix (A/B crossfade), y: saturation,
     // z: bg_ramp_gamma (CPU-clamped positive), w: unused
     c: vec4<f32>,
-    // The ramp (ADR-0094). x: unused, y: bg_hue_span,
+    // The ramp (ADR-0094). x: bg_angle, y: bg_hue_span,
     // z: bg_shade, w: bg_shade_end
     g: vec4<f32>,
 }
@@ -178,14 +183,34 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let vig_amt = u.v.z;
     let palette_mix = u.c.x;
     let saturation = u.c.y;
+    let aspect = u.v.w;
+    let angle = u.g.x;
     let hue_span = u.g.y;
     let shade = u.g.z;
     let shade_end = u.g.w;
 
-    // The ramp axis (ADR-0094): a normalized position along it, 0 at the frame's
-    // bottom edge and 1 at its top. Bottom-to-top for now — `bg_angle` turns it
-    // in a later phase, and its zero reduces to exactly this.
-    let s = clamp(0.5 + 0.5 * in.ndc.y, 0.0, 1.0);
+    // The ramp axis (ADR-0094): a normalized position along it, 0 at the frame
+    // edge the ramp starts from and 1 at the edge it ends on. `bg_angle` is in
+    // radians and `0` runs bottom-to-top, matching `launch_angle`'s
+    // zero-is-up convention.
+    //
+    // `aspect` is the **destination surface's**, and the axis is measured in
+    // pixel-proportional coordinates so an authored angle is the angle seen on
+    // screen. The normalizing denominator is the ramp's own extent across that
+    // rectangle, so `s` still spans 0..1 corner to corner at any angle.
+    //
+    // **At `angle = 0` the aspect term cancels exactly**: `sin(0)` is 0 and
+    // `cos(0)` is 1, so `dot(q, d)` is `ndc.y` and the denominator is
+    // `aspect * 0 + 1`. That is why this reduces to the pre-ramp expression bit
+    // for bit — and why no default-angle test can tell a right aspect from a
+    // wrong one, which is what Phase 4's negative control exists for.
+    let d = vec2<f32>(sin(angle), cos(angle));
+    let q = vec2<f32>(in.ndc.x * aspect, in.ndc.y);
+    let s = clamp(
+        0.5 + 0.5 * dot(q, d) / (aspect * abs(d.x) + abs(d.y)),
+        0.0,
+        1.0,
+    );
 
     // The ramp is linear in screen space and light is not, so one exponent shapes
     // *where* things sit along the axis. It is applied to the position, ahead of
@@ -436,6 +461,7 @@ pub struct Background {
     hue: f32,
     bright: f32,
     vignette: f32,
+    angle: f32,
     hue_span: f32,
     shade: f32,
     shade_end: f32,
@@ -461,6 +487,7 @@ pub const PARAMS: &[&str] = &[
     "bg_hue",
     "bg_bright",
     "bg_vignette",
+    "bg_angle",
     "bg_hue_span",
     "bg_shade",
     "bg_shade_end",
@@ -506,6 +533,7 @@ impl Background {
             hue: DEFAULT_HUE,
             bright: DEFAULT_BRIGHT,
             vignette: DEFAULT_VIGNETTE,
+            angle: DEFAULT_ANGLE,
             hue_span: DEFAULT_HUE_SPAN,
             shade: DEFAULT_SHADE,
             shade_end: DEFAULT_SHADE_END,
@@ -545,6 +573,7 @@ impl Background {
         self.hue = DEFAULT_HUE;
         self.bright = DEFAULT_BRIGHT;
         self.vignette = DEFAULT_VIGNETTE;
+        self.angle = DEFAULT_ANGLE;
         self.hue_span = DEFAULT_HUE_SPAN;
         self.shade = DEFAULT_SHADE;
         self.shade_end = DEFAULT_SHADE_END;
@@ -562,6 +591,7 @@ impl Background {
             "bg_hue" => self.hue = value,
             "bg_bright" => self.bright = value,
             "bg_vignette" => self.vignette = value,
+            "bg_angle" => self.angle = value,
             "bg_hue_span" => self.hue_span = value,
             "bg_shade" => self.shade = value,
             "bg_shade_end" => self.shade_end = value,
@@ -586,11 +616,24 @@ impl Background {
     /// Own the frame clear — the first pass of the composite. With no visible
     /// backdrop (`bg_bright <= 0`) this is a plain black clear (no pipeline); with
     /// one, it lazily builds the gradient pipeline and paints it fullscreen.
+    ///
+    /// # `surface` is the **destination's** size, never an internal grid's
+    ///
+    /// This pass paints `destination`, which `composite_into` sizes from the
+    /// surface. The `target.size` sitting on the next line there is the post
+    /// chain's quantized, capped internal grid — a *resolution, not a shape*
+    /// ([ADR-0037](../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)),
+    /// and at a 160x100 surface it is a square 256x256. Taking it would be that
+    /// defect for the third time, and it is invisible at `bg_angle = 0` where the
+    /// aspect term provably cancels — which is why `backdrop_ramp.rs` carries a
+    /// negative control at a non-zero angle *with a stage active*, where the two
+    /// sources disagree.
     pub fn render(
         &mut self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
+        surface: (u32, u32),
     ) {
         if self.bright <= 0.0 {
             // Passthrough: a plain black clear establishes the frame without a
@@ -625,18 +668,19 @@ impl Background {
             palette::write_lut(queue, &res.lut_texture_b, &self.palette.lut_b_bytes());
             self.palette_dirty = false;
         }
+        let aspect = surface.0.max(1) as f32 / surface.1.max(1) as f32;
         queue.write_buffer(
             &res.uniforms,
             0,
             bytemuck::bytes_of(&Bg {
-                v: [self.hue, self.bright, self.vignette, 0.0],
+                v: [self.hue, self.bright, self.vignette, aspect],
                 c: [
                     self.palette_mix,
                     self.saturation,
                     applied_ramp_gamma(self.ramp_gamma),
                     0.0,
                 ],
-                g: [0.0, self.hue_span, self.shade, self.shade_end],
+                g: [self.angle, self.hue_span, self.shade, self.shade_end],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

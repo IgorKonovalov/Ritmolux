@@ -129,24 +129,39 @@ fn worst_channel(a: [u8; 3], b: [u8; 3]) -> u8 {
     (0..3).map(|c| a[c].abs_diff(b[c])).max().unwrap_or(0)
 }
 
-/// The mid-column row whose colour is closest to `target`, by squared RGB
-/// distance. Used to *locate* a ramp's midpoint against a pinned control rather
-/// than to compute where it should be.
+/// Squared RGB distance between two triples.
+fn distance(a: [u8; 3], b: [u8; 3]) -> i32 {
+    (0..3)
+        .map(|c| {
+            let d = i32::from(a[c]) - i32::from(b[c]);
+            d * d
+        })
+        .sum()
+}
+
+/// The mid-column row whose colour is closest to `target`. Used to *locate* a
+/// ramp's midpoint against a pinned control rather than to compute where it
+/// should be.
 fn closest_row(image: &CaptureImage, target: [u8; 3]) -> u32 {
-    let distance = |px: &[u8; 3]| -> i32 {
-        (0..3)
-            .map(|c| {
-                let d = i32::from(px[c]) - i32::from(target[c]);
-                d * d
-            })
-            .sum()
-    };
     let column = mid_column(image);
     let mut best = (0u32, i32::MAX);
     for (row, px) in column.iter().enumerate() {
-        let d = distance(px);
+        let d = distance(*px, target);
         if d < best.1 {
             best = (row as u32, d);
+        }
+    }
+    best.0
+}
+
+/// The column within one row whose colour is closest to `target` — the same
+/// locate-against-a-control idea, along the other axis.
+fn closest_col(image: &CaptureImage, row: u32, target: [u8; 3]) -> u32 {
+    let mut best = (0u32, i32::MAX);
+    for col in 0..image.width {
+        let d = distance(pixel(image, col, row), target);
+        if d < best.1 {
+            best = (col, d);
         }
     }
     best.0
@@ -422,6 +437,116 @@ fn an_out_of_range_exponent_lands_on_its_rail() {
             worst <= 1,
             "bg_ramp_gamma = {driven} must render as the {rail} rail it clamps \
              to — the mid-columns differ by {worst} levels"
+        );
+    }
+}
+
+/// **The ramp's angle is true in screen pixels, and the aspect it uses comes
+/// from the destination surface rather than the chain's internal grid** —
+/// [ADR-0037](../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s
+/// trap, which has shipped twice and is worse than usual here.
+///
+/// At `bg_angle = 0` the aspect term *provably* cancels (`d = (0, 1)`, so the
+/// denominator is `aspect * 0 + 1`), so no default-angle test anywhere in this
+/// suite can tell a right aspect from a wrong one. This runs at **π/4 on a
+/// 160x100 target**, where the two candidate sources disagree by 60 %.
+///
+/// # What is measured
+///
+/// The `s = 0.5` iso-line satisfies `A * ndc.x + ndc.y = 0`, so it crosses at
+/// `ndc.x = -ndc.y / A` and its x position shifts by `2 / A` across the frame's
+/// full height. Locating that crossing on the top and bottom rows — against a
+/// pinned midpoint control, as everywhere else here — gives `A` back:
+///
+/// | aspect source | value | crossing shift, in columns of 160 |
+/// |---|---|---|
+/// | `surface` (correct) | 1.6 | 99 |
+/// | `target.size`, chain active | 1.0 | 158 (clipped to the frame's edges) |
+///
+/// # Why a post stage has to be active
+///
+/// With an empty chain `target.size` **is** `surface`, so the wrong source
+/// would measure right and the control would be theatre. `trails` forces the
+/// disagreement: at a 160x100 surface the internal grid quantizes to a **square
+/// 256x256** (a 256 px step over a 1920x1080 cap), which is aspect 1.0 exactly —
+/// the plan's "aspect forced to 1.0" is not a hypothetical, it is what the
+/// adjacent line in `composite_into` would hand over.
+///
+/// The stage is safe to switch on here because the backdrop is **not inside the
+/// chain** (ADR-0055): it paints `destination` and the chain composites over it.
+/// The scene draws nothing, so the fold is transparent and the backdrop arrives
+/// whole. The first assertion checks exactly that rather than assuming it.
+///
+/// # The control was verified to bite
+///
+/// `composite_into` was temporarily re-pointed at `target.size` and this test
+/// failed — on the **first** assertion, at 20 levels: switching `trails` on
+/// changed the backdrop, because the aspect went from 1.6 to 1.0 underneath it.
+/// That is ADR-0037's symptom stated directly ("turning a stage on changes the
+/// shape of the picture"), and it is why that assertion is first. The crossing
+/// assertion below catches the other flavour — an aspect wrong in *both*
+/// configurations, such as a hardcoded 1.0.
+#[test]
+fn the_ramp_angle_takes_the_surfaces_aspect_not_the_internal_grids() {
+    // 160x100 (aspect 1.6). Both numbers matter: the aspect is well away from 1,
+    // and the internal grid at this size is square.
+    const W: u32 = 160;
+    const H: u32 = 100;
+    let Some(mut renderer) = renderer_sized(W, H) else {
+        return;
+    };
+    const FLAT: &str = "[palette]\nstops = [{ at = 0.0, color = \"#ffcf80\" }, \
+                        { at = 1.0, color = \"#ffcf80\" }]";
+    // π/4, written out: the expression grammar has no `pi`.
+    const DIAGONAL: &str = "0.7853981634";
+
+    let sky = |stage: &str| {
+        format!(
+            "bg_vignette = \"0\"\nbg_hue = \"0\"\n\
+             bg_shade = \"1.0\"\nbg_shade_end = \"0.0\"\nbg_angle = \"{DIAGONAL}\"\n{stage}"
+        )
+    };
+    let plain = capture(&mut renderer, FLAT, &sky(""));
+    let staged = capture(&mut renderer, FLAT, &sky("trails = \"0.6\"\n"));
+
+    // The chain is a passthrough over an empty scene, so switching it on must not
+    // move the backdrop. Without this the comparison below could pass by the
+    // stage having eaten the picture.
+    let moved = (0..H)
+        .map(|row| {
+            (0..W)
+                .map(|col| worst_channel(pixel(&plain, col, row), pixel(&staged, col, row)))
+                .max()
+                .unwrap_or(0)
+        })
+        .max()
+        .unwrap_or(0);
+    assert!(
+        moved <= 1,
+        "switching `trails` on moved the backdrop by {moved} levels. The backdrop \
+         is supposed to sit underneath the chain (ADR-0055), so this control \
+         cannot separate the two aspect sources until that holds."
+    );
+
+    // The midpoint control: a uniform frame at the shade ramp's half value.
+    let mid = capture(
+        &mut renderer,
+        FLAT,
+        "bg_vignette = \"0\"\nbg_hue = \"0\"\nbg_shade = \"0.5\"\nbg_shade_end = \"0.5\"\n",
+    );
+    let target = pixel(&mid, W / 2, H / 2);
+
+    for (what, image) in [("no stage", &plain), ("trails active", &staged)] {
+        let top = closest_col(image, 0, target);
+        let bottom = closest_col(image, H - 1, target);
+        let shift = bottom.abs_diff(top);
+        println!("{what}: s=0.5 crossing at col {top} (top) and {bottom} (bottom), shift {shift}");
+        assert!(
+            shift.abs_diff(99) <= 3,
+            "{what}: the s = 0.5 crossing shifts {shift} columns between the top \
+             and bottom rows. The surface's aspect (1.6) puts it at 99; the \
+             chain's square 256x256 internal grid would put it at ~158. The \
+             backdrop is taking its aspect from a resolution instead of a shape."
         );
     }
 }

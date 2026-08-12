@@ -409,7 +409,7 @@ fn drive(
             });
         capture::record_clear(&mut encoder, &view);
         let target = chain.begin(&mut encoder, &view, size);
-        background.render(&ctx.queue, &mut encoder, &target.view);
+        background.render(&ctx.queue, &mut encoder, &target.view, size);
         chain.resolve(&ctx.queue, &mut encoder, target.routing, &view, size);
         ctx.queue.submit(std::iter::once(encoder.finish()));
     }
@@ -706,7 +706,7 @@ fn fold_error_at(ctx: &RenderContext, surface: (u32, u32)) -> f32 {
     // — this probe wants radially-structured content to measure symmetry on,
     // and paints it straight into the fold's input. `Fold::Own` because `view`
     // is a fresh capture target with nothing underneath to blend with.
-    background.render(&ctx.queue, &mut encoder, &src);
+    background.render(&ctx.queue, &mut encoder, &src, surface);
     kaleido.resolve(&ctx.queue, &mut encoder, &view, surface, Fold::Own);
     let (buffer, padded_bpr) = capture::create_readback(&ctx.device, surface.0, surface.1);
     capture::record_copy(
