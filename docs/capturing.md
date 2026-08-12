@@ -1071,13 +1071,28 @@ constant alpha 1 over their whole quad (Plan 0051 / ADR-0056). Each was fixed
 with a guard of the same shape, and the guards are per-seam rather than global
 because nothing structurally forces a shader's colour and alpha to stay in step.
 
-**One golden baseline is lit, and it is the exception that proves the rule**
-(Plan 0080, ADR-0094): `core/tests/fixtures/backdrop_ramp.toml` runs
-`bg_bright = 0.6`, because the backdrop's gradient pipeline is *not even built*
-below that and no dark baseline anywhere in the suite executes a line of that
-pass. It is an `EXTRA_FIXTURES` entry rather than a rostered one, so the
+**Two golden baselines are lit, and they are the exception that proves the
+rule** — both `EXTRA_FIXTURES` entries rather than rostered ones, so the
 per-system roster is still uniformly dark and the sentence above still describes
-what a *drift* baseline is for.
+what a *drift* baseline is for. Each exists because the backdrop pass is
+**lazy**: it does not build its gradient pipeline at all below a visible
+backdrop, so no dark baseline anywhere in the suite executes a line of it.
+
+- `core/tests/fixtures/backdrop_ramp.toml` (Plan 0080, ADR-0094) runs
+  `bg_bright = 0.6` — the directional ramp.
+- `core/tests/fixtures/backdrop_band.toml` (Plan 0081, ADR-0095) runs
+  `bg_bright = 0.5` **and all seven band params off their defaults** — the
+  curved band, over a lit ramp so the baseline pins the two *added* rather than
+  the band alone. It is not redundant with the one above: the band is an untaken
+  `select` branch at `bg_band_amount = 0`, so `backdrop_ramp` — the suite's only
+  other lit baseline — executes none of it, and `bg_band_curve` off `0` is the
+  only thing in the crate's baselines that reads the along-band axis at all.
+
+**Both were adapter-compared before blessing** (WARP against hardware, means
+recorded in each fixture's header), because each plan grew this pass's uniform
+and therefore moved its `min_binding_size` — a Plan 0053 fix against a *measured*
+WARP mis-render, so a divergence there is a finding rather than something to
+bless.
 
 The fixtures below exist purely for this axis, and they are **additive test
 surface** rather than re-parameterized existing files, for the reason above:

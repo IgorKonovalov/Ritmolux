@@ -409,7 +409,7 @@ and a session's temporary directory does not survive the session.
   ramp leaves a long dim tail and a flat tail is where one 8-bit level lasts
   longest. It is kept so the **same frame** can be re-measured after
   [Plan 0082](../../../docs/plans/done/0082-the-gradient-stops-banding.md)'s dither
-  and again after [Plan 0081](../../../docs/plans/0081-the-sky-gets-a-galaxy.md)
+  and again after [Plan 0081](../../../docs/plans/done/0081-the-sky-gets-a-galaxy.md)
   adds a second overlapping gradient — a before/after on two different pictures
   would prove nothing. Its README carries the run command, the 2026-08-12
   pre-dither measurements (widest mid-range plateau **58 px at value 11**, 0 %

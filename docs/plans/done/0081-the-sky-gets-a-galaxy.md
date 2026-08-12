@@ -1,19 +1,28 @@
 # 0081 — The sky gets a galaxy: the backdrop paints a curved band
 
-> **Status:** in-progress 2026-08-12 (user approval, same day; the structure/colour/arc forks were all
-> decided by interview — see ADR-0095 Alternatives A, D and F)
-> **Sequenced after:** [0082](done/0082-the-gradient-stops-banding.md) — the band is a second wide smooth
+> **Status:** done 2026-08-12 — all five `dev` phases landed (`50cac56..e7960f5`); **Phase 6 is
+> `human` and deliberately outstanding**. Mode 4 review: no blockers, no majors, two minors, two
+> nits. The band ships as decided — seven params, additive over the ground, its own segment of the
+> same `[palette]`, the widened build condition — with the baselines hash-identical under the
+> bless-to-bless control three times and the adapters compared to 0.026 of one 8-bit level before
+> the fifth fixture was blessed. **Two claims in this file are false and are corrected in
+> [ADR-0095's Outcome](../../adrs/0095-the-backdrop-paints-a-curved-band.md#outcome--2026-08-12-at-plan-0081s-close)**:
+> the along-band normalizer *does* cancel at the default angle (Risks, and the header line below),
+> and Phase 3's "the defaults leave the band on the ground's own coordinate" contradicted ADR-0095's
+> table — the user settled it toward the ADR, so `bg_band_hue` is **absolute**.
+> **Sequenced after:** [0082](0082-the-gradient-stops-banding.md) — the band is a second wide smooth
 > gradient, and Phase 6's verdict must not be confounded by banding already known about
 > **Created:** 2026-08-12
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0095](../adrs/0095-the-backdrop-paints-a-curved-band.md) (this plan's
-> decision), continues [0094](../adrs/0094-the-backdrop-paints-a-directional-ramp.md) (the ramp it
+> **Related ADRs:** [0095](../../adrs/0095-the-backdrop-paints-a-curved-band.md) (this plan's
+> decision), continues [0094](../../adrs/0094-the-backdrop-paints-a-directional-ramp.md) (the ramp it
 > sits beside, same pass), supplements
-> [0086](../adrs/0086-the-backdrop-colours-through-the-preset-palette.md) (one colour language),
-> [0090](../adrs/0090-a-preset-composes-two-scene-layers.md) (the layer cap this avoids widening),
-> [0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the aspect trap — **twice over
-> here, and the new axis does not cancel at the default angle**)
-> **Follows:** [0080](done/0080-the-sky-gets-a-horizon.md), whose Phase 7 verdict is **still
+> [0086](../../adrs/0086-the-backdrop-colours-through-the-preset-palette.md) (one colour language),
+> [0090](../../adrs/0090-a-preset-composes-two-scene-layers.md) (the layer cap this avoids widening),
+> [0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the aspect trap — **twice over
+> here, and the new axis does not cancel at the default angle** — ~~and that second clause is wrong:
+> it cancels, see the ADR's Outcome~~)
+> **Follows:** [0080](0080-the-sky-gets-a-horizon.md), whose Phase 7 verdict is **still
 > outstanding** — see Risks
 
 ## TL;DR
@@ -32,7 +41,7 @@ reference photograph — a Milky Way arc over a dusk horizon. The ground reads. 
 is missing**, and it is missing structurally rather than by tuning.
 
 Four roles are wanted at once — ground, band, bright stars, reactive figure — against a budget of a
-main scene plus one `[layer]` ([ADR-0090](../adrs/0090-a-preset-composes-two-scene-layers.md)).
+main scene plus one `[layer]` ([ADR-0090](../../adrs/0090-a-preset-composes-two-scene-layers.md)).
 Plan 0080 answered the first by moving the ground out of the scene budget entirely; the band has to
 come from the same place or it displaces the stars. And no scene can be asked for the shape: neither
 `swarm::PARAMS` nor `emitter::PARAMS` carries any positional or density control — verified against
@@ -43,7 +52,7 @@ backdrop entirely.
 ADR-0094 already named a neighbouring capability — a ramp drawn *after* the scene — and it is the
 wrong one. That is a foreground haze. A galaxy is unresolved starlight **behind** the stars, so it
 belongs in the same pre-pass the ground uses. Full reasoning, with the rejected alternatives, is in
-[ADR-0095](../adrs/0095-the-backdrop-paints-a-curved-band.md).
+[ADR-0095](../../adrs/0095-the-backdrop-paints-a-curved-band.md).
 
 ## Decision
 
@@ -256,7 +265,7 @@ flowchart TB
   - **Does the arc's curvature read at a normal field of view**, or does it need to be pushed so far
     that the ends leave the frame?
   - **Does it band, with two overlapping gradients rather than one?** Plan 0080 Phase 7's verdict
-    is **answered** — it banded, measured, and [Plan 0082](done/0082-the-gradient-stops-banding.md)
+    is **answered** — it banded, measured, and [Plan 0082](0082-the-gradient-stops-banding.md)
     dithers the display write ahead of this plan precisely so this question is asked of a chain
     that already works. **The check runs on the kept reference frame**,
     `core/tests/fixtures/scratch-0082/dusk_ground_banding.toml` — the darkest of the Plan 0080
@@ -327,8 +336,8 @@ struct Bg {
   the backdrop.
 - **No dither.** See Phase 6, and Plan 0080 Phase 7 before it.
 - **It does not ship the Milky Way world.** Authoring and landing it is content-lane work through
-  the [ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) /
-  [Plan 0067](done/0067-the-curation-route.md) route, after Phase 6's verdict.
+  the [ADR-0081](../../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) /
+  [Plan 0067](0067-the-curation-route.md) route, after Phase 6's verdict.
 
 ## Followups (after this lands)
 

@@ -122,7 +122,7 @@ still passes. Alternative F is not foreclosed, but nothing is now asking for it.
 
 ## What to check, and when
 
-- **After [Plan 0081](../../../../docs/plans/0081-the-sky-gets-a-galaxy.md)
+- **After [Plan 0081](../../../../docs/plans/done/0081-the-sky-gets-a-galaxy.md)
   (the galactic band).** The band is a *second* wide smooth gradient over this
   same near-black sky, so this frame is the natural place to add
   `bg_band_amount` and confirm the dither still holds with two overlapping

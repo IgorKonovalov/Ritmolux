@@ -1,8 +1,9 @@
 # ADR-0095 — The backdrop paints a curved band under the scene
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-12, **with a dated [Outcome](#outcome--2026-08-12-at-plan-0081s-close)
+> falsifying one claim in this ADR and settling one conflict between it and its plan**
 > **Date:** 2026-08-12
-> **Related plan(s):** [0081-the-sky-gets-a-galaxy](../plans/0081-the-sky-gets-a-galaxy.md)
+> **Related plan(s):** [0081-the-sky-gets-a-galaxy](../plans/done/0081-the-sky-gets-a-galaxy.md)
 > **Supplements:** [ADR-0094](0094-the-backdrop-paints-a-directional-ramp.md) (the ramp this sits
 > beside, in the same pass), [ADR-0086](0086-the-backdrop-colours-through-the-preset-palette.md)
 > (one colour language), [ADR-0090](0090-a-preset-composes-two-scene-layers.md) (the one-`[layer]`
@@ -167,6 +168,54 @@ A scene that paints the band. **Rejected for the identical reason ADR-0094 rejec
 ground**, and the reason is stronger here rather than weaker: a new system would occupy the main
 slot or the one `[layer]`, and with four roles wanted and two slots available that leaves two roles
 homeless instead of one.
+
+## Outcome — 2026-08-12, at Plan 0081's close
+
+All five `dev` phases landed (`50cac56..e7960f5`); Phase 6 is `human` and outstanding on purpose.
+The decision shipped as written — seven params, the additive band, the shared palette, the widened
+build condition — and the identity discipline held: the baselines came back hash-identical under the
+bless-to-bless control **three times**, once per code phase. Two things this ADR and its plan said
+turned out to be wrong, and both are recorded here rather than edited out of the body.
+
+**1. The along-band axis's aspect *does* cancel at the default angle.** This ADR's Decision says the
+new axis "gets its own normalizer, so ADR-0037 applies to it independently"; the plan's Risks section
+and the roster row went further and said it *"does not cancel at the default angle"*, which made
+Phase 2's non-square bow measurement the only thing that could ever see the trap on that axis. It is
+false. At `bg_band_angle = 0` the along direction is `(1, 0)`, so `axis_pos`'s numerator carries
+`ndc.x * aspect` while its denominator is `aspect * |1| + |0|`, and the two divide out exactly as
+they do on the ramp. Confirmed by running the bow measurement with the aspect forced to `1.0`: it
+reproduces the correct numbers to every digit.
+
+What Phase 2's measurement actually catches is a wrong normalizer **form**, and it does catch that —
+dropping the aspect from the along denominator alone (keeping it in the numerator) moves the edge
+columns' centrelines to rows 30.39 and 29.03 and shears the arc by 1.36 rows, failing on the first
+edge assertion. And the trap itself costs nothing extra, because **all three axes read the single
+aspect the pass is handed**: where that number comes from is one property with one control, and
+`the_ramp_angle_takes_the_surfaces_aspect_not_the_internal_grids` has been it since Plan 0080. The
+correction matters for the next reader, not for the code — "this axis needs its own ADR-0037
+control" is the sentence that would otherwise get copied into the next backdrop plan.
+
+**2. This ADR and its plan disagreed on what `bg_band_hue = 0.0` means, and the user settled it
+toward this ADR.** The table above calls `bg_band_hue` "its own coordinate in the **same**
+`[palette]`" — an absolute coordinate. The plan's Phase 3 done-when said the `0.0`/`0.0` defaults
+"leave the band on the ground's own coordinate, so Phase 2's frame is reproduced", which is an
+*offset*. Those cannot both hold: an absolute coordinate at `0.0` is `palette[0.0]`, not the
+ground's. `dev` raised the fork rather than picking, and the user chose **absolute**, on the
+authoring argument — the ground's coordinate varies along the band's path, so an offset would drag
+the ramp's own sweep into the arc and an author aiming a pale band at a dusk sky would get amber at
+one end. So the table is what shipped and **the plan's identity sentence is false as written**.
+Nothing shipped moved regardless: no baseline and no preset lights the band, and at
+`bg_band_amount = 0` the whole term is an untaken `select` branch.
+
+**Everything else held.** The `48 → 80 B` growth needed no ADR-0058 entry — the enumeration records
+*whether* a `min_binding_size` is declared, deliberately not which, so a second growth in two plans
+moves nothing and a changed answer would have been the finding. The adapters were compared before
+blessing and agreed to **0.026 of one 8-bit level** whole-frame (WARP `152.200 120.540 086.088`
+against hardware `152.198 120.550 086.114`). The widened build condition is exercised by a test that
+lights a band over an unlit ground, which is the only thing in the suite that can see it.
+
+**The headline Negative is still untested.** "If that reads as a smudge rather than a galaxy, the
+fix is Alternative A" — Phase 6 is the only instrument that can answer it and it has not run.
 
 ## Notes
 
