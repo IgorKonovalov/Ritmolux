@@ -1246,6 +1246,8 @@ fn declared_params_match_set_param() {
                 "ink_hue",
                 "ink_sat",
                 "ink_bright",
+                // ADR-0092's response exponent on the luminance key.
+                "ink_gamma",
             ],
         ),
     ];

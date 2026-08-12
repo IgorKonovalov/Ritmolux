@@ -1,6 +1,7 @@
 # 0078 — The ink learns to bite: a contrast exponent on the terminal remap
 
-> **Status:** approved 2026-08-11 (scope user-decided by interview at the Plan 0075 handoff)
+> **Status:** in-progress 2026-08-12 (approved 2026-08-11; scope user-decided by interview at the
+> Plan 0075 handoff)
 > **Created:** 2026-08-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0092](../adrs/0092-the-ink-remap-gains-a-contrast-exponent.md) (the

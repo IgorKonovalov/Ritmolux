@@ -1,7 +1,7 @@
 //! Final-stage duotone "ink" tone-remap (ADR-0028, Plan 0027 Phase 1): the
 //! **terminal engine post-pass** of the ADR-0018 fixed composite. It reads the
 //! fully composited frame's per-pixel luminance as an *ink density* `d` and
-//! outputs `mix(paper, ink, d)` between two preset-configurable colors — so a
+//! outputs `mix(paper, ink, d^g)` between two preset-configurable colors — so a
 //! bright additive stroke (density high) becomes ink and the dark base (density
 //! low) becomes paper. That is a *darkening* step the additive scene pipelines
 //! can't express, which is what "black on white" needs: it is the inverse of the
@@ -13,6 +13,17 @@
 //! is driven by the `ink_*` named params, offered to it by the renderer after the
 //! background and the chain, so there is **no `Scene`-trait change and the C ABI
 //! is untouched**.
+//!
+//! # The response exponent
+//!
+//! `ink_gamma` (`g` above, ADR-0092) reshapes *how fast* a pixel travels from
+//! paper to ink without moving either pole: `0^g = 0` and `1^g = 1` for every
+//! positive `g`, so endpoint invariance is a property of the arithmetic rather
+//! than a tuning. `g > 1` thins the mid-tones toward paper — only the strong
+//! strokes keep full ink, which is the "bites harder" duotone three looks in two
+//! cohorts asked for — and `g < 1` inks them for a heavier, flatter print. The
+//! default `1.0` is the **exact** identity (see the shader's branch), so the
+//! stage is bit-for-bit what it was until a preset binds the param.
 //!
 //! # Why it is not a [`PostStage`](super::post::PostStage)
 //!
@@ -63,6 +74,16 @@ const DEFAULT_PAPER_BRIGHT: f32 = 1.0;
 const DEFAULT_INK_HUE: f32 = 0.0;
 const DEFAULT_INK_SAT: f32 = 0.0;
 const DEFAULT_INK_BRIGHT: f32 = 0.0;
+/// `ink_gamma` default — the **exact** identity response (ADR-0092), so the stage
+/// is unchanged until a preset binds it.
+const DEFAULT_GAMMA: f32 = 1.0;
+/// The exponent's guard rails. An exponent is only endpoint-invariant for a
+/// *positive* `g` — `pow(0, 0)` is undefined and a negative `g` sends the dark
+/// end to infinity — so a binding that sweeps out of range is clamped rather than
+/// allowed to produce a NaN frame. Both ends are far outside anything a look
+/// wants: at `g = 0.05` a key of 0.5 already reads as 0.97, at `g = 20` as 1e-6.
+const MIN_GAMMA: f32 = 0.05;
+const MAX_GAMMA: f32 = 20.0;
 
 const SHADER: &str = r#"
 struct Ink {
@@ -72,7 +93,7 @@ struct Ink {
     ink_from: vec4<f32>,
     paper_to: vec4<f32>,
     ink_to: vec4<f32>,
-    ctl: vec4<f32>,        // x amount, y dissolve progress, rest unused
+    ctl: vec4<f32>,        // x amount, y dissolve progress, z gamma, w unused
 }
 
 @group(0) @binding(0) var<uniform> u: Ink;
@@ -99,6 +120,20 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // keys toward the ink pole, the dark base toward paper.
     let d = clamp(dot(src, vec3<f32>(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
 
+    // The response exponent (ADR-0092). `0^g = 0` and `1^g = 1` for any positive
+    // `g`, so the poles themselves never move — only how fast the mid-tones
+    // travel between them. `g > 1` thins the mids toward paper (the strong
+    // strokes keep the ink), `g < 1` inks them for a heavier print.
+    //
+    // The `g == 1` branch is not an optimization: `pow(x, 1.0)` is
+    // `exp2(1.0 * log2(x))` and is NOT bit-exact for arbitrary `x`, so without it
+    // the default would perturb every shipped ink preset and every future golden
+    // by a rounding step. ADR-0092's "default 1.0 is the exact identity" is a
+    // claim about pixels, and this is what makes it one. `g` is clamped positive
+    // on the CPU side, so `pow` never sees the undefined `0^0`.
+    let g = u.ctl.z;
+    let key = select(pow(d, g), d, g == 1.0);
+
     // Crossfade the two presets' poles in **RGB**, after the HSV conversion.
     // Interpolating hue/sat instead would sweep an unrelated arc of the wheel —
     // white (sat 0) to blue passes through yellow-green, a tone neither preset
@@ -110,7 +145,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let t = clamp(u.ctl.y, 0.0, 1.0);
     let paper = mix(hsv2rgb(u.paper_from.xyz), hsv2rgb(u.paper_to.xyz), t);
     let ink = mix(hsv2rgb(u.ink_from.xyz), hsv2rgb(u.ink_to.xyz), t);
-    let remapped = mix(paper, ink, d);
+    let remapped = mix(paper, ink, key);
 
     // `amount` gates the remap against the untouched frame (0 = passthrough, 1 =
     // full remap), so a preset can breathe between glow and ink on the beat. The
@@ -164,7 +199,15 @@ impl Resources {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: surface_format,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::RENDER_ATTACHMENT
+                // COPY_DST is for the tests alone, exactly as on `tonemap-src`:
+                // it is what lets a known display-referred frame be written
+                // straight in, so ADR-0092's endpoint invariance can be asserted
+                // at a key of **1** — which no rendered scene produces, since the
+                // tonemap's shoulder is bounded strictly below it. A usage flag,
+                // no runtime cost.
+                | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
         let src_view = src.create_view(&wgpu::TextureViewDescriptor::default());
@@ -248,6 +291,7 @@ pub struct Ink {
     ink_hue: f32,
     ink_sat: f32,
     ink_bright: f32,
+    gamma: f32,
     /// The **outgoing** preset's params while a dissolve runs, plus that
     /// dissolve's progress — the crossfade state (ADR-0032). `None` on every
     /// ordinary frame, where the shader sees one pole pair and `t = 0`.
@@ -277,6 +321,10 @@ pub struct InkParams {
     ink_hue: f32,
     ink_sat: f32,
     ink_bright: f32,
+    /// The response exponent (ADR-0092). A scalar on the *key*, not a colour, so
+    /// unlike the poles it interpolates on the CPU alongside `amount` — see
+    /// [`Ink::crossfade_from`].
+    gamma: f32,
 }
 
 impl InkParams {
@@ -302,6 +350,7 @@ impl Default for InkParams {
             ink_hue: DEFAULT_INK_HUE,
             ink_sat: DEFAULT_INK_SAT,
             ink_bright: DEFAULT_INK_BRIGHT,
+            gamma: DEFAULT_GAMMA,
         }
     }
 }
@@ -310,6 +359,34 @@ impl Default for InkParams {
 /// can never extrapolate a param past either preset's value.
 fn lerp(from: f32, to: f32, t: f32) -> f32 {
     from + (to - from) * t.clamp(0.0, 1.0)
+}
+
+/// The exponent the shader will **actually apply** for a bound `ink_gamma`: a
+/// non-finite binding falls back to the identity, and a finite one is held inside
+/// the positive range the endpoint-invariance property needs
+/// ([`MIN_GAMMA`], [`MAX_GAMMA`]).
+///
+/// The guard lives on the CPU rather than in the shader so `1.0` stays *exactly*
+/// `1.0` on the way to the uniform — the shader's identity branch tests it — and
+/// so the clamp cannot be reached with a NaN, where WGSL's `clamp` is
+/// implementation-defined.
+fn applied_gamma(gamma: f32) -> f32 {
+    if gamma.is_finite() {
+        gamma.clamp(MIN_GAMMA, MAX_GAMMA)
+    } else {
+        DEFAULT_GAMMA
+    }
+}
+
+/// The key the remap feeds to `mix(paper, ink, ·)` — the CPU mirror of the
+/// shader's two lines, kept here so ADR-0092's three properties are testable
+/// without a GPU (the same arrangement `tonemap::map` uses for its curve).
+///
+/// `d` is the clamped Rec. 709 luminance of the composited pixel.
+#[cfg(test)]
+pub(crate) fn key(d: f32, gamma: f32) -> f32 {
+    let g = applied_gamma(gamma);
+    if g == 1.0 { d } else { d.powf(g) }
 }
 
 /// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
@@ -322,6 +399,7 @@ pub const PARAMS: &[&str] = &[
     "ink_hue",
     "ink_sat",
     "ink_bright",
+    "ink_gamma",
 ];
 
 impl Ink {
@@ -338,6 +416,7 @@ impl Ink {
             ink_hue: DEFAULT_INK_HUE,
             ink_sat: DEFAULT_INK_SAT,
             ink_bright: DEFAULT_INK_BRIGHT,
+            gamma: DEFAULT_GAMMA,
             crossfade: None,
         }
     }
@@ -353,6 +432,7 @@ impl Ink {
         self.ink_hue = DEFAULT_INK_HUE;
         self.ink_sat = DEFAULT_INK_SAT;
         self.ink_bright = DEFAULT_INK_BRIGHT;
+        self.gamma = DEFAULT_GAMMA;
         self.crossfade = None;
     }
 
@@ -369,6 +449,7 @@ impl Ink {
             "ink_hue" => self.ink_hue = value,
             "ink_sat" => self.ink_sat = value,
             "ink_bright" => self.ink_bright = value,
+            "ink_gamma" => self.gamma = value,
             _ => return false,
         }
         true
@@ -391,6 +472,7 @@ impl Ink {
             ink_hue: self.ink_hue,
             ink_sat: self.ink_sat,
             ink_bright: self.ink_bright,
+            gamma: self.gamma,
         }
     }
 
@@ -402,11 +484,15 @@ impl Ink {
     /// Call **after** routing and **before** [`active`](Self::active): `amount`
     /// interpolates here, so a dissolve out of an ink-on preset into an ink-off one
     /// keeps the pass running at a fading `ink_amount` rather than cutting it off
-    /// at the first frame. The **poles** are handed to the shader as two pairs and
-    /// interpolated there, in RGB — see the fragment stage.
+    /// at the first frame. `gamma` interpolates here for the same reason and by
+    /// the same `t` — it is a scalar on the key, so unlike the poles it has no
+    /// colour-space question to answer and needs no second uniform slot. The
+    /// **poles** are handed to the shader as two pairs and interpolated there, in
+    /// RGB — see the fragment stage.
     pub fn crossfade_from(&mut self, from: &InkParams, t: f32) {
         let t = t.clamp(0.0, 1.0);
         self.amount = lerp(from.amount, self.amount, t);
+        self.gamma = lerp(from.gamma, self.gamma, t);
         self.crossfade = Some((*from, t));
     }
 
@@ -462,7 +548,7 @@ impl Ink {
                 ink_from,
                 paper_to,
                 ink_to,
-                ctl: [self.amount, t, 0.0, 0.0],
+                ctl: [self.amount, t, applied_gamma(self.gamma), 0.0],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -488,6 +574,15 @@ impl Ink {
         1 // the remap pass
     }
 
+    /// The display-referred input texture, for a test that wants to remap a
+    /// **known** frame rather than a rendered one — the only way to observe a key
+    /// of exactly 1, which the tonemap's bounded shoulder never produces
+    /// (ADR-0092's endpoint invariance).
+    #[cfg(test)]
+    pub(crate) fn src_texture(&self) -> Option<&wgpu::Texture> {
+        self.res.as_ref().map(|res| &res._src)
+    }
+
     /// Drop the lazily-built resources — used on the capture scene-rebuild so a
     /// stale remap pipeline never lingers to mis-render the next capture's scene on
     /// the WARP adapter (module docs).
@@ -495,3 +590,6 @@ impl Ink {
         self.res = None;
     }
 }
+
+#[cfg(test)]
+mod tests;
