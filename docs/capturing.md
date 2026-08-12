@@ -257,6 +257,19 @@ it summarises), so the report's numbers are real for a spectrum preset.
 | `cover` | fraction of the frame that differs from the corner background — [a low value is often correct](#a-low-cover-is-not-a-defect) |
 | `rise` `fall` | the **transient probe** (below) — frames to settle after a step up, and after the matching step down; a **`+` suffix** means the value is a *lower bound*, not a measurement (below); [read them as evidence, not a verdict](#what-the-transient-columns-cannot-see) |
 
+Two extra labeled blocks print under the table (the table itself stays un-widened,
+so every historical number keeps its place): the **realistic-levels** reading
+(`reactivity_low` — the same bands at the levels real music reaches, ADR-0042) and,
+since Plan 0077, the **footprint** reading (`reactivity_footprint`) — the same
+differentials divided by the **union of lit pixels** instead of the whole frame
+(`metrics::footprint_diff`, ADR-0091). Read the footprint block when a mean band
+column shows ~0.000: reactivity concentrated in a small footprint — a `bloom_amount`
+halo, a sparse figure — is diluted by the whole-frame mean, and before this reading
+existed the house workaround was binding a `flash` lever just so the report had
+something to see. On a backdrop-heavy preset the union mask approaches the whole
+frame and the reading degrades toward the mean column — it never sits meaningfully
+below it, so it fails toward the old behaviour rather than inventing reactivity.
+
 Every one of those but the last two is a **settled** measurement: the capture
 holds one stimulus for every frame it renders, so each smoother has converged
 long before the pixels are read. That is the right question for "does it
@@ -774,10 +787,10 @@ figures; whether it needs a re-gain pass is
 > audio pipeline can be validated without adding anything.
 
 The `--report --json` schema is a nested object of numbers keyed by
-family/preset: per-band `reactivity` and `reactivity_low`, `animation`,
-`coverage`, `transient` (`rise_frames` / `fall_frames` as integers plus their
-`ratio`), `reachability`, the pairwise `pixel`/`shape` distinctness matrices, and
-`near_duplicates`.
+family/preset: per-band `reactivity`, `reactivity_low` and `reactivity_footprint`,
+`animation`, `coverage`, `transient` (`rise_frames` / `fall_frames` as integers
+plus their `ratio`), `reachability`, the pairwise `pixel`/`shape` distinctness
+matrices, and `near_duplicates`.
 
 `reachability` carries `dead_branches`, `unapproached_ceilings` and
 `saturated_clamps` counts, the full `gates` list (each with `param`, `source`,
