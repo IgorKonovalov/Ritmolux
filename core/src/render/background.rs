@@ -78,8 +78,15 @@
 //! centre. That is what the half-width *means*; it is not a full width and not a
 //! hard edge.
 //!
-//! Both axes are the **same function** ([`axis_pos`] in the shader), called with
-//! two directions. One copy rather than two, precisely so
+//! **And the centreline bows.** `bg_band_curve` displaces it by `curve * 4t(1-t)`
+//! in the *along-band* coordinate `t`, a form that is zero at both ends and
+//! exactly `1` in the middle — so the param is the bow's depth in across-axis
+//! units, and `0` is exactly straight rather than nearly so. The straight band
+//! ADR-0095 Alternative F would have shipped is still here; it just is not the
+//! only shape.
+//!
+//! Every axis is the **same function** ([`axis_pos`] in the shader), called with
+//! a direction. One copy rather than three, precisely so
 //! [ADR-0037](../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s
 //! trap cannot be fixed in one axis and left in the other.
 //!
@@ -189,6 +196,11 @@ const DEFAULT_BAND_POS: f32 = 0.5;
 /// The gaussian's **`1/e` half-width**, in those same units — the envelope
 /// reaches `1/e` exactly this far either side of the centre.
 const DEFAULT_BAND_WIDTH: f32 = 0.15;
+/// The arc: how far the centreline bows, in across-axis units, at the middle of
+/// the band. `0.0` is **exactly** straight rather than nearly so — the bow term
+/// is `0.0` times a finite number — so the straight band the simpler design
+/// would have shipped is still here, as the default (ADR-0095 Alternative F).
+const DEFAULT_BAND_CURVE: f32 = 0.0;
 /// The half-width's guard rails, and the reasoning [`applied_ramp_gamma`] states
 /// for its pair: the shader divides by this, so zero is a division by zero and a
 /// negative value is a mirrored band no author asked for. Both ends are far
@@ -214,7 +226,7 @@ struct Bg {
     // z: bg_shade, w: bg_shade_end
     g: vec4<f32>,
     // The band (ADR-0095). x: bg_band_angle, y: bg_band_pos,
-    // z: bg_band_width (CPU-clamped positive), w: unused
+    // z: bg_band_width (CPU-clamped positive), w: bg_band_curve
     b: vec4<f32>,
 }
 
@@ -269,6 +281,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let band_angle = u.b.x;
     let band_pos = u.b.y;
     let band_width = u.b.z;
+    let band_curve = u.b.w;
 
     // The ramp axis (ADR-0094): a normalized position along it, 0 at the frame
     // edge the ramp starts from and 1 at the edge it ends on. `bg_angle` is in
@@ -343,7 +356,36 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // negative.
     let bd = vec2<f32>(sin(band_angle), cos(band_angle));
     let band_across = clamp(axis_pos(in.ndc, bd, aspect), 0.0, 1.0);
-    let z = (band_across - band_pos) / band_width;
+
+    // The **along-band** axis, perpendicular to the across one: rotating
+    // `(sin a, cos a)` a quarter turn gives `(cos a, -sin a)`, so at
+    // `bg_band_angle = 0` the band runs left-to-right and `t` travels with it.
+    //
+    // **Deliberately not clamped.** With the right normalizer `t` is inside
+    // [0, 1] by construction, so a clamp could only ever *hide* a wrong one:
+    // push `t` out of range and `4t(1-t)` goes negative, bowing the band the
+    // wrong way at the frame edges. That is what `backdrop_ramp.rs`'s non-square
+    // bow measurement catches, and it was verified to bite — dropping the aspect
+    // from this denominator alone moves the edge columns 1.1 and 2.5 rows and
+    // shears the arc.
+    //
+    // **The aspect's *value* nonetheless cancels here at the default angle**,
+    // exactly as it does on the ramp: at `bg_band_angle = 0` the along direction
+    // is horizontal, so the denominator is `aspect` while the numerator carries
+    // `ndc.x * aspect`. The plan expected otherwise. It costs nothing — every
+    // axis reads the one `u.v.w` the pass is handed, so ADR-0037's real trap
+    // (taking that from the chain's internal grid) is one measurement for all
+    // three, and `the_ramp_angle_takes_the_surfaces_aspect_not_the_internal_grids`
+    // is it.
+    let be = vec2<f32>(cos(band_angle), -sin(band_angle));
+    let t = axis_pos(in.ndc, be, aspect);
+
+    // The arc. `4t(1-t)` is zero at both ends and exactly `1` in the middle, so
+    // `bg_band_curve` is *the bow's depth in across-axis units* — and `0` is
+    // exactly straight on every pixel, not approximately so: the whole term is
+    // `0.0 * (a finite number)`, which is `0.0`.
+    let centre = band_pos + band_curve * 4.0 * t * (1.0 - t);
+    let z = (band_across - centre) / band_width;
     let env = exp(-z * z);
 
     // `select(f, t, cond)` — so at `bg_band_amount <= 0` the value taken is the
@@ -563,6 +605,7 @@ pub struct Background {
     band_angle: f32,
     band_pos: f32,
     band_width: f32,
+    band_curve: f32,
     /// The active preset's baked palette pair, re-uploaded to the LUT textures
     /// when `palette_dirty` (a preset switch, or a lazy rebuild), off the hot
     /// path. Held here rather than in [`Resources`] so a backdrop that has not
@@ -593,6 +636,7 @@ pub const PARAMS: &[&str] = &[
     "bg_band_angle",
     "bg_band_pos",
     "bg_band_width",
+    "bg_band_curve",
 ];
 
 /// The exponent the shader will **actually apply** for a bound `bg_ramp_gamma`:
@@ -655,6 +699,7 @@ impl Background {
             band_angle: DEFAULT_BAND_ANGLE,
             band_pos: DEFAULT_BAND_POS,
             band_width: DEFAULT_BAND_WIDTH,
+            band_curve: DEFAULT_BAND_CURVE,
             // Seeded with the default `spectrum` (the cosine this pass used to
             // inline), so a backdrop painted before any `set_palette` call is the
             // colour it always was rather than black.
@@ -699,6 +744,7 @@ impl Background {
         self.band_angle = DEFAULT_BAND_ANGLE;
         self.band_pos = DEFAULT_BAND_POS;
         self.band_width = DEFAULT_BAND_WIDTH;
+        self.band_curve = DEFAULT_BAND_CURVE;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
     }
@@ -721,6 +767,7 @@ impl Background {
             "bg_band_angle" => self.band_angle = value,
             "bg_band_pos" => self.band_pos = value,
             "bg_band_width" => self.band_width = value,
+            "bg_band_curve" => self.band_curve = value,
             _ => return false,
         }
         true
@@ -815,7 +862,7 @@ impl Background {
                     self.band_angle,
                     self.band_pos,
                     applied_band_width(self.band_width),
-                    0.0,
+                    self.band_curve,
                 ],
             }),
         );

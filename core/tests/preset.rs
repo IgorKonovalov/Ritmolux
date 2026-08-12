@@ -1218,6 +1218,7 @@ fn declared_params_match_set_param() {
                 "bg_band_angle",
                 "bg_band_pos",
                 "bg_band_width",
+                "bg_band_curve",
             ],
         ),
         (
