@@ -537,6 +537,137 @@ fn the_dither_is_one_encoded_level_at_both_ends_of_the_range() {
     }
 }
 
+/// The widest run of one identical 8-bit value along any row of `image`, on any
+/// channel — the instrument that found the banding Plan 0082 exists to fix, and
+/// the thing a *band* actually is.
+///
+/// **Rail-pinned runs are excluded.** A genuinely flat region of a picture — a
+/// black margin, a blown highlight — is not a band, and counting one would let
+/// this statistic pass for the wrong reason.
+fn widest_plateau(image: &CaptureImage) -> u32 {
+    let mut widest = 0u32;
+    for y in 0..image.height {
+        for channel in 0..3usize {
+            let row: Vec<u8> = (0..image.width)
+                .map(|x| image.rgba[((y * image.width + x) * 4) as usize + channel])
+                .collect();
+            let (mut run, mut value) = (0u32, row[0]);
+            // A sentinel that closes the final run without special-casing it.
+            for &px in row.iter().chain(std::iter::once(&u8::MAX)) {
+                if px == value {
+                    run += 1;
+                    continue;
+                }
+                if value != 0 && value != u8::MAX {
+                    widest = widest.max(run);
+                }
+                value = px;
+                run = 1;
+            }
+        }
+    }
+    widest
+}
+
+/// **The dither turns a banded dark ramp into a hairline one** — the plateau
+/// measurement that opened Plan 0082, made permanent so the fix cannot be
+/// silently undone (Phase 3).
+///
+/// # Why a synthetic ramp rather than a rendered scene
+///
+/// The frame is **injected** straight into this pass, so the guard does not
+/// depend on any preset, palette or backdrop param surviving. A dusk-ground
+/// probe would be a better picture and a worse test: it would fail for a dozen
+/// reasons that have nothing to do with the display write.
+///
+/// # What is asserted, and why it is a ratio
+///
+/// A flat dark ramp — about four encoded levels spread across 512 columns, so
+/// roughly **128 pixels per level** — is resolved twice through the same
+/// pipeline from the same input texture, once with the dither and once without.
+/// The claim is the ratio between those two arms of one run, so it says nothing
+/// about this machine (ADR-0071) and both terms are the same kind of quantity, a
+/// run length in pixels (ADR-0074).
+///
+/// The undithered arm's own plateau width is the **positive control**: the same
+/// measurement, on a frame with the dither off, has to report a band well past
+/// the 16-pixel width Plan 0082's survey treats as one. A banding test that
+/// cannot detect banding is the failure mode here, and if the dither were
+/// deleted the two arms would be identical and the ratio would be 1.
+///
+/// Measured when this landed: **132 px → 23 px on WARP, 133 px → 20 px on
+/// hardware**. The dithered figure is not luck — a plateau survives only where
+/// the encoded fractional part sits near a code value, and there the change
+/// probability bottoms out at 1/4, so the longest run over 512 columns is about
+/// `ln(512) / ln(4/3) ≈ 22`. That is also why the ratio *widens* as the ramp
+/// flattens: the undithered arm grows with pixels-per-level while this one grows
+/// only logarithmically. A flat factor is the conservative claim.
+///
+/// # Why bytes 28-32 and not the darkest tail
+///
+/// **WARP's float-to-sRGB8 conversion departs from the true transfer function in
+/// the steep dark region** — measured in
+/// `the_dither_is_one_encoded_level_at_both_ends_of_the_range`, whose doc comment
+/// carries the evidence. Below about byte 20 a one-level perturbation there
+/// frequently fails to move the value at all, and the same ramp placed at bytes
+/// 8-12 reads **200 px → 65 px on WARP against 137 px → 19 px on hardware**. A
+/// suite that captures on WARP would then be measuring the adapter rather than
+/// the fix. Bytes 28-32 are still inside the band Plan 0082's survey found its
+/// plateaus in (values 7 to 30), and there the two adapters agree to within a few
+/// pixels.
+#[test]
+fn the_dither_dissolves_a_dark_ramps_plateaus() {
+    /// Wide enough that a four-level ramp spends ~128 px on each level, which is
+    /// the flat dark tail the 58-px plateaus were measured in.
+    const WIDTH: u32 = 512;
+    const HEIGHT: u32 = 16;
+    /// The linear values that land on roughly bytes 28 and 32 through this pass
+    /// — the dark tail, and far below the tonemap's knee so the curve is the
+    /// identity and the ramp arrives as the ramp.
+    const LO: f32 = 0.011_624;
+    const HI: f32 = 0.014_459;
+    /// A plateau this wide is what Plan 0082's survey counted as a band.
+    const BAND_WIDTH: u32 = 16;
+    /// The reduction asserted — see the doc comment on why a flat factor is the
+    /// conservative form of a gap that widens with the ramp's flatness.
+    const REDUCTION: u32 = 4;
+
+    let Some(ctx) = context(WIDTH, HEIGHT, true) else {
+        return;
+    };
+    let texels = grey_texels(WIDTH, HEIGHT, |x| {
+        LO + (HI - LO) * (x as f32 + 0.5) / WIDTH as f32
+    });
+    let dithered = resolve_linear(&ctx, WIDTH, HEIGHT, &texels, true);
+    let control = resolve_linear(&ctx, WIDTH, HEIGHT, &texels, false);
+
+    let (banded, hairline) = (widest_plateau(&control), widest_plateau(&dithered));
+    println!(
+        "dark ramp over {WIDTH} px, bytes {}..{}: widest mid-range plateau \
+         {banded} px undithered -> {hairline} px dithered",
+        control.rgba[0],
+        control.rgba[((WIDTH - 1) * 4) as usize],
+    );
+
+    assert!(
+        banded >= BAND_WIDTH,
+        "the undithered control's widest mid-range plateau is only {banded} px, \
+         under the {BAND_WIDTH} px this survey calls a band. The ramp is no \
+         longer flat enough to band at all, so the comparison below would pass \
+         with the dither doing nothing — re-flatten it (fewer encoded levels \
+         across more columns) rather than lowering this."
+    );
+    assert!(
+        hairline > 0 && hairline * REDUCTION <= banded,
+        "the dither took the widest mid-range plateau from {banded} px to \
+         {hairline} px, short of the {REDUCTION}x this asserts. The display \
+         write has stopped decorrelating the quantization error — check that \
+         `dither_offset` still divides by `srgb_slope` (ADR-0096 Alternative D \
+         leaves the bright end looking fine and re-bands exactly this tail) and \
+         that the rail fade has not swallowed the whole amplitude."
+    );
+}
+
 // -----------------------------------------------------------------------
 // The bind-group layout enumeration (Plan 0045 Phase 4b; generalized into the
 // ADR-0058 collision property by Plan 0053 Phase 2)
