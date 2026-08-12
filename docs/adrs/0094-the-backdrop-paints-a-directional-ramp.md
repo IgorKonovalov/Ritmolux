@@ -1,8 +1,8 @@
 # ADR-0094 — The backdrop paints a directional ramp through the preset's palette
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-12 (at Plan 0080's close — see the [Outcome](#outcome--2026-08-12-at-plan-0080s-close))
 > **Date:** 2026-08-12
-> **Related plan(s):** [0080-the-sky-gets-a-horizon](../plans/0080-the-sky-gets-a-horizon.md)
+> **Related plan(s):** [0080-the-sky-gets-a-horizon](../plans/done/0080-the-sky-gets-a-horizon.md)
 > **Supplements:** [ADR-0018](0018-engine-wide-scene-compositing.md) (the background pre-pass),
 > [ADR-0086](0086-the-backdrop-colours-through-the-preset-palette.md) (the backdrop samples the
 > preset's LUT), [ADR-0090](0090-a-preset-composes-two-scene-layers.md) (the one-`[layer]` budget)
@@ -247,6 +247,44 @@ for alpha to reveal, and the swapchain ignores it. The distinct capability in th
 a **foreground** ramp, drawn after the scene and occluding the bottom of the figure as a haze — is
 a different pass at a different point in the composite and is not what the dusk look needs (its
 horizon sits *behind* the stars). Out of scope here, and unblocked by nothing this ADR decides.
+
+## Outcome — 2026-08-12, at Plan 0080's close
+
+Accepted as written. **Nothing here was falsified**, which is worth stating rather than assuming
+given how much of this ADR is arithmetic claims. Four things the implementation settled that this
+document either asserted without evidence or did not specify at all:
+
+- **The identity held, four times.** Every default is an arithmetic identity, and the plan demanded
+  the whole baseline suite come back hash-identical once per code phase under a bless-to-bless
+  control (bless twice on the branch, differing only by reverting the change — never a `git diff`
+  against the committed bytes). It did, all four times, on **26** baselines. The suite is 27 now;
+  the only file that differs from the pre-plan snapshot is this plan's own new fixture.
+- **The `min_binding_size` cost is discharged, not merely survived.** This ADR listed the 32 → 48 B
+  growth as a cost because that field is a Plan 0053 fix against a *measured* WARP mis-render. Two
+  findings: the declared size is `size_of::<Bg>()`, so it tracked the growth without an edit; and
+  the ADR-0058 enumeration keys on **whether** a layout declares a size, deliberately not which, so
+  the growth moves no shape and needs no `ALLOWED` entry. Adapter-compared before blessing, as
+  required — worst disagreement **0.044 of one 8-bit level** on a mean of 156, across three
+  configurations (2026-08-12, this box, DX12, 128x128 over 60 frames).
+- **The axis normalization is the shipped detail this ADR did not fix.** `s` is
+  `clamp(0.5 + 0.5 * dot(q, d) / (aspect * |d.x| + |d.y|), 0, 1)` with `q = (ndc.x * aspect, ndc.y)`
+  and `d = (sin θ, cos θ)`. The denominator is the ramp's own extent across the NDC rectangle, so
+  `s` still spans 0..1 corner to corner **at any angle** rather than compressing as the axis turns —
+  and at `θ = 0` it is `aspect * 0 + 1`, which is where the byte-identity comes from.
+- **Two `dev` judgment calls, neither specified here, both mirroring `ink.rs`** (the ADR-0092
+  precedent this ADR already leans on for the `select` form): `bg_ramp_gamma` is clamped to a finite
+  `0.05 .. 20` rather than merely "positive", and a non-finite binding falls back to the `1.0`
+  identity. Both live on the CPU in `applied_ramp_gamma`, which is what makes `1.0` reach the
+  uniform *exactly* — the thing the shader's identity branch tests — and keeps a NaN away from
+  WGSL's implementation-defined `clamp`. Documented as `0.05 .. 20` in `presets/README.md`.
+
+**ADR-0037's trap was instrumented rather than argued.** The negative control runs at π/4 on a
+160x100 target *with `trails` active*, because with an empty chain `target.size` **is** `surface`
+and the control would be theatre; at that size the internal grid quantizes to a square 256x256, so
+the wrong source is aspect 1.0 exactly against the surface's 1.6. It was verified to **bite** —
+`composite_into` was temporarily re-pointed at `target.size` and the test failed on its first
+assertion at 20 levels, which is ADR-0037's symptom (turning a stage on changes the shape of the
+picture) stated directly.
 
 ## Notes
 

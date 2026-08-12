@@ -2308,7 +2308,7 @@ unnecessary.
 ## 0091 — there is no static, screen-anchored, oriented gradient, so a horizon cannot be drawn
 
 - **PROMOTED 2026-08-12 → [ADR-0094](adrs/0094-the-backdrop-paints-a-directional-ramp.md) +
-  [Plan 0080](plans/0080-the-sky-gets-a-horizon.md)** — the same day it was raised, because the
+  [Plan 0080](plans/done/0080-the-sky-gets-a-horizon.md)** — the same day it was raised, because the
   entry arrived with the workaround already rejected by the user and the mechanism already
   concrete. The backdrop pre-pass gains one ramp axis and paints a *segment* of the preset's
   palette along it; the shape was chosen by user interview over a `gradient` scene and over an

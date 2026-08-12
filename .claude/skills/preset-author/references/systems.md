@@ -21,7 +21,8 @@ flat — see below), band index (`spectrum`). `hue_spread = 0` everywhere is one
 what these scenes drew before. See `docs/preset-palettes.md` and `presets/README.md`'s axis table.
 
 **Every scene also takes** the shared view transform (`zoom`, `pan_x`, `pan_y`) and the engine
-stages `bg_hue`/`bg_bright`/`bg_vignette`, `trails`,
+stages `bg_hue`/`bg_bright`/`bg_vignette` + the ramp
+(`bg_angle`/`bg_hue_span`/`bg_shade`/`bg_shade_end`/`bg_ramp_gamma`), `trails`,
 `kaleido_order`/`kaleido_angle`/`kaleido_center_x`/`kaleido_center_y`,
 `bloom_amount`/`bloom_threshold`/`bloom_radius`, `exposure`, `ink_amount`/`paper_*`/`ink_*`.
 Line scenes additionally take `mirror_order`/`mirror_reflect`.
@@ -263,6 +264,9 @@ Full parameter roster and defaults: [`presets/README.md`](../../../../presets/RE
 |-------|---------|------|
 | `zoom` / `pan_x` / `pan_y` | `1` / `0` / `0` | camera **in** on line/swarm/attractor; **out** (shows more) on fragment/RD. |
 | `bg_hue` / `bg_bright` / `bg_vignette` | `0` / `0` / `0` | backdrop is black until `bg_bright > 0`. Visible behind sparse scenes and RD voids; **invisible behind `fragment_field`**. |
+| `bg_angle` / `bg_hue_span` | `0` / `0` | **the directional ramp** (Plan 0080/ADR-0094): the backdrop paints a *segment* of your `[palette]` along one axis instead of one point of it. `bg_angle` is **radians**, `0` = bottom-to-top; `bg_hue_span` is how far the coordinate travels, `bg_hue` being the coordinate at the ramp's **start**. Placement is your stops' own `at` positions — there is no `bg_ramp_center`. The segment **wraps** if it leaves `[0, 1]`. |
+| `bg_shade` / `bg_shade_end` | `0.72` / `1.0` | the brightness ramp's two ends, on that same axis. These two numbers **are** the fixed `0.72 -> 1.0` upward tilt the pass used to hardcode, so leaving them alone changes nothing — but a backdrop can now be brighter at the **bottom**, which it never could be. |
+| `bg_ramp_gamma` | `1.0` | the ramp's **response exponent**, applied to the *position* ahead of both channels so colour and brightness reach their midpoints at the same height. `> 1` holds the ramp near its start then falls away (a hot horizon band, then a long fade); `< 1` drops fast into a dim tail. Clamped `0.05 .. 20`. It is the only shape control the brightness ramp has, and the only one that shapes the sky *without* re-mapping the figure — the `[palette]` is shared. |
 | `trails` | `0` | per-frame decay; `0` off, higher = longer. Needs real motion to read. |
 | `kaleido_order` / `kaleido_angle` | `1` / `0` | `< 2` is passthrough. **The order is rounded to a whole number** (a fractional wedge count tears the frame), so it snaps at each half-integer even when smoothed — ride `kaleido_angle` on `time` for continuous motion. |
 | `kaleido_center_x` / `kaleido_center_y` | `0.5` / `0.5` | the fold axis, in uv; clamped into the frame. The fold shows the largest disc around that axis and fades out past it onto the backdrop. |

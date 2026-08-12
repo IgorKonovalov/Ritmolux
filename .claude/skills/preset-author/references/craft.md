@@ -116,7 +116,13 @@ cosine `hue`. So colour is a two-part decision: *which gradient*, and *where in 
 These are engine-wide and bindable, so treat them as instruments, not decoration:
 
 - **`bg_*`** — a tinted, vignetted backdrop turns the sparse scenes (lines, swarm, attractor) and
-  RD's voids from "shapes on black" into an atmosphere. No effect behind `fragment_field`.
+  RD's voids from "shapes on black" into an atmosphere. No effect behind `fragment_field`. Since
+  Plan 0080 it also paints a **directional ramp** — a segment of your `[palette]` swept along one
+  axis (`bg_angle`, `bg_hue_span`), with its own brightness ramp (`bg_shade`/`bg_shade_end`) and
+  easing (`bg_ramp_gamma`) — so a horizon, a ground, a lit sky is a *backdrop* now and does not
+  spend the scene slot or the one `[layer]`. Roster and the worked dusk example: `systems.md`'s
+  engine-stage table and `presets/README.md`. **It earns you nothing at `sanity` or `animation`**
+  (both are blind to `bg_*`), so the figure still has to carry both floors.
 - **`trails`** — needs real motion to read; it turns a spinning curve into a light-painting. High
   values plus a bright scene wash out fast (the accumulation stacks luminance the way everything else
   does — see the ceiling note above, which the tonemap softened but did not remove). It also
