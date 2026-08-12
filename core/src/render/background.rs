@@ -90,6 +90,15 @@
 //! [ADR-0037](../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s
 //! trap cannot be fixed in one axis and left in the other.
 //!
+//! **The band takes its own segment of the same `[palette]`.** `bg_band_hue` is
+//! an **absolute** coordinate in that gradient — not an offset from the ground's
+//! — and `bg_band_hue_span` sweeps it *along* the band, so the galactic core can
+//! brighten toward one end. Same LUT pair, same `palette_mix`, same
+//! `saturation`: one colour language (ADR-0086), two coordinates. The practical
+//! consequence is that an arc aimed at a pale stop stays that colour along its
+//! whole length whatever the ramp underneath it is doing, and the price is that
+//! one palette must now hold the ground's colours *and* the band's.
+//!
 //! **`bg_band_amount = 0` is an identity structurally, not arithmetically**: the
 //! shader takes a `select` arm, so the pre-band expression is the *untaken*
 //! branch and no shipped preset or baseline can move by a rounding step.
@@ -201,6 +210,19 @@ const DEFAULT_BAND_WIDTH: f32 = 0.15;
 /// is `0.0` times a finite number — so the straight band the simpler design
 /// would have shipped is still here, as the default (ADR-0095 Alternative F).
 const DEFAULT_BAND_CURVE: f32 = 0.0;
+/// The band's **own** coordinate in the same `[palette]` the ground samples, and
+/// how far it travels **along** the band so the galactic core can brighten
+/// toward one end. Absolute rather than an offset from the ground's coordinate:
+/// an author aims the arc at a stop and it stays that colour along its whole
+/// length, whatever the ramp underneath it is doing.
+///
+/// These two defaults are identities in the only sense that can apply to them —
+/// no baseline and no shipped preset lights the band, and at
+/// `bg_band_amount = 0` the band is an untaken `select` branch. A frame that
+/// *does* light the band takes `palette[0.0]` here, which is a colour of its own
+/// rather than the ground's.
+const DEFAULT_BAND_HUE: f32 = 0.0;
+const DEFAULT_BAND_HUE_SPAN: f32 = 0.0;
 /// The half-width's guard rails, and the reasoning [`applied_ramp_gamma`] states
 /// for its pair: the shader divides by this, so zero is a division by zero and a
 /// negative value is a mirrored band no author asked for. Both ends are far
@@ -228,6 +250,9 @@ struct Bg {
     // The band (ADR-0095). x: bg_band_angle, y: bg_band_pos,
     // z: bg_band_width (CPU-clamped positive), w: bg_band_curve
     b: vec4<f32>,
+    // The band's own palette segment. x: bg_band_hue, y: bg_band_hue_span,
+    // zw: unused
+    n: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> u: Bg;
@@ -265,6 +290,23 @@ fn axis_pos(ndc: vec2<f32>, dir: vec2<f32>, aspect: f32) -> f32 {
     return 0.5 + 0.5 * dot(q, dir) / (aspect * abs(dir.x) + abs(dir.y));
 }
 
+// One point of the preset's gradient, through the crossfade and the shared
+// saturation — the pass's whole colour vocabulary in one place (ADR-0086).
+//
+// **The coordinate is not clamped**, here or anywhere: it keeps the engine-wide
+// repeat addressing every other palette coordinate in this engine uses, so a
+// segment leaving [0, 1] wraps (ADR-0094 Alternative D — two shipped presets
+// depend on it, and the band samples the same coordinate space).
+//
+// The ground and the band both call this, which is what "one colour language"
+// (ADR-0095) means operationally: same LUT pair, same `palette_mix`, same
+// `saturation`, two coordinates.
+fn palette_at(coord: f32, palette_mix: f32, saturation: f32) -> vec3<f32> {
+    let ca = textureSample(lut_a, lut_samp, vec2<f32>(coord, 0.5)).rgb;
+    let cb = textureSample(lut_b, lut_samp, vec2<f32>(coord, 0.5)).rgb;
+    return apply_saturation(mix(ca, cb, clamp(palette_mix, 0.0, 1.0)), saturation);
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let hue = u.v.x;
@@ -282,6 +324,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let band_pos = u.b.y;
     let band_width = u.b.z;
     let band_curve = u.b.w;
+    let band_hue = u.n.x;
+    let band_hue_span = u.n.y;
 
     // The ramp axis (ADR-0094): a normalized position along it, 0 at the frame
     // edge the ramp starts from and 1 at the edge it ends on. `bg_angle` is in
@@ -333,15 +377,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     //
     // With `bg_hue_span` the pass paints a **segment** of that gradient along the
     // ramp rather than one point of it: `bg_hue` is the coordinate at the ramp's
-    // start and the sweep travels `bg_hue_span` from there. The coordinate is not
-    // clamped — it keeps the engine-wide repeat addressing, so a segment leaving
-    // [0, 1] wraps (ADR-0094 Alternative D: two shipped presets depend on it).
+    // start and the sweep travels `bg_hue_span` from there.
     // At the `0.0` default this is `hue + 0.0 * e`, which is `hue` exactly.
-    let coord = hue + hue_span * e;
-    let ca = textureSample(lut_a, lut_samp, vec2<f32>(coord, 0.5)).rgb;
-    let cb = textureSample(lut_b, lut_samp, vec2<f32>(coord, 0.5)).rgb;
-    var tint = mix(ca, cb, clamp(palette_mix, 0.0, 1.0));
-    tint = apply_saturation(tint, saturation);
+    let tint = palette_at(hue + hue_span * e, palette_mix, saturation);
 
     let ground = tint * bright * grad * vig;
 
@@ -393,7 +431,16 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // That is why the default is an identity structurally rather than
     // arithmetically: nothing here can perturb a shipped backdrop by a rounding
     // step (ADR-0095).
-    let col = select(ground + tint * env * band_amount, ground, band_amount <= 0.0);
+    // The band's **own** segment of the same gradient (ADR-0095), swept along
+    // `t` so the galactic core can brighten toward one end. `bg_band_hue` is an
+    // absolute coordinate, not an offset from the ground's: the band keeps one
+    // colour along its whole length whatever the ramp is doing underneath it,
+    // which is what an author aiming a pale arc at a dusk sky needs. Same LUT
+    // pair, same `palette_mix`, same `saturation` — one colour language, two
+    // coordinates.
+    let band_tint = palette_at(band_hue + band_hue_span * t, palette_mix, saturation);
+
+    let col = select(ground + band_tint * env * band_amount, ground, band_amount <= 0.0);
     return vec4<f32>(col, 1.0);
 }
 "#;
@@ -405,6 +452,7 @@ struct Bg {
     c: [f32; 4],
     g: [f32; 4],
     b: [f32; 4],
+    n: [f32; 4],
 }
 
 /// The gradient pipeline, its uniform and its LUT pair, built lazily on the first
@@ -606,6 +654,8 @@ pub struct Background {
     band_pos: f32,
     band_width: f32,
     band_curve: f32,
+    band_hue: f32,
+    band_hue_span: f32,
     /// The active preset's baked palette pair, re-uploaded to the LUT textures
     /// when `palette_dirty` (a preset switch, or a lazy rebuild), off the hot
     /// path. Held here rather than in [`Resources`] so a backdrop that has not
@@ -637,6 +687,8 @@ pub const PARAMS: &[&str] = &[
     "bg_band_pos",
     "bg_band_width",
     "bg_band_curve",
+    "bg_band_hue",
+    "bg_band_hue_span",
 ];
 
 /// The exponent the shader will **actually apply** for a bound `bg_ramp_gamma`:
@@ -700,6 +752,8 @@ impl Background {
             band_pos: DEFAULT_BAND_POS,
             band_width: DEFAULT_BAND_WIDTH,
             band_curve: DEFAULT_BAND_CURVE,
+            band_hue: DEFAULT_BAND_HUE,
+            band_hue_span: DEFAULT_BAND_HUE_SPAN,
             // Seeded with the default `spectrum` (the cosine this pass used to
             // inline), so a backdrop painted before any `set_palette` call is the
             // colour it always was rather than black.
@@ -745,6 +799,8 @@ impl Background {
         self.band_pos = DEFAULT_BAND_POS;
         self.band_width = DEFAULT_BAND_WIDTH;
         self.band_curve = DEFAULT_BAND_CURVE;
+        self.band_hue = DEFAULT_BAND_HUE;
+        self.band_hue_span = DEFAULT_BAND_HUE_SPAN;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
     }
@@ -768,6 +824,8 @@ impl Background {
             "bg_band_pos" => self.band_pos = value,
             "bg_band_width" => self.band_width = value,
             "bg_band_curve" => self.band_curve = value,
+            "bg_band_hue" => self.band_hue = value,
+            "bg_band_hue_span" => self.band_hue_span = value,
             _ => return false,
         }
         true
@@ -864,6 +922,7 @@ impl Background {
                     applied_band_width(self.band_width),
                     self.band_curve,
                 ],
+                n: [self.band_hue, self.band_hue_span, 0.0, 0.0],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
