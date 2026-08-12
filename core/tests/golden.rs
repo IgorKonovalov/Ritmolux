@@ -94,18 +94,29 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// takes that arm, and no edit to it that kept its baseline could execute a line
 /// of the ring, polygon, star or heart arms.
 ///
+/// `backdrop_ramp` is the fourth (Plan 0080, ADR-0094), and its impossibility is
+/// the starkest of the four: every rostered fixture runs `bg_bright = 0`, where
+/// the backdrop's gradient pipeline is **not even built** (`background.rs`'s
+/// module docs), so no baseline in this suite executes a line of that pass. The
+/// ramp's five params each default to an arithmetic identity with the pre-ramp
+/// expression, so a fixture leaving any of them alone would pin the old picture
+/// through the new code — `bg_ramp_gamma` off `1.0` in particular is the only
+/// thing anywhere in the crate's baselines that takes the shader's `pow` arm
+/// rather than its identity `select` arm.
+///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 3] = [
+const EXTRA_FIXTURES: [(&str, &str); 4] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
     ),
     ("attractor_ifs", include_str!("fixtures/attractor_ifs.toml")),
     ("swarm_shaped", include_str!("fixtures/swarm_shaped.toml")),
+    ("backdrop_ramp", include_str!("fixtures/backdrop_ramp.toml")),
 ];
 
 fn golden_dir() -> PathBuf {

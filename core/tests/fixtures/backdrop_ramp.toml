@@ -1,0 +1,54 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The backdrop's directional ramp (Plan 0080, ADR-0094). Every rostered fixture
+# runs `bg_bright = 0`, where the backdrop pass is not even built - so nothing in
+# the drift suite executes a line of this pass, let alone the ramp. That is the
+# EXTRA_FIXTURES condition: no edit to `swarm.toml` that kept its baseline could
+# reach this code.
+#
+# All five ramp params are off their defaults, on purpose. Each default is an
+# arithmetic identity with the pre-ramp picture, so a fixture that left any of
+# them alone would pin the OLD expression through the new code and report no
+# drift if the new terms were dropped entirely:
+#
+#  - `bg_angle` off 0 is what makes the aspect term live at all; at 0 it cancels
+#  - `bg_hue_span` off 0 is what makes the LUT coordinate vary across the frame
+#  - `bg_shade`/`bg_shade_end` off 0.72/1.0 is the retired tilt actually moved
+#  - `bg_ramp_gamma` off 1.0 takes the shader's `pow` arm rather than the
+#    identity `select` arm, which is otherwise unexecuted anywhere in the suite
+#
+# The dusk palette is ADR-0094's own - near-black through deep blue to hot amber
+# - swept backwards (`bg_hue = 1.0`, span `-1.0`) so the hot end lands at the
+# ramp's start. The swarm is frozen (`force`/`spin`/`burst` at 0) and small, so
+# it composites a sparse figure over the ramp without covering it: this baseline
+# is meant to catch a ramp regression, and a frame that is mostly figure would
+# hide one.
+system = "swarm"
+name   = "fixture_backdrop_ramp"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#060b24" },
+  { at = 0.25, color = "#1b2a5e" },
+  { at = 0.5,  color = "#c74b1d" },
+  { at = 0.75, color = "#ff7a1f" },
+  { at = 1.0,  color = "#ffd06e" },
+]
+
+[params]
+force      = "0"
+spin       = "0"
+burst      = "0"
+brightness = "0.7"
+size       = "0.5"
+hue_spread = "0"
+hue_center = "0.15"
+
+bg_bright     = "0.6"
+bg_vignette   = "0.2"
+bg_hue        = "1.0"
+bg_hue_span   = "-1.0"
+bg_angle      = "0.35"
+bg_shade      = "1.0"
+bg_shade_end  = "0.25"
+bg_ramp_gamma = "2.0"
