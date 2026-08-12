@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0082** (ADRs are a separate sequence — next free there is **0096**.)
+**Next free number: 0083** (ADRs are a separate sequence — next free there is **0097**.)
 
 ## Active roster
 
@@ -16,6 +16,7 @@ someone who picked it up is reading.
 
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
+| [0082](0082-the-gradient-stops-banding.md) | The gradient stops banding: the display write dithers | **draft 2026-08-12** | dev, human | Answers [0080](done/0080-the-sky-gets-a-horizon.md) Phase 7's banding half, **measured rather than suspected** ([ADR-0096](../adrs/0096-the-display-write-dithers.md)): the dusk ground's dark tail holds single-value plateaus **58 px** wide at 1080p, 0 % of the column rail-pinned, user verdict *reads as light, but the banding is visible*. The tonemap — the one 8-bit boundary — gains TPDF noise of ±1 **encoded** LSB from an **integer** hash, **scaled by the inverse sRGB slope** because `Rgba8UnormSrgb` means the hardware encodes after the shader (a flat linear amplitude is 12.9x too strong exactly where the plateaus are). Integer hash, not `fract(sin(..))`, so the adapters must agree **byte-for-byte** — sharper than the 0.02 drift floor. **Carries the project's first deliberate full re-bless**: all 27 baselines move, bounded and *proved* by `max delta <= 1`, landing alone in its own commit. Static, so every byte-equality test survives. **Sequenced before [0081]** by the user's call, so the galaxy's band is born onto a chain that already dithers. |
 | [0081](0081-the-sky-gets-a-galaxy.md) | The sky gets a galaxy: the backdrop paints a curved band | **draft 2026-08-12** | dev, human | Continues [0080](done/0080-the-sky-gets-a-horizon.md) in the same pass ([ADR-0095](../adrs/0095-the-backdrop-paints-a-curved-band.md)): one soft gaussian band whose centreline bows, drawn **additively** over the ground, with its own segment of the same `[palette]` swept *along* it. Seven params, all identity defaults, so the suite must come back hash-identical **three times**. **The band lives in the backdrop because no scene can express it** — neither particle roster carries a positional or density control — and because ADR-0090's layer cap must not move with four roles wanted. **ADR-0037 applies twice and the second one differs**: the new along-band axis does *not* cancel at the default angle, but is unread until `bg_band_curve` or `bg_band_hue_span` is non-zero, so Phase 2's non-square bow measurement is the only thing that can see it. Also widens the pipeline build condition to `bg_bright > 0 \|\| bg_band_amount > 0` — the reference sky is near-black. Ends with a `human` verdict; **the smudge risk is the real one and is not testable**, and fbm is its named answer. The world ships later through the [0067] route, as **one pass with [0077]'s Phase 5 and [0080]'s Phase 7**. |
 | [0079](0079-the-attractor-learns-new-figures.md) | The attractor learns new figures: the tuple roster with per-tuple framing, and measured morph paths | **approved 2026-08-11** | dev, human | The largest of the three ([ADR-0093](../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md)): per-family curated tuple tables carrying their own projection + seed box (jitter derived per-entry so `reseed` survives — the Plan 0062 coupling), a CPU-quantized `tuple` param, the rho ≈ 100 Lorenz as the walking skeleton, user-curated roster from contact sheets, then morph-path filmstrip sweeps where **zero survivors is a legitimate recorded outcome** (user accepted the research risk by interview). Closes backlog 0055. **Queued after [0075]'s cohort 6, last of the three** ([0076] landed 2026-08-11) — two `human` curation gates inside. |
 
@@ -42,8 +43,20 @@ bringing the user in rather than picking on that criterion.
 
 | # | Plan | Why here |
 |---|------|----------|
-| 1 | [0081](0081-the-sky-gets-a-galaxy.md) | The user's call: build the capability first, then author the world against a finished surface. It is the only plan with a look **already blocked behind it** — the same position [0080] held, for the same reason. |
-| 2 | [0079](0079-the-attractor-learns-new-figures.md) | The last of the three promoted handoff plans. Largest, two `human` curation gates inside. |
+| 1 | [0082](0082-the-gradient-stops-banding.md) | A measured defect in shipped behaviour, and the only plan here fixing one. It is also **cheapest to do first**: it re-blesses every baseline, so anything landing after it inherits a clean drift guard rather than colliding with the re-bless. |
+| 2 | [0081](0081-the-sky-gets-a-galaxy.md) | The user's call: build the capability first, then author the world against a finished surface. It is the only plan with a look **already blocked behind it** — the same position [0080] held, for the same reason. |
+| 3 | [0079](0079-the-attractor-learns-new-figures.md) | The last of the three promoted handoff plans. Largest, two `human` curation gates inside. |
+
+**Updated 2026-08-12, when [0082](0082-the-gradient-stops-banding.md) was written**, from
+settling [0080](done/0080-the-sky-gets-a-horizon.md) Phase 7 rather than from a new want. That phase
+asked whether the ramp bands; it does, measured, and the user's verdict is *"reads as light, but the
+banding is visible"* — so the look passes and the quantization is the defect. **0080's own
+arithmetic pointed the wrong way** ("two pixels per 8-bit level is the classic Mach-band
+configuration" — two px/level is the *safe*, dense case), which is recorded in
+[ADR-0096](../adrs/0096-the-display-write-dithers.md) because that sentence would otherwise send the
+next reader hunting in the bright end. It goes **first** by the user's call: the galaxy's band is a
+second wide smooth gradient, and building it onto an undithered chain would confound its own `human`
+verdict with a defect already known about.
 
 **Updated 2026-08-12, when [0081](0081-the-sky-gets-a-galaxy.md) was written**, hours after [0080]
 closed and from judging that plan's own output in the running app. It goes first by the user's
@@ -223,25 +236,41 @@ the rows above.
   still explains its onset-`flash` binding by "the report is bloom-blind" (fixed by Phase 4 —
   the binding may stay for its look, but the reason is gone), and `emitter_perseids.toml`'s
   header records the routed-out quiet sky this phase exists to ship.
-- **Plan [0080](done/0080-the-sky-gets-a-horizon.md) Phase 7 — judge the dusk ground against the
-  reference photo** (2026-08-12). The plan is `done` and all six `dev` phases landed; this phase is
-  `human` and outstanding **on purpose**, not missed. The user renders the dusk ground in the
-  running app beside the reference and answers the three questions no test can: does the fade read
-  as *light* rather than as a gradient, does the horizon sit where the `[palette]` stops' `at`
-  positions put it, and **does it band**. The banding question is the one with a rider: a
-  quarter-frame fade crossing most of the luminance range spends roughly **two pixels per 8-bit
-  output level** at 1080p, which is the classic Mach-band configuration — the chain is float and
-  linear until the tonemap, so quantization is at the final write only, and nothing dithers. **Look
-  for it deliberately at 1080p and at the low `bg_ramp_gamma` end**, where the tail is flattest and
-  the steps widest; "no banding observed, at these two settings" is a result. **If it bands, a
-  dither is its own decision and its own ADR** — do not add one under this plan. If it reads, the
-  dusk world ships through the [0067] curation route in the content lane, **not here**, and it is
-  **one pass with [0077]'s standing Phase 5** (Perseids' quiet sky): that look and this ground are
-  the same family. Two things the close established that the pass should start from: the backdrop
-  earns a preset **nothing** at `sanity` or `animation` (both are blind to `bg_*`), so the figure
-  carries both floors — written into `presets/README.md`; and `bg_bright` near 1.0 is untested
-  against the tonemap knee and `occlude`, which makes this the natural companion to [0071]'s
-  standing Phase 5 retune above.
+- **Plan [0080](done/0080-the-sky-gets-a-horizon.md) Phase 7 — ANSWERED 2026-08-12, and it
+  produced a plan.** All three questions are settled; the phase is discharged and only the content
+  half remains (folded into the family pass below).
+  - **"Does the fade read as light?" — YES.** The user's verdict on the running app at `v0.54.0`:
+    *"reads as light, but the banding is visible."* The ramp does what ADR-0094 was written to do.
+  - **"Does the horizon sit where the `[palette]` stops put it?" — settled by construction, not by
+    eye.** `a_swept_span_samples_the_palette_at_the_coordinate_its_height_implies` asserts exactly
+    that at seven rows to within one 8-bit level, and it is green. The question never needed a
+    human.
+  - **"Does it band?" — YES, and it is now measured rather than judged.** Run lengths down the
+    mid-column of the 1080p renders, where a plateau of one identical 8-bit value *is* the band:
+    widest mid-range plateau **58 px at value 11** (`bg_ramp_gamma = 0.4`), **31 px at value 30**
+    (`1.0`), **122 px at value 225** (`2.5`), with mean 4.1–7.5 px per level. **0 % of the column is
+    rail-pinned** on any channel in any of the three — so a quantized gradient, not a tonemap clip,
+    which also **retires the suspicion raised at the close that `bg_bright = 0.85` was reaching the
+    tonemap's shoulder. It is not; nothing clips.**
+  - **The plan's own banding arithmetic was backwards, and that is the finding worth carrying.** Its
+    rider read "roughly **two pixels per 8-bit output level** at 1080p, which is the classic
+    Mach-band configuration". Two px/level is the *safe*, dense case; banding lives where a level
+    lasts a **long** time, in the flattest part of the curve. Its prose instruction ("the low
+    `bg_ramp_gamma` end, where the tail is flattest and the steps widest") named the right place
+    while its arithmetic argued for the opposite one. Recorded in
+    [ADR-0096](../adrs/0096-the-display-write-dithers.md), because that sentence would otherwise
+    send the next reader hunting in the bright end where there is nothing to find.
+  - **The plan said "if it bands, a dither is its own decision and its own ADR" — so it has one.**
+    [ADR-0096](../adrs/0096-the-display-write-dithers.md) +
+    [Plan 0082](0082-the-gradient-stops-banding.md), sequenced **first** on the roster by the user's
+    call, so [0081](0081-the-sky-gets-a-galaxy.md)'s band is born onto a chain that already dithers.
+  - **What remains is content, not judgement.** The dusk world ships through the [0067] curation
+    route, and it is **one pass with [0077]'s standing Phase 5** (Perseids' quiet sky) and
+    [0081]'s world — three standing items on one family of looks. Two things to start from: the
+    backdrop earns a preset **nothing** at `sanity` or `animation` (both are blind to `bg_*`), so
+    the figure carries both floors; and the `occlude` question is still open and pairs with
+    [0071]'s standing Phase 5 retune above — but the *tonemap-knee* half of that pairing is now
+    measured away.
 - **Plan [0078](done/0078-the-ink-learns-to-bite.md) Phase 3 — the ink worlds re-judge on
   `ink_gamma`** (2026-08-12). The plan is `done` and both `dev` phases landed; this phase is
   `human` (content lane) and outstanding **on purpose**, not missed. The lever ships and is
