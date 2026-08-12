@@ -1200,7 +1200,17 @@ fn declared_params_match_set_param() {
         // The global compositing stages, declared the same way.
         (
             src.join("render/background.rs"),
-            &["bg_hue", "bg_bright", "bg_vignette", "bg_hue_span"],
+            &[
+                "bg_hue",
+                "bg_bright",
+                "bg_vignette",
+                // The ramp (ADR-0094): a palette segment swept along one axis,
+                // with the brightness tilt that used to be hardcoded retired
+                // into the two ends of a ramp on that same axis.
+                "bg_hue_span",
+                "bg_shade",
+                "bg_shade_end",
+            ],
         ),
         (
             src.join("render/trails.rs"),
