@@ -840,6 +840,166 @@ fn a_band_alone_lights_the_pass_over_an_unlit_ground() {
     }
 }
 
+/// Where the band's centreline crosses one column, located rather than computed:
+/// the luma-weighted centroid of that column, with the plate underneath
+/// subtracted off so only the band's own light is weighed.
+///
+/// **A centroid rather than the brightest row**, for two reasons that both bite
+/// here. A gaussian's peak is flat, so at `bg_band_pos = 0.5` — a centre at row
+/// 31.5, equidistant from rows 31 and 32 — an argmax is choosing between two
+/// pixels carrying the same value; and the display write **dithers**
+/// (ADR-0096), so what breaks that tie is ±1 LSB of deliberate noise. Measured:
+/// argmax reports rows 31, 32 and 33 for three columns of one *straight* band.
+/// A centroid over 64 rows averages that noise away and resolves the centreline
+/// to a fraction of a row.
+///
+/// It carries one bias, and it cancels: a centre near a frame edge has its
+/// gaussian truncated on that side, pulling the centroid inward. Every
+/// comparison below is between columns of the *same* capture or against a
+/// tolerance wide enough to hold it.
+fn centreline_row(image: &CaptureImage, col: u32) -> f32 {
+    let lumas: Vec<f32> = (0..image.height)
+        .map(|row| luma(pixel(image, col, row)))
+        .collect();
+    let floor = lumas.iter().copied().fold(f32::MAX, f32::min);
+    let (mut moment, mut mass) = (0.0f32, 0.0f32);
+    for (row, l) in lumas.iter().enumerate() {
+        let w = l - floor;
+        moment += row as f32 * w;
+        mass += w;
+    }
+    assert!(
+        mass > 0.0,
+        "column {col} carries no band at all, so it has no centreline to locate"
+    );
+    moment / mass
+}
+
+/// **The bow is where the arithmetic puts it, and it is symmetric** — the arc
+/// (ADR-0095), and the *second* place [ADR-0037] applies in this pass.
+///
+/// `centre = bg_band_pos + bg_band_curve * 4t(1-t)`, where `t` runs **along** the
+/// band. That form is zero at both ends and `1` in the middle, so `bg_band_curve`
+/// is the bow's depth in across-axis units. At `pos = 0.5` and `curve = 0.2` the
+/// centreline therefore sits at `across = 0.5` at both frame edges and `0.7` in
+/// the middle — over 64 rows, rows **31.5** and **18.7**, a 13-row bow. Both
+/// numbers are *located* column by column, never computed from the shader.
+///
+/// The two edge columns are also compared **against each other**, which is what
+/// says the bow is symmetric rather than sheared: a wrong `t` origin would still
+/// produce a curve, just not one centred on the band.
+///
+/// # Why this runs at a non-square target, and what it does and does not catch
+///
+/// The along-band axis is new, and until this phase **nothing read it**: with
+/// `bg_band_curve = 0` the shader never touches `t`. So this is the first
+/// measurement that can see its normalizer at all, and it can only see it where
+/// the aspect is not 1.
+///
+/// `t` is unclamped by design. With the right normalizer it lands in [0, 1] by
+/// construction; with a wrong one it leaves that range near the frame edges,
+/// where `4t(1-t)` goes **negative** and the band bows the wrong way. Verified
+/// to bite: dropping the aspect from the denominator alone (keeping it in the
+/// numerator) moves the edge columns' centrelines to rows 30.39 and 29.03 and
+/// shears the arc by 1.36 rows, failing on the first edge assertion.
+///
+/// **What this does *not* catch is [ADR-0037]'s own trap, and that is fine.**
+/// The plan expected the along-axis aspect *not* to cancel at the default angle.
+/// It does: the denominator is `aspect` while the numerator carries
+/// `ndc.x * aspect`, so the two divide out exactly as they do on the ramp. It
+/// costs nothing, because all three axes read the single aspect the pass is
+/// handed — so where that number comes from is one property with one control,
+/// and [`the_ramp_angle_takes_the_surfaces_aspect_not_the_internal_grids`] is
+/// already it.
+///
+/// [ADR-0037]: ../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md
+#[test]
+fn the_bands_centreline_bows_by_its_curve_and_stays_symmetric() {
+    // Aspect 2.5, and 64 rows so the across-axis geometry is the one the 1/e
+    // test already pinned.
+    const W: u32 = 160;
+    const H: u32 = 64;
+    let Some(mut renderer) = renderer_sized(W, H) else {
+        return;
+    };
+    let arc = |curve: &str| {
+        format!(
+            "{PLATE}bg_band_amount = \"{BAND_AMOUNT}\"\nbg_band_angle = \"0\"\n\
+             bg_band_pos = \"0.5\"\nbg_band_width = \"0.15\"\n\
+             bg_band_curve = \"{curve}\"\n"
+        )
+    };
+
+    // **Straight first**, because "the band bows" means nothing unless the same
+    // band is flat at `curve = 0`. Every column must peak on the same row.
+    let straight = capture(&mut renderer, FLAT, &arc("0"));
+    let flat_rows: Vec<f32> = [0, W / 2, W - 1]
+        .iter()
+        .map(|&c| centreline_row(&straight, c))
+        .collect();
+    println!(
+        "curve 0: centreline at rows {flat_rows:?} for columns 0, {}, {}",
+        W / 2,
+        W - 1
+    );
+    let flat_spread = flat_rows
+        .iter()
+        .fold(0.0f32, |worst, r| worst.max((r - flat_rows[0]).abs()));
+    assert!(
+        flat_spread <= 0.25,
+        "at `bg_band_curve = 0` the band must be exactly straight — its \
+         centreline sits at rows {flat_rows:?} across the frame, a spread of \
+         {flat_spread:.2}"
+    );
+
+    let bowed = capture(&mut renderer, FLAT, &arc("0.2"));
+    let (left, mid, right) = (
+        centreline_row(&bowed, 0),
+        centreline_row(&bowed, W / 2),
+        centreline_row(&bowed, W - 1),
+    );
+    println!("curve 0.2: centreline left {left:.2}, middle {mid:.2}, right {right:.2}");
+
+    // The edges. Their pixel centres sit half a pixel inside the frame, so `t` is
+    // 1/(2W) rather than 0 and the bow there is `0.2 * 4t(1-t)`, 0.0025 of the
+    // axis — a sixth of a row. The bound is a whole row, which holds that plus
+    // the centroid's truncation bias and leaves no room for a sign error.
+    for (what, row) in [("left", left), ("right", right)] {
+        let off = (row - 31.5).abs();
+        assert!(
+            off <= 1.0,
+            "the {what} edge column's centreline is at row {row:.2}, {off:.2} \
+             rows from the 31.5 that `bg_band_pos = 0.5` puts it at. `4t(1-t)` \
+             is supposed to vanish at the band's ends — if `t` is not in [0, 1] \
+             there, the along-band normalizer is wrong (this target is 160x64, \
+             aspect 2.5)."
+        );
+    }
+    let shear = (left - right).abs();
+    assert!(
+        shear <= 0.25,
+        "the two edge columns' centrelines are at rows {left:.2} and {right:.2}, \
+         {shear:.2} apart. The bow is sheared rather than symmetric, which is a \
+         `t` measured from the wrong origin rather than a wrong depth."
+    );
+
+    // The middle, and the bow itself. `across = 0.7` is row 18.7; against the
+    // edges' 31.3 (their half-pixel inset included) that is a 12.6-row bow.
+    let off = (mid - 18.7).abs();
+    assert!(
+        off <= 1.5,
+        "the middle column's centreline is at row {mid:.2}, {off:.2} rows from \
+         the 18.7 that `bg_band_pos + bg_band_curve` = 0.7 puts it at"
+    );
+    let bow = left - mid;
+    assert!(
+        (11.0..=15.0).contains(&bow),
+        "the centreline bows {bow:.2} rows between the frame's edge and its \
+         middle, against the 12.6 the arithmetic gives (31.3 to 18.7). \
+         `bg_band_curve` is not the bow's depth in across-axis units."
+    );
+}
+
 /// **At `bg_band_amount = 0` the band's other params do nothing whatsoever** —
 /// byte-for-byte, which is what the shader's `select` arm buys over a multiply
 /// by zero.
@@ -864,7 +1024,8 @@ fn the_bands_geometry_is_inert_until_its_amount_is_bound() {
         &mut renderer,
         DUSK,
         "bg_hue = \"1.0\"\nbg_hue_span = \"-1.0\"\nbg_band_amount = \"0\"\n\
-         bg_band_angle = \"0.7\"\nbg_band_pos = \"0.2\"\nbg_band_width = \"0.05\"\n",
+         bg_band_angle = \"0.7\"\nbg_band_pos = \"0.2\"\nbg_band_width = \"0.05\"\n\
+         bg_band_curve = \"0.3\"\n",
     );
     let worst = (0..SIZE)
         .map(|row| {
