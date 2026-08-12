@@ -104,12 +104,19 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// thing anywhere in the crate's baselines that takes the shader's `pow` arm
 /// rather than its identity `select` arm.
 ///
+/// `backdrop_band` is the fifth (Plan 0081, ADR-0095), and it takes the ramp's
+/// argument one layer further out: the band is an untaken `select` branch at
+/// `bg_band_amount = 0`, so even `backdrop_ramp` — the suite's one lit backdrop —
+/// executes none of it. Its `bg_band_curve` off `0` is the only thing in the
+/// crate's baselines that reads the **along-band** axis at all; with the default
+/// there the shader never touches `t`.
+///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 4] = [
+const EXTRA_FIXTURES: [(&str, &str); 5] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -117,6 +124,7 @@ const EXTRA_FIXTURES: [(&str, &str); 4] = [
     ("attractor_ifs", include_str!("fixtures/attractor_ifs.toml")),
     ("swarm_shaped", include_str!("fixtures/swarm_shaped.toml")),
     ("backdrop_ramp", include_str!("fixtures/backdrop_ramp.toml")),
+    ("backdrop_band", include_str!("fixtures/backdrop_band.toml")),
 ];
 
 fn golden_dir() -> PathBuf {
