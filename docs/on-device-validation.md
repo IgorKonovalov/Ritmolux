@@ -171,6 +171,22 @@ footprint so the vendor spread is on record.
       **never measured** — the check needs a live window, so it could not run at that plan's close.
       Run the standalone with the overlay on, let it settle, and report whether p99 moved.
       _(Plan 0030's dynamic-dispatch risk bullet, extracted.)_
+- [ ] **The display-write dither, on a second display and on the low-end box, 1080p fullscreen.**
+      Plan 0082 made the tonemap add ±1 encoded LSB of triangular noise before the 8-bit write
+      ([ADR-0096](adrs/0096-the-display-write-dithers.md)) — always on, no param, so every frame
+      the engine draws carries it. Two things were settled on **one machine and one panel** and
+      neither generalizes for free. **(a) Does the grain read?** The dither is a *fixed* pattern
+      by design (that is what keeps every byte-equality test working), and a fixed pattern on a
+      long-held still frame can resolve as texture. The 2026-08-12 verdict was "looks fine" on
+      the dev box's own display; a **6-bit + FRC panel**, which runs its own temporal dither over
+      ours, is the case that verdict cannot speak to. Load the reference frame
+      (`LMV_PRESET_DIR=core/tests/fixtures/scratch-0082 …`, the run line is in that directory's
+      README), go fullscreen, and hold it. If the grain reads as texture the answer is ADR-0096
+      **Alternative F** — an animated dither, one term — and it is an `architect` call, not a
+      constant to lower. **(b) Does it cost anything?** The pass gained three `pow` calls per
+      pixel (one per channel, in `srgb_slope`) on a fullscreen draw. Expected to be unmeasurable,
+      never measured on weak hardware. Overlay on (`F3`), report the p99.
+      _(Plan 0082 Phase 5 was a `human` verdict on one display; extracted at that plan's close.)_
 
 ## Runnable now — the `Rich` tier calibration (Plan 0044 Phase 4)
 
