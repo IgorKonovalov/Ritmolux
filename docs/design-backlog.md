@@ -2302,3 +2302,69 @@ stderr lines naming the reason, and every one was discarded by Finder. The survi
 suspects (stale/mismatched TCC grant from the ad-hoc per-build identity, macOS below 13, an
 SCK start error) are distinguishable only by the Terminal relaunch this entry exists to make
 unnecessary.
+
+---
+
+## 0091 — there is no static, screen-anchored, oriented gradient, so a horizon cannot be drawn
+
+- **PROMOTED 2026-08-12 → [ADR-0094](adrs/0094-the-backdrop-paints-a-directional-ramp.md) +
+  [Plan 0080](plans/0080-the-sky-gets-a-horizon.md)** — the same day it was raised, because the
+  entry arrived with the workaround already rejected by the user and the mechanism already
+  concrete. The backdrop pre-pass gains one ramp axis and paints a *segment* of the preset's
+  palette along it; the shape was chosen by user interview over a `gradient` scene and over an
+  orientation lever on `fragment_field`.
+- **Raised:** 2026-08-12, from `preset-author`, in a content session riding
+  [Plan 0077](plans/done/0077-the-quiet-sky.md)'s new swarm params.
+- **Verified against code:** yes, all three walls, at the lines cited below.
+- **Not a defect.** Everything named here works as designed. This is a missing primitive.
+
+**The look that failed.** A photoreal dusk — a bright orange horizon band whose light fades
+smoothly upward through deep blue to near-black over roughly the lower third of the frame (the
+user supplied a reference photo of exactly this), with a music-driven starfield above it. The best
+approximation the shipped engine can express renders a **hard-edged static band with a thin glow
+rim**, and the user's verdict on it is **"unacceptable"** — so this is a demonstrated want with a
+rejected workaround, not speculation.
+
+**Three walls, each structural rather than a tuning miss.**
+
+1. **`fragment_field` cannot be it.** Its field is `0.5 + 0.5 * sin(p.x + p.y + t * 0.5)`
+   (`core/src/render/scenes/fragment_field.rs:142`) — both axes weighted equally by construction,
+   so its bands are diagonal and there is no orientation lever — **and** `t` enters the field phase
+   directly, so even `warp = 0` cannot hold a frame still. There is no time-scale or freeze param
+   on the scene.
+2. **The backdrop pre-pass cannot be it.** It takes **one** palette sample at `bg_hue` and
+   multiplies it by a *fixed* tilt, `mix(0.72, 1.0, 0.5 + 0.5 * ndc.y)`
+   (`core/src/render/background.rs:124`), plus a radial vignette. The tilt is hardcoded, is 28 % of
+   brightness rather than a colour ramp, and points **up** — brighter at the top, the wrong way
+   round for a horizon.
+3. **A line-scene fake cannot finish it.** A `spectrum` slab at `scale = 0` gives a static
+   screen-anchored band — this worked, and is what the demo ships — but `glow` is a local stroke
+   halo and the bloom pyramid's spatial radius is bounded (`bloom_radius = 3.0` measured, barely
+   visible). **No stage downstream can turn a hard edge into a quarter-frame fade.**
+
+**The layer budget is the second half, and it is why the ground cannot simply be another scene.**
+This class of look needs three roles — ground gradient, reactive figure, star layer — and
+[ADR-0090](adrs/0090-a-preset-composes-two-scene-layers.md) caps composition at a main scene plus
+one `[layer]`. The dusk look already spends its layer on the star swarm.
+
+**What made the smallest option also the strongest.** The demo's own `[palette]` already runs
+`#060b24 → #1b2a5e → #c74b1d → #ff7a1f → #ffd06e` — near-black through deep blue to hot amber. That
+*is* the dusk ramp, already authored, already baked into the LUT the backdrop has sampled since
+[ADR-0086](adrs/0086-the-backdrop-colours-through-the-preset-palette.md). Sweeping the coordinate
+along a screen axis makes the smooth fade fall out of the palette's own stops, and each stop's `at`
+becomes the horizon's vertical placement — so no second colour language and no second placement
+mechanism is needed.
+
+**Evidence.** `quiet_sky_demo.toml` and `sun_v8..v10.png` in the content session's scratchpad; the
+reference photo is the user's. The `v10` render is the finding in one image: a razor edge with no
+upward light at all.
+
+**One thing the promotion does not fix, recorded here because it is the same look's other wall.**
+The backdrop is **invisible to every behavioral gate** — coverage measures the scene
+([ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)) and the animation gate
+strips `bg_*` ([ADR-0091](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)'s
+Outcome). That is correct, and it is what stops a more capable backdrop being used to game the
+gates, but it means a dusk world's whole gate burden falls on its figure and star layer even
+though the frame looks full. If that prices the look out, the rule is the one
+[0072](#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo)
+established: **read the floor and re-derive by its own recorded rule, do not lower it to fit.**
