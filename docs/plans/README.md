@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0081** (ADRs are a separate sequence — next free there is **0095**.)
+**Next free number: 0082** (ADRs are a separate sequence — next free there is **0096**.)
 
 ## Active roster
 
@@ -16,6 +16,7 @@ someone who picked it up is reading.
 
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
+| [0081](0081-the-sky-gets-a-galaxy.md) | The sky gets a galaxy: the backdrop paints a curved band | **draft 2026-08-12** | dev, human | Continues [0080](done/0080-the-sky-gets-a-horizon.md) in the same pass ([ADR-0095](../adrs/0095-the-backdrop-paints-a-curved-band.md)): one soft gaussian band whose centreline bows, drawn **additively** over the ground, with its own segment of the same `[palette]` swept *along* it. Seven params, all identity defaults, so the suite must come back hash-identical **three times**. **The band lives in the backdrop because no scene can express it** — neither particle roster carries a positional or density control — and because ADR-0090's layer cap must not move with four roles wanted. **ADR-0037 applies twice and the second one differs**: the new along-band axis does *not* cancel at the default angle, but is unread until `bg_band_curve` or `bg_band_hue_span` is non-zero, so Phase 2's non-square bow measurement is the only thing that can see it. Also widens the pipeline build condition to `bg_bright > 0 \|\| bg_band_amount > 0` — the reference sky is near-black. Ends with a `human` verdict; **the smudge risk is the real one and is not testable**, and fbm is its named answer. The world ships later through the [0067] route, as **one pass with [0077]'s Phase 5 and [0080]'s Phase 7**. |
 | [0079](0079-the-attractor-learns-new-figures.md) | The attractor learns new figures: the tuple roster with per-tuple framing, and measured morph paths | **approved 2026-08-11** | dev, human | The largest of the three ([ADR-0093](../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md)): per-family curated tuple tables carrying their own projection + seed box (jitter derived per-entry so `reseed` survives — the Plan 0062 coupling), a CPU-quantized `tuple` param, the rho ≈ 100 Lorenz as the walking skeleton, user-curated roster from contact sheets, then morph-path filmstrip sweeps where **zero survivors is a legitimate recorded outcome** (user accepted the research risk by interview). Closes backlog 0055. **Queued after [0075]'s cohort 6, last of the three** ([0076] landed 2026-08-11) — two `human` curation gates inside. |
 
 ## Recommended execution sequence
@@ -41,7 +42,21 @@ bringing the user in rather than picking on that criterion.
 
 | # | Plan | Why here |
 |---|------|----------|
-| 1 | [0079](0079-the-attractor-learns-new-figures.md) | The last of the three promoted handoff plans, and now the only plan on the roster. Largest, two `human` curation gates inside. |
+| 1 | [0081](0081-the-sky-gets-a-galaxy.md) | The user's call: build the capability first, then author the world against a finished surface. It is the only plan with a look **already blocked behind it** — the same position [0080] held, for the same reason. |
+| 2 | [0079](0079-the-attractor-learns-new-figures.md) | The last of the three promoted handoff plans. Largest, two `human` curation gates inside. |
+
+**Updated 2026-08-12, when [0081](0081-the-sky-gets-a-galaxy.md) was written**, hours after [0080]
+closed and from judging that plan's own output in the running app. It goes first by the user's
+explicit call at the interview — offered "ship the sky now and plan the band later" versus "build
+the band first, then author the world once", they chose the second. So this is deliberately *not*
+the smaller-first ordering: the world waits on the capability rather than being authored twice.
+The two plans do not contend for files — 0081 is the backdrop pre-pass, 0079 is the attractor's
+tuple tables — which is the same non-collision [0080] and [0079] had.
+
+**One consequence worth stating, because it is easy to miss:** the content lane now has **three**
+standing items on one family of looks — [0077]'s Phase 5 (Perseids' quiet sky), [0080]'s Phase 7
+(the dusk ground), and this plan's world. They are one pass, not three, and walking the family once
+is the point.
 
 **Updated 2026-08-12, at [0080](done/0080-the-sky-gets-a-horizon.md)'s close.** It landed — all
 six `dev` phases, no blockers and no majors at review — so the sequence is **one plan**, and for
