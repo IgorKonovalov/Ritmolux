@@ -123,6 +123,15 @@ These are engine-wide and bindable, so treat them as instruments, not decoration
   spend the scene slot or the one `[layer]`. Roster and the worked dusk example: `systems.md`'s
   engine-stage table and `presets/README.md`. **It earns you nothing at `sanity` or `animation`**
   (both are blind to `bg_*`), so the figure still has to carry both floors.
+  **A long dim tail is safe to author.** Since Plan 0082 the display write dithers by one encoded
+  level (ADR-0096, always on, no param), so a wide smooth ramp no longer bands. This is worth
+  knowing because the risky end is the counter-intuitive one: a band is a run of pixels sharing one
+  8-bit value, so it is widest where the ramp is **flattest**, and sRGB's near-black slope made the
+  *dim tail* the flattest part of any ramp reaching toward black — a low `bg_ramp_gamma` was the
+  dangerous setting, not a high one. Measured, the dusk ground held one value for 58 pixels at
+  1080p before the dither and 20 after. So reach for the low exponent, the near-black sky, the
+  horizon glow above a dark ground, and do not add stops to break up a step you can see — that
+  workaround is retired.
 - **`trails`** — needs real motion to read; it turns a spinning curve into a light-painting. High
   values plus a bright scene wash out fast (the accumulation stacks luminance the way everything else
   does — see the ceiling note above, which the tonemap softened but did not remove). It also

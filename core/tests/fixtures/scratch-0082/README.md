@@ -55,16 +55,44 @@ px at values 17–30, B 25/24/23/22 px. Every wide plateau is in the **dark tail
 rows 5–436; they become hairlines as soon as the horizon brightens.
 
 The instrument was a pure-stdlib PNG decode plus a run-length count. **Plan 0082
-Phase 3 replaces it with a Rust test**, which is where the permanent version
-belongs — this README records the numbers, not the tool.
+Phase 3 replaced it with a Rust test** —
+`the_dither_dissolves_a_dark_ramps_plateaus` in
+`core/src/render/tonemap/tests.rs` — which is where the permanent version
+belongs; this README records the numbers, not the tool.
+
+## What was measured, 2026-08-12, after the dither
+
+Same preset, same size, same instrument, re-run at
+[Plan 0082](../../../../docs/plans/0082-the-gradient-stops-banding.md) Phase 4 —
+which is what this file was kept for.
+
+| | mean px/level | widest mid-range plateau | plateaus ≥ 16 px |
+|---|---|---|---|
+| **before** | 7.5 | **58 px at value 11** | **17** |
+| **after** | 2.1 | **20 px at value 23** | **3** |
+
+Per-channel after: R 17 px at value 7, G 20 px at 23, B 16 px at 32 — against a
+before of R 58, G 47, B 25. Still **0 % rail-pinned**, so this is the same
+gradient being measured and not a frame that has started clipping.
+
+**The widest plateau is 20 px rather than a hairline, and that is the honest
+number.** The prediction in the line this replaces was "a hairline"; what the
+dither actually buys here is the *level count* — 7.5 pixels per level became 2.1,
+so the column now spends about a fifth as long on each value — and the collapse
+of wide plateaus from 17 to 3. A residual 20-px run is a long-tail event on a
+decorrelated draw over 1080 rows, not a structural step: it survives where the
+ramp is locally flattest, and it moves if the frame does. The synthetic guard in
+`core/src/render/tonemap/tests.rs` states the same claim as a ratio against an
+undithered control resolved in the same run, which is the form that does not
+depend on this picture.
 
 ## What to check, and when
 
-- **After [Plan 0082](../../../../docs/plans/0082-the-gradient-stops-banding.md)
-  (the dither).** Re-render at 1920x1080 and re-measure. The widest mid-range
-  plateau should fall from 58 px to a hairline. Then look at it: the bands should
-  be gone *and* the grain that replaced them should not itself read as texture on
-  a held frame. If it does, that is ADR-0096 Alternative F — an animated dither —
+- **After Plan 0082, by eye** (its Phase 5, the `human` one). The measurement
+  above says the bands are gone; the remaining question is whether the grain that
+  replaced them reads as texture on a held frame. It is a *fixed* pattern, and
+  this sky is nearly still by design, which is close to the worst case for that
+  choice. If it does read, that is ADR-0096 Alternative F — an animated dither —
   and it is one term, but it costs the byte-equality property.
 - **After [Plan 0081](../../../../docs/plans/0081-the-sky-gets-a-galaxy.md)
   (the galactic band).** The band is a *second* wide smooth gradient over this
