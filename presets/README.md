@@ -1697,6 +1697,15 @@ low density and the identity row leans toward paper before anything is bound.
 The two ends of that ramp — pure black in, pure white in — came back as *exactly*
 the same two bytes at every one of those five exponents.
 
+**Which way you want to go depends on how dense the drawing already is**, and
+the identity row above is the reason. Rendered on `attractor_ink` (a sparse,
+mid-density figure) at the same four values: `0.5` gives a heavier, sootier
+mark; `2` drops the fine tracery and leaves the strong strokes; `4` thins the
+whole figure to a ghost. So on a *faint* drawing, raising it separates the
+strokes and costs weight — pair it with `exposure`, or go below `1` for a
+heavier print — while on a drawing that is already crowding into a blot, raising
+it is what buys the page back. The cream paper was pixel-identical in all four.
+
 Like the rest of the `ink_*` family, `ink_gamma` crossfades across a cross-preset
 dissolve rather than snapping.
 
