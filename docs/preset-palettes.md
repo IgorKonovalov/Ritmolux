@@ -412,6 +412,40 @@ and with the `[layer]`, so re-spacing stops to bend the backdrop's falloff re-co
 too. When it is only the sky's *response* you want to shape, `bg_ramp_gamma` is the lever that
 touches nothing else.
 
+**The band takes a *second* coordinate in the same gradient**
+([ADR-0095](adrs/0095-the-backdrop-paints-a-curved-band.md)). The backdrop also paints one soft
+curved band of light over that ground, and it colours through the same `[palette]`, the same
+`palette_mix` crossfade and the same `saturation` — one colour language, two coordinates:
+
+| Param | Default | What it does |
+|-------|---------|--------------|
+| `bg_band_hue` | `0.0` | The band's own coordinate in *your* gradient. **Absolute**, not an offset from the ground's — so the arc keeps its colour whatever the ramp underneath it is doing. Cyclic, same wrap. |
+| `bg_band_hue_span` | `0.0` | How far that coordinate travels **along** the band (not across it), so one end can brighten toward a galactic core. |
+
+The shape params that place and bow the band live in
+[`presets/README.md`](../presets/README.md#the-curved-band--bg_band_amount-bg_band_angle-bg_band_pos-bg_band_width-bg_band_curve-bg_band_hue-bg_band_hue_span),
+with a worked Milky Way example. What belongs here is the colour consequence, and it is the one real
+authoring constraint the band creates:
+
+**Your palette must now serve three consumers at once — the ground ramp, the band, and the scene
+(plus any `[layer]`).** They all read the same stops, and there is no second palette to reach for:
+`palette_mix` already owns the A/B pair for preset crossfade, so pinning the band to B would fight
+every dissolve and a dissolve would recolour the galaxy on its way past. A dusk palette spent
+entirely on a horizon — near-black through deep blue to hot amber, every stop earning its place in
+the ramp — has **no room left for a pale arc**, and discovering that after tuning the ground is the
+expensive order to discover it in. Budget the stops for both before you tune either.
+
+Where that bites hardest is a band and a ground wanting *opposite* temperatures, which is exactly
+the Milky Way case: a cool blue-white arc over a warm horizon needs cool stops the ramp never
+visits, which usually means giving the ramp a shorter `bg_hue_span` so it leaves a stretch of the
+gradient free, and pointing `bg_band_hue` at that stretch.
+
+**The band's wrap behaves like the ramp's**, for the same reason and with the same surface: the
+segment `[bg_band_hue, bg_band_hue + bg_band_hue_span]` is repeat-addressed, so a span leaving
+`[0, 1]` paints the palette's far end back into the arc with a hard seam. It is easy to walk into
+here, because a band that wraps into the ground's own colours stops reading as a separate object at
+all.
+
 ---
 
 ## Hard bands — `palette_steps` and `palette_contour`

@@ -132,6 +132,17 @@ These are engine-wide and bindable, so treat them as instruments, not decoration
   1080p before the dither and 20 after. So reach for the low exponent, the near-black sky, the
   horizon glow above a dark ground, and do not add stops to break up a step you can see — that
   workaround is retired.
+  **And since Plan 0081 it paints a *band* over that ground** — one soft gaussian swell whose
+  centreline bows, for a Milky Way arc standing over a horizon (`bg_band_amount` to switch it on,
+  then `bg_band_angle`/`bg_band_pos`/`bg_band_width`/`bg_band_curve` for the shape and
+  `bg_band_hue`/`bg_band_hue_span` for its own segment of the same palette). Four things to know
+  before reaching for it: `bg_band_width` is a **`1/e` half-width**, so the visible band is several
+  times wider than the number; `bg_band_amount > 0` lights the pass **on its own**, so the
+  near-black sky this wants needs no `bg_bright` at all; the band is additive *over* the ground and
+  *under* the scene, so an opaque scene hides it exactly as it hides the ramp; and it shares your
+  `[palette]` with the ground **and** the figure **and** the `[layer]`, which is the one real
+  constraint — a palette fully spent on a horizon has no stops left for an arc. It earns nothing at
+  either gate either, and a more capable sky makes that easier to forget.
 - **`trails`** — needs real motion to read; it turns a spinning curve into a light-painting. High
   values plus a bright scene wash out fast (the accumulation stacks luminance the way everything else
   does — see the ceiling note above, which the tonemap softened but did not remove). It also
