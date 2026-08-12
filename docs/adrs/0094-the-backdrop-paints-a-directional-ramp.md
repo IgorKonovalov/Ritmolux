@@ -47,7 +47,7 @@ available change is also the most expressive one, and it adds no second colour l
 ## Decision
 
 **The background pre-pass gains one ramp axis, and paints a segment of the preset's palette along
-it instead of a single sample.** Four new bindable `bg_*` params, all defaulting to today's
+it instead of a single sample.** Five new bindable `bg_*` params, all defaulting to today's
 behaviour:
 
 | param | default | meaning |
@@ -56,6 +56,7 @@ behaviour:
 | `bg_hue_span` | `0.0` | palette-coordinate **travel** from the ramp's start to its end. `bg_hue` keeps its ADR-0086 meaning as the coordinate at the start |
 | `bg_shade` | `0.72` | brightness factor at the ramp's start |
 | `bg_shade_end` | `1.0` | brightness factor at its end |
+| `bg_ramp_gamma` | `1.0` | the ramp's **response exponent** — eases *where* things sit along the axis, applied before both channels |
 
 The shader becomes, in outline (illustrative):
 
@@ -63,10 +64,31 @@ The shader becomes, in outline (illustrative):
 let d = vec2<f32>(sin(bg_angle), cos(bg_angle));          // 0 rad = up
 let q = vec2<f32>(in.ndc.x * aspect, in.ndc.y);           // pixel-proportional
 let s = clamp(0.5 + 0.5 * dot(q, d) / (aspect * abs(d.x) + abs(d.y)), 0.0, 1.0);
-let u = bg_hue + bg_hue_span * s;                         // a SEGMENT, not a point
+let e = select(pow(s, bg_ramp_gamma), s, bg_ramp_gamma == 1.0);   // ADR-0092's form
+let u = bg_hue + bg_hue_span * e;                         // a SEGMENT, not a point
 let tint = textureSample(lut, samp, vec2<f32>(u, 0.5));   // repeat-addressed, as today
-let col  = tint * bg_bright * mix(bg_shade, bg_shade_end, s) * vig;
+let col  = tint * bg_bright * mix(bg_shade, bg_shade_end, e) * vig;
 ```
+
+**The ramp is linear in screen space, and light is not** — so one exponent shapes the falloff.
+`bg_ramp_gamma > 1` holds the ramp near its start before falling away (a hot band at the horizon,
+then a long fade); `< 1` drops fast and leaves a dim tail. It applies to the axis position `e`
+rather than to either channel, so colour and brightness stay locked as **one** ramp — the same
+reason the fixed tilt retires into the ramp rather than sitting beside it.
+
+**It is not redundant with stop placement, and the reason is load-bearing.** A `[palette]`'s `at`
+positions can already shape the colour response arbitrarily — but that palette is **shared with
+the scene** (ADR-0086, and with both layers under ADR-0090), so re-authoring stops to shape the
+sky's falloff re-maps the figure's colours too. This exponent shapes the backdrop's *mapping* onto
+the axis and touches nothing else. It is also the only shape control the **brightness** ramp has
+at all: `mix(bg_shade, bg_shade_end, ·)` is a straight line, and no stop can bend it.
+
+**The `g == 1.0` branch is a correctness requirement, not an optimization**, and it is the form
+`ink.rs:135` shipped at Plan 0078: `pow(x, 1.0)` compiles to `exp2(1.0 * log2(x))` and is not
+bit-exact, so without the `select` the *default* would perturb every backdrop-binding preset and
+every future golden by a rounding step. The exponent is clamped positive on the CPU
+(`ink.rs::applied_gamma`'s arrangement — non-finite falls back to `1.0`, finite is held in a
+positive range) so `1.0` reaches the uniform exactly and `pow` never sees an undefined `0^0`.
 
 **The fixed `0.72 → 1.0` tilt retires *into* this ramp rather than sitting beside it.** There is
 one brightness ramp on the frame, on the same axis as the colour ramp, and its defaults are the
@@ -75,10 +97,16 @@ different ways": there are not two.
 
 **The defaults are an arithmetic identity, not a close match.** At `bg_angle = 0`, `d = (0, 1)`
 exactly, so `dot(q, d) = ndc.y` and the denominator is `aspect * 0 + 1 = 1` — the aspect term
-cancels and `s ≡ 0.5 + 0.5 * ndc.y`, today's expression. `u = bg_hue + 0.0 * s ≡ bg_hue`. The
-shade `mix` is the identical instruction with the identical constants. So every preset that does
-not opt in renders byte-identically, and the plan proves it by a bless-to-bless control rather
-than claiming it.
+cancels and `s ≡ 0.5 + 0.5 * ndc.y`, today's expression. At `bg_ramp_gamma = 1.0` the `select`
+takes `e ≡ s`. `u = bg_hue + 0.0 * e ≡ bg_hue`. The shade `mix` is the identical instruction with
+the identical constants. So every preset that does not opt in renders byte-identically, and the
+plan proves it by a bless-to-bless control rather than claiming it.
+
+**The backdrop stays opaque, and no alpha is added.** It owns the frame clear and writes through
+`BlendState::REPLACE`, so nothing renders beneath it for an alpha to reveal. The want that
+normally motivates a transparency ramp — a soft edge — is answered structurally instead: the
+ground and the sky are one continuous sweep of one ramp, so there is no object boundary anywhere
+in the frame to soften. Fading to the palette's dark end *is* fading to nothing.
 
 **The swept coordinate is not clamped** — it inherits the repeat addressing every other palette
 coordinate in this engine uses. This is settled by evidence rather than by consistency: two
@@ -128,11 +156,19 @@ non-zero angle.
   under that one system. Worse, this raises the odds of the exact configuration `background.rs`'s
   ADR-0058 note says to re-measure ("if a fragment-field preset ever binds `bg_bright`"), because
   a bright backdrop is now worth binding.
-- **Four more names on a global namespace.** `bg_*` is unioned into every preset's typo check
+- **Five more names on a global namespace.** `bg_*` is unioned into every preset's typo check
   (ADR-0020), so this widens the vocabulary every author sees whether or not they want a ramp.
-- **The uniform grows** from 32 to 48 bytes. That changes the pass's `min_binding_size`, which is
+- **The uniform grows** from 32 to 48 bytes — one new `vec4` for `bg_angle`, `bg_hue_span`,
+  `bg_shade`, `bg_shade_end`, with `aspect` and `bg_ramp_gamma` taking two of the three words
+  already sitting unused in `v.w` and `c.z`. That changes the pass's `min_binding_size`, which is
   a Plan 0053 fix against a measured WARP mis-render — it further separates the layout rather than
   colliding it, but the ADR-0058 enumeration has to be re-run rather than assumed.
+- **A wide smooth ramp is where 8-bit banding shows.** A quarter-frame fade crossing most of the
+  luminance range at 1080p spends roughly two pixels per output level, which is the classic
+  Mach-band configuration. The chain is float and linear until the tonemap, so the quantization is
+  at the final write only — but nothing here dithers, and whether it bands is a measurement this
+  ADR does not have. Plan 0080 Phase 7 is where it gets looked at; a dither is a separate decision
+  if it turns out to be owed.
 
 ### Neutral
 
@@ -191,6 +227,26 @@ same constants* as today's `mix(0.72, 1.0, s)`, so byte-identity at defaults is 
 than a hope about how a compiler folds `0.72 + 0.28 * s`. Colour keeps the span form because
 `bg_hue` is a shipped name whose meaning ADR-0086 fixed, and a `bg_hue_end` could not default to
 "whatever `bg_hue` is".
+
+### Alternative G — a smoothstep (or a per-channel curve) instead of one exponent
+
+Two shapes were weighed against the single positional exponent. A **smoothstep** `s²(3 - 2s)`
+eases both ends symmetrically, which is a genuinely different curve from any power — but it takes
+no parameter, so it is a look rather than a lever, and the flat-then-fall shape a horizon actually
+wants is what `bg_ramp_gamma > 1` already produces. A **separate curve per channel** (one for
+colour, one for brightness) was rejected for the same reason Alternative E rejects a second
+brightness ramp: it lets the two halves of one ramp disagree, and the incoherence is harder to see
+in a curve than in a direction. If a symmetric ease is ever wanted, it is one more `select` arm on
+the same position, not a second mechanism.
+
+### Alternative H — an alpha ramp on the backdrop
+
+Fade the backdrop to *transparent* rather than to its palette's dark end. Rejected as inert: the
+pass owns the frame clear and writes with `BlendState::REPLACE`, so there is nothing underneath
+for alpha to reveal, and the swapchain ignores it. The distinct capability in this neighbourhood —
+a **foreground** ramp, drawn after the scene and occluding the bottom of the figure as a haze — is
+a different pass at a different point in the composite and is not what the dusk look needs (its
+horizon sits *behind* the stars). Out of scope here, and unblocked by nothing this ADR decides.
 
 ## Notes
 

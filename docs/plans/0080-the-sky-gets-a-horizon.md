@@ -13,8 +13,8 @@
 ## TL;DR
 
 The background pre-pass gains **one ramp axis** and paints a *segment* of the preset's palette
-along it instead of a single sample — four new bindable params (`bg_angle`, `bg_hue_span`,
-`bg_shade`, `bg_shade_end`), all defaulting to exactly today's picture. The first user-visible
+along it instead of a single sample — five new bindable params (`bg_angle`, `bg_hue_span`,
+`bg_shade`, `bg_shade_end`, `bg_ramp_gamma`), all defaulting to exactly today's picture. The first user-visible
 behavior is a photoreal dusk ground: a bright horizon band at the bottom of the frame fading
 smoothly up through deep blue to near-black, authored entirely from the `[palette]` stops that
 already exist, leaving the main scene and the one `[layer]` free for the figure and the stars.
@@ -42,9 +42,11 @@ a scene slot.
 ## Decision
 
 **Extend the backdrop pre-pass**, per ADR-0094: one ramp axis (`bg_angle`, radians, `0` = up),
-a palette-coordinate travel along it (`bg_hue_span`, default `0`), and a brightness ramp on the
+a palette-coordinate travel along it (`bg_hue_span`, default `0`), a brightness ramp on the
 same axis (`bg_shade` / `bg_shade_end`, defaults `0.72` / `1.0`) into which the existing hardcoded
-`mix(0.72, 1.0, ndc.y)` tilt **retires**, so there is one brightness ramp rather than two. The
+`mix(0.72, 1.0, ndc.y)` tilt **retires**, so there is one brightness ramp rather than two, and one
+response exponent (`bg_ramp_gamma`, default `1.0`) easing the axis position ahead of **both**
+channels so the ramp stays one curve. The
 horizon's vertical placement is authored by the `[palette]` stops' own `at` positions — no second
 placement mechanism. The swept coordinate keeps the engine-wide repeat addressing.
 
@@ -125,7 +127,31 @@ flowchart TB
   - 17 of the 27 shipped presets bind `bg_bright` and none binds the new names, so no preset is
     re-tuned by this phase. If any preset's render moves, that is the finding.
 
-### Phase 3 — the ramp rotates, and it takes the surface's aspect
+### Phase 3 — the ramp eases
+
+- **Owner skill:** dev
+- **What:** `bg_ramp_gamma` (default `1.0`) shapes the axis position ahead of both the LUT
+  coordinate and the shade mix, so brightness stops falling off linearly. The colour channel could
+  be shaped by stop `at` placement instead — but `[palette]` is **shared with the scene**
+  (ADR-0086/0090), so doing it there re-maps the figure too; this is the only lever that shapes
+  the sky alone, and the only shape control the brightness ramp has at all.
+- **Files touched:** `core/src/render/background.rs` (`c.z` is a free uniform word, so the buffer
+  does not grow again).
+- **Done when:**
+  - The exponent uses **ADR-0092's shipped form**, `select(pow(s, g), s, g == 1.0)`
+    (`core/src/render/ink.rs:135`), with the positive clamp and non-finite fallback on the **CPU**
+    side (`ink.rs::applied_gamma`'s arrangement) so `1.0` reaches the uniform exactly and `pow`
+    never sees `0^0`. The `g == 1.0` branch is a correctness requirement: `pow(x, 1.0)` is
+    `exp2(1.0 * log2(x))` and is not bit-exact, so without it the *default* perturbs every
+    backdrop-binding preset. Reuse the reasoning already written at that line rather than
+    re-deriving it.
+  - `bg_ramp_gamma = 2.5` on the dusk ground holds the horizon's brightness near its start and
+    then falls away — a hot band with a long fade above it — and `0.4` drops fast into a dim tail.
+    Both read as one curve: the colour and the brightness reach their midpoints at the **same**
+    height, which is what "one ramp" means and what a per-channel curve would break.
+  - Baselines hash-identical a third time, by the same bless-to-bless control.
+
+### Phase 4 — the ramp rotates, and it takes the surface's aspect
 
 - **Owner skill:** dev
 - **What:** `bg_angle` (radians, `0` = bottom-to-top, matching `launch_angle`'s zero-is-up
@@ -146,9 +172,9 @@ flowchart TB
     **2.0 NDC** with the aspect forced to `1.0` — a 60 % error, in the shape of Plan 0046's
     `45x46` / `44x71` control.
   - Baselines hash-identical once more: `sin(0) = 0` and `cos(0) = 1` exactly, so the default path
-    reduces to Phase 2's expression.
+    reduces to Phase 3's expression.
 
-### Phase 4 — a fixture pins the ramp, and the instruments see it
+### Phase 5 — a fixture pins the ramp, and the instruments see it
 
 - **Owner skill:** dev
 - **What:** One golden fixture binding all four params (a swept colour ramp, a non-default shade
@@ -165,7 +191,7 @@ flowchart TB
   - A preset binding the new names appears in `shot --report` with its bindings walked under the
     `bg_*` namespace like the existing three, and a dead gate on one of them flags.
 
-### Phase 5 — the operator docs learn the ramp
+### Phase 6 — the operator docs learn the ramp
 
 - **Owner skill:** dev
 - **What:** The doc sweep the new surface owes.
@@ -185,13 +211,20 @@ flowchart TB
   6. the fragment field draws **opaquely** over the backdrop, so a ramp is invisible under that one
      system.
 
-### Phase 6 — judge the dusk ground against the reference
+### Phase 7 — judge the dusk ground against the reference
 
 - **Owner skill:** human
 - **What:** The user renders the dusk ground in the running app and against the reference photo,
-  and answers the two questions no test can: does the fade read as light rather than as a
-  gradient, and does the horizon sit where the palette `at` positions put it.
-- **Done when:** a verdict is recorded. If it reads, the look ships through the
+  and answers the three questions no test can: does the fade read as light rather than as a
+  gradient, does the horizon sit where the palette `at` positions put it, and **does it band**.
+- **Done when:** a verdict is recorded, including the banding one. A quarter-frame fade crossing
+  most of the luminance range spends roughly **two pixels per 8-bit output level** at 1080p, which
+  is the classic Mach-band configuration — the chain is float and linear until the tonemap, so the
+  quantization is at the final write only, and nothing in it dithers. **Look for it deliberately at
+  1080p and at the low `bg_ramp_gamma` end** (where the tail is flattest and the steps widest);
+  reporting "no banding observed, at these two settings" is a result. If it bands, a dither is its
+  own decision and its own ADR — do not add one inside this plan. If it reads, the look ships
+  through the
   [ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) /
   [Plan 0067](done/0067-the-curation-route.md) curation route in the content lane — **not in this
   plan**. Group it with **Plan 0077 Phase 5** (Perseids' quiet sky, standing): that look and this
@@ -200,13 +233,13 @@ flowchart TB
 ## Data shapes
 
 ```rust
-// illustrative — the uniform after Phase 3. `v.w` is unused today, so the
+// illustrative — the uniform after Phase 4. `v.w` is unused today, so the
 // aspect lands there and only one new vec4 is added: 32 -> 48 bytes.
 #[repr(C)]
 struct Bg {
     /// x: bg_hue, y: bg_bright, z: bg_vignette, w: aspect (from `surface`)
     v: [f32; 4],
-    /// x: palette_mix, y: saturation, zw: unused
+    /// x: palette_mix, y: saturation, z: bg_ramp_gamma (CPU-clamped positive), w: unused
     c: [f32; 4],
     /// x: bg_angle, y: bg_hue_span, z: bg_shade, w: bg_shade_end
     g: [f32; 4],
@@ -217,11 +250,11 @@ struct Bg {
 
 - **The aspect trap is the one to watch.** ADR-0037 has shipped twice, both times invisible at the
   development configuration. Here it is worse than usual: at the default angle the aspect term
-  *provably* cancels, so the whole test suite could pass with the wrong source wired in. Phase 3's
+  *provably* cancels, so the whole test suite could pass with the wrong source wired in. Phase 4's
   negative control is the mitigation, and it is a done-when rather than a suggestion.
 - **A bright backdrop is untested territory.** Shipped presets sit at `bg_bright ≤ 0.039`; a dusk
   ground wants an order of magnitude more. The tonemap knee, `occlude` (ADR-0085) and the additive
-  families over a lit plate have not been judged there. Phase 6 is where that surfaces; the
+  families over a lit plate have not been judged there. Phase 7 is where that surfaces; the
   neighbouring lever is Plan 0071 Phase 5's standing `occlude` retune.
 - **A dusk world may struggle at `sanity`'s coverage floor** even with a full-looking frame,
   because the ground earns nothing. If it does, **read the floor rather than fight it** — re-derive
@@ -229,11 +262,17 @@ struct Bg {
 - **The ADR-0058 LUT pair gets more likely to go live.** `background.rs`'s own note says to re-run
   its measurement "if a fragment-field preset ever binds `bg_bright`", and a bright backdrop makes
   that binding attractive. The pass and the fragment field share a `[Texture, Texture, Sampler]`
-  layout shape. Phase 4 re-runs the enumeration; if a fragment-field preset later binds a ramp, the
+  layout shape. Phase 5 re-runs the enumeration; if a fragment-field preset later binds a ramp, the
   measurement is owed again.
-- **Open:** whether `bg_shade`/`bg_shade_end` are the right names beside `bg_bright`. The defaults
-  and the identity requirement are fixed by ADR-0094; if `dev` finds a clearly better pair while
-  writing the docs in Phase 5, raise it rather than silently renaming.
+- **A wide smooth ramp is exactly where 8-bit banding lives**, and this engine has never drawn one
+  — every backdrop so far has been a dim wash at `bg_bright ≤ 0.039`, where there is no range to
+  band across. Nothing dithers. Phase 7 looks for it rather than assuming either way; a dither, if
+  owed, is a separate decision.
+- **Open:** whether `bg_shade`/`bg_shade_end` are the right names beside `bg_bright`, and whether
+  `bg_ramp_gamma` is the right name for a *positional* exponent (an author may read "gamma" as a
+  colour or display gamma, which it is not). The defaults and the identity requirement are fixed by
+  ADR-0094; if `dev` finds a clearly better name while writing the docs in Phase 6, raise it rather
+  than silently renaming.
 
 ## What this plan does NOT do
 
@@ -244,8 +283,14 @@ struct Bg {
   legitimate separate want, unaddressed here.
 - **No radial or elliptical gradient.** The vignette remains the only radial term and is unchanged.
 - **No clamp on any palette coordinate**, here or elsewhere — the repeat addressing stands.
+- **No alpha on the backdrop, and no foreground haze.** The pass owns the frame clear and writes
+  `REPLACE`, so an alpha ramp would be inert — there is nothing beneath it to reveal (ADR-0094
+  Alternative H). A ramp drawn *after* the scene, occluding the bottom of the figure, is a real and
+  different capability; the dusk look does not need it (its horizon sits behind the stars) and
+  nothing here forecloses it.
+- **No dither.** See Phase 7 — whether the ramp bands is measured, not pre-empted.
 - **It does not ship the dusk preset.** Authoring and landing the world is content-lane work
-  through the Plan 0067 route, after Phase 6's verdict.
+  through the Plan 0067 route, after Phase 7's verdict.
 
 ## Followups (after this lands)
 
