@@ -6,7 +6,7 @@
 > [Close notes](#close-notes--2026-08-12) below, and
 > [ADR-0096's Outcome](../../adrs/0096-the-display-write-dithers.md#outcome--2026-08-12-at-plan-0082s-close),
 > which falsifies two of its claims. Approved by interview the same day; the dither's shape, the
-> sequencing ahead of [0081](../0081-the-sky-gets-a-galaxy.md), and the decision to fix this before
+> sequencing ahead of [0081](0081-the-sky-gets-a-galaxy.md), and the decision to fix this before
 > authoring the world were all settled there — see ADR-0096's Alternatives.
 > **Created:** 2026-08-12
 > **Owner skill(s):** dev, human
@@ -15,7 +15,7 @@
 > boundary), answers [0094](../../adrs/0094-the-backdrop-paints-a-directional-ramp.md)'s open banding
 > question, unblocks [0095](../../adrs/0095-the-backdrop-paints-a-curved-band.md)
 > **Closes:** [Plan 0080](0080-the-sky-gets-a-horizon.md) Phase 7's banding half
-> **Blocks:** [Plan 0081](../0081-the-sky-gets-a-galaxy.md) — sequenced first by the user's call
+> **Blocks:** [Plan 0081](0081-the-sky-gets-a-galaxy.md) — sequenced first by the user's call
 
 ## TL;DR
 
@@ -225,7 +225,7 @@ flowchart TB
 
 ## Followups (after this lands)
 
-- **[Plan 0081](../0081-the-sky-gets-a-galaxy.md) is unblocked**, and its Phase 6 verdict is no longer
+- **[Plan 0081](0081-the-sky-gets-a-galaxy.md) is unblocked**, and its Phase 6 verdict is no longer
   confounded — the galactic band is born onto a chain that already dithers.
 - **If Phase 5 says the grain reads as texture**, Alternative F, with the observation as its
   evidence.

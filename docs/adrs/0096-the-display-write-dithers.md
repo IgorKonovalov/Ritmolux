@@ -196,7 +196,7 @@ was that the banding is visible and spoiling an otherwise working look.
   test, because a plateau-width assertion on a synthetic dark ramp is exactly what would catch
   someone removing the slope term from Alternative D.
 - This decision is sequenced **before** [ADR-0095](0095-the-backdrop-paints-a-curved-band.md) /
-  [Plan 0081](../plans/0081-the-sky-gets-a-galaxy.md) by the user's call, so the galactic band is
+  [Plan 0081](../plans/done/0081-the-sky-gets-a-galaxy.md) by the user's call, so the galactic band is
   born onto a chain that already dithers and its own `human` verdict is not confounded by a defect
   already known about.
 
