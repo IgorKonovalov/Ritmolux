@@ -45,6 +45,46 @@ fn frame_diff_bounds() {
 }
 
 #[test]
+fn footprint_diff_measures_over_the_mask_not_the_frame() {
+    let w = 32;
+    // A 4-pixel white dot at x=0..4 in row 0, then the same dot moved to
+    // x=8..12: the union mask is 8 pixels, each fully swung on 3 channels.
+    let dot_at = |x0: u32| {
+        image(w, w, |x, y| {
+            if y == 0 && x >= x0 && x < x0 + 4 {
+                [255, 255, 255, 255]
+            } else {
+                BLACK
+            }
+        })
+    };
+    let (a, b) = (dot_at(0), dot_at(8));
+
+    // Whole-frame: 8 changed pixels diluted by 1024. Masked (zero floor): the
+    // mean over exactly the 8 mask pixels is a full swing.
+    let whole = frame_diff(&a, &b);
+    assert!(whole < 0.01, "whole-frame dilutes the dot: {whole}");
+    assert_eq!(footprint_diff(&a, &b, BLACK, 8, 0.0), 1.0);
+
+    // The denominator floor caps what a tiny mask can read: at a floor of half
+    // the frame, 8 fully-swung pixels over 512 counted ones.
+    let floored = footprint_diff(&a, &b, BLACK, 8, 0.5);
+    assert!((floored - 8.0 / 512.0).abs() < 1e-6, "floored: {floored}");
+
+    // Identical frames have a zero numerator whatever the mask — the ADR-0091
+    // safety argument — and an all-black pair reads 0.0, not a division.
+    assert_eq!(footprint_diff(&a, &a, BLACK, 8, 0.0), 0.0);
+    let black = solid(w, w, BLACK);
+    assert_eq!(footprint_diff(&black, &black, BLACK, 8, 0.0), 0.0);
+
+    // Mismatched sizes read as fully different, like `frame_diff`.
+    assert_eq!(
+        footprint_diff(&a, &solid(16, 16, BLACK), BLACK, 8, 0.0),
+        1.0
+    );
+}
+
+#[test]
 fn coverage_and_spread_extremes() {
     let black = solid(32, 32, BLACK);
     let white = solid(32, 32, [255, 255, 255, 255]);

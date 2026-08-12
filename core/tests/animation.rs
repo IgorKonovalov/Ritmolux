@@ -4,15 +4,32 @@
 //! near-zero and fails. Silent audio is used deliberately — the motion under
 //! test is the shared scene clock, not an audio edge.
 //!
+//! **Plan 0077 Phase 1 / ADR-0091: motion is scored against the figure's own
+//! footprint, not the whole frame.** The original statistic was
+//! `metrics::frame_diff`, a mean over every pixel, which dilutes a sparse
+//! figure's motion into the empty frame around it — it scores *occupancy*, and
+//! Plan 0067 Phase 1d measured occupancy to be scale-invariant (the ladder at
+//! the bottom of this file), so no render size fixes it. The gate now uses
+//! `metrics::footprint_diff`: the same mean, taken over the union of lit
+//! pixels in the two frames only. The capture roster has its `bg_*` bindings
+//! stripped ([`without_backdrop`]) for the same reason sanity.rs strips them
+//! (ADR-0067): a shipped backdrop's dim gradient sits above the lit threshold
+//! in sRGB, and measured *with* backdrops the sparse probe's footprint read as
+//! 65 % of the frame — the dilution this change exists to remove, back again
+//! by another door.
+//!
 //! Software adapter so it holds on any CI GPU.
 //!
 //! The resolution ladder at the bottom of this file (Plan 0067 Phase 1d) is a
-//! **measurement, not a gate** — it is `#[ignore]`d and records why [`SIZE`] and
-//! [`ANIM_FLOOR`] did not move.
+//! **measurement, not a gate** — it is `#[ignore]`d, records why [`SIZE`] did
+//! not move, and stays pinned to the whole-frame statistic it measured.
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::{Preset, SystemKind, default_presets};
-use lmv_core::render::{HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::{
+    HeadlessOptions, RenderError, Renderer,
+    metrics::{footprint_diff, frame_diff},
+};
 
 /// Capture size for the gate.
 ///
@@ -24,17 +41,98 @@ const SIZE: u32 = 96;
 /// 60 fps `SCENE_DT` is ample for any live scene to move visibly.
 const FRAME_A: u32 = 24;
 const FRAME_B: u32 = 48;
-/// Minimum motion (mean-abs RGB, 0..1) between the two frames. Catches a
-/// *frozen* scene, not a subtly-animated one.
+/// Minimum motion between the two frames, in `metrics::footprint_diff`'s
+/// mean-abs-over-the-lit-footprint units (0..1). Catches a *frozen* scene, not
+/// a subtly-animated one.
 ///
-/// **Not moved by Plan 0067 Phase 1d, on that phase's own measurement.** The
-/// ladder below drove the sparse draft this floor rejected, the symmetric design
-/// it is documented to penalize, and a genuinely static control through 96 /
-/// 192 / 384, and resolution does not separate them: see that test's doc comment
-/// for the table. Raising the resolution would cost the whole shipped-set sweep
-/// 4x or 16x the pixels and buy no separation, so the constant stays and the
-/// negative result is recorded rather than a threshold forced.
+/// **Re-derived against the footprint statistic at Plan 0077 Phase 1
+/// (ADR-0091), from the same measurement the sweep above prints on every run.**
+/// The pre-0077 whole-frame floor was also 0.01; the number surviving is a
+/// coincidence of the derivation, not the old constant kept. The derivation,
+/// per ADR-0071:
+///
+/// - The shipped library's minimum under the new statistic is **0.0205**
+///   (`Banded Mandala`), measured 2026-08-12, DX12 software adapter, backdrop
+///   suppressed. The floor sits at **half the shipped minimum** — the sanity
+///   suite's per-system-floor convention, applied to this gate's one floor.
+///   Slack 2.05x; the sweep prints the distribution, so a new library minimum
+///   is re-derived from the printed numbers, not nudged until green.
+/// - The noise ceiling sits **below** it: with the mask floored at
+///   [`MIN_FOOTPRINT_FRAC`], the worst-case stray event ADR-0091 names (one
+///   pixel swinging full-scale on all three channels in an otherwise empty
+///   frame) reads `1/139 = 0.0072` — under this floor with 1.4x margin, so a
+///   flicker cannot clear a gate that real content clears by 2x.
+/// - The non-vacuity pair brackets it: the rejected fifth-density Squall draft
+///   reads **0.1049** (10.5x the floor, against 0.0057 under the whole-frame
+///   statistic that priced it out), and the static control reads **0.0000** —
+///   a zero numerator, which no normalization can rescue (ADR-0091's safety
+///   argument). The pair is pinned as a standing test below.
 const ANIM_FLOOR: f32 = 0.01;
+/// A pixel counts as lit (in the footprint) if any RGB channel differs from
+/// [`BLACK`] by more than this — the sanity suite's convention, same value,
+/// same reason: shrugs off near-black dithering.
+const EPS: u8 = 10;
+/// What the footprint is measured against. Not a sampled pixel: the backdrop is
+/// suppressed for this capture ([`without_backdrop`]), so every lit pixel is
+/// light the **scene** put there.
+const BLACK: [u8; 4] = [0, 0, 0, 255];
+/// Lower bound on `footprint_diff`'s denominator, as a fraction of the frame —
+/// the guard ADR-0091 requires against a tiny mask amplifying noise. `0.015` of
+/// a 96x96 frame floors the mask at **139 pixels**, which caps the one-pixel
+/// full-swing flicker at `0.0072`, under [`ANIM_FLOOR`] (the derivation there).
+/// The cost side: a figure lighting less than 1.5 % of the frame has its score
+/// scaled down by `mask/139`. The sparsest *silent* footprint in the shipped
+/// library is ~7 % of the frame (`Halo` — read any preset's mask fraction off
+/// the sweep as `whole-frame / footprint`), 4.5x this bound, so no shipped
+/// content is diluted. A future look that sits near this bound is being told
+/// it is near-invisible at 96x96 — surface that at the coverage gate rather
+/// than tuning this epsilon to pass (ADR-0091's stated risk).
+const MIN_FOOTPRINT_FRAC: f32 = 0.015;
+
+/// The prefix every background-stage parameter carries (see sanity.rs, which
+/// established the convention and the guard below).
+const BG_PREFIX: &str = "bg_";
+
+/// Strip the backdrop bindings so the footprint is the **scene's** lit pixels
+/// (ADR-0067's lesson, re-learned here by measurement: a shipped `bg_bright` of
+/// 0.016 stores as ~34/255 in sRGB — over [`EPS`] — so with the backdrop on,
+/// the "footprint" of a sparse emitter read as 65 % of the frame and the
+/// statistic went straight back to diluting by emptiness). The background stage
+/// defaults to a black clear, so this is removing bindings, not adding a path.
+///
+/// One semantic change rides along, deliberately: backdrop drift (a slow
+/// `bg_hue` sweep) no longer counts as animation. The gate's question is
+/// whether the *scene* moves; a picture whose only life is its vignette
+/// breathing is exactly what it should convict.
+fn without_backdrop(mut preset: Preset) -> Preset {
+    preset.params.retain(|b| !b.name.starts_with(BG_PREFIX));
+    preset
+}
+
+/// The shipped library, backdrops suppressed, plus `(name, system)` per preset.
+/// Panics if the transform matched nothing — the same guard-on-the-guard as
+/// sanity.rs: a rename off `bg_` would silently put the backdrop back into the
+/// footprint.
+fn animation_roster() -> (Vec<Preset>, Vec<(String, SystemKind)>) {
+    let mut stripped = 0usize;
+    let presets: Vec<Preset> = default_presets()
+        .into_iter()
+        .map(|p| {
+            let before = p.params.len();
+            let p = without_backdrop(p);
+            stripped += before - p.params.len();
+            p
+        })
+        .collect();
+    assert!(
+        stripped > 0,
+        "no `{BG_PREFIX}*` binding was found in any of the {} shipped presets — the \
+         backdrop suppression the footprint statistic rests on has become a no-op",
+        presets.len()
+    );
+    let meta = presets.iter().map(|p| (p.name.clone(), p.system)).collect();
+    (presets, meta)
+}
 
 fn system_name(system: SystemKind) -> &'static str {
     match system {
@@ -68,9 +166,10 @@ fn headless_at(size: u32) -> Option<Renderer> {
     }
 }
 
-/// The statistic the gate is: whole-frame difference between the two capture
-/// points, at silent audio.
-fn motion(renderer: &mut Renderer, name: &str) -> f32 {
+/// Both statistics over one pair of captures at silent audio, as
+/// `(footprint, whole_frame)`: the gate's footprint difference (ADR-0091) and
+/// the pre-0077 whole-frame mean the ladder below stays pinned to.
+fn motions(renderer: &mut Renderer, name: &str) -> (f32, f32) {
     let audio = AnalysisFrame::default();
     let early = renderer
         .capture_preset(name, &audio, FRAME_A)
@@ -78,7 +177,10 @@ fn motion(renderer: &mut Renderer, name: &str) -> f32 {
     let late = renderer
         .capture_preset(name, &audio, FRAME_B)
         .expect("capture late frame");
-    frame_diff(&early, &late)
+    (
+        footprint_diff(&early, &late, BLACK, EPS, MIN_FOOTPRINT_FRAC),
+        frame_diff(&early, &late),
+    )
 }
 
 #[test]
@@ -87,22 +189,77 @@ fn every_preset_animates_over_time() {
         return;
     };
 
+    let (presets, meta) = animation_roster();
+    renderer.set_presets(presets);
+
     let mut failures = Vec::new();
-    for preset in default_presets() {
-        let motion = motion(&mut renderer, &preset.name);
+    for (name, system) in meta {
+        let (motion, whole) = motions(&mut renderer, &name);
         println!(
-            "[{}] {:<12} frame {FRAME_A} vs {FRAME_B}: {motion:.4}",
-            system_name(preset.system),
-            preset.name,
+            "[{}] {name:<12} frame {FRAME_A} vs {FRAME_B}: footprint {motion:.4} (whole-frame {whole:.4})",
+            system_name(system),
         );
         if motion < ANIM_FLOOR {
-            failures.push(format!("{} (motion {motion:.4})", preset.name));
+            failures.push(format!("{name} (motion {motion:.4})"));
         }
     }
 
     assert!(
         failures.is_empty(),
         "these presets do not animate above {ANIM_FLOOR}: {failures:#?}"
+    );
+}
+
+/// **The two pinned non-vacuity probes of ADR-0091, as a standing gate** (Plan
+/// 0077 Phase 1): the rejected fifth-density Squall draft — the sparse-but-moving
+/// design the whole-frame statistic diluted to 0.0051 — must **pass** the
+/// footprint statistic, and Phase 1d's static control must keep **failing** it.
+/// Together they pin the change to exactly the class ADR-0091 claims it moves:
+/// if the draft ever fails, the statistic has regressed to scoring occupancy; if
+/// the control ever passes, the floor has stopped gating anything.
+///
+/// Runs at [`SIZE`] only — the ladder below already measured that resolution
+/// does not move either statistic.
+#[test]
+fn the_footprint_statistic_separates_the_rejected_draft_from_the_static_control() {
+    let Some(mut renderer) = headless_at(SIZE) else {
+        return;
+    };
+    let probes = probes();
+    let presets: Vec<Preset> = probes
+        .iter()
+        .map(|(label, _, src)| {
+            let p = Preset::from_toml_str(src)
+                .unwrap_or_else(|e| panic!("probe `{label}` parses: {e}"));
+            without_backdrop(p)
+        })
+        .collect();
+    let names: Vec<String> = presets.iter().map(|p| p.name.clone()).collect();
+    renderer.set_presets(presets);
+
+    let mut sparse = None;
+    let mut frozen = None;
+    for ((label, note, _), name) in probes.iter().zip(names.iter()) {
+        let (footprint, whole) = motions(&mut renderer, name);
+        println!("{label:<20} footprint {footprint:.4} (whole-frame {whole:.4})   {note}");
+        match *label {
+            "squall_sparse" => sparse = Some(footprint),
+            "star_frozen" => frozen = Some(footprint),
+            _ => {}
+        }
+    }
+    let (Some(sparse), Some(frozen)) = (sparse, frozen) else {
+        panic!("the probe roster no longer carries the two pinned probes");
+    };
+    assert!(
+        sparse >= ANIM_FLOOR,
+        "THE REJECTED DRAFT fails the footprint statistic ({sparse:.4} < {ANIM_FLOOR}) — \
+         it has regressed to scoring occupancy (ADR-0091)"
+    );
+    assert!(
+        frozen < ANIM_FLOOR,
+        "THE STATIC CONTROL passes the footprint statistic ({frozen:.4} >= {ANIM_FLOOR}) — \
+         the floor no longer gates anything"
     );
 }
 
@@ -382,6 +539,15 @@ fn probes() -> Vec<(&'static str, &'static str, String)> {
 /// That was explicitly out of this plan's scope; this table is the evidence that
 /// it is now the only remaining option.
 ///
+/// **That successor landed at Plan 0077 Phase 1 (ADR-0091)** — the gate above
+/// now scores `metrics::footprint_diff`. This ladder deliberately keeps
+/// measuring the whole-frame statistic it is pinned to: its table is the
+/// recorded evidence for why the statistic had to change, and re-pointing the
+/// instrument at the new statistic would erase the comparison the numbers
+/// exist to hold. Under the footprint statistic the rejected draft reads
+/// 0.1049 against the shipped 0.1093 — the density difference cancels, which
+/// is the whole claim — and the static control keeps its zero numerator.
+///
 /// **Being `#[ignore]`d has a cost worth naming:** the two probes rebuilt from
 /// shipped sources go through [`param_line`], which panics if `spawn_rate` or
 /// `name` is renamed — and a panic in an ignored test is silent. If this is run
@@ -408,7 +574,7 @@ fn the_resolution_ladder_against_the_two_designs_it_penalizes() {
         let names: Vec<String> = presets.iter().map(|p| p.name.clone()).collect();
         renderer.set_presets(presets);
         for (row, name) in rows.iter_mut().zip(names.iter()) {
-            row.2.push(motion(&mut renderer, name));
+            row.2.push(motions(&mut renderer, name).1);
         }
     }
 

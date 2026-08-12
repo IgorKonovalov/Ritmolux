@@ -44,6 +44,64 @@ pub fn frame_diff(a: &CaptureImage, b: &CaptureImage) -> f32 {
     sum as f32 / (count as f32 * 255.0)
 }
 
+/// Mean absolute per-channel (RGB) difference measured **over the union of lit
+/// pixels in the two frames** rather than over the whole frame, normalized to
+/// `0.0..=1.0` — the footprint statistic of ADR-0091 (Plan 0077 Phase 1).
+///
+/// [`frame_diff`] is a mean over every pixel, so a sparse figure's motion is
+/// averaged against the empty frame around it and the statistic scores
+/// *occupancy* — which Plan 0067 Phase 1d measured to be scale-invariant, so no
+/// render size recovers the dilution. This is the masked form ADR-0091 offers
+/// (chosen over `frame_diff / max(occupancy, eps)` because the quotient form
+/// keeps the whole-frame numerator, so backdrop drift outside the figure still
+/// leaks into a statistic that claims to be about the figure): a pixel is in
+/// the mask if it differs from `bg` by more than `eps` on any RGB channel in
+/// **either** frame, and the mean is taken over the mask only.
+///
+/// The denominator is floored at `min_lit_frac` of the frame's pixels — the
+/// guard ADR-0091 requires, without which a one-pixel flicker in a nearly-empty
+/// frame reads as strong animation (one full-swing pixel over a mask of one is
+/// `1.0`). Callers state their bound and its derivation; a mask at or under the
+/// floor means the statistic is reporting "near-invisible at this size" rather
+/// than measuring motion, which is a finding for the *coverage* gate, not this
+/// one.
+///
+/// Mismatched dimensions read as fully different (`1.0`); an empty mask over a
+/// zero floor reads `0.0` (nothing lit in either frame is no motion, not a
+/// division). Alpha is ignored, as in [`frame_diff`].
+pub fn footprint_diff(
+    a: &CaptureImage,
+    b: &CaptureImage,
+    bg: [u8; 4],
+    eps: u8,
+    min_lit_frac: f32,
+) -> f32 {
+    if a.width != b.width || a.height != b.height || a.rgba.len() != b.rgba.len() {
+        return 1.0;
+    }
+    let mut sum: u64 = 0;
+    let mut mask: u64 = 0;
+    let mut total: u64 = 0;
+    for (pa, pb) in a.rgba.chunks_exact(4).zip(b.rgba.chunks_exact(4)) {
+        total += 1;
+        if !is_lit(pa, bg, eps) && !is_lit(pb, bg, eps) {
+            continue;
+        }
+        mask += 1;
+        for c in 0..3 {
+            if let (Some(&x), Some(&y)) = (pa.get(c), pb.get(c)) {
+                sum += x.abs_diff(y) as u64;
+            }
+        }
+    }
+    let floor = (total as f32 * min_lit_frac.clamp(0.0, 1.0)).ceil() as u64;
+    let denom = mask.max(floor);
+    if denom == 0 {
+        return 0.0;
+    }
+    sum as f32 / (denom as f32 * 3.0 * 255.0)
+}
+
 /// Shape-aware difference in `0.0..=1.0`: downscale each image to a small
 /// grayscale grid, take the Sobel edge magnitude, normalize each edge map by its
 /// own peak, and mean-abs-diff them. Normalizing per-image cancels overall
