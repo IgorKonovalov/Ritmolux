@@ -4,7 +4,8 @@
 
 use super::{
     DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, DEPTH_PARALLAX_FAR, DEPTH_PARALLAX_NEAR,
-    DEPTH_SCALE_FAR, DEPTH_SCALE_NEAR, MARGIN, SEED, Scene, SwarmScene, bounds, hue_coord,
+    DEPTH_SCALE_FAR, DEPTH_SCALE_NEAR, MARGIN, SEED, Scene, SwarmScene, TWINKLE_FREQ_HI,
+    TWINKLE_FREQ_LO, bounds, channel, hue_coord, size_factor, twinkle_factor, unit,
 };
 use crate::render::palette::Palette;
 use crate::render::scenes::SeededRng;
@@ -320,6 +321,231 @@ fn narrow_spread_makes_colour_coherent() {
     assert!(
         narrow < full * 0.25,
         "narrow band ({narrow:.4}) is far more coherent than the full wheel ({full:.4})"
+    );
+}
+
+// -----------------------------------------------------------------------
+// Per-mark individuation (Plan 0077 Phase 2, backlog 0068)
+// -----------------------------------------------------------------------
+
+/// The pure-function half of the individuation contract, in the emitter's
+/// test's shape: both factors collapse to **exactly** `1.0` at their defaults
+/// — the arithmetic every untouched golden baseline rests on — and both
+/// genuinely vary across the population when opened. The third block is the
+/// property backlog 0068 measured the emitter for and the swarm lacked: with
+/// rate AND phase drawn per particle, the population's mean stays nearly flat
+/// while every member swings — a shared-rate field would swing its mean as one
+/// sheet however the phases scattered.
+#[test]
+fn per_mark_individuation_collapses_at_zero_and_shimmers_without_breathing() {
+    let n = 512u32;
+    let freqs: Vec<f32> = (0..n)
+        .map(|i| {
+            TWINKLE_FREQ_LO + unit(i, channel::TWINKLE_FREQ) * (TWINKLE_FREQ_HI - TWINKLE_FREQ_LO)
+        })
+        .collect();
+    let phases: Vec<f32> = (0..n).map(|i| unit(i, channel::TWINKLE_PHASE)).collect();
+
+    // Exact identity at the defaults, falsifiable in both directions.
+    for i in 0..n as usize {
+        assert_eq!(twinkle_factor(freqs[i], phases[i], 3.7, 0.0), 1.0);
+        assert_eq!(size_factor(unit(i as u32, channel::SIZE), 0.0), 1.0);
+    }
+
+    // Opened, both vary across the population.
+    let sizes: Vec<f32> = (0..n)
+        .map(|i| size_factor(unit(i, channel::SIZE), 0.7))
+        .collect();
+    let twinkles: Vec<f32> = (0..n as usize)
+        .map(|i| twinkle_factor(freqs[i], phases[i], 3.7, 0.8))
+        .collect();
+    for (label, series) in [("size", &sizes), ("twinkle", &twinkles)] {
+        let lo = series.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = series.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        assert!(
+            hi - lo > 1e-3,
+            "{label} must vary across the population: {lo} .. {hi}"
+        );
+    }
+
+    // Shimmer without breathing, at the factor level: the field mean's swing
+    // over a window against the mean member swing over the same window. The
+    // emitter asserted 8x on the same statistic; the swarm uses the emitter's
+    // band and hash, so the same margin holds.
+    const TWINKLE: f32 = 0.8;
+    let times: Vec<f32> = (0..240).map(|f| f as f32 / 60.0).collect();
+    let swing = |series: &[f32]| {
+        let lo = series.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = series.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        hi - lo
+    };
+    let field_mean: Vec<f32> = times
+        .iter()
+        .map(|&t| {
+            (0..n as usize)
+                .map(|i| twinkle_factor(freqs[i], phases[i], t, TWINKLE))
+                .sum::<f32>()
+                / n as f32
+        })
+        .collect();
+    let member_swing: f32 = (0..n as usize)
+        .map(|i| {
+            let series: Vec<f32> = times
+                .iter()
+                .map(|&t| twinkle_factor(freqs[i], phases[i], t, TWINKLE))
+                .collect();
+            swing(&series)
+        })
+        .sum::<f32>()
+        / n as f32;
+    let field_swing = swing(&field_mean);
+    assert!(
+        member_swing > TWINKLE,
+        "members must actually twinkle (mean swing {member_swing:.3}), or the \
+         flat field mean below is vacuous"
+    );
+    assert!(
+        member_swing > field_swing * 8.0,
+        "the field must not flash as one sheet: member swing {member_swing:.3} \
+         vs field swing {field_swing:.3}"
+    );
+}
+
+/// **The captured pixels say the same thing** — Phase 2's done-when, on the
+/// real pipeline: with `twinkle` bound at fixed (silent) audio, two captures
+/// at different scene times differ per mark while the whole-frame mean stays
+/// within a bound derived from the twinkle depth; and the whole path is
+/// deterministic and byte-identical at the explicit defaults.
+///
+/// **The bound's derivation, stated as the done-when requires.** Each mark's
+/// brightness factor swings up to `1 ± TWINKLE`; if every mark shared one
+/// oscillator the whole-frame mean would swing by up to `TWINKLE` relatively
+/// (the sheet flash — the failure this gate names). With rates and phases
+/// drawn independently per particle, the mean of `N` independent unit-variance
+/// oscillators scales as `1/sqrt(N)`, so the expected relative swing is
+/// `~TWINKLE / sqrt(N_visible)` where `N_visible = FLOOR_PARTICLES / MARGIN^2`
+/// (the tier's pool times the domain's visible fraction) — 0.6/80 = 0.75 %
+/// here. The asserted bound takes **8x** that for the tonemap's nonlinearity
+/// and 8-bit quantization: 6 %, still 16x under the sheet's 100 %-of-TWINKLE
+/// signature, so the assertion separates the two designs by an order of
+/// magnitude in both directions.
+#[test]
+fn a_twinkling_swarm_shimmers_without_breathing_on_the_pixels() {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::context::RenderError;
+    use crate::render::{HeadlessOptions, Renderer};
+
+    const SIZE: u32 = 128;
+    /// Two capture points 0.5 s apart: the slowest rate in the band moves
+    /// 0.175 cycles between them, so every mark's factor moves visibly.
+    const FRAME_A: u32 = 40;
+    const FRAME_B: u32 = 70;
+    const TWINKLE: f32 = 0.6;
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: SIZE,
+        height: SIZE,
+        prefer_software: true,
+    }) {
+        Ok(renderer) => renderer,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    let frame = AnalysisFrame::default();
+    // `force`/`spin` at 0 so the seeded velocities damp out and a pixel
+    // difference between the two capture points is the marks' brightness, not
+    // their motion.
+    let mut capture = |name: &str, extra: &str, at: u32| {
+        let toml = format!(
+            "system = \"swarm\"\nname = \"{name}\"\n[params]\nforce = \"0\"\n\
+             spin = \"0\"\nbrightness = \"0.9\"\nsize = \"3.0\"\n{extra}"
+        );
+        let preset = Preset::from_toml_str(&toml).expect("the probe preset parses");
+        renderer.set_presets(vec![preset]);
+        renderer
+            .capture_preset(name, &frame, at)
+            .expect("capture the probe preset")
+    };
+    let mean = |img: &crate::render::CaptureImage| -> f32 {
+        let sum: u64 = img
+            .rgba
+            .chunks_exact(4)
+            .map(|px| px[0] as u64 + px[1] as u64 + px[2] as u64)
+            .sum();
+        sum as f32 / (img.rgba.len() as f32 / 4.0 * 3.0)
+    };
+
+    let tw = format!("twinkle = \"{TWINKLE}\"\n");
+    let a = capture("tw", &tw, FRAME_A);
+    let b = capture("tw", &tw, FRAME_B);
+
+    // Determinism first: the same preset at the same scene time, byte for byte.
+    let a2 = capture("tw", &tw, FRAME_A);
+    assert_eq!(
+        a.rgba, a2.rgba,
+        "two captures at the same scene time must be byte-identical — the \
+         twinkle is a pure function of (seed, scene time)"
+    );
+
+    // Per-mark life: the two capture points differ across a real share of the
+    // frame...
+    let differing = a
+        .rgba
+        .chunks_exact(4)
+        .zip(b.rgba.chunks_exact(4))
+        .filter(|(x, y)| x[..3] != y[..3])
+        .count();
+    let total = (SIZE * SIZE) as usize;
+    eprintln!("twinkle: {differing} of {total} pixels differ between the two times");
+    assert!(
+        differing * 50 > total,
+        "a bound twinkle must move individual marks between two capture points: \
+         only {differing} of {total} pixels differ"
+    );
+
+    // ...while the frame's total light sits still, within the derived bound.
+    let (mean_a, mean_b) = (mean(&a), mean(&b));
+    let n_visible = FLOOR_PARTICLES as f32 / (MARGIN * MARGIN);
+    let bound = 8.0 * TWINKLE / n_visible.sqrt();
+    let rel = (mean_a - mean_b).abs() / mean_a.max(1e-6);
+    eprintln!(
+        "twinkle: whole-frame mean {mean_a:.3} vs {mean_b:.3} (relative {rel:.4}, \
+         bound {bound:.4})"
+    );
+    assert!(
+        rel < bound,
+        "the whole-frame mean must not breathe with the twinkle: relative swing \
+         {rel:.4} over the derived bound {bound:.4} — the field is flashing as \
+         one sheet"
+    );
+
+    // The explicit defaults are the unbound preset, byte for byte — the
+    // identity claim through the whole preset path.
+    let unbound = capture("plain", "", FRAME_A);
+    let explicit = capture("zeroed", "twinkle = \"0\"\nsize_spread = \"0\"\n", FRAME_A);
+    assert_eq!(
+        unbound.rgba, explicit.rgba,
+        "explicit twinkle = 0 / size_spread = 0 must render byte-identically to \
+         no binding at all"
+    );
+
+    // And `size_spread` genuinely reaches the marks (its non-vacuity arm).
+    let spread = capture("spread", "size_spread = \"1.2\"\n", FRAME_A);
+    let spread_differs = spread
+        .rgba
+        .chunks_exact(4)
+        .zip(unbound.rgba.chunks_exact(4))
+        .filter(|(x, y)| x[..3] != y[..3])
+        .count();
+    eprintln!("size_spread: {spread_differs} of {total} pixels differ from unbound");
+    assert!(
+        spread_differs * 50 > total,
+        "a bound size_spread must move the frame: only {spread_differs} of \
+         {total} pixels differ"
     );
 }
 
