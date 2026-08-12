@@ -54,6 +54,16 @@
 //! the tilt is welded to `+y` while the ramp can point anywhere, so any angled
 //! backdrop would carry a second vertical gradient no param explains.
 //!
+//! **One exponent shapes the ramp, and it shapes the *position* rather than
+//! either channel.** `bg_ramp_gamma` eases where things sit along the axis ahead
+//! of both the palette coordinate and the shade mix, so colour and brightness
+//! reach their midpoints at the same height and the two halves of one ramp
+//! cannot disagree. It is not redundant with `[palette]` stop placement: that
+//! palette is **shared with the scene** (ADR-0086/0090), so shaping the sky's
+//! falloff through stop `at` positions would re-map the figure too — and it is
+//! the only shape control the brightness ramp has at all, `mix` being a straight
+//! line no stop can bend.
+//!
 //! Every ramp param defaults to an **arithmetic identity** with the picture that
 //! shipped before it, not to an approximation of it — see each one's constant.
 //!
@@ -116,6 +126,18 @@ const DEFAULT_HUE_SPAN: f32 = 0.0;
 /// brightness the other way, which the tilt could never do.
 const DEFAULT_SHADE: f32 = 0.72;
 const DEFAULT_SHADE_END: f32 = 1.0;
+/// The ramp's response exponent (ADR-0094, in ADR-0092's form). `1.0` is the
+/// **exact** identity — the shader's `select` takes the unexponentiated arm — so
+/// the ramp is bit-for-bit linear until a preset bends it.
+const DEFAULT_RAMP_GAMMA: f32 = 1.0;
+/// The exponent's guard rails, and the reasoning `ink.rs` states for the same
+/// pair: `pow(0, 0)` is undefined and a negative exponent sends the ramp's start
+/// to infinity, so a binding that sweeps out of range is clamped rather than
+/// allowed to produce a NaN frame. Both ends are far outside anything a sky
+/// wants — at `0.05` the ramp's midpoint sits within a pixel of its start, at
+/// `20` within a pixel of its end.
+const MIN_RAMP_GAMMA: f32 = 0.05;
+const MAX_RAMP_GAMMA: f32 = 20.0;
 /// The two shared colour modulations, at the same defaults every scene uses —
 /// `saturation` unchanged, `palette_mix` fully on palette A.
 const DEFAULT_SATURATION: f32 = 1.0;
@@ -125,7 +147,8 @@ const SHADER: &str = r#"
 struct Bg {
     // x: hue, y: bright, z: vignette, w: unused
     v: vec4<f32>,
-    // x: palette_mix (A/B crossfade), y: saturation, zw: unused
+    // x: palette_mix (A/B crossfade), y: saturation,
+    // z: bg_ramp_gamma (CPU-clamped positive), w: unused
     c: vec4<f32>,
     // The ramp (ADR-0094). x: unused, y: bg_hue_span,
     // z: bg_shade, w: bg_shade_end
@@ -164,6 +187,23 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // in a later phase, and its zero reduces to exactly this.
     let s = clamp(0.5 + 0.5 * in.ndc.y, 0.0, 1.0);
 
+    // The ramp is linear in screen space and light is not, so one exponent shapes
+    // *where* things sit along the axis. It is applied to the position, ahead of
+    // both channels, so colour and brightness stay locked as ONE ramp — the same
+    // reason the fixed tilt retired into the ramp rather than sitting beside it.
+    // `g > 1` holds the ramp near its start before falling away (a hot band at
+    // the horizon, then a long fade); `g < 1` drops fast and leaves a dim tail.
+    //
+    // The `g == 1.0` branch is a correctness requirement, not an optimization,
+    // and it is the form `ink.rs:135` shipped at Plan 0078: `pow(x, 1.0)` is
+    // `exp2(1.0 * log2(x))` and is NOT bit-exact, so without it the *default*
+    // would perturb every backdrop-binding preset and every future golden by a
+    // rounding step. `g` is clamped positive on the CPU
+    // ([`applied_ramp_gamma`]), so `1.0` reaches the uniform exactly and `pow`
+    // never sees the undefined `0^0`.
+    let g = u.c.z;
+    let e = select(pow(s, g), s, g == 1.0);
+
     // The brightness ramp, on the **same axis as the colour sweep**. This used to
     // be a hardcoded `mix(0.72, 1.0, ·)` — a fixed 28 % tilt welded to +y, which
     // is the wrong way round for a horizon and which no param explained. Those
@@ -172,7 +212,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // otherwise (ADR-0094 Alternative E: the tilt retires *into* the ramp rather
     // than sitting beside it, so an angled backdrop cannot carry a second,
     // invisible vertical gradient).
-    let grad = mix(shade, shade_end, s);
+    let grad = mix(shade, shade_end, e);
     // A radial vignette that darkens the corners. Stays radial and independent of
     // the ramp — nothing here makes it directional.
     let r = length(in.ndc);
@@ -187,8 +227,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // start and the sweep travels `bg_hue_span` from there. The coordinate is not
     // clamped — it keeps the engine-wide repeat addressing, so a segment leaving
     // [0, 1] wraps (ADR-0094 Alternative D: two shipped presets depend on it).
-    // At the `0.0` default this is `hue + 0.0 * s`, which is `hue` exactly.
-    let coord = hue + hue_span * s;
+    // At the `0.0` default this is `hue + 0.0 * e`, which is `hue` exactly.
+    let coord = hue + hue_span * e;
     let ca = textureSample(lut_a, lut_samp, vec2<f32>(coord, 0.5)).rgb;
     let cb = textureSample(lut_b, lut_samp, vec2<f32>(coord, 0.5)).rgb;
     var tint = mix(ca, cb, clamp(palette_mix, 0.0, 1.0));
@@ -399,6 +439,7 @@ pub struct Background {
     hue_span: f32,
     shade: f32,
     shade_end: f32,
+    ramp_gamma: f32,
     /// The active preset's baked palette pair, re-uploaded to the LUT textures
     /// when `palette_dirty` (a preset switch, or a lazy rebuild), off the hot
     /// path. Held here rather than in [`Resources`] so a backdrop that has not
@@ -423,7 +464,26 @@ pub const PARAMS: &[&str] = &[
     "bg_hue_span",
     "bg_shade",
     "bg_shade_end",
+    "bg_ramp_gamma",
 ];
+
+/// The exponent the shader will **actually apply** for a bound `bg_ramp_gamma`:
+/// a non-finite binding falls back to the identity, and a finite one is held
+/// inside the positive range the arithmetic needs ([`MIN_RAMP_GAMMA`],
+/// [`MAX_RAMP_GAMMA`]).
+///
+/// The guard lives on the CPU rather than in the shader for the two reasons
+/// [`ink::applied_gamma`](super::ink) states: `1.0` stays **exactly** `1.0` on
+/// the way to the uniform, which is what the shader's identity branch tests, and
+/// the clamp can never be reached with a NaN, where WGSL's `clamp` is
+/// implementation-defined.
+fn applied_ramp_gamma(gamma: f32) -> f32 {
+    if gamma.is_finite() {
+        gamma.clamp(MIN_RAMP_GAMMA, MAX_RAMP_GAMMA)
+    } else {
+        DEFAULT_RAMP_GAMMA
+    }
+}
 
 /// The two colour modulations the backdrop **shares with the scene** rather than
 /// owning (ADR-0086).
@@ -449,6 +509,7 @@ impl Background {
             hue_span: DEFAULT_HUE_SPAN,
             shade: DEFAULT_SHADE,
             shade_end: DEFAULT_SHADE_END,
+            ramp_gamma: DEFAULT_RAMP_GAMMA,
             // Seeded with the default `spectrum` (the cosine this pass used to
             // inline), so a backdrop painted before any `set_palette` call is the
             // colour it always was rather than black.
@@ -487,6 +548,7 @@ impl Background {
         self.hue_span = DEFAULT_HUE_SPAN;
         self.shade = DEFAULT_SHADE;
         self.shade_end = DEFAULT_SHADE_END;
+        self.ramp_gamma = DEFAULT_RAMP_GAMMA;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
     }
@@ -503,6 +565,7 @@ impl Background {
             "bg_hue_span" => self.hue_span = value,
             "bg_shade" => self.shade = value,
             "bg_shade_end" => self.shade_end = value,
+            "bg_ramp_gamma" => self.ramp_gamma = value,
             _ => return false,
         }
         true
@@ -567,7 +630,12 @@ impl Background {
             0,
             bytemuck::bytes_of(&Bg {
                 v: [self.hue, self.bright, self.vignette, 0.0],
-                c: [self.palette_mix, self.saturation, 0.0, 0.0],
+                c: [
+                    self.palette_mix,
+                    self.saturation,
+                    applied_ramp_gamma(self.ramp_gamma),
+                    0.0,
+                ],
                 g: [0.0, self.hue_span, self.shade, self.shade_end],
             }),
         );
