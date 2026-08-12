@@ -1,6 +1,9 @@
 # 0081 — The sky gets a galaxy: the backdrop paints a curved band
 
-> **Status:** draft 2026-08-12
+> **Status:** approved 2026-08-12 (user approval, same day; the structure/colour/arc forks were all
+> decided by interview — see ADR-0095 Alternatives A, D and F)
+> **Sequenced after:** [0082](0082-the-gradient-stops-banding.md) — the band is a second wide smooth
+> gradient, and Phase 6's verdict must not be confounded by banding already known about
 > **Created:** 2026-08-12
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0095](../adrs/0095-the-backdrop-paints-a-curved-band.md) (this plan's
