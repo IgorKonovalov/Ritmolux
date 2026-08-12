@@ -1,12 +1,18 @@
-//! The backdrop paints a directional ramp (Plan 0080, ADR-0094).
+//! The backdrop paints a directional ramp (Plan 0080, ADR-0094) and one curved
+//! band over it (Plan 0081, ADR-0095).
 //!
 //! The pass used to take **one** palette sample and multiply it by a fixed
 //! upward brightness tilt. It now sweeps a *segment* of the preset's gradient
 //! along a ramp axis, with a brightness ramp on that same axis, an easing
-//! exponent shaping both, and an angle turning it. This suite is the behavioural
-//! half of that; the identity half — that every default renders byte-identically
+//! exponent shaping both, and an angle turning it — and adds a soft gaussian
+//! band over the result, on an axis of its own. This suite is the behavioural
+//! half of both; the identity half — that every default renders byte-identically
 //! to the picture before it — is the golden suite's bless-to-bless control, which
 //! is a claim about *bytes* and belongs there rather than here.
+//!
+//! **One file, not two**, because the band is the same pass through the same
+//! helpers: a second binary would duplicate every capture, probe and locator
+//! below to test the neighbouring half of one fragment shader.
 //!
 //! # Everything here is a differential
 //!
@@ -47,6 +53,12 @@ const DUSK: &str = "[palette]\nstops = [\
     { at = 0.75, color = \"#ff7a1f\" }, \
     { at = 1.0,  color = \"#ffd06e\" }]";
 
+/// A palette with no gradient in it at all, so a probe's colour cannot vary with
+/// position and the only thing moving across the frame is the property under
+/// test. Used by every test whose subject is a *shape* rather than a colour.
+const FLAT: &str = "[palette]\nstops = [{ at = 0.0, color = \"#ffcf80\" }, \
+                    { at = 1.0, color = \"#ffcf80\" }]";
+
 /// The ramp position at framebuffer row `j` of `height`, at the pixel's centre.
 ///
 /// Derived from the documented convention rather than measured: `ndc` is
@@ -61,13 +73,17 @@ fn ramp_at_row(row: u32, height: u32) -> f32 {
 /// A backdrop-only preset: a swarm whose sprites have zero area, so no fragment
 /// is ever rasterized and the frame is the backdrop alone, through the real
 /// composite. `params` is appended to the `[params]` table verbatim.
-fn ramp_preset(palette: &str, params: &str) -> Preset {
+///
+/// `bright` is written into the table here rather than left to `params`, because
+/// TOML rejects a duplicate key — so a probe that wants an **unlit** ground
+/// (the band's own, ADR-0095) cannot get one by appending.
+fn probe_preset(palette: &str, bright: &str, params: &str) -> Preset {
     let toml = format!(
         "system = \"swarm\"\nname = \"probe\"\n{palette}\n[params]\n\
          size = \"0\"\nforce = \"0\"\nspin = \"0\"\nburst = \"0\"\n\
-         bg_bright = \"{BRIGHT}\"\n{params}"
+         bg_bright = \"{bright}\"\n{params}"
     );
-    Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("the ramp probe parses: {e}"))
+    Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("the backdrop probe parses: {e}"))
 }
 
 /// Build a software headless renderer at `width` x `height`, or `None` (a logged
@@ -93,10 +109,20 @@ fn renderer() -> Option<Renderer> {
 
 /// Capture one backdrop-only preset.
 fn capture(renderer: &mut Renderer, palette: &str, params: &str) -> CaptureImage {
-    renderer.set_presets(vec![ramp_preset(palette, params)]);
+    capture_at_bright(renderer, palette, &BRIGHT.to_string(), params)
+}
+
+/// Capture one backdrop-only preset at an explicit `bg_bright`.
+fn capture_at_bright(
+    renderer: &mut Renderer,
+    palette: &str,
+    bright: &str,
+    params: &str,
+) -> CaptureImage {
+    renderer.set_presets(vec![probe_preset(palette, bright, params)]);
     renderer
         .capture_preset("probe", &AnalysisFrame::default(), FRAMES)
-        .unwrap_or_else(|e| panic!("capture the ramp probe [{params}]: {e}"))
+        .unwrap_or_else(|e| panic!("capture the backdrop probe [{params}]: {e}"))
 }
 
 /// The RGB triple at `(x, y)`.
@@ -240,8 +266,6 @@ fn the_brightness_ramp_runs_the_way_the_preset_points_it() {
     let Some(mut renderer) = renderer() else {
         return;
     };
-    const FLAT: &str = "[palette]\nstops = [{ at = 0.0, color = \"#ffcf80\" }, \
-                        { at = 1.0, color = \"#ffcf80\" }]";
     let ends = |image: &CaptureImage| {
         let column = mid_column(image);
         let top = luma(column[0]);
@@ -340,8 +364,6 @@ fn the_exponent_moves_both_channels_midpoints_to_the_same_height() {
     let Some(mut renderer) = renderer() else {
         return;
     };
-    const FLAT: &str = "[palette]\nstops = [{ at = 0.0, color = \"#ffcf80\" }, \
-                        { at = 1.0, color = \"#ffcf80\" }]";
     // Vignette off throughout: it is radial, so it varies down the column too and
     // would blunt every argmin below.
     const STILL: &str = "bg_vignette = \"0\"\n";
@@ -495,8 +517,6 @@ fn the_ramp_angle_takes_the_surfaces_aspect_not_the_internal_grids() {
     let Some(mut renderer) = renderer_sized(W, H) else {
         return;
     };
-    const FLAT: &str = "[palette]\nstops = [{ at = 0.0, color = \"#ffcf80\" }, \
-                        { at = 1.0, color = \"#ffcf80\" }]";
     // π/4, written out: the expression grammar has no `pi`.
     const DIAGONAL: &str = "0.7853981634";
 
@@ -609,5 +629,256 @@ fn the_swept_ramp_is_continuous_down_the_whole_column() {
          at row {worst_row}, against a total travel of {travel:.1} — that is an \
          edge, not a ramp. The shipped `scale = 0` slab this replaces puts the \
          entire travel into one step."
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The band (Plan 0081, ADR-0095)
+// ---------------------------------------------------------------------------
+
+/// The band probes' ground: a flat mid plate with nothing else varying across
+/// it, so anything that moves down the column is the band. `bg_shade` held at
+/// both ends leaves the ramp out of the picture, and the vignette is off because
+/// it is radial and would vary down the column too.
+const PLATE: &str = "bg_vignette = \"0\"\nbg_hue = \"0\"\n\
+                     bg_shade = \"0.5\"\nbg_shade_end = \"0.5\"\n";
+
+/// The band's intensity for the probes. Roughly the ground's own brightness, so
+/// the swell is unmistakable without pushing the sum anywhere near a rail.
+const BAND_AMOUNT: f32 = 0.5;
+
+/// `background.rs`'s upper half-width rail, mirrored because the constant is
+/// private. What this test needs from it is only that the envelope is flat
+/// there, which that constant's own doc comment derives (within 0.0025 % of 1
+/// across the whole frame) — so a *lower* rail landing here would fail the
+/// non-vacuity assertion rather than pass quietly.
+const MAX_WIDTH: f32 = 100.0;
+
+/// **The envelope reaches `1/e` exactly `bg_band_width` either side of the
+/// centre** — which is what a gaussian half-width *means*, and the one thing an
+/// author has to be able to trust when they type a number into it.
+///
+/// # Why this is a differential and not a ratio
+///
+/// The obvious test — read the band's contribution at the centre and at the
+/// half-width, assert the ratio is 0.368 — would be **wrong**, and Plan 0080
+/// Phase 2 already paid for the lesson: the tonemap and the sRGB encode both sit
+/// between the envelope and the 8-bit write, so the linear ratio is not the
+/// encoded one. A magnitude claim here would be a claim about the tonemap's
+/// shoulder instead.
+///
+/// So the `1/e` is put into the **control** rather than into an assertion. Two
+/// frames:
+///
+/// - the real band, at `bg_band_width = 0.15`, `bg_band_amount = A`;
+/// - a **flat** one at the upper width rail, where the envelope is within
+///   0.0025 % of `1` everywhere, carrying `bg_band_amount = A/e`.
+///
+/// At the rows where the real envelope is `1/e`, both frames add the same light
+/// to the same ground and go through the same tonemap and the same encode, so
+/// they must agree. Everything except the envelope cancels by construction.
+///
+/// # Where those rows are
+///
+/// At `bg_band_angle = 0` the across axis runs bottom-to-top, so row `j` sits at
+/// `across = 1 - (j + 0.5)/H` — the same mapping the ramp uses. With the centre
+/// at 0.5 and the half-width 0.15, the crossings are at `across = 0.65` and
+/// `0.35`, which over 64 rows are rows **22** and **41** (and the centre, 0.5,
+/// is row 31.5 — between two pixels, which is why the peak itself is not one of
+/// the probed rows).
+///
+/// # The margin
+///
+/// Two levels, from two sources that are both bounded rather than guessed. Row
+/// 22's pixel centre sits at `across = 0.6484`, not at exactly 0.65, so its real
+/// envelope is 0.3756 against the control's 0.3679 — **2.1 % of the band's own
+/// contribution**, which at these amplitudes is under one 8-bit level after the
+/// encode. The display write also dithers (ADR-0096), and while its noise is a
+/// pure function of the pixel — identical in both frames — the two sides can
+/// still round to either side of one LSB.
+#[test]
+fn the_bands_envelope_reaches_one_over_e_at_the_half_width_its_param_names() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    const WIDTH: f32 = 0.15;
+    const POS: f32 = 0.5;
+    // The rows the geometry above puts the crossings on, and the row-to-position
+    // mapping restated as an assertion so they cannot quietly become magic
+    // numbers if `SIZE` changes.
+    const CROSSINGS: [u32; 2] = [22, 41];
+    for row in CROSSINGS {
+        let across = ramp_at_row(row, SIZE);
+        let off = (across - POS).abs();
+        assert!(
+            (off - WIDTH).abs() < 0.01,
+            "row {row} sits at across {across:.4}, which is {off:.4} from the \
+             centre — this test's control only means anything if that is the \
+             half-width {WIDTH}"
+        );
+    }
+
+    let band = |amount: f32, width: f32| {
+        format!(
+            "{PLATE}bg_band_amount = \"{amount}\"\nbg_band_angle = \"0\"\n\
+             bg_band_pos = \"{POS}\"\nbg_band_width = \"{width}\"\n"
+        )
+    };
+    let real = capture(&mut renderer, FLAT, &band(BAND_AMOUNT, WIDTH));
+    // The upper rail: `env` is within 0.0025 % of 1 across the whole frame, so
+    // this frame's band is a flat wash of exactly `A/e`.
+    let flat = capture(
+        &mut renderer,
+        FLAT,
+        &band(BAND_AMOUNT / std::f32::consts::E, MAX_WIDTH),
+    );
+
+    for row in CROSSINGS {
+        let real_px = pixel(&real, SIZE / 2, row);
+        let flat_px = pixel(&flat, SIZE / 2, row);
+        let worst = worst_channel(real_px, flat_px);
+        println!("1/e crossing at row {row}: band {real_px:?} against flat {flat_px:?}");
+        assert!(
+            worst <= 2,
+            "at row {row} the envelope should be 1/e, so the band must add \
+             exactly what a flat band at `bg_band_amount / e` adds — the two \
+             differ by {worst} levels ({real_px:?} against {flat_px:?}). \
+             `bg_band_width` is not the 1/e half-width it is documented as."
+        );
+    }
+
+    // **Non-vacuity.** The two frames agree at the crossings *because* the
+    // envelope is 1/e there — if it were flat, or the amount were being ignored,
+    // they would agree everywhere. At the band's own centre the real frame
+    // carries the full `A` against the control's `A/e`, so they must not.
+    let centre = SIZE / 2;
+    let apart = worst_channel(
+        pixel(&real, SIZE / 2, centre),
+        pixel(&flat, SIZE / 2, centre),
+    );
+    println!("centre row {centre}: the two frames differ by {apart} levels");
+    assert!(
+        apart > 10,
+        "at the band's centre the real band carries its full amount and the \
+         control carries 1/e of it, so the two frames must differ — they differ \
+         by {apart} levels, which means the envelope is not varying at all"
+    );
+}
+
+/// **`bg_band_amount > 0` is enough on its own to light the pass** — the widened
+/// build condition (ADR-0095), and the near-black sky the reference photograph
+/// actually is.
+///
+/// Below a visible `bg_bright` this pass used to skip building its gradient
+/// pipeline entirely and clear the frame black. A galaxy over an unlit ground
+/// would have rendered *nothing*, silently, and no test that only ever runs a
+/// lit backdrop could see it: the one-line condition is the whole subject here.
+///
+/// The `bg_band_amount = 0` companion capture is what makes this a measurement
+/// of the condition rather than of the band — same preset, same unlit ground,
+/// and it must come back the plain black clear it always was.
+#[test]
+fn a_band_alone_lights_the_pass_over_an_unlit_ground() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    let unlit = |amount: &str| {
+        format!(
+            "bg_vignette = \"0\"\nbg_hue = \"0\"\nbg_band_amount = \"{amount}\"\n\
+             bg_band_angle = \"0\"\nbg_band_pos = \"0.5\"\nbg_band_width = \"0.15\"\n"
+        )
+    };
+    let dark = capture_at_bright(&mut renderer, FLAT, "0", &unlit("0"));
+    let banded = capture_at_bright(&mut renderer, FLAT, "0", &unlit("0.6"));
+
+    let dark_worst = mid_column(&dark).into_iter().map(luma).fold(0.0, f32::max);
+    assert!(
+        dark_worst <= 1.0,
+        "an unlit ground with no band is the plain black clear it always was — \
+         the brightest mid-column luma is {dark_worst:.1}"
+    );
+
+    let column: Vec<f32> = mid_column(&banded).into_iter().map(luma).collect();
+    let peak = column.iter().copied().fold(0.0f32, f32::max);
+    assert!(
+        peak > 32.0,
+        "a band over an unlit ground paints nothing (brightest mid-column luma \
+         {peak:.1}). The pass is still skipping its pipeline below a visible \
+         `bg_bright`, so `bg_band_amount` alone cannot reach the frame."
+    );
+
+    // And it is a *band*, not a wash: at `bg_band_pos = 0.5` the peak sits at
+    // the middle of the column and both ends are dark. The envelope at the frame
+    // edge is `exp(-(0.5/0.15)^2)`, about 1.5e-5, so "dark" here is black.
+    let peak_row = column
+        .iter()
+        .enumerate()
+        .fold(
+            (0usize, 0.0f32),
+            |best, (row, &l)| {
+                if l > best.1 { (row, l) } else { best }
+            },
+        )
+        .0;
+    println!(
+        "unlit band: peak luma {peak:.1} at row {peak_row}, ends {:.1}/{:.1}",
+        column[0],
+        column[column.len() - 1]
+    );
+    assert!(
+        peak_row.abs_diff((SIZE / 2) as usize) <= 1,
+        "the band centred at `bg_band_pos = 0.5` peaks at row {peak_row} of \
+         {SIZE} — it is not where its position names"
+    );
+    for (what, edge) in [("top", column[0]), ("bottom", column[column.len() - 1])] {
+        assert!(
+            edge <= 1.0,
+            "the {what} of the column is {edge:.1} luma, against the band's \
+             {peak:.1} peak — the envelope is not falling off, so this is a wash \
+             rather than a band"
+        );
+    }
+}
+
+/// **At `bg_band_amount = 0` the band's other params do nothing whatsoever** —
+/// byte-for-byte, which is what the shader's `select` arm buys over a multiply
+/// by zero.
+///
+/// This is the identity claim in its strongest form. A multiply by zero would
+/// also be *arithmetically* neutral, but it would put the band's expression on
+/// the evaluated path, where a `pow`, an `exp` or a division has room to perturb
+/// a shipped backdrop by a rounding step. The `select` makes the pre-band
+/// expression the *untaken* branch, so the frames are not merely close.
+#[test]
+fn the_bands_geometry_is_inert_until_its_amount_is_bound() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    let plain = capture(
+        &mut renderer,
+        DUSK,
+        "bg_hue = \"1.0\"\nbg_hue_span = \"-1.0\"\n",
+    );
+    // Every band param bound, off its default, and the amount left at zero.
+    let bound = capture(
+        &mut renderer,
+        DUSK,
+        "bg_hue = \"1.0\"\nbg_hue_span = \"-1.0\"\nbg_band_amount = \"0\"\n\
+         bg_band_angle = \"0.7\"\nbg_band_pos = \"0.2\"\nbg_band_width = \"0.05\"\n",
+    );
+    let worst = (0..SIZE)
+        .map(|row| {
+            (0..SIZE)
+                .map(|col| worst_channel(pixel(&plain, col, row), pixel(&bound, col, row)))
+                .max()
+                .unwrap_or(0)
+        })
+        .max()
+        .unwrap_or(0);
+    assert!(
+        worst == 0,
+        "binding the band's geometry at `bg_band_amount = 0` moved {worst} \
+         levels. The band is supposed to be an untaken `select` branch there, \
+         not a term multiplied by zero."
     );
 }
