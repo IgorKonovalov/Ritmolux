@@ -16,8 +16,8 @@ use crate::render::{CaptureImage, HeadlessOptions, Renderer};
 /// **Near-identity below the mid-range** (ADR-0046). A frame whose values are
 /// all at or below the knee comes back unchanged to well within a byte.
 ///
-/// This is the property that rules plain Reinhard out â€” it maps 0.8 to 0.44,
-/// which would have darkened every shipped preset â€” and it is what confines
+/// This is the property that rules plain Reinhard out — it maps 0.8 to 0.44,
+/// which would have darkened every shipped preset — and it is what confines
 /// this plan's golden re-bless to the regions that were actually clipping.
 #[test]
 fn the_curve_is_near_identity_below_the_mid_range() {
@@ -40,7 +40,7 @@ fn the_curve_is_near_identity_below_the_mid_range() {
 }
 
 /// **Monotone, and bounded below 1** (ADR-0046). A saturating ramp maps in
-/// strictly increasing order â€” so two values never swap places â€” and never
+/// strictly increasing order — so two values never swap places — and never
 /// reaches 1.0, so the 8-bit write below this pass has somewhere to put the
 /// decade above 1.0 instead of flattening all of it onto one value.
 ///
@@ -49,7 +49,7 @@ fn the_curve_is_near_identity_below_the_mid_range() {
 /// finite `x`, but `f(x)` still crosses the last byte's midpoint at a linear
 /// input of about **36** at [`KNEE`] `= 0.6`. A frame carrying that much light
 /// presents 255 legitimately. What the curve buys is the *separation* asserted
-/// below â€” 2.0 and 4.0 landing on different bytes, where the 8-bit chain gave
+/// below — 2.0 and 4.0 landing on different bytes, where the 8-bit chain gave
 /// both the same white.
 #[test]
 fn a_saturating_ramp_maps_monotonically_and_never_reaches_clip() {
@@ -66,7 +66,7 @@ fn a_saturating_ramp_maps_monotonically_and_never_reaches_clip() {
         x *= 1.05;
     }
     // The shoulder's whole point: an accumulation that used to clip to flat
-    // white is now separable â€” 2.0 and 4.0 land on different bytes.
+    // white is now separable — 2.0 and 4.0 land on different bytes.
     let two = (map(2.0) * 255.0).round();
     let four = (map(4.0) * 255.0).round();
     assert!(
@@ -76,8 +76,8 @@ fn a_saturating_ramp_maps_monotonically_and_never_reaches_clip() {
 }
 
 /// **Hue-preserving** (ADR-0046): the roll-off scales all three channels by
-/// one factor, so the ratios between them â€” and therefore the hue and the
-/// saturation â€” are exactly what came in. A per-channel curve would fail
+/// one factor, so the ratios between them — and therefore the hue and the
+/// saturation — are exactly what came in. A per-channel curve would fail
 /// this by washing the core toward white.
 #[test]
 fn the_roll_off_preserves_channel_ratios() {
@@ -93,7 +93,7 @@ fn the_roll_off_preserves_channel_ratios() {
         let after = out[pair.0] / out[pair.1];
         assert!(
             (before - after).abs() < 1.0e-5,
-            "channel ratio {before} became {after} â€” the map rotated the hue"
+            "channel ratio {before} became {after} — the map rotated the hue"
         );
     }
 }
@@ -104,7 +104,7 @@ fn the_roll_off_preserves_channel_ratios() {
 
 /// The fixture both GPU assertions run on: a dense additive rose whose
 /// strokes cross each other everywhere. Shared with
-/// `core/tests/composite.rs`, which pins the same figure to a baseline â€” one
+/// `core/tests/composite.rs`, which pins the same figure to a baseline — one
 /// definition, two guards.
 const OVERLAP_FIXTURE: &str = include_str!("../../../tests/fixtures/composite_overlap.toml");
 
@@ -116,7 +116,7 @@ const HEIGHT: u32 = 100;
 /// this only has to get past the lazy resource builds.
 const FRAMES: u32 = 4;
 
-/// Rec.709 relative luminance â€” the ordering the "brighter than" claims are
+/// Rec.709 relative luminance — the ordering the "brighter than" claims are
 /// made in, so a hue difference between two pixels cannot decide them.
 fn luma(r: f32, g: f32, b: f32) -> f32 {
     0.2126 * r + 0.7152 * g + 0.0722 * b
@@ -127,7 +127,7 @@ fn luma(r: f32, g: f32, b: f32) -> f32 {
 // -----------------------------------------------------------------------
 
 /// A headless render context, or `None` (a logged skip) on a runner with no GPU
-/// adapter at all â€” macOS has no software Metal fallback (ADR-0016).
+/// adapter at all — macOS has no software Metal fallback (ADR-0016).
 fn context(width: u32, height: u32, software: bool) -> Option<RenderContext> {
     match RenderContext::new_headless(width, height, software) {
         Ok(ctx) => Some(ctx),
@@ -149,9 +149,9 @@ fn to_half(x: f32) -> u16 {
 }
 
 /// An opaque grey [`COMPOSITE_FORMAT`](crate::render::COMPOSITE_FORMAT) frame
-/// whose value is `at(column)` â€” grey so the hue-preserving scale reduces to the
+/// whose value is `at(column)` — grey so the hue-preserving scale reduces to the
 /// curve, and varying along **x** so the vertex prelude's Y flip is irrelevant.
-pub(super) fn grey_texels(width: u32, height: u32, at: impl Fn(u32) -> f32) -> Vec<u8> {
+fn grey_texels(width: u32, height: u32, at: impl Fn(u32) -> f32) -> Vec<u8> {
     let opaque = to_half(1.0);
     let mut texels = Vec::with_capacity((width * height * 8) as usize);
     for _ in 0..height {
@@ -166,7 +166,7 @@ pub(super) fn grey_texels(width: u32, height: u32, at: impl Fn(u32) -> f32) -> V
 }
 
 /// Write `texels` straight into a fresh tonemap's input and read back what the
-/// pass writes at the surface format â€” the pixel-exact rig the `COPY_DST` usage
+/// pass writes at the surface format — the pixel-exact rig the `COPY_DST` usage
 /// on `tonemap-src` exists for.
 ///
 /// `dither` selects the shipped write or its **control arm**; both resolve
@@ -221,7 +221,7 @@ fn resolve_linear(
 }
 
 /// A headless renderer on the software adapter, or `None` (a logged skip) on
-/// a runner with no GPU â€” macOS has no software Metal fallback (ADR-0016).
+/// a runner with no GPU — macOS has no software Metal fallback (ADR-0016).
 fn headless() -> Option<Renderer> {
     match Renderer::new_headless(HeadlessOptions {
         width: WIDTH,
@@ -240,8 +240,8 @@ fn headless() -> Option<Renderer> {
 /// **Plan 0045 Phase 3's two done-when claims, on one frame.**
 ///
 /// 1. *The composite carries float linear values from scene to blend.* The
-///    tonemap's input is read back **before** the map runs â€” the only place
-///    an over-1.0 accumulation is observable â€” and the additive rose's
+///    tonemap's input is read back **before** the map runs — the only place
+///    an over-1.0 accumulation is observable — and the additive rose's
 ///    crossings are found above 1.0 there. On the pre-Plan-0045 8-bit chain
 ///    this readback could not exceed 1.0 by construction.
 ///
@@ -271,7 +271,7 @@ fn stacked_light_survives_the_composite_and_separates_after_the_map() {
         bar: 0.25,
         ..Default::default()
     };
-    // The 8-bit surface of the *last* frame this renders â€” and the tonemap's
+    // The 8-bit surface of the *last* frame this renders — and the tonemap's
     // input still holds that same frame's linear composite afterwards.
     let displayed = renderer
         .capture_preset(&name, &frame, FRAMES)
@@ -310,7 +310,7 @@ fn stacked_light_survives_the_composite_and_separates_after_the_map() {
     }
     assert!(
         peak.1 > 1.0,
-        "the composite clipped: its brightest linear luminance is {} â€” an \
+        "the composite clipped: its brightest linear luminance is {} — an \
          additive crossing must exceed 1.0 where the 8-bit chain could not",
         peak.1
     );
@@ -329,7 +329,7 @@ fn stacked_light_survives_the_composite_and_separates_after_the_map() {
         crossing > stroke,
         "the crossing (linear {:.3}) came out no brighter than the single \
          stroke (linear {single_luma:.3}) after the map: {crossing:.1} vs \
-         {stroke:.1} â€” that is the flat-white clip this plan removes",
+         {stroke:.1} — that is the flat-white clip this plan removes",
         peak.1
     );
     let clipped = displayed
@@ -349,7 +349,7 @@ fn stacked_light_survives_the_composite_and_separates_after_the_map() {
     );
 }
 
-/// **The shipped shader implements the curve this module documents** â€” the
+/// **The shipped shader implements the curve this module documents** — the
 /// one claim the three GPU-free tests above cannot make, since they exercise
 /// the CPU mirror and the frame path only ever runs the WGSL.
 ///
@@ -360,7 +360,7 @@ fn stacked_light_survives_the_composite_and_separates_after_the_map() {
 ///
 /// **The control arm, with the dither off.** This is a claim about the *curve*,
 /// and the shipped write adds up to one encoded level of noise on top of it
-/// (ADR-0096) â€” which would make a one-byte bound a coin flip. The dither has
+/// (ADR-0096) — which would make a one-byte bound a coin flip. The dither has
 /// its own test below.
 #[test]
 fn the_shader_implements_the_documented_curve() {
@@ -376,7 +376,7 @@ fn the_shader_implements_the_documented_curve() {
         let image = resolve_linear(&ctx, SIZE, SIZE, &texels, false);
 
         // The surface is sRGB, so the byte is the encoded form of what the
-        // shader wrote â€” encode the expectation the same way rather than
+        // shader wrote — encode the expectation the same way rather than
         // decoding the measurement.
         let expected = encode_srgb(map(value)) * 255.0;
         let actual = image.rgba[0] as f32;
@@ -402,14 +402,14 @@ fn encode_srgb(x: f32) -> f32 {
 // -----------------------------------------------------------------------
 
 /// **The dither perturbs the encoded value by ~1 level at BOTH ends of the
-/// range** â€” the claim ADR-0096 Alternative D gets wrong in both directions at
+/// range** — the claim ADR-0096 Alternative D gets wrong in both directions at
 /// once, and the guard against someone tidying `srgb_slope` out of the shader.
 ///
 /// # Why this is where the two disagree
 ///
 /// The surface is `Rgba8UnormSrgb`, so the *hardware* encodes after the shader
 /// and `dE/dL` runs from 12.92 near black to ~0.5 at the bright end. A constant
-/// linear amplitude â€” the tidier-looking implementation â€” therefore lands ~12.9
+/// linear amplitude — the tidier-looking implementation — therefore lands ~12.9
 /// encoded levels down in the dark tail, which is exactly where every plateau
 /// Plan 0082 measured lives, and ~0.44 at white, which is too little to dither
 /// anything. Dividing by the local slope is the whole fix, and it is invisible
@@ -417,15 +417,15 @@ fn encode_srgb(x: f32) -> f32 {
 ///
 /// # The bound is derived, not measured
 ///
-/// For a Â±1-LSB TPDF dither over a signal whose *encoded* fractional part is
+/// For a ±1-LSB TPDF dither over a signal whose *encoded* fractional part is
 /// uniformly distributed, the mean absolute change in the rounded byte is
 /// exactly **1/3**:
 ///
 /// ```text
-/// E|Î”| = 2 âˆ«â‚€^Â½ [ (1-t)Â² + tÂ² ] / 2  dt / Â½  =  1/3
+/// E|Δ| = 2 ∫₀^½ [ (1-t)² + t² ] / 2  dt / ½  =  1/3
 /// ```
 ///
-/// â€” the two tails of the triangular CDF that push a value across the nearest
+/// — the two tails of the triangular CDF that push a value across the nearest
 /// rounding boundary, averaged over where in its interval that value sits. So
 /// each probe is a **narrow ramp** rather than a flat field: sweeping the input
 /// across a dozen or so encoded levels spreads the fractional part evenly, which
@@ -436,25 +436,31 @@ fn encode_srgb(x: f32) -> f32 {
 /// same pipeline, from the same input texture**, so the curve, the encode and
 /// the rounding are identical on both sides and what survives is the dither.
 ///
-/// # WARP's sRGB encode skips byte values below ~20, and that is why the
-/// per-pixel bound is adapter-dependent
+/// # The per-pixel bound is adapter-dependent, and WARP is the loose one
 ///
 /// Measured while writing this test (Plan 0082 Phase 1, this box, DX12). On the
 /// **hardware** adapter both sweeps come back with a worst per-channel move of
 /// **1** and **zero** channels moving 2, at mean 0.3171 (dark) and 0.3408
-/// (bright). On **WARP** the bright sweep is identical in kind â€” worst 1, zero
-/// 2s â€” but the dark sweep reports worst 2 on 84 of 12 288 channels.
+/// (bright) — `round(x + n)` with `|n| <= 1` behaving exactly as the arithmetic
+/// says. On **WARP** the bright sweep is identical in kind, but the dark sweep
+/// reports worst 2 on 84 of 12 288 channels.
 ///
-/// Those are not our amplitude. The undithered **control** on WARP steps
-/// `â€¦ 15, 16, 18 â€¦` down the dark sweep: bytes 17, 14 and 11 are never produced
-/// at all, so WARP's own sRGB quantizer has a **two-byte step** in the dark
-/// region and a one-level dither necessarily crosses it. Every observed 2 is a
-/// jump between two adjacent *produced* values (16 â†’ 18, 15 â†’ 13, 10 â†’ 12) and
-/// none is a jump of two produced levels.
+/// **That is not our amplitude, and it is not an unreachable code value
+/// either.** An undithered control ramp rendered on WARP contains every byte
+/// from 6 to 18 with no gaps, so nothing down there is unreachable. What differs
+/// is the **conversion**: DX12 permits tolerance in float-to-sRGB8, and in the
+/// steep dark region WARP's approximation departs from the true transfer
+/// function — so a perturbation sized by the true slope lands two levels away in
+/// some places and fails to move the value at all in others. Both symptoms are
+/// observed and one mechanism covers them: the 2s here, and the plateau guard
+/// Plan 0082 Phase 3 adds measuring 200 px -> 65 px on WARP against
+/// 137 px -> 19 px on hardware when its ramp sits at its darkest.
 ///
-/// This matters beyond this test: the golden suite blesses on WARP, so Plan
-/// 0082's re-bless carries the same artifact and its bounded-by-one check is
-/// stated against what the blessing adapter can produce.
+/// This reaches past this test: the golden suite blesses on WARP, so Plan 0082's
+/// re-bless carries the same artifact — 212 of 2 049 408 channels across the 27
+/// baselines, 88 % of them below byte 20, every one skipping exactly one value.
+/// **Bounded-by-one is a hardware claim**, and the bound below is read off the
+/// adapter rather than assumed.
 #[test]
 fn the_dither_is_one_encoded_level_at_both_ends_of_the_range() {
     /// Wide enough that the sweep crosses many rounding boundaries; tall enough
@@ -462,7 +468,7 @@ fn the_dither_is_one_encoded_level_at_both_ends_of_the_range() {
     /// draw serves all three channels, so the independent sample count is
     /// `SIZE * SIZE`, not three times it.
     const SIZE: u32 = 64;
-    /// The mean absolute byte change a Â±1-LSB TPDF dither produces, derived
+    /// The mean absolute byte change a ±1-LSB TPDF dither produces, derived
     /// above. The band is ~7 standard errors at this sample count.
     const EXPECTED: f32 = 1.0 / 3.0;
     const BAND: f32 = 0.05;
@@ -470,16 +476,15 @@ fn the_dither_is_one_encoded_level_at_both_ends_of_the_range() {
     let Some(ctx) = context(SIZE, SIZE, true) else {
         return;
     };
-    // WARP's own sRGB encode does not produce every byte below ~20 (see the
-    // `worst` assertion), so the bound on a single pixel's move is one level
-    // there and two here. Measured, not assumed â€” `is_software` is read back
-    // rather than inferred from the `prefer_software` request.
+    // See the doc comment: on WARP a perturbation sized by the true sRGB slope
+    // can cross two levels in the dark. Read back from the adapter rather than
+    // inferred from the `prefer_software` request.
     let bound = if ctx.is_software() { 2 } else { 1 };
 
     // Two sweeps, each in **linear** light at this pass's input. The dark one
-    // straddles the sRGB knee and comes out around bytes 7-18 â€” the band where
+    // straddles the sRGB knee and comes out around bytes 6-18 — the band where
     // Plan 0082 measured 58-pixel plateaus. The bright one runs through the
-    // tonemap's shoulder and comes out around bytes 215-241.
+    // tonemap's shoulder and comes out around bytes 216-241.
     for (end, lo, hi) in [("dark", 0.0020f32, 0.0060f32), ("bright", 0.70, 1.50)] {
         let sweep = |x: u32| lo + (hi - lo) * (x as f32 + 0.5) / SIZE as f32;
         let texels = grey_texels(SIZE, SIZE, sweep);
@@ -494,12 +499,11 @@ fn the_dither_is_one_encoded_level_at_both_ends_of_the_range() {
             .collect();
         let worst = deltas.iter().map(|d| d.abs()).max().unwrap_or(0);
         let mean = deltas.iter().map(|d| d.abs() as f32).sum::<f32>() / deltas.len() as f32;
-        let spans = (control.rgba[0], control.rgba[(SIZE - 1) as usize * 4]);
         println!(
             "{end} sweep (linear {lo}..{hi}, bytes {}..{}): mean |delta| {mean:.4} \
              (expected {EXPECTED:.4}), worst {worst}, {} up / {} down",
-            spans.0,
-            spans.1,
+            control.rgba[0],
+            control.rgba[(SIZE - 1) as usize * 4],
             deltas.iter().filter(|d| **d > 0).count(),
             deltas.iter().filter(|d| **d < 0).count(),
         );
@@ -507,20 +511,20 @@ fn the_dither_is_one_encoded_level_at_both_ends_of_the_range() {
         assert!(
             worst <= bound,
             "the {end} sweep moved a channel by {worst} encoded levels, against \
-             a bound of {bound} on this adapter. The dither is Â±1 LSB **in the \
-             encoded domain**, so no pixel may move more than one produced \
-             byte â€” the property that also makes Plan 0082's one-time golden \
-             re-bless provably bounded. A value near 12 here is a constant \
-             linear amplitude with the `srgb_slope` divide missing (ADR-0096 \
+             a bound of {bound} on this adapter. The dither is one LSB **in the \
+             encoded domain**, so no pixel may move more than one byte — the \
+             property that also makes Plan 0082's one-time golden re-bless \
+             provably bounded. A value near 12 here is a constant linear \
+             amplitude with the `srgb_slope` divide missing (ADR-0096 \
              Alternative D)."
         );
         assert!(
             (mean - EXPECTED).abs() <= BAND,
             "the {end} sweep's mean absolute byte change is {mean:.4}, against \
-             the {EXPECTED:.4} a Â±1-LSB triangular dither produces over a \
+             the {EXPECTED:.4} a one-LSB triangular dither produces over a \
              uniformly-distributed fractional part. Well below means the \
              perturbation is too small to decorrelate the quantization error \
-             at this end of the range â€” which is what a missing slope term \
+             at this end of the range — which is what a missing slope term \
              does at the bright end (0.44 LSB), where a dark-end probe alone \
              would see nothing wrong."
         );
@@ -567,7 +571,7 @@ enum Vis {
 
 /// Every spelling of an entry this repository uses, **longest first**. The
 /// scan takes the longest match at each byte, so `BufferBindingType::Uniform`
-/// is never read as the `BindingType::â€¦` substring it contains.
+/// is never read as the `BindingType::…` substring it contains.
 ///
 /// A new spelling belongs here. Leaving it out does not weaken the guard
 /// silently: the per-layout entry count below is derived independently, and a
@@ -595,7 +599,7 @@ const MARKERS: &[(&str, Kind, Vis)] = &[
 /// emitter's uniform, and **distinguishing the descriptor by a wider visibility
 /// mask and an explicit `min_binding_size` restored it**
 /// (`scenes/emitter.rs`, ADR-0058). Under a kinds-only shape those two still
-/// read as colliding â€” so the assertion below would have demanded an allowlist
+/// read as colliding — so the assertion below would have demanded an allowlist
 /// entry for a pair that was *deliberately separated*, recording a fix as a
 /// tolerated collision.
 ///
@@ -603,7 +607,7 @@ const MARKERS: &[(&str, Kind, Vis)] = &[
 /// assumed** (Plan 0053 Phase 3). Phase 2 left it out because the emitter's fix
 /// moved the mask and the size together, so which one did the work was not
 /// established. Phase 3 established it, twice and independently: adding an
-/// explicit size â€” and *nothing else* â€” to `background-bind-layout` and to
+/// explicit size — and *nothing else* — to `background-bind-layout` and to
 /// `blend-bind-layout` moved WARP onto the hardware adapter's numbers in three
 /// configurations that were rendering the wrong picture. Both sites carry the
 /// before/after tables.
@@ -612,7 +616,7 @@ const MARKERS: &[(&str, Kind, Vis)] = &[
 /// fixes are load-bearing, and dropping either back to a bare `gpu::uniform`
 /// re-collides its pair and fails the assertion below.
 struct Layout {
-    /// The file the layout is built in â€” for the failure messages, not the key.
+    /// The file the layout is built in — for the failure messages, not the key.
     file: String,
     /// The descriptor's `label`, or a synthetic one for a computed label.
     label: String,
@@ -622,7 +626,7 @@ struct Layout {
 }
 
 /// One entry's contribution to a [`Layout::shape`]: kind, visibility, and
-/// **whether** it declares a `min_binding_size` â€” deliberately not *which*.
+/// **whether** it declares a `min_binding_size` — deliberately not *which*.
 ///
 /// Recording the value would split two layouts whose sizes are spelled
 /// differently but equal, and a false split is the one direction of error this
@@ -631,7 +635,7 @@ struct Layout {
 /// wrong.
 type Binding = (Kind, String, bool);
 
-/// `[Uniform:FRAGMENT+size, Texture:FRAGMENT]` â€” the form the messages print.
+/// `[Uniform:FRAGMENT+size, Texture:FRAGMENT]` — the form the messages print.
 fn shape_str(shape: &[Binding]) -> String {
     let parts: Vec<String> = shape
         .iter()
@@ -643,9 +647,9 @@ fn shape_str(shape: &[Binding]) -> String {
 /// Whether the entry a marker at `at` opens declares a `min_binding_size`.
 ///
 /// Only a **buffer** entry has the field at all, and only the full-literal
-/// spelling can set it â€” every helper in `MARKERS` passes `None`. So this looks
+/// spelling can set it — every helper in `MARKERS` passes `None`. So this looks
 /// for the first `min_binding_size:` after the marker, which is inside that
-/// entry's own `BindingType::Buffer { â€¦ }` block.
+/// entry's own `BindingType::Buffer { … }` block.
 fn declares_min_size(body: &str, at: usize, kind: Kind, rule: Vis) -> bool {
     const FIELD: &str = "min_binding_size:";
     if !matches!(kind, Kind::Uniform | Kind::Storage) || !matches!(rule, Vis::Preceding) {
@@ -727,7 +731,7 @@ fn balanced(text: &str, open: u8, close: u8) -> &str {
 }
 
 /// How many entries a slice body holds, counted from its **top-level commas**
-/// â€” independent of [`MARKERS`], which is what makes the two a cross-check.
+/// — independent of [`MARKERS`], which is what makes the two a cross-check.
 fn entry_count(body: &str) -> usize {
     let (mut depth, mut count, mut filled) = (0i32, 0usize, false);
     for byte in body.bytes() {
@@ -755,7 +759,7 @@ fn entry_count(body: &str) -> usize {
 
 /// Every `create_bind_group_layout` call in one file, as a [`Layout`].
 fn layouts_in(text: &str, file: &str) -> Vec<Layout> {
-    // Split so the constant does not match **itself** â€” this scan reads its
+    // Split so the constant does not match **itself** — this scan reads its
     // own file, and an anchor spelled whole here would open a "descriptor"
     // that runs to the end of the module.
     const CALL: &str = concat!(
@@ -785,7 +789,7 @@ fn layouts_in(text: &str, file: &str) -> Vec<Layout> {
         let body = balanced(&desc[entries_at..], b'[', b']');
 
         // A combined mask would read as its first flag alone and split a pair
-        // that does collide â€” the one direction of error this scan must not
+        // that does collide — the one direction of error this scan must not
         // make silently.
         assert!(
             !body.contains('|'),
@@ -818,7 +822,7 @@ fn layouts_in(text: &str, file: &str) -> Vec<Layout> {
             shape.len(),
             entry_count(body),
             "{file}: `{label}` declares {} entries but the scan recognized {} \
-             of them. Teach `MARKERS` the spelling this layout uses â€” an \
+             of them. Teach `MARKERS` the spelling this layout uses — an \
              unrecognized entry would make the uniqueness check below blind \
              to a real collision.",
             entry_count(body),
@@ -856,7 +860,7 @@ fn all_layouts() -> Vec<Layout> {
 /// How many layouts `core/src` held when Plan 0053 Phase 2 landed.
 ///
 /// A **floor**, not an equality: adding a pass is ordinary and the collision
-/// property below is what guards that. What this catches is the opposite â€” a
+/// property below is what guards that. What this catches is the opposite — a
 /// refactor that moves a layout into a spelling the scan cannot see, which
 /// would shrink the enumeration and make every assertion here quietly weaker on
 /// a shorter list. Lower it only when a pass was genuinely removed, and say so.
@@ -874,7 +878,7 @@ fn assert_scan_is_whole(all: &[Layout]) {
 }
 
 /// **The tonemap's bind-group layout is a shape nothing else in `core/src`
-/// has** â€” by enumerating every layout in the crate, not by asserting it in a
+/// has** — by enumerating every layout in the crate, not by asserting it in a
 /// comment (Plan 0045 Phase 4b).
 ///
 /// The comment is exactly what went wrong. Phase 3 shipped
@@ -907,7 +911,7 @@ fn the_tonemap_layout_is_a_shape_no_other_layout_in_core_has() {
         "`tonemap-bind-layout` is {}, and so is {sharers:?}. This pass runs \
          on every frame beside whatever the preset switched on, so it is the \
          most exposed pipeline in the engine to the WARP identical-layout \
-         aliasing hazard. Move it to a shape this enumeration shows is free â€” \
+         aliasing hazard. Move it to a shape this enumeration shows is free — \
          and fix the comment in `Resources::build`, which is the thing that \
          was wrong last time.",
         shape_str(&mine.shape)
@@ -915,18 +919,18 @@ fn the_tonemap_layout_is_a_shape_no_other_layout_in_core_has() {
 }
 
 /// **The two present layouts `occlude` widened are shapes nothing else has**
-/// (Plan 0071 Phase 1, ADR-0085) â€” the second and third entries in this
+/// (Plan 0071 Phase 1, ADR-0085) — the second and third entries in this
 /// enumeration that are asserted on rather than printed.
 ///
 /// They are asserted because this hazard was not hypothetical here: it was
 /// *measured on this change*. `occlude` needed a uniform in the trails present
 /// and the attractor present, neither of which had one. The first attempt put it
-/// in a second bind group holding the uniform alone â€” `[uniform]`, which is
+/// in a second bind group holding the uniform alone — `[uniform]`, which is
 /// `background-bind-layout`'s shape, and the backdrop pass is live in every
 /// frame. On the DX12 WARP software adapter the trails present then read the
 /// *backdrop's* buffer: `occlude` moved 0 of 196 608 channels there while moving
 /// 3 307 of them on the hardware adapter, and every capture test in the suite
-/// went green over it. That is the whole failure mode â€” silent, adapter-specific,
+/// went green over it. That is the whole failure mode — silent, adapter-specific,
 /// and invisible to a tolerance.
 ///
 /// Unlike the tonemap above, these two are also asserted **against each other**:
@@ -952,8 +956,8 @@ fn the_two_present_layouts_added_for_occlude_are_shapes_nothing_else_has() {
             "`{label}` is {}, and so is {sharers:?}. This pass carries \
              `occlude` (ADR-0085), and a colliding layout is why an earlier \
              shape of it silently did nothing on WARP while working on \
-             hardware. The odd-looking arrangement â€” a sampler before the \
-             uniform in one, a sampler bound twice in the other â€” is what buys \
+             hardware. The odd-looking arrangement — a sampler before the \
+             uniform in one, a sampler bound twice in the other — is what buys \
              the uniqueness this asserts; pick another free shape rather than \
              tidying it away.",
             shape_str(&mine.shape)
@@ -971,7 +975,7 @@ fn the_two_present_layouts_added_for_occlude_are_shapes_nothing_else_has() {
 /// recorded measurement is not an entry: [`evidence`](Self::evidence) carries
 /// the same configuration rendered on the hardware adapter and on WARP, and the
 /// date it was taken. Where separating a pair is cheap, separating it is
-/// preferred â€” a layout that cannot collide needs no evidence and no
+/// preferred — a layout that cannot collide needs no evidence and no
 /// maintenance.
 struct AllowedCollision {
     /// A layout label, as the enumeration prints it. Order does not matter.
@@ -1037,12 +1041,12 @@ const ALLOWED: &[AllowedCollision] = &[
               both: `post/tests.rs` builds the disc, a `Background` and the \
               post stages and no scene, while only a `Renderer` builds a \
               scene and no `Renderer` builds the disc",
-        evidence: "AGREES, and the pair is not constructible â€” this is the one \
+        evidence: "AGREES, and the pair is not constructible — this is the one \
                    entry whose evidence is an argument plus a proxy rather than \
                    the two layouts rendered together, because there is no \
                    configuration that puts them together. Proxy: `post/tests.rs` \
                    run on both adapters reports identical numbers for every \
-                   statistic the disc and the backdrop feed â€” disc x/y 1.0000 \
+                   statistic the disc and the backdrop feed — disc x/y 1.0000 \
                    and 1.0000, backdrop mean 0.42401, occlude 0.83148 / 0.85120 \
                    empty-chain and 0.42279 / 0.42892 chain-active, all equal to \
                    five decimals on hardware and WARP.",
@@ -1051,7 +1055,7 @@ const ALLOWED: &[AllowedCollision] = &[
         a: "disc-bind-layout",
         b: "rd-init-layout",
         why: "the disc is a test-only stand-in scene (see above)",
-        evidence: "AGREES, and not constructible â€” same argument and the same \
+        evidence: "AGREES, and not constructible — same argument and the same \
                    proxy as the entry above.",
     },
     // --- `[Texture, Texture, Sampler]`: the two palette-LUT groups ---
@@ -1063,7 +1067,7 @@ const ALLOWED: &[AllowedCollision] = &[
         evidence: "AGREES, and this pair is the reason the entry is worth \
                    having rather than obvious: it was live and colliding \
                    THROUGHOUT the fragment-field mis-render Phase 3 found, and \
-                   fixing the uniform group alone made the frame correct â€” so \
+                   fixing the uniform group alone made the frame correct — so \
                    this pair was measurably not the one aliasing. After the \
                    fix, fragment field over a lit backdrop: hardware 131.010 \
                    170.559 141.381, WARP 130.989 170.538 141.359. Supersedes \
@@ -1080,7 +1084,7 @@ const ALLOWED: &[AllowedCollision] = &[
 /// This is the general form of the two assertions above. Plan 0045 Phase 4b
 /// enumerated the crate's layouts and asserted on the tonemap alone, **printing
 /// three collision groups it asserted nothing about** under a docstring calling
-/// them "older and deliberate" â€” a claim with nothing behind it, which is the
+/// them "older and deliberate" — a claim with nothing behind it, which is the
 /// exact failure mode that enumeration existed to retire.
 ///
 /// # "Can be live in one frame" is approximated, and the approximation is coarse
@@ -1156,7 +1160,7 @@ fn no_two_layouts_share_a_shape_without_recorded_evidence() {
         "{} layout pair(s) share a shape with no ADR-0058 allowlist entry:\n  \
          {}\n\nOn the DX12 WARP software adapter a pipeline whose bind-group \
          layout matches another live one is handed the OTHER pass's resources, \
-         and the whole golden suite captures on WARP â€” so a mis-render there is \
+         and the whole golden suite captures on WARP — so a mis-render there is \
          not caught, it is blessed. Either separate the pair (preferred where \
          cheap: a layout that cannot collide needs no evidence) or add an \
          `ALLOWED` entry carrying a hardware-vs-WARP comparison of the same \
@@ -1184,7 +1188,7 @@ fn no_two_layouts_share_a_shape_without_recorded_evidence() {
     // ADR-0058's rule, enforced rather than printed (Plan 0053 Phase 4). Phase 2
     // seeded this list with `EVIDENCE: none yet` so the build stayed green while
     // Phase 3 measured; Phase 3 measured, so the debt is now a failure. **An
-    // entry with no recorded measurement is not an entry** â€” adding a pair here
+    // entry with no recorded measurement is not an entry** — adding a pair here
     // to turn a red build green, without rendering the configuration on both
     // adapters, is the suppression this whole mechanism exists to refuse.
     let owed: Vec<String> = ALLOWED
@@ -1196,11 +1200,11 @@ fn no_two_layouts_share_a_shape_without_recorded_evidence() {
         owed.is_empty(),
         "{} of {} allowlist entries carry no measurement: {}. Render the \
          pair's configuration on the hardware adapter and on WARP, compare, \
-         and record the numbers in `evidence` â€” `RIG` describes the rig and \
+         and record the numbers in `evidence` — `RIG` describes the rig and \
          every existing entry shows the form. A pair that does NOT agree is a \
          defect: fix it by separation rather than by writing an entry that \
          records the mis-render. An explicit `min_binding_size` was sufficient \
-         twice â€” see `background.rs` and `transition.rs`.",
+         twice — see `background.rs` and `transition.rs`.",
         owed.len(),
         ALLOWED.len(),
         owed.join(", ")
@@ -1215,7 +1219,7 @@ fn no_two_layouts_share_a_shape_without_recorded_evidence() {
 /// closing note, Plan 0053 Phase 2).
 ///
 /// `bloom.rs`'s module docs carried the same prose uniqueness claim the tonemap
-/// comment did, in a table, for four layouts â€” and the tonemap's version of that
+/// comment did, in a table, for four layouts — and the tonemap's version of that
 /// claim was false while it sat there reading as reassurance. This converts it.
 /// The general property above would catch two bloom layouts colliding with each
 /// other only in the sense that it catches *any* collision; this one says whose
@@ -1248,7 +1252,7 @@ fn the_bloom_layouts_are_four_shapes_nothing_else_shares() {
         assert!(
             sharers.is_empty(),
             "`{label}` is {}, and so is {sharers:?}. The bright / blur / up / \
-             mix layouts look arbitrary because they are â€” the requirement is \
+             mix layouts look arbitrary because they are — the requirement is \
              only that they be distinct, and the natural orderings were all \
              taken. Pick another free shape, and fix the table in `bloom.rs`'s \
              module docs, which is the thing that would otherwise still claim \
@@ -1261,7 +1265,7 @@ fn the_bloom_layouts_are_four_shapes_nothing_else_shares() {
 /// The visibilities [`MARKERS`] hard-codes are the ones the helpers set.
 ///
 /// [`Vis::Fixed`] exists because three helpers put their `visibility` in their
-/// own body, out of reach of the descriptor the scan reads â€” so the scan states
+/// own body, out of reach of the descriptor the scan reads — so the scan states
 /// it instead. A restated constant is a claim, and this is the kind of claim
 /// this whole section exists to stop trusting: if `gpu::texture` ever became
 /// `VERTEX_FRAGMENT`, every texture in the enumeration would carry the wrong
@@ -1292,7 +1296,7 @@ fn the_scan_reads_the_visibility_the_helpers_actually_set() {
         assert_eq!(
             found, expected,
             "`{definition}` now sets ShaderStages::{found}, but MARKERS says \
-             its entries are {expected}-visible. Update the Vis::Fixed value â€” \
+             its entries are {expected}-visible. Update the Vis::Fixed value — \
              until then every layout using it carries the wrong visibility, and \
              collision pairs split or merge on a stale constant."
         );
