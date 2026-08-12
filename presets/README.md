@@ -1045,6 +1045,22 @@ Move the `at = 0.50` stop down and the ember band moves down the frame with it. 
 `bg_ramp_gamma` and the band holds longer before fading; drop it below `1` and the ramp falls away
 fast and leaves a long dim tail.
 
+**A wide smooth ramp is safe now, and the dark tail is no longer the risky end.** Until Plan 0082
+a gradient this broad *banded* — visibly, on a real display — and the worst of it was exactly where
+this control is most useful. The reason is worth carrying: a band is a run of pixels sharing one
+8-bit value, so it is widest where the ramp is **flattest**, and sRGB's near-black slope makes the
+dim tail the flattest part of any ramp that reaches toward black. Measured on the dusk ground at
+1080p, `bg_ramp_gamma = 0.4` spent 7.5 pixels on each level and held one value for **58 pixels**
+in its tail. (The intuition that *steep* is dangerous is backwards, and it is written down wrong in
+one closed plan — two pixels per level is the healthy state.)
+
+The tonemap now dithers its output by one encoded level
+([ADR-0096](../docs/adrs/0096-the-display-write-dithers.md)), always, for every gradient in the
+engine at once — the same frame now spends 2.1 pixels per level and its widest plateau is 20. So
+**author the ramp you want**: a long dim tail, a low exponent, a near-black sky under a bright
+horizon are all ordinary requests, and none of them needs a stop added to break up a step. Nothing
+to switch on and no param to bind.
+
 **Why the exponent exists when stop placement can already shape the colour.** Your `[palette]` is
 **shared with the scene** (and with the `[layer]`, under
 [ADR-0090](../docs/adrs/0090-a-preset-composes-two-scene-layers.md)), so re-spacing stops to shape

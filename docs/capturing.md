@@ -997,6 +997,60 @@ boundary. Two things follow for anything that reads pixels here:
   drift a luminance-model change produces in these columns — not as noise, and
   not as something to re-derive without measuring.
 
+### The display write dithers, and every baseline moved once (Plan 0082)
+
+**All 27 baselines were re-blessed on 2026-08-12**, in one commit that contains
+nothing else. If you find that commit in the history and wonder what happened:
+the tonemap now adds ±1 **encoded** LSB of triangular noise before the 8-bit
+write ([ADR-0096](adrs/0096-the-display-write-dithers.md)), hashed from the
+fragment's integer coordinates and divided by the sRGB transfer function's local
+slope. It is always on and it is not a param — correct quantization of the
+display write is not a look. So every pixel in the engine can shift by one level,
+and every baseline did.
+
+**The re-bless is bounded, and that was asserted rather than trusted.**
+`round(x + n)` with `|n| ≤ 1` differs from `round(x)` by at most one level, so
+the whole change is provable rather than eyeballed. Measured **bless-to-bless**
+across all 27 — a control set blessed from the pre-dither commit on the same box
+first, because 8 of the 27 rewrite against their committed bytes on a clean local
+bless and comparing against the repository would have charged that drift to the
+dither:
+
+| | |
+|---|---|
+| channels compared | 2 049 408 |
+| max \|before − after\| | 2 (WARP) / 1 (hardware) |
+| channels moved | 11.52 % |
+| channels moved by 2 | 0.0103 % |
+
+**The two-level moves are the blessing adapter's, not the amplitude's**, and this
+is worth knowing before it is rediscovered. On the hardware adapter the bound is
+exactly one: zero of 12 288 channels move by 2 on flat-sweep probes at either end
+of the range. On WARP, 212 channels across the 27 baselines move by 2, 88 % of
+them below byte 20 and every one skipping exactly one value. WARP is not missing
+those code values — an undithered ramp there contains every byte from 6 to 18
+with no gaps. DX12 permits tolerance in float-to-sRGB8, and in the steep dark
+region WARP's approximation departs from the true transfer function, so a
+perturbation sized by the true slope lands two levels away in some places and
+fails to move the value at all in others. **Below ~byte 20 a WARP capture is not
+a reliable instrument for one-level effects**; take those on hardware.
+
+The guards live in `core/src/render/tonemap/tests.rs`:
+`the_dither_is_one_encoded_level_at_both_ends_of_the_range` (the amplitude, which
+is what a "tidied away" slope term breaks) and
+`the_dither_dissolves_a_dark_ramps_plateaus` (the banding itself, stated as a
+ratio against an undithered control resolved in the same run).
+
+> **Two pixels per 8-bit level is the SAFE case, not the dangerous one.** Plan
+> 0080 Phase 7 reasoned the other way — it called a quarter-frame fade at roughly
+> two pixels per level "the classic Mach-band configuration" — and the arithmetic
+> is inverted. Banding lives where one level lasts a *long* time, which is the
+> **flattest** part of a curve, so a dense packing is the healthy state and a
+> `bg_ramp_gamma` below 1 (a long dim tail) is where to look. That plan is closed
+> and its own text is history; the correction belongs here, where someone reading
+> about plateau widths will meet it. The reference frame and its before/after are
+> in [`core/tests/fixtures/scratch-0082/`](../core/tests/fixtures/scratch-0082/README.md).
+
 ### A lit backdrop is a distinct test configuration, not a variant (Plan 0051)
 
 **`bg_bright > 0` is its own coverage axis, and until Plan 0051 nothing in the
