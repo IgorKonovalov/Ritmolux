@@ -1598,7 +1598,7 @@ Bind it sparingly for the same reason it exists — an `exposure` riding the bas
 pumps the entire frame, which reads as a camera reacting rather than as the
 music, and it is the same trap `glow` on a beat has always been.
 
-### Ink on paper — `ink_amount`, `paper_*`, `ink_*` (Plan 0027)
+### Ink on paper — `ink_amount`, `paper_*`, `ink_*`, `ink_gamma` (Plans 0027, 0078)
 
 The **last** stage before present (ADR-0028), and the only engine-wide one that is
 not per-preset: it remaps the one finished frame, which during a cross-preset
@@ -1622,7 +1622,9 @@ display-referred pixels in `0..1`. So nothing in this section changed with Plan
 `bloom_amount` are *upstream* of the remap, so raising either pushes more of the
 frame toward the ink pole. That is the lever for an ink preset whose drawing is
 coming out too faint, and it is a better one than widening the two poles — see
-the note below on why the poles do not do what they look like they do.
+the note below on why the poles do not do what they look like they do. It is
+*not* the lever for "the ink should bite harder" — that one is `ink_gamma`, and
+the three-lever note below says which does what.
 
 | Param | Default | Meaning |
 |---|---|---|
@@ -1633,6 +1635,7 @@ the note below on why the poles do not do what they look like they do.
 | `ink_hue` | `0` | Ink (bright-input) hue. |
 | `ink_sat` | `0` | Ink saturation. `0` = neutral. |
 | `ink_bright` | `0` | Ink brightness. `0` = black. |
+| `ink_gamma` | `1` | **Response** between the two poles — how fast a pixel travels from paper to ink. `1` is the identity. Above `1` thins the mid-tones toward paper, so only the strongest strokes keep full ink; below `1` inks the mids for a heavier, flatter print. Neither pole moves at any value. Bindable and continuous; clamped to `0.05 .. 20`, both far outside anything a look wants. |
 
 ```toml
 [params]
@@ -1645,6 +1648,10 @@ paper_bright = "0.97"
 ink_hue      = "0.68"
 ink_sat      = "0.85"
 ink_bright   = "0.30"
+
+# ...and hold the mids off the ink pole, leaving it to the strong strokes.
+# The paper stays exactly where it was - see the three-lever note below.
+ink_gamma    = "2"
 ```
 
 **A partial `ink_amount` is a transition, not a resting value.** The stage
@@ -1656,6 +1663,42 @@ Bind `ink_amount` when you want to *travel* between the glowing and the drawn lo
 middle rather than sit in it); pick `0` or `1` when you want to stay somewhere. A
 sparse, faint drawing comes from the scene — a finer `size`, a shorter `fade` —
 not from a half-strength remap.
+
+**Three levers shape one response, and they are not interchangeable.** An ink
+look that is "not contrasty enough" has three places to go, and picking the wrong
+one costs structure:
+
+- **`exposure` moves the level going in.** It sits *upstream* of the remap, so
+  raising it pushes more of the frame toward the ink pole — and it moves the
+  paper with it, because a brighter base is no longer near zero. Reach for it
+  when the drawing itself is too faint.
+- **`ink_gamma` reshapes the response between the poles, and only that.** The
+  paper does not move: a black pixel lands on paper and a full-brightness one
+  lands on ink at *every* value — that is the exponent's defining property, not
+  a tuning — so raising it leaves less of the frame inked without lifting the
+  page or dimming the strokes. This is the lever for "the dark pole should bite
+  harder".
+- **`ink_amount` is how much remap happens at all**, not how hard it bites. A
+  partial value blends the remapped frame back toward the untouched source (see
+  the note above), which greys the page. It is a transition, not a contrast
+  control.
+
+Measured on a 256-step grey ramp put through the remap with the default poles
+(white paper, black ink) — mean output byte over the ramp's interior, higher =
+more paper:
+
+| `ink_gamma` | `0.25` | `0.5` | `1` | `2` | `4` |
+|---|---|---|---|---|---|
+| mean output byte | 147 | 180 | 209 | 229 | 241 |
+
+Read the **direction and size** of the move, not the absolute: the ramp's levels
+are sRGB bytes while the key is linear light, so a byte-50 % grey is already a
+low density and the identity row leans toward paper before anything is bound.
+The two ends of that ramp — pure black in, pure white in — came back as *exactly*
+the same two bytes at every one of those five exponents.
+
+Like the rest of the `ink_*` family, `ink_gamma` crossfades across a cross-preset
+dissolve rather than snapping.
 
 **Swapping the poles does not make a dark look on a continuous field.** The pass
 is `mix(paper, ink, luminance)` — it **interpolates**, it does not map. Setting a
