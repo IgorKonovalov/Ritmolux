@@ -134,6 +134,23 @@ const DEFAULT_SIZE_SPREAD: f32 = 0.0;
 /// swings (backlog 0068's measurement).
 const TWINKLE_FREQ_LO: f32 = 0.35;
 const TWINKLE_FREQ_HI: f32 = 1.6;
+/// `reseed` rises past this to disturb the population once — edge-triggered,
+/// the attractor's constant and its reason (`particles/mod.rs`): a sustained
+/// beat flag must not disturb every frame.
+const RESEED_THRESHOLD: f32 = 0.5;
+/// Fraction of the domain's normalized half-extent one `reseed` kick spans per
+/// axis (Plan 0077 Phase 3, ADR-0066 semantics): the kick disturbs the
+/// population **where it is**, sized from the swarm's own domain the way
+/// `AttractorFamily::jitter_extent` derives from `seed_box` — *not* a respawn
+/// into a uniform box, which is the artifact class ADR-0066 removed and
+/// backlog 0064 caught returning once already. Positions are normalized, so a
+/// fraction here is domain-relative on any target and any aspect.
+///
+/// The value is the attractor's measured `JITTER_FRACTION`, adopted as the
+/// starting magnitude for the same figure-relative kick. ADR-0066 records the
+/// magnitude as the lever if the disturbance reads too subtle; returning to a
+/// box re-fill is not.
+const RESEED_KICK: f32 = 0.06;
 // Shared palette color knobs (ADR-0021). Each particle's hue occupies the band
 // `hue_center + (particle_hue - 0.5) * hue_spread`; the defaults (`center = 0.5`,
 // `spread = 1`) reproduce the prior full-wheel look (`particle_hue`), and
@@ -366,6 +383,15 @@ pub struct SwarmScene {
     /// size-spread width, both resolved per particle at draw.
     twinkle: f32,
     size_spread: f32,
+    /// This frame's `reseed` level (bound to a beat/onset expression); its
+    /// rising edge past [`RESEED_THRESHOLD`] disturbs the population once
+    /// (Plan 0077 Phase 3, ADR-0066 semantics).
+    reseed: f32,
+    /// Previous frame's `reseed`, for rising-edge detection.
+    prev_reseed: f32,
+    /// How many reseeds have fired. Salts the per-particle kick draw so
+    /// successive reseeds scatter differently (the attractor's convention).
+    reseed_count: u32,
 }
 
 impl SwarmScene {
@@ -518,6 +544,9 @@ impl SwarmScene {
             points: DEFAULT_POINTS,
             twinkle: DEFAULT_TWINKLE,
             size_spread: DEFAULT_SIZE_SPREAD,
+            reseed: 0.0,
+            prev_reseed: 0.0,
+            reseed_count: 0,
         }
     }
 
@@ -586,6 +615,8 @@ mod channel {
     pub(super) const TWINKLE_FREQ: u32 = 0;
     pub(super) const TWINKLE_PHASE: u32 = 1;
     pub(super) const SIZE: u32 = 2;
+    pub(super) const RESEED_X: u32 = 3;
+    pub(super) const RESEED_Y: u32 = 4;
 }
 
 /// The particle's brightness multiplier under `twinkle` — the emitter's
@@ -632,6 +663,9 @@ pub const PARAMS: &[&str] = &[
     // the emitter's semantics.
     "twinkle",
     "size_spread",
+    // The percussive accent (Plan 0077 Phase 3) — the attractor's name, with
+    // ADR-0066's disturbance semantics.
+    "reseed",
     // The shared mark silhouette (ADR-0084) — the same two names the emitter
     // carries; `marks::PARAMS` is the single statement of the pair.
     "shape",
@@ -678,6 +712,13 @@ impl Scene for SwarmScene {
         self.points = DEFAULT_POINTS;
         self.twinkle = DEFAULT_TWINKLE;
         self.size_spread = DEFAULT_SIZE_SPREAD;
+        // `prev_reseed` is deliberately NOT reset: this runs every frame
+        // before the bindings are routed, and resetting the previous level
+        // would turn a held gate into an edge per frame — a continuous
+        // disturbance in place of a percussive one (measured while building
+        // this: the population never re-gathered at all). The attractor's
+        // reset_params makes the same omission for the same reason.
+        self.reseed = 0.0;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -702,6 +743,7 @@ impl Scene for SwarmScene {
             "points" => self.points = value,
             "twinkle" => self.twinkle = value,
             "size_spread" => self.size_spread = value,
+            "reseed" => self.reseed = value,
             _ => {}
         }
     }
@@ -711,6 +753,26 @@ impl Scene for SwarmScene {
         reason = "pos/vel index fixed [f32; 2] and base indexes a fixed [f32; 3], all at constant offsets, always in-bounds"
     )]
     fn update(&mut self, _frame: &AnalysisFrame) {
+        // Rising-edge detect on `reseed` (Plan 0077 Phase 3): **disturb** the
+        // existing population where it is, by a seeded, domain-relative kick —
+        // ADR-0066's semantics, not the box respawn it removed. The kick is a
+        // pure function of (particle index, reseed ordinal), so a capture
+        // remains reproducible; unbound, `reseed` and `prev_reseed` sit at 0
+        // and this path never touches a position.
+        if self.reseed >= RESEED_THRESHOLD && self.prev_reseed < RESEED_THRESHOLD {
+            self.reseed_count = self.reseed_count.wrapping_add(1);
+            let salt = self.reseed_count.wrapping_mul(0x9E37_79B9);
+            for (i, p) in self.particles.iter_mut().enumerate() {
+                let seed = (i as u32).wrapping_add(salt);
+                p.pos[0] += (unit(seed, channel::RESEED_X) - 0.5) * 2.0 * RESEED_KICK;
+                p.pos[1] += (unit(seed, channel::RESEED_Y) - 0.5) * 2.0 * RESEED_KICK;
+                // No wrap here: a kick of ±RESEED_KICK cannot overshoot the ±1
+                // seam by more than itself, and the integration loop below
+                // wraps every position this same frame.
+            }
+        }
+        self.prev_reseed = self.reseed;
+
         // Field evolves at `spin`; `force` steers, `burst` shoves outward.
         let field_t = self.time * self.spin;
         let force = self.force;

@@ -550,6 +550,122 @@ fn a_twinkling_swarm_shimmers_without_breathing_on_the_pixels() {
 }
 
 // -----------------------------------------------------------------------
+// The reseed disturbance (Plan 0077 Phase 3, ADR-0066 semantics)
+// -----------------------------------------------------------------------
+
+/// **A `reseed` pulse disperses the population and the flow re-gathers it** —
+/// Phase 3's done-when, at fixed (silent) audio. The pulse is a pure-time
+/// gate, so the edge fires at a known frame with no audio in the loop.
+///
+/// Four claims: shortly after the edge the frame visibly differs from the
+/// no-pulse control (the disturbance is real); a few seconds later the two
+/// populations paint statistically similar coverage again (the kick disturbs,
+/// it does not restructure); `reseed` unbound is byte-identical
+/// to an explicit `reseed = "0"` (the default is the absence); and the whole
+/// path is deterministic. What is deliberately **not** claimed here is the
+/// minutes-horizon rescue of a piled-up swarm — no test at this suite's
+/// horizon can see it (backlog 0086); that is Plan 0077 Phase 5's bounded
+/// check, run once by the content lane and recorded in the world's header.
+#[test]
+fn a_reseed_pulse_disperses_the_population_and_it_reconverges() {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::context::RenderError;
+    use crate::render::metrics::{coverage, frame_diff};
+    use crate::render::{HeadlessOptions, Renderer};
+
+    const SIZE: u32 = 128;
+    /// The pulse gate opens at t = 1 s (frame 60 at the fixed capture step).
+    const PULSE: &str = "reseed = \"time > 1.0\"\n";
+    /// Six frames after the edge: the kick has landed, the flow has not yet
+    /// re-gathered it.
+    const DISPERSED: u32 = 66;
+    /// Four seconds in (three after the edge). Measured: the single kick's
+    /// coverage gap against the control closes to **0.30 %** here — the
+    /// re-gathering is fast because a ±6 % kick leaves every particle near
+    /// the streamline it left. The margin below (15 %) is not tuned to that;
+    /// it is the bound under which the *defect class* cannot hide: while the
+    /// edge detector re-fired every frame (the `reset_params` bug caught
+    /// building this — see the omission comment there), the gap read 19 % at
+    /// this frame and **105 % and diverging** at ten seconds. The two
+    /// behaviours sit two orders of magnitude apart at this horizon.
+    const RECONVERGED: u32 = 240;
+    const BLACK: [u8; 4] = [0, 0, 0, 255];
+    const EPS: u8 = 10;
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: SIZE,
+        height: SIZE,
+        prefer_software: true,
+    }) {
+        Ok(renderer) => renderer,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    let frame = AnalysisFrame::default();
+    // The family-default flow (`force`/`spin` unbound), so "re-converges" means
+    // the scene's own gathering, not a stilled field.
+    let mut capture = |name: &str, extra: &str, at: u32| {
+        let toml = format!(
+            "system = \"swarm\"\nname = \"{name}\"\n[params]\n\
+             brightness = \"0.9\"\nsize = \"3.0\"\n{extra}"
+        );
+        let preset = Preset::from_toml_str(&toml).expect("the probe preset parses");
+        renderer.set_presets(vec![preset]);
+        renderer
+            .capture_preset(name, &frame, at)
+            .expect("capture the probe preset")
+    };
+
+    // The disturbance is real: pulsed vs control, six frames after the edge.
+    let control_d = capture("ctl", "reseed = \"0\"\n", DISPERSED);
+    let pulsed_d = capture("pulse", PULSE, DISPERSED);
+    let disperse_diff = frame_diff(&control_d, &pulsed_d);
+    eprintln!("reseed: frame-diff vs control at frame {DISPERSED}: {disperse_diff:.4}");
+    assert!(
+        disperse_diff > 0.005,
+        "a reseed pulse must visibly move the frame against the no-pulse \
+         control: frame-diff {disperse_diff:.4}"
+    );
+
+    // Determinism: the same pulsed capture twice, byte for byte — the kick is
+    // a pure function of (particle index, reseed ordinal).
+    let pulsed_d2 = capture("pulse", PULSE, DISPERSED);
+    assert_eq!(
+        pulsed_d.rgba, pulsed_d2.rgba,
+        "two captures of the same reseed pulse must be byte-identical"
+    );
+
+    // The population re-converges: statistically similar coverage afterwards.
+    let control_r = capture("ctl", "reseed = \"0\"\n", RECONVERGED);
+    let pulsed_r = capture("pulse", PULSE, RECONVERGED);
+    let (cov_c, cov_p) = (
+        coverage(&control_r, BLACK, EPS),
+        coverage(&pulsed_r, BLACK, EPS),
+    );
+    let rel = (cov_c - cov_p).abs() / cov_c.max(1e-6);
+    eprintln!(
+        "reseed: coverage at frame {RECONVERGED}: control {cov_c:.4}, pulsed {cov_p:.4} \
+         (relative gap {rel:.4})"
+    );
+    assert!(
+        rel < 0.15,
+        "three seconds after the pulse the population must paint statistically \
+         similar coverage again: control {cov_c:.4} vs pulsed {cov_p:.4}"
+    );
+
+    // Unbound is the explicit zero, byte for byte.
+    let unbound = capture("plain", "", DISPERSED);
+    assert_eq!(
+        unbound.rgba, control_d.rgba,
+        "`reseed` unbound must render byte-identically to `reseed = \"0\"`"
+    );
+}
+
+// -----------------------------------------------------------------------
 // The mark silhouette (Plan 0070 Phase 1, ADR-0084)
 // -----------------------------------------------------------------------
 
