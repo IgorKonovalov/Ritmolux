@@ -184,6 +184,99 @@ fn a_swept_span_samples_the_palette_at_the_coordinate_its_height_implies() {
     }
 }
 
+/// **The brightness ramp points wherever the preset says** — the direction the
+/// engine could not express at all until the fixed tilt retired into it.
+///
+/// `mix(0.72, 1.0, s)` was hardcoded and welded to `+y`: brighter at the top, by
+/// 28 %, always. `bg_shade = 1.0, bg_shade_end = 0.0` is the reverse and then
+/// some — full brightness at the ramp's start, black at its end.
+///
+/// Asserted as a **pair**, because the interesting claim is the reversal rather
+/// than either frame alone: the default backdrop must still be brighter at the
+/// top (that is the tilt, unchanged, and a sanity check that the retirement kept
+/// its constants), and the bound one must be brighter at the bottom. A flat
+/// palette so the colour sweep contributes nothing, and no vignette so the only
+/// thing varying down the column is the ramp.
+#[test]
+fn the_brightness_ramp_runs_the_way_the_preset_points_it() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    const FLAT: &str = "[palette]\nstops = [{ at = 0.0, color = \"#ffcf80\" }, \
+                        { at = 1.0, color = \"#ffcf80\" }]";
+    let ends = |image: &CaptureImage| {
+        let column = mid_column(image);
+        let top = luma(column[0]);
+        let bottom = luma(column[column.len() - 1]);
+        (top, bottom)
+    };
+
+    // The tilt, exactly as it always was: a touch brighter toward the top.
+    let tilt = capture(&mut renderer, FLAT, "bg_hue = \"0\"\nbg_vignette = \"0\"\n");
+    let (tilt_top, tilt_bottom) = ends(&tilt);
+    assert!(
+        tilt_top > tilt_bottom,
+        "the default ramp is the retired 0.72 -> 1.0 tilt and must still run \
+         upward: top luma {tilt_top:.1} against bottom {tilt_bottom:.1}"
+    );
+
+    // Reversed, and taken to black — neither reachable before this phase.
+    let reversed = capture(
+        &mut renderer,
+        FLAT,
+        "bg_hue = \"0\"\nbg_vignette = \"0\"\nbg_shade = \"1.0\"\nbg_shade_end = \"0.0\"\n",
+    );
+    let (rev_top, rev_bottom) = ends(&reversed);
+    println!(
+        "shade ramp: default (top {tilt_top:.1}, bottom {tilt_bottom:.1}), \
+         reversed (top {rev_top:.1}, bottom {rev_bottom:.1})"
+    );
+    assert!(
+        rev_bottom > rev_top + 100.0,
+        "`bg_shade = 1.0, bg_shade_end = 0.0` must run the brightness *down* the \
+         frame: top luma {rev_top:.1}, bottom {rev_bottom:.1}"
+    );
+    // **The end reaches zero, and the top row is not where zero lives.** No pixel
+    // centre sits at `s = 1`: the topmost is half a row short, at
+    // `s = 1 - 0.5/64`, so it carries 0.0078125 of the ramp's start — and sRGB's
+    // near-black slope (12.92x) turns that 0.78 % of linear light into ~17 of
+    // 255. Asserting a small number here would be asserting that fact about the
+    // encode. Instead the row is pinned against a **constant** ramp held at
+    // exactly the factor it should be carrying: if the two agree, the ramp
+    // arrives at the value `bg_shade_end` names rather than bottoming out on a
+    // floor somewhere above it.
+    let inset = 0.5 / SIZE as f32;
+    let floor = capture(
+        &mut renderer,
+        FLAT,
+        &format!(
+            "bg_hue = \"0\"\nbg_vignette = \"0\"\n\
+             bg_shade = \"{inset}\"\nbg_shade_end = \"{inset}\"\n"
+        ),
+    );
+    let floor_top = luma(mid_column(&floor)[0]);
+    assert!(
+        (rev_top - floor_top).abs() <= 2.0,
+        "`bg_shade_end = 0.0` must carry the topmost row's half-row inset and \
+         nothing more — {rev_top:.1} against the {floor_top:.1} a ramp pinned \
+         flat at {inset} paints. The default holds {tilt_top:.1} at that pixel."
+    );
+    // What "full brightness at the ramp's start" means, measured rather than
+    // asserted: `bg_shade = 1.0` at the ramp's start is the same brightness
+    // factor the retired tilt reached at *its* `1.0` end, so the two must land on
+    // the same luma — through the same flat palette, the same vignette-free
+    // frame, and the same tonemap. They differ only by the half-pixel each edge
+    // row sits inside the ramp (0.9922 against 0.9978), which is why the bound is
+    // a few levels rather than zero. A magnitude claim here would be a claim
+    // about the tonemap's shoulder instead: at this `bg_bright` the whole
+    // 0.72 -> 1.0 tilt is worth only ~16 levels.
+    assert!(
+        (rev_bottom - tilt_top).abs() <= 3.0,
+        "`bg_shade = 1.0` must reach the same full brightness the tilt's own 1.0 \
+         end reached: {rev_bottom:.1} against {tilt_top:.1}"
+    );
+}
+
 /// **There is no edge anywhere in the column** — the property the shipped
 /// workaround (a `spectrum` slab at `scale = 0`, whose verdict was
 /// "unacceptable") structurally cannot have, and the whole reason ADR-0094 was

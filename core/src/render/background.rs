@@ -46,6 +46,14 @@
 //! other palette coordinate in this engine uses, because two shipped presets
 //! already drive `bg_hue` outside `[0, 1]` and depend on the wrap.
 //!
+//! **There is one brightness ramp on the frame, not two.** The fixed
+//! `mix(0.72, 1.0, ndc.y)` tilt this pass used to hardcode has *retired into*
+//! that ramp as `bg_shade` / `bg_shade_end`'s defaults, on the same axis as the
+//! colour sweep. Keeping the tilt and multiplying an authorable ramp on top would
+//! have been the cheaper identity guarantee, and it is exactly what was rejected:
+//! the tilt is welded to `+y` while the ramp can point anywhere, so any angled
+//! backdrop would carry a second vertical gradient no param explains.
+//!
 //! Every ramp param defaults to an **arithmetic identity** with the picture that
 //! shipped before it, not to an approximation of it — see each one's constant.
 //!
@@ -101,6 +109,13 @@ const DEFAULT_VIGNETTE: f32 = 0.0;
 /// one sample at `bg_hue` — today's picture, as an arithmetic identity rather
 /// than an approximation of it.
 const DEFAULT_HUE_SPAN: f32 = 0.0;
+/// The brightness ramp's two ends, on the same axis as the colour sweep. These
+/// two numbers **are** the fixed `mix(0.72, 1.0, ·)` tilt the pass used to
+/// hardcode: the shader still runs that instruction with those constants, so the
+/// retirement costs no pixels. A preset that binds them can now point the
+/// brightness the other way, which the tilt could never do.
+const DEFAULT_SHADE: f32 = 0.72;
+const DEFAULT_SHADE_END: f32 = 1.0;
 /// The two shared colour modulations, at the same defaults every scene uses —
 /// `saturation` unchanged, `palette_mix` fully on palette A.
 const DEFAULT_SATURATION: f32 = 1.0;
@@ -112,7 +127,8 @@ struct Bg {
     v: vec4<f32>,
     // x: palette_mix (A/B crossfade), y: saturation, zw: unused
     c: vec4<f32>,
-    // The ramp (ADR-0094). x: unused, y: bg_hue_span, zw: unused
+    // The ramp (ADR-0094). x: unused, y: bg_hue_span,
+    // z: bg_shade, w: bg_shade_end
     g: vec4<f32>,
 }
 
@@ -140,15 +156,25 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let palette_mix = u.c.x;
     let saturation = u.c.y;
     let hue_span = u.g.y;
+    let shade = u.g.z;
+    let shade_end = u.g.w;
 
     // The ramp axis (ADR-0094): a normalized position along it, 0 at the frame's
     // bottom edge and 1 at its top. Bottom-to-top for now — `bg_angle` turns it
     // in a later phase, and its zero reduces to exactly this.
     let s = clamp(0.5 + 0.5 * in.ndc.y, 0.0, 1.0);
 
-    // A gentle vertical gradient (a touch brighter toward the top) plus a radial
-    // vignette that darkens the corners — the atmospheric backdrop.
-    let grad = mix(0.72, 1.0, s);
+    // The brightness ramp, on the **same axis as the colour sweep**. This used to
+    // be a hardcoded `mix(0.72, 1.0, ·)` — a fixed 28 % tilt welded to +y, which
+    // is the wrong way round for a horizon and which no param explained. Those
+    // two constants are now `bg_shade` / `bg_shade_end`'s defaults, so this is
+    // the identical instruction with the identical constants until a preset says
+    // otherwise (ADR-0094 Alternative E: the tilt retires *into* the ramp rather
+    // than sitting beside it, so an angled backdrop cannot carry a second,
+    // invisible vertical gradient).
+    let grad = mix(shade, shade_end, s);
+    // A radial vignette that darkens the corners. Stays radial and independent of
+    // the ramp — nothing here makes it directional.
     let r = length(in.ndc);
     let vig = 1.0 - vig_amt * clamp(r * r, 0.0, 1.0);
 
@@ -371,6 +397,8 @@ pub struct Background {
     bright: f32,
     vignette: f32,
     hue_span: f32,
+    shade: f32,
+    shade_end: f32,
     /// The active preset's baked palette pair, re-uploaded to the LUT textures
     /// when `palette_dirty` (a preset switch, or a lazy rebuild), off the hot
     /// path. Held here rather than in [`Resources`] so a backdrop that has not
@@ -388,7 +416,14 @@ pub struct Background {
 /// **Keep in sync with `set_param` below**; the
 /// `declared_params_match_set_param` guard in `core/tests/preset.rs` fails if
 /// the two drift.
-pub const PARAMS: &[&str] = &["bg_hue", "bg_bright", "bg_vignette", "bg_hue_span"];
+pub const PARAMS: &[&str] = &[
+    "bg_hue",
+    "bg_bright",
+    "bg_vignette",
+    "bg_hue_span",
+    "bg_shade",
+    "bg_shade_end",
+];
 
 /// The two colour modulations the backdrop **shares with the scene** rather than
 /// owning (ADR-0086).
@@ -412,6 +447,8 @@ impl Background {
             bright: DEFAULT_BRIGHT,
             vignette: DEFAULT_VIGNETTE,
             hue_span: DEFAULT_HUE_SPAN,
+            shade: DEFAULT_SHADE,
+            shade_end: DEFAULT_SHADE_END,
             // Seeded with the default `spectrum` (the cosine this pass used to
             // inline), so a backdrop painted before any `set_palette` call is the
             // colour it always was rather than black.
@@ -448,6 +485,8 @@ impl Background {
         self.bright = DEFAULT_BRIGHT;
         self.vignette = DEFAULT_VIGNETTE;
         self.hue_span = DEFAULT_HUE_SPAN;
+        self.shade = DEFAULT_SHADE;
+        self.shade_end = DEFAULT_SHADE_END;
         self.saturation = DEFAULT_SATURATION;
         self.palette_mix = DEFAULT_PALETTE_MIX;
     }
@@ -462,6 +501,8 @@ impl Background {
             "bg_bright" => self.bright = value,
             "bg_vignette" => self.vignette = value,
             "bg_hue_span" => self.hue_span = value,
+            "bg_shade" => self.shade = value,
+            "bg_shade_end" => self.shade_end = value,
             _ => return false,
         }
         true
@@ -527,7 +568,7 @@ impl Background {
             bytemuck::bytes_of(&Bg {
                 v: [self.hue, self.bright, self.vignette, 0.0],
                 c: [self.palette_mix, self.saturation, 0.0, 0.0],
-                g: [0.0, self.hue_span, 0.0, 0.0],
+                g: [0.0, self.hue_span, self.shade, self.shade_end],
             }),
         );
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
