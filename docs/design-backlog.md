@@ -2045,9 +2045,16 @@ file's standing verify-before-acting rule applies.
 
 ## 0084 — the ink stage has no contrast lever, and three worlds in two cohorts paid for it
 
-- **PROMOTED 2026-08-11 → [ADR-0092](adrs/0092-the-ink-remap-gains-a-contrast-exponent.md) +
-  [Plan 0078](plans/0078-the-ink-learns-to-bite.md)** — same day as filed; the response
-  exponent, endpoints invariant so the paper never moves. Queued after Plan 0076 + cohort 6.
+- ~~**PROMOTED 2026-08-11 → [ADR-0092](adrs/0092-the-ink-remap-gains-a-contrast-exponent.md) +
+  [Plan 0078](plans/done/0078-the-ink-learns-to-bite.md)** — same day as filed; the response
+  exponent, endpoints invariant so the paper never moves. Queued after Plan 0076 + cohort 6.~~
+- **CLOSED 2026-08-12 at [Plan 0078](plans/done/0078-the-ink-learns-to-bite.md)'s close.**
+  `ink_gamma` ships and `presets/README.md` carries the three-lever note. **The content half is
+  standing, not closed**: that plan's Phase 3 (`human`) is the ink worlds re-judging onto the
+  lever, carried in the [plans README](plans/README.md)'s Standing section with its two-header
+  roster (Etching, Shatter). If a world turns out to need a toe *and* a shoulder, that is
+  ADR-0092's named negative — file it **with the measurement** as a new entry rather than
+  reopening this one.
 
 **Raised by:** `preset-author`, three separate times across Plan 0075 cohorts 3 and 4.
 **Owner if taken:** `architect` (a small ADR — where the response shape lives) then `dev`.

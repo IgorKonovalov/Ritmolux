@@ -1,9 +1,10 @@
 # ADR-0092 — The ink remap gains a contrast exponent
 
-> **Status:** accepted 2026-08-11 (user approval at the Plan 0075 handoff; Plan 0078 queued —
-> an Outcome section is owed at that plan's close if implementation falsifies anything here)
+> **Status:** accepted 2026-08-11 (user approval at the Plan 0075 handoff), with a dated
+> [Outcome](#outcome--2026-08-12-at-plan-0078s-close) added at Plan 0078's close — nothing here
+> was falsified; two implementation decisions the decision did not specify are recorded there.
 > **Date:** 2026-08-11
-> **Related plan(s):** [0078](../plans/0078-the-ink-learns-to-bite.md)
+> **Related plan(s):** [0078](../plans/done/0078-the-ink-learns-to-bite.md)
 > **Resolves:** [design-backlog 0084](../design-backlog.md#0084--the-ink-stage-has-no-contrast-lever-and-three-worlds-in-two-cohorts-paid-for-it)
 > **Supplements:** [ADR-0028](0028-final-stage-ink-tone-remap.md) (the ink stage)
 
@@ -76,3 +77,37 @@ hits the exponent's ceiling.
 ### Alternative C — do nothing (keep the brightness/fade juggle)
 
 Measured insufficient three times; it is the defect, not a mitigation.
+
+## Outcome — 2026-08-12, at Plan 0078's close
+
+**Nothing above was falsified.** `ink_gamma` ships with the shape this ADR specified, and the two
+claims that were arguments when this was written are now measured: the endpoints are invariant
+across a ladder of exponents *and* across hostile values (0, negative, NaN, ±∞), and the default
+moved zero pixels. Three things the decision did not say, recorded here because implementation had
+to decide them:
+
+- **"Default `1.0` is the exact identity" had to be *built*, not inherited.** `pow(x, 1.0)` is
+  `exp2(1.0 * log2(x))` and is not bit-exact for arbitrary `x`, so the shader takes an explicit
+  `g == 1.0` branch. Without it this ADR's zero-baseline sentence would have been false by a
+  rounding step on every shipped ink preset. The guard that clamps `g` deliberately does not
+  perturb `1.0` on the way to the uniform, so the branch stays reachable.
+- **The exponent is clamped finite into `0.05 .. 20`, on the CPU side.** This ADR says the
+  endpoints are invariant "for any *positive* `g`" and left the negative and zero cases unstated;
+  a bound expression can sweep through both, and `pow(0, 0)` is undefined. The clamp lives in Rust
+  rather than WGSL so `1.0` reaches the shader exactly and so WGSL's implementation-defined
+  `clamp`-with-NaN is never reached. Both bounds are far outside anything a look wants (at
+  `g = 0.05` a key of 0.5 reads 0.97; at `g = 20`, 1e-6).
+- **It crossfades across a cross-preset dissolve**, CPU-side alongside `ink_amount`, rather than
+  snapping. Unlike the poles it is a scalar on the key, so there is no colour-space question to
+  answer and no second uniform slot needed.
+
+**The zero-baseline claim is structural in a stronger sense than the paired plan argued.** No
+golden fixture binds `ink_amount` at all, and the stage builds its resources only when active — so
+no committed baseline ever constructs the ink pass, let alone keys through it. That also covers the
+one thing a param grep cannot see: the `COPY_DST` usage flag added to `ink-src` for the endpoint
+test (the arrangement `tonemap-src` already carried).
+
+**The Negative about the one-parameter family stands untested.** Plan 0078's Phase 3 — the content
+lane re-judging the ink worlds — is outstanding at that plan's close, so whether an author hits the
+exponent's ceiling and wants a toe *and* a shoulder is still unmeasured. That is the trigger this
+ADR named for revisiting Alternative B.
