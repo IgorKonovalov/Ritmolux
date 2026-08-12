@@ -251,7 +251,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | System            | Named `[params]`                                                         |
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
-| `swarm`           | `force` `spin` `burst` `field_freq` `hue` `brightness` `size` `shape` `points` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
+| `swarm`           | `force` `spin` `burst` `field_freq` `hue` `brightness` `size` `size_spread` `twinkle` `shape` `points` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
@@ -436,6 +436,17 @@ rewritten. The family's apparent flocking is not a per-particle rule — it emer
 from neighbours falling onto the *same* streamline and travelling together — so a
 coarse field (low `field_freq`) with a near-frozen one (low `spin`) is the
 formation-holding end, and raising either dissolves the flock toward shimmer.
+
+Since Plan 0077 the swarm's marks individuate the way the emitter's do —
+same names, same semantics (see [Individuation](#individuation--the-distribution-params)).
+`size_spread` widens the per-mark size as a fraction either side of `size`; the
+swarm's seeded scatter already varies mildly on its own, and this opens that
+distribution further. `twinkle` is a per-mark brightness oscillation whose
+**rate and phase both** come off the seed, so the field shimmers while the
+whole-frame light sits still — which is what separates it from binding
+`brightness` to an oscillator, which flashes the frame as one sheet. Both
+default `0`; an unbound preset is byte-unchanged. This is the pair that makes a
+sparse starfield able to twinkle at all (backlog 0068).
 
 Two things the swarm does on its own, with nothing to bind.
 

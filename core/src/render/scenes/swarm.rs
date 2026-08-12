@@ -118,6 +118,22 @@ const DEFAULT_SIZE: f32 = 1.0;
 /// high values give many tight swirls. `spin` says how fast the field is rewritten;
 /// this says how finely it is divided.
 const DEFAULT_FIELD_FREQ: f32 = 2.3;
+// Per-mark individuation (Plan 0077 Phase 2, backlog 0068). Both default OFF —
+// unlike the emitter's spreads, which default non-zero, the swarm's scatter
+// already ships a seeded per-particle size and brightness, so these *widen*
+// what is there and their defaults must leave every shipped capture
+// byte-identical.
+const DEFAULT_TWINKLE: f32 = 0.0;
+const DEFAULT_SIZE_SPREAD: f32 = 0.0;
+/// The per-particle twinkle rate band, Hz — the emitter's values
+/// (`emitter.rs`), kept equal so `twinkle` means one thing across the two
+/// particle scenes. The spread across particles is the point, not the values:
+/// a field of oscillators sharing one rate flashes as one sheet however their
+/// phases scatter, so the **rate is drawn per particle as well as the phase**
+/// — that is what keeps the whole-frame mean steady while every member of it
+/// swings (backlog 0068's measurement).
+const TWINKLE_FREQ_LO: f32 = 0.35;
+const TWINKLE_FREQ_HI: f32 = 1.6;
 // Shared palette color knobs (ADR-0021). Each particle's hue occupies the band
 // `hue_center + (particle_hue - 0.5) * hue_spread`; the defaults (`center = 0.5`,
 // `spread = 1`) reproduce the prior full-wheel look (`particle_hue`), and
@@ -260,6 +276,17 @@ struct Particle {
     /// Velocity in **world** units per second — the flow field and the burst are
     /// screen-space forces, so they must not change magnitude with the domain.
     vel: [f32; 2],
+    /// Per-particle twinkle oscillator (Plan 0077 Phase 2): rate in Hz from
+    /// the `TWINKLE_FREQ_LO..HI` band and phase in cycles, both off the
+    /// particle's stable identity through [`unit`]. Fixed for the particle's
+    /// life; resolved into a brightness factor at draw only when `twinkle`
+    /// is bound.
+    twinkle_freq: f32,
+    twinkle_phase: f32,
+    /// The particle's unit draw for `size_spread`, resolved at draw time so an
+    /// eased spread moves the whole population continuously (the emitter's
+    /// reasoning for draw-time resolution, verbatim).
+    size_unit: f32,
     /// Depth: 0 = far, 1 = near (Plan 0043 Phase 3). Drives sprite scale, an
     /// atmospheric brightness fade, a parallax offset against the shared view
     /// transform, and which current the particle rides — **never** sorting, since
@@ -335,6 +362,10 @@ pub struct SwarmScene {
     /// (see [`marks::mark_points`]).
     shape: f32,
     points: f32,
+    /// Per-mark individuation (Plan 0077 Phase 2): the twinkle depth and the
+    /// size-spread width, both resolved per particle at draw.
+    twinkle: f32,
+    size_spread: f32,
 }
 
 impl SwarmScene {
@@ -431,7 +462,22 @@ impl SwarmScene {
         });
 
         let mut rng = SeededRng::new(SEED);
-        let particle_state: Vec<Particle> = (0..particles).map(|_| Self::spawn(&mut rng)).collect();
+        // The individuation draws come off the particle's index through `unit`,
+        // NOT off `rng`: an extra `SeededRng` draw per particle would shift the
+        // stream for every draw after it and re-scatter the whole field, and
+        // the defaults' byte-identity claim (Plan 0077 Phase 2) rests on the
+        // existing scatter being untouched.
+        let particle_state: Vec<Particle> = (0..particles)
+            .map(|i| {
+                let mut p = Self::spawn(&mut rng);
+                let seed = i as u32;
+                p.twinkle_freq = TWINKLE_FREQ_LO
+                    + unit(seed, channel::TWINKLE_FREQ) * (TWINKLE_FREQ_HI - TWINKLE_FREQ_LO);
+                p.twinkle_phase = unit(seed, channel::TWINKLE_PHASE);
+                p.size_unit = unit(seed, channel::SIZE);
+                p
+            })
+            .collect();
 
         Self {
             pipeline,
@@ -470,6 +516,8 @@ impl SwarmScene {
             palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             shape: DEFAULT_SHAPE,
             points: DEFAULT_POINTS,
+            twinkle: DEFAULT_TWINKLE,
+            size_spread: DEFAULT_SIZE_SPREAD,
         }
     }
 
@@ -491,6 +539,11 @@ impl SwarmScene {
             hue: rng.next_f32(),
             bright: rng.range(0.5, 1.0),
             size: rng.range(0.004, 0.011),
+            // Neutral; `new` overwrites all three from the particle's index.
+            // Deliberately not drawn from `rng` — see the comment there.
+            twinkle_freq: 0.0,
+            twinkle_phase: 0.0,
+            size_unit: 0.5,
         }
     }
 }
@@ -514,6 +567,48 @@ fn hue_coord(hue_center: f32, hue_spread: f32, particle_hue: f32, hue: f32) -> f
     hue_center + (particle_hue - 0.5) * hue_spread + hue
 }
 
+/// The individuation contract, mirrored from the emitter (`emitter.rs`'s
+/// `unit`, which is private to that scene): a per-particle quantity is a pure
+/// function of `(seed, channel)` — splitmix64's finalizer applied as a hash.
+/// The swarm's `seed` is the particle's index in the seeded pool, which is
+/// stable for the scene's life, and the hash runs at construction only.
+fn unit(seed: u32, k: u32) -> f32 {
+    let mut z = ((seed as u64) << 32 | k as u64).wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    (z >> 40) as f32 / (1u64 << 24) as f32
+}
+
+/// Seed channels, named so a later quantity cannot silently reuse one and
+/// correlate itself with an existing draw (the emitter's convention).
+mod channel {
+    pub(super) const TWINKLE_FREQ: u32 = 0;
+    pub(super) const TWINKLE_PHASE: u32 = 1;
+    pub(super) const SIZE: u32 = 2;
+}
+
+/// The particle's brightness multiplier under `twinkle` — the emitter's
+/// semantics on the emitter's frequency band, over the pre-resolved
+/// per-particle rate and phase. Exactly `1.0` at `twinkle <= 0`, which is what
+/// makes the defaults' byte-identity falsifiable in both directions; clamped
+/// at zero because `twinkle` is a preset expression and may exceed 1, and a
+/// negative multiplier would subtract light rather than removing it.
+fn twinkle_factor(freq: f32, phase: f32, time: f32, twinkle: f32) -> f32 {
+    if twinkle <= 0.0 {
+        return 1.0;
+    }
+    let wave = (std::f32::consts::TAU * (freq * time + phase)).sin();
+    (1.0 + twinkle * wave).max(0.0)
+}
+
+/// The particle's size multiplier within `size_spread` — the emitter's
+/// `size_factor`, over the pre-resolved unit draw. Exactly `1.0` at zero
+/// spread (the default), on top of the scatter's own seeded base size.
+fn size_factor(size_unit: f32, size_spread: f32) -> f32 {
+    (1.0 + (size_unit - 0.5) * size_spread).max(0.0)
+}
+
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
 pub const PARAMS: &[&str] = &[
@@ -533,6 +628,10 @@ pub const PARAMS: &[&str] = &[
     "palette_mix",
     "palette_steps",
     "palette_contour",
+    // Per-mark individuation (Plan 0077 Phase 2) — the emitter's names, with
+    // the emitter's semantics.
+    "twinkle",
+    "size_spread",
     // The shared mark silhouette (ADR-0084) — the same two names the emitter
     // carries; `marks::PARAMS` is the single statement of the pair.
     "shape",
@@ -577,6 +676,8 @@ impl Scene for SwarmScene {
         self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.shape = DEFAULT_SHAPE;
         self.points = DEFAULT_POINTS;
+        self.twinkle = DEFAULT_TWINKLE;
+        self.size_spread = DEFAULT_SIZE_SPREAD;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -599,6 +700,8 @@ impl Scene for SwarmScene {
             "palette_contour" => self.palette_contour = value,
             "shape" => self.shape = value,
             "points" => self.points = value,
+            "twinkle" => self.twinkle = value,
+            "size_spread" => self.size_spread = value,
             _ => {}
         }
     }
@@ -614,6 +717,12 @@ impl Scene for SwarmScene {
         let burst_kick = self.burst;
         // Hoisted out of the loop: one read, 10 000 uses (Plan 0043 Phase 2).
         let field_freq = self.field_freq;
+        // The individuation pair, resolved at draw like the emitter's: an
+        // eased width moves the whole population continuously instead of only
+        // particles spawned since the change (Plan 0077 Phase 2).
+        let twinkle = self.twinkle;
+        let size_spread = self.size_spread;
+        let time = self.time;
 
         // Frame-rate-independent integration (Plan 0014 Phase 2): scale the
         // acceleration/advection by real `dt`, and raise the per-frame damping to
@@ -697,12 +806,19 @@ impl Scene for SwarmScene {
 
             // The speed cue predates depth and still earns its place: on a coherent
             // field the fast channels read brighter than slack water. The
-            // atmospheric fade multiplies it rather than replacing it.
-            let bright = ((0.25 + speed * 0.7) * p.bright).min(1.6) * self.brightness * depth_fade;
+            // atmospheric fade multiplies it rather than replacing it. The
+            // twinkle factor is exactly 1.0 when `twinkle` is unbound, and the
+            // size factor exactly 1.0 at zero spread — multiplying by either is
+            // bit-exact, which is what keeps the shipped captures byte-identical
+            // (Plan 0077 Phase 2).
+            let bright = ((0.25 + speed * 0.7) * p.bright).min(1.6)
+                * self.brightness
+                * depth_fade
+                * twinkle_factor(p.twinkle_freq, p.twinkle_phase, time, twinkle);
 
             *inst = Instance {
                 center: [p.pos[0] * bound_x, p.pos[1] * bound_y],
-                size: p.size * self.size * depth_scale,
+                size: p.size * self.size * depth_scale * size_factor(p.size_unit, size_spread),
                 color: [base[0] * bright, base[1] * bright, base[2] * bright],
                 parallax,
             };
