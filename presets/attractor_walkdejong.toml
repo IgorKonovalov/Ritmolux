@@ -8,6 +8,22 @@
 #
 # `morph` runs a full round trip in about 48 s. That is deliberate: the walk is
 # continuous where `tuple` cuts, and the whole point is that it is gradual.
+#
+# THE RETURN LEG IS WHY THIS PRESET HAS A `reseed` AND THE OTHER THREE WALKS DO
+# NOT. De Jong is a discrete map on position alone, so two particles at the same
+# point are the same particle forever. The middle of this pair contracts hard
+# (measured: healthy at morph 0.07, breaking up by 0.22, down to about a dozen
+# distinct points by 0.42), and once the cloud has collapsed, walking the
+# coefficients back to a chaotic tuple does NOT bring it back - the survivors
+# are bit-identical, so they re-diverge into nothing. Only the reseed's
+# per-particle kick re-injects the diversity the contraction destroyed.
+#
+# The forward-only curation sweep could not see this: `scripts/tuple-paths.mjs`
+# ramps `morph` up to a cell's position and holds, so no cell ever renders the
+# way back, and it traverses 5x faster than this binding does - less dwell in
+# the contracting middle. The three flow-family walks (Thomas, Knot, Rho) were
+# re-checked over a 100 s round trip and stay populated throughout; they need
+# nothing. This is a De Jong problem, not a walk problem.
 system = "attractor"
 name = "De Jong Walk"
 
@@ -22,6 +38,12 @@ name = "spectrum"
 
 [params]
 morph = "clamp(0.5 - 0.5 * cos(time * 0.13) + clamp(bass * 0.10, 0, 0.08), 0, 1)"
+
+# Recovery, not decoration - see the header. The `beat_index` clause is the
+# load-bearing half: an onset gate alone would leave quiet material with no way
+# back at all, and the collapse this repairs is permanent. Every 16 beats is
+# ~8 s at 120 BPM, well inside one 48 s round trip.
+reseed = "max(onset > 0.45, min(beat, mod(beat_index, 16) == 0))"
 
 brightness = "1.4"
 fade = "0.86 - clamp(bass * 0.04, 0, 0.04)"
