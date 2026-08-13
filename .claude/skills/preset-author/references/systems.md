@@ -157,11 +157,25 @@ each defaulting to that family's canonical value.
 | Param | Default | Typical | Controls / natural driver |
 |-------|---------|---------|---------------------------|
 | `a` `b` `c` `d` | family canon | ±0.05 around canon | the map's coefficients — **chaotic**: move them slowly and by a little, or it reads as a cut, not a morph. |
+| `tuple` | `0` | `0 .. roster-1` | **picks a whole figure, framing included** (Plan 0079/ADR-0093). Each map family carries a curated roster — `de_jong` 13, `clifford` 13, `thomas` 13, `lorenz` 12 — whose entries carry their coefficients *and* their projection + seed box, so a distant figure arrives centred and in frame where `a`..`d` alone could not reach it at all. `0` is the canonical figure. **Quantized CPU-side to the nearest whole entry**, like `kaleido_spiral`: there is no figure between two entries, so a change is a **cut** and wants a long `[smoothing]` or a slow binding. A bound `a`..`d` loses to the entry on the frame the cut lands. |
 | `size` | `1.0` | `0.6 – 2.0` | point size. Reads *finer* at high resolution — a value tuned on a small capture may look thin at 1080p. |
 | `fade` | `0.94` | `0 – 0.98` | trail persistence per 1/60 s. `0` = no trails; near `1` smears toward permanence (the "blot" trap with `ink_amount`). |
 | `reseed` | `0.0` | gate | **edge-triggered**: re-scatters once when the expression rises past `0.5`. `"beat"` re-scatters per beat. |
 | `hue_spread` | `0.15` | `0.05 – 0.4` | per-particle hue band width. |
 | `hue_center` | `0.075` | `0 – 1` | centre of that band. |
+
+**To *travel* between two figures instead of cutting, name a path** (Plan 0079/ADR-0093):
+`[particles] tuple_to = <index>` turns the walk on (`tuple_from` is the near end, entry `0` by
+default), and the already-existing `morph` param — continuous, the one place in this scene's surface
+a param is *not* quantized — is the position along it. `tuple` goes inert while a path is
+configured; a preset either steps the roster or walks a path. **Not every pair has a walk**: a tuple
+partway between two others can collapse to a fixed point, which has no scale to render at, so the
+engine refuses the path and the preset sits on its near end with `morph` doing nothing — the first
+thing to suspect when a walk looks dead. Four shipped paths were judged in motion (`thomas` 5→8,
+`lorenz` 0→1, `lorenz` 0→4, `de_jong` 1→3); the one-dimensional sweeps hold best, because
+neighbouring `a`/`rho` values are neighbouring *figures*. Do **not** put `morph` in `[smoothing]` —
+easing an already-slow curve only lags it. Full table and the per-roster notes:
+[`presets/README.md`](../../../../presets/README.md).
 
 ---
 

@@ -667,6 +667,17 @@ cargo run -p standalone --example shot -- --preset "Burst" \
   --audio assets/test/clip.wav --strip 8 --out clip.png
 ```
 
+**Two committed scripts drive `shot` for curation work** (Plan 0079), both writing under
+`target/` and both self-documenting in their headers — run them with `node`, no arguments needed:
+
+| Script | What it renders |
+|---|---|
+| `scripts/tuple-sheets.mjs` | one labeled contact sheet per attractor family, a cell per roster entry — the menu a `tuple` curation judges |
+| `scripts/tuple-paths.mjs` | one filmstrip per candidate `tuple_from`/`tuple_to` pair, a cell per `morph` step; pairs the engine refuses a walk for are skipped rather than rendered as identical cells |
+
+They read the roster straight out of `core/src/render/scenes/particles/family.rs`, so a roster edit
+needs no script edit. Their output is **not** committed — re-run them when a judgement is owed.
+
 `--signal` kinds: `click:<bpm>`, `bass:<hz>`, `treble:<hz>`, `noise:<seed>`,
 `chord`, `dynamic:<bpm>`. The synth path needs no committed asset. `--audio`
 reads uncompressed 16-bit PCM WAV only (a hand-rolled reader — no decoder

@@ -79,6 +79,7 @@ cannot express them.
 | 0052 | `Spectrum Ridge` has no tonal structure — **premise was false** | Retired 2026-08-03; the preset was never flat and the statistic convicted the right preset for the wrong reason |
 | 0053 | The retune rescaled band gains but not the world-space params | [ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) + [Plan 0058](plans/done/0058-the-gate-can-see-an-empty-frame.md) |
 | 0054 | Pixel coverage cannot see a figure whose *tips* leave the frame | [ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) + [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md). **Closed 2026-08-06.** The successor measures in-frame segment length inside `LineRenderer::draw` and convicts both frozen defects (`0.4975` / `0.7788` separation, against the `0.055` pixel coverage had). **But it has no separating absolute threshold over the shipped library either** — `Rose Zoom` and `Rose Overflow` bracket the over-scaled comb and both are correct content, so it shipped as a **paired** instrument, not the gate this entry asked for. What that leaves open is [0070](#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report) |
+| 0055 | The attractor's shape vocabulary is "breathe and bend", and the reference figures ask for more | [ADR-0093](adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md) + [Plan 0079](plans/done/0079-the-attractor-learns-new-figures.md). **Closed 2026-08-13, both halves.** Variety: a curated per-family tuple roster (13/13/13/12) whose entries carry their own **measured framing**, so the rho ≈ 100 Lorenz cohort 5 called unreachable now renders centred and in frame. Morph: the entry's "may not exist in general" research question **has an answer along a single-coefficient axis** — four measured paths ship out of twenty swept, four refused by measurement (a mid-walk tuple can collapse to a fixed point, which has no scale to render at). Cross-fading two instances stays rejected and unneeded |
 | 0057 | No scene-local level param, so `exposure` gets used for one and two stages disagree | [ADR-0080](adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md) + [Plan 0066](plans/done/0066-the-level-lever.md). **Closed 2026-08-05.** Both halves landed; the retune found a consequence the ADR had not — the background pre-pass is upstream of the tonemap, so moving a number from `exposure` to `brightness` multiplies the sky by `1/old_exposure` (33x on Lorenz). Recorded as the ADR's `Outcome` |
 | 0058 | Thirteen presets bind the fold and eleven had not chosen an edge treatment | Closed by content 2026-08-04, `859ec66` — all thirteen now name a `kaleido_edge`, the verdicts spread across all three treatments. **The entry named `attractor_dejong`, which binds no `kaleido_*` param; the thirteenth is `attractor_clifford`** — inherited from [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md)'s own scope bullet, corrected in both |
 
@@ -463,9 +464,24 @@ reachable with its framing carried beside it.
 demonstrably shipped around the gap. ADR-shaped and earned.
 
 **PROMOTED same day → [ADR-0093](adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md) +
-[Plan 0079](plans/0079-the-attractor-learns-new-figures.md)** — the roster **plus** measured
+[Plan 0079](plans/done/0079-the-attractor-learns-new-figures.md)** — the roster **plus** measured
 morph paths, the stronger form, user-decided by interview (zero surviving paths is a recorded
 outcome, not a failure). Queued after Plan 0076 + cohort 6, last of the three handoff plans.
+
+**CLOSED 2026-08-13, at Plan 0079's close, and closed in *full* — both halves.** The entry's own
+framing was "is the ask variety-over-time or morph-between-figures? They are different features",
+with the morph half called "a real research question [that] may not exist in general". Both
+shipped. **Variety:** a curated roster per map family — `de_jong` 13, `clifford` 13, `thomas` 13,
+`lorenz` 12 — each entry carrying its coefficients *and its measured framing*, selected by a
+CPU-quantized `tuple` param. The rho ≈ 100 Lorenz that cohort 5 measured as physically unreachable
+now renders centred and in frame, which is the wall this entry named coming down. **Morph:** four
+measured paths ship, driven by `morph` along a structural `tuple_from`/`tuple_to` pair, after a
+twenty-pair sweep in which four pairs were refused *by measurement* (a tuple partway between two
+others can collapse to a fixed point) and four were judged in motion and kept. The research
+question turned out to have an answer where a roster walks a **single** coefficient — Thomas's `a`,
+Lorenz's `rho` — because there neighbouring entries are neighbouring *figures*; the discrete maps
+are the harder case in both directions. The entry's own "cross-fading two attractors is the other
+shape" stays rejected (ADR-0093 Alternative B), unmeasured and now unneeded.
 
 ---
 
