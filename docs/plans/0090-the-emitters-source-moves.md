@@ -1,9 +1,9 @@
 # 0090 — the emitter's source moves
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0104](../adrs/0104-the-emitters-source-is-authorable-geometry.md) (proposed, this plan)
+> **Related ADRs:** [ADR-0104](../adrs/0104-the-emitters-source-is-authorable-geometry.md) (accepted, this plan)
 > **Closes:** [design-backlog 0068](../design-backlog.md) option 2
 > **Supplements:** [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md),
 > [ADR-0091](../adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)

@@ -1,6 +1,6 @@
 # ADR-0102 — a palette coordinate's edge is a per-preset choice
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-13, user approval) — decided, deliberately unbuilt
 > **Date:** 2026-08-13
 > **Related plan(s):** none — deliberately. Recorded now, built when a want arrives.
 > **Supplements:** [ADR-0086](0086-the-backdrop-colours-through-the-preset-palette.md),

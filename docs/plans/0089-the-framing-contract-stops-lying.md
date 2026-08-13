@@ -1,9 +1,9 @@
 # 0089 — the framing contract stops lying, and two doc gaps close
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0103](../adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) (proposed, this plan)
+> **Related ADRs:** [ADR-0103](../adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) (accepted, this plan)
 > **Closes:** [design-backlog 0089](../design-backlog.md), and the surviving halves of
 > [design-backlog 0078](../design-backlog.md) and [design-backlog 0081](../design-backlog.md)
 > **Supplements:** [ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md),
