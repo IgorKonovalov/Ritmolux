@@ -1,0 +1,77 @@
+# Plan 0079 demo - THE figure the plan exists for, held still.
+#
+# Lorenz at rho ~ 100: the periodic torus-knot window that Plan 0075 cohort 5
+# measured as physically unreachable. Entry 1 carries its own projection, its
+# own world centre (z ~ 102) and its own seed box, so it arrives centred and in
+# frame with no `pan` or `zoom` rescue.
+#
+# The reseed is here to be watched: this orbit is marginally stable, so a kick
+# blooms wide and takes several seconds to fall back onto the knot. On the
+# canonical butterfly the same disturbance is absorbed in a few frames.
+system = "attractor"
+name = "Torus Knot"
+
+[particles]
+family = "lorenz"
+# Sparse on purpose (ADR-0069): the segment joins each step to the last, so a
+# thin population draws the orbit as a continuous ribbon rather than as fog.
+# Total light is invariant to this (ADR-0065) - it sets distribution, not level.
+density = 0.02
+
+[palette]
+name = "aurora"
+
+[params]
+tuple = "1"
+
+# LEVEL AND LINE. The nib is fine and the trail short: those two, not `density`,
+# are what keep a Lorenz from filling in. `brightness` is well over 1 so the
+# ribbon's core crosses the bloom threshold below - a preset that holds all its
+# light under 1.0 hands the bright-pass an empty frame and the stage does
+# nothing at all.
+brightness = "1.6"
+fade = "0.80 - clamp(bass * 0.05, 0, 0.05)"
+size = "0.18 + clamp(treb * 0.08, 0, 0.06) + beat * 0.05"
+reseed = "max(onset > 0.55, min(beat, mod(beat_index, 16) == 0))"
+
+# BLOOM - the halo that makes a thin curve read as light rather than as line
+# art. The threshold sits ABOVE the ribbon's body and below its core, which is
+# what keeps the glow a rim rather than a second, fatter ribbon: at a threshold
+# under the body the whole orbit blooms and the knot reads as a blurred tube.
+# The beat term is the accent - a wider halo for one frame reads as the knot
+# pulsing without moving.
+bloom_amount = "0.30 + beat * 0.25 + clamp(bass * 0.20, 0, 0.15)"
+bloom_threshold = "1.4"
+bloom_radius = "1.4"
+
+# BACKDROP - a cold deep-sea gradient, brightest at the bottom, so the ribbon
+# has something to sit in front of. Kept far under the figure's level: the
+# backdrop is the room, not a second subject.
+bg_bright = "0.16 + clamp(bass * 0.06, 0, 0.05)"
+bg_hue = "0.62"
+bg_hue_span = "-0.22"
+bg_angle = "0"
+bg_shade = "1.0"
+bg_shade_end = "0.18"
+bg_ramp_gamma = "1.7"
+bg_vignette = "0.40"
+
+perspective = "0.24 + clamp(bass * 0.06, 0, 0.05)"
+depth_fade = "0.45 + clamp(mid * 0.20, 0, 0.18)"
+depth_hue = "0.18"
+spin = "0.8 + clamp(bass * 0.5, 0, 0.45)"
+
+saturation = "0.9"
+hue_spread = "0.22"
+hue_center = "0.42"
+zoom = "1.0 + bar * 0.05"
+
+[smoothing]
+size = { attack = 0.03, release = 0.35 }
+perspective = 0.9
+depth_fade = 1.2
+spin = 1.0
+# The halo eases in and falls away slowly, so a beat reads as a swell rather
+# than as a strobe.
+bloom_amount = { attack = 0.04, release = 0.45 }
+bg_bright = 0.5

@@ -1,0 +1,68 @@
+# Plan 0079 demo - the Lorenz roster, stepping itself.
+#
+# `tuple` steps one entry every ~3 s. Each cut changes the figure AND its
+# framing together, which is the whole point: the rho ~ 100 knot is centred and
+# in frame at entry 1 even though it lives on z ~ 102, where the canonical
+# framing subtracts 25.
+#
+# No [smoothing] on `tuple` deliberately - this is the cut, shown honestly.
+system = "attractor"
+name = "Lorenz Gallery"
+
+[particles]
+family = "lorenz"
+# The roster spans a single closed orbit and several dense chaotic sheets, so
+# one exposure has to serve both. Sparse + a short trail is what keeps the dense
+# entries from filling in; `density` alone cannot, because the deposit is
+# normalized by count (ADR-0065) and total light is invariant to it.
+density = 0.006
+
+[palette]
+name = "ember"
+
+[params]
+tuple = "mod(floor(time * 0.33), 12)"
+
+# Over 1.0 deliberately: the bloom below selects light that is over range, so a
+# figure held under 1.0 would hand the bright-pass an empty frame.
+brightness = "1.5"
+fade = "0.62 - clamp(bass * 0.05, 0, 0.05)"
+size = "0.22 + clamp(treb * 0.10, 0, 0.08) + beat * 0.05"
+reseed = "onset > 0.55"
+
+# BLOOM - a tighter halo than the knot's, because this preset has to survive the
+# dense entries too: a wide wash over a chaotic sheet is a blur, where the same
+# radius over a single orbit is a glow. Threshold above the strokes' mid-tones
+# so the halo picks out the figure's hot core rather than the whole sheet.
+bloom_amount = "0.8 + beat * 0.5 + clamp(bass * 0.4, 0, 0.35)"
+bloom_threshold = "0.9"
+bloom_radius = "1.5"
+
+# BACKDROP - warm and very low, the ember palette's own dark end travelling a
+# little further into its heat. Brightest at the bottom, so the figure reads
+# against a floor rather than floating in nothing.
+bg_bright = "0.13 + clamp(bass * 0.05, 0, 0.04)"
+bg_hue = "0.06"
+bg_hue_span = "0.16"
+bg_angle = "0"
+bg_shade = "1.0"
+bg_shade_end = "0.20"
+bg_ramp_gamma = "1.8"
+bg_vignette = "0.35"
+
+perspective = "0.22"
+depth_fade = "0.55"
+depth_hue = "0.10"
+spin = "1.0 + clamp(bass * 0.4, 0, 0.35)"
+
+saturation = "0.85"
+hue_spread = "0.18"
+hue_center = "0.30"
+zoom = "1.0 + clamp(bass * 0.10, 0, 0.09)"
+
+[smoothing]
+size = { attack = 0.03, release = 0.30 }
+spin = 1.0
+zoom = 0.2
+bloom_amount = { attack = 0.04, release = 0.40 }
+bg_bright = 0.5
