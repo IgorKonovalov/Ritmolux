@@ -256,7 +256,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
-| `attractor`       | `a` `b` `c` `d` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
+| `attractor`       | `a` `b` `c` `d` `tuple` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 
@@ -2391,6 +2391,42 @@ to bands for a morphing cloud, but move them **slowly and by a little** — thes
 are chaotic maps, and a large jump reads as a hard cut rather than a morph.
 **On the five IFS figures they mean nothing at all** — that family's shape is an
 affine table, and `morph`/`curl`/`vigor`/`lean`/`bias` are what reach it.
+
+### `tuple` picks a whole figure, framing included
+
+The companion to the paragraph above. Moving `a`..`d` yourself reaches the
+figures *near* the canonical one; it cannot reach a distant one at all, because
+a family's world scale and centre are sized to its canonical tuple and a wild
+tuple renders off-centre and out of frame with no preset-side recovery — `pan`
+cannot span it. `tuple` selects from a **curated roster** whose entries carry
+their coefficients *and their framing*, so a distant figure arrives centred and
+in frame, with `reseed` and the depth cues already sized to it
+([ADR-0093](../docs/adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md)).
+
+| Param | What it does | Range that means something |
+|---|---|---|
+| `tuple` | Selects a roster entry for the current family. `0` is the canonical figure — exactly what the family drew before this param existed. | `0` .. one less than the family's roster length; out of range holds the last entry, and a non-finite binding falls back to `0` |
+
+Three things to know before you bind it:
+
+- **It is quantized CPU-side, to the nearest whole entry**, the way
+  `kaleido_spiral` and `palette_steps` are. There is no figure between two roster
+  entries — a fractional index would mean coefficients interpolated between two
+  different attractors, which is a third, unmeasured figure with neither
+  endpoint's framing.
+- **So a change is a cut, and it wants a long `[smoothing]`** — the guidance
+  `kaleido_order` carries, for the same reason. A fast binding is a slideshow
+  rather than a morph. The cut is softened by whatever `reseed` disturbance is
+  already running, and a cut *between presets* is hidden by the dissolve.
+- **A bound `a`..`d` loses to the entry on the frame the cut lands**, and gets
+  it back on the next one. Binding both is legal and mostly not what you want:
+  the entry's coefficients are the base your `a` was modulating around, and the
+  base has just moved.
+
+Today only `lorenz` has more than one entry — entry `1` is the rho ≈ 100
+torus knot, a figure that was physically unreachable before this param. It is
+**provisional**, pending curation; `reseed` on it is a slow bloom rather than a
+shimmer, because its orbit takes several seconds to absorb a disturbance.
 
 **Each family is viewed in its own plane**, and it matters the moment you reach
 for `zoom` or `pan_*`, because those aim at the figure the plane produces:

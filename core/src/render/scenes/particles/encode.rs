@@ -31,6 +31,10 @@ pub(super) struct UniformInputs {
     pub(super) aspect: f32,
     pub(super) coeffs: [f32; 4],
     pub(super) family: AttractorFamily,
+    /// The active roster entry's framing (ADR-0093) — where this tuple's figure
+    /// is and how big, which is what makes a distant tuple reachable at all.
+    /// Read instead of `family.projection()`, which is entry 0's.
+    pub(super) framing: Framing,
     /// The integrated spin in spin-scaled seconds, not a wall clock — see
     /// [`advance_spin`].
     pub(super) spin_time: f32,
@@ -166,7 +170,7 @@ pub(super) fn upload_uniforms(
             )),
         );
     }
-    let (scale, dim, centre) = inputs.family.projection();
+    let (scale, dim, centre) = inputs.framing.projection;
     // An IFS takes its framing from the fit instead — measured over `morph` at
     // load, so the figure stays in the frame as it crosses from one figure to
     // another, and **aspect-aware**, so a wide figure fits a portrait window
@@ -244,7 +248,7 @@ pub(super) fn upload_uniforms(
                 // Not clamped: the palette LUT sampler repeats, so any shift is
                 // a legitimate coordinate.
                 inputs.depth_hue,
-                inputs.family.inv_depth_extent(),
+                inputs.framing.inv_depth_extent(inputs.family),
             ],
             ctr: [centre[0], centre[1], centre[2], 0.0],
             // The four colour channels, unclamped for the same reason
@@ -351,7 +355,7 @@ pub(super) fn encode_jitter(
     encoder: &mut wgpu::CommandEncoder,
     pipelines: &PipelineResources,
     active: u32,
-    family: AttractorFamily,
+    framing: Framing,
     reseed_count: &u32,
     pending_jitter: &mut bool,
 ) {
@@ -360,7 +364,12 @@ pub(super) fn encode_jitter(
     }
     *pending_jitter = false;
 
-    let [jx, jy, jz] = family.jitter_extent();
+    // The **active entry's** extent, not the family's (ADR-0093): the kick is a
+    // fraction of the figure's own size, and on a roster entry twice the
+    // canonical figure's extent the canonical fraction would be a disturbance
+    // half as strong as the one the preset asked for. This is the Plan 0062
+    // coupling, and it survives the roster because framing travels with the tuple.
+    let [jx, jy, jz] = framing.jitter_extent();
     let jitter_offset = pipelines.step_stride * JITTER_SLOT;
     queue.write_buffer(
         &pipelines.step_uniform,

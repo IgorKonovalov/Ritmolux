@@ -148,6 +148,34 @@ fn attractor_bare_preset(name: &str, family: &str, extra: &str) -> Preset {
     Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name} preset parses: {e}"))
 }
 
+/// The lit region's bounding box as `(x0, y0, x1, y1)` in pixels, inclusive, or
+/// `None` when nothing is lit at all.
+///
+/// Where [`lit_centroid_offset`] measures where the figure's *mass* sits, this
+/// measures where its *edges* are — which is what "in frame" is a claim about: a
+/// figure hanging off the top still has a centroid, and it is the clipped
+/// silhouette that says so.
+fn lit_bbox(img: &CaptureImage) -> Option<(u32, u32, u32, u32)> {
+    let bg = background(img);
+    let mut bounds: Option<(u32, u32, u32, u32)> = None;
+    for (i, px) in img.rgba.chunks_exact(4).enumerate() {
+        let lit = px
+            .iter()
+            .zip(bg.iter())
+            .take(3)
+            .any(|(&c, &b)| c.abs_diff(b) > EPS);
+        if !lit {
+            continue;
+        }
+        let (x, y) = (i as u32 % img.width, i as u32 / img.width);
+        bounds = Some(match bounds {
+            None => (x, y, x, y),
+            Some((x0, y0, x1, y1)) => (x0.min(x), y0.min(y), x1.max(x), y1.max(y)),
+        });
+    }
+    bounds
+}
+
 /// `pan_y` probe magnitude, in NDC. The frame spans 2 NDC units vertically, so a
 /// pan of `p` displaces the figure by `p/2` of frame height and the **separation**
 /// between `+p` and `-p` captures is `p` — which is why the assertion below reads
@@ -468,6 +496,109 @@ fn attractor_contract() {
     assert_eq!(
         dim.rgba, dim_again.rgba,
         "a `brightness`-bound attractor capture is not reproducible"
+    );
+    // --- A roster entry brings its own frame (Plan 0079 Phase 1, ADR-0093) ---
+    //
+    // The claim is the one backlog 0055 measured as a wall: the rho ~ 100 Lorenz
+    // is not out of reach because its coefficients cannot be bound — they can,
+    // and `at_knot_unframed` below binds them — but because the canonical
+    // framing subtracts a world centre of `z = 25` from a figure centred on
+    // `z ~ 102` and scales it for an extent half its size. So the two captures
+    // differ **only** in whether the framing travelled with the tuple, and that
+    // is the whole difference between a blank frame and a figure.
+    //
+    // Appended at the end, not inserted, so every capture above is still taken
+    // from the device state it always was.
+    renderer.set_presets(vec![
+        attractor_bare_preset("at_knot", "lorenz", "tuple = \"1\"\n"),
+        attractor_bare_preset("at_knot_unframed", "lorenz", "b = \"100\"\n"),
+        attractor_bare_preset("at_canonical", "lorenz", ""),
+    ]);
+    let knot = renderer
+        .capture_preset("at_knot", &lively, 90)
+        .expect("capture at_knot");
+    let unframed = renderer
+        .capture_preset("at_knot_unframed", &lively, 90)
+        .expect("capture at_knot_unframed");
+    let canonical = renderer
+        .capture_preset("at_canonical", &lively, 90)
+        .expect("capture at_canonical");
+    let knot_bg = background(&knot);
+    let (knot_cov, unframed_cov, canonical_cov) = (
+        coverage(&knot, knot_bg, EPS),
+        coverage(&unframed, background(&unframed), EPS),
+        coverage(&canonical, background(&canonical), EPS),
+    );
+    println!(
+        "lorenz coverage — canonical {canonical_cov:.4}, rho 100 framed \
+         {knot_cov:.4}, rho 100 through the canonical framing {unframed_cov:.4}"
+    );
+
+    // The wall, at capture level: the same coefficients without their framing
+    // land the figure's mass far off the centre line and clipped against an
+    // edge, where the framed entry sits on the centre. `lit_centroid_offset` is
+    // the instrument the `pan_y` probe above already trusts.
+    let (knot_off, unframed_off, canonical_off) = (
+        lit_centroid_offset(&knot),
+        lit_centroid_offset(&unframed),
+        lit_centroid_offset(&canonical),
+    );
+    println!(
+        "lorenz centroid offset — canonical {canonical_off:+.3}, rho 100 framed \
+         {knot_off:+.3}, rho 100 through the canonical framing {unframed_off:+.3}"
+    );
+    assert!(
+        unframed_off.abs() > 0.2,
+        "rho = 100 through the canonical framing sits {unframed_off:+.3} off \
+         centre — it is framed after all, so this capture no longer demonstrates \
+         the wall ADR-0093 exists for"
+    );
+
+    // The fix: the entry renders a real figure...
+    assert!(
+        knot_cov > 0.01,
+        "the framed rho ~ 100 entry covers only {knot_cov:.4} — it is not drawing"
+    );
+    let (x0, y0, x1, y1) = lit_bbox(&knot).expect("the framed entry lights something");
+    println!("rho 100 framed bbox: x {x0}..{x1}, y {y0}..{y1} in a {SIZE}px frame");
+
+    // ...in frame: nothing of it is clipped by an edge.
+    assert!(
+        x0 > 0 && y0 > 0 && x1 < SIZE - 1 && y1 < SIZE - 1,
+        "the framed entry touches the frame edge (x {x0}..{x1}, y {y0}..{y1}) — \
+         it is not fully in frame"
+    );
+
+    // ...and centred: both its silhouette and its mass straddle the frame centre
+    // rather than sitting to one side of it, which is what a per-entry world
+    // centre buys over the family constant.
+    let centre = |lo: u32, hi: u32| (lo + hi) as f32 / 2.0 / SIZE as f32 - 0.5;
+    let (cx, cy) = (centre(x0, x1), centre(y0, y1));
+    println!("rho 100 framed silhouette centre: ({cx:+.3}, {cy:+.3}) of the frame");
+    assert!(
+        cx.abs() < 0.12 && cy.abs() < 0.12,
+        "the framed entry sits at ({cx:+.3}, {cy:+.3}) of the frame rather than on \
+         its centre"
+    );
+    assert!(
+        knot_off.abs() < canonical_off.abs().max(0.08),
+        "the framed entry's mass sits {knot_off:+.3} off centre, no better than \
+         the canonical figure's {canonical_off:+.3}"
+    );
+
+    // Non-vacuity for the two assertions above: the canonical entry passes them
+    // too, so they are a property this framing has and not a property of any
+    // capture at this size.
+    let (bx0, by0, bx1, by1) = lit_bbox(&canonical).expect("the canonical entry lights something");
+    assert!(
+        bx0 > 0 && by0 > 0 && bx1 < SIZE - 1 && by1 < SIZE - 1,
+        "the canonical Lorenz is itself clipped, so 'in frame' is not what this \
+         instrument measures"
+    );
+    // And the entry is a different figure, not the canonical one relabelled.
+    assert_ne!(
+        knot.rgba, canonical.rgba,
+        "`tuple = 1` renders identically to `tuple = 0` — the selector is inert"
     );
 }
 
