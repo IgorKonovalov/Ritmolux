@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0089** (ADRs are a separate sequence — next free there is **0102**.)
+**Next free number: 0090** (ADRs are a separate sequence — next free there is **0104**.)
 
 ## Active roster
 
@@ -20,6 +20,7 @@ someone who picked it up is reading.
 | [0086](0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md) | The downbeat finds a cue that is not the kick | approved | dev, human | **Measures before it chooses.** Phase 2 is a `human` gate that needs the user's own music — a synthesized backbeat is a hypothesis about backbeats, which is exactly what cannot settle this. The cue for Phase 3 is named at that gate, so the later phases state properties rather than edits. `CONFIDENCE_THRESHOLD` does not move. |
 | [0088](0088-the-docs-get-pictures.md) | The docs get pictures | approved | dev, human | The only user-facing-docs plan on the roster, and the only one that starts with a **tool gap**: `shot` cannot produce a full-resolution frame under real audio today (`--at` returns a 363x208 bordered tile), so Phase 1 is a capability. Commits ~22 MB of PNGs permanently ([ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md), measured, budgeted). Its gallery is invalidated by [0087](0087-the-line-renderer-draws-a-curve.md) — one script re-run, by construction. |
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
+| [0089](0089-the-framing-contract-stops-lying.md) | The framing contract stops lying, and two doc gaps close | approved | dev | The smallest on the roster and the only one that is **three unrelated items in one sitting** — they share a session, not a subject. Phase 1 is the load-bearing one: `FRAME_FILL = 0.88` is **falsified** by rotation, and the closed form in [ADR-0103](../adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) makes it general (a square figure overruns 24.4 %; only the fern complies). It **moves zero pixels** — prove that bless-to-bless, never by a `git diff`. Phase 1 can honestly redirect: if the dragon comes back *inside* the bound, rotation is not the mechanism and the finding is the preset's own `zoom` reaching 1.04. |
 
 **Five plans, written 2026-08-13 from a backlog sweep**, after the roster stood empty for the first
 time in this file's history — **three now: [0083] and [0084] both closed the same day they were
@@ -30,6 +31,14 @@ sequence note below. Three carry new ADRs
 [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md),
 [ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md)), and every
 one of the five closes backlog entries that had been sitting on a demonstrated want with no route.
+
+**Added 2026-08-13, from a second backlog pass: [0089](0089-the-framing-contract-stops-lying.md)**,
+which takes the three items the first sweep left unrouted. Two more came out of that pass and are
+deliberately **not** plans: [ADR-0102](../adrs/0102-a-palette-coordinates-edge-is-a-per-preset-choice.md)
+records the palette-coordinate edge decision with no plan behind it (the want is real, nobody is
+blocked), and the emitter's fixed source line ([backlog 0068](../design-backlog.md) option 2) is going
+to an interview first, because a movable line, a point source and an authorable region are three
+different param surfaces.
 
 ## Recommended execution sequence
 
@@ -74,9 +83,28 @@ full-resolution frame under real audio. Where it sits in the order:
 - **Its `human` phase is a look verdict on nine gallery picks** and can carry forward the way [0083]'s
   Phase 5 did; the `dev` phases close the plan with provisional picks committed and working.
 
+**Added 2026-08-13: [0089](0089-the-framing-contract-stops-lying.md), from the second backlog pass**
+— and it is the one to take first if a short session is what is available. Where it sits:
+
+- **It is the only plan on the roster with no `human` phase**, so it closes in one unattended
+  session. All three phases are `dev` and the two doc phases are independent of Phase 1 and of each
+  other, so a session that runs out of room can stop cleanly after any of them.
+- **File contention is genuinely zero against the other four.** Phase 1 touches
+  `core/src/render/scenes/particles/ifs.rs` and its tests; Phases 2-3 touch `presets/README.md`.
+  Nothing else on the roster is in either. The one thing to watch is [0088], which rewrites the
+  *authoring docs* — but it adds `docs/preset-guide.md` and `docs/preset-tuning-walkthrough.md` as new
+  files and leaves the three references' shape alone by
+  [ADR-0101](../adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)'s own rule, so
+  the two touch `presets/README.md` for different reasons and in different sections. Run [0089] first
+  if both are queued, so [0088]'s tutorial is written against a `presets/README.md` that already
+  carries the two facts.
+- **It gates nothing.** Phase 1 is a contract restatement and a test; it changes no behaviour and
+  moves no pixels.
+
 **Three of the five carried a `human` phase**, so none closes in one unattended session — the same
 property the previous roster had. [0083] is the exception that proves it: its four `dev` phases
 closed the plan, and its `human` Phase 5 carried forward under Standing rather than holding it open.
+**[0089] is now a second exception, and a cleaner one**: it has no `human` phase at all.
 
 **One thing worth stating because it is the whole reason these five exist:** the sweep found the
 backlog carrying **twenty discharged entries** it had never archived, and **two entries whose premise
@@ -218,6 +246,8 @@ at 60 Hz or at capture `dt` stays correct as written.
 [0085]: 0085-the-show-length-horizon-gets-an-instrument.md
 [0086]: 0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md
 [0087]: 0087-the-line-renderer-draws-a-curve.md
+[0088]: 0088-the-docs-get-pictures.md
+[0089]: 0089-the-framing-contract-stops-lying.md
 [0045]: done/0045-linear-light-and-bloom.md
 [0046]: done/0046-transformed-feedback.md
 [0052]: done/0052-the-emitter-objects-that-spawn-fall-and-die.md
