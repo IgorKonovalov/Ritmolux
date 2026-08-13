@@ -61,6 +61,7 @@ use crate::dsp::AnalysisFrame;
 use crate::preset::{Easing, Expr, Layer, LayerJoin, Preset, SystemKind, Variables};
 use background::Background;
 pub use capture::CaptureImage;
+pub use capture_api::AudioCapture;
 pub use context::{RenderContext, RenderError};
 use ink::Ink;
 use overlay::Overlay;
