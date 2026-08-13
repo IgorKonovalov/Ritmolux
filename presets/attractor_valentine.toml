@@ -1,0 +1,96 @@
+# Valentine - a pink heart drawn on a white page.
+#
+# The figure is the Lorenz butterfly held upright: `spin = 0` is the whole
+# trick, because at any other rate it turns edge-on twice a revolution and
+# reads as a wedge. `tuple` walks the family roster, so the heart keeps
+# becoming other figures - the knot at entry 1 and the open rings at 7/9/11
+# are the ones that break the shape, and they are the punctuation.
+#
+# A white background cannot come from `bg_bright`: the cloud draws ADDITIVELY,
+# so light over a white field just stays white. The page has to come from the
+# final ink remap (ADR-0028), which keys on LUMINANCE and maps dark input to
+# paper and bright input to ink. That is why the backdrop below is left dark -
+# dark input IS the paper.
+#
+# The remap discards hue, so the pink here comes from `ink_hue`, not from the
+# palette; the palette is kept only for the luminance ramp, desaturated so that
+# ramp stays honest.
+system = "attractor"
+name = "Valentine"
+
+[particles]
+family = "lorenz"
+density = 0.02
+
+[palette]
+stops = [
+  { at = 0.0, color = "#2a0014" },
+  { at = 0.45, color = "#ff2d78" },
+  { at = 0.80, color = "#ff8ab8" },
+  { at = 1.0, color = "#ffe3ef" },
+]
+
+[params]
+# NOT PINNED ANY MORE: the heart walks the whole Lorenz roster, ~4.5 s a
+# figure. `spin` stays at 0 through all of it, which is what keeps each one
+# readable - most of this roster is a two-lobed butterfly, and held upright a
+# butterfly IS a heart. The knot at entry 1 and the open rings at 7/9/11 are
+# the ones that break the shape, and they are the punctuation.
+tuple = "mod(floor(time * 0.22), 12)"
+
+# Lower than the black version, and that is the remap rather than taste: every
+# stroke over the ink pole draws at full ink, so an over-hot figure floods the
+# page into a solid pink blot. This is the level where the strands stay
+# separate lines on white.
+brightness = "0.9"
+fade = "0.84 - clamp(bass * 0.05, 0, 0.05)"
+size = "0.20 + clamp(treb * 0.08, 0, 0.06) + beat * 0.06"
+reseed = "max(onset > 0.60, min(beat, mod(beat_index, 32) == 0))"
+
+# Bloom runs BEFORE the remap, so the halo arrives as luminance and the remap
+# turns it into a soft ink falloff around each stroke - the pencil-pressure
+# look, rather than the neon one the black version gets from the same stage.
+bloom_amount = "0.30 + beat * 0.25"
+bloom_threshold = "0.55"
+bloom_radius = "1.6"
+
+spin = "0.0 + beat * 0.05"
+perspective = "0.20 + clamp(mid * 0.12, 0, 0.10)"
+depth_fade = "0.45 + clamp(mid * 0.15, 0, 0.15)"
+
+# THE PAGE AND THE INK. `ink_amount` rests at the pole and never travels: a
+# partial amount blends back toward the dark source and greys the paper.
+ink_amount = "1"
+paper_hue = "0.95"
+paper_sat = "0.04"
+paper_bright = "1.0"
+ink_hue = "0.93"
+ink_sat = "0.92"
+ink_bright = "0.48"
+# THE LEVER THAT ACTUALLY MADE IT ROSE RATHER THAN DUSTY. Raising `brightness`
+# and deepening `ink_bright` both did almost nothing, because the strokes were
+# landing in the MID-TONES and the remap was mixing them halfway to paper.
+# `ink_gamma` below 1 inks the mids, which is exactly that case.
+ink_gamma = "0.20 + clamp(treb * 0.30, 0, 0.25)"
+
+# Desaturated source, for the reason in the header.
+saturation = "0.30"
+hue_spread = "0.10"
+hue_center = "0.50"
+# THE REACTIVE LEVERS ARE GEOMETRIC, AND THAT IS FORCED RATHER THAN CHOSEN.
+# `ink_amount = "1"` collapses the frame to two tones, so saturation, hue and
+# level bindings are all structurally invisible here - the reactivity gate
+# measured this preset at 0.016 against a 0.02 floor while it was visibly
+# binding treble on `size`. `attractor_thomas` hit the identical wall and
+# answered it the same way: move the audio onto something that changes WHERE
+# the ink is. Zoom breathes the whole drawing, and `ink_gamma` moves how far
+# down the mid-tones the ink reaches, which is coverage rather than colour.
+zoom = "1.02 + bar * 0.03 + clamp(bass * 0.16, 0, 0.13)"
+
+[smoothing]
+ink_gamma = 0.35
+perspective = 0.8
+size = { attack = 0.03, release = 0.35 }
+bloom_amount = { attack = 0.03, release = 0.40 }
+depth_fade = 1.0
+zoom = 0.25
