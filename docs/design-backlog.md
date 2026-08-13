@@ -542,6 +542,33 @@ parameter surface, and the scene that most wants it cannot reach it.
 
 ## 0069 — there is no way to draw a two-tone object (a fill with a contrasting outline), because the composite is additive
 
+> **CORRECTED 2026-08-13 — the title and the mechanism below are FALSE for field scenes, and have
+> been since 2026-08-11. This entry stays live for its other half only; do not act on the paragraph
+> that follows without reading this box first.**
+>
+> The claim "black adds zero, so a dark edge cannot exist inside the composite" was written
+> **2026-08-05**. The layer system landed **2026-08-11** ([ADR-0090](adrs/0090-a-preset-composes-two-scene-layers.md)),
+> six days later, and three closes ran in between without anyone revisiting this. `layer_blend.rs`
+> gives `multiply`, which **strictly darkens**, and `fragment_field.rs:168` shows a fullscreen field
+> emitting alpha = `occlude` — **1 by default on every pixel, including black ones** — which is the
+> coverage a darkening blend needs.
+>
+> **Measured 2026-08-13**, one preset, `blend` the only variable, 640x360 on this box's hardware
+> adapter: `multiply` reaches **min luma 18.5** with **61.9 %** of pixels below 64; the `add`
+> control **cannot get below 181.6** anywhere, with **0.0 %** below 64. Three tones coexist in the
+> multiply frame. Full derivation and costs in
+> [ADR-0106](adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md); the route gets written down
+> in [Plan 0091](plans/0091-the-figure-fills-the-frame.md) Phase 1, which also measures the one path
+> still open — whether multiply reaches the **backdrop**, which sits outside the chain's input
+> (`post.rs:33`) and is therefore a separate question.
+>
+> **What survives, and it is why this entry is corrected rather than archived:** multiply darkens in
+> proportion to *coverage*, and **nothing in this engine still decides what is in front of what**. A
+> shaped object that occludes another figure is unbuilt. The mechanism below is also still exactly
+> right for **particle** scenes — a particle's alpha *is* its falloff, so a black sprite has no
+> coverage and cannot darken anything. That asymmetry between the two routes to one shape is now a
+> documented authoring trap rather than an engine limit.
+
 - **Raised:** 2026-08-05, at [Plan 0070](plans/done/0070-shaped-marks.md)'s close. **Re-filed from
   [0033](design-backlog-archive.md), at that entry's own instruction** — 0033 carried two asks, Plan
   0070 answered one of them, and leaving the other inside a closed entry is how the two get confused

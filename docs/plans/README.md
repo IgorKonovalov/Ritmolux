@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0091** (ADRs are a separate sequence — next free there is **0105**.)
+**Next free number: 0092** (ADRs are a separate sequence — next free there is **0107**.)
 
 ## Active roster
 
@@ -20,6 +20,7 @@ someone who picked it up is reading.
 | [0086](0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md) | The downbeat finds a cue that is not the kick | approved | dev, human | **Measures before it chooses.** Phase 2 is a `human` gate that needs the user's own music — a synthesized backbeat is a hypothesis about backbeats, which is exactly what cannot settle this. The cue for Phase 3 is named at that gate, so the later phases state properties rather than edits. `CONFIDENCE_THRESHOLD` does not move. |
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 | [0089](0089-the-framing-contract-stops-lying.md) | The framing contract stops lying, and two doc gaps close | approved | dev | The smallest on the roster and the only one that is **three unrelated items in one sitting** — they share a session, not a subject. Phase 1 is the load-bearing one: `FRAME_FILL = 0.88` is **falsified** by rotation, and the closed form in [ADR-0103](../adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) makes it general (a square figure overruns 24.4 %; only the fern complies). It **moves zero pixels** — prove that bless-to-bless, never by a `git diff`. Phase 1 can honestly redirect: if the dragon comes back *inside* the bound, rotation is not the mechanism and the finding is the preset's own `zoom` reaching 1.04. |
+| [0091](0091-the-figure-fills-the-frame.md) | The figure fills the frame | draft | dev, human | From three user reference images, and the gap turned out to be **one thing**: nesting, banding and contours all ship, but no shape-shaped scalar exists at frame scale. Phase 2 is the load-bearing one — `marks.rs:33-37` says the polygon and star arms are deliberately *not* true distance functions outside the silhouette, which is exactly the region contours read. Phase 6 is a stated cut point and may close negative. **Touches no line-renderer file, so it is independent of [0087](0087-the-line-renderer-draws-a-curve.md).** |
 | [0090](0090-the-emitters-source-moves.md) | The emitter's source moves | approved | dev, human | Four scalars, four exact-identity defaults, so it **moves zero pixels** — one emitter baseline and three fixtures in scope. **Phase 3 (`prewarm`) is beyond the interview and is the designed cut point**: it exists because the source alone does not deliver the gate argument (~18 % of steady-state population at the 0.5 s capture), and Phases 1/2/4/5 stand without it. Its gate measurement may come back negative — that is a result, and the answer is **not** to move a floor. Phase 4's `systems.md` sweep is a done-when because that minor has been raised at four consecutive closes. |
 
 **Five plans, written 2026-08-13 from a backlog sweep**, after the roster stood empty for the first
@@ -71,6 +72,23 @@ take any free session. The numbered list below is otherwise unchanged.
 5. **[0087]** — last, and largest. Touches `core/src/render/scenes/lines/` and owes a re-bless, so it
    wants a lane to itself. **It is also the only plan here that can end early**: two separate gates
    (a cost measurement and a `human` look verdict) can route it to ADR-0098's Alternative C.
+
+**Added 2026-08-13: [0091](0091-the-figure-fills-the-frame.md), from three user reference images** —
+concentric offset heart contours, and a collage the engine can only partly reach. Where it sits:
+
+- **It contends with nothing on the roster, and specifically not with [0087].** The obvious route to
+  a nested outline is the line renderer, and [ADR-0105](../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md)
+  rejects it on measured precedent — ~20 nested thin contours maximise both backlog 0073's faceting
+  and ADR-0098's vertex bead. Taking the per-pixel route instead means the two plans share no file
+  and can run in either order or at the same time.
+- **One phase of it is already 80 % proven and lands first.** A rendered measurement
+  ([ADR-0106](../adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md)) found that a `multiply`
+  layer reaches luma **18.5** where the additive control cannot go below **181.6** — so
+  design-backlog 0069's "a dark edge cannot exist inside the composite" is **false for field
+  scenes**, and has been since the layer system landed six days after that entry was written.
+  Phase 1 measures the one path left open (does it reach the *backdrop*?) and writes the route down.
+- **Phase 6 is a cut point that may honestly close negative**, and it is the only part of the plan
+  whose value is not already established.
 
 **[0088] closed 2026-08-13**, the day it was written, all seven phases including the `human` look
 call — so its sequencing question is discharged and only one line of it is still live guidance:
