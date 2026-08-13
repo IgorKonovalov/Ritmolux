@@ -1,0 +1,57 @@
+# A measured walk between two roster entries (ADR-0093), bound to a slow cycle.
+#
+# Judged at Plan 0079 Phase 6 and kept.
+#
+# The dramatic one: the canonical butterfly narrows into the rho ~ 100 torus
+# knot. The far end needs longer to settle than the near end does - the knot is
+# a PERIODIC attractor and a cloud arriving along the walk is still falling onto
+# it - so let it sit at the far end a while before judging that end.
+#
+# `morph` runs a full round trip in about 48 s. That is deliberate: the walk is
+# continuous where `tuple` cuts, and the whole point is that it is gradual.
+system = "attractor"
+name = "Butterfly to Knot"
+
+[particles]
+family = "lorenz"
+density = 0.02
+tuple_from = 0
+tuple_to = 1
+
+[palette]
+name = "aurora"
+
+[params]
+morph = "clamp(0.5 - 0.5 * cos(time * 0.13) + clamp(bass * 0.10, 0, 0.08), 0, 1)"
+
+brightness = "1.7"
+fade = "0.84 - clamp(bass * 0.04, 0, 0.04)"
+size = "0.20 + clamp(treb * 0.08, 0, 0.06) + beat * 0.05"
+
+bloom_amount = "0.30 + beat * 0.25 + clamp(bass * 0.18, 0, 0.14)"
+bloom_threshold = "1.4"
+bloom_radius = "1.5"
+
+bg_bright = "0.10 + clamp(bass * 0.05, 0, 0.04)"
+bg_hue = "0.10"
+bg_hue_span = "0.14"
+bg_angle = "0"
+bg_shade = "1.0"
+bg_shade_end = "0.22"
+bg_ramp_gamma = "1.7"
+bg_vignette = "0.38"
+
+spin = "0.25"
+perspective = "0.20"
+depth_fade = "0.45 + clamp(mid * 0.15, 0, 0.15)"
+saturation = "0.9"
+hue_spread = "0.18"
+hue_center = "0.35"
+zoom = "1.0 + bar * 0.04"
+
+[smoothing]
+# NOT on `morph`: the binding is already a slow cosine, and easing an ease only
+# lags it. The walk's smoothness is the mechanism's, not a smoothing curve's.
+size = { attack = 0.03, release = 0.32 }
+bloom_amount = { attack = 0.04, release = 0.40 }
+depth_fade = 1.0
