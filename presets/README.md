@@ -2423,10 +2423,33 @@ Three things to know before you bind it:
   the entry's coefficients are the base your `a` was modulating around, and the
   base has just moved.
 
-Today only `lorenz` has more than one entry — entry `1` is the rho ≈ 100
-torus knot, a figure that was physically unreachable before this param. It is
-**provisional**, pending curation; `reseed` on it is a slow bloom rather than a
-shimmer, because its orbit takes several seconds to absorb a disturbance.
+#### What is in each roster
+
+Curated at Plan 0079 Phase 3 by judging every candidate in motion. Entry `0` is
+always the canonical figure — what the family drew before this param existed.
+
+| Family | Entries | What the extras are |
+|---|---|---|
+| `de_jong` | 13 | Twelve gallery tuples: shells, vaulted arcs, a four-lobed bow-tie, a dense orb, a bare S-curve. |
+| `clifford` | 13 | Twelve more: woven discs, an oblique ring, three separated crescents, a hard-edged chevron. |
+| `thomas` | 13 | A twelve-step sweep of `a` from `0.03` to `0.22` — the family reads `a` alone, so this is one continuous axis from a space-filling scribble to a tight knot at the edge of chaos. |
+| `lorenz` | 12 | `rho` walked from `24.4` to `126.52` (entry `1` is the rho ≈ 100 **torus knot**), plus three that move `sigma`/`beta` instead. |
+
+Two facts about specific entries that a still will not tell you:
+
+- **The Lorenz torus knot (entry `1`) blooms slowly on a `reseed`.** Its orbit is
+  marginally stable, so a kick sends the cloud on a wide excursion — measured at
+  about **2.2x** the figure's own extent — that takes several seconds to fall
+  back. On the canonical butterfly the same disturbance is absorbed in a handful
+  of frames. That is a look, not a defect, but bind `reseed` on it knowing it.
+- **Thomas past `a ≈ 0.208` closes into periodic orbits.** The roster stops at
+  `0.22` deliberately: further up, the flow collapses onto a short cycle, which
+  has a perfectly good bounding box and draws as a few dots rather than a
+  figure. Four De Jong candidates were rejected at curation for the same reason.
+
+**Indices are names.** The shipped `attractor_*gallery` presets step these by
+index and `attractor_torusknot` pins Lorenz entry `1`, so a roster edit that
+inserts or reorders renames figures out from under them. Append instead.
 
 **Each family is viewed in its own plane**, and it matters the moment you reach
 for `zoom` or `pan_*`, because those aim at the figure the plane produces:

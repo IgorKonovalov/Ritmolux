@@ -103,6 +103,46 @@ flowchart LR
   file, each entry named against its sheet cell.
 - **Done when:** the list is in this file and the user has said "go" on it.
 
+#### Outcome (2026-08-13) — the whole candidate roster ships, and that is a verdict
+
+**Nothing was trimmed.** The user judged all 50 candidates and kept every one:
+*"honestly I love them all."*
+
+The judgement was made **in motion, in the app**, not off the contact sheets. Phase 2's
+sheets were rendered first and reviewed; then the shortlist and its complement were built
+as preset pairs (`Shortlist - <family>` stepping the proposed picks, `Rest - <family>`
+stepping everything the shortlist left out) and watched under spin and trail at ~3 s a
+figure. That matters for the record, because a sheet freezes one instant of a rotating
+figure and several of these read differently once they move — which is exactly why the
+proposed trim did not survive contact with them.
+
+**A shortlist was drafted and rejected**, so "no trim" is a choice rather than a default.
+It proposed four entries per family — De Jong 6/2/10/9, Clifford 9/5/7/12, Thomas
+0.05/0.11/0.17/0.208, Lorenz knot/28-4.0/92/28-1.0 — chosen for structural distance from
+the canonical figure and from each other.
+
+The shipped roster is therefore `extra_tuples()` exactly as Phase 2 left it:
+
+| Family | Entries | Extras |
+|---|---|---|
+| `de_jong` | 13 | the 12 gallery tuples backlog 0055 cites |
+| `clifford` | 13 | 12 gallery tuples |
+| `thomas` | 13 | a 12-step sweep of `a`, 0.03 to 0.22 |
+| `lorenz` | 12 | 11: `rho` walked 24.4 to 126.52, plus three `sigma`/`beta` variations |
+
+**What this costs, stated so it is not discovered later.** ADR-0093's negative — "a bad
+tuple ships with its own framing looking authoritative" — is discharged **by inspection
+rather than by selection**: every entry was watched, and the four De Jong and three Thomas
+tuples that drew as periodic cycles rather than figures were already screened out at Phase
+2 on the count of distinct points visited. The residual costs are a maintenance surface of
+51 tuples, and a preset load that measures every entry of its family's roster (~3.7 ms per
+entry in a debug build, an order less in release, once per preset switch and never per
+frame).
+
+**One thing this makes easier rather than harder:** the four gallery presets shipped at
+`7157d6c` already cycle their family's whole roster, so they need no modulus repair — the
+Phase 2 caveat about them parking on the last entry after a trim is void.
+
 ### Phase 4 — the roster lands, with docs
 
 - **Owner skill:** dev
