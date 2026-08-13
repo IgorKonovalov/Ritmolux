@@ -1,6 +1,6 @@
 # 0084 — two gates stop lying about what they check
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev
 > **Related ADRs:** none — both changes restore a stated property; no alternative worth recording
