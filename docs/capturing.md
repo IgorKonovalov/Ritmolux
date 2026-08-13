@@ -103,6 +103,7 @@ Flags:
 | `--audio <clip.wav>` | filmstrip from a 16-bit PCM WAV |
 | `--strip <N>` | frames tiled along the audio (default 8) |
 | `--at <hop>,...` | explicit filmstrip hops, beating `--strip`'s even spacing — [how to capture a transient](#aiming-a-capture-at-a-transient) |
+| `--frame-at <hop>` | **one** frame at that hop, written at the full `--size` — no tile scaling, no border. Needs `--signal`/`--audio`; not combinable with `--at`. [Which flag takes a picture worth keeping](#a-full-size-frame-under-real-audio) |
 | `--tier floor\|rich` | quality tier to capture at (default `floor` — see above) |
 
 Bad arguments and unknown presets exit non-zero with a message.
@@ -242,6 +243,41 @@ cargo run -p standalone --example shot -- --preset "Spectrum Comb" \
 `--report` builds its stimulus frames in code rather than from `--set`, and those
 **do** light the band array (each named band lights the slice of the log spectrum
 it summarises), so the report's numbers are real for a spectrum preset.
+
+### A full-size frame under real audio
+
+`--frame-at <hop>` (Plan 0088) captures **one** frame at the named hop and writes
+it at the full `--size`. It is the flag every committed documentation image uses,
+and the reason it had to exist is that neither of the other two paths produces a
+picture worth keeping:
+
+| what you run | what you get | why it is not a documentation image |
+|---|---|---|
+| `--frames 120 --out x.png` | a clean 1280x720 frame | it runs under **silence** — the capture path builds a default analysis frame, so a band-driven preset photographs at its resting state |
+| `--at 340 --out x.png` | the right stimulus, through the real analyzer | the filmstrip scales every frame to a fixed tile height and draws a gutter round it: a single-hop `--at` at default size comes back **363x208 with a border** |
+| `--set bass=0.8 --frames 120` | full size, and wrong three ways | [the three calibration traps](#the-three-calibration-traps) — a held `beat`, band magnitudes no music reaches, and a silent 64-band array |
+
+`--frame-at` is the first two combined:
+
+```bash
+# The picture the docs commit: full size, real dynamics, late enough to be developed
+cargo run -p standalone --example shot --release -- \
+  --preset-file presets/attractor_leviathan.toml \
+  --signal dynamic:110 --frame-at 340 --size 1280x720 --tier rich \
+  --out docs/images/gallery/attractor.png
+```
+
+It shares everything with the strip except the write: the same hop numbering, the
+same `capture_audio` call, and the same level table on stdout. A hop past the end
+of the clip is an error, as `--at`'s is. Passing both `--frame-at` and `--at` is
+an error — they answer the same question two ways — and `--frame-at` without
+`--signal`/`--audio` is an error naming what is missing, since there is no clip to
+advance through.
+
+Two captures of the same `(preset, signal, hop, size, tier)` on **one machine and
+binary** are byte-identical. That is a same-adapter claim only: the golden suite
+treats a `0.02` mean channel difference as ordinary rasterizer drift, so
+cross-machine byte equality does not hold and nothing here asserts it.
 
 ### What the report's columns mean
 

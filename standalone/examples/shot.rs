@@ -33,6 +33,9 @@
 //!   --at <hop>,...           explicit filmstrip hops, beating --strip's even
 //!                            spacing — the only way to aim a capture at a
 //!                            transient (the level table names the onset peak)
+//!   --frame-at <hop>         ONE frame at that hop, written at the full --size
+//!                            with no tile scaling and no border. Needs --signal
+//!                            or --audio; mutually exclusive with --at
 //!   --tier floor|rich        quality tier to capture at (default floor).
 //!                            A Rich capture is an instrument, never a baseline
 //!
@@ -47,13 +50,13 @@
 use std::path::{Path, PathBuf};
 
 use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{AnalysisFrame, HOP_SIZE};
+use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::{Preset, SystemKind, default_presets, load_dir};
 use lmv_core::render::{CaptureImage, Tier};
 use standalone::shot::args::{
     BandLevels, apply_set, band_levels, parse_hops, parse_size, synth_signal,
 };
-use standalone::shot::film::{StripLayout, filmstrip_indices, filmstrip_layout};
+use standalone::shot::film::{StripLayout, check_hops, filmstrip_indices, filmstrip_layout};
 use standalone::shot::glyph::{GLYPH_ADVANCE, GLYPH_COLS, glyph_for};
 use standalone::shot::renderer;
 use standalone::shot::report;
@@ -100,6 +103,20 @@ struct Args {
     /// even spacing. The only way to aim a capture at a *transient* — see
     /// [`parse_hops`].
     at: Option<Vec<u32>>,
+    /// `--frame-at <hop>`: capture that one hop and write it at the full
+    /// `--size`, unscaled and unbordered.
+    ///
+    /// The gap this closes (Plan 0088 Phase 1). `--frames N` reaches full size
+    /// but runs under **silence**, so a band-driven preset photographs at its
+    /// resting state; `--at <hop>` runs the real analyzer over real dynamics but
+    /// tiles into a filmstrip, which scales every frame to [`STRIP_H`] and draws
+    /// a gutter around it. Neither produces a documentation image, and
+    /// [ADR-0100] needs one. The hop is the same index `--at` takes and the
+    /// level table reports.
+    ///
+    /// [`STRIP_H`]: standalone::shot::film::STRIP_H
+    /// [ADR-0100]: ../../docs/adrs/0100-documentation-images-are-committed-headless-renders.md
+    frame_at: Option<u32>,
     /// `--tier floor|rich`: the quality tier to capture at. **Floor by default**
     /// — a capture is a pure function of its inputs (NFR §6) and every golden
     /// baseline is blessed at the floor, so raising it is an explicit act. There
@@ -127,6 +144,7 @@ impl Default for Args {
             audio: None,
             strip: 8,
             at: None,
+            frame_at: None,
             tier: Tier::Floor,
         }
     }
@@ -172,6 +190,12 @@ fn parse_args() -> Result<Args, String> {
                     .ok_or("--strip expects a positive integer")?;
             }
             "--at" => args.at = Some(parse_hops(&next_value(&mut it, "--at")?)?),
+            "--frame-at" => {
+                let value = next_value(&mut it, "--frame-at")?;
+                args.frame_at = Some(value.parse::<u32>().map_err(|_| {
+                    format!("--frame-at expects a single hop index, got `{value}`")
+                })?);
+            }
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -180,6 +204,25 @@ fn parse_args() -> Result<Args, String> {
                 args.family = Some(parse_system(other.trim_start_matches("family="))?);
             }
             other => return Err(format!("unknown argument `{other}` (try --help)")),
+        }
+    }
+    if args.frame_at.is_some() {
+        // Both flags name a hop to capture; accepting them together would mean
+        // silently picking one, and there is no reading under which that is what
+        // the caller meant.
+        if args.at.is_some() {
+            return Err(
+                "--frame-at and --at both choose which hop to capture: pass one \
+                 (--frame-at for a single full-size frame, --at for a filmstrip)"
+                    .to_string(),
+            );
+        }
+        if args.signal.is_none() && args.audio.is_none() {
+            return Err(
+                "--frame-at needs audio to advance through: add --signal <kind:param> \
+                 (e.g. dynamic:110) or --audio <clip.wav>"
+                    .to_string(),
+            );
         }
     }
     Ok(args)
@@ -225,6 +268,9 @@ fn print_usage() {
          --strip <N>                frames tiled along the audio (default 8)\n\
          --at <hop>,...             explicit filmstrip hops (beats --strip) -\n\
                                     aim at the transient the level table names\n\
+         --frame-at <hop>           ONE frame at that hop, at the full --size:\n\
+                                    no tile scaling, no border. Needs --signal\n\
+                                    or --audio; not combinable with --at\n\
          --tier floor|rich          quality tier to capture at (default floor)\n\
                                     rich is an INSTRUMENT, never a baseline"
     );
@@ -465,37 +511,48 @@ fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), Strin
         .ok_or("no preset available to render")?;
 
     let mut r = renderer(args.width, args.height, presets, args.tier)?;
-    // Explicit hops beat the even spacing. Validated against the clip here rather
-    // than in the parser: a hop past the end is silently *not captured* by
-    // `capture_audio` (it only records indices it reaches), which would shorten
-    // the strip without saying why.
-    let at = match &args.at {
-        Some(hops) => {
-            let total = pcm.len() / (HOP_SIZE * format.channels.max(1) as usize);
-            if let Some(past) = hops.iter().find(|h| **h as usize >= total) {
-                return Err(format!(
-                    "--at {past}: the clip is only {total} analysis hops long"
-                ));
-            }
+    // An explicitly named hop beats the even spacing, whichever flag named it.
+    // Both are range-checked against this clip — see [`check_hops`].
+    let at = match (args.frame_at, &args.at) {
+        (Some(hop), _) => {
+            check_hops(&[hop], pcm.len(), format, "--frame-at")?;
+            vec![hop]
+        }
+        (None, Some(hops)) => {
+            check_hops(hops, pcm.len(), format, "--at")?;
             hops.clone()
         }
-        None => filmstrip_indices(pcm.len(), format, args.strip)?,
+        (None, None) => filmstrip_indices(pcm.len(), format, args.strip)?,
     };
     let frames = r
         .capture_audio(&name, &pcm, format, &at)
         .map_err(|e| format!("capture audio: {e}"))?;
 
-    let strip = tile_filmstrip(&frames)?;
-    save_image(&strip, &out)?;
+    // Same clip, same analysis, same hop arithmetic as the strip — the only
+    // difference is that one frame goes to disk at its captured size instead of
+    // being scaled into a tile.
+    let summary = match args.frame_at {
+        Some(hop) => {
+            let frame = frames
+                .first()
+                .ok_or_else(|| format!("--frame-at {hop}: no frame captured"))?;
+            save_png(frame, &out)?;
+            format!(
+                "{}x{}, preset {name}, hop {hop}, {label}",
+                frame.width, frame.height
+            )
+        }
+        None => {
+            let strip = tile_filmstrip(&frames)?;
+            save_image(&strip, &out)?;
+            format!("{} frames, preset {name}, {label}", frames.len())
+        }
+    };
     // Printed unconditionally rather than behind a flag: an author who does not
     // already know that `--set` magnitudes are unlike real levels is exactly the
     // one who will never pass the flag.
     print_band_levels(&band_levels(&pcm, format)?);
-    println!(
-        "wrote {} ({} frames, preset {name}, {label}) [{source}]",
-        out.display(),
-        frames.len(),
-    );
+    println!("wrote {} ({summary}) [{source}]", out.display());
     Ok(())
 }
 
