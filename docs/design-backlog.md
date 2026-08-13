@@ -757,12 +757,27 @@ both presets and documented. It is a documentation gap with one genuine engine q
 
 ## 0077 — the doc-link gate is blind to reference-style links, so 85 of them rendered as bracket noise behind a green check
 
-- **PROMOTED 2026-08-13 → [Plan 0084](plans/0084-two-gates-stop-lying-about-what-they-check.md)
+- **PROMOTED 2026-08-13 → [Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md)
   Phase 1**, with [0080](#0080--the-reactivity-gate-pays-18x-to-render-frames-it-throws-away-because-warm-up-and-measurement-share-one-capture-path)
   riding the same plan — two gates of the same size, sharing a session and nothing else. No ADR: the
   change restores a stated property and has no rejected alternative worth recording. **Re-verified
   against code 2026-08-13** — the regex at `scripts/check-doc-links.mjs:48` is unchanged and the
   script's own header still says *"not reference-style links"*.
+- **CLOSED 2026-08-13** (Plan 0084 Phases 1-2, `33436f0` + `83cfb67`). Two new break classes beside
+  the inline one — a use with no definition in its file, and a definition whose relative target does
+  not resolve — reported through the same `file:line -> target` shape. **The narrowing that makes it
+  usable was measured, not assumed:** a shortcut use is only reported when *some* file in the tree
+  defines that label, without which the repo corpus yields 31 findings of which 24 are ordinary prose
+  brackets; with it, 7 findings and no noise. It found exactly the seven breaks this entry and the
+  plan predicted, all seven repaired by reading the target rather than pattern-matching it. **It
+  proved itself again at this very close** — moving the plan into `done/` broke four inbound links
+  and the checker named all four, one of them in the definition class it had just learned to see.
+  **Known and deliberate blind spot:** the narrowing cannot see the mirror failure, where a
+  definition block is *deleted* outright rather than left behind, since then no file in the tree
+  defines the label and every use goes quiet. Documented in the script header. **Left undone:** the
+  fixture tree the phase's done-when described was run ad-hoc and not committed, so the script's
+  optional `root` argument has no caller in the repo and the bite check is unrepeatable — raised as
+  a minor at the close, not repaired.
 
 **Raised by:** `architect`, at Plan 0061's close ceremony. **Owner if taken:** `dev` — it is a
 change to `scripts/check-doc-links.mjs`, which gates CI and the pre-push hook.
@@ -944,12 +959,34 @@ this plan one unanswered question, which Phase 6 absorbed.
 
 ## 0080 — the reactivity gate pays 1.8x to render frames it throws away, because warm-up and measurement share one capture path
 
-- **PROMOTED 2026-08-13 → [Plan 0084](plans/0084-two-gates-stop-lying-about-what-they-check.md)
+- **PROMOTED 2026-08-13 → [Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md)
   Phases 3-4**, riding with [0077](#0077--the-doc-link-gate-is-blind-to-reference-style-links-so-85-of-them-rendered-as-bracket-noise-behind-a-green-check).
   The plan takes exactly the fix `core/tests/reactivity.rs:69` already names, and asserts the
   property that makes it safe: N warm-up hops **without** rendering must leave analyzer state whose
   next frame is **bit-for-bit** equal to N hops **with** rendering. `SIGNAL_HOPS` and `WARMUP_HOPS`
   do not move — the measured headroom is not being renegotiated, only the wasted work removed.
+- **CLOSED 2026-08-13** (Plan 0084 Phases 3-4, `0e5216a` + `79b9b9b`). `Renderer::capture_audio_after_warmup`
+  takes a count of leading hops to advance without drawing; `capture_audio` is that call with a
+  warm-up of zero, unchanged. Measured on the Windows development box through the DX12 software
+  adapter (ADR-0071 — a measurement, not a contract): **136.3 s -> 100.2 s over 36 presets**, two
+  sequential runs in one session differing only by the change. **The 86 s -> 167 s figure this entry
+  and the plan both quote is superseded and does not difference against it** — it was taken on a
+  41-preset library. The ~15 % this entry attributed to the wider readback window does *not* come
+  back: the readbacks are the measurement.
+- **The premise was half wrong, and that is the finding worth more than the speedup.** The warm-up
+  renders were not pure waste — they were also the *scene* warm-up, which `reactivity.rs` said in as
+  many words. Removing them moved 35 of the 36 per-band vectors, the exception being `spectrum/Halo`,
+  the only preset in the set with no accumulating state. Escalated rather than absorbed; the user
+  accepted the recalibration. Nothing regressed and the direction is uniform — every maximum rose or
+  held, and the lowest across the library went 0.0287 -> 0.0504 against the 0.020 floor. **Read any
+  reactivity figure recorded before 2026-08-13 as a different measurement, not as drift.**
+- **What still has no instrument, carried forward from the close review.** The byte-identity test in
+  `core/tests/capture_advance.rs` guards the analyzer, which the render pass structurally cannot
+  reach (`capture_api.rs:321` publishes before it skips). The thing that actually moves under this
+  change — GPU-integrated scene state meeting the measured window `WARMUP_HOPS` steps colder — is
+  documented in three places and asserted in none. It matters for the followup this entry enables:
+  **any gate that copies this pattern onto an accumulating scene inherits the cold start silently.**
+  `docs/capturing.md`'s gate section now says so where a future author will read it.
 
 **Raised by:** `architect`, at [Plan 0067](plans/done/0067-the-curation-route.md)'s close.
 **Owner if taken:** `dev` — `core/tests/reactivity.rs` and whatever `Renderer::capture_audio` needs
