@@ -27,6 +27,24 @@
 // of this one.
 use super::*;
 
+/// What one [`Renderer::capture_audio_after_warmup`] run produced.
+///
+/// The two fields beside the images exist so a caller can check *what the run
+/// did* rather than infer it from a stopwatch (Plan 0084 Phase 3): `analysis`
+/// is the analyzer state the run walked through, and `rendered` is how much of
+/// it reached a rasterizer.
+pub struct AudioCapture {
+    /// The requested frames, in `at_frames` order.
+    pub images: Vec<CaptureImage>,
+    /// One published [`AnalysisFrame`] per hop, in hop order. Independent of
+    /// whether the hop was rendered — which is the property that makes feeding
+    /// warm-up hops without pixels safe, and is asserted rather than argued
+    /// (`core/tests/capture_advance.rs`).
+    pub analysis: Vec<AnalysisFrame>,
+    /// How many frames were rasterized. Zero when every hop is a warm-up hop.
+    pub rendered: usize,
+}
+
 impl Renderer {
     /// Advance the scene clock one step and capture that single frame into an
     /// offscreen texture, returning tight RGBA (Plan 0013). Off the hot path —
@@ -235,6 +253,40 @@ impl Renderer {
         format: AudioFormat,
         at_frames: &[u32],
     ) -> Result<Vec<CaptureImage>, RenderError> {
+        Ok(self
+            .capture_audio_after_warmup(name, pcm, format, at_frames, 0)?
+            .images)
+    }
+
+    /// [`capture_audio`](Self::capture_audio), with the first `warmup_hops` hops
+    /// **advanced but not rasterized** (Plan 0084 Phase 3).
+    ///
+    /// A warm-up hop still pushes its samples, still publishes its
+    /// [`AnalysisFrame`], and still advances the scene clock by one
+    /// [`FALLBACK_DT`](scenes::FALLBACK_DT) — the hop happened, it just did not
+    /// draw. What it skips is the render pass, which is why a caller that only
+    /// needs the analyzer warm (`core/tests/reactivity.rs` drives
+    /// `WARMUP_HOPS` of them per capture, at silence, and reads none of them
+    /// back) stops paying a full rasterization per hop to reach a DSP state that
+    /// needs no pixels.
+    ///
+    /// **This does not warm GPU-side scene state.** Analysis is a pure function
+    /// of its window and the render pass never touches the analyzer, so the
+    /// published frames are bit-for-bit what they would have been — but a scene
+    /// that *integrates* on the GPU (particles, trails, reaction-diffusion) has
+    /// that many fewer steps behind it at the first rendered hop. Time-driven
+    /// scenes are unaffected, since the clock advances either way.
+    ///
+    /// An `at_frames` entry inside the warm-up span was never rendered and is an
+    /// error, the same one an index past the audio length gives.
+    pub fn capture_audio_after_warmup(
+        &mut self,
+        name: &str,
+        pcm: &[f32],
+        format: AudioFormat,
+        at_frames: &[u32],
+        warmup_hops: usize,
+    ) -> Result<AudioCapture, RenderError> {
         if !self.select_preset_by_name_now(name) {
             return Err(RenderError::UnknownPreset(name.to_string()));
         }
@@ -256,12 +308,20 @@ impl Renderer {
 
         let hop_samples = crate::dsp::HOP_SIZE * format.channels as usize;
         let mut captured: Vec<(u32, CaptureImage)> = Vec::with_capacity(at_frames.len());
+        let mut published: Vec<AnalysisFrame> = Vec::new();
+        let mut rendered = 0usize;
 
         for (index, hop) in pcm.chunks(hop_samples).enumerate() {
             let frame_index = index as u32;
             analyzer.push_interleaved(hop);
             let analysis = analyzer.take_frame();
             self.time += scenes::FALLBACK_DT;
+            published.push(analysis);
+
+            if index < warmup_hops {
+                continue;
+            }
+            rendered += 1;
 
             let wanted = at_frames.contains(&frame_index)
                 && !captured.iter().any(|(i, _)| *i == frame_index);
@@ -295,7 +355,7 @@ impl Renderer {
             }
         }
 
-        at_frames
+        let images = at_frames
             .iter()
             .map(|idx| {
                 captured
@@ -304,7 +364,13 @@ impl Renderer {
                     .map(|(_, img)| img.clone())
                     .ok_or(RenderError::CaptureReadback)
             })
-            .collect()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(AudioCapture {
+            images,
+            analysis: published,
+            rendered,
+        })
     }
 
     /// Draw one frame into `view` and submit it — advancing scene state without
