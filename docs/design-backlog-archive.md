@@ -4439,6 +4439,231 @@ though the frame looks full. If that prices the look out, the rule is the one
 [0072](#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo)
 established: **read the floor and re-derive by its own recorded rule, do not lower it to fit.**
 
+## Entry 0077 — from the Plan 0061 close (2026-08-08), and it is a gate's blind spot rather than a preset gap
+
+---
+
+## 0077 — the doc-link gate is blind to reference-style links, so 85 of them rendered as bracket noise behind a green check
+
+- **PROMOTED 2026-08-13 → [Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md)
+  Phase 1**, with [0080](#0080--the-reactivity-gate-pays-18x-to-render-frames-it-throws-away-because-warm-up-and-measurement-share-one-capture-path)
+  riding the same plan — two gates of the same size, sharing a session and nothing else. No ADR: the
+  change restores a stated property and has no rejected alternative worth recording. **Re-verified
+  against code 2026-08-13** — the regex at `scripts/check-doc-links.mjs:48` is unchanged and the
+  script's own header still says *"not reference-style links"*.
+- **CLOSED 2026-08-13** (Plan 0084 Phases 1-2, `33436f0` + `83cfb67`). Two new break classes beside
+  the inline one — a use with no definition in its file, and a definition whose relative target does
+  not resolve — reported through the same `file:line -> target` shape. **The narrowing that makes it
+  usable was measured, not assumed:** a shortcut use is only reported when *some* file in the tree
+  defines that label, without which the repo corpus yields 31 findings of which 24 are ordinary prose
+  brackets; with it, 7 findings and no noise. It found exactly the seven breaks this entry and the
+  plan predicted, all seven repaired by reading the target rather than pattern-matching it. **It
+  proved itself again at this very close** — moving the plan into `done/` broke four inbound links
+  and the checker named all four, one of them in the definition class it had just learned to see.
+  **Known and deliberate blind spot:** the narrowing cannot see the mirror failure, where a
+  definition block is *deleted* outright rather than left behind, since then no file in the tree
+  defines the label and every use goes quiet. Documented in the script header. **Left undone:** the
+  fixture tree the phase's done-when described was run ad-hoc and not committed, so the script's
+  optional `root` argument has no caller in the repo and the bite check is unrepeatable — raised as
+  a minor at the close, not repaired.
+
+**Raised by:** `architect`, at Plan 0061's close ceremony. **Owner if taken:** `dev` — it is a
+change to `scripts/check-doc-links.mjs`, which gates CI and the pre-push hook.
+
+### The finding
+
+Markdown has two link forms. `scripts/check-doc-links.mjs` validates one of them: its regex is
+`/\]\((?!https?:|mailto:|#)([^)#\s]+)/g`, which matches `[text](target)` and nothing else. The
+reference form — `[0044]` in the prose, resolved by a `[0044]: plans/done/0044-….md` definition
+elsewhere in the file — is invisible to it, in **both** directions:
+
+- a **use with no definition** renders as the literal characters `[0044]`, and the checker is silent;
+- a **definition with a broken target** is never resolved at all, so it can rot freely.
+
+Measured at Plan 0061's close: **85 undefined uses across 11 files**, every one of them behind a
+green `links` job and a green pre-push hook.
+
+### Why it accumulated, which is the part worth keeping
+
+**62 of the 85 were created by Plan 0061's own Phase 7b**, and the phase did nothing wrong. It moved
+~2,700 lines of link-dense prose from `docs/plans/README.md` into `README-archive.md` verbatim; the
+reference *definitions* those lines depend on sit in a block at the bottom of `README.md` and stayed
+behind. The archive shipped with **zero** definitions. The phase's done-when said, correctly, *"Run
+it, do not inspect"* — and it ran clean.
+
+This is the same shape as the 74 broken inline links Plan 0060 found: a rot that degrades only in a
+browser, accumulates one close at a time, and has no natural moment of discovery. Plan 0060 built
+the gate for the first form. This is the second form of the identical failure.
+
+### What a fix would be
+
+Collect each file's `^[label]: target` definitions and its `[label]` uses (excluding inline `[…](…)`
+and fenced/inline code, which the checker already strips), then report two new classes beside the
+existing one: a use with no definition, and a definition whose relative target does not resolve. The
+existing per-line `file:line -> target` output shape carries both without a new format. Worth a
+deliberately-broken-label check that it goes red naming the label, for the same reason Phase 2c owed
+one: a link checker that silently passes is worse than none.
+
+### Priority
+
+**Medium.** The 85 uses were repaired at the close and all 68 definitions in the repo currently
+resolve, so nothing is broken today — it is *unguarded*, and it re-accumulates on exactly the
+close-ceremony `git mv` that Plan 0060 already proved nobody catches by eye.
+
+---
+
+## 0080 — the reactivity gate pays 1.8x to render frames it throws away, because warm-up and measurement share one capture path
+
+- **PROMOTED 2026-08-13 → [Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md)
+  Phases 3-4**, riding with [0077](#0077--the-doc-link-gate-is-blind-to-reference-style-links-so-85-of-them-rendered-as-bracket-noise-behind-a-green-check).
+  The plan takes exactly the fix `core/tests/reactivity.rs:69` already names, and asserts the
+  property that makes it safe: N warm-up hops **without** rendering must leave analyzer state whose
+  next frame is **bit-for-bit** equal to N hops **with** rendering. `SIGNAL_HOPS` and `WARMUP_HOPS`
+  do not move — the measured headroom is not being renegotiated, only the wasted work removed.
+- **CLOSED 2026-08-13** (Plan 0084 Phases 3-4, `0e5216a` + `79b9b9b`). `Renderer::capture_audio_after_warmup`
+  takes a count of leading hops to advance without drawing; `capture_audio` is that call with a
+  warm-up of zero, unchanged. Measured on the Windows development box through the DX12 software
+  adapter (ADR-0071 — a measurement, not a contract): **136.3 s -> 100.2 s over 36 presets**, two
+  sequential runs in one session differing only by the change. **The 86 s -> 167 s figure this entry
+  and the plan both quote is superseded and does not difference against it** — it was taken on a
+  41-preset library. The ~15 % this entry attributed to the wider readback window does *not* come
+  back: the readbacks are the measurement.
+- **The premise was half wrong, and that is the finding worth more than the speedup.** The warm-up
+  renders were not pure waste — they were also the *scene* warm-up, which `reactivity.rs` said in as
+  many words. Removing them moved 35 of the 36 per-band vectors, the exception being `spectrum/Halo`,
+  the only preset in the set with no accumulating state. Escalated rather than absorbed; the user
+  accepted the recalibration. Nothing regressed and the direction is uniform — every maximum rose or
+  held, and the lowest across the library went 0.0287 -> 0.0504 against the 0.020 floor. **Read any
+  reactivity figure recorded before 2026-08-13 as a different measurement, not as drift.**
+- **What still has no instrument, carried forward from the close review.** The byte-identity test in
+  `core/tests/capture_advance.rs` guards the analyzer, which the render pass structurally cannot
+  reach (`capture_api.rs:321` publishes before it skips). The thing that actually moves under this
+  change — GPU-integrated scene state meeting the measured window `WARMUP_HOPS` steps colder — is
+  documented in three places and asserted in none. It matters for the followup this entry enables:
+  **any gate that copies this pattern onto an accumulating scene inherits the cold start silently.**
+  `docs/capturing.md`'s gate section now says so where a future author will read it.
+
+**Raised by:** `architect`, at [Plan 0067](plans/done/0067-the-curation-route.md)'s close.
+**Owner if taken:** `dev` — `core/tests/reactivity.rs` and whatever `Renderer::capture_audio` needs
+to grow to express "advance without rasterizing".
+
+### The finding
+
+Plan 0067 Phase 1 moved the reactivity gate onto real PCM through the real analyzer, which was the
+right call and is the only reason a green suite now says anything about audio at all. It cost
+**86 s → 167 s** over 41 presets, measured interleaved on one machine, and the lane declined to
+absorb the number silently.
+
+**About 85 % of that growth is warm-up.** Each capture runs `WARMUP_HOPS + SIGNAL_HOPS` hops, and
+the warm-up exists so the analyzer's window is full before anything is measured — an FFT and an
+onset envelope need history. But `capture_audio` **renders every hop**, warm-up included, and those
+frames are discarded. The gate is paying for a full rasterization pass per warm-up hop to obtain a
+DSP state that needs no pixels.
+
+### Why it is worth an entry rather than a comment
+
+The cheap fix was already tried and correctly rejected: `SIGNAL_HOPS = 16` cut the cost but dropped
+`emitter_squall` to 10 % headroom, which is a gate that fails on someone else's machine rather than
+a gate that is faster. So the *measured* budget is not negotiable downward — which leaves the
+discarded work as the only slack, and makes this the one place the cost can come from.
+
+It also compounds. This is the pattern Plan 0067 explicitly nominates as the one to copy if another
+gate ever needs to answer an audio question, and each copy would inherit the same waste.
+
+### What a fix would be
+
+Split "advance the analyzer" from "capture a frame" in the capture path, so warm-up hops push
+samples and step the DSP without a render pass, and only the measured window rasterizes. The
+property to preserve is the one the plan already leans on: determinism. The analysis must remain a
+pure function of its window, so a warm-up that skips rendering has to produce byte-identical
+analyzer state to one that does not — which is testable directly, and is the assertion that would
+make the change safe.
+
+### Priority
+
+**Medium.** Nothing is wrong; CI is simply slower than it needs to be on a job this project already
+pays for more than once per push. Worth taking the next time anyone is in that file.
+
+---
+
+## ~~0090 — the Mac build's capture verdict is stderr-only, so a Finder-launched tester cannot tell us why it hears nothing~~
+
+- **CLOSED 2026-08-13 by [Plan 0083](plans/done/0083-the-build-says-why-it-hears-nothing.md)** — the
+  capture verdict is a value, and it lands in both artifacts a remote tester can send: a trailing
+  `capture` column on every `diagnostics.log` row, and an `audio` line under the F3 panel, both read
+  off one string built once at startup. The entry's claim — *we cannot tell why* — is discharged as a
+  **capability**; the tester's own answer is Plan 0083's `human` Phase 5, still outstanding, and it
+  is recorded here when it arrives.
+- **PROMOTED 2026-08-13 → [Plan 0083](plans/done/0083-the-build-says-why-it-hears-nothing.md)** — no ADR;
+  the shape follows the existing diagnostics surface. Two decisions the plan takes that this entry
+  left open. The verdict lands as an **appended column**, not a startup line: this log rotates at
+  1 MiB keeping one backup and the tester's spanned 6.5 days, so a line written once is exactly what
+  rotation deletes — and a column also catches a capture that dies *mid-run*. And the **Windows arm
+  is in scope**, not for symmetry but because nobody on this project can execute the macOS path, so
+  building both is what gets the mechanism tested and reviewed on the development box.
+  **Re-verified against code 2026-08-13** — `standalone/src/main.rs:1023` is still `eprintln!` only.
+
+**Raised by:** `architect`, 2026-08-11, from the first external Mac tester report — "app
+works, but does not react to music; permissions were granted". **Owner if taken:** `dev` —
+`standalone/src/main.rs`'s capture startup, `diaglog.rs`, optionally `overlay.rs`.
+
+### The finding
+
+When `capture_mac::start()` fails, the app deliberately degrades: it prints one line to
+**stderr** and renders without audio (`main.rs:1023` — same shape on Windows at `:996`).
+That degradation is correct; what is wrong is that the reason exists **only on stderr**,
+which a Finder launch discards. The two artifacts a remote tester can actually send carry no
+capture verdict at all:
+
+- **`diagnostics.log`** — the file `READ-ME-FIRST.md` step 6 asks testers to send — has the
+  band columns (`bass`/`mid`/`treb`/`onset`), so it can show *whether* audio reached the
+  analyzer (all ~0.000 under playing music = capture-side), but records nothing about
+  whether capture started or which `CaptureError` it died with.
+- **The F3 overlay** has no capture field (grep confirms: no capture/audio-state string in
+  `overlay.rs`).
+
+So the README's step 3 escape hatch — relaunch from Terminal to see the message — is the
+*only* route to the reason, and it is the highest-friction ask in the whole tester loop.
+The loop stalls exactly where this report stalled: "permissions were granted" is the
+tester's entire observable, and it cannot distinguish the real candidates (not restarted
+after granting; a **stale TCC grant** — each ad-hoc-signed build is a different app to
+macOS, so the Privacy toggle can show an older build's entry as enabled while the new
+binary is denied, the pile-up the README's update note already names; macOS below 13; a
+Sequoia periodic re-approval lapse).
+
+### What a fix would be
+
+Cheap, and both halves off the audio thread. At startup, write one line into
+`diagnostics.log`: capture started (path + negotiated format) or the `CaptureError`'s
+`Display` — startup code, before the 1 Hz cadence. Optionally a capture field in the F3
+overlay (`audio: SCK 48k stereo` / `audio: NONE — <reason>`) so a tester can read the
+verdict off a screenshot. The sacred-callback rule is untouched — nothing here is on the
+capture thread.
+
+### Priority
+
+**Medium-high while external Mac testing is active** — every remote round-trip that starts
+with "it doesn't react" pays a Terminal-relaunch cycle this one log line would eliminate.
+Drops to low once a capture-device picker (the live-performance plan's Mac half) surfaces
+the state in-app anyway.
+
+### Update 2026-08-11 — the tester's log arrived, and it is this entry demonstrated
+
+The `diagnostics.log` came back: **1,249 rows spanning ~6.5 days and 12 app restarts, and
+every row has all four band columns at exactly 0.0000.** The renderer is healthy throughout
+(steady 60.0 fps, `frame_ms_avg` ~16.7, `gpu_bytes` constant at the 1080p float target; the
+scattered 0.1-fps rows coincide with multi-minute timestamp gaps — sleep/background
+throttling, not crashes). So the log *proves* capture never delivered one sample on any
+launch — which rules out "forgot to restart after granting" (twelve restarts), quiet
+music/gain (a live tap shows a noise floor eventually), and anything render-side — **and it
+cannot say why**, which is this entry's exact claim. Thirteen launches produced thirteen
+stderr lines naming the reason, and every one was discarded by Finder. The surviving
+suspects (stale/mismatched TCC grant from the ad-hoc per-build identity, macOS below 13, an
+SCK start error) are distinguishable only by the Terminal relaunch this entry exists to make
+unnecessary.
+
+---
+
 <!-- Reference definitions for entries moved here by the 2026-08-13 sweep. The uses came
      across; their definitions lived in the live file and stayed behind — the Plan 0061
      Phase 7b failure mode, and the reason design-backlog 0077 exists. -->

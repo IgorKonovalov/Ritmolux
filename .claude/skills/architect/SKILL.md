@@ -413,6 +413,27 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
 
      The output is a **list for the close notes, not a re-tune** — judging the look is content work
      and stays in the `preset-author` lane.
+3c. **Archive every backlog entry this plan discharged — trigger: the plan header names a
+   `**Closes:** design-backlog NNNN`.** Writing the `CLOSED` marker onto the entry is **half** the
+   step; the body then moves to [`docs/design-backlog-archive.md`](../../../docs/design-backlog-archive.md)
+   and leaves a ledger row behind in `docs/design-backlog.md`. **This step exists because the marker
+   half is the only half that ever gets done.** Three sweeps have now found the same accumulation —
+   2026-08-04 (26 entries), 2026-08-13 (20 more, *"recurring inside ten days"*), and a third batch
+   hours later that same day (3 entries, from two closes that ran **after** the second sweep wrote the
+   rule down). The rule lived in the backlog, the ceremony that executes it lived here, and until this
+   step existed the two never met.
+
+   Mechanically: move the body verbatim (nothing is summarized — the archive's value is the record of
+   how a diagnosis moved, and five entries had their causal claim *inverted* under verification), add
+   the ledger row, then **re-point any `#NNNN--…` anchor a still-live entry aimed at the moved body**
+   to `design-backlog-archive.md#NNNN--…`. `scripts/check-doc-links.mjs` does **not** validate
+   fragments, so those are the one class of break here that no gate will catch for you.
+
+   Two things that are not this step. An entry whose premise turns out **false** is corrected in
+   place and stays live — a wrong live entry is more dangerous than a closed one, because it sends
+   the next reader to do work that is already done. And an entry only **half** discharged (one of two
+   asks landed) stays live with a dated update naming which half; the archive is append-only and
+   closed, so a question that comes back is a *new* entry citing the archived one, never an edit to it.
 4. **Bump the application version.** This is the step that chronically gets skipped (the version
    sat at `0.2.0` across five feature plans that each forgot it), so treat it as non-optional and
    decide it deliberately every close. Per
