@@ -1,6 +1,6 @@
 # ADR-0098 — the line renderer draws arcs as per-pixel distance fields
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
 > **Related plan(s):** [0087 — the line renderer draws a curve](../plans/0087-the-line-renderer-draws-a-curve.md)
 > **Supplements:** [ADR-0007](0007-line-geometry-generators.md),

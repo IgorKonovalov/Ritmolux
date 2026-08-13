@@ -1,6 +1,6 @@
 # ADR-0097 — the downbeat cue is chosen against per-beat evidence, not against the ladder argument
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
 > **Related plan(s):** [0086 — the downbeat finds a cue that is not the kick](../plans/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md)
 > **Supplements:** [ADR-0050](0050-downbeat-and-phrase-tracking-with-confidence-fallback.md),
