@@ -9,7 +9,9 @@
 //! (Plan 0067 Phase 1). The four clips are `core::signal` generators pushed
 //! hop-by-hop through [`Analyzer`](lmv_core::dsp::Analyzer) — FFT, band split,
 //! onset detector, the normalizers of ADR-0049 — and each published
-//! `AnalysisFrame` drives one rendered frame. Before this the four stimuli were
+//! `AnalysisFrame` past the analyzer's warm-up drives one rendered frame (Plan
+//! 0084 Phase 4: the warm-up hops advance the same analyzer and rasterize
+//! nothing). Before this the four stimuli were
 //! hand-built frames, which made a green run evidence that the *renderer* does
 //! something with numbers the test made up, rather than evidence that the audio
 //! path reaches the picture. This gate is the one ADR-0081 leans on to authorize
@@ -58,25 +60,46 @@ const FORMAT: AudioFormat = AudioFormat {
 /// gets the same settling time it always got.
 ///
 /// **This is the gate's cost knob and it was chosen by measurement, not taste.**
-/// The clip is `WARMUP_HOPS + SIGNAL_HOPS` renders per capture against the old
-/// 24, so at 24 the sweep costs ~1.8x what the synthesized version did (measured
-/// interleaved on one machine: 86 s -> 167 s over 41 presets; ~85 % of the growth
-/// is the 16 warm-up renders, ~15 % the wider readback window). **16 was tried
-/// and rejected**: it brings the sweep to 120 s, but the tightest preset in the
-/// library (`Squall`) falls from 0.0270 to 0.0220 against a 0.020 floor — 10 %
-/// headroom, which is one content tweak away from a false failure. At 24 the
-/// tightest preset reads 0.0270 against the synthesized version's 0.0284, so the
-/// margin the gate has always had survives the change. Buying that back would
-/// take a capture entry point that feeds warm-up hops without rendering them,
-/// which is a `core/src/render` change and not this gate's to make.
+/// It has not moved since Plan 0067 and Plan 0084 did not renegotiate it — only
+/// the wasted rendering around it went. **16 was tried and rejected** back when
+/// every hop rasterized: it brought that sweep to 120 s, but the tightest preset
+/// in the library then (`Squall`) fell from 0.0270 to 0.0220 against a 0.020
+/// floor — 10 % headroom, one content tweak from a false failure. Those two
+/// figures are pre-Plan-0084 and are kept as the reason the knob sits at 24, not
+/// as current readings.
+///
+/// **What Plan 0084 Phase 4 actually bought, measured on this Windows
+/// development box through the DX12 software adapter (ADR-0071 — this is a
+/// measurement, not a contract): `cargo test --test reactivity --
+/// --test-threads=1` over 36 presets went 136.3 s -> 100.2 s, a 26 % cut.** The
+/// older 86 s -> 167 s arithmetic in this docstring's previous form was taken on
+/// a 41-preset library and does not difference against these; and its ~15 %
+/// attributable to the wider readback window **does not come back** — the
+/// readbacks are the measurement, and only the warm-up renders were removed.
+///
+/// **The gate's numbers moved, and that was accepted rather than discovered.**
+/// The plan expected the warm-up renders to be pure waste; they were also the
+/// scene warm-up ([`HOPS`] below). Removing them left 35 of the 36 per-band
+/// vectors different — every one of them *larger* — with `spectrum/Halo`, the
+/// only preset in the set with no accumulating state, bit-identical. Nothing
+/// regressed: the lowest max across the library went 0.0287 -> 0.0504 against
+/// the 0.020 floor, so the tightest headroom in the set roughly doubled. Read a
+/// figure recorded before 2026-08-13 as a different measurement, not as drift.
 const SIGNAL_HOPS: usize = 24;
 
 /// Hops of PCM each capture is driven through. The first [`WARMUP_HOPS`]
 /// publish nothing at all — the analyzer's long window has not filled, so it
-/// holds a zeroed frame — which means they render at silence and double as the
-/// scene warm-up. Keeping the clip this short is deliberate: the analyzer needs
-/// enough window to fill, not a musical phrase, and this gate already sweeps the
-/// whole shipped set.
+/// holds a zeroed frame — so they are fed through
+/// [`Renderer::capture_audio_after_warmup`], which advances the analyzer and the
+/// clock without rasterizing anything. Keeping the clip this short is
+/// deliberate: the analyzer needs enough window to fill, not a musical phrase,
+/// and this gate already sweeps the whole shipped set.
+///
+/// **These hops used to render, at silence, and doubled as the scene warm-up.**
+/// They no longer do, which is why every preset carrying GPU-integrated state —
+/// trails, particles, a reaction-diffusion field — meets the measured window
+/// [`WARMUP_HOPS`] steps colder than it once did. Scenes driven only by time and
+/// audio are unaffected, because the clock advances either way.
 const HOPS: usize = WARMUP_HOPS + SIGNAL_HOPS;
 
 /// Clip length in seconds, derived so the generators produce exactly [`HOPS`]
@@ -161,9 +184,26 @@ fn stimuli() -> [(&'static str, Vec<f32>); 4] {
 /// frame; a click track's response peaks a few hops after the strike and decays,
 /// so a single-frame read would score a beat-latched preset by where the strike
 /// happened to fall. Reading back more hops costs readbacks, **not renders** —
-/// `capture_audio` renders every hop regardless.
+/// every hop past the warm-up is rasterized whether or not it is read.
 fn measured_hops() -> Vec<u32> {
     (WARMUP_HOPS as u32..HOPS as u32).collect()
+}
+
+/// Drive `pcm` through the gate's capture shape: the analyzer's warm-up hops
+/// advanced without pixels, the measured window rendered.
+///
+/// The count is asserted rather than trusted. Every hop in this clip used to be
+/// rasterized and all but the measured window thrown away, so the one thing
+/// that could silently undo this is a warm-up that starts drawing again.
+fn capture(renderer: &mut Renderer, name: &str, pcm: &[f32], hops: &[u32]) -> Vec<CaptureImage> {
+    let run = renderer
+        .capture_audio_after_warmup(name, pcm, FORMAT, hops, WARMUP_HOPS)
+        .expect("capture through the analyzer");
+    assert_eq!(
+        run.rendered, SIGNAL_HOPS,
+        "{name}: the measured window and nothing else should reach a rasterizer"
+    );
+    run.images
 }
 
 /// The largest per-hop difference between the silent baseline and `pcm`, over
@@ -175,9 +215,7 @@ fn response(
     pcm: &[f32],
     hops: &[u32],
 ) -> f32 {
-    let lit = renderer
-        .capture_audio(name, pcm, FORMAT, hops)
-        .expect("capture stimulus");
+    let lit = capture(renderer, name, pcm, hops);
     baseline
         .iter()
         .zip(lit.iter())
@@ -188,9 +226,7 @@ fn response(
 /// The per-band vector for one preset in the renderer's current roster.
 fn measure(renderer: &mut Renderer, name: &str) -> Vec<(&'static str, f32)> {
     let hops = measured_hops();
-    let baseline = renderer
-        .capture_audio(name, &silence(), FORMAT, &hops)
-        .expect("capture silent baseline");
+    let baseline = capture(renderer, name, &silence(), &hops);
     stimuli()
         .into_iter()
         .map(|(label, pcm)| (label, response(renderer, name, &baseline, &pcm, &hops)))
