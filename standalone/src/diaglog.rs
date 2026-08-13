@@ -21,12 +21,13 @@ const MAX_LOG_BYTES: u64 = 1024 * 1024;
 ///
 /// **The eight leading columns and their names are frozen** — anything already
 /// parsing this file reads them by index and must keep working. The analysis
-/// columns (Plan 0049 Phase 4) are appended, never interleaved.
+/// columns (Plan 0049 Phase 4) and the `capture` column (Plan 0083) are appended,
+/// never interleaved.
 ///
 /// Tab-separated with a named header is what makes a run of these lines
 /// something a lock **rate** can be computed from: split on `\t`, take the
 /// column, no regex tuned to one value's formatting.
-const HEADER: &str = "unix_ms\tfps\tframe_ms_avg\tframe_ms_p99\tframes_total\tframes_dropped\tgpu_bytes\trss_bytes\tbass\tmid\ttreb\tonset\tdownbeat_confidence\tdownbeat_locked\n";
+const HEADER: &str = "unix_ms\tfps\tframe_ms_avg\tframe_ms_p99\tframes_total\tframes_dropped\tgpu_bytes\trss_bytes\tbass\tmid\ttreb\tonset\tdownbeat_confidence\tdownbeat_locked\tcapture\n";
 
 /// Appends diagnostics samples to a rotating log file at ~1 Hz.
 pub struct DiagLog {
@@ -58,6 +59,10 @@ impl DiagLog {
     /// `analysis` and `rss` are both evaluated **lazily** — only on the seconds a
     /// sample is actually due. This runs every frame, so nothing here may become
     /// per-frame work; the closures are what keeps that true as the row grows.
+    ///
+    /// `capture` is the startup capture verdict's token (Plan 0083), taken as a
+    /// **borrow** for the same reason: it is decided once, at startup, and a row
+    /// that re-formatted it would be per-frame work in the frame's own path.
     #[allow(
         clippy::disallowed_methods,
         reason = "log-cadence + sample timestamp reads on the render thread; core analysis stays clock-free"
@@ -67,6 +72,7 @@ impl DiagLog {
         metrics: &Metrics,
         analysis: impl FnOnce() -> AnalysisMetrics,
         rss: impl FnOnce() -> Option<u64>,
+        capture: &str,
     ) {
         if self.last.elapsed() < LOG_INTERVAL {
             return;
@@ -92,7 +98,7 @@ impl DiagLog {
         let a = analysis();
         let _ = writeln!(
             file,
-            "{ts}\t{:.1}\t{:.3}\t{:.3}\t{}\t{}\t{}\t{}\t{}",
+            "{ts}\t{:.1}\t{:.3}\t{:.3}\t{}\t{}\t{}\t{}\t{}\t{capture}",
             metrics.fps,
             metrics.frame_ms_avg,
             metrics.frame_ms_p99,
@@ -209,9 +215,14 @@ mod tests {
 
     use std::io::Read as _;
 
+    use lmv_core::audio::AudioFormat;
     use lmv_core::dsp::{Analyzer, HOP_SIZE, WARMUP_HOPS};
 
     use super::*;
+    use crate::capture_verdict::CaptureVerdict;
+
+    /// A live-capture token, for the rows whose subject is a different column.
+    const LIVE: &str = "live WASAPI 48000/2";
 
     /// The eight columns that existed before Plan 0049, in order. **Frozen** —
     /// anything already parsing this file reads them by index.
@@ -233,6 +244,11 @@ mod tests {
         "downbeat_confidence",
         "downbeat_locked",
     ];
+    /// The capture verdict's column (Plan 0083), appended after the analysis
+    /// block. Named separately from the two tables above so the assertion below
+    /// checks a **frozen prefix** rather than the whole header — which is what
+    /// keeps it meaning something the next time a column is appended.
+    const CAPTURE_COLUMN: &str = "capture";
 
     fn columns() -> Vec<&'static str> {
         HEADER.trim_end().split('\t').collect()
@@ -296,6 +312,7 @@ mod tests {
             },
             || analysis,
             || Some(1234),
+            LIVE,
         );
 
         let text = read(&path);
@@ -339,19 +356,122 @@ mod tests {
     /// The existing columns and their names are unchanged and still lead the row,
     /// so anything already parsing these lines keeps working. The new columns are
     /// appended, never interleaved.
+    ///
+    /// **Asserted as a frozen prefix, not as the whole header.** The next appended
+    /// column should have to move nothing here, and a test pinned to the entire
+    /// string would go green by being rewritten — which is not a check.
     #[test]
     fn the_legacy_columns_are_unchanged_and_still_lead() {
         let cols = columns();
+        let frozen: Vec<&str> = LEGACY_COLUMNS
+            .iter()
+            .chain(ANALYSIS_COLUMNS.iter())
+            .copied()
+            .collect();
         assert_eq!(
-            cols.get(..LEGACY_COLUMNS.len()),
-            Some(&LEGACY_COLUMNS[..]),
-            "the pre-Plan-0049 columns moved or were renamed: {cols:?}"
+            cols.get(..frozen.len()),
+            Some(&frozen[..]),
+            "the pre-Plan-0083 columns moved or were renamed: {cols:?}"
         );
         assert_eq!(
-            cols.get(LEGACY_COLUMNS.len()..),
-            Some(&ANALYSIS_COLUMNS[..]),
-            "the analysis columns are not the appended tail: {cols:?}"
+            cols.get(frozen.len()..),
+            Some(&[CAPTURE_COLUMN][..]),
+            "the capture column is not the appended tail: {cols:?}"
         );
+    }
+
+    /// **A run with capture unavailable says so on every row.** This is the whole
+    /// plan: the tester whose log started it sent 1,249 rows that proved capture
+    /// delivered nothing and could not say why.
+    #[test]
+    fn a_failed_capture_names_its_reason_on_every_row() {
+        let path = scratch("capture-failed");
+        let token = CaptureVerdict::failed("SCK", "screen recording permission denied").token();
+
+        let mut log = DiagLog::new(Some(path.clone()));
+        for _ in 0..3 {
+            log.force_due();
+            log.maybe_log(
+                &Metrics::default(),
+                AnalysisMetrics::default,
+                || None,
+                &token,
+            );
+        }
+
+        let text = read(&path);
+        let mut lines = text.lines();
+        assert_eq!(lines.next(), Some(HEADER.trim_end()), "header first");
+        let mut rows = 0;
+        for line in lines {
+            let fields: Vec<&str> = line.split('\t').collect();
+            assert_eq!(
+                fields.len(),
+                columns().len(),
+                "row width matches the header"
+            );
+            assert_eq!(
+                capture_field(&fields),
+                token,
+                "a row does not carry the failure reason: {line:?}"
+            );
+            rows += 1;
+        }
+        assert_eq!(rows, 3, "expected three sample rows: {text:?}");
+
+        let _ = fs::remove_dir_all(path.parent().expect("the scratch dir"));
+    }
+
+    /// **A live capture names the backend and the negotiated format**, and reads
+    /// back differently from the failed run above — so a log cannot be read as
+    /// "audio was flowing" when it was not.
+    #[test]
+    fn a_live_capture_names_its_backend_and_format() {
+        let path = scratch("capture-live");
+        let token = CaptureVerdict::Live {
+            backend: "WASAPI",
+            format: AudioFormat {
+                sample_rate: 44_100,
+                channels: 2,
+            },
+        }
+        .token();
+
+        let mut log = DiagLog::new(Some(path.clone()));
+        log.force_due();
+        log.maybe_log(
+            &Metrics::default(),
+            AnalysisMetrics::default,
+            || None,
+            &token,
+        );
+
+        let text = read(&path);
+        let row: Vec<&str> = text
+            .lines()
+            .nth(1)
+            .expect("one sample row")
+            .split('\t')
+            .collect();
+        assert_eq!(capture_field(&row), "live WASAPI 44100/2");
+        assert_ne!(
+            capture_field(&row),
+            CaptureVerdict::failed("WASAPI", "device in use").token(),
+            "a live run and a failed one write the same field"
+        );
+
+        let _ = fs::remove_dir_all(path.parent().expect("the scratch dir"));
+    }
+
+    /// The `capture` field of a row, located **by the header** rather than by a
+    /// hardcoded index, so appending another column later cannot silently move
+    /// what these tests read.
+    fn capture_field<'a>(row: &[&'a str]) -> &'a str {
+        let i = columns()
+            .iter()
+            .position(|c| *c == CAPTURE_COLUMN)
+            .expect("no `capture` column");
+        row.get(i).copied().expect("the row has a capture field")
     }
 
     /// **A log from an older build is rotated, not appended to.** Its header names
@@ -367,7 +487,7 @@ mod tests {
 
         let mut log = DiagLog::new(Some(path.clone()));
         log.force_due();
-        log.maybe_log(&Metrics::default(), AnalysisMetrics::default, || None);
+        log.maybe_log(&Metrics::default(), AnalysisMetrics::default, || None, LIVE);
 
         let text = read(&path);
         assert!(
@@ -393,7 +513,7 @@ mod tests {
         let mut log = DiagLog::new(Some(path.clone()));
         for _ in 0..3 {
             log.force_due();
-            log.maybe_log(&Metrics::default(), AnalysisMetrics::default, || None);
+            log.maybe_log(&Metrics::default(), AnalysisMetrics::default, || None, LIVE);
         }
         let text = read(&path);
         assert_eq!(
