@@ -254,7 +254,13 @@ Play any audio (loopback capture feeds the visuals). Then, in the window:
   its own measurement — see the dual-live budget item above.
 - **`F3`** — toggle the diagnostics overlay (frame-time sparkline + GPU bar + fps/p99 readout, and
   below them the analysis block: `BASS` / `MID` / `TREB` / `ONSET` as meters with their numbers,
-  plus a `LOCK` / `FREE` row carrying the downbeat estimator's confidence — Plan 0049).
+  plus a `LOCK` / `FREE` row carrying the downbeat estimator's confidence — Plan 0049). Under the
+  panel, an `audio` line naming the **capture verdict** — `live WASAPI 48000/2`, or `failed …` with
+  the platform error (Plan 0083).
+- **Check the `audio` line before recording anything.** Four flat band meters mean either "capture
+  failed" or "nothing is playing", and every reactivity judgement below is worthless if it was the
+  first. The line separates them in one glance, and it is the same value the log's `capture` column
+  carries, so a screenshot and a log from one run cannot disagree.
 
 The 1 Hz log lands at:
 
@@ -263,15 +269,22 @@ The 1 Hz log lands at:
 ```
 
 Columns: `unix_ms  fps  frame_ms_avg  frame_ms_p99  frames_total  frames_dropped  gpu_bytes  rss_bytes
-bass  mid  treb  onset  downbeat_confidence  downbeat_locked`.
+bass  mid  treb  onset  downbeat_confidence  downbeat_locked  capture`.
 `rss_bytes` is the working set. For private commit too, run the throwaway floor spike or read
 `PrivateMemorySize64` via `Get-Process lmv` (the ADR-0010 method).
 
-The six trailing columns are the analysis snapshot (Plan 0049 / ADR-0052) — native-only, so the
+The six analysis columns are the analysis snapshot (Plan 0049 / ADR-0052) — native-only, so the
 plugin's `plugin-diagnostics.log` has no counterpart. `downbeat_locked` is `0`/`1`, so the
 estimator's **lock rate** over a run is the mean of that column. A log written by an older build
 is rotated to `.log.1` on the next launch rather than appended to, so a file never mixes row
 widths.
+
+`capture` is the trailing column (Plan 0083): the startup capture verdict, repeated on every row —
+`live <backend> <rate>/<channels>`, or `failed <backend> <reason>` with the platform error, or
+`unsupported` on a build with no capture path. It is what makes a log of flat band columns
+self-diagnosing: it says whether audio ever reached the analyzer, and if not, why. It repeats per
+row rather than appearing once at startup because this file rotates at 1 MiB, and because a
+capture that dies mid-run is a thing a startup line could never show.
 
 ## Pass criteria & escalation
 
