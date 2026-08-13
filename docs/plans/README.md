@@ -294,7 +294,10 @@ the rows above.
   so the Privacy toggle can show an older build's entry as enabled while the new binary is denied),
   macOS below 13, a ScreenCaptureKit start error, or an unexpected fourth. **A reason that turns out
   not to be actionable is still a successful outcome** — the claim being discharged is *we cannot
-  tell*. Record the answer in [backlog 0090](../design-backlog.md); whatever fix it implies is a new
+  tell*. **Record the answer as a fresh entry in [`docs/design-backlog.md`](../design-backlog.md)
+  citing [archived 0090](../design-backlog-archive.md)** — that entry moved to the archive at the
+  third batch on 2026-08-13, and the archive is closed, so a returning question is a new entry rather
+  than an edit to a closed one; whatever fix it implies is a new
   plan, not scope there. If it names a stale-TCC grant, the durable fix is a stable signing identity
   across builds, which is
   [ADR-0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md) territory and
