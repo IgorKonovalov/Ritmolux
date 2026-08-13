@@ -2931,6 +2931,49 @@ fn a_divergent_tuple_falls_back_instead_of_reaching_the_gpu() {
     }
 }
 
+/// **Every roster entry is in frame** — Plan 0079 Phase 2's done-when, asserted
+/// on the geometry rather than by eye on the contact sheets.
+///
+/// It is not a tolerance and it is barely a measurement: `measured_framing`
+/// scales each entry so its [`family::framed_half`] times its scale equals the
+/// canonical figure's, so every entry of a family occupies **the same fraction
+/// of the frame** as the figure that family shipped with. That is the property
+/// worth pinning — a candidate sheet is only a judgement of figures if no cell
+/// is bigger or smaller than the others for framing reasons.
+#[test]
+fn every_roster_entry_fills_the_frame_like_its_canonical_figure() {
+    for family in [
+        AttractorFamily::DeJong,
+        AttractorFamily::Clifford,
+        AttractorFamily::Thomas,
+        AttractorFamily::Lorenz,
+    ] {
+        let roster = family::resolve_roster(family);
+        assert!(
+            roster.len() > 1,
+            "{family:?} has no candidates to sheet — Phase 2 needs a menu"
+        );
+        let reference = family::framed_half(family, canonical(family).seed_box.0)
+            * canonical(family).projection.0;
+        for (index, entry) in roster.iter().enumerate() {
+            let (scale, _, _) = entry.tuple.framing.projection;
+            let reach = family::framed_half(family, entry.tuple.framing.seed_box.0) * scale;
+            assert!(
+                reach <= 1.0,
+                "{family:?} entry {index} reaches {reach:.2} of the frame — out of frame"
+            );
+            // Entry 0 is measured against its own *pinned* box rather than a
+            // measurement, so it sits within a few per cent of the reference
+            // instead of exactly on it; the measured entries land on it.
+            assert!(
+                (reach / reference - 1.0).abs() < 0.35,
+                "{family:?} entry {index} fills {reach:.3} against the canonical \
+                 {reference:.3} — the cells are not comparable"
+            );
+        }
+    }
+}
+
 /// **The framing travels with the tuple, so `reseed` does too** — the Plan 0062
 /// coupling ADR-0093 names as the thing a naive roster would silently break.
 ///

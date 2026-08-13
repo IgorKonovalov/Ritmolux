@@ -1,0 +1,153 @@
+#!/usr/bin/env node
+// Render one contact sheet per attractor family, a cell per tuple roster entry.
+//
+// Rationale: Plan 0079 makes attractor tuples content (ADR-0093), and Phase 3 is
+// a `human` curation gate — the user picks the shipping figures off rendered
+// sheets rather than off coefficient tables. Each cell must be a judgement of a
+// *figure* rather than of a framing accident, which is what the engine's own
+// per-entry measurement buys: every cell is auto-framed to the same footprint as
+// its family's canonical figure, and labeled with the tuple it draws.
+//
+// Usage:  node scripts/tuple-sheets.mjs [out-dir]
+// Writes  <out-dir>/<family>-tuples.png  and  <out-dir>/index.md
+// Default out-dir: target/tuple-sheets
+//
+// It builds nothing itself: it writes one scratch preset per (family, entry)
+// into a temp directory and runs the `shot` example's `--all` contact sheet over
+// that directory, which is the tooling the repo already trusts for labeled
+// grids. Cells are labeled by preset NAME, so the name carries the tuple.
+//
+// **The roster is read out of the Rust source, not mirrored here.** A duplicated
+// table would go stale the moment Phase 4 trims the roster to the curated picks,
+// and the symptom would be silent: `tuple` clamps, so asking for an index past
+// the end renders a duplicate of the last cell rather than failing.
+
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+const FAMILY_SRC = "core/src/render/scenes/particles/family.rs";
+const FAMILIES = ["DeJong", "Clifford", "Thomas", "Lorenz"];
+/// snake_case is what a preset's `[particles] family` key takes.
+const SNAKE = { DeJong: "de_jong", Clifford: "clifford", Thomas: "thomas", Lorenz: "lorenz" };
+/// How many of the four coefficients each family actually reads — the rest are
+/// inert, and printing them would put four numbers on a label that means one.
+const MEANINGFUL = { DeJong: 4, Clifford: 4, Thomas: 1, Lorenz: 3 };
+
+/// Every `[a, b, c, d]` row inside one `AttractorFamily::<name> =>` arm — which
+/// is a bare `[..]` in `default_coeffs` and a `&[[..], [..]]` in
+/// `extra_tuples`, so the slice is taken by matching brackets rather than by
+/// looking for a terminator that means different things in the two shapes.
+function armTuples(src, fnName, family) {
+  const fn = src.slice(src.indexOf(`fn ${fnName}(`));
+  const arm = fn.indexOf(`AttractorFamily::${family} =>`);
+  if (arm < 0) return [];
+  const open = fn.indexOf("[", arm);
+  if (open < 0) return [];
+  let depth = 0;
+  let close = open;
+  for (; close < fn.length; close += 1) {
+    if (fn[close] === "[") depth += 1;
+    if (fn[close] === "]") {
+      depth -= 1;
+      if (depth === 0) break;
+    }
+  }
+  const body = fn.slice(open, close + 1);
+  return [...body.matchAll(/\[\s*(-?[\d.]+(?:\s*,\s*-?[\d.]+)*)\s*,?\s*\]/g)].map((m) =>
+    m[1].split(",").map((v) => v.trim()).filter(Boolean),
+  );
+}
+
+/// The family's roster as coefficient rows, entry 0 (the canonical tuple) first.
+function roster(src, family) {
+  const canonical = armTuples(src, "default_coeffs", family);
+  const extras = armTuples(src, "extra_tuples", family);
+  if (canonical.length !== 1) {
+    throw new Error(`could not read ${family}'s canonical tuple from ${FAMILY_SRC}`);
+  }
+  return [...canonical, ...extras];
+}
+
+// A bare preset per cell: no backdrop and no post stages, so what is judged is
+// the scene's own geometry rather than a vignette (the discipline
+// `attractor_bare_preset` follows in core/tests/attractor.rs). The exposure is
+// one compromise across figures of very different density — a Lorenz butterfly
+// fills its frame where a torus knot is a single curve — so it is set where the
+// dense figures still show their striations and the sparse ones still read.
+const PRESET = (name, family, index) => `system = "attractor"
+name = "${name}"
+
+[particles]
+family = "${family}"
+
+[params]
+tuple = "${index}"
+size = "0.4"
+fade = "0.88"
+brightness = "0.22"
+`;
+
+// Uppercased by the renderer; its glyph table covers A-Z 0-9 space - and dot.
+// Kept under 26 characters: the label is drawn at a fixed 12 px advance and a
+// longer one runs off its 320 px thumbnail into the next cell.
+const label = (index, coeffs) => `${String(index).padStart(2, "0")} ${coeffs.join(" ")}`;
+
+const outDir = resolve(process.argv[2] ?? "target/tuple-sheets");
+mkdirSync(outDir, { recursive: true });
+const src = readFileSync(FAMILY_SRC, "utf8");
+
+const index = [
+  "# Attractor tuple candidate sheets (Plan 0079 Phase 2)",
+  "",
+  "Cell labels carry the coefficients each family actually reads. Entry 0 of",
+  "every family is the canonical tuple — the figure that family has always drawn",
+  "— and every other entry is framed by measurement, so the cells are comparable",
+  "as figures rather than as framings.",
+  "",
+  "Generated by `node scripts/tuple-sheets.mjs`, which reads the roster out of",
+  "`core/src/render/scenes/particles/family.rs`.",
+  "",
+];
+
+for (const family of FAMILIES) {
+  const tuples = roster(src, family).map((row) => row.slice(0, MEANINGFUL[family]));
+  const snake = SNAKE[family];
+  const dir = mkdtempSync(join(tmpdir(), `lmv-tuples-${snake}-`));
+  try {
+    tuples.forEach((coeffs, i) => {
+      const file = join(dir, `${snake}-${String(i).padStart(2, "0")}.toml`);
+      writeFileSync(file, PRESET(label(i, coeffs), snake, i));
+    });
+    const sheet = join(outDir, `${snake}-tuples.png`);
+    console.log(`rendering ${tuples.length} cells for ${snake} -> ${sheet}`);
+    execFileSync(
+      "cargo",
+      [
+        "run", "--release", "-p", "standalone", "--example", "shot", "--",
+        "--presets", dir,
+        "--all",
+        "--out", sheet,
+        "--size", "640x640",
+        "--frames", "420",
+      ],
+      { stdio: "inherit" },
+    );
+    index.push(
+      `## ${snake}`,
+      "",
+      `![${snake}](${snake}-tuples.png)`,
+      "",
+      "| Entry | Coefficients |",
+      "|---|---|",
+      ...tuples.map((c, i) => `| ${i} | \`${c.join(" ")}\`${i === 0 ? " (canonical)" : ""} |`),
+      "",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+writeFileSync(join(outDir, "index.md"), index.join("\n"));
+console.log(`\nsheets + index in ${outDir}`);
