@@ -703,16 +703,25 @@ cargo run -p standalone --example shot -- --preset "Burst" \
   --audio assets/test/clip.wav --strip 8 --out clip.png
 ```
 
-**Two committed scripts drive `shot` for curation work** (Plan 0079), both writing under
-`target/` and both self-documenting in their headers — run them with `node`, no arguments needed:
+**Three committed scripts drive `shot`**, all self-documenting in their headers — run them with
+`node`, no arguments needed:
 
-| Script | What it renders |
-|---|---|
-| `scripts/tuple-sheets.mjs` | one labeled contact sheet per attractor family, a cell per roster entry — the menu a `tuple` curation judges |
-| `scripts/tuple-paths.mjs` | one filmstrip per candidate `tuple_from`/`tuple_to` pair, a cell per `morph` step; pairs the engine refuses a walk for are skipped rather than rendered as identical cells |
+| Script | What it renders | Output |
+|---|---|---|
+| `scripts/tuple-sheets.mjs` | one labeled contact sheet per attractor family, a cell per roster entry — the menu a `tuple` curation judges | `target/`, not committed |
+| `scripts/tuple-paths.mjs` | one filmstrip per candidate `tuple_from`/`tuple_to` pair, a cell per `morph` step; pairs the engine refuses a walk for are skipped rather than rendered as identical cells | `target/`, not committed |
+| `scripts/docs-shots.mjs` | every documentation image, from an inline manifest naming the preset file, stimulus, hop, size and tier behind each one | **`docs/images/`, committed** |
 
-They read the roster straight out of `core/src/render/scenes/particles/family.rs`, so a roster edit
-needs no script edit. Their output is **not** committed — re-run them when a judgement is owed.
+The first two read the roster straight out of `core/src/render/scenes/particles/family.rs`, so a
+roster edit needs no script edit, and their output is a scratch artifact — re-run them when a
+judgement is owed.
+
+`docs-shots.mjs` is the odd one: its output *is* committed, so the manifest is the provenance record
+for every picture in the documentation, and swapping which preset represents a family is one line
+plus a re-run ([ADR-0100](adrs/0100-documentation-images-are-committed-headless-renders.md)). It
+writes only under `docs/images/` and refuses an entry pointing anywhere else. **It is not a CI gate
+and must not become one** — renders are not byte-reproducible across machines, so freshness is a
+close-ceremony sweep duty rather than a check.
 
 `--signal` kinds: `click:<bpm>`, `bass:<hz>`, `treble:<hz>`, `noise:<seed>`,
 `chord`, `dynamic:<bpm>`. The synth path needs no committed asset. `--audio`
