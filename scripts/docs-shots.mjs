@@ -70,7 +70,7 @@
 // accumulation argument does not cost anything by moving.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { basename, relative, resolve, sep } from "node:path";
 
 // ---------------------------------------------------------------------------
@@ -87,12 +87,25 @@ import { basename, relative, resolve, sep } from "node:path";
 /// The gallery holds exactly one entry per system name in `SystemKind::from_name`
 /// and is filed under that name, so a system added later shows up as a missing
 /// file rather than as a silent gap. Four families have exactly one preset and
-/// choose themselves; the other five are **provisional picks** awaiting the
-/// Plan 0088 Phase 7 look call, and a swap is one line here plus a re-run.
+/// choose themselves; the other five had a real choice and were **judged at the
+/// Plan 0088 close** (Phase 7) — the entries below carry the verdict where one
+/// pick displaced another. A later swap is one line here plus a re-run.
+///
+/// Two of the single-preset families came out of that pass with a picture that
+/// is accepted rather than good, and the fix is content work rather than a hop:
+/// `emitter_perseids` bunches its fan into the right half at every hop tried,
+/// and `star_rosewindow`'s outermost ring runs off all four edges. Both are
+/// recorded as content-lane notes at the Plan 0088 close, not as manifest bugs.
 const IMAGES = [
   {
+    // Judged at the Plan 0088 close (Phase 7) against fragment_supernova,
+    // fragment_vitrail, fragment_mandala and attractor_volute. Supernova held
+    // this slot through Phases 2-6 and lost it on the front page's terms rather
+    // than on its own: a flat salmon field over most of the frame reads as
+    // wallpaper at the top of a README. Tunnel has real blacks, so it carries
+    // contrast and depth at any column width.
     out: "docs/images/hero.png",
-    presetFile: "presets/fragment_supernova.toml",
+    presetFile: "presets/fragment_tunnel.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
@@ -146,12 +159,18 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // swarm — provisional, from 2 candidates. The weakest picture in the set,
-    // and honestly so: a swarm is a MOTION, and at full energy it photographs
-    // as uniform noise. This hop is in the phrase's quiet bar, where the flock
-    // settles onto the flow field and the structure driving it becomes legible.
+    // swarm — judged at the Plan 0088 close (Phase 7). swarm_drift held this
+    // slot through Phase 3 and `dev` flagged it as the weakest picture in the
+    // set; the close agreed, for a reason no column measures: drift is charcoal
+    // on black and collapses to a dark rectangle at README column width. Both
+    // swarm presets were shot at 300 and 374 and shatter won at both.
+    //
+    // The hop is still NOT 300, and for drift's original reason: a swarm is a
+    // MOTION, and at full energy it photographs as uniform noise. 374 is inside
+    // the phrase's quiet bar, where the flock settles onto the flow field and
+    // the wave crest driving it becomes legible.
     out: "docs/images/gallery/swarm.png",
-    presetFile: "presets/swarm_drift.toml",
+    presetFile: "presets/swarm_shatter.toml",
     hop: 374,
     signal: "dynamic:110",
     size: "1280x720",
@@ -323,8 +342,11 @@ for (const [index, entry] of IMAGES.entries()) {
   } catch (err) {
     // A non-zero `shot` — a hop past the end of the clip, an unreadable preset,
     // no GPU adapter — must not leave the previous PNG sitting there looking
-    // current. Name the entry and keep a non-zero exit.
-    console.error(`FAILED: ${where}: ${err.message}`);
+    // current, because `git status` would then be clean over a stale image and
+    // the run's whole freshness claim would be false. So the old file goes with
+    // the failed render, and the entry is named on a non-zero exit.
+    rmSync(entry.out, { force: true });
+    console.error(`FAILED: ${where} (previous image removed): ${err.message}`);
     failures += 1;
   }
 }

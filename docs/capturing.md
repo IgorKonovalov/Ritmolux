@@ -260,12 +260,21 @@ picture worth keeping:
 `--frame-at` is the first two combined:
 
 ```bash
-# The picture the docs commit: full size, real dynamics, late enough to be developed
+# The picture the docs commit: full size, real dynamics, on the loudest beat
 cargo run -p standalone --example shot --release -- \
   --preset-file presets/attractor_leviathan.toml \
-  --signal dynamic:110 --frame-at 340 --size 1280x720 --tier rich \
+  --signal dynamic:110 --frame-at 300 --size 1280x720 --tier rich \
   --out docs/images/gallery/attractor.png
 ```
+
+**Hop 300 is not arbitrary, and a later hop is worse.** `dynamic:110`'s phrase
+builds for six beats and then rests for two at an amplitude of `0.04`, and at
+110 BPM with a 512-sample hop that rest begins at hop 306 — so anything past that
+photographs a reactive preset at its resting state. 300 is the last hop of the
+loudest beat: maximum energy, and the most scene time an accumulating family can
+have before the rest. The arithmetic is in
+[`scripts/docs-shots.mjs`](../scripts/docs-shots.mjs)'s header, which is also
+where a per-image deviation from 300 has to say why.
 
 It shares everything with the strip except the write: the same hop numbering, the
 same `capture_audio` call, and the same level table on stdout. A hop past the end
