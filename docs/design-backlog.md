@@ -1325,9 +1325,15 @@ invariant away without knowing which source mis-fits.
 
 ---
 
-## 0090 — the Mac build's capture verdict is stderr-only, so a Finder-launched tester cannot tell us why it hears nothing
+## ~~0090 — the Mac build's capture verdict is stderr-only, so a Finder-launched tester cannot tell us why it hears nothing~~
 
-- **PROMOTED 2026-08-13 → [Plan 0083](plans/0083-the-build-says-why-it-hears-nothing.md)** — no ADR;
+- **CLOSED 2026-08-13 by [Plan 0083](plans/done/0083-the-build-says-why-it-hears-nothing.md)** — the
+  capture verdict is a value, and it lands in both artifacts a remote tester can send: a trailing
+  `capture` column on every `diagnostics.log` row, and an `audio` line under the F3 panel, both read
+  off one string built once at startup. The entry's claim — *we cannot tell why* — is discharged as a
+  **capability**; the tester's own answer is Plan 0083's `human` Phase 5, still outstanding, and it
+  is recorded here when it arrives.
+- **PROMOTED 2026-08-13 → [Plan 0083](plans/done/0083-the-build-says-why-it-hears-nothing.md)** — no ADR;
   the shape follows the existing diagnostics surface. Two decisions the plan takes that this entry
   left open. The verdict lands as an **appended column**, not a startup line: this log rotates at
   1 MiB keeping one backup and the tester's spanned 6.5 days, so a line written once is exactly what
