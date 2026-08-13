@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0088** (ADRs are a separate sequence — next free there is **0100**.)
+**Next free number: 0089** (ADRs are a separate sequence — next free there is **0102**.)
 
 ## Active roster
 
@@ -19,6 +19,7 @@ someone who picked it up is reading.
 | [0084](0084-two-gates-stop-lying-about-what-they-check.md) | Two gates stop lying about what they check | approved | dev | Two `dev`-only defects sharing a session and nothing else. Both fixes are the ones their own source comments already name (`check-doc-links.mjs`'s header, `reactivity.rs:69`). Phase 2's repair may be larger than it looks — `README-archive.md` holds ~2,700 lines whose reference definitions stayed behind. |
 | [0085](0085-the-show-length-horizon-gets-an-instrument.md) | The show-length horizon gets an instrument | approved | dev, human | Three backlog entries, two instruments — headless for simulation drift (deterministic), live `--soak` for resource drift (not). **Never a gate** (ADR-0099). Phase 4 is owed *before* R0's governor is designed, which is the only scheduling constraint here. Phase 5 needs a real machine for real minutes. |
 | [0086](0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md) | The downbeat finds a cue that is not the kick | approved | dev, human | **Measures before it chooses.** Phase 2 is a `human` gate that needs the user's own music — a synthesized backbeat is a hypothesis about backbeats, which is exactly what cannot settle this. The cue for Phase 3 is named at that gate, so the later phases state properties rather than edits. `CONFIDENCE_THRESHOLD` does not move. |
+| [0088](0088-the-docs-get-pictures.md) | The docs get pictures | draft | dev, human | The only user-facing-docs plan on the roster, and the only one that starts with a **tool gap**: `shot` cannot produce a full-resolution frame under real audio today (`--at` returns a 363x208 bordered tile), so Phase 1 is a capability. Commits ~22 MB of PNGs permanently ([ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md), measured, budgeted). Its gallery is invalidated by [0087](0087-the-line-renderer-draws-a-curve.md) — one script re-run, by construction. |
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 
 **Five plans, written 2026-08-13 from a backlog sweep**, after the roster stood empty for the first
@@ -52,6 +53,25 @@ take any free session. The numbered list below is otherwise unchanged.
 5. **[0087]** — last, and largest. Touches `core/src/render/scenes/lines/` and owes a re-bless, so it
    wants a lane to itself. **It is also the only plan here that can end early**: two separate gates
    (a cost measurement and a `human` look verdict) can route it to ADR-0098's Alternative C.
+
+**Added 2026-08-13: [0088](0088-the-docs-get-pictures.md), from a user request** — update the main
+README, add screenshots, and document preset authoring with pictures and a worked tuning example.
+It is a **docs plan with a code phase**: `shot` gains `--frame-at <hop>` first, because the filmstrip
+path scales every frame to a 363x208 bordered tile and nothing in the tool can currently produce a
+full-resolution frame under real audio. Where it sits in the order:
+
+- **It gates nothing and is gated by nothing**, so it takes any free session. File contention is
+  near-zero: it touches `standalone/examples/shot.rs`, `scripts/docs-shots.mjs` (new), `docs/`, and
+  one assertion in `core/tests/preset.rs`. The overlap with [0084] is nominal — both touch `scripts/`
+  and `core/tests/`, but different files in each.
+- **[0087] invalidates its gallery, and that is priced rather than sequenced.** The line-renderer
+  plan changes what the curve family draws (three mandala presets were already retired on
+  [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)), so any
+  documentation image of that family owes a re-render afterwards. Re-rendering the whole set is one
+  argument-free script run — which is the entire reason the images are driven from a committed
+  manifest instead of captured by hand. Run them in either order.
+- **Its `human` phase is a look verdict on nine gallery picks** and can carry forward the way [0083]'s
+  Phase 5 did; the `dev` phases close the plan with provisional picks committed and working.
 
 **Three of the five carried a `human` phase**, so none closes in one unattended session — the same
 property the previous roster had. [0083] is the exception that proves it: its four `dev` phases
