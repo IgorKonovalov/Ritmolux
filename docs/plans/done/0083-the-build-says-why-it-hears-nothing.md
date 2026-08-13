@@ -1,11 +1,20 @@
 # 0083 — the build says why it hears nothing
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-13
+> **Closed:** 2026-08-13 — all four `dev` phases (`645eda6`, `e20872f`, `141fd6c`). Mode 4 review:
+> **no blockers, no majors, one minor, two nits.** The verdict is a value built once at startup on
+> the render/UI thread and only borrowed thereafter, landing in both durable artifacts from the same
+> stored string — so a tester's screenshot and their `diagnostics.log` cannot disagree about one run.
+> Verified at the close rather than taken on trust: `cargo fmt --all --check` clean,
+> `node scripts/check-doc-links.mjs` exit 0, `cargo nextest run -p standalone` **108/108**. `core/`
+> is untouched, the diff contains no `aspect`, and nothing here runs on the capture thread.
+> **Phase 5 is `human` and deliberately outstanding** — it needs the external Mac tester and gates
+> nothing; carried forward under Standing in [the plans index](../README.md).
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none — no rejected alternative worth recording; the shape follows
-> [ADR-0052](../adrs/0052-analysis-diagnostics-are-native-only.md)'s existing diagnostics surface
-> **Closes:** [design-backlog 0090](../design-backlog.md)
+> [ADR-0052](../../adrs/0052-analysis-diagnostics-are-native-only.md)'s existing diagnostics surface
+> **Closes:** [design-backlog 0090](../../design-backlog.md)
 
 ## TL;DR
 
@@ -162,7 +171,7 @@ the callback exists, and both consumers already live on the render/UI thread.
   grant, macOS below 13, a ScreenCaptureKit start error, an unexpected fourth — are distinguishable
   from one field.
 - **Done when:** the returned `diagnostics.log`'s `capture` column names a reason, and that reason
-  is recorded in [design-backlog 0090](../design-backlog.md) as the entry's answer. **A reason that
+  is recorded in [design-backlog 0090](../../design-backlog.md) as the entry's answer. **A reason that
   turns out not to be actionable is still a successful outcome** — the entry's claim is that we
   cannot tell, and telling is the deliverable. Whatever fix the named reason implies is a *new*
   plan, not scope here.
