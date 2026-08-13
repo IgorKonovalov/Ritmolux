@@ -19,6 +19,12 @@ cargo run -p standalone --example shot -- --preset-file presets/<name>.toml --ou
 See [`../docs/presets.md`](../docs/presets.md#a-custom-preset-folder-lmv_preset_dir)
 and [`../docs/capturing.md`](../docs/capturing.md#editing-presets-live).
 
+> **This file is the parameter roster, not the way in.** If you have not written a preset before,
+> read [`../docs/preset-guide.md`](../docs/preset-guide.md) first — it shows what each of the nine
+> systems looks like and when to reach for it, then sends you back here for the parameters. The
+> guide reproduces none of the tables below, deliberately
+> ([ADR-0101](../docs/adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)).
+
 **A preset ships when the behavioral suite is green
 ([ADR-0081](../docs/adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)),
 so know what green is evidence of.** Five gates sweep this folder and **one of them
