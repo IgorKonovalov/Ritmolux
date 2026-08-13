@@ -111,6 +111,29 @@ const IMAGES = [
     tier: "rich",
   },
 
+  // --- the tuning walkthrough: five steps, one hop -------------------------
+  //
+  // NOT hop 300. These five are read against each other, so they share a hop —
+  // and it has to be a hop where the music is at an ORDINARY level, not at the
+  // top of the build. Step 2's whole lesson is that its bindings are dead
+  // wherever real material actually sits; captured at 300, the loudest hop in
+  // the clip, its thresholds all fire and the picture would contradict the
+  // report row printed beside it. Hop 230 is inside beat 4, mid-build.
+  ...[
+    ["step-1-constants", "1"],
+    ["step-2-naive-bands", "2"],
+    ["step-3-calibrated", "3"],
+    ["step-4-eased", "4"],
+    ["step-5-colour-and-beat", "5"],
+  ].map(([file, n]) => ({
+    out: `docs/images/walkthrough/step-${n}.png`,
+    presetFile: `docs/examples/tuning/${file}.toml`,
+    signal: "dynamic:110",
+    hop: 230,
+    size: "1280x720",
+    tier: "rich",
+  })),
+
   // --- the gallery: one per SystemKind ------------------------------------
 
   {
