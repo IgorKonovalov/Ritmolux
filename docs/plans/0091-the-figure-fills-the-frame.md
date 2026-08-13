@@ -1,7 +1,8 @@
 # 0091 — The figure fills the frame
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-13
+> **Approved:** 2026-08-13 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0105](../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md) (the mark roster becomes a fullscreen distance field), [0106](../adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md) (two-tone graphics come from a multiply layer)
 > **Corrects:** design-backlog 0069 (premise falsified in part — corrected in place, not archived)

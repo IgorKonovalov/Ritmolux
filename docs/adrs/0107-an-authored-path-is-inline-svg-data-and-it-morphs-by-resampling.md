@@ -1,6 +1,6 @@
 # ADR-0107 — An authored path is inline SVG data, and it morphs by resampling
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
 > **Related plan(s):** [0092](../plans/0092-the-engine-draws-an-authored-path.md)
 
