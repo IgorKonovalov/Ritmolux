@@ -82,7 +82,7 @@ only (ADR-0011), so the shipped `lmv.exe` is untouched; the CLI is a
 Render one preset to a PNG (the agent then Reads the file):
 
 ```bash
-cargo run -p standalone --example shot -- --preset "Aurora" --frames 120 --out shot.png
+cargo run -p standalone --example shot -- --preset "Whorl" --frames 120 --out shot.png
 ```
 
 Flags:
@@ -125,7 +125,7 @@ real on live audio. If you want a beat, capture one:
 
 ```bash
 # Transient beats through the real onset detector, no asset needed
-cargo run -p standalone --example shot -- --preset "Pulse Field" \
+cargo run -p standalone --example shot -- --preset "Drift" \
   --signal click:120 --strip 8 --out click.png
 ```
 
@@ -236,7 +236,7 @@ analyzer over real samples and therefore populate the array:
 
 ```bash
 # The band array through the real FFT - the readout actually moves
-cargo run -p standalone --example shot -- --preset "Spectrum Comb" \
+cargo run -p standalone --example shot -- --preset "Halo" \
   --signal chord --strip 3 --out comb.png
 ```
 
@@ -646,17 +646,17 @@ Point both surfaces at the repo's version-controlled `presets/` and edit a
 $env:LMV_PRESET_DIR = "./presets"; cargo run -p standalone --release
 
 # ...and every shot in that shell reads the same folder
-cargo run -p standalone --example shot -- --preset "Aurora" --out shot.png
+cargo run -p standalone --example shot -- --preset "Whorl" --out shot.png
 ```
 
 For a one-off capture, the flags say it explicitly and need no environment:
 
 ```bash
 # The whole repo library
-cargo run -p standalone --example shot -- --presets presets --preset "Aurora" --out a.png
+cargo run -p standalone --example shot -- --presets presets --preset "Whorl" --out a.png
 
 # A single file — --preset is unnecessary, the one-entry library names itself
-cargo run -p standalone --example shot -- --preset-file presets/fragment_aurora.toml --out a.png
+cargo run -p standalone --example shot -- --preset-file presets/fragment_whorl.toml --out a.png
 
 # Metrics for the repo library rather than the seeded per-user copy
 LMV_PRESET_DIR=./presets cargo run -p standalone --example shot -- --report
@@ -670,14 +670,19 @@ directory. The foobar2000 plugin does not read `LMV_PRESET_DIR`.
 
 ```bash
 # Shot a preset under a loud beat, at a custom size
-cargo run -p standalone --example shot -- --preset "Pulse Field" \
+cargo run -p standalone --example shot -- --preset "Drift" \
   --set bass=1,onset=1,beat=1 --size 960x540 --out pulse.png
 
-# Both sides of a tempo gate, e.g. `select(tempo > 130, ..., ...)`
-cargo run -p standalone --example shot -- --preset-file presets/rose_zoom.toml \
-  --set tempo=90 --out slow.png
-cargo run -p standalone --example shot -- --preset-file presets/rose_zoom.toml \
-  --set tempo=160 --out fast.png
+# Both sides of a gate, e.g. `select(treb > 0.55, 12, 8)` on kaleido_order.
+# The subject is a docs/examples file rather than a shipped preset on purpose:
+# NO preset in the library binds `tempo`, so the tempo-gate example this
+# replaces named a file that had been deleted and a variable nothing uses.
+cargo run -p standalone --example shot -- \
+  --preset-file docs/examples/tuning/step-2-naive-bands.toml \
+  --set treb=0.2 --out below-the-gate.png
+cargo run -p standalone --example shot -- \
+  --preset-file docs/examples/tuning/step-2-naive-bands.toml \
+  --set treb=0.9 --out above-the-gate.png
 
 # Labeled contact sheet of the whole library
 cargo run -p standalone --example shot -- --all --out gallery/
@@ -687,7 +692,7 @@ cargo run -p standalone --example shot -- --report
 cargo run -p standalone --example shot -- --report --json > report.json
 
 # Beat filmstrip from a synthesized click track (no asset needed)
-cargo run -p standalone --example shot -- --preset "Pulse Field" \
+cargo run -p standalone --example shot -- --preset "Drift" \
   --signal click:120 --strip 8 --out click.png
 
 # The frame a reseed actually fired on, at the tier the app starts in
@@ -695,11 +700,11 @@ cargo run -p standalone --example shot -- --preset-file presets/attractor_ink.to
   --signal click:120 --at 44,46,48,54 --tier rich --out reseed.png
 
 # ...or from the one synthesized kind with dynamics
-cargo run -p standalone --example shot -- --preset "Pulse Field" \
+cargo run -p standalone --example shot -- --preset "Drift" \
   --signal dynamic:110 --strip 8 --out groove.png
 
 # Filmstrip from a real clip (16-bit PCM WAV)
-cargo run -p standalone --example shot -- --preset "Burst" \
+cargo run -p standalone --example shot -- --preset "Perseids" \
   --audio assets/test/clip.wav --strip 8 --out clip.png
 ```
 

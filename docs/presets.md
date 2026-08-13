@@ -25,8 +25,11 @@ this document does not duplicate them.
 > the guide's opening on purpose; where they disagree, the guide is the newer one
 > ([ADR-0101](adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)).
 
-> **Accurate as of 2026-07-25**, against the 35-preset curated set across seven
-> systems and the v2 expression grammar (Plan 0019).
+> **Accurate as of 2026-08-13**, against the curated set in
+> [`presets/`](../presets/) — one or more presets for every built-in system — and
+> the v2 expression grammar (Plan 0019). The count is deliberately not written
+> down here: it has moved with almost every plan, and a number in this line is a
+> line that goes stale without anything noticing.
 
 ---
 
