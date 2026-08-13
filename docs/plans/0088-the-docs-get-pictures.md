@@ -1,7 +1,8 @@
 # 0088 — The docs get pictures
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-13
+> **Approved:** 2026-08-13 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0100](../adrs/0100-documentation-images-are-committed-headless-renders.md) (documentation images are committed headless renders), [0101](../adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md) (the preset docs gain a tutorial layer rather than a merge)
 
