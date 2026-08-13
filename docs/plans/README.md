@@ -220,6 +220,7 @@ at 60 Hz or at capture `dt` stays correct as written.
 [0080]: done/0080-the-sky-gets-a-horizon.md
 [0081]: done/0081-the-sky-gets-a-galaxy.md
 [0082]: done/0082-the-gradient-stops-banding.md
+[ADR-0037]: ../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md
 [backlog 0038]: ../design-backlog.md
 [backlog 0058]: ../design-backlog.md
 

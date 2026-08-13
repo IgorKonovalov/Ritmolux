@@ -2952,7 +2952,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0048]: done/0048-analysis-v2-and-the-retune.md
 [0051]: done/0051-the-scene-seam-emits-premultiplied-alpha.md
 [0052]: done/0052-the-emitter-objects-that-spawn-fall-and-die.md
-[0053]: 0053-the-suite-stops-blessing-what-warp-gets-wrong.md
+[0053]: done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md
 [0054]: done/0054-the-line-scenes-catch-up.md
 [0055]: done/0055-the-fold-edge-becomes-a-choice.md
 [0056]: done/0056-clamp-occupancy-and-the-axis-anchor.md
@@ -2960,5 +2960,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0059]: done/0059-lorenz-finds-its-plane.md
 [0063]: done/0063-the-attractor-keeps-its-depth.md
 [0069]: done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md
+[0071]: done/0071-light-that-adds-without-covering.md
 [0074]: done/0074-the-figure-colours-by-how-far-it-has-come.md
+[0075]: done/0075-the-content-renaissance.md
 [ADR-0037]: ../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md
