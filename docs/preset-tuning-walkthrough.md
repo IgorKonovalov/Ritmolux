@@ -194,7 +194,7 @@ settled table cannot tell these two presets apart, and one of them is dead on mu
 not. If you take one thing from this document, take that: **the first table is not the one that says
 whether a preset reacts.**
 
-Two smaller readings:
+Three smaller readings:
 
 - **`mid` appears** — `0.000 → 0.083` and `0.000 → 0.050` — because step 3 bound it. Where a column
   was zero for lack of a binding, adding one is the whole fix.

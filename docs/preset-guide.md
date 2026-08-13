@@ -92,10 +92,10 @@ plasma, oil-on-water.
 
 ### `swarm`
 
-![A dense charcoal murmuration: thousands of small elongated particles combed into flowing bands by
-an invisible field, pale grey against black](images/gallery/swarm.png)
+![Thousands of small coloured marks — teal, amber, violet — banked into a broad wave crest across a
+dark navy field, sparse above it and dense below](images/gallery/swarm.png)
 
-*`presets/swarm_drift.toml`*
+*`presets/swarm_shatter.toml`*
 
 Around ten thousand CPU-simulated particles drifting through a flow field, drawn as instanced
 additive marks. Their world is a torus, so nothing ever leaves the frame — the field stays populated
