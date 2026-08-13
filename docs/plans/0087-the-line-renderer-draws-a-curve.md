@@ -1,6 +1,6 @@
 # 0087 — the line renderer draws a curve
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md),

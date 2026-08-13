@@ -1,6 +1,6 @@
 # ADR-0099 — the show-length horizon is a spot-check, and it splits in two
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
 > **Related plan(s):** [0085 — the show-length horizon gets an instrument](../plans/0085-the-show-length-horizon-gets-an-instrument.md)
 > **Supplements:** [ADR-0010](0010-accept-gpu-driver-memory-floor.md),

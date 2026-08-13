@@ -1,6 +1,6 @@
 # 0086 — the downbeat finds a cue that is not the kick
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0097](../adrs/0097-the-downbeat-cue-is-chosen-against-per-beat-evidence.md),
