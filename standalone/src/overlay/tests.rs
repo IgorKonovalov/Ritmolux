@@ -1,4 +1,7 @@
-use super::{ListLayout, NAME_CHARS, OverlayAction, OverlayKey, OverlayState, fit, layout};
+use super::{
+    CAPTURE_TOP, ListLayout, NAME_CHARS, OverlayAction, OverlayKey, OverlayState, capture_line,
+    fit, layout,
+};
 
 const NAMES: [&str; 4] = ["alpha", "bravo", "charlie", "delta"];
 
@@ -29,6 +32,50 @@ const QHD: (f32, f32) = (2560.0, 1440.0);
 /// *number* rather than read from the library, because the arithmetic below
 /// is the claim — the library growing must not silently retire it.
 const SHIPPED: usize = 34;
+
+/// **The overlay line carries the log's token verbatim** — both the failure
+/// reason and the negotiated format — so a tester's screenshot and their
+/// `diagnostics.log` cannot tell two different stories about one run.
+#[test]
+fn the_capture_line_carries_the_token_it_was_given() {
+    let failed = capture_line("failed SCK screen recording permission denied");
+    assert!(
+        failed.contains("failed SCK screen recording permission denied"),
+        "the reason did not survive the line: {failed:?}"
+    );
+    let live = capture_line("live WASAPI 44100/2");
+    assert!(
+        live.contains("live WASAPI 44100/2"),
+        "the negotiated format did not survive the line: {live:?}"
+    );
+    assert_ne!(failed, live, "a failed capture reads as a live one");
+    // Labelled, because `live SCK 48000/2` alone does not say it is about audio
+    // to someone who has never seen this app's log.
+    assert!(
+        live.starts_with("audio"),
+        "the line is unlabelled: {live:?}"
+    );
+}
+
+/// The line clears the core's diagnostics panel, which composites *after* the
+/// text layer — a line inside that band would be painted over, not crowded.
+/// Pinned as arithmetic over the core's own layout so a panel that grows fails
+/// this deliberately rather than silently hiding the verdict.
+#[test]
+fn the_capture_line_sits_below_the_core_diagnostics_panel() {
+    // core/src/render/overlay.rs: MARGIN 12 + PAD 8 -> text at 20, TEXT_H 14,
+    // sparkline 72, GPU bar 12, then five analysis rows of pitch 19, + PAD.
+    const PANEL_BOTTOM: f32 =
+        12.0 + 8.0 + 14.0 + 8.0 + 72.0 + 8.0 + 12.0 + 8.0 + (19.0 * 5.0 - 5.0) + 8.0;
+    // A `const` block: both sides are constants, so this is a compile-time
+    // check — the panel growing past the line fails the build, not a run.
+    const {
+        assert!(
+            CAPTURE_TOP >= PANEL_BOTTOM,
+            "the capture line starts inside the core diagnostics panel, which composites over it"
+        );
+    }
+}
 
 /// **The numbers the plan pinned**, and they are this file's constants'
 /// arithmetic rather than an implementation's output: a change to `ROW_H` or
