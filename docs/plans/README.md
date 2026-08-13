@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0083** (ADRs are a separate sequence — next free there is **0097**.)
+**Next free number: 0088** (ADRs are a separate sequence — next free there is **0100**.)
 
 ## Active roster
 
@@ -16,17 +16,49 @@ someone who picked it up is reading.
 
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
+| [0083](0083-the-build-says-why-it-hears-nothing.md) | The build says why it hears nothing | draft | dev, human | An external Mac tester is blocked *now* — 1,249 log rows over 6.5 days prove capture never delivered a sample and cannot say why. Small and dependency-free. **The Windows arm is in scope deliberately**: nobody here can execute the macOS path, so building both is what gets it tested on this box. Phase 5 needs the tester and gates nothing. |
+| [0084](0084-two-gates-stop-lying-about-what-they-check.md) | Two gates stop lying about what they check | draft | dev | Two `dev`-only defects sharing a session and nothing else. Both fixes are the ones their own source comments already name (`check-doc-links.mjs`'s header, `reactivity.rs:69`). Phase 2's repair may be larger than it looks — `README-archive.md` holds ~2,700 lines whose reference definitions stayed behind. |
+| [0085](0085-the-show-length-horizon-gets-an-instrument.md) | The show-length horizon gets an instrument | draft | dev, human | Three backlog entries, two instruments — headless for simulation drift (deterministic), live `--soak` for resource drift (not). **Never a gate** (ADR-0099). Phase 4 is owed *before* R0's governor is designed, which is the only scheduling constraint here. Phase 5 needs a real machine for real minutes. |
+| [0086](0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md) | The downbeat finds a cue that is not the kick | draft | dev, human | **Measures before it chooses.** Phase 2 is a `human` gate that needs the user's own music — a synthesized backbeat is a hypothesis about backbeats, which is exactly what cannot settle this. The cue for Phase 3 is named at that gate, so the later phases state properties rather than edits. `CONFIDENCE_THRESHOLD` does not move. |
+| [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | draft | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 
-**The roster is empty as of 2026-08-13** — [0079](done/0079-the-attractor-learns-new-figures.md)
-closed and nothing succeeded it. That is a first for this file, and it is a real state rather than
-a bookkeeping gap: the six-plan backlog sweep of 2026-08-04, the three promoted handoff plans from
-[0075]'s close, and the three-plan sky family all landed inside ten days. **What is outstanding is
-under `Standing` below, not here** — five `human` items, four of them content-lane passes over the
-same family of looks, and none of them a plan. The next plan comes from an interview, from
-`docs/design-backlog.md`'s open entries, or from
-[the visual-richness roadmap](../roadmap-visual-richness.md) — not from this table.
+**Five plans, written 2026-08-13 from a backlog sweep**, after the roster stood empty for the first
+time in this file's history. They are ordered above roughly smallest-and-most-urgent first; see the
+sequence note below. Three carry new ADRs
+([ADR-0097](../adrs/0097-the-downbeat-cue-is-chosen-against-per-beat-evidence.md),
+[ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md),
+[ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md)), and every
+one of the five closes backlog entries that had been sitting on a demonstrated want with no route.
 
 ## Recommended execution sequence
+
+**Rewritten 2026-08-13, from the backlog sweep that filled the empty roster.** Five plans, and the
+ordering question is genuinely small because **none of them gates another on capability**. What
+orders them is urgency, file contention and who they need:
+
+1. **[0083]** — first, because a real person is blocked today and the plan is small. Touches
+   `standalone/` only.
+2. **[0084]** — any free session. Touches `scripts/`, `core/tests/` and one `core/src/render` seam;
+   contends with nothing else here.
+3. **[0085]** — before R0 is designed, which is its only hard constraint. Touches `standalone/` and
+   so **contends with [0083]** for `main.rs` — run them in sequence rather than in parallel lanes.
+4. **[0086]** — needs the user twice (Phase 2's capture, Phase 4's re-measure), so plan on bringing
+   them in. Touches `core/src/dsp/` and contends with nothing.
+5. **[0087]** — last, and largest. Touches `core/src/render/scenes/lines/` and owes a re-bless, so it
+   wants a lane to itself. **It is also the only plan here that can end early**: two separate gates
+   (a cost measurement and a `human` look verdict) can route it to ADR-0098's Alternative C.
+
+**Three of the five carry a `human` phase**, so none closes in one unattended session — the same
+property the previous roster had.
+
+**One thing worth stating because it is the whole reason these five exist:** the sweep found the
+backlog carrying **twenty discharged entries** it had never archived, and **two entries whose premise
+was false when written** — backlog 0078 and backlog 0081, both asserting an *absence* that the repo
+already contained (those are *backlog* numbers, not the plans this file's `[0078]` / `[0081]`
+resolve to). What was left after that was smaller and much sharper than the raw count suggested.
+
+**Prior sequence notes are kept below as the record of how the roster emptied**, not as live
+guidance.
 
 **Rewritten 2026-08-09, at [0046]'s close, because the shape of this roster changed rather than
 its order.** The previous sequence was written when [0075] had four open engine prerequisites, and
@@ -154,6 +186,11 @@ semantics. The honest phrasing there is seconds rather than frames — and note 
 exponent is `fade^(dt / FALLBACK_DT)`, exactly `1.0` at the capture step, so every number measured
 at 60 Hz or at capture `dt` stays correct as written.
 
+[0083]: 0083-the-build-says-why-it-hears-nothing.md
+[0084]: 0084-two-gates-stop-lying-about-what-they-check.md
+[0085]: 0085-the-show-length-horizon-gets-an-instrument.md
+[0086]: 0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md
+[0087]: 0087-the-line-renderer-draws-a-curve.md
 [0045]: done/0045-linear-light-and-bloom.md
 [0046]: done/0046-transformed-feedback.md
 [0052]: done/0052-the-emitter-objects-that-spawn-fall-and-die.md
@@ -236,146 +273,43 @@ the rows above.
     single measurement that flips ADR-0073's Alternative A (merge the two Windows jobs) from
     rejected to worth taking — route it back to `architect` as a supplement rather than editing
     the job.
-- **Plan [0071] Phase 5 — the retune `occlude` unblocked** (2026-08-09). The plan is `done` and
-  every `dev` phase landed; this phase is `human` and was left undone **on purpose**, not missed.
-  It is a `preset-author` pass raising the floors that were floored for the black rim, now that the
-  ceiling above them is adjustable. **Run it as one pass with [backlog 0038]** — both are retunes of
-  the same shipped set against a composite that moved underneath it, both are judged in motion over
-  a lit backdrop, and doing them separately means walking the same presets twice. **The plan's own
-  text says "0038 and 0058"; that is one entry out of date** — backlog 0058 closed by content on
-  2026-08-04 (`859ec66`, all thirteen fold-binding presets now name a `kaleido_edge`), five days
-  before this plan reached Phase 5. The three-way pass is a two-way pass. Two things the close
-  measured that it should start from: **no shipped
-  preset binds `occlude` today**, and at shipped brightnesses the default's effect is almost
-  negligible — the ceiling binds where the figure is *dim*, so the presets worth walking first are
-  the ones with a dimming depth cue (`swarm_storm`'s `depth_fade`, `lsystem_fern`'s `glow`-dimmed
-  outer stems). `lsystem_fern.toml`'s header now says so in place.
-- **Plan [0077](done/0077-the-quiet-sky.md) Phase 5 — the quiet sky ships through the curation
-  route** (2026-08-12). The plan is `done` and every `dev` phase landed; this phase is `human`
-  (content lane) and outstanding **on purpose**, not missed. The lane authors Perseids' quiet
-  twinkling sky — sparse marks, low coverage, slow shimmer on swarm `twinkle` — under the
-  fresh-slate rule, landing it through the [0067] route at the author's preferred density, with
-  the plan's two riders: the sanity floor is *read, not fought* (re-derive by the floor's own
-  recorded rule if it prices the sky out — the backlog-0072 precedent), and if the world binds
-  `reseed` or any sustained force it owes **one minutes-horizon soak observation with the
-  verdict recorded in the world's header** — that is [backlog 0086](../design-backlog.md)'s
-  bounded check; the entry stays parked and its trigger re-arms for the next slow-accumulation
-  look. Two stale headers the close-grep found belong to the same pass: `fragment_vitrail.toml`
-  still explains its onset-`flash` binding by "the report is bloom-blind" (fixed by Phase 4 —
-  the binding may stay for its look, but the reason is gone), and `emitter_perseids.toml`'s
-  header records the routed-out quiet sky this phase exists to ship.
-- **Plan [0081](done/0081-the-sky-gets-a-galaxy.md) Phase 6 — judge the galaxy against the
-  reference** (2026-08-12). The plan is `done` and all five `dev` phases landed; this phase is
-  `human` and outstanding **on purpose**, not missed. It asks the three questions no instrument in
-  this repo can answer, and the first is the one the whole decision rides on:
-  - **Does it read as a galaxy, or as a smudge?** [ADR-0095](../adrs/0095-the-backdrop-paints-a-curved-band.md)
-    rejected fbm mottling on the bet that the scattered starfield drawn *in front* supplies the
-    texture the smooth band lacks. **If it reads as an airbrushed streak that is a result, not a
-    failure** — the answer is Alternative A (fbm), with this observation as its evidence, and it
-    gets its own ADR and plan rather than a patch. Nothing in the shipped code forecloses it: the
-    envelope is a single multiply, so noise multiplies into it later.
-  - **Does the arc's curvature read at a normal field of view**, or does `bg_band_curve` have to be
-    pushed so far the ends leave the frame?
-  - **Does it band under two overlapping gradients?** This is the *same run* as the banding
-    reference frame's second check below — do them together, on the kept frame, at 1920x1080.
+- **The content lane's five standing sittings now live in one place:
+  [`docs/content-brief.md`](../content-brief.md)** (consolidated 2026-08-13). They were five
+  `human` phases of five closed plans, recorded here in five separate bullets running to ~140 lines
+  — and three of them are **one sitting by construction**, which no reader of five bullets would
+  see. The brief sequences them, carries every rider each plan attached, and is the **single** copy:
+  this section deliberately no longer restates them, because a duty recorded twice drifts in one of
+  the two. In order:
+  1. **The sky family — one sitting, three items.** [0077]'s quiet sky, [0080]'s dusk ground,
+     [0081]'s galaxy judgement (plus the banding frame's second check, below).
+  2. **The ink worlds re-judge on `ink_gamma`** — [0078] Phase 3, two headers.
+  3. **The attractor binds `tuple`** — [0079]'s Followup, a different family and a different
+     sitting. Opens with a curation question, not a tuning one: the family is **17 of 37 presets,
+     46 % of the library**.
+  4. **The `occlude` retune with [backlog 0038]** — library-wide, so it goes last.
 
-  Two things to start from. The look wants `bg_bright = 0` with the band alone, which the widened
-  build condition now supports and which no earlier configuration could reach. And the backdrop
-  still earns a preset **nothing** at `sanity` or `animation`, so however much of the frame the sky
-  fills, the figure carries both floors.
-- **The banding reference frame is kept in the repo, and it is owed a re-measure twice**
-  (2026-08-12). `core/tests/fixtures/scratch-0082/dusk_ground_banding.toml` — a `scratch-NNNN/`
-  in the [0046] arrangement, so nothing includes it, no test names it and `LMV_BLESS` does not
-  touch it. It is the dusk ground at `bg_ramp_gamma = 0.4`: **the darkest of the Plan 0080 probes**
-  (mean RGB 34.0 / 42.7 / 69.5, against 82.2 and 122.6 for the other two) **and** the worst banding
-  case, both for the same reason — a fast-dropping ramp leaves a long dim tail, and a flat tail is
-  where one 8-bit level lasts longest. It is committed rather than left in a session directory
-  because **a before/after taken on two different pictures would prove nothing**. Re-measure it at
-  **1920x1080** (plateau width is in pixels, so the resolution is part of the measurement). The
-  first of its two checks is **discharged**: after [0082](done/0082-the-gradient-stops-banding.md)
-  the widest mid-range plateau went **58 px -> 20 px** and pixels-per-level **7.5 -> 2.1**, still
-  0 % rail-pinned, and the `human` verdict on the held frame was that the grain does not read as
-  texture. **Not a hairline, which is what that plan predicted** — what the dither buys on this
-  picture is the level count and the collapse of wide plateaus from 17 to 3. What remains is the
-  second, and **it is now due rather than pending**: [0081](done/0081-the-sky-gets-a-galaxy.md)
-  closed 2026-08-12, so add `bg_band_amount` to the frame and confirm the dither still holds under
-  **two overlapping gradients** — which nothing inside 0081 checks, and which is why it is named
-  here rather than assumed. It is [0081]'s own Phase 6 third question, so **run it in that same
-  sitting**; its README carries the run command and both sets of numbers.
-- **Plan [0080](done/0080-the-sky-gets-a-horizon.md) Phase 7 — ANSWERED 2026-08-12, and it
-  produced a plan.** All three questions are settled; the phase is discharged and only the content
-  half remains (folded into the family pass below).
-  - **"Does the fade read as light?" — YES.** The user's verdict on the running app at `v0.54.0`:
-    *"reads as light, but the banding is visible."* The ramp does what ADR-0094 was written to do.
-  - **"Does the horizon sit where the `[palette]` stops put it?" — settled by construction, not by
-    eye.** `a_swept_span_samples_the_palette_at_the_coordinate_its_height_implies` asserts exactly
-    that at seven rows to within one 8-bit level, and it is green. The question never needed a
-    human.
-  - **"Does it band?" — YES, and it is now measured rather than judged.** Run lengths down the
-    mid-column of the 1080p renders, where a plateau of one identical 8-bit value *is* the band:
-    widest mid-range plateau **58 px at value 11** (`bg_ramp_gamma = 0.4`), **31 px at value 30**
-    (`1.0`), **122 px at value 225** (`2.5`), with mean 4.1–7.5 px per level. **0 % of the column is
-    rail-pinned** on any channel in any of the three — so a quantized gradient, not a tonemap clip,
-    which also **retires the suspicion raised at the close that `bg_bright = 0.85` was reaching the
-    tonemap's shoulder. It is not; nothing clips.**
-  - **The plan's own banding arithmetic was backwards, and that is the finding worth carrying.** Its
-    rider read "roughly **two pixels per 8-bit output level** at 1080p, which is the classic
-    Mach-band configuration". Two px/level is the *safe*, dense case; banding lives where a level
-    lasts a **long** time, in the flattest part of the curve. Its prose instruction ("the low
-    `bg_ramp_gamma` end, where the tail is flattest and the steps widest") named the right place
-    while its arithmetic argued for the opposite one. Recorded in
-    [ADR-0096](../adrs/0096-the-display-write-dithers.md), because that sentence would otherwise
-    send the next reader hunting in the bright end where there is nothing to find.
-  - **The plan said "if it bands, a dither is its own decision and its own ADR" — so it has one.**
-    [ADR-0096](../adrs/0096-the-display-write-dithers.md) +
-    [Plan 0082](done/0082-the-gradient-stops-banding.md), sequenced **first** on the roster by the
-    user's call and **closed 2026-08-12**, so [0081](done/0081-the-sky-gets-a-galaxy.md)'s band is born
-    onto a chain that already dithers.
-  - **What remains is content, not judgement.** The dusk world ships through the [0067] curation
-    route, and it is **one pass with [0077]'s standing Phase 5** (Perseids' quiet sky) and
-    [0081]'s world — three standing items on one family of looks. Two things to start from: the
-    backdrop earns a preset **nothing** at `sanity` or `animation` (both are blind to `bg_*`), so
-    the figure carries both floors; and the `occlude` question is still open and pairs with
-    [0071]'s standing Phase 5 retune above — but the *tonemap-knee* half of that pairing is now
-    measured away.
-- **Plan [0078](done/0078-the-ink-learns-to-bite.md) Phase 3 — the ink worlds re-judge on
-  `ink_gamma`** (2026-08-12). The plan is `done` and both `dev` phases landed; this phase is
-  `human` (content lane) and outstanding **on purpose**, not missed. The lever ships and is
-  documented — `presets/README.md`'s ink section carries the three-lever note (`ink_gamma` x
-  `ink_amount` x `exposure`) and the measured mean-byte ladder. **The roster is two headers, both
-  named by the close's step-3b grep, and both were predicted at [0075]'s close as workarounds that
-  would go stale the moment this landed**: `reaction_etching.toml` (its duotone is painted into
-  `[palette]` because "the ink remap gives a mid-contrast field no contrast lever of its own" — but
-  note the world has since been *inverted to scratchboard*, bright line work on black, so whether
-  the palette version still earns its place is a live judgement, not a foregone retune), and
-  `swarm_shatter.toml` (its light-ground twin was routed out with "when ink grows a contrast
-  control, the light-ground twin becomes authorable" — that condition is now met). The output per
-  world is a verdict in its header, judged in motion: retune onto `ink_gamma`, or a recorded "the
-  palette version stays on its looks". One rider from the close: `dev`'s eyeball on
-  `attractor_ink` found that **which way to take the exponent depends on how dense the drawing
-  already is** — a sparse figure's bite likely lives *below* 1, not above. If a world needs a toe
-  *and* a shoulder, that is [ADR-0092](../adrs/0092-the-ink-remap-gains-a-contrast-exponent.md)'s
-  named negative and the finding routes to the backlog with its measurement rather than growing
-  the plan.
-- **Plan [0079](done/0079-the-attractor-learns-new-figures.md)'s Followup — a content pass binding
-  `tuple` on the attractor worlds** (2026-08-13). The plan is `done` and every phase landed; this
-  is its own named Followup, routed to the content lane rather than bundled, and it is **not** part
-  of the three-item sky pass above — a different family, a different sitting. What ships today is
-  eleven presets that landed *with* the capability: four `attractor_*gallery` demonstrations, the
-  pinned `attractor_torusknot`, `attractor_valentine`, and four walk worlds. Three things to start
-  from, all measured at the close rather than guessed. **The family is now 17 of 37 presets, 46 %
-  of the library** — the question this pass should answer first is whether the galleries earn
-  standing places or were scaffolding for a `human` gate; `attractor_dejonggallery` and
-  `attractor_cliffordgallery` are near-twins by construction, and all four step on a **wall clock**
-  rather than on the music. **An entry's index is a preset-visible name** — the galleries step them
-  and `attractor_torusknot` pins Lorenz entry 1 — so the roster table is append-only in practice.
-  And **two roster facts a still cannot show**, both already in `presets/README.md`: the Lorenz
-  torus knot blooms slowly on a `reseed` (a wide excursion to ~2.2x its own extent, seconds to fall
-  back, where the canonical butterfly absorbs the same kick in a handful of frames), and Thomas past
-  `a ≈ 0.208` closes into periodic orbits that have a perfectly good bounding box and draw as a few
-  dots. **Twelve morph filmstrips are rendered but unjudged** and are recorded as such; they cost a
-  viewing rather than a re-render only while `target/tuple-paths/` survives — `node
-  scripts/tuple-paths.mjs` regenerates them.
+  **One correction this consolidation carries, because it would otherwise stand in this file
+  uncontested:** the [0080] Phase 7 write-up below says *"the **tonemap-knee** half of that pairing
+  is now measured away."* **It is not.** That phase retired a different suspicion — that
+  `bg_bright = 0.85` was reaching the tonemap's shoulder on the **backdrop ramp** (0 % of the
+  column rail-pinned). Backlog 0038 is about **mid-tone figure luminance on attractor presets**
+  (`attractor_clifford` 82.54 → 75.91 mean luma), which no backdrop measurement speaks to. It is
+  live, and exactly one shipped preset binds `exposure` today (`lsystem_vellum.toml:60`).
+- **The banding reference frame is kept in the repo, and its second check is now due**
+  (2026-08-12). `core/tests/fixtures/scratch-0082/dusk_ground_banding.toml` — a `scratch-NNNN/` in
+  the [0046] arrangement, so nothing includes it, no test names it and `LMV_BLESS` does not touch
+  it. It is the dusk ground at `bg_ramp_gamma = 0.4`: the darkest of the Plan 0080 probes **and**
+  the worst banding case, both for the same reason — a fast-dropping ramp leaves a long dim tail,
+  and a flat tail is where one 8-bit level lasts longest. It is committed rather than left in a
+  session directory because **a before/after taken on two different pictures would prove nothing**.
+  Re-measure at **1920x1080** (plateau width is in pixels, so the resolution is part of the
+  measurement). **Check 1 is discharged**: after [0082] the widest mid-range plateau went
+  **58 px → 20 px** and pixels-per-level **7.5 → 2.1**, still 0 % rail-pinned, and the `human`
+  verdict was that the grain does not read as texture — *not* a hairline, which is what that plan
+  predicted; what the dither bought is the level count and the collapse of wide plateaus from 17 to
+  3. **Check 2 is owed**: add `bg_band_amount` and confirm the dither holds under **two
+  overlapping gradients**, which nothing inside [0081] checks. Run it in the same sitting as the
+  galaxy judgement — it is that plan's own Phase 6 third question, and the brief's §1c says so.
 - **[On-device validation — low-end Windows iGPU smoke](../on-device-validation.md)** — a
   hardware-gated checklist, **not** a phased plan and **not** in the roster above: it never blocks a
   plan from closing. Holds the low-end / older Windows iGPU checks (fps floor ≥ 60 @ 1080p; footprint
