@@ -179,6 +179,46 @@ Phase 2 caveat about them parking on the last entry after a trim is void.
 - **Done when:** every candidate pair has a verdict; shipped paths (if any) are green
   through the suite and documented; the plan file records the outcome either way.
 
+#### Outcome (2026-08-13) — four paths ship; the walk is real
+
+**The research risk did not materialise.** ADR-0093 accepted that the morph half
+might ship empty; it does not. Four pairs were judged **in motion in the running app**
+rather than off the filmstrips — the strips are stills, and "does the figure stay
+recognisable across the walk" is a question about motion — and all four were kept
+(*"looks fine"*). They ship as presets:
+
+| Path | Preset | Note |
+|---|---|---|
+| `thomas` 5 → 8 (`a` 0.11 → 0.17) | `Thomas Walk` | The strongest: the knot reorganises rather than dissolving. |
+| `lorenz` 0 → 1 (rho 28 → ~100) | `Butterfly to Knot` | The dramatic one; the far end keeps settling for seconds after arrival. |
+| `lorenz` 0 → 4 (rho 28 → 35) | `Rho Walk` | The most legible — one figure growing. |
+| `de_jong` 1 → 3 | `De Jong Walk` | The discrete-map case, and a pair that survived. |
+
+**The one-dimensional sweeps are the strongest case, and that is the finding worth
+carrying forward**: where a roster walks a single coefficient — Thomas's `a`,
+Lorenz's `rho` — neighbouring entries are neighbouring *figures*, and the walk
+between them holds. The discrete maps are the harder case in both directions (see
+the refusals below).
+
+**Verdicts on the rest of the sweep:**
+
+- **Four pairs were refused by measurement, before any eye reached them** —
+  `de_jong` 0→6, `clifford` 0→9, `clifford` 9→10, `clifford` 2→3. A tuple partway
+  between two others can collapse to a fixed point, whose extent is zero and which
+  therefore has no scale to render at, so `TupleWalk::build` returns `None` and the
+  preset sits on its near end. All four are on the discrete maps.
+  `the_swept_pairs_report_whether_they_have_a_walk` prints the list and is the
+  source of truth; the sweep script skips rendering them, because seven identical
+  cells read as "the walk does nothing" rather than "there is no walk".
+- **Twelve strips are rendered but unjudged**, and are deliberately recorded as
+  such rather than waved through on the strength of the four: the user judged what
+  they watched. They sit in `target/tuple-paths/` with the script that made them, so
+  a later pass costs a viewing rather than a re-render.
+
+**ADR-0093 owes an Outcome section at close** recording that the paths shipped —
+its Consequences call an empty morph phase the accepted risk, and that is now known
+not to have happened.
+
 ## Data shapes
 
 ```rust

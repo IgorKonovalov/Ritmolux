@@ -2451,6 +2451,58 @@ Two facts about specific entries that a still will not tell you:
 index and `attractor_torusknot` pins Lorenz entry `1`, so a roster edit that
 inserts or reorders renames figures out from under them. Append instead.
 
+#### Walking between two entries — `tuple_from`, `tuple_to`, and `morph`
+
+`tuple` **cuts**. To *travel* between two figures instead, name a path in
+`[particles]` and drive it with `morph` — the same key, and the same meaning, it
+already has on an IFS:
+
+```toml
+[particles]
+family = "thomas"
+tuple_from = 5          # the near end (optional; entry 0 by default)
+tuple_to   = 8          # the far end — this key is what turns the walk on
+
+[params]
+# a slow round trip, about 48 s
+morph = "0.5 - 0.5 * cos(time * 0.13)"
+```
+
+| Key | Meaning |
+|---|---|
+| `tuple_to` | Far end of the path, a roster index. **Absent, there is no path and `morph` is inert** — which is every preset that does not ask for one. |
+| `tuple_from` | Near end. Defaults to entry `0`. |
+| `morph` | Position along the path, `0`..`1`. Continuous — this is the one place in the attractor's surface a param is *not* quantized. |
+
+Five things that are not guessable:
+
+- **The middle is measured, not averaged.** The engine samples the figure's
+  framing at nine positions across the pair at load, because a figure halfway
+  between two tuples is a figure in its own right and its extent is only
+  coincidentally the mean of its endpoints'. The ends keep the framing the
+  roster already measured, so `morph = 0` renders exactly the entry it names —
+  which is what makes a path safe to add to a preset that already works.
+- **`tuple` goes inert while a path is configured.** A preset either steps the
+  roster or walks a path. Both ends are structural because measuring the walk is
+  thousands of map iterations; a near end that moved per frame would re-measure
+  inside the frame loop.
+- **Not every pair has a walk.** A tuple partway between two others can collapse
+  to a fixed point, whose extent is zero and which has no scale to render at.
+  The engine then refuses the path and the preset sits on its near end with
+  `morph` doing nothing. Four of the twenty pairs swept at Plan 0079 Phase 5 were
+  refused this way — all on the two discrete maps. If your `morph` does nothing,
+  this is the first thing to suspect.
+- **Do not put `morph` in `[smoothing]`.** The binding is already a slow curve
+  and easing an ease only lags it. The walk's smoothness is the mechanism's.
+- **A far end may need time to settle.** Where the target is a *periodic*
+  attractor — the rho ≈ 100 knot is one — a cloud arriving along the walk is
+  still falling onto it for several seconds after `morph` reaches `1`.
+
+Four paths ship, judged in motion at Plan 0079 Phase 6:
+`thomas` 5→8 (`Thomas Walk`), `lorenz` 0→1 (`Butterfly to Knot`), `lorenz` 0→4
+(`Rho Walk`), `de_jong` 1→3 (`De Jong Walk`). The one-dimensional sweeps are the
+strongest case: neighbouring `a` or `rho` values are neighbouring *figures*.
+
 **Each family is viewed in its own plane**, and it matters the moment you reach
 for `zoom` or `pan_*`, because those aim at the figure the plane produces:
 
