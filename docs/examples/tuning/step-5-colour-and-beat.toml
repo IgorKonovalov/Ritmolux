@@ -1,0 +1,58 @@
+# TEACHING MATERIAL - NOT A SHIPPED PRESET. See step-1-constants.toml.
+#
+# STEP 5 - COLOUR AND A BEAT ACCENT. The look is finished here: a palette of
+# its own, and one term latched to the beat rather than to a band.
+#
+# A beat accent is a different KIND of binding from a band gain. A band is a
+# level and moves continuously; `beat` is an edge, and it is either taken or it
+# is not. So the thing to check is not the gain but the REACHABILITY - whether
+# the branch ever fires under real material - and `--report` prints a line for
+# exactly that.
+
+system = "fragment_field"
+name = "Step 5 Finished"
+
+# Six stops chosen to survive quantization: each is a distinct HUE, not a
+# lightness step, so `palette_steps` reads as a graphic device rather than as
+# banding in a gradient.
+[palette]
+stops = [
+  { at = 0.00, color = "#0b1026" },
+  { at = 0.24, color = "#1f4b6e" },
+  { at = 0.46, color = "#2f9c8f" },
+  { at = 0.66, color = "#8fce7a" },
+  { at = 0.84, color = "#f2c14e" },
+  { at = 1.00, color = "#e8734a" },
+]
+
+[params]
+warp  = "0.85 + clamp(treb * 1.70, 0, 0.90)"
+zoom  = "1.75 + clamp(bass * 0.34, 0, 0.50)"
+glow  = "0.50 + clamp(mid * 0.28, 0, 0.35)"
+flash = "clamp(onset * 1.30, 0, 0.40)"
+
+# THE BEAT ACCENT: seven colour bands at rest, ten on a hit. `beat` is 0 or 1,
+# so this is a two-valued term and the [smoothing] entry below is what turns it
+# from a switch into a swell.
+palette_steps   = "7 + beat * 3"
+palette_contour = "0.35"
+
+kaleido_order = "select(treb > 0.55, 12, 8)"
+kaleido_radial = "1.45"
+kaleido_edge  = "2"
+kaleido_inner = "0.06"
+
+hue          = "0.58"
+color_span   = "1.45"
+saturation   = "1.10"
+
+[smoothing]
+warp  = { attack = 0.05, release = 0.45 }
+flash = { attack = 0.03, release = 0.50 }
+zoom  = 0.30
+glow  = 0.25
+kaleido_order = 0.70
+# Fast in, slow out - the shape that decides whether a beat term is a response
+# or a strobe. Quantizing colour changes every pixel at once, which is exactly
+# the shape a strobe has, so this one is not optional.
+palette_steps = { attack = 0.05, release = 0.55 }

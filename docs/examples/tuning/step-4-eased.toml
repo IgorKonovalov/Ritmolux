@@ -1,0 +1,39 @@
+# TEACHING MATERIAL - NOT A SHIPPED PRESET. See step-1-constants.toml.
+#
+# STEP 4 - EASE IT. Step 3's bindings are correct and jumpy: an expression is
+# re-evaluated every frame and has no memory, so a parameter follows its band
+# exactly, transient for transient. The [smoothing] table is the memory.
+#
+# A scalar entry eases both directions equally. The { attack, release } pair is
+# the shape that makes an accent read as a RESPONSE rather than a flicker: snap
+# up in a few frames, glide back down over half a second.
+
+system = "fragment_field"
+name = "Step 4 Eased"
+
+[params]
+warp  = "0.85 + clamp(treb * 1.70, 0, 0.90)"
+zoom  = "1.75 + clamp(bass * 0.34, 0, 0.50)"
+glow  = "0.50 + clamp(mid * 0.28, 0, 0.35)"
+flash = "clamp(onset * 1.30, 0, 0.40)"
+
+kaleido_order = "select(treb > 0.55, 12, 8)"
+kaleido_radial = "1.45"
+kaleido_edge  = "2"
+kaleido_inner = "0.06"
+
+hue          = "0.58"
+color_span   = "1.45"
+saturation   = "1.10"
+
+[smoothing]
+# The two transient-driven params get the asymmetric pair.
+warp  = { attack = 0.05, release = 0.45 }
+flash = { attack = 0.03, release = 0.50 }
+# The two band-driven ones want to move like the band does, not snap: a scalar.
+zoom  = 0.30
+glow  = 0.25
+# The fold order is the slowest thing in the file. A fold count that snaps
+# reads as the whole picture changing scale at once, because every wedge moves
+# together - and it is an integer, so it is quantized on the way out.
+kaleido_order = 0.70

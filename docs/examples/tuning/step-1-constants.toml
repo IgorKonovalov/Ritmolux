@@ -1,0 +1,27 @@
+# TEACHING MATERIAL - NOT A SHIPPED PRESET.
+#
+# Step 1 of docs/preset-tuning-walkthrough.md. This file lives under docs/
+# rather than presets/ on purpose: it is deliberately incomplete, and a bad
+# preset in presets/ would enter the preset browser, the embedded set and all
+# five behavioral gates.
+#
+# STEP 1 - IT RENDERS. Every binding is a constant, so there is a picture and
+# there is nothing in it but the picture. This is the baseline every later step
+# is read against.
+
+system = "fragment_field"
+name = "Step 1 Frame"
+
+[params]
+warp  = "0.85"
+zoom  = "1.75"
+glow  = "0.50"
+
+kaleido_order = "8"
+kaleido_radial = "1.45"
+kaleido_edge  = "2"
+kaleido_inner = "0.06"
+
+hue          = "0.58"
+color_span   = "1.45"
+saturation   = "1.10"

@@ -18,7 +18,7 @@ Where to go from here:
 | Every parameter each system takes | [`presets/README.md`](../presets/README.md) |
 | The expression grammar — variables, functions, operators | [`docs/presets.md`](presets.md) |
 | Palettes, custom stops, the A/B crossfade | [`docs/preset-palettes.md`](preset-palettes.md) |
-| One preset tuned step by step, with the numbers | `docs/preset-tuning-walkthrough.md` |
+| One preset tuned step by step, with the numbers | [`docs/preset-tuning-walkthrough.md`](preset-tuning-walkthrough.md) |
 
 > **Every picture on this page is a headless render of the engine**, captured by the `shot` CLI
 > under a synthesized audio clip — not a screenshot of the application window. They are regenerated
@@ -62,7 +62,7 @@ Four things are worth naming, because they are the whole model:
 - **`clamp(x, lo, hi)` is doing the real work.** `bass * 0.35` is a *gain*: it decides how much of
   the music reaches the parameter. The clamp is a *limit*: it decides how far the parameter is
   allowed to travel. Getting the gain wrong is the single most common way a preset ends up looking
-  dead, and section 3 of the walkthrough is about exactly that.
+  dead, and step 3 of the [walkthrough](preset-tuning-walkthrough.md) is about exactly that.
 
 Some systems also take a **structural table** — `[curve]` here, `[generator]` for the two generator
 systems, `[particles]` for the attractor, `[spectrum]` for the readout. Those are declarative
@@ -233,7 +233,7 @@ result into hard bands, or cross-fade between two palettes. **The reference is
 There is a fourth, smaller surface worth knowing early: the **`[smoothing]` table**, which eases a
 parameter's response over time and is the difference between an accent that snaps and glides and one
 that flickers. It is documented in [`presets/README.md`](../presets/README.md), and step 4 of the
-walkthrough is a worked example of it.
+[walkthrough](preset-tuning-walkthrough.md) is a worked example of it.
 
 ---
 
@@ -295,7 +295,8 @@ the full table of what each gate can and cannot see.
 Two instruments are worth running by hand while you tune:
 
 - **`shot --report`** prints per-preset reactivity, animation, coverage and transient columns, and
-  accepts `--preset-file`, so you can measure a draft that has not shipped. The walkthrough uses it
+  accepts `--preset-file`, so you can measure a draft that has not shipped. The
+  [walkthrough](preset-tuning-walkthrough.md) uses it
   at every step.
 - **the band-level table** that every `--signal`/`--audio` capture prints. If your gain was chosen
   against a `--set` magnitude it will be wrong by roughly an order of magnitude, and this table is
@@ -307,6 +308,6 @@ One thing no instrument here can judge: whether the picture is *good*. That stay
 
 ## 6. Next
 
-**`docs/preset-tuning-walkthrough.md`** takes one preset from
+[**`docs/preset-tuning-walkthrough.md`**](preset-tuning-walkthrough.md) takes one preset from
 constants to a finished look over five numbered steps, and shows the picture **and the `--report`
 row** that changed at each one — including the step where the numbers moved the wrong way.

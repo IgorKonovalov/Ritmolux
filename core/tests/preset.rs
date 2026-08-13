@@ -1653,6 +1653,70 @@ fn embedded_default_presets_all_parse() {
     );
 }
 
+/// Every `.toml` under `docs/examples/` parses with the shipped parser.
+///
+/// These files are **teaching material, not shipped presets** (Plan 0088): the
+/// guide's ten-line opening and the tuning walkthrough's five steps. They
+/// deliberately live outside `presets/` — step 2 of the walkthrough is a preset
+/// that does not react, and a bad preset in `presets/` would enter the browser,
+/// the embedded set and all five behavioral gates.
+///
+/// Which is exactly why they need this: nothing else in the build looks at them,
+/// so a grammar change would rot the documentation silently and be found by a
+/// reader rather than by CI. Structural only — that a file parses says nothing
+/// about whether it teaches what its prose claims.
+#[test]
+fn documentation_example_presets_all_parse() {
+    use lmv_core::preset::Preset;
+    use std::path::{Path, PathBuf};
+
+    // core/tests/ -> core/ -> repo root.
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("core/ has a parent")
+        .join("docs")
+        .join("examples");
+    assert!(
+        root.is_dir(),
+        "docs/examples/ is missing — the guide and the walkthrough render from it"
+    );
+
+    let mut found: Vec<PathBuf> = Vec::new();
+    let mut dirs = vec![root.clone()];
+    while let Some(dir) = dirs.pop() {
+        for entry in std::fs::read_dir(&dir).expect("readable example directory") {
+            let path = entry.expect("readable directory entry").path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else if path.extension().is_some_and(|e| e == "toml") {
+                found.push(path);
+            }
+        }
+    }
+
+    for path in &found {
+        let src = std::fs::read_to_string(path).expect("readable example preset");
+        let preset = Preset::from_toml_str(&src)
+            .unwrap_or_else(|e| panic!("{} does not parse: {e:?}", path.display()));
+        // A parse that produced no bindings would pass the line above while
+        // documenting nothing, which is the failure this would otherwise miss.
+        assert!(
+            !preset.params.is_empty(),
+            "{} parsed but binds no parameters",
+            path.display()
+        );
+    }
+
+    // The floor is the set the two documents actually reference: the guide's
+    // minimal preset plus the walkthrough's five steps. A dropped file would
+    // otherwise leave this test green over an empty sweep.
+    assert!(
+        found.len() >= 6,
+        "expected at least the minimal preset and the five walkthrough steps, found {}: {found:?}",
+        found.len()
+    );
+}
+
 #[test]
 fn load_dir_loads_the_good_and_reports_the_bad() {
     use std::fs;

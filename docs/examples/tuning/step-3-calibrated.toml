@@ -1,0 +1,41 @@
+# TEACHING MATERIAL - NOT A SHIPPED PRESET. See step-1-constants.toml.
+#
+# STEP 3 - CALIBRATE AGAINST A MEASURED LEVEL. The floors are gone. Every gain
+# is now sized so that the level the band ACTUALLY reaches - read off the table
+# a `--signal` capture prints, not off a `--set` magnitude - lands in the middle
+# of the parameter's travel rather than under it.
+#
+# The measured means under `--signal dynamic:110`, which is what these gains
+# were divided by:
+#
+#     bass  min 0.035  mean 0.747  max 1.000
+#     mid   min 0.031  mean 0.633  max 1.000
+#     treb  min 0.002  mean 0.295  max 1.000
+#     onset min 0.001  mean 0.153  max 1.000
+#
+# Note how far apart those means are. treb sits at a third of bass and onset at
+# a fifth, so the SAME gain on each is three different amounts of reaction.
+
+system = "fragment_field"
+name = "Step 3 Calibrated"
+
+[params]
+# treb mean 0.295 * 1.70 = 0.50, half of the 0.90 travel.
+warp  = "0.85 + clamp(treb * 1.70, 0, 0.90)"
+# bass mean 0.747 * 0.34 = 0.25, half of the 0.50 travel.
+zoom  = "1.75 + clamp(bass * 0.34, 0, 0.50)"
+# mid was bound to nothing at all in step 2, which the report showed as a
+# column of exact zeros. mean 0.633 * 0.28 = 0.18, half of 0.35.
+glow  = "0.50 + clamp(mid * 0.28, 0, 0.35)"
+# onset mean 0.153 * 1.30 = 0.20, half of 0.40. A transient wants a bigger gain
+# than a band, because its mean IS its rest state and its peaks are brief.
+flash = "clamp(onset * 1.30, 0, 0.40)"
+
+kaleido_order = "select(treb > 0.55, 12, 8)"
+kaleido_radial = "1.45"
+kaleido_edge  = "2"
+kaleido_inner = "0.06"
+
+hue          = "0.58"
+color_span   = "1.45"
+saturation   = "1.10"

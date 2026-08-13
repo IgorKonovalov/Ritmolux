@@ -1,0 +1,25 @@
+# TEACHING MATERIAL - NOT A SHIPPED PRESET. See step-1-constants.toml.
+#
+# STEP 2 - BIND THE BANDS, NAIVELY. Three bands and a gate, written to the
+# intent "react to the loud bits, ignore the quiet ones" - each binding
+# subtracts a floor before applying a gain. Nothing here is a typo; it is what
+# a first draft honestly looks like, and it does move under a loud stimulus.
+# The report is what says it is wrong.
+
+system = "fragment_field"
+name = "Step 2 Naive"
+
+[params]
+warp  = "0.85 + clamp((treb - 0.35) * 2.40, 0, 0.90)"
+zoom  = "1.75 + clamp((bass - 0.70) * 1.60, 0, 0.50)"
+glow  = "0.50 + clamp((onset - 0.30) * 2.00, 0, 0.60)"
+
+# More folds when it gets bright. 0.55 looks like a sensible half-way point.
+kaleido_order = "select(treb > 0.55, 12, 8)"
+kaleido_radial = "1.45"
+kaleido_edge  = "2"
+kaleido_inner = "0.06"
+
+hue          = "0.58"
+color_span   = "1.45"
+saturation   = "1.10"
