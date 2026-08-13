@@ -1,9 +1,10 @@
 # ADR-0093 — Attractor tuples are content: a curated roster with per-tuple framing, and morph paths only where measured
 
-> **Status:** accepted 2026-08-11 (user approval at the Plan 0075 handoff; Plan 0079 queued —
-> an Outcome section is owed at that plan's close if implementation falsifies anything here)
+> **Status:** accepted 2026-08-11 (user approval at the Plan 0075 handoff) — with an
+> [Outcome](#outcome--2026-08-13-at-plan-0079s-close) added at Plan 0079's close: nothing here
+> was falsified, and three things happened that this ADR does not describe
 > **Date:** 2026-08-11
-> **Related plan(s):** [0079](../plans/0079-the-attractor-learns-new-figures.md)
+> **Related plan(s):** [0079](../plans/done/0079-the-attractor-learns-new-figures.md)
 > **Resolves:** [design-backlog 0055](../design-backlog.md#0055--the-attractors-shape-vocabulary-is-breathe-and-bend-and-the-reference-figures-ask-for-more)
 > **Supplements:** [ADR-0068](0068-the-projection-basis-is-a-per-family-property.md) (the per-family projection),
 > [ADR-0066](0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) (reseed semantics this must not break)
@@ -102,3 +103,48 @@ The curation inputs are the reference galleries backlog 0055 cites (the `de jong
 attractor` image sweep) plus the cohort-5 want (torus-knot Lorenz). Candidate-tuple contact
 sheets are the concrete-examples workflow the user prefers; the paired plan phases it that
 way.
+
+## Outcome — 2026-08-13, at [Plan 0079](../plans/done/0079-the-attractor-learns-new-figures.md)'s close
+
+**Nothing above is falsified.** The roster shipped with per-tuple framing, entry 0 is the
+canonical constants byte-for-byte, `tuple` quantizes CPU-side, and the Plan 0062 `jitter_extent`
+coupling survives by construction. Three things happened that this ADR does not describe, all
+recorded here rather than by editing the body.
+
+**1. The accepted research risk did not materialise — four morph paths ship.** The Consequences
+name "the morph-path phase may ship empty after real render cost" as the price the user accepted.
+Twenty candidate pairs were swept; four were refused *by measurement* before any eye reached them
+(a tuple partway between two others can collapse to a fixed point, whose extent is zero and which
+therefore has no scale to render at — `TupleWalk::build` returns `None`, and all four are on the
+discrete maps); four were judged **in motion in the running app** and kept, shipping as presets
+(`thomas` 5→8, `lorenz` 0→1, `lorenz` 0→4, `de_jong` 1→3); twelve strips are rendered and
+deliberately recorded as **unjudged** rather than waved through. The finding worth carrying: where
+a roster walks a *single* coefficient — Thomas's `a`, Lorenz's `rho` — neighbouring entries are
+neighbouring *figures* and the walk holds. The discrete maps are the harder case in both
+directions.
+
+**2. Framing alone was not enough: a measured entry seeds from an on-attractor bank.** This ADR
+argues framing and stops there, and framing alone leaves a multi-second transient that overruns
+the frame — the rho ≈ 100 entry wanders out to **2.2x its own extent** for its first several
+seconds, because a uniform fill of a chaotic figure's bounding box puts most of its particles
+*off* the attractor. The fix is ADR-0087's IFS argument extended to a figure with no closed-form
+fixed points: the measurement **visits** the attractor thousands of times while framing it, so it
+banks 4096 of the points it saw and a measured entry starts on itself. Entry 0 banks nothing by
+design, which is what keeps every golden baseline blessed against its box fill. The cost is 48 KB
+per measured entry, held for the life of the preset.
+
+**3. The walk drives the existing `morph` param rather than a new one.** This ADR says "named
+morph paths" without saying what moves along them. The implementation gave `morph` — until now
+IFS-only in effect — a second meaning on the four map families, gated on a structural
+`[particles] tuple_from`/`tuple_to` pair, with a tuple path on an IFS a **load error** rather than
+a silent no-op. That keeps the param surface at the "+1" this ADR's last Negative budgeted for
+(`tuple` alone) instead of "+2", and `without_a_path_morph_leaves_a_map_family_alone` pins the
+inertness that makes it safe. Both ends are structural because the walk's framing is measured
+across it at load — a near end that moved per frame would re-measure inside the frame loop.
+
+**Two costs to state plainly.** The curation kept **all 50** candidates (*"honestly I love them
+all"*), so the maintenance surface is 51 tuples rather than the short roster this ADR imagined,
+and a preset load now measures every entry of its family's roster (~3.7 ms per entry in a debug
+build, an order less in release, once per preset switch and never per frame). And **an entry's
+index is a preset-visible name** — shipped presets step and pin them — so the table is
+append-only in practice; reordering renames figures out from under content.
