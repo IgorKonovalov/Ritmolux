@@ -273,7 +273,7 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// fragment_field      0.50    0.9926  Kaleido Field      1.99
 /// swarm               0.42    0.8407  Storm              2.00
 /// parametric_curve    0.33    0.6722  Rose Trails        2.04
-/// lsystem             0.32    0.6413  Fern Grow          2.00
+/// lsystem             0.50    1.0000  Vellum             2.00
 /// star_pattern        0.34    0.6908  Star Lantern       2.03
 /// reaction_diffusion  0.09    0.1910  Verdigris          2.12
 /// attractor           0.18    0.3442  Leviathan          1.91
@@ -391,7 +391,13 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // Line art. The trails-heavy looks score lowest because a faint tail is
         // still lit; Rose Trails at 0.6722 sets this one.
         SystemKind::ParametricCurve => 0.33,
-        SystemKind::LSystem => 0.32,
+        // Raised from 0.32 on 2026-08-13 when `Wildwood` was retired on sight in
+        // the running app: it was the family minimum, and its removal left
+        // `Vellum` at 1.0000 as the only shipped member, putting the old floor
+        // 3.12x below it — over this file's 2.2x slack. Re-derived at half the
+        // new minimum like every floor here. A one-member family means the next
+        // lsystem preset will very likely move this number again.
+        SystemKind::LSystem => 0.50,
         // Went to 0.12 and back on 2026-08-06 — see the doc comment. Star
         // Lantern's 0.6908 sets it again now that the three ring mandalas are
         // retired.
