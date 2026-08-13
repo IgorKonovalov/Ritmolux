@@ -1,8 +1,8 @@
 # ADR-0101 — The preset docs gain a tutorial layer rather than a merge
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-13, at Plan 0088's close)
 > **Date:** 2026-08-13
-> **Related plan(s):** [0088](../plans/0088-the-docs-get-pictures.md)
+> **Related plan(s):** [0088](../plans/done/0088-the-docs-get-pictures.md)
 
 ## Context
 

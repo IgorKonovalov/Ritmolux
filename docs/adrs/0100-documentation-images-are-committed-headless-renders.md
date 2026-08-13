@@ -1,8 +1,8 @@
 # ADR-0100 — Documentation images are committed headless renders
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-13, at Plan 0088's close)
 > **Date:** 2026-08-13
-> **Related plan(s):** [0088](../plans/0088-the-docs-get-pictures.md)
+> **Related plan(s):** [0088](../plans/done/0088-the-docs-get-pictures.md)
 
 ## Context
 
@@ -125,6 +125,34 @@ so a working preset photographs as a blown-out one. `--set` band magnitudes are 
 held forever", which no music does. And `--set` cannot reach the 64-band array at all, so `bin(x)`
 reads `0` and the entire `spectrum` system renders as its inert resting comb — the family's
 documentation image would show a preset that looks broken and is not.
+
+## Outcome — 2026-08-13, at [Plan 0088](../plans/done/0088-the-docs-get-pictures.md)'s close
+
+The decision held in full. Three refinements the implementation and the close measured, none of
+which changes it:
+
+**The budget has two numbers, and this ADR conflated them.** The Negative above says "~28 MB enters
+git history permanently" and caps the set at "≤ 22 images, ≤ 32 MB", as though those were one
+quantity. They are not. At the close the **tree** holds 16 images totalling **20,459,591 bytes**,
+while **history** holds **19 blobs totalling 25,489,457 bytes** — `hero.png` was re-rendered twice
+and `swarm.png` once, and in a repository that never rewrites history a superseded blob is as
+permanent as a current one. **The ceiling is about the history figure.** A re-shoot is therefore not
+free: re-rendering the whole 16-image set to correct a drifted look would add its full weight again,
+which is the real reason the "a new image replaces one" rule matters more than the image count does.
+
+**The stated capture hop was wrong, and the ADR was right not to name one.** The decision says "a
+named hop of `--signal dynamic:110`" and leaves the number to the manifest; Plan 0088's own text
+named hop 340, which lands 34 hops inside `dynamic_groove`'s two-beat rest (the phrase builds for
+six beats then rests at amplitude `0.04`, and at 110 BPM with a 512-sample hop that rest begins at
+hop 306). Every reactive family photographs there at its resting state. The committed set is at hop
+300, the last hop of the loudest beat, with two documented per-entry deviations. Keeping the number
+in the manifest rather than in this ADR is what made that a one-line correction.
+
+**The freshness claim is now tested, not asserted.** "Re-run the script and the images are current"
+was a design intent until this close re-ran the whole manifest after two entry edits: exactly those
+two images changed and the other fourteen came back byte-identical. That is a same-machine,
+same-binary result only — it is not evidence against the cross-adapter drift that keeps this script
+out of CI, and it must not be read as such.
 
 ## Notes
 
