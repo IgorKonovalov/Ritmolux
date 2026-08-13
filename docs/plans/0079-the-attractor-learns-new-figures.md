@@ -1,7 +1,7 @@
 # 0079 — The attractor learns new figures: the tuple roster with per-tuple framing, and measured morph paths
 
-> **Status:** approved 2026-08-11 (shape user-decided by interview at the Plan 0075 handoff —
-> roster **plus** morph paths, research risk accepted)
+> **Status:** in-progress 2026-08-13 (approved 2026-08-11; shape user-decided by interview at
+> the Plan 0075 handoff — roster **plus** morph paths, research risk accepted)
 > **Created:** 2026-08-11
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0093](../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md)

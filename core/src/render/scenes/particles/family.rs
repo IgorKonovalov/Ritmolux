@@ -96,33 +96,10 @@ impl AttractorFamily {
         }
     }
 
-    /// Projection: (world scale, dim 2/3, **world centre** to subtract). The
-    /// scale fits each attractor's native extent into the frame; the centre is
-    /// what the projection pivots and frames on.
-    ///
-    /// **The centre is three components, not a z-centre** (Plan 0062). It was
-    /// scalar while every family that needed one was a 3D flow centred on the
-    /// origin in `x` and `y`; the fern spans `y ∈ [0, 10]` and is not
-    /// origin-centred, so a 2D family needs the other two. The four map families
-    /// pass exactly the values they passed before — `[0,0,0]` and `[0,0,25]` —
-    /// and subtracting a zero is exact, so no capture moves.
-    pub(super) fn projection(self) -> (f32, f32, [f32; 3]) {
-        match self {
-            AttractorFamily::DeJong => (0.42, 2.0, [0.0, 0.0, 0.0]),
-            AttractorFamily::Clifford => (0.42, 2.0, [0.0, 0.0, 0.0]),
-            AttractorFamily::Thomas => (0.14, 3.0, [0.0, 0.0, 0.0]),
-            AttractorFamily::Lorenz => (0.022, 3.0, [0.0, 0.0, 25.0]),
-            AttractorFamily::Ifs(figure) => {
-                let (scale, centre) = figure.frame();
-                (scale, 2.0, centre)
-            }
-        }
-    }
-
     /// Which plane a 3D family is viewed in (ADR-0068).
     ///
     /// **Named outright per family, deliberately.** It is not derived from
-    /// [`projection`](Self::projection)'s `dim`, even though `dim == 3.0` selects
+    /// [`canonical_framing`](Self::canonical_framing)'s `dim`, even though `dim == 3.0` selects
     /// exactly the same two families today: `dim` and "wants a non-default basis"
     /// agree on this roster of four and are not the same property, so keying one
     /// off the other is ADR-0037's trap in another costume. A 2D family with a
@@ -152,7 +129,8 @@ impl AttractorFamily {
     /// rather than an invented chord.
     ///
     /// **Named per family, like [`basis`](Self::basis), and for the same reason.**
-    /// It agrees with `projection().1 == 3.0` on today's roster of four, and that
+    /// It agrees with `canonical_framing().projection.1 == 3.0` on today's roster of
+    /// four, and that
     /// agreement is a **coincidence** — "is an ODE flow" and "is three
     /// dimensional" are different properties. A 2-D flow would be continuous at
     /// `dim == 2.0`, and a 3-D discrete map would be a 3-D family that must not
@@ -174,38 +152,123 @@ impl AttractorFamily {
         }
     }
 
-    /// The seeded initial-scatter box: `(half-spread, centre)` per axis. Sized to
-    /// the attractor's native extent so particles start spread **across** it —
-    /// a box too small for a chaotic flow leaves every particle on nearly the same
-    /// trajectory, so the cloud clumps instead of filling the shape. The discrete
-    /// 2D maps converge from any small box, so theirs is the historical ~[-1.5,1.5]
-    /// (kept identical so their seeded look is unchanged; `z` is unused there).
+    /// The framing of roster entry 0 — the coefficients in
+    /// [`default_coeffs`](Self::default_coeffs) — as literal constants.
     ///
-    /// **Used for the initial fill and a family change only** (ADR-0066). A
-    /// `reseed` no longer re-fills it — see [`Self::jitter_extent`] — because
-    /// re-filling replaced the cloud with a uniform axis-aligned rectangle, which
-    /// is what a reseed visibly was.
-    pub(super) fn seed_box(self) -> ([f32; 3], [f32; 3]) {
+    /// **These are the numbers this scene shipped with**, and they are here as
+    /// literals rather than derived from anything: entry 0 *is* today's framing
+    /// by construction, which is what makes "an unbound `tuple` is byte-identical
+    /// to the build before the roster existed" structural rather than a claim
+    /// about two tables agreeing (ADR-0093). Every other roster entry is measured
+    /// — see [`measured_framing`].
+    ///
+    /// **`projection` is (world scale, dim 2/3, world centre to subtract).** The
+    /// scale fits the attractor's native extent into the frame; the centre is
+    /// what the projection pivots and frames on, and it is three components
+    /// rather than a z-centre (Plan 0062) — it was scalar while every family that
+    /// needed one was a 3D flow centred on the origin in `x` and `y`, and the
+    /// fern spans `y ∈ [0, 10]`. The four map families carry exactly the values
+    /// they carried before, `[0,0,0]` and `[0,0,25]`, and subtracting a zero is
+    /// exact, so no capture moves.
+    ///
+    /// **`seed_box` is the seeded initial-scatter box**, `(half-spread, centre)`
+    /// per axis, sized to the attractor's native extent so particles start spread
+    /// **across** it — a box too small for a chaotic flow leaves every particle
+    /// on nearly the same trajectory, so the cloud clumps instead of filling the
+    /// shape. The discrete 2D maps converge from any small box, so theirs is the
+    /// historical ~[-1.5, 1.5] (kept identical so their seeded look is unchanged;
+    /// `z` is unused there). It feeds the initial fill and a family change only
+    /// (ADR-0066) — a `reseed` no longer re-fills it, see
+    /// [`Framing::jitter_extent`], because re-filling replaced the cloud with a
+    /// uniform axis-aligned rectangle, which is what a reseed visibly was.
+    pub(super) fn canonical_framing(self) -> Framing {
         match self {
-            AttractorFamily::DeJong | AttractorFamily::Clifford => {
-                ([1.5, 1.5, 1.5], [0.0, 0.0, 0.0])
+            AttractorFamily::DeJong | AttractorFamily::Clifford => Framing {
+                projection: (0.42, 2.0, [0.0, 0.0, 0.0]),
+                seed_box: ([1.5, 1.5, 1.5], [0.0, 0.0, 0.0]),
+            },
+            AttractorFamily::Thomas => Framing {
+                projection: (0.14, 3.0, [0.0, 0.0, 0.0]),
+                seed_box: ([4.5, 4.5, 4.5], [0.0, 0.0, 0.0]),
+            },
+            AttractorFamily::Lorenz => Framing {
+                projection: (0.022, 3.0, [0.0, 0.0, 25.0]),
+                seed_box: ([20.0, 26.0, 24.0], [0.0, 0.0, 25.0]),
+            },
+            AttractorFamily::Ifs(figure) => {
+                let (scale, centre) = figure.frame();
+                Framing {
+                    projection: (scale, 2.0, centre),
+                    // The figure's own bounding box, so the fill lands *over* the
+                    // attractor and contracts onto it — see [`IfsFigure::seed_box`].
+                    seed_box: figure.seed_box(),
+                }
             }
-            AttractorFamily::Thomas => ([4.5, 4.5, 4.5], [0.0, 0.0, 0.0]),
-            AttractorFamily::Lorenz => ([20.0, 26.0, 24.0], [0.0, 0.0, 25.0]),
-            // The figure's own bounding box, so the fill lands *over* the
-            // attractor and contracts onto it — see [`IfsFigure::seed_box`].
-            AttractorFamily::Ifs(figure) => figure.seed_box(),
         }
     }
 
+    /// The curated tuples **past entry 0** (ADR-0093), in roster order.
+    ///
+    /// Coefficients only: their framing is measured rather than written down, so
+    /// a curator adds a figure by adding the four numbers that define it and
+    /// nothing else. Entry 0 is deliberately absent from this table — it is
+    /// [`default_coeffs`](Self::default_coeffs) with
+    /// [`canonical_framing`](Self::canonical_framing), which is what keeps an
+    /// unbound `tuple` byte-identical to the build before this table existed.
+    ///
+    /// **The Lorenz entry is provisional** (Plan 0079 Phase 1): rho ≈ 100 is the
+    /// periodic torus-knot window, the regime Plan 0075 cohort 5 measured as
+    /// physically unreachable — the figure is centred on `z ≈ 102` against the
+    /// canonical framing's `25` and spans twice its extent, so it rendered
+    /// off-centre and out of frame with no preset-side recovery. It ships here as
+    /// the walking skeleton for the plumbing, ahead of Phase 3's curation.
+    ///
+    /// **The IFS is empty and stays empty.** Its shape lives in an affine table
+    /// rather than in four scalars, and its figure-to-figure travel is ADR-0075's
+    /// `morph`, which already carries its own measured framing.
+    pub(super) fn extra_tuples(self) -> &'static [[f32; 4]] {
+        match self {
+            AttractorFamily::Lorenz => &[[10.0, 100.0, 2.6667, 0.0]],
+            AttractorFamily::DeJong
+            | AttractorFamily::Clifford
+            | AttractorFamily::Thomas
+            | AttractorFamily::Ifs(_) => &[],
+        }
+    }
+}
+
+/// One roster entry's framing (ADR-0093): where the figure is and how big, as
+/// the two constants the render path needs.
+///
+/// **The unit that travels with a tuple.** It used to be two per-family
+/// constants, which is exactly why a distant tuple was unreachable: the
+/// coefficients were bindable and their framing was not. Both derived
+/// quantities below hang off it, so `reseed` and the depth cues follow a tuple
+/// without a second table to keep in step — the Plan 0062 coupling, preserved
+/// by construction rather than by discipline.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) struct Framing {
+    /// (world scale, dim 2/3, world centre) — see
+    /// [`AttractorFamily::projection`].
+    pub(super) projection: (f32, f32, [f32; 3]),
+    /// (half-spread, centre) per axis — see [`AttractorFamily::seed_box`].
+    pub(super) seed_box: ([f32; 3], [f32; 3]),
+}
+
+impl Framing {
     /// Half-extent of the per-axis kick a `reseed` applies to each particle
     /// **where it already is** (ADR-0066), in the family's own world units.
     ///
-    /// Family-relative by construction: it is [`JITTER_FRACTION`] of the family's
-    /// own [`seed_box`](Self::seed_box) spread, which is itself sized to the
-    /// attractor's native extent. So one constant serves a map bounded in
-    /// `[-2, 2]` and a flow spanning `±26` without a per-family number to keep in
-    /// step.
+    /// Extent-relative by construction: it is [`JITTER_FRACTION`] of this
+    /// entry's own [`seed_box`](Self::seed_box), which is itself sized to the
+    /// figure's native extent. So one constant serves a map bounded in
+    /// `[-2, 2]`, a flow spanning `±26`, and a roster entry twice that — with no
+    /// per-entry number to keep in step. **This is the Plan 0062 coupling**, and
+    /// it is why the roster carries framing rather than coefficients alone: a
+    /// tuple whose framing did not travel with it would leave `reseed` kicking
+    /// by the canonical figure's fraction, which on a larger figure is a kick
+    /// too small to read and on a smaller one is a kick that throws the cloud
+    /// off the attractor.
     ///
     /// **The magnitude is a look constant with no principled value.** It is large
     /// enough that the disturbance reads and small enough that the points stay on
@@ -214,9 +277,9 @@ impl AttractorFamily {
     /// Phase 6 is where it is judged in motion, at both tiers; ADR-0066 records
     /// that if the disturbance reads too subtle, *this* is the lever and returning
     /// to the box is not.
-    pub(super) fn jitter_extent(self) -> [f32; 3] {
+    pub(super) fn jitter_extent(&self) -> [f32; 3] {
         // Destructured rather than indexed: this file denies `indexing_slicing`.
-        let ([sx, sy, sz], _) = self.seed_box();
+        let ([sx, sy, sz], _) = self.seed_box;
         [
             sx * JITTER_FRACTION,
             sy * JITTER_FRACTION,
@@ -224,8 +287,9 @@ impl AttractorFamily {
         ]
     }
 
-    /// Reciprocal of the family's half-extent along the **view depth axis**, in
-    /// its own world units — and **exactly `0.0` for a 2D family** (ADR-0076).
+    /// Reciprocal of this entry's half-extent along the **view depth axis**, in
+    /// the family's own world units — and **exactly `0.0` for a 2D family**
+    /// (ADR-0076).
     ///
     /// That zero is the whole mechanism by which the flat families opt out: it
     /// makes `d_n` identically zero for every one of their particles, so the
@@ -235,22 +299,26 @@ impl AttractorFamily {
     /// to project, and ADR-0076 Alternative B records why inventing one for them
     /// is worse than leaving them alone.
     ///
-    /// **Derived from [`seed_box`](Self::seed_box), not hand-written per family**
-    /// — the discipline [`jitter_extent`](Self::jitter_extent) already uses, so
-    /// there is no second table of magnitudes to keep in step. The depth is the
+    /// **Derived from [`seed_box`](Self::seed_box), not hand-written** — the
+    /// discipline [`jitter_extent`](Self::jitter_extent) already uses, so there
+    /// is no second table of magnitudes to keep in step. The depth is the
     /// rotation's third output, and the rotation acts in the plane spanned by
     /// `x` and the basis's horizontal axis ([`Basis::masks`]'s first selector),
     /// so the depth swings through *those two* half-extents and the larger is
-    /// what normalizes it. That is **26** for Lorenz (basis XZ, so the plane is
-    /// `x`–`y`, half-extents 20 and 26) and **4.5** for Thomas (basis XY, plane
-    /// `x`–`z`).
+    /// what normalizes it. That is **26** for the canonical Lorenz (basis XZ, so
+    /// the plane is `x`–`y`, half-extents 20 and 26) and **4.5** for Thomas
+    /// (basis XY, plane `x`–`z`).
     ///
-    /// The match is exhaustive with no wildcard arm, so a fifth family has to
-    /// answer the question rather than inherit an answer.
-    pub(super) fn inv_depth_extent(self) -> f32 {
+    /// **The family is a parameter and not a field**, because flatness is a
+    /// property of the family rather than of the framing: the match below is
+    /// exhaustive with no wildcard arm, so a fifth family has to answer the
+    /// question rather than inherit an answer — and deriving it from
+    /// `projection.1 == 3.0` would be ADR-0037's trap in the costume
+    /// [`AttractorFamily::basis`] already declined once.
+    pub(super) fn inv_depth_extent(&self, family: AttractorFamily) -> f32 {
         // Destructured rather than indexed: this file denies `indexing_slicing`.
-        let ([sx, sy, sz], _) = self.seed_box();
-        let half = match self {
+        let ([sx, sy, sz], _) = self.seed_box;
+        let half = match family {
             // Every IFS figure is `dim = 2` — it has no third coordinate to
             // project, which is exactly the case this doc comment anticipated.
             AttractorFamily::DeJong | AttractorFamily::Clifford | AttractorFamily::Ifs(_) => {
@@ -259,7 +327,7 @@ impl AttractorFamily {
             AttractorFamily::Thomas | AttractorFamily::Lorenz => {
                 // Read off `basis()` rather than restated per family, so the two
                 // cannot disagree about which plane the spin turns in.
-                let partner = match self.basis() {
+                let partner = match family.basis() {
                     Basis::XY => sz,
                     Basis::XZ => sy,
                 };
@@ -267,9 +335,393 @@ impl AttractorFamily {
             }
         };
         // A degenerate box would otherwise send an infinity to the shader. It
-        // cannot happen with the boxes above; it costs one compare not to rely
-        // on that.
+        // cannot happen with the canonical boxes; a measured entry makes it a
+        // live possibility rather than a theoretical one, and it costs one
+        // compare either way.
         if half > 0.0 { 1.0 / half } else { 0.0 }
+    }
+}
+
+/// A roster entry with its framing resolved (ADR-0093) — what the render path
+/// actually reads once `tuple` has selected an entry.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) struct ResolvedTuple {
+    /// The entry's coefficients, family-interpreted exactly as
+    /// [`AttractorFamily::default_coeffs`]'s are. They become the fallback the
+    /// `a`..`d` params modulate around, which is why selecting an entry changes
+    /// the figure at all.
+    pub(super) coeffs: [f32; 4],
+    pub(super) framing: Framing,
+}
+
+/// A roster entry: the resolved tuple, plus the on-attractor fill a **measured**
+/// entry carries.
+pub(super) struct RosterEntry {
+    pub(super) tuple: ResolvedTuple,
+    /// Points **on** this entry's own attractor, banked by the measurement while
+    /// it framed the figure — see [`MEASURE_BANK`].
+    ///
+    /// **Empty on the canonical entry**, which keeps the box fill it shipped
+    /// with. That is not an omission: entry 0's seeded scatter is what sixteen
+    /// golden baselines were blessed against, and a fill from anywhere else
+    /// would move every one of them.
+    pub(super) fill: Vec<[f32; 3]>,
+}
+
+/// A family's roster, framing and all — **built once at preset load**, off the
+/// hot path (ADR-0093).
+///
+/// Entry 0 is the canonical tuple with its pinned constants; every other entry
+/// is [`measured_framing`]. Resolved here rather than per frame for
+/// [`FitLut::build`](super::ifs::FitLut::build)'s reason: the framing is a pure
+/// function of the family and the tuple, so a frame that pays for it is paying
+/// repeatedly for an answer that cannot have changed — and a `tuple` cut would
+/// spend a measurement *inside the frame loop*, which is a visible hitch on the
+/// exact frame the figure is already changing.
+///
+/// **A measurement that fails falls back to the canonical framing rather than
+/// dropping the entry**, because an index is a preset-visible name: dropping
+/// entry 2 would silently renumber every entry after it. A diverged tuple is
+/// then visibly wrong on its contact sheet, which is where it gets rejected.
+pub(super) fn resolve_roster(family: AttractorFamily) -> Vec<RosterEntry> {
+    let canonical = ResolvedTuple {
+        coeffs: family.default_coeffs(),
+        framing: family.canonical_framing(),
+    };
+    let extras = family.extra_tuples();
+    if extras.is_empty() {
+        // Nothing to measure, so nothing is measured — which is what keeps the
+        // four one-entry families (and every IFS figure) paying literally zero
+        // for the roster at load.
+        return vec![RosterEntry {
+            tuple: canonical,
+            fill: Vec::new(),
+        }];
+    }
+    // The reference extent, measured **once per family** rather than once per
+    // entry: every entry is scaled against the canonical figure's own extent, and
+    // that number does not depend on which entry is being framed.
+    let reference =
+        measure_figure(family, family.default_coeffs()).map(|m| framed_half(family, m.extent.half));
+    std::iter::once(RosterEntry {
+        tuple: canonical,
+        fill: Vec::new(),
+    })
+    .chain(extras.iter().map(|&coeffs| {
+        let measured = measure_figure(family, coeffs)
+            .zip(reference)
+            .and_then(|(m, reference)| {
+                measured_framing(family, &m.extent, reference).map(|framing| (framing, m.fill))
+            });
+        match measured {
+            Some((framing, fill)) => RosterEntry {
+                tuple: ResolvedTuple { coeffs, framing },
+                fill,
+            },
+            None => RosterEntry {
+                tuple: ResolvedTuple {
+                    coeffs,
+                    framing: canonical.framing,
+                },
+                fill: Vec::new(),
+            },
+        }
+    }))
+    .collect()
+}
+
+/// `tuple`'s CPU-side quantization: a bound value to a roster index.
+///
+/// **Quantized here and not in the shader, and that is not an optimization**
+/// (ADR-0093). These are chaotic maps: a fractional index would interpolate
+/// coefficients *between two different figures*, which is not a halfway figure
+/// but a third, unmeasured one — with neither endpoint's framing. `kaleido_order`
+/// and `kaleido_edge` round for the same class of reason, and the reason bites
+/// harder here: a smoothing curve makes it **necessary rather than defensive**,
+/// since an eased param is continuous even when the thing it selects is not, so
+/// a binding easing from `0` toward `3` sweeps *through* 1.4 whatever its
+/// endpoints are.
+///
+/// Nearest-integer rather than truncation, so an eased sweep lands on the entry
+/// it is closest to; clamped into the roster, so an over-driven binding holds the
+/// last figure rather than selecting nothing; and a non-finite binding falls back
+/// to the canonical entry, since `f32::clamp` propagates `NaN` and a `NaN as
+/// usize` is zero by saturation rather than by decision.
+pub(super) fn roster_index(value: f32, len: usize) -> usize {
+    if !value.is_finite() {
+        return 0;
+    }
+    let last = len.saturating_sub(1);
+    value.round().clamp(0.0, last as f32) as usize
+}
+
+/// Euler sub-steps per fixed step for the continuous families.
+///
+/// **Mirrored from [`STEP_SHADER`](super::STEP_SHADER), which is the source** —
+/// `the_ode_substeps_agree_between_rust_and_wgsl` holds the WGSL literal to this
+/// constant. The CPU needs the same number because [`measure_extent`] frames a
+/// tuple by iterating the very map the GPU will iterate, and an integrator that
+/// took different steps would measure a different figure.
+pub(super) const ODE_SUBSTEPS: u32 = 4;
+
+/// Trajectories the measurement runs at once.
+///
+/// **A handful rather than a cloud**, because a chaotic attractor is sampled by
+/// one trajectory's *time*, not by how many trajectories are launched — the
+/// steps below are what buys coverage. More than one only so a figure with
+/// disjoint basins cannot be measured from inside one of them.
+const MEASURE_TRAJECTORIES: u32 = 4;
+/// Steps discarded before measuring, so the seed box's own extent is not what
+/// gets measured.
+///
+/// **Sized to the slowest transient on the roster, not to the fastest.** The
+/// discrete maps converge within tens of steps; the Lorenz torus knot at
+/// rho ≈ 100 reaches its periodic orbit through several seconds of transient
+/// chaos, and measured at 600 steps its bounding box comes out ~40 % too large
+/// — a figure framed off that measurement renders correspondingly small. At
+/// 1200 the measurement is stable to three digits against a ten-times-longer
+/// warm-up.
+const MEASURE_WARMUP: u32 = 1200;
+/// Steps the bounding box accumulates over, after the warm-up.
+const MEASURE_STEPS: u32 = 3000;
+/// A coordinate past this is a divergence rather than a figure.
+///
+/// **Euler is conditionally stable and the roster can reach past its
+/// condition**: the Lorenz flow at rho ≈ 160 blows up at this scene's sub-step,
+/// so an uncurated tuple really does produce infinities. The guard is what turns
+/// that into a fallback rather than an `inf` scale reaching the GPU.
+const MEASURE_DIVERGENCE: f32 = 1.0e6;
+/// The measurement's own RNG seed — its own, so the starting points do not
+/// correlate with the scene's seeded scatter.
+const MEASURE_SEED: u64 = 0x4C4D_5641_5455_5031; // "LMVATUP1"
+/// How many on-attractor points a measurement banks for the initial fill
+/// ([`Measurement::fill`]).
+///
+/// **Duplication across the particle buffer is fine and is not what this number
+/// is protecting.** At the `Rich` tier 150 000 particles share these, so each
+/// bank point starts ~37 particles — and on a chaotic figure those separate
+/// within a few steps, while on a periodic one they stay a curve, which is what
+/// the figure is. What the count buys is *coverage*: too few points and the fill
+/// is a handful of arcs rather than the whole attractor for the first second. At
+/// 12 bytes each this is 48 KB per measured entry, held for the life of the
+/// preset.
+const MEASURE_BANK: u32 = 4096;
+
+/// A measured bounding box, as the projection and the seed box both want it.
+pub(super) struct Extent {
+    pub(super) half: [f32; 3],
+    pub(super) centre: [f32; 3],
+}
+
+/// Frame a tuple from its measured [`Extent`] (ADR-0093) — the readback-free
+/// form of auto-centering, run once at load instead of once a frame.
+///
+/// `reference` is the family's canonical figure's own [`framed_half`]; `None`
+/// comes back when the measurement is degenerate, which the caller turns into
+/// the canonical framing.
+///
+/// **The scale is a ratio against the canonical tuple rather than a target fill
+/// fraction**, and that is the whole trick: each family's shipped scale already
+/// encodes a judgement about how much of the frame its figure should occupy —
+/// 0.42 against De Jong's extent of ~1.9 fills far more of the frame than 0.022
+/// against Lorenz's ~26, because a spinning 3D figure needs slack a flat map does
+/// not. Scaling by the ratio of the two extents means a roster entry occupies
+/// **the same footprint as its family's canonical figure**, whatever its native
+/// size — so a curator judges figures, and no fill constant has to be invented
+/// or defended.
+pub(super) fn measured_framing(
+    family: AttractorFamily,
+    extent: &Extent,
+    reference: f32,
+) -> Option<Framing> {
+    let (canonical_scale, dim, _) = family.canonical_framing().projection;
+    let measured = framed_half(family, extent.half);
+    if !(measured > 0.0 && reference > 0.0) {
+        return None;
+    }
+    let scale = canonical_scale * reference / measured;
+    if !scale.is_finite() || scale <= 0.0 {
+        return None;
+    }
+    Some(Framing {
+        projection: (scale, dim, extent.centre),
+        // The measured box IS the figure's extent, so the initial fill lands
+        // across the attractor rather than in a corner of it — and
+        // `jitter_extent` inherits the right magnitude for free.
+        seed_box: (extent.half, extent.centre),
+    })
+}
+
+/// What one measurement pass produces: the figure's extent, and a bank of points
+/// **on** it.
+pub(super) struct Measurement {
+    pub(super) extent: Extent,
+    /// Positions the measured trajectories actually visited, evenly sampled
+    /// across the window — see [`MEASURE_BANK`].
+    pub(super) fill: Vec<[f32; 3]>,
+}
+
+/// Iterate a tuple: where its figure is, how big, and where it lives.
+///
+/// **The bank is not a by-product, it is half the point** (ADR-0087's argument,
+/// applied to a measured tuple). A uniform fill of a figure's bounding box puts
+/// most of its particles *off* the attractor, and getting back on is a transient
+/// the viewer watches: at rho ≈ 100 the cloud wanders out to **2.2 times** the
+/// figure's own extent for its first several seconds — measured, and visible as
+/// a capture clipped on all four edges. The IFS solved exactly this by seeding at
+/// its maps' fixed points, which are on the attractor by construction. A measured
+/// tuple has no closed-form point set, but the measurement **visits** the
+/// attractor thousands of times while it frames it, so banking what it saw costs
+/// one push per sampled step and starts the figure on itself: seeded from the
+/// bank, the same tuple never exceeds its own extent at all.
+pub(super) fn measure_figure(family: AttractorFamily, coeffs: [f32; 4]) -> Option<Measurement> {
+    measure_extent(
+        family,
+        coeffs,
+        // Started from the canonical seed box: it is the one box known to be in
+        // the right neighbourhood before anything has been measured, and a
+        // chaotic map forgets where it started within the warm-up anyway.
+        family.canonical_framing().seed_box,
+        MEASURE_WARMUP,
+        MEASURE_STEPS,
+    )
+}
+
+/// The half-extent the frame is sized against: the largest the figure gets on
+/// screen at any rotation.
+///
+/// Read off [`Basis::masks`] rather than restated, so it cannot disagree with
+/// the shader about which axes are drawn. The spin turns `x` against the basis's
+/// partner axis, so the horizontal sweep reaches the larger of those two — the
+/// same reduction [`Framing::inv_depth_extent`] normalizes depth by, for the same
+/// reason. **A 2D family needs no special case**: its partner axis is `z`, whose
+/// extent is exactly zero, so the `max` falls through to `x`.
+pub(super) fn framed_half(family: AttractorFamily, half: [f32; 3]) -> f32 {
+    let ([hx, hy, hz], [vx, vy, vz]) = family.basis().masks();
+    let [x, y, z] = half;
+    let partner = x * hx + y * hy + z * hz;
+    let vertical = x * vx + y * vy + z * vz;
+    x.max(partner).max(vertical)
+}
+
+/// The tuple's bounding box and point bank over `steps`, from a few trajectories
+/// started in `from` and run `warmup` steps first.
+fn measure_extent(
+    family: AttractorFamily,
+    coeffs: [f32; 4],
+    from: ([f32; 3], [f32; 3]),
+    warmup: u32,
+    steps: u32,
+) -> Option<Measurement> {
+    let ([sx, sy, sz], [cx, cy, cz]) = from;
+    let mut rng = SeededRng::new(MEASURE_SEED);
+    let mut points: Vec<[f32; 3]> = (0..MEASURE_TRAJECTORIES)
+        .map(|_| {
+            [
+                cx + rng.range(-sx, sx),
+                cy + rng.range(-sy, sy),
+                cz + rng.range(-sz, sz),
+            ]
+        })
+        .collect();
+    // Every `stride`-th visited point is banked, so the fill samples the whole
+    // measured window evenly rather than the last few hundred steps of it —
+    // which on a slow flow would be a short arc of the figure rather than the
+    // figure.
+    let visited = steps.max(1) * MEASURE_TRAJECTORIES.max(1);
+    let stride = (visited / MEASURE_BANK.max(1)).max(1) as usize;
+    let mut fill: Vec<[f32; 3]> = Vec::with_capacity(MEASURE_BANK as usize + 1);
+    let mut seen = 0usize;
+    let mut lo = [f32::INFINITY; 3];
+    let mut hi = [f32::NEG_INFINITY; 3];
+    for step in 0..(warmup + steps) {
+        for p in points.iter_mut() {
+            *p = step_once(family, coeffs, *p);
+            let [x, y, z] = *p;
+            let reach = x.abs().max(y.abs()).max(z.abs());
+            if !reach.is_finite() || reach > MEASURE_DIVERGENCE {
+                return None;
+            }
+            if step < warmup {
+                continue;
+            }
+            let ([lx, ly, lz], [hx, hy, hz]) = (lo, hi);
+            lo = [lx.min(x), ly.min(y), lz.min(z)];
+            hi = [hx.max(x), hy.max(y), hz.max(z)];
+            if seen.is_multiple_of(stride) {
+                fill.push(*p);
+            }
+            seen += 1;
+        }
+    }
+    let ([lx, ly, lz], [hx, hy, hz]) = (lo, hi);
+    if !(lx.is_finite() && hx.is_finite()) || fill.is_empty() {
+        return None;
+    }
+    Some(Measurement {
+        extent: Extent {
+            half: [(hx - lx) * 0.5, (hy - ly) * 0.5, (hz - lz) * 0.5],
+            centre: [(hx + lx) * 0.5, (hy + ly) * 0.5, (hz + lz) * 0.5],
+        },
+        fill,
+    })
+}
+
+/// One fixed step of a family's map, on the CPU.
+///
+/// **The CPU mirror of [`STEP_SHADER`](super::STEP_SHADER)'s four map arms** —
+/// the WGSL is the source and this is the mirror, the discipline
+/// [`projection_mirror`](super::projection_mirror) and [`hash_unit`](super::hash_unit)
+/// already follow. `the_cpu_step_mirrors_the_shader` runs both and compares, so
+/// this is held to the shader by a differential rather than by reading.
+///
+/// It exists because a framing measured off *different* arithmetic would frame a
+/// figure the GPU does not draw. The IFS is deliberately absent: its step draws a
+/// random map per particle and its framing is ADR-0075's measured fit, so there
+/// is nothing here for it to be measured by.
+pub(super) fn step_once(family: AttractorFamily, coeffs: [f32; 4], p: [f32; 3]) -> [f32; 3] {
+    let [a, b, c, d] = coeffs;
+    let [x, y, z] = p;
+    match family {
+        AttractorFamily::DeJong => [
+            (a * y).sin() - (b * x).cos(),
+            (c * x).sin() - (d * y).cos(),
+            0.0,
+        ],
+        AttractorFamily::Clifford => [
+            (a * y).sin() + c * (a * x).cos(),
+            (b * x).sin() + d * (b * y).cos(),
+            0.0,
+        ],
+        AttractorFamily::Thomas => {
+            // The shader's "lively speed-up" factor of 3 is part of the map as
+            // far as a measurement is concerned: it is what the figure is
+            // iterated at, so leaving it out would measure a different flow.
+            let h = FIXED_STEP * 3.0 / ODE_SUBSTEPS as f32;
+            let (mut x, mut y, mut z) = (x, y, z);
+            for _ in 0..ODE_SUBSTEPS {
+                let (dx, dy, dz) = (y.sin() - a * x, z.sin() - a * y, x.sin() - a * z);
+                x += dx * h;
+                y += dy * h;
+                z += dz * h;
+            }
+            [x, y, z]
+        }
+        AttractorFamily::Lorenz => {
+            let h = FIXED_STEP / ODE_SUBSTEPS as f32;
+            let (mut x, mut y, mut z) = (x, y, z);
+            for _ in 0..ODE_SUBSTEPS {
+                let (dx, dy, dz) = (a * (y - x), x * (b - z) - y, x * y - c * z);
+                x += dx * h;
+                y += dy * h;
+                z += dz * h;
+            }
+            [x, y, z]
+        }
+        // Nothing to iterate: an IFS has no coefficient tuple to frame (see
+        // `extra_tuples`), so the fixed point of this function is the honest
+        // answer rather than a placeholder.
+        AttractorFamily::Ifs(_) => p,
     }
 }
 

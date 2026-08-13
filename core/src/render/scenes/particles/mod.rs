@@ -160,6 +160,12 @@ const JITTER_SLOT: u32 = MAX_SUBSTEPS;
 /// that never binds it draws exactly the figure it named.
 const DEFAULT_MORPH: f32 = 0.0;
 
+/// `tuple`'s default: roster entry 0 (ADR-0093), which is the family's canonical
+/// coefficients with the framing this scene shipped with — so a preset that never
+/// binds it renders byte-identically to the build before the roster existed, and
+/// no golden baseline moves.
+const DEFAULT_TUPLE: f32 = 0.0;
+
 /// Parameter defaults — a calm idle look when nothing is bound.
 const DEFAULT_SIZE: f32 = 1.0;
 const DEFAULT_HUE: f32 = 0.0;
@@ -654,6 +660,26 @@ pub struct AttractorScene {
     /// The active attractor map, selected data-driven via `[particles]`
     /// (ADR-0007 `configure`); its default coefficients seed `a`..`d`.
     family: AttractorFamily,
+    /// The active family's tuple roster, framing resolved (ADR-0093). Built in
+    /// [`configure`](Scene::configure) — off the hot path, for the reason
+    /// [`ifs_ends`](Self::ifs_ends) is cached there: entry framing is a pure
+    /// function of the family and the coefficients, and measuring it inside the
+    /// frame loop would spend a hitch on the exact frame a `tuple` cut lands.
+    roster: Vec<RosterEntry>,
+    /// Which entry [`tuple`](Self::tuple) last resolved to. Always a valid index
+    /// into [`roster`](Self::roster) — [`roster_index`] clamps.
+    tuple_index: usize,
+    /// The roster selector (ADR-0093), raw as the preset bound it;
+    /// [`roster_index`] quantizes it on the way to an entry.
+    ///
+    /// **Resolved in [`update`](Scene::update) rather than in
+    /// [`set_param`](Scene::set_param)**, because the renderer routes a frame's
+    /// bindings in an unspecified order: an entry's coefficients landing in
+    /// `a`..`d` mid-routing would be overwritten by — or would overwrite — a
+    /// preset's own `a` binding depending on which name the map yielded first.
+    /// `update` runs after every binding and before the render, so the entry, its
+    /// coefficients and its framing all reach the GPU from the same frame's value.
+    tuple: f32,
     /// The two ends of the IFS morph, **decomposed once at `configure`**
     /// (ADR-0075). `None` on the four map families.
     ///
@@ -816,7 +842,15 @@ impl AttractorScene {
         trail_cap: (u32, u32),
     ) -> Self {
         let family = AttractorFamily::DeJong;
-        let seed_particles = Self::seed(family, particle_count);
+        // Entry 0's box by construction rather than by index: nothing has been
+        // configured yet, so the canonical framing IS the roster's first entry
+        // and reaching for it directly keeps this constructor infallible.
+        let seed_particles = Self::seed(
+            family,
+            family.canonical_framing().seed_box,
+            &[],
+            particle_count,
+        );
         let [a, b, c, d] = family.default_coeffs();
         Self {
             device: device.clone(),
@@ -841,6 +875,9 @@ impl AttractorScene {
             dt: FIXED_STEP,
             spin_time: 0.0,
             family,
+            roster: family::resolve_roster(family),
+            tuple_index: 0,
+            tuple: DEFAULT_TUPLE,
             ifs_ends: None,
             ifs_fit: None,
             morph: DEFAULT_MORPH,
@@ -1004,9 +1041,15 @@ impl AttractorScene {
 
     /// The CPU-side initial fill.
     ///
+    /// The box is the **active roster entry's** (ADR-0093), handed in rather
+    /// than read off the family: a wild tuple's figure can be twice the
+    /// canonical one's, and filling the canonical box would leave its particles
+    /// bunched in the middle of it — the clumping [`Framing::seed_box`] exists to
+    /// prevent, on a figure that has no other way to ask for a bigger fill.
+    ///
     /// **The IFS does not fill a box, and that is where backlog 0064 dies**
-    /// (ADR-0087). Every other family scatters uniformly over
-    /// [`AttractorFamily::seed_box`] and contracts onto its attractor over the
+    /// (ADR-0087). Every other family scatters uniformly over its entry's box
+    /// and contracts onto its attractor over the
     /// following second, which showed as a legible, hard-edged, axis-aligned
     /// rectangle for roughly two thirds of a second on every switch into the
     /// family — the same artifact class ADR-0066 removed from `reseed`, back on
@@ -1016,7 +1059,7 @@ impl AttractorScene {
     /// there is no rectangle to fade out at any frame.
     ///
     /// **`seed_box` is deliberately untouched.**
-    /// [`AttractorFamily::jitter_extent`] is derived from it as a fraction of its
+    /// [`Framing::jitter_extent`] is derived from it as a fraction of its
     /// spread, so collapsing that spread would make `reseed` silently inert on
     /// the whole family. What changes is what this function *writes*.
     ///
@@ -1025,12 +1068,17 @@ impl AttractorScene {
     /// so there is no resolved table to ask. Phase 3's continuous respawn targets
     /// the live resolved table, which is what carries the fill to wherever a
     /// bound `morph` has taken the figure — within one particle lifetime.
-    fn seed(family: AttractorFamily, count: u32) -> Vec<Particle> {
-        let (spread, center) = family.seed_box();
+    fn seed(
+        family: AttractorFamily,
+        seed_box: ([f32; 3], [f32; 3]),
+        fill: &[[f32; 3]],
+        count: u32,
+    ) -> Vec<Particle> {
+        let (spread, center) = seed_box;
         let fixed = family.figure().map(|f| ifs::fixed_points(&f.table()));
         let mut rng = SeededRng::new(SEED);
-        let mut particles: Vec<Particle> = (0..count)
-            .map(|_| {
+        let mut particles: Vec<Particle> = (0..count as usize)
+            .map(|index| {
                 let (x, y, seed, age) = match fixed {
                     // Drawn from the particle's own fixed seed, so which point a
                     // given particle starts at is a pure function of the seeded
@@ -1053,6 +1101,23 @@ impl AttractorScene {
                         // there is no bulk restart at startup either.
                         let age = rng.next_f32() * churn_lifetime(seed);
                         (x, y, seed, age)
+                    }
+                    // A measured roster entry starts **on** its own attractor
+                    // (ADR-0093), from the bank the framing measurement collected
+                    // — the IFS argument above, on a figure with no closed-form
+                    // fixed points to reach for. The box fill below is what a
+                    // measured entry cannot use: most of a chaotic figure's
+                    // bounding box is empty space, and the cloud's way back onto
+                    // the attractor is a transient that overruns the frame for
+                    // seconds (measured: 2.2x the figure's own extent at
+                    // rho ~ 100, for its first several seconds).
+                    //
+                    // Walked in order rather than drawn at random: the bank is
+                    // already an even sample of the attractor, so a draw would
+                    // only leave gaps and pile up duplicates.
+                    None if !fill.is_empty() => {
+                        let [x, y, _] = fill.get(index % fill.len()).copied().unwrap_or_default();
+                        (x, y, rng.next_f32(), 0.0)
                     }
                     None => {
                         let x = center[0] + rng.range(-spread[0], spread[0]);
@@ -1086,11 +1151,86 @@ impl AttractorScene {
                 }
             })
             .collect();
-        for p in &mut particles {
-            p.pos[2] = center[2] + rng.range(-spread[2], spread[2]);
+        for (index, p) in particles.iter_mut().enumerate() {
+            // The bank's own `z` where there is one, so a 3D figure starts on the
+            // attractor in all three axes rather than in two — the `x`/`y` above
+            // came from the same banked point, and a re-drawn `z` would put the
+            // particle off the figure exactly as a box fill does.
+            p.pos[2] = match fill.get(index % fill.len().max(1)) {
+                Some([_, _, z]) => *z,
+                None => center[2] + rng.range(-spread[2], spread[2]),
+            };
             p.prev[2] = p.pos[2];
         }
         particles
+    }
+
+    /// The active roster entry (ADR-0093).
+    ///
+    /// Total rather than fallible: [`roster_index`] clamps into the roster and
+    /// [`resolve_roster`] never returns an empty one, so the fallback below is
+    /// unreachable — it is here because this file denies `unwrap_used`, and
+    /// because the honest value for "no entry" is the canonical one rather than
+    /// a panic on a render path.
+    fn entry(&self) -> ResolvedTuple {
+        self.roster
+            .get(self.tuple_index)
+            .map(|entry| entry.tuple)
+            .unwrap_or(ResolvedTuple {
+                coeffs: self.family.default_coeffs(),
+                framing: self.family.canonical_framing(),
+            })
+    }
+
+    /// The active entry's on-attractor fill, or empty on the canonical entry —
+    /// which is every entry the four shipped families have today, and is what
+    /// keeps their seeded scatter (and every golden blessed against it) exactly
+    /// as it was.
+    fn entry_fill(&self) -> &[[f32; 3]] {
+        self.roster
+            .get(self.tuple_index)
+            .map_or(&[][..], |entry| entry.fill.as_slice())
+    }
+
+    /// Re-point the scene at whichever entry this frame's `tuple` selects
+    /// (ADR-0093), and hand back whether it moved.
+    ///
+    /// The entry's coefficients become `a`..`d`, which is what makes selecting an
+    /// entry change the *figure* rather than only its framing. A preset that binds
+    /// both `tuple` and a coefficient loses that coefficient for the single frame
+    /// the cut lands on, and gets it back on the next one — [`reset_params`]
+    /// re-reads the new entry before the following frame's bindings are routed.
+    /// That is the ordering cost of resolving after routing, and it is a frame of
+    /// a cut the ADR-0066 disturbance and the ADR-0024 dissolve are already
+    /// covering.
+    fn select_tuple(&mut self) -> bool {
+        let index = family::roster_index(self.tuple, self.roster.len());
+        if index == self.tuple_index {
+            return false;
+        }
+        self.tuple_index = index;
+        let entry = self.entry();
+        let [a, b, c, d] = entry.coeffs;
+        self.a = a;
+        self.b = b;
+        self.c = c;
+        self.d = d;
+        // **Only while the scatter is still pending upload**, which is the first
+        // frame after a build or a family change — there, the entry's own box is
+        // what the fill should have used and nothing has been drawn yet. A *live*
+        // cut deliberately keeps the cloud it has: re-seeding mid-preset replaces
+        // the figure with a uniform axis-aligned rectangle, which is precisely the
+        // artifact ADR-0066 removed from `reseed`, and the entry's map pulls the
+        // existing points onto its own attractor within a second anyway.
+        if self.needs_upload {
+            self.seed_particles = Self::seed(
+                self.family,
+                entry.framing.seed_box,
+                self.entry_fill(),
+                self.particle_count,
+            );
+        }
+        true
     }
 }
 
@@ -1101,6 +1241,10 @@ pub const PARAMS: &[&str] = &[
     "b",
     "c",
     "d",
+    // The roster selector (ADR-0093), quantized CPU-side to an entry index. It
+    // sits with the coefficients because it selects them — an entry is a tuple
+    // and the framing that makes the tuple reachable.
+    "tuple",
     "size",
     "hue",
     // The scene-local level (ADR-0080) — spelled exactly as `swarm` and
@@ -1198,10 +1342,11 @@ impl Scene for AttractorScene {
     }
 
     fn reset_params(&mut self) {
-        // Defaults are the active family's canonical coefficients + the calm look,
+        // Defaults are the **active roster entry's** coefficients + the calm look,
         // so an unbound preset (or a param a preset leaves out) falls back here
-        // rather than leaking last frame's.
-        let [a, b, c, d] = self.family.default_coeffs();
+        // rather than leaking last frame's. At entry 0 those are the family's
+        // canonical coefficients, exactly as before the roster existed.
+        let [a, b, c, d] = self.entry().coeffs;
         self.a = a;
         self.b = b;
         self.c = c;
@@ -1228,6 +1373,7 @@ impl Scene for AttractorScene {
         self.root_hue = DEFAULT_CHANNEL_COLOUR;
         self.emergence = DEFAULT_EMERGENCE;
         self.spin = DEFAULT_SPIN;
+        self.tuple = DEFAULT_TUPLE;
         self.morph = DEFAULT_MORPH;
         self.levers = Levers::NEUTRAL;
         self.reseed = 0.0;
@@ -1240,6 +1386,9 @@ impl Scene for AttractorScene {
             "b" => self.b = value,
             "c" => self.c = value,
             "d" => self.d = value,
+            // Stored raw; quantized and applied in `update`, once every binding
+            // this frame has been routed — see the field's doc comment.
+            "tuple" => self.tuple = value,
             "size" => self.size = value,
             "hue" => self.hue = value,
             "brightness" => self.brightness = value,
@@ -1285,6 +1434,14 @@ impl Scene for AttractorScene {
     }
 
     fn update(&mut self, _frame: &AnalysisFrame) {
+        // Resolve the roster selector first, because it rewrites `a`..`d`: this
+        // runs after every one of the frame's bindings and before the render, so
+        // the entry's coefficients and its framing reach the GPU together
+        // (ADR-0093). A cut, by design — chaos forbids a general walk between two
+        // tuples, and the ADR-0066 disturbance and the ADR-0024 dissolve are what
+        // soften it.
+        self.select_tuple();
+
         // Integrate the spin. **Here and not in `advance`**: the renderer calls
         // `advance` before it routes this frame's bindings, so `self.spin` is
         // last frame's value there and this frame's here. `self.dt` is the real
@@ -1351,14 +1508,29 @@ impl Scene for AttractorScene {
                 .map(|(start, end)| FitLut::build(start, end));
             if *family != self.family {
                 self.family = *family;
-                let [a, b, c, d] = family.default_coeffs();
+                // The new family's roster, framing and all — **here**, off the
+                // hot path, for the reason the morph ends above are decomposed
+                // here: measuring a tuple's extent is thousands of map
+                // iterations, and it is a pure function of the family.
+                self.roster = family::resolve_roster(*family);
+                // Back to the canonical entry: an index is only meaningful
+                // against the roster it indexes, so carrying the old family's
+                // across would name a different figure. `update` re-selects from
+                // this frame's `tuple` before anything renders.
+                self.tuple_index = 0;
+                let entry = self.entry();
+                let [a, b, c, d] = entry.coeffs;
                 self.a = a;
                 self.b = b;
                 self.c = c;
                 self.d = d;
                 // Re-seed with the new family's box (its scale differs) and clear
-                // the trail so the new attractor forms cleanly.
-                self.seed_particles = Self::seed(*family, self.particle_count);
+                // the trail so the new attractor forms cleanly. Entry 0 has no
+                // on-attractor bank by construction — this is the box fill it
+                // always was, and `select_tuple` re-seeds from the bank if this
+                // preset's `tuple` picks a measured entry.
+                self.seed_particles =
+                    Self::seed(*family, entry.framing.seed_box, &[], self.particle_count);
                 self.needs_upload = true;
                 self.needs_clear = true;
             }
@@ -1382,6 +1554,10 @@ impl Scene for AttractorScene {
         aspect: f32,
     ) {
         self.rebuild_if_stale();
+        // Read before the destructure below, which borrows the fields
+        // individually: `Framing` is `Copy`, so this is the active entry's
+        // framing by value and the roster stays where it is.
+        let framing = self.entry().framing;
         let Self {
             res,
             active_count,
@@ -1453,6 +1629,7 @@ impl Scene for AttractorScene {
                 aspect,
                 coeffs: [*a, *b, *c, *d],
                 family: *family,
+                framing,
                 spin_time: *spin_time,
                 dt: *dt,
                 pending_steps: *pending_steps,
@@ -1503,7 +1680,7 @@ impl Scene for AttractorScene {
             encoder,
             pipelines,
             *active_count,
-            *family,
+            framing,
             reseed_count,
             pending_jitter,
         );

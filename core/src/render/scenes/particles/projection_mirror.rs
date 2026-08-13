@@ -15,7 +15,11 @@ pub(super) struct Projected {
 /// `f32` `π` is not `−1` to the last bit, and the property ADR-0076 names is
 /// about `cs = −1, sn = 0`.
 pub(super) fn project(q: [f32; 3], family: AttractorFamily, cs: f32, sn: f32) -> Projected {
-    let (_, dim, [cx, cy, cz]) = family.projection();
+    // Entry 0's framing (ADR-0093). The mirror's claim is about the projection's
+    // *algebra* — that rotation by π is an exact x-mirror under orthography and
+    // is not under perspective — which holds for every roster entry, so the
+    // canonical one is a representative rather than a limitation.
+    let (_, dim, [cx, cy, cz]) = family.canonical_framing().projection;
     let ([hx, hy, hz], [vx, vy, vz]) = family.basis().masks();
     let [qx, qy, qz] = q;
     let [px, py, pz] = [qx - cx, qy - cy, qz - cz];
@@ -162,9 +166,13 @@ pub(super) fn world(
     sn: f32,
     perspective: f32,
 ) -> [f32; 2] {
-    let (scl, _, _) = family.projection();
+    let framing = family.canonical_framing();
+    let (scl, _, _) = framing.projection;
     let p = project(q, family, cs, sn);
-    let m = magnify(depth_norm(p.depth, family.inv_depth_extent()), perspective);
+    let m = magnify(
+        depth_norm(p.depth, framing.inv_depth_extent(family)),
+        perspective,
+    );
     let [sx, sy] = p.screen;
     [sx * scl * m, sy * scl * m]
 }

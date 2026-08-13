@@ -7,12 +7,38 @@ use super::{
     DEFAULT_DEPTH_HUE, DEFAULT_SPIN, FIXED_STEP, JITTER_MODE, MAX_PERSPECTIVE,
     MIN_PARTICLE_DENSITY, PARTICLE_ATTRIBUTES, Particle, RESEED_DRAWS_STREAK, SPIN_RATE,
     STEP_SLOTS, Scene, StepUniform, active_particles, advance_spin, brightness_factor,
-    deposit_scale, ifs, projection_mirror, spin_phase, streak_flag,
+    deposit_scale, family, ifs, projection_mirror, spin_phase, streak_flag,
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::context::RenderContext;
 use crate::render::{Tier, TierConfig};
+use family::Framing;
 use ifs::{IfsFigure, Levers};
+
+// -----------------------------------------------------------------------
+// Entry 0 (ADR-0093)
+// -----------------------------------------------------------------------
+//
+// Every assertion in this file that predates the tuple roster is about the
+// canonical tuple's framing, because that is the framing those behaviours
+// shipped with and the one an unbound preset still gets. These three helpers
+// say so at each call site rather than reaching through `canonical_framing()`
+// inline forty times.
+
+/// Roster entry 0's framing for a family.
+fn canonical(family: AttractorFamily) -> Framing {
+    family.canonical_framing()
+}
+
+/// Entry 0's depth normalizer — `d.w` as an unbound preset uploads it.
+fn canonical_depth(family: AttractorFamily) -> f32 {
+    canonical(family).inv_depth_extent(family)
+}
+
+/// The seeded scatter over entry 0's box.
+fn canonical_seed(family: AttractorFamily, count: u32) -> Vec<Particle> {
+    AttractorScene::seed(family, canonical(family).seed_box, &[], count)
+}
 
 // -----------------------------------------------------------------------
 // The IFS family (Plan 0062 Phase 1 / ADR-0075)
@@ -244,9 +270,9 @@ fn the_projection_basis_is_pinned_per_family() {
     // And the departure is not derived from `dim`. Thomas is 3D and keeps
     // x–y — which is the whole reason ADR-0068 Alternative C was declined,
     // so it is asserted rather than left to the doc comment.
-    assert_eq!(AttractorFamily::Thomas.projection().1, 3.0);
+    assert_eq!(canonical(AttractorFamily::Thomas).projection.1, 3.0);
     assert_eq!(AttractorFamily::Thomas.basis(), Basis::XY);
-    assert_eq!(AttractorFamily::Lorenz.projection().1, 3.0);
+    assert_eq!(canonical(AttractorFamily::Lorenz).projection.1, 3.0);
     assert_ne!(
         AttractorFamily::Thomas.basis(),
         AttractorFamily::Lorenz.basis(),
@@ -318,7 +344,7 @@ fn the_depth_extent_is_zero_for_every_flat_family() {
     ];
     for (family, expected) in table {
         assert_eq!(
-            family.inv_depth_extent(),
+            canonical_depth(family),
             expected,
             "{family:?}'s inverse depth extent must be exactly {expected}"
         );
@@ -327,16 +353,16 @@ fn the_depth_extent_is_zero_for_every_flat_family() {
     // The flat families' zero is an *exact* zero, not a small number: the
     // shader multiplies by it and clamps, so anything else is a depth.
     for flat in [AttractorFamily::DeJong, AttractorFamily::Clifford] {
-        assert_eq!(flat.inv_depth_extent(), 0.0);
-        assert!(flat.inv_depth_extent().is_finite());
+        assert_eq!(canonical_depth(flat), 0.0);
+        assert!(canonical_depth(flat).is_finite());
     }
     // Non-vacuity: the 3D families genuinely carry one, and the two differ —
     // so this is a per-family derivation and not one shared constant.
-    assert!(AttractorFamily::Thomas.inv_depth_extent() > 0.0);
-    assert!(AttractorFamily::Lorenz.inv_depth_extent() > 0.0);
+    assert!(canonical_depth(AttractorFamily::Thomas) > 0.0);
+    assert!(canonical_depth(AttractorFamily::Lorenz) > 0.0);
     assert_ne!(
-        AttractorFamily::Thomas.inv_depth_extent(),
-        AttractorFamily::Lorenz.inv_depth_extent()
+        canonical_depth(AttractorFamily::Thomas),
+        canonical_depth(AttractorFamily::Lorenz)
     );
 }
 
@@ -391,7 +417,7 @@ fn perspective_breaks_the_orthographic_mirror() {
             // The premise: this sample must actually have depth, or every
             // assertion below is about `m(0) = m(0)`.
             let rest = projection_mirror::project(q, family, REST.0, REST.1);
-            let dn = projection_mirror::depth_norm(rest.depth, family.inv_depth_extent());
+            let dn = projection_mirror::depth_norm(rest.depth, canonical_depth(family));
             assert!(
                 dn.abs() > 0.05,
                 "{family:?} sample {q:?} sits at depth {dn} — too near the view plane to \
@@ -529,7 +555,7 @@ fn distance_dims_the_far_material() {
     const SAMPLES: usize = 33;
     // A family that actually has depth: any non-zero inverse extent engages the
     // fade; Lorenz's is the one the shipped presets ride.
-    let deep = AttractorFamily::Lorenz.inv_depth_extent();
+    let deep = canonical_depth(AttractorFamily::Lorenz);
 
     // Sample the depth range end to end. `dn = -1` is farthest, `+1` nearest.
     let dn_at = |i: usize| i as f32 / (SAMPLES - 1) as f32 * 2.0 - 1.0;
@@ -581,7 +607,7 @@ fn distance_dims_the_far_material() {
 /// coordinate leaves its bits alone.
 #[test]
 fn the_atmosphere_is_off_by_default() {
-    let deep = AttractorFamily::Lorenz.inv_depth_extent();
+    let deep = canonical_depth(AttractorFamily::Lorenz);
     for dn in [-1.0f32, -0.5, 0.0, 0.25, 1.0] {
         assert_eq!(projection_mirror::haze(dn, DEFAULT_DEPTH_FADE, deep), 1.0);
         assert_eq!(projection_mirror::depth_tint(dn, DEFAULT_DEPTH_HUE), 0.0);
@@ -592,7 +618,7 @@ fn the_atmosphere_is_off_by_default() {
         // is design-backlog 0067 — so the fade term is zeroed by the family's
         // zero inverse extent instead (Plan 0075 Phase 2). Exactly 1.0, the
         // identity ADR-0076 always claimed.
-        let flat_extent = AttractorFamily::DeJong.inv_depth_extent();
+        let flat_extent = canonical_depth(AttractorFamily::DeJong);
         assert_eq!(flat_extent, 0.0);
         let flat = projection_mirror::depth_norm(1e6, flat_extent);
         assert_eq!(projection_mirror::haze(flat, 1.0, flat_extent), 1.0);
@@ -829,7 +855,7 @@ fn continuity_is_pinned_per_family() {
     // re-derive continuity from `dim` to make it pass.
     for (family, continuous) in table {
         assert_eq!(
-            family.projection().1 == 3.0,
+            canonical(family).projection.1 == 3.0,
             continuous,
             "{family:?}: the dim/continuity coincidence has broken, which is                  allowed - update this note, do NOT key `is_continuous` off `dim`"
         );
@@ -1123,6 +1149,27 @@ impl Harness {
         self.scene.set_param("reseed", 0.0);
     }
 
+    /// A `reseed` with **no fixed step alongside it** — the kick, isolated.
+    ///
+    /// `advance(0.0)` leaves the accumulator with nothing to drain, so the frame
+    /// encodes the jitter dispatch and zero step dispatches. That matters for any
+    /// claim about the kick's *magnitude*: on a fast flow one step's own travel
+    /// dwarfs the disturbance, so a before/after difference across a normal frame
+    /// measures the attractor rather than the reseed.
+    fn kick_only(&mut self) {
+        self.scene.set_param("reseed", 1.0);
+        self.scene.advance(0.0);
+        self.scene.update(&AnalysisFrame::default());
+        let mut encoder = self
+            .ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        self.scene
+            .render(&self.ctx.queue, &mut encoder, &self.target, 1.0);
+        self.ctx.queue.submit(std::iter::once(encoder.finish()));
+        self.scene.set_param("reseed", 0.0);
+    }
+
     fn positions(&self) -> Vec<[f32; 3]> {
         self.raw().into_iter().map(|p| p.pos).collect()
     }
@@ -1316,7 +1363,7 @@ fn a_reseed_disturbs_the_cloud_without_leaving_the_attractor() {
     // Direction 2 — and the cloud is still on the attractor. Measured against
     // the old behaviour under the identical instrument.
     let jittered_outside = occupied.fraction_outside(&after);
-    let refilled: Vec<[f32; 3]> = AttractorScene::seed(FAMILY, TEST_PARTICLES)
+    let refilled: Vec<[f32; 3]> = canonical_seed(FAMILY, TEST_PARTICLES)
         .iter()
         .map(|p| p.pos)
         .collect();
@@ -1337,7 +1384,7 @@ fn a_reseed_disturbs_the_cloud_without_leaving_the_attractor() {
         "a reseed put {:.1}% of the cloud off the attractor; the kick is ±{:?} \
          in a figure spanning {:?}",
         jittered_outside * 100.0,
-        FAMILY.jitter_extent(),
+        canonical(FAMILY).jitter_extent(),
         extent(&before)
     );
     // Non-vacuity, and the half that makes this a test of ADR-0066 rather than
@@ -1531,7 +1578,7 @@ fn the_ifs_fill_is_four_points_and_a_box_fill_is_every_point() {
     for figure in ifs::IfsFigure::ALL {
         let family = AttractorFamily::Ifs(figure);
         let drawn = figure.table().maps.iter().filter(|m| m.p > 0.0).count();
-        let seeded = distinct(&AttractorScene::seed(family, COUNT));
+        let seeded = distinct(&canonical_seed(family, COUNT));
         assert!(
             seeded <= drawn,
             "{figure:?} seeded {seeded} distinct positions for {drawn} drawn maps — \
@@ -1554,7 +1601,7 @@ fn the_ifs_fill_is_four_points_and_a_box_fill_is_every_point() {
         AttractorFamily::Lorenz,
     ] {
         assert_eq!(
-            distinct(&AttractorScene::seed(family, COUNT)),
+            distinct(&canonical_seed(family, COUNT)),
             COUNT as usize,
             "{family:?} should still scatter over its seed box — this plan changes \
              only what the IFS writes"
@@ -1849,7 +1896,7 @@ fn the_root_channel_maths_agree_between_rust_and_wgsl() {
 #[test]
 fn every_seeded_age_sits_inside_its_own_lifetime() {
     for figure in ifs::IfsFigure::ALL {
-        let particles = AttractorScene::seed(AttractorFamily::Ifs(figure), 4096);
+        let particles = canonical_seed(AttractorFamily::Ifs(figure), 4096);
         let [lo, hi] = super::CHURN_LIFETIME_SPREAD;
         for p in &particles {
             let life = super::churn_lifetime(p.seed);
@@ -1910,8 +1957,7 @@ fn the_churn_stays_finite_across_ten_thousand_steps() {
                         morph,
                         levers,
                     ));
-                    let seeded =
-                        AttractorScene::seed(AttractorFamily::Ifs(figure), PARTICLES as u32);
+                    let seeded = canonical_seed(AttractorFamily::Ifs(figure), PARTICLES as u32);
                     let mut state: Vec<ChurnState> = seeded
                         .iter()
                         .map(|p| {
@@ -2586,5 +2632,512 @@ fn the_ifs_writes_every_map_index_and_no_other_family_writes_any() {
         de_jong.raw().iter().all(|p| p.root == 0.0),
         "a map family must leave `root` at its seeded 0.0 — it has no fixed \
          points, so any value there is measured against a zeroed table"
+    );
+}
+
+// -----------------------------------------------------------------------
+// The tuple roster (Plan 0079 Phase 1 / ADR-0093)
+// -----------------------------------------------------------------------
+
+/// Lorenz's provisional second entry — the rho ~ 100 torus knot, the regime
+/// Plan 0075 cohort 5 measured as unreachable.
+const KNOT: usize = 1;
+
+/// **Entry 0 is today**, on every family — the claim the whole "no golden
+/// baseline moves" argument rests on, stated where it can fail loudly rather
+/// than inferred from a green capture suite.
+///
+/// Two halves, and the second is the one that could silently rot: the entry's
+/// coefficients must be the family's canonical ones, and its framing must be
+/// the literal constants the scene shipped with. A roster whose entry 0 was
+/// *measured* would land within a percent of these and would move every
+/// attractor baseline by a pixel.
+#[test]
+fn roster_entry_zero_is_the_canonical_tuple_unchanged() {
+    for family in [
+        AttractorFamily::DeJong,
+        AttractorFamily::Clifford,
+        AttractorFamily::Thomas,
+        AttractorFamily::Lorenz,
+        AttractorFamily::Ifs(IfsFigure::Fern),
+    ] {
+        let roster = family::resolve_roster(family);
+        let first = roster
+            .first()
+            .map(|e| e.tuple)
+            .expect("a roster is never empty");
+        assert_eq!(
+            first.coeffs,
+            family.default_coeffs(),
+            "{family:?} entry 0 must carry the canonical coefficients"
+        );
+        assert_eq!(
+            first.framing,
+            canonical(family),
+            "{family:?} entry 0 must carry the framing this scene shipped with"
+        );
+    }
+
+    // The literals themselves, spelled out once: these are the numbers the
+    // pre-roster `projection()` / `seed_box()` returned, and a refactor that
+    // "tidied" one of them would otherwise only show up as a golden diff.
+    assert_eq!(
+        canonical(AttractorFamily::Lorenz),
+        Framing {
+            projection: (0.022, 3.0, [0.0, 0.0, 25.0]),
+            seed_box: ([20.0, 26.0, 24.0], [0.0, 0.0, 25.0]),
+        }
+    );
+    assert_eq!(
+        canonical(AttractorFamily::DeJong),
+        Framing {
+            projection: (0.42, 2.0, [0.0, 0.0, 0.0]),
+            seed_box: ([1.5, 1.5, 1.5], [0.0, 0.0, 0.0]),
+        }
+    );
+}
+
+/// A scene that binds nothing sits on entry 0, and its coefficients are the
+/// ones `reset_params` hands out — the scene-level half of the claim above.
+#[test]
+fn an_unbound_tuple_selects_the_canonical_entry() {
+    let Some(mut h) = Harness::new(AttractorFamily::Lorenz) else {
+        return;
+    };
+    h.scene.reset_params();
+    h.scene.update(&AnalysisFrame::default());
+    assert_eq!(h.scene.entry().framing, canonical(AttractorFamily::Lorenz));
+    assert_eq!(
+        [h.scene.a, h.scene.b, h.scene.c, h.scene.d],
+        AttractorFamily::Lorenz.default_coeffs(),
+        "an unbound preset must still get the canonical coefficients"
+    );
+
+    // ...and the selector reaches the other entry, so the equality above is a
+    // choice rather than the only thing the roster can express.
+    h.scene.set_param("tuple", 1.0);
+    h.scene.update(&AnalysisFrame::default());
+    assert_ne!(
+        h.scene.entry().framing,
+        canonical(AttractorFamily::Lorenz),
+        "entry 1 must carry framing of its own, or the roster buys nothing"
+    );
+}
+
+/// **A fractional `tuple` never reaches a fractional figure** (ADR-0093).
+///
+/// The hazard is not a bad index — the index is a `usize` and cannot be
+/// fractional. It is that a *smoothing curve* makes intermediate values
+/// unavoidable: an eased binding from `0` toward `1` passes through `0.4`
+/// whatever its endpoints are, and interpolating coefficients there would draw
+/// a third, unmeasured attractor with neither endpoint's framing. So the
+/// assertion is on the resolved *coefficients*: every value along a sweep must
+/// land bit-exactly on some roster entry.
+#[test]
+fn an_eased_tuple_never_lands_between_two_figures() {
+    let roster = family::resolve_roster(AttractorFamily::Lorenz);
+    assert!(
+        roster.len() > 1,
+        "the sweep needs two entries to have anything to land between"
+    );
+    for step in 0..=40 {
+        let raw = step as f32 / 20.0 - 0.5;
+        let index = family::roster_index(raw, roster.len());
+        let landed = roster
+            .get(index)
+            .map(|e| e.tuple)
+            .expect("clamped into the roster");
+        assert!(
+            roster.iter().any(|e| e.tuple.coeffs == landed.coeffs),
+            "tuple = {raw} resolved to coefficients {:?}, which are no entry's",
+            landed.coeffs
+        );
+    }
+
+    // Nearest-integer, not truncation: an eased sweep lands on the entry it is
+    // closest to rather than lagging a whole figure behind.
+    assert_eq!(family::roster_index(0.4, 2), 0);
+    assert_eq!(family::roster_index(0.6, 2), 1);
+    // Clamped into the roster at both ends, so an over-driven binding holds the
+    // last figure rather than selecting nothing...
+    assert_eq!(family::roster_index(-7.0, 2), 0);
+    assert_eq!(family::roster_index(1e9, 2), 1);
+    // ...and a non-finite one falls back to the canonical entry rather than
+    // saturating — `f32::clamp` propagates `NaN`, and `kaleido_edge` /
+    // `kaleido_spiral` both answer their default rather than a bound here.
+    // An infinity is *not* the last entry: a binding that has blown up is a
+    // broken binding, and holding the figure it started on is the readable
+    // failure.
+    assert_eq!(family::roster_index(f32::NAN, 2), 0);
+    assert_eq!(family::roster_index(f32::INFINITY, 2), 0);
+    assert_eq!(family::roster_index(f32::NEG_INFINITY, 2), 0);
+    // A one-entry roster (every family but Lorenz today, and every IFS figure)
+    // answers 0 to everything rather than indexing past its end.
+    assert_eq!(family::roster_index(3.0, 1), 0);
+}
+
+/// **The wall and the fix, on one instrument** (backlog 0055, ADR-0093).
+///
+/// The rho ~ 100 Lorenz is unreachable *not* because its coefficients cannot be
+/// bound — they can — but because the canonical framing puts it off-centre and
+/// out of frame: it is centred on `z ~ 102` where the canonical projection
+/// subtracts `25`, and it spans roughly twice the canonical extent. So this
+/// measures the figure once and projects it through **both** framings: through
+/// the canonical one it lands outside the frame (the wall), and through its own
+/// it is centred and inside (the fix).
+#[test]
+fn a_measured_entry_frames_a_tuple_the_canonical_framing_cannot() {
+    const FAMILY: AttractorFamily = AttractorFamily::Lorenz;
+    let roster = family::resolve_roster(FAMILY);
+    let knot = roster
+        .get(KNOT)
+        .map(|e| e.tuple)
+        .expect("the provisional entry ships");
+    let knot_figure = family::measure_figure(FAMILY, knot.coeffs).expect("rho ~ 100 is bounded");
+    let measured = &knot_figure.extent;
+
+    // The premise: this really is a figure the canonical framing was not sized
+    // for. Both halves matter — a bigger figure alone could be zoomed and an
+    // off-centre one alone could be panned; it is the pair that neither rescues.
+    let [_, _, cz] = measured.centre;
+    let (_, _, [_, _, canonical_cz]) = canonical(FAMILY).projection;
+    assert!(
+        (cz - canonical_cz).abs() > 50.0,
+        "the knot is centred on z = {cz}, only {} from the canonical {canonical_cz} — \
+         the premise this entry exists to demonstrate is gone",
+        (cz - canonical_cz).abs()
+    );
+    let canonical_span = family::framed_half(FAMILY, canonical(FAMILY).seed_box.0);
+    assert!(
+        family::framed_half(FAMILY, measured.half) > 1.5 * canonical_span,
+        "the knot no longer overruns the canonical extent"
+    );
+
+    // The wall: the figure's farthest point, projected through the CANONICAL
+    // framing, sits outside NDC. `1.0` is the frame edge — the vertical axis is
+    // not divided by the aspect, so this is the honest bound on either.
+    let wall = {
+        let (scale, _, [_, _, ctr_z]) = canonical(FAMILY).projection;
+        let [_, _, hz] = measured.half;
+        (hz + (cz - ctr_z).abs()) * scale
+    };
+    assert!(
+        wall > 1.0,
+        "the knot fits the canonical frame after all (reach {wall:.2}) — then \
+         ADR-0093's framing argument is not what this entry demonstrates"
+    );
+
+    // The fix: through its own framing it pivots on its own figure, and every
+    // point of it is inside the frame.
+    let (scale, _, centre) = knot.framing.projection;
+    assert_eq!(
+        centre, measured.centre,
+        "a measured entry must pivot on its own figure"
+    );
+    let reach = family::framed_half(FAMILY, measured.half) * scale;
+    println!("the knot fills {reach:.3} of the frame");
+    assert!(
+        (0.2..=1.0).contains(&reach),
+        "the knot projects to {reach:.2} of the frame — out of frame above 1.0, \
+         and a dot below 0.2"
+    );
+
+    // ...and at the same on-screen size as the family's canonical figure, which
+    // is what `measured_framing` scales by rather than by an invented fill
+    // constant.
+    let butterfly =
+        family::measure_figure(FAMILY, FAMILY.default_coeffs()).expect("the butterfly is bounded");
+    let canonical_reach =
+        family::framed_half(FAMILY, butterfly.extent.half) * canonical(FAMILY).projection.0;
+    let ratio = reach / canonical_reach;
+    assert!(
+        (0.99..=1.01).contains(&ratio),
+        "a measured entry should occupy the same footprint as its family's \
+         canonical figure; this one is {ratio:.3}x"
+    );
+
+    // **The fill starts on the figure** (ADR-0093, the ADR-0087 argument): the
+    // bank the measurement collected is what a measured entry seeds from, and
+    // every point of it is inside the figure's own box by construction. Seeded
+    // from a uniform fill of that box instead, this tuple wanders out to 2.2x
+    // its own extent for its first several seconds.
+    let banked = family::resolve_roster(FAMILY)
+        .into_iter()
+        .nth(KNOT)
+        .map(|entry| entry.fill)
+        .expect("the provisional entry ships");
+    assert!(
+        banked.len() > 1000,
+        "the knot banked only {} fill points — too few to cover the figure",
+        banked.len()
+    );
+    let ([hx, hy, hz], [bcx, bcy, bcz]) = knot.framing.seed_box;
+    for [x, y, z] in &banked {
+        assert!(
+            (x - bcx).abs() <= hx && (y - bcy).abs() <= hy && (z - bcz).abs() <= hz,
+            "banked fill point {:?} is outside the figure it was measured from",
+            [x, y, z]
+        );
+    }
+}
+
+/// A diverging tuple keeps its slot rather than renumbering the roster, and
+/// cannot send an infinity to the GPU.
+///
+/// Euler is conditionally stable and this scene integrates at a fixed sub-step,
+/// so rho ~ 160 genuinely blows up — the guard is the difference between a
+/// fallback and a `NaN` scale.
+#[test]
+fn a_divergent_tuple_falls_back_instead_of_reaching_the_gpu() {
+    const FAMILY: AttractorFamily = AttractorFamily::Lorenz;
+    let wild = [10.0, 160.0, 2.6667, 0.0];
+    assert!(
+        family::measure_figure(FAMILY, wild).is_none(),
+        "rho = 160 no longer diverges at this sub-step — pick another witness"
+    );
+    // Whatever reference it is handed, a figure that cannot be measured cannot
+    // be framed.
+    let degenerate = family::Extent {
+        half: [0.0; 3],
+        centre: [0.0; 3],
+    };
+    assert!(family::measured_framing(FAMILY, &degenerate, 30.0).is_none());
+
+    // Every shipped entry's framing is finite and usable, which is what the
+    // fallback guarantees for a curated roster that later grows a bad tuple.
+    for family in [
+        AttractorFamily::DeJong,
+        AttractorFamily::Clifford,
+        AttractorFamily::Thomas,
+        AttractorFamily::Lorenz,
+    ] {
+        for entry in family::resolve_roster(family) {
+            let (scale, dim, centre) = entry.tuple.framing.projection;
+            let (half, _) = entry.tuple.framing.seed_box;
+            assert!(
+                scale.is_finite() && scale > 0.0,
+                "{family:?} entry scale {scale} is unusable"
+            );
+            assert_eq!(dim, canonical(family).projection.1, "{family:?} dim moved");
+            assert!(
+                centre.iter().all(|v| v.is_finite()) && half.iter().all(|v| v.is_finite()),
+                "{family:?} entry framing is not finite"
+            );
+            assert!(
+                entry.tuple.framing.inv_depth_extent(family).is_finite(),
+                "{family:?} entry would send a non-finite depth normalizer to the GPU"
+            );
+        }
+    }
+}
+
+/// **The framing travels with the tuple, so `reseed` does too** — the Plan 0062
+/// coupling ADR-0093 names as the thing a naive roster would silently break.
+///
+/// `jitter_extent` is a fraction of the entry's own box, so a bigger figure gets
+/// a proportionally bigger kick. Had the roster carried coefficients without
+/// framing, the kick would have stayed sized to the canonical butterfly — which
+/// on a figure twice the size is a disturbance half as strong as the one the
+/// preset asked for, and that failure is invisible in a still.
+#[test]
+fn a_measured_entry_derives_its_own_reseed_kick() {
+    const FAMILY: AttractorFamily = AttractorFamily::Lorenz;
+    let roster = family::resolve_roster(FAMILY);
+    let knot = roster
+        .get(KNOT)
+        .map(|e| e.tuple)
+        .expect("the provisional entry ships");
+    let [kx, ky, kz] = knot.framing.jitter_extent();
+    let [cx, cy, cz] = canonical(FAMILY).jitter_extent();
+    // Per axis, and every one of them larger: the knot overruns the canonical
+    // butterfly on all three.
+    for (kick, canon, axis) in [(kx, cx, "x"), (ky, cy, "y"), (kz, cz, "z")] {
+        assert!(
+            kick > canon * 1.1,
+            "the knot's {axis} kick is {kick}, the canonical {canon} — the \
+             derivation is not following the entry"
+        );
+    }
+    // And it is still the same *fraction* of the entry's own box, which is what
+    // makes one constant serve every figure.
+    let ([hx, hy, hz], _) = knot.framing.seed_box;
+    for (kick, half) in [(kx, hx), (ky, hy), (kz, hz)] {
+        assert!(
+            (kick / half - super::JITTER_FRACTION).abs() < 1e-6,
+            "kick {kick} against half-extent {half} is not JITTER_FRACTION"
+        );
+    }
+}
+
+/// The kick lands on the GPU too, on a measured entry, and the cloud comes back
+/// — the render-path half of the test above, and the done-when the Plan 0062
+/// coupling is checked by.
+#[test]
+fn a_reseed_disturbs_a_measured_entry_and_it_reconverges() {
+    const FAMILY: AttractorFamily = AttractorFamily::Lorenz;
+    let Some(mut h) = Harness::new(FAMILY) else {
+        return;
+    };
+    h.scene.set_param("tuple", KNOT as f32);
+    h.run(CONVERGE_FRAMES);
+    assert_eq!(
+        h.scene.tuple_index, KNOT,
+        "the scene is not on the entry under test"
+    );
+    let before = h.positions();
+    let occupied = Occupancy::of(&before);
+    let (lo_before, hi_before) = extent(&before);
+
+    // The kick alone, with no step alongside it — see `kick_only`. At rho ~ 100
+    // one fixed step carries a particle several world units, which is more than
+    // the disturbance itself, so a normal frame cannot measure the kick.
+    h.kick_only();
+    let after = h.positions();
+    let moved = before
+        .iter()
+        .zip(after.iter())
+        .filter(|(a, b)| a != b)
+        .count();
+    assert!(
+        moved * 10 > before.len() * 9,
+        "a reseed on entry {KNOT} moved only {moved} of {}",
+        before.len()
+    );
+
+    // The kick's measured magnitude, against what each framing would predict.
+    // A uniform draw over [-j, j] has mean |offset| = j/2, so this separates
+    // "derived from the entry" from "derived from the family" numerically
+    // rather than by inspection.
+    let mean_kick = before
+        .iter()
+        .zip(after.iter())
+        .map(|(a, b)| {
+            let ([_, ay, _], [_, by, _]) = (a, b);
+            (by - ay).abs()
+        })
+        .sum::<f32>()
+        / before.len() as f32;
+    let [_, entry_j, _] = h.scene.entry().framing.jitter_extent();
+    let [_, canonical_j, _] = canonical(FAMILY).jitter_extent();
+    println!(
+        "mean |dy| after a reseed on entry {KNOT}: {mean_kick:.3} (the entry \
+         predicts {:.3}, the canonical framing {:.3})",
+        entry_j / 2.0,
+        canonical_j / 2.0
+    );
+    assert!(
+        (mean_kick - entry_j / 2.0).abs() < entry_j / 8.0,
+        "the kick does not match the entry's own extent"
+    );
+    assert!(
+        (mean_kick - canonical_j / 2.0).abs() > canonical_j / 4.0,
+        "the instrument cannot tell the two framings apart, so it proves nothing"
+    );
+
+    // ...and the figure survives it: still on the attractor, and back to its own
+    // extent afterwards.
+    let outside = occupied.fraction_outside(&after);
+    assert!(
+        outside < 0.05,
+        "a reseed put {:.1}% of the knot off its own figure",
+        outside * 100.0
+    );
+    // **The disturbance decays**, which is the claim — not that it is gone by
+    // some particular frame. rho ~ 100 is a marginally stable orbit: a kick of a
+    // few per cent sends the trajectory on a wide excursion before it falls
+    // back, measured at ~2.2x the figure's extent and decaying over hundreds of
+    // steps, where the canonical butterfly absorbs the same disturbance within a
+    // handful of frames. That is a property of this provisional tuple worth
+    // knowing before it is curated in — a `reseed` on it is a slow bloom rather
+    // than a shimmer — and it is why the assertion below is about the direction
+    // the extent is moving rather than about a threshold it must be under.
+    h.run(120);
+    let (lo_peak, hi_peak) = extent(&h.positions());
+    h.run(600);
+    let (lo_late, hi_late) = extent(&h.positions());
+    let span = |lo: [f32; 3], hi: [f32; 3], axis: usize| {
+        hi.get(axis).copied().unwrap_or(0.0) - lo.get(axis).copied().unwrap_or(0.0)
+    };
+    for axis in 0..3 {
+        let (was, peak, late) = (
+            span(lo_before, hi_before, axis),
+            span(lo_peak, hi_peak, axis),
+            span(lo_late, hi_late, axis),
+        );
+        println!("axis {axis}: {was:.1} before -> {peak:.1} at the excursion -> {late:.1} after");
+        assert!(
+            peak > was,
+            "axis {axis} never widened past its pre-reseed {was} — the kick did \
+             not reach the figure"
+        );
+        assert!(
+            late < peak,
+            "axis {axis} spans {late} after ten more seconds against {peak} at \
+             the excursion — the disturbance is not decaying"
+        );
+        assert!(
+            late < 1.5 * was,
+            "axis {axis} is still {late} against a pre-reseed {was} — the cloud \
+             has been left off its figure rather than disturbed on it"
+        );
+    }
+}
+
+/// **The CPU step mirror is the shader's**, asserted by running both.
+///
+/// The whole roster rests on it: a framing measured off different arithmetic
+/// frames a figure the GPU does not draw. A transcription error in one of the
+/// four arms would produce a plausible-looking extent and a quietly mis-framed
+/// entry, which no capture-level check would name.
+#[test]
+fn the_cpu_step_mirrors_the_shader() {
+    for family in [
+        AttractorFamily::DeJong,
+        AttractorFamily::Clifford,
+        AttractorFamily::Thomas,
+        AttractorFamily::Lorenz,
+    ] {
+        let Some(mut h) = Harness::new(family) else {
+            return;
+        };
+        let seeded = canonical_seed(family, TEST_PARTICLES);
+        // One frame is exactly one fixed step at the capture `dt`.
+        h.run(1);
+        let stepped = h.positions();
+        let coeffs = family.default_coeffs();
+        let ([hx, hy, hz], _) = canonical(family).seed_box;
+        let scale = hx.max(hy).max(hz);
+        let worst = seeded
+            .iter()
+            .zip(stepped.iter())
+            .map(|(seed, gpu)| {
+                let [cx, cy, cz] = family::step_once(family, coeffs, seed.pos);
+                let [gx, gy, gz] = *gpu;
+                (cx - gx).abs().max((cy - gy).abs()).max((cz - gz).abs())
+            })
+            .fold(0.0f32, f32::max);
+        println!(
+            "{family:?}: worst CPU/GPU step disagreement {worst:.3e} in a figure \
+             of scale {scale}"
+        );
+        assert!(
+            worst < 1e-3 * scale,
+            "{family:?}: the CPU step mirror disagrees with the shader by {worst} \
+             (figure scale {scale})"
+        );
+    }
+}
+
+/// The integrator's sub-step count is one number in two languages, held to the
+/// Rust side — `the_churn_constants_agree_between_rust_and_wgsl`'s discipline,
+/// applied to the constant the measurement depends on.
+#[test]
+fn the_ode_substeps_agree_between_rust_and_wgsl() {
+    let expected = format!("const ODE_SUBSTEPS: i32 = {};", family::ODE_SUBSTEPS);
+    assert!(
+        super::STEP_SHADER.contains(&expected),
+        "the step shader should carry `{expected}` — the Rust constant moved and \
+         the WGSL literal did not, so a measured framing would frame a figure the \
+         GPU does not draw"
     );
 }
