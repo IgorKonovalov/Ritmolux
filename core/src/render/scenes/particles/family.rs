@@ -216,23 +216,86 @@ impl AttractorFamily {
     /// [`canonical_framing`](Self::canonical_framing), which is what keeps an
     /// unbound `tuple` byte-identical to the build before this table existed.
     ///
-    /// **The Lorenz entry is provisional** (Plan 0079 Phase 1): rho ≈ 100 is the
-    /// periodic torus-knot window, the regime Plan 0075 cohort 5 measured as
-    /// physically unreachable — the figure is centred on `z ≈ 102` against the
-    /// canonical framing's `25` and spans twice its extent, so it rendered
-    /// off-centre and out of frame with no preset-side recovery. It ships here as
-    /// the walking skeleton for the plumbing, ahead of Phase 3's curation.
+    /// **This is the Phase 2 CANDIDATE roster, not the shipping one** (Plan
+    /// 0079). Every entry below is a contact-sheet cell for the curation gate at
+    /// Phase 3; Phase 4 trims this table to the figures the user picked. Do not
+    /// read the current length as a decision — it is a menu.
+    ///
+    /// The map families' tuples are the gallery sets backlog 0055 cites; Thomas
+    /// is a sweep of its single dissipation coefficient across the chaotic band
+    /// and out the far side into its periodic windows; Lorenz walks `rho`
+    /// through the regimes above and below the canonical butterfly, plus three
+    /// tuples that move `sigma`/`beta` instead. Entry 1 on Lorenz is the
+    /// rho ≈ 100 torus knot Phase 1 shipped as the walking skeleton — the regime
+    /// Plan 0075 cohort 5 measured as physically unreachable, because the figure
+    /// is centred on `z ≈ 102` against the canonical framing's `25` and spans
+    /// twice its extent.
     ///
     /// **The IFS is empty and stays empty.** Its shape lives in an affine table
     /// rather than in four scalars, and its figure-to-figure travel is ADR-0075's
     /// `morph`, which already carries its own measured framing.
     pub(super) fn extra_tuples(self) -> &'static [[f32; 4]] {
         match self {
-            AttractorFamily::Lorenz => &[[10.0, 100.0, 2.6667, 0.0]],
-            AttractorFamily::DeJong
-            | AttractorFamily::Clifford
-            | AttractorFamily::Thomas
-            | AttractorFamily::Ifs(_) => &[],
+            AttractorFamily::DeJong => &[
+                [-2.0, -2.0, -1.2, 2.0],
+                [-2.7, -0.09, -0.86, -2.2],
+                [1.4, -2.3, 2.4, -2.1],
+                [2.01, -2.53, 1.61, -0.33],
+                [1.5, -1.8, 1.6, 0.9],
+                [-0.827, -1.637, 1.659, -0.943],
+                [0.97, -1.899, 1.381, -1.506],
+                [-1.24, -1.25, -1.81, -1.9],
+                [-0.709, 1.638, 0.452, 1.74],
+                [-1.9, 1.7, 1.7, -1.4],
+                [1.7, 1.7, 0.6, 1.2],
+                [2.1, -1.9, 1.4, 1.1],
+            ],
+            AttractorFamily::Clifford => &[
+                [-1.7, 1.3, -0.1, -1.21],
+                [1.5, -1.8, 1.6, 0.9],
+                [-1.8, -2.0, -0.5, -0.9],
+                [1.7, 1.7, 0.6, 1.2],
+                [-1.7, 1.8, -1.9, -0.4],
+                [1.6, -0.6, -1.2, 1.6],
+                [1.1, -1.0, 1.0, 1.5],
+                [-1.9, 1.4, 1.9, 0.4],
+                [-1.3, -1.3, -1.8, -1.9],
+                [1.9, -1.9, -1.4, 1.2],
+                [-1.2, -1.9, 1.5, -0.8],
+                [-1.4, -1.5, 1.1, 1.4],
+            ],
+            // Thomas reads `a` alone, so its roster is a one-dimensional sweep:
+            // 0.05 is the space-filling end of the chaotic band, 0.208 is where
+            // the chaos gives way, and past it the flow closes into successively
+            // tighter periodic loops.
+            AttractorFamily::Thomas => &[
+                [0.03, 0.0, 0.0, 0.0],
+                [0.05, 0.0, 0.0, 0.0],
+                [0.07, 0.0, 0.0, 0.0],
+                [0.09, 0.0, 0.0, 0.0],
+                [0.11, 0.0, 0.0, 0.0],
+                [0.13, 0.0, 0.0, 0.0],
+                [0.15, 0.0, 0.0, 0.0],
+                [0.17, 0.0, 0.0, 0.0],
+                [0.20, 0.0, 0.0, 0.0],
+                [0.205, 0.0, 0.0, 0.0],
+                [0.208, 0.0, 0.0, 0.0],
+                [0.22, 0.0, 0.0, 0.0],
+            ],
+            AttractorFamily::Lorenz => &[
+                [10.0, 100.0, 2.6667, 0.0],
+                [10.0, 92.0, 2.6667, 0.0],
+                [10.0, 126.52, 2.6667, 0.0],
+                [10.0, 35.0, 2.6667, 0.0],
+                [10.0, 60.0, 2.6667, 0.0],
+                [10.0, 70.0, 2.6667, 0.0],
+                [10.0, 24.4, 2.6667, 0.0],
+                [16.0, 45.92, 4.0, 0.0],
+                [10.0, 28.0, 1.0, 0.0],
+                [14.0, 28.0, 2.6667, 0.0],
+                [10.0, 28.0, 4.0, 0.0],
+            ],
+            AttractorFamily::Ifs(_) => &[],
         }
     }
 }
