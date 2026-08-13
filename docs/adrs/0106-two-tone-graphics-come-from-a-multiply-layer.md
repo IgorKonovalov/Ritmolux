@@ -1,6 +1,6 @@
 # ADR-0106 — Two-tone graphics come from a multiply layer, not a composite redesign
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
 > **Related plan(s):** [0091](../plans/0091-the-figure-fills-the-frame.md)
 
