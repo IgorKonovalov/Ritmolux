@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0090** (ADRs are a separate sequence — next free there is **0104**.)
+**Next free number: 0091** (ADRs are a separate sequence — next free there is **0105**.)
 
 ## Active roster
 
@@ -21,6 +21,7 @@ someone who picked it up is reading.
 | [0088](0088-the-docs-get-pictures.md) | The docs get pictures | approved | dev, human | The only user-facing-docs plan on the roster, and the only one that starts with a **tool gap**: `shot` cannot produce a full-resolution frame under real audio today (`--at` returns a 363x208 bordered tile), so Phase 1 is a capability. Commits ~22 MB of PNGs permanently ([ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md), measured, budgeted). Its gallery is invalidated by [0087](0087-the-line-renderer-draws-a-curve.md) — one script re-run, by construction. |
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 | [0089](0089-the-framing-contract-stops-lying.md) | The framing contract stops lying, and two doc gaps close | approved | dev | The smallest on the roster and the only one that is **three unrelated items in one sitting** — they share a session, not a subject. Phase 1 is the load-bearing one: `FRAME_FILL = 0.88` is **falsified** by rotation, and the closed form in [ADR-0103](../adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) makes it general (a square figure overruns 24.4 %; only the fern complies). It **moves zero pixels** — prove that bless-to-bless, never by a `git diff`. Phase 1 can honestly redirect: if the dragon comes back *inside* the bound, rotation is not the mechanism and the finding is the preset's own `zoom` reaching 1.04. |
+| [0090](0090-the-emitters-source-moves.md) | The emitter's source moves | approved | dev, human | Four scalars, four exact-identity defaults, so it **moves zero pixels** — one emitter baseline and three fixtures in scope. **Phase 3 (`prewarm`) is beyond the interview and is the designed cut point**: it exists because the source alone does not deliver the gate argument (~18 % of steady-state population at the 0.5 s capture), and Phases 1/2/4/5 stand without it. Its gate measurement may come back negative — that is a result, and the answer is **not** to move a floor. Phase 4's `systems.md` sweep is a done-when because that minor has been raised at four consecutive closes. |
 
 **Five plans, written 2026-08-13 from a backlog sweep**, after the roster stood empty for the first
 time in this file's history — **three now: [0083] and [0084] both closed the same day they were
@@ -32,13 +33,21 @@ sequence note below. Three carry new ADRs
 [ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md)), and every
 one of the five closes backlog entries that had been sitting on a demonstrated want with no route.
 
-**Added 2026-08-13, from a second backlog pass: [0089](0089-the-framing-contract-stops-lying.md)**,
-which takes the three items the first sweep left unrouted. Two more came out of that pass and are
-deliberately **not** plans: [ADR-0102](../adrs/0102-a-palette-coordinates-edge-is-a-per-preset-choice.md)
-records the palette-coordinate edge decision with no plan behind it (the want is real, nobody is
-blocked), and the emitter's fixed source line ([backlog 0068](../design-backlog.md) option 2) is going
-to an interview first, because a movable line, a point source and an authorable region are three
-different param surfaces.
+**Added 2026-08-13, from a second backlog pass: [0089](0089-the-framing-contract-stops-lying.md) and
+[0090](0090-the-emitters-source-moves.md)**, which between them take the five items the first sweep
+left unrouted. [0089] is the three-item sitting (a falsified invariant plus two doc paragraphs that
+each named a home and never got a carrier); [0090] came out of an interview on the emitter's fixed
+source line ([backlog 0068](../design-backlog.md) option 2) and ships four scalars plus the world they
+exist for. One item from that pass is deliberately **not** a plan:
+[ADR-0102](../adrs/0102-a-palette-coordinates-edge-is-a-per-preset-choice.md) records the
+palette-coordinate edge decision with no plan behind it — the want is real, nobody is blocked, and it
+is built when a look asks.
+
+**Two items stay parked and are not being planned**, which is the honest half of the sweep:
+[backlog 0021](../design-backlog.md) (the slew release, waiting on an author who wants the look rather
+than on an architect's arithmetic) and [backlog 0032](../design-backlog.md) (both analysis windows
+sized in samples, so 21 of 64 bands are bin-starved at 96 kHz — pinned by a test, ADR territory,
+waiting on someone reporting a mushy low end on a 96 kHz interface).
 
 ## Recommended execution sequence
 
@@ -100,6 +109,23 @@ full-resolution frame under real audio. Where it sits in the order:
   carries the two facts.
 - **It gates nothing.** Phase 1 is a contract restatement and a test; it changes no behaviour and
   moves no pixels.
+
+**Added 2026-08-13: [0090](0090-the-emitters-source-moves.md), from the same pass, by interview** —
+the emitter's source becomes a position and a width, gains a spawn fade, and gains a `prewarm`.
+Where it sits:
+
+- **It contends with nothing on the roster.** It touches `core/src/render/scenes/emitter.rs` and its
+  tests, `presets/`, and three docs; no other active plan is in the emitter. It shares
+  `presets/README.md` with [0089] and [0088], in three different sections.
+- **Phase 3 is the designed cut point, and it is worth knowing before starting.** `prewarm` was not in
+  the interview — it exists because grounding the gate argument found a *second* warm-up the backlog
+  entry never named (the pool starts empty and fills at `spawn_rate`, so ~18 % of steady-state
+  population is on screen at the gates' 0.5 s capture, whatever `source_y` is). Phases 1, 2, 4 and 5
+  stand without it; dropping it costs only the *gateable* half of the slow look.
+- **Its `human` Phase 5 is the reason the plan exists**, not a trailing verdict: the two looks
+  (a quiet drifting field, and a point fountain) are what backlog 0068 has been asking for, and two
+  questions no test can answer ride it — whether `spawn_fade` actually hides the pop, and whether a
+  prewarmed world switches in badly.
 
 **Three of the five carried a `human` phase**, so none closes in one unattended session — the same
 property the previous roster had. [0083] is the exception that proves it: its four `dev` phases
@@ -248,6 +274,7 @@ at 60 Hz or at capture `dt` stays correct as written.
 [0087]: 0087-the-line-renderer-draws-a-curve.md
 [0088]: 0088-the-docs-get-pictures.md
 [0089]: 0089-the-framing-contract-stops-lying.md
+[0090]: 0090-the-emitters-source-moves.md
 [0045]: done/0045-linear-light-and-bloom.md
 [0046]: done/0046-transformed-feedback.md
 [0052]: done/0052-the-emitter-objects-that-spawn-fall-and-die.md

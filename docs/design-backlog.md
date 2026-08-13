@@ -507,7 +507,34 @@ parameter surface, and the scene that most wants it cannot reach it.
   so the field shimmers while the whole-frame mean sits still, the exact property this entry
   measured the emitter for. Both default 0 and the goldens pass unblessed (byte-identity by
   arithmetic, not by bless). The quiet sky itself is Plan 0077 Phase 5, standing in the plans
-  README. **Option 2 remains open here.**
+  README.
+
+### Option 2 — PROMOTED 2026-08-13, by interview
+
+- **→ [ADR-0104](adrs/0104-the-emitters-source-is-authorable-geometry.md) +
+  [Plan 0090](plans/0090-the-emitters-source-moves.md).** Four scalars, every default an exact
+  arithmetic identity: `source_y` (which **may sit inside the frame** — the interview took that
+  trade deliberately, because clamping it below is the decision that keeps the emitter unusable for
+  any slow look), `source_width` (**fractional**, so `aspect * 1.0` is bit-for-bit today's value; `0`
+  is a point source, which falls out rather than being its own concept), `spawn_fade`, and `prewarm`.
+- **The internals were already the right shape**, which is why this is smaller than the entry implies:
+  `source_half_width` is a real field on `Spawn` (`emitter.rs:357`) assigned `self.aspect`
+  unconditionally, and the spawn site already multiplies a unit draw by it. One constant and one
+  assignment.
+- **This entry named ONE warm-up and there are TWO, which is the finding the promotion adds.** Moving
+  the source into the frame removes the *travel* warm-up this entry measured (2.12 units against a
+  0.5 s capture) and leaves the *population* warm-up untouched: the pool starts empty and fills at
+  `spawn_rate`, so Perseids' own numbers put ~100 of ~560 objects on screen at 0.5 s — **about
+  18 %** — wherever `source_y` is. `prewarm` is Plan 0090 Phase 3 and is the phase that actually
+  makes a slow world gateable; it is also the plan's designed cut point, being beyond what the
+  interview covered.
+- **The entry's refusal is honoured**: no gate's capture length, floor or statistic moves. The
+  warm-up is attacked instead of the instrument.
+- **CORRECTION — this entry's own claim that the Perseids look was "routed out of the cohort rather
+  than shipped" is stale.** `presets/emitter_perseids.toml` exists on `system = "emitter"` at
+  `launch_speed = 2.6`: it shipped as exactly the fast-shower compromise this entry predicted would
+  be the only reachable form. What did not ship is the quiet version, which is Plan 0090 Phase 5.
+  The demonstrated want is therefore stronger than the entry records, not weaker.
 
 ---
 
