@@ -442,12 +442,20 @@ fn an_over_scaled_figure_measures_below_its_repaired_counterpart() {
         .into_iter()
         .filter(|p| draws_segments(p.system))
         .collect();
-    // Re-derived from 8 at Plan 0075 cohort four: the renaissance library
-    // ships six line-family worlds (five cohort-one line worlds + Halo), so
-    // eight would fail a library that is fully covered. The guard still
-    // catches the real failure it exists for — the filter matching nothing.
+    // Re-derived twice, and the number is the shipped count rather than a
+    // claim: 8 at Plan 0075 cohort four, then 6 -> 5 when `lsystem_wildwood`
+    // was retired (`7596d56`). The library now draws segments from five
+    // presets — `curve_ionwake`, `curve_nightbloom`, `lsystem_vellum`,
+    // `star_rosewindow` and `spectrum_halo` — so a floor above that fails a
+    // library that is fully covered. The guard still catches the real failure
+    // it exists for: the filter matching nothing.
+    //
+    // `7596d56` re-derived the lsystem floor in `sanity.rs` and missed this
+    // second guard, which is the shape to expect — a retirement moves every
+    // count keyed on the family, and `lsystem` is now a one-member family, so
+    // the next preset in it moves this number again.
     assert!(
-        shipped.len() >= 6,
+        shipped.len() >= 5,
         "only {} shipped line-family presets — this sweep has stopped covering \
          the library",
         shipped.len()
