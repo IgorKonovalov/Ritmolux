@@ -1,6 +1,6 @@
 # ADR-0103 — the IFS fit frames a figure that does not turn, and says so
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
 > **Related plan(s):** [0089 — the framing contract stops lying](../plans/0089-the-framing-contract-stops-lying.md)
 > **Supplements:** [ADR-0075](0075-ifs-family-morphs-in-singular-value-space.md),

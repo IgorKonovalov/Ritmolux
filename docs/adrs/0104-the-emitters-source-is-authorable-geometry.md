@@ -1,6 +1,6 @@
 # ADR-0104 — the emitter's source is authorable geometry, and the pool can start warm
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
 > **Related plan(s):** [0090 — the emitter's source moves](../plans/0090-the-emitters-source-moves.md)
 > **Supplements:** [ADR-0057](0057-emitter-scene-analytic-ballistics-seeded-individuation.md),
