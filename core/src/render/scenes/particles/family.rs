@@ -216,10 +216,19 @@ impl AttractorFamily {
     /// [`canonical_framing`](Self::canonical_framing), which is what keeps an
     /// unbound `tuple` byte-identical to the build before this table existed.
     ///
-    /// **This is the Phase 2 CANDIDATE roster, not the shipping one** (Plan
-    /// 0079). Every entry below is a contact-sheet cell for the curation gate at
-    /// Phase 3; Phase 4 trims this table to the figures the user picked. Do not
-    /// read the current length as a decision — it is a menu.
+    /// **Curated, and the curation kept everything** (Plan 0079 Phase 3,
+    /// 2026-08-13). This table was drafted as a candidate menu for the contact
+    /// sheets; the user judged all 50 entries *in motion in the app* — a sheet
+    /// freezes one instant of a rotating figure and several of these read
+    /// differently once they move — and kept every one. A four-per-family
+    /// shortlist was drafted and rejected, so the length is a verdict rather
+    /// than a default.
+    ///
+    /// The consequence for anyone editing this table: **an entry's index is a
+    /// preset-visible name.** The shipped `attractor_*gallery` presets step
+    /// through these by index, and a preset may pin one (`attractor_torusknot`
+    /// pins Lorenz entry 1), so inserting or reordering renames figures out from
+    /// under them. Append; do not insert.
     ///
     /// The map families' tuples are the gallery sets backlog 0055 cites; Thomas
     /// is a sweep of its single dissipation coefficient across the chaotic band
