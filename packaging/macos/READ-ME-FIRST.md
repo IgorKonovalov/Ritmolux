@@ -52,15 +52,24 @@ That is not a crash, and the app is working - it is drawing its idle animation
 because no audio reached it. Almost always it means step 2 did not complete:
 the permission was denied, or the app was not restarted after granting.
 
-To find out exactly why, run it from Terminal instead of the Finder - cd into
-this folder and run:
+The app says which it was. Either of these answers it, and neither needs the
+Terminal:
+
+  - Press F3. Under the diagnostics panel there is a line starting with
+    "audio". If it reads "live SCK 48000/2" then sound is reaching the app and
+    the problem is elsewhere - check that something is actually playing. If it
+    reads "failed SCK ..." then the rest of that line is the reason. A photo of
+    the screen is enough.
+
+  - Or open diagnostics.log (step 5, below). Its last column is named "capture"
+    and carries the same sentence on every row.
+
+Send back whichever you get - that line is the whole answer.
+
+If neither is available for some reason, the fallback is to run the app from
+Terminal, which prints the same reason on startup - cd into this folder and run:
 
     ./LightMusicVisualizer.app/Contents/MacOS/lmv
-
-It prints the reason on startup. A Finder launch hides that message. Copy
-whatever it says and send it back.
-
-Also make sure something is actually playing.
 
 
 4. Controls
@@ -99,9 +108,9 @@ Six things, however roughly:
   - Did the app open at all?
   - Did the permission prompt say "Light Music Visualizer"?
   - After granting and reopening, do the visuals react to music?
-  - What frame rate does F3 show?
+  - What frame rate does F3 show, and what does its "audio" line say?
   - The contents of the diagnostics.log file from the folder in step 5.
-  - If anything went wrong, the output of the Terminal command in step 3.
+  - If anything went wrong, whatever step 3 told you the reason was.
 
 Thank you - this build exists to find out what breaks.
 

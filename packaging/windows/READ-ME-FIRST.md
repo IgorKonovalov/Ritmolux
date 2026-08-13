@@ -24,9 +24,18 @@ Start any music and the visuals react. There is no setup: the app captures
 whatever your PC is already playing, through the default output device.
 
 If the visuals move but never react to the beat, they are running on the idle
-animation because no audio reached the app. Check that sound is actually coming
-out of the device Windows has selected as default output, and that something is
-playing.
+animation because no audio reached the app. The app says why:
+
+  - Press F3. Under the diagnostics panel there is a line starting with
+    "audio". If it reads "live WASAPI 48000/2" then sound is reaching the app,
+    so check that something is playing and that it is playing out of the device
+    Windows has selected as default output. If it reads "failed WASAPI ..."
+    then the rest of that line is the reason.
+
+  - Or open diagnostics.log (section 4, below). Its last column is named
+    "capture" and carries the same sentence on every row.
+
+Either one is worth sending back on its own.
 
 
 3. Controls
@@ -67,7 +76,7 @@ does not load it - it has its own built in.
 Five things, however roughly:
 
   - Did it run at all, and what did SmartScreen do?
-  - Do the visuals react to music?
+  - Do the visuals react to music? If not, what does F3's "audio" line say?
   - What frame rate does F3 show, and does it say the quality tier was dropped?
   - What graphics card do you have?
   - The contents of diagnostics.log from the folder in step 4.
