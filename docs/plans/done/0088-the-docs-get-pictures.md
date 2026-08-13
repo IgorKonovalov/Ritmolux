@@ -1,10 +1,60 @@
 # 0088 — The docs get pictures
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-13
 > **Approved:** 2026-08-13 (user)
+> **Closed:** 2026-08-13
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0100](../adrs/0100-documentation-images-are-committed-headless-renders.md) (documentation images are committed headless renders), [0101](../adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md) (the preset docs gain a tutorial layer rather than a merge)
+> **Related ADRs:** [0100](../../adrs/0100-documentation-images-are-committed-headless-renders.md) (documentation images are committed headless renders), [0101](../../adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md) (the preset docs gain a tutorial layer rather than a merge)
+
+## Close (2026-08-13)
+
+**All seven phases shipped.** Six by `dev` in one session — `476a989` (`--frame-at`), `c574a0b`
+(the manifest script + hero), `b7fd7ae` (the nine-image gallery), `7549f17`
+([`docs/preset-guide.md`](../../preset-guide.md)), `984494f`
+([`docs/preset-tuning-walkthrough.md`](../../preset-tuning-walkthrough.md)), `30b9eb4` (README +
+the dead-example sweep) — and Phase 7, the `human` look call, at this close (`5dda709`).
+
+**Mode 4 verdict: no blockers, no majors, three minors and two nits**, all repaired in `5dda709`.
+Verified rather than trusted: the hop arithmetic re-derived from `core/src/signal.rs:144`
+(`beat % 8 → 6|7 => 0.04`, rest begins at hop 306.8 — `dev`'s deviation is correct and **this
+plan's hop 340 was wrong**); nine gallery files against the nine arms of `SystemKind::from_name`;
+every quoted `--preset` name and `--preset-file` path re-grepped against the library; `flash` and
+the `occ`/`ceils` prose checked against `fragment_field.rs` and `docs/capturing.md`; link checker,
+`fmt`, `clippy -p standalone --all-targets -D warnings`, and the three new tests all green.
+
+**Two deviations from this document, both argued and both right.** Phase 3's capture hop moved
+**340 → 300**: this plan reasoned from scene time and never checked where 340 lands in
+`dynamic_groove`'s phrase, which is 34 hops inside the two-beat rest. That is the "do the
+arithmetic on every numeric done-when" rule failing on the authoring side, and `dev` caught it.
+Phase 5's subject moved from a `swarm` to a `fragment_field` mandala, user-directed: a still
+picture cannot teach `force`, `spin`, `field_freq`, `reseed` or `twinkle`, and the five steps'
+method is family-agnostic. The phase bodies above are left as written — a closed plan records what
+was decided, not what was learned.
+
+**Phase 7 (the look call).** All ten committed pictures opened and read. Eight of nine gallery
+picks stand; `swarm_drift → swarm_shatter` (charcoal on black collapses to a dark rectangle at
+README width) and the hero `fragment_supernova → fragment_tunnel` (a flat salmon field reads as
+wallpaper at the top of a front page), each judged against alternatives shot for the comparison.
+`emitter_perseids` and `star_rosewindow` are **accepted rather than good** and the hop is not the
+lever — both were shot at other hops with the same framing — so they are content-lane notes in
+[`docs/content-brief.md`](../../content-brief.md) §5, under this plan's own rule.
+
+**One thing the close verified that no phase could.** Re-running `node scripts/docs-shots.mjs`
+after the two manifest edits changed **exactly those two images** and left the other fourteen
+byte-identical — the first actual test of Phase 2's "re-running leaves `git status` clean on the
+same machine" done-when.
+
+**Curation (step 3b):** no preset content landed — `docs/examples/` is teaching material and never
+enters `presets/` — so no near-duplicate sweep is owed. The workaround grep over `presets/*.toml`
+is unchanged by this plan.
+
+**Weight, measured at the close.** The tree holds **16 images, 20,459,591 bytes**. Git history
+holds **19 blobs, 25,489,457 bytes** — `hero.png` was written three times (Phase 2, Phase 3's hop
+correction, Phase 7's swap) and `swarm.png` twice, and a superseded blob never leaves a repository
+that does not rewrite history. Both are inside ADR-0100's ≤ 22 images / ≤ 32 MB, but **the 25.5 MB
+is the figure the ceiling is actually about**, and it is the one a later close must track. Recorded
+as a dated `Outcome` on [ADR-0100](../../adrs/0100-documentation-images-are-committed-headless-renders.md).
 
 ## TL;DR
 
@@ -33,7 +83,7 @@ weight question below is a one-way decision rather than a formatting one.
 `presets/README.md` (2,943) is the parameter roster, `docs/presets.md` (1,143) is the grammar,
 `docs/preset-palettes.md` (733) is the colour surface. All three are current and load-bearing — the
 `preset-author` lane keeps no catalogue of its own precisely so these stay the one copy. What is
-missing is an entrance, not more reference. [ADR-0101](../adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)
+missing is an entrance, not more reference. [ADR-0101](../../adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)
 records why the answer is a fourth document rather than a merge.
 
 **`shot` cannot currently take the picture this needs.** Measured 2026-08-13:
@@ -46,7 +96,7 @@ records why the answer is a fourth document rather than a merge.
   single-hop `--at` at default size comes back **363x208 with a frame around it**. Unusable as a
   documentation image.
 - `--set` reaches full size but is the wrong stimulus three ways, all named in
-  [`docs/capturing.md`](../capturing.md#the-three-calibration-traps): a held `beat` photographs every
+  [`docs/capturing.md`](../../capturing.md#the-three-calibration-traps): a held `beat` photographs every
   accent at full deflection, band magnitudes are "a fraction of peak, held forever", and the 64-band
   array stays silent — so `bin(x)` reads `0` and the entire `spectrum` family renders as its inert
   resting comb.
@@ -72,7 +122,7 @@ downscaled or lossy images (the user's explicit call with the measured cost in f
 the worst-case content for palettization), live application screenshots as the primary source
 (nothing regenerates, every image becomes a `human` sitting), and `--set` stimuli (the three
 calibration traps, of which the `spectrum` one is decisive). Full rationale and the measured numbers
-are in [ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md).
+are in [ADR-0100](../../adrs/0100-documentation-images-are-committed-headless-renders.md).
 
 **The weight, stated plainly.** Measured across six families at 1280x720: **1.0–2.0 MB per PNG, mean
 ~1.4 MB**. This plan commits **16 images** — 9 gallery, 1 hero, 6 walkthrough — for **~22 MB** of
@@ -175,7 +225,7 @@ flowchart LR
   call belongs.
 - **The capture recipe, and why:** `--signal dynamic:110 --frame-at 340 --size 1280x720 --tier rich`.
   `dynamic:110` is the only synthesized kind with real rise and fall through the real analyzer
-  ([`docs/capturing.md`](../capturing.md#dynamicbpm--the-one-kind-that-rises-and-falls)); the clip
+  ([`docs/capturing.md`](../../capturing.md#dynamicbpm--the-one-kind-that-rises-and-falls)); the clip
   runs ~355 analysis hops, so hop 340 is ~3.8 s of scene time — nearly twice the 2 s a default
   `--frames 120` capture reaches, which matters for every accumulating family. Measured:
   `attractor_leviathan` at hop 46 is an undeveloped smudge and at hop 340 is the finished rosette.
@@ -201,11 +251,11 @@ flowchart LR
   2. **The nine systems** — one image, two sentences and a "reach for this when" line each.
   3. **The three surfaces** — expressions, structure, colour: a paragraph each saying what it is and
      linking to the document that owns it. **No table from any of them is reproduced here**
-     ([ADR-0101](../adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)).
+     ([ADR-0101](../../adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)).
   4. **Iterating** — `LMV_PRESET_DIR` hot reload beside a `shot` capture, the loop the content lane
      actually runs.
   5. **Knowing it is good** — the five gates and what green is evidence of (only `reactivity` plays
-     audio), pointing at [`docs/capturing.md`](../capturing.md).
+     audio), pointing at [`docs/capturing.md`](../../capturing.md).
   6. **Next: the walkthrough.**
 - **Done when:**
   - Every one of the nine systems appears with its image and its "reach for this when" line.
@@ -285,7 +335,7 @@ flowchart LR
 - **Done when:** each of the nine picks is either kept or swapped. A swap is **one manifest line and
   a script re-run** — that is the whole point of Phase 2's shape.
 - **This phase may carry forward.** If the user is not available, the `dev` phases close the plan and
-  this item moves to [`docs/content-brief.md`](../content-brief.md) under the same rule Plan 0083's
+  this item moves to [`docs/content-brief.md`](../../content-brief.md) under the same rule Plan 0083's
   Phase 5 followed. The provisional picks are committed and working in the meantime.
 
 ## Data shapes

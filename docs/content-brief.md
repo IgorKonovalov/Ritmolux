@@ -170,6 +170,39 @@ over a lit backdrop — **one pass, not two.**
 
 ---
 
+## 5. Two families photograph badly, and only content can fix it — [Plan 0088](plans/done/0088-the-docs-get-pictures.md) Phase 7
+
+**This item is a framing brief, not a look brief.** Plan 0088 committed one gallery image per
+built-in system, and the Phase 7 look call at its close accepted two of them as *adequate rather
+than good*. Both families ship **exactly one preset**, so there is nothing to swap to — and the
+close established, by shooting alternatives, that the capture hop is not the lever either.
+
+- **`emitter_perseids`** — the meteor fan bunches into the right half of the frame and leaves the
+  left third empty navy. Shot at hops 250, 300 and 340: the same imbalance at all three, so this is
+  the preset's spawn geometry and not a moment in the clip. The gallery image is
+  `docs/images/gallery/emitter.png`.
+- **`star_rosewindow`** — the outermost ring of the rosette runs off all four edges, so the image
+  reads as a crop rather than as a rose window. Shot at 230 and 300: identical framing, different
+  palette phase. The gallery image is `docs/images/gallery/star_pattern.png`.
+
+Three riders:
+
+- **Judge it in the window, not only in a still.** Both may well be right in motion — a fan that
+  sweeps and a rosette that breathes past the frame edge are legitimate looks. The complaint is
+  specifically that the *single committed frame* misrepresents the family to a first-time reader.
+  If the motion is right and the still is not, say so and close this with that verdict; adding a
+  second preset to the family is then the better answer than retuning the one that exists.
+- **A swap is one manifest line.** If the sitting produces a second `emitter` or `star_pattern`
+  preset, point `scripts/docs-shots.mjs` at it and re-run the script — argument-free, no other
+  image moves (verified at the close: re-running changed only the two entries that were edited).
+- **Re-run the script whatever the outcome**, since a retune of either preset silently invalidates
+  its committed picture and [ADR-0100](adrs/0100-documentation-images-are-committed-headless-renders.md)
+  deliberately has no gate that would notice.
+
+**Record the verdict here**, then move the row to `Done` below.
+
+---
+
 ## Done
 
 *(Nothing yet — this file was consolidated 2026-08-13. Move a row here with its date and a
