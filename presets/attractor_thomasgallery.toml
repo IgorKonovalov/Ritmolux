@@ -1,0 +1,49 @@
+# Plan 0079 demo - the Thomas roster: one coefficient swept across the chaotic
+# band and out the far side, thirteen entries, ~3 s each.
+#
+# Sparse on purpose (ADR-0069): at low `density` the segment joins each step to
+# the last and the flow reads as pen lines rather than as fog, which is what
+# makes the difference between neighbouring entries legible.
+system = "attractor"
+name = "Thomas Gallery"
+
+[particles]
+family = "thomas"
+density = 0.03
+
+[palette]
+name = "mono"
+
+[params]
+tuple = "mod(floor(time * 0.33), 13)"
+
+brightness = "2.0"
+fade = "0.80 - clamp(bass * 0.05, 0, 0.05)"
+size = "0.25 + clamp(treb * 0.10, 0, 0.08) + beat * 0.05"
+reseed = "onset > 0.55"
+
+# BLOOM - and the level above it is what makes the stage do anything at all.
+# This preset sat at `brightness = 0.14`, which is the documented trap: the
+# bright-pass selects light that is OVER range, so a figure held under 1.0 hands
+# it an empty frame and bloom renders pixel-identical to bloom switched off. The
+# level had to come up first, and the trail and nib had to come down with it or
+# the lattice would have filled in.
+#
+# Threshold above the strand body, as on the knot: the halo picks out the
+# crossings where strands pile up, which is exactly where a lattice wants light.
+bloom_amount = "0.35 + beat * 0.25 + clamp(bass * 0.20, 0, 0.15)"
+bloom_threshold = "1.6"
+bloom_radius = "1.6"
+
+perspective = "0.20"
+depth_fade = "0.50"
+spin = "1.0"
+
+saturation = "0.4"
+hue_spread = "0.10"
+hue_center = "0.55"
+
+[smoothing]
+size = { attack = 0.03, release = 0.30 }
+bloom_amount = { attack = 0.04, release = 0.40 }
+perspective = 0.9

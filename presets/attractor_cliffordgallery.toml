@@ -1,0 +1,28 @@
+# Plan 0079 demo - the Clifford roster, thirteen figures at ~3 s each.
+system = "attractor"
+name = "Clifford Gallery"
+
+[particles]
+family = "clifford"
+density = 0.5
+
+[palette]
+name = "ice"
+
+[params]
+tuple = "mod(floor(time * 0.33), 13)"
+
+brightness = "0.22"
+fade = "0.90"
+size = "0.45 + clamp(treb * 0.15, 0, 0.12)"
+reseed = "onset > 0.55"
+
+saturation = "0.9"
+hue_spread = "0.22"
+hue_center = "0.35"
+spin = "0.3"
+zoom = "1.0 + clamp(bass * 0.08, 0, 0.07)"
+
+[smoothing]
+size = { attack = 0.03, release = 0.30 }
+zoom = 0.2
