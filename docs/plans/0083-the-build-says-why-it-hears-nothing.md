@@ -1,6 +1,6 @@
 # 0083 — the build says why it hears nothing
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none — no rejected alternative worth recording; the shape follows

@@ -1,5 +1,6 @@
 #[cfg(target_os = "macos")]
 mod capture_mac;
+mod capture_verdict;
 #[cfg(windows)]
 mod capture_win;
 mod config;
@@ -14,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use capture_verdict::CaptureVerdict;
 use config::Config;
 use diaglog::DiagLog;
 use director::Director;
@@ -79,6 +81,11 @@ struct AppState {
     consumer: Option<SampleConsumer>,
     // Held for its Drop: stops the capture thread with the app.
     _capture: Option<capture_handle::Handle>,
+    /// The startup capture verdict, already rendered to its one-line token
+    /// (Plan 0083). Built once and borrowed by both durable surfaces — the
+    /// `diagnostics.log` `capture` column and the F3 overlay — so the two can
+    /// never disagree about the same run.
+    capture_token: String,
     scratch: Vec<f32>,
     occluded: bool,
     /// Frames since the last title refresh (title shows core-sourced fps + p99).
@@ -220,8 +227,11 @@ impl AppState {
         // shows live fps/p99 (the overlay itself stays off until F3 — Plan 0011).
         renderer.enable_diagnostics(true);
 
-        let (capture, consumer, format) = start_capture(&config.input);
-        let analyzer = Analyzer::new(format)
+        let capture = start_capture(&config.input);
+        // Rendered once, here, and only borrowed afterwards: the log's row builder
+        // runs every frame and the overlay every frame it is up (Plan 0083).
+        let capture_token = capture.verdict.token();
+        let analyzer = Analyzer::new(capture.format)
             .expect("capture layer already validated this format at the boundary");
 
         // Frame pacing is a shell concern; the core stays clock-free (determinism).
@@ -235,8 +245,9 @@ impl AppState {
             window,
             renderer,
             analyzer,
-            consumer,
-            _capture: capture,
+            consumer: capture.consumer,
+            _capture: capture.handle,
+            capture_token,
             scratch: vec![0.0; 32_768],
             occluded: false,
             title_tick: 0,
@@ -492,6 +503,7 @@ impl AppState {
             &metrics,
             || renderer.analysis_metrics(),
             rss::current_rss_bytes,
+            &self.capture_token,
         );
         // Long-run soak trace (opt-in). Absent unless `--soak` was passed, so the
         // normal loop is unaffected; when present it samples only every few
@@ -970,14 +982,26 @@ fn decode_overlay_key(code: KeyCode) -> Option<OverlayKey> {
     })
 }
 
+/// What one call to `start_capture` produced: the handle and consumer when it
+/// worked, the format the analyzer is built on either way, and — the point of
+/// Plan 0083 — the [`CaptureVerdict`] that says which of those two happened.
+struct CaptureStart {
+    handle: Option<capture_handle::Handle>,
+    consumer: Option<SampleConsumer>,
+    format: AudioFormat,
+    verdict: CaptureVerdict,
+}
+
+/// The format both platform arms fall back to when capture fails, so the analyzer
+/// has something valid to start on. **The verdict never reports it** — a log
+/// stating a format nothing is delivering is worse than no log.
+const FALLBACK_FORMAT: AudioFormat = AudioFormat {
+    sample_rate: 48_000,
+    channels: 2,
+};
+
 #[cfg(windows)]
-fn start_capture(
-    input: &config::Input,
-) -> (
-    Option<capture_handle::Handle>,
-    Option<SampleConsumer>,
-    AudioFormat,
-) {
+fn start_capture(input: &config::Input) -> CaptureStart {
     let selector = capture_win::CaptureSelector {
         mode: match input.mode {
             config::InputMode::Loopback => capture_win::CaptureMode::Loopback,
@@ -990,66 +1014,66 @@ fn start_capture(
     match capture_win::start(&selector) {
         Ok((handle, consumer)) => {
             let format = handle.format();
-            (Some(handle), Some(consumer), format)
+            CaptureStart {
+                handle: Some(handle),
+                consumer: Some(consumer),
+                format,
+                verdict: CaptureVerdict::Live {
+                    backend: "WASAPI",
+                    format,
+                },
+            }
         }
         Err(err) => {
+            // Stays: it costs nothing and is still the fastest read for anyone
+            // already at a terminal. The verdict is for everyone who is not.
             eprintln!("audio capture unavailable ({err}); rendering without audio");
-            (
-                None,
-                None,
-                AudioFormat {
-                    sample_rate: 48_000,
-                    channels: 2,
-                },
-            )
+            CaptureStart {
+                handle: None,
+                consumer: None,
+                format: FALLBACK_FORMAT,
+                verdict: CaptureVerdict::failed("WASAPI", err),
+            }
         }
     }
 }
 
 #[cfg(target_os = "macos")]
-fn start_capture(
-    _input: &config::Input,
-) -> (
-    Option<capture_handle::Handle>,
-    Option<SampleConsumer>,
-    AudioFormat,
-) {
+fn start_capture(_input: &config::Input) -> CaptureStart {
     match capture_mac::start() {
         Ok((handle, consumer)) => {
             let format = handle.format();
-            (Some(handle), Some(consumer), format)
+            CaptureStart {
+                handle: Some(handle),
+                consumer: Some(consumer),
+                format,
+                verdict: CaptureVerdict::Live {
+                    backend: "SCK",
+                    format,
+                },
+            }
         }
         Err(err) => {
             eprintln!("ScreenCaptureKit capture unavailable ({err}); rendering without audio");
-            (
-                None,
-                None,
-                AudioFormat {
-                    sample_rate: 48_000,
-                    channels: 2,
-                },
-            )
+            CaptureStart {
+                handle: None,
+                consumer: None,
+                format: FALLBACK_FORMAT,
+                verdict: CaptureVerdict::failed("SCK", err),
+            }
         }
     }
 }
 
 #[cfg(not(any(windows, target_os = "macos")))]
-fn start_capture(
-    _input: &config::Input,
-) -> (
-    Option<capture_handle::Handle>,
-    Option<SampleConsumer>,
-    AudioFormat,
-) {
+fn start_capture(_input: &config::Input) -> CaptureStart {
     // No capture path on this platform; render silence-driven visuals.
-    (
-        None,
-        None,
-        AudioFormat {
-            sample_rate: 48_000,
-            channels: 2,
-        },
-    )
+    CaptureStart {
+        handle: None,
+        consumer: None,
+        format: FALLBACK_FORMAT,
+        verdict: CaptureVerdict::Unsupported,
+    }
 }
 
 struct App {
