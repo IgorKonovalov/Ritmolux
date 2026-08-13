@@ -908,7 +908,7 @@ sweep the shipped set, and **one of them drives real audio**:
 
 | gate | where its numbers come from | would it notice a preset that ignores the music? |
 |------|------------------------------|--------------------------------------------------|
-| `reactivity` | **PCM → the real analyzer** — four `core::signal` clips (60 Hz sine, a mid chord, a 12 kHz tone, a 240 BPM click track) pushed hop-by-hop through `Analyzer` and rendered frame by frame via `Renderer::capture_audio` | **Yes.** This is the only one. A preset that reads no band moves identically under all four clips and fails |
+| `reactivity` | **PCM → the real analyzer** — four `core::signal` clips (60 Hz sine, a mid chord, a 12 kHz tone, a 240 BPM click track) pushed hop-by-hop through `Analyzer` via `Renderer::capture_audio_after_warmup`, which advances the analyzer's warm-up hops without pixels and rasterizes only the measured window | **Yes.** This is the only one. A preset that reads no band moves identically under all four clips and fails |
 | `sanity` | one synthesized `AnalysisFrame` | No — it asks whether the frame is lit, spread and tonally structured |
 | `animation` | a **zeroed** `AnalysisFrame` held constant | No, by design — it asks whether the scene clock moves, with audio deliberately held out |
 | `distinctness` | one synthesized `AnalysisFrame`, shared across a family | No — it asks whether two presets look alike |
@@ -918,8 +918,13 @@ sweep the shipped set, and **one of them drives real audio**:
 *frame* — is it lit, does it move, is it distinct, does it match its baseline —
 and a made-up analysis frame answers those correctly and several times faster
 than pushing samples would. Converting them would buy nothing and cost the sweep
-another ~1.8x each. That is a decision, not an omission
+a multiple of what it costs now. That is a decision, not an omission
 ([Plan 0067](plans/done/0067-the-curation-route.md), "What this plan does NOT do").
+The **price of converting one has dropped** since that decision — Plan 0067 measured
+it at ~1.8x when every hop rasterized, and
+[Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md) removed
+the warm-up renders from that figure — but the reasoning above does not turn on
+the price, so the decision stands.
 
 **So read a green suite as: the renderer produced a plausible, distinct, moving
 frame, and the preset responds to at least one band of real audio.** What it
@@ -932,10 +937,25 @@ second gate that sees real signal even though it renders nothing. `beat`,
 than the shipped set.
 
 If one of the other four ever needs to answer an audio question, `reactivity.rs`
-is the pattern: synthesize with `core::signal`, drive `Renderer::capture_audio`,
-and keep the clip only as long as the analyzer's window needs to fill —
-`WARMUP_HOPS` of the ~40-hop clip publish nothing at all, and they are most of
-what the change costs.
+is the pattern: synthesize with `core::signal`, drive
+`Renderer::capture_audio_after_warmup`, and keep the clip only as long as the
+analyzer's window needs to fill — `WARMUP_HOPS` of the ~40-hop clip publish
+nothing at all, so they are fed as warm-up and never rasterized.
+
+**Copying it carries one consequence that is easy to miss** (Plan 0084 Phase 4,
+2026-08-13). Skipping the warm-up renders is safe for the *analyzer* — analysis
+is a pure function of its window and the render pass never touches it, which
+`core/tests/capture_advance.rs` asserts bit-for-bit — but it is **not** a no-op
+for the scene. A scene that integrates on the GPU (trails, particles,
+reaction-diffusion) now meets the measured window `WARMUP_HOPS` steps colder
+than it would have, because those hops used to double as the scene warm-up.
+Time-driven scenes are unaffected, since the clock advances either way. When
+that change landed on `reactivity` it moved 35 of 36 per-band vectors — all
+upward, none regressed, and the tightest headroom in the library roughly
+doubled — but a gate copying the pattern should expect its own numbers to be a
+fresh baseline rather than comparable to a rendered-warm-up run. Nothing asserts
+this; it is documented here and in the two source docstrings because no
+instrument in the repo can see it.
 
 ### Golden baselines
 
