@@ -107,6 +107,21 @@ pub enum GeneratorConfig {
         /// Structural, not bindable: an eased integer count would re-decide the
         /// picture every frame. `1.0` is the whole budget and the default.
         density: f32,
+        /// The **tuple path** the bindable `morph` param walks along on a map
+        /// family (ADR-0093), as `(from, to)` roster indices from
+        /// `[particles] tuple_from` / `tuple_to`. `None` — the default — means
+        /// there is no path and `morph` is inert, exactly as `morph_to` does for
+        /// the IFS.
+        ///
+        /// **Both ends are structural on purpose.** The walk's framing is
+        /// measured across it at load, which is thousands of map iterations; a
+        /// path whose near end came from the per-frame `tuple` param would have
+        /// to re-measure inside the frame loop every time that param moved.
+        ///
+        /// Map-family-only, and validated as such at load — the IFS reaches its
+        /// own figure-to-figure travel through `morph_to` instead, and a tuple
+        /// path on an IFS is a load error rather than a silent no-op.
+        tuple_path: Option<(u32, u32)>,
     },
     /// The spectrum readout's `[spectrum]` table (Plan 0034 / ADR-0036): how many
     /// elements the frequency axis is divided into, how they are laid out, and how

@@ -669,6 +669,15 @@ pub struct AttractorScene {
     /// Which entry [`tuple`](Self::tuple) last resolved to. Always a valid index
     /// into [`roster`](Self::roster) — [`roster_index`] clamps.
     tuple_index: usize,
+    /// The measured path `morph` walks on a map family (ADR-0093), from
+    /// `[particles] tuple_from`/`tuple_to`. `None` — the default — is what makes
+    /// `morph` inert on the four map families, exactly as an absent `morph_to`
+    /// makes it inert on an IFS.
+    ///
+    /// Built at [`configure`](Scene::configure) for [`ifs_fit`](Self::ifs_fit)'s
+    /// reason: measuring nine framings across the walk is thousands of map
+    /// iterations, and the walk is a pure function of the pair.
+    tuple_walk: Option<TupleWalk>,
     /// The roster selector (ADR-0093), raw as the preset bound it;
     /// [`roster_index`] quantizes it on the way to an entry.
     ///
@@ -876,6 +885,7 @@ impl AttractorScene {
             spin_time: 0.0,
             family,
             roster: family::resolve_roster(family),
+            tuple_walk: None,
             tuple_index: 0,
             tuple: DEFAULT_TUPLE,
             ifs_ends: None,
@@ -1204,6 +1214,14 @@ impl AttractorScene {
     /// a cut the ADR-0066 disturbance and the ADR-0024 dissolve are already
     /// covering.
     fn select_tuple(&mut self) -> bool {
+        // **A preset either steps the roster or walks a path, never both.** The
+        // walk's ends are structural and its framing was measured across them at
+        // load; letting `tuple` move the near end underneath that would either
+        // re-measure inside the frame loop or render the walk against a framing
+        // belonging to a different pair.
+        if self.tuple_walk.is_some() {
+            return false;
+        }
         let index = family::roster_index(self.tuple, self.roster.len());
         if index == self.tuple_index {
             return false;
@@ -1232,6 +1250,17 @@ impl AttractorScene {
         }
         true
     }
+}
+
+/// How many entries a family's roster holds — what `[particles] tuple_to` is
+/// validated against at load (ADR-0093).
+///
+/// `pub` because the boundary check lives in `preset/schema.rs`, which is where
+/// a structural key belongs: an index past the end should be a load error naming
+/// the roster's size, not a silent clamp onto a figure the author did not ask
+/// for.
+pub fn roster_len(family: AttractorFamily) -> usize {
+    family.extra_tuples().len() + 1
 }
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
@@ -1441,6 +1470,16 @@ impl Scene for AttractorScene {
         // tuples, and the ADR-0066 disturbance and the ADR-0024 dissolve are what
         // soften it.
         self.select_tuple();
+        // A walk overrides the coefficients the entry handed out, for the reason
+        // `select_tuple` overrides a bound `a` on a cut: the figure and its
+        // framing have to reach the GPU from the same frame's `morph`.
+        if let Some(walk) = self.tuple_walk.as_ref() {
+            let [a, b, c, d] = walk.coeffs_at(self.morph);
+            self.a = a;
+            self.b = b;
+            self.c = c;
+            self.d = d;
+        }
 
         // Integrate the spin. **Here and not in `advance`**: the renderer calls
         // `advance` before it routes this frame's bindings, so `self.spin` is
@@ -1480,6 +1519,7 @@ impl Scene for AttractorScene {
             family,
             density,
             morph_to,
+            tuple_path,
         } = cfg
         {
             // `density` is resolved unconditionally, not behind the family guard:
@@ -1506,6 +1546,12 @@ impl Scene for AttractorScene {
                 .ifs_ends
                 .as_ref()
                 .map(|(start, end)| FitLut::build(start, end));
+            // The tuple path, resolved unconditionally for `density`'s reason:
+            // two presets can share a family and walk different pairs. Built
+            // AFTER the family block below would be wrong — the roster it
+            // indexes is rebuilt there — so it is done once the family is
+            // settled, at the end of this block.
+            let requested_path = *tuple_path;
             if *family != self.family {
                 self.family = *family;
                 // The new family's roster, framing and all — **here**, off the
@@ -1534,6 +1580,36 @@ impl Scene for AttractorScene {
                 self.needs_upload = true;
                 self.needs_clear = true;
             }
+            // ...and now the roster is the right family's, so the path can index
+            // it. A pair that cannot be measured end to end yields `None` and the
+            // preset simply has no walk — the same shape a missing `morph_to`
+            // leaves the IFS in, and a finding rather than an error: a pair whose
+            // middle diverges has no path, whatever its endpoints look like.
+            self.tuple_walk = requested_path.and_then(|(from, to)| {
+                let reference = family::family_reference(*family)?;
+                let (a, b) = (
+                    self.roster.get(from as usize)?.tuple,
+                    self.roster.get(to as usize)?.tuple,
+                );
+                TupleWalk::build(*family, a, b, reference)
+            });
+            // Park on the near end so the initial fill is that entry's own
+            // on-attractor bank rather than entry 0's. `select_tuple` leaves the
+            // index alone once a walk exists, so this is where it is set.
+            if self.tuple_walk.is_some()
+                && let Some((from, _)) = requested_path
+            {
+                self.tuple_index = (from as usize).min(self.roster.len().saturating_sub(1));
+                let entry = self.entry();
+                self.seed_particles = Self::seed(
+                    *family,
+                    entry.framing.seed_box,
+                    self.entry_fill(),
+                    self.particle_count,
+                );
+                self.needs_upload = true;
+                self.needs_clear = true;
+            }
         }
         None
     }
@@ -1557,7 +1633,10 @@ impl Scene for AttractorScene {
         // Read before the destructure below, which borrows the fields
         // individually: `Framing` is `Copy`, so this is the active entry's
         // framing by value and the roster stays where it is.
-        let framing = self.entry().framing;
+        let framing = match self.tuple_walk.as_ref() {
+            Some(walk) => walk.framing_at(self.morph),
+            None => self.entry().framing,
+        };
         let Self {
             res,
             active_count,

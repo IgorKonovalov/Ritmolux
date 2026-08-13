@@ -849,19 +849,25 @@ fn build_config(
         // absent, it defaults to De Jong. Config is always `Some` so `configure`
         // runs on every preset switch (resetting the family — never stale).
         SystemKind::Attractor => {
-            let (family, density, morph_to) = match particles {
+            let (family, density, morph_to, tuple_path) = match particles {
                 Some(p) => {
                     let family = AttractorFamily::from_name(&p.family).ok_or_else(|| {
                         PresetError::Config(format!("unknown attractor family '{}'", p.family))
                     })?;
-                    (family, p.density()?, p.morph_to(family)?)
+                    (
+                        family,
+                        p.density()?,
+                        p.morph_to(family)?,
+                        p.tuple_path(family)?,
+                    )
                 }
-                None => (AttractorFamily::DeJong, 1.0, None),
+                None => (AttractorFamily::DeJong, 1.0, None, None),
             };
             Ok(Some(GeneratorConfig::Particles {
                 family,
                 density,
                 morph_to,
+                tuple_path,
             }))
         }
         // The spectrum readout selects its element count, layout and per-element
@@ -1264,6 +1270,13 @@ struct RawParticles {
     /// The IFS figure the bindable `morph` param travels towards (ADR-0075).
     /// Optional; absent pins the figure and makes `morph` inert.
     morph_to: Option<String>,
+    /// The near end of the tuple path `morph` walks on a map family (ADR-0093),
+    /// as a roster index. Optional; defaults to entry `0` when `tuple_to` names
+    /// a far end.
+    tuple_from: Option<u32>,
+    /// The far end of that path. Optional — and it is the key that turns the
+    /// walk on: absent, there is no path and `morph` is inert.
+    tuple_to: Option<u32>,
 }
 
 impl RawParticles {
@@ -1289,6 +1302,55 @@ impl RawParticles {
             PresetError::Config(format!("unknown [particles] morph_to figure '{name}'"))
         })?;
         Ok(Some(figure))
+    }
+
+    /// Validate the tuple path against the family it was written next to
+    /// (ADR-0093), into the `(from, to)` pair the scene measures across.
+    ///
+    /// **Four ways to be wrong, all load errors**, for `morph_to`'s reason — a
+    /// silent no-op leaves an author binding `morph` to audio and watching
+    /// nothing happen:
+    ///
+    /// - a path on an **IFS**, which travels between figures through `morph_to`
+    ///   instead and has no coefficient tuple to walk;
+    /// - either end **past the family's roster**;
+    /// - a `tuple_from` with **no `tuple_to`**, which reads like a path and is
+    ///   not one;
+    /// - both ends the **same entry**, which is a path of zero length and almost
+    ///   certainly a typo.
+    fn tuple_path(&self, family: AttractorFamily) -> Result<Option<(u32, u32)>, PresetError> {
+        let Some(to) = self.tuple_to else {
+            if self.tuple_from.is_some() {
+                return Err(PresetError::Config(
+                    "[particles] tuple_from names the near end of a path, but there is no                      tuple_to naming the far end"
+                        .to_string(),
+                ));
+            }
+            return Ok(None);
+        };
+        if matches!(family, AttractorFamily::Ifs(_)) {
+            return Err(PresetError::Config(format!(
+                "[particles] tuple_to is only meaningful for a map family, but family is                  '{}' — an IFS travels between figures through morph_to instead",
+                self.family
+            )));
+        }
+        let from = self.tuple_from.unwrap_or(0);
+        let len = crate::render::scenes::particles::roster_len(family) as u32;
+        for (label, index) in [("tuple_from", from), ("tuple_to", to)] {
+            if index >= len {
+                return Err(PresetError::Config(format!(
+                    "[particles] {label} = {index} is past '{}'s roster, which has {len}                      entries (0..={})",
+                    self.family,
+                    len.saturating_sub(1)
+                )));
+            }
+        }
+        if from == to {
+            return Err(PresetError::Config(format!(
+                "[particles] tuple_from and tuple_to are both {from} — a path needs two                  different entries"
+            )));
+        }
+        Ok(Some((from, to)))
     }
 
     /// Validate `density` into the fraction the scene will resolve against the
