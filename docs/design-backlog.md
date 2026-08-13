@@ -705,6 +705,21 @@ that reads as a curve — which is every future user of `star_pattern`'s motif r
 
 ## 0075 — `root_tint` earned no binding on either shipped IFS preset, and `root_hue` earned both
 
+- **ITEM 2 DECIDED 2026-08-13 → [ADR-0102](adrs/0102-a-palette-coordinates-edge-is-a-per-preset-choice.md),
+  proposed, and deliberately with no plan.** The entry asked whether to clamp the palette coordinate
+  rather than repeat it. The ADR's finding is that **no per-param answer exists**: there is exactly one
+  coordinate, it is a *sum* of contributors of two kinds — angles, where wrapping is correct, and
+  distances, where it is a discontinuity at the quantity's own floor — and a sum cannot carry two
+  addressing behaviours. So the edge becomes a **per-preset `[palette]` choice**, wrap by default
+  (zero pixels move), implemented as a shader `select` rather than a second sampler, clamped to the
+  **texel-centre range** because linear filtering blends texel 255 into texel 0 at exactly 0 and 1.
+  **Verified against code 2026-08-13:** one sampler, `AddressMode::Repeat` on `u`
+  (`core/src/render/palette.rs:332`), and its docstring gives the cyclic justification.
+- **No plan, by the user's call** — the want is real, no shipped content is wrong, and both presets
+  bind the route that works. This entry stays live because the design has not landed, which is the
+  lifecycle working rather than a miss. **Item 1 remains closed** (the authoring half landed at Plan
+  0074's close) and **item 3 is not a defect**.
+
 - **Raised:** 2026-08-08, at [Plan 0074](plans/done/0074-the-figure-colours-by-how-far-it-has-come.md)
   Phase 6 — the `preset-author` pass, filed under that phase's own "any route that could not be made
   to read is written up here rather than quietly left bound to nothing".
@@ -807,8 +822,14 @@ both presets and documented. It is a documentation gap with one genuine engine q
 >
 > **The one thing worth acting on is a doc gap, and it is one line.** `fragment_tiled.toml` binds
 > `kaleido_tile = "2"` as a constant and `presets/README.md` says nothing about whether it may be
-> driven — so an author meets neither the capability nor its edge behaviour. Folded into the next
-> plan that touches the symmetry stage's docs rather than kept open here.
+> driven — so an author meets neither the capability nor its edge behaviour.
+>
+> **PROMOTED 2026-08-13 → [Plan 0089](plans/0089-the-framing-contract-stops-lying.md) Phase 2**, and
+> the promotion is the point: "folded into the next plan that touches the symmetry stage's docs" was
+> written here and **no such plan was ever written**, so the item sat with a named home and no carrier.
+> The same was true of [0081](#0081--the-house-gain-rule-lives-only-in-preset-headers-the-first-half-is-falsified-the-exception-class-survives)'s
+> survivor, which rides the same plan. Judging whether the clipped last cell *reads* badly is
+> explicitly **not** in that phase's scope — nobody has looked, and a render is what would decide it.
 >
 > **The method note, which is why this is corrected in place rather than archived:** the entry is a
 > claim about what the repo does *not* do, and it was checked against the param roster rather than
@@ -930,8 +951,15 @@ this plan one unanswered question, which Phase 6 absorbed.
 > it is unlikely to be the only member.
 >
 > **So this is now a one-paragraph doc item, not a rule-plus-exception item**, and it is half the
-> size the entry claims. It goes into the next plan that touches `presets/README.md`'s reactivity
-> section rather than earning one of its own.
+> size the entry claims.
+>
+> **PROMOTED 2026-08-13 → [Plan 0089](plans/0089-the-framing-contract-stops-lying.md) Phase 3.** "It
+> goes into the next plan that touches `presets/README.md`'s reactivity section" was written here and
+> no such plan followed, which is the same no-carrier failure as
+> [0078](#0078--kaleido_tile-is-a-discrete-quantity-that-is-not-quantized-so-it-is-the-one-term-of-the-composed-map-an-author-cannot-bind)'s
+> survivor; the two ride one plan. **Re-verified against code 2026-08-13** — neither
+> `presets/README.md` nor `docs/presets.md` contains any "failure state" or "death state" language, so
+> the exception class is still nowhere.
 >
 > Same method note as [0078](#0078--kaleido_tile-is-a-discrete-quantity-that-is-not-quantized-so-it-is-the-one-term-of-the-composed-map-an-author-cannot-bind): both entries assert an *absence*, and neither absence was
 > checked. Everything below is the entry as raised.
@@ -1189,6 +1217,27 @@ One cohort's demonstrated want. The ADR-0080 shape is the named route when the s
 ---
 
 ## 0089 — the dragon overruns the frame corner at the default view, and `FRAME_FILL = 0.88` promises it cannot
+
+- **PROMOTED 2026-08-13 → [ADR-0103](adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) +
+  [Plan 0089](plans/0089-the-framing-contract-stops-lying.md) Phase 1.** The correction below named
+  **rotation** as the leading candidate; it is now **derived**, and the derivation makes this entry
+  much larger than the dragon. `fit_scale` fits the axis-aligned half-extents; a centred AABB rotated
+  by `θ` reaches `sqrt(hx²+hy²)`, so with `a = hx/hy` the guarantee holds at every angle only if
+  `a <= sqrt(1/FRAME_FILL² − 1) = 0.5397` (vertical-binding) and is **unsatisfiable** horizontal-binding
+  at any aspect >= 1. **A square figure overruns by 24.4 %**; only a figure 1.85x taller than wide is
+  safe. The fern (`a ~ 0.48`) is the sole compliant shipped figure **and the one the fit was built
+  on**, which is why nobody saw it — while **all three** 2D-IFS presets independently bind `spin` down
+  *and* set base `zoom` below 1 (0.92 / 0.96 / 0.96), so the library has been paying in triplicate with
+  only one header naming why.
+- **The entry's own second candidate stays live as the plan's redirect.** If Phase 1's non-vacuity
+  check finds the dragon *inside* the bound, rotation is not the mechanism and the finding is the
+  preset's own `zoom` reaching `1.04` at a bass peak. The plan says so rather than tuning the test
+  until the expected figure fails.
+- **What the promotion does not do:** it does not buy the guarantee. The routes that would — fitting
+  the rotation-invariant radius, or a per-figure measured fill — are **priced and deferred with a
+  trigger** in ADR-0103, because both re-frame all three shipped worlds on top of compensating `zoom`
+  values they already carry. What lands is a contract that is true, pinned as a property test, moving
+  zero pixels.
 
 > **CORRECTION 2026-08-13, at the backlog sweep — the entry's own first suspect is largely
 > exonerated, and it would have sent `dev` hunting in the wrong file.** The entry says *"the
