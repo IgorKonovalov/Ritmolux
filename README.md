@@ -1,5 +1,8 @@
 # light-music-visualizer
 
+![A saturated kaleidoscopic mandala: concentric rings of yellow and cyan petals folded eight-fold
+over a magenta field](docs/images/hero.png)
+
 A lightweight, real-time music visualizer built around one **shared Rust core** that turns a
 stream of PCM audio samples into GPU-rendered visuals. Two frontends consume that core:
 
