@@ -1105,6 +1105,7 @@ impl Harness {
             family,
             density,
             morph_to: None,
+            tuple_path: None,
         });
         scene.set_target_size(64, 64);
         let target = ctx
@@ -1125,6 +1126,20 @@ impl Harness {
             })
             .create_view(&wgpu::TextureViewDescriptor::default());
         Some(Self { ctx, scene, target })
+    }
+
+    /// As [`Self::new`], walking a measured path between two roster entries
+    /// (ADR-0093) instead of sitting on one.
+    fn with_path(family: AttractorFamily, from: u32, to: u32) -> Option<Self> {
+        let mut h = Self::with_density(family, 1.0)?;
+        h.scene
+            .configure(&crate::render::scenes::lines::GeneratorConfig::Particles {
+                family,
+                density: 1.0,
+                morph_to: None,
+                tuple_path: Some((from, to)),
+            });
+        Some(h)
     }
 
     /// Advance and render `frames` frames at the fixed capture `dt`.
@@ -3182,5 +3197,296 @@ fn the_ode_substeps_agree_between_rust_and_wgsl() {
         "the step shader should carry `{expected}` — the Rust constant moved and \
          the WGSL literal did not, so a measured framing would frame a figure the \
          GPU does not draw"
+    );
+}
+
+// -----------------------------------------------------------------------
+// The tuple walk (Plan 0079 Phase 5 / ADR-0093)
+// -----------------------------------------------------------------------
+
+/// The mechanism is **inert until a preset names a path** — Phase 5's done-when,
+/// and the reason no golden baseline moves.
+///
+/// `morph` is an existing param that has always been IFS-only in effect; giving
+/// it a second meaning on the map families is only safe if the map families
+/// still ignore it when no path is configured. Asserted on the coefficients and
+/// the framing together, since the walk drives both.
+#[test]
+fn without_a_path_morph_leaves_a_map_family_alone() {
+    let Some(mut h) = Harness::new(AttractorFamily::Lorenz) else {
+        return;
+    };
+    h.scene.reset_params();
+    h.scene.update(&AnalysisFrame::default());
+    let (coeffs, framing) = (
+        [h.scene.a, h.scene.b, h.scene.c, h.scene.d],
+        h.scene.entry().framing,
+    );
+    for morph in [0.0f32, 0.25, 0.5, 1.0, 7.0, -3.0] {
+        h.scene.reset_params();
+        h.scene.set_param("morph", morph);
+        h.scene.update(&AnalysisFrame::default());
+        assert_eq!(
+            [h.scene.a, h.scene.b, h.scene.c, h.scene.d],
+            coeffs,
+            "morph = {morph} moved a map family's coefficients with no path configured"
+        );
+        assert_eq!(
+            h.scene.entry().framing,
+            framing,
+            "morph = {morph} moved the framing with no path configured"
+        );
+    }
+    assert!(
+        h.scene.tuple_walk.is_none(),
+        "no path was configured, so there should be no walk"
+    );
+}
+
+/// **The ends are the entries, exactly** — a walk parked at either end renders
+/// the roster entry it names rather than a re-measurement of it.
+///
+/// That is what makes a path safe to add to an existing preset: at `morph = 0`
+/// nothing about the figure changes.
+#[test]
+fn a_walk_lands_exactly_on_its_endpoints() {
+    const FAMILY: AttractorFamily = AttractorFamily::Lorenz;
+    const FROM: u32 = 0;
+    const TO: u32 = 4;
+    let roster = family::resolve_roster(FAMILY);
+    let reference = family::family_reference(FAMILY).expect("the butterfly is measurable");
+    let (a, b) = (
+        roster.get(FROM as usize).expect("entry 0").tuple,
+        roster.get(TO as usize).expect("entry 4").tuple,
+    );
+    let walk = family::TupleWalk::build(FAMILY, a, b, reference).expect("a measurable path");
+
+    assert_eq!(walk.coeffs_at(0.0), a.coeffs);
+    assert_eq!(walk.coeffs_at(1.0), b.coeffs);
+    assert_eq!(walk.framing_at(0.0), a.framing);
+    assert_eq!(walk.framing_at(1.0), b.framing);
+
+    // Out of range parks on an end rather than leaving the measured pair — the
+    // walk must never reach coefficients nobody framed.
+    assert_eq!(walk.coeffs_at(-2.0), a.coeffs);
+    assert_eq!(walk.coeffs_at(9.0), b.coeffs);
+    assert_eq!(walk.coeffs_at(f32::NAN), a.coeffs);
+    assert_eq!(walk.framing_at(f32::NAN), a.framing);
+}
+
+/// **The middle is measured, not averaged** — the property the whole walk rests
+/// on, and the one an interpolated framing would silently get wrong.
+///
+/// A figure halfway between two tuples is a figure in its own right; its extent
+/// is whatever it is, and only coincidentally the mean of its endpoints'. So the
+/// mid-walk framing must differ from the average of the two ends — and must
+/// still be a usable frame.
+#[test]
+fn the_middle_of_a_walk_is_measured_rather_than_averaged() {
+    const FAMILY: AttractorFamily = AttractorFamily::Lorenz;
+    let roster = family::resolve_roster(FAMILY);
+    let reference = family::family_reference(FAMILY).expect("measurable");
+    let (a, b) = (
+        roster.first().expect("entry 0").tuple,
+        roster.get(4).expect("entry 4").tuple,
+    );
+    let walk = family::TupleWalk::build(FAMILY, a, b, reference).expect("a measurable path");
+
+    let mid = walk.framing_at(0.5);
+    let averaged = (a.framing.projection.0 + b.framing.projection.0) * 0.5;
+    println!(
+        "mid-walk scale {:.5}, endpoint average {:.5}",
+        mid.projection.0, averaged
+    );
+    assert!(
+        (mid.projection.0 - averaged).abs() > 1e-6,
+        "the mid-walk framing is the endpoints' average, so it was interpolated \
+         rather than measured"
+    );
+
+    // ...and every sample along it is a frame the GPU can use.
+    for step in 0..=20 {
+        let t = step as f32 / 20.0;
+        let framing = walk.framing_at(t);
+        let (scale, _, centre) = framing.projection;
+        let (half, box_centre) = framing.seed_box;
+        assert!(
+            scale.is_finite() && scale > 0.0,
+            "scale {scale} at morph {t} is unusable"
+        );
+        assert!(
+            centre
+                .iter()
+                .chain(half.iter())
+                .chain(box_centre.iter())
+                .all(|v| v.is_finite()),
+            "framing at morph {t} is not finite"
+        );
+        let reach = family::framed_half(FAMILY, half) * scale;
+        assert!(
+            reach <= 1.0,
+            "the walk reaches {reach:.2} of the frame at morph {t} — it spills"
+        );
+    }
+}
+
+/// The walk moves the figure **continuously**, which is the whole point: this is
+/// the one place in the attractor's surface where a param is *not* quantized,
+/// and the contrast with `tuple` is the mechanism ADR-0093 describes.
+#[test]
+fn a_walk_is_continuous_where_the_selector_cuts() {
+    const FAMILY: AttractorFamily = AttractorFamily::Lorenz;
+    let roster = family::resolve_roster(FAMILY);
+    let reference = family::family_reference(FAMILY).expect("measurable");
+    let (a, b) = (
+        roster.first().expect("entry 0").tuple,
+        roster.get(4).expect("entry 4").tuple,
+    );
+    let walk = family::TupleWalk::build(FAMILY, a, b, reference).expect("a measurable path");
+
+    // Coefficients: every small step in `morph` is a small step in the figure.
+    let span = a
+        .coeffs
+        .iter()
+        .zip(b.coeffs.iter())
+        .map(|(x, y)| (x - y).abs())
+        .fold(0.0f32, f32::max);
+    let mut worst = 0.0f32;
+    let mut previous = walk.coeffs_at(0.0);
+    for step in 1..=100 {
+        let now = walk.coeffs_at(step as f32 / 100.0);
+        let jump = previous
+            .iter()
+            .zip(now.iter())
+            .map(|(x, y)| (x - y).abs())
+            .fold(0.0f32, f32::max);
+        worst = worst.max(jump);
+        previous = now;
+    }
+    println!("worst per-percent coefficient step {worst:.4} across a span of {span:.2}");
+    assert!(
+        worst < span * 0.02,
+        "a 1% step in morph moved a coefficient by {worst}, which is not a walk"
+    );
+
+    // ...where the selector, handed the same sweep, only ever lands on whole
+    // entries. The two together are the ADR's distinction.
+    let landed: Vec<usize> = (0..=100)
+        .map(|step| family::roster_index(step as f32 / 100.0 * 4.0, roster.len()))
+        .collect();
+    assert!(
+        landed.iter().all(|&i| i <= 4),
+        "the selector left the swept range"
+    );
+    assert_eq!(
+        landed
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        5,
+        "the selector should visit exactly the five whole entries it swept across"
+    );
+}
+
+/// The walk reaches the GPU: a preset that names a path renders differently at
+/// two positions along it, and identically at the same one.
+#[test]
+fn a_walked_figure_renders_and_stays_reproducible() {
+    const FAMILY: AttractorFamily = AttractorFamily::Lorenz;
+    let capture = |morph: f32| -> Option<Vec<[f32; 3]>> {
+        let mut h = Harness::with_path(FAMILY, 0, 4)?;
+        h.scene.set_param("morph", morph);
+        h.run(90);
+        Some(h.positions())
+    };
+    let (Some(near), Some(mid), Some(far)) = (capture(0.0), capture(0.5), capture(1.0)) else {
+        return;
+    };
+    assert_ne!(near, mid, "morph = 0.5 draws the same cloud as morph = 0");
+    assert_ne!(mid, far, "morph = 0.5 draws the same cloud as morph = 1");
+    let Some(again) = capture(0.5) else {
+        return;
+    };
+    assert_eq!(mid, again, "a walked figure is not reproducible");
+}
+
+/// A path a preset cannot have is a **load error**, not a silent no-op — the
+/// `morph_to` discipline, on the key that turns the walk on.
+#[test]
+fn an_impossible_tuple_path_is_refused_at_load() {
+    let preset = |table: &str| {
+        crate::preset::Preset::from_toml_str(&format!(
+            "system = \"attractor\"\nname = \"p\"\n[particles]\n{table}"
+        ))
+    };
+    // A path on an IFS, which travels through `morph_to` instead.
+    assert!(preset("family = \"fern\"\ntuple_to = 1\n").is_err());
+    // Either end past the roster.
+    assert!(preset("family = \"lorenz\"\ntuple_to = 99\n").is_err());
+    assert!(preset("family = \"lorenz\"\ntuple_from = 99\ntuple_to = 1\n").is_err());
+    // A near end with no far end reads like a path and is not one.
+    assert!(preset("family = \"lorenz\"\ntuple_from = 2\n").is_err());
+    // A path of zero length.
+    assert!(preset("family = \"lorenz\"\ntuple_from = 3\ntuple_to = 3\n").is_err());
+    // ...and the valid form loads.
+    assert!(preset("family = \"lorenz\"\ntuple_from = 0\ntuple_to = 4\n").is_ok());
+    assert!(preset("family = \"lorenz\"\ntuple_to = 4\n").is_ok());
+}
+
+/// **Which swept pairs have a walk at all** — the CPU half of Phase 5's
+/// evidence, and the half a filmstrip cannot show.
+///
+/// A pair whose middle cannot be framed yields no walk, and the preset then
+/// simply sits on its near end: every cell of its strip renders identically,
+/// which reads as "the walk does nothing" rather than "there is no walk". This
+/// prints the distinction so the sweep's index can record it, and asserts only
+/// the floor — that the mechanism produces *some* survivors, or Phase 5 shipped
+/// a mechanism with nothing to gate.
+#[test]
+fn the_swept_pairs_report_whether_they_have_a_walk() {
+    let pairs: [(AttractorFamily, u32, u32); 20] = [
+        (AttractorFamily::DeJong, 0, 6),
+        (AttractorFamily::DeJong, 0, 10),
+        (AttractorFamily::DeJong, 6, 2),
+        (AttractorFamily::DeJong, 9, 12),
+        (AttractorFamily::DeJong, 1, 3),
+        (AttractorFamily::Clifford, 0, 9),
+        (AttractorFamily::Clifford, 0, 5),
+        (AttractorFamily::Clifford, 9, 10),
+        (AttractorFamily::Clifford, 7, 12),
+        (AttractorFamily::Clifford, 2, 3),
+        (AttractorFamily::Thomas, 1, 12),
+        (AttractorFamily::Thomas, 2, 6),
+        (AttractorFamily::Thomas, 5, 8),
+        (AttractorFamily::Thomas, 8, 11),
+        (AttractorFamily::Thomas, 0, 9),
+        (AttractorFamily::Lorenz, 0, 1),
+        (AttractorFamily::Lorenz, 0, 4),
+        (AttractorFamily::Lorenz, 4, 5),
+        (AttractorFamily::Lorenz, 2, 1),
+        (AttractorFamily::Lorenz, 0, 11),
+    ];
+    let mut built = 0;
+    for (family, from, to) in pairs {
+        let roster = family::resolve_roster(family);
+        let reference = family::family_reference(family).expect("a measurable family");
+        let (Some(a), Some(b)) = (roster.get(from as usize), roster.get(to as usize)) else {
+            panic!("{family:?} {from}->{to} is past the roster");
+        };
+        let walk = family::TupleWalk::build(family, a.tuple, b.tuple, reference);
+        built += usize::from(walk.is_some());
+        println!(
+            "{family:?} {from} -> {to}: {}",
+            if walk.is_some() {
+                "walk"
+            } else {
+                "NO WALK - a point along it cannot be framed"
+            }
+        );
+    }
+    println!("{built} of {} swept pairs have a walk", pairs.len());
+    assert!(
+        built > 0,
+        "no swept pair produced a walk, so the mechanism has nothing to gate"
     );
 }

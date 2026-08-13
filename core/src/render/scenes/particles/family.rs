@@ -473,8 +473,7 @@ pub(super) fn resolve_roster(family: AttractorFamily) -> Vec<RosterEntry> {
     // The reference extent, measured **once per family** rather than once per
     // entry: every entry is scaled against the canonical figure's own extent, and
     // that number does not depend on which entry is being framed.
-    let reference =
-        measure_figure(family, family.default_coeffs()).map(|m| framed_half(family, m.extent.half));
+    let reference = family_reference(family);
     std::iter::once(RosterEntry {
         tuple: canonical,
         fill: Vec::new(),
@@ -500,6 +499,135 @@ pub(super) fn resolve_roster(family: AttractorFamily) -> Vec<RosterEntry> {
         }
     }))
     .collect()
+}
+
+/// Framing samples taken across a tuple walk (ADR-0093).
+///
+/// [`FIT_STEPS`](super::ifs::FIT_STEPS)' reason, on this family's arithmetic: the
+/// walk's framing is **measured at each sample rather than interpolated between
+/// the endpoints'**, because the figure halfway between two tuples is a figure
+/// in its own right and its extent is not the average of theirs. Nine is enough
+/// that the sampled scale moves smoothly at a walk slow enough to read; the cost
+/// is nine measurements at preset load, which is the same order the roster
+/// itself already pays.
+const WALK_STEPS: usize = 9;
+
+/// A measured path between two roster entries — the mechanism ADR-0093 gates on
+/// evidence.
+///
+/// **It walks a named pair and nothing else.** There is deliberately no way to
+/// reach an arbitrary pair of coefficients through this type: it is constructed
+/// from two roster indices, and the only thing a frame can move is *where along
+/// that pair* it sits. That is the whole difference between this and the free
+/// interpolation `tuple`'s quantization exists to forbid — a curator measured
+/// this pair and decided the walk holds; nobody measured the others.
+pub(super) struct TupleWalk {
+    from: [f32; 4],
+    to: [f32; 4],
+    /// The framing at each of [`WALK_STEPS`] evenly-spaced positions.
+    frames: [Framing; WALK_STEPS],
+}
+
+impl TupleWalk {
+    /// Measure a path between two resolved entries, or `None` if any point
+    /// along it cannot be framed — which is itself a finding: a pair whose
+    /// middle diverges has no walk, whatever its endpoints look like.
+    pub(super) fn build(
+        family: AttractorFamily,
+        from: ResolvedTuple,
+        to: ResolvedTuple,
+        reference: f32,
+    ) -> Option<Self> {
+        let mut frames = [from.framing; WALK_STEPS];
+        for (i, slot) in frames.iter_mut().enumerate() {
+            let t = i as f32 / (WALK_STEPS - 1) as f32;
+            let coeffs = lerp4(from.coeffs, to.coeffs, t);
+            // The endpoints keep the framing the roster already measured for
+            // them, so a walk parked at either end renders exactly the entry it
+            // names rather than a re-measurement of it.
+            *slot = if i == 0 {
+                from.framing
+            } else if i == WALK_STEPS - 1 {
+                to.framing
+            } else {
+                let figure = measure_figure(family, coeffs)?;
+                measured_framing(family, &figure.extent, reference)?
+            };
+        }
+        Some(Self {
+            from: from.coeffs,
+            to: to.coeffs,
+            frames,
+        })
+    }
+
+    /// The coefficients at `t`, clamped into the path.
+    ///
+    /// **This is the one interpolation of coefficients the scene performs**, and
+    /// it is why the type exists rather than the arithmetic being inlined
+    /// somewhere a stray value could reach it.
+    pub(super) fn coeffs_at(&self, t: f32) -> [f32; 4] {
+        lerp4(self.from, self.to, walk_position(t))
+    }
+
+    /// The framing at `t`, interpolated between the two nearest measured
+    /// samples — [`FitLut::sample`](super::ifs::FitLut::sample)'s shape.
+    pub(super) fn framing_at(&self, t: f32) -> Framing {
+        let last = WALK_STEPS - 1;
+        let pos = walk_position(t) * last as f32;
+        let i = (pos.floor() as usize).min(last - 1);
+        let frac = pos - i as f32;
+        let (Some(a), Some(b)) = (self.frames.get(i), self.frames.get(i + 1)) else {
+            return self.frames.first().copied().unwrap_or(Framing {
+                projection: (1.0, 2.0, [0.0; 3]),
+                seed_box: ([1.0; 3], [0.0; 3]),
+            });
+        };
+        let (sa, dim, ca) = a.projection;
+        let (sb, _, cb) = b.projection;
+        let (ha, boxca) = a.seed_box;
+        let (hb, boxcb) = b.seed_box;
+        Framing {
+            projection: (sa + (sb - sa) * frac, dim, lerp3(ca, cb, frac)),
+            seed_box: (lerp3(ha, hb, frac), lerp3(boxca, boxcb, frac)),
+        }
+    }
+}
+
+/// A walk position: clamped into `[0, 1]`, with a non-finite binding parked at
+/// the near end rather than propagated.
+///
+/// Clamped rather than wrapped, and that is ADR-0075's reason on this family's
+/// arithmetic: past either end the coefficients leave the measured pair, and an
+/// unmeasured tuple is exactly what the walk exists to avoid reaching.
+fn walk_position(t: f32) -> f32 {
+    if t.is_finite() {
+        t.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+fn lerp3(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
+    let ([ax, ay, az], [bx, by, bz]) = (a, b);
+    [ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t]
+}
+
+fn lerp4(a: [f32; 4], b: [f32; 4], t: f32) -> [f32; 4] {
+    let ([ax, ay, az, aw], [bx, by, bz, bw]) = (a, b);
+    [
+        ax + (bx - ax) * t,
+        ay + (by - ay) * t,
+        az + (bz - az) * t,
+        aw + (bw - aw) * t,
+    ]
+}
+
+/// The reference reach a family's measured framings are scaled against — the
+/// canonical figure's own [`framed_half`]. `None` if the canonical tuple cannot
+/// be measured, which cannot happen for the four shipped families.
+pub(super) fn family_reference(family: AttractorFamily) -> Option<f32> {
+    measure_figure(family, family.default_coeffs()).map(|m| framed_half(family, m.extent.half))
 }
 
 /// `tuple`'s CPU-side quantization: a bound value to a roster index.
