@@ -23,6 +23,39 @@ pub const STRIP_H: u32 = 200;
 /// Gutter between (and around) the tiled frames.
 pub const STRIP_PAD: u32 = 4;
 
+/// Analysis hops a clip of `pcm_len` interleaved samples yields.
+///
+/// The one place this division lives. `--strip`'s even spacing, `--at`'s and
+/// `--frame-at`'s range checks and the level table all count hops from hop 0 of
+/// the clip, so they have to agree on how many there are; a second copy of this
+/// expression is how they would stop agreeing.
+pub fn total_hops(pcm_len: usize, format: AudioFormat) -> usize {
+    let hop_samples = HOP_SIZE * format.channels.max(1) as usize;
+    pcm_len / hop_samples.max(1)
+}
+
+/// Reject any hop that lands past the end of the clip, naming the flag that
+/// asked for it.
+///
+/// Validated against the clip rather than in the parser because a hop the
+/// capture never reaches is silently *not captured* — it records only the
+/// indices it passes — which shortens a strip, and empties a `--frame-at`
+/// capture, without either one saying why.
+pub fn check_hops(
+    hops: &[u32],
+    pcm_len: usize,
+    format: AudioFormat,
+    flag: &str,
+) -> Result<(), String> {
+    let total = total_hops(pcm_len, format);
+    match hops.iter().find(|h| **h as usize >= total) {
+        Some(past) => Err(format!(
+            "{flag} {past}: the clip is only {total} analysis hops long"
+        )),
+        None => Ok(()),
+    }
+}
+
 /// `--strip` frame indices, evenly spaced from just past warm-up to the last
 /// analysis frame the PCM produces.
 pub fn filmstrip_indices(
@@ -30,8 +63,7 @@ pub fn filmstrip_indices(
     format: AudioFormat,
     strip: u32,
 ) -> Result<Vec<u32>, String> {
-    let hop_samples = HOP_SIZE * format.channels as usize;
-    let total = pcm_len / hop_samples.max(1);
+    let total = total_hops(pcm_len, format);
     if total <= FILMSTRIP_WARMUP + 1 {
         return Err("audio too short for a filmstrip".to_string());
     }
@@ -169,6 +201,51 @@ mod tests {
             filmstrip_indices(boundary, mono, 8).is_ok(),
             "mono gets twice the hops from the same sample count"
         );
+    }
+
+    /// `--frame-at` and `--at` share one range check, and it has to agree with
+    /// the hop numbering `filmstrip_indices` produces — the last index that
+    /// function returns is the last index `check_hops` accepts.
+    #[test]
+    fn check_hops_rejects_past_the_end_and_agrees_with_the_strip_numbering() {
+        let format = stereo(48_000);
+        let pcm_len = 48_000 * 2 * 4; // 4 s interleaved stereo
+        let total = total_hops(pcm_len, format);
+        assert_eq!(total, pcm_len / (HOP_SIZE * 2));
+
+        let last = filmstrip_indices(pcm_len, format, 8).expect("4 s is plenty");
+        let last = *last.last().unwrap();
+        assert_eq!(last as usize, total - 1);
+        assert_eq!(check_hops(&[last], pcm_len, format, "--frame-at"), Ok(()));
+
+        // One past that last index is the error, and the message names the flag
+        // that asked so `--at` and `--frame-at` do not report each other's.
+        let err = check_hops(&[last + 1], pcm_len, format, "--frame-at")
+            .expect_err("one hop past the clip");
+        assert!(err.starts_with("--frame-at "), "got {err}");
+        assert!(
+            err.contains(&format!("only {total} analysis hops")),
+            "got {err}"
+        );
+        let err = check_hops(&[0, 9_999], pcm_len, format, "--at").expect_err("second hop is past");
+        assert!(
+            err.contains("--at 9999"),
+            "the offending hop is named: {err}"
+        );
+
+        // Mono halves the samples per hop, so the same byte count reaches twice
+        // as far — the check has to follow the format, not a fixed divisor.
+        let mono = AudioFormat {
+            sample_rate: 48_000,
+            channels: 1,
+        };
+        assert_eq!(total_hops(pcm_len, mono), total * 2);
+        assert!(check_hops(&[last + 1], pcm_len, mono, "--frame-at").is_ok());
+
+        // An empty clip has no valid hop at all, including hop 0.
+        assert!(check_hops(&[0], 0, format, "--frame-at").is_err());
+        // Asking for nothing is vacuously fine; the parser rejects an empty spec.
+        assert_eq!(check_hops(&[], pcm_len, format, "--at"), Ok(()));
     }
 
     #[test]

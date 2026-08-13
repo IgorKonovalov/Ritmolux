@@ -396,6 +396,136 @@ fn a_filmstrip_reports_the_band_levels_it_measured() {
     );
 }
 
+/// `--frame-at` exists because neither existing path produces a documentation
+/// image (Plan 0088 Phase 1, ADR-0100): `--frames` reaches full size under
+/// **silence**, and `--at` runs the real analyzer but tiles its output to a fixed
+/// height with a gutter round it. So the assertion that matters is a size
+/// comparison between the two paths on the *same* hop — not merely that a file
+/// appeared.
+#[test]
+fn frame_at_writes_the_full_size_where_the_same_hop_as_a_strip_does_not() {
+    let dir = scratch("frame-at");
+    let frame = dir.join("frame.png");
+    let tile = dir.join("tile.png");
+    const HOP: &str = "30"; // past FILMSTRIP_WARMUP, inside the 4 s clip
+    const SIZE: (u32, u32) = (160, 120);
+
+    let common = [
+        "--preset-file",
+        SHIPPED_PRESET_FILE,
+        "--signal",
+        "dynamic:110",
+        "--size",
+        "160x120",
+    ];
+
+    let out = run(&[
+        &common[..],
+        &["--frame-at", HOP, "--out", &frame.to_string_lossy()],
+    ]
+    .concat());
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "--frame-at failed\nstdout: {}\nstderr: {}",
+        stdout(&out),
+        stderr(&out)
+    );
+
+    let decoded = image::open(&frame).expect("the written file decodes as an image");
+    assert_eq!(
+        (decoded.width(), decoded.height()),
+        SIZE,
+        "--frame-at must write the frame at --size, unscaled and unbordered"
+    );
+
+    // The stdout line names the hop it captured, so a manifest entry and its
+    // image can be matched up from the run log alone.
+    let text = stdout(&out);
+    assert!(
+        text.contains(&format!("hop {HOP}")),
+        "the capture did not name the hop it took:\n{text}"
+    );
+    // ...and the level table is the filmstrip's, unchanged — same clip, same
+    // analysis, only the write differs.
+    assert!(
+        text.contains("audio levels"),
+        "--frame-at dropped the band-level report the strip prints:\n{text}"
+    );
+
+    // The counter-case that makes the size assertion mean something: `--at` on
+    // the very same hop comes back scaled to STRIP_H with a gutter, which is
+    // neither dimension above.
+    let out = run(&[
+        &common[..],
+        &["--at", HOP, "--out", &tile.to_string_lossy()],
+    ]
+    .concat());
+    assert!(out.status.success(), "--at failed\n{}", stderr(&out));
+    let tiled = image::open(&tile).expect("the strip decodes");
+    assert_ne!(
+        (tiled.width(), tiled.height()),
+        SIZE,
+        "the strip path was expected to tile, not to write the frame at --size"
+    );
+}
+
+/// The two ways of asking for `--frame-at` that cannot be honoured. Both are
+/// GPU-free — they fail in the parser, before a renderer is built.
+#[test]
+fn frame_at_rejects_a_second_hop_source_and_a_missing_clip() {
+    assert_failed_naming(
+        &run(&[
+            "--preset-file",
+            SHIPPED_PRESET_FILE,
+            "--signal",
+            "dynamic:110",
+            "--frame-at",
+            "30",
+            "--at",
+            "30",
+            "--out",
+            "unused.png",
+        ]),
+        "--frame-at and --at",
+        "both flags choose a hop",
+    );
+
+    // Without a clip there is nothing to advance through, and the message has to
+    // name the flags that would supply one.
+    let out = run(&[
+        "--preset-file",
+        SHIPPED_PRESET_FILE,
+        "--frame-at",
+        "30",
+        "--out",
+        "unused.png",
+    ]);
+    assert_failed_naming(&out, "--frame-at needs audio", "no --signal or --audio");
+    assert!(
+        stderr(&out).contains("--signal") && stderr(&out).contains("--audio"),
+        "the message must name what is missing:\n{}",
+        stderr(&out)
+    );
+
+    assert_failed_naming(
+        &run(&[
+            "--preset-file",
+            SHIPPED_PRESET_FILE,
+            "--signal",
+            "dynamic:110",
+            "--frame-at",
+            "9999",
+            "--out",
+            "unused.png",
+        ]),
+        "analysis hops long",
+        "a hop past the end of the clip",
+    );
+}
+
 /// Decode a PNG `shot` wrote back into the shape `lmv_core`'s metrics take, so a
 /// CLI-level difference is measured with the same function the in-core harness
 /// uses rather than a second, subtly different one.
