@@ -40,18 +40,38 @@
 //                          `bin(x)` reads 0 and a spectrum preset photographs
 //                          inert (docs/capturing.md, "the three calibration
 //                          traps").
-//   --frame-at 340         the clip runs ~375 analysis hops, so 340 is ~3.8 s of
-//                          scene time — nearly twice what a default --frames 120
-//                          capture reaches. Accumulating families need it:
-//                          attractor_leviathan at hop 46 is an undeveloped smudge
-//                          and at hop 340 is the finished rosette.
+//   --frame-at 300         the last hop of the loudest beat — see below.
 //   --tier rich            what the app starts on. A README picture should be
 //                          what a user sees, and a Rich capture is not measurably
 //                          larger on disk than a Floor one.
+//
+// WHY HOP 300 AND NOT 340. Plan 0088 specifies hop 340, on the reasoning that it
+// is ~3.8 s of scene time — nearly twice a default `--frames 120` capture — and
+// that accumulating families need the extra development. The first half of that
+// is right and the conclusion is not, because of where 340 lands in the clip.
+//
+// `dynamic_groove` is an 8-beat phrase that builds geometrically for six beats
+// and then RESTS for two at an amplitude of 0.04. At 110 BPM a beat is 0.545 s
+// and a hop is 512 samples at 48 kHz, so:
+//
+//   beat 5 (the loudest, amp 0.968)   2.73-3.27 s   hops 255-306
+//   beat 6 (the rest,   amp 0.040)    3.27-3.82 s   hops 306-357
+//   beat 7 (the rest,   amp 0.040)    3.82-4.36 s   hops 357-409, clipped at 375
+//
+// So hop 340 is not the peak of the build — it is 34 hops INTO the quiet bar,
+// and every reactive family photographs there at its resting state. Measured on
+// the shipped library: spectrum_halo's readout is collapsed to a stub at 340 and
+// fully extended at 300; fragment_supernova's `kaleido_order` select drops to its
+// lowest arm and the frame flattens to a near-uniform wash.
+//
+// Hop 300 is the last hop of beat 5: maximum energy, and the most scene time any
+// accumulating family can have before the rest. attractor_leviathan — the
+// preset the plan measured — is a fuller rosette at 300 than at 340, so the
+// accumulation argument does not cost anything by moving.
 
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { relative, resolve, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, relative, resolve, sep } from "node:path";
 
 // ---------------------------------------------------------------------------
 // The manifest
@@ -60,22 +80,108 @@ import { relative, resolve, sep } from "node:path";
 /// Every field is spelled out on every entry rather than defaulted, so one entry
 /// read in isolation reconstructs its whole command.
 ///
-/// `hop` is 340 unless a note says otherwise. Where it differs, the note says
-/// what was wrong with 340 for that preset — the hop is a judgement about one
+/// `hop` is 300 unless a note says otherwise. Where it differs, the note says
+/// what was wrong with 300 for that preset — the hop is a judgement about one
 /// picture, and an unexplained number would look like a typo.
+///
+/// The gallery holds exactly one entry per system name in `SystemKind::from_name`
+/// and is filed under that name, so a system added later shows up as a missing
+/// file rather than as a silent gap. Four families have exactly one preset and
+/// choose themselves; the other five are **provisional picks** awaiting the
+/// Plan 0088 Phase 7 look call, and a swap is one line here plus a re-run.
 const IMAGES = [
   {
     out: "docs/images/hero.png",
     presetFile: "presets/fragment_supernova.toml",
     signal: "dynamic:110",
-    // NOT 340. The 4 s clip is a single 8-beat phrase that builds almost to its
-    // end, so hop 340 is the loudest moment in it — and Supernova puts peak
-    // energy into `warp`, `zoom` and `palette_mix` at once, which at the top of
-    // the build flattens into a near-uniform orange wash. Hop 70 is early in the
-    // same phrase, where the fold still reads as a rosette. Fragment fields do
-    // not accumulate, so the "late enough to be developed" argument behind 340
-    // does not apply to this entry.
-    hop: 70,
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+
+  // --- the gallery: one per SystemKind ------------------------------------
+
+  {
+    // fragment_field — provisional, from 8 candidates.
+    out: "docs/images/gallery/fragment_field.png",
+    presetFile: "presets/fragment_whorl.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // swarm — provisional, from 2 candidates. The weakest picture in the set,
+    // and honestly so: a swarm is a MOTION, and at full energy it photographs
+    // as uniform noise. This hop is in the phrase's quiet bar, where the flock
+    // settles onto the flow field and the structure driving it becomes legible.
+    out: "docs/images/gallery/swarm.png",
+    presetFile: "presets/swarm_drift.toml",
+    hop: 374,
+    signal: "dynamic:110",
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // parametric_curve — provisional, from 2 candidates.
+    out: "docs/images/gallery/parametric_curve.png",
+    presetFile: "presets/curve_nightbloom.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // lsystem — the only lsystem preset.
+    out: "docs/images/gallery/lsystem.png",
+    presetFile: "presets/lsystem_vellum.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // star_pattern — the only star_pattern preset.
+    out: "docs/images/gallery/star_pattern.png",
+    presetFile: "presets/star_rosewindow.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // reaction_diffusion — provisional, from 3 candidates.
+    out: "docs/images/gallery/reaction_diffusion.png",
+    presetFile: "presets/reaction_verdigris.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // attractor — provisional, from 17 candidates.
+    out: "docs/images/gallery/attractor.png",
+    presetFile: "presets/attractor_leviathan.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // spectrum — the only spectrum preset.
+    out: "docs/images/gallery/spectrum.png",
+    presetFile: "presets/spectrum_halo.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // emitter — the only emitter preset.
+    out: "docs/images/gallery/emitter.png",
+    presetFile: "presets/emitter_perseids.toml",
+    signal: "dynamic:110",
+    hop: 300,
     size: "1280x720",
     tier: "rich",
   },
@@ -118,6 +224,43 @@ function check(entry, index) {
 }
 
 IMAGES.forEach(check);
+
+/// The system roster, read out of the Rust rather than mirrored here.
+///
+/// `SystemKind::from_name` is the source of truth for what a system *is*, so it
+/// is also the source of truth for what the gallery owes a picture of. A
+/// hardcoded list of nine names would let a tenth system ship with no gallery
+/// image and nothing saying so — which is the exact silent gap this check exists
+/// to turn into a loud one. Same discipline as `tuple-sheets.mjs` reading the
+/// attractor roster out of `family.rs`.
+function systemNames() {
+  const path = "core/src/preset/schema.rs";
+  const src = readFileSync(path, "utf8");
+  const start = src.indexOf("pub fn from_name(name: &str) -> Option<Self> {");
+  if (start < 0) throw new Error(`could not find SystemKind::from_name in ${path}`);
+  const body = src.slice(start, src.indexOf("}", src.indexOf("_ => return None", start)));
+  const names = [...body.matchAll(/"([a-z_]+)" => SystemKind::/g)].map((m) => m[1]);
+  if (names.length === 0) throw new Error(`read no system names out of ${path}`);
+  return names;
+}
+
+/// Every system has exactly one gallery image, filed under its own name.
+{
+  const gallery = new Set(
+    IMAGES.map((e) => e.out)
+      .filter((out) => out.includes("gallery/"))
+      .map((out) => basename(out, ".png")),
+  );
+  const missing = systemNames().filter((name) => !gallery.has(name));
+  const extra = [...gallery].filter((name) => !systemNames().includes(name));
+  if (missing.length > 0 || extra.length > 0) {
+    throw new Error(
+      "the gallery does not match SystemKind::from_name" +
+        (missing.length ? `\n  no image for: ${missing.join(", ")}` : "") +
+        (extra.length ? `\n  not a system: ${extra.join(", ")}` : ""),
+    );
+  }
+}
 
 // Checked up front, all of them, before the first render: a manifest typo in the
 // last entry should not cost the eight renders before it.
