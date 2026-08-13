@@ -54,6 +54,34 @@ const COL_GUTTER: f32 = 24.0;
 /// Horizontal pitch between columns.
 pub const COL_W: f32 = CHAR_W * COL_CHARS as f32 + COL_GUTTER;
 
+// ---------------------------------------------------------------------------
+// The F3 capture line (Plan 0083)
+// ---------------------------------------------------------------------------
+
+/// Top of the capture line, in device px, and its font size.
+///
+/// **Below the core's diagnostics panel, deliberately.** That panel is fixed
+/// geometry (`core/src/render/overlay.rs`: a 12 px margin, five analysis rows
+/// under the sparkline and the GPU bar) whose bottom edge lands at ~240 px, and
+/// it composites *after* this text layer — so a line placed inside its band would
+/// be painted over rather than merely crowded. This clears it, which keeps the
+/// audio verdict and the frame-time block readable as one screenshot.
+pub const CAPTURE_TOP: f32 = 252.0;
+pub const CAPTURE_SIZE: f32 = 18.0;
+/// Dimmer than the preset name, brighter than a browse row: a diagnostics line,
+/// not part of the show.
+pub const CAPTURE_COLOR: [f32; 4] = [0.72, 0.80, 0.90, 0.95];
+
+/// The F3 overlay's audio line, built from the **same** startup token the
+/// `diagnostics.log` `capture` column carries — so a screenshot and a log from
+/// one run cannot disagree about why the app is or is not hearing anything.
+///
+/// The label is what makes the token self-describing to a tester who has never
+/// seen this app's log: `live SCK 48000/2` alone does not say it is about audio.
+pub fn capture_line(token: &str) -> String {
+    format!("audio  {token}")
+}
+
 /// A name shortened to fit one column, with an ASCII ellipsis.
 ///
 /// Borrowed when it already fits, which is every shipped preset — so the common

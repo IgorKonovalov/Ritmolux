@@ -726,6 +726,20 @@ impl AppState {
         texts.push(self.renderer.preset_name().to_owned());
         meta.push((NAME_INSET, NAME_INSET, NAME_SIZE, NAME_COLOR));
 
+        // The capture verdict, under the core's diagnostics panel and only while
+        // it is up (Plan 0083). Built from the stored token rather than from the
+        // capture state, so this line and the log's `capture` column are the same
+        // sentence about the same run.
+        if self.overlay_on {
+            texts.push(overlay::capture_line(&self.capture_token));
+            meta.push((
+                NAME_INSET,
+                overlay::CAPTURE_TOP,
+                overlay::CAPTURE_SIZE,
+                overlay::CAPTURE_COLOR,
+            ));
+        }
+
         if self.modal() == Some(Modal::Settings) {
             let view = self.settings_view();
             texts.push("settings  -  up/down  left/right  esc".to_owned());
