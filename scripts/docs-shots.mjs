@@ -99,6 +99,18 @@ const IMAGES = [
     tier: "rich",
   },
 
+  {
+    // The guide's opening figure: the smallest preset that is worth looking at.
+    // Rendered from the same file the guide prints, so the picture cannot drift
+    // from the listing beside it.
+    out: "docs/images/preset-minimal.png",
+    presetFile: "docs/examples/minimal.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+
   // --- the gallery: one per SystemKind ------------------------------------
 
   {

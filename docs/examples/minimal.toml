@@ -1,0 +1,11 @@
+system = "parametric_curve"
+name = "Ten Lines"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n          = "6"
+scale      = "0.55 + clamp(bass * 0.35, 0, 0.30)"
+brightness = "0.80 + clamp(mid * 0.45, 0, 0.40)"
+hue        = "0.55 + time * 0.02"
