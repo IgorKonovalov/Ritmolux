@@ -12,10 +12,11 @@ A new `shape_field` scene draws the `marks` roster's signed distance as a fullsc
 banding the palette coordinate produces **concentric offset contours of a chosen shape** — the
 construction in the user's reference images, per pixel, with no geometry to facet. The three
 reactivity asks (rings travelling outward, ring count on the beat, the figure breathing) fall out of
-parameters that already exist once the scalar is a distance. Alongside it, a capability the engine
-has had since 2026-08-11 and nobody knew about gets written down: a fullscreen field in a
-`multiply` layer draws **dark marks on a light ground**, which is most of what design-backlog 0069
-says is impossible.
+parameters that already exist once the scalar is a distance. The `star` arm then gains the three
+shape parameters a second batch of references turned out to be asking for. Alongside all of it, a
+capability the engine has had since 2026-08-11 and nobody knew about gets written down: a fullscreen
+field in a `multiply` layer draws **dark marks on a light ground**, which is most of what
+design-backlog 0069 says is impossible.
 
 ## Context & problem
 
@@ -42,6 +43,24 @@ Two things about the collage separate from that and are not equal in cost:
 
 What is explicitly not in reach at any price: the collage's photographic arrow and the poster's
 typography. There is no runtime asset path and no text rendering outside the F3 debug overlay.
+
+**A second batch of six references arrived while this plan was being drafted**, all of them stars,
+with the question attached: *should this be another family — can we introduce paths and path
+morphing, SVG-like?* The analysis said no, and the reason is worth recording because it is the
+opposite of what the images suggest. **Five of the six are the `star` arm wanting parameters it does
+not have** — the valley radius is the hardcoded `STAR_INNER = 0.45`, the edges cannot bow inward,
+and there is no per-spike variation — so they need three knobs on an existing arm, not a new
+representation. That is Phase 5. The sixth (a cartoon star **with eyes**) is the only one needing
+machinery this plan does not build, and it is multi-shape composition rather than a path.
+
+The path-and-morphing question is real and is being interviewed separately; it is **not** folded in
+here. Two facts shaped that split: [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)'s
+biarc chain is already a path representation, so Plan 0087 is building half of it and a second
+representation invented here would collide with it; and the half that is genuinely missing is
+**fill**, not path — the line renderer strokes, and every one of these references is a filled
+silhouette. Two other things in that batch are separately filed rather than absorbed: the chrome
+shading on the sparkle pair ([backlog 0092](../design-backlog.md)) is a lighting decision, and the
+hand-drawn wobble is noise displacement — neither is a path feature.
 
 ## Decision
 
@@ -87,7 +106,7 @@ flowchart TD
 - **Owner skill:** dev
 - **What:** Settles the one thing ADR-0106 leaves unmeasured, then writes the whole two-tone route
   down. It is first because it is cheap, it is independent of every other phase, and its answer
-  changes what Phase 6 can attempt.
+  changes what Phase 7 can attempt.
 - **Files touched:** `presets/README.md`, `docs/preset-palettes.md`, `docs/design-backlog.md`,
   a golden fixture under `core/tests/`.
 - **Done when:**
@@ -184,12 +203,45 @@ flowchart TD
     gives, and the reference is not evenly spaced. Same shape as `bg_ramp_gamma` and `ink_gamma`
     (ADR-0092), including the exact-identity branch at 1.0, since `pow(x, 1.0)` is not bit-exact.
 
-### Phase 5 — The look gate
+### Phase 5 — The star gains its shape
+
+- **Owner skill:** dev
+- **What:** Three parameters on the `star` arm, from a second batch of six user reference images
+  that arrived after this plan was drafted. **Five of the six are this arm wanting parameters it
+  does not have** — a sharp seven-pointer, an irregular nine-pointed "bang", two concave-edged
+  four-point sparkles, and a hand-drawn six-pointer. The roster does not grow by a name
+  ([ADR-0105](../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md)'s closed-roster
+  consequence is about silhouettes, not about how many knobs an arm has).
+- **Files touched:** `core/src/render/scenes/marks.rs`, `core/src/render/scenes/marks/tests.rs`,
+  `core/src/render/scenes/shape_field.rs`, `presets/README.md`.
+- **Done when:**
+  - **The valley radius is a parameter.** `STAR_INNER = 0.45` (`marks.rs:105`) was chosen for marks
+    "a few pixels across" and is welded; the sharp reference sits far below it. The default is
+    `0.45` **exactly**, so every shipped `shape`-bearing preset moves zero pixels — the shared chunk
+    means this knob reaches the particle path too, and that is the whole reason the default is not a
+    judgement call.
+  - **The edge gains curvature**, so the segment between tip and valley can bow inward — the concave
+    sparkle silhouette, which a straight-edged star provably cannot make at any valley radius. Exact
+    identity at the neutral value, with the same `pow`-is-not-bit-exact care Phase 4's exponent
+    takes.
+  - **Per-spike jitter is seeded**, not random: same seed, same figure, every run and every machine.
+    This is the project's determinism rule, and the `SeededRng` caution from Plan 0077 applies — an
+    extra stream draw re-scatters everything downstream of it.
+  - **The exterior measurement of Phase 2 is re-run for the curved arm.** A curved edge is a
+    different distance problem from a straight one, so whatever Phase 2 concluded about `star` does
+    not transfer, and this phase inherits Phase 2's obligation rather than its answer.
+  - `presets/README.md` carries all three rows in this commit, and says plainly that they reach the
+    particle marks as well as the field.
+  - **Not in this phase, deliberately:** the cartoon reference's *eyes*. Composing two discs onto a
+    star is multi-shape composition, which is neither a parameter nor a silhouette, and it is the
+    one thing in the batch that genuinely needs machinery this plan does not build.
+
+### Phase 6 — The look gate
 
 - **Owner skill:** human
-- **What:** Judge the concentric figure **in motion, in the running app**, against the reference
-  images — and judge the beat-latched band count specifically, since that is the one the engine
-  cannot answer for itself.
+- **What:** Judge the figures **in motion, in the running app**, against both reference batches —
+  and judge the beat-latched band count specifically, since that is the one the engine cannot answer
+  for itself.
 - **Done when:**
   - A verdict on whether the contours read as the reference does, and on whether the ring count on
     the beat reads as a **response or as a strobe**. If it strobes, the recorded fallback is the one
@@ -197,15 +249,19 @@ flowchart TD
     sit still.
   - A verdict on the response exponent's useful range, taken from rendered comparisons rather than
     from the parameter's clamp.
+  - A verdict on the star batch: whether the three Phase 5 parameters reach the five reference
+    silhouettes, judged against the images. **A named miss here is the useful outcome** — it says
+    which of the three is mis-shaped, or that a silhouette needs something none of them expresses,
+    and either answer is worth more than a pass.
   - **This phase may carry forward.** If the user is not available, the `dev` phases close the plan
     and the item moves to `docs/content-brief.md` under the rule Plan 0083's and Plan 0088's Phase
     7 both followed. It gates nothing below it.
 
-### Phase 6 — The converging fan, and it must earn itself
+### Phase 7 — The converging fan, and it must earn itself
 
 - **Owner skill:** dev
 - **What:** The reference collage's floor: stripes converging to a vanishing point. **This is the
-  designed cut point.** Phases 1-5 stand entirely without it, and it is last because it is the only
+  designed cut point.** Phases 1-6 stand entirely without it, and it is last because it is the only
   part of this plan whose value is not already established.
 - **Files touched:** `core/src/render/background.rs` and its tests, `presets/README.md` — *if it
   proceeds*.
@@ -225,7 +281,7 @@ flowchart TD
   - **A negative outcome is a legitimate close.** If the fan needs more than a coordinate — and the
     collage's floor is also *bounded* by a horizon, which the ramp expresses only through palette
     stop placement — the honest result is a backlog entry describing what was learned, not a
-    half-built mode. The reference is a collage; this engine is not a collage tool, and Phase 5's
+    half-built mode. The reference is a collage; this engine is not a collage tool, and Phase 6's
     verdict on the heart is the part of this plan the user actually asked for twice.
 
 ## Data shapes
@@ -263,7 +319,7 @@ outline, unbounded outside. Phase 2 establishes what "unbounded outside" is actu
   heart, where the gaps are unlit rather than darkened.
 - **The layer slot is contended by this plan's own two halves.** ADR-0090 caps a preset at one
   `[layer]`, and both the two-tone route (Phase 1) and a fan-plus-figure collage (Phase 6) want it.
-  That contention is a reason Phase 6 is a cut point, and it is worth stating before someone
+  That contention is a reason Phase 7 is a cut point, and it is worth stating before someone
   discovers it while authoring.
 - **Cost at the floor tier is unmeasured.** A fullscreen distance is a handful of ALU ops per pixel
   and unconditional, unlike the sprite path where the quad bounds the work. Expected cheap; not

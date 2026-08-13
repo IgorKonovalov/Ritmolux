@@ -1339,3 +1339,56 @@ invariant away without knowing which source mis-fits.
 
 ---
 
+
+## 0092 — every figure this engine draws is unlit, and two reference images ask for a shaded one
+
+- **Raised:** 2026-08-13, from the second of two user reference batches, alongside
+  [Plan 0091](plans/0091-the-figure-fills-the-frame.md). Filed separately **at the point of raising**
+  rather than absorbed into that plan, because it is a lighting decision and the plan is a silhouette
+  one, and bundling them would have made a shading register arrive as a side effect of a shape phase.
+- **Verified by measurement:** no, and it does not need one — the claim is an absence. Nothing in
+  `core/src/render/` computes a surface normal or evaluates a light. Every family is emissive: the
+  particle scenes add glow, the field scenes map a scalar through a LUT, the line renderer strokes,
+  and the terminal stages remap what those produced. Brightness in this engine is *authored colour*,
+  never *illumination*.
+
+Two of the six star references are chrome — a four-pointed sparkle with concave edges, rendered as
+polished metal with specular highlights, a horizon reflection and self-shadowing. They read as
+**objects with a surface**, and the engine has no vocabulary for that at all. The rest of the batch
+is flat graphic work that [Plan 0091](plans/0091-the-figure-fills-the-frame.md) Phase 5 reaches with
+three parameters; these two are a different question wearing the same silhouette.
+
+### Why it is worth an entry rather than a comment
+
+**The prerequisite is about to exist, and that is the whole reason to file this now.** ADR-0105 puts
+a signed distance field on screen, and the gradient of a distance field *is* a surface normal —
+`normalize(vec3(dFdx(d), dFdy(d), k))` for a 2.5D bevel, or the analytic gradient where an arm has
+one. So the expensive precondition for shading (knowing which way a surface faces) arrives as a free
+by-product of a plan already written for other reasons. A matcap or a small analytic environment then
+turns that normal into the chrome look, and neither needs a light rig, a depth buffer, or a second
+pass.
+
+**It would also be the engine's first non-emissive register**, which is why it is an ADR-worthy
+decision and not a parameter. Every consequence downstream assumes emission: ADR-0056's alpha *is*
+the falloff, bloom's bright-pass reads emitted light, ADR-0046's linear-light ordering is built for
+additive accumulation, and [ADR-0106](adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md) has
+just established that darkening requires a `multiply` layer. A shaded object has dark regions that
+are *shape information* rather than absent light, and nothing in that chain currently distinguishes
+the two.
+
+### What a fix would be
+
+A `shade` amount on the shape field, off by default, deriving a normal from the distance gradient
+and reading a small built-in matcap. Off is an exact identity, so nothing that ships moves. The open
+questions are which matcaps ship (a closed roster, on ADR-0084's precedent), whether the bevel
+profile is authorable or fixed, and — the load-bearing one — whether a shaded figure should bloom,
+since its highlight is the brightest thing on screen and is *not* an emitter.
+
+### Priority
+
+**Low, and gated on Plan 0091.** There is no route to this before the distance field exists, and one
+user batch that mixed it with five flat references is a want expressed once rather than a demonstrated
+gap. Take it if the Phase 6 look gate says the flat sparkle is the disappointing one in the set — that
+verdict is the trigger, and it is scheduled.
+
+---

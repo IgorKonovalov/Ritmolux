@@ -94,6 +94,20 @@ flowchart LR
 - **The roster stays closed**, per ADR-0084's consequence, so a look wanting a shape outside the
   five still routes back through `architect` + `dev`. Promoting the roster raises the *value* of
   each name in it without making it extensible.
+
+  **"Closed" governs the list of names, not the shape of each arm**, and the distinction is
+  load-bearing enough to state before someone reads the sentence above as forbidding the obvious
+  next move. An arm gaining a *parameter* — the star's valley radius, currently the hardcoded
+  `STAR_INNER = 0.45` (`marks.rs:105`), or an edge curvature, or seeded per-spike jitter — adds no
+  name and needs no ADR; it is the same decision ADR-0084 already took when it made `points`
+  authorable. What the closed roster forbids is a *sixth silhouette*. Six further reference images
+  arrived while this ADR was being written, five of which are the existing `star` arm wanting
+  exactly those parameters, so this is a live reading and not a hypothetical one.
+
+  One consequence of the shared chunk follows and belongs to whoever adds them: a constant promoted
+  to a parameter is promoted for **both** consumers, so the particle path gains the same knob. Its
+  default must therefore be the current constant exactly, or every shipped `shape`-bearing preset
+  moves.
 - **ADR-0037 is directly in play and this family has shipped that bug three times.** A fullscreen
   distance is screen-destined geometry, so its aspect must come from the render target. There is no
   internal grid here to take it from by accident, which removes the usual mechanism — but the rule
