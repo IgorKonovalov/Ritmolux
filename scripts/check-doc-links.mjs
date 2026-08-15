@@ -12,8 +12,11 @@
 // Usage:  node scripts/check-doc-links.mjs [root]
 // Exit 0 = every relative link resolves. Exit 1 = the broken ones are listed as
 // `file:line -> target`, which is clickable in most terminals. The optional
-// `root` scans some other directory — used to run this against a fixture tree
-// (Plan 0084 Phase 1); CI and the pre-push hook pass nothing and get the repo.
+// `root` scans some other directory — used to run this against the committed
+// fixture tree (Plan 0084 Phase 1 built the argument, Plan 0093 Phase 1 finally
+// committed the tree): `node scripts/check-doc-links.mjs scripts/fixtures`
+// expects exit 1 and exactly three breaks, one per class below. CI and the
+// pre-push hook pass nothing and get the repo.
 //
 // Three break classes, and the first is the only one this script had until
 // Plan 0084. Markdown has two link forms and checking one of them was a green
@@ -49,12 +52,21 @@ const REPO = resolve(
 // Build output, vendored deps, and VCS internals hold markdown we do not own.
 const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
 
+// A fixture tree holds deliberately broken links as this checker's own bite
+// check (Plan 0093 Phase 1, which committed the tree the `root` argument above
+// was built for and never got). Skip it on a repo walk, where those seeds would
+// red the gate for everyone; scan it when it IS the root, which is the only way
+// they are reachable.
+const isFixtureRoot = REPO.split(sep).includes("fixtures");
+
 /** Every `.md` file in the repo, as paths relative to the repo root. */
 function markdownFiles(dir = REPO, found = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) markdownFiles(full, found);
+      if (SKIP_DIRS.has(entry.name)) continue;
+      if (entry.name === "fixtures" && !isFixtureRoot) continue;
+      markdownFiles(full, found);
     } else if (entry.name.endsWith(".md")) {
       found.push(relative(REPO, full));
     }
