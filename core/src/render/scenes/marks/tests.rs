@@ -7,11 +7,11 @@ use super::{
 };
 
 /// Roster indices, by name, so the tests below read as shapes.
-pub(super) const DISC: f32 = 0.0;
-pub(super) const RING: f32 = 1.0;
-pub(super) const POLYGON: f32 = 2.0;
-pub(super) const STAR: f32 = 3.0;
-pub(super) const HEART: f32 = 4.0;
+pub(crate) const DISC: f32 = 0.0;
+pub(crate) const RING: f32 = 1.0;
+pub(crate) const POLYGON: f32 = 2.0;
+pub(crate) const STAR: f32 = 3.0;
+pub(crate) const HEART: f32 = 4.0;
 
 /// **The CPU mirror of the WGSL above.** Kept identical by inspection, the
 /// same arrangement `kaleidoscope.rs`'s `edge_sample_radius` uses and for the
@@ -387,14 +387,14 @@ fn the_shader_chunk_substitutes_every_placeholder() {
 // outside.
 
 /// A closed loop of boundary points, in sprite-local coordinates.
-type Loop = Vec<[f32; 2]>;
+pub(crate) type Loop = Vec<[f32; 2]>;
 
 /// How finely a curved boundary is sampled.
 const BOUNDARY_SAMPLES: usize = 1440;
 
 /// The arm's outline, as one or more closed loops, built from the shape's
 /// **definition**.
-fn boundary_loops(shape: f32, points: f32) -> Vec<Loop> {
+pub(crate) fn boundary_loops(shape: f32, points: f32) -> Vec<Loop> {
     let n = points as usize;
     let circle = |r: f32| -> Loop {
         (0..BOUNDARY_SAMPLES)
@@ -476,7 +476,7 @@ fn boundary_loops(shape: f32, points: f32) -> Vec<Loop> {
 
 /// Distance from `p` to the segment `a`-`b`. Exact, so the polyline's own
 /// resolution is the only approximation in the ground truth.
-fn point_segment_distance(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
+pub(crate) fn point_segment_distance(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
     let (ab, ap) = ([b[0] - a[0], b[1] - a[1]], [p[0] - a[0], p[1] - a[1]]);
     let denom = ab[0] * ab[0] + ab[1] * ab[1];
     let t = if denom > 0.0 {
@@ -491,7 +491,7 @@ fn point_segment_distance(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
 /// The ground-truth **signed** distance: negative inside the figure, positive
 /// outside, the sign from an even-odd crossing count over the same segments the
 /// magnitude came from.
-fn true_signed_distance(p: [f32; 2], loops: &[Loop]) -> f32 {
+pub(crate) fn true_signed_distance(p: [f32; 2], loops: &[Loop]) -> f32 {
     let mut nearest = f32::INFINITY;
     let mut inside = false;
     for lp in loops {
@@ -519,7 +519,7 @@ fn true_signed_distance(p: [f32; 2], loops: &[Loop]) -> f32 {
 /// apothem, the star's is the perpendicular from the origin to the edge plane
 /// the arm measures against, and the heart's is `HEART_INRADIUS` over the scale
 /// that maps heart space into the sprite.
-fn inradius_local(shape: f32, points: f32) -> f32 {
+pub(crate) fn inradius_local(shape: f32, points: f32) -> f32 {
     if shape < 0.5 {
         return 1.0;
     }

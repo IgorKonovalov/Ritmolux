@@ -1,0 +1,57 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `shape_field` scene's drift baseline (Plan 0091 Phase 3, ADR-0105): the
+# mark roster's signed distance drawn at frame scale, banded into concentric
+# offset contours of a heart. This is the construction the plan's reference
+# images carry, and the fixture is deliberately the whole of it rather than the
+# scene's defaults:
+#
+#  - `shape = "4"` is the heart, the one arm the references need and the only
+#    one whose distance function `marks.rs` names a source for. It is also the
+#    arm that makes this baseline non-vacuous: at the roster default (`disc`,
+#    index 0) the field is `length(p)` and the contours would be concentric
+#    CIRCLES, which is exactly the wrong picture this scene exists to avoid
+#    drawing - a regression that fed the palette a radius instead of a distance
+#    would pin identically.
+#  - `palette_steps = "9"` is what turns a smooth ramp into hard contour bands.
+#    At the default (off) the frame is a gradient and nothing here reads as an
+#    offset curve at all.
+#  - `palette_contour = "0.7"` draws the thin outlines at the band boundaries.
+#    This scene is the THIRD place that param does anything (`palette.rs` scopes
+#    it to the continuous-field scenes), and no other baseline in the suite pairs
+#    it with a shape.
+#  - `color_span = "0.45"` keeps the interior in the gradient's lower half so
+#    the exterior bands - the region Phase 2 had to repair before any of this
+#    was meaningful - have somewhere to go.
+#
+# `scale` is off its default so the figure is a definite size in the frame
+# rather than whatever the default happens to become.
+#
+# Adapter-compared before blessing (the ADR-0058 standing rule, and this scene
+# adds a bind-group layout so the rule is live rather than ceremonial): at
+# 160x100 over 2 frames, WARP mean rgb 190.614 113.794 118.311 against hardware
+# 190.627 113.794 118.323, frame_diff 0.000182. Inside the noise floor, so this
+# baseline pins a picture hardware also draws.
+#
+# The layout itself is a single group - sampler, two LUT textures, then the
+# uniform - which is a shape nothing else in core/src holds, so no allowlist
+# entry is needed. See shape_field.rs for why a lone uniform group had no free
+# shape left.
+system = "shape_field"
+name   = "fixture_shape_field"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#2a0010" },
+  { at = 0.35, color = "#c11d3a" },
+  { at = 0.7,  color = "#ff6b4a" },
+  { at = 1.0,  color = "#ffd9a0" },
+]
+
+[params]
+shape           = "4"
+scale           = "0.55"
+color_span      = "0.45"
+color_center    = "0.0"
+palette_steps   = "9"
+palette_contour = "0.7"

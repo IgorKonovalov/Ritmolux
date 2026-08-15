@@ -752,6 +752,7 @@ fn band_contour(t: f32, steps: f32, amount: f32) -> f32 {
     const FRAGMENT_FIELD_SRC: &str = include_str!("scenes/fragment_field.rs");
     const REACTION_DIFFUSION_SRC: &str = include_str!("scenes/reaction_diffusion.rs");
     const PARTICLE_SHADERS_SRC: &str = include_str!("scenes/particles/shaders.rs");
+    const SHAPE_FIELD_SRC: &str = include_str!("scenes/shape_field.rs");
 
     #[test]
     fn every_wgsl_sample_site_carries_the_same_banding_expression() {
@@ -759,6 +760,7 @@ fn band_contour(t: f32, steps: f32, amount: f32) -> f32 {
             ("fragment_field.rs", FRAGMENT_FIELD_SRC),
             ("reaction_diffusion.rs", REACTION_DIFFUSION_SRC),
             ("particles/shaders.rs", PARTICLE_SHADERS_SRC),
+            ("shape_field.rs", SHAPE_FIELD_SRC),
         ] {
             assert!(
                 src.contains(BAND_COORD_WGSL),
@@ -778,6 +780,7 @@ fn band_contour(t: f32, steps: f32, amount: f32) -> f32 {
         for (name, src) in [
             ("fragment_field.rs", FRAGMENT_FIELD_SRC),
             ("reaction_diffusion.rs", REACTION_DIFFUSION_SRC),
+            ("shape_field.rs", SHAPE_FIELD_SRC),
         ] {
             assert!(
                 src.contains(BAND_CONTOUR_WGSL),
