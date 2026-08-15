@@ -3,8 +3,8 @@
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
 use super::{
-    DEFAULT_SOURCE_Y, Field, Instance, Object, RETIRE_MARGIN, Spawn, bounds, build, exit_time,
-    size_factor, sprite_angle, twinkle_factor,
+    ATTACK_FRAC, DEFAULT_SOURCE_Y, Field, Instance, Object, RETIRE_MARGIN, Spawn, bounds, build,
+    exit_time, size_factor, sprite_angle, twinkle_factor,
 };
 
 /// A test aspect, and the retirement bound it gives.
@@ -638,6 +638,189 @@ fn a_narrow_source_draws_a_column_and_pan_carries_it_off_centre() {
         panned_mid - narrow_mid > 0.15,
         "pan_x must carry the column off centre — this is the off-centre jet: \
          {narrow_mid:.3} -> {panned_mid:.3}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// `spawn_fade` — the ramp that makes an inside-frame source usable
+// (Plan 0090 Phase 2, ADR-0104)
+// -----------------------------------------------------------------------
+
+/// **The default is exactly `1.0`, at every age including zero** — Phase 2's
+/// first done-when, and the reason [`super::spawn_ramp`] takes an equality
+/// branch rather than dividing.
+///
+/// `age = 0` is the case that forces it: the natural arithmetic is `u / fade`,
+/// which is `0/0` at the default and would give a NaN that propagates into a
+/// colour. The exactness matters beyond that one point — the whole "no pixel
+/// moves" claim of this plan is that the product picks up a factor of exactly
+/// one, and `x * 1.0` is `x` in IEEE-754 while `x * 0.9999999` is not.
+///
+/// The hostile values are the same discipline every other param on this scene
+/// gets: a binding is arbitrary arithmetic and may hand over anything.
+#[test]
+fn a_zero_spawn_fade_is_exactly_one_at_every_age() {
+    for u in [0.0f32, 1e-9, 0.001, ATTACK_FRAC, 0.5, 1.0, 2.0] {
+        assert_eq!(
+            super::spawn_ramp(u, 0.0),
+            1.0,
+            "the ramp must be exactly 1 at u={u} with the fade off"
+        );
+        // Negative and NaN reach the ramp only through the draw site's
+        // `finite(..).clamp(0, 1)`, so both arrive as the default — and the
+        // branch below the clamp holds for a negative anyway.
+        assert_eq!(super::spawn_ramp(u, -0.5), 1.0);
+        assert_eq!(
+            super::spawn_ramp(u, super::finite(f32::NAN, 0.0).clamp(0.0, 1.0)),
+            1.0
+        );
+        // Above 1 there is no more life to ramp over, so it clamps to a ramp
+        // spanning the whole of one.
+        assert_eq!(
+            super::spawn_ramp(u, super::finite(4.0, 0.0).clamp(0.0, 1.0)),
+            u.clamp(0.0, 1.0)
+        );
+    }
+}
+
+/// **The ramp climbs, and it climbs the right way** — the pure half of Phase
+/// 2's second done-when. An inverted ramp passes any single-cohort assertion,
+/// so the claim is stated as an ordering between a young age and an old one.
+#[test]
+fn the_spawn_ramp_is_monotone_from_dark_to_full() {
+    const FADE: f32 = 0.5;
+    assert_eq!(super::spawn_ramp(0.0, FADE), 0.0, "it starts at black");
+    assert_eq!(
+        super::spawn_ramp(FADE, FADE),
+        1.0,
+        "and reaches full exactly at the end of the ramp"
+    );
+    let mut previous = -1.0f32;
+    for i in 0..=200 {
+        let u = i as f32 / 200.0;
+        let ramp = super::spawn_ramp(u, FADE);
+        assert!(
+            ramp >= previous,
+            "the ramp must never fall: {ramp} at u={u} after {previous}"
+        );
+        assert!((0.0..=1.0).contains(&ramp));
+        previous = ramp;
+    }
+    assert!(
+        super::spawn_ramp(0.1, FADE) < super::spawn_ramp(0.4, FADE),
+        "a young object must be dimmer than an older one, which is the arm an \
+         inverted ramp fails"
+    );
+}
+
+/// **The fade is visible, and it dims the young cohort rather than the old
+/// one** — the rendered half of Phase 2's second done-when.
+///
+/// The cohorts are read off the *geometry*, which is what makes this a
+/// statement about two populations rather than about one number: with `spread`
+/// and `lifetime_spread` closed, every object rides the same rising parabola,
+/// so an object's height in frame **is** its age. The band nearest the source
+/// therefore holds the objects inside the ramp and the far band holds the ones
+/// past it.
+///
+/// Both directions are asserted, and each rules out a different mistake: the
+/// young band must lose a fifth of its light (the ramp does something), and the
+/// old band must keep nine tenths of its own (the ramp is a *fade-in*, not a
+/// global dimmer — and an inverted ramp fails exactly here, since it would
+/// darken the objects that have lived longest).
+///
+/// Needs a GPU adapter, so it skips where there is none (ADR-0016).
+#[test]
+fn a_spawn_fade_dims_the_young_cohort_and_leaves_the_old_one() {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::CaptureImage;
+    use crate::render::context::RenderError;
+    use crate::render::{HeadlessOptions, Renderer};
+
+    const FIXTURE: &str = include_str!("../../../../tests/fixtures/emitter.toml");
+    const SIZE: u32 = 96;
+    /// Short enough that a `spawn_fade = 0.5` ramp — 0.3 s of a 0.6 s life —
+    /// finishes well inside the capture, so there is an *old* cohort to compare
+    /// against at all. Both distributions are closed so that height reads as age.
+    const OVERRIDES: &str = "spread = \"0\"\nlifetime_spread = \"0\"\n";
+    const LIFETIME: &str = "0.6";
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: SIZE,
+        height: SIZE,
+        prefer_software: true,
+    }) {
+        Ok(renderer) => renderer,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+
+    // Mean level of the third of the frame nearest the source line (the young
+    // cohort) and of the third furthest from it (the old one). Row 0 is the
+    // top of the frame; the source is below it, so the young band is the last
+    // third of the rows.
+    fn cohorts(img: &CaptureImage, size: u32) -> (f32, f32) {
+        let mut old = 0.0f64;
+        let mut young = 0.0f64;
+        for (i, p) in img.rgba.chunks_exact(4).enumerate() {
+            let level = (p[0] as f64 + p[1] as f64 + p[2] as f64) / 3.0;
+            let row = i as u32 / size;
+            if row < size / 3 {
+                old += level;
+            } else if row >= size - size / 3 {
+                young += level;
+            }
+        }
+        let per_band = (size * (size / 3)) as f64;
+        ((old / per_band) as f32, (young / per_band) as f32)
+    }
+
+    // TOML has no override, so the fixture's own `lifetime` line is stripped
+    // and rewritten — the same shape the lit-backdrop guard below uses.
+    let body: Vec<&str> = FIXTURE
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("lifetime"))
+        .collect();
+    let body = body.join("\n");
+
+    let capture = |renderer: &mut Renderer, fade: &str| -> CaptureImage {
+        let toml =
+            format!("{body}\nlifetime = \"{LIFETIME}\"\n{OVERRIDES}spawn_fade = \"{fade}\"\n");
+        let preset =
+            Preset::from_toml_str(&toml).expect("the emitter fixture parses with overrides");
+        let name = preset.name.clone();
+        renderer.set_presets(vec![preset]);
+        renderer
+            .capture_preset(&name, &AnalysisFrame::default(), 45)
+            .expect("capture the faded emitter")
+    };
+
+    let (base_old, base_young) = cohorts(&capture(&mut renderer, "0"), SIZE);
+    let (faded_old, faded_young) = cohorts(&capture(&mut renderer, "0.5"), SIZE);
+    eprintln!(
+        "emitter spawn_fade: young {base_young:.4} -> {faded_young:.4}, \
+         old {base_old:.4} -> {faded_old:.4} (of 255)"
+    );
+
+    assert!(
+        base_young > 0.5 && base_old > 0.5,
+        "both cohorts must be lit without the fade, or the comparison is two \
+         dark bands agreeing: young {base_young:.4}, old {base_old:.4}"
+    );
+    assert!(
+        faded_young < 0.8 * base_young,
+        "the objects still inside the ramp must be visibly dimmer: \
+         {base_young:.4} -> {faded_young:.4}"
+    );
+    assert!(
+        faded_old > 0.9 * base_old,
+        "the objects past the ramp must be untouched — a fade-in, not a \
+         dimmer, and the arm an inverted ramp fails: {base_old:.4} -> \
+         {faded_old:.4}"
     );
 }
 
