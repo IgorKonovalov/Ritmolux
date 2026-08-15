@@ -523,7 +523,25 @@ impl AppState {
     /// [`pending_switch_settle`](AppState::pending_switch_settle).
     fn on_preset_switched(&mut self) {
         self.pending_switch_settle = true;
+        self.note_soak_switch();
         self.window.request_redraw();
+    }
+
+    /// Mark a GPU-resource rebuild in the soak log, if one is running
+    /// (Plan 0085 Phase 3).
+    ///
+    /// Off the per-frame path by construction — the two callers are a preset
+    /// switch and a surface reconfigure, both event-driven and both rare. The
+    /// frame count comes from the core's own counter so the exclusion window is
+    /// measured in the same units the frame-time ring is.
+    fn note_soak_switch(&mut self) {
+        if self.soak.is_none() {
+            return;
+        }
+        let frames_total = self.renderer.metrics().frames_total;
+        if let Some(soak) = self.soak.as_mut() {
+            soak.note_switch(frames_total);
+        }
     }
 
     /// Refresh the window title with the preset, system, and the core's
@@ -1159,6 +1177,11 @@ impl ApplicationHandler for App {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
                 state.renderer.resize(size.width, size.height);
+                // A reconfigure rebuilds GPU resources exactly as a preset
+                // switch does, so the soak log counts it as the same event
+                // (Plan 0085 Phase 3) — the measured `frame_ms_p99` spikes
+                // included a fullscreen toggle, which arrives here.
+                state.note_soak_switch();
                 state.window.request_redraw();
             }
             WindowEvent::Occluded(occluded) => {
