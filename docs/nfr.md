@@ -33,6 +33,47 @@ contradicts this file is a plan bug — surface it, don't guess.
   not asserted from a multiplier — Plan 0044 Phase 4.
 - **Background cost:** when the window is minimized or fully occluded, rendering throttles to
   near-zero GPU; DSP may keep running so visuals resume in sync.
+- **`frame_ms_p99` spikes on a GPU resource rebuild, and a governor reading it bare would demote
+  a preset that is running fine.** Read this before designing the governor — it qualifies the
+  instrument the design is specified to read. Measured over three minutes at Rich tier, 1080p, with
+  preset switching and a fullscreen toggle (Plan 0046 Phase 5,
+  [backlog 0082](design-backlog.md)):
+
+  | | value |
+  |---|---|
+  | fps median / min | 165.0 / 114.3 |
+  | rows below this section's 60 fps floor | **0 of 158** |
+  | `frame_ms_avg` median / max | 6.061 / **8.749** ms |
+  | `frame_ms_p99` median / max | 6.866 / **25.037** ms |
+  | frames dropped | **0 of 28,698** |
+
+  The budget holds with ~2.7x headroom and **nothing is dropped**, yet p99 passes 16.67 ms. The
+  spikes coincide with the preset switches and the fullscreen toggle: they are the cost of
+  *rebuilding* GPU resources, not of running the preset. A demotion fired on one of them would
+  change what the audience sees during the event that is already the most visually disruptive.
+
+  **Three candidate responses were named, and choosing between them is the governor's own design
+  decision — this file deliberately does not choose.** Exclude the frames following a switch or
+  surface reconfigure from the governor's window; require N consecutive bad windows rather than one;
+  or read a separate steady-state statistic and leave `p99` the diagnostic it is today. Whichever is
+  taken, **the measurement above is the test case.**
+
+  **The shipped governor does not read `p99` at all, and that is worth knowing before anyone
+  "fixes" it** (checked against `core/src/render/tier.rs` at Plan 0085 Phase 4, and it contradicts
+  backlog 0082's own premise that the governor "is specified to read p99"). `sustained_miss` counts
+  what fraction of the raw frame-time series exceeds `budget × MISS_FACTOR` and demotes only when
+  **75 % of at least 180 samples** miss. A preset switch contributes a handful of slow frames to a
+  240-sample ring, which cannot approach that fraction — so the governor as built already landed the
+  second candidate response, in the form of a miss *fraction* rather than consecutive windows. What
+  is still live is the **wording**: the roadmap item and the backlog entry both describe a governor
+  that reads p99, and a future revisit starting from that description would reintroduce the hazard
+  this measurement documents.
+
+  The instrument for the third response exists anyway: `--soak` writes **`frame_ms_p99_steady`**
+  beside the raw `frame_ms_p99`, the same statistic with the frames following a switch or
+  reconfigure left out, alongside a monotone `switches` counter (Plan 0085 Phase 3,
+  [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md)). It is a
+  **reading, not a gate** — nothing demotes on it today.
 - **Captures pin `Floor`.** Headless capture is floor-tier by construction (`Renderer::new_headless`
   cannot produce another tier, and `set_tier` is a **no-op on a surface-less context** — the guard
   ADR-0054 adds so the runtime switch cannot reopen this), so every golden baseline stays
