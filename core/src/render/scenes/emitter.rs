@@ -175,6 +175,11 @@ const DEFAULT_SOURCE_Y: f32 = -1.12;
 /// resolves to `aspect * 1.0` — bit for bit the full-frame line this scene has
 /// always drawn. `0` collapses the line to a point source.
 const DEFAULT_SOURCE_WIDTH: f32 = 1.0;
+/// Fraction of an object's life over which its brightness ramps up from zero.
+/// Off by default, which is exactly today: an object arrives at the brightness
+/// [`ATTACK_FRAC`] gives it. It is the answer to an inside-frame `source_y`,
+/// where a mark switched on at full brightness is a pop.
+const DEFAULT_SPAWN_FADE: f32 = 0.0;
 // Shared palette colour knobs (ADR-0021), same meaning as the swarm's.
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_HUE_SPREAD: f32 = 1.0;
@@ -632,6 +637,28 @@ fn envelope(u: f32) -> f32 {
     attack * remaining.sqrt()
 }
 
+/// **The spawn ramp** (Plan 0090 Phase 2): a second, preset-owned fade-in over
+/// the first `spawn_fade` of an object's life, multiplying [`envelope`]'s own
+/// short attack rather than replacing it. `u` is `age / lifetime`.
+///
+/// It exists for the source that sits *inside* the frame (ADR-0104), where the
+/// engine's 8 % attack is far too short to hide a mark switching on where the
+/// eye already is. It is also a soft spark on its own terms — a ramp this scene
+/// could not express at any `brightness`.
+///
+/// **Exactly `1.0` when the fade is off, by an equality branch and not by
+/// arithmetic.** The natural form divides by the fade and is `0/0` at age zero,
+/// and the house precedent is that the obviously-equivalent arithmetic is not
+/// bit-exact: ADR-0092's `ink_gamma` and ADR-0094's ramp exponent both take the
+/// same branch. That exactness is what keeps the default free of the one
+/// committed emitter baseline.
+fn spawn_ramp(u: f32, spawn_fade: f32) -> f32 {
+    if spawn_fade <= 0.0 {
+        return 1.0;
+    }
+    (u / spawn_fade).clamp(0.0, 1.0)
+}
+
 /// **The per-object brightness multiplier** — the answer to the report this plan
 /// came from (ADR-0057 Notes: the user asked for stars that *blink* and got a
 /// field-wide flash, because a binding is evaluated once per frame for the whole
@@ -682,9 +709,11 @@ pub const PARAMS: &[&str] = &[
     "spread",
     "lifetime",
     "lifetime_spread",
-    // The source geometry (Plan 0090).
+    // The source geometry, and the ramp that makes an inside-frame one usable
+    // (Plan 0090).
     "source_y",
     "source_width",
+    "spawn_fade",
     "size",
     "size_spread",
     "spin",
@@ -736,6 +765,9 @@ pub struct EmitterScene {
     /// arbitrary arithmetic is allowed to reach the pool.
     source_y: f32,
     source_width: f32,
+    /// Fraction of a life spent ramping up from black, **as bound**; conditioned
+    /// at the draw site beside the other appearance params.
+    spawn_fade: f32,
     size: f32,
     size_spread: f32,
     spin: f32,
@@ -915,6 +947,7 @@ impl EmitterScene {
             lifetime_spread: DEFAULT_LIFETIME_SPREAD,
             source_y: DEFAULT_SOURCE_Y,
             source_width: DEFAULT_SOURCE_WIDTH,
+            spawn_fade: DEFAULT_SPAWN_FADE,
             size: DEFAULT_SIZE,
             size_spread: DEFAULT_SIZE_SPREAD,
             spin: DEFAULT_SPIN,
@@ -990,6 +1023,7 @@ impl Scene for EmitterScene {
         self.lifetime_spread = DEFAULT_LIFETIME_SPREAD;
         self.source_y = DEFAULT_SOURCE_Y;
         self.source_width = DEFAULT_SOURCE_WIDTH;
+        self.spawn_fade = DEFAULT_SPAWN_FADE;
         self.size = DEFAULT_SIZE;
         self.size_spread = DEFAULT_SIZE_SPREAD;
         self.spin = DEFAULT_SPIN;
@@ -1020,6 +1054,7 @@ impl Scene for EmitterScene {
             "lifetime_spread" => self.lifetime_spread = value,
             "source_y" => self.source_y = value,
             "source_width" => self.source_width = value,
+            "spawn_fade" => self.spawn_fade = value,
             "size" => self.size = value,
             "size_spread" => self.size_spread = value,
             "spin" => self.spin = value,
@@ -1057,6 +1092,11 @@ impl Scene for EmitterScene {
         let size_spread = finite(self.size_spread, DEFAULT_SIZE_SPREAD).clamp(0.0, 2.0);
         let spin = finite(self.spin, DEFAULT_SPIN);
         let twinkle = finite(self.twinkle, DEFAULT_TWINKLE);
+        // A fraction of a life, so past 1 there is no more life to ramp over.
+        // Resolved here rather than at spawn for the same reason as the three
+        // above: it says how an object *looks*, so easing it moves the whole
+        // population and not only the marks thrown since the change.
+        let spawn_fade = finite(self.spawn_fade, DEFAULT_SPAWN_FADE).clamp(0.0, 1.0);
         let mut count = 0usize;
         // One pass over the pool, writing the live objects into the front of the
         // instance buffer. Iterating dead slots costs a branch; compacting is
@@ -1088,7 +1128,10 @@ impl Scene for EmitterScene {
                 ),
                 self.saturation,
             );
-            let bright = brightness * envelope(u) * twinkle_factor(object.seed, time, twinkle);
+            let bright = brightness
+                * envelope(u)
+                * spawn_ramp(u, spawn_fade)
+                * twinkle_factor(object.seed, time, twinkle);
             *slot = Instance {
                 center: pos,
                 size: size * size_factor(object.seed, size_spread),

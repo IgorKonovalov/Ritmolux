@@ -582,6 +582,7 @@ nothing.
 |---|---|---|
 | `source_y` | `-1.12` | the line's world `y`. Just below the frame by default, so an upward throw rises into shot |
 | `source_width` | `1` | the line's half-width **as a fraction of the frame's**. `1` spans the frame, `0` is a point source |
+| `spawn_fade` | `0` | fraction of an object's life spent ramping up from black. `0` is no ramp beyond the engine's own 8 % attack |
 
 `source_width` is a fraction, not world units, so it means the same thing on every
 display — the engine has already reconciled the aspect
@@ -598,8 +599,16 @@ column rather than a fan.
 **`source_y` may sit inside the frame**, which is what makes a drift slow enough to
 read as a sky reachable at all: from below the frame an object has to travel 2.12
 world units before it crosses, and at sky speeds that is seconds of empty picture.
-The price is a spawn pop — an object switched on at full brightness where the eye is
-— and nothing validates the pair, so it is yours to avoid.
+The price is a spawn pop — an object switched on at full brightness where the eye is.
+
+**`spawn_fade` is what you pay it with.** It ramps an object's brightness from
+black over the first fraction of its life, so a mark born mid-frame arrives instead
+of appearing. `0.3` on a two-second life is a 0.6 s arrival. Nothing validates the
+pair — an inside-frame `source_y` at `spawn_fade = 0` pops, and the engine lets it
+(ADR-0104 rejected coupling them: the preset surface is a flat set of independent
+scalars, and a rule like that would make a legal preset briefly illegal under a
+`[smoothing]`-eased fade passing through zero). It is also worth having on its own:
+a ramp on a short-lived object is a *soft* spark, which no `brightness` can express.
 
 #### Individuation — the distribution params
 
