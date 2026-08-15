@@ -215,6 +215,38 @@ ways, any `clamp()` ceiling the value never reached, and any `clamp()` that neve
 let its ceiling go
 ([`../docs/capturing.md`](../docs/capturing.md#reachability-gates-the-probe-never-drove-both-ways)).
 
+**The gain rule has one exception class: a param whose cap is a FAILURE STATE
+rather than a maximum.** The rule above assumes the top of a param's range is a
+*more* of whatever the param does — more zoom, more bloom, more curl — so
+arranging for a peak to reach it is the whole point. Some params are not like
+that. Their range contains a region where the picture *exists* and a region where
+it does not, and the edge between the two is not a maximum, it is a death. Gaining
+a band term to reach the cap on one of those means gaining it to reach the state
+where there is nothing on screen.
+
+**The treatment is to pull the range in at both ends** — pick the two values the
+look lives between, and let the band drift between *those*. A small reactive span
+is the correct answer here rather than a timid one: it is a drift between two
+living states, not a sweep to the edge of the parameter space. The occupancy gate
+has nothing to say about it, because the term never had a cap to reach.
+
+**Gray-Scott `feed`/`kill` is the worked example.** The reaction-diffusion field
+draws its picture out of the *gaps* between the growing regions, and the live
+regime is a narrow band in the `feed`×`kill` plane. Gains derived by the house
+rule take the field into the filled regime, where the gaps close, no contour is
+left to draw, and the preset renders as a flat wash — found by rendering it, as
+flat mustard, by the author of a reaction-diffusion preset that did not survive
+curation. The three shipped ones show the treatment instead: `reaction_etching`
+runs `feed = "0.0420 + noise(…) * 0.0022 + clamp(bass * 1.18, 0, 1) * 0.0016"` —
+a base inside the live band, a **±0.0016** reactive span, and the `clamp` bounding
+the *band* rather than capping the term. `reaction_verdigris` and
+`reaction_mitosis` are the same shape at their own regimes.
+
+**The class is unlikely to have one member**, which is why it is worth naming
+rather than leaving in a preset header. Anything whose parameter space has a dead
+region behind an edge is in it. If you are about to write `C / 0.85` on a param,
+first ask what its cap actually looks like on screen.
+
 ### Seeded randomness — `hash`, `noise`, and `[generator] seed`
 
 `hash(x)` scatters (neighbouring arguments unrelated, `[0, 1)`); `noise(x)`
