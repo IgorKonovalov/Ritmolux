@@ -443,8 +443,15 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
      dodging:
 
      ```sh
-     grep -rn "ADR-00NN\|Plan 00NN\|design-backlog 00NN" presets/*.toml
+     grep -rn "ADR-00NN\|Plan 00NN\|design-backlog 00NN\|backlog 00NN" presets/*.toml
      ```
+
+     **The bare `backlog NNNN` form is in that pattern because it was missing once and cost a
+     finding.** At Plan 0090's close the grep reported clean and `emitter_perseids.toml:7` was
+     carrying a fourteen-line header declaring the quiet sky *"ROUTED, NOT SHIPPED ... on two
+     measured walls"* — both of which that very plan and Plan 0077 had taken down. It says
+     `(backlog 0068)`, not `design-backlog 0068`. **And read the whole output**: the run that missed
+     it was piped through `head`, which is the same miss wearing a different hat.
 
      The output is a **list for the close notes, not a re-tune** — judging the look is content work
      and stays in the `preset-author` lane.
