@@ -3,8 +3,8 @@
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
 use super::{
-    Field, Instance, Object, RETIRE_MARGIN, SOURCE_Y, Spawn, bounds, build, exit_time, size_factor,
-    sprite_angle, twinkle_factor,
+    DEFAULT_SOURCE_Y, Field, Instance, Object, RETIRE_MARGIN, Spawn, bounds, build, exit_time,
+    size_factor, sprite_angle, twinkle_factor,
 };
 
 /// A test aspect, and the retirement bound it gives.
@@ -65,6 +65,7 @@ fn cfg(rate: f32, gravity: f32, speed: f32) -> Spawn {
         lifetime: 4.0,
         lifetime_spread: 0.0,
         source_half_width: ASPECT,
+        source_y: DEFAULT_SOURCE_Y,
         bound: bounds(ASPECT),
     }
 }
@@ -356,7 +357,7 @@ fn the_exit_time_is_the_last_crossing_not_the_first() {
     // it finally falls past the bottom.
     let g = 1.0f32;
     let v0 = [0.0f32, 3.0f32];
-    let p0 = [0.0f32, SOURCE_Y];
+    let p0 = [0.0f32, DEFAULT_SOURCE_Y];
     let t = exit_time(p0, v0, g, b);
     let apex = v0[1] / g;
     assert!(
@@ -405,8 +406,239 @@ fn a_spawn_is_a_pure_function_of_its_seed() {
             "the source line spans the frame width, got x={}",
             a.p0[0]
         );
-        assert_eq!(a.p0[1], SOURCE_Y);
+        assert_eq!(a.p0[1], DEFAULT_SOURCE_Y);
     }
+}
+
+// -----------------------------------------------------------------------
+// The source is geometry a preset owns (Plan 0090 Phase 1, ADR-0104)
+// -----------------------------------------------------------------------
+
+/// **The defaults are the line this scene shipped with, bit for bit** — Phase
+/// 1's first done-when, and the whole reason `source_width` is a *fraction*.
+///
+/// Asserted as exact equality rather than within a tolerance, because that is
+/// the claim: `aspect * 1.0` is the identity in IEEE-754, so the resolved
+/// half-width is the same float `self.aspect` was, and the one committed
+/// emitter baseline cannot move by arithmetic. A tolerance here would pass for
+/// an absolute width that merely *approximated* the frame, which is the
+/// alternative ADR-0104 rejected (F).
+#[test]
+fn the_default_source_geometry_is_the_line_the_scene_shipped_with() {
+    for aspect in [
+        16.0f32 / 9.0,
+        16.0 / 10.0,
+        4.0 / 3.0,
+        21.0 / 9.0,
+        9.0 / 16.0,
+    ] {
+        assert_eq!(
+            super::source_half_width(aspect, super::DEFAULT_SOURCE_WIDTH),
+            aspect,
+            "the default source line must be the frame's own half-width, exactly"
+        );
+        assert_eq!(
+            super::source_line_y(DEFAULT_SOURCE_Y, bounds(aspect)),
+            -1.12,
+            "the default source y must be the constant this scene shipped with"
+        );
+    }
+}
+
+/// **`source_width = 0` is a point source**, asserted exactly across seeds.
+///
+/// The spawn site multiplies a unit draw by the half-width, so zero collapses
+/// every draw onto the same `x` — there is no distribution left to be nearly
+/// zero, which is why this is `== 0.0` and not a bound on the spread.
+///
+/// The negative arm is the same clamp `lifetime_spread` takes: a width is only
+/// meaningful as a magnitude, and a negative one would mirror the seed's draw
+/// rather than narrow it.
+#[test]
+fn a_zero_source_width_is_a_point_source() {
+    for width in [0.0f32, -0.5, -3.0] {
+        let half = super::source_half_width(ASPECT, width);
+        assert_eq!(half, 0.0, "source_width = {width} must collapse the line");
+        let cfg = Spawn {
+            source_half_width: half,
+            ..cfg(60.0, 1.5, 1.9)
+        };
+        for seed in [0u32, 1, 7, 0xDEAD_BEEF, u32::MAX] {
+            assert_eq!(
+                build(seed, 0.25, &cfg).p0[0],
+                0.0,
+                "every object must leave from x = 0 exactly at source_width = {width}"
+            );
+        }
+    }
+    // ...and the property is falsifiable: the same seeds do scatter at a width.
+    let wide = cfg(60.0, 1.5, 1.9);
+    let xs: Vec<f32> = [0u32, 1, 7, 0xDEAD_BEEF, u32::MAX]
+        .iter()
+        .map(|&seed| build(seed, 0.25, &wide).p0[0])
+        .collect();
+    assert!(
+        xs.windows(2).any(|w| w[0] != w[1]),
+        "the full-width source must scatter its spawns, or the point-source \
+         assertion above holds vacuously: {xs:?}"
+    );
+}
+
+/// **A source outside the retirement bound is clamped to it, and the objects
+/// it spawns are alive for at least a frame** — Phase 1's second done-when.
+///
+/// The failure mode this guards is invisible rather than ugly: an object
+/// spawned past the bound has an `exit_time` that has *already* passed, so it
+/// is retired on the frame it was born on and the pool churns against itself
+/// forever, drawing nothing. So the assertion is on the death time, which is
+/// where the churn would be, and not on a pixel.
+#[test]
+fn a_source_past_the_bound_is_clamped_and_still_spawns_live_objects() {
+    let bound = bounds(ASPECT);
+    const FRAME: f32 = 1.0 / 60.0;
+
+    for asked in [9.0f32, -9.0, f32::INFINITY, f32::NAN] {
+        let y = super::source_line_y(asked, bound);
+        assert!(
+            y.abs() <= bound[1],
+            "source_y = {asked} must land inside the retirement bound, got {y}"
+        );
+        let cfg = Spawn {
+            source_y: y,
+            ..cfg(60.0, 1.5, 1.9)
+        };
+        for seed in [0u32, 1, 7, 0xDEAD_BEEF, u32::MAX] {
+            let object = build(seed, 0.25, &cfg);
+            assert!(
+                object.death_time > 0.25 + FRAME,
+                "an object spawned from source_y = {asked} (clamped to {y}) \
+                 must live at least a frame, not be born dead: death_time \
+                 {} against spawn 0.25",
+                object.death_time
+            );
+        }
+    }
+    // The clamp lands *on* the bound rather than somewhere inside it, which is
+    // what makes the reachable range the whole of the legal one.
+    assert_eq!(super::source_line_y(9.0, bound), bound[1]);
+    assert_eq!(super::source_line_y(-9.0, bound), -bound[1]);
+    // A source inside the visible frame is legal and is NOT clamped — the
+    // decision ADR-0104 took (C), and the one that makes a slow look reachable.
+    assert_eq!(super::source_line_y(0.0, bound), 0.0);
+    assert_eq!(super::source_line_y(0.6, bound), 0.6);
+}
+
+/// **A narrowed source is visible in a render, and `pan_x` carries it
+/// off-centre** — Phase 1's third done-when, stated as a property of the lit
+/// pixels rather than as a frozen count.
+///
+/// Two captures of one fixture, differing only in `source_width`. The narrow
+/// one has to put its ejecta in a column narrower than the frame; the wide one
+/// is the control that makes that non-vacuous, because a capture that drew
+/// almost nothing would satisfy the narrow arm on its own. `spread` is closed
+/// for both so the horizontal extent is the *source's* and not the cone's.
+///
+/// The off-centre jet is the narrow source plus the scene's own `pan_x` — the
+/// two together are the look `presets/README.md` used to route to engine
+/// feedback, so the third capture asserts the column actually moves.
+///
+/// Needs a GPU adapter, so it skips where there is none (ADR-0016).
+#[test]
+fn a_narrow_source_draws_a_column_and_pan_carries_it_off_centre() {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::CaptureImage;
+    use crate::render::context::RenderError;
+    use crate::render::{HeadlessOptions, Renderer};
+
+    const FIXTURE: &str = include_str!("../../../../tests/fixtures/emitter.toml");
+    const SIZE: u32 = 96;
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: SIZE,
+        height: SIZE,
+        prefer_software: true,
+    }) {
+        Ok(renderer) => renderer,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+
+    /// The lit columns of a capture, as fractions of the frame width: the
+    /// leftmost, the rightmost, and the mean.
+    fn lit_columns(img: &CaptureImage, size: u32) -> Option<(f32, f32, f32)> {
+        let mut lo = f32::INFINITY;
+        let mut hi = f32::NEG_INFINITY;
+        let mut sum = 0.0f64;
+        let mut count = 0u32;
+        for (i, p) in img.rgba.chunks_exact(4).enumerate() {
+            if p[0] <= 8 && p[1] <= 8 && p[2] <= 8 {
+                continue;
+            }
+            let x = (i as u32 % size) as f32 / (size - 1) as f32;
+            lo = lo.min(x);
+            hi = hi.max(x);
+            sum += x as f64;
+            count += 1;
+        }
+        (count > 0).then(|| (lo, hi, (sum / count as f64) as f32))
+    }
+
+    // Capture the fixture with `extra` appended to its `[params]` table.
+    let capture = |renderer: &mut Renderer, extra: &str| -> CaptureImage {
+        let toml = format!("{FIXTURE}\nspread = \"0\"\n{extra}");
+        let preset =
+            Preset::from_toml_str(&toml).expect("the emitter fixture parses with overrides");
+        let name = preset.name.clone();
+        renderer.set_presets(vec![preset]);
+        renderer
+            .capture_preset(&name, &AnalysisFrame::default(), 45)
+            .expect("capture the emitter column")
+    };
+
+    let wide = capture(&mut renderer, "source_width = \"1\"\n");
+    let narrow = capture(&mut renderer, "source_width = \"0.1\"\n");
+    let panned = capture(&mut renderer, "source_width = \"0.1\"\npan_x = \"0.5\"\n");
+
+    let (wide_lo, wide_hi, _) = lit_columns(&wide, SIZE).expect("the wide source drew nothing");
+    let (narrow_lo, narrow_hi, narrow_mid) =
+        lit_columns(&narrow, SIZE).expect("the narrow source drew nothing");
+    let (_, _, panned_mid) = lit_columns(&panned, SIZE).expect("the panned source drew nothing");
+    eprintln!(
+        "emitter source: wide span {:.3}, narrow span {:.3}, centre {narrow_mid:.3} -> \
+         {panned_mid:.3} under pan_x",
+        wide_hi - wide_lo,
+        narrow_hi - narrow_lo
+    );
+
+    // The control: a full-width source really does span the frame, so the
+    // narrow arm below is measuring the source and not an empty capture.
+    assert!(
+        wide_hi - wide_lo > 0.8,
+        "the full-width source must span the frame: {:.3}",
+        wide_hi - wide_lo
+    );
+    // A tenth of the frame's half-width, plus a mark's own radius either side.
+    // Half the frame is the bar rather than the arithmetic minimum, because the
+    // claim is "a column" and not a pixel count.
+    assert!(
+        narrow_hi - narrow_lo < 0.5,
+        "source_width = 0.1 must put the ejecta in a column: {:.3} of the frame",
+        narrow_hi - narrow_lo
+    );
+    // ...and the column is where the source is, not merely small.
+    assert!(
+        (narrow_mid - 0.5).abs() < 0.1,
+        "the centred column must sit at the middle of the frame: {narrow_mid:.3}"
+    );
+    assert!(
+        panned_mid - narrow_mid > 0.15,
+        "pan_x must carry the column off centre — this is the off-centre jet: \
+         {narrow_mid:.3} -> {panned_mid:.3}"
+    );
 }
 
 // -----------------------------------------------------------------------
