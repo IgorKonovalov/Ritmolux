@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
-> **Related plan(s):** [0086 — the downbeat finds a cue that is not the kick](../plans/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md)
+> **Related plan(s):** [0086 — the downbeat finds a cue that is not the kick](../plans/done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md)
 > **Supplements:** [ADR-0050](0050-downbeat-and-phrase-tracking-with-confidence-fallback.md),
 > [ADR-0082](0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md)
 
@@ -154,3 +154,33 @@ a reason the threshold stays where it is while the estimator changes underneath 
 **Do not re-measure by ear.** The 1 Hz `downbeat_locked` column is the outcome instrument and
 `DownbeatTerms` is the decomposition; both are in the repo, and an impression from listening cannot
 be compared against either.
+
+## Outcome (2026-08-15)
+
+**The decision worked, and it cost this ADR its own shortlist.** Plan 0086 built the capture,
+ran it on three genres, and the reading named a defect **upstream of every candidate ranked
+here**: the fold is indexed by onset-detector events, not musical beats — 1.73x / 1.35-2.10x /
+1.76x detections per beat, wandering across 1x, 2x and 4x within a single track, against a
+synthesized control that reads exactly 1.00. A second accent band changes *what* is measured per
+event, not *what the events are indexed by*, so Alternative A could not have repaired it. Full
+table in [Plan 0086](../plans/done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md)'s
+`Outcome`; the decision that follows is
+[ADR-0109](0109-the-beat-clock-counts-onsets-not-beats.md).
+
+**This is the outcome the Negative section priced and the Decision was written to produce** —
+"a plan that went straight at the second accent band could plausibly ship a working improvement
+sooner", and it would have shipped a plausible repair on top of a broken index. The phase bought
+a redirection rather than a confirmation.
+
+**The shortlist is deferred, not refuted.** The 2-periodic degeneracy this ADR named appears in
+the data **only on backbeat rock/pop**, in the predicted direction: the top two alignment scores
+sit closer to each other (top-2nd 0.0397) than the second and third do (0.0434), with `best`
+flipping on 17.0 % of beats and `best == held` at only 23.3 %. It is weak and swamped by the
+fold-unit defect, and it becomes answerable once Plan 0095 gives the fold a bar-scale unit.
+
+**One claim in the Context did not survive its own measurement.** This ADR inherited Plan 0068's
+6.79 % / 0.14 % genre split as the fact to be explained. It **did not reproduce**: all three
+genres landed in a narrow 1.6-2.9 % band and backbeat rock/pop was not the worst. That may be
+material the capture set lacked, or the two statistics may differ — 0068 measured shares of
+audible 1 Hz rows, Plan 0086 shares of detected beats. Unresolved, and recorded here so the next
+reader does not treat the 48x split as established.

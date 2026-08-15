@@ -443,8 +443,21 @@ correction.
 
 ## 0042 — the downbeat estimator locks on ~3 % of audible time, so the gated bar variables are almost always fallback
 
+- **PROMOTED A THIRD TIME 2026-08-15 → [ADR-0109](adrs/0109-the-beat-clock-counts-onsets-not-beats.md) +
+  [Plan 0095](plans/0095-the-downbeat-fold-gets-a-musical-beat.md)**, and **this entry's stated cause
+  is corrected here rather than left standing.** Plan 0086 ran its measurement and closed at Phase 2:
+  the cue was never changed, so the repair this entry has now been promoted for three times is still
+  unbuilt and the entry stays **live**. What the measurement found is upstream of the cue. `beat_index`
+  counts **onset-detector events, not musical beats** — 1.73x / 1.35-2.10x / 1.76x detections per beat
+  on three genres, wandering across 1x, 2x and 4x inside a single track, against a synthesized control
+  that reads exactly 1.00 — so the 4/4 fold is indexed by a unit that is not a beat and a bar-locked
+  accent precesses across all four alignments. The bass-weighted accent named below (Plan 0068 Phase 3,
+  and repeated in the 2026-08-15 verification bullet) is therefore **at best secondary**: it is a real
+  property of the feature, but it is not what holds the publish rate down, and a second accent band
+  would not have moved it. The measured rates in this entry's body remain accurate as *outcomes*; the
+  mechanism sentence attached to them does not.
 - **PROMOTED AGAIN 2026-08-13 → [ADR-0097](adrs/0097-the-downbeat-cue-is-chosen-against-per-beat-evidence.md) +
-  [Plan 0086](plans/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md)** — the **repair**, which
+  [Plan 0086](plans/done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md)** — the **repair**, which
   the 2026-08-09 answer below explicitly left unwritten. The plan does not open by building the cue:
   ADR-0082's own `Outcome` records that the 1 Hz log carries **band levels, not per-beat accents**,
   so "the accent feature is the cause" is a ladder match plus a construction argument. Phase 1
@@ -469,7 +482,7 @@ correction.
 - **Verified 2026-08-15** — the gate has not moved, and the accent is still bass-weighted, which
   is the cause Plan 0068 Phase 3 named: `present: CONFIDENCE_THRESHOLD: f32 = 0\.25 in: core/src/dsp/downbeat.rs`,
   `present: BASS_WEIGHT: f32 = 0\.7 in: core/src/dsp/downbeat.rs`. Both are written to go red when
-  [Plan 0086](plans/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md) changes the cue, which
+  [Plan 0086](plans/done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md) changes the cue, which
   is exactly when this entry's measured rates stop describing the engine. The authoring-doc
   qualification this entry called for is also still in place, checked rather than assumed:
   `present: 70 % bass band in: presets/README.md`.
