@@ -218,6 +218,10 @@ answer a `dev` finding, and left a real want with nowhere to live.
   `held + (1 - exp(-dt/tau)) * (raw - held)`, one constant per direction (ADR-0035), no shape.
   `Smoother::smooth` (`core/src/render/mod.rs:317`) is the same arithmetic for bindings, and the
   spectrum scene's per-element easing calls the same method.
+- **Verified 2026-08-15** — the mechanism citation still resolves, and the rate-limited release
+  this entry proposes as the cheap shape is still unbuilt:
+  `present: Easing in: core/src/preset/schema.rs`, `absent: slew in: core/src`. The evenness
+  arithmetic itself is not a repo claim and is not reduced here.
 
 **The measurement, for the record.** An exponential spends **30 %** of its settling time covering the
 first half of its travel (`ln2 / ln10` = 0.301); a linear ramp spends **56 %**. Both curve orderings
@@ -267,6 +271,12 @@ plan — the evidence so far is an architect's arithmetic, not a frustrated auth
   gap Plan 0048's Mode 4 review named), and confirmed at that plan's close review.
 - **Verified against code:** yes — measured, and the measurement is pinned by
   `core/src/dsp/fft.rs::the_axis_holds_at_the_rates_we_do_not_develop_at`.
+- **Verified 2026-08-15** — both windows are still sized in samples, and the sweep that measured
+  the consequence is still pinned: `present: WINDOW_SIZE: usize = 2048 in: core/src/dsp/mod.rs`,
+  `present: LOW_WINDOW_SIZE: usize = 8192 in: core/src/dsp/mod.rs`,
+  `present: the_axis_holds_at_the_rates_we_do_not_develop_at in: core/src/dsp/fft.rs`. A literal
+  sample count is the claim, so the day either becomes a duration this goes red — which is the
+  fix this entry asks for and therefore the re-read it wants.
 
 Every band-layout test was at 48 kHz until Plan 0049. `AudioFormat` accepts 8 kHz-384 kHz, and
 WASAPI loopback runs at whatever the device mix format is — 96 kHz is an ordinary setting on a
@@ -334,6 +344,13 @@ point this entry is the starting measurement rather than a fresh investigation.
   three-way pass is a two-way pass.
 - **Raised:** 2026-07-31, from `architect`, at Plan 0045's Mode 4 review.
 - **Verified against code:** yes — measured, not inferred (numbers below).
+- **Verified 2026-08-15** — the one binding this entry names is still the only one a retune has
+  to start from: `present: ^exposure in: presets/lsystem_vellum.toml`. The count around it does
+  not reduce — `unprobeable: exactly one shipped preset binds exposure is a claim about how many
+  files match, and the grammar deliberately has no count verb (ADR-0108, Notes)`. The document this
+  entry corrects still carries the sentence it corrects: `present: tonemap-knee in: docs/plans/README.md`
+  — which goes red when that paragraph is next rewritten, and that is the moment to re-read whether
+  the correction is still owed.
 - **For:** `preset-author`. This is genuinely content-lane work; the engine behaved as designed.
 - **ROUTED 2026-08-01 → `preset-author`, as a content pass rather than a plan.** The user's
   call at the Plan 0051 close: this needs no engine change and no ADR, so it goes to the lane
@@ -398,6 +415,13 @@ correction.
 - **Measured, not impressionistic:** 8.8 minutes through the live app on the `v0.28.1` release
   build, 517 log rows at 1 Hz, **458 with signal**, roughly half beat-driven 4/4 (the Plan 0037
   Phase 4 trap/808 material) and half sparse.
+- **Verified 2026-08-15** — the gate has not moved, and the accent is still bass-weighted, which
+  is the cause Plan 0068 Phase 3 named: `present: CONFIDENCE_THRESHOLD: f32 = 0\.25 in: core/src/dsp/downbeat.rs`,
+  `present: BASS_WEIGHT: f32 = 0\.7 in: core/src/dsp/downbeat.rs`. Both are written to go red when
+  [Plan 0086](plans/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md) changes the cue, which
+  is exactly when this entry's measured rates stop describing the engine. The authoring-doc
+  qualification this entry called for is also still in place, checked rather than assumed:
+  `present: 70 % bass band in: presets/README.md`.
 
 `downbeat_locked` was true in **14 of 458 audible rows — 3.1 %**, which over the beat-driven half
 is roughly **6 %**. `downbeat_confidence` sat at **mean 0.030, median 0.000** against
@@ -476,6 +500,13 @@ time here too.
   Phase 6 — the starfield the whole plan was built for.
 - **Verified by measurement:** yes. The emitter draft was rendered and gated before being discarded;
   the numbers below are from that run, not from reading the code.
+- **Verified 2026-08-15** — option 2 is still open, and this entry's own dated correction still
+  holds: `present: SOURCE_Y: f32 = -1\.12 in: core/src/render/scenes/emitter.rs`,
+  `present: source_half_width in: core/src/render/scenes/emitter.rs`,
+  `present: launch_speed = "2\.6" in: presets/emitter_perseids.toml`.
+  [Plan 0090](plans/0090-the-emitters-source-moves.md) turns the first of these into an authorable
+  scalar, so it is designed to go red the day that lands — at which point option 2 is delivered and
+  the entry is the architect's to close.
 
 **The scene with the right individuation cannot hold the look, and the scene that can hold it has no
 individuation.** `emitter` carries `twinkle`, whose *rate and phase both* come off each object's own
@@ -609,6 +640,14 @@ parameter surface, and the scene that most wants it cannot reach it.
   `r = 1 - sin(theta)` drawn through `parametric_curve` at `ink_amount = 1` on white paper renders
   its outline **grey**, not black: a thin anti-aliased stroke averages to mid luminance and lands
   halfway down the ink ramp.
+- **Verified 2026-08-15** — the correction box above, not the title: the darkening blend and the
+  fullscreen coverage it needs both exist:
+  `present: multiply in: core/src/render/layer_blend.rs`,
+  `present: occlude in: core/src/render/scenes/fragment_field.rs`. The half this entry stays live
+  for does not reduce — `unprobeable: nothing in this engine decides what is in front of what is
+  the absence of a whole mechanism rather than of a symbol, and every narrow spelling of it (depth,
+  sort, order) is a common word in this tree, so any probe on it could never fail and would read as
+  verification while checking nothing`
 
 The original ask was a Solitaire-style cascade of **hearts — red fill, black outline**. Plan 0070
 delivered the silhouette: `shape = heart` on `swarm`/`emitter` draws a heart-shaped *glow*,
@@ -666,6 +705,10 @@ still cite the old numbers; the mapping is `0070`→`0071`, `0071`→`0072`, `00
 - **Raised:** 2026-08-06, at Plan 0065 Phase 3. **This is a user decision, not an open question.**
 - **Verified by measurement:** n/a — it is a look decision, taken from the `bound A touch` /
   `bound B curve` A/B in the Phase 2 sample set.
+- **Verified 2026-08-15** — the standing note that [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md)
+  Phase 6 replaces is still in the file: `present: Nothing here fakes one in: core/src/render/scenes/lines/star.rs`.
+  The promotion bullet cites it at `star.rs:599` and it now sits at line 606, which is why the probe
+  is on the sentence rather than the line.
 
 [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)'s Notes left
 open whether the reference image's scalloped outer boundary is "a motif ring whose members touch, or
@@ -723,6 +766,13 @@ chosen compositions (four rings, six rings, rings in weave) carry no boundary ri
 - **Verified by measurement:** **no** — user judgement in the running app, corroborated by the
   Phase 2 sheets (the joints are clearest on `bound A touch`, where neighbouring `arc` members meet).
   **The mechanism below is a hypothesis and has not been measured.**
+- **Verified 2026-08-15** — both mechanisms are still exactly as this entry's 2026-08-13 resolution
+  describes them. The join extends each flagged endpoint by the half-width
+  (`present: JOINED_A in: core/src/render/scenes/lines/renderer.rs`), and the per-motif vertex count
+  is still a fixed constant with no authorable resolution
+  (`present: fn vertex_count in: core/src/render/scenes/lines/star.rs`,
+  `present: SMOOTH_SAMPLES in: core/src/render/scenes/lines/star.rs`).
+  [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md) is written to falsify the second.
 
 Every motif in the closed roster is a parametric outline **sampled to straight segments** and drawn
 as instanced quads through the shared `LineRenderer`. Two consequences the user saw:
@@ -811,6 +861,11 @@ that reads as a curve — which is every future user of `star_pattern`'s motif r
   to read is written up here rather than quietly left bound to nothing".
 - **Verified by measurement:** yes — both routes rendered against each other on both presets, at a
   quiet frame and a typical one, and on `attractor_dissolve` at three points across its morph.
+- **Verified 2026-08-15** — item 2's engine fact is unchanged, and it is the only half of this
+  entry still open: one sampler, repeating on the palette coordinate:
+  `present: address_mode_u: wgpu::AddressMode::Repeat in: core/src/render/palette.rs`.
+  [ADR-0102](adrs/0102-a-palette-coordinates-edge-is-a-per-preset-choice.md) is proposed and has no
+  plan, so this is expected to hold until a look asks for the clamp.
 - **Nothing here argues the channel was a mistake.** `root` reads, exactly as the Phase 2 gate
   found. This entry is about *which of its two routes* a real preset can afford, and the answer was
   the same on both looks for two **different** reasons — which is what makes it a property of the
@@ -887,6 +942,10 @@ both presets and documented. It is a documentation gap with one genuine engine q
 Phase 3's sample set at Phase 4. **Owner if taken:** whoever next builds a capture grid — this is a
 methodology note, not a code change.
 
+- **Verified 2026-08-15** — `unprobeable: this is a capture-hygiene rule for whoever next builds a
+  sample grid, and its own What a fix would be section is nothing in code, so it makes no claim
+  about this repository's contents at all`
+
 ### The finding
 
 Phase 3 rendered its grid with `trails = 0` in every cell, on sound reasoning that is written into
@@ -951,6 +1010,11 @@ file's standing verify-before-acting rule applies.
 **Raised by:** `preset-author`, Plan 0075 cohort 3 (the Verdigris/Mitosis register).
 **Owner if taken:** `architect` then `dev`, if a second want arrives.
 
+- **Verified 2026-08-15** — the absence is still an absence: the RD scene has no glow or threshold
+  of its own, so the engine-wide `bloom_*` is still the only instrument pointed at it:
+  `absent: bloom in: core/src/render/scenes/reaction_diffusion.rs`. That is the whole of this
+  entry's repo claim; whether a second want has arrived is not a fact about the tree.
+
 ### The finding
 
 The want: a glow accent on the RD field. Engine `bloom_*` acts on the composited frame, and its
@@ -981,6 +1045,11 @@ One cohort's demonstrated want. The ADR-0080 shape is the named route when the s
   particle scenes add glow, the field scenes map a scalar through a LUT, the line renderer strokes,
   and the terminal stages remap what those produced. Brightness in this engine is *authored colour*,
   never *illumination*.
+- **Verified 2026-08-15** — nothing shades: `absent: matcap in: core/src`. Deliberately narrow
+  rather than probing for a normal or a light — `normalize` is everywhere in this tree, so a probe
+  spelled that way could never fail, and a probe that cannot fail reads as verification while
+  checking nothing (ADR-0108, Negative). `matcap` is the name this entry's own proposed fix
+  carries, so the probe goes red exactly when the entry is delivered.
 
 Two of the six star references are chrome — a four-pointed sparkle with concave edges, rendered as
 polished metal with specular highlights, a horizon reflection and self-shadowing. They read as
@@ -1030,6 +1099,24 @@ verdict is the trigger, and it is scheduled.
 **Raised by:** `architect`, at [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md)'s
 close, from that plan's Phase 2 findings. **Owner if taken:** `dev` — but read the mechanism below
 first, because the candidate cause is one line and the entry may be cheaper than it looks.
+
+- **Verified 2026-08-15** — the candidate mechanism is still exactly as stated below, and still
+  unfixed: `present: fn step_offscreen in: core/src/render/capture_api.rs`,
+  `absent: poll in: core/src/render/capture_api.rs`. The second probe is the whole hypothesis in one
+  line — the day anyone polls per frame in that file it goes red, which is the right moment to
+  re-read this entry whether or not the fix worked.
+- **Verified 2026-08-15, AND IT CONVICTS THIS ENTRY — reported by `dev` at Plan 0093 Phase 2, not
+  repaired.** The finding below says *"Both shipped reaction-diffusion worlds
+  (`reaction_mitosis`, `reaction_verdigris`)"*. **There are three:**
+  `present: system = "reaction_diffusion" in: presets/reaction_etching.toml`. `reaction_etching`
+  was already shipped on 2026-08-12 — Plan 0078's close names it in its own workaround grep, three
+  days before this entry was written — so this is a **birth defect**, the class
+  [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) exists for,
+  found by the first pass that read the entry against the tree. What it costs is not cosmetic:
+  the entry's *"every other world in the roster cleared 36,001 renders, so this is not a general
+  ceiling — it is a ceiling on the family"* rests on a family of two, and the third member was
+  never in the measured set. Whether that widens the ceiling or narrows it is unknown. **Repairing
+  or re-scoping this is `architect`'s call, not `dev`'s.**
 
 ### The finding
 
