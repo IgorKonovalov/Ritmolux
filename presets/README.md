@@ -296,7 +296,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `attractor`       | `a` `b` `c` `d` `tuple` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
-| `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
+| `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -574,9 +574,12 @@ held by objects thrown straight up into a `gravity = 0` sky.
 #### The source (Plan 0090)
 
 The line objects are thrown from is **geometry the preset owns**
-([ADR-0104](../docs/adrs/0104-the-emitters-source-is-authorable-geometry.md)). Both
-defaults are exactly the line this scene always drew, so binding neither changes
-nothing.
+([ADR-0104](../docs/adrs/0104-the-emitters-source-is-authorable-geometry.md)). Four
+scalars, and they are one mechanism rather than four knobs: the first two say where
+the source *is*, and the last two answer the two things that go wrong once you move
+it — a mark that pops on arrival, and a world that takes a lifetime to fill. Every
+default is exactly the behaviour this scene shipped with, so a preset that binds
+none of them is unchanged to the pixel.
 
 | param | default | what it does |
 |---|---|---|
@@ -588,8 +591,9 @@ nothing.
 `source_width` is a fraction, not world units, so it means the same thing on every
 display — the engine has already reconciled the aspect
 ([ADR-0037](../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) and an
-author never should. Both are clamped to the retirement bound (`1.6` frames), past
-which an object would be born already outside it.
+author never should. `source_y` and `source_width` are both clamped to the
+retirement bound (`1.6` frames), past which an object would be born already outside
+it — a pool churning against itself rather than anything visible.
 
 **A point fountain is `source_width = 0`; an off-centre jet is that plus `pan_x`.**
 The source line is centred on the world origin, and `pan_x` carries the whole scene,
@@ -674,6 +678,12 @@ inter-object forces, no stamped trail. `trails` reads differently here than on t
 swarm and that is not a defect: a decaying smear behind an object that **leaves**
 is a comet tail, where behind a wrapping particle it is a current. Keep it short
 if the arcs should read as arcs.
+
+No source **shape** either — the source is a line, so a ring or an area is engine
+feedback; the two scalars above reach every shape that has been asked for. And
+there is no fade-*out* to match `spawn_fade`: an object vanishes at its death time,
+which the retirement margin usually puts off-frame — an inside-frame `source_y`
+is exactly the case that undoes that.
 
 ### Shaped marks — the particle silhouette (Plan 0070)
 

@@ -238,9 +238,40 @@ they launched on. There is also no `dt` in it, so the motion is identical on eve
 | `lifetime` | seconds | how long an object lives if it has not left frame first. Past the flight time it is wasted pool. |
 
 **Do the crest arithmetic before tuning.** A mark launched at `v` against `g` turns over `v² / (2g)`
-world units above the source line at `y = -1.12`, and a frame is `|y| <= 1`. So a crest *inside* the
-frame draws a visible horizontal ceiling where the population piles up. `emitter_sparks.toml` puts
-its crest off-frame at `y = 1.28` deliberately.
+world units above the source line (at `y = -1.12` unless `source_y` moves it), and a frame is
+`|y| <= 1`. So a crest *inside* the frame draws a visible horizontal ceiling where the population
+piles up. `emitter_sparks.toml` puts its crest off-frame at `y = 1.28` deliberately.
+
+### The source, and the two warm-ups (Plan 0090)
+
+The source line is **geometry you own**
+([ADR-0104](../../../../docs/adrs/0104-the-emitters-source-is-authorable-geometry.md)). Every default
+below is exactly the line the scene always drew, so binding none of them changes nothing.
+
+| Param | Default | Controls |
+|-------|---------|----------|
+| `source_y` | `-1.12` | the line's world `y`. **May sit inside the frame** — that is what makes a slow look reachable. |
+| `source_width` | `1` | half-width **as a fraction of the frame's**. `1` spans it; `0` is a point source. |
+| `spawn_fade` | `0` | fraction of a life spent ramping up from black. The answer to an inside-frame source. |
+| `prewarm` | `0` | lifetimes of spawns back-dated at scene start, so the population **begins** at steady state. Clamped at `2`. |
+
+**A point fountain is `source_width = 0`; an off-centre jet is that plus `pan_x`** (the line is centred
+on the world origin and `pan_x` carries the scene). Close `spread` too if the throw should be a column
+rather than a fan.
+
+**Two warm-ups, and they are independent.** Moving the source inside the frame removes the *travel*
+warm-up — from below the frame an object has 2.12 world units to cross before it is visible, which at
+sky speeds is seconds of empty picture. It does nothing about the *population* warm-up: the pool starts
+empty and fills at `spawn_rate` over a whole `lifetime`. `prewarm` is that half. Both matter because
+every behavioral gate captures **half a second**: a slow draft measured `0.0074` coverage with 0 of 10
+radial shells at `prewarm = 0` — convicted blank — and `0.1470` with 10 of 10 at `prewarm = 1`, changed
+in nothing else.
+
+**Two prices, both yours to judge.** An inside-frame `source_y` at `spawn_fade = 0` **pops** — the mark
+switches on at full brightness where the eye is — and nothing validates the pair. And a prewarmed world
+is **full on its first frame**, which is right for a sky and wrong for a cascade: a preset switching
+into one arrives already populated. Record the verdict in the world's header the way the fold-edge
+verdicts are recorded.
 
 ### Individuation — the spread params
 
@@ -267,8 +298,10 @@ glint**, not a disc — a disc is rotationally symmetric, so `spin` on one would
 No per-object expressions — "every seventh object is gold" is not expressible; widen a spread
 instead. No collision or inter-object forces. No stamped trail: `trails` decays, so behind an object
 that *leaves* it reads as a comet tail rather than the hard copies a cascade wants — keep it short.
-And **no positionable source** — the line spans the frame width at `y = -1.12` and cannot be moved
-or narrowed, so a point fountain or an off-centre jet is engine feedback.
+No source *shape* either: the source is a line, and a ring or an area is engine feedback (the two
+scalars above reach every shape anyone has asked for). And an object **vanishes** at its death time
+rather than fading out — the retirement margin is what usually puts that off-frame, which an
+inside-frame `source_y` undoes; a fade-*out* to match `spawn_fade` does not exist yet.
 
 Full parameter roster and defaults: [`presets/README.md`](../../../../presets/README.md).
 
