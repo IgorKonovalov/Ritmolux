@@ -4940,7 +4940,7 @@ half discharged and a half-discharged entry does not move.
 
 - **PROMOTED 2026-08-13 → [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) +
   [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 3-4**, jointly with
-  [0083](design-backlog.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)
+  [0083](#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)
   and [0086](#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument):
   three entries about the show-length timescale nothing in this repo measures. **The plan does not
   choose among this entry's three candidate responses** — that stays R0's decision, exactly as
@@ -5030,7 +5030,7 @@ diagnostic it is today. Whatever is chosen, this measurement is the test case.
   N simulated minutes at capture cadence and reporting drift statistics, run by the lane on worlds
   with an accumulation axis, verdict in the world's header. The ADR adds one thing the entry did not
   separate: **this half is deterministic and reproducible headless** (forces integrate against
-  injected `dt`), while [0083](design-backlog.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)'s
+  injected `dt`), while [0083](#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)'s
   RSS growth comes from live GPU resource churn no headless loop reproduces — so they share a
   motivation and **not** an instrument, and one harness for both would be blind to two of the three.
   The 2026-08-11 park-with-a-trigger below is discharged by the trigger having fired.
@@ -5073,7 +5073,7 @@ any slow-divergence look (accumulating forces, feedback with net gain, populatio
 migrate) can ship green and die on stage.
 
 Adjacent, not identical:
-[0083](design-backlog.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)
+[0083](#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)
 wants a long-horizon RSS measurement for the same regime (hours-long live shows); the two would
 share a soak recipe.
 
@@ -5100,3 +5100,91 @@ one minutes-horizon observation, verdict recorded in the world's header. The ent
 stays **parked**: no instrument is built, and the trigger re-arms for the next
 slow-accumulation look. (2026-08-12: the plan's `dev` scope closed; the bounded check travels
 with its Phase 5, standing in the plans README — this entry's status is unchanged.)
+
+---
+
+## 0083 — RSS grew 385 to 663 MB over three minutes of preset switching, and there is no no-feedback control to compare it against
+
+- **PROMOTED 2026-08-13 → [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) +
+  [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phase 5** — the measurement
+  this entry asks for, not a fix, and it stays a `human` phase because it needs the live app on a
+  real machine for a real duration. One thing the plan adds that this entry did not ask for and
+  needs: **`--soak` has no notion of a preset switch**, which is the axis the whole question turns
+  on, so a `switches` column lands first (Phase 3) and the three runs read against it. **Either
+  answer closes this entry** — the entry's complaint is the missing control, not the number.
+- **HALF DISCHARGED 2026-08-15, at Plan 0085's close — and it stays live, which is the point.** The
+  instrument landed and the measurement did not. `--soak` now writes a monotone `switches` counter
+  (preset changes **and** surface reconfigures, so the difference between two rows is how many
+  happened between them) beside the existing `rss_bytes` column, which is exactly the axis this
+  entry said was missing. **The three paired runs are Phase 5, `human`, and have not been made** —
+  they need the live app on a real machine for a real duration, so they carry forward under Standing
+  in [`docs/plans/README.md`](plans/README.md) rather than holding the plan open. Its two sibling
+  entries, [0082](design-backlog-archive.md#0082--the-quality-governor-reads-frame_ms_p99-and-a-preset-switch-spikes-p99-to-25-ms-while-nothing-is-dropped)
+  and [0086](design-backlog-archive.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument),
+  were discharged in full and are archived. **Nothing about the finding below has been re-measured**,
+  so read it as the 2026-08-09 snapshot it is. One thing that *has* changed underneath it:
+  [0093](#0093--the-headless-capture-path-dies-past-a-few-thousand-frames-so-the-horizon-cannot-reach-its-own-headline-length)
+  found the **headless** capture path climbing to ~2.9 GB over 3,600 frames — a different process on
+  a different path, and not evidence about this one, but a reason to run the control here rather
+  than assume the growth is the driver's.
+- **CLOSED 2026-08-15 — the three runs were made, and the answer is the bounded direction.**
+  Plan 0085 Phase 5, run on windows x86_64 with a hardware adapter, release build, 165 Hz,
+  windowed, `tier = "rich"`, four presets per set rotating on a fixed 20 s dwell:
+
+  | run | presets | duration | switches | RSS first -> last | delta | range |
+  |---|---|---|---|---|---|---|
+  | 1 | feedback (`curve_ionwake`, `fragment_whorl`, `reaction_mitosis`, `reaction_verdigris`) | 1196 s | 62 | 382.6 -> 367.2 MB | **-15.4** | 359.6-390.1 |
+  | 2 | no-feedback control (`fragment_strata`, `lsystem_vellum`, `spectrum_halo`, `swarm_shatter`) | 1196 s | 62 | 379.9 -> 380.1 MB | **+0.2** | 379.8-380.2 |
+  | 3 | feedback, no switching (3 startup reconfigures only) | 1797 s | 3 | 379.7 -> 328.0 MB | **-51.7** | 328.0-389.1 |
+
+  **No run grew.** The 385 -> 663 MB does not reproduce; run 3 *fell* 52 MB over half an hour. The
+  control is what makes that readable: run 1 oscillates across a ~30 MB band while run 2 sits
+  inside 0.4 MB, so **feedback presets do cost real per-switch memory churn and it is recovered
+  every switch rather than accumulated** — which is precisely the "per-switch cost, bounded"
+  direction this entry named as one of its two closing answers. NFR §12's hard requirement (no
+  monotonic growth across a session) holds.
+
+  **Read the caveats as bounding the claim, because they are real.** No audio was playing, so the
+  band-driven half of the workload is absent and this is a *lighter* load than the one that
+  produced the original number; the runs were windowed and never fullscreen, so the surface
+  reconfigure that dominated the original observation never happened; the preset sets and the
+  refresh rate both differ. What the runs establish is that **switching feedback content for 20
+  minutes does not accumulate**, which is the question the missing control blocked. A fullscreen,
+  audio-driven repeat would be a stronger claim and nobody is blocked on it.
+
+  **One thing the runs found that this entry did not ask about, and it falsifies a claim in its
+  archived sibling** — filed as
+  [0094](design-backlog.md#0094--the-frame_ms_p99-tail-is-not-switch-correlated-so-the-steady-state-column-does-not-remove-it).
+
+**Raised by:** `architect`, at [Plan 0046](plans/done/0046-transformed-feedback.md)'s close, from
+that plan's Phase 5 measurement. **Owner if taken:** `dev` (a measurement first, not a fix).
+
+### The finding
+
+Over the same three-minute Phase 5 run, resident set grew **385 MB to 663 MB** (max 663), against
+the ~327 MB driver-dominated floor [ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md)
+established and the NFR §12 working-set target.
+
+**This is not yet evidence of a leak, and it is important not to record it as one.** Three minutes
+is short, the run switched presets repeatedly (each switch builds a side's GPU resources), and this
+plan adds two accumulation buffers, so *some* growth is expected. What makes it worth keeping is
+the other half: **it was never measured against a no-feedback control**, so nothing separates
+"expected cost of what landed" from "growth that does not stop".
+
+### Why it is worth an entry
+
+R6 ([Plan 0075](plans/done/0075-the-content-renaissance.md)) will ship feedback presets, and the live-show
+use case runs for hours — the exact regime three minutes cannot speak to. A number with no control
+beside it is the kind of observation that gets quoted later as either a clean bill of health or a
+known leak, depending on who is quoting it, and it supports neither.
+
+### What a fix would be
+
+The measurement, not a change: two runs of equal length and equal switching, one on feedback
+presets and one on a no-feedback control, reading the same RSS column — and one longer run
+(tens of minutes, no switching) to separate per-switch cost from monotone growth. Only if the
+control run also climbs is there something to fix.
+
+### Priority
+
+**Medium.** Cheap to run, and it is owed *before* R6 ships long-running feedback content.

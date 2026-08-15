@@ -181,10 +181,16 @@ working rule from a lucky one.
 | 0082 | The quality governor reads `frame_ms_p99`, and a preset switch spikes it to 25 ms — **the premise was false** | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 3-4. **Closed 2026-08-15**, and the qualification landed in all three places a governor design starts from, with the three candidate responses named and deliberately not chosen. **But this entry described a governor that does not exist.** R0 was **not** unbuilt — [Plan 0044](plans/done/0044-quality-tiers.md) / [ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md) shipped it on 2026-07-30, ten days *before* this entry was raised — and the shipped `sustained_miss` **never reads p99**: it needs 75 % of at least 180 raw frame times past `budget * 1.25`, which a switch's handful of slow frames in a 240-sample ring cannot approach. So the built governor already landed this entry's *second* candidate response, independently, as a miss fraction. The hazard is real and lives in the **prose**; a revisit starting from the old description would build it. Same failure mode as 0078 and 0081 — a claim about the repo, rotting the way claims about the repo do |
 | 0086 | No capture path reaches the minutes-long horizon | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 1-2. **Closed 2026-08-15** as the shape the entry specified rather than the gate it refused: `shot --horizon <minutes>`, run by the lane, verdict in the world's header, both determinism properties asserted on rendered pixels and a static control reading `delta 0.0000` as the non-vacuity half. **The named subject came back clean** — `swarm_shatter` wanders 0.197-0.384 across ten minutes with no trend, its collapse repaired by [Plan 0077](plans/done/0077-the-quiet-sky.md)'s `reseed` — and the instrument convicted a world nobody suspected instead: `attractor_ink`, coverage 0.199 -> 0.002 with the **silhouette intact and the density gone**, recorded in that header and deliberately unrepaired. **One bound the entry could not anticipate:** the headless path dies at 3,601 frames on both RD worlds, so those two rows are 0.5 minutes and their `monotone 1.00` is settling, not drift — filed as [0093](#0093--the-headless-capture-path-dies-past-a-few-thousand-frames-so-the-horizon-cannot-reach-its-own-headline-length) |
 
-**Their sibling [0083](#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)
-did not move.** Plan 0085 gave it the `switches` instrument (Phase 3) and not the three paired runs
-it asks for (Phase 5, `human`, standing in the plans README) — a half-discharged entry stays live,
-with a dated update naming which half.
+### Added when Plan 0085's Phase 5 was run, later the same day
+
+Their sibling **0083 was half-discharged at the close above and closed a few hours later**, when
+the `human` phase it was waiting on was actually run. Both halves of that are worth keeping: a
+half-discharged entry *does* stay live with a dated update naming which half, and this one shows
+the other half arriving rather than sitting.
+
+| # | Entry | Went to |
+|---|-------|---------|
+| 0083 | RSS grew 385 to 663 MB over three minutes of switching, with no no-feedback control | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 3 and 5. **Closed 2026-08-15, bounded direction.** Three runs at a fixed 20 s dwell: feedback (62 switches, 1196 s) **382.6 -> 367.2 MB**, no-feedback control (62 switches, 1196 s) **379.9 -> 380.1 MB**, and feedback with no switching (1797 s) **379.7 -> 328.0 MB**. **Nothing grew and the long run fell 52 MB.** The control is what makes it readable — run 1 oscillates across ~30 MB while run 2 sits inside 0.4 MB, so feedback churn is real, **per-switch, and recovered every switch**. Caveats bound it rather than undermine it: no audio, windowed never fullscreen, different presets, 165 Hz — a lighter load than the original, and the fullscreen reconfigure that dominated the original observation never happened. **The runs also falsified a claim in the archived [0082](design-backlog-archive.md#0082--the-quality-governor-reads-frame_ms_p99-and-a-preset-switch-spikes-p99-to-25-ms-while-nothing-is-dropped)**, filed as [0094](#0094--the-frame_ms_p99-tail-is-not-switch-correlated-so-the-steady-state-column-does-not-remove-it) |
 
 ## Open entries
 
@@ -923,66 +929,6 @@ this plan one unanswered question, which Phase 6 absorbed.
 
 ---
 
-## 0083 — RSS grew 385 to 663 MB over three minutes of preset switching, and there is no no-feedback control to compare it against
-
-- **PROMOTED 2026-08-13 → [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) +
-  [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phase 5** — the measurement
-  this entry asks for, not a fix, and it stays a `human` phase because it needs the live app on a
-  real machine for a real duration. One thing the plan adds that this entry did not ask for and
-  needs: **`--soak` has no notion of a preset switch**, which is the axis the whole question turns
-  on, so a `switches` column lands first (Phase 3) and the three runs read against it. **Either
-  answer closes this entry** — the entry's complaint is the missing control, not the number.
-- **HALF DISCHARGED 2026-08-15, at Plan 0085's close — and it stays live, which is the point.** The
-  instrument landed and the measurement did not. `--soak` now writes a monotone `switches` counter
-  (preset changes **and** surface reconfigures, so the difference between two rows is how many
-  happened between them) beside the existing `rss_bytes` column, which is exactly the axis this
-  entry said was missing. **The three paired runs are Phase 5, `human`, and have not been made** —
-  they need the live app on a real machine for a real duration, so they carry forward under Standing
-  in [`docs/plans/README.md`](plans/README.md) rather than holding the plan open. Its two sibling
-  entries, [0082](design-backlog-archive.md#0082--the-quality-governor-reads-frame_ms_p99-and-a-preset-switch-spikes-p99-to-25-ms-while-nothing-is-dropped)
-  and [0086](design-backlog-archive.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument),
-  were discharged in full and are archived. **Nothing about the finding below has been re-measured**,
-  so read it as the 2026-08-09 snapshot it is. One thing that *has* changed underneath it:
-  [0093](#0093--the-headless-capture-path-dies-past-a-few-thousand-frames-so-the-horizon-cannot-reach-its-own-headline-length)
-  found the **headless** capture path climbing to ~2.9 GB over 3,600 frames — a different process on
-  a different path, and not evidence about this one, but a reason to run the control here rather
-  than assume the growth is the driver's.
-
-**Raised by:** `architect`, at [Plan 0046](plans/done/0046-transformed-feedback.md)'s close, from
-that plan's Phase 5 measurement. **Owner if taken:** `dev` (a measurement first, not a fix).
-
-### The finding
-
-Over the same three-minute Phase 5 run, resident set grew **385 MB to 663 MB** (max 663), against
-the ~327 MB driver-dominated floor [ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md)
-established and the NFR §12 working-set target.
-
-**This is not yet evidence of a leak, and it is important not to record it as one.** Three minutes
-is short, the run switched presets repeatedly (each switch builds a side's GPU resources), and this
-plan adds two accumulation buffers, so *some* growth is expected. What makes it worth keeping is
-the other half: **it was never measured against a no-feedback control**, so nothing separates
-"expected cost of what landed" from "growth that does not stop".
-
-### Why it is worth an entry
-
-R6 ([Plan 0075](plans/done/0075-the-content-renaissance.md)) will ship feedback presets, and the live-show
-use case runs for hours — the exact regime three minutes cannot speak to. A number with no control
-beside it is the kind of observation that gets quoted later as either a clean bill of health or a
-known leak, depending on who is quoting it, and it supports neither.
-
-### What a fix would be
-
-The measurement, not a change: two runs of equal length and equal switching, one on feedback
-presets and one on a no-feedback control, reading the same RSS column — and one longer run
-(tens of minutes, no switching) to separate per-switch cost from monotone growth. Only if the
-control run also climbs is there something to fix.
-
-### Priority
-
-**Medium.** Cheap to run, and it is owed *before* R6 ships long-running feedback content.
-
----
-
 ## Entries 0084-0089 — from the Plan 0075 cohorts 1-5 handoff (2026-08-11)
 
 The renaissance's first five cohorts (28 worlds, cohort 5 judged live 2026-08-11) handed back
@@ -1110,7 +1056,7 @@ prevent. Every other world in the roster cleared 36,001 renders, so this is not 
 it is a ceiling on the family whose mechanism most obviously wants a long look.
 
 It is also **adjacent to, and not the same as,**
-[0083](#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against):
+[0083](design-backlog-archive.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against):
 that is the *live app's* resident set under preset switching, this is a *headless offscreen loop*
 that never rebuilds a surface. If they share a cause it would be worth knowing, and nothing
 currently says they do.
@@ -1138,3 +1084,83 @@ header verdict comparable across worlds.
 every frame through its own present. But it silently truncates the only instrument this project has
 for show-length behaviour, on the family that most needs it, and the truncation reads as a *result*
 (`monotone 1.00`) rather than as an error unless someone reads the run's stderr.
+
+---
+
+## 0094 — the `frame_ms_p99` tail is not switch-correlated, so the steady-state column does not remove it
+
+**Raised by:** `architect`, at [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md)
+Phase 5, from the three paired runs that closed
+[0083](design-backlog-archive.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against).
+**Owner if taken:** `architect`, and only if the governor is revisited.
+
+- **Verified 2026-08-15** — the governor reads the raw series at a miss fraction, not `p99`:
+  `present: MISS_FRACTION in: core/src/render/tier.rs`. Written in
+  [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)'s grammar
+  while [Plan 0093](plans/0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md)
+  is still in flight, because this entry's whole reason to exist is that its *predecessor's*
+  repo-claim rotted. The probe covers the load-bearing half: if `sustained_miss` is ever rewritten
+  to read `p99`, that constant is what goes with it, and this entry should go red rather than keep
+  telling a reader the tail is unremovable by an exclusion nobody is applying.
+
+**This is a new entry rather than an edit to
+[0082](design-backlog-archive.md#0082--the-quality-governor-reads-frame_ms_p99-and-a-preset-switch-spikes-p99-to-25-ms-while-nothing-is-dropped)**,
+which is closed and archived. It cites it; it does not amend it. 0082 already carries two
+corrections — the governor was built, and it never reads p99. This is a **third**, and it is about
+the half of 0082 that survived both.
+
+### The finding
+
+0082 states, as the observation the whole entry rests on: *"The spikes coincide with preset switches
+and the fullscreen toggle — GPU resource rebuilds, not steady-state cost."* Plan 0085 Phase 5's
+**run 3** was 1,797 s of feedback presets with auto-rotate **off** — three surface reconfigures at
+startup and nothing after. It reached:
+
+| | value |
+|---|---|
+| `frame_ms_p99` max | **23.960 ms** at t = 355 s |
+| second peak | 18.681 ms at t = 1761 s |
+| switches after startup | **0** |
+| rows where `frame_ms_p99_steady` diverged from raw | **0 of 359** |
+| frames dropped (`diagnostics.log`, whole window) | **0 of 200,667** |
+
+The steady column never diverged because there was no switch anywhere near those spikes — the
+exclusion window had nothing to exclude. **A ~24 ms p99 excursion happened in a session with no
+preset switching at all.**
+
+Both mechanisms are real and they are different sizes. In **run 1** (62 switches) the exclusion
+fired on **58 of 239** rows and separated them cleanly — ~11.9 ms raw against ~6.5-7.0 ms steady —
+so switches *do* elevate p99 and the new column *does* remove that. But the largest excursions in
+both runs (17.7 ms in run 1, 24.0 ms in run 3) landed on rows the exclusion did not touch.
+
+### Why it is worth an entry
+
+**0082's first candidate response — "exclude the frames following a preset switch or a surface
+reconfigure from the governor's window" — would not have solved the problem 0082 raised.** The
+spikes it was written about survive the exclusion. Anyone revisiting the governor from that entry
+would implement the exclusion, watch the tail persist, and have to rediscover this.
+
+It is **not** currently a defect: nothing demotes on p99 (the shipped `sustained_miss` reads the raw
+series at a 75 %-of-180 miss fraction, which no excursion of this size approaches), zero frames
+dropped across 200,667, and fps never left the 146-165 band against a 60 fps floor. The value is
+entirely in *not* designing against a false model later.
+
+### What a fix would be
+
+Nothing, until the governor is revisited. What is missing is a **cause** — the tail is unexplained,
+and three candidates are untested: OS/driver scheduling on a 165 Hz vsync, a genuinely expensive
+frame in one of the four feedback presets, or another process on a developer box. The cheap
+discriminator is a run with the per-frame series retained rather than a p99 summary, which
+`--soak`'s coarse tick cannot give — `diagnostics.log`'s 1 Hz rows are the nearest existing
+instrument and were not read for this.
+
+**Whoever takes this should re-measure rather than trust the table above.** These runs were
+windowed, with no audio, on one box — and **the fullscreen toggle, which is the one event 0082
+named that this run could not reproduce, remains the strongest untested candidate for the original
+25.037 ms.**
+
+### Priority
+
+**Low.** It blocks nothing, nothing ships broken, and it becomes load-bearing only when someone
+opens the governor. It is filed because that is exactly the moment the correction would otherwise
+be missing.
