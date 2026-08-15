@@ -400,10 +400,18 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    - **A break** names the entry, the probe, and the `file:line` that contradicts it. Often the
      close that just happened is the cause — several shipped probes are written to go red **on
      delivery** rather than on decay, which is a re-read trigger and not an accusation.
+   - **A break with no probe in it** is the other class (Plan 0094 Phase 2): a live `## NNNN`
+     heading carrying no dated verification bullet at all, reported at the heading's own line. That
+     is the *first* half of ADR-0108's Decision, and a gate whose entry roster is built out of the
+     bullets it finds cannot see it — so until 0094 the 14 live entries complied only because
+     someone did it by hand. The repair is a bullet with a probe or a reasoned `unprobeable:`.
    - **The advisory block** (below the pass/fail line, never affecting the exit code) names entries
      whose probed paths have moved since anyone last read them, plus the full `unprobeable:` roster.
      That roster is the set of claims nothing checks; it is printed at every close precisely so it
-     stays small and visible rather than growing silently.
+     stays small and visible rather than growing silently. **The moved half needs git history and
+     withholds itself when there is none** — on a shallow clone `git log -1` hands back the tip
+     commit for every path, so the block prints a notice instead of 25 false rows (ADR-0016's shape).
+     You run this on a full checkout, so you get the real reading; CI does not, and says so.
 
    **Repairing a convicted entry is yours, and it is a judgement rather than an edit** — corrected
    in place, closed to the archive, or split. `dev` is instructed to report a red probe and leave

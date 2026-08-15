@@ -22,7 +22,7 @@ matching any directory of that name rather than the approved one, which silently
 `core/tests/fixtures/README.md` and its 12 relative links from the link gate; and the gate never
 requiring a live entry to *carry* a bullet, which is ADR-0108's decision sentence and the durability
 half of the mechanism — plus the shallow-clone advisory noise on CI are carried by
-[Plan 0094](../0094-the-two-doc-gates-check-what-they-claim-to.md).
+[Plan 0094](0094-the-two-doc-gates-check-what-they-claim-to.md).
 
 **Phase 2 convicted backlog entry 0093 and `dev` correctly reported it rather than repairing it.**
 Corrected in place at this close: the entry's finding is untouched (the capture path still dies at

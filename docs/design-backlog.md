@@ -20,7 +20,9 @@ half of a verification moves out of the sentence and into something a script can
 
 **Write a dated bullet with the claim's reduction inside an inline-code span**, in one of three
 forms. `<path>` is a file or a directory from the repo root; `<regex>` is JavaScript regex source,
-so a literal dot needs escaping:
+so a literal dot needs escaping. **This is enforced, not advised** — since Plan 0094 a live `##`
+entry with no dated bullet beneath it reds the gate at its own line, because "every live entry
+carries a probe" was the half of the rule a checker built out of the bullets it finds could not see:
 
 ```markdown
 - **Verified 2026-08-15** — the governor does not exist: `absent: sustained_miss in: core/src`
@@ -50,7 +52,10 @@ Three things to know before writing one:
 `git log` when each probed path was last touched and names the entries whose subject has moved
 since anyone read them. It cannot tell a commit that invalidates a claim from one that does not, so
 making it a gate would mean firing constantly at a broad path or saying nothing at a narrow one —
-it is a report instead, and it never changes the exit code.
+it is a report instead, and it never changes the exit code. It also **withholds itself rather than
+guessing**: on a shallow clone — which is what the CI `links` job checks out — `git log -1` returns
+the tip commit for every path, so the block prints a notice in place of a roster it did not measure.
+The pre-push hook and the close ceremony run on a full checkout and get the real reading.
 
 **The archive is out of scope and stays out.** An archived entry is a closed record whose value is
 the correction it carries; re-probing it would be checking history against the present.
