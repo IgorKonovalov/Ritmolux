@@ -110,6 +110,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: node scripts/check-doc-links.mjs
+      # The same job carries the backlog-claim gate (ADR-0108), for the same
+      # reason and at the same cost: it re-runs the probes each live entry in
+      # docs/design-backlog.md carries beside its claims about this repo. That
+      # file is the architect's inbox and its entries are meant to be acted on
+      # NOW, which is what makes a stale one dangerous rather than historical -
+      # four have been falsified, two of them wrong on the day they were
+      # written. Unlike the pre-push hook this cannot skip itself for want of a
+      # Node, which is what makes it the backstop rather than the gate.
+      - run: node scripts/check-backlog-claims.mjs
 
   # Supply-chain gate (deny.toml): advisories, licenses, bans, sources.
   # Platform-independent (reads Cargo.lock + the [graph] targets in deny.toml),
