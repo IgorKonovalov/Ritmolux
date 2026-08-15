@@ -538,8 +538,21 @@ Execution order after Plan 0001, per the NFR interviews ([docs/nfr.md](../nfr.md
    **Front-run by [Plan 0011](done/0011-diagnostics-and-memory-trim.md)** (diagnostics harness +
    the cheap NFR §12 levers, all-three-frontend, C ABI v3 / [ADR-0008](../adrs/0008-c-abi-v3-diagnostics.md)):
    it builds the before/after measuring stick and lands the wgpu-backend + swapchain trims. The
-   **adaptive-quality tiers + frame-time governor remain** for a later plan — 0011 explicitly
-   does not do them.
+   The **adaptive-quality tiers + frame-time governor** were then **delivered by
+   [Plan 0044](done/0044-quality-tiers.md) / [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md)**
+   (2026-07-30) — this sentence said they "remain for a later plan" for six weeks after they
+   landed. What remains of the item is the `Rich` budget's on-device calibration (Plan 0044
+   Phase 4, carried in [on-device-validation.md](../on-device-validation.md)) and NFR §12's
+   memory work.
+   **Before touching the governor, read its qualification** ([NFR §1](../nfr.md),
+   [backlog 0082](../design-backlog.md)): `frame_ms_p99` reached **25.037 ms against an 8.749 ms
+   average with zero of 28,698 frames dropped**, on preset switches and a fullscreen toggle — GPU
+   resource rebuilds, not steady-state cost. A governor reading that column bare would demote a
+   preset running at 165 fps. **The shipped one does not read it** — `sustained_miss` needs 75 % of
+   ≥180 samples past 1.25× the budget, which a switch's handful of slow frames cannot reach — so the
+   hazard is in the *description*, not the code. Three candidate responses are named in the backlog
+   and **deliberately not chosen**; `--soak` carries `frame_ms_p99_steady` and a `switches` counter
+   (Plan 0085 Phase 3) so the third can be measured rather than argued.
 4. **Remaining v1 UX** — always-on-top / mini mode, settings persistence (NFR §11;
    fullscreen/multi-monitor land earlier with live features).
 5. **Packaging & release** — GitHub release zip: unsigned standalone exe +

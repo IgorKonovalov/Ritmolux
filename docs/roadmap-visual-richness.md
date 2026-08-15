@@ -152,6 +152,24 @@ honesty, not commitments.
 > calibration did not run, and is carried in
 > [`on-device-validation.md`](on-device-validation.md#runnable-now--the-rich-tier-calibration-plan-0044-phase-4).
 > So the *license* is granted; the *budget* is still a guess.
+>
+> **The governor's qualification, for whoever revisits it** (Plan 0085 Phase 4,
+> [backlog 0082](design-backlog.md), [NFR §1](nfr.md)). Measured over three minutes at `Rich`,
+> 1080p, with preset switching and a fullscreen toggle: `frame_ms_p99` reached **25.037 ms** while
+> `frame_ms_avg` never passed **8.749 ms** and **zero of 28,698 frames dropped**. The spikes are
+> GPU resource *rebuilds*, not the cost of running the preset — so a governor reading p99 bare would
+> demote a preset holding 165 fps, during the event that is already the most visually disruptive.
+>
+> **What is built is not what the prose above describes.** `sustained_miss` reads the raw
+> frame-time series and demotes only when **75 % of at least 180 samples** exceed `budget × 1.25`;
+> it never touches p99. A switch's handful of slow frames in a 240-sample ring cannot approach that
+> fraction, so the shipped governor is already immune to this class — by a miss *fraction*, which is
+> the second of [backlog 0082](design-backlog.md)'s three candidate responses arrived at
+> independently. **The three responses are named there and deliberately not chosen here**; the
+> reason this paragraph exists is that the item's own description says the governor reads p99, and a
+> revisit starting from that sentence would build the hazard rather than avoid it. `--soak` carries
+> `frame_ms_p99_steady` beside the raw column (Plan 0085 Phase 3) if the third response is ever
+> wanted — a reading, never a gate.
 
 An ADR that ends the single-tier era: a `rich` tier as the default on capable hardware, the
 existing constants becoming the `floor` tier, and a frame-time governor that demotes gracefully
