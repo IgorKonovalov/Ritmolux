@@ -170,6 +170,11 @@ const DEFAULT_PAN: f32 = 0.0;
 // drew before the roster existed, so an unbound swarm is unchanged.
 const DEFAULT_SHAPE: f32 = marks::DEFAULT_SHAPE;
 const DEFAULT_POINTS: f32 = marks::DEFAULT_POINTS;
+/// The `star` arm's three shape params (Plan 0091 Phase 5), aliased beside the
+/// other two mark defaults so this scene states its whole vocabulary locally.
+const DEFAULT_STAR_VALLEY: f32 = marks::DEFAULT_STAR_VALLEY;
+const DEFAULT_STAR_CURVE: f32 = marks::DEFAULT_STAR_CURVE;
+const DEFAULT_STAR_JITTER: f32 = marks::DEFAULT_STAR_JITTER;
 
 /// The scene's own WGSL. The shared mark-silhouette chunk
 /// ([`marks::sdf_wgsl`]) is prepended at module creation, so `mark_distance` here
@@ -192,6 +197,10 @@ struct Misc {
     // per instance: the branch stays uniform across a warp and `Instance` does
     // not grow.
     m: vec4<f32>,
+    // xyz: the star arm's shape params (valley, curve, jitter), conditioned
+    // CPU-side (Plan 0091 Phase 5). Per draw, like `m`. Inert on every other
+    // shape, and at their defaults the arm takes its original closed form.
+    s: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> misc: Misc;
@@ -202,6 +211,7 @@ struct VsOut {
     @location(1) color: vec3<f32>,
     @location(2) @interpolate(flat) shape: f32,
     @location(3) @interpolate(flat) points: f32,
+    @location(4) @interpolate(flat) star: vec3<f32>,
 }
 
 @vertex
@@ -235,6 +245,7 @@ fn vs_main(
     out.color = color;
     out.shape = misc.m.x;
     out.points = misc.m.y;
+    out.star = misc.s.xyz;
     return out;
 }
 
@@ -244,7 +255,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // and nothing else, so an unshaped swarm is the arithmetic it always was; the
     // falloff below is untouched either way, so a visual change is attributable
     // to the shape alone.
-    let d = mark_distance(in.local, in.shape, in.points);
+    let d = mark_distance(in.local, in.shape, in.points, in.star);
     let falloff = max(0.0, 1.0 - d);
     let g = falloff * falloff;
     // Premultiplied: colour AND alpha carry the same coverage `g`, so the four
@@ -273,6 +284,11 @@ struct Misc {
     /// (ADR-0084). Padded to a second `vec4` because that is WGSL's uniform
     /// layout rule, not because three slots are wanted.
     m: [f32; 4],
+    /// `[star_valley, star_curve, star_jitter, 0]` — the star arm's three shape
+    /// params, conditioned on the way in (Plan 0091 Phase 5). A third `vec4`
+    /// rather than a wider `m` because WGSL's uniform layout rule packs in
+    /// 16-byte rows; the layout SHAPE is unchanged, so ADR-0058 is untouched.
+    s: [f32; 4],
 }
 
 struct Particle {
@@ -379,6 +395,13 @@ pub struct SwarmScene {
     /// (see [`marks::mark_points`]).
     shape: f32,
     points: f32,
+    /// The `star` arm's three shape params, raw as the preset bound them
+    /// (Plan 0091 Phase 5). `marks::star_*` condition them on the way to the
+    /// uniform. Inert on every other silhouette, and nothing warns —
+    /// `presets/README.md` carries that.
+    star_valley: f32,
+    star_curve: f32,
+    star_jitter: f32,
     /// Per-mark individuation (Plan 0077 Phase 2): the twinkle depth and the
     /// size-spread width, both resolved per particle at draw.
     twinkle: f32,
@@ -542,6 +565,9 @@ impl SwarmScene {
             palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             shape: DEFAULT_SHAPE,
             points: DEFAULT_POINTS,
+            star_valley: DEFAULT_STAR_VALLEY,
+            star_curve: DEFAULT_STAR_CURVE,
+            star_jitter: DEFAULT_STAR_JITTER,
             twinkle: DEFAULT_TWINKLE,
             size_spread: DEFAULT_SIZE_SPREAD,
             reseed: 0.0,
@@ -670,6 +696,9 @@ pub const PARAMS: &[&str] = &[
     // carries; `marks::PARAMS` is the single statement of the pair.
     "shape",
     "points",
+    "star_valley",
+    "star_curve",
+    "star_jitter",
 ];
 
 impl Scene for SwarmScene {
@@ -710,6 +739,9 @@ impl Scene for SwarmScene {
         self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.shape = DEFAULT_SHAPE;
         self.points = DEFAULT_POINTS;
+        self.star_valley = DEFAULT_STAR_VALLEY;
+        self.star_curve = DEFAULT_STAR_CURVE;
+        self.star_jitter = DEFAULT_STAR_JITTER;
         self.twinkle = DEFAULT_TWINKLE;
         self.size_spread = DEFAULT_SIZE_SPREAD;
         // `prev_reseed` is deliberately NOT reset: this runs every frame
@@ -741,6 +773,9 @@ impl Scene for SwarmScene {
             "palette_contour" => self.palette_contour = value,
             "shape" => self.shape = value,
             "points" => self.points = value,
+            "star_valley" => self.star_valley = value,
+            "star_curve" => self.star_curve = value,
+            "star_jitter" => self.star_jitter = value,
             "twinkle" => self.twinkle = value,
             "size_spread" => self.size_spread = value,
             "reseed" => self.reseed = value,
@@ -916,6 +951,12 @@ impl Scene for SwarmScene {
                     marks::mark_shape(self.shape),
                     marks::mark_points(self.points),
                     0.0,
+                    0.0,
+                ],
+                s: [
+                    marks::star_valley(self.star_valley),
+                    marks::star_curve(self.star_curve),
+                    marks::star_jitter(self.star_jitter),
                     0.0,
                 ],
             }),

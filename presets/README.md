@@ -289,15 +289,15 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | System            | Named `[params]`                                                         |
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
-| `swarm`           | `force` `spin` `burst` `reseed` `field_freq` `hue` `brightness` `size` `size_spread` `twinkle` `shape` `points` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
+| `swarm`           | `force` `spin` `burst` `reseed` `field_freq` `hue` `brightness` `size` `size_spread` `twinkle` `shape` `points` `star_valley` `star_curve` `star_jitter` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `attractor`       | `a` `b` `c` `d` `tuple` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
-| `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
-| `shape_field`     | `shape` `points` `scale` `gamma` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
+| `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `star_valley` `star_curve` `star_jitter` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
+| `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -717,6 +717,55 @@ has no strings, so a star is `shape = "3"`.
 nothing on `disc`, `ring` or `heart`. Past a dozen the marks these are *for* — a
 few pixels across — are a disc with a rough edge.
 
+#### The `star` arm's three shape params (Plan 0091 Phase 5)
+
+The star was one welded silhouette until a batch of six reference images turned
+out to be **five requests for parameters this arm did not have**. It has them
+now, and they reach **`swarm`, `emitter` and `shape_field` alike** — one chunk,
+one roster, so a shape a particle wears and a figure a field draws cannot drift.
+
+| param | range | default | does |
+|---|---|---|---|
+| `star_valley` | `0.05`..`0.95` | **`0.45`** | the valley radius as a fraction of the tip's. Low is a sharp, thin-spiked star; high is a bumpy polygon |
+| `star_curve` | `-0.9`..`0.9` | **`0`** | bows the edge between tip and valley. **Positive bows it inward** — the concave sparkle, which a straight-edged star cannot make at *any* valley radius. Negative bulges it out |
+| `star_jitter` | `0`..`1` | **`0`** | per-spike variation in tip length, for the hand-drawn / irregular "bang" look |
+
+**Every default is an exact identity**, and that is an obligation rather than
+taste: the shared chunk means these knobs reach the particle path, so anything
+but the old welded constants would move every shipped `shape = "3"` preset. All
+30 golden baselines re-bless byte-identical.
+
+```toml
+[params]
+shape       = "3"
+points      = "4"
+star_valley = "0.18"      # a long, sharp four-point sparkle
+star_curve  = "0.55"      # ...with concave edges
+```
+
+Three things worth knowing before you tune them:
+
+- **`star_jitter` is seeded, not random.** The per-spike lengths come from an
+  integer hash of the spike index, so the same preset draws the same figure in
+  every run and on every machine. There is no separate lever to *re-scatter* the
+  pattern while keeping the amount — if a look needs one, that is engine
+  feedback.
+- **`star_curve` is where the field's precision goes.** A bowed edge has no
+  closed-form distance, so it is sampled; the contours `shape_field` draws are
+  0.0032 off true, which is invisible. **`star_jitter` costs much more** — up to
+  0.54 at seven points, because the angular fold measures against a point's own
+  spike and a longer neighbour can be nearer. On a particle mark none of this is
+  visible (the sprite reads only the interior); on a big banded field, a heavily
+  jittered star's outer rings are approximate.
+- **They are inert on the other four shapes**, and nothing warns — the name is
+  known, so no unknown-parameter warning fires (ADR-0020). This paragraph is the
+  warning.
+
+**Not in the roster and not a parameter: a star with *eyes*.** Composing two
+discs onto a silhouette is multi-shape composition, which is neither a knob nor
+a name in the closed roster, and it is the one thing in that reference batch this
+engine still cannot reach.
+
 **`polygon` has far less range than `star`, and the reason is geometry rather
 than tuning.** A polygon's corners sit at radius 1 and its edges at
 `cos(pi / points)` of that, so by seven sides the figure is within 10 % of a
@@ -796,6 +845,7 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 |---|---|
 | `shape` | the same numeric selector as the table above, same five names, same closed roster |
 | `points` | the same `3`..`12` count, for `polygon` and `star` |
+| `star_valley` / `star_curve` / `star_jitter` | the same three star shape params — see [The `star` arm](#the-star-arms-three-shape-params-plan-0091-phase-5). `star_jitter` is the one whose *field* precision is worth reading about there |
 | `scale` | the figure's size: its outline sits at `scale` of the frame's short half-axis. Default `0.6`, clamped to `0.01`..`20` |
 | `pan_x` / `pan_y` | move the figure's centre (the shared view transform) |
 | `gamma` | the **response exponent** on the distance, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20` |

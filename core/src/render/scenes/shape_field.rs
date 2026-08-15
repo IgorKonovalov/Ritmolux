@@ -106,9 +106,11 @@ struct Params {
     // CPU-side), w: palette_contour
     c: vec4<f32>,
     // x: occlude (ADR-0085), y: gamma (the response exponent on the distance,
-    // exactly 1.0 for the identity), zw: reserved — the uniform is sized once so
-    // its `min_binding_size` does not move when a later phase claims a slot.
+    // exactly 1.0 for the identity), zw: reserved.
     d: vec4<f32>,
+    // xyz: the star arm's shape params (valley, curve, jitter), conditioned
+    // CPU-side. Inert on every other silhouette.
+    e: vec4<f32>,
 }
 
 // **One bind group, sampler first and uniform last — and that arrangement is
@@ -175,6 +177,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let palette_steps = params.c.z;
     let palette_contour = params.c.w;
     let gamma = params.d.y;
+    let star = params.e.xyz;
 
     // Square units, from the RENDER TARGET's aspect (ADR-0037): stretching x
     // makes one unit of `uv` the same length on both axes, so the figure below
@@ -189,7 +192,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // DISTANCE. `mark_distance` is 0 at the figure's deepest interior point,
     // exactly 1 on its outline, and grows outward — so a band of coordinate is
     // a band of constant distance, which is the definition of an offset curve.
-    let d = mark_distance(p, shape, points);
+    let d = mark_distance(p, shape, points, star);
     // The response exponent, applied to the distance BEFORE it becomes a palette
     // coordinate — so it reshapes where the contours sit rather than which
     // colours they take. Above 1 the bands crowd toward the centre, which is what
@@ -222,6 +225,7 @@ struct Params {
     b: [f32; 4],
     c: [f32; 4],
     d: [f32; 4],
+    e: [f32; 4],
 }
 
 /// A fullscreen signed-distance figure from the shared mark roster, coloured
@@ -240,6 +244,13 @@ pub struct ShapeFieldScene {
     /// precedent).
     shape: f32,
     points: f32,
+    /// The `star` arm's three shape params, raw as the preset bound them
+    /// (Plan 0091 Phase 5). `marks::star_*` condition them on the way to the
+    /// uniform. Inert on every other silhouette, and nothing warns —
+    /// `presets/README.md` carries that.
+    star_valley: f32,
+    star_curve: f32,
+    star_jitter: f32,
     scale: f32,
     pan_x: f32,
     pan_y: f32,
@@ -348,6 +359,9 @@ impl ShapeFieldScene {
             palette_dirty: true,
             shape: marks::DEFAULT_SHAPE,
             points: marks::DEFAULT_POINTS,
+            star_valley: marks::DEFAULT_STAR_VALLEY,
+            star_curve: marks::DEFAULT_STAR_CURVE,
+            star_jitter: marks::DEFAULT_STAR_JITTER,
             scale: DEFAULT_SCALE,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
@@ -411,6 +425,9 @@ pub(crate) fn coord(distance: f32, gamma: f32, color_span: f32, color_center: f3
 pub const PARAMS: &[&str] = &[
     "shape",
     "points",
+    "star_valley",
+    "star_curve",
+    "star_jitter",
     "scale",
     "pan_x",
     "pan_y",
@@ -440,6 +457,9 @@ impl Scene for ShapeFieldScene {
     fn reset_params(&mut self) {
         self.shape = marks::DEFAULT_SHAPE;
         self.points = marks::DEFAULT_POINTS;
+        self.star_valley = marks::DEFAULT_STAR_VALLEY;
+        self.star_curve = marks::DEFAULT_STAR_CURVE;
+        self.star_jitter = marks::DEFAULT_STAR_JITTER;
         self.scale = DEFAULT_SCALE;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
@@ -456,6 +476,9 @@ impl Scene for ShapeFieldScene {
         match name {
             "shape" => self.shape = value,
             "points" => self.points = value,
+            "star_valley" => self.star_valley = value,
+            "star_curve" => self.star_curve = value,
+            "star_jitter" => self.star_jitter = value,
             "scale" => self.scale = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
@@ -505,6 +528,12 @@ impl Scene for ShapeFieldScene {
                 palette::band_contour(self.palette_contour),
             ],
             d: [self.occlude, applied_gamma(self.gamma), 0.0, 0.0],
+            e: [
+                marks::star_valley(self.star_valley),
+                marks::star_curve(self.star_curve),
+                marks::star_jitter(self.star_jitter),
+                0.0,
+            ],
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
 
