@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0095** (ADRs are a separate sequence — next free there is **0109**.)
+**Next free number: 0096** (ADRs are a separate sequence — next free there is **0110**.)
 
 ## Active roster
 
@@ -16,7 +16,7 @@ someone who picked it up is reading.
 
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0086](0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md) | The downbeat finds a cue that is not the kick | approved | dev, human | **Measures before it chooses.** Phase 2 is a `human` gate that needs the user's own music — a synthesized backbeat is a hypothesis about backbeats, which is exactly what cannot settle this. The cue for Phase 3 is named at that gate, so the later phases state properties rather than edits. `CONFIDENCE_THRESHOLD` does not move. |
+| [0095](0095-the-downbeat-fold-gets-a-musical-beat.md) | The downbeat fold gets a musical beat | draft | dev, human | **Succeeds [0086], which measured the defect and shipped the instrument.** The fold is indexed by onset events, not beats (1.7-2.1x, wandering 1x-4x within a track, against a control that reads 1.00). Phase 2 puts **tempo octave stability on the critical path by choice** — if Phase 1's ladder says the octave choice is a coin flip, the plan stops there with a diagnosis rather than gridding on sand. `beat`/`beat_index` are bit-identical by Phase 3's own assertion, so no preset timing moves. |
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | **Hard-depends on [0091](0091-the-figure-fills-the-frame.md)** (the scene it draws into) and soft-depends on [0087](0087-the-line-renderer-draws-a-curve.md) — the plan states that disagreement openly: a polyline distance field is complete alone, arcs only lower the arity, so **this is takeable even if 0087 ends at ADR-0098's Alternative C**, and Phase 4 may legitimately be empty. Phase 2's arity ceiling is a **measurement**, not [ADR-0107](../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md)'s construction estimate. Expect morph degeneracy — Plan 0079 refused 4 of 20 swept pairs by measurement. |
 | [0091](0091-the-figure-fills-the-frame.md) | The figure fills the frame | approved | dev, human | From three user reference images, and the gap turned out to be **one thing**: nesting, banding and contours all ship, but no shape-shaped scalar exists at frame scale. Phase 2 is the load-bearing one — `marks.rs:33-37` says the polygon and star arms are deliberately *not* true distance functions outside the silhouette, which is exactly the region contours read. Phase 6 is a stated cut point and may close negative. **Touches no line-renderer file, so it is independent of [0087](0087-the-line-renderer-draws-a-curve.md).** |
@@ -70,8 +70,13 @@ take any free session. The numbered list below is otherwise unchanged.
    "before R0 is designed" constraint turned out to be moot — **R0's governor shipped on
    2026-07-30** (Plan 0044 / ADR-0045) and does not read `p99` at all, so the qualification Phase 4
    wrote down guards a *description*, not a live demotion. See roadmap item 3 below.
-4. **[0086]** — needs the user twice (Phase 2's capture, Phase 4's re-measure), so plan on bringing
-   them in. Touches `core/src/dsp/` and contends with nothing.
+4. ~~**[0086]**~~ — **closed 2026-08-15 at Phase 2, by its own gate.** Phase 1's instrument landed
+   and Phase 2's capture ran on three genres; the verdict named a defect upstream of every cue on
+   its shortlist, so Phases 3-5 were superseded rather than executed. Succeeded by **[0095]**,
+   which inherits the slot: same subsystem (`core/src/dsp/`), still contends with nothing, still
+   needs the user once (Phase 5's re-measure). **Read [ADR-0109] before touching anything in
+   `core/src/dsp/tempo.rs` or `downbeat.rs`** — `beat_index` counts onsets, not beats, and two
+   authoring docs currently say otherwise.
 5. **[0087]** — last, and largest. Touches `core/src/render/scenes/lines/` and owes a re-bless, so it
    wants a lane to itself. **It is also the only plan here that can end early**: two separate gates
    (a cost measurement and a `human` look verdict) can route it to ADR-0098's Alternative C.
@@ -298,7 +303,9 @@ at 60 Hz or at capture `dt` stays correct as written.
 [0083]: done/0083-the-build-says-why-it-hears-nothing.md
 [0084]: done/0084-two-gates-stop-lying-about-what-they-check.md
 [0085]: done/0085-the-show-length-horizon-gets-an-instrument.md
-[0086]: 0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md
+[0086]: done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md
+[0095]: 0095-the-downbeat-fold-gets-a-musical-beat.md
+[ADR-0109]: ../adrs/0109-the-beat-clock-counts-onsets-not-beats.md
 [0087]: 0087-the-line-renderer-draws-a-curve.md
 [0088]: done/0088-the-docs-get-pictures.md
 [0089]: done/0089-the-framing-contract-stops-lying.md
