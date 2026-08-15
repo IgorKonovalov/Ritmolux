@@ -4669,3 +4669,258 @@ unnecessary.
      Phase 7b failure mode, and the reason design-backlog 0077 exists. -->
 
 [0048]: plans/done/0048-analysis-v2-and-the-retune.md
+
+
+---
+
+# Archived 2026-08-15 — at Plan 0089's close
+
+Three entries, all discharged by [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md),
+whose header named all three as its `**Closes:**`. Two of them (0078, 0081) are the pair the
+2026-08-13 sweep found **falsified in their first halves** — both asserted an *absence* nobody had
+checked against the file — and both survivors had named "the next plan that touches this file" as
+their home with no such plan ever written. Plan 0089 was that carrier. The third (0089) is the
+falsified `FRAME_FILL` invariant, whose own first suspect the sweep had already exonerated and
+whose real mechanism (rotation) the plan then derived, pinned as a property test, and shipped
+without moving a pixel.
+
+**0078 and 0081 cross-link to each other by anchor.** Both bodies are here, so those links resolve
+inside this file.
+
+---
+
+## ~~0078 — `kaleido_tile` is a discrete quantity that is not quantized, so it is the one term of the composed map an author cannot bind~~ — FALSIFIED
+
+> **CORRECTED 2026-08-13, at the backlog sweep. The premise is false, and it was false when the
+> entry was written.** `kaleido_tile` is not quantized **on purpose**, and the reasoning is a doc
+> comment on the function itself (`core/src/render/kaleidoscope.rs:458`):
+>
+> > *Deliberately **not** rounded, unlike the fold order and the winding number. Those two are
+> > integral because a fractional value is undefined or torn; a fractional cell count is neither.
+> > `abs(fract(x·n/2)·2 − 1)` at `n = 2.5` is a perfectly continuous mirrored grid whose last cell is
+> > cut off at the frame edge, so a smoothed `kaleido_tile` can ease between cell counts instead of
+> > snapping — the one param on this stage where that is true.*
+>
+> That comment landed in `e648a02`, **Plan 0064 Phase 1** — five phases before this entry was filed
+> at Phase 6 of the same plan. So the entry's central claim, that `tile` is "the same kind of
+> quantity" as `kaleido_spiral` and `palette_steps`, is answered in place: those two are rounded
+> because a fractional value is *meaningless*, and a fractional cell count is not.
+>
+> **What survives is smaller and is a look question, not a correctness one.** A fractional count
+> genuinely does cut the last cell at the frame edge, so the wallpaper is seamless *within* the
+> frame and clipped at its border. Whether that reads as a broken tiling or as an ordinary crop is
+> a **render** judgement nobody has made — the entry asserts the first without having looked. If a
+> content pass binds `kaleido_tile` to audio and the clipped edge reads badly, **that** is a fresh
+> entry with a rendered pair behind it, and it would be arguing for a *clamp at the edge*, not for
+> rounding.
+>
+> **The one thing worth acting on is a doc gap, and it is one line.** `fragment_tiled.toml` binds
+> `kaleido_tile = "2"` as a constant and `presets/README.md` says nothing about whether it may be
+> driven — so an author meets neither the capability nor its edge behaviour.
+>
+> **PROMOTED 2026-08-13 → [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md) Phase 2**, and
+> the promotion is the point: "folded into the next plan that touches the symmetry stage's docs" was
+> written here and **no such plan was ever written**, so the item sat with a named home and no carrier.
+> The same was true of [0081](#0081--the-house-gain-rule-lives-only-in-preset-headers-the-first-half-is-falsified-the-exception-class-survives)'s
+> survivor, which rides the same plan. Judging whether the clipped last cell *reads* badly is
+> explicitly **not** in that phase's scope — nobody has looked, and a render is what would decide it.
+>
+> **The method note, which is why this is corrected in place rather than archived:** the entry is a
+> claim about what the repo does *not* do, and it was checked against the param roster rather than
+> against the function. "Nothing does X" rots exactly like "X is broken" does. Everything below is
+> the entry as raised.
+
+**Raised by:** `preset-author`, at [Plan 0064](plans/done/0064-the-symmetry-stage-and-the-banded-palette.md)
+Phase 6. **Owner if taken:** `dev` — it is a CPU-side quantization in
+`core/src/render/kaleidoscope.rs`, beside the one `kaleido_spiral` already has.
+
+### The finding
+
+The composed map ships three discrete quantities. Two of them are quantized to integers CPU-side
+before the uniform is packed, for the reason this project has already written down twice — an eased
+parameter is continuous even when its math needs integers, so the smoothing sweeps it through values
+that are not merely wrong but meaningless. `kaleido_spiral` is quantized because a fractional winding
+number draws a visible seam. `palette_steps` is quantized because a fractional band count is not a
+band count.
+
+**`kaleido_tile` is the same kind of quantity and did not get the same treatment.** It is cells
+across the frame, with alternate cells mirrored. A fractional value splits a cell at the frame edge,
+so the mirroring no longer meets and the wallpaper stops being seamless — which is the entire
+property that makes the tile read as a pattern rather than a grid of stamps.
+
+The practical consequence is narrow and complete: **a preset can only ever bind `kaleido_tile` to a
+constant.** `fragment_tiled.toml` does exactly that and says so in its header. Every other term of
+the composed map is audio-bindable; this one is decoration you set once.
+
+### Why it is worth an entry rather than a comment
+
+Phase 4 decided the tile **ships** — it was the term the plan named as most likely to drop, and the
+rendered grid earned it a place. So this is now an author-facing param whose most natural binding
+(a fold count that responds to the music, exactly as `kaleido_order` does) is unavailable, and
+nothing warns: the param *is* known, so ADR-0020's unknown-parameter warning cannot catch it, and a
+swept value renders a plausible-looking broken picture rather than failing.
+
+### What a fix would be
+
+Quantize `tile` where `spiral` is quantized, and say so in `presets/README.md` alongside the existing
+note for the other two. The open question a fix has to answer is what a *transition* between two
+integer tile counts should look like — `kaleido_order` has the same problem and solves it with a long
+`[smoothing]` constant so the change is rare rather than smooth, which works because the fold count
+changes the motif in place. A tile count changes the layout, so the same trick may read as a jump.
+
+### Priority
+
+**Low-medium.** Nothing is broken and the constant binding is honest. It is the gap between "the
+stage has five new terms" and "the stage has four new terms you can drive with audio", which is the
+difference an author meets on their first attempt.
+
+---
+
+## 0081 — the house gain rule lives only in preset headers *(the first half is FALSIFIED; the exception class survives)*
+
+> **CORRECTED 2026-08-13, at the backlog sweep.** The entry's central claim — *"It is written down
+> nowhere. It is not in `presets/README.md`, not in `docs/presets.md`"* — **is false, and was false
+> when the entry was written.** `presets/README.md:203` carries it, inside the "A GAIN can be wrong
+> the same way" bullet:
+>
+> > *The rule that came out of the retune: pick `G = C / 0.85` for `bass`/`mid` and `C / 0.60` for
+> > `treb`/`onset`, which puts a typical passage near half the cap and a peak at it.*
+>
+> It landed in `fc698cd` on **2026-08-03** — six days before this entry was raised on 2026-08-09. So
+> the rule is not folklore; it is documented, in the file the `preset-author` lane treats as the
+> authority, in the paragraph an author reads when composing a clamped band term.
+>
+> **The second half of the entry stands, unchanged and unbuilt.** The *exception class* is nowhere:
+> a param whose cap is a **failure state** rather than a maximum wants its range pulled in at both
+> ends instead of gained to reach the cap. Gray-Scott `feed`/`kill` is the worked example — gains
+> derived by the house rule put the field in the filled regime, where the gaps close and the picture
+> becomes a flat wash with no contour left to draw, and the Coral Oracle's author found this by
+> rendering it as flat mustard. Naming the **class** is what makes it useful beyond one preset, and
+> it is unlikely to be the only member.
+>
+> **So this is now a one-paragraph doc item, not a rule-plus-exception item**, and it is half the
+> size the entry claims.
+>
+> **PROMOTED 2026-08-13 → [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md) Phase 3.** "It
+> goes into the next plan that touches `presets/README.md`'s reactivity section" was written here and
+> no such plan followed, which is the same no-carrier failure as
+> [0078](#0078--kaleido_tile-is-a-discrete-quantity-that-is-not-quantized-so-it-is-the-one-term-of-the-composed-map-an-author-cannot-bind)'s
+> survivor; the two ride one plan. **Re-verified against code 2026-08-13** — neither
+> `presets/README.md` nor `docs/presets.md` contains any "failure state" or "death state" language, so
+> the exception class is still nowhere.
+>
+> Same method note as [0078](#0078--kaleido_tile-is-a-discrete-quantity-that-is-not-quantized-so-it-is-the-one-term-of-the-composed-map-an-author-cannot-bind): both entries assert an *absence*, and neither absence was
+> checked. Everything below is the entry as raised.
+
+**Raised by:** `architect`, at [Plan 0067](plans/done/0067-the-curation-route.md)'s close, from the
+`chthonic_coral_oracle.toml` commit. **Owner if taken:** `architect` (the rule is a doc), with
+`preset-author` review.
+
+### The finding
+
+This project applies a consistent convention when gaining a band term into a clamped range: derive
+the gain from the cap so a typical passage reaches about half of it and a peak reaches it —
+`cap / 0.85` for `bass` and `mid`, `cap / 0.60` for `treb` and `onset`. It is applied across the
+library and it is the reason a clamp is meaningful rather than decorative.
+
+**It is written down nowhere.** It is not in `presets/README.md`, not in `docs/presets.md`. It
+propagates by being copied from one preset header to the next, which is how the Coral Oracle's
+author found it and re-derived every gain from it.
+
+And then that preset found a case where the rule is **actively wrong**. For a Gray-Scott regime the
+cap is a **death state**: feed high and kill low is the filled regime, where the gaps close and the
+picture becomes a flat wash with no contour left to draw. Gains derived by the rule (feed cap 0.059,
+kill floor 0.0595) put the field there on a sustained loud passage and rendered as flat mustard. So
+`feed` and `kill` are deliberately gentle, with caps pulled inside the labyrinth regime at **both**
+ends — a small reactive span on purpose, a drift between two living states rather than a sweep to
+the edge of the parameter space.
+
+### Why it is worth an entry rather than a comment
+
+The exception is already recorded, in the one file it applies to. The gap is structural: a
+convention that exists only as folklore cannot carry an exception, because the next author meets
+the *rule* (copied from a neighbouring preset) without ever meeting the *reason* it has limits.
+Both halves are load-bearing for the `preset-author` lane, which keeps no catalogue of its own and
+reads `presets/README.md` as the authority.
+
+### What a fix would be
+
+One short section in `presets/README.md`: the rule, the two constants and why they differ, and the
+exception class the Oracle names — **a param whose cap is a failure state rather than a maximum**
+gets its range pulled in at both ends instead. Gray-Scott `feed`/`kill` is the worked example; it is
+unlikely to be the only member of that class, and naming the class is what makes the entry useful
+beyond one preset.
+
+### Priority
+
+**Medium.** Cheap, and it converts a piece of folklore plus a one-file exception into a rule an
+author can apply and know the limits of.
+
+---
+
+## 0089 — the dragon overruns the frame corner at the default view, and `FRAME_FILL = 0.88` promises it cannot
+
+- **PROMOTED 2026-08-13 → [ADR-0103](adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) +
+  [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md) Phase 1.** The correction below named
+  **rotation** as the leading candidate; it is now **derived**, and the derivation makes this entry
+  much larger than the dragon. `fit_scale` fits the axis-aligned half-extents; a centred AABB rotated
+  by `θ` reaches `sqrt(hx²+hy²)`, so with `a = hx/hy` the guarantee holds at every angle only if
+  `a <= sqrt(1/FRAME_FILL² − 1) = 0.5397` (vertical-binding) and is **unsatisfiable** horizontal-binding
+  at any aspect >= 1. **A square figure overruns by 24.4 %**; only a figure 1.85x taller than wide is
+  safe. The fern (`a ~ 0.48`) is the sole compliant shipped figure **and the one the fit was built
+  on**, which is why nobody saw it — while **all three** 2D-IFS presets independently bind `spin` down
+  *and* set base `zoom` below 1 (0.92 / 0.96 / 0.96), so the library has been paying in triplicate with
+  only one header naming why.
+- **The entry's own second candidate stays live as the plan's redirect.** If Phase 1's non-vacuity
+  check finds the dragon *inside* the bound, rotation is not the mechanism and the finding is the
+  preset's own `zoom` reaching `1.04` at a bass peak. The plan says so rather than tuning the test
+  until the expected figure fails.
+- **What the promotion does not do:** it does not buy the guarantee. The routes that would — fitting
+  the rotation-invariant radius, or a per-figure measured fill — are **priced and deferred with a
+  trigger** in ADR-0103, because both re-frame all three shipped worlds on top of compensating `zoom`
+  values they already carry. What lands is a contract that is true, pinned as a property test, moving
+  zero pixels.
+
+> **CORRECTION 2026-08-13, at the backlog sweep — the entry's own first suspect is largely
+> exonerated, and it would have sent `dev` hunting in the wrong file.** The entry says *"the
+> suspicion to check first is `FitLut` against the fallback `frame()`."* But
+> `core/src/render/scenes/particles/ifs/tests.rs:1064`
+> (`the_fit_leaves_margin_for_what_it_under_measures`) **already asserts the property this entry
+> says is falsified**, for every shipped figure and three morph points on two pairs: it compares the
+> fit's sampled half-extent against a 200 000-iteration long run and requires the true figure to
+> fill under `0.97` of the frame, with a non-vacuity check that the under-measure is real. That test
+> is green, and it covers the dragon.
+>
+> **So the suspect should be what the fit does not model, and the leading candidate is rotation.**
+> The fit measures an **axis-aligned** bounding box; the view transform then **rotates** the figure.
+> An axis-aligned box that rotates sweeps its corners outside — which is a *corner* overrun
+> specifically, matching the entry's own wording, and it would be invisible to a per-axis fill test
+> by construction. `presets/attractor_dragon.toml:117` binds `spin = "sin(time * 0.24) * 0.26"`, so
+> the shipped world does rotate. Its `zoom` line directly below is the `0.92` workaround.
+>
+> A second candidate worth eliminating in the same sitting: the same file's `zoom` reaches
+> `0.92 + bar * 0.04 + clamp(bass * 0.094, 0, 0.080)` — **1.04 at a bass peak**, past 1.0 — so part
+> of what was seen may be the preset zooming in rather than the fit mis-measuring.
+>
+> **This does not close the entry** — a stated invariant is still falsified and this project does not
+> leave one standing. It redirects it, and it keeps the entry's own good instruction: do not close
+> this by re-documenting the invariant away without knowing which mechanism breaks it.
+
+**Raised by:** `preset-author`, Plan 0075 cohort 5, at 1280x720 — the reference aspect, not an
+odd target. **Owner if taken:** `dev` — the suspicion to check first is `FitLut` against the
+fallback `frame()` in the IFS fit path.
+
+### The finding
+
+`FRAME_FILL = 0.88` documents that the fitted figure stays inside the frame with margin. The
+dragon (two maps at exactly 0.7071, space-filling) overruns the frame **corner** at the default
+view; the shipped world works around it with `zoom = 0.92`. Small — but it contradicts a
+documented invariant, and this project does not leave a falsified stated property standing.
+The first question is which of the two fit sources mis-measures the dragon's extent: the
+`FitLut` or the fallback `frame()`.
+
+### Handoff verdict (2026-08-11): park, take opportunistically
+
+Nothing ships broken — the workaround is one line and honest, in the world's own header. Take
+it the next time anyone is in the IFS fit path, and do not close it by re-documenting the
+invariant away without knowing which source mis-fits.

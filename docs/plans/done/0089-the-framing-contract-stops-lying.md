@@ -1,13 +1,75 @@
 # 0089 — the framing contract stops lying, and two doc gaps close
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-13
+> **Approved:** 2026-08-13 (user)
+> **Closed:** 2026-08-15
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0103](../adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) (accepted, this plan)
-> **Closes:** [design-backlog 0089](../design-backlog.md), and the surviving halves of
-> [design-backlog 0078](../design-backlog.md) and [design-backlog 0081](../design-backlog.md)
-> **Supplements:** [ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md),
-> [ADR-0093](../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md)
+> **Related ADRs:** [ADR-0103](../../adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) (accepted, this plan)
+> **Closes:** [design-backlog 0089](../../design-backlog.md), and the surviving halves of
+> [design-backlog 0078](../../design-backlog.md) and [design-backlog 0081](../../design-backlog.md)
+> **Supplements:** [ADR-0075](../../adrs/0075-ifs-family-morphs-in-singular-value-space.md),
+> [ADR-0093](../../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md)
+
+## Close (2026-08-15)
+
+**All three phases shipped, in one `dev` session:** `e23bd04` (Phase 1 — the framing contract and
+its property test), `d4570e7` (Phase 2 — `kaleido_tile`'s bindability), `52b1dc3` (Phase 3 — the
+gain rule's exception class).
+
+**Mode 4 verdict: no blockers, no majors, one minor and three nits.** Verified rather than trusted:
+the new test run and read (green, non-vacuous in both directions — the fern inside at `a = 0.4851`,
+four figures outside); "zero pixels move" checked against the three preset diffs line by line, where
+**every added line begins with `#`**, which is stronger evidence than the bless-to-bless control this
+plan asked for; Phase 2 re-derived from `fold_tile`, `fold_order` and `fold_spiral` in
+`core/src/render/kaleidoscope.rs` plus `MIN_ACTIVE_TILE`/`MAX_TILE`; Phase 3's quoted `feed` line
+compared byte-for-byte against `presets/reaction_etching.toml:29`; `cargo fmt --check`, `clippy
+--workspace --all-targets`, the `preset` and `ifs` test binaries (92/92) and
+`scripts/check-doc-links.mjs` all green.
+
+**The test is better than this plan specified.** It asserts against the shipped `fit_scale` rather
+than a parallel arithmetic, derives every constant from `FRAME_FILL`, derives the sweep tolerance
+from the sweep's own angular step as `r·(1 − cos(step/2))` instead of an epsilon, and guards the
+knife edge so the equivalence cannot be decided by `f32` rounding.
+
+**The minor is this document's arithmetic, not the implementation's.** The claim that horizontal
+binding is *"unsatisfiable at any aspect at or above 1"* is over-general: the fill
+`FRAME_FILL · aspect · sqrt(1+a²)/a` decreases in `a` toward `FRAME_FILL · aspect`, so the case is
+unsatisfiable exactly when `aspect >= 1/FRAME_FILL = 1.136`, and at `aspect = 1` a figure at least
+`1.853x` *wider* than tall complies. The two facts this plan cites in support only combine at 16:9.
+Related: the whole derivation assumes a landscape target, and `fit_scale` is handed the render
+target's aspect, which a resizable window can take below 1 — where the bound reverses. Recorded as
+[ADR-0103](../../adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md)'s dated `Outcome`;
+`dev`'s test scopes its own version of the claim to 16:9 correctly, so no code carries the error.
+
+**Two deviations, both correct.** Phase 3's shipped instance moved from `chthonic_coral_oracle.toml`
+to the three `reaction_*` presets: the coral **was retired on 2026-08-10 in `d92dcb2`**, three days
+before this plan was written, and this plan inherited the name from backlog 0081's body where it is
+right as *provenance* and wrong as a shipped file. The substitution keeps the coral as where the
+finding came from and quotes `reaction_etching`'s `feed` line as the treatment. Phase 1's fern header
+says something different from the dragon's and the volute's, on purpose: this plan expected all three
+sub-1 `zoom` values to be rotation recourse, and **the measurement says the fern is the one figure
+that satisfies the rotated bound**, so its note says that and points at the real reason its base sits
+under 1 (the binding peaks at 1.08, `vigor` on top). Writing this plan's wording onto the fern would
+have shipped a false claim in a preset header — the exact failure Phase 1 exists to remove.
+
+**Nits, none repaired here.** `FRAME_FILL`'s docstring states the vertical-binding formula
+unconditionally, and the spiral (`a = 1.82`) binds horizontally at 16:9. `attractor_dragon` and
+`attractor_volute` say "do not raise the base to 1.0" two lines above bindings that already peak at
+1.04 and 1.06 — the fern's header names this about itself and the other two do not. The test
+measures at `REFERENCE_ASPECT` only; both branches are exercised there by the roster, so it is not
+vacuous, but a second aspect would turn a guarded assumption into a checked property.
+
+**Followup, not a defect.** All three 2-D IFS presets' `zoom` bindings peak above 1.0 —
+`attractor_dragon` 1.04, `attractor_volute` 1.06, `attractor_fern` 1.08. The non-vacuity check came
+back as this plan expected, so rotation is confirmed as the mechanism and the redirect does not fire.
+A content-lane sitting, as **What this plan does NOT do** says.
+
+**Curation (step 3b).** The plan touched `presets/` — three headers, no values — so neither sweep
+finds work. Nothing new landed to judge against the set, and the workaround grep does not fire
+because this plan **fixed no engine defect** by design. The three headers move the other way: the
+dragon's `zoom` stops reading as a probe-driven workaround and the fern's and volute's stop reading
+as taste, which is the loss step 3b exists to prevent. No curation action owed.
 
 ## TL;DR
 
@@ -29,7 +91,7 @@ unplanned. Two of them wanted an interview or an ADR of their own and are out of
 
 ### 1. `FRAME_FILL = 0.88` is falsified, and the entry's own first suspect was wrong
 
-[Backlog 0089](../design-backlog.md) reported the Heighway dragon overrunning the **frame corner**
+[Backlog 0089](../../design-backlog.md) reported the Heighway dragon overrunning the **frame corner**
 at the default view at 1280x720, worked around in `presets/attractor_dragon.toml:118` with a base
 `zoom = 0.92`. The entry named the fit sources — `FitLut` versus the fallback `frame()` — as "the
 suspicion to check first". That suspect is largely exonerated:
@@ -81,12 +143,12 @@ and `zoom` is the recourse."* Rotation belongs in that same sentence and is not 
 difference — and the reason this is worth a plan rather than a comment — is that a lever overrun
 happens when an author pushes something, while **the rotation overrun is the default**, so every
 author of a 2D IFS world meets it on their first render and has to rediscover the recourse.
-[ADR-0103](../adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) takes that decision and
+[ADR-0103](../../adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) takes that decision and
 prices the alternative that would buy a real guarantee.
 
 ### 2. `kaleido_tile`'s bindability is undocumented
 
-[Backlog 0078](../design-backlog.md) was **falsified** at the sweep — `kaleido_tile` is
+[Backlog 0078](../../design-backlog.md) was **falsified** at the sweep — `kaleido_tile` is
 deliberately not quantized, and `core/src/render/kaleidoscope.rs:458` carries the reasoning in a doc
 comment that predates the entry by five phases. What survives is a doc gap the entry names
 precisely: `presets/README.md:1524` carries the `kaleido_tile` row and nothing else, so an author
@@ -97,7 +159,7 @@ to "the next plan that touches the symmetry stage's docs" and no such plan was e
 
 ### 3. The house gain rule has no exception class
 
-[Backlog 0081](../design-backlog.md)'s first half was also **falsified** — `presets/README.md:203`
+[Backlog 0081](../../design-backlog.md)'s first half was also **falsified** — `presets/README.md:203`
 has carried `G = C / 0.85` and `C / 0.60` since 2026-08-03. Its second half stands: the *exception*
 class is nowhere. Grepped 2026-08-13, `presets/README.md` and `docs/presets.md` contain no
 "failure state" or "death state" language. The class is **a param whose cap is a failure state
@@ -117,7 +179,7 @@ stated property becomes "inside the frame at neutral levers **and zero rotation*
 the recourse", which is ADR-0075's existing sentence extended to the input it forgot, and it moves
 zero pixels. We do **not** take the two routes that would make the original invariant true — a fit
 against the rotation-invariant radius `r`, or a per-figure measured fill in
-[ADR-0093](../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md)'s shape — because
+[ADR-0093](../../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md)'s shape — because
 both shrink every shipped 2D figure, re-frame all three worlds on top of compensating `zoom` values
 they already carry, and owe a golden re-bless plus a content pass, for a guarantee nobody has asked
 for. They are **priced and deferred with a trigger, not rejected**, in ADR-0103: framing decisions
@@ -202,7 +264,7 @@ down; the other defaults to on.
   and the disagreement is the finding. `fragment_tiled.toml`'s constant binding is noted as one
   choice rather than the only one.
   **Not in scope:** judging whether the clipped edge reads badly. Nobody has looked, and
-  [backlog 0078](../design-backlog.md) says a render is what would decide it.
+  [backlog 0078](../../design-backlog.md) says a render is what would decide it.
 
 ### Phase 3 — the gain rule names its exception class
 
@@ -256,14 +318,14 @@ down; the other defaults to on.
 - **It does not quantize `kaleido_tile`** — that premise is falsified, and the code comment
   explaining why predates the entry.
 - **It does not judge the fractional-tile frame edge**, which needs a render nobody has made.
-- **It does not touch [backlog 0068](../design-backlog.md) option 2** (the emitter's source line is
+- **It does not touch [backlog 0068](../../design-backlog.md) option 2** (the emitter's source line is
   fixed at `y = −1.12`; `core/src/render/scenes/emitter.rs:91`). That is a param-surface change with
   a real fork — a movable line versus a point source versus an authorable region — and it is going
   to an interview before anything is written.
-- **It does not touch [backlog 0075](../design-backlog.md) item 2** (the palette LUT repeat-addresses
+- **It does not touch [backlog 0075](../../design-backlog.md) item 2** (the palette LUT repeat-addresses
   a *coordinate*, so a negative-driven `root_tint` wraps a figure's darkest region to the ramp's
   brightest stop). That is
-  [ADR-0102](../adrs/0102-a-palette-coordinates-edge-is-a-per-preset-choice.md), proposed, no plan
+  [ADR-0102](../../adrs/0102-a-palette-coordinates-edge-is-a-per-preset-choice.md), proposed, no plan
   yet by the user's call.
 - **It does not re-tune anything.** Phase 1 explains three presets' `zoom` values; it does not change
   them. If the explanation makes any of the three look wrong, that is a content-lane sitting.

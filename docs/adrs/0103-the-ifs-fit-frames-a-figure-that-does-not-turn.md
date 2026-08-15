@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
-> **Related plan(s):** [0089 — the framing contract stops lying](../plans/0089-the-framing-contract-stops-lying.md)
+> **Related plan(s):** [0089 — the framing contract stops lying](../plans/done/0089-the-framing-contract-stops-lying.md)
 > **Supplements:** [ADR-0075](0075-ifs-family-morphs-in-singular-value-space.md),
 > [ADR-0093](0093-attractor-tuples-are-content-with-per-tuple-framing.md)
 
@@ -120,3 +120,27 @@ rather than from argument.
 - **E — leave the invariant standing and treat the dragon as a one-off.** Rejected because the
   arithmetic says it is not a one-off: every figure but the fern is affected, and two of the three
   shipped worlds are already paying for it without knowing.
+
+## Outcome (added at Plan 0089's close, 2026-08-15)
+
+The decision held and the plan landed it without a pixel moving. Two corrections to what is written
+above, both found at the close review, neither of which changes the decision.
+
+**The horizontal-binding case is not unsatisfiable at every aspect at or above 1.** Context's second
+bullet justifies that claim with `sqrt(1+a²)/a > 1` and `0.88 · 16/9 = 1.564`, and those two facts
+only combine at 16:9. The horizontal-binding fill is `FRAME_FILL · aspect · sqrt(1+a²) / a`, which
+*decreases* in `a` toward `FRAME_FILL · aspect` — so the case is unsatisfiable exactly when
+`aspect >= 1/FRAME_FILL = 1.136`, and at `aspect = 1` a figure at least `1.853x` **wider** than tall
+complies. Nothing shipped lands in `[1.0, 1.136)`, and the test
+(`the_fit_frames_a_figure_that_does_not_turn`) scopes its own version of the claim to 16:9 correctly,
+so no code carries the error — but the general statement above is the over-general one.
+
+**And the whole derivation assumes a landscape target.** `fit_scale` is handed the render target's
+aspect (`particles/encode.rs`), and the standalone window is resizable, so a portrait target makes the
+*horizontal* the scarcer budget and reverses the bound: there the compliant figures are the wide ones.
+"Only a figure at least 1.85x taller than wide is safe" is a statement about `aspect >= 1`.
+
+Both are the same shape as the rule this project already writes down for numbers (ADR-0071), one level
+up: `aspect` is a real varying input, and every figure in this ADR was derived and asserted at one
+value of it. The deferred routes A and B are unaffected — a rotation-invariant fit is aspect-free by
+construction, and a per-figure measured fill would measure per aspect or not at all.
