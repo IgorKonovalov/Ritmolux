@@ -180,6 +180,17 @@ const DEFAULT_SOURCE_WIDTH: f32 = 1.0;
 /// [`ATTACK_FRAC`] gives it. It is the answer to an inside-frame `source_y`,
 /// where a mark switched on at full brightness is a pop.
 const DEFAULT_SPAWN_FADE: f32 = 0.0;
+/// Lifetimes of spawns to back-date at scene start. Off by default, because a
+/// prewarmed world is *full* on its first frame — right for a sky, wrong for a
+/// cascade, and the two readings live one number apart.
+const DEFAULT_PREWARM: f32 = 0.0;
+
+/// Ceiling on `prewarm`, in lifetimes. Past one nothing new survives to be
+/// added — an object older than its own life is dead by definition — and the
+/// widest `lifetime_spread` stretches that to one and a half, so two is already
+/// generous. It bounds the back-dated spawn loop's arithmetic the way
+/// [`MAX_SPAWN_RATE`] bounds the live one's.
+const MAX_PREWARM: f32 = 2.0;
 // Shared palette colour knobs (ADR-0021), same meaning as the swarm's.
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_HUE_SPREAD: f32 = 1.0;
@@ -375,6 +386,9 @@ struct Spawn {
     source_half_width: f32,
     /// The source line's world `y`, clamped to the retirement bound.
     source_y: f32,
+    /// Lifetimes of spawns to back-date at scene start, in `0..=`[`MAX_PREWARM`].
+    /// Read once, on the field's first [`step`](Field::step), and never again.
+    prewarm: f32,
     /// Half-extents of the retirement bound, world units.
     bound: [f32; 2],
 }
@@ -429,9 +443,64 @@ impl Field {
         if !self.started {
             self.started = true;
             self.next_spawn = time;
+            self.prewarm(time, cfg);
         }
         self.retire(time);
         self.spawn_due(time, cfg);
+    }
+
+    /// Fill the pool as if this field had already been running for
+    /// `prewarm * lifetime` seconds, so the population **begins** at its steady
+    /// state instead of ramping toward it over a lifetime (ADR-0104).
+    ///
+    /// This is the second warm-up, and moving the source does not touch it:
+    /// wherever the source sits, the population climbs toward `rate * lifetime`
+    /// at `rate` a second, and a behavioral gate captures 30 frames — half a
+    /// second. A world whose lifetime is measured in seconds is therefore
+    /// scored on a fraction of the picture it is actually about.
+    ///
+    /// **Back-dating is exact, not approximated**, and that is a property of the
+    /// scene rather than of this function: a path is closed-form in `t - t0` and
+    /// a death time is derived from `t0`, so an object built with a back-dated
+    /// `t0` is indistinguishable from one that genuinely spawned then. The RNG
+    /// advances once per back-dated spawn exactly as a real run's would, so the
+    /// seeds match too, and nothing here reads a clock (NFR §6).
+    ///
+    /// Two bounds keep the work finite and the pool holding the right end of
+    /// the history. An object spawned more than a longest-possible life ago
+    /// cannot still be alive, so the window is clipped there rather than at
+    /// whatever `prewarm` asked for; and a back-dated object whose life has
+    /// already ended is **dropped rather than stored**, because it is invisible
+    /// either way (its envelope is zero) but a stored one would hold a slot the
+    /// live object behind it needs. A world whose steady state exceeds the pool
+    /// starts full of the oldest survivors, which is a saturated pool either
+    /// way.
+    fn prewarm(&mut self, time: f32, cfg: &Spawn) {
+        if cfg.rate <= 0.0 || cfg.prewarm <= 0.0 {
+            return;
+        }
+        let longest_life = cfg.lifetime * (1.0 + cfg.lifetime_spread * 0.5);
+        let seconds = (cfg.prewarm * cfg.lifetime).min(longest_life);
+        let period = 1.0 / cfg.rate;
+        let cap = self.capacity();
+        let mut t0 = time - seconds;
+        let mut spawned = 0usize;
+        while t0 <= time && spawned < cap {
+            let seed = (self.rng.next_u64() >> 32) as u32;
+            let object = build(seed, t0, cfg);
+            if object.death_time > time
+                && let Some(index) = self.free.pop()
+                && let Some(slot) = self.objects.get_mut(index as usize)
+            {
+                *slot = object;
+                self.live += 1;
+            }
+            t0 += period;
+            spawned += 1;
+        }
+        // The live schedule resumes where the back-dated one left off, so the
+        // seam is a spawn instant like any other rather than a gap or a burst.
+        self.next_spawn = t0;
     }
 
     fn retire(&mut self, time: f32) {
@@ -714,6 +783,7 @@ pub const PARAMS: &[&str] = &[
     "source_y",
     "source_width",
     "spawn_fade",
+    "prewarm",
     "size",
     "size_spread",
     "spin",
@@ -768,6 +838,10 @@ pub struct EmitterScene {
     /// Fraction of a life spent ramping up from black, **as bound**; conditioned
     /// at the draw site beside the other appearance params.
     spawn_fade: f32,
+    /// Lifetimes of spawns to back-date at scene start, **as bound**. Read once,
+    /// on the pool's first step — a preset easing it afterwards changes nothing,
+    /// which is why it is the one param here that is not a per-frame quantity.
+    prewarm: f32,
     size: f32,
     size_spread: f32,
     spin: f32,
@@ -948,6 +1022,7 @@ impl EmitterScene {
             source_y: DEFAULT_SOURCE_Y,
             source_width: DEFAULT_SOURCE_WIDTH,
             spawn_fade: DEFAULT_SPAWN_FADE,
+            prewarm: DEFAULT_PREWARM,
             size: DEFAULT_SIZE,
             size_spread: DEFAULT_SIZE_SPREAD,
             spin: DEFAULT_SPIN,
@@ -987,6 +1062,7 @@ impl EmitterScene {
             lifetime_spread: finite(self.lifetime_spread, DEFAULT_LIFETIME_SPREAD).clamp(0.0, 1.0),
             source_half_width: source_half_width(self.aspect, self.source_width),
             source_y: source_line_y(self.source_y, bound),
+            prewarm: finite(self.prewarm, DEFAULT_PREWARM).clamp(0.0, MAX_PREWARM),
             bound,
         }
     }
@@ -1024,6 +1100,7 @@ impl Scene for EmitterScene {
         self.source_y = DEFAULT_SOURCE_Y;
         self.source_width = DEFAULT_SOURCE_WIDTH;
         self.spawn_fade = DEFAULT_SPAWN_FADE;
+        self.prewarm = DEFAULT_PREWARM;
         self.size = DEFAULT_SIZE;
         self.size_spread = DEFAULT_SIZE_SPREAD;
         self.spin = DEFAULT_SPIN;
@@ -1055,6 +1132,7 @@ impl Scene for EmitterScene {
             "source_y" => self.source_y = value,
             "source_width" => self.source_width = value,
             "spawn_fade" => self.spawn_fade = value,
+            "prewarm" => self.prewarm = value,
             "size" => self.size = value,
             "size_spread" => self.size_spread = value,
             "spin" => self.spin = value,
