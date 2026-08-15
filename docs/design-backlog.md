@@ -9,6 +9,52 @@ An entry here is **not** a commitment to build — it is a captured signal so th
 lost between sessions. Verify every entry against the code before acting on it — these are dated
 snapshots, and the surface moves (same rule the lanes apply to their own references).
 
+## Every live entry carries a probe, and something re-runs it
+
+That rule above used to live only in this paragraph, and four entries were falsified anyway (0052,
+0078, 0081, 0082 — two of them wrong on the day they were written). So since
+[ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) the mechanical
+half of a verification moves out of the sentence and into something a script can re-run:
+`scripts/check-backlog-claims.mjs`, at the three call sites the doc-link checker already occupies
+(`pre-push`, the architect close ceremony, and the CI `links` job, which is the un-bypassable one).
+
+**Write a dated bullet with the claim's reduction inside an inline-code span**, in one of three
+forms. `<path>` is a file or a directory from the repo root; `<regex>` is JavaScript regex source,
+so a literal dot needs escaping:
+
+```markdown
+- **Verified 2026-08-15** — the governor does not exist: `absent: sustained_miss in: core/src`
+- **Verified 2026-08-15** — the rule is documented, and here: `present: G = C / 0\.85 in: presets/README.md`
+- **Verified 2026-08-15** — `unprobeable: this is a judgement about rendered output, not a claim
+  about repo contents`
+```
+
+(Those three are examples and the first is deliberately false today, which is why the checker skips
+fenced blocks — a document describing the grammar is not making a claim.)
+
+Three things to know before writing one:
+
+- **Green means the stated reduction still holds, never that the entry is true.** Entry 0081's
+  stamp was dated, recent and accurate, and verified the half of the entry that survived rather
+  than the half in its own title. A probe only checks the reduction its author chose, and whether
+  that reduction covers the claim is something a reader has to see — which is why the probe sits
+  beside the claim rather than in a manifest.
+- **Prefer the narrowest path that carries the claim** (`core/src/render/tier.rs`, not `core/src`).
+  A narrow path keeps the staleness advisory quiet, and it is a better probe for the same reason.
+- **`absent:` on a common word is a probe that can never fail**, and it reads as verification while
+  checking nothing. If a claim has no honest reduction, say so with `unprobeable: <why>` — the
+  checker accepts it, prints every one of them in its advisory, and that visible, countable roster
+  is what keeps the opt-out from becoming a blanket.
+
+**Staleness is an advisory and never a failure.** After the pass/fail line the checker asks
+`git log` when each probed path was last touched and names the entries whose subject has moved
+since anyone read them. It cannot tell a commit that invalidates a claim from one that does not, so
+making it a gate would mean firing constantly at a broad path or saying nothing at a narrow one —
+it is a report instead, and it never changes the exit code.
+
+**The archive is out of scope and stays out.** An archived entry is a closed record whose value is
+the correction it carries; re-probing it would be checking history against the present.
+
 **The lifecycle, in one line:** raised here → **PROMOTED** (an ADR and/or a plan now exists; the
 entry stays in this file, because a design that has not landed is still live) → **CLOSED** (the
 plan landed; the entry moves to the archive and leaves a ledger row behind).
