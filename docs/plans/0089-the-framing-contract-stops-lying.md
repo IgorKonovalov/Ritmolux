@@ -1,6 +1,6 @@
 # 0089 — the framing contract stops lying, and two doc gaps close
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0103](../adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) (accepted, this plan)

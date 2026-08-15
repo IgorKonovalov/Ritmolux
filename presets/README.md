@@ -2582,6 +2582,26 @@ exactly — the figure would surge and the frame would shrink it back for a net
 zero. The cost is that a hard `vigor` push can leave the frame; `zoom` is the
 recourse.
 
+**And it does not re-frame for `spin` either, which matters more, because `spin`
+defaults to on**
+([ADR-0103](../docs/adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md)).
+What the fit measures is an **axis-aligned** box; the projection then rotates it.
+A box that is `hx` by `hy` reaches `sqrt(hx² + hy²)` on *both* axes at its worst
+angle, so a figure only stays inside the frame at every angle if it is at least
+**1.85x taller than wide** — and of the five, only the `fern` is
+(`a = hx/hy = 0.49`, against a bound of `0.54`). The others overrun the frame
+corner at some point in the rotation: `sierpinski` by 34 %, `tree` by 41 %,
+`dragon` by 58 %, `spiral` by 79 %.
+
+So the fit's actual guarantee is **inside the frame at neutral levers and zero
+rotation**, and `zoom` is the recourse for both. That is why all three shipped
+2-D IFS worlds carry a base `zoom` below 1 — `attractor_dragon` `0.92`,
+`attractor_fern` and `attractor_volute` `0.96`. Those are framing values, not
+taste: raising one back to `1.0` puts the figure's corner off screen at some spin
+phase. A new 2-D IFS world either binds `spin` down to a small rock, or pays the
+same static `zoom`, or does both — which is what each of the three did
+independently before this was written down.
+
 <a id="morph-is-a-travel-knob"></a>
 
 **`morph` is a TRAVEL knob, not a little-life knob**, and its visible rate is

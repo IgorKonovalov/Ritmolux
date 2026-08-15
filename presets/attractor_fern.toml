@@ -197,6 +197,13 @@ palette_mix = "0.10 + sin(time * 0.023) * 0.10 + clamp(treb * 0.37, 0, 0.22)"
 # VIEW - a slow breathing push-in and a lazy sway. The fern is upright and
 # static in a way a strange attractor is not, so the view is what keeps it from
 # reading as a still image between beats.
+#
+# FRAMING: the base under 1 is the documented recourse, not taste (ADR-0103).
+# The engine's fit frames an axis-aligned box and the projection then rotates
+# it, so nothing guarantees the frame once the figure turns. This is the one
+# shipped figure that satisfies the rotated bound - 0.49 wide-to-tall against
+# a bound of 0.54 - and it has almost no room, while this binding peaks at
+# 1.08 and `vigor` surges the figure on top of that. Do not raise the base.
 zoom  = "0.96 + bar * 0.05 + clamp(bass * 0.082, 0, 0.070)"
 pan_x = "sin(time * 0.13) * 0.05"
 pan_y = "cos(time * 0.101) * 0.04"
