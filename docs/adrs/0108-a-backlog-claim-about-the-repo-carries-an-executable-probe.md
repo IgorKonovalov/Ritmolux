@@ -1,6 +1,6 @@
 # ADR-0108 — a backlog claim about the repo carries an executable probe
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-15, user approval)
 > **Date:** 2026-08-15
 > **Related plan(s):** [0093 — the backlog stops asserting things about a repo it has not read](../plans/0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md)
 > **Supplements:** [ADR-0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md), [ADR-0073](0073-the-windows-ci-critical-path.md)

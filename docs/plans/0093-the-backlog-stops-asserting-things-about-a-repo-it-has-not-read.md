@@ -1,9 +1,10 @@
 # 0093 — the backlog stops asserting things about a repo it has not read
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-15
+> **Approved:** 2026-08-15 (user)
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)
+> **Related ADRs:** [ADR-0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) (a backlog claim about the repo carries an executable probe)
 
 ## TL;DR
 
