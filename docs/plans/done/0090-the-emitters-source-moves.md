@@ -346,12 +346,23 @@ switch in badly. It is listed under **Standing** in `docs/plans/README.md`, alon
 content-lane items on this family. Backlog 0068 is closed and archived regardless: what it asked the
 engine for is delivered, and the world is content work rather than an undischarged half.
 
-**Curation (step 3b): nothing to curate.** The plan touched no `.toml` — the four params are inert in
-every shipped world by arithmetic, which the golden pass confirms. The workaround grep
-(`grep -rn "ADR-00NN\|Plan 00NN\|design-backlog 00NN" presets/*.toml`) returns only known,
-already-discharged headers; **no preset works around the fixed source line**, because until this plan
-there was no way to work around it. `emitter_perseids` keeps its place — whether the quiet world
-joins or replaces it is Phase 5's call, not this close's.
+**Curation (step 3b): one preset was made stale, and the first pass missed it.** The plan touched no
+`.toml` and the four params are inert in every shipped world by arithmetic, which the golden pass
+confirms — but the workaround grep found `emitter_perseids.toml:7`, whose header carries a
+fourteen-line block declaring the quiet sky *"ROUTED, NOT SHIPPED (2026-08-11), on two measured
+walls: per-mark variation beyond the spreads (backlog 0068), and the sanity gates themselves"*.
+**Both walls are down.** Per-mark variation landed at Plan 0077 Phase 2; the source and the warm-up
+landed here; and Plan 0075's `radial_shell_occupancy` rescue is what the sparse draft now passes
+`sanity` on. The header is a documented lie about the current engine, and it is exactly the class
+step 3b exists to catch — nothing is *wrong*, the preset renders fine and passes every gate.
+
+**Two lessons, and the second is about this ceremony rather than the preset.** The grep in the skill
+is written as `grep -rn "ADR-00NN\|Plan 00NN\|design-backlog 00NN"`, and this header says
+`(backlog 0068)` — **the bare form, which that pattern does not match**. It was found only because a
+later question sent someone into the file by hand, which is precisely the failure mode the grep
+replaced. Widen the pattern to `backlog 00NN` as well. And the finding stays a *list item*: rewriting
+the header is content work and belongs to `preset-author` at Phase 5, alongside the call on whether
+the quiet world joins `emitter_perseids` or replaces it.
 
 **One finding that outlives the plan: a `present:` probe anchored on an identifier is satisfied by
 any identifier that ends with it.** Backlog 0068's own verification bullet claimed
