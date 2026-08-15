@@ -5,9 +5,12 @@ other than this repository. This directory is that tree. Every file under it is 
 wrong in a named way**, so that "the checker still catches things" is a command anyone can run
 rather than a property nobody has re-tested since the day it was written.
 
-`check-doc-links.mjs` skips a directory named `fixtures` on an ordinary repo walk and scans it
-when it **is** the root — which is the only way the seeded breaks below are reachable. Without
-that skip, this directory would red the link gate on every push.
+`check-doc-links.mjs` skips this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
+enumerated once in the script — and scans it when it **is** the root, which is the only way the
+seeded breaks below are reachable. Without that skip, this directory would red the link gate on
+every push. The skip matched the directory *name* until Plan 0094 Phase 1, which meant it also
+swallowed `core/tests/fixtures/` and its twelve relative links; a second seeded tree has to add
+its own path to that list rather than inherit the skip from what it is called.
 
 The seeded cases are kept **per checker, in per-checker subdirectories**, because a shared
 fixture that drifts into serving one of them stops being an instrument for the other and says
