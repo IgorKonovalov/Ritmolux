@@ -27,6 +27,18 @@ use std::time::Instant;
 
 use crate::dsp::AnalysisFrame;
 
+/// The downbeat estimator's per-beat decomposition, re-exported here because
+/// **this** is the module a native shell reaches diagnostics through (Plan 0086
+/// Phase 1).
+///
+/// It is defined beside the estimator it describes, and it stays there: nothing
+/// about its shape is a diagnostics concern. What this line adds is the same
+/// boundary statement [`AnalysisMetrics`] makes as a type — analysis diagnostics
+/// are **native-only** (ADR-0052), so a consumer that finds them here has already
+/// been told they do not cross the C ABI. Read it with
+/// [`Analyzer::downbeat_terms`](crate::dsp::Analyzer::downbeat_terms).
+pub use crate::dsp::downbeat::DownbeatTerms;
+
 /// Recent frame durations retained for the rolling stats. 240 samples is ~4 s
 /// at 60 fps — long enough for a stable p99, short enough to react to a stall.
 ///

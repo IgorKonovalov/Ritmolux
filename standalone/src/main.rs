@@ -6,6 +6,7 @@ mod capture_win;
 mod config;
 mod diaglog;
 mod director;
+mod downbeatlog;
 mod overlay;
 mod settings;
 mod soak;
@@ -18,6 +19,7 @@ use capture_verdict::CaptureVerdict;
 use config::Config;
 use diaglog::DiagLog;
 use director::Director;
+use downbeatlog::DownbeatLog;
 use lmv_core::audio::{AudioFormat, SampleConsumer};
 use lmv_core::dsp::Analyzer;
 use lmv_core::render::{CapOverflow, Renderer, RendererOptions, TextRun, Tier};
@@ -127,6 +129,9 @@ struct AppState {
     /// Long-run soak sampler, present only with `--soak` (else the render loop
     /// is byte-unchanged).
     soak: Option<SoakLog>,
+    /// Per-beat downbeat decomposition log, present only with `--downbeat-log`
+    /// (Plan 0086 Phase 1). Absent otherwise, so the frame path is unchanged.
+    downbeat_log: Option<DownbeatLog>,
     /// Wall-clock time of the previous left-button press, for detecting a
     /// double-click (fullscreen toggle). `None` until the first click.
     last_click: Option<Instant>,
@@ -188,6 +193,7 @@ impl AppState {
         config_path: Option<PathBuf>,
         display_index: usize,
         soak_path: Option<PathBuf>,
+        downbeat_log_path: Option<PathBuf>,
         tier: Option<Tier>,
     ) -> Self {
         let size = window.inner_size();
@@ -261,6 +267,7 @@ impl AppState {
             director: Director::from_config(&config.rotate),
             last_frame: start,
             soak: soak_path.map(SoakLog::new),
+            downbeat_log: downbeat_log_path.map(DownbeatLog::new),
             last_click: None,
             pending_switch_settle: false,
             // Seeded from what `reload_presets` already printed above, so the
@@ -462,6 +469,16 @@ impl AppState {
         }
         self.poll_presets();
         let frame = self.analyzer.take_frame();
+
+        // Per-beat downbeat decomposition (opt-in, Plan 0086 Phase 1). Absent
+        // unless `--downbeat-log` was passed; when present it returns on the
+        // frames that carry no beat, so the per-frame cost is a bool test and the
+        // terms are only recomputed on a beat. Reading them cannot change what
+        // they say — `downbeat_terms` is `&self`, alloc-free and clock-free.
+        if let Some(log) = self.downbeat_log.as_mut() {
+            let analyzer = &self.analyzer;
+            log.maybe_log(&frame, || analyzer.downbeat_terms());
+        }
 
         // Hands-off scene rotation: the director decides from dt + this frame's
         // energy whether to advance the preset (manual Space/A override it).
@@ -1114,6 +1131,9 @@ struct App {
     config_path: Option<PathBuf>,
     /// Soak-log path from `--soak`, or `None` when the mode is off.
     soak_path: Option<PathBuf>,
+    /// Per-beat downbeat-log path from `--downbeat-log`, or `None` when the mode
+    /// is off (Plan 0086 Phase 1).
+    downbeat_log_path: Option<PathBuf>,
     /// The quality-tier pin, already resolved across `--tier` / `LMV_TIER` /
     /// config (Plan 0044). `None` is auto — rich, governed.
     tier: Option<Tier>,
@@ -1153,6 +1173,7 @@ impl ApplicationHandler for App {
                         self.config_path.take(),
                         display_index,
                         self.soak_path.take(),
+                        self.downbeat_log_path.take(),
                         self.tier,
                     );
                     state.window.request_redraw();
@@ -1286,6 +1307,32 @@ fn parse_soak_arg() -> Option<PathBuf> {
     None
 }
 
+/// The downbeat-log path if `--downbeat-log` was passed (`--downbeat-log <path>`
+/// / `--downbeat-log=<path>`, or a bare `--downbeat-log` for the default under the
+/// per-user dir), else `None` so no logger is created and the frame path is
+/// unchanged (Plan 0086 Phase 1).
+///
+/// Deliberately the same three shapes `--soak` accepts, rather than a tidier
+/// single one: both flags are typed by hand at a capture session, and a mode that
+/// took its path differently from the one beside it would be a footgun for the
+/// person running both.
+fn parse_downbeat_log_arg() -> Option<PathBuf> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if let Some(path) = arg.strip_prefix("--downbeat-log=") {
+            return Some(PathBuf::from(path));
+        }
+        if arg == "--downbeat-log" {
+            // An explicit path may follow; otherwise use the default location.
+            return match args.next() {
+                Some(next) if !next.starts_with("--") => Some(PathBuf::from(next)),
+                _ => Some(default_downbeat_log_path()),
+            };
+        }
+    }
+    None
+}
+
 /// The tier `--tier <name>` / `--tier=<name>` pins, or `None` when the flag is
 /// absent (Plan 0044).
 ///
@@ -1318,6 +1365,15 @@ fn default_soak_path() -> PathBuf {
     preset_data_root()
         .map(|root| root.join(APP_DIR_NAME).join("soak.log"))
         .unwrap_or_else(|| PathBuf::from("soak.log"))
+}
+
+/// Default per-beat downbeat-log location: under the per-user app dir, or
+/// `downbeat.log` in the current directory if that can't be resolved — so a bare
+/// `--downbeat-log` always logs somewhere.
+fn default_downbeat_log_path() -> PathBuf {
+    preset_data_root()
+        .map(|root| root.join(APP_DIR_NAME).join("downbeat.log"))
+        .unwrap_or_else(|| PathBuf::from("downbeat.log"))
 }
 
 /// Pick the monitor for the configured output, returning its index in
@@ -1461,6 +1517,7 @@ fn main() {
     let config = config_path.as_deref().map(Config::load).unwrap_or_default();
 
     let soak_path = parse_soak_arg();
+    let downbeat_log_path = parse_downbeat_log_arg();
 
     // Quality tier, highest precedence first: `--tier`, `LMV_TIER`, config
     // (Plan 0044 / ADR-0045). A bad flag is a usage error; a bad env var is
@@ -1489,6 +1546,7 @@ fn main() {
         config,
         config_path,
         soak_path,
+        downbeat_log_path,
         tier,
         state: None,
     };
