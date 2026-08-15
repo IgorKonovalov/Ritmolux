@@ -139,3 +139,30 @@ whose `exit_time` has already passed and churns the pool against itself.
   the default then depends on the aspect, so "unchanged" stops being an arithmetic identity and
   becomes a per-display coincidence — and it hands the author an aspect reconciliation that ADR-0037
   says the engine should have already done.
+
+## Outcome (2026-08-15) — both accepted prices were judged in the running app, and both held
+
+This ADR shipped **two negatives that were arguments rather than observations**, and said so. Plan
+0090's `human` Phase 5 put them in front of the user on parameter probes — one variable moving at a
+time, at `rich` tier — and both came back positive. Recorded here rather than in the body, which is
+append-only once accepted.
+
+- **"A visible spawn pop becomes authorable. `spawn_fade` makes it *avoidable*, not impossible."**
+  **Judged: it does.** With the source on the screen midline — `source_y = 0`, the pop at its most
+  visible — a `spawn_fade` of `0.35` reads as marks *arriving* rather than switching on. The paired
+  probe at `spawn_fade = 0` shows the artifact plainly, so the comparison is not a single dim frame
+  agreeing with itself. The documented-limit fallback the plan held in reserve ("do not put the
+  source inside the frame unless the marks are faint") is **not needed**, and the late clamp this ADR
+  rejected as Alternative D stays rejected on a second, independent ground: there is nothing to clamp
+  against.
+- **"`prewarm` changes what 'scene start' means, and a preset switching *into* a prewarmed emitter
+  appears fully populated in one frame."** **Judged: it reads as intended.** Stepping between a
+  `prewarm = 1` sky and its byte-identical `prewarm = 0` control, the full-population arrival is
+  right rather than jarring. Nothing routes to the transition stage's crossfade; that followup is
+  discharged unfired rather than deferred.
+
+**What this does not settle.** The verdicts are on probes, not on shipped worlds — the quiet sky and
+the point fountain are still the content lane's to author, with these two answers already in hand.
+And the third question Phase 5 carried was a curation call, not an ADR one: `emitter_perseids`
+**keeps its place** alongside the quiet world rather than being replaced by it, on the reading that a
+fast shower and a slow sky are different looks rather than two tunings of one.
