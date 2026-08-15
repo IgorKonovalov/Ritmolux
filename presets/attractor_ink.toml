@@ -23,6 +23,25 @@
 # render target rather than a fixed 1280x720, so the cost is far smaller than it
 # was - but the two caps still differ (2560x1440 for the attractor's own grid,
 # 1920x1080 for the post stages), so the fold still costs this preset some bite.
+#
+# HORIZON VERDICT, 2026-08-15 (Plan 0085 Phase 2, `shot --horizon 10`): THE
+# DRAWING DRIES OUT. Coverage falls 0.199 -> 0.006 between minute one and minute
+# two and keeps falling to 0.002 by minute ten, while concentration (peak/mean)
+# climbs 23.8 -> 1161. Rendered either side of it, the silhouette is UNCHANGED
+# and the density is gone: a dense hatched figure at 10 s, scattered specks at
+# 150 s. So this is not the coefficients collapsing the attractor - the shape
+# survives - it is the deposit failing to keep the page inked.
+#
+# Reproduced at 96x96 and 256x256, and under silence as well as a held loud
+# stimulus, so it is neither a capture-size artifact nor stimulus-driven: the
+# only thing left moving is this preset's own slow coefficient sines (periods
+# ~200-410 s), and the collapse lands inside their first cycle.
+#
+# NOT FIXED HERE. Plan 0085 records findings and repairs none - the fix is a
+# content pass or its own plan, and it should start by asking whether `fade`
+# 0.857 (its value at the measured stimulus) is simply too short to hold a
+# drawing whose points are being redistributed by a moving coefficient set.
+# Nothing about this is a gate; see docs/capturing.md on reading a horizon.
 system = "attractor"
 name = "Ink on Paper"
 
