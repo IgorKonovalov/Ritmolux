@@ -1,10 +1,35 @@
 # 0093 — the backlog stops asserting things about a repo it has not read
 
-> **Status:** in-progress
+> **Status:** done (2026-08-15)
 > **Created:** 2026-08-15
 > **Approved:** 2026-08-15 (user)
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) (a backlog claim about the repo carries an executable probe)
+> **Related ADRs:** [ADR-0108](../../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) (a backlog claim about the repo carries an executable probe)
+
+## Close summary (2026-08-15)
+
+Four phase commits, all four done-when sets met: `ee471fb` (the checker + the shared fixture tree),
+`7a975ad` (25 probes across the 14 live entries, 3 reasoned `unprobeable`), `0ab3331` (pre-push, the
+CI `links` job, close-ceremony step 1c), `9d8b1ff` (the staleness advisory + the backlog header's
+grammar section).
+
+**Mode 4 verdict: no blockers, two major findings, both in the machinery rather than the plan.**
+Verified by running, not by reading: the gate green at `HEAD` (25 reductions, 14 entries, 3
+`unprobeable`), `--self-test` 7/7 with the non-vacuity assertion biting for real at
+`core/src/diag/mod.rs:35`, and both fixture bite checks reporting exactly their seeded breaks
+(4 for the claim checker, 3 for the link checker). The two major findings — the fixtures skip
+matching any directory of that name rather than the approved one, which silently dropped
+`core/tests/fixtures/README.md` and its 12 relative links from the link gate; and the gate never
+requiring a live entry to *carry* a bullet, which is ADR-0108's decision sentence and the durability
+half of the mechanism — plus the shallow-clone advisory noise on CI are carried by
+[Plan 0094](../0094-the-two-doc-gates-check-what-they-claim-to.md).
+
+**Phase 2 convicted backlog entry 0093 and `dev` correctly reported it rather than repairing it.**
+Corrected in place at this close: the entry's finding is untouched (the capture path still dies at
+3,601 frames, the `step_offscreen` unpolled-submit hypothesis still stands), but its *scope
+argument* rested on a family of two when the family is three — `reaction_etching` shipped
+2026-08-10, five days before the entry was written, and was never in the measured set. The entry now
+states the open question and names the one `shot --horizon` run that settles it.
 
 ## TL;DR
 
@@ -24,7 +49,7 @@ when deciding what to design next. Its entries are meant to be **acted on now**,
 a stale one dangerous rather than merely historical: it sends the next reader to do work that is
 already done.
 
-Four have been falsified, and the pattern is one shape ([ADR-0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)
+Four have been falsified, and the pattern is one shape ([ADR-0108](../../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)
 carries the table): 0052, 0078, 0081, 0082. **Three carried no verification stamp at all.** The
 fourth, 0081, carried one that was dated, recent and *true* — and verified the half of the entry that
 survived rather than the half in its own title. That is the case that decides the mechanism: a prose
@@ -42,7 +67,7 @@ The cost is small and already counted: **14 live entries**, and the CI `links` j
 
 ## Decision
 
-Per [ADR-0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md): a
+Per [ADR-0108](../../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md): a
 restricted, two-verb, **non-executing** probe grammar beside each claim, re-run by a checked-in
 script that is a **gate** — with staleness as a printed **advisory** rather than a failure, and an
 explicit `unprobeable: <why>` opt-out whose every use is printed in the summary.

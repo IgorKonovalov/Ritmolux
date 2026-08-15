@@ -1151,24 +1151,25 @@ first, because the candidate cause is one line and the entry may be cheaper than
   `absent: poll in: core/src/render/capture_api.rs`. The second probe is the whole hypothesis in one
   line — the day anyone polls per frame in that file it goes red, which is the right moment to
   re-read this entry whether or not the fix worked.
-- **Verified 2026-08-15, AND IT CONVICTS THIS ENTRY — reported by `dev` at Plan 0093 Phase 2, not
-  repaired.** The finding below says *"Both shipped reaction-diffusion worlds
-  (`reaction_mitosis`, `reaction_verdigris`)"*. **There are three:**
+- **Verified 2026-08-15, AND IT CONVICTED THIS ENTRY — reported by `dev` at Plan 0093 Phase 2,
+  corrected in place by `architect` at that plan's close.** The finding said *"Both shipped
+  reaction-diffusion worlds (`reaction_mitosis`, `reaction_verdigris`)"*. **There are three:**
   `present: system = "reaction_diffusion" in: presets/reaction_etching.toml`. `reaction_etching`
-  was already shipped on 2026-08-12 — Plan 0078's close names it in its own workaround grep, three
-  days before this entry was written — so this is a **birth defect**, the class
+  landed in `6ebec33` on **2026-08-10**, five days before this entry was written, so this is a
+  **birth defect** — the class
   [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) exists for,
-  found by the first pass that read the entry against the tree. What it costs is not cosmetic:
-  the entry's *"every other world in the roster cleared 36,001 renders, so this is not a general
-  ceiling — it is a ceiling on the family"* rests on a family of two, and the third member was
-  never in the measured set. Whether that widens the ceiling or narrows it is unknown. **Repairing
-  or re-scoping this is `architect`'s call, not `dev`'s.**
+  found by the first pass that read the entry against the tree, by the instrument that pass was
+  building. It is corrected rather than closed because the finding it distorts is untouched: the
+  capture path still dies at 3,601 frames and the candidate mechanism is still one line. What the
+  correction costs the entry is its **scope argument**, and that half is now stated as the open
+  question it always was — see *Why it is worth an entry* below.
 
 ### The finding
 
-Both shipped reaction-diffusion worlds (`reaction_mitosis`, `reaction_verdigris`) fail at **3,601
-frames** with `Buffer with 'lmv-capture-readback' label is invalid`, after the process's resident
-set climbs to **~2.9 GB**. Measured on the Windows development box, hardware adapter, debug build,
+**Two of the three shipped reaction-diffusion worlds** (`reaction_mitosis`, `reaction_verdigris`)
+fail at **3,601 frames** with `Buffer with 'lmv-capture-readback' label is invalid`, after the
+process's resident set climbs to **~2.9 GB**. The third, `reaction_etching`, **was never run** —
+it was shipped before this entry was written and was simply missed.  Measured on the Windows development box, hardware adapter, debug build,
 at 96x96 — the capture size is not the lever, since 2.9 GB is four orders above what 3,600 frames of
 96x96 RGBA would be.
 
@@ -1185,8 +1186,17 @@ simulated minutes — 36,001 renders — and on two shipped worlds it cannot get
 rows in the plan's Phase 2 table are therefore a **0.5-minute** horizon, and their `monotone 1.00`
 is a world still settling into its pattern rather than drifting: a horizon shorter than a world's
 own warm-up reads settling *as* drift, which is precisely the misreading the instrument exists to
-prevent. Every other world in the roster cleared 36,001 renders, so this is not a general ceiling —
-it is a ceiling on the family whose mechanism most obviously wants a long look.
+prevent.
+
+**How wide the ceiling is, is open — and the entry originally overstated how well that was known.**
+Every world in the *measured* set other than these two cleared 36,001 renders, which is why this
+reads as a family ceiling rather than a general one. But the measured set was not the roster: it
+omitted `reaction_etching`, the third RD world, so the family evidence is two of three and nobody
+has run the member that would confirm it. Two readings survive that and the entry does not choose
+between them — a mechanism ceiling specific to RD's heavy per-frame ping-pong, or a *cost* ceiling
+that any sufficiently expensive world reaches and RD reaches first. **Running `reaction_etching`
+separates them, and it is the cheapest thing anyone can do here** — it costs one `shot --horizon`
+and it decides which of the two the fix has to answer.
 
 It is also **adjacent to, and not the same as,**
 [0083](design-backlog-archive.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against):
@@ -1205,7 +1215,9 @@ through `step_offscreen`, which is exactly why the control failed the same way �
 explain why an RD world, whose per-frame ping-pong is the heaviest in the engine, hits it first.
 
 **This is a hypothesis and nobody has run it.** The check is cheap: poll once per frame in
-`step_offscreen` and re-run `shot --horizon 10` on `reaction_mitosis`. If the RSS trace flattens,
+`step_offscreen` and re-run `shot --horizon 10` on `reaction_mitosis` — and on `reaction_etching`,
+which has never been run at all and is what decides whether the ceiling is the family's or the
+cost's. If the RSS trace flattens,
 the fix is one line and the entry closes with a measurement; if it does not, the diagnosis is wrong
 and the real one starts from a GPU memory report rather than from this paragraph. **Do not close
 this by lowering a documented horizon** — the instrument's stated length is what makes a recorded
@@ -1230,7 +1242,7 @@ Phase 5, from the three paired runs that closed
 - **Verified 2026-08-15** — the governor reads the raw series at a miss fraction, not `p99`:
   `present: MISS_FRACTION in: core/src/render/tier.rs`. Written in
   [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)'s grammar
-  while [Plan 0093](plans/0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md)
+  while [Plan 0093](plans/done/0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md)
   is still in flight, because this entry's whole reason to exist is that its *predecessor's*
   repo-claim rotted. The probe covers the load-bearing half: if `sustained_miss` is ever rewritten
   to read `p99`, that constant is what goes with it, and this entry should go red rather than keep
