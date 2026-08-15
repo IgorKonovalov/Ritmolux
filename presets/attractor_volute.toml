@@ -86,6 +86,13 @@ size   = "0.58 - clamp((bass + treb) * 0.083, 0, 0.120) + beat * 0.070"
 reseed = "onset > 0.50"
 
 # VIEW - the wave fills a wide frame; a slow shallow rock, gentle breathing.
+#
+# FRAMING: the shallow rock and the base zoom under 1 are together the
+# documented recourse, not taste (ADR-0103). The engine's fit measures an
+# axis-aligned box and the projection then rotates it, so its guarantee stops
+# at zero rotation; the spiral is 1.82x wider than tall and would overrun the
+# frame corner by 79 % at a full turn. Do not raise the base to 1.0 and do not
+# widen the rock without lowering it.
 spin  = "sin(time * 0.30) * 0.25"
 zoom  = "0.96 + bar * 0.04 + clamp(bass * 0.071, 0, 0.060)"
 pan_x = "0.0"

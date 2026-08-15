@@ -30,10 +30,14 @@
 # presets/README.md), so density redistribution is not a lever here; vigor
 # swells and the re-cut carry the accents instead.
 #
-# FRAMING: the raw figure overruns the frame corner at the default view
-# (probed at 1280x720), so the base zoom sits under 1 - on this family
-# zoom < 1 is the camera moving OUT. The view otherwise stays nearly still:
-# camera moves are a last-resort lever in this library.
+# FRAMING: the base zoom sits under 1, and that is the DOCUMENTED RECOURSE
+# rather than a probe-driven workaround (ADR-0103). The engine's fit measures
+# an axis-aligned box and the projection then rotates it, so the fit's
+# guarantee is "inside the frame at zero rotation"; this figure is 1.49x wider
+# than tall and overruns the frame corner by 58 % at its worst spin angle.
+# On this family zoom < 1 is the camera moving OUT. Do not raise it back to
+# 1.0 - the view otherwise stays nearly still, because camera moves are a
+# last-resort lever in this library.
 system = "attractor"
 name = "Dragon"
 

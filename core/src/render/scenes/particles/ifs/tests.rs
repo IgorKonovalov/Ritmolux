@@ -1142,6 +1142,151 @@ fn the_fit_scale_binds_on_whichever_axis_is_tighter() {
     assert!(fit_scale([1.0, 1.0], 0.0).is_finite());
 }
 
+/// **The fit frames a figure that does not turn** (ADR-0103), and this is the
+/// closed form that says so, asserted against the shipped [`fit_scale`].
+///
+/// The fit measures an **axis-aligned** box; `project`'s 2D branch then
+/// centres and rotates in-plane by the spin phase, which defaults to on. A
+/// centred AABB of half-extents `(hx, hy)` rotated by `θ` has half-extents
+/// `hx·|cos θ| + hy·|sin θ|` and `hx·|sin θ| + hy·|cos θ|`, and **both reach
+/// `r = hypot(hx, hy)` at their worst angle** — so with the vertical budget
+/// the scarcer one at any aspect at or above 1, the worst-angle fill is
+/// simply `fit_scale · r`. Writing `a = hx / hy`, that is
+/// `FRAME_FILL · sqrt(1 + a²)` when the vertical binds and
+/// `FRAME_FILL · aspect · sqrt(1 + a²) / a` when the horizontal does.
+///
+/// Every constant here is **derived, not measured** (ADR-0071): the
+/// compliance bound is `sqrt(1/FRAME_FILL² − 1)` written as that expression,
+/// so moving `FRAME_FILL` moves the bound rather than falsifying a literal.
+/// Nothing in it depends on an adapter, a display or a machine.
+///
+/// **It is non-vacuous in both directions and must stay so**: the fern comes
+/// back inside the bound and every other shipped figure comes back outside
+/// it. If a change ever puts all five on one side, this test proves nothing
+/// and the assertion at the bottom fails rather than passing quietly.
+#[test]
+fn the_fit_frames_a_figure_that_does_not_turn() {
+    use std::f32::consts::PI;
+
+    /// Angular samples over the half-turn `|cos|`/`|sin|` are periodic on.
+    const SWEEP_STEPS: usize = 720;
+    /// Relative slack for an `f32` comparison of two ways of writing one
+    /// product. Far below any difference that would mean the closed form and
+    /// the shipped fit disagree.
+    const REL_TOL: f32 = 1e-4;
+
+    // The compliance bound, from `FRAME_FILL · sqrt(1 + a²) <= 1`.
+    let bound = (1.0 / (super::FRAME_FILL * super::FRAME_FILL) - 1.0).sqrt();
+    let aspect = super::REFERENCE_ASPECT;
+    assert!(
+        aspect >= 1.0,
+        "the fill below takes the vertical as the scarcer \
+                            budget, which needs a landscape or square target"
+    );
+
+    let mut inside: Vec<String> = Vec::new();
+    let mut outside: Vec<String> = Vec::new();
+
+    for figure in IfsFigure::ALL {
+        // The SAME under-measured half-extents the fit itself reads. Mixing a
+        // long run into one side of this comparison and a sampled one into
+        // the other would compare two different figures.
+        let half = chaos_extent(&figure.table(), super::FIT_ITERATIONS).half();
+        let [hx, hy] = half;
+        let a = hx / hy;
+        let r = hx.hypot(hy);
+
+        // 1. The measured worst angle agrees with the closed `r`.
+        let step = PI / SWEEP_STEPS as f32;
+        let mut measured = 0.0f32;
+        for i in 0..=SWEEP_STEPS {
+            let (sin, cos) = (step * i as f32).sin_cos();
+            let (sin, cos) = (sin.abs(), cos.abs());
+            measured = measured.max(hx * cos + hy * sin).max(hx * sin + hy * cos);
+        }
+        // A sweep can straddle the maximiser by half a step, and the extremum
+        // is smooth, so the shortfall is at most `r·(1 − cos(step/2))`. It
+        // can never exceed `r`, which is the exact supremum.
+        let shortfall = r * (1.0 - (step * 0.5).cos());
+        assert!(
+            measured <= r * (1.0 + REL_TOL) && measured >= r - shortfall - r * REL_TOL,
+            "{figure:?}: the swept worst-angle half-extent {measured} disagrees \
+             with hypot(hx, hy) = {r} by more than the sweep's own angular step \
+             can account for ({shortfall})"
+        );
+
+        // 2. The closed form is what the SHIPPED fit produces, not a parallel
+        //    arithmetic that happens to agree with the plan.
+        let fill = fit_scale(half, aspect) * r;
+        let closed = if a <= aspect {
+            super::FRAME_FILL * (1.0 + a * a).sqrt()
+        } else {
+            super::FRAME_FILL * aspect * (1.0 + a * a).sqrt() / a
+        };
+        assert!(
+            (fill - closed).abs() <= closed * REL_TOL,
+            "{figure:?}: fit_scale · r = {fill}, but the closed form says {closed}"
+        );
+
+        // 3. The bound predicts the sign of the outcome. Asserted as an
+        //    equivalence, which is only meaningful because no figure sits on
+        //    the knife edge — checked, so a rounding flip cannot decide it.
+        if a <= aspect {
+            assert!(
+                (a - bound).abs() > 1e-3,
+                "{figure:?}: a = {a} sits on the compliance bound {bound}, so \
+                 the equivalence below would be decided by f32 rounding"
+            );
+            assert_eq!(
+                fill <= 1.0,
+                a <= bound,
+                "{figure:?}: a = {a} against the bound {bound} must predict \
+                 the worst-angle fill {fill}"
+            );
+        } else {
+            // `sqrt(1 + a²)/a > 1` for every finite `a`, and FRAME_FILL·aspect
+            // is already above 1 at 16:9 — so this case cannot be satisfied.
+            assert!(
+                fill > 1.0,
+                "{figure:?}: horizontal binding is unsatisfiable at any aspect \
+                 at or above 1, yet the fill came back {fill}"
+            );
+        }
+
+        if fill <= 1.0 {
+            &mut inside
+        } else {
+            &mut outside
+        }
+        .push(format!("{figure:?}@a={a:.4}"));
+    }
+
+    // A square figure overruns by 24.4 % at 45°, which is ADR-0103's headline
+    // and depends on no figure in the roster.
+    let square = fit_scale([1.0, 1.0], aspect) * 2.0f32.sqrt();
+    assert!(
+        (square - super::FRAME_FILL * 2.0f32.sqrt()).abs() < 1e-6 && square > 1.24,
+        "a square figure's worst-angle fill is FRAME_FILL·sqrt(2), not {square}"
+    );
+
+    // Non-vacuity in both directions: the assertion can tell the two apart
+    // only if both sides are populated.
+    assert!(
+        inside
+            .iter()
+            .any(|n| n.starts_with(&format!("{:?}@", IfsFigure::Fern))),
+        "the fern must satisfy the rotated bound — it is the figure the fit \
+         was developed against, and it is what exercises the equivalence on \
+         its true side. Inside: {inside:?}"
+    );
+    assert!(
+        !outside.is_empty(),
+        "every shipped figure satisfies the rotated bound ({inside:?}), so \
+         rotation is NOT the framing mechanism and ADR-0103's finding needs \
+         re-deriving rather than this test needs tuning"
+    );
+}
+
 // -----------------------------------------------------------------------
 // The levers (Plan 0062 Phase 5 / ADR-0075)
 // -----------------------------------------------------------------------

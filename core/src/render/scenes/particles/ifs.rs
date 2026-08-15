@@ -496,7 +496,15 @@ impl IfsFigure {
     }
 }
 
-/// The fraction of the frame a fitted figure occupies along its binding axis.
+/// The fraction of the frame a fitted figure occupies along its binding axis
+/// **at zero rotation** (ADR-0103).
+///
+/// The remaining `0.12` is margin against what the fit under-measures, not
+/// against what turns: a figure of aspect `a = hx / hy` reaches
+/// `FRAME_FILL · sqrt(1 + a²)` of the frame at its worst spin angle, so only a
+/// figure at or under `sqrt(1/FRAME_FILL² − 1)` — about `1.85x` taller than
+/// wide — stays inside at every angle. Of the shipped roster only the fern
+/// does. See `the_fit_frames_a_figure_that_does_not_turn`.
 const FRAME_FILL: f32 = 0.88;
 /// The aspect [`IfsFigure::frame`]'s fallback fits against.
 const REFERENCE_ASPECT: f32 = 16.0 / 9.0;
@@ -510,6 +518,14 @@ const REFERENCE_ASPECT: f32 = 16.0 / 9.0;
 /// about twice as wide as they are tall — hanging out of a portrait window.
 /// Taking the smaller of the two fits is what makes "inside the frame" true at
 /// every aspect rather than at one.
+///
+/// **Rotation is a separate axis, and this does not cover it** (ADR-0103). The
+/// box being fitted is axis-aligned, and `project`'s 2D branch rotates it by
+/// the spin phase afterwards — `spin` defaults to on — so what this guarantees
+/// is "inside the frame at neutral levers **and zero rotation**". A rotated
+/// figure reaches `hypot(hx, hy)` on both axes at its worst angle, which for
+/// every shipped figure but the fern is outside the frame. `zoom` is the
+/// recourse, the same one the levers have.
 ///
 /// The aspect comes from the **render target**, never from the trail grid: the
 /// grid is a resolution, not a shape (ADR-0037), and the present is a plain
@@ -849,6 +865,12 @@ const FIT_ITERATIONS: u32 = 4_000;
 /// The accepted cost is that a hard `vigor` push can leave the frame. That is
 /// the intended trade — an audible lever that can overshoot beats an inaudible
 /// one that cannot — and `zoom` is the recourse.
+///
+/// **`spin` is the second unmodelled input, and unlike `vigor` it defaults to
+/// on** (ADR-0103). The table holds axis-aligned half-extents; the projection
+/// rotates them. So the framing this buys is "at neutral levers and zero
+/// rotation", `zoom` is the recourse for both, and the three shipped 2D worlds
+/// each carry a sub-1 base `zoom` for exactly this reason.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FitLut {
     /// `(centre, half-extent)` per sample, evenly spaced over `morph`.
