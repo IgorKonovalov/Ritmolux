@@ -40,6 +40,9 @@ const FRAMES: u32 = 40;
 const LAYERED: &str = include_str!("fixtures/layer_under.toml");
 const CONTROL: &str = include_str!("fixtures/layer_under_control.toml");
 const OVER: &str = include_str!("fixtures/layer_over.toml");
+/// Plan 0091 Phase 1's two-tone fixture — a dark figure on a light ground,
+/// which is the shape design-backlog 0069 said was unreachable.
+const MULTIPLY: &str = include_str!("fixtures/layer_multiply.toml");
 
 /// The fixed frame the captures run under. `bass = 0.9` on purpose: the layered
 /// fixture binds the layer's `zoom` to `bass`, and the reactivity probe below
@@ -507,11 +510,258 @@ fn an_over_layer_participates_in_bloom() {
     );
 }
 
-/// The two frozen golden fixtures (Plan 0076 Phase 5, ADR-0023): one pair per
-/// join, each pinned to a committed baseline PNG within `composite.rs`'s
+/// Rec. 601 luma of a **display-referred** capture, in `0..255` — ADR-0106's
+/// units, so the numbers this file prints are directly comparable with the table
+/// that ADR records. Returns `(min, mean, max)`.
+///
+/// Display bytes rather than linear light on purpose: the question these probes
+/// answer is "how dark does the frame a viewer sees actually get", and the
+/// tonemap sits between the composite and that frame.
+fn luma_stats(img: &CaptureImage) -> (f32, f32, f32) {
+    let mut min = f32::INFINITY;
+    let mut max = f32::NEG_INFINITY;
+    let mut sum = 0.0f64;
+    let mut n = 0u64;
+    for px in img.rgba.chunks_exact(4) {
+        let (r, g, b) = (f32::from(px[0]), f32::from(px[1]), f32::from(px[2]));
+        let luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        min = min.min(luma);
+        max = max.max(luma);
+        sum += f64::from(luma);
+        n += 1;
+    }
+    (min, sum as f32 / n.max(1) as f32, max)
+}
+
+/// **Plan 0091 Phase 1 — the one thing [ADR-0106] left unmeasured.**
+///
+/// That ADR measured a `multiply` layer over the *chain* and found it reaches
+/// display luma 18.5 where the additive control cannot go below 181.6. It ran at
+/// `bg_bright = 0`, so it establishes the layer-over-chain path only, and
+/// `post.rs`'s module docs say the backdrop is a genuinely separate path: **it is
+/// not in the chain's input.** It is painted into the chain's *destination*, and
+/// the chain composites premultiplied-over it.
+///
+/// So this probe varies `blend` over a **lit** backdrop, in that ADR's shape, and
+/// reports the luma minimum for both. It runs on the hardware adapter for
+/// `headless_hardware`'s reason: a fragment-on-fragment pair duplicates
+/// byte-identical bind-group layouts, which WARP aliases (ADR-0058).
+#[test]
+fn a_multiply_layer_meets_a_lit_backdrop() {
+    let Some(mut renderer) = headless_hardware() else {
+        return;
+    };
+    let frame = fixed_frame();
+
+    // ADR-0106's construction, with `bg_bright` and `occlude` promoted to
+    // variables: a fullscreen field pinned flat by `color_span = 0` as the
+    // chain, the same system sampling the whole gradient at `palette_steps = 5`
+    // as an `over` layer at `mix = 1`.
+    let probe = |name: &str, bg: &str, occlude: &str, blend: Option<&str>| {
+        let layer = match blend {
+            Some(mode) => format!(
+                "[layer]\nsystem = \"fragment_field\"\njoin = \"over\"\n\
+                 blend = \"{mode}\"\nmix = \"1\"\n\
+                 [layer.params]\ncolor_span = \"1\"\npalette_steps = \"5\"\n"
+            ),
+            None => String::new(),
+        };
+        format!(
+            "name = \"{name}\"\nsystem = \"fragment_field\"\n\
+             [params]\ncolor_span = \"0\"\nwarp = \"0.35\"\nzoom = \"0.6\"\n\
+             trails = \"0.25\"\n\
+             bg_bright = \"{bg}\"\nbg_vignette = \"0\"\nbg_hue = \"0.55\"\n\
+             occlude = \"{occlude}\"\n{layer}"
+        )
+    };
+    // Every arm binds a post stage, and that is not decoration: with an empty
+    // chain a fullscreen field draws `REPLACE` straight into the destination and
+    // covers the backdrop whatever `occlude` says (`fragment_field.rs`'s own
+    // note at its `LoadOp::Load`). The backdrop path this phase is about only
+    // exists when the chain folds. Same precedent as the three lit-backdrop
+    // draw-seam guards, which all bind `trails` for the same structural reason.
+
+    // Three configurations x {no layer, multiply, add}. The dark-backdrop row
+    // reproduces ADR-0106; the two lit rows are what this phase is for.
+    const LIT: &str = "0.85";
+    let arms: Vec<(String, String)> = [
+        ("dark_bg", "0", "1"),
+        ("lit_bg_occluding", LIT, "1"),
+        ("lit_bg_visible", LIT, "0"),
+    ]
+    .iter()
+    .flat_map(|(row, bg, occ)| {
+        [None, Some("multiply"), Some("add")]
+            .into_iter()
+            .map(move |blend| {
+                let name = match blend {
+                    Some(mode) => format!("{row}_{mode}"),
+                    None => format!("{row}_plain"),
+                };
+                (name.clone(), probe(&name, bg, occ, blend))
+            })
+    })
+    .collect();
+
+    renderer.set_presets(arms.iter().map(|(_, toml)| load(toml)).collect());
+
+    let mut captures = Vec::new();
+    println!("{:<26} {:>8} {:>8} {:>8}", "arm", "min", "mean", "max");
+    for (name, _) in &arms {
+        let img = renderer
+            .capture_preset(name, &frame, FRAMES)
+            .unwrap_or_else(|e| panic!("capture {name}: {e}"));
+        let (min, mean, max) = luma_stats(&img);
+        println!("{name:<26} {min:>8.1} {mean:>8.1} {max:>8.1}");
+        captures.push((name.clone(), img, min));
+    }
+
+    let arm = |name: &str| -> &(String, CaptureImage, f32) {
+        captures
+            .iter()
+            .find(|(n, _, _)| n == name)
+            .unwrap_or_else(|| panic!("missing arm {name}"))
+    };
+
+    // 1. The dark-backdrop row reproduces ADR-0106's separation: the multiply
+    //    goes far below the chain it darkens, where the additive control only
+    //    goes up. This is the control on the harness, not the finding.
+    let dark_plain = arm("dark_bg_plain").2;
+    let dark_multiply = arm("dark_bg_multiply").2;
+    let dark_add = arm("dark_bg_add").2;
+    assert!(
+        dark_multiply < 0.5 * dark_plain && dark_add > dark_plain,
+        "over a black backdrop the multiply layer must darken the chain and the \
+         additive control must not (plain {dark_plain:.1}, multiply \
+         {dark_multiply:.1}, add {dark_add:.1}) — ADR-0106's measurement"
+    );
+
+    // 2. At the default `occlude = 1` the frame is byte-identical to the same
+    //    preset over a *black* backdrop, layer or no layer. The backdrop is not
+    //    darkened by the multiply; it is **absent**, held out by coverage
+    //    (`layer_blend.rs`'s union `alpha = a.a + cov * (1 - a.a)`, and the
+    //    chain's own opaque fold before that).
+    for row in ["plain", "multiply", "add"] {
+        let lit = &arm(&format!("lit_bg_occluding_{row}")).1;
+        let dark = &arm(&format!("dark_bg_{row}")).1;
+        assert_eq!(
+            lit.rgba, dark.rgba,
+            "at occlude = 1 the `{row}` arm must render identically over a lit and \
+             a black backdrop — an opaque composite removes the backdrop rather \
+             than blending with it"
+        );
+    }
+    // ...and with `occlude = 0` the backdrop emphatically does reach the frame,
+    // so the identity above is a statement about coverage rather than about an
+    // inert `bg_bright`.
+    assert_ne!(
+        arm("lit_bg_visible_plain").1.rgba,
+        arm("dark_bg_plain").1.rgba,
+        "at occlude = 0 the lit backdrop must reach the frame"
+    );
+
+    // 3. **The finding.** With the backdrop visible the composite is
+    //    `blended_chain + backdrop * (1 - alpha)` — the backdrop is added
+    //    *after* the junction, so no blend mode can reach it. The multiply still
+    //    darkens the chain's own contribution, but the backdrop's light is a
+    //    floor underneath it: 18.9 over black against 171.3 over a lit sky on
+    //    this box, where the backdrop alone reads 196.9.
+    let visible_plain = arm("lit_bg_visible_plain").2;
+    let visible_multiply = arm("lit_bg_visible_multiply").2;
+    println!(
+        "lit + visible: plain {visible_plain:.1}, multiply {visible_multiply:.1}; \
+         the same multiply over black reaches {dark_multiply:.1}"
+    );
+    assert!(
+        visible_multiply > 0.75 * visible_plain,
+        "a multiply layer must not be able to darken a *visible* backdrop \
+         (backdrop-only {visible_plain:.1}, with the multiply layer \
+         {visible_multiply:.1}) — if this ever fails, the backdrop has entered \
+         the junction's input and `docs/preset-palettes.md`'s two-tone route is \
+         wrong about where the light ground has to come from"
+    );
+    assert!(
+        visible_multiply > 4.0 * dark_multiply,
+        "the same multiply layer reaches {dark_multiply:.1} over black and only \
+         {visible_multiply:.1} over the lit backdrop — the gap *is* the backdrop's \
+         own light, arriving underneath the blend"
+    );
+}
+
+/// The **trap** the two-tone route has to name, measured rather than asserted
+/// from the shader (Plan 0091 Phase 1).
+///
+/// [ADR-0106] states that a particle scene in a `multiply` slot "cannot darken,
+/// because its alpha *is* its brightness" — so a `swarm` heart and a field heart
+/// would have different colour capabilities. `swarm.rs`'s fragment stage says
+/// something narrower: it emits `vec4(color * g, g)`, where `g` is the mark's
+/// **geometric** falloff and `color` is its palette colour. Those are independent,
+/// and `layer_blend.rs` un-premultiplies (`straight = b.rgb / max(b.a, 1e-4)`)
+/// before the mode runs — so a *dark* particle has full coverage and a dark
+/// operand, which is the darkening condition met.
+///
+/// This probe settles which description holds, because the docs are about to
+/// teach one of them.
+#[test]
+fn a_dark_particle_layer_in_a_multiply_slot() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let frame = fixed_frame();
+
+    // A flat, bright chain to darken, and a sparse frozen swarm of large marks
+    // as the layer. `brightness` is the only variable between the two layered
+    // arms: it scales the particle's colour and *not* its falloff.
+    let probe = |name: &str, layer: Option<&str>| {
+        let layer = match layer {
+            Some(brightness) => format!(
+                "[layer]\nsystem = \"swarm\"\njoin = \"over\"\n\
+                 blend = \"multiply\"\nmix = \"1\"\n\
+                 [layer.params]\nforce = \"0\"\nspin = \"0\"\nburst = \"0\"\n\
+                 size = \"6.0\"\nbrightness = \"{brightness}\"\n"
+            ),
+            None => String::new(),
+        };
+        format!(
+            "name = \"{name}\"\nsystem = \"fragment_field\"\n\
+             [params]\ncolor_span = \"0\"\ncolor_center = \"0.75\"\nglow = \"1.2\"\n\
+             warp = \"0\"\n{layer}"
+        )
+    };
+    renderer.set_presets(vec![
+        load(&probe("chain_only", None)),
+        load(&probe("dark_marks", Some("0.0"))),
+        load(&probe("bright_marks", Some("1.6"))),
+    ]);
+
+    let mut mins = Vec::new();
+    for name in ["chain_only", "dark_marks", "bright_marks"] {
+        let img = renderer
+            .capture_preset(name, &frame, FRAMES)
+            .unwrap_or_else(|e| panic!("capture {name}: {e}"));
+        let (min, mean, max) = luma_stats(&img);
+        println!("{name:<14} min {min:>7.1} mean {mean:>7.1} max {max:>7.1}");
+        mins.push(min);
+    }
+    let (chain_only, dark_marks) = (mins[0], mins[1]);
+
+    assert!(
+        dark_marks < 0.5 * chain_only,
+        "a swarm layer at brightness = 0 must darken the chain it multiplies \
+         (chain alone {chain_only:.1}, with the dark marks {dark_marks:.1}) — a \
+         particle's alpha is its falloff, which is geometry, and the blend \
+         un-premultiplies before it takes the mode, so the mark's *colour* is the \
+         darkening operand"
+    );
+}
+
+/// The three frozen golden fixtures (Plan 0076 Phase 5 and Plan 0091 Phase 1,
+/// ADR-0023), each pinned to a committed baseline PNG within `composite.rs`'s
 /// tolerances. `layer_under` is the Phase 1 walking-skeleton fixture;
 /// `layer_over` runs the junction's richest path (layer offscreen -> `screen`
-/// blend -> bloom's grid -> fold).
+/// blend -> bloom's grid -> fold); `layer_multiply` pins the **two-tone**
+/// capability — a dark figure on a light ground, which is the one thing in this
+/// suite that would notice the darkening modes regressing into additive ones.
 ///
 /// `LMV_BLESS=1 cargo test -p lmv-core --test layer` rewrites these two — and,
 /// run against the whole suite instead of this one binary, **every other
@@ -560,7 +810,15 @@ fn layered_fixtures_match_golden_baselines() {
     };
 
     let mut failures = Vec::new();
-    for (stem, toml) in [("layer_under", LAYERED), ("layer_over", OVER)] {
+    // `layer_multiply` is **appended**, never inserted: building GPU resources
+    // mid-run changes what a later capture resolves to on WARP (Plan 0053's
+    // standing rule), so a new entry at the end leaves the two older baselines
+    // rendered from the device state they were blessed under.
+    for (stem, toml) in [
+        ("layer_under", LAYERED),
+        ("layer_over", OVER),
+        ("layer_multiply", MULTIPLY),
+    ] {
         let preset = load(toml);
         let name = preset.name.clone();
         renderer.set_presets(vec![preset]);

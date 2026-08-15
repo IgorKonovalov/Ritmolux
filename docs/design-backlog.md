@@ -586,17 +586,34 @@ options delivered — and its body is in the archive.
 > adapter: `multiply` reaches **min luma 18.5** with **61.9 %** of pixels below 64; the `add`
 > control **cannot get below 181.6** anywhere, with **0.0 %** below 64. Three tones coexist in the
 > multiply frame. Full derivation and costs in
-> [ADR-0106](adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md); the route gets written down
-> in [Plan 0091](plans/0091-the-figure-fills-the-frame.md) Phase 1, which also measures the one path
-> still open — whether multiply reaches the **backdrop**, which sits outside the chain's input
-> (`post.rs:33`) and is therefore a separate question.
+> [ADR-0106](adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md).
+>
+> **MEASURED AGAIN 2026-08-15**, at [Plan 0091](plans/0091-the-figure-fills-the-frame.md) Phase 1,
+> which settled the path ADR-0106 left open and falsified one of its own consequences in the
+> process. Both runs are `core/tests/layer.rs`, so the numbers are re-derivable rather than
+> recalled:
+>
+> - **Multiply does NOT reach the backdrop, and the answer is negative in the clean way.** The
+>   backdrop sits outside the chain's input (`post.rs:33`) and is composited *underneath* the
+>   junction, so no blend mode can operate on it. At the default `occlude = 1` the frame is
+>   **byte-identical** over a lit backdrop and over a black one — the backdrop is not darkened, it
+>   is **absent**, held out by coverage. With it visible (`occlude = 0`) it is added after the
+>   blend and floors the frame: the same multiply layer reaching **18.9** over black reaches only
+>   **171.3** over a lit sky, where the sky alone reads 196.9. **Consequence for authoring: a light
+>   ground must come from the CHAIN, not from `bg_*`.**
+> - **A particle layer CAN darken, and ADR-0106's Negative consequence saying otherwise is
+>   wrong.** Measured: a frozen swarm at `brightness = 0` in a `multiply` slot takes a light chain
+>   from luma **174.1** to **0.9** — *darker* than the field route's 18.9. The mechanism the ADR
+>   states ("a particle's alpha *is* its brightness") is not what the code does: `swarm.rs` emits
+>   `vec4(color * g, g)` where `g` is the mark's **geometric** falloff, independent of its colour,
+>   and `layer_blend.rs:138` un-premultiplies (`straight = b.rgb / max(b.a, 1e-4)`) before the mode
+>   runs. So a black particle has full coverage and a zero operand — the darkening condition met,
+>   not failed. **The real difference between the two routes is footprint, not capability**: a field
+>   darkens every pixel, a particle darkens only inside its marks.
 >
 > **What survives, and it is why this entry is corrected rather than archived:** multiply darkens in
 > proportion to *coverage*, and **nothing in this engine still decides what is in front of what**. A
-> shaped object that occludes another figure is unbuilt. The mechanism below is also still exactly
-> right for **particle** scenes — a particle's alpha *is* its falloff, so a black sprite has no
-> coverage and cannot darken anything. That asymmetry between the two routes to one shape is now a
-> documented authoring trap rather than an engine limit.
+> shaped object that occludes another figure is unbuilt.
 
 - **Raised:** 2026-08-05, at [Plan 0070](plans/done/0070-shaped-marks.md)'s close. **Re-filed from
   [0033](design-backlog-archive.md), at that entry's own instruction** — 0033 carried two asks, Plan
