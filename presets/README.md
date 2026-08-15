@@ -3046,6 +3046,42 @@ preset can breathe between one world and two. `mix = "0"` renders exactly the
 layerless preset. On an `under` join, `blend` is ignored (with a load warning)
 and `mix` has no junction to act at.
 
+### Dark on light — the `multiply` route, and its two traps
+
+`multiply` is how this engine draws a **dark figure on a light ground**, which
+is worth stating plainly because the rest of the pipeline adds light and a
+reader reasonably assumes dark-on-light is unavailable. The full recipe with a
+worked preset is in
+[`docs/preset-palettes.md`](../docs/preset-palettes.md#dark-on-light--the-two-tone-route-adr-0106-measured-again-at-plan-0091);
+the two things that will bite you belong here, beside the parameters they are
+about:
+
+- **In a `multiply` layer, the darkening operand is the layer's *colour*, so
+  `brightness` runs backwards.** `brightness = 0` is an opaque black mark; a
+  high `brightness` clamps to white and does nothing. Nothing warns — the
+  parameter's meaning is inverted by `blend` in a *different* table.
+- **The light ground has to be the chain, never `bg_*`.** The backdrop is
+  composited *underneath* the finished chain, so no blend mode can reach it. At
+  the default `occlude = 1` a covering layer makes the frame **byte-identical**
+  to the same preset over a black backdrop (the backdrop is held out, not
+  darkened); at `occlude = 0` it is added *after* the blend and becomes a floor
+  the layer cannot cross. Measured at Plan 0091 Phase 1: a multiply layer
+  reaching display luma 18.9 over black reaches only 171.3 over a lit sky.
+
+Which scene to put in the slot is a question of **footprint**, not of
+capability — both routes darken:
+
+| layer system | coverage | gives you |
+|---|---|---|
+| `fragment_field`, `reaction_diffusion` | every pixel (alpha = `occlude`) | the whole frame darkened — a wash, a gradient, a figure *and* its surround |
+| `swarm`, `emitter` | inside each mark only (alpha = the mark's geometric falloff) | discrete dark marks on an untouched light ground |
+
+The particle route reaches **darker**: a frozen swarm at `brightness = 0` takes
+a light chain to display luma **0.9**, against **18.9** for the field route.
+(If you find a document saying a particle layer cannot darken at all — ADR-0106
+and design-backlog 0069 both did — it is wrong and corrected; a particle's alpha
+is its *geometric* falloff, independent of its colour.)
+
 ### What the layer does and does not get
 
 - **Its own params and easing** — `[layer.params]` reaches the layer's scene

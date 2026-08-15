@@ -692,6 +692,101 @@ floor under a bright figure at its crest — without leaving the family.
 
 ---
 
+## Dark on light — the two-tone route (ADR-0106, measured again at Plan 0091)
+
+Everything else in this document adds light. **A `multiply` layer takes it
+away**, and that is the whole route to a dark figure on a light ground — the one
+construction this engine was believed not to have, for six days after it
+actually landed.
+
+```toml
+system = "fragment_field"     # the LIGHT GROUND: flat, bright, full-frame
+name   = "Two Tone"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#fff4e0" },
+  { at = 1.0, color = "#ffd9a0" },
+]
+
+[params]
+color_span   = "0"            # one coordinate = one flat tone across the frame
+color_center = "0.2"
+glow         = "1.1"
+
+[layer]                       # the DARK FIGURE: it subtracts, it does not add
+system = "swarm"
+join   = "over"
+blend  = "multiply"
+mix    = "1"
+
+[layer.params]
+brightness = "0.15"           # <- the darkening operand. LOW is DARK.
+size       = "5.0"
+```
+
+The rule under it is one sentence: **`multiply` darkens by the layer's colour,
+within the layer's coverage.** Both halves matter, and the second is the one
+that decides which scene you reach for.
+
+### `brightness` runs backwards here, and nothing warns
+
+In every additive preset you have ever written, `brightness` up is *more*
+visible. In a `multiply` layer it is the **darkening operand**: the blend
+un-premultiplies the layer's colour and multiplies the ground by it, so
+`brightness = 0` is an opaque black mark and a high `brightness` clamps to white
+and does nothing at all. This is a parameter whose meaning is inverted by a
+setting in a *different* table, and no gate or warning can see it.
+
+### Which scene: it is a question of footprint, not of capability
+
+| layer scene | coverage | what a `multiply` slot gives you |
+|---|---|---|
+| `fragment_field`, `reaction_diffusion` | every pixel (alpha = `occlude`, 1 by default) | the whole frame is darkened — a graded wash, a banded gradient, a figure *and* its surround |
+| `swarm`, `emitter` | inside each mark only (alpha = the mark's geometric falloff) | discrete dark marks on an untouched light ground |
+
+Both routes reach a dark figure, and the particle one reaches **darker**:
+measured at Plan 0091 Phase 1, a frozen swarm at `brightness = 0` takes a light
+chain from display luma 174.1 to **0.9**, where the field route bottoms out at
+**18.9**. Pick by the shape you want, not by what you think can darken.
+
+> **If you have read [ADR-0106](adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md)
+> or design-backlog 0069, they say a particle layer cannot darken at all.** That
+> is wrong and this table is the correction. The claim was that a particle's
+> alpha *is* its brightness; in fact `swarm.rs` emits `vec4(color * g, g)` where
+> `g` is the mark's **geometric** falloff and is independent of its colour, and
+> `layer_blend.rs` un-premultiplies before taking the mode. `core/tests/layer.rs`
+> carries the measurement.
+
+### The light ground must come from the chain, never from `bg_*`
+
+The tempting version of the recipe above is a bright **backdrop** with a dark
+layer over it. It does not work, and the reason is structural rather than a
+tuning problem: **the backdrop is not in the chain's input** (`post.rs`) — it is
+composited *underneath* the finished chain, so no blend mode ever sees it.
+
+Measured at Plan 0091 Phase 1, both ways it can go:
+
+| what you set | what you get |
+|---|---|
+| `occlude = 1` (default), any blend | the frame is **byte-identical** to the same preset over a black backdrop. The backdrop is not darkened, it is gone — coverage held it out |
+| `occlude = 0` | the backdrop is added *after* the blend, so it is a **floor**: the same multiply layer that reaches luma 18.9 over black reaches only 171.3 over a lit sky (the sky alone reads 196.9) |
+
+So `bg_bright` cannot be the white paper of a two-tone graphic. Make the ground
+a flat, bright, full-frame scene in the **chain** — `color_span = 0` pins a field
+to one tone — and spend the `[layer]` slot on the figure.
+
+### Two costs worth knowing before you commit to this
+
+- **It uses the preset's only `[layer]`.** ADR-0090 caps a preset at one layer
+  table, so a two-tone graphic cannot also carry a second figure as counterpoint.
+- **"Black" is dark grey unless the marks are.** The field route's floor is luma
+  ~18.5 with bloom and the tonemap both live; the particle route at
+  `brightness = 0` gets to 0.9. If you need a true black, that difference is the
+  lever.
+
+---
+
 ## Worked example — a cohesive warm fragment field
 
 ```toml

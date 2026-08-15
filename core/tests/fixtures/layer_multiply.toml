@@ -1,0 +1,66 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# Plan 0091 Phase 1 - the two-tone route, pinned. A DARK figure on a LIGHT
+# ground, which design-backlog 0069 said this engine could not draw: the chain is
+# a flat bright field, and a frozen swarm joins it `multiply` at mix 1, so the
+# marks subtract light instead of adding it.
+#
+# Why a swarm and not a second field. Two reasons, and both are structural:
+#
+#  - a fragment-on-fragment pair duplicates byte-identical bind-group layouts,
+#    which WARP aliases (ADR-0058), and this suite runs on WARP - the same
+#    reason `layer.rs`'s same-system probes take the hardware adapter;
+#  - the particle route is the one whose capability was in doubt. ADR-0106
+#    records a particle layer as unable to darken; measured at this plan's
+#    Phase 1 it darkens to display luma 0.9, against 18.9 for the field route,
+#    because `swarm.rs` emits `vec4(color * g, g)` where `g` is GEOMETRIC
+#    falloff and the blend un-premultiplies before taking the mode. So the
+#    darkening operand is the mark's colour, and `brightness` drives it.
+#
+# `brightness = 0.15` rather than 0: at a literal zero the marks are exactly
+# black and the fixture would pin a picture that a broken un-premultiply could
+# also produce by accident. A dark but non-zero colour is a value only the real
+# path reaches.
+#
+# The swarm is frozen (`force`/`spin`/`burst` at 0) so the baseline is a still
+# figure, and `size` is large so each mark's footprint is many pixels across -
+# the darkening is bounded by coverage, and a hairline mark would pin a
+# difference too small for the drift tolerance to see.
+#
+# Adapter-compared before blessing (the ADR-0058 standing rule): WARP against
+# the hardware adapter is mean frame_diff 0.00022, with both reading display
+# luma min 44.5 / mean 147.3. So this baseline pins a picture hardware also
+# draws, and the light ground (mean 147.3) with a dark figure in it (min 44.5)
+# is the two-tone shape rather than an adapter artifact.
+name = "layer_multiply"
+system = "fragment_field"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#fff4e0" },
+  { at = 1.0, color = "#ffd9a0" },
+]
+
+[params]
+# A flat, bright ground: `color_span = 0` pins the field to one palette
+# coordinate, so every pixel of the chain is the same light tone and the only
+# structure in the frame is what the layer takes away.
+color_span = "0"
+color_center = "0.2"
+warp = "0"
+glow = "1.1"
+
+[layer]
+system = "swarm"
+join = "over"
+blend = "multiply"
+mix = "1"
+
+[layer.params]
+force = "0"
+spin = "0"
+burst = "0"
+size = "5.0"
+brightness = "0.15"
+hue_spread = "0"
+hue_center = "0.6"

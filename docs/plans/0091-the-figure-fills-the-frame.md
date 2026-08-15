@@ -1,6 +1,6 @@
 # 0091 — The figure fills the frame
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-13
 > **Approved:** 2026-08-13 (user)
 > **Owner skill(s):** dev, human
