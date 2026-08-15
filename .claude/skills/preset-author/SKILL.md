@@ -259,6 +259,72 @@ the library look like this" rather than "make one new look" — it costs one bui
 minutes. `--report` + the sheet pair together will usually have found the problem before you open a
 single `.toml`.
 
+**If the world accumulates, none of the above can see its real failure — run the horizon.**
+Everything on this page measures the first half-second. A live set runs for hours, and a world whose
+mechanism *piles up* can pass every gate and still collapse on stage: Plan 0075's Shatter did it
+three times while the suite stayed green. `shot --horizon <minutes>` renders N **simulated** minutes
+at capture cadence and prints one row per interval — coverage, `peak/mean` concentration, and
+motion — plus a `delta`/`monotone` trend per statistic.
+
+```sh
+# Ten simulated minutes of the subject, a row every 30 s
+cargo run -p standalone --example shot -- --preset-file presets/my_draft.toml \
+  --horizon 10 --size 96x96 --set bass=0.6,mid=0.45
+
+# ...and the same horizon on a static control, which is what makes it readable
+cargo run -p standalone --example shot -- --preset-file /tmp/control.toml \
+  --horizon 10 --size 96x96
+```
+
+**No shipped preset is a usable control** — they are all built to move, and several carry `trails`
+on top, so write a throwaway. Anything with no `time`, no audio variable and no feedback will do:
+
+```toml
+system = "star_pattern"
+name = "horizon_control"
+[generator]
+tiling = "12"
+contact_angle_deg = 20
+[params]
+variant = "1"
+rotation = "0.4"      # a constant, NOT "0.4 * time"
+hue = "0.55"
+draw_progress = "1"
+thickness = "1.8"
+scale = "0.6"
+brightness = "0.85"
+```
+
+**The trigger — run it when the mechanism has an accumulation axis**: trails / `fade`, a
+`[feedback]` table, particles in a flow field, reaction-diffusion. Anything where this frame's
+output feeds the next one's input. If a look has none of those, skip it; the horizon has nothing to
+find and costs minutes.
+
+Three things make the reading honest, and the first is the one people drop:
+
+- **Run a static control beside the subject** — a preset with no `time`, audio or feedback term.
+  It prints `delta 0.0000, monotone 0.00` on all three statistics. These are image-domain proxies
+  for a simulation-domain event, so a flat control is what earns a sloped subject its meaning.
+- **No threshold is applied and this is not a gate.** `delta` is end-to-end travel, `monotone` the
+  share of steps that went that way: grinding into a corner reads a big delta at monotone near
+  `1.00`, breathing reads delta near zero. Where "drifting" ends and "alive" begins is a judgement
+  about the *look* — which is yours, not the tool's.
+- **Record the verdict in the world's own header**, the way the fold-edge verdicts were.
+  `presets/attractor_ink.toml` carries the first one; copy its shape.
+
+It is slow by construction — ~3,600 renders per simulated minute, roughly 10 s of wall clock per
+simulated minute at 96x96 — so budget a sitting rather than running it casually. That cost is why
+it is a spot-check you remember instead of a gate that runs itself (ADR-0099).
+
+Worth knowing before you trust a row: the two reaction-diffusion worlds currently **die past ~3,600
+frames** (design-backlog 0093), so they cannot reach ten minutes yet; and a horizon shorter than a
+world's own warm-up reads **settling as drift** — `reaction_verdigris` reads `monotone 1.00` over
+30 s purely because its pattern is still establishing.
+
+On its first outing it cleared the named suspect (`swarm_shatter`: no trend across ten minutes) and
+convicted one nobody suspected — `attractor_ink` goes coverage **0.199 → 0.002** with the silhouette
+intact and the density gone. That asymmetry is the argument for running it.
+
 Full flag reference: `references/render-loop.md`.
 
 ### 5 — Iterate with the user on stills
