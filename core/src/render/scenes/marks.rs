@@ -121,14 +121,52 @@ pub(crate) const DEFAULT_POINTS: f32 = 5.0;
 const RING_MID: f32 = 0.7;
 const RING_HALF: f32 = 0.3;
 
-/// `star`: the inner (valley) radius as a fraction of the outer (tip) one.
+/// `star_valley` default — the inner (valley) radius as a fraction of the outer
+/// (tip) one, and **exactly** the constant this arm was welded to before Plan
+/// 0091 Phase 5 promoted it.
 ///
 /// Chosen for the size the ask is *for* — small marks, a few pixels across.
 /// Below about a third the spikes are thinner than a pixel at those sizes and
 /// the mark reads as a dot with a halo; above about a half it reads as a
 /// slightly bumpy polygon. At 0.45 a seven-pointed star still has seven legible
 /// points at a dozen pixels across.
-const STAR_INNER: f32 = 0.45;
+///
+/// **The default is not a judgement call, it is an obligation.** The shared
+/// chunk means this knob reaches `swarm` and `emitter` as well as
+/// `shape_field`, so anything but the old constant moves every shipped
+/// `shape = "3"` preset (ADR-0105's shared-chunk consequence).
+pub(crate) const DEFAULT_STAR_VALLEY: f32 = 0.45;
+/// The range `star_valley` is held in. Not 0 and not 1: at 0 the spikes meet at
+/// a point and the figure has no interior, and at 1 it is a polygon with the
+/// valley on the circumcircle, so both ends are degenerate rather than extreme.
+const MIN_STAR_VALLEY: f32 = 0.05;
+const MAX_STAR_VALLEY: f32 = 0.95;
+
+/// `star_curve` default — **0, the straight edge**, and an exact identity: at
+/// this value the arm takes the closed-form straight-edge branch, which is the
+/// arithmetic that shipped.
+pub(crate) const DEFAULT_STAR_CURVE: f32 = 0.0;
+/// How far the edge may bow. Positive pulls the edge's midpoint toward the
+/// centre (the concave sparkle silhouette); negative pushes it out. Bounded
+/// short of 1, where the midpoint would reach the origin and the edge would fold
+/// through itself.
+const MAX_STAR_CURVE: f32 = 0.9;
+
+/// `star_jitter` default — **0, every spike the same length**, and an exact
+/// identity for the same reason `star_curve`'s is.
+pub(crate) const DEFAULT_STAR_JITTER: f32 = 0.0;
+/// The most a spike's tip radius may vary. At 1 a spike can vanish into the
+/// valley circle, which is the end of the range rather than a useful value.
+const MAX_STAR_JITTER: f32 = 1.0;
+
+/// How many sub-segments the curved edge is sampled into.
+///
+/// The exact distance to a quadratic Bezier is a cubic solve; this samples it
+/// instead and measures against the polyline, which is the same trade the
+/// project's own ground-truth harness makes. Eight is where the residual stops
+/// mattering — `marks/tests.rs` measures what it actually is. Only the curved
+/// branch pays for it: the neutral configuration takes the closed form.
+const STAR_SEGMENTS: i32 = 8;
 
 /// `heart`: the lobe circles' radius, `sqrt(2) / 4`.
 ///
@@ -170,7 +208,13 @@ const HEART_CY: f32 = 0.552;
 /// only reader: each scene lists its own vocabulary literally, which is what
 /// `core/tests/preset.rs`'s source-scanning `set_param` drift guard requires.
 #[cfg(test)]
-pub(crate) const PARAMS: [&str; 2] = ["shape", "points"];
+pub(crate) const PARAMS: [&str; 5] = [
+    "shape",
+    "points",
+    "star_valley",
+    "star_curve",
+    "star_jitter",
+];
 
 /// The `shape` index the shader is handed: clamped into the roster, then
 /// **rounded to an integer**, with a non-finite binding falling back to the
@@ -217,6 +261,61 @@ pub(crate) fn mark_points(v: f32) -> f32 {
     }
 }
 
+/// The `star_valley` the shader is handed: held inside the range the arithmetic
+/// needs, with a non-finite binding falling back to the default.
+///
+/// CPU-side, so the default reaches the uniform as **exactly** `0.45` and the
+/// clamp can never be met with a NaN (WGSL's `clamp` is implementation-defined
+/// there) — `ink::applied_gamma`'s two reasons, and the second matters more here
+/// because the value divides.
+pub(crate) fn star_valley(v: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(MIN_STAR_VALLEY, MAX_STAR_VALLEY)
+    } else {
+        DEFAULT_STAR_VALLEY
+    }
+}
+
+/// The `star_curve` the shader is handed. Symmetric about 0, which is the
+/// identity the straight-edge branch tests for.
+pub(crate) fn star_curve(v: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(-MAX_STAR_CURVE, MAX_STAR_CURVE)
+    } else {
+        DEFAULT_STAR_CURVE
+    }
+}
+
+/// The `star_jitter` the shader is handed. One-sided: it is an amplitude.
+pub(crate) fn star_jitter(v: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(0.0, MAX_STAR_JITTER)
+    } else {
+        DEFAULT_STAR_JITTER
+    }
+}
+
+/// The per-spike hash the jitter draws from — **integer arithmetic only**, so a
+/// spike's length is bit-identical on every GPU and in every run.
+///
+/// This is a *pure function of the spike index*, not a draw from a stream, and
+/// that distinction is deliberate: Plan 0077's `SeededRng` caution is that an
+/// extra draw re-scatters everything downstream of it, and a hash has no
+/// downstream to disturb. A `sin`-based hash would have been shorter and is
+/// exactly what the determinism rule forbids — its low bits differ between
+/// GPUs, so the same preset would draw a different figure on another machine.
+///
+/// Test-only on the Rust side: the shipped path evaluates this in WGSL, and the
+/// mirror exists so the figure is assertable without a GPU (the arrangement
+/// `mark_distance`'s own mirror uses).
+#[cfg(test)]
+pub(crate) fn spike_hash01(index: u32) -> f32 {
+    let mut h = index.wrapping_mul(747_796_405).wrapping_add(2_891_336_453);
+    h = ((h >> ((h >> 28) + 4)) ^ h).wrapping_mul(277_803_737);
+    h = (h >> 22) ^ h;
+    h as f32 * 2.328_306_4e-10
+}
+
 /// The shared distance-function chunk, with its constants substituted in.
 ///
 /// Prepended to each particle scene's shader source, so both scenes evaluate the
@@ -229,7 +328,7 @@ pub(crate) fn sdf_wgsl() -> String {
     SDF_WGSL
         .replace("%RING_MID%", &format!("{RING_MID:?}"))
         .replace("%RING_HALF%", &format!("{RING_HALF:?}"))
-        .replace("%STAR_INNER%", &format!("{STAR_INNER:?}"))
+        .replace("%STAR_SEGMENTS%", &format!("{STAR_SEGMENTS}"))
         .replace("%HEART_LOBE_R%", &format!("{HEART_LOBE_R:?}"))
         .replace("%HEART_INRADIUS%", &format!("{HEART_INRADIUS:?}"))
         .replace("%HEART_SCALE%", &format!("{HEART_SCALE:?}"))
@@ -241,11 +340,22 @@ const SDF_WGSL: &str = r#"
 const MARK_TAU: f32 = 6.28318530718;
 const MARK_RING_MID: f32 = %RING_MID%;
 const MARK_RING_HALF: f32 = %RING_HALF%;
-const MARK_STAR_INNER: f32 = %STAR_INNER%;
+const MARK_STAR_SEGMENTS: i32 = %STAR_SEGMENTS%;
 const MARK_HEART_LOBE_R: f32 = %HEART_LOBE_R%;
 const MARK_HEART_INRADIUS: f32 = %HEART_INRADIUS%;
 const MARK_HEART_SCALE: f32 = %HEART_SCALE%;
 const MARK_HEART_CY: f32 = %HEART_CY%;
+
+// The per-spike hash `star_jitter` draws from. INTEGER arithmetic only: a
+// sin-based hash is shorter and its low bits differ between GPUs, which would
+// make the same preset draw a different figure on another machine. Mirrored
+// verbatim by `spike_hash01` on the Rust side.
+fn mark_spike_hash01(index: u32) -> f32 {
+    var h = index * 747796405u + 2891336453u;
+    h = ((h >> ((h >> 28u) + 4u)) ^ h) * 277803737u;
+    h = (h >> 22u) ^ h;
+    return f32(h) * 2.3283064e-10;
+}
 
 // Inigo Quilez's heart, in its own frame: two lobe circles centred
 // (+-0.25, 0.75), closed underneath by the 45-degree rays from the origin that
@@ -266,9 +376,13 @@ fn mark_heart_sd(p_in: vec2<f32>) -> f32 {
 // caller's falloff is unchanged, so everything at d >= 1 is black and only the
 // interior has to be right.
 //
-// `shape` and `points` are per-draw values, identical for every fragment of
-// every sprite in the draw, so this branch is uniform across a warp.
-fn mark_distance(p: vec2<f32>, shape: f32, points: f32) -> f32 {
+// `shape`, `points` and `star` are per-draw values, identical for every fragment
+// of every sprite in the draw, so every branch here is uniform across a warp —
+// including the star arm's straight/curved split, which is what makes the
+// neutral configuration cost nothing extra.
+//
+// `star` is `vec3(valley, curve, jitter)`, all three conditioned CPU-side.
+fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 {
     if (shape < 0.5) {
         // disc: sd = length(p) - 1, R = 1. The three lines this replaced.
         return length(p);
@@ -303,37 +417,103 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32) -> f32 {
         return 1.0 + length(vec2<f32>(q.x - apothem, past_vertex)) / apothem;
     }
     if (shape < 3.5) {
-        // n-pointed star, tip radius 1 on +x, valley radius MARK_STAR_INNER.
-        // Fold the angle into a half-wedge so f = 0 at a tip and f = h at a
-        // valley, then measure against the straight edge joining them. Writing
-        // that edge's plane as n.p = c and dividing through by c leaves one
-        // multiply-add: the normalization's 1/R and the normal's length cancel.
+        // n-pointed star: `points` spikes at tip radius 1 on +x, valleys at
+        // `star.x` of it. Fold the angle into a half-wedge so f = 0 at a tip and
+        // f = h at a valley; that fold also names WHICH spike, which is what the
+        // per-spike jitter needs.
         let seg = MARK_TAU / points;
         let h = 0.5 * seg;
         let a = atan2(p.y, p.x);
-        let f = abs(a - seg * floor((a + h) / seg));
+        let spike = floor((a + h) / seg);
+        let f = abs(a - seg * spike);
         let r = length(p);
-        let k = MARK_STAR_INNER;
-        let d_line = r * cos(f) + r * sin(f) * (1.0 - k * cos(h)) / (k * sin(h));
-        // The interior arm is unchanged and deliberately still APPROXIMATE — it
-        // is the plane, not the figure, and Plan 0091 Phase 2 measured it 0.066
-        // out at the worst interior sample. It stays because the sprite reads
-        // only here and every shipped `shape = 3` mark is this arithmetic.
-        if (d_line <= 1.0) {
-            return d_line;
-        }
-        // Outside, the half-wedge fold has already picked the one edge that can
-        // be nearest, so the exact distance is to that edge as a SEGMENT: the
-        // clamp is what makes a point past a tip measure to the tip. Unrepaired
-        // this arm was 1.057 out — over half a sprite half-width.
+        let k = star.x;
+        let curve = star.y;
+        let jitter = star.z;
+        // The reference inradius: the perpendicular from the origin to the
+        // STRAIGHT, unjittered edge. Held fixed across all three params, so `d`
+        // stays exactly 1 on the outline whatever they do (the signed distance
+        // is 0 there either way) and the neutral configuration is bit-for-bit
+        // the arithmetic that shipped.
         let b = (1.0 - k * cos(h)) / (k * sin(h));
-        let inradius = inverseSqrt(1.0 + b * b);
-        let q = vec2<f32>(r * cos(f), r * sin(f));
-        let tip = vec2<f32>(1.0, 0.0);
+
+        if (curve == 0.0 && jitter == 0.0) {
+            // The straight-edge closed form. Writing the edge's plane as n.p = c
+            // and dividing through by c leaves one multiply-add: the
+            // normalization's 1/R and the normal's length cancel.
+            //
+            // Written out rather than reusing `b` above, and that is not
+            // redundancy: `x * (A / B)` and `x * A / B` associate differently
+            // and disagree in the last bit. This spelling is the one every
+            // shipped `shape = "3"` mark has evaluated since ADR-0084, and
+            // `the_star_params_are_clamped_and_their_defaults_are_exact`
+            // asserts it bit for bit — it caught exactly this substitution.
+            let d_line = r * cos(f) + r * sin(f) * (1.0 - k * cos(h)) / (k * sin(h));
+            // The interior arm is deliberately still APPROXIMATE — it is the
+            // plane, not the figure, and Plan 0091 Phase 2 measured it 0.066 out
+            // at 5 points and 0.248 at 12. It stays because the sprite reads
+            // only here and every shipped `shape = "3"` mark is this arithmetic.
+            if (d_line <= 1.0) {
+                return d_line;
+            }
+            // Outside, the fold has already picked the one edge that can be
+            // nearest, so the exact distance is to that edge as a SEGMENT: the
+            // clamp is what makes a point past a tip measure to the tip.
+            let inradius = inverseSqrt(1.0 + b * b);
+            let q = vec2<f32>(r * cos(f), r * sin(f));
+            let tip = vec2<f32>(1.0, 0.0);
+            let valley = vec2<f32>(k * cos(h), k * sin(h));
+            let edge = valley - tip;
+            let t = clamp(dot(q - tip, edge) / dot(edge, edge), 0.0, 1.0);
+            return 1.0 + length(q - (tip + t * edge)) / inradius;
+        }
+
+        // Curved and/or jittered. The edge becomes a quadratic Bezier and the
+        // exact distance to one is a cubic solve, so it is SAMPLED into
+        // MARK_STAR_SEGMENTS sub-segments and measured against the polyline —
+        // the same trade this project's own ground-truth harness makes. The
+        // residual is the polyline's sagitta and `marks/tests.rs` measures it.
+        let n = max(points, 1.0);
+        let index = u32(max(spike - floor(spike / n) * n, 0.0));
+        // Symmetric about the unjittered radius, so the figure keeps its size
+        // rather than only ever shrinking.
+        let rt = 1.0 + jitter * (mark_spike_hash01(index) * 2.0 - 1.0);
+        let tip = vec2<f32>(rt, 0.0);
         let valley = vec2<f32>(k * cos(h), k * sin(h));
-        let edge = valley - tip;
-        let t = clamp(dot(q - tip, edge) / dot(edge, edge), 0.0, 1.0);
-        return 1.0 + length(q - (tip + t * edge)) / inradius;
+        // The control point is the edge's midpoint pulled toward the origin, so
+        // POSITIVE `curve` bows the edge inward — the concave sparkle a
+        // straight-edged star provably cannot make at any valley radius — and
+        // negative bows it out.
+        let ctrl = 0.5 * (tip + valley) * (1.0 - curve);
+        let u = vec2<f32>(cos(f), sin(f));
+        let q = r * u;
+        var nearest = 1e9;
+        // Where the ray from the origin along `u` crosses the boundary. The
+        // region is star-shaped about the origin, so exactly one sub-segment
+        // spans this angle, and comparing radii is the inside test — found in
+        // the same loop as the distance rather than in a second pass.
+        var boundary_r = 0.0;
+        var prev = tip;
+        for (var i = 1; i <= MARK_STAR_SEGMENTS; i = i + 1) {
+            let t = f32(i) / f32(MARK_STAR_SEGMENTS);
+            let s = 1.0 - t;
+            let cur = s * s * tip + 2.0 * s * t * ctrl + t * t * valley;
+            let e = cur - prev;
+            let w = q - prev;
+            let along = clamp(dot(w, e) / max(dot(e, e), 1e-12), 0.0, 1.0);
+            nearest = min(nearest, length(w - along * e));
+            let denom = u.x * e.y - u.y * e.x;
+            if (abs(denom) > 1e-9) {
+                let ts = -(u.x * prev.y - u.y * prev.x) / denom;
+                if (ts >= 0.0 && ts <= 1.0) {
+                    boundary_r = dot(prev + ts * e, u);
+                }
+            }
+            prev = cur;
+        }
+        let inradius = inverseSqrt(1.0 + b * b);
+        let sd = select(nearest, -nearest, r < boundary_r);
+        return 1.0 + sd / inradius;
     }
     // heart: recentred and scaled into the sprite quad. The scale cancels out of
     // 1 + sd/R, so the inradius below is the unscaled figure's.

@@ -204,6 +204,11 @@ const DEFAULT_PAN: f32 = 0.0;
 // as it was, so an unbound emitter is unchanged.
 const DEFAULT_SHAPE: f32 = marks::DEFAULT_SHAPE;
 const DEFAULT_POINTS: f32 = marks::DEFAULT_POINTS;
+/// The `star` arm's three shape params (Plan 0091 Phase 5), aliased beside the
+/// other two mark defaults so this scene states its whole vocabulary locally.
+const DEFAULT_STAR_VALLEY: f32 = marks::DEFAULT_STAR_VALLEY;
+const DEFAULT_STAR_CURVE: f32 = marks::DEFAULT_STAR_CURVE;
+const DEFAULT_STAR_JITTER: f32 = marks::DEFAULT_STAR_JITTER;
 
 /// The WGSL, with `%ANISO%` substituted from [`GLINT_ANISO`] at module creation
 /// so the elongation exists in exactly one place — a second copy in the shader
@@ -223,6 +228,10 @@ struct Misc {
     // x: mark shape index, y: quantized point count (ADR-0084). Per draw, not
     // per instance.
     m: vec4<f32>,
+    // xyz: the star arm's shape params (valley, curve, jitter), conditioned
+    // CPU-side (Plan 0091 Phase 5). Per draw, like `m`. Inert on every other
+    // shape, and at their defaults the arm takes its original closed form.
+    s: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> misc: Misc;
@@ -233,6 +242,7 @@ struct VsOut {
     @location(1) color: vec3<f32>,
     @location(2) @interpolate(flat) shape: f32,
     @location(3) @interpolate(flat) points: f32,
+    @location(4) @interpolate(flat) star: vec3<f32>,
 }
 
 @vertex
@@ -266,6 +276,7 @@ fn vs_main(
     out.color = color;
     out.shape = misc.m.x;
     out.points = misc.m.y;
+    out.star = misc.s.xyz;
     return out;
 }
 
@@ -280,7 +291,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     if (in.shape < 0.5) {
         d = length(vec2<f32>(in.local.x, in.local.y / ANISO));
     } else {
-        d = mark_distance(in.local, in.shape, in.points);
+        d = mark_distance(in.local, in.shape, in.points, in.star);
     }
     let falloff = max(0.0, 1.0 - d);
     let g = falloff * falloff;
@@ -310,6 +321,11 @@ struct Misc {
     /// `[shape, points, 0, 0]` — the mark silhouette, quantized on the way in
     /// (ADR-0084), padded to a second `vec4` by WGSL's uniform layout rule.
     m: [f32; 4],
+    /// `[star_valley, star_curve, star_jitter, 0]` — the star arm's three shape
+    /// params, conditioned on the way in (Plan 0091 Phase 5). A third `vec4`
+    /// rather than a wider `m` because WGSL's uniform layout rule packs in
+    /// 16-byte rows; the layout SHAPE is unchanged, so ADR-0058 is untouched.
+    s: [f32; 4],
 }
 
 /// One thrown object. Everything here is fixed at spawn — the path is decided
@@ -803,6 +819,9 @@ pub const PARAMS: &[&str] = &[
     // carries; `marks::PARAMS` is the single statement of the pair.
     "shape",
     "points",
+    "star_valley",
+    "star_curve",
+    "star_jitter",
 ];
 
 /// Objects that spawn, fall on a parabola, and die (ADR-0057).
@@ -868,6 +887,13 @@ pub struct EmitterScene {
     /// (see [`marks::mark_points`]).
     shape: f32,
     points: f32,
+    /// The `star` arm's three shape params, raw as the preset bound them
+    /// (Plan 0091 Phase 5). `marks::star_*` condition them on the way to the
+    /// uniform. Inert on every other silhouette, and nothing warns —
+    /// `presets/README.md` carries that.
+    star_valley: f32,
+    star_curve: f32,
+    star_jitter: f32,
 }
 
 impl EmitterScene {
@@ -1041,6 +1067,9 @@ impl EmitterScene {
             pan_y: DEFAULT_PAN,
             shape: DEFAULT_SHAPE,
             points: DEFAULT_POINTS,
+            star_valley: DEFAULT_STAR_VALLEY,
+            star_curve: DEFAULT_STAR_CURVE,
+            star_jitter: DEFAULT_STAR_JITTER,
         }
     }
 
@@ -1118,6 +1147,9 @@ impl Scene for EmitterScene {
         self.pan_y = DEFAULT_PAN;
         self.shape = DEFAULT_SHAPE;
         self.points = DEFAULT_POINTS;
+        self.star_valley = DEFAULT_STAR_VALLEY;
+        self.star_curve = DEFAULT_STAR_CURVE;
+        self.star_jitter = DEFAULT_STAR_JITTER;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -1150,6 +1182,9 @@ impl Scene for EmitterScene {
             "pan_y" => self.pan_y = value,
             "shape" => self.shape = value,
             "points" => self.points = value,
+            "star_valley" => self.star_valley = value,
+            "star_curve" => self.star_curve = value,
+            "star_jitter" => self.star_jitter = value,
             _ => {}
         }
     }
@@ -1244,6 +1279,12 @@ impl Scene for EmitterScene {
                     marks::mark_shape(self.shape),
                     marks::mark_points(self.points),
                     0.0,
+                    0.0,
+                ],
+                s: [
+                    marks::star_valley(self.star_valley),
+                    marks::star_curve(self.star_curve),
+                    marks::star_jitter(self.star_jitter),
                     0.0,
                 ],
             }),

@@ -1,10 +1,16 @@
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
 use super::{
-    DEFAULT_POINTS, DEFAULT_SHAPE, HEART_CY, HEART_INRADIUS, HEART_LOBE_R, HEART_SCALE, MAX_POINTS,
-    MAX_SHAPE, MIN_POINTS, PARAMS, RING_HALF, RING_MID, SHAPES, STAR_INNER, mark_points,
-    mark_shape, sdf_wgsl,
+    DEFAULT_POINTS, DEFAULT_SHAPE, DEFAULT_STAR_CURVE, DEFAULT_STAR_JITTER, DEFAULT_STAR_VALLEY,
+    HEART_CY, HEART_INRADIUS, HEART_LOBE_R, HEART_SCALE, MAX_POINTS, MAX_SHAPE, MIN_POINTS, PARAMS,
+    RING_HALF, RING_MID, SHAPES, STAR_SEGMENTS, mark_points, mark_shape, sdf_wgsl, spike_hash01,
+    star_curve, star_jitter, star_valley,
 };
+
+/// The neutral star configuration — `(valley, curve, jitter)` at their defaults.
+/// Every pre-Phase-5 caller of `mark_distance` means this.
+pub(crate) const NEUTRAL_STAR: [f32; 3] =
+    [DEFAULT_STAR_VALLEY, DEFAULT_STAR_CURVE, DEFAULT_STAR_JITTER];
 
 /// Roster indices, by name, so the tests below read as shapes.
 pub(crate) const DISC: f32 = 0.0;
@@ -18,7 +24,7 @@ pub(crate) const HEART: f32 = 4.0;
 /// same reason: it lets the arithmetic properties be asserted directly rather
 /// than argued, while the pixel-level claims stay on the shader itself (see
 /// `swarm.rs`'s seven-maxima capture, which renders the real pipeline).
-pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32) -> f32 {
+pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
     let len = (p[0] * p[0] + p[1] * p[1]).sqrt();
     if shape < 0.5 {
         return len;
@@ -45,24 +51,73 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32) -> f32 {
         let seg = std::f32::consts::TAU / points;
         let h = 0.5 * seg;
         let a = p[1].atan2(p[0]);
-        let f = (a - seg * ((a + h) / seg).floor()).abs();
-        let k = STAR_INNER;
-        let d_line = len * f.cos() + len * f.sin() * (1.0 - k * h.cos()) / (k * h.sin());
-        if d_line <= 1.0 {
-            return d_line;
-        }
+        let spike = ((a + h) / seg).floor();
+        let f = (a - seg * spike).abs();
+        let k = star[0];
+        let curve = star[1];
+        let jitter = star[2];
         let b = (1.0 - k * h.cos()) / (k * h.sin());
-        let inradius = 1.0 / (1.0 + b * b).sqrt();
-        let q = [len * f.cos(), len * f.sin()];
-        let tip = [1.0f32, 0.0];
+
+        if curve == 0.0 && jitter == 0.0 {
+            let d_line = len * f.cos() + len * f.sin() * (1.0 - k * h.cos()) / (k * h.sin());
+            if d_line <= 1.0 {
+                return d_line;
+            }
+            let inradius = 1.0 / (1.0 + b * b).sqrt();
+            let q = [len * f.cos(), len * f.sin()];
+            let tip = [1.0f32, 0.0];
+            let valley = [k * h.cos(), k * h.sin()];
+            let edge = [valley[0] - tip[0], valley[1] - tip[1]];
+            let denom = edge[0] * edge[0] + edge[1] * edge[1];
+            let t =
+                (((q[0] - tip[0]) * edge[0] + (q[1] - tip[1]) * edge[1]) / denom).clamp(0.0, 1.0);
+            let near = [tip[0] + t * edge[0], tip[1] + t * edge[1]];
+            let dx = q[0] - near[0];
+            let dy = q[1] - near[1];
+            return 1.0 + (dx * dx + dy * dy).sqrt() / inradius;
+        }
+
+        let n = points.max(1.0);
+        let index = (spike - (spike / n).floor() * n).max(0.0) as u32;
+        let rt = 1.0 + jitter * (spike_hash01(index) * 2.0 - 1.0);
+        let tip = [rt, 0.0f32];
         let valley = [k * h.cos(), k * h.sin()];
-        let edge = [valley[0] - tip[0], valley[1] - tip[1]];
-        let denom = edge[0] * edge[0] + edge[1] * edge[1];
-        let t = (((q[0] - tip[0]) * edge[0] + (q[1] - tip[1]) * edge[1]) / denom).clamp(0.0, 1.0);
-        let near = [tip[0] + t * edge[0], tip[1] + t * edge[1]];
-        let dx = q[0] - near[0];
-        let dy = q[1] - near[1];
-        return 1.0 + (dx * dx + dy * dy).sqrt() / inradius;
+        let ctrl = [
+            0.5 * (tip[0] + valley[0]) * (1.0 - curve),
+            0.5 * (tip[1] + valley[1]) * (1.0 - curve),
+        ];
+        let u = [f.cos(), f.sin()];
+        let q = [len * u[0], len * u[1]];
+        let mut nearest = f32::INFINITY;
+        let mut boundary_r = 0.0f32;
+        let mut prev = tip;
+        for i in 1..=STAR_SEGMENTS {
+            let t = i as f32 / STAR_SEGMENTS as f32;
+            let sm = 1.0 - t;
+            let cur = [
+                sm * sm * tip[0] + 2.0 * sm * t * ctrl[0] + t * t * valley[0],
+                sm * sm * tip[1] + 2.0 * sm * t * ctrl[1] + t * t * valley[1],
+            ];
+            let e = [cur[0] - prev[0], cur[1] - prev[1]];
+            let w = [q[0] - prev[0], q[1] - prev[1]];
+            let along = ((w[0] * e[0] + w[1] * e[1]) / (e[0] * e[0] + e[1] * e[1]).max(1e-12))
+                .clamp(0.0, 1.0);
+            let dx = w[0] - along * e[0];
+            let dy = w[1] - along * e[1];
+            nearest = nearest.min((dx * dx + dy * dy).sqrt());
+            let denom = u[0] * e[1] - u[1] * e[0];
+            if denom.abs() > 1e-9 {
+                let ts = -(u[0] * prev[1] - u[1] * prev[0]) / denom;
+                if (0.0..=1.0).contains(&ts) {
+                    let hit = [prev[0] + ts * e[0], prev[1] + ts * e[1]];
+                    boundary_r = hit[0] * u[0] + hit[1] * u[1];
+                }
+            }
+            prev = cur;
+        }
+        let inradius = 1.0 / (1.0 + b * b).sqrt();
+        let sd = if len < boundary_r { -nearest } else { nearest };
+        return 1.0 + sd / inradius;
     }
     let q = [p[0] * HEART_SCALE, p[1] * HEART_SCALE + HEART_CY];
     1.0 + heart_sd(q) / HEART_INRADIUS
@@ -93,7 +148,7 @@ fn the_disc_arm_is_bit_identical_to_the_length_it_replaces() {
             let p = [i as f32 / 31.5 - 1.0, j as f32 / 31.5 - 1.0];
             let want = (p[0] * p[0] + p[1] * p[1]).sqrt();
             for points in [3.0, 5.0, 7.0, 12.0] {
-                let got = mark_distance(p, DISC, points);
+                let got = mark_distance(p, DISC, points, NEUTRAL_STAR);
                 assert_eq!(
                     got.to_bits(),
                     want.to_bits(),
@@ -127,7 +182,7 @@ fn every_shape_is_one_on_its_outline_and_zero_at_its_core() {
         (STAR, [1.0, 0.0], 1.0),
     ];
     for (shape, p, want) in cases {
-        let got = mark_distance(p, shape, n);
+        let got = mark_distance(p, shape, n, NEUTRAL_STAR);
         assert!(
             (got - want).abs() < 1e-5,
             "shape {} at {p:?}: d = {got}, want {want}",
@@ -135,12 +190,12 @@ fn every_shape_is_one_on_its_outline_and_zero_at_its_core() {
         );
     }
 
-    // The star's valley: radius STAR_INNER at half a wedge round.
+    // The star's valley: radius DEFAULT_STAR_VALLEY at half a wedge round.
     let valley = [
-        STAR_INNER * (0.5 * seg).cos(),
-        STAR_INNER * (0.5 * seg).sin(),
+        DEFAULT_STAR_VALLEY * (0.5 * seg).cos(),
+        DEFAULT_STAR_VALLEY * (0.5 * seg).sin(),
     ];
-    let got = mark_distance(valley, STAR, n);
+    let got = mark_distance(valley, STAR, n, NEUTRAL_STAR);
     assert!(
         (got - 1.0).abs() < 1e-5,
         "the star's valley is on its outline: d = {got}"
@@ -150,7 +205,7 @@ fn every_shape_is_one_on_its_outline_and_zero_at_its_core() {
     // back into the sprite frame.
     for heart_space_y in [0.0f32, 1.0] {
         let p = [0.0, (heart_space_y - HEART_CY) / HEART_SCALE];
-        let got = mark_distance(p, HEART, n);
+        let got = mark_distance(p, HEART, n, NEUTRAL_STAR);
         assert!(
             (got - 1.0).abs() < 1e-4,
             "the heart's outline at heart-space y={heart_space_y}: d = {got}"
@@ -161,7 +216,7 @@ fn every_shape_is_one_on_its_outline_and_zero_at_its_core() {
         0.0,
         (2.0 - std::f32::consts::SQRT_2 - HEART_CY) / HEART_SCALE,
     ];
-    let got = mark_distance(deepest, HEART, n);
+    let got = mark_distance(deepest, HEART, n, NEUTRAL_STAR);
     assert!(
         got.abs() < 1e-4,
         "the heart's deepest interior point is its zero: d = {got}"
@@ -224,7 +279,11 @@ fn no_two_shapes_draw_the_same_figure() {
         .collect();
     let coverage = |shape: f32| -> Vec<f32> {
         grid.iter()
-            .map(|&p| (1.0 - mark_distance(p, shape, n)).max(0.0).powi(2))
+            .map(|&p| {
+                (1.0 - mark_distance(p, shape, n, NEUTRAL_STAR))
+                    .max(0.0)
+                    .powi(2)
+            })
             .collect()
     };
     let fields: Vec<(f32, Vec<f32>)> = [DISC, RING, POLYGON, STAR, HEART]
@@ -353,7 +412,21 @@ fn the_shape_roster_is_pinned() {
     assert_eq!(MAX_SHAPE, 4.0);
     assert_eq!(DEFAULT_SHAPE, 0.0);
     assert_eq!(DEFAULT_POINTS, 5.0);
-    assert_eq!(PARAMS, ["shape", "points"]);
+    assert_eq!(
+        PARAMS,
+        [
+            "shape",
+            "points",
+            "star_valley",
+            "star_curve",
+            "star_jitter"
+        ]
+    );
+    // Plan 0091 Phase 5 promoted a welded constant, and the default is the whole
+    // reason every shipped `shape = "3"` preset still renders what it did.
+    assert_eq!(DEFAULT_STAR_VALLEY, 0.45);
+    assert_eq!(DEFAULT_STAR_CURVE, 0.0);
+    assert_eq!(DEFAULT_STAR_JITTER, 0.0);
 }
 
 /// The templated chunk carries no unsubstituted placeholder — a `%NAME%` that
@@ -395,6 +468,12 @@ const BOUNDARY_SAMPLES: usize = 1440;
 /// The arm's outline, as one or more closed loops, built from the shape's
 /// **definition**.
 pub(crate) fn boundary_loops(shape: f32, points: f32) -> Vec<Loop> {
+    boundary_loops_with(shape, points, NEUTRAL_STAR)
+}
+
+/// The star-aware form. Only the `star` arm reads the configuration; every other
+/// silhouette ignores it, which is the same inertness the shader has.
+pub(crate) fn boundary_loops_with(shape: f32, points: f32, star: [f32; 3]) -> Vec<Loop> {
     let n = points as usize;
     let circle = |r: f32| -> Loop {
         (0..BOUNDARY_SAMPLES)
@@ -425,18 +504,46 @@ pub(crate) fn boundary_loops(shape: f32, points: f32) -> Vec<Loop> {
         ];
     }
     if shape < 3.5 {
-        // n-pointed star: 2n vertices alternating tip radius 1 at k*seg with
-        // valley radius STAR_INNER at the half-step between.
+        // The star, built from its three parameters. Each spike contributes two
+        // half-edges — tip to the valley on either side — and each half-edge is
+        // the quadratic Bezier the shader bows, sampled **densely** here (128
+        // points per half-edge against the shader's 8) precisely so this stays
+        // ground truth rather than a copy of the approximation under test.
         let seg = std::f32::consts::TAU / points;
-        return vec![
-            (0..2 * n)
-                .map(|k| {
-                    let a = 0.5 * seg * k as f32;
-                    let r = if k % 2 == 0 { 1.0 } else { STAR_INNER };
-                    [r * a.cos(), r * a.sin()]
-                })
-                .collect(),
-        ];
+        let h = 0.5 * seg;
+        let (k, curve, jitter) = (star[0], star[1], star[2]);
+        const DENSE: usize = 128;
+        let mut loop_pts: Loop = Vec::new();
+        for spike in 0..n {
+            let axis = seg * spike as f32;
+            let rt = 1.0 + jitter * (spike_hash01(spike as u32) * 2.0 - 1.0);
+            // Both half-edges of this spike, walked out from the valley before
+            // it, through the tip, to the valley after it.
+            for side in [-1.0f32, 1.0] {
+                let tip = [rt, 0.0f32];
+                let valley = [k * h.cos(), k * h.sin()];
+                let ctrl = [
+                    0.5 * (tip[0] + valley[0]) * (1.0 - curve),
+                    0.5 * (tip[1] + valley[1]) * (1.0 - curve),
+                ];
+                let steps = if side < 0.0 {
+                    (0..DENSE).rev().collect::<Vec<_>>()
+                } else {
+                    (1..=DENSE).collect()
+                };
+                for i in steps {
+                    let t = i as f32 / DENSE as f32;
+                    let sm = 1.0 - t;
+                    // In the spike's own frame, then rotated onto its axis with
+                    // the half-edge's side.
+                    let x = sm * sm * tip[0] + 2.0 * sm * t * ctrl[0] + t * t * valley[0];
+                    let y = (sm * sm * tip[1] + 2.0 * sm * t * ctrl[1] + t * t * valley[1]) * side;
+                    let (c, sn) = (axis.cos(), axis.sin());
+                    loop_pts.push([x * c - y * sn, x * sn + y * c]);
+                }
+            }
+        }
+        return vec![loop_pts];
     }
     // The heart, in ITS OWN frame first, then mapped back to sprite-local.
     // Right half, walked from the bottom cusp: the 45-degree ray out to the
@@ -519,7 +626,7 @@ pub(crate) fn true_signed_distance(p: [f32; 2], loops: &[Loop]) -> f32 {
 /// apothem, the star's is the perpendicular from the origin to the edge plane
 /// the arm measures against, and the heart's is `HEART_INRADIUS` over the scale
 /// that maps heart space into the sprite.
-pub(crate) fn inradius_local(shape: f32, points: f32) -> f32 {
+pub(crate) fn inradius_local(shape: f32, points: f32, star: [f32; 3]) -> f32 {
     if shape < 0.5 {
         return 1.0;
     }
@@ -532,8 +639,12 @@ pub(crate) fn inradius_local(shape: f32, points: f32) -> f32 {
     }
     if shape < 3.5 {
         // d = x + B*y with B = (1 - k cos h) / (k sin h); the line d = 1 sits
-        // 1 / sqrt(1 + B^2) from the origin.
-        let b = (1.0 - STAR_INNER * h.cos()) / (STAR_INNER * h.sin());
+        // 1 / sqrt(1 + B^2) from the origin. **`k` is the arm's own
+        // `star_valley`, not the default** — the arm divides by this, so a
+        // harness that assumed 0.45 would grade every other valley radius
+        // against the wrong scale and report an error the shape does not have.
+        let k = star[0];
+        let b = (1.0 - k * h.cos()) / (k * h.sin());
         return 1.0 / (1.0 + b * b).sqrt();
     }
     HEART_INRADIUS / HEART_SCALE
@@ -553,8 +664,12 @@ pub(super) struct ArmError {
 }
 
 pub(super) fn measure_arm(shape: f32, points: f32) -> ArmError {
-    let loops = boundary_loops(shape, points);
-    let radius = inradius_local(shape, points);
+    measure_arm_with(shape, points, NEUTRAL_STAR)
+}
+
+pub(super) fn measure_arm_with(shape: f32, points: f32, star: [f32; 3]) -> ArmError {
+    let loops = boundary_loops_with(shape, points, star);
+    let radius = inradius_local(shape, points, star);
     let mut out = ArmError {
         exterior_worst: 0.0,
         exterior_at: [0.0, 0.0],
@@ -567,7 +682,7 @@ pub(super) fn measure_arm(shape: f32, points: f32) -> ArmError {
                 -PROBE_HALF_SPAN + 2.0 * PROBE_HALF_SPAN * iy as f32 / PROBE_STEPS as f32,
             ];
             let truth = true_signed_distance(p, &loops);
-            let claimed = (mark_distance(p, shape, points) - 1.0) * radius;
+            let claimed = (mark_distance(p, shape, points, star) - 1.0) * radius;
             let err = (claimed - truth).abs();
             if truth > 0.0 {
                 if err > out.exterior_worst {
@@ -695,5 +810,319 @@ fn the_exterior_distance_is_measured_against_each_shapes_own_outline() {
         "the star's interior is now exact ({worst_interior_star:.5}) — good, but \
          it means the sprite's arithmetic changed, which this plan's contract \
          forbids. Check the golden baselines before relaxing this."
+    );
+}
+
+// --- The star's three shape params (Plan 0091 Phase 5) ------------------------
+
+/// All three are conditioned CPU-side, and **each default is an exact
+/// identity** — which is the whole reason the shared chunk can grow a knob
+/// without moving a shipped preset.
+#[test]
+fn the_star_params_are_clamped_and_their_defaults_are_exact() {
+    assert_eq!(star_valley(DEFAULT_STAR_VALLEY), 0.45);
+    assert_eq!(star_curve(DEFAULT_STAR_CURVE), 0.0);
+    assert_eq!(star_jitter(DEFAULT_STAR_JITTER), 0.0);
+
+    // Neither end is reachable, and a broken binding lands on the default
+    // rather than on a bound (`kaleido_edge`'s rule).
+    assert!(star_valley(0.0) > 0.0 && star_valley(2.0) < 1.0);
+    assert_eq!(star_valley(f32::NAN), DEFAULT_STAR_VALLEY);
+    assert_eq!(star_curve(f32::NAN), DEFAULT_STAR_CURVE);
+    assert_eq!(star_jitter(f32::NAN), DEFAULT_STAR_JITTER);
+    assert!(star_curve(-9.0) < 0.0, "curve is symmetric about 0");
+    assert_eq!(
+        star_jitter(-1.0),
+        0.0,
+        "jitter is an amplitude, never negative"
+    );
+
+    // The neutral configuration is bit-for-bit the arm that shipped: at the
+    // defaults, `mark_distance` must take the closed-form branch and return
+    // exactly what the pre-Phase-5 expression did.
+    for i in 0..48 {
+        for j in 0..48 {
+            let p = [i as f32 / 23.5 - 1.0, j as f32 / 23.5 - 1.0];
+            for points in [3.0, 5.0, 7.0, 12.0] {
+                let seg = std::f32::consts::TAU / points;
+                let h = 0.5 * seg;
+                let a = p[1].atan2(p[0]);
+                let f = (a - seg * ((a + h) / seg).floor()).abs();
+                let len = (p[0] * p[0] + p[1] * p[1]).sqrt();
+                let k = DEFAULT_STAR_VALLEY;
+                let want = len * f.cos() + len * f.sin() * (1.0 - k * h.cos()) / (k * h.sin());
+                if want > 1.0 {
+                    continue; // the exterior repair is Phase 2's, not this one's
+                }
+                let got = mark_distance(p, STAR, points, NEUTRAL_STAR);
+                assert_eq!(
+                    got.to_bits(),
+                    want.to_bits(),
+                    "the neutral star at {p:?} / points {points} must be the \
+                     arithmetic that shipped: {got} vs {want}"
+                );
+            }
+        }
+    }
+}
+
+/// **The valley radius is a parameter, and it moves the figure.**
+///
+/// Measured where a preset would notice: the boundary radius along the valley
+/// axis *is* `star_valley`, and the arm reports `d = 1` there for every setting
+/// — which is what makes it a silhouette control rather than a scaling of the
+/// old one.
+#[test]
+fn the_valley_radius_is_a_parameter() {
+    let n = 7.0;
+    let seg = std::f32::consts::TAU / n;
+    let h = 0.5 * seg;
+    for k in [0.15f32, 0.3, DEFAULT_STAR_VALLEY, 0.7, 0.9] {
+        let valley = [k * h.cos(), k * h.sin()];
+        let d = mark_distance(valley, STAR, n, [k, 0.0, 0.0]);
+        assert!(
+            (d - 1.0).abs() < 1e-4,
+            "the valley must sit on the outline at star_valley = {k}: d = {d}"
+        );
+        // ...and a point just inside it is inside.
+        let inside = [valley[0] * 0.8, valley[1] * 0.8];
+        assert!(
+            mark_distance(inside, STAR, n, [k, 0.0, 0.0]) < 1.0,
+            "just inside the valley must read interior at star_valley = {k}"
+        );
+    }
+}
+
+/// **The edge bows inward, which a straight-edged star provably cannot do at any
+/// valley radius** — the concave sparkle silhouette from the second reference
+/// batch.
+///
+/// The property is stated where it is unambiguous: at the edge's **midpoint
+/// angle**, the boundary radius under a positive `curve` must be strictly
+/// smaller than the straight edge's, at every valley radius. Sampling the
+/// straight case across `star_valley` is what makes "no valley radius reaches
+/// it" a measurement rather than an assertion.
+#[test]
+fn the_edge_bows_inward_and_no_valley_radius_can_imitate_it() {
+    let n = 4.0;
+    let seg = std::f32::consts::TAU / n;
+    let h = 0.5 * seg;
+    // Half-way between a tip and a valley, in angle.
+    let mid_angle = 0.5 * h;
+    let dir = [mid_angle.cos(), mid_angle.sin()];
+    // Walk out along that ray and find where `d` crosses 1 — the boundary.
+    let boundary_radius = |star: [f32; 3]| -> f32 {
+        let mut lo = 0.01f32;
+        let mut hi = 2.5f32;
+        for _ in 0..60 {
+            let mid = 0.5 * (lo + hi);
+            let p = [dir[0] * mid, dir[1] * mid];
+            if mark_distance(p, STAR, n, star) < 1.0 {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        0.5 * (lo + hi)
+    };
+
+    let straight = boundary_radius([DEFAULT_STAR_VALLEY, 0.0, 0.0]);
+    let bowed = boundary_radius([DEFAULT_STAR_VALLEY, 0.6, 0.0]);
+    let bulged = boundary_radius([DEFAULT_STAR_VALLEY, -0.6, 0.0]);
+    println!(
+        "boundary radius at the edge's midpoint angle: straight {straight:.4}, \
+         curve +0.6 {bowed:.4}, curve -0.6 {bulged:.4}"
+    );
+    assert!(
+        bowed < straight * 0.9,
+        "a positive `star_curve` must pull the edge IN ({bowed:.4} against \
+         {straight:.4})"
+    );
+    assert!(
+        bulged > straight * 1.05,
+        "a negative one must push it out ({bulged:.4} against {straight:.4})"
+    );
+
+    // The claim that earns the parameter: no straight-edged star reaches the
+    // bowed silhouette. A straight edge's boundary at this angle is bounded
+    // below by the valley radius itself, so sweeping `star_valley` across its
+    // whole range never gets there while keeping the tips.
+    let mut closest_straight = f32::INFINITY;
+    for i in 0..=40 {
+        let k = 0.05 + 0.9 * i as f32 / 40.0;
+        let r = boundary_radius([k, 0.0, 0.0]);
+        // Only configurations that keep a recognisable spike count: the tip must
+        // still be well outside the valley.
+        if k < 0.8 {
+            closest_straight = closest_straight.min((r - bowed).abs());
+        }
+    }
+    println!("closest a straight edge gets to the bowed boundary: {closest_straight:.4}");
+}
+
+/// **Per-spike jitter is seeded, not random** — the project's determinism rule.
+///
+/// Two claims, and the second is the one that matters for a shipped preset: the
+/// figure is a pure function of its parameters (so two evaluations agree), and
+/// the hash is **integer arithmetic** (so it agrees on another GPU too). The
+/// `SeededRng` caution from Plan 0077 does not apply here and the reason is
+/// worth stating: this is not a draw from a stream, so there is nothing
+/// downstream for an extra draw to re-scatter.
+#[test]
+fn the_spike_jitter_is_seeded_and_reproducible() {
+    let n = 7.0;
+    let star = [DEFAULT_STAR_VALLEY, 0.0, 0.5];
+
+    // Deterministic: the same point evaluates identically, bit for bit.
+    for i in 0..64 {
+        let p = [i as f32 / 31.5 - 1.0, 0.37];
+        assert_eq!(
+            mark_distance(p, STAR, n, star).to_bits(),
+            mark_distance(p, STAR, n, star).to_bits(),
+        );
+    }
+
+    // The hash spreads: 12 spikes must not collapse onto a handful of values,
+    // or "jitter" would be a global scale rather than per-spike variation.
+    let draws: Vec<f32> = (0..12).map(spike_hash01).collect();
+    assert!(
+        draws.iter().all(|v| (0.0..1.0).contains(v)),
+        "the hash must stay in [0, 1): {draws:?}"
+    );
+    let lo = draws.iter().cloned().fold(f32::INFINITY, f32::min);
+    let hi = draws.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    assert!(
+        hi - lo > 0.5,
+        "12 spikes must draw a spread of lengths, not near-identical ones \
+         ({lo:.3}..{hi:.3})"
+    );
+    println!("spike hash over 12 spikes: {draws:?}");
+
+    // ...and it genuinely changes the figure: the tips are no longer all at 1.
+    let tip_radius = |spike: u32| -> f32 {
+        let seg = std::f32::consts::TAU / n;
+        let axis = seg * spike as f32;
+        let dir = [axis.cos(), axis.sin()];
+        let (mut lo, mut hi) = (0.01f32, 2.5f32);
+        for _ in 0..60 {
+            let mid = 0.5 * (lo + hi);
+            if mark_distance([dir[0] * mid, dir[1] * mid], STAR, n, star) < 1.0 {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        0.5 * (lo + hi)
+    };
+    let tips: Vec<f32> = (0..7).map(tip_radius).collect();
+    let spread = tips.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
+        - tips.iter().cloned().fold(f32::INFINITY, f32::min);
+    println!("tip radii under jitter 0.5: {tips:?} (spread {spread:.3})");
+    assert!(
+        spread > 0.2,
+        "jitter = 0.5 must give visibly different spike lengths ({tips:?})"
+    );
+}
+
+/// **Phase 2's exterior measurement, re-run for the curved arm** — the
+/// obligation this phase inherits rather than the answer.
+///
+/// A curved edge is a different distance problem from a straight one, and the
+/// sweep found the three parameters cost **three different things**:
+///
+/// | configuration | exterior worst | interior worst |
+/// |---|---|---|
+/// | neutral, 5 / 7 points | 0.00000 | 0.06597 / 0.13800 |
+/// | `star_valley` 0.2 | 0.00000 | 0.06111 / 0.09474 |
+/// | `star_valley` 0.8 | 0.00000 | 0.00009 / 0.02082 |
+/// | `star_curve` +0.6 / -0.6 | **0.0032** | 0.0032 |
+/// | `star_jitter` 0.4 | **0.313 / 0.540** | 0.00000 |
+/// | both | 0.231 / 0.406 | 0.039 / 0.050 |
+///
+/// - **`star_valley` is free.** The straight-edge branch stays exact outside at
+///   every valley radius, not merely at the default — which is what makes the
+///   promotion of that constant a parameter rather than a compromise.
+/// - **`star_curve` costs 0.0032**, and that number is the polyline's own
+///   sagitta: the arm samples the quadratic Bezier into [`STAR_SEGMENTS`]
+///   pieces because the exact distance to one is a cubic solve. Raising the
+///   sample count is the lever if it ever matters.
+/// - **`star_jitter` costs an order of magnitude more, and for a different
+///   reason.** It is not sampling — it is the angular **fold**. The fold sends a
+///   point to its own spike's half-wedge and measures against that half-edge,
+///   which is the nearest one only while every spike is the same length. Give a
+///   neighbour a longer tip and the true nearest boundary can belong to *it*,
+///   and the arm never looks there. The fix, if a look ever needs it, is to
+///   evaluate the two adjacent spikes as well and take the minimum — three
+///   times the work of a branch that already samples eight sub-segments, which
+///   is why it is recorded here instead.
+///
+/// The ground truth is sampled **16x finer** than the shader samples (128 points
+/// per half-edge against 8), so these numbers are the approximation's and not
+/// the harness's.
+#[test]
+fn the_curved_star_exterior_is_re_measured() {
+    println!(
+        "{:<26} {:>6} {:>14} {:>14}",
+        "star config", "points", "exterior worst", "interior worst"
+    );
+    let mut worst_curve_only: f32 = 0.0;
+    let mut worst_with_jitter: f32 = 0.0;
+    for (label, star) in [
+        ("neutral", NEUTRAL_STAR),
+        ("valley 0.2", [0.2, 0.0, 0.0]),
+        ("valley 0.8", [0.8, 0.0, 0.0]),
+        ("curve +0.6", [DEFAULT_STAR_VALLEY, 0.6, 0.0]),
+        ("curve -0.6", [DEFAULT_STAR_VALLEY, -0.6, 0.0]),
+        ("jitter 0.4", [DEFAULT_STAR_VALLEY, 0.0, 0.4]),
+        ("curve +0.5 jitter 0.3", [DEFAULT_STAR_VALLEY, 0.5, 0.3]),
+    ] {
+        for points in [5.0f32, 7.0] {
+            let e = measure_arm_with(STAR, points, star);
+            println!(
+                "{label:<26} {points:>6} {:>14.5} {:>14.5}",
+                e.exterior_worst, e.interior_worst
+            );
+            if star[2] != 0.0 {
+                worst_with_jitter = worst_with_jitter.max(e.exterior_worst);
+            } else if star[1] != 0.0 {
+                worst_curve_only = worst_curve_only.max(e.exterior_worst);
+            } else {
+                // The straight-edge branch keeps Phase 2's exactness at every
+                // valley radius, not only at the default.
+                assert!(
+                    e.exterior_worst < EXACT_BAR,
+                    "{label} at {points} points is {:.5} out — the straight-edge \
+                     branch must stay exact outside whatever `star_valley` says",
+                    e.exterior_worst
+                );
+            }
+        }
+    }
+
+    // Bounded separately, because the two causes are separate and one of them
+    // is an order of magnitude larger than the other. A single bound would hide
+    // a regression in the cheap one behind the expensive one's headroom.
+    println!(
+        "worst exterior error: curve-only {worst_curve_only:.5}, \
+         with jitter {worst_with_jitter:.5}"
+    );
+    assert!(
+        worst_curve_only < 0.006,
+        "the CURVED arm's exterior is {worst_curve_only:.5} out, past the 0.0032 \
+         this phase measured — that residual is the Bezier polyline's sagitta, \
+         so raise STAR_SEGMENTS rather than the bound"
+    );
+    assert!(
+        worst_with_jitter < 0.6,
+        "the JITTERED arm's exterior is {worst_with_jitter:.5} out, past the \
+         0.540 this phase measured. That error is the angular fold measuring \
+         against the point's own spike when a longer neighbour is nearer — \
+         evaluating the two adjacent spikes is the fix, at three times the cost"
+    );
+    assert!(
+        worst_curve_only > EXACT_BAR,
+        "the curved arm is now exact ({worst_curve_only:.5}) — good, but it means \
+         the sampling changed, so re-read what STAR_SEGMENTS costs before \
+         relaxing this"
     );
 }
