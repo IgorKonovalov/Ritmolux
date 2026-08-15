@@ -382,6 +382,33 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    prose says "Plan NNNN", in which case the number is a **plan** number and the missing piece is
    the `../plans/` prefix rather than the filename. Guessing wrong here silently re-points a
    citation at a different document.
+1c. **Re-run the backlog-claim probes, and read the advisory** ([ADR-0108](../../../docs/adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)).
+
+   **The trigger is every close, without exception** — not "when the backlog changed". A close
+   lands code, and code is what falsifies an entry; the entry you break is rarely the one you
+   edited.
+
+   ```sh
+   node scripts/check-backlog-claims.mjs   # exit 0 = every stated reduction still holds
+   ```
+
+   **What it prints, and what each half means:**
+   - **Green** says *the reductions still match the tree*. It does **not** say the entries are
+     true — backlog 0081 was falsified by a verification that was dated, recent and accurate, and
+     simply covered a different claim than the one in its own title. A probe verifies the reduction
+     its author chose; reading whether that reduction covers the claim is still yours.
+   - **A break** names the entry, the probe, and the `file:line` that contradicts it. Often the
+     close that just happened is the cause — several shipped probes are written to go red **on
+     delivery** rather than on decay, which is a re-read trigger and not an accusation.
+   - **The advisory block** (below the pass/fail line, never affecting the exit code) names entries
+     whose probed paths have moved since anyone last read them, plus the full `unprobeable:` roster.
+     That roster is the set of claims nothing checks; it is printed at every close precisely so it
+     stays small and visible rather than growing silently.
+
+   **Repairing a convicted entry is yours, and it is a judgement rather than an edit** — corrected
+   in place, closed to the archive, or split. `dev` is instructed to report a red probe and leave
+   the entry alone, so if a phase commit says an entry is falsified, that finding is waiting here.
+
 2. **Accept any paired ADRs** (`proposed → accepted`) and refresh `docs/adrs/README.md`. An ADR is
    append-only *once accepted* — but if the plan's implementation falsified something the ADR
    recorded, accept it **with a dated `Outcome` section** (the ADR-0054 and ADR-0074 precedent)
