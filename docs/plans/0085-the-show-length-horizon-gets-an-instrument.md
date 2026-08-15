@@ -1,6 +1,6 @@
 # 0085 — the show-length horizon gets an instrument
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md)

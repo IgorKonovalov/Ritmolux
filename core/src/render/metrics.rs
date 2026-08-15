@@ -195,12 +195,7 @@ pub fn tonal_flatness(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
             continue;
         }
         lit += 1;
-        // The same weights `downscale_gray` uses, so "luminance" means one thing
-        // across this module.
-        let luma = 0.299 * px.first().copied().unwrap_or(0) as f32
-            + 0.587 * px.get(1).copied().unwrap_or(0) as f32
-            + 0.114 * px.get(2).copied().unwrap_or(0) as f32;
-        let bucket = ((luma / 256.0) * TONE_BANDS as f32) as usize;
+        let bucket = ((luma(px) / 256.0) * TONE_BANDS as f32) as usize;
         if let Some(slot) = buckets.get_mut(bucket.min(TONE_BANDS - 1)) {
             *slot += 1;
         }
@@ -209,6 +204,63 @@ pub fn tonal_flatness(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
         return 0.0;
     }
     buckets.iter().copied().max().unwrap_or(0) as f32 / lit as f32
+}
+
+/// Ratio of the frame's **peak** departure from its background luminance to the
+/// **mean** departure over every pixel — the crest factor, and the direct
+/// reading of *has the population piled onto a few places?* (Plan 0085 Phase 1).
+///
+/// A pixel's departure is `|luma - luma(bg)|`, and zero for any pixel
+/// [`coverage`] would not call lit (so 8-bit dither and a vignette's own
+/// gradient do not inflate the denominator). The **absolute** difference, not
+/// the signed one, because a two-tone world draws its figure *darker* than its
+/// ground (ADR-0106) and an ink figure piling up is the same event as a
+/// particle field piling up. The mean is taken over **every** pixel, not over
+/// the lit ones — that is what makes concentration visible. Move a fixed amount
+/// of contrast from many pixels into few and the sum barely changes while the
+/// peak rises, so the ratio rises with it; spread it back out and it falls
+/// toward `1.0`.
+///
+/// Range: `1.0` for a perfectly uniform lit frame, up to the frame's pixel count
+/// for a single lit pixel, and exactly `0.0` for a frame that does not depart
+/// from its own background at all — an empty picture makes no claim about
+/// concentration, the same convention [`tonal_flatness`] uses. Total by
+/// construction: the peak is itself part of the sum, so a non-zero peak
+/// guarantees a non-zero denominator.
+///
+/// **It saturates, and a caller must know that.** The peak is 8-bit, so once the
+/// brightest pixel reaches white the numerator stops growing and further piling
+/// registers only through the falling mean. Read it as a *trend* — which is why
+/// the horizon mode reports a series and never a threshold (ADR-0099).
+pub fn peak_to_mean(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
+    let bg_luma = luma(&bg);
+    let mut peak = 0.0f32;
+    let mut sum = 0.0f64;
+    let mut total: u64 = 0;
+    for px in img.rgba.chunks_exact(4) {
+        total += 1;
+        if !is_lit(px, bg, eps) {
+            continue;
+        }
+        let departure = (luma(px) - bg_luma).abs();
+        peak = peak.max(departure);
+        sum += f64::from(departure);
+    }
+    if total == 0 || peak <= 0.0 {
+        return 0.0;
+    }
+    let mean = (sum / total as f64) as f32;
+    // `peak` is one of the terms of `sum`, so `mean >= peak / total > 0` here.
+    peak / mean
+}
+
+/// Rec.601 luma of a pixel's first three channels — the same weights
+/// [`downscale_gray`] and [`tonal_flatness`] use, so "luminance" means one thing
+/// across this module. Tolerates a short slice (missing channels read zero).
+fn luma(px: &[u8]) -> f32 {
+    0.299 * px.first().copied().unwrap_or(0) as f32
+        + 0.587 * px.get(1).copied().unwrap_or(0) as f32
+        + 0.114 * px.get(2).copied().unwrap_or(0) as f32
 }
 
 /// Concentric annuli [`radial_shell_occupancy`] divides the frame's inscribed

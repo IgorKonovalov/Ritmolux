@@ -7,12 +7,13 @@
 //! [`json`] and [`wav`] are pure functions of their arguments: no GPU, no
 //! filesystem, no `Args`, no process state.
 //!
-//! [`report`] is the exception and it is deliberate (Plan 0061 Phase 4). The
-//! `--report` machinery *does* drive a renderer, so it is not pure — but leaving
-//! it in the example meant a thousand lines of table generation, gate
-//! reachability and transient analysis whose only coverage was a subprocess
-//! asserting that the JSON's braces balanced. Its pure half is now directly
-//! testable; the GPU half is one function it calls.
+//! [`report`] and [`horizon`] are the exceptions and both are deliberate
+//! (Plan 0061 Phase 4, Plan 0085 Phase 1). The `--report` and `--horizon`
+//! machinery *does* drive a renderer, so neither is pure — but leaving `report`
+//! in the example meant a thousand lines of table generation, gate reachability
+//! and transient analysis whose only coverage was a subprocess asserting that
+//! the JSON's braces balanced. Their pure halves are directly testable here;
+//! the GPU half of each is one function it calls.
 //!
 //! **`image` stays a dev-dependency.** The PNG codec is deliberately out of the
 //! shipped `lmv.exe` (ADR-0011, ADR-0033 Alt E), so nothing here names an
@@ -23,6 +24,7 @@
 pub mod args;
 pub mod film;
 pub mod glyph;
+pub mod horizon;
 pub mod json;
 pub mod report;
 pub mod wav;

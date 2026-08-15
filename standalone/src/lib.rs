@@ -24,6 +24,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
+pub mod rss;
 pub mod shot;
 
 /// Per-user application directory name, used under the OS data root for the

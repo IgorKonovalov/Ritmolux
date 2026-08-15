@@ -7,7 +7,6 @@ mod config;
 mod diaglog;
 mod director;
 mod overlay;
-mod rss;
 mod settings;
 mod soak;
 
@@ -27,7 +26,7 @@ use settings::{SettingsAction, SettingsKey, SettingsState, SettingsView, TierSta
 use soak::SoakLog;
 use standalone::{
     APP_DIR_NAME, PRESET_DIR_ENV, PresetDir, preset_data_root, resolve_preset_dir, resolve_tier,
-    tier_env,
+    rss, tier_env,
 };
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};

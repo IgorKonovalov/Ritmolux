@@ -694,6 +694,265 @@ fn the_footprint_reading_sees_reactivity_spent_on_bloom() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// The long-run horizon (Plan 0085 Phase 1, ADR-0099)
+// ---------------------------------------------------------------------------
+
+/// A world with a **known accumulation axis**: a de Jong attractor whose trail
+/// `fade` is 0.999, so deposited ink persists for ~1000 frames and the field
+/// fills monotonically. Nothing here is audio-driven and no coefficient moves,
+/// which is the point — the drift is the accumulation and nothing else.
+///
+/// Written by the test rather than pointed at a shipped preset, for the reason
+/// the tempo probe learned: coupling an instrument's proof to the content
+/// library breaks it the day a world is retuned.
+const HORIZON_SUBJECT_SRC: &str = r#"
+system = "attractor"
+name = "horizon_subject"
+[particles]
+family = "de_jong"
+[params]
+a = "1.641"
+b = "1.902"
+c = "0.316"
+d = "1.525"
+size = "0.6"
+fade = "0.999"
+saturation = "0.3"
+hue_center = "0.5"
+"#;
+
+/// The **static control**, and the half that makes the subject's numbers mean
+/// something. A star pattern with a constant rotation and no time, audio or
+/// feedback term: it renders the same frame forever, so every statistic must
+/// come back flat. Without it, a drifting series would only show that the
+/// instrument emits varying numbers.
+const HORIZON_CONTROL_SRC: &str = r#"
+system = "star_pattern"
+name = "horizon_control"
+[generator]
+tiling            = "12"
+contact_angle_deg = 20
+[params]
+variant       = "1"
+rotation      = "0.4"
+hue           = "0.55"
+draw_progress = "1"
+thickness     = "1.8"
+scale         = "0.6"
+brightness    = "0.85"
+"#;
+
+/// Horizon runs are sized so the whole case is a couple of seconds: three
+/// simulated seconds at 48x48 is 181 renders. The mode is minutes of wall clock
+/// at a useful horizon — that cost belongs to the lane running it, never to CI.
+const HORIZON_SIZE: &str = "48x48";
+const HORIZON_INTERVAL: &str = "1";
+
+/// Write `src` to a scratch `.toml` and return the path as an owned argument.
+fn fixture(dir_name: &str, file: &str, src: &str) -> String {
+    let path = scratch(dir_name).join(file);
+    std::fs::write(&path, src).unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+    path.to_string_lossy().into_owned()
+}
+
+/// The `samples` array of a horizon report, verbatim.
+fn samples_array(json: &str) -> &str {
+    let start = json
+        .find("\"samples\":[")
+        .unwrap_or_else(|| panic!("no samples array in:\n{json}"));
+    let tail = &json[start..];
+    let end = tail
+        .find(']')
+        .unwrap_or_else(|| panic!("unterminated samples array in:\n{json}"));
+    &tail[..=end]
+}
+
+/// **Both determinism properties, on rendered pixels rather than on
+/// arithmetic** (Plan 0085 Phase 1's done-when).
+///
+/// A drift verdict recorded in a world's header is worth nothing unless the same
+/// world at the same horizon produces the same rows — that is the first claim.
+/// The second is subtler and is what lets a ten-minute run be read against a
+/// two-minute one: the statistics at interval *k* must not depend on how far the
+/// run was asked to go. Both are asserted on the JSON text, so a difference in
+/// any digit of any row fails.
+#[test]
+fn a_horizon_is_reproducible_and_does_not_depend_on_its_own_length() {
+    let subject = fixture("horizon", "subject.toml", HORIZON_SUBJECT_SRC);
+    let horizon = |minutes: &str| {
+        run(&[
+            "--preset-file",
+            &subject,
+            "--horizon",
+            minutes,
+            "--interval",
+            HORIZON_INTERVAL,
+            "--size",
+            HORIZON_SIZE,
+            "--json",
+        ])
+    };
+
+    let first = horizon("0.05");
+    if skipped_for_no_adapter(&first) {
+        return;
+    }
+    assert!(
+        first.status.success(),
+        "the horizon run failed\nstdout: {}\nstderr: {}",
+        stdout(&first),
+        stderr(&first)
+    );
+    let first = stdout(&first);
+    assert!(
+        json_is_balanced(&first),
+        "the horizon report is not well-formed JSON:\n{first}"
+    );
+
+    // Same request, second run: every row identical.
+    let again = horizon("0.05");
+    assert!(again.status.success(), "the repeat run failed");
+    assert_eq!(
+        samples_array(&first),
+        samples_array(&stdout(&again)),
+        "two runs of the same world at the same horizon produced different \
+         rows — a recorded drift verdict would not be reproducible"
+    );
+
+    // Twice the horizon: the rows it shares with the short run are the same
+    // rows. Asserted as a prefix, because the long run has more of them.
+    let long = horizon("0.1");
+    assert!(long.status.success(), "the long run failed");
+    let long = stdout(&long);
+    let (short_rows, long_rows) = (samples_array(&first), samples_array(&long));
+    assert!(
+        long_rows.len() > short_rows.len(),
+        "the longer horizon did not produce more rows: {long_rows}"
+    );
+    // Drop the short array's closing bracket and require the rest to be a
+    // prefix of the long one.
+    let shared = short_rows.trim_end_matches(']');
+    assert!(
+        long_rows.starts_with(shared),
+        "an interval's statistics changed when a longer horizon was requested:\n\
+         short: {short_rows}\nlong:  {long_rows}"
+    );
+}
+
+/// **The non-vacuity half**: an accumulating world reads as a one-way trend
+/// while a static control reads flat.
+///
+/// This is what separates an instrument from a number generator. The subject's
+/// trail `fade` gives it a known accumulation axis and it must show up as a
+/// monotone series; the control renders one frame over and over and every
+/// statistic must come back with zero travel. Either half alone proves nothing.
+#[test]
+fn a_horizon_separates_an_accumulating_world_from_a_static_control() {
+    let subject = fixture("horizon", "subject.toml", HORIZON_SUBJECT_SRC);
+    let control = fixture("horizon", "control.toml", HORIZON_CONTROL_SRC);
+    let horizon = |file: &str| {
+        run(&[
+            "--preset-file",
+            file,
+            "--horizon",
+            "0.05",
+            "--interval",
+            HORIZON_INTERVAL,
+            "--size",
+            HORIZON_SIZE,
+            "--json",
+        ])
+    };
+
+    let out = horizon(&subject);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "the subject run failed: {}",
+        stderr(&out)
+    );
+    let subject = stdout(&out);
+
+    let out = horizon(&control);
+    assert!(
+        out.status.success(),
+        "the control run failed: {}",
+        stderr(&out)
+    );
+    let control = stdout(&out);
+
+    // The subject drifts one way. `coverage` is the statistic the accumulation
+    // moves most directly — the field fills — so it carries the claim, and the
+    // floor is `core/tests/reactivity.rs`'s: below it, a difference is noise.
+    let drift = value_for(&subject, "coverage", "delta");
+    let direction = value_for(&subject, "coverage", "monotone");
+    eprintln!("subject coverage: delta {drift}, monotone {direction}");
+    assert!(
+        drift.abs() > REACTIVITY_FLOOR,
+        "the accumulating world's coverage travelled {drift}, under the \
+         {REACTIVITY_FLOOR} noise floor — the horizon cannot see its own subject"
+    );
+    assert_eq!(
+        direction, 1.0,
+        "the accumulation is one-way, so every step should have agreed with it"
+    );
+
+    // The control does not move at all. Exact zeros, not a tolerance: the same
+    // frame rendered twice is the same bytes, so any travel here would be a
+    // defect in the instrument rather than a property of the world.
+    for stat in ["coverage", "peak/mean", "footprint"] {
+        let delta = value_for(&control, stat, "delta");
+        let monotone = value_for(&control, stat, "monotone");
+        assert_eq!(
+            (delta, monotone),
+            (0.0, 0.0),
+            "the static control drifted on `{stat}`: delta {delta}, monotone \
+             {monotone} — the instrument is reporting motion that is not there"
+        );
+    }
+}
+
+/// A horizon cannot be driven by a clip, and says so rather than silently
+/// ignoring one of the two stimuli it was handed. GPU-free — it fails in the
+/// parser.
+#[test]
+fn a_horizon_rejects_a_clip_as_its_stimulus() {
+    assert_failed_naming(
+        &run(&[
+            "--preset-file",
+            SHIPPED_PRESET_FILE,
+            "--horizon",
+            "0.05",
+            "--signal",
+            "dynamic:110",
+        ]),
+        "--horizon holds a single stimulus",
+        "a horizon with --signal",
+    );
+    assert_failed_naming(
+        &run(&["--preset-file", SHIPPED_PRESET_FILE, "--horizon", "soon"]),
+        "--horizon expects minutes",
+        "a non-numeric horizon",
+    );
+    // An interval longer than the whole run samples nothing; the error names
+    // the flag that has to move.
+    assert_failed_naming(
+        &run(&[
+            "--preset-file",
+            SHIPPED_PRESET_FILE,
+            "--horizon",
+            "0.05",
+            "--interval",
+            "600",
+        ]),
+        "longer than",
+        "an interval past the horizon",
+    );
+}
+
 /// `--report --json` emits parseable JSON with the documented top-level shape. The
 /// report is hand-rolled (no serde), so nothing but a consumer proves it is
 /// well-formed — and the `preset-author` lane is that consumer.

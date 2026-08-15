@@ -212,6 +212,108 @@ impl Renderer {
         Ok(images)
     }
 
+    /// Advance preset `name` under a single constant `frame` and read back only
+    /// the frames named in `at_frames` (Plan 0085 Phase 1) — the **long-run**
+    /// primitive, and the one a horizon needs.
+    ///
+    /// Its two siblings cannot serve a run of tens of thousands of frames:
+    /// [`capture_preset`](Self::capture_preset) reseeds from scratch on every
+    /// call, so sampling *k* points costs `O(k·N)` renders, and
+    /// [`capture_preset_over`](Self::capture_preset_over) reads back *every*
+    /// frame, so a ten-minute run at 720p would materialize ~36,000 images. This
+    /// renders `N` frames once and holds `at_frames.len()` of them.
+    ///
+    /// Frame numbering matches [`capture_audio`](Self::capture_audio): frame 0
+    /// is the first advanced frame, so `at_frames = [n - 1]` returns exactly what
+    /// `capture_preset(name, frame, n)` returns — asserted in
+    /// `core/tests/capture_advance.rs` rather than argued, because it is the
+    /// property that lets a horizon's rows be compared with every other capture
+    /// this repo takes.
+    ///
+    /// Deterministic on the same terms as its siblings: scenes are rebuilt to
+    /// their seed, the clock resets to `0.0`, and the step is a fixed
+    /// [`FALLBACK_DT`](scenes::FALLBACK_DT) — so a row at index *k* does not
+    /// depend on how far the run was asked to go. Images come back in
+    /// `at_frames` order; a repeated index yields the same frame twice rather
+    /// than rendering it twice. An empty `at_frames` renders nothing.
+    ///
+    /// **Off the hot path** — it blocks on a GPU readback per requested frame.
+    /// The readback buffer is built **once, at the first requested frame**, and
+    /// reused for every later one. Both halves of that matter on the DX12
+    /// software adapter, where building GPU resources mid-sequence perturbs what
+    /// the feedback stages resolve to (the hazard
+    /// [`capture_preset_over`](Self::capture_preset_over) documents, and a
+    /// horizon is precisely a long feedback sequence): reusing it means the
+    /// perturbation happens once rather than per sample, and doing it at the
+    /// first sample rather than up front is what puts the allocation at the same
+    /// point in the sequence [`capture_preset`](Self::capture_preset) puts it —
+    /// which is what makes the two agree pixel-for-pixel on WARP as well as on
+    /// hardware. It also stays independent of the horizon requested, since the
+    /// first sample sits at the same frame index however long the run is.
+    pub fn capture_preset_at(
+        &mut self,
+        name: &str,
+        frame: &AnalysisFrame,
+        at_frames: &[u32],
+    ) -> Result<Vec<CaptureImage>, RenderError> {
+        self.reset_for_capture(name)?;
+        let Some(&last) = at_frames.iter().max() else {
+            return Ok(Vec::new());
+        };
+
+        let (width, height) = (self.ctx.config.width, self.ctx.config.height);
+        let format = self.ctx.surface_format();
+        let (texture, view) = capture::create_target(&self.ctx.device, format, width, height);
+        let mut readback: Option<(wgpu::Buffer, u32)> = None;
+
+        let mut captured: Vec<(u32, CaptureImage)> = Vec::with_capacity(at_frames.len());
+        for index in 0..=last {
+            self.time += scenes::FALLBACK_DT;
+            if !at_frames.contains(&index) {
+                self.step_offscreen(frame, &view, width, height, scenes::FALLBACK_DT);
+                continue;
+            }
+            let slot = readback
+                .get_or_insert_with(|| capture::create_readback(&self.ctx.device, width, height));
+            let (buffer, padded_bpr) = (&slot.0, slot.1);
+            let mut encoder =
+                self.ctx
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("lmv-capture-at"),
+                    });
+            capture::record_clear(&mut encoder, &view);
+            let _ = self.draw_frame(
+                frame,
+                &mut encoder,
+                &view,
+                width,
+                height,
+                scenes::FALLBACK_DT,
+                SaltMode::Pinned,
+            );
+            capture::record_copy(&mut encoder, &texture, buffer, padded_bpr, width, height);
+            self.ctx.queue.submit(std::iter::once(encoder.finish()));
+
+            #[cfg(feature = "text")]
+            self.text_layer.end_frame();
+
+            let img = capture::read_back(&self.ctx.device, buffer, width, height, padded_bpr)?;
+            captured.push((index, img));
+        }
+
+        at_frames
+            .iter()
+            .map(|idx| {
+                captured
+                    .iter()
+                    .find(|(i, _)| i == idx)
+                    .map(|(_, img)| img.clone())
+                    .ok_or(RenderError::CaptureReadback)
+            })
+            .collect()
+    }
+
     /// Select `name` and reset every stateful system to its deterministic seed —
     /// the shared preamble of [`capture_preset`](Self::capture_preset) and
     /// [`capture_preset_over`](Self::capture_preset_over), so both are pure
