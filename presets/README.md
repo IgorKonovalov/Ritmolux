@@ -297,7 +297,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `attractor`       | `a` `b` `c` `d` `tuple` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
-| `shape_field`     | `shape` `points` `scale` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
+| `shape_field`     | `shape` `points` `scale` `gamma` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -798,9 +798,59 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 | `points` | the same `3`..`12` count, for `polygon` and `star` |
 | `scale` | the figure's size: its outline sits at `scale` of the frame's short half-axis. Default `0.6`, clamped to `0.01`..`20` |
 | `pan_x` / `pan_y` | move the figure's centre (the shared view transform) |
+| `gamma` | the **response exponent** on the distance, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20` |
 
 There is no `zoom` here and that is not an omission: `scale` **is** this scene's
 size lever, and a view zoom on top of it would be a second spelling of one idea.
+
+#### Making the figure respond — the three levers, and none of them is new
+
+All three of the obvious reactivity asks fall out of parameters that already
+existed, once the thing being banded is a distance. That is ADR-0105's claim and
+it holds; these are recipes, not features.
+
+```toml
+[params]
+color_center = "time * 0.15"            # RINGS TRAVEL OUTWARD
+scale        = "0.5 + 0.12 * bass"      # THE FIGURE BREATHES
+palette_steps = "6 + floor(hash(beat_index) * 4)"   # RING COUNT ON THE BEAT
+```
+
+- **Rings travel outward** because `color_center` slides the palette coordinate,
+  and the coordinate is a distance — so sliding it slides every contour together.
+  The seam to know about is the LUT's **repeat addressing**: the coordinate wraps
+  at 1, so unless the gradient's last stop is its first colour again, the wrap is
+  a visible edge crossing the figure once per cycle. Measured on a *cyclic*
+  gradient, a full 12-step cycle moves the frame by 0.0339 per step on average
+  with the wrap step at 0.0330 — no stutter. On a non-cyclic palette the wrap is
+  the sharpest transition in the gradient; see
+  [Repeating is not the same as continuous](../docs/preset-palettes.md#the-palette-table).
+- **The figure breathes** on `scale`, monotonically: measured 14, 26 and 41 px of
+  half-extent at `scale` 0.25, 0.45 and 0.7.
+- **Ring count on the beat** works because `palette_steps` is quantized on the
+  CPU — an eased binding visits whole counts and never a fractional one, which
+  would leave every boundary crawling. **Whether it *reads* is a separate
+  question**: a band count is a global change to every pixel at once, which is
+  the shape a strobe has, and `fragment_mandala`'s header flags the same worry.
+  If it strobes, put the beat on `scale` or `gamma` instead and let the count
+  sit still.
+
+#### `gamma` runs the opposite way to `ink_gamma`
+
+The exponent applies to the **distance**, before the palette coordinate, so it
+decides where contours crowd rather than what colour they are. Because a band
+boundary sits at `(k/n)^(1/gamma)`, the exponent is inverted on its way to a
+position — and **below 1 is the direction that tightens the rings toward the
+centre**, which is what the reference images do:
+
+| `gamma` | where the 8 boundaries land, in distance | reads as |
+|---|---|---|
+| `0.4` | 0.006 0.031 0.086 0.177 0.309 0.487 0.716 1.0 | **tight at the centre, opening outward** |
+| `1.0` | 0.125 0.25 0.375 0.5 0.625 0.75 0.875 1.0 | evenly spaced (the default, an exact identity) |
+| `2.5` | 0.435 0.574 0.675 0.758 0.829 0.891 0.948 1.0 | tight at the outline |
+
+That is the opposite of the intuition `ink_gamma` builds, where a higher exponent
+means more effect at the low end. Nothing warns — this table is the warning.
 
 **`palette_steps` is what makes this scene look like anything.** Left at its
 default the frame is a smooth ramp from the figure's centre outwards — correct,
