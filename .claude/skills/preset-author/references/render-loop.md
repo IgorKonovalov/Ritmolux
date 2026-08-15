@@ -81,6 +81,63 @@ The app **never seeds** into an override folder — it is yours.
 | `--size <WxH>` | render size (default 1280x720). Render near 1080p when judging the real look — the attractor's detail in particular follows the target size. |
 | `--strip <N>` | frames tiled along the audio (default 8). |
 | `--out <path>` | output PNG (parent dirs auto-created). For `--all`, a `.png` path is used verbatim; any other path is treated as a dir and the sheet lands at `<out>/contact-sheet.png`. |
+| `--horizon <minutes>` | the **long-run drift check** — N *simulated* minutes at capture cadence, one statistics row per interval, no image. Only for worlds that accumulate; see below. |
+| `--interval <secs>` | simulated seconds between horizon rows (default 30). |
+
+## The horizon — the only instrument that measures past half a second
+
+Every other mode on this page photographs the first moments of a preset's life. The behavioural
+gates capture 30 frames; a live set runs for hours. A world whose mechanism **accumulates** can
+drift across that gap invisibly — Plan 0075's Shatter piled onto its flow field's attractors over
+minutes and collapsed on stage three times with the whole suite green.
+
+```sh
+# Ten simulated minutes of a draft, a row every 30 s
+cargo run -p standalone --example shot -- --preset-file presets/my_draft.toml \
+  --horizon 10 --size 96x96 --set bass=0.6,mid=0.45
+
+# The same run as JSON, and at a finer interval
+cargo run -p standalone --example shot -- --preset-file presets/my_draft.toml \
+  --horizon 10 --interval 15 --json
+```
+
+**Run it when the mechanism has an accumulation axis** — trails / `fade`, a `[feedback]` table,
+particles in a flow field, reaction-diffusion. Anything where this frame's output is next frame's
+input. A look with none of those has nothing for the horizon to find, and it costs minutes.
+
+The stimulus is `--set`, **held for the whole run** — that is what makes a row at minute nine
+comparable with a row at minute one, and it is why `--horizon` and `--signal`/`--audio` are mutually
+exclusive rather than one silently winning.
+
+Each row carries `coverage` (lit fraction), `peak/mean` (concentration — has the population piled
+onto a few places?) and `footprint` (motion over the figure's own footprint since the previous row;
+the first row prints `-` because it has no predecessor). Under the table, a trend line per
+statistic: `delta` is end-to-end travel, `monotone` the share of consecutive steps that went that
+way.
+
+**Read it against a static control.** A preset with no `time`, audio or feedback term renders one
+frame forever and prints `delta 0.0000, monotone 0.00` on all three. These statistics are
+image-domain proxies for a simulation-domain event — particles piling up *reads* as coverage
+falling and concentration rising, which is a strong correlation and not an identity — so the flat
+control is what makes a sloped subject mean something.
+
+**Nothing here is a threshold and nothing is a gate.** A world grinding into a corner reads a large
+`delta` at `monotone` near `1.00`; a world breathing around a stable mean reads `delta` near zero
+whatever its monotone. Where the line falls between drifting and alive is a judgement about the
+look, so the tool declines to make it and you make it instead. **Record the verdict in the world's
+own header** — `presets/attractor_ink.toml` carries the first one and is the shape to copy.
+
+Two live bounds worth knowing before trusting a row:
+
+- The headless capture path **dies past ~3,600 frames on both reaction-diffusion worlds**
+  (design-backlog 0093), so those two cannot reach a ten-minute horizon yet.
+- A horizon **shorter than the world's own warm-up reads settling as drift**. `reaction_verdigris`
+  reads `monotone 1.00` over 30 s purely because its pattern is still establishing.
+
+Cost: ~3,600 renders per simulated minute — roughly 10 s of wall clock per simulated minute at
+96x96 on a hardware adapter. Slow by construction, which is exactly why it is a spot-check rather
+than a gate (ADR-0099); budget a sitting. Full reference: the "horizon" section of
+`docs/capturing.md`.
 
 ## Reading the report
 
