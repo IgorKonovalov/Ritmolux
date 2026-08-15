@@ -1,6 +1,6 @@
 # 0093 — the backlog stops asserting things about a repo it has not read
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-15
 > **Approved:** 2026-08-15 (user)
 > **Owner skill(s):** dev
