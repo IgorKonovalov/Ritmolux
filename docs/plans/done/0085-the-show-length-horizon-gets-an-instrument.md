@@ -4,18 +4,20 @@
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0099](../../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md)
-> **Closes:** [design-backlog 0082](../../design-backlog-archive.md), [design-backlog 0086](../../design-backlog-archive.md).
-> **[design-backlog 0083](../../design-backlog.md) is HALF discharged** — the `switches` column it
-> needs exists (Phase 3); the three paired runs it asks for are Phase 5 and have not been made, so
-> that entry stays live.
+> **Closes:** [design-backlog 0082](../../design-backlog-archive.md), [design-backlog 0086](../../design-backlog-archive.md),
+> and — after Phase 5 was run later the same day — [design-backlog 0083](../../design-backlog-archive.md).
+> The header below said 0083 was half discharged for the few hours between the close and the runs;
+> see the Phase 5 addendum.
 
 ## Close (2026-08-15)
 
 Four `dev` phases, four commits: `3280136` (Phase 1, the horizon mode), `a1e62e5` (Phase 2, the
 first subjects), `97b7227` (Phase 3, the soak columns), `9514e2b` (Phase 4, the governor's
-qualification). **Phase 5 is `human` and deliberately outstanding** — it needs the live app on a
-real machine for real minutes and, as this plan's own risk section says, it gates nothing; it
-carries forward under Standing in [`docs/plans/README.md`](../README.md).
+qualification). **Phase 5 was `human` and outstanding at the moment of this close** — it needs the
+live app on a real machine for real minutes — **and was run a few hours later the same day**, so
+the plan is complete on all five phases. See the addendum at the end of this file; the paragraphs
+below are left as they were written, because a close that describes an outstanding phase and an
+addendum that discharges it are two facts, not one edited fact.
 
 Mode 4 verdict: **no blockers, one major, three minors, one nit.** The major is not against this
 implementation — it is the pre-existing headless-capture frame ceiling Phase 2 surfaced, filed as
@@ -241,4 +243,44 @@ rule `diagnostics.log` states for its own frozen prefix.
   no stated trigger is one this project has evidence gets skipped. Its first named subject already
   exists: Plan 0077's standing Phase 5 rider.
 - If the control run in Phase 5 climbs, the leak hunt is its own plan and starts from ADR-0010's
-  floor and Plan 0012's measuring stick.
+  floor and Plan 0012's measuring stick. **It did not — see the addendum.**
+
+## Phase 5 addendum (2026-08-15, hours after the close)
+
+The `human` phase was run. **All five phases are complete**, and
+[design-backlog 0083](../../design-backlog-archive.md) is closed in its bounded direction rather
+than staying live.
+
+Setup: release build, `tier = "rich"`, windowed at 165 Hz on windows x86_64 with a hardware
+adapter, four presets per set rotating on a fixed 20 s dwell (`min_dwell_secs = max_dwell_secs`,
+`track_change = false`), each run its own `--soak` log.
+
+| run | presets | duration | switches | RSS first → last | delta | range |
+|---|---|---|---|---|---|---|
+| 1 | feedback (`curve_ionwake`, `fragment_whorl`, `reaction_mitosis`, `reaction_verdigris`) | 1196 s | 62 | 382.6 → 367.2 MB | **−15.4** | 359.6–390.1 |
+| 2 | no-feedback control (`fragment_strata`, `lsystem_vellum`, `spectrum_halo`, `swarm_shatter`) | 1196 s | 62 | 379.9 → 380.1 MB | **+0.2** | 379.8–380.2 |
+| 3 | feedback, no switching (3 startup reconfigures only) | 1797 s | 3 | 379.7 → 328.0 MB | **−51.7** | 328.0–389.1 |
+
+**Nothing grew, and the 385 → 663 MB does not reproduce.** The control is what makes that
+readable: run 1 oscillates across a ~30 MB band where run 2 sits inside 0.4 MB, so feedback presets
+**do** cost real per-switch memory churn and it is **recovered every switch rather than
+accumulated**. NFR §12's hard requirement — no monotonic growth across a session — holds.
+
+**Phase 3's claim got the live confirmation `soak::tests` cannot give.** In run 1 the exclusion
+fired on **58 of 239** rows, holding ~6.5–7.0 ms where the raw column read ~11.9 ms, and the two
+agreed everywhere else.
+
+**Two things the runs found that this plan did not ask about.**
+
+- **The `frame_ms_p99` tail is not switch-correlated**, which falsifies the surviving half of
+  backlog 0082's premise. Run 3 reached **23.960 ms with zero switches after startup**, and the
+  steady column diverged on **0 of 359** rows because there was no switch to exclude. So 0082's
+  first candidate response — exclude the frames following a switch — **would not have solved what
+  it raised**. Filed as [backlog 0094](../../design-backlog.md); 0 of 200,667 frames dropped across
+  the whole window, so nothing ships broken.
+- **The caveats are load-bearing and are recorded as such.** No audio was playing, so the
+  band-driven half of the workload is absent; the runs were windowed and **never fullscreen**, so
+  the surface reconfigure that dominated the original observation never happened. What is
+  established is that switching feedback content for twenty minutes does not accumulate — which is
+  the question the missing control blocked. A fullscreen, audio-driven repeat would be a stronger
+  claim, and nobody is blocked on it.
