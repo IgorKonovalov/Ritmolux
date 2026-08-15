@@ -75,6 +75,16 @@ const MAX_SCALE: f32 = 20.0;
 /// Shared view transform (ADR-0018): `pan_*` moves the figure's centre.
 const DEFAULT_PAN: f32 = 0.0;
 
+/// `gamma` default — **the identity**, and it is exactly `1.0` on the way to the
+/// uniform because the shader's identity branch tests for it (`pow(x, 1.0)` is
+/// not bit-exact, ADR-0092's care).
+const DEFAULT_GAMMA: f32 = 1.0;
+/// The range `gamma` is held in. Same shape and the same reasoning as
+/// `ink_gamma` and `bg_ramp_gamma`: positive on both sides, wide enough that the
+/// clamp is the end of the useful range rather than a limit an author meets.
+const MIN_GAMMA: f32 = 0.05;
+const MAX_GAMMA: f32 = 20.0;
+
 /// Shared palette colour knobs (ADR-0021). `color_span = 0.6` puts the
 /// silhouette's interior (`d` in `0..1`) across the gradient's first 60 %, so
 /// the exterior contours have somewhere to go.
@@ -95,8 +105,9 @@ struct Params {
     // x: saturation, y: palette_mix, z: palette_steps (integral, quantized
     // CPU-side), w: palette_contour
     c: vec4<f32>,
-    // x: occlude (ADR-0085), yzw: reserved — the uniform is sized once so its
-    // `min_binding_size` does not move when a later phase claims a slot.
+    // x: occlude (ADR-0085), y: gamma (the response exponent on the distance,
+    // exactly 1.0 for the identity), zw: reserved — the uniform is sized once so
+    // its `min_binding_size` does not move when a later phase claims a slot.
     d: vec4<f32>,
 }
 
@@ -163,6 +174,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let palette_mix = params.c.y;
     let palette_steps = params.c.z;
     let palette_contour = params.c.w;
+    let gamma = params.d.y;
 
     // Square units, from the RENDER TARGET's aspect (ADR-0037): stretching x
     // makes one unit of `uv` the same length on both axes, so the figure below
@@ -178,7 +190,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // exactly 1 on its outline, and grows outward — so a band of coordinate is
     // a band of constant distance, which is the definition of an offset curve.
     let d = mark_distance(p, shape, points);
-    let coord = d * color_span + color_center;
+    // The response exponent, applied to the distance BEFORE it becomes a palette
+    // coordinate — so it reshapes where the contours sit rather than which
+    // colours they take. Above 1 the bands crowd toward the centre, which is what
+    // the reference images do and what a raw (evenly spaced) distance cannot.
+    // `select` rather than a branch, and the identity is exact: `pow(x, 1.0)` is
+    // not bit-exact, so an unbound preset must not go through it (ADR-0092).
+    let shaped = select(pow(d, gamma), d, gamma == 1.0);
+    let coord = shaped * color_span + color_center;
 
     // Hard bands, then the contour drawn from the SAME coordinate (ADR-0078).
     let banded = band_coord(coord, palette_steps);
@@ -230,6 +249,9 @@ pub struct ShapeFieldScene {
     palette_mix: f32,
     palette_steps: f32,
     palette_contour: f32,
+    /// The response exponent on the distance, raw as the preset bound it;
+    /// [`applied_gamma`] conditions it on the way to the uniform.
+    gamma: f32,
     /// How much of this field's (total) coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame — **not** a named param, so
     /// it is not reset by `reset_params`.
@@ -335,6 +357,7 @@ impl ShapeFieldScene {
             palette_mix: DEFAULT_PALETTE_MIX,
             palette_steps: palette::DEFAULT_PALETTE_STEPS,
             palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
+            gamma: DEFAULT_GAMMA,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
@@ -355,6 +378,32 @@ fn applied_scale(scale: f32) -> f32 {
     }
 }
 
+/// The exponent the shader will **actually apply** for a bound `gamma`: a
+/// non-finite binding falls back to the identity, and a finite one is held
+/// inside the positive range ([`MIN_GAMMA`], [`MAX_GAMMA`]).
+///
+/// CPU-side for `ink::applied_gamma`'s two reasons: `1.0` stays **exactly**
+/// `1.0` on the way to the uniform, which is what the shader's identity branch
+/// tests, and the clamp can never be reached with a NaN, where WGSL's `clamp` is
+/// implementation-defined.
+fn applied_gamma(gamma: f32) -> f32 {
+    if gamma.is_finite() {
+        gamma.clamp(MIN_GAMMA, MAX_GAMMA)
+    } else {
+        DEFAULT_GAMMA
+    }
+}
+
+/// The palette coordinate this scene hands the LUT, as a CPU mirror of the
+/// shader's two lines — so the exponent's properties are testable without a GPU
+/// (the arrangement `ink::key` and `tonemap::map` both use).
+#[cfg(test)]
+pub(crate) fn coord(distance: f32, gamma: f32, color_span: f32, color_center: f32) -> f32 {
+    let g = applied_gamma(gamma);
+    let shaped = if g == 1.0 { distance } else { distance.powf(g) };
+    shaped * color_span + color_center
+}
+
 /// The parameter names this scene consumes — the vocabulary a preset binding is
 /// checked against at load (ADR-0020). **Keep in sync with `set_param` below**;
 /// `declared_params_match_set_param` in `core/tests/preset.rs` fails if the two
@@ -371,6 +420,7 @@ pub const PARAMS: &[&str] = &[
     "palette_mix",
     "palette_steps",
     "palette_contour",
+    "gamma",
 ];
 
 impl Scene for ShapeFieldScene {
@@ -399,6 +449,7 @@ impl Scene for ShapeFieldScene {
         self.palette_mix = DEFAULT_PALETTE_MIX;
         self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
         self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
+        self.gamma = DEFAULT_GAMMA;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -414,6 +465,7 @@ impl Scene for ShapeFieldScene {
             "palette_mix" => self.palette_mix = value,
             "palette_steps" => self.palette_steps = value,
             "palette_contour" => self.palette_contour = value,
+            "gamma" => self.gamma = value,
             _ => {}
         }
     }
@@ -452,7 +504,7 @@ impl Scene for ShapeFieldScene {
                 palette::band_steps(self.palette_steps),
                 palette::band_contour(self.palette_contour),
             ],
-            d: [self.occlude, 0.0, 0.0, 0.0],
+            d: [self.occlude, applied_gamma(self.gamma), 0.0, 0.0],
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
 

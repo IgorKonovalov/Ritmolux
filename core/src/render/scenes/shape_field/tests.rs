@@ -8,7 +8,10 @@
 
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
-use super::{DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, PARAMS, applied_scale};
+use super::{
+    DEFAULT_GAMMA, DEFAULT_SCALE, MAX_GAMMA, MAX_SCALE, MIN_GAMMA, MIN_SCALE, PARAMS,
+    applied_gamma, applied_scale, coord,
+};
 use crate::dsp::AnalysisFrame;
 use crate::preset::Preset;
 use crate::render::scenes::marks;
@@ -244,4 +247,309 @@ fn banding_the_distance_draws_offsets_of_the_shape() {
          outline — a band of the palette coordinate must be a band of constant \
          DISTANCE, which is what makes it an offset curve rather than a circle"
     );
+}
+
+// --- Phase 4: the figure responds ---------------------------------------------
+//
+// Most of this phase is **verification that the three levers the user asked for
+// are already free**, which is why there is more measurement here than code. The
+// one thing built is the response exponent.
+
+/// The response exponent is conditioned CPU-side, and **`1.0` is the exact
+/// identity** ([ADR-0092](../../../../../docs/adrs/0092-the-ink-remap-is-a-gamma-on-the-key.md)'s
+/// care, because `pow(x, 1.0)` is not bit-exact).
+#[test]
+fn the_response_exponent_is_an_exact_identity_at_one() {
+    assert_eq!(applied_gamma(DEFAULT_GAMMA), 1.0);
+    assert_eq!(applied_gamma(0.0), MIN_GAMMA);
+    assert_eq!(applied_gamma(-3.0), MIN_GAMMA);
+    assert_eq!(applied_gamma(1e9), MAX_GAMMA);
+    assert_eq!(applied_gamma(f32::NAN), DEFAULT_GAMMA);
+
+    // Bit equality, not a tolerance: at the default the coordinate must be the
+    // distance itself, so an unbound preset never goes through `pow`.
+    for i in 0..=40 {
+        let d = i as f32 / 10.0;
+        let through = coord(d, 1.0, 1.0, 0.0);
+        assert_eq!(
+            through.to_bits(),
+            d.to_bits(),
+            "gamma = 1 must pass the distance through untouched: {through} vs {d}"
+        );
+    }
+}
+
+/// **The exponent moves where the contours crowd, and BELOW 1 is the direction
+/// the reference images want.**
+///
+/// Stated as a property of where the *band boundaries* land rather than as a
+/// curve shape, because that is the thing an author sees. Bands are evenly
+/// spaced in the palette coordinate and the coordinate is `d^gamma`, so a
+/// boundary at `k/n` sits at distance `(k/n)^(1/gamma)`:
+///
+/// | `gamma` | boundary distances (8 bands) | reads as |
+/// |---|---|---|
+/// | `0.4` | 0.006 0.031 0.086 0.177 0.309 0.487 0.716 1.0 | **crowded toward the centre** |
+/// | `1.0` | 0.125 0.25 0.375 0.5 0.625 0.75 0.875 1.0 | evenly spaced |
+/// | `2.5` | 0.435 0.574 0.675 0.758 0.829 0.891 0.948 1.0 | crowded toward the outline |
+///
+/// **The direction is worth stating because it is the opposite of the intuition
+/// `ink_gamma` builds.** There a higher exponent darkens, so "more" reads as
+/// "more effect toward the low end"; here the exponent is inverted on its way to
+/// a boundary position, so it is `gamma` **below** 1 that tightens the rings
+/// toward the middle the way the user's reference does. Nothing warns; the docs
+/// carry the table.
+#[test]
+fn the_exponent_moves_where_the_contours_crowd() {
+    // Where does band boundary `k / n` sit, in distance? Solve
+    // `coord(d) = k/n` for `d` at `color_span = 1`, `color_center = 0`:
+    // `d^gamma = k/n`, so `d = (k/n)^(1/gamma)`.
+    let boundary = |k: u32, n: u32, gamma: f32| -> f32 { (k as f32 / n as f32).powf(1.0 / gamma) };
+    let gaps = |gamma: f32| -> Vec<f32> {
+        (1..8)
+            .map(|k| boundary(k + 1, 8, gamma) - boundary(k, 8, gamma))
+            .collect()
+    };
+
+    // The boundary helper must agree with the shader's own arithmetic, or this
+    // whole test is about a formula rather than about the scene.
+    for gamma in [0.4f32, 1.0, 2.5] {
+        for k in 1..8 {
+            let d = boundary(k, 8, gamma);
+            let want = k as f32 / 8.0;
+            let got = coord(d, gamma, 1.0, 0.0);
+            assert!(
+                (got - want).abs() < 1e-4,
+                "the boundary solver disagrees with `coord` at gamma {gamma}, \
+                 band {k}: {got} vs {want}"
+            );
+        }
+    }
+
+    let flat = gaps(1.0);
+    for w in flat.windows(2) {
+        assert!(
+            (w[1] - w[0]).abs() < 1e-5,
+            "at gamma = 1 the contours must be EVENLY spaced — that is the \
+             baseline this param exists to move away from ({flat:?})"
+        );
+    }
+
+    // Below 1: the gaps GROW outward, so the rings tighten toward the centre.
+    // This is the reference's direction.
+    let toward_centre = gaps(0.4);
+    for w in toward_centre.windows(2) {
+        assert!(
+            w[1] > w[0],
+            "below 1 the gaps must grow outward — the contours tighten toward the \
+             CENTRE, which is what the reference images do ({toward_centre:?})"
+        );
+    }
+    // Above 1: the reverse, and it is a real look rather than a mistake.
+    let toward_edge = gaps(2.5);
+    for w in toward_edge.windows(2) {
+        assert!(
+            w[1] < w[0],
+            "above 1 the contours must crowd toward the OUTLINE ({toward_edge:?})"
+        );
+    }
+    println!(
+        "contour gaps  gamma 0.4: {toward_centre:?}\n              gamma 1.0: {flat:?}\n              gamma 2.5: {toward_edge:?}"
+    );
+}
+
+/// **The figure breathes**: `scale` takes a binding and the response is
+/// **monotone** in it.
+///
+/// Rendered rather than argued, and measured as the figure's own pixel extent
+/// at three scales — a param that reached the uniform but was, say, inverted or
+/// clamped flat would still load and still warn about nothing.
+#[test]
+fn the_figure_breathes_monotonically_with_scale() {
+    const SIZE: u32 = 240;
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    let scales = [0.25f32, 0.45, 0.7];
+    renderer.set_presets(
+        scales
+            .iter()
+            .map(|s| {
+                preset(
+                    &format!("s{}", (s * 100.0) as u32),
+                    &format!(
+                        "shape = \"0\"\nscale = \"{s}\"\ncolor_span = \"1\"\npalette_steps = \"2\"\n"
+                    ),
+                )
+            })
+            .collect(),
+    );
+
+    let mut extents = Vec::new();
+    for s in scales {
+        let name = format!("s{}", (s * 100.0) as u32);
+        let img = renderer
+            .capture_preset(&name, &AnalysisFrame::default(), 2)
+            .unwrap_or_else(|e| panic!("capture {name}: {e}"));
+        let (cx, cy) = (SIZE / 2, SIZE / 2);
+        let centre = luma(&img, cx, cy);
+        let mut half = 0u32;
+        while cx + half + 1 < SIZE && (luma(&img, cx + half + 1, cy) - centre).abs() <= 8.0 {
+            half += 1;
+        }
+        println!("scale {s}: figure half-extent {half} px");
+        extents.push(half);
+    }
+
+    assert!(
+        extents[0] < extents[1] && extents[1] < extents[2],
+        "the figure's extent must grow monotonically with `scale` — measured \
+         {extents:?} at scales {scales:?}"
+    );
+    assert!(
+        extents[0] > 4,
+        "the smallest figure has no measurable extent ({}) — this test is \
+         measuring nothing",
+        extents[0]
+    );
+}
+
+/// **Rings travel outward from `color_center`, and the wrap does not stutter** —
+/// the first of the three asks, and the plan's expectation was that it costs no
+/// code. It does not, and this is the evidence plus the check on the one seam
+/// that could have spoiled it.
+///
+/// `color_center` offsets the palette coordinate, which is now a distance, so
+/// sliding it slides every contour outward together. The risk the plan named is
+/// the LUT's **repeat addressing**: the coordinate wraps at 1, and if the
+/// gradient's two ends differ the wrap is a visible seam crossing the figure. So
+/// this walks a full cycle of `color_center` and asserts two things — that the
+/// picture actually moves at every step, and that no single step is an outlier
+/// against the rest, which is what a stutter at the wrap would look like.
+#[test]
+fn rings_travel_outward_with_color_center_and_the_wrap_does_not_stutter() {
+    use crate::render::metrics::frame_diff;
+
+    const SIZE: u32 = 160;
+    const STEPS: usize = 12;
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    // A CYCLIC gradient, which is what the wrap needs to be seamless: the last
+    // stop is the first colour again. `presets/README.md` says so at the
+    // parameter; this test is where the claim is checked.
+    let cyclic = "[palette]\nstops = [\n\
+                  { at = 0.0, color = \"#101030\" },\n\
+                  { at = 0.5, color = \"#ff6040\" },\n\
+                  { at = 1.0, color = \"#101030\" },\n]\n";
+    let presets: Vec<_> = (0..STEPS)
+        .map(|i| {
+            let c = i as f32 / STEPS as f32;
+            let toml = format!(
+                "name = \"c{i}\"\nsystem = \"shape_field\"\n{cyclic}\
+                 [params]\nshape = \"4\"\nscale = \"0.45\"\ncolor_span = \"0.5\"\n\
+                 palette_steps = \"6\"\ncolor_center = \"{c}\"\n"
+            );
+            Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("c{i}: {e}"))
+        })
+        .collect();
+    renderer.set_presets(presets);
+
+    let frames: Vec<_> = (0..STEPS)
+        .map(|i| {
+            renderer
+                .capture_preset(&format!("c{i}"), &AnalysisFrame::default(), 2)
+                .unwrap_or_else(|e| panic!("capture c{i}: {e}"))
+        })
+        .collect();
+
+    // Consecutive steps, wrapping the last back to the first — so the step
+    // ACROSS the seam is in the list and is graded like every other.
+    let steps: Vec<f32> = (0..STEPS)
+        .map(|i| frame_diff(&frames[i], &frames[(i + 1) % STEPS]))
+        .collect();
+    let mean = steps.iter().sum::<f32>() / steps.len() as f32;
+    let worst = steps.iter().cloned().fold(0.0f32, f32::max);
+    println!(
+        "color_center walk, {STEPS} steps round a full cycle: mean {mean:.5}, \
+         worst {worst:.5}, wrap step {:.5}",
+        steps[STEPS - 1]
+    );
+
+    assert!(
+        steps.iter().all(|d| *d > 0.001),
+        "every step of `color_center` must move the picture — the rings travel \
+         because the coordinate they band is a distance ({steps:?})"
+    );
+    assert!(
+        worst < 4.0 * mean,
+        "one step is {worst:.5} against a mean of {mean:.5} — on a cyclic \
+         gradient the wrap must be no more of a jump than any other step, and an \
+         outlier here IS the stutter the plan asked about ({steps:?})"
+    );
+}
+
+/// **Ring count on the beat**: `palette_steps` is quantized CPU-side, so an
+/// eased binding visits whole counts and never a fractional one.
+///
+/// The plan's open question is not whether it works but whether it *reads* — a
+/// band count is a global change to every pixel at once, "which is exactly the
+/// shape a strobe has". That is Phase 6's judgement, in the running app. What
+/// this pins is the half a test can settle: each count is a distinct picture,
+/// and the distinctness is not an artifact of a fractional value crawling.
+#[test]
+fn the_ring_count_steps_between_whole_figures() {
+    use crate::render::metrics::frame_diff;
+    use crate::render::palette::band_steps;
+
+    // The CPU-side quantizer is the mechanism, and it is shared — this asserts
+    // the property this scene depends on rather than re-implementing it.
+    for i in 0..=400 {
+        let raw = 3.0 + 6.0 * i as f32 / 400.0;
+        let q = band_steps(raw);
+        assert_eq!(
+            q,
+            q.round(),
+            "palette_steps reached the shader at {q}, from {raw}"
+        );
+    }
+
+    const SIZE: u32 = 160;
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    let counts = [4u32, 5, 6, 7];
+    renderer.set_presets(
+        counts
+            .iter()
+            .map(|n| {
+                preset(
+                    &format!("n{n}"),
+                    &format!(
+                        "shape = \"4\"\nscale = \"0.45\"\ncolor_span = \"0.5\"\n\
+                         palette_steps = \"{n}\"\n"
+                    ),
+                )
+            })
+            .collect(),
+    );
+    let frames: Vec<_> = counts
+        .iter()
+        .map(|n| {
+            renderer
+                .capture_preset(&format!("n{n}"), &AnalysisFrame::default(), 2)
+                .unwrap_or_else(|e| panic!("capture n{n}: {e}"))
+        })
+        .collect();
+    for (i, a) in frames.iter().enumerate() {
+        for (j, b) in frames.iter().enumerate().skip(i + 1) {
+            let diff = frame_diff(a, b);
+            assert!(
+                diff > 0.002,
+                "ring counts {} and {} render indistinguishably (diff {diff:.5})",
+                counts[i],
+                counts[j]
+            );
+        }
+    }
 }
