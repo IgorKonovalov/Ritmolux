@@ -1144,6 +1144,28 @@ second gate that sees real signal even though it renders nothing. `beat`,
 `chain` and `dsp` also push PCM, but they test fixtures and the DSP itself rather
 than the shipped set.
 
+**A fourth caveat, since Plan 0090: on an `emitter` world, a green gate means
+something different at `prewarm = 0` than at `prewarm = 1`, and no gate can see
+which.** Every behavioral gate captures 30 frames — half a second — and an
+emitter's population *ramps* toward `spawn_rate * lifetime` over a whole lifetime
+from an empty pool. `prewarm` back-dates that ramp so the first frame is already
+the steady state, which means the gates score the world the author is designing
+rather than the first 3 % of it. The same draft, changed in nothing else:
+
+| statistic | `prewarm = 0` | `prewarm = 1` | floor |
+|---|---|---|---|
+| `sanity` coverage / radial shells | `0.0074`, 0 of 10 — convicted blank | `0.1470`, 10 of 10 — structurally present | `0.25` / 4 shells |
+| `animation` footprint motion | `0.0629` | `0.1702` | `0.01` |
+| `reactivity` best band | `0.0002` | `0.0195` | `0.02` |
+
+Two things follow. A slow emitter world that fails `sanity` may be failing its
+*warm-up* rather than its design — check `prewarm` before touching the look. And
+a green row on a prewarmed world says nothing about what the first seconds of a
+live set look like, which is the question `prewarm = 0` was answering all along.
+Neither the capture length nor any floor moved to accommodate this
+([ADR-0104](adrs/0104-the-emitters-source-is-authorable-geometry.md) rejected
+that; the warm-up is what got attacked instead).
+
 If one of the other four ever needs to answer an audio question, `reactivity.rs`
 is the pattern: synthesize with `core::signal`, drive
 `Renderer::capture_audio_after_warmup`, and keep the clip only as long as the
