@@ -17,7 +17,8 @@
 //
 // After the pass/fail line it prints an ADVISORY block, which never touches the
 // exit code: the entries whose probed paths have moved since anyone last read
-// them, and the full `unprobeable:` roster.
+// them, and the full `unprobeable:` roster. The moved half needs git history and
+// says so rather than guessing when there is none — a shallow CI checkout.
 //
 // Exit 0 = every stated reduction still holds. Exit 1 = the breaks are listed
 // as `file:line -> entry`, which is clickable in most terminals. The optional
@@ -314,6 +315,13 @@ function check(root) {
  * supplied text out of a markdown file; here the argument vector is built from
  * paths the parser has already resolved against the filesystem, handed to
  * execFileSync as an array with no shell anywhere in the chain.
+ *
+ * IT NEEDS HISTORY, and on CI it does not have any. The `links` job checks out
+ * at actions/checkout's default `fetch-depth: 1`, where the tip commit is
+ * grafted parentless and every file reads as added by it — so this returns the
+ * tip date for EVERY path, and from the first run dated after the stamps the
+ * whole roster reports as moved and buries the `unprobeable:` block it shares.
+ * See `isShallow` below: the reading is withheld rather than printed wrong.
  */
 function lastTouched(path, root) {
   try {
@@ -328,8 +336,32 @@ function lastTouched(path, root) {
   }
 }
 
+/**
+ * Whether `root` is a shallow clone. Returns false when git cannot answer at
+ * all, which is deliberate: the fallback is today's behaviour, not the notice.
+ * Reporting the moved block on a full clone is right, and printing "cannot see
+ * the history" on one would be a new lie in place of the old one.
+ */
+function isShallow(root) {
+  try {
+    const out = execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return out.trim() === "true";
+  } catch {
+    return false; // no git, not a repo, or a git too old to know the flag
+  }
+}
+
 /** ISO dates compare correctly as strings, which is the whole reason for `%cs`. */
 function advisory(probes, unprobeable, root) {
+  // ADR-0016's shape, applied to an advisory: a check that cannot run says so
+  // rather than reporting something it did not measure. Only the moved half
+  // needs history — the `unprobeable:` roster is read out of the markdown.
+  if (isShallow(root)) return { moved: [], shallow: true, unprobeable };
+
   const seen = new Map();
   const moved = new Map(); // one row per entry+path, not per probe — two probes
   for (const probe of probes) { //  on one file are one thing to go and re-read
@@ -339,14 +371,19 @@ function advisory(probes, unprobeable, root) {
     const key = `${probe.entry} ${probe.path}`;
     if (!moved.has(key)) moved.set(key, { ...probe, touched });
   }
-  return { moved: [...moved.values()], unprobeable };
+  return { moved: [...moved.values()], shallow: false, unprobeable };
 }
 
-function printAdvisory({ moved, unprobeable }) {
+function printAdvisory({ moved, shallow, unprobeable }) {
   console.log("");
   console.log("advisory — reported, and never part of the exit code:");
 
-  if (moved.length === 0) {
+  if (shallow) {
+    console.log(
+      "  staleness not measured: this is a shallow clone, where `git log -1` returns the\n" +
+        "  tip commit for every path. Run it on a full checkout — the pre-push hook does.",
+    );
+  } else if (moved.length === 0) {
     console.log("  no probed path has moved since its entry was last read");
   } else {
     console.log(`  ${moved.length} probed path(s) moved since the entry was last read:`);
