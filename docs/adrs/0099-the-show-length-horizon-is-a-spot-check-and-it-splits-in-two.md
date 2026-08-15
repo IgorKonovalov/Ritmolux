@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
-> **Related plan(s):** [0085 — the show-length horizon gets an instrument](../plans/0085-the-show-length-horizon-gets-an-instrument.md)
+> **Related plan(s):** [0085 — the show-length horizon gets an instrument](../plans/done/0085-the-show-length-horizon-gets-an-instrument.md)
 > **Supplements:** [ADR-0010](0010-accept-gpu-driver-memory-floor.md),
 > [ADR-0045](0045-quality-tiers-floor-and-rich.md)
 
@@ -133,6 +133,51 @@ wrong**: with no switch marker the log cannot separate per-switch cost from mono
 is the *entire* question [backlog 0083](../design-backlog.md) asks. One appended column is what
 turns the existing instrument into one that can answer it — which is why this decision extends
 `--soak` rather than replacing it.
+
+## Outcome (2026-08-15, at Plan 0085's close)
+
+Both instruments shipped as decided: `shot --horizon <minutes>` (Phase 1) and `--soak`'s appended
+switch/frame-time columns (Phase 3). Neither is a gate, neither runs in CI. Four things this ADR
+asserted turned out to be wrong, and each is worth more than the decision it sat under.
+
+**1. `metrics` had no peak-to-mean instrument.** The Decision says the headless horizon reuses
+"`metrics`'s existing coverage / footprint / peak-to-mean instruments rather than inventing new
+ones", and the third of those did not exist. `metrics::peak_to_mean` was built in Phase 1 — a crest
+factor over each pixel's **absolute** departure from the sampled ground, so a two-tone ink world
+(ADR-0106) reads like its inverse rather than reporting zero forever. It saturates once the peak
+pixel reaches white, which is stated on the function and is a second reason the mode prints a trend
+rather than a threshold. The "reuses instruments whose meaning is established" consequence is
+therefore two-thirds true; the new one arrived with its own derivation and its own stated blind
+spot, which is what that consequence was really asking for.
+
+**2. R0's governor is built, and it does not read `p99`.** This ADR's Context calls it "the
+**unbuilt** adaptive-quality governor … **specified to read p99**", and the second Positive
+consequence rests on getting the qualification in "before it is designed". Both halves are false:
+Plan 0044 / ADR-0045 delivered tiers and the governor on **2026-07-30**, two weeks before this ADR
+was written, and `core/src/render/tier.rs`'s `sustained_miss` reads the **raw** frame-time series,
+demoting only when 75 % of at least 180 samples exceed `budget × 1.25`. A switch's handful of slow
+frames in a 240-sample ring cannot approach that fraction — so the shipped governor already landed
+[backlog 0082](../design-backlog-archive.md)'s *second* candidate response, independently, in the
+form of a miss fraction. The hazard this ADR documents is real but it lives in the **prose**: the
+roadmap item and the backlog entry both describe a governor that reads p99, and a revisit starting
+from those sentences would build the thing the measurement warns about. Phase 4 says exactly that
+in all three places a governor design would start from.
+
+**3. The headless horizon does not reach ten minutes on every world.** The Negative section priced
+the mode in wall clock ("3,600·N renders … minutes of wall clock per world") and that held — 10 to
+75 s per world at 96x96. What it did not anticipate is a **frame ceiling**: both reaction-diffusion
+worlds die at 3,601 frames with an invalid capture readback buffer after RSS reaches ~2.9 GB, so
+they were measured at 0.5 simulated minutes rather than 10. It is pre-existing and shared with the
+shipped `capture_preset` (run as the control before it was called a finding), and it is filed as
+[backlog 0093](../design-backlog.md). Until it is fixed, "N simulated minutes" is bounded by world.
+
+**4. The trigger's first named subject was already repaired.** The Notes below point at Plan 0077's
+standing Phase 5 rider as the first world to use the instrument. Phase 2 ran it: `swarm_shatter`
+reads monotone 0.50 and wanders 0.197–0.384 across ten minutes with no trend — the collapse that
+raised backlog 0086 does not reproduce. The plan called finding nothing the expected outcome and it
+was; what the instrument convicted instead was a world nobody suspected, `attractor_ink`, whose
+coverage falls 0.199 → 0.002 with the silhouette intact. That verdict is in its header, unrepaired
+by design.
 
 ## Notes
 

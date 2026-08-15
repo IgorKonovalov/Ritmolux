@@ -1,11 +1,36 @@
 # 0085 — the show-length horizon gets an instrument
 
-> **Status:** in-progress
+> **Status:** done (2026-08-15)
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md)
-> **Closes:** [design-backlog 0082](../design-backlog.md), [design-backlog 0083](../design-backlog.md),
-> [design-backlog 0086](../design-backlog.md)
+> **Related ADRs:** [ADR-0099](../../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md)
+> **Closes:** [design-backlog 0082](../../design-backlog-archive.md), [design-backlog 0086](../../design-backlog-archive.md).
+> **[design-backlog 0083](../../design-backlog.md) is HALF discharged** — the `switches` column it
+> needs exists (Phase 3); the three paired runs it asks for are Phase 5 and have not been made, so
+> that entry stays live.
+
+## Close (2026-08-15)
+
+Four `dev` phases, four commits: `3280136` (Phase 1, the horizon mode), `a1e62e5` (Phase 2, the
+first subjects), `97b7227` (Phase 3, the soak columns), `9514e2b` (Phase 4, the governor's
+qualification). **Phase 5 is `human` and deliberately outstanding** — it needs the live app on a
+real machine for real minutes and, as this plan's own risk section says, it gates nothing; it
+carries forward under Standing in [`docs/plans/README.md`](../README.md).
+
+Mode 4 verdict: **no blockers, one major, three minors, one nit.** The major is not against this
+implementation — it is the pre-existing headless-capture frame ceiling Phase 2 surfaced, filed as
+[backlog 0093](../../design-backlog.md) with a candidate mechanism. Verified at the close: `fmt`
+clean, `clippy --workspace --all-targets -D warnings` clean, `check-doc-links.mjs` exit 0, and the
+21 tests this plan added or touched green on this box's hardware adapter.
+
+**Three corrections this plan made to its own premises, all recorded rather than absorbed.**
+`metrics::peak_to_mean` did not exist, despite ADR-0099 naming it an existing instrument — built in
+Phase 1 and recorded in that ADR's `Outcome`. R0's governor is *not* unbuilt (Plan 0044 / ADR-0045,
+2026-07-30) and the shipped one **never reads p99**, so the hazard lives in the description rather
+than the code — corrected in `nfr.md`, this README's roadmap item 3, and `roadmap-visual-richness.md`
+by Phase 4, and in backlog 0082 at this close. And Phase 3's own done-when was unsatisfiable as
+written: it asked for "the two frame-time columns diverging" from a log that carried **no** `p99`
+column at all, so three columns were appended rather than two.
 
 ## TL;DR
 
@@ -49,7 +74,7 @@ turn on.
 
 ## Decision
 
-Per [ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md), build
+Per [ADR-0099](../../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md), build
 **two** spot-check instruments rather than one harness, because the failures do not share a
 mechanism: simulation drift is deterministic and reproducible headless (injected `dt` since
 ADR-0019 / Plan 0014), while RSS growth and p99 spikes come from live GPU resource churn that no
@@ -100,7 +125,7 @@ flowchart TB
   asserted rather than assumed: the same world at the same horizon produces **identical** statistics
   across two runs, and the statistics at interval *k* do not depend on the horizon requested (a
   10-minute run's first interval equals a 2-minute run's first interval). Peak memory and wall clock
-  are **reported, naming the machine** ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)),
+  are **reported, naming the machine** ([ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)),
   not asserted.
 
 ### Phase 2 — the horizon has a first subject
@@ -138,7 +163,7 @@ flowchart TB
 - **What:** record, beside the roadmap item and the NFR that names the frame budget, that
   `frame_ms_p99` spikes on resource rebuilds while nothing is dropped, that the measured case is
   25.037 ms p99 against 8.749 ms avg and zero drops in 28,698 frames, and that the new steady-state
-  column exists for exactly this reason. Name [backlog 0082](../design-backlog.md)'s three candidate
+  column exists for exactly this reason. Name [backlog 0082](../../design-backlog-archive.md)'s three candidate
   responses without choosing between them — that choice is R0's.
 - **Files touched:** `docs/nfr.md`, `docs/plans/README.md`'s roadmap item 3,
   `docs/roadmap-visual-richness.md` if it carries R0's description.
@@ -148,7 +173,7 @@ flowchart TB
 ### Phase 5 — the paired RSS runs
 
 - **Owner skill:** human
-- **What:** the measurement [backlog 0083](../design-backlog.md) asks for, which needs the live app
+- **What:** the measurement [backlog 0083](../../design-backlog.md) asks for, which needs the live app
   on a real machine for a real duration. Three runs, all with `--soak`:
   1. feedback presets, switching, matched length;
   2. a **no-feedback control**, same length, same switching cadence;
