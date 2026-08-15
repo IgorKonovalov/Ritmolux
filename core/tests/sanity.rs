@@ -428,6 +428,16 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // preset lands this is the number to re-derive from the distribution
         // this test prints.
         SystemKind::Emitter => 0.25,
+        // **Not derived from a distribution, because there is no distribution
+        // yet**: Plan 0091 ships the `shape_field` engine and deliberately no
+        // preset content (ADR-0081 puts worlds in the author's lane), so this
+        // family has zero shipped members and this floor has never gated
+        // anything. It is inherited from `FragmentField` on the structural
+        // argument alone — both are fullscreen scenes that cover every pixel
+        // with `occlude`, so a shape field that is not broken cannot score low.
+        // **Re-derive it from this test's printed distribution when the first
+        // one ships**, at half the family minimum like every floor above.
+        SystemKind::ShapeField => 0.50,
     }
 }
 
@@ -442,6 +452,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::Attractor => "attractor",
         SystemKind::Spectrum => "spectrum",
         SystemKind::Emitter => "emitter",
+        SystemKind::ShapeField => "shape_field",
     }
 }
 

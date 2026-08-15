@@ -342,5 +342,8 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32) -> f32 {
 }
 "#;
 
+// Crate-visible under `cfg(test)` only: `shape_field`'s contour test needs the
+// numerically-sampled outline this module's tests already build, and a second
+// copy of a ground truth is a ground truth that can disagree with itself.
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

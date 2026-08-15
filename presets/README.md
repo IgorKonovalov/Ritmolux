@@ -297,6 +297,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `attractor`       | `a` `b` `c` `d` `tuple` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
+| `shape_field`     | `shape` `points` `scale` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -752,19 +753,77 @@ Two consequences worth planning around:
   have a legible figure fills the frame. The engine's own shaped fixture reaches
   for `zoom` to thin the field rather than for a smaller mark.
 
-> **A shaped mark is a silhouette in additive light — there is no fill and no
-> outline.** The compositor adds, so black adds nothing and a dark edge cannot
-> exist: a `heart` is a heart-shaped **glow**, brightest in its middle and fading
-> to nothing at its outline, not a red body with a black rim. The same is true of
-> every entry above. This is ADR-0084's deliberate scope and not a gap waiting to
-> be tuned around — a two-tone object reopens the additive-blend decision the
-> whole composite rests on and is its own backlog question. If a look needs one,
-> that is engine feedback.
+> **A shaped mark drawn straight into the chain is a silhouette in additive
+> light — there is no fill and no outline.** The compositor adds, so black adds
+> nothing and a dark edge cannot exist *there*: a `heart` drawn this way is a
+> heart-shaped **glow**, brightest in its middle and fading to nothing at its
+> outline, not a red body with a black rim. That is ADR-0084's deliberate scope.
+>
+> **It is no longer the whole story, and the correction is not a workaround.**
+> Put the same scene in a `[layer]` with `blend = "multiply"` and its marks
+> *subtract* light instead — dark figures on a light ground, measured to display
+> luma 0.9 at Plan 0091 Phase 1. See
+> [Dark on light](#dark-on-light--the-multiply-route-and-its-two-traps). What
+> stays true is the sentence's other half: nothing in this engine decides what
+> is in **front** of what, so a mark that occludes another figure is still
+> unbuilt, and *that* is engine feedback.
 
 The roster is closed: a shape that is not in the table is `architect` + `dev`
 work, not a preset. That is the same trade
 [ADR-0061](../docs/adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)
 made for fold edges.
+
+### `shape_field` — the same roster, at frame scale (Plan 0091)
+
+**The five silhouettes above are not only marks.** `system = "shape_field"`
+draws one of them as a **fullscreen signed-distance field**, which is a different
+thing from a big particle: the palette coordinate becomes the *distance* to the
+figure, so banding it draws **concentric offset contours of the shape**
+([ADR-0105](../docs/adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md)).
+
+```toml
+system = "shape_field"
+
+[params]
+shape           = "4"        # the roster above - 4 is the heart
+scale           = "0.55"     # the figure's size in the frame
+palette_steps   = "9"        # <- the contours. Without this it is a gradient.
+palette_contour = "0.7"      # thin outlines at the band boundaries
+color_span      = "0.45"     # how much gradient the figure's interior spans
+```
+
+| param | does |
+|---|---|
+| `shape` | the same numeric selector as the table above, same five names, same closed roster |
+| `points` | the same `3`..`12` count, for `polygon` and `star` |
+| `scale` | the figure's size: its outline sits at `scale` of the frame's short half-axis. Default `0.6`, clamped to `0.01`..`20` |
+| `pan_x` / `pan_y` | move the figure's centre (the shared view transform) |
+
+There is no `zoom` here and that is not an omission: `scale` **is** this scene's
+size lever, and a view zoom on top of it would be a second spelling of one idea.
+
+**`palette_steps` is what makes this scene look like anything.** Left at its
+default the frame is a smooth ramp from the figure's centre outwards — correct,
+and not the reason to reach for this system. Turned up, each band is a band of
+constant distance, which is the definition of an offset curve; `palette_contour`
+then draws a hairline at each boundary. This is the **third** scene those two
+params do anything in, and the first where the thing being banded is a figure
+rather than a noise field.
+
+**Where the contours read is `color_span`.** The distance is `0` at the figure's
+deepest interior point and exactly `1` on its outline, and keeps growing
+outside — so `color_span` decides how much gradient the *interior* gets and how
+much is left for the rings around it. Low values put the whole gradient inside
+the silhouette and leave the surround flat; the default `0.6` is a compromise
+that shows both.
+
+> **`points` on a `star` here is not the same picture as on a mark.** These
+> silhouettes were tuned for sprites a few pixels across, and at frame scale the
+> star's interior is knowingly approximate — measured at Plan 0091 Phase 2, its
+> field is 0.066 out of true at 5 points and **0.248 at 12**, in units where the
+> figure's own inradius is 1. The contours *outside* every shape are exact. So
+> a many-pointed star's inner rings will not sit where an offset curve should;
+> its outer ones will.
 
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 

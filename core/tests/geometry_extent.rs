@@ -197,7 +197,11 @@ fn draws_segments(system: SystemKind) -> bool {
         | SystemKind::Swarm
         | SystemKind::ReactionDiffusion
         | SystemKind::Attractor
-        | SystemKind::Emitter => false,
+        | SystemKind::Emitter
+        // `shape_field` draws a figure and still belongs on this side: it is a
+        // per-pixel distance with no CPU segment list at all, which is precisely
+        // the property ADR-0105 chose it for.
+        | SystemKind::ShapeField => false,
     }
 }
 

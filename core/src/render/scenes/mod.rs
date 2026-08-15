@@ -23,6 +23,7 @@ pub mod lines;
 pub(crate) mod marks;
 pub mod particles;
 pub mod reaction_diffusion;
+pub mod shape_field;
 pub mod swarm;
 
 use std::cell::RefCell;
@@ -504,7 +505,8 @@ fn draws_through_shared_line_renderer(kind: SystemKind) -> bool {
         | SystemKind::Swarm
         | SystemKind::ReactionDiffusion
         | SystemKind::Attractor
-        | SystemKind::Emitter => false,
+        | SystemKind::Emitter
+        | SystemKind::ShapeField => false,
     }
 }
 
@@ -565,6 +567,9 @@ fn create(
             surface_format,
             tier.emitter_objects,
         )),
+        SystemKind::ShapeField => {
+            Box::new(shape_field::ShapeFieldScene::new(device, surface_format))
+        }
     }
 }
 
@@ -613,6 +618,7 @@ mod tests {
     fn expected_scene_name(system: SystemKind) -> &'static str {
         match system {
             SystemKind::FragmentField => "fragment field",
+            SystemKind::ShapeField => "shape field",
             SystemKind::Swarm => "swarm",
             SystemKind::ParametricCurve => "parametric curve",
             SystemKind::LSystem => "l-system",
@@ -711,6 +717,7 @@ mod tests {
             SystemKind::ReactionDiffusion,
             SystemKind::Attractor,
             SystemKind::Emitter,
+            SystemKind::ShapeField,
         ];
         for (i, a) in independent.iter().enumerate() {
             for b in independent.iter().skip(i + 1).chain(lines.iter()) {

@@ -1,13 +1,15 @@
 # Preset colour: the palette surface
 
 Presets control colour through a **shared palette** (ADR-0021, Plan 0020). A
-palette is a gradient baked once at load into a lookup table that the four
+palette is a gradient baked once at load into a lookup table that the five
 **shader-coloured** scenes sample:
 
 - `fragment_field`
 - `swarm`
 - `reaction_diffusion`
 - `attractor`
+- `shape_field` (Plan 0091) — the one whose sample coordinate is a **distance**
+  rather than a level, which is what makes banding it draw offset contours
 
 **All four line scenes** sample the same LUT too, but **on the CPU, once per
 segment** rather than per pixel or per particle:
@@ -129,7 +131,7 @@ the audio vocabulary (`bass mid treb onset beat bar time` …) — only the grad
 | `saturation` | `1.0` | Scales chroma toward luma. `1` unchanged, `0` grayscale, `>1` oversaturated. |
 | `palette_mix`| `0.0` | A/B crossfade position (see below); `0` = palette A. |
 | `palette_steps` | `0.0` (off) | Quantizes the gradient into that many hard bands — see [Hard bands](#hard-bands--palette_steps-and-palette_contour). |
-| `palette_contour` | `0.0` (off) | Darkens a hairline at each band edge. **Fragment-field and reaction-diffusion only**; inert elsewhere — same section. |
+| `palette_contour` | `0.0` (off) | Darkens a hairline at each band edge. **Fragment-field, reaction-diffusion and shape-field only**; inert elsewhere — same section. |
 
 `saturation` and `palette_mix` are **one binding with two consumers**: the active scene and the
 background pre-pass. You write them once and the whole frame answers — see
@@ -137,11 +139,11 @@ background pre-pass. You write them once and the whole frame answers — see
 deliberately: it offsets the *scene's* sample coordinate, and the backdrop has its own coordinate in
 `bg_hue`.
 
-### Fragment field & reaction-diffusion — where the field sits in the gradient
+### Fragment field, reaction-diffusion & shape field — where the field sits in the gradient
 
 | Param | Default | What it does |
 |-------|---------|--------------|
-| `color_span`   | `0.6` (fragment) / `0.85` (RD) | Multiplies the scene's field level to set how much of the gradient it spans. **Low = a cohesive single-family mood**; high = a wide sweep. |
+| `color_span`   | `0.6` (fragment and shape field) / `0.85` (RD) | Multiplies the scene's field level to set how much of the gradient it spans. **Low = a cohesive single-family mood**; high = a wide sweep. |
 | `color_center` | `0.0` | Where that window sits in the gradient. Slide it (e.g. `0.1 + treb*0.2`) to move the tonal centre. **Cyclic** — see below. |
 
 A warm, cohesive field: a warm palette + a low `color_span`.
@@ -547,6 +549,7 @@ Where the LUT is sampled decides whether that derivative exists at all:
 |-------|--------------------------|-----------------|-------------------|
 | `fragment_field` | per pixel, fragment stage | ✅ | ✅ |
 | `reaction_diffusion` | per pixel, fragment stage | ✅ | ✅ |
+| `shape_field` | per pixel, fragment stage | ✅ | ✅ |
 | `attractor` | per particle, **vertex** stage | ✅ | ❌ inert |
 | `swarm` | per particle, on the CPU | ✅ | ❌ inert |
 | `emitter` | per particle, on the CPU | ✅ | ❌ inert |
@@ -742,7 +745,7 @@ setting in a *different* table, and no gate or warning can see it.
 
 | layer scene | coverage | what a `multiply` slot gives you |
 |---|---|---|
-| `fragment_field`, `reaction_diffusion` | every pixel (alpha = `occlude`, 1 by default) | the whole frame is darkened — a graded wash, a banded gradient, a figure *and* its surround |
+| `fragment_field`, `reaction_diffusion`, `shape_field` | every pixel (alpha = `occlude`, 1 by default) | the whole frame is darkened — a graded wash, a banded gradient, a figure *and* its surround |
 | `swarm`, `emitter` | inside each mark only (alpha = the mark's geometric falloff) | discrete dark marks on an untouched light ground |
 
 Both routes reach a dark figure, and the particle one reaches **darker**:

@@ -44,6 +44,11 @@ pub enum SystemKind {
     /// above (it draws through the same shared renderer), driven by the analysis
     /// frame's log-spaced band array rather than by a generator.
     Spectrum,
+    /// The mark roster drawn at frame scale as a signed-distance field —
+    /// [ADR-0105](../../../docs/adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md).
+    /// The one scene whose palette coordinate is a *distance*, which is what
+    /// makes `palette_steps` draw concentric offset contours of a shape.
+    ShapeField,
     /// The ballistic emitter — objects that spawn, fall on a parabola and die
     /// ([ADR-0057](../../../docs/adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)).
     /// The first scene whose population is not fixed.
@@ -55,7 +60,7 @@ impl SystemKind {
     /// `variant_roster_reminder` below: a new variant fails the build there until
     /// this is bumped, and the length of [`ALL`](SystemKind::ALL) is typed from
     /// it, so bumping it without rostering the variant does not compile either.
-    pub const VARIANT_COUNT: usize = 9;
+    pub const VARIANT_COUNT: usize = 10;
 
     /// **The** roster of built-in systems — every [`SystemKind`], in the order the
     /// engine builds their scenes. The single place the variant list lives: the
@@ -74,6 +79,7 @@ impl SystemKind {
         SystemKind::Attractor,
         SystemKind::Spectrum,
         SystemKind::Emitter,
+        SystemKind::ShapeField,
     ];
 
     /// Parse a canonical system name (as written in a preset's `system = "..."`
@@ -92,6 +98,7 @@ impl SystemKind {
             "attractor" => SystemKind::Attractor,
             "spectrum" => SystemKind::Spectrum,
             "emitter" => SystemKind::Emitter,
+            "shape_field" => SystemKind::ShapeField,
             _ => return None,
         })
     }
@@ -110,6 +117,7 @@ impl SystemKind {
             SystemKind::Attractor => "attractor",
             SystemKind::Spectrum => "spectrum",
             SystemKind::Emitter => "emitter",
+            SystemKind::ShapeField => "shape_field",
         }
     }
 
@@ -132,6 +140,7 @@ impl SystemKind {
             SystemKind::Attractor => scenes::particles::PARAMS,
             SystemKind::Spectrum => scenes::lines::spectrum::PARAMS,
             SystemKind::Emitter => scenes::emitter::PARAMS,
+            SystemKind::ShapeField => scenes::shape_field::PARAMS,
         }
     }
 }
@@ -152,7 +161,8 @@ fn variant_roster_reminder(system: SystemKind) {
         | SystemKind::ReactionDiffusion
         | SystemKind::Attractor
         | SystemKind::Spectrum
-        | SystemKind::Emitter => {}
+        | SystemKind::Emitter
+        | SystemKind::ShapeField => {}
     }
 }
 
@@ -879,11 +889,15 @@ fn build_config(
             None => RawSpectrum::default().into_config()?,
         })),
         // Reaction-diffusion drives its regime through named params (feed/kill/
-        // flow), not a declarative structural table.
+        // flow), not a declarative structural table. `shape_field` is here for a
+        // sharper reason: its structure is the `marks` roster, which is a closed
+        // list selected by a numeric `shape` param (ADR-0084/ADR-0105), so there
+        // is nothing declarative for a table to carry.
         SystemKind::FragmentField
         | SystemKind::Swarm
         | SystemKind::ReactionDiffusion
-        | SystemKind::Emitter => Ok(None),
+        | SystemKind::Emitter
+        | SystemKind::ShapeField => Ok(None),
     }
 }
 
