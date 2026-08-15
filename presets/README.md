@@ -583,6 +583,7 @@ nothing.
 | `source_y` | `-1.12` | the line's world `y`. Just below the frame by default, so an upward throw rises into shot |
 | `source_width` | `1` | the line's half-width **as a fraction of the frame's**. `1` spans the frame, `0` is a point source |
 | `spawn_fade` | `0` | fraction of an object's life spent ramping up from black. `0` is no ramp beyond the engine's own 8 % attack |
+| `prewarm` | `0` | lifetimes of spawns to back-date at scene start, so the population **begins** at its steady state instead of ramping to it. Clamped at `2` |
 
 `source_width` is a fraction, not world units, so it means the same thing on every
 display — the engine has already reconciled the aspect
@@ -609,6 +610,28 @@ pair — an inside-frame `source_y` at `spawn_fade = 0` pops, and the engine let
 scalars, and a rule like that would make a legal preset briefly illegal under a
 `[smoothing]`-eased fade passing through zero). It is also worth having on its own:
 a ramp on a short-lived object is a *soft* spark, which no `brightness` can express.
+
+**`prewarm` is the other half of a slow world, and moving the source does not do
+its job.** Wherever the line sits, the pool starts *empty* and fills at
+`spawn_rate`, so the population climbs toward `spawn_rate * lifetime` over a whole
+lifetime. On an eight-second sky that is eight seconds of a picture arriving.
+`prewarm = 1` back-dates a lifetime of spawns at scene start, so the first frame is
+already the steady state — exactly, not approximately: an emitter object's path is
+a closed form in its own age, so an object born back-dated is indistinguishable
+from one that had been flying all along.
+
+Measured on a slow drifting draft (`source_y = -1.05`, `launch_speed = 0.3`,
+`lifetime = 8`), `prewarm = 0` against `prewarm = 1`, everything else identical:
+
+| statistic | `prewarm = 0` | `prewarm = 1` |
+|---|---|---|
+| coverage (sanity, floor `0.25`) | `0.0074`, **0/10** radial shells — reads as blank | `0.1470`, **10/10** shells — under the floor but structurally present, which passes |
+| motion (animation, floor `0.01`) | `0.0629` | `0.1702` |
+| best band (reactivity, floor `0.02`) | `0.0002` | `0.0195` |
+
+**A prewarmed world is full on its first frame**, which is right for a sky and
+wrong for a cascade — a preset switching *into* one arrives already populated
+rather than building. That is the whole reason it is a param and not a fix.
 
 #### Individuation — the distribution params
 

@@ -66,6 +66,7 @@ fn cfg(rate: f32, gravity: f32, speed: f32) -> Spawn {
         lifetime_spread: 0.0,
         source_half_width: ASPECT,
         source_y: DEFAULT_SOURCE_Y,
+        prewarm: 0.0,
         bound: bounds(ASPECT),
     }
 }
@@ -822,6 +823,176 @@ fn a_spawn_fade_dims_the_young_cohort_and_leaves_the_old_one() {
          dimmer, and the arm an inverted ramp fails: {base_old:.4} -> \
          {faded_old:.4}"
     );
+}
+
+// -----------------------------------------------------------------------
+// `prewarm` — the pool can start in its steady state
+// (Plan 0090 Phase 3, ADR-0104)
+// -----------------------------------------------------------------------
+
+/// **A prewarmed pool is indistinguishable from one that has been running** —
+/// Phase 3's first done-when, asserted as exact equality against a field
+/// stepped normally from the back-dated instant.
+///
+/// This is available *because* of the shape ADR-0057 chose: the path is closed
+/// form in `t - t0` and the death time derives from `t0`, so back-dating is a
+/// substitution rather than a simulation. If it did not hold exactly, the
+/// back-dating would be wrong and the honest response is to fix it rather than
+/// to loosen this into a tolerance.
+///
+/// The comparison is by `(spawn time, position)` sorted on spawn time — the
+/// same shape `the_trajectory_is_the_same_under_any_frame_cadence` uses —
+/// because the two fields reach the same population through different free-list
+/// histories, and a slot index is not part of the claim.
+#[test]
+fn a_prewarmed_pool_matches_one_that_actually_ran() {
+    const T: f32 = 7.5;
+    const PREWARM: f32 = 1.0;
+
+    for (rate, gravity, speed, lifetime_spread) in
+        [(60.0f32, 1.5f32, 1.9f32, 0.0f32), (200.0, 0.4, 0.9, 0.45)]
+    {
+        let warm = Spawn {
+            prewarm: PREWARM,
+            lifetime_spread,
+            ..cfg(rate, gravity, speed)
+        };
+        let cold = Spawn {
+            prewarm: 0.0,
+            ..warm
+        };
+
+        // The prewarmed field, at its very first step.
+        let mut prewarmed = Field::new(8192);
+        prewarmed.step(T, &warm);
+
+        // The control: the same config, stepped at 60 Hz from the instant the
+        // prewarm back-dates to, landing on exactly the same scene time.
+        let start = T - PREWARM * warm.lifetime;
+        let mut times = vec![start];
+        let mut t = start;
+        while t < T {
+            t += 1.0 / 60.0;
+            times.push(t.min(T));
+        }
+        if times.last().copied() != Some(T) {
+            times.push(T);
+        }
+        let mut ran = Field::new(8192);
+        for &t in &times {
+            ran.step(t, &cold);
+        }
+
+        let live = |field: &Field| -> Vec<(f32, [f32; 2])> {
+            let mut out: Vec<(f32, [f32; 2])> = field
+                .objects
+                .iter()
+                .filter(|o| o.alive)
+                .map(|o| (o.t0, o.position(T)))
+                .collect();
+            out.sort_by(|a, b| a.0.total_cmp(&b.0));
+            out
+        };
+        let (warm_pop, ran_pop) = (live(&prewarmed), live(&ran));
+        assert!(
+            warm_pop.len() > 50,
+            "the comparison needs a population: {} objects at rate {rate}",
+            warm_pop.len()
+        );
+        assert_eq!(
+            warm_pop, ran_pop,
+            "a pool prewarmed to {T} must hold exactly the objects a pool \
+             stepped from {start} to {T} holds — same spawn instants, same \
+             seeds, same closed-form positions"
+        );
+    }
+}
+
+/// **`prewarm = 0` leaves the pool starting empty**, which is today's behaviour
+/// and the reason this is a param rather than a fix.
+///
+/// The rendered half of this claim is
+/// [`a_spawn_rate_on_onset_bursts_and_then_idles`], which asserts an *empty*
+/// frame before its transient and is left unmodified by this plan — a
+/// default-on prewarm would break it. Here is the pool-level statement: nothing
+/// is back-dated, so the first step holds only what that instant is due.
+#[test]
+fn a_zero_prewarm_starts_the_pool_empty() {
+    let cold = cfg(600.0, 1.5, 1.9);
+    let mut field = Field::new(4096);
+    field.step(4.0, &cold);
+    assert_eq!(
+        field.live, 1,
+        "an unprewarmed pool starts from the one spawn its first instant is \
+         due, not from a population"
+    );
+
+    // ...and the same field one lifetime later is the steady state the prewarm
+    // reaches immediately, which is what makes the claim above non-vacuous.
+    let mut t = 4.0f32;
+    while t < 4.0 + cold.lifetime {
+        t += 1.0 / 60.0;
+        field.step(t, &cold);
+    }
+    let settled = field.live;
+    let mut warm = Field::new(4096);
+    warm.step(
+        4.0,
+        &Spawn {
+            prewarm: 1.0,
+            ..cold
+        },
+    );
+    let ratio = warm.live as f32 / settled as f32;
+    eprintln!(
+        "emitter prewarm: {} live at once against {settled} settled",
+        warm.live
+    );
+    assert!(
+        (0.95..=1.05).contains(&ratio),
+        "a prewarmed pool must start at the population a lifetime of running \
+         reaches: {} against {settled}",
+        warm.live
+    );
+}
+
+/// **A hostile `prewarm` costs bounded work and cannot outrun the pool** — the
+/// same discipline `spawn_rate` gets from [`MAX_SPAWN_RATE`].
+///
+/// The ceiling is not a look value: back-dating past the longest life anything
+/// can have would build objects only to drop them, so the window is clipped
+/// there, and the loop is capped at one pool's worth of spawns however deep the
+/// prewarm asked to go.
+#[test]
+fn a_hostile_prewarm_is_bounded() {
+    for prewarm in [1e9f32, f32::INFINITY, f32::NAN, -4.0] {
+        let mut field = Field::new(512);
+        // The back-dated fill on its own, not a whole `step`: the live spawn
+        // loop that follows it may leave an object that died inside the frame
+        // it was spawned in, which is this scene's existing behaviour (the next
+        // `retire` takes it) and not something the prewarm is answerable for.
+        field.prewarm(
+            9.0,
+            &Spawn {
+                prewarm: super::finite(prewarm, 0.0).clamp(0.0, super::MAX_PREWARM),
+                ..cfg(4000.0, 1.5, 1.9)
+            },
+        );
+        assert!(
+            field.live <= field.capacity(),
+            "prewarm = {prewarm} overran the pool: {} of {}",
+            field.live,
+            field.capacity()
+        );
+        for object in field.objects.iter().filter(|o| o.alive) {
+            assert!(
+                object.death_time > 9.0,
+                "a prewarmed pool must hold no object that is already dead: \
+                 death {} at time 9.0",
+                object.death_time
+            );
+        }
+    }
 }
 
 // -----------------------------------------------------------------------
