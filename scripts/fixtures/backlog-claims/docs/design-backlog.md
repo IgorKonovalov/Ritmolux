@@ -62,3 +62,10 @@ reports everything it sees.
   `absent: SEEDED_ABSENT_SYMBOL in: core/src`
 - **Verified 2026-08-15** — the rule is documented, and here:
   `present: SEEDED_PRESENT_RULE in: presets/README.md`
+
+## 0007 — a live entry with no verification bullet at all
+
+The pre-ADR-0108 default: an entry that makes a claim about the repo and never says anyone
+checked it. Case 0004 is a bullet with nothing runnable inside it; this one has no bullet, which
+a checker built out of the bullets it finds cannot see at all. Last on purpose — its absence runs
+to the end of the file, which is the one position a heading-driven check could get wrong.

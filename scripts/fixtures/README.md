@@ -22,7 +22,8 @@ nothing about it.
 node scripts/check-backlog-claims.mjs scripts/fixtures/backlog-claims
 ```
 
-Expect **exit 1 and exactly four breaks**. Six entries, five seeded cases:
+Expect **exit 1 and exactly five breaks**. Seven live entries, six seeded cases — plus `0099`
+above the `Open entries` marker, whose probe is deliberately violated and must never be read:
 
 | Entry | Case | Expected |
 |-------|------|----------|
@@ -32,8 +33,14 @@ Expect **exit 1 and exactly four breaks**. Six entries, five seeded cases:
 | 0004 | a verification bullet with no probe and no opt-out | reported |
 | 0005 | a valid `unprobeable:` opt-out | **not** reported; rostered in the summary |
 | 0006 | two probes that still hold | not reported |
+| 0007 | a live entry with **no verification bullet at all** | reported at the heading's own line |
 
-The same six run inside `node scripts/check-backlog-claims.mjs --self-test`, together with the
+0004 and 0007 are the two halves of ADR-0108's Decision sentence and they fail differently: 0004
+has a bullet with nothing runnable in it, 0007 has no bullet, which a check built out of the
+bullets it finds cannot see. 0007 is last in the fixture on purpose — its absence runs to the end
+of the file, the one position a heading-driven check could get wrong.
+
+The same seven run inside `node scripts/check-backlog-claims.mjs --self-test`, together with the
 non-vacuity assertion that is pinned to the real repository rather than to this tree.
 
 ## `doc-links/` — for `check-doc-links.mjs`

@@ -32,6 +32,11 @@
 // covers the claim; there is no mechanical defence and this script does not
 // pretend to one.
 //
+// EVERY LIVE ENTRY MUST CARRY A BULLET, which is the first half of ADR-0108's
+// Decision and the half a script built out of the bullets it finds cannot see.
+// A `## NNNN` heading below `## Open entries` with no dated verification bullet
+// beneath it is a break, reported at the heading's own line.
+//
 // The grammar, in full — three forms, written as inline-code spans inside a
 // `- **Verified <ISO date>**` bullet:
 //
@@ -159,7 +164,16 @@ function runProbe(probe, root) {
   return hit ? { ok: true } : { ok: false, detail: `no match under ${probe.path}` };
 }
 
-/** The verification bullets of every live entry, with their code spans. */
+/**
+ * The verification bullets of every live entry, with their code spans, and the
+ * live entry headings themselves.
+ *
+ * The headings are collected separately on purpose. Reading the roster off the
+ * bullets answers "does every bullet carry a probe" and silently excuses an
+ * entry that has no bullet at all — which is the FIRST half of ADR-0108's
+ * Decision sentence, and the half a reader who has never opened the ADR will
+ * omit by default (Plan 0094 Phase 2).
+ */
 function readBullets(root) {
   const backlogAbs = join(root, ...BACKLOG.split("/"));
   if (!existsSync(backlogAbs)) return { fatal: `${BACKLOG} not found under ${root}` };
@@ -167,7 +181,7 @@ function readBullets(root) {
   const lines = readFileSync(backlogAbs, "utf8").split(/\r?\n/);
   const hasLiveMarker = lines.some((l) => LIVE_FROM.test(l));
   const bullets = [];
-  const entries = new Set();
+  const headings = [];
   let live = !hasLiveMarker;
   let entry = null;
   let inFence = false;
@@ -189,6 +203,7 @@ function readBullets(root) {
     const heading = lines[i].match(ENTRY);
     if (heading) {
       entry = live ? heading[1] : null;
+      if (entry) headings.push({ entry, line: i + 1 });
       continue;
     }
     if (!live) continue;
@@ -209,11 +224,10 @@ function readBullets(root) {
       .map((m) => m[1].replace(/\s+/g, " ").trim())
       .filter((s) => VERB.test(s));
 
-    if (entry) entries.add(entry);
     bullets.push({ entry: entry ?? "(outside any entry)", line: i + 1, stamped: stamp[1], spans });
   }
 
-  return { bullets, entries };
+  return { bullets, headings };
 }
 
 /**
@@ -227,8 +241,10 @@ function check(root) {
   const breaks = [];
   const probes = [];
   const unprobeable = [];
+  const stamped = new Set();
 
   for (const bullet of parsed.bullets) {
+    if (bullet.entry) stamped.add(bullet.entry);
     const at = `${BACKLOG}:${bullet.line} -> ${bullet.entry}`;
 
     if (bullet.spans.length === 0) {
@@ -265,7 +281,17 @@ function check(root) {
     }
   }
 
-  return { breaks, probes, unprobeable, entries: parsed.entries };
+  for (const heading of parsed.headings) {
+    if (stamped.has(heading.entry)) continue;
+    breaks.push(
+      `${BACKLOG}:${heading.line} -> ${heading.entry} — live entry carries no dated verification ` +
+        "bullet. Add a `- **Verified <ISO date>**` bullet holding either a probe " +
+        "(`absent: <regex> in: <path>` or `present: ...`) or a reasoned `unprobeable: <why>`. " +
+        "See ADR-0108.",
+    );
+  }
+
+  return { breaks, probes, unprobeable, entries: new Set(parsed.headings.map((h) => h.entry)) };
 }
 
 // --- the advisory ------------------------------------------------------------
@@ -371,14 +397,24 @@ function selfTest() {
   );
   record("fixture: bullet with no probe", hits("0004").length === 1, hits("0004")[0]);
   record(
+    "fixture: live entry with no bullet",
+    hits("0007").length === 1 && /no dated verification bullet/.test(hits("0007")[0] ?? ""),
+    hits("0007")[0],
+  );
+  record(
     "fixture: valid unprobeable:",
     hits("0005").length === 0 && f.unprobeable.some((u) => u.entry === "0005"),
     "must be rostered, never reported",
   );
   record(
+    "fixture: the archived entry is not probed",
+    hits("0099").length === 0 && !f.entries.has("0099"),
+    "0099 sits above the live marker and its probe is deliberately violated",
+  );
+  record(
     "fixture: nothing else reported",
-    f.breaks.length === 4 && f.probes.length === 2,
-    `${f.breaks.length} breaks, ${f.probes.length} holding probes`,
+    f.breaks.length === 5 && f.probes.length === 2 && f.entries.size === 7,
+    `${f.breaks.length} breaks, ${f.probes.length} holding probes, ${f.entries.size} live entries`,
   );
 
   const zeroEightyTwo = { verb: "absent", pattern: "sustained_miss", path: "core/src" };
@@ -414,8 +450,8 @@ const summary = advisory(probes, unprobeable, REPO);
 
 if (breaks.length === 0) {
   console.log(
-    `backlog claims: OK — ${probes.length} stated reductions still hold across ` +
-      `${entries.size} entries (${unprobeable.length} unprobeable)`,
+    `backlog claims: OK — ${probes.length} stated reductions still hold across all ` +
+      `${entries.size} live entries (${unprobeable.length} unprobeable)`,
   );
   console.log(
     "                green means the reductions still match the tree, not that the entries are true",
