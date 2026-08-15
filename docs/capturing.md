@@ -976,6 +976,23 @@ One tab-separated row per **beat**, header on a fresh file:
 | `beats_seen` | accents recorded, against the 8-beat floor, saturating at 32 |
 | `locked` | `0`/`1`, so the publish **rate** over a run is the mean of the column |
 | `bass` `mid` `treb` `onset` | the normalized levels for context |
+| `bpm` | the tempo tracker's estimate — read the **row rate** against it (see below) |
+| `time_since_beat` | how stale this row's band levels are: they come from the latest analysis hop, not necessarily the hop the beat fired on |
+| `unix_ms` | the time axis. Deltas between rows are the inter-detection interval, and it lines a capture up against a `diagnostics.log` from the same session |
+
+> The last three are **appended, never interleaved** — the frozen-prefix rule
+> `diagnostics.log` follows — so a capture taken before they existed stays
+> parseable by column name.
+
+**Read the row rate against `bpm` before reading anything else.** The beat flag
+that paces these rows comes from the onset detector — an adaptive threshold on
+spectral flux with a 96 ms refractory — and it is **not tempo-gated**
+(`core/src/dsp/onset.rs`); `beat_index` is a straight count of those events
+(`core/src/dsp/tempo.rs`). So `rows / seconds` against `bpm / 60` is the number of
+detections per musical beat, and it is **not** guaranteed to be 1. On a synthesized
+clip with one transient per beat it measures exactly 1.00; on real material with
+hats it does not, and where it does not, `beat_index % 4` spans less than a bar and
+the four alignments are not the four beats of one.
 
 **Reading it is what tells the three stories apart** — the reason the plan spends
 a phase capturing before choosing a repair:
