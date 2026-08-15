@@ -34,6 +34,7 @@ use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use lmv_core::diag::DownbeatTerms;
 use lmv_core::dsp::AnalysisFrame;
@@ -48,8 +49,29 @@ use lmv_core::dsp::AnalysisFrame;
 /// The `s0..s3` block is the fold's own output and is as wide as
 /// [`BEATS_PER_BAR`](lmv_core::dsp::downbeat::BEATS_PER_BAR) — a test pins that
 /// rather than leaving it to whoever changes the meter assumption.
+///
+/// **The last three columns are appended, never interleaved** — the frozen-prefix
+/// rule `diagnostics.log` follows — so the first captures taken with this mode
+/// stay parseable by column name. They were added the same day, from reading the
+/// first two runs, because the reading needed all three and the file carried none
+/// of them:
+///
+/// - **`bpm`** is the tempo tracker's own estimate, and it is here to be compared
+///   against the rate these very rows arrive at. The beat flag this log is paced
+///   by comes from the onset detector with **no tempo gating** (`onset.rs`), so
+///   "how many detections per musical beat" is a real question about the fold's
+///   unit — and it was answerable only by counting rows against a wall clock and a
+///   BPM the listener reported by ear.
+/// - **`unix_ms`** is that time axis. Deltas between consecutive rows give the
+///   inter-detection interval directly, and it lets a capture be lined up against
+///   a `diagnostics.log` from the same session.
+/// - **`time_since_beat`** is how stale the row's own band levels are. The bands
+///   here come from the latest analysis hop, not necessarily the hop the beat
+///   fired on, and this column is the size of that gap rather than an assurance
+///   there isn't one.
 const HEADER: &str = "beat\ts0\ts1\ts2\ts3\tbest\theld\teffect_raw\tnull_share\t\
-                      effect_corrected\tbeats_seen\tlocked\tbass\tmid\ttreb\tonset\n";
+                      effect_corrected\tbeats_seen\tlocked\tbass\tmid\ttreb\tonset\t\
+                      bpm\ttime_since_beat\tunix_ms\n";
 
 /// Appends one row per detected beat. Constructed only when `--downbeat-log` is
 /// requested, so its mere existence signals the mode is on.
@@ -70,7 +92,12 @@ impl DownbeatLog {
     ///
     /// `terms` is evaluated **lazily** — only on the frames that carry a beat —
     /// for the reason the 1 Hz logger's closures exist: this runs every frame, so
-    /// nothing here may become per-frame work as the row grows.
+    /// nothing here may become per-frame work as the row grows. The timestamp is
+    /// read on the same branch, for the same reason.
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "row timestamp on the render thread, on beat frames only; core analysis stays clock-free"
+    )]
     pub fn maybe_log(&mut self, frame: &AnalysisFrame, terms: impl FnOnce() -> DownbeatTerms) {
         if !frame.beat {
             return;
@@ -82,12 +109,17 @@ impl DownbeatLog {
             return;
         };
         let terms = terms();
+        let unix_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
         let _ = writeln!(
             file,
             "{}",
             Row {
                 frame,
-                terms: &terms
+                terms: &terms,
+                unix_ms,
             }
         );
         let _ = file.flush();
@@ -126,6 +158,8 @@ impl DownbeatLog {
 struct Row<'a> {
     frame: &'a AnalysisFrame,
     terms: &'a DownbeatTerms,
+    /// Wall-clock stamp for this row, read once by the caller on the beat branch.
+    unix_ms: u128,
 }
 
 impl fmt::Display for Row<'_> {
@@ -137,7 +171,7 @@ impl fmt::Display for Row<'_> {
         }
         write!(
             f,
-            "\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}",
+            "\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.2}\t{:.4}\t{}",
             t.best,
             t.held,
             t.effect_raw,
@@ -149,6 +183,9 @@ impl fmt::Display for Row<'_> {
             self.frame.mid,
             self.frame.treb,
             self.frame.onset,
+            self.frame.bpm,
+            self.frame.time_since_beat,
+            self.unix_ms,
         )
     }
 }
@@ -397,7 +434,69 @@ mod tests {
             field(last, "effect_corrected")
         );
 
+        // **The `bpm` column is the estimator's own tempo, and the row rate is
+        // what it has to be read against.** That comparison is the whole reason
+        // the column exists: the beat flag pacing these rows is un-gated by tempo
+        // (`onset.rs`), so "detections per musical beat" is a real question, and
+        // on a clip built at a known tempo it has a known answer.
+        let bpm = field(last, "bpm");
+        eprintln!(
+            "tempo estimate {bpm:.1} BPM against a clip built at {BPM}; \
+             {} rows over {BEATS} beats",
+            rows.len()
+        );
+        assert!(
+            bpm > 0.0,
+            "the tempo estimate never warmed, so the row cannot be read against \
+             it: {last:?}"
+        );
+        let per_beat = rows.len() as f32 / BEATS as f32;
+        assert!(
+            (0.5..2.0).contains(&per_beat),
+            "{per_beat:.2} detections per built beat — the clip has one transient \
+             per beat by construction, so this is the log disagreeing with its own \
+             stimulus"
+        );
+
         let _ = fs::remove_dir_all(path.parent().expect("the scratch dir"));
+    }
+
+    /// The columns the first captures were taken with are unchanged and still
+    /// lead the row, so those logs stay parseable by name; the three added after
+    /// reading them are appended, never interleaved. Asserted as a **frozen
+    /// prefix** rather than as the whole header, so the next appended column
+    /// should have to move nothing here.
+    #[test]
+    fn the_original_columns_are_unchanged_and_still_lead() {
+        const ORIGINAL: [&str; 16] = [
+            "beat",
+            "s0",
+            "s1",
+            "s2",
+            "s3",
+            "best",
+            "held",
+            "effect_raw",
+            "null_share",
+            "effect_corrected",
+            "beats_seen",
+            "locked",
+            "bass",
+            "mid",
+            "treb",
+            "onset",
+        ];
+        let cols = columns();
+        assert_eq!(
+            cols.get(..ORIGINAL.len()),
+            Some(&ORIGINAL[..]),
+            "the frozen prefix moved or was renamed: {cols:?}"
+        );
+        assert_eq!(
+            cols.get(ORIGINAL.len()..),
+            Some(&["bpm", "time_since_beat", "unix_ms"][..]),
+            "the added columns are not the appended tail: {cols:?}"
+        );
     }
 
     /// The three effect columns are the estimator's own arithmetic, not three
@@ -468,7 +567,10 @@ mod tests {
     #[test]
     fn the_header_labels_the_row_and_the_score_block_is_the_meter() {
         let cols = columns();
-        let scores = cols.iter().filter(|c| c.starts_with('s')).count();
+        let scores = cols
+            .iter()
+            .filter(|c| c.len() == 2 && c.starts_with('s'))
+            .count();
         assert_eq!(
             scores, BEATS_PER_BAR as usize,
             "the header names {scores} score columns but the fold produces \
@@ -478,6 +580,8 @@ mod tests {
         let frame = AnalysisFrame {
             beat_index: 412,
             bass: 0.812,
+            bpm: 128.5,
+            time_since_beat: 0.0213,
             ..Default::default()
         };
         let terms = DownbeatTerms {
@@ -493,6 +597,7 @@ mod tests {
         let line = Row {
             frame: &frame,
             terms: &terms,
+            unix_ms: 1_755_000_000_123,
         }
         .to_string();
         let row: Vec<String> = line.split('\t').map(str::to_owned).collect();
@@ -500,6 +605,12 @@ mod tests {
         assert_eq!(field(&row, "beat"), 412.0);
         assert_eq!(field(&row, "s0"), 0.7314);
         assert_eq!(field(&row, "s3"), 0.1994);
+        assert_eq!(field(&row, "bpm"), 128.5);
+        assert_eq!(field(&row, "time_since_beat"), 0.0213);
+        // Milliseconds, unrounded: the deltas between consecutive rows are the
+        // inter-detection interval, so losing precision here would cost the one
+        // measurement this column was added for.
+        assert_eq!(row[index("unix_ms")], "1755000000123");
         assert_eq!(field(&row, "bass"), 0.812);
         // 0/1, so the publish RATE over a run is the mean of this column.
         assert_eq!(field(&row, "locked"), 1.0);
