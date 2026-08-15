@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
-> **Related plan(s):** [0090 — the emitter's source moves](../plans/0090-the-emitters-source-moves.md)
+> **Related plan(s):** [0090 — the emitter's source moves](../plans/done/0090-the-emitters-source-moves.md)
 > **Supplements:** [ADR-0057](0057-emitter-scene-analytic-ballistics-seeded-individuation.md),
 > [ADR-0091](0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)
 
