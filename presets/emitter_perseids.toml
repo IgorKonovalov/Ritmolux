@@ -3,14 +3,23 @@
 # the trails stage draws the meteor tails — and every member still twinkles at
 # its own seeded rate under the shower.
 #
-# THE BRIEF'S QUIET "sky that twinkles" IS ROUTED, NOT SHIPPED (2026-08-11), on
-# two measured walls: per-mark variation beyond the spreads (backlog 0068), and
-# the sanity gates themselves — backdrop-suppressed coverage requires the SCENE
-# to paint (0.04 absolute, 0.25 emitter floor), and a slow sparse starfield
-# measures 0.0066 however lovely it is. Squall's header called this the gate
-# constraint on sparse idioms (design-backlog 0009). A sky of slow stars needs
-# either that floor to learn about structure, or per-mark variation — until
-# then, the night sky performs as a shower.
+# THE TWO WALLS THIS HEADER USED TO DECLARE ARE BOTH DOWN (2026-08-15), and the
+# quiet sky it said was unreachable now ships beside this file as `Drift Field`.
+# The paragraph they replaced said the brief's "sky that twinkles" was ROUTED,
+# NOT SHIPPED on per-mark variation (backlog 0068) and on the sanity gates. What
+# actually happened to each:
+#   - Per-mark variation landed at Plan 0077 Phase 2 — the swarm took `twinkle`
+#     and `size_spread` with this scene's names and semantics.
+#   - The gate wall was TWO walls, not one. Plan 0075's `radial_shell_occupancy`
+#     rescues a sparse figure under the coverage floor when it is structurally
+#     present, and Plan 0090 gave the emitter `source_y`/`prewarm`, which is what
+#     lets a slow world be POPULATED at all in the half second a gate watches.
+#     Drift Field measures 10/10 shells where the old draft read 0.0066.
+# Kept as the record of a preset written around a limit that later moved, which
+# is the failure class design-backlog 0060 exists for: nothing renders wrong, so
+# only a header ever remembers. THIS PRESET IS UNCHANGED and stays in the set by
+# the user's call at Plan 0090 Phase 5 — a fast shower and a slow sky are
+# different looks, not two tunings of one.
 # Drives: bass drives the shower's density, a beat volleys a handful more, mid
 # leans the radiant, treble sharpens the chroma, onset lifts the sky's glow.
 system = "emitter"

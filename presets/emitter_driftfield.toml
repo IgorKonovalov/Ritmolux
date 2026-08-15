@@ -1,0 +1,83 @@
+# Drift Field - a slow sky of stars that shears as it turns.
+#
+# Fresh slate (ADR-0089). The mechanism is the one Plan 0090 opened up: a source
+# just under the frame at `gravity = 0`, so nothing arcs and nothing falls - every
+# mark rides a straight line at 0.28 units a second and the whole field is a slow
+# drift rather than a shower. `prewarm = 1` back-dates a full lifetime of spawns
+# so the sky is ALREADY THERE on the first frame instead of arriving over eight
+# seconds.
+#
+# THE SHEAR IS THE CHARACTER, and it is a property of the scene rather than a
+# trick: `launch_angle` only reaches objects thrown AFTER it changes, so wandering
+# the heading on slow noise leaves every mark on the bearing it was born with.
+# What you see is age laid out as direction - the oldest stars near the top still
+# running the heading of a minute ago while the newest ones near the bottom take
+# the current one. Nothing else in the library does this because nothing else has
+# a population with an age.
+#
+# Drives: bass swells the stars and thickens the field, treble runs the shimmer
+# and the light, mid turns the colour toward ice, onset blooms the cores.
+system = "emitter"
+name = "Drift Field"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#0b0620" },  # violet black
+  { at = 0.35, color = "#3a4d8f" },  # dusty blue
+  { at = 0.70, color = "#8fd4e0" },  # ice
+  { at = 1.00, color = "#fdf6ff" },  # the white ones
+]
+
+[params]
+# The source (Plan 0090). Below the frame, so there is no pop to answer and
+# `spawn_fade` is doing something else here - it is what stops a star switching
+# on at the bottom edge in full view.
+source_y = "-1.05"
+source_width = "1"
+spawn_fade = "0.18"
+prewarm = "1"
+
+spawn_rate = "38 + clamp(bass * 35, 0, 30)"
+gravity = "0"                      # no arc, no fall - a drift
+launch_speed = "0.28"              # 8 s of life carries a mark 2.24 units, so it crosses
+launch_angle = "-0.2 + noise(time * 0.03) * 0.4"   # the heading wanders; old marks keep theirs
+spread = "0.3"
+lifetime = "8"
+lifetime_spread = "0.55"
+
+# THE BASS SWELLS THE STARS THEMSELVES, and that is a measured choice rather than
+# a taste one. A sparse field's reactivity is diluted by the whole frame - the
+# gate reads a per-band differential over every pixel, and a sky is mostly empty
+# sky. A first pass spent bass on `spawn_rate` and read 0.0144 against the 0.02
+# floor: density is the wrong lever here because the population takes a LIFETIME
+# to answer it, and the gate watches half a second. `size` answers on the frame
+# it is bound in, and it is structure rather than luminance, which is where peak
+# energy belongs anyway.
+size = "0.9 + clamp(bass * 1.18, 0, 1.0)"
+size_spread = "0.8"                # near stars and far ones
+shape = "3"                        # a four-pointed star, not Perseids' glint
+points = "4"
+spin = "0"
+twinkle = "0.5 + clamp(treb * 0.42, 0, 0.25)"
+brightness = "0.8 + clamp(bass * 0.59, 0, 0.5)"
+
+hue = "0.55"
+hue_center = "0.6 + noise(time * 0.05 + 50) * 0.06 + clamp(mid * 0.088, 0, 0.075)"
+hue_spread = "0.55"
+saturation = "0.7"
+
+bg_hue = "0.12"                    # low on the ramp - violet black, not the ice end
+bg_bright = "0.035"                # deliberately low - coverage is measured against it
+bg_vignette = "0.55"
+trails = "0"                       # a trail would smear stars into streaks
+
+bloom_amount = "0.25 + clamp(bass * 1.18, 0, 1.0)"
+bloom_threshold = "0.55"
+bloom_radius = "2.0"
+
+[smoothing]
+spawn_rate = { attack = 0.15, release = 1.2 }
+size = { attack = 0.06, release = 0.45 }
+brightness = { attack = 0.04, release = 0.4 }
+bloom_amount = { attack = 0.02, release = 0.35 }
+twinkle = 0.5

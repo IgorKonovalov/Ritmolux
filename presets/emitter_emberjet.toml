@@ -1,0 +1,117 @@
+# Ember Jet - a point fountain, thrown off centre, that pumps on the low end.
+#
+# Fresh slate (ADR-0089). This is the look `presets/README.md` refused in as many
+# words until Plan 0090 - "a look that wants a point fountain or an off-centre jet
+# is engine feedback, not a preset". `source_width = 0` collapses the source line
+# to a single point exactly, and `pan_x` carries the world so the nozzle stands
+# right of the frame's middle instead of on it.
+#
+# THE CREST IS IN FRAME ON PURPOSE, which inverts the emitter's standing advice.
+# `presets/README.md` warns that a crest inside the frame draws a horizontal
+# ceiling where the population piles up, and `emitter_perseids` puts its crest at
+# y = 1.48 to avoid exactly that. A fountain is the one look that WANTS it: the
+# arc turning over IS the figure. At rest, v = 1.55 against g = 1.05 puts the
+# crest 1.14 units above a source at y = -0.95, so it turns over at y = 0.19 -
+# just above the middle, with 1.48 s of rise and about 1.9 s of fall under it.
+#
+# AND THE CREST IS WHERE THE BASS IS SPENT. `launch_speed` reaches 1.83 at a peak,
+# which lifts the crest from y = 0.19 to y = 0.64: the fountain visibly THROWS
+# HIGHER on the low end instead of merely brightening. The ceiling on that term is
+# picked so the crest stays inside the frame at a peak; a wider gain throws the
+# head off the top and the fountain loses its shape. It is a slow lever by
+# construction - see the note on `size` below - so it is the character rather
+# than the reactivity.
+#
+# THE GRAVITY IS LOW ON PURPOSE TOO, and it is a composition fix rather than a
+# physical one. A first pass at g = 1.7 drew a correct fountain that occupied a
+# narrow column against a mostly black frame - the arc has to be WIDE to be a
+# figure, and a parabola widens by falling more slowly, not by being thrown
+# harder. Halving the gravity roughly doubles both the reach and the hang time.
+#
+# THE SOURCE IS INSIDE THE FRAME, so a mark would switch on in plain view.
+# `spawn_fade = 0.35` is the answer, and it is not a guess - that is the value
+# judged in the running app at Plan 0090 Phase 5 (2026-08-15), on a probe with
+# the source on the screen midline, which is the pop at its most visible. The
+# verdict was that it hides it. `prewarm` is deliberately 0: a fountain SHOULD
+# build from nothing when you switch into it, which is the reading a sky wants
+# inverted and the whole reason that is a param.
+#
+# Drives: bass throws the jet higher, swells the sparks and lifts the firelight on
+# the backdrop; mid leans the nozzle; treble opens the fan. `spawn_rate` is a
+# CONSTANT here and that is deliberate - at 560 a second against a 3.4 s life the
+# pool sits near 1,900 of the Floor tier's 2,000, so there is no headroom to drive
+# it with, and density answers over a lifetime anyway rather than over a beat.
+system = "emitter"
+name = "Ember Jet"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#160603" },  # ash
+  { at = 0.30, color = "#a02d08" },  # deep ember
+  { at = 0.62, color = "#f0801c" },  # flame
+  { at = 0.85, color = "#ffd071" },  # gold
+  { at = 1.00, color = "#fff6e2" },  # the hot ones
+]
+
+[params]
+# The source (Plan 0090): a point, low in frame, carried off centre by the view.
+source_y = "-0.95"
+source_width = "0"                 # a point source, exactly
+spawn_fade = "0.35"                # the judged value - this is what hides the pop
+prewarm = "0"                      # a fountain builds; that is the cascade reading
+# OFF CENTRE IS THE NOZZLE, NOT THE FAN. A first pass at `pan_x = 0.3` put the
+# whole figure in one quadrant, which `sanity` calls a dot and refuses - and it
+# was the worse composition anyway, a bushy column against three-quarters of
+# black. The jet stands right of centre and its spray crosses the middle, which
+# is what an off-centre fountain actually looks like.
+pan_x = "0.16"
+
+spawn_rate = "560"
+gravity = "1.05"                   # low, so the arc is WIDE - see the header
+launch_speed = "1.55 + clamp(bass * 0.33, 0, 0.28)"
+launch_angle = "noise(time * 0.09 + 12) * 0.26 - 0.13 + clamp(mid * 0.106, 0, 0.09)"
+# WIDE, and that is a coverage decision as much as a look one: from a POINT
+# source a narrow cone piles marks on top of each other, and overlap is area
+# thrown away. Opening the fan converts the same population into picture.
+spread = "1.05 + clamp(treb * 0.33, 0, 0.2)"          # treble opens it further
+lifetime = "3.4"
+lifetime_spread = "0.5"
+
+# Same reasoning as Drift Field's `size`, and this scene needed it harder: a
+# fountain's density and throw both answer only in NEW spawns, so over the half
+# second a gate watches, `spawn_rate` and `launch_speed` are nearly invisible.
+# This preset read 0.0015 on every band with the bass spent entirely on those
+# two. The mark's own size answers immediately, for the whole population.
+size = "0.64 + clamp(bass * 0.71, 0, 0.6)"
+size_spread = "1.15"               # sparks, not a mass - the apex was solid at 0.6
+shape = "0"                        # the elongated glint - a spark, stretched by spin
+points = "5"
+spin = "0"
+twinkle = "0.35"
+brightness = "0.85 + clamp(bass * 0.83, 0, 0.7)"
+
+hue = "0.12"
+hue_center = "0.7"
+hue_spread = "0.5"
+saturation = "0.92"
+
+bg_hue = "0.03"
+# The fire lights the room. Same shape `emitter_perseids` uses for its sky glow,
+# and on this world it is the only lever that reaches the frame the figure does
+# not occupy - a point fountain is a small figure by construction.
+bg_bright = "0.026 + clamp(bass * 0.129, 0, 0.11)"
+bg_vignette = "0.6"
+trails = "0.28"                    # the spark tails, and they are what give this
+                                   # figure its AREA - see the note above `size`
+
+bloom_amount = "0.35 + clamp(bass * 1.65, 0, 1.4)"
+bloom_threshold = "0.42"
+bloom_radius = "2.2"
+
+[smoothing]
+launch_speed = { attack = 0.05, release = 0.45 }
+spread = { attack = 0.06, release = 0.5 }
+size = { attack = 0.05, release = 0.4 }
+brightness = { attack = 0.02, release = 0.35 }
+bloom_amount = { attack = 0.02, release = 0.3 }
+launch_angle = 0.6
