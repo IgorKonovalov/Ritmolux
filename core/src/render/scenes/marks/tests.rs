@@ -28,9 +28,18 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32) -> f32 {
     }
     if shape < 2.5 {
         let seg = std::f32::consts::TAU / points;
+        let h = 0.5 * seg;
         let a = p[1].atan2(p[0]);
-        let f = a - seg * (a / seg).floor() - 0.5 * seg;
-        return len * f.cos() / (0.5 * seg).cos();
+        let f = a - seg * (a / seg).floor() - h;
+        let apothem = h.cos();
+        let d_line = len * f.cos() / apothem;
+        if d_line <= 1.0 {
+            return d_line;
+        }
+        let q = [len * f.cos(), (len * f.sin()).abs()];
+        let past_vertex = (q[1] - h.sin()).max(0.0);
+        let dx = q[0] - apothem;
+        return 1.0 + (dx * dx + past_vertex * past_vertex).sqrt() / apothem;
     }
     if shape < 3.5 {
         let seg = std::f32::consts::TAU / points;
@@ -38,7 +47,22 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32) -> f32 {
         let a = p[1].atan2(p[0]);
         let f = (a - seg * ((a + h) / seg).floor()).abs();
         let k = STAR_INNER;
-        return len * f.cos() + len * f.sin() * (1.0 - k * h.cos()) / (k * h.sin());
+        let d_line = len * f.cos() + len * f.sin() * (1.0 - k * h.cos()) / (k * h.sin());
+        if d_line <= 1.0 {
+            return d_line;
+        }
+        let b = (1.0 - k * h.cos()) / (k * h.sin());
+        let inradius = 1.0 / (1.0 + b * b).sqrt();
+        let q = [len * f.cos(), len * f.sin()];
+        let tip = [1.0f32, 0.0];
+        let valley = [k * h.cos(), k * h.sin()];
+        let edge = [valley[0] - tip[0], valley[1] - tip[1]];
+        let denom = edge[0] * edge[0] + edge[1] * edge[1];
+        let t = (((q[0] - tip[0]) * edge[0] + (q[1] - tip[1]) * edge[1]) / denom).clamp(0.0, 1.0);
+        let near = [tip[0] + t * edge[0], tip[1] + t * edge[1]];
+        let dx = q[0] - near[0];
+        let dy = q[1] - near[1];
+        return 1.0 + (dx * dx + dy * dy).sqrt() / inradius;
     }
     let q = [p[0] * HEART_SCALE, p[1] * HEART_SCALE + HEART_CY];
     1.0 + heart_sd(q) / HEART_INRADIUS
@@ -343,4 +367,333 @@ fn the_shader_chunk_substitutes_every_placeholder() {
         "unsubstituted placeholder in the mark SDF chunk:\n{wgsl}"
     );
     assert!(wgsl.contains("fn mark_distance("));
+}
+
+// --- The exterior contract (Plan 0091 Phase 2) ---------------------------------
+//
+// Everything above this line grades the roster on the contract it was built
+// for: `d` is 0 at the deepest interior point, 1 on the outline, and the
+// falloff blacks out everything past it. `shape_field` reads the region past
+// it, so the arms now owe a distance out there too — and the module docs say
+// plainly that two of them were never built to give one.
+//
+// The ground truth is a **dense boundary polyline per arm**, built from each
+// shape's own defining geometry and never from `mark_distance`, so this
+// measures the roster against the figure rather than against itself. Distance
+// is point-to-*segment* (exact for a polyline, so only the polyline's own
+// sagitta enters — under 3e-6 at these sample counts), and inside/outside is an
+// even-odd crossing count over the same segments, which is what lets `ring`
+// work with no special case: a point in the hole crosses two rims and reads
+// outside.
+
+/// A closed loop of boundary points, in sprite-local coordinates.
+type Loop = Vec<[f32; 2]>;
+
+/// How finely a curved boundary is sampled.
+const BOUNDARY_SAMPLES: usize = 1440;
+
+/// The arm's outline, as one or more closed loops, built from the shape's
+/// **definition**.
+fn boundary_loops(shape: f32, points: f32) -> Vec<Loop> {
+    let n = points as usize;
+    let circle = |r: f32| -> Loop {
+        (0..BOUNDARY_SAMPLES)
+            .map(|i| {
+                let a = std::f32::consts::TAU * i as f32 / BOUNDARY_SAMPLES as f32;
+                [r * a.cos(), r * a.sin()]
+            })
+            .collect()
+    };
+    if shape < 0.5 {
+        return vec![circle(1.0)];
+    }
+    if shape < 1.5 {
+        // The annulus: two rims, at RING_MID +- RING_HALF.
+        return vec![circle(RING_MID + RING_HALF), circle(RING_MID - RING_HALF)];
+    }
+    if shape < 2.5 {
+        // Regular n-gon, circumradius 1, one vertex on +x. Straight edges, so
+        // the vertices alone are an exact polyline.
+        let seg = std::f32::consts::TAU / points;
+        return vec![
+            (0..n)
+                .map(|k| {
+                    let a = seg * k as f32;
+                    [a.cos(), a.sin()]
+                })
+                .collect(),
+        ];
+    }
+    if shape < 3.5 {
+        // n-pointed star: 2n vertices alternating tip radius 1 at k*seg with
+        // valley radius STAR_INNER at the half-step between.
+        let seg = std::f32::consts::TAU / points;
+        return vec![
+            (0..2 * n)
+                .map(|k| {
+                    let a = 0.5 * seg * k as f32;
+                    let r = if k % 2 == 0 { 1.0 } else { STAR_INNER };
+                    [r * a.cos(), r * a.sin()]
+                })
+                .collect(),
+        ];
+    }
+    // The heart, in ITS OWN frame first, then mapped back to sprite-local.
+    // Right half, walked from the bottom cusp: the 45-degree ray out to the
+    // tangent point (0.5, 0.5), then the lobe's outer semicircle round to the
+    // notch at (0, 1). Mirrored for the left half.
+    let arc_steps = BOUNDARY_SAMPLES / 4;
+    let ray_steps = BOUNDARY_SAMPLES / 8;
+    let mut heart: Loop = Vec::new();
+    for i in 0..=ray_steps {
+        let t = 0.5 * i as f32 / ray_steps as f32;
+        heart.push([t, t]);
+    }
+    // The lobe centred (0.25, 0.75): from the tangent point at -45 degrees,
+    // round the outside, to the notch at +135.
+    for i in 1..=arc_steps {
+        let a = -std::f32::consts::FRAC_PI_4 + std::f32::consts::PI * i as f32 / arc_steps as f32;
+        heart.push([0.25 + HEART_LOBE_R * a.cos(), 0.75 + HEART_LOBE_R * a.sin()]);
+    }
+    // ...and back down the mirrored half, skipping the shared notch and cusp so
+    // the loop does not double a vertex.
+    let mirrored: Loop = heart
+        .iter()
+        .rev()
+        .skip(1)
+        .take(heart.len().saturating_sub(2))
+        .map(|p| [-p[0], p[1]])
+        .collect();
+    heart.extend(mirrored);
+    // Heart space -> sprite-local: q = p * HEART_SCALE + (0, HEART_CY).
+    vec![
+        heart
+            .into_iter()
+            .map(|q| [q[0] / HEART_SCALE, (q[1] - HEART_CY) / HEART_SCALE])
+            .collect(),
+    ]
+}
+
+/// Distance from `p` to the segment `a`-`b`. Exact, so the polyline's own
+/// resolution is the only approximation in the ground truth.
+fn point_segment_distance(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
+    let (ab, ap) = ([b[0] - a[0], b[1] - a[1]], [p[0] - a[0], p[1] - a[1]]);
+    let denom = ab[0] * ab[0] + ab[1] * ab[1];
+    let t = if denom > 0.0 {
+        ((ap[0] * ab[0] + ap[1] * ab[1]) / denom).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let d = [ap[0] - t * ab[0], ap[1] - t * ab[1]];
+    (d[0] * d[0] + d[1] * d[1]).sqrt()
+}
+
+/// The ground-truth **signed** distance: negative inside the figure, positive
+/// outside, the sign from an even-odd crossing count over the same segments the
+/// magnitude came from.
+fn true_signed_distance(p: [f32; 2], loops: &[Loop]) -> f32 {
+    let mut nearest = f32::INFINITY;
+    let mut inside = false;
+    for lp in loops {
+        for i in 0..lp.len() {
+            let a = lp[i];
+            let b = lp[(i + 1) % lp.len()];
+            nearest = nearest.min(point_segment_distance(p, a, b));
+            // Even-odd crossing count along the +x ray from `p`.
+            if (a[1] > p[1]) != (b[1] > p[1]) {
+                let x = a[0] + (p[1] - a[1]) / (b[1] - a[1]) * (b[0] - a[0]);
+                if x > p[0] {
+                    inside = !inside;
+                }
+            }
+        }
+    }
+    if inside { -nearest } else { nearest }
+}
+
+/// The arm's **inradius in sprite-local units** — what `d = 1 + sd / R` divides
+/// by, so `(d - 1) * R` is the signed distance the arm is claiming.
+///
+/// Each value comes from the arm's own arithmetic rather than from a fit:
+/// `disc` is the unit circle, `ring` its half-width, the polygon's is its
+/// apothem, the star's is the perpendicular from the origin to the edge plane
+/// the arm measures against, and the heart's is `HEART_INRADIUS` over the scale
+/// that maps heart space into the sprite.
+fn inradius_local(shape: f32, points: f32) -> f32 {
+    if shape < 0.5 {
+        return 1.0;
+    }
+    if shape < 1.5 {
+        return RING_HALF;
+    }
+    let h = std::f32::consts::PI / points;
+    if shape < 2.5 {
+        return h.cos();
+    }
+    if shape < 3.5 {
+        // d = x + B*y with B = (1 - k cos h) / (k sin h); the line d = 1 sits
+        // 1 / sqrt(1 + B^2) from the origin.
+        let b = (1.0 - STAR_INNER * h.cos()) / (STAR_INNER * h.sin());
+        return 1.0 / (1.0 + b * b).sqrt();
+    }
+    HEART_INRADIUS / HEART_SCALE
+}
+
+/// The sampled region, in sprite-local units. The sprite quad is `[-1, 1]`; a
+/// contour reads well past it.
+const PROBE_HALF_SPAN: f32 = 2.2;
+const PROBE_STEPS: usize = 96;
+
+/// The per-arm error report: worst absolute deviation from the true signed
+/// distance, inside and outside separately, in sprite-local units.
+pub(super) struct ArmError {
+    pub exterior_worst: f32,
+    pub exterior_at: [f32; 2],
+    pub interior_worst: f32,
+}
+
+pub(super) fn measure_arm(shape: f32, points: f32) -> ArmError {
+    let loops = boundary_loops(shape, points);
+    let radius = inradius_local(shape, points);
+    let mut out = ArmError {
+        exterior_worst: 0.0,
+        exterior_at: [0.0, 0.0],
+        interior_worst: 0.0,
+    };
+    for iy in 0..=PROBE_STEPS {
+        for ix in 0..=PROBE_STEPS {
+            let p = [
+                -PROBE_HALF_SPAN + 2.0 * PROBE_HALF_SPAN * ix as f32 / PROBE_STEPS as f32,
+                -PROBE_HALF_SPAN + 2.0 * PROBE_HALF_SPAN * iy as f32 / PROBE_STEPS as f32,
+            ];
+            let truth = true_signed_distance(p, &loops);
+            let claimed = (mark_distance(p, shape, points) - 1.0) * radius;
+            let err = (claimed - truth).abs();
+            if truth > 0.0 {
+                if err > out.exterior_worst {
+                    out.exterior_worst = err;
+                    out.exterior_at = p;
+                }
+            } else {
+                out.interior_worst = out.interior_worst.max(err);
+            }
+        }
+    }
+    out
+}
+
+/// The bar an arm has to clear to count as **exact**. Three orders above the
+/// boundary polyline's own sagitta and three below the errors this phase found,
+/// so nothing lands ambiguously between the two verdicts.
+const EXACT_BAR: f32 = 1e-4;
+
+/// `star`'s worst interior error, **recorded rather than repaired** — see the
+/// test below and `mark_distance`'s own comment at that arm.
+///
+/// It is the value at the *most* pointed star the roster allows, because the
+/// error **scales with the point count** rather than being one number: measured
+/// 0.00075 at 3 points, 0.06597 at 5, 0.13800 at 7 and 0.24822 at 12. More
+/// spikes means a narrower wedge, and the plane the arm measures against
+/// diverges from the figure faster near the centre. A twelve-pointed star is
+/// therefore a quarter of a sprite half-width out at its middle.
+const STAR_INTERIOR_ERROR: f32 = 0.25;
+
+/// **The Phase 2 measurement, and the verdict it produced.** Every arm's
+/// returned distance against a numerically computed distance to its own
+/// outline, over a region reaching well outside the silhouette — swept across
+/// the point counts, since the two arms that take one are the two that were
+/// wrong.
+///
+/// What it found, before the repair in `mark_distance`:
+///
+/// | arm | exterior worst | interior worst | verdict |
+/// |---|---|---|---|
+/// | `disc` | 0.00000 | 0.00000 | exact by construction — the control |
+/// | `ring` | 0.00000 | 0.00000 | exact |
+/// | `polygon` | **0.32628** | 0.00000 | **repaired** |
+/// | `star` | **1.05685** | 0.06597 | **exterior repaired, interior recorded** |
+/// | `heart` | 0.00001 | 0.00001 | exact (IQ's, to the polyline's resolution) |
+///
+/// `disc` is the control and it is load-bearing: it is `length(p) - 1` exactly,
+/// so an arm that could not reproduce it would convict the harness rather than
+/// the shape. It reads 0.
+///
+/// **`star`'s interior stays approximate on purpose.** It measures against the
+/// edge *plane* rather than the figure, and the error **grows with the point
+/// count** — 0.00075 at 3 points, 0.06597 at 5, 0.13800 at 7, 0.24822 at 12
+/// (see [`STAR_INTERIOR_ERROR`]). Repairing it would change what every shipped
+/// `shape = "3"` mark looks like, since the sprite reads only the interior, and
+/// this plan's contract is that the particle path moves zero pixels. So it is
+/// recorded with its error, which is the other half of the phase's done-when.
+///
+/// The one place that matters today is `core/tests/fixtures/swarm_shaped.toml`,
+/// a 7-pointed star: its marks are drawn from a field 0.138 out at the centre,
+/// and always have been.
+#[test]
+fn the_exterior_distance_is_measured_against_each_shapes_own_outline() {
+    // `polygon` and `star` fold by the point count, so the repair has to hold
+    // across the roster and not merely at the default.
+    let counts: &[f32] = &[MIN_POINTS, DEFAULT_POINTS, 7.0, MAX_POINTS];
+    let arms: [(&str, f32, &[f32]); 5] = [
+        ("disc", DISC, &[DEFAULT_POINTS]),
+        ("ring", RING, &[DEFAULT_POINTS]),
+        ("polygon", POLYGON, counts),
+        ("star", STAR, counts),
+        ("heart", HEART, &[DEFAULT_POINTS]),
+    ];
+
+    println!(
+        "{:<9} {:>6} {:>14} {:>20} {:>14}",
+        "arm", "points", "exterior worst", "at", "interior worst"
+    );
+    let mut worst_interior_star: f32 = 0.0;
+    for (name, shape, points_list) in arms {
+        for &points in points_list {
+            let e = measure_arm(shape, points);
+            println!(
+                "{name:<9} {points:>6} {:>14.5} {:>20} {:>14.5}",
+                e.exterior_worst,
+                format!("({:.2}, {:.2})", e.exterior_at[0], e.exterior_at[1]),
+                e.interior_worst
+            );
+
+            // Every arm owes an exact EXTERIOR — that is what this phase bought.
+            assert!(
+                e.exterior_worst < EXACT_BAR,
+                "{name} at points = {points} is {:.5} from its own outline at \
+                 ({:.2}, {:.2}) — the contours `shape_field` draws are level sets \
+                 of this number, so an arm that is wrong out here draws the wrong \
+                 figure",
+                e.exterior_worst,
+                e.exterior_at[0],
+                e.exterior_at[1]
+            );
+
+            if shape == STAR {
+                // Recorded, not repaired. Bounded so it cannot silently grow.
+                worst_interior_star = worst_interior_star.max(e.interior_worst);
+            } else {
+                assert!(
+                    e.interior_worst < EXACT_BAR,
+                    "{name} at points = {points} drifted inside its own silhouette \
+                     ({:.5}) — only `star` is knowingly approximate there",
+                    e.interior_worst
+                );
+            }
+        }
+    }
+
+    assert!(
+        worst_interior_star <= STAR_INTERIOR_ERROR,
+        "the star's interior error grew to {worst_interior_star:.5}, past the \
+         {STAR_INTERIOR_ERROR} this phase recorded — it measures against the edge \
+         plane rather than the figure, and that is a documented approximation, \
+         not a licence for it to get worse"
+    );
+    assert!(
+        worst_interior_star > EXACT_BAR,
+        "the star's interior is now exact ({worst_interior_star:.5}) — good, but \
+         it means the sprite's arithmetic changed, which this plan's contract \
+         forbids. Check the golden baselines before relaxing this."
+    );
 }

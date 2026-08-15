@@ -30,11 +30,37 @@
 //!   *literally* the line it replaces, not an approximation of it. That is why
 //!   every pre-existing golden baseline is byte-identical: no shipped preset
 //!   names a shape, so they all take this arm.
-//! - **Only the interior matters.** The falloff downstream is unchanged —
-//!   `g = max(0, 1 - d)^2` — so every fragment at `d >= 1` is black. The lit
-//!   region *is* the silhouette, and a distance function only has to be right
-//!   inside it. That is what makes the polygon and star arms two cheap lines
-//!   rather than an exact convex-polygon SDF.
+//! - **Only the interior matters — *to a particle*.** The falloff downstream is
+//!   unchanged — `g = max(0, 1 - d)^2` — so every fragment at `d >= 1` is
+//!   black. For `swarm` and `emitter` the lit region *is* the silhouette, and a
+//!   distance function only has to be right inside it. That is what made the
+//!   polygon and star arms two cheap lines rather than exact SDFs.
+//!
+//! # The exterior became load-bearing (ADR-0105, Plan 0091 Phase 2)
+//!
+//! `shape_field` draws this roster at frame scale and bands the distance into
+//! contours, so it reads the region **outside** the silhouette — which nothing
+//! had ever looked at. Measured against a numerically sampled outline (see
+//! [`the_exterior_distance_is_measured_against_each_shapes_own_outline`](tests::the_exterior_distance_is_measured_against_each_shapes_own_outline),
+//! which carries the full table), the two cheap arms were exactly as wrong as
+//! the sentence above implies: `polygon` 0.326 and `star` 1.057 out, in
+//! sprite-local units where the whole sprite is 2 wide.
+//!
+//! Both are now **exact outside**, and the repair is shaped so the particle path
+//! cannot notice:
+//!
+//! - each arm keeps its original expression verbatim for `d <= 1`, so every
+//!   fragment a sprite lights is the arithmetic it was before, bit for bit —
+//!   asserted by all 29 golden baselines re-blessing byte-identical;
+//! - past that, the fold has already selected the one edge that can be nearest,
+//!   so the exact distance is to that edge as a **segment** rather than as an
+//!   infinite line. The clamp is the whole repair: it is what makes a point
+//!   beyond a vertex measure to the vertex.
+//!
+//! **`star`'s interior stays approximate, knowingly.** It measures against the
+//! edge plane rather than the figure, and the error grows with the point count —
+//! 0.00075 at 3 points, 0.066 at 5, 0.138 at 7, 0.248 at 12. Repairing it would
+//! move every shipped `shape = "3"` mark, so it is recorded rather than fixed.
 //!
 //! # What this deliberately is not
 //!
@@ -255,9 +281,26 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32) -> f32 {
         // regular polygon, circumradius 1, one vertex on +x. Fold the angle into
         // a wedge and measure against that wedge's edge line; R is the apothem.
         let seg = MARK_TAU / points;
+        let h = 0.5 * seg;
         let a = atan2(p.y, p.x);
-        let f = a - seg * floor(a / seg) - 0.5 * seg;
-        return length(p) * cos(f) / cos(0.5 * seg);
+        let f = a - seg * floor(a / seg) - h;
+        let r = length(p);
+        let apothem = cos(h);
+        let d_line = r * cos(f) / apothem;
+        // Inside a CONVEX polygon the nearest boundary is always an edge, never
+        // a vertex, so the line above is already the exact distance — and it is
+        // the expression the sprite has evaluated since ADR-0084, bit for bit.
+        if (d_line <= 1.0) {
+            return d_line;
+        }
+        // Outside it is not: past a vertex the nearest boundary is that vertex,
+        // and an infinite edge line measures straight past it (Plan 0091 Phase 2
+        // measured 0.326 of a sprite half-width at the worst sample). Clamp
+        // along the edge instead — folded, it is the segment x = apothem,
+        // |y| <= sin(h).
+        let q = vec2<f32>(r * cos(f), abs(r * sin(f)));
+        let past_vertex = max(q.y - sin(h), 0.0);
+        return 1.0 + length(vec2<f32>(q.x - apothem, past_vertex)) / apothem;
     }
     if (shape < 3.5) {
         // n-pointed star, tip radius 1 on +x, valley radius MARK_STAR_INNER.
@@ -271,7 +314,26 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32) -> f32 {
         let f = abs(a - seg * floor((a + h) / seg));
         let r = length(p);
         let k = MARK_STAR_INNER;
-        return r * cos(f) + r * sin(f) * (1.0 - k * cos(h)) / (k * sin(h));
+        let d_line = r * cos(f) + r * sin(f) * (1.0 - k * cos(h)) / (k * sin(h));
+        // The interior arm is unchanged and deliberately still APPROXIMATE — it
+        // is the plane, not the figure, and Plan 0091 Phase 2 measured it 0.066
+        // out at the worst interior sample. It stays because the sprite reads
+        // only here and every shipped `shape = 3` mark is this arithmetic.
+        if (d_line <= 1.0) {
+            return d_line;
+        }
+        // Outside, the half-wedge fold has already picked the one edge that can
+        // be nearest, so the exact distance is to that edge as a SEGMENT: the
+        // clamp is what makes a point past a tip measure to the tip. Unrepaired
+        // this arm was 1.057 out — over half a sprite half-width.
+        let b = (1.0 - k * cos(h)) / (k * sin(h));
+        let inradius = inverseSqrt(1.0 + b * b);
+        let q = vec2<f32>(r * cos(f), r * sin(f));
+        let tip = vec2<f32>(1.0, 0.0);
+        let valley = vec2<f32>(k * cos(h), k * sin(h));
+        let edge = valley - tip;
+        let t = clamp(dot(q - tip, edge) / dot(edge, edge), 0.0, 1.0);
+        return 1.0 + length(q - (tip + t * edge)) / inradius;
     }
     // heart: recentred and scaled into the sprite quad. The scale cancels out of
     // 1 + sd/R, so the inradius below is the unscaled figure's.
