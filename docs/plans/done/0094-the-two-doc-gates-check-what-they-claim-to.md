@@ -1,10 +1,23 @@
 # 0094 — the two doc gates check what they claim to
 
-> **Status:** draft
+> **Status:** done
 > **Created:** 2026-08-15
+> **Closed:** 2026-08-15, the day it was written — all three `dev` phases (`38addde`, `a9f8c70`,
+> `24c85dd`). Mode 4 verdict: **no blockers, no majors, two minors, two nits**, neither minor against
+> the implementation. Every phase re-verified independently at the close: the walk goes **249 -> 252**
+> with exactly the three `core/tests/fixtures/` READMEs regained and exactly the six under
+> `scripts/fixtures/` still skipped (258 markdown files exist); `--self-test` 9/9 with the fixture at
+> 5 breaks / 2 probes / 7 live entries; the repo exits 0 across all 14 live entries. Phase 3's premise
+> was **reproduced** on a `--depth 1` clone — `core/src/dsp/mod.rs` reads 2026-08-15 there against its
+> real 2026-07-30 — and both halves of its done-when hold: the shallow clone prints the notice with no
+> moved rows and the roster intact, and the full checkout still reports two real moved rows when entry
+> 0032's stamp is backdated. **Phase 1's done-when number was wrong in the plan and `dev` asserted the
+> property instead**, which this plan's own parenthetical authorises: "257, up from 248" counted the
+> files that *exist* rather than the files the walk *reads*, and six of those nine stay skipped by
+> design.
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) (a backlog claim about the repo carries an executable probe), [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md) (a gate that cannot run says so and skips)
-> **From:** [Plan 0093](done/0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md)'s Mode 4 review — two major findings and one minor, all three in `scripts/`
+> **Related ADRs:** [ADR-0108](../../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) (a backlog claim about the repo carries an executable probe), [ADR-0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md) (a gate that cannot run says so and skips)
+> **From:** [Plan 0093](0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md)'s Mode 4 review — two major findings and one minor, all three in `scripts/`
 
 ## TL;DR
 
@@ -69,7 +82,7 @@ Fix all three in place; add no dependency, no new script, and no new call site.
 
 The one real choice is Finding 3, and this plan takes the **notice** route over `fetch-depth: 0`:
 the checker detects a shallow repository and prints one line in place of the moved block, in
-[ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md)'s shape — *a check that cannot run says so
+[ADR-0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md)'s shape — *a check that cannot run says so
 rather than reporting something it did not measure*. The rejected alternative is `fetch-depth: 0` on
 the `links` job, which buys a real advisory on CI at the cost of a full-history fetch on every run,
 for a block that never touches the exit code. A gate should be honest wherever it runs rather than
