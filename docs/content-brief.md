@@ -40,7 +40,7 @@ Two riders from the plan:
   recorded rule — the [backlog 0072](design-backlog.md) precedent — and never lower it to fit.
 - **If the world binds `reseed` or any sustained force it owes one minutes-horizon soak
   observation**, verdict in the world's header. That is [backlog 0086](design-backlog.md)'s bounded
-  check. **The instrument for it is [Plan 0085](plans/0085-the-show-length-horizon-gets-an-instrument.md)
+  check. **The instrument for it is [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md)
   Phase 1** — if that plan has landed, use it; if not, the bounded observation stands as written.
 
 ### 1b. The dusk ground — [Plan 0080](plans/done/0080-the-sky-gets-a-horizon.md) Phase 7, content half

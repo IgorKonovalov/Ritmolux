@@ -154,7 +154,7 @@ working rule from a lucky one.
 | 0074 | The age channel has nothing spatial to colour | [ADR-0088](adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md) + [Plan 0074](plans/done/0074-the-figure-colours-by-how-far-it-has-come.md) — route 2 (the channel that IS spatial) plus route 3 (`age_*` retired), so the roster did not grow |
 | 0076 | The operator docs describe a fern tuning the shipped fern does not carry | Repaired at [Plan 0074](plans/done/0074-the-figure-colours-by-how-far-it-has-come.md)'s close |
 | 0084 | The ink stage has no contrast lever | [ADR-0092](adrs/0092-the-ink-remap-gains-a-contrast-exponent.md) + [Plan 0078](plans/done/0078-the-ink-learns-to-bite.md). **The content half is standing, not open** — the two-header re-judge lives in [`content-brief.md`](content-brief.md) §2 |
-| 0085 | `swarm` has no `reseed` | [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 3 — ADR-0066 disturbance semantics, never a box respawn. The minutes-horizon caveat it insisted on is honoured and stays live as [0086](#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument) |
+| 0085 | `swarm` has no `reseed` | [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 3 — ADR-0066 disturbance semantics, never a box respawn. The minutes-horizon caveat it insisted on is honoured, and the entry it kept alive — [0086](design-backlog-archive.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument) — **closed 2026-08-15** with `shot --horizon`, which ran on this world first and found the collapse repaired |
 | 0088 | `shot --report`'s band columns cannot see reactivity spent on bloom | [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 4 — the mean columns keep their meaning and a footprint reading lands beside them. Third member of a family the project has now fixed three times (0022, 0028, this) |
 | 0091 | There is no static, screen-anchored, oriented gradient | [ADR-0094](adrs/0094-the-backdrop-paints-a-directional-ramp.md) + [Plan 0080](plans/done/0080-the-sky-gets-a-horizon.md) |
 
@@ -173,6 +173,18 @@ working rule from a lucky one.
 | 0078 | `kaleido_tile` is a discrete quantity that is not quantized — **premise was false** | [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md) Phase 2, as documentation. The param is deliberately **not** rounded and `fold_tile`'s doc comment said so five phases before the entry was filed; what survived was the doc gap the entry named precisely, and `presets/README.md` now carries both facts — that `kaleido_tile` is the one param on the symmetry stage an author may ease between values, and that a fractional count leaves the border cell **cut off at the frame edge**. Judging whether that clipped edge *reads* badly stays unasked, because nobody has rendered it |
 | 0081 | The house gain rule lives only in preset headers — **first half was false** | [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md) Phase 3, as documentation. The rule itself had been in `presets/README.md` since 2026-08-03; the **exception class** was the survivor and is now named — *a param whose cap is a failure state rather than a maximum*, treated by pulling the range in at **both** ends rather than gaining to reach the cap, worked through Gray-Scott `feed`/`kill`. **The plan's shipped instance was wrong and `dev` corrected it at implementation:** it named `chthonic_coral_oracle.toml`, retired with cohort three on 2026-08-10 (`d92dcb2`), three days before the plan was written — the coral is right as *provenance* and wrong as a file, so the three shipped `reaction_*` presets carry the instance and `reaction_etching`'s `feed` line is quoted as the treatment |
 | 0089 | The dragon overruns the frame corner, and `FRAME_FILL = 0.88` promises it cannot | [ADR-0103](adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) + [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md) Phase 1. **Closed 2026-08-15, and it was never one figure's bug.** The fit measures an axis-aligned box and `project` rotates it at `spin`'s default, so only a figure at or under `sqrt(1/FRAME_FILL² − 1)` stays inside at every angle — measured over the roster, **only the fern complies** (`a = 0.4851`), and sierpinski/tree/dragon/spiral overrun by 34/41/58/79 %. The contract was restated to what it guarantees, pinned as a property test asserted against the shipped `fit_scale`, with **zero pixels moved**. The guarantee itself is **deferred with a trigger, not bought** — the entry's own second candidate (the preset's `zoom` reaching 1.04) did not fire, and all three 2-D IFS presets' bindings peaking above 1.0 is now a content-lane sitting |
+
+### Added at Plan 0085's close, 2026-08-15
+
+| # | Entry | Went to |
+|---|-------|---------|
+| 0082 | The quality governor reads `frame_ms_p99`, and a preset switch spikes it to 25 ms — **the premise was false** | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 3-4. **Closed 2026-08-15**, and the qualification landed in all three places a governor design starts from, with the three candidate responses named and deliberately not chosen. **But this entry described a governor that does not exist.** R0 was **not** unbuilt — [Plan 0044](plans/done/0044-quality-tiers.md) / [ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md) shipped it on 2026-07-30, ten days *before* this entry was raised — and the shipped `sustained_miss` **never reads p99**: it needs 75 % of at least 180 raw frame times past `budget * 1.25`, which a switch's handful of slow frames in a 240-sample ring cannot approach. So the built governor already landed this entry's *second* candidate response, independently, as a miss fraction. The hazard is real and lives in the **prose**; a revisit starting from the old description would build it. Same failure mode as 0078 and 0081 — a claim about the repo, rotting the way claims about the repo do |
+| 0086 | No capture path reaches the minutes-long horizon | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 1-2. **Closed 2026-08-15** as the shape the entry specified rather than the gate it refused: `shot --horizon <minutes>`, run by the lane, verdict in the world's header, both determinism properties asserted on rendered pixels and a static control reading `delta 0.0000` as the non-vacuity half. **The named subject came back clean** — `swarm_shatter` wanders 0.197-0.384 across ten minutes with no trend, its collapse repaired by [Plan 0077](plans/done/0077-the-quiet-sky.md)'s `reseed` — and the instrument convicted a world nobody suspected instead: `attractor_ink`, coverage 0.199 -> 0.002 with the **silhouette intact and the density gone**, recorded in that header and deliberately unrepaired. **One bound the entry could not anticipate:** the headless path dies at 3,601 frames on both RD worlds, so those two rows are 0.5 minutes and their `monotone 1.00` is settling, not drift — filed as [0093](#0093--the-headless-capture-path-dies-past-a-few-thousand-frames-so-the-horizon-cannot-reach-its-own-headline-length) |
+
+**Their sibling [0083](#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)
+did not move.** Plan 0085 gave it the `switches` instrument (Phase 3) and not the three paired runs
+it asks for (Phase 5, `human`, standing in the plans README) — a half-discharged entry stays live,
+with a dated update naming which half.
 
 ## Open entries
 
@@ -911,73 +923,30 @@ this plan one unanswered question, which Phase 6 absorbed.
 
 ---
 
-## 0082 — the quality governor reads `frame_ms_p99`, and a preset switch spikes p99 to 25 ms while nothing is dropped
-
-- **PROMOTED 2026-08-13 → [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) +
-  [Plan 0085](plans/0085-the-show-length-horizon-gets-an-instrument.md) Phases 3-4**, jointly with
-  [0083](#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)
-  and [0086](#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument):
-  three entries about the show-length timescale nothing in this repo measures. **The plan does not
-  choose among this entry's three candidate responses** — that stays R0's decision, exactly as
-  written below. What it does is add a steady-state frame-time column beside `p99` and record the
-  qualification where R0's designer will meet it before they meet the column, which is this entry's
-  own "the cheapest time to know is before the governor exists".
-
-**Raised by:** `architect`, at [Plan 0046](plans/done/0046-transformed-feedback.md)'s close, from
-that plan's Phase 5 measurement. **Owner if taken:** `dev`, after an `architect` call on what the
-governor should do about it.
-
-### The finding
-
-Three minutes of the standalone at Rich tier, 1080p, two feedback presets with switching and a
-fullscreen toggle — 158 audible 1 Hz rows:
-
-| | value |
-|---|---|
-| fps median / min | 165.0 / **114.3** |
-| rows below the NFR §1 60 fps floor | **0 of 158** |
-| `frame_ms_avg` median / max | 6.061 / **8.749** ms |
-| `frame_ms_p99` median / max | 6.866 / **25.037** ms (p95 of that column: 18.1) |
-| frames dropped | **0 of 28 698** |
-
-So the frame budget holds with roughly 2.7x headroom and the transform costs nothing measurable.
-**But `frame_ms_p99` exceeds the 16.67 ms budget while `frame_ms_avg` never passes 8.7 ms and no
-frame is dropped.** The spikes coincide with preset switches and the fullscreen toggle — GPU
-resource rebuilds, not steady-state cost.
-
-### Why it is worth an entry
-
-**The adaptive-quality governor is specified to read p99** (roadmap item 3 / R0, not yet built). A
-demotion decision reading this column would see 25 ms during a preset switch and demote a preset
-that is in fact running at 165 fps — and demotion changes what the audience sees, on the one event
-that is already visually disruptive. The measurement is not a defect; the *instrument the governor
-will read* is what needs the qualification, and the cheapest time to know is before the governor
-exists.
-
-### What a fix would be
-
-One of three, and choosing is the design question: exclude the frames following a preset switch or
-a surface reconfigure from the governor's window; make the governor require N consecutive bad
-windows rather than one; or give it a separate steady-state statistic and leave p99 as the
-diagnostic it is today. Whatever is chosen, this measurement is the test case.
-
-### Priority
-
-**Medium — but it must be read before R0's governor is designed**, not after.
-
----
-
----
-
 ## 0083 — RSS grew 385 to 663 MB over three minutes of preset switching, and there is no no-feedback control to compare it against
 
 - **PROMOTED 2026-08-13 → [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) +
-  [Plan 0085](plans/0085-the-show-length-horizon-gets-an-instrument.md) Phase 5** — the measurement
+  [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phase 5** — the measurement
   this entry asks for, not a fix, and it stays a `human` phase because it needs the live app on a
   real machine for a real duration. One thing the plan adds that this entry did not ask for and
   needs: **`--soak` has no notion of a preset switch**, which is the axis the whole question turns
   on, so a `switches` column lands first (Phase 3) and the three runs read against it. **Either
   answer closes this entry** — the entry's complaint is the missing control, not the number.
+- **HALF DISCHARGED 2026-08-15, at Plan 0085's close — and it stays live, which is the point.** The
+  instrument landed and the measurement did not. `--soak` now writes a monotone `switches` counter
+  (preset changes **and** surface reconfigures, so the difference between two rows is how many
+  happened between them) beside the existing `rss_bytes` column, which is exactly the axis this
+  entry said was missing. **The three paired runs are Phase 5, `human`, and have not been made** —
+  they need the live app on a real machine for a real duration, so they carry forward under Standing
+  in [`docs/plans/README.md`](plans/README.md) rather than holding the plan open. Its two sibling
+  entries, [0082](design-backlog-archive.md#0082--the-quality-governor-reads-frame_ms_p99-and-a-preset-switch-spikes-p99-to-25-ms-while-nothing-is-dropped)
+  and [0086](design-backlog-archive.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument),
+  were discharged in full and are archived. **Nothing about the finding below has been re-measured**,
+  so read it as the 2026-08-09 snapshot it is. One thing that *has* changed underneath it:
+  [0093](#0093--the-headless-capture-path-dies-past-a-few-thousand-frames-so-the-horizon-cannot-reach-its-own-headline-length)
+  found the **headless** capture path climbing to ~2.9 GB over 3,600 frames — a different process on
+  a different path, and not evidence about this one, but a reason to run the control here rather
+  than assume the growth is the driver's.
 
 **Raised by:** `architect`, at [Plan 0046](plans/done/0046-transformed-feedback.md)'s close, from
 that plan's Phase 5 measurement. **Owner if taken:** `dev` (a measurement first, not a fix).
@@ -1028,64 +997,6 @@ demonstrated want, each through its own ADR/plan, never absorbed into 0075). Pro
 queue **behind Plan 0076 and cohort 6**; none of them gates the collage. All measurements below
 are the lane's renders, reported at the handoff — not independently re-verified here; the
 file's standing verify-before-acting rule applies.
-
----
-
-## 0086 — no capture path reaches the minutes-long horizon, so a slow-accumulation failure is invisible to every instrument
-
-- **PROMOTED 2026-08-13 → [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) +
-  [Plan 0085](plans/0085-the-show-length-horizon-gets-an-instrument.md) Phases 1-2** — and promoted
-  **as the shape this entry specified**, not as the gate it refused: a headless `shot` mode rendering
-  N simulated minutes at capture cadence and reporting drift statistics, run by the lane on worlds
-  with an accumulation axis, verdict in the world's header. The ADR adds one thing the entry did not
-  separate: **this half is deterministic and reproducible headless** (forces integrate against
-  injected `dt`), while [0083](#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)'s
-  RSS growth comes from live GPU resource churn no headless loop reproduces — so they share a
-  motivation and **not** an instrument, and one harness for both would be blind to two of the three.
-  The 2026-08-11 park-with-a-trigger below is discharged by the trigger having fired.
-
-**Raised by:** `preset-author`, Plan 0075 cohort 4, watching Shatter collapse live three times
-while the suite stayed green. **Owner if taken:** `architect` first — this is a methodology
-question before it is code.
-
-### The finding
-
-`shot` strips and all five behavioral gates live in the first seconds of a preset's life (the
-synthetic gates capture 30 frames at 1/60 s; even the PCM-driven reactivity gate measures a few
-seconds of hops). Shatter's collapse developed over **minutes** of sustained force. Nothing
-went red and nothing was flagged — the suite is structurally blind to any failure whose
-timescale is the show rather than the capture. The class is real and now has a named member:
-any slow-divergence look (accumulating forces, feedback with net gain, populations that
-migrate) can ship green and die on stage.
-
-Adjacent, not identical:
-[0083](#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against)
-wants a long-horizon RSS measurement for the same regime (hours-long live shows); the two would
-share a soak recipe.
-
-### What a fix would be
-
-**Not a gate.** A minutes-long capture per preset is not a price this suite can pay — see
-[0080](design-backlog-archive.md#0080--the-reactivity-gate-pays-18x-to-render-frames-it-throws-away-because-warm-up-and-measurement-share-one-capture-path)
-for what the *seconds* already cost. The honest shape is a documented soak-style spot-check: a
-`shot` mode or recipe that renders N minutes at capture cadence and reports drift statistics
-(population spread, deposit concentration), run by the lane on worlds whose mechanism has an
-accumulation axis, with the verdict recorded in the preset header the way the fold-edge
-verdicts were.
-
-### Handoff verdict (2026-08-11): park, with a trigger
-
-Park until someone ships a look with a slow-accumulation axis — and that trigger explicitly
-includes acting on
-[0085](#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever), which must
-not ship its lever verified only at the horizon the suite can see.
-
-**Trigger status (2026-08-11, same day):** [Plan 0077](plans/done/0077-the-quiet-sky.md) acts on
-0085 and its Phase 5 carries the bounded check this entry's "What a fix would be" prescribes —
-one minutes-horizon observation, verdict recorded in the world's header. The entry itself
-stays **parked**: no instrument is built, and the trigger re-arms for the next
-slow-accumulation look. (2026-08-12: the plan's `dev` scope closed; the bounded check travels
-with its Phase 5, standing in the plans README — this entry's status is unchanged.)
 
 ---
 
@@ -1165,3 +1076,65 @@ gap. Take it if the Phase 6 look gate says the flat sparkle is the disappointing
 verdict is the trigger, and it is scheduled.
 
 ---
+
+---
+
+## 0093 — the headless capture path dies past a few thousand frames, so the horizon cannot reach its own headline length
+
+**Raised by:** `architect`, at [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md)'s
+close, from that plan's Phase 2 findings. **Owner if taken:** `dev` — but read the mechanism below
+first, because the candidate cause is one line and the entry may be cheaper than it looks.
+
+### The finding
+
+Both shipped reaction-diffusion worlds (`reaction_mitosis`, `reaction_verdigris`) fail at **3,601
+frames** with `Buffer with 'lmv-capture-readback' label is invalid`, after the process's resident
+set climbs to **~2.9 GB**. Measured on the Windows development box, hardware adapter, debug build,
+at 96x96 — the capture size is not the lever, since 2.9 GB is four orders above what 3,600 frames of
+96x96 RGBA would be.
+
+**It is pre-existing and not a defect in Plan 0085's new sampling primitive.** The shipped
+`Renderer::capture_preset` fails identically at the same frame count on the same preset, which was
+run as the control *before* this was called a finding. It is only visible now because nothing in
+this repo had ever driven a world for thousands of frames: the four synthesized gates capture 30,
+the reactivity gate a few hundred.
+
+### Why it is worth an entry
+
+**It bounds the instrument Plan 0085 just shipped.** `shot --horizon 10` is documented as ten
+simulated minutes — 36,001 renders — and on two shipped worlds it cannot get past 3,601. Those two
+rows in the plan's Phase 2 table are therefore a **0.5-minute** horizon, and their `monotone 1.00`
+is a world still settling into its pattern rather than drifting: a horizon shorter than a world's
+own warm-up reads settling *as* drift, which is precisely the misreading the instrument exists to
+prevent. Every other world in the roster cleared 36,001 renders, so this is not a general ceiling —
+it is a ceiling on the family whose mechanism most obviously wants a long look.
+
+It is also **adjacent to, and not the same as,**
+[0083](#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against):
+that is the *live app's* resident set under preset switching, this is a *headless offscreen loop*
+that never rebuilds a surface. If they share a cause it would be worth knowing, and nothing
+currently says they do.
+
+### What a fix would be — with a candidate mechanism, stated as unverified
+
+`core/src/render/capture_api.rs:481` — **`step_offscreen` creates a command encoder, submits it, and
+never polls.** `capture::read_back` holds the only `device.poll` anywhere in the capture path, so
+between two sampled frames wgpu has no opportunity to release the transient resources each
+submission retains. At a 60-second interval that is **3,600 consecutive unpolled submits**. All
+three capture entry points (`capture_preset`, `capture_preset_over`, `capture_preset_at`) funnel
+through `step_offscreen`, which is exactly why the control failed the same way — and it would
+explain why an RD world, whose per-frame ping-pong is the heaviest in the engine, hits it first.
+
+**This is a hypothesis and nobody has run it.** The check is cheap: poll once per frame in
+`step_offscreen` and re-run `shot --horizon 10` on `reaction_mitosis`. If the RSS trace flattens,
+the fix is one line and the entry closes with a measurement; if it does not, the diagnosis is wrong
+and the real one starts from a GPU memory report rather than from this paragraph. **Do not close
+this by lowering a documented horizon** — the instrument's stated length is what makes a recorded
+header verdict comparable across worlds.
+
+### Priority
+
+**Medium.** Nothing ships broken — this is a QA path, not a runtime one, and the live app polls
+every frame through its own present. But it silently truncates the only instrument this project has
+for show-length behaviour, on the family that most needs it, and the truncation reads as a *result*
+(`monotone 1.00`) rather than as an error unless someone reads the run's stderr.
