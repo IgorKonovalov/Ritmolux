@@ -340,11 +340,28 @@ plan asked for. The table is recorded in three places a future reader will actua
   carries, and the hostile-input test proves the first step is bounded at two pool-fulls rather than
   at whatever a binding asked for.
 
-**Phase 5 stands, and it is the reason the plan exists.** It is `human`-owned and carries the two
-questions no test can answer — does `spawn_fade` actually hide the pop, and does a prewarmed world
-switch in badly. It is listed under **Standing** in `docs/plans/README.md`, alongside the other
-content-lane items on this family. Backlog 0068 is closed and archived regardless: what it asked the
-engine for is delivered, and the world is content work rather than an undischarged half.
+**Phase 5's verdicts came in the same day, on probes** — five throwaway parameter probes at `rich`
+tier, one variable moving at a time, run through `LMV_PRESET_DIR`. All three answers are positive and
+both of ADR-0104's argued negatives held:
+
+- **Does `spawn_fade` hide the pop? Yes.** Source on the screen midline (`source_y = 0`), a `0.35`
+  fade reads as marks arriving rather than switching on, against a paired `spawn_fade = 0` probe that
+  shows the artifact plainly. The documented-limit fallback this plan held in reserve — *"do not put
+  the source inside the frame unless the marks are faint"* — is **not needed**, and Alternative D's
+  clamp stays rejected on a second ground.
+- **Does a prewarmed world switch in badly? No.** Stepping between a `prewarm = 1` sky and its
+  byte-identical `prewarm = 0` control, the full-population arrival reads as intended. The Followup
+  pointing at the transition stage's crossfade is **discharged unfired**, not deferred.
+- **Curation: `emitter_perseids` keeps its place.** The fast shower and the quiet sky are different
+  looks rather than two tunings of one, so the quiet world joins the set rather than replacing it.
+  Its stale header is still a rewrite the content lane owes.
+
+Recorded as a dated `Outcome` on [ADR-0104](../../adrs/0104-the-emitters-source-is-authorable-geometry.md)
+rather than by editing its body. **What is not settled is the content**: the verdicts are on probes,
+not on shipped worlds, so the quiet sky and the point fountain remain the `preset-author` lane's to
+author — now with both answers in hand. That is what still stands under **Standing** in
+`docs/plans/README.md`. Backlog 0068 is closed and archived regardless: what it asked the *engine*
+for is delivered.
 
 **Curation (step 3b): one preset was made stale, and the first pass missed it.** The plan touched no
 `.toml` and the four params are inert in every shipped world by arithmetic, which the golden pass

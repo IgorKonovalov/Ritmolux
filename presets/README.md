@@ -615,6 +615,14 @@ scalars, and a rule like that would make a legal preset briefly illegal under a
 `[smoothing]`-eased fade passing through zero). It is also worth having on its own:
 a ramp on a short-lived object is a *soft* spark, which no `brightness` can express.
 
+**Judged in the app, 2026-08-15** (Plan 0090 Phase 5): at the pop's most visible —
+a source on the screen midline, `source_y = 0` — **`spawn_fade = 0.35` hides it**,
+against a paired `spawn_fade = 0` probe that shows the artifact plainly. So the
+price above is real but payable, and there is no "keep the marks faint" caveat to
+work around. The same sitting judged a prewarmed world's one-frame arrival as
+**right rather than jarring**, so nothing about a preset switch argues against
+`prewarm` either.
+
 **`prewarm` is the other half of a slow world, and moving the source does not do
 its job.** Wherever the line sits, the pool starts *empty* and fills at
 `spawn_rate`, so the population climbs toward `spawn_rate * lifetime` over a whole
