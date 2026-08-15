@@ -1,12 +1,13 @@
 # 0090 — the emitter's source moves
 
-> **Status:** in-progress
+> **Status:** done (closed 2026-08-15 — Phases 1-4 landed as `a274a48`, `10072ed`, `1c87eb7`,
+> `669c6bd`; the `human` Phase 5 stands, see below)
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0104](../adrs/0104-the-emitters-source-is-authorable-geometry.md) (accepted, this plan)
-> **Closes:** [design-backlog 0068](../design-backlog.md) option 2
-> **Supplements:** [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md),
-> [ADR-0091](../adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)
+> **Related ADRs:** [ADR-0104](../../adrs/0104-the-emitters-source-is-authorable-geometry.md) (accepted, this plan)
+> **Closes:** [design-backlog 0068](../../design-backlog.md) option 2
+> **Supplements:** [ADR-0057](../../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md),
+> [ADR-0091](../../adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)
 
 ## TL;DR
 
@@ -21,9 +22,9 @@ itself is the closing `human` phase.
 
 ## Context & problem
 
-[Backlog 0068](../design-backlog.md) carried two independent asks and one of them is still open.
+[Backlog 0068](../../design-backlog.md) carried two independent asks and one of them is still open.
 Option 1 — per-mark variation on the swarm — was delivered by
-[Plan 0077](done/0077-the-quiet-sky.md) Phase 2. **Option 2, the source, was never promoted**, and
+[Plan 0077](0077-the-quiet-sky.md) Phase 2. **Option 2, the source, was never promoted**, and
 the entry says so in as many words at every update: *"Option 2 remains open here."*
 
 **Two wants, one of which has a measured casualty.**
@@ -61,7 +62,7 @@ let p0 = [
 
 So the geometry is one constant and one assignment. The design question was which knobs to expose and
 whether a source may sit inside the frame; that is settled by
-[ADR-0104](../adrs/0104-the-emitters-source-is-authorable-geometry.md), decided by interview.
+[ADR-0104](../../adrs/0104-the-emitters-source-is-authorable-geometry.md), decided by interview.
 
 ### The second warm-up, which the interview surfaced and the entry did not
 
@@ -195,7 +196,7 @@ which is what makes back-dating exact rather than approximate.
     slow enough to read as a sky — is rendered through the behavioral gates at `prewarm = 0` and at
     `prewarm = 1` and the two reports are recorded. The plan does **not** promise a pass: what it
     promises is the number, and if `prewarm = 1` still fails the gates then the sparse idiom's
-    remaining wall is a finding for [ADR-0091](../adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md),
+    remaining wall is a finding for [ADR-0091](../../adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md),
     not something to fix by moving a floor.
 
 ### Phase 4 — the docs stop routing this to engine feedback
@@ -225,7 +226,7 @@ which is what makes back-dating exact rather than approximate.
 - **Owner skill:** human
 - **What:** the content lane authors the look this plan exists for, and the user judges it in the app.
 - **Files touched:** `presets/` (one or two worlds, landed by `preset-author` under
-  [ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)).
+  [ADR-0081](../../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)).
 - **Done when:** the user has judged, in the running app, (a) a **quiet drifting field** — the look
   backlog 0068 measured the emitter for and could not reach — and (b) a **point fountain or
   off-centre jet**, the ask `presets/README.md` has been refusing. Two questions to answer while
@@ -308,3 +309,55 @@ struct Spawn {
   off-frame, which an inside-frame source undoes.
 - **If the prewarmed switch reads badly**, the transition stage is the place to look and it is a
   different plan.
+
+## Close notes (2026-08-15)
+
+**Verdict: landed clean — no blockers, no majors, two minors, one nit.** All four `dev` phases did
+what the plan said, in the order it said, one commit each. Every named done-when was checked by
+opening the test and reading the assertion, not by trusting a green run: 25 emitter tests pass, the
+golden suite passes **against the committed baselines** (so the zero-pixels claim is verified here
+and not only re-blessed at the phases), `fmt` is clean, the doc-link gate and the backlog-claim gate
+both exit 0.
+
+**Phase 3's measurement came back, and it did not say what the plan guessed.** The plan expected the
+animation gate to be the wall; it is not — ADR-0091's footprint statistic passes the sparse draft
+**cold** at `0.0629` against a `0.01` floor. The wall is `sanity`: at `prewarm = 0` the slow draft is
+convicted **blank** (0 of 10 radial shells, cover `0.0074`) and `prewarm = 1` carries it to 10 of 10
+and the structural rescue. Reactivity is the one still short — `0.0195` against a `0.02` floor, 97.5 %
+of it — on a draft nobody tuned for that gate. **No floor moved and none should**, which is what the
+plan asked for. The table is recorded in three places a future reader will actually hit
+(`docs/capturing.md`'s gate caveats, `presets/README.md`'s source section, and `systems.md`).
+
+**Two deviations from the plan text, both improvements, both stated in their commits.**
+
+- `spawn_fade` landed **CPU-side at the draw site** rather than in the shader the plan's diagram put
+  it in. The emitter resolves brightness on the CPU and packs it into the instance colour, so no
+  shader edit was needed — and resolving it beside `size_spread`/`spin`/`twinkle` rather than on
+  `Spawn` is the right seam: it says how an object *looks*, so easing it moves the whole population
+  and not only the marks thrown since the change.
+- `prewarm` gained a `MAX_PREWARM = 2.0` ceiling and a window clipped at the longest possible life,
+  neither of which the plan named. Both are the bounded-work discipline `MAX_SPAWN_RATE` already
+  carries, and the hostile-input test proves the first step is bounded at two pool-fulls rather than
+  at whatever a binding asked for.
+
+**Phase 5 stands, and it is the reason the plan exists.** It is `human`-owned and carries the two
+questions no test can answer — does `spawn_fade` actually hide the pop, and does a prewarmed world
+switch in badly. It is listed under **Standing** in `docs/plans/README.md`, alongside the other
+content-lane items on this family. Backlog 0068 is closed and archived regardless: what it asked the
+engine for is delivered, and the world is content work rather than an undischarged half.
+
+**Curation (step 3b): nothing to curate.** The plan touched no `.toml` — the four params are inert in
+every shipped world by arithmetic, which the golden pass confirms. The workaround grep
+(`grep -rn "ADR-00NN\|Plan 00NN\|design-backlog 00NN" presets/*.toml`) returns only known,
+already-discharged headers; **no preset works around the fixed source line**, because until this plan
+there was no way to work around it. `emitter_perseids` keeps its place — whether the quiet world
+joins or replaces it is Phase 5's call, not this close's.
+
+**One finding that outlives the plan: a `present:` probe anchored on an identifier is satisfied by
+any identifier that ends with it.** Backlog 0068's own verification bullet claimed
+`present: SOURCE_Y: f32 = -1\.12` was *"designed to go red the day that lands"*. It did not — Phase 1
+renamed the constant to `DEFAULT_SOURCE_Y`, which still contains the substring, so
+`check-backlog-claims.mjs` stayed green through the exact delivery it was written to detect. Two live
+probes share the shape (`CONFIDENCE_THRESHOLD`, `BASS_WEIGHT` in backlog 0048); both are lower risk
+because a prefix rename is less likely there, but the lesson is general — **anchor a probe on the
+line, not on a bare identifier**, or it reports a rename as continuity.

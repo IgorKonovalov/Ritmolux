@@ -232,6 +232,12 @@ working rule from a lucky one.
 | 0082 | The quality governor reads `frame_ms_p99`, and a preset switch spikes it to 25 ms — **the premise was false** | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 3-4. **Closed 2026-08-15**, and the qualification landed in all three places a governor design starts from, with the three candidate responses named and deliberately not chosen. **But this entry described a governor that does not exist.** R0 was **not** unbuilt — [Plan 0044](plans/done/0044-quality-tiers.md) / [ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md) shipped it on 2026-07-30, ten days *before* this entry was raised — and the shipped `sustained_miss` **never reads p99**: it needs 75 % of at least 180 raw frame times past `budget * 1.25`, which a switch's handful of slow frames in a 240-sample ring cannot approach. So the built governor already landed this entry's *second* candidate response, independently, as a miss fraction. The hazard is real and lives in the **prose**; a revisit starting from the old description would build it. Same failure mode as 0078 and 0081 — a claim about the repo, rotting the way claims about the repo do |
 | 0086 | No capture path reaches the minutes-long horizon | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 1-2. **Closed 2026-08-15** as the shape the entry specified rather than the gate it refused: `shot --horizon <minutes>`, run by the lane, verdict in the world's header, both determinism properties asserted on rendered pixels and a static control reading `delta 0.0000` as the non-vacuity half. **The named subject came back clean** — `swarm_shatter` wanders 0.197-0.384 across ten minutes with no trend, its collapse repaired by [Plan 0077](plans/done/0077-the-quiet-sky.md)'s `reseed` — and the instrument convicted a world nobody suspected instead: `attractor_ink`, coverage 0.199 -> 0.002 with the **silhouette intact and the density gone**, recorded in that header and deliberately unrepaired. **One bound the entry could not anticipate:** the headless path dies at 3,601 frames on both RD worlds, so those two rows are 0.5 minutes and their `monotone 1.00` is settling, not drift — filed as [0093](#0093--the-headless-capture-path-dies-past-a-few-thousand-frames-so-the-horizon-cannot-reach-its-own-headline-length) |
 
+### Added at Plan 0090's close, 2026-08-15
+
+| # | Entry | Went to |
+|---|-------|---------|
+| 0068 | A swarm mark has no per-mark variation, and the one scene that could hold a starfield could not reach a slow one | [ADR-0104](adrs/0104-the-emitters-source-is-authorable-geometry.md) + [Plan 0090](plans/done/0090-the-emitters-source-moves.md) Phases 1-4, closing the **second** option; option 1 had landed at [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 2. **Closed 2026-08-15, both halves.** The source is now two authorable scalars plus the two params that answer what moving it costs (`spawn_fade`, `prewarm`), every default an exact arithmetic identity — the golden suite passes against the **committed** baselines, not merely re-blessed. **This entry named one warm-up and there were two**, which the plan found while grounding the gate argument and then measured: the *travel* warm-up is geometry and the *population* one is the spawn rate. Slow draft, `prewarm = 0` against `prewarm = 1` — `sanity` `0.0074` / 0 of 10 radial shells (**convicted blank**) against `0.1470` / 10 of 10; `animation` `0.0629` against `0.1702`; `reactivity` `0.0002` against `0.0195`. **The measurement corrected the plan's own guess**: the animation gate was never the wall (it passes the sparse draft cold), `sanity` was, and no floor moved either way. The world itself is Plan 0090's `human` Phase 5 and stands under Standing — content work on a delivered surface, not an undischarged half. **One lesson banked**: this entry's `present: SOURCE_Y: f32 = -1\.12` probe was written to go red on delivery and did not, because `DEFAULT_SOURCE_Y` still contains the substring — anchor a probe on the line, not on a bare identifier |
+
 ### Added when Plan 0085's Phase 5 was run, later the same day
 
 Their sibling **0083 was half-discharged at the close above and closed a few hours later**, when
@@ -552,116 +558,12 @@ time here too.
 
 ---
 
-## Entries 0068-0069 — from Plan 0070's close (2026-08-05)
+## Entry 0069 — from Plan 0070's close (2026-08-05)
 
----
-
----
-
-## 0068 — a swarm mark has no per-mark variation, so the only scene that can hold a starfield cannot make one twinkle
-
-- **Raised:** 2026-08-05, from `preset-author`, during [Plan 0070](plans/done/0070-shaped-marks.md)
-  Phase 6 — the starfield the whole plan was built for.
-- **Verified by measurement:** yes. The emitter draft was rendered and gated before being discarded;
-  the numbers below are from that run, not from reading the code.
-- **Verified 2026-08-15** — option 2 is still open, and this entry's own dated correction still
-  holds: `present: SOURCE_Y: f32 = -1\.12 in: core/src/render/scenes/emitter.rs`,
-  `present: source_half_width in: core/src/render/scenes/emitter.rs`,
-  `present: launch_speed = "2\.6" in: presets/emitter_perseids.toml`.
-  [Plan 0090](plans/0090-the-emitters-source-moves.md) turns the first of these into an authorable
-  scalar, so it is designed to go red the day that lands — at which point option 2 is delivered and
-  the entry is the architect's to close.
-
-**The scene with the right individuation cannot hold the look, and the scene that can hold it has no
-individuation.** `emitter` carries `twinkle`, whose *rate and phase both* come off each object's own
-seed, so a field shimmers while the frame's total light sits still — which is exactly what a sky of
-stars does and exactly what a whole-field brightness term cannot fake. It also carries
-`size_spread`. It is unusable for a starfield anyway, and the reason is geometry rather than taste:
-its source line is fixed at `y = -1.12` and cannot be moved, so a star must travel 2.12 units to
-cross the frame. A drift slow enough to read as a sky (~0.85 units/s) needs ~2.5 s to fill it, and
-**every behavioral gate in the suite captures 30 frames at 1/60 s, which is 0.5 s** — so the gate
-sees an empty sky. Measured: the emitter draft reported cover `0.013` and `0.000` on all four bands.
-Speeding it to the ~4.3 units/s the geometry demands is a rising shower rather than a starfield, and
-the twinkle stops reading at that speed regardless.
-
-`swarm` has the opposite profile. Its population is fixed and present from frame one, so it has no
-warm-up at all and the gates see it immediately — which is why `swarm_starfield` ships on it. What
-it has no way to express is **per-mark** anything: a `brightness` or `size` binding moves the entire
-field together, so the shipped preset's shimmer is a slow global breath plus a beat flash, and the
-per-star life the look actually wants is simply absent.
-
-### What would close it
-
-Either half would; they are independent and the first is much smaller.
-
-1. **Per-mark variation on the swarm** — a `twinkle` and a `size_spread` in the emitter's shape,
-   driven off the existing per-particle seed. The swarm already draws a seeded per-particle `size`
-   factor and a depth scale, so the machinery to individuate is there; nothing exposes a *bound*
-   parameter through it.
-2. **A movable or point source on the emitter** — the fixed line is recorded separately in
-   [0060](#0060--an-engine-fix-leaves-its-preset-side-workarounds-standing-and-only-a-header-comment-remembers-them)'s
-   neighbourhood as "no positionable source". Closing that would make the emitter reachable for
-   slow-drift looks, and this entry is a second, independent reason to want it.
-
-**Not the answer:** raising the gate's capture length. The gates are 0.5 s by design and a preset
-that needs 2.5 s of warm-up to look like anything is also a preset that looks like nothing for the
-first 2.5 s of a live show.
-
-### Priority
-
-**Medium.** One preset ships today with a documented compromise rather than a defect, so nothing is
-broken. But the emitter's `twinkle` is the single most-cited example of per-object life in the whole
-parameter surface, and the scene that most wants it cannot reach it.
-
-### Update 2026-08-11 — a second, independent want, and this time it was the whole look
-
-- **Raised by:** `preset-author`, Plan 0075 cohort 4: the quiet twinkling starfield (the
-  Perseids look). Sparse marks, low coverage, slow shimmer — the shimmer half is exactly this
-  entry's option 1 (per-mark variation on the swarm), and the look was **routed out of the
-  cohort rather than shipped**. The gate half of the same casualty is recorded in
-  [0009](#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)'s update
-  of the same date.
-- **Handoff verdict (2026-08-11): promote** — option 1, jointly with 0009's coverage-aware
-  statistic as the sparse-idiom pair (fixing either wall alone leaves the look unreachable),
-  and with [0085](#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever)
-  (swarm `reseed`) riding the same plan.
-- **PROMOTED same day → [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 2** (option 1; the
-  gate half is that plan's Phase 1 via
-  [ADR-0091](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)).
-  Option 2 — the emitter's movable source — stays open in this entry, unpromoted.
-- **DELIVERED 2026-08-12 (Plan 0077 Phase 2, `fae16e6`).** The swarm carries `twinkle` and
-  `size_spread` with the emitter's names and semantics — **rate and phase both off the seed**,
-  so the field shimmers while the whole-frame mean sits still, the exact property this entry
-  measured the emitter for. Both default 0 and the goldens pass unblessed (byte-identity by
-  arithmetic, not by bless). The quiet sky itself is Plan 0077 Phase 5, standing in the plans
-  README.
-
-### Option 2 — PROMOTED 2026-08-13, by interview
-
-- **→ [ADR-0104](adrs/0104-the-emitters-source-is-authorable-geometry.md) +
-  [Plan 0090](plans/0090-the-emitters-source-moves.md).** Four scalars, every default an exact
-  arithmetic identity: `source_y` (which **may sit inside the frame** — the interview took that
-  trade deliberately, because clamping it below is the decision that keeps the emitter unusable for
-  any slow look), `source_width` (**fractional**, so `aspect * 1.0` is bit-for-bit today's value; `0`
-  is a point source, which falls out rather than being its own concept), `spawn_fade`, and `prewarm`.
-- **The internals were already the right shape**, which is why this is smaller than the entry implies:
-  `source_half_width` is a real field on `Spawn` (`emitter.rs:357`) assigned `self.aspect`
-  unconditionally, and the spawn site already multiplies a unit draw by it. One constant and one
-  assignment.
-- **This entry named ONE warm-up and there are TWO, which is the finding the promotion adds.** Moving
-  the source into the frame removes the *travel* warm-up this entry measured (2.12 units against a
-  0.5 s capture) and leaves the *population* warm-up untouched: the pool starts empty and fills at
-  `spawn_rate`, so Perseids' own numbers put ~100 of ~560 objects on screen at 0.5 s — **about
-  18 %** — wherever `source_y` is. `prewarm` is Plan 0090 Phase 3 and is the phase that actually
-  makes a slow world gateable; it is also the plan's designed cut point, being beyond what the
-  interview covered.
-- **The entry's refusal is honoured**: no gate's capture length, floor or statistic moves. The
-  warm-up is attacked instead of the instrument.
-- **CORRECTION — this entry's own claim that the Perseids look was "routed out of the cohort rather
-  than shipped" is stale.** `presets/emitter_perseids.toml` exists on `system = "emitter"` at
-  `launch_speed = 2.6`: it shipped as exactly the fast-shower compromise this entry predicted would
-  be the only reachable form. What did not ship is the quiet version, which is Plan 0090 Phase 5.
-  The demonstrated want is therefore stronger than the entry records, not weaker.
+Its sibling
+**[0068](design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+closed 2026-08-15** at [Plan 0090](plans/done/0090-the-emitters-source-moves.md)'s close — both
+options delivered — and its body is in the archive.
 
 ---
 
@@ -1058,7 +960,7 @@ The renaissance's first five cohorts (28 worlds, cohort 5 judged live 2026-08-11
 one assembled feedback note. Three of its items are **re-raises** and are recorded as dated
 updates inside [0009](#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational),
 [0055](#0055--the-attractors-shape-vocabulary-is-breathe-and-bend-and-the-reference-figures-ask-for-more)
-and [0068](#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+and [0068](design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
 rather than as new entries; the two doc drifts it carried went to
 [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 6's sweep list, not here. Each entry
 below carries a **handoff verdict** — promote or park — per that plan's Decision (promotion on

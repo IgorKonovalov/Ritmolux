@@ -12,7 +12,7 @@
 > (the statistic), [0066](../../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md)
 > (the reseed semantics Phase 3 reuses)
 > **Closes:** [design-backlog 0009](../../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
-> (the statistic half), [0068](../../design-backlog.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+> (the statistic half), [0068](../../design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
 > (option 1), [0085](../../design-backlog.md#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever),
 > [0088](../../design-backlog.md#0088--shot---reports-band-columns-cannot-see-reactivity-spent-on-bloom);
 > discharges [0086](../../design-backlog-archive.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument)'s
