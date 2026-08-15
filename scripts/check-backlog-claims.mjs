@@ -15,6 +15,10 @@
 // Usage:  node scripts/check-backlog-claims.mjs [root]
 //         node scripts/check-backlog-claims.mjs --self-test
 //
+// After the pass/fail line it prints an ADVISORY block, which never touches the
+// exit code: the entries whose probed paths have moved since anyone last read
+// them, and the full `unprobeable:` roster.
+//
 // Exit 0 = every stated reduction still holds. Exit 1 = the breaks are listed
 // as `file:line -> entry`, which is clickable in most terminals. The optional
 // `root` scans some other tree — used to run this against the committed fixture
@@ -49,6 +53,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
 import { join, resolve, relative, sep, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const REPO_DEFAULT = resolve(dirname(SCRIPT), "..");
@@ -165,8 +170,18 @@ function readBullets(root) {
   const entries = new Set();
   let live = !hasLiveMarker;
   let entry = null;
+  let inFence = false;
 
   for (let i = 0; i < lines.length; i++) {
+    // A document that DESCRIBES the grammar is not making a claim — the same
+    // reasoning check-doc-links.mjs applies to prose about link syntax. This
+    // file's own header carries three worked examples, one of which is 0082's
+    // historical probe and is deliberately false against today's tree.
+    if (/^\s*(```|~~~)/.test(lines[i])) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
     if (LIVE_FROM.test(lines[i])) {
       live = true;
       continue;
@@ -253,6 +268,78 @@ function check(root) {
   return { breaks, probes, unprobeable, entries: parsed.entries };
 }
 
+// --- the advisory ------------------------------------------------------------
+//
+// Staleness is an ADVISORY and never a failure (ADR-0108, and Alternative B is
+// explicit about why): a probe scoped at `core/src` would re-red on every
+// commit, and one scoped narrowly enough not to would say nothing. Kept as a
+// report, it is what rewards a narrow probe path — which is also a better probe.
+//
+// The `unprobeable:` roster prints in the same block so the set of claims
+// nothing checks stays visible and countable at every push, rather than
+// invisible and unbounded. That visibility is the only defence against the
+// opt-out being abused into a blanket.
+
+/**
+ * The date of the most recent commit touching `path`, or null.
+ *
+ * This DOES run `git`, and the ADR's "never a shell" rule is not bent by it.
+ * That rule is about resolving the probe *grammar*, whose input is author-
+ * supplied text out of a markdown file; here the argument vector is built from
+ * paths the parser has already resolved against the filesystem, handed to
+ * execFileSync as an array with no shell anywhere in the chain.
+ */
+function lastTouched(path, root) {
+  try {
+    const out = execFileSync("git", ["log", "-1", "--format=%cs", "--", path], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return out.trim() || null;
+  } catch {
+    return null; // no git, not a repo, or a path git has never seen
+  }
+}
+
+/** ISO dates compare correctly as strings, which is the whole reason for `%cs`. */
+function advisory(probes, unprobeable, root) {
+  const seen = new Map();
+  const moved = new Map(); // one row per entry+path, not per probe — two probes
+  for (const probe of probes) { //  on one file are one thing to go and re-read
+    if (!seen.has(probe.path)) seen.set(probe.path, lastTouched(probe.path, root));
+    const touched = seen.get(probe.path);
+    if (!touched || touched <= probe.stamped) continue;
+    const key = `${probe.entry} ${probe.path}`;
+    if (!moved.has(key)) moved.set(key, { ...probe, touched });
+  }
+  return { moved: [...moved.values()], unprobeable };
+}
+
+function printAdvisory({ moved, unprobeable }) {
+  console.log("");
+  console.log("advisory — reported, and never part of the exit code:");
+
+  if (moved.length === 0) {
+    console.log("  no probed path has moved since its entry was last read");
+  } else {
+    console.log(`  ${moved.length} probed path(s) moved since the entry was last read:`);
+    for (const m of moved) {
+      console.log(`    ${m.entry}  stamped ${m.stamped}, ${m.path} last touched ${m.touched}`);
+    }
+  }
+
+  if (unprobeable.length === 0) {
+    console.log("  no unprobeable claims — every live entry reduces to something re-runnable");
+  } else {
+    console.log(`  ${unprobeable.length} unprobeable claim(s), which is the set nothing checks:`);
+    for (const u of unprobeable) {
+      const why = u.why.length > 96 ? `${u.why.slice(0, 93)}...` : u.why;
+      console.log(`    ${u.entry}  ${why}`);
+    }
+  }
+}
+
 // --- self-test ---------------------------------------------------------------
 //
 // The fixture half proves the checker reports the seeded breaks and nothing
@@ -323,6 +410,8 @@ if (fatal) {
   process.exit(1);
 }
 
+const summary = advisory(probes, unprobeable, REPO);
+
 if (breaks.length === 0) {
   console.log(
     `backlog claims: OK — ${probes.length} stated reductions still hold across ` +
@@ -331,11 +420,13 @@ if (breaks.length === 0) {
   console.log(
     "                green means the reductions still match the tree, not that the entries are true",
   );
+  printAdvisory(summary);
   process.exit(0);
 }
 
 console.error(`backlog claims: ${breaks.length} broken`);
 for (const b of breaks) console.error(`  ${b}`);
+printAdvisory(summary);
 console.error(
   "\nA broken probe means the reduction an entry's author committed to no longer\n" +
     "matches the tree. That is not automatically the entry's fault — a rename\n" +
