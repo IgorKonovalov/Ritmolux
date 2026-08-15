@@ -45,19 +45,24 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const REPO = resolve(
-  process.argv[2] ?? resolve(dirname(fileURLToPath(import.meta.url)), ".."),
-);
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO = resolve(process.argv[2] ?? REPO_ROOT);
 
 // Build output, vendored deps, and VCS internals hold markdown we do not own.
 const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
 
-// A fixture tree holds deliberately broken links as this checker's own bite
-// check (Plan 0093 Phase 1, which committed the tree the `root` argument above
-// was built for and never got). Skip it on a repo walk, where those seeds would
-// red the gate for everyone; scan it when it IS the root, which is the only way
-// they are reachable.
-const isFixtureRoot = REPO.split(sep).includes("fixtures");
+// A seeded tree holds deliberately broken links as this checker's own bite check
+// (Plan 0093 Phase 1, which committed the tree the `root` argument above was
+// built for and never got). Skip it on a repo walk, where those seeds would red
+// the gate for everyone; scan it when it IS the root, which is the only way they
+// are reachable.
+//
+// Skipped BY PATH, and enumerated here rather than matched by directory name.
+// The name form also swallowed core/tests/fixtures/ and its twelve relative
+// links — nine markdown files silently out of the walk under a green gate, which
+// is the shape this gate exists to catch (Plan 0094 Phase 1). A second seeded
+// tree has to name itself on this list.
+const SEEDED_TREES = new Set([resolve(REPO_ROOT, "scripts", "fixtures")]);
 
 /** Every `.md` file in the repo, as paths relative to the repo root. */
 function markdownFiles(dir = REPO, found = []) {
@@ -65,7 +70,7 @@ function markdownFiles(dir = REPO, found = []) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
-      if (entry.name === "fixtures" && !isFixtureRoot) continue;
+      if (SEEDED_TREES.has(full)) continue;
       markdownFiles(full, found);
     } else if (entry.name.endsWith(".md")) {
       found.push(relative(REPO, full));
