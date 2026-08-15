@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0093** (ADRs are a separate sequence — next free there is **0108**.)
+**Next free number: 0094** (ADRs are a separate sequence — next free there is **0109**.)
 
 ## Active roster
 
@@ -20,6 +20,7 @@ someone who picked it up is reading.
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | **Hard-depends on [0091](0091-the-figure-fills-the-frame.md)** (the scene it draws into) and soft-depends on [0087](0087-the-line-renderer-draws-a-curve.md) — the plan states that disagreement openly: a polyline distance field is complete alone, arcs only lower the arity, so **this is takeable even if 0087 ends at ADR-0098's Alternative C**, and Phase 4 may legitimately be empty. Phase 2's arity ceiling is a **measurement**, not [ADR-0107](../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md)'s construction estimate. Expect morph degeneracy — Plan 0079 refused 4 of 20 swept pairs by measurement. |
 | [0091](0091-the-figure-fills-the-frame.md) | The figure fills the frame | approved | dev, human | From three user reference images, and the gap turned out to be **one thing**: nesting, banding and contours all ship, but no shape-shaped scalar exists at frame scale. Phase 2 is the load-bearing one — `marks.rs:33-37` says the polygon and star arms are deliberately *not* true distance functions outside the silhouette, which is exactly the region contours read. Phase 6 is a stated cut point and may close negative. **Touches no line-renderer file, so it is independent of [0087](0087-the-line-renderer-draws-a-curve.md).** |
+| [0093](0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md) | The backlog stops asserting things about a repo it has not read | draft | dev | **Four falsified entries, one shape** — a claim about the repo, wrong when written or shortly after ([ADR-0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)). Small and self-contained: one `scripts/` sibling of the link checker, 14 entries to backfill, no `core/` or `standalone/` code, so it **contends with nothing on this roster** and fits a short session. Phase 2 will very likely convict another entry — reporting that is `dev`'s, deciding what to do about it is `architect`'s. Phase 3 lands after Phase 2 on purpose, so the gate cannot red the build on day one. |
 | [0090](0090-the-emitters-source-moves.md) | The emitter's source moves | approved | dev, human | Four scalars, four exact-identity defaults, so it **moves zero pixels** — one emitter baseline and three fixtures in scope. **Phase 3 (`prewarm`) is beyond the interview and is the designed cut point**: it exists because the source alone does not deliver the gate argument (~18 % of steady-state population at the 0.5 s capture), and Phases 1/2/4/5 stand without it. Its gate measurement may come back negative — that is a result, and the answer is **not** to move a floor. Phase 4's `systems.md` sweep is a done-when because that minor has been raised at four consecutive closes. |
 
 **Five plans, written 2026-08-13 from a backlog sweep**, after the roster stood empty for the first
@@ -74,6 +75,15 @@ take any free session. The numbered list below is otherwise unchanged.
 5. **[0087]** — last, and largest. Touches `core/src/render/scenes/lines/` and owes a re-bless, so it
    wants a lane to itself. **It is also the only plan here that can end early**: two separate gates
    (a cost measurement and a `human` look verdict) can route it to ADR-0098's Alternative C.
+
+**Added 2026-08-15 at [0085]'s close: [0093](0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md)**,
+and it sits outside the sequence above rather than in it. It touches only `scripts/`, `docs/`,
+`.githooks/` and the CI `links` job — **no Rust, no GPU, no re-bless, and no file any other plan on
+this roster names** — so it contends with nothing and can take any session, including a short one
+next to a larger lane. Take it sooner rather than later for one reason: every close from here on
+writes new backlog entries, and each one written before the gate exists is another entry nobody will
+mechanically check. Its own Phase 2 is the cheapest audit this project has of a file it reads to
+decide what to build.
 
 **Added 2026-08-13: [0091](0091-the-figure-fills-the-frame.md), from three user reference images** —
 concentric offset heart contours, and a collage the engine can only partly reach. Where it sits:
