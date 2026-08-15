@@ -233,3 +233,132 @@ fn an_all_warmup_run_renders_zero_frames() {
     );
     assert_eq!(gate_shaped.images.len(), SIGNAL_HOPS);
 }
+
+// ---------------------------------------------------------------------------
+// The long-run primitive (Plan 0085 Phase 1)
+// ---------------------------------------------------------------------------
+
+/// Frame indices the horizon cases sample at. Small — the claims here are about
+/// *which* frame comes back, not about a settled picture.
+const SAMPLES: [u32; 3] = [3, 9, 17];
+
+/// `capture_preset_at` is `capture_preset` continued, not a second renderer.
+///
+/// The whole value of a horizon row is that it can be compared with every other
+/// capture this repo takes — a `--report` column, a golden baseline, an author's
+/// `shot`. That holds only if sampling frame `n - 1` of a long run returns the
+/// same pixels `capture_preset(name, frame, n)` returns, which is asserted here
+/// on the bytes rather than argued from the two functions looking alike. The
+/// software adapter is the strict case: it is the one where *when* a GPU buffer
+/// is allocated changes what the feedback stages resolve to, which is why the
+/// readback buffer is built at the first sample rather than up front.
+#[test]
+fn a_sampled_frame_is_the_frame_a_plain_capture_of_that_length_returns() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let name = a_preset();
+    let stimulus = AnalysisFrame::default();
+
+    for n in SAMPLES {
+        let sampled = renderer
+            .capture_preset_at(&name, &stimulus, &[n])
+            .expect("sample one frame of a run");
+        let plain = renderer
+            .capture_preset(&name, &stimulus, n + 1)
+            .expect("the same length as a plain capture");
+        let sampled = sampled.first().expect("one requested frame, one image");
+        assert_eq!(
+            (sampled.width, sampled.height),
+            (plain.width, plain.height),
+            "frame {n}: capture dimensions differ"
+        );
+        assert!(
+            sampled.rgba == plain.rgba,
+            "frame {n} of a sampled run differs from capture_preset(.., {}) — the \
+             two paths have diverged, so a horizon row cannot be compared with \
+             any other capture",
+            n + 1
+        );
+    }
+}
+
+/// A row does not depend on how far the run was asked to go, and the images are
+/// not all the same image.
+///
+/// These are the two properties a drift series rests on. The first is what lets
+/// a two-minute run and a ten-minute run be read against each other — asserted
+/// by taking the *same* early index alone and inside a longer request. The
+/// second is the non-vacuity half: without it, a primitive that returned the
+/// first frame for every index would satisfy everything above.
+#[test]
+fn an_earlier_row_is_unchanged_by_asking_for_a_longer_run() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let name = a_preset();
+    let stimulus = AnalysisFrame::default();
+    let first = *SAMPLES.first().expect("SAMPLES is not empty");
+
+    let short = renderer
+        .capture_preset_at(&name, &stimulus, &[first])
+        .expect("the short run");
+    let long = renderer
+        .capture_preset_at(&name, &stimulus, &SAMPLES)
+        .expect("the long run");
+    assert_eq!(long.len(), SAMPLES.len(), "one image per requested index");
+    assert!(
+        short.first().map(|i| &i.rgba) == long.first().map(|i| &i.rgba),
+        "the first row changed when a longer horizon was requested — a drift \
+         series read at two horizons would not be comparable"
+    );
+
+    // Non-vacuity: the last sampled frame is not the first one. A time-driven
+    // scene has moved 14 frames on by then; if this ever fails the subject
+    // preset has gone static, not the primitive.
+    assert!(
+        long.first().map(|i| &i.rgba) != long.last().map(|i| &i.rgba),
+        "every sampled index returned the same pixels, so the equality above is \
+         proving nothing (is `{name}` animating?)"
+    );
+}
+
+/// The degenerate requests, which a horizon of zero intervals will reach.
+#[test]
+fn an_empty_request_renders_nothing_and_a_repeated_index_renders_once() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let name = a_preset();
+    let stimulus = AnalysisFrame::default();
+
+    assert!(
+        renderer
+            .capture_preset_at(&name, &stimulus, &[])
+            .expect("an empty request is not an error")
+            .is_empty(),
+        "no requested frames, no images"
+    );
+
+    // A repeated index yields the same frame twice — the run is not re-rendered
+    // and the caller's order is preserved.
+    let repeated = renderer
+        .capture_preset_at(&name, &stimulus, &[5, 2, 5])
+        .expect("out-of-order and repeated indices");
+    assert_eq!(repeated.len(), 3);
+    assert!(
+        repeated.first().map(|i| &i.rgba) == repeated.get(2).map(|i| &i.rgba),
+        "the same index must come back as the same image"
+    );
+    assert!(
+        repeated.first().map(|i| &i.rgba) != repeated.get(1).map(|i| &i.rgba),
+        "frames 5 and 2 came back identical"
+    );
+
+    assert!(
+        renderer
+            .capture_preset_at("definitely not a preset", &stimulus, &[1])
+            .is_err(),
+        "an unknown preset is an error, as it is for every capture entry point"
+    );
+}

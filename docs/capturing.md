@@ -105,8 +105,80 @@ Flags:
 | `--at <hop>,...` | explicit filmstrip hops, beating `--strip`'s even spacing — [how to capture a transient](#aiming-a-capture-at-a-transient) |
 | `--frame-at <hop>` | **one** frame at that hop, written at the full `--size` — no tile scaling, no border. Needs `--signal`/`--audio`; not combinable with `--at`. [Which flag takes a picture worth keeping](#a-full-size-frame-under-real-audio) |
 | `--tier floor\|rich` | quality tier to capture at (default `floor` — see above) |
+| `--horizon <minutes>` | [the long-run drift check](#the-horizon-does-a-world-still-look-like-itself-after-minutes) — N **simulated** minutes at capture cadence, one statistics row per interval. Minutes of wall clock; never a gate |
+| `--interval <secs>` | simulated seconds between horizon rows (default 30) |
 
 Bad arguments and unknown presets exit non-zero with a message.
+
+### The horizon: does a world still look like itself after minutes?
+
+Everything else on this page measures the first seconds of a preset's life. The
+four behavioral gates capture **30 frames** — half a second — and the reactivity
+gate a few seconds of hops. A live set runs for hours, and a world whose
+mechanism *accumulates* can drift across that gap with the whole suite green:
+Plan 0075 cohort 4's Shatter piled onto its flow field's attractors over minutes
+and collapsed live three times without a single test going red.
+
+`--horizon` is the instrument for that class. It renders N simulated minutes at
+the fixed 1/60 s capture step and prints one row per interval — coverage,
+concentration (`peak/mean`), and motion over the figure's own footprint since the
+previous row — plus a trend line per statistic.
+
+```bash
+# Ten simulated minutes of a swarm world, a row every 30 s
+cargo run -p standalone --example shot -- \
+  --preset-file presets/swarm_shatter.toml --horizon 10 --size 96x96 --set bass=0.7
+
+# ...and the same run as JSON
+cargo run -p standalone --example shot -- \
+  --preset-file presets/swarm_shatter.toml --horizon 10 --interval 60 --json
+```
+
+**When to run it** (ADR-0099 states the trigger once, so it can be found): on a
+world whose mechanism has an **accumulation axis** — sustained forces, feedback
+with net gain, a population that can migrate or pile up. Record the verdict in
+the world's own header, the way the fold-edge verdicts were recorded.
+
+**Four things to know before reading a row.**
+
+1. **It is never a gate.** Nothing here runs in CI or fails a build, and the mode
+   applies no threshold. It prints a trend; the verdict is yours. Making it a
+   gate was rejected on measured cost — the reactivity gate's move to real PCM
+   alone cost 1.8x over 41 presets, and a minutes-long capture per preset is
+   orders beyond that.
+2. **Run a static control beside the subject.** The statistics are image-domain
+   proxies for a simulation-domain event: particles piling onto attractors
+   *reads* as coverage falling and concentration rising, and that correlation is
+   strong without being identity. A world that renders one frame forever prints
+   `delta 0.0000, monotone 0.00` on every statistic — that flat series is what
+   makes a sloped one mean something.
+3. **It is slow by construction** — 3,600 renders per simulated minute. At
+   96x96 on a hardware adapter that is roughly 10 s of wall clock per simulated
+   minute, so a ten-minute horizon is a couple of minutes of sitting. Nobody will
+   run it casually, which is the honest cost of refusing a gate.
+4. **It cannot see the process.** Resident set, GPU resource churn, frame-time
+   spikes on a preset switch: none of that is reproducible in a headless loop
+   that never rebuilds a surface. [`--soak`](nfr.md) is the instrument for that
+   half, and the two are deliberately separate (ADR-0099).
+
+The stimulus is `--set`, held for the whole run, which is what makes a row at
+minute nine comparable with a row at minute one — so `--horizon` and
+`--signal`/`--audio` are mutually exclusive rather than one silently winning.
+
+Reading the trend block: `delta` is how far a statistic travelled end to end, and
+`monotone` is what share of the steps went that way. A world grinding into a
+corner reads a large `delta` at a `monotone` near `1.00`; a world breathing
+around a stable mean reads a `delta` near zero whatever its `monotone`. Where the
+line falls between *drifting* and *alive* is a judgement about the look, which is
+why the tool declines to make it.
+
+Two properties hold and are asserted rather than assumed
+(`standalone/tests/shot_cli.rs`): the same world at the same horizon produces
+**identical** rows across runs, and a row at interval *k* does not depend on how
+far the run was asked to go — so a two-minute run and a ten-minute run agree on
+every row they share. The wall clock and resident set in the cost block are the
+exception: those are properties of the box, reported and never asserted
+(ADR-0071).
 
 ### The three calibration traps
 

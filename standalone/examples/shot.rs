@@ -38,6 +38,10 @@
 //!                            or --audio; mutually exclusive with --at
 //!   --tier floor|rich        quality tier to capture at (default floor).
 //!                            A Rich capture is an instrument, never a baseline
+//!   --horizon <minutes>      long-run drift check: render N SIMULATED minutes
+//!                            at capture cadence and print one statistics row
+//!                            per interval. Slow by construction; never a gate
+//!   --interval <secs>        simulated seconds between horizon rows (default 30)
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
 //! `--presets`, the `LMV_PRESET_DIR` override, the per-user preset directory,
@@ -58,6 +62,7 @@ use standalone::shot::args::{
 };
 use standalone::shot::film::{StripLayout, check_hops, filmstrip_indices, filmstrip_layout};
 use standalone::shot::glyph::{GLYPH_ADVANCE, GLYPH_COLS, glyph_for};
+use standalone::shot::horizon;
 use standalone::shot::renderer;
 use standalone::shot::report;
 use standalone::shot::wav::parse_wav_16bit;
@@ -78,6 +83,8 @@ enum Mode {
     Shot,
     All,
     Report,
+    /// `--horizon <minutes>`: the long-run drift check (Plan 0085 Phase 1).
+    Horizon,
 }
 
 struct Args {
@@ -124,6 +131,12 @@ struct Args {
     /// silently changing what a capture renders is the reproducibility hazard the
     /// pin exists to prevent (ADR-0045).
     tier: Tier,
+    /// `--horizon <minutes>`: simulated minutes to render in the long-run drift
+    /// mode (Plan 0085 Phase 1). `None` leaves the mode off, which is what every
+    /// other invocation of this CLI wants — a horizon is minutes of wall clock.
+    horizon: Option<f32>,
+    /// `--interval <secs>`: simulated seconds between horizon rows.
+    interval: f32,
 }
 
 impl Default for Args {
@@ -146,6 +159,11 @@ impl Default for Args {
             at: None,
             frame_at: None,
             tier: Tier::Floor,
+            horizon: None,
+            // Thirty seconds: fine enough that a one-minute smoke run has rows to
+            // compare, coarse enough that a ten-minute horizon prints twenty of
+            // them rather than a page nobody reads.
+            interval: 30.0,
         }
     }
 }
@@ -189,6 +207,21 @@ fn parse_args() -> Result<Args, String> {
                     .filter(|n| *n >= 1)
                     .ok_or("--strip expects a positive integer")?;
             }
+            "--horizon" => {
+                let value = next_value(&mut it, "--horizon")?;
+                args.horizon = Some(
+                    value
+                        .parse::<f32>()
+                        .map_err(|_| format!("--horizon expects minutes, got `{value}`"))?,
+                );
+                args.mode = Mode::Horizon;
+            }
+            "--interval" => {
+                let value = next_value(&mut it, "--interval")?;
+                args.interval = value
+                    .parse::<f32>()
+                    .map_err(|_| format!("--interval expects seconds, got `{value}`"))?;
+            }
             "--at" => args.at = Some(parse_hops(&next_value(&mut it, "--at")?)?),
             "--frame-at" => {
                 let value = next_value(&mut it, "--frame-at")?;
@@ -224,6 +257,17 @@ fn parse_args() -> Result<Args, String> {
                     .to_string(),
             );
         }
+    }
+    // A horizon holds one stimulus for its whole run, which is what makes it
+    // deterministic and what makes a row at minute nine comparable with a row at
+    // minute one. A clip cannot serve that — `--signal` synthesizes four seconds
+    // — so accepting both would mean silently ignoring one of them.
+    if args.horizon.is_some() && (args.signal.is_some() || args.audio.is_some()) {
+        return Err(
+            "--horizon holds a single stimulus for the whole run and cannot be driven \
+             by a clip: drop --signal/--audio and set the level with --set"
+                .to_string(),
+        );
     }
     Ok(args)
 }
@@ -272,7 +316,12 @@ fn print_usage() {
                                     no tile scaling, no border. Needs --signal\n\
                                     or --audio; not combinable with --at\n\
          --tier floor|rich          quality tier to capture at (default floor)\n\
-                                    rich is an INSTRUMENT, never a baseline"
+                                    rich is an INSTRUMENT, never a baseline\n\
+         --horizon <minutes>        long-run drift check: N SIMULATED minutes at\n\
+                                    capture cadence, one row per interval.\n\
+                                    Minutes of wall clock; never a gate\n\
+         --interval <secs>          simulated seconds between horizon rows\n\
+                                    (default 30)"
     );
 }
 
@@ -354,6 +403,22 @@ fn run() -> Result<(), String> {
         // The report machinery lives in the library (Plan 0061 Phase 4), so it
         // takes the three `Args` fields it reads rather than `Args` itself.
         Mode::Report => report::run(presets, &source, args.tier, args.family, args.json),
+        Mode::Horizon => horizon::run(
+            presets,
+            &source,
+            // Same reason as `report` above: the library owns the request's
+            // shape, the example owns how a command line spells it.
+            &horizon::HorizonRequest {
+                preset: args.preset.clone(),
+                stimulus: args.stimulus,
+                minutes: args.horizon.unwrap_or_default(),
+                interval_secs: args.interval,
+                width: args.width,
+                height: args.height,
+                tier: args.tier,
+                json: args.json,
+            },
+        ),
     }
 }
 

@@ -84,6 +84,114 @@ fn footprint_diff_measures_over_the_mask_not_the_frame() {
     );
 }
 
+/// The concentration reading has to move the right way when light *piles up*,
+/// which is the whole reason it exists (Plan 0085 Phase 1): the same total
+/// energy gathered into fewer pixels must read higher, and spread back out must
+/// read lower.
+#[test]
+fn peak_to_mean_rises_as_the_same_light_concentrates() {
+    let w = 32;
+    let total = (w * w) as f32;
+    // `n` lit pixels at `value`, black elsewhere — the energy is `n * value`.
+    let spread = |n: u32, value: u8| {
+        image(w, w, |x, y| {
+            if y * w + x < n {
+                [value, value, value, 255]
+            } else {
+                BLACK
+            }
+        })
+    };
+
+    // Same energy (64 x 60 = 3840 vs 16 x 240 = 3840), four times the
+    // concentration. Both are well below saturation, so the numerator is free
+    // to move.
+    let wide = peak_to_mean(&spread(64, 60), BLACK, 8);
+    let tight = peak_to_mean(&spread(16, 240), BLACK, 8);
+    assert!(
+        tight > wide * 3.5,
+        "concentrating the same light must raise the ratio: {wide} -> {tight}"
+    );
+
+    // The two endpoints of the range, exactly. A uniform lit frame is 1.0 (peak
+    // equals mean); one lit pixel is the pixel count (all the light in 1/N).
+    let uniform = peak_to_mean(&solid(w, w, [200, 200, 200, 255]), BLACK, 8);
+    assert!((uniform - 1.0).abs() < 1e-4, "uniform frame: {uniform}");
+    let single = peak_to_mean(&spread(1, 255), BLACK, 8);
+    assert!((single - total).abs() < 0.5, "one lit pixel: {single}");
+
+    // An empty frame makes no claim rather than dividing by zero, and neither
+    // does one that is lit *by* its own background.
+    assert_eq!(peak_to_mean(&solid(w, w, BLACK), BLACK, 8), 0.0);
+    let grey = [90, 90, 90, 255];
+    assert_eq!(peak_to_mean(&solid(w, w, grey), grey, 8), 0.0);
+    assert_eq!(
+        peak_to_mean(&image(0, 0, |_, _| BLACK), BLACK, 8),
+        0.0,
+        "a zero-pixel frame is not a division"
+    );
+
+    // Measured against the frame's *own* ground, not absolute black: the same
+    // figure over a lifted backdrop reads the same, which is what lets a
+    // vignetted world be compared with a dark one.
+    let on_black = image(w, w, |x, y| {
+        if y * w + x < 16 {
+            [240, 240, 240, 255]
+        } else {
+            BLACK
+        }
+    });
+    let on_grey = image(w, w, |x, y| {
+        if y * w + x < 16 {
+            [255, 255, 255, 255]
+        } else {
+            grey
+        }
+    });
+    let (a, b) = (
+        peak_to_mean(&on_black, BLACK, 8),
+        peak_to_mean(&on_grey, grey, 8),
+    );
+    assert!(
+        (a - b).abs() < 0.5,
+        "the ground must cancel: {a} on black, {b} on grey"
+    );
+
+    // A **dark** figure on a light ground is the same event, and reads the same
+    // number. Without the absolute value an ink world (ADR-0106) would report
+    // 0.0 for every frame of a horizon and its drift would be invisible.
+    let white = [255, 255, 255, 255];
+    let ink = image(w, w, |x, y| {
+        if y * w + x < 16 {
+            [15, 15, 15, 255]
+        } else {
+            white
+        }
+    });
+    let dark = peak_to_mean(&ink, white, 8);
+    assert!(
+        (dark - a).abs() < 0.5,
+        "a dark figure on a light ground must read like its inverse: {a} vs {dark}"
+    );
+
+    // The deadband keeps near-ground noise out of the denominator: a dithered
+    // ground one code value off black must not read as spread-out light.
+    let dithered = image(w, w, |x, y| {
+        if y * w + x < 16 {
+            [240, 240, 240, 255]
+        } else if (x + y) % 2 == 0 {
+            [1, 1, 1, 255]
+        } else {
+            BLACK
+        }
+    });
+    let noisy = peak_to_mean(&dithered, BLACK, 8);
+    assert!(
+        (noisy - a).abs() < 1e-4,
+        "sub-eps dither changed the reading: {a} -> {noisy}"
+    );
+}
+
 #[test]
 fn coverage_and_spread_extremes() {
     let black = solid(32, 32, BLACK);
