@@ -1,6 +1,6 @@
 # 0090 — the emitter's source moves
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0104](../adrs/0104-the-emitters-source-is-authorable-geometry.md) (accepted, this plan)

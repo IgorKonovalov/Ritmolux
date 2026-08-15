@@ -296,7 +296,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `attractor`       | `a` `b` `c` `d` `tuple` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
-| `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
+| `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `size` `size_spread` `shape` `points` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -560,7 +560,8 @@ there is no `dt` in it at all.
 
 The geometry is one line of arithmetic and it is worth doing before tuning: a mark
 launched at `v` against gravity `g` turns over after `v / g` seconds, `v² / (2g)`
-world units above the source line at `y = -1.12`. **A frame is `|y| <= 1`**, so
+world units above the source line (at `y = -1.12` unless `source_y` moves it).
+**A frame is `|y| <= 1`**, so
 `v² / (2g) - 1.12` is where the crest of the shower sits. Every object shares
 `launch_speed`, so a crest *inside* the frame draws a visible horizontal ceiling
 where the population piles up at the top of its arc; `emitter_perseids.toml` puts
@@ -569,6 +570,36 @@ its crest at `y = 1.48` (`v = 2.6`, `g = 1.3`), off frame, for exactly that reas
 `lifetime` past the flight time is wasted pool. An object that has left the frame
 is retired the moment it does, so the only thing a long `lifetime` buys is slots
 held by objects thrown straight up into a `gravity = 0` sky.
+
+#### The source (Plan 0090)
+
+The line objects are thrown from is **geometry the preset owns**
+([ADR-0104](../docs/adrs/0104-the-emitters-source-is-authorable-geometry.md)). Both
+defaults are exactly the line this scene always drew, so binding neither changes
+nothing.
+
+| param | default | what it does |
+|---|---|---|
+| `source_y` | `-1.12` | the line's world `y`. Just below the frame by default, so an upward throw rises into shot |
+| `source_width` | `1` | the line's half-width **as a fraction of the frame's**. `1` spans the frame, `0` is a point source |
+
+`source_width` is a fraction, not world units, so it means the same thing on every
+display — the engine has already reconciled the aspect
+([ADR-0037](../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)) and an
+author never should. Both are clamped to the retirement bound (`1.6` frames), past
+which an object would be born already outside it.
+
+**A point fountain is `source_width = 0`; an off-centre jet is that plus `pan_x`.**
+The source line is centred on the world origin, and `pan_x` carries the whole scene,
+so a narrow source at `pan_x = 0.5` is a jet three-quarters of the way across the
+frame. `spread` still opens the *cone* — close it too if the throw should be a
+column rather than a fan.
+
+**`source_y` may sit inside the frame**, which is what makes a drift slow enough to
+read as a sky reachable at all: from below the frame an object has to travel 2.12
+world units before it crosses, and at sky speeds that is seconds of empty picture.
+The price is a spawn pop — an object switched on at full brightness where the eye is
+— and nothing validates the pair, so it is yours to avoid.
 
 #### Individuation — the distribution params
 
@@ -611,10 +642,6 @@ inter-object forces, no stamped trail. `trails` reads differently here than on t
 swarm and that is not a defect: a decaying smear behind an object that **leaves**
 is a comet tail, where behind a wrapping particle it is a current. Keep it short
 if the arcs should read as arcs.
-
-There is also no positionable source: the line spans the frame width at
-`y = -1.12` and cannot be moved or narrowed. A look that wants a point fountain
-or an off-centre jet is engine feedback, not a preset.
 
 ### Shaped marks — the particle silhouette (Plan 0070)
 

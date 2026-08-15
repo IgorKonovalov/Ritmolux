@@ -86,10 +86,6 @@ const FALLBACK_ASPECT: f32 = 16.0 / 9.0;
 /// read as a pop rather than an exit.
 const RETIRE_MARGIN: f32 = 1.6;
 
-/// Where the source line sits, in world units. Just **below** the visible frame,
-/// so an upward-launched object rises into shot rather than appearing in it.
-const SOURCE_Y: f32 = -1.12;
-
 /// The sprite's world half-size at `size = 1`, before the per-object size draw.
 const BASE_SIZE: f32 = 0.019;
 
@@ -163,6 +159,22 @@ const DEFAULT_SIZE_SPREAD: f32 = 0.6;
 const DEFAULT_LIFETIME_SPREAD: f32 = 0.45;
 const DEFAULT_SPIN: f32 = 0.0;
 const DEFAULT_TWINKLE: f32 = 0.0;
+// The source geometry (Plan 0090). Both defaults are the geometry this scene
+// shipped with, stated as values rather than as constants at the spawn site
+// ([ADR-0104](../../../../docs/adrs/0104-the-emitters-source-is-authorable-geometry.md)).
+/// Where the source line sits, in world units. Just **below** the visible frame,
+/// so an upward-launched object rises into shot rather than appearing in it.
+///
+/// A preset may move it, **including inside the frame** — that is the only route
+/// to a slow look the behavioral gates can see, and the object then switches on
+/// where the eye is unless the preset also asks for a `spawn_fade`. It is still
+/// clamped to the retirement bound, by correctness rather than by taste: a source
+/// outside it spawns objects whose exit time has already passed.
+const DEFAULT_SOURCE_Y: f32 = -1.12;
+/// The source line's half-width **as a fraction of the frame's**, so the default
+/// resolves to `aspect * 1.0` — bit for bit the full-frame line this scene has
+/// always drawn. `0` collapses the line to a point source.
+const DEFAULT_SOURCE_WIDTH: f32 = 1.0;
 // Shared palette colour knobs (ADR-0021), same meaning as the swarm's.
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_HUE_SPREAD: f32 = 1.0;
@@ -353,8 +365,12 @@ struct Spawn {
     /// Fractional width of the per-object lifetime draw (`0` = every object
     /// lives exactly `lifetime`).
     lifetime_spread: f32,
-    /// Half-extents of the source line and of the retirement bound, world units.
+    /// Half-extent of the source line, world units: `aspect * source_width`,
+    /// clamped to the retirement bound. `0` is a point source.
     source_half_width: f32,
+    /// The source line's world `y`, clamped to the retirement bound.
+    source_y: f32,
+    /// Half-extents of the retirement bound, world units.
     bound: [f32; 2],
 }
 
@@ -504,7 +520,7 @@ fn build(seed: u32, t0: f32, cfg: &Spawn) -> Object {
         .clamp(MIN_LIFETIME, MAX_LIFETIME);
     let p0 = [
         (unit(seed, channel::SOURCE_X) * 2.0 - 1.0) * cfg.source_half_width,
-        SOURCE_Y,
+        cfg.source_y,
     ];
     // Angle is measured clockwise from straight up, so zero launches along +y.
     let v0 = [angle.sin() * cfg.speed, angle.cos() * cfg.speed];
@@ -567,6 +583,36 @@ fn exit_time(p0: [f32; 2], v0: [f32; 2], gravity: f32, bound: [f32; 2]) -> f32 {
 /// not a shape.
 fn bounds(aspect: f32) -> [f32; 2] {
     [aspect * RETIRE_MARGIN, RETIRE_MARGIN]
+}
+
+/// The source line's half-extent on a target of this aspect, from `source_width`
+/// **as the preset bound it** (ADR-0104).
+///
+/// Fractional rather than absolute, which is what makes the default an exact
+/// identity: `aspect * 1.0` is bit for bit `aspect`, the full-frame line this
+/// scene has always drawn, so nothing shipped moves on the way in. It is also
+/// where the aspect belongs (ADR-0037) — an absolute width would be a different
+/// fraction of the frame on every display and would hand the author the
+/// reconciliation.
+///
+/// Clamped as a magnitude, the way `lifetime_spread` is, and at the retirement
+/// margin: a line wider than the bound puts its ends where the side exit has
+/// already happened, which is a pool churning against itself rather than
+/// anything visible.
+fn source_half_width(aspect: f32, source_width: f32) -> f32 {
+    aspect * finite(source_width, DEFAULT_SOURCE_WIDTH).clamp(0.0, RETIRE_MARGIN)
+}
+
+/// The source line's world `y`, from `source_y` as the preset bound it.
+///
+/// Clamped to the retirement bound and deliberately **not** to the visible frame:
+/// a source inside the frame is legal (ADR-0104) and is the only route to a look
+/// slow enough to read as a sky, at the price of a spawn pop that `spawn_fade`
+/// is there to answer. Outside the *bound* is a different matter and is a
+/// correctness clamp: an object spawned there is born with its exit time already
+/// past.
+fn source_line_y(source_y: f32, bound: [f32; 2]) -> f32 {
+    finite(source_y, DEFAULT_SOURCE_Y).clamp(-bound[1], bound[1])
 }
 
 /// The LUT sample coordinate for one object (ADR-0021), identical in meaning to
@@ -636,6 +682,9 @@ pub const PARAMS: &[&str] = &[
     "spread",
     "lifetime",
     "lifetime_spread",
+    // The source geometry (Plan 0090).
+    "source_y",
+    "source_width",
     "size",
     "size_spread",
     "spin",
@@ -681,6 +730,12 @@ pub struct EmitterScene {
     spread: f32,
     lifetime: f32,
     lifetime_spread: f32,
+    /// The source line's world `y` and its half-width as a fraction of the
+    /// frame's, **as bound** (ADR-0104). Both are conditioned in
+    /// [`spawn_config`](Self::spawn_config), which is the one place a binding's
+    /// arbitrary arithmetic is allowed to reach the pool.
+    source_y: f32,
+    source_width: f32,
     size: f32,
     size_spread: f32,
     spin: f32,
@@ -858,6 +913,8 @@ impl EmitterScene {
             spread: DEFAULT_SPREAD,
             lifetime: DEFAULT_LIFETIME,
             lifetime_spread: DEFAULT_LIFETIME_SPREAD,
+            source_y: DEFAULT_SOURCE_Y,
+            source_width: DEFAULT_SOURCE_WIDTH,
             size: DEFAULT_SIZE,
             size_spread: DEFAULT_SIZE_SPREAD,
             spin: DEFAULT_SPIN,
@@ -895,7 +952,8 @@ impl EmitterScene {
             // A width, so it is only meaningful as a magnitude; clamped at 1 so
             // a preset cannot draw a negative lifetime out of the distribution.
             lifetime_spread: finite(self.lifetime_spread, DEFAULT_LIFETIME_SPREAD).clamp(0.0, 1.0),
-            source_half_width: self.aspect,
+            source_half_width: source_half_width(self.aspect, self.source_width),
+            source_y: source_line_y(self.source_y, bound),
             bound,
         }
     }
@@ -930,6 +988,8 @@ impl Scene for EmitterScene {
         self.spread = DEFAULT_SPREAD;
         self.lifetime = DEFAULT_LIFETIME;
         self.lifetime_spread = DEFAULT_LIFETIME_SPREAD;
+        self.source_y = DEFAULT_SOURCE_Y;
+        self.source_width = DEFAULT_SOURCE_WIDTH;
         self.size = DEFAULT_SIZE;
         self.size_spread = DEFAULT_SIZE_SPREAD;
         self.spin = DEFAULT_SPIN;
@@ -958,6 +1018,8 @@ impl Scene for EmitterScene {
             "spread" => self.spread = value,
             "lifetime" => self.lifetime = value,
             "lifetime_spread" => self.lifetime_spread = value,
+            "source_y" => self.source_y = value,
+            "source_width" => self.source_width = value,
             "size" => self.size = value,
             "size_spread" => self.size_spread = value,
             "spin" => self.spin = value,
