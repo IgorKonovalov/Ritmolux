@@ -943,6 +943,66 @@ matrices, and `near_duplicates`.
 first two together. Keep the provenance when you consume it: a flag only ever
 means *not observed under this stimulus*.
 
+## `--downbeat-log`: the estimator's terms, one row per beat
+
+The one instrument on this page that runs the **live app** rather than a headless
+capture, and that is the point of it (Plan 0086 Phase 1). The question it exists
+for cannot be asked of synthesized audio: the downbeat estimator publishes on
+**6.0 %** of audible time and on backbeat rock/pop **0.14 %**, and the cause is
+still *inferred* — `diagnostics.log` samples at 1 Hz and records the estimator's
+outcome, not its per-beat terms, so three different failures fit the same reading.
+
+```bash
+# Windows: a row per detected beat, alongside the 1 Hz diagnostics.log
+lmv.exe --downbeat-log
+lmv.exe --downbeat-log C:\path\to\downbeat.log     # or --downbeat-log=<path>
+```
+
+A bare flag writes `downbeat.log` beside `diagnostics.log` under the per-user app
+dir — the same three argument shapes [`--soak`](nfr.md) takes. Off by default:
+without the flag no logger exists and the frame loop is unchanged.
+
+One tab-separated row per **beat**, header on a fresh file:
+
+| column | what it is |
+|---|---|
+| `beat` | the beat clock's `beat_index` — gaps mean beats the render loop coalesced |
+| `s0`..`s3` | mean accent per candidate beat-1 alignment: the 4/4 fold's own output |
+| `best` | the alignment the fold favours right now |
+| `held` | the alignment actually held, which lags `best` by the hysteresis |
+| `effect_raw` | between-alignment share of accent variance, **before** correction |
+| `null_share` | what four groups would explain by chance at this history length |
+| `effect_corrected` | what the gate compares — and the published `downbeat_confidence`, bit for bit |
+| `beats_seen` | accents recorded, against the 8-beat floor, saturating at 32 |
+| `locked` | `0`/`1`, so the publish **rate** over a run is the mean of the column |
+| `bass` `mid` `treb` `onset` | the normalized levels for context |
+
+**Reading it is what tells the three stories apart** — the reason the plan spends
+a phase capturing before choosing a repair:
+
+- `s0..s3` flat and `effect_raw` low → the accent carries no bar-scale structure
+  → the accent feature is the defect.
+- two scores tied and high, the other two low → a kick on 1 and 3 is 2-periodic,
+  so the fold is choosing between two equally good answers → the repair is a cue
+  independent of the drum pattern, and a second *percussive* band is the same
+  ambiguity phase-shifted.
+- `effect_raw` healthy but `effect_corrected` near zero → the noise correction is
+  eating a real effect at this history length → the window or the measure.
+
+Three things to know before running one:
+
+1. **It costs the estimator nothing.** `Analyzer::downbeat_terms` is `&self`,
+   allocation-free and clock-free, so being observed cannot change what is
+   observed. The write is on the render thread — never the audio callback — and
+   event-paced: ~2 rows/s at 120 BPM, and a frame with no beat costs a bool test.
+2. **A hidden window logs nothing.** Rows come off the frame path, which returns
+   early while occluded or zero-sized. Keep the window up for a capture.
+3. **Run matched material.** The measurement this file exists for is a *genre
+   split* — unambiguous 4/4 backbeat rock/pop against a four-on-the-floor control,
+   matched in duration — so the result is comparable with Plan 0068's 6.79 % /
+   0.14 % baseline. And do not re-measure by ear: `locked` is the outcome
+   instrument and the score columns are the decomposition.
+
 ## The `core/tests/` harness
 
 Most differential tests render on the **software adapter** (`prefer_software`) so

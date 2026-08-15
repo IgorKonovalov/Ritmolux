@@ -317,6 +317,21 @@ impl Analyzer {
         }
     }
 
+    /// The downbeat estimator's current decomposition — Plan 0068's instrument,
+    /// reachable from a native shell (Plan 0086 Phase 1).
+    ///
+    /// **Reading it changes nothing.** [`downbeat::DownbeatTracker::terms`] takes
+    /// `&self`, recomputes from state [`push_interleaved`](Self::push_interleaved)
+    /// already keeps, allocates nothing and reads no clock — so the estimator
+    /// behaves identically whether or not anyone is looking, and the value is the
+    /// published [`AnalysisFrame::downbeat_confidence`] bit for bit between hops.
+    ///
+    /// Diagnostics only, and **native-only** (ADR-0052): not a grammar variable,
+    /// and never on the C ABI.
+    pub fn downbeat_terms(&self) -> downbeat::DownbeatTerms {
+        self.downbeat.terms()
+    }
+
     /// Latest analysis with any beat since the previous take. Call once per
     /// render frame.
     pub fn take_frame(&mut self) -> AnalysisFrame {
