@@ -1543,6 +1543,27 @@ author-selectable — that is what keeps the whole stage one pipeline and one
 resample however many terms are live. Read forwards it means the polar rosette is
 the motif the tile replicates.
 
+**`kaleido_tile` is the one param on this stage you may ease between values, and
+that is deliberate.** `kaleido_spiral` and `kaleido_order` are rounded because a
+fractional winding number tears along a ray, and `palette_steps` is rounded
+because a fractional band count is not a thing; a fractional **cell** count is
+neither undefined nor torn. The mirrored grid is continuous in the count, so
+`kaleido_tile = "2 + bass * 1.5"` under `[smoothing]` glides between two and
+three-and-a-half cells instead of snapping, and a bar-phase sweep across the
+range is a legal move. (`core/src/render/kaleidoscope.rs` is the authority on
+this; it carries the reasoning at `fold_tile`.)
+
+**What a fractional count costs is the border cell.** At `2.5` the grid is
+seamless everywhere inside the frame and the last cell is simply **cut off at the
+frame edge** — a half cell against the border rather than a torn seam through the
+middle. Whether that clipped edge reads as deliberate or as a mistake is a
+question nobody has rendered; `1`–`16` is the accepted range and only values at
+or below `1` mean off.
+
+`fragment_tiled.toml` binds it as the constant `"2"`, which is **one choice and
+not the only one** — it is the preset that wanted a fixed wallpaper, not a
+statement that the param is constant-only.
+
 **`kaleido_radial` is a ratio, not a count.** `2.0` means each ring is half the size
 of the one outside it; `1.3` gives fine dense rings. Across a 10:1 radius span,
 `1.3` draws about **9** rings and `2.0` about **3**. `<= 1` is off. This is the term
