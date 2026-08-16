@@ -1,7 +1,7 @@
 # plugin-foobar
 
 The foobar2000 visualization component: a thin C++ shim over lmv-core's C ABI
-(`core-cabi/include/lmv_core.h`). Windows-only per ADR-0001.
+(`core-cabi/include/lmv_core.h`). Windows-only per ADR-0001, x64 only.
 
 ## SDK location (Plan 0001 Phase 7)
 
@@ -16,7 +16,47 @@ plugin-foobar/sdk/
 ```
 
 The SDK is third-party and separately licensed — it is gitignored, never
-committed. To recreate: download from <https://www.foobar2000.org/SDK> and
-extract the archive to `plugin-foobar/sdk/`.
+committed (ADR-0115 Alternative A). To stage it:
+
+```powershell
+.\packaging\foobar\fetch-sdk.ps1
+```
+
+That downloads the **pinned** release against a SHA-256 and unpacks it here. The
+pin lives in [`packaging/foobar/sdk-pin.ps1`](../packaging/foobar/sdk-pin.ps1),
+which is the one file a bump edits and which explains why the release is pinned
+rather than tracked. To do it by hand instead, download from
+<https://www.foobar2000.org/SDK> and extract the archive to `plugin-foobar/sdk/`.
 
 Toolchain: MSVC (VS Build Tools 2022, x64).
+
+## Building
+
+```powershell
+.\build.ps1            # -> plugin-foobar\build\foo_lmv.dll
+.\build.ps1 -Install   # ...then copy it into the local foobar2000 v2 profile
+```
+
+`-Install` writes to `%APPDATA%\foobar2000-v2\user-components-x64\foo_lmv\` —
+the development inner loop. It is **not** how a release is produced, and it is
+deliberately not what Plan 0102 Phase 5 tests: an artifact that only ever gets
+installed over its own build directory has never exercised the path a user takes.
+
+## Packaging a release
+
+```powershell
+.\packaging\foobar\build-component.ps1
+```
+
+Builds, assembles, stamps the version, packages and **verifies**
+`target/dist/light-music-visualizer-v<version>-foobar2000-component.zip`, which
+holds `foo_lmv.fb2k-component` and a `READ-ME-FIRST.txt`. Pass `-SkipBuild` to
+reuse the DLL already in `build/`.
+
+The verification lives in the script rather than in the release workflow, so a
+local run is held to the same bar as CI (ADR-0038's model, applied by ADR-0115).
+Every check is fatal, and two of them are why the script exists rather than a
+`Compress-Archive` line: the component archive must hold `x64/foo_lmv.dll` and
+nothing else — foobar2000 extracts a component's whole archive into the user's
+components folder, so a stray file is a real defect — and the DLL must carry the
+workspace version rather than `foo_lmv.cpp`'s `0.0.0-dev` fallback.
