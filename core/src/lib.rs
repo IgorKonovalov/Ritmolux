@@ -12,6 +12,7 @@
 pub mod audio;
 pub mod diag;
 pub mod dsp;
+pub mod milk;
 pub mod preset;
 pub mod render;
 pub mod signal;

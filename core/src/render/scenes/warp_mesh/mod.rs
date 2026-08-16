@@ -623,6 +623,10 @@ pub struct WarpMeshScene {
     /// This frame's target size, recorded by `set_target_size` and acted on in
     /// `render` (ADR-0030: never allocate in the setter).
     target: (u32, u32),
+    /// The **render target's** aspect as of the last `render` (ADR-0037).
+    /// Recorded because a bundle's per-frame program reads `aspectx`/`aspecty`
+    /// and `update` runs before `render` — see `update`.
+    last_aspect: f32,
     time: f32,
     dt: f32,
     /// The nine per-vertex outputs as whole-mesh scalars, in
@@ -650,6 +654,21 @@ pub struct WarpMeshScene {
     occlude: f32,
     palette: Palette,
     palette_dirty: bool,
+    /// The converted MilkDrop preset's live EEL2 state, when the preset carries a
+    /// `[milk]` table (Plan 0100 Phase 2 / ADR-0113). `None` — a hand-authored
+    /// preset — executes no VM at all, so the ten native systems and a native
+    /// `warp_mesh` preset take exactly the path they took before this existed.
+    ///
+    /// **The bundle drives the scene *after* the ordinary bindings**, and that is
+    /// the composition rule: `set_param` and `set_per_vertex` run during the
+    /// renderer's `evaluate_preset`, and the programs run in
+    /// [`update`](Scene::update) and [`render`](Scene::render), which come later.
+    /// A converted preset is authoritative about its own transform; a `[params]`
+    /// binding alongside one is inert rather than fighting it.
+    milk: Option<crate::milk::MilkRuntime>,
+    /// This frame's analysis, kept from `update` so `render` can drive the
+    /// per-vertex program with the same frame the per-frame program saw.
+    frame: crate::dsp::AnalysisFrame,
 }
 
 impl WarpMeshScene {
@@ -674,6 +693,7 @@ impl WarpMeshScene {
             requested_mesh: DEFAULT_MESH,
             state: MeshState::new(mesh),
             target: (0, 0),
+            last_aspect: 1.0,
             time: 0.0,
             dt: super::FALLBACK_DT,
             scalars: PER_VERTEX_DEFAULTS,
@@ -699,6 +719,8 @@ impl WarpMeshScene {
             occlude: crate::render::post::DEFAULT_OCCLUDE,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
+            milk: None,
+            frame: crate::dsp::AnalysisFrame::default(),
         }
     }
 
@@ -1082,13 +1104,20 @@ impl Scene for WarpMeshScene {
     }
 
     fn configure(&mut self, cfg: &super::GeneratorConfig) -> Option<super::CapOverflow> {
-        if let super::GeneratorConfig::WarpMesh { mesh } = cfg {
+        if let super::GeneratorConfig::WarpMesh { mesh, milk, salt } = cfg {
             self.requested_mesh = *mesh;
             let tier = crate::render::TierConfig {
                 mesh_grid: self.tier_mesh,
                 ..crate::render::TierConfig::FLOOR
             };
             self.state.resize(clamp_grid(*mesh, &tier));
+            // Built here, off the hot path, and rebuilt on every preset switch —
+            // so a bundle never inherits the previous preset's register file,
+            // `megabuf` or RNG stream. `configure` runs on every switch for
+            // exactly this reason (the `[particles]` arm's note).
+            self.milk = milk
+                .as_ref()
+                .map(|bundle| crate::milk::MilkRuntime::new((**bundle).clone(), *salt));
         }
         None
     }
@@ -1172,7 +1201,37 @@ impl Scene for WarpMeshScene {
         }
     }
 
-    fn update(&mut self, _frame: &AnalysisFrame) {}
+    fn update(&mut self, frame: &AnalysisFrame) {
+        // Kept for `render`, which drives the per-vertex program and is the only
+        // place the render target's aspect is known.
+        self.frame = *frame;
+        // A converted preset's per-frame program, run after the ordinary
+        // bindings and overriding them — see the `milk` field.
+        //
+        // The aspect is deliberately **not** available here, so the value handed
+        // to the program is the one `render` recorded last frame (or 1.0 on the
+        // first). `aspectx`/`aspecty` change only on a resize, so a one-frame lag
+        // on a window drag is invisible; taking the aspect from the mesh instead
+        // would be the ADR-0037 bug.
+        let aspect = self.last_aspect;
+        let mesh = self.state.mesh;
+        let (time, dt) = (self.time, self.dt);
+        if let Some(runtime) = self.milk.as_mut() {
+            let (outputs, decay) = runtime.run_frame(&self.frame, time, dt, mesh, aspect);
+            for (index, value) in outputs.iter().enumerate() {
+                if let Some(slot) = self.scalars.get_mut(index) {
+                    *slot = *value;
+                }
+            }
+            if let Some(decay) = decay {
+                self.decay = decay;
+            }
+            // A bundle's per-vertex program replaces any `[per_vertex]` table's
+            // series wholesale, so the flags are cleared here and re-set in
+            // `render` once the vertices are evaluated.
+            self.state.bound = [false; OUTPUTS];
+        }
+    }
 
     fn render(
         &mut self,
@@ -1221,6 +1280,44 @@ impl Scene for WarpMeshScene {
             palette::write_lut(queue, &res.lut_texture_a, &self.palette.lut_a_bytes());
             palette::write_lut(queue, &res.lut_texture_b, &self.palette.lut_b_bytes());
             self.palette_dirty = false;
+        }
+
+        self.last_aspect = aspect;
+        // A converted preset's per-vertex program, evaluated over the whole grid
+        // here — after the ordinary `[per_vertex]` bindings, which it replaces.
+        // Allocation-free: the series live in the scene's own arrays, sized when
+        // the grid was.
+        if self
+            .milk
+            .as_ref()
+            .is_some_and(crate::milk::MilkRuntime::has_per_vertex)
+        {
+            let (mx, my) = self.state.mesh;
+            let mut v = 0usize;
+            for row in 0..=my {
+                for col in 0..=mx {
+                    let (x, y, rad, ang) = vertex_position(col, row, (mx, my), aspect);
+                    // MilkDrop's `y` runs bottom-up where this scene's runs
+                    // top-down, and its `rad`/`ang` are already the aspect-
+                    // corrected pair `vertex_position` computes. Flipping `y`
+                    // here rather than in `vertex_position` keeps the native
+                    // `[per_vertex]` vocabulary in texture space, where every
+                    // sampler in this file addresses.
+                    let outputs = match self.milk.as_mut() {
+                        Some(runtime) => runtime.run_vertex(x, 1.0 - y, rad, ang),
+                        None => break,
+                    };
+                    for (index, value) in outputs.iter().enumerate() {
+                        if let Some(slot) =
+                            self.state.values.get_mut(index).and_then(|s| s.get_mut(v))
+                        {
+                            *slot = *value;
+                        }
+                    }
+                    v += 1;
+                }
+            }
+            self.state.bound = [true; OUTPUTS];
         }
 
         // Assemble and upload this frame's mesh.

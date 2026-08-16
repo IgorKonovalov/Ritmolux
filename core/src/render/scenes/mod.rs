@@ -154,6 +154,25 @@ pub enum GeneratorConfig {
         /// Requested cells, `(x, y)`, validated at load into
         /// [`MIN_MESH`](warp_mesh::MIN_MESH)`..=`[`MAX_MESH`](warp_mesh::MAX_MESH).
         mesh: (u32, u32),
+        /// The compiled EEL2 programs a **converted** preset carries, from a
+        /// `[milk]` table (Plan 0100 Phase 2 / ADR-0113). `None` — a
+        /// hand-authored `warp_mesh` preset — drives the mesh from the ordinary
+        /// `[params]` and `[per_vertex]` bindings instead, and executes no VM at
+        /// all.
+        ///
+        /// Boxed because it is much the largest thing this enum carries and every
+        /// other variant would pay for it by value.
+        milk: Option<Box<crate::milk::MilkBundle>>,
+        /// The salt the bundle's `rand()` draws under (ADR-0051).
+        ///
+        /// **The preset's `pinned_salt`, always** — its declared numeric seed, or
+        /// `0` where it declared `seed = "random"`. So a bundle is a pure
+        /// function of its inputs in the live app as well as in the harness,
+        /// which is stronger than ADR-0051 requires and costs nothing: per-run
+        /// variety is opt-in through `seed = "random"`, and no *converted* preset
+        /// declares one. A hand-written bundle that does gets the pinned
+        /// behaviour, and that is stated rather than discovered.
+        salt: u32,
     },
 }
 

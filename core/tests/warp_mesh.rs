@@ -391,6 +391,120 @@ fn the_adapters_agree_on_the_warp_mesh() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// The bundle (Plan 0100 Phase 2)
+// ---------------------------------------------------------------------------
+
+/// The bundle-driven fixture — a hand-written `[milk]` table driving the mesh.
+const MILK_FIXTURE: &str = include_str!("fixtures/warp_mesh_milk.toml");
+
+fn milk_fixture() -> Preset {
+    let preset = Preset::from_toml_str(MILK_FIXTURE).expect("the milk fixture parses");
+    assert_eq!(preset.system, SystemKind::WarpMesh);
+    assert!(
+        preset.warnings.is_empty(),
+        "the milk fixture must load clean, got {:?}",
+        preset.warnings
+    );
+    preset
+}
+
+/// **A hand-written bundle drives the mesh, and the render is byte-identical
+/// across two runs** — Plan 0100 Phase 2's done-when, both halves.
+///
+/// Byte-identical rather than within a tolerance, and that is the point. The
+/// bundle carries state in three places a run could leak from: a register file
+/// (`q1`, `q2`), a `megabuf` arena, and an RNG stream. Two renders that agree to
+/// the last byte say all three were reset with the preset — which is what
+/// NFR §6 asks of a capture and what the golden baseline below rests on.
+#[test]
+fn a_bundle_drives_the_mesh_and_reruns_identically() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let preset = milk_fixture();
+    let name = preset.name.clone();
+    let frame = loud();
+
+    renderer.set_presets(vec![preset]);
+    let first = renderer
+        .capture_preset(&name, &frame, SANITY_FRAMES)
+        .expect("capture the bundle-driven fixture");
+    let second = renderer
+        .capture_preset(&name, &frame, SANITY_FRAMES)
+        .expect("capture it again");
+
+    assert_eq!(
+        first.rgba,
+        second.rgba,
+        "two renders of a bundle-driven preset must be byte-identical; \
+         {} of {} bytes differ",
+        first
+            .rgba
+            .iter()
+            .zip(&second.rgba)
+            .filter(|(a, b)| a != b)
+            .count(),
+        first.rgba.len()
+    );
+
+    // ...and it is a picture, not a blank frame — otherwise the byte-identity
+    // above would be satisfied by rendering nothing twice.
+    let cov = coverage(&first, BLACK, EPS);
+    let spread = quadrant_spread(&first, BLACK, EPS);
+    println!("[warp_mesh/milk] coverage={cov:.4} quadrants={spread}");
+    assert!(
+        cov >= COVERAGE_FLOOR,
+        "the bundle-driven fixture is blank: coverage {cov:.4} < {COVERAGE_FLOOR:.2}"
+    );
+    assert!(spread >= MIN_QUADRANTS);
+}
+
+/// **The bundle is what is driving the mesh**, not the preset's own defaults.
+///
+/// The non-vacuity check for the test above: a runtime that silently did nothing
+/// would still render a picture and still render it twice identically. The
+/// control is the same preset with its `[milk]` table removed — the same deposit,
+/// the same palette, the same grid, and the scene's default transform — and the
+/// two must differ.
+#[test]
+fn the_bundle_and_not_the_defaults_drives_the_transform() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let driven = milk_fixture();
+    let control = Preset::from_toml_str(&MILK_FIXTURE.replace("[milk]", "[milk_disabled]"))
+        .expect("the control parses");
+    assert!(
+        matches!(
+            control.config.as_ref(),
+            Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh { milk: None, .. })
+        ),
+        "the control must carry no bundle, or it proves nothing"
+    );
+
+    let mut driven = driven;
+    driven.name = "milk-driven".into();
+    let mut control = control;
+    control.name = "milk-control".into();
+    renderer.set_presets(vec![driven, control]);
+
+    let frame = loud();
+    let a = renderer
+        .capture_preset("milk-driven", &frame, SANITY_FRAMES)
+        .expect("capture the driven fixture");
+    let b = renderer
+        .capture_preset("milk-control", &frame, SANITY_FRAMES)
+        .expect("capture the control");
+    let difference = frame_diff(&a, &b);
+    println!("[warp_mesh/milk] bundle vs no bundle: frame_diff {difference:.4}");
+    assert!(
+        difference > 0.01,
+        "a preset with a `[milk]` table must render differently from the same \
+         preset without one; got {difference:.4}. The VM is not reaching the mesh"
+    );
+}
+
 /// The floor this file measures against is the one `sanity.rs` would apply, so
 /// the duplication above cannot silently drift into a weaker bar.
 ///

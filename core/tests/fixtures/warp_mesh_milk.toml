@@ -1,0 +1,155 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# **A hand-written bundle driving the warp mesh from compiled EEL2** (Plan 0100
+# Phase 2's done-when, ADR-0113). The `[milk]` table below is bytecode, in the
+# assembly text a bundle carries; the `[params]` table sets only the deposit,
+# because a converted MilkDrop preset has no light source of its own and the
+# bundle is authoritative about everything else.
+#
+# THE SOURCE IT COMPILED FROM, which is not decoration: `milkconv/tests/fixture.rs`
+# holds this same EEL2 and asserts that compiling it produces the assembly below,
+# byte for byte. So the two cannot drift into a comment that used to be true.
+#
+#   per_frame_init:
+#     q1 = 0.35;
+#     q2 = 0.0;
+#
+#   per_frame:
+#     q2 = q2 + 0.013;
+#     zoom = 1.024 + bass * 0.004;
+#     rot = 0.011;
+#     decay = 0.90;
+#     cx = 0.5 + 0.05 * sin(time * 0.7);
+#     cy = 0.5 + 0.05 * cos(time * 0.53);
+#
+#   per_vertex:
+#     zoom = zoom + rad * 0.018;
+#     rot = rot + q1 * (x - 0.5);
+#     dx = 0.002 * sin(q2 + ang);
+#
+# What each part of it pins, and why a shorter program would pin less:
+#
+#  - `q1` is written by `per_frame_init` and read by `per_vertex`, which is the
+#    q-bridge across TWO programs and a load-time run. A regression that gave each
+#    program its own register file, or that ran the init more than once, changes
+#    the picture.
+#  - `q2` accumulates in `per_frame` and is read by `per_vertex`, so the bundle
+#    carries state ACROSS FRAMES. A reset that failed to clear it, or a per-vertex
+#    write that leaked into the next vertex, shows up here.
+#  - `per_vertex` reads `zoom` and `rot` and ADDS to them, which is MilkDrop's own
+#    idiom: the per-vertex program starts from the per-frame values. A regression
+#    that zeroed the outputs before each vertex renders a completely different
+#    frame.
+#  - `rad`, `x` and `ang` are all read, so both halves of `vertex_position` are
+#    exercised.
+#  - `decay = 0.90` is a per-FRAME survival factor; the runtime converts it to
+#    0.90^30 per second. A regression in that conversion is the plan's most
+#    consequential translation and moves the frame's brightness wholesale.
+#
+# `[mesh]` is named rather than defaulted, so the baseline pins a known grid.
+system = "warp_mesh"
+name   = "fixture_warp_mesh_milk"
+
+[mesh]
+x = 24
+y = 18
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#180016" },
+  { at = 0.34, color = "#7a1d68" },
+  { at = 0.68, color = "#ff7a3d" },
+  { at = 1.0,  color = "#fff6d0" },
+]
+
+[params]
+# The bundle drives the transform; the preset supplies the light it drags.
+deposit        = "6.5"
+deposit_radius = "0.34"
+deposit_width  = "0.045"
+deposit_arms   = "4"
+deposit_twist  = "1.6"
+deposit_spin   = "0.4"
+color_span     = "1.0"
+brightness     = "1.0"
+
+[milk]
+per_frame_init = """
+.regs q1 q2 zoom bass rot decay cx time cy rad x dx ang
+.code
+const 0.35
+store 0
+pop
+const 0.0
+store 1
+"""
+
+per_frame = """
+.regs q1 q2 zoom bass rot decay cx time cy rad x dx ang
+.code
+load 1
+const 0.013
+add
+store 1
+pop
+const 1.024
+load 3
+const 0.004
+mul
+add
+store 2
+pop
+const 0.011
+store 4
+pop
+const 0.9
+store 5
+pop
+const 0.5
+const 0.05
+load 7
+const 0.7
+mul
+fn1 sin
+mul
+add
+store 6
+pop
+const 0.5
+const 0.05
+load 7
+const 0.53
+mul
+fn1 cos
+mul
+add
+store 8
+"""
+
+per_vertex = """
+.regs q1 q2 zoom bass rot decay cx time cy rad x dx ang
+.code
+load 2
+load 9
+const 0.018
+mul
+add
+store 2
+pop
+load 4
+load 0
+load 10
+const 0.5
+sub
+mul
+add
+store 4
+pop
+const 0.002
+load 1
+load 12
+add
+fn1 sin
+mul
+store 11
+"""

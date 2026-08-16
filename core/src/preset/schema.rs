@@ -592,6 +592,8 @@ impl Preset {
             raw.particles,
             raw.spectrum,
             raw.mesh,
+            raw.milk,
+            pinned_salt,
         )?;
 
         // The `[feedback]` table (ADR-0048): two closed rosters, validated here so
@@ -911,6 +913,12 @@ fn build_layer(raw: RawLayer, warnings: &mut Vec<String>) -> Result<Layer, Prese
         raw.particles,
         raw.spectrum,
         raw.mesh,
+        // A `[layer]` carries no `[milk]` table: a converted preset is a whole
+        // preset, and layering one under another is a composition nothing in the
+        // corpus asks for. A layer warp mesh drives its mesh from `[layer.params]`
+        // and `[layer.per_vertex]` like any hand-authored one.
+        None,
+        0,
     )?;
 
     Ok(Layer {
@@ -951,6 +959,7 @@ fn entropy_salt() -> u32 {
 
 /// Assemble the optional structural config for `system` from the raw tables,
 /// validating at this boundary (ADR-0007). Non-line systems have no config.
+#[allow(clippy::too_many_arguments)]
 fn build_config(
     system: SystemKind,
     curve: Option<RawCurve>,
@@ -958,6 +967,8 @@ fn build_config(
     particles: Option<RawParticles>,
     spectrum: Option<RawSpectrum>,
     mesh: Option<RawMesh>,
+    milk: Option<RawMilk>,
+    salt: u32,
 ) -> Result<Option<GeneratorConfig>, PresetError> {
     match system {
         // A curve preset without a `[curve]` table accepts the family default.
@@ -1012,7 +1023,16 @@ fn build_config(
         // vertex and index buffers are built from it, and an eased grid would
         // rebuild them mid-frame. Config is always `Some` so `configure` runs on
         // every preset switch (resizing the mesh — never stale).
-        SystemKind::WarpMesh => Ok(Some(mesh.unwrap_or_default().into_config()?)),
+        SystemKind::WarpMesh => {
+            let bundle = milk
+                .map(|raw| raw.into_bundle())
+                .transpose()
+                .map_err(|err| PresetError::Config(err.to_string()))?;
+            Ok(Some(
+                mesh.unwrap_or_default()
+                    .into_config(bundle.map(Box::new), salt)?,
+            ))
+        }
         // Reaction-diffusion drives its regime through named params (feed/kill/
         // flow), not a declarative structural table. `shape_field` is here for a
         // sharper reason: its structure is the `marks` roster, which is a closed
@@ -1048,7 +1068,11 @@ impl RawMesh {
     /// grid must still load on the floor. `warp_mesh::clamp_grid` applies it at
     /// both consumers — the scene and the renderer's per-vertex scratch — from
     /// the one tier they share.
-    fn into_config(self) -> Result<GeneratorConfig, PresetError> {
+    fn into_config(
+        self,
+        milk: Option<Box<crate::milk::MilkBundle>>,
+        salt: u32,
+    ) -> Result<GeneratorConfig, PresetError> {
         use crate::render::scenes::warp_mesh::{DEFAULT_MESH, MAX_MESH, MIN_MESH};
         let axis = |name: &str, value: Option<u32>, default: u32, max: u32| {
             let v = value.unwrap_or(default);
@@ -1064,6 +1088,8 @@ impl RawMesh {
                 axis("x", self.x, DEFAULT_MESH.0, MAX_MESH.0)?,
                 axis("y", self.y, DEFAULT_MESH.1, MAX_MESH.1)?,
             ),
+            milk,
+            salt,
         })
     }
 }
@@ -1100,6 +1126,10 @@ struct RawPreset {
     /// per mesh vertex, with `x`/`y`/`rad`/`ang` in scope.
     #[serde(default)]
     per_vertex: BTreeMap<String, String>,
+    /// The optional `[milk]` table (Plan 0100 Phase 2): a converted MilkDrop
+    /// preset's three compiled EEL2 programs, as assembly text.
+    #[serde(default)]
+    milk: Option<RawMilk>,
     /// The optional `[feedback]` structural-config table (ADR-0048): the warp
     /// kind and deposit blend both accumulation buffers read their past through.
     #[serde(default)]
@@ -1449,6 +1479,33 @@ fn validate_stops(stops: Vec<RawStop>) -> Result<Vec<(f32, [f32; 3])>, PresetErr
         out.push((stop.at, stop.color.into_rgb()?));
     }
     Ok(out)
+}
+
+/// The raw `[milk]` table (Plan 0100 Phase 2): a converted MilkDrop preset's
+/// three EEL2 programs, as the assembly text `milkconv` emits.
+///
+/// Every section is optional. An absent one is the empty program, which is what
+/// a `.milk` file with no `per_frame_init` block converts to.
+#[derive(Debug, Default, Deserialize)]
+struct RawMilk {
+    #[serde(default)]
+    per_frame_init: Option<String>,
+    #[serde(default)]
+    per_frame: Option<String>,
+    #[serde(default)]
+    per_vertex: Option<String>,
+}
+
+impl RawMilk {
+    /// Decode and validate the three sections at the load boundary — a malformed
+    /// program is a surfaced load error, never a panic (ADR-0002 / NFR 10).
+    fn into_bundle(self) -> Result<crate::milk::MilkBundle, crate::milk::BundleError> {
+        crate::milk::MilkBundle::from_assembly(
+            self.per_frame_init.as_deref(),
+            self.per_frame.as_deref(),
+            self.per_vertex.as_deref(),
+        )
+    }
 }
 
 /// The raw `[particles]` table: which strange-attractor family the
