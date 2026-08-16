@@ -382,10 +382,18 @@ pub const WAVE_MODES: u32 = 8;
 /// The built-in waveform: MilkDrop's eight `wave_mode` figures over the audio
 /// trace.
 ///
-/// Each mode is the reference's own construction, and they are genuinely
-/// different *figures* rather than the same line rearranged — a circle, a pair of
-/// lines, a spectrum-shaped strip — which is what Phase 4's done-when asks to be
-/// distinguishable.
+/// Each mode is the reference's own construction, and the eight are **pairwise
+/// distinct figures** — a circle, a pair of rings, a scope, a Lissajous, a
+/// mirrored pair, an angled line and its double — which is what Phase 4's
+/// done-when asks and what
+/// [`every_wave_mode_builds_a_different_figure`](super::tests) holds them to.
+///
+/// Two pairs had to be separated to get there, and both for the same reason: the
+/// reference tells 0 from 1, and 6 from 7, using the **second audio channel**,
+/// and this engine's analysis is mono by construction. Where the reference would
+/// draw two diverging traces, this draws the one trace at the separation the
+/// reference's own parameters name — the same figure with the channel difference
+/// removed rather than an invented eighth mode. See each arm.
 fn waveform_figure(
     geometry: &mut DrawGeometry,
     out: &FrameOutputs,
@@ -450,7 +458,7 @@ fn waveform_figure(
     match mode {
         // 0 — a circle whose radius breathes with the trace. MilkDrop's first
         // mode and the one most presets use.
-        0 | 1 => {
+        0 => {
             closed = true;
             let base = 0.2 + 0.1 * mystery;
             for i in 0..count {
@@ -461,6 +469,39 @@ fn waveform_figure(
                     &mut points,
                     &mut used,
                 );
+            }
+        }
+        // 1 — the reference's **second** circular mode, which draws the left and
+        // right channels as two rings whose separation is `wave_mystery`. This
+        // engine's analysis is mono (see `MilkRuntime::run_wave_point`), so the
+        // two rings carry the same trace and only the separation tells them
+        // apart — which is the reference's own figure with the channel
+        // difference removed, and is what keeps mode 1 from being mode 0.
+        1 => {
+            closed = true;
+            let base = 0.2 + 0.1 * mystery;
+            let separation = 0.04 + 0.06 * mystery.abs();
+            for ring in [separation, -separation] {
+                used = 0;
+                for i in 0..count {
+                    let t = i as f32 / count as f32 * std::f32::consts::TAU;
+                    let r = base + ring + sample(i) * 0.1;
+                    push(
+                        (cx + r * t.cos() / aspect.max(0.1), cy + r * t.sin()),
+                        &mut points,
+                        &mut used,
+                    );
+                }
+                // The outer ring closes here; the inner one falls through to the
+                // shared emit below, so both are stroked exactly once.
+                if ring > 0.0 {
+                    let built = points.get(..used).unwrap_or(&[]);
+                    if out.wave_usedots >= 0.5 {
+                        dots(geometry, built, width, additive);
+                    } else {
+                        polyline(geometry, built, width, true, additive);
+                    }
+                }
             }
         }
         // 2 — a horizontal line across the frame, the classic scope.
@@ -517,18 +558,35 @@ fn waveform_figure(
             }
         }
         // 6 — a line at an angle set by `wave_mystery`, which is what the
-        // reference's modes 6 and 7 use it for.
+        // reference uses it for here, and 7 — the reference's **double** line, the
+        // same figure offset to both sides along its own normal. That is exactly
+        // the relationship mode 5 has to mode 2, so the pair is consistent with
+        // the pair above it rather than being two names for one figure.
         6 | 7 => {
             let angle = mystery * std::f32::consts::PI + time * 0.05;
             let (s, c) = angle.sin_cos();
-            for i in 0..count {
-                let t = i as f32 / (count - 1).max(1) as f32 - 0.5;
-                let n = sample(i) * 0.15;
-                push(
-                    (cx + (t * c - n * s) / aspect.max(0.1), cy + (t * s + n * c)),
-                    &mut points,
-                    &mut used,
-                );
+            let offsets: &[f32] = if mode == 7 { &[0.03, -0.03] } else { &[0.0] };
+            for (index, offset) in offsets.iter().enumerate() {
+                used = 0;
+                for i in 0..count {
+                    let t = i as f32 / (count - 1).max(1) as f32 - 0.5;
+                    let n = sample(i) * 0.15 + offset;
+                    push(
+                        (cx + (t * c - n * s) / aspect.max(0.1), cy + (t * s + n * c)),
+                        &mut points,
+                        &mut used,
+                    );
+                }
+                // All but the last pass emit here; the last falls through to the
+                // shared emit below.
+                if index + 1 < offsets.len() {
+                    let built = points.get(..used).unwrap_or(&[]);
+                    if out.wave_usedots >= 0.5 {
+                        dots(geometry, built, width, additive);
+                    } else {
+                        polyline(geometry, built, width, false, additive);
+                    }
+                }
             }
         }
         _ => {}
@@ -613,15 +671,11 @@ fn custom_shapes(
             let additive = shape.additive >= 0.5;
             let sides = (shape.sides.max(3.0) as u32).clamp(3, MAX_SHAPE_SIDES);
             let centre = uv_to_world(shape.x, shape.y, aspect);
-            let inner = light(shape.r, shape.g, shape.b, shape.a, false, exposure, additive);
+            let inner = light(
+                shape.r, shape.g, shape.b, shape.a, false, exposure, additive,
+            );
             let outer = light(
-                shape.r2,
-                shape.g2,
-                shape.b2,
-                shape.a2,
-                false,
-                exposure,
-                additive,
+                shape.r2, shape.g2, shape.b2, shape.a2, false, exposure, additive,
             );
             // The perimeter, in world space. `rad` is in frame-heights, so the
             // aspect only enters through the centre — which is what keeps a
@@ -737,7 +791,9 @@ fn motion_vectors(
     if nx == 0 || ny == 0 {
         return;
     }
-    let colour = light(out.mv_r, out.mv_g, out.mv_b, out.mv_a, false, exposure, false);
+    let colour = light(
+        out.mv_r, out.mv_g, out.mv_b, out.mv_a, false, exposure, false,
+    );
     let len = out.mv_l * 0.02;
     for iy in 0..ny {
         for ix in 0..nx {

@@ -42,6 +42,18 @@ pub struct SegmentInstance {
     pub color: [f32; 3],
     /// Half-width in NDC-y units.
     pub width: f32,
+    /// Per-endpoint join flags — [`JOINED_A`] and/or [`JOINED_B`] (ADR-0041).
+    ///
+    /// Connectivity is the **producer's** to declare: only it knows whether an
+    /// end is shared with a neighbour. `0` (neither end joined) renders exactly
+    /// the pre-Plan-0039 geometry, which is what keeps the isolated producers —
+    /// `spectrum`'s `Bars` and `RadialRing` — byte-identical.
+    ///
+    /// A bitfield rather than two `f32`s: 4 bytes instead of 8 against
+    /// ADR-0007's fixed-capacity instance buffer, still `Pod` (36 + 4 = 40 with
+    /// no padding at align 4), and it leaves 30 bits for whatever the next
+    /// per-endpoint property turns out to be.
+    pub joined: u32,
     /// **How much of its own footprint this stroke occupies**, on top of the
     /// across-the-stroke falloff — the fragment's alpha is `falloff * alpha`.
     ///
@@ -56,19 +68,14 @@ pub struct SegmentInstance {
     /// stroke is composited **over** rather than added and the blend needs the
     /// producer's real coverage: a MilkDrop waveform at `wave_a = 0.1` must
     /// replace a tenth of what is under it, not all of it (Plan 0100 Phase 4).
+    ///
+    /// **Declared last, and that is load-bearing.** `vertex_attr_array!` derives
+    /// each attribute's byte offset from the order of the *shader locations*, so a
+    /// field inserted before `joined` puts location 4 (`Uint32`) over this float
+    /// and location 5 over the flags. The result compiles, renders, and quietly
+    /// reinterprets every stroke's join bits as alpha's mantissa — which is what
+    /// it did, moving five composite golden baselines.
     pub alpha: f32,
-    /// Per-endpoint join flags — [`JOINED_A`] and/or [`JOINED_B`] (ADR-0041).
-    ///
-    /// Connectivity is the **producer's** to declare: only it knows whether an
-    /// end is shared with a neighbour. `0` (neither end joined) renders exactly
-    /// the pre-Plan-0039 geometry, which is what keeps the isolated producers —
-    /// `spectrum`'s `Bars` and `RadialRing` — byte-identical.
-    ///
-    /// A bitfield rather than two `f32`s: 4 bytes instead of 8 against
-    /// ADR-0007's fixed-capacity instance buffer, still `Pod` (32 + 4 = 36 with
-    /// no padding at align 4), and it leaves 30 bits for whatever the next
-    /// per-endpoint property turns out to be.
-    pub joined: u32,
 }
 
 #[repr(C)]
@@ -104,8 +111,8 @@ fn vs_main(
     @location(1) b: vec2<f32>,
     @location(2) color: vec3<f32>,
     @location(3) width: f32,
-    @location(5) alpha: f32,
     @location(4) joined: u32,
+    @location(5) alpha: f32,
 ) -> VsOut {
     // (along, side): along runs a->b, side spans -1..1 across the width.
     var corners = array<vec2<f32>, 6>(

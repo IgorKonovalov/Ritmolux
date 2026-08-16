@@ -1006,9 +1006,15 @@ and which is why this exists beside the `fb_*` vocabulary rather than inside it
 ([ADR-0113](../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md),
 generalizing [ADR-0048](../docs/adrs/0048-transformed-feedback.md)).
 
-It is also the **only** scene here with nothing to draw of its own. Every other
-system paints a figure; this one paints light into a feedback field and then
-moves the field. Turn the deposit off and the frame goes black in about a second.
+It is also the **only** scene here with nothing to draw of its own *when you
+author it by hand*. Every other system paints a figure; this one paints light
+into a feedback field and then moves the field. Turn the deposit off and the
+frame goes black in about a second.
+
+A **converted** MilkDrop preset is the exception, and it is not one you can
+write: it brings its own draw layer — a waveform, custom waves and shapes,
+borders, a motion grid — and turns the deposit off. See
+[`[milk]`](#milk--the-table-you-do-not-write) below.
 
 ```toml
 system = "warp_mesh"
@@ -1160,23 +1166,60 @@ per_frame = """
 const 1.024
 ...
 """
+
+[[milk.shapes]]              # up to four, and as many [[milk.waves]]
+count = 7                    # sides (a shape) or points (a wave)
+instances = 3
+per_frame = """..."""
 ```
 
 That is compiled EEL2 bytecode, emitted ahead of time by `milkconv` and executed
 by a small stack VM in the engine
 ([ADR-0113](../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
-Two things about it are worth knowing even though you will not author one:
+Three things about it are worth knowing even though you will not author one:
 
 - **A bundle is authoritative about the transform.** Its programs run *after*
   `[params]` and `[per_vertex]`, so binding `zoom` alongside a `[milk]` table is
   inert rather than a conflict. What a converted preset does still take from
-  `[params]` is everything the bundle has no opinion about — the deposit, the
-  palette, the compositing stages.
+  `[params]` is everything the bundle has no opinion about — the palette and the
+  compositing stages.
 - **The rates inside it are MilkDrop's, per *frame*.** The runtime converts them
   to this engine's per-second vocabulary at a nominal 30 fps, which is what makes
   a converted preset move at the speed its author saw on any display. So a number
   you read in a bundle is not on the same scale as the same-named `[params]`
   binding beside it.
+- **A bundle brings its own light, so the deposit stays off.** That is the one
+  place where reading this section as "the warp mesh has nothing to draw" would
+  mislead you.
+
+#### The draw layer a converted preset brings
+
+Between the warp and the composite, a bundle draws what MilkDrop draws. None of
+it is authorable from a hand-written preset — it is listed so a converted file is
+readable, and so the vocabulary is somewhere other than the source:
+
+| what | from |
+|---|---|
+| the **waveform** | eight `wave_mode` figures over the audio trace — a circle, a pair of rings, a horizontal and a vertical scope, a Lissajous, a mirrored pair, an angled line and its double — placed by `wave_x`/`wave_y`, coloured by `wave_r`/`_g`/`_b`/`_a`, shaped by `wave_scale`, `wave_smoothing` and `wave_mystery` |
+| up to four **custom waves** | each a polyline or a scatter from its own per-point program |
+| up to four **custom shapes** | each up to 1024 filled polygons from its own per-frame program, with an optional outline |
+| the two **borders** | `ob_*` outside, `ib_*` inside |
+| the **motion grid** | `mv_*`: a lattice of short strokes |
+
+> **Two blend modes, and the difference is visible.** MilkDrop picks per element
+> between adding light and compositing it *over* what is already there
+> (`bAdditiveWaves`, and a custom element's own `additive`). This engine honours
+> both, because reading them all as additive is not a small error: an additive
+> seam **sums** where alpha-over **replaces**, so ten overlapping producers land
+> at ten rather than at one. On the 28.5 % of the MilkDrop library that sets
+> `fDecay = 1` — where the field never fades — that is the difference between a
+> preset and a white frame.
+
+The waveform's own trace is the **mono** signal this engine analyses, where
+MilkDrop had two channels. Where the reference tells two of its wave modes apart
+by drawing the left channel against the right, this draws the one trace at the
+separation the reference's own parameters name. It is the same figure with the
+channel difference removed.
 
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 

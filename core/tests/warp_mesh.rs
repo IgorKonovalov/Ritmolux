@@ -505,6 +505,153 @@ fn the_bundle_and_not_the_defaults_drives_the_transform() {
     );
 }
 
+/// The lit-backdrop fixture — see its own header for why every binding is what
+/// it is.
+const LIT_FIXTURE: &str = include_str!("fixtures/warp_mesh_lit_backdrop.toml");
+
+/// **The backdrop arrives intact where the draw layer wrote nothing** — the
+/// lit-backdrop capture test `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE` says every
+/// new draw seam owes, and Plan 0100 Phase 4 added two of them (the shape
+/// triangle pipeline and its premultiplied-OVER twin).
+///
+/// The defect it guards is not hypothetical and not subtle once you can see it:
+/// a fragment that emits a constant alpha rather than its own coverage discards
+/// the backdrop across its whole footprint, including everywhere it drew no
+/// light. Both existing call sites shipped exactly that. It is invisible at
+/// `bg_bright = 0`, which is the setting **every golden baseline runs**, so no
+/// amount of golden coverage would catch a third instance.
+///
+/// The property, in two arms:
+///
+/// - the frame's corners — far from the centred circle the fixture draws — carry
+///   the backdrop, unchanged from what the same preset renders with its draw
+///   layer producing nothing;
+/// - the centre differs from those corners, so the capture is not simply a flat
+///   backdrop with no scene in it at all.
+#[test]
+fn a_lit_backdrop_survives_where_the_draw_layer_drew_nothing() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let preset = Preset::from_toml_str(LIT_FIXTURE).expect("the lit fixture parses");
+    assert_eq!(preset.system, SystemKind::WarpMesh);
+    assert!(
+        preset.warnings.is_empty(),
+        "the lit fixture must load clean, got {:?}",
+        preset.warnings
+    );
+
+    // --- Non-vacuity, before any GPU work. ---
+    let bright = preset
+        .params
+        .iter()
+        .find(|b| b.name == "bg_bright")
+        .map(|b| b.expr.eval(&Default::default()))
+        .unwrap_or(0.0);
+    assert!(
+        bright > 0.1,
+        "warp_mesh_lit_backdrop.toml no longer ships a lit backdrop \
+         (bg_bright = {bright}); on black this whole comparison is black \
+         against black"
+    );
+    assert!(
+        matches!(
+            preset.config.as_ref(),
+            Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh { milk: Some(_), .. })
+        ),
+        "the fixture must carry a `[milk]` table — without one the scene draws no \
+         MilkDrop layer at all and there is no seam under test"
+    );
+
+    // The same preset with its draw layer silenced: `wave_a = 0` leaves the
+    // waveform dark, so the field stays empty and every pixel is pure backdrop.
+    // That is the control the corners are read against — a hard-coded expected
+    // colour would drift with any backdrop change and prove nothing about the
+    // seam.
+    // Appended rather than substituted: the fixture's own header discusses
+    // `[milk]` in prose, and a `replace` would rewrite the comment too.
+    let control = Preset::from_toml_str(&format!(
+        "{LIT_FIXTURE}per_frame = \"\"\"\n.regs wave_a\n.code\nconst 0.0\nstore 0\n\"\"\"\n"
+    ))
+    .expect("the control parses");
+
+    let mut lit = preset;
+    lit.name = "warp-mesh-lit".into();
+    let mut control = control;
+    control.name = "warp-mesh-lit-control".into();
+    renderer.set_presets(vec![lit, control]);
+
+    let frame = loud();
+    let drawn = renderer
+        .capture_preset("warp-mesh-lit", &frame, SANITY_FRAMES)
+        .expect("capture the lit fixture");
+    let empty = renderer
+        .capture_preset("warp-mesh-lit-control", &frame, SANITY_FRAMES)
+        .expect("capture the control");
+
+    // The four corners, well outside the circle the waveform draws at radius 0.2.
+    let corners = [
+        (0u32, 0u32),
+        (SIZE - 1, 0),
+        (0, SIZE - 1),
+        (SIZE - 1, SIZE - 1),
+    ];
+    let pixel = |image: &CaptureImage, x: u32, y: u32| -> [u8; 3] {
+        let i = ((y * image.width + x) * 4) as usize;
+        [
+            image.rgba.get(i).copied().unwrap_or(0),
+            image.rgba.get(i + 1).copied().unwrap_or(0),
+            image.rgba.get(i + 2).copied().unwrap_or(0),
+        ]
+    };
+
+    let channel_delta = |a: [u8; 3], b: [u8; 3]| -> i16 {
+        a.iter()
+            .zip(&b)
+            .map(|(p, q)| (i16::from(*p) - i16::from(*q)).abs())
+            .max()
+            .unwrap_or(0)
+    };
+
+    for (x, y) in corners {
+        let a = pixel(&drawn, x, y);
+        let b = pixel(&empty, x, y);
+        let delta = channel_delta(a, b);
+        println!("[warp_mesh/lit] corner ({x}, {y}) {a:?} vs control {b:?} — {delta}");
+        assert!(
+            delta <= LIT_TOLERANCE,
+            "at ({x}, {y}) — far from anything the draw layer drew — the backdrop \
+             moved by {delta} channels ({a:?} against the undrawn control's {b:?}). \
+             A draw seam is writing coverage where it wrote no light (ADR-0056)"
+        );
+    }
+
+    // ...and the draw layer really did put light somewhere, or the arm above is
+    // satisfied by two identical blank frames. Taken as the largest per-pixel
+    // difference anywhere rather than at a named coordinate: the waveform is a
+    // ring, so the pixel it lights is a function of the mode's own geometry and
+    // pinning one would make this test a second copy of `waveform_figure`.
+    let widest = (0..SIZE)
+        .flat_map(|y| (0..SIZE).map(move |x| (x, y)))
+        .map(|(x, y)| channel_delta(pixel(&drawn, x, y), pixel(&empty, x, y)))
+        .max()
+        .unwrap_or(0);
+    println!("[warp_mesh/lit] widest difference anywhere: {widest}");
+    assert!(
+        widest > LIT_TOLERANCE * 3,
+        "the fixture drew nothing distinguishable — the drawn frame and the \
+         undrawn control differ by at most {widest} channels anywhere. With no \
+         geometry the corner arm above is vacuous"
+    );
+}
+
+/// How far a corner channel may move between the drawn frame and the undrawn
+/// control. Not zero: the tonemap scales every channel off the frame's own
+/// brightest pixel (ADR-0055), so drawing anything at all moves the whole frame
+/// by a little. The defect this guards is the backdrop being *replaced*, which is
+/// the full `bg_bright` swing.
+const LIT_TOLERANCE: i16 = 12;
+
 /// The floor this file measures against is the one `sanity.rs` would apply, so
 /// the duplication above cannot silently drift into a weaker bar.
 ///
