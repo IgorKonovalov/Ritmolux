@@ -359,3 +359,85 @@ fn the_generated_ffmpeg_command_carries_its_inputs_mapping_and_colour() {
     // a pipe is a render that hangs with no explanation.
     assert!(args.iter().any(|a| a == "-y"), "{line}");
 }
+
+// ---------------------------------------------------------------------------
+// The resident set across a long render
+// ---------------------------------------------------------------------------
+
+/// **Growth is measured from the warm reading, not from the baseline** — which is
+/// the difference between an instrument and a false alarm (Plan 0101 Phase 4).
+///
+/// The measured series on the Windows dev box steps once, by 76 MB, at the first
+/// sampled frame and is then flat to the end: pipelines compiled and GPU
+/// resources built on the first draw. Charged against the baseline that prints as
+/// "+76 MB" and reads exactly like the linear per-frame retention Plan 0099
+/// found. This case is that shape, and it must read flat.
+#[test]
+fn the_resident_set_line_separates_warm_up_from_growth_across_the_run() {
+    const MB: u64 = 1024 * 1024;
+
+    // The measured shape: one step, then twenty flat readings.
+    let mut warmed = vec![357 * MB];
+    warmed.extend(std::iter::repeat_n(434 * MB, 20));
+    let line = ResidentSet { samples: warmed }.summary(600);
+    assert!(
+        line.contains("growth +0.0 MB across 600 frames"),
+        "a one-step warm-up is not growth: {line}"
+    );
+    assert!(
+        line.contains("a +77.0 MB warm-up"),
+        "the startup step is reported rather than hidden: {line}"
+    );
+    assert!(line.contains("resident set 434 MB"), "got {line}");
+    assert!(line.contains("peak 434 MB"), "got {line}");
+    assert!(line.contains("21 samples"), "got {line}");
+
+    // Real growth, charged from the warm reading: 330 warm, 346 at the end.
+    let leaked = ResidentSet {
+        samples: vec![300 * MB, 330 * MB, 338 * MB, 346 * MB],
+    };
+    let line = leaked.summary(14_400);
+    assert!(line.contains("growth +16.0 MB"), "got {line}");
+    assert!(line.contains("a +30.0 MB warm-up"), "got {line}");
+
+    // An excursion that was reclaimed reads flat end to end, and only the peak
+    // tells it apart from a run that never grew.
+    let spiked = ResidentSet {
+        samples: vec![300 * MB, 330 * MB, 400 * MB, 330 * MB],
+    };
+    let line = spiked.summary(600);
+    assert!(line.contains("growth +0.0 MB"), "got {line}");
+    assert!(
+        line.contains("peak 400 MB"),
+        "the excursion is visible: {line}"
+    );
+
+    // Reclaimed below the warm reading: negative, not an underflow. Both
+    // subtractions are signed for exactly this — `u64` here would print
+    // 17 exabytes and read as a catastrophic leak.
+    let shrank = ResidentSet {
+        samples: vec![300 * MB, 340 * MB, 330 * MB],
+    };
+    assert!(
+        shrank.summary(1).contains("growth -10.0 MB"),
+        "got {}",
+        shrank.summary(1)
+    );
+
+    // A run with only a baseline has no warm reading to charge against, and
+    // reports zero of each rather than dividing by a sample it does not have.
+    let one = ResidentSet {
+        samples: vec![300 * MB],
+    };
+    let line = one.summary(1);
+    assert!(line.contains("growth +0.0 MB"), "got {line}");
+    assert!(line.contains("a +0.0 MB warm-up"), "got {line}");
+
+    // No reading at all is said rather than shown as a flat zero, which would be
+    // a leak-free verdict nobody measured.
+    let none = ResidentSet::default();
+    assert_eq!(
+        none.summary(14_400),
+        "render: resident set unavailable on this platform"
+    );
+}
