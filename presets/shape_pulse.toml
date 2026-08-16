@@ -16,15 +16,24 @@
 #
 # -- THE TWO TUNING FACTS THIS FILE EXISTS TO RECORD ------------------------------
 #
-# 1. THE PALETTE MUST BE CYCLIC, and this one is (first stop and last are both
-#    #000000). The coordinate wraps at 1 and `color_center` slides it, so on a
-#    non-cyclic gradient the wrap is a hard seam sweeping through the figure once
-#    per cycle. Because the ends match, the jump is invisible.
+# 1. THE CENTRAL HEART'S COLOUR *IS* `color_center`, WHICH IS WHY IT IS PINNED.
+#    At the figure's deepest point d = 0, so the palette coordinate there is
+#    `0^gamma * color_span + color_center` - it collapses to `color_center` and
+#    nothing else. A drifting `color_center` therefore cannot travel the rings
+#    without also cycling the core: they are the same number. The first shipped
+#    draft drifted it at 0.05/s and the middle of the figure churned; slowing it
+#    five-fold only made the churn slower (checked, 23 s window - the core still
+#    walks from maroon to brown). So it is a constant 0, which reproduces the
+#    look the reference frame was judged on exactly, and the motion comes from
+#    the breath instead - as `scale` moves, every contour slides across the frame
+#    with it while the core stays the colour it is.
 #
-#    COROLLARY: do NOT put `color_center` in [smoothing]. It is a sawtooth here,
-#    and a one-pole on a sawtooth ramps *backwards* through the whole range at
-#    each wrap - the rings would lurch inward once a cycle. Un-smoothed, the jump
-#    is exactly one period and reads as nothing.
+#    IF YOU EVER WANT CONTINUOUS TRAVEL BACK, the price is the fixed core, and
+#    the palette must then be cyclic (first stop == last) or the wrap is a hard
+#    seam crossing the figure once per cycle - this palette already satisfies
+#    that, so the change is one line. And do NOT put `color_center` in
+#    [smoothing]: it is a sawtooth, and a one-pole on a sawtooth ramps
+#    *backwards* through the whole range at each wrap.
 #
 # 2. `gamma` AND `scale` ARE COUPLED, and picking them independently is how this
 #    look breaks. A gamma above 1 crowds the bands toward the outline - that is
@@ -56,16 +65,20 @@ stops = [
 [params]
 shape = "4"
 
-# THE RINGS TRAVEL OUTWARD. `color_center` offsets the palette coordinate, and
-# the coordinate is a distance - so sliding it slides every contour together.
-# Decreasing sends them outward; the `onset` term is a shove on each hit, small
-# on purpose so it reads as the figure being struck rather than as a jump.
-color_center = "mod(0 - time * 0.05 - clamp(onset * 0.05, 0, 0.03), 1.0)"
+# PINNED. See note 1 - this is the core's colour, so it is the one number that
+# must not move.
+color_center = "0"
 
-# THE FIGURE BREATHES. A slow sine so it is alive in silence, plus the low end.
-# Gain from the cap by the house rule (C / 0.85 for bass), so a typical passage
-# sits near half of it and a peak reaches it.
-scale = "0.76 + 0.025 * sin(time * 0.5) + clamp(bass * 0.0941, 0, 0.08)"
+# THE FIGURE BREATHES, AND THIS IS NOW THE WHOLE OF THE MOTION. A very slow sine
+# so it is alive in silence, plus the low end. Gain from the cap by the house
+# rule (C / 0.85 for bass), so a typical passage sits near half of it and a peak
+# reaches it.
+#
+# The sine was 0.5 rad/s in the first shipped draft - about a 13 s period, which
+# read as fast next to a figure this large. At 0.16 it is a ~39 s swell, and the
+# smoothing constant below is lengthened to match so the bass term arrives as a
+# tide rather than as a pump.
+scale = "0.76 + 0.035 * sin(time * 0.16) + clamp(bass * 0.0941, 0, 0.08)"
 
 # Structure, not luminance: the bands are already at the palette's own levels, so
 # peak energy goes on the coordinate and the size rather than on brightness.
@@ -79,6 +92,8 @@ palette_contour = "0.7"
 gamma           = "2.0"
 
 [smoothing]
-# The breath eases; the travel deliberately does not (see note 1 above).
-scale      = 0.15
+# Lengthened with the breath: at 0.15 the bass term punched, which is the pace
+# the look was rejected for. Half a second reads as the figure leaning into the
+# low end rather than answering each hit.
+scale      = 0.5
 saturation = 0.25

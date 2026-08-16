@@ -104,7 +104,26 @@ n             = "6"
 d             = "29 + floor(hash(floor(beat_index * 0.25)) * 5) * 6"
 phase         = "time * 0.010"
 samples       = "500"
-thickness     = "0.016 + clamp(treb * 0.013, 0, 0.008)"
+# THIS WAS THE WHOLE BUG, FIXED 2026-08-16 ON A USER LOOK CALL: the rose was
+# rendering as STIPPLE - scattered dots rather than a line figure - and it read
+# as gauze over the vault instead of as a window.
+#
+# It was `0.016`, about a HUNDREDTH of what this param takes. Every other line
+# preset in the library sits at 1.5-3.2 (`curve_nightbloom` 1.5, `curve_ionwake`
+# 2.6, `lsystem_vellum` 2.0, `star_rosewindow` 3.2). At 0.016 the stroke is
+# sub-pixel, so nothing survives rasterization except where a sample happens to
+# land - which is exactly the dotted figure that was on screen, and it is why
+# the value looked like a plausible small number rather than like a defect.
+#
+# The trap that hid it: raising a sub-pixel thickness is invisible. This file was
+# first re-tuned 0.016 -> 0.022 -> 0.038 and the picture did not change at all,
+# because all three are below one pixel. Chord count and sample count were
+# suspected and swept first for the same reason. NOTHING WARNS - the value is in
+# range and the preset loads clean.
+#
+# 1.6 rather than 2.2: at 2.2 the chords fuse into a solid mass at the centre,
+# and the leading is the point of the figure.
+thickness     = "1.6 + clamp(treb * 0.9, 0, 0.6)"
 brightness    = "1.15 + clamp(treb * 0.41, 0, 0.35)"
 glow          = "0.25"
 scale         = "0.80"
@@ -119,7 +138,14 @@ saturation    = "1.35"
 # strobe. GUARDED for silence: `bar` is 0 until the beat tracker runs, and an
 # unguarded ride left the window entirely absent from the quiet frame - the
 # figure rests complete when no beats flow.
-draw_progress = "select(beat_index > 0, clamp(bar * 2.2, 0, 1), 1)"
+# SWEEP SHORTENED 2026-08-16, same call, and this is the half that actually made
+# it visible. `bar` is the BEAT phase, and `tempo.rs` resets it on every detected
+# onset - which fires 1.7-2.1x per musical beat (ADR-0109). So this sweep does
+# not restart once a beat, it restarts about twice, and at `bar * 2.2` the window
+# spent much of its life part-drawn. At 3.4 it completes in under a third of the
+# phase and rests complete for the remainder, so the stroke still reads without
+# the figure being perpetually half there.
+draw_progress = "select(beat_index > 0, clamp(bar * 3.4, 0, 1), 1)"
 hue_spread    = "0.70"
 palette_mix   = "0"
 
