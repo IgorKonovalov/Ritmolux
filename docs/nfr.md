@@ -142,9 +142,13 @@ contradicts this file is a plan bug — surface it, don't guess.
   **All of those carry `--workspace` since [ADR-0072](adrs/0072-the-c-abi-ships-from-its-own-crate.md)**,
   and it is load-bearing rather than stylistic: `lmv-core-cabi` is deliberately outside the workspace
   `default-members`, so the bare forms would silently stop testing and linting the C ABI entirely.
-- Plus **four** single-runner gates: `cargo deny check` (supply chain), Miri over `lmv-ring`'s
-  `unsafe` (UB), `node scripts/check-doc-links.mjs` (every relative markdown link resolves — Plan
-  0061 Phase 2c), and the coverage ratchet below.
+- Plus **six** single-runner gates: `cargo deny check` (supply chain), Miri over `lmv-ring`'s
+  `unsafe` (UB), the coverage ratchet below, and the three Node doc gates that share the `links`
+  job — `check-doc-links.mjs` (every relative markdown link resolves — Plan 0061 Phase 2c),
+  `check-index-rows.mjs` (every row inside a marked roster region stays a pointer under 320 bytes —
+  [ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)), and
+  `check-backlog-claims.mjs` (every live backlog entry's probe still holds —
+  [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)).
 - **The nine GPU-heavy suites run once per push, not twice**
   ([ADR-0073](adrs/0073-the-windows-ci-critical-path.md), Plan 0061 Phase 2b). They render the shipped
   preset library on WARP, and until that change ran uninstrumented in `check (windows-latest)` and
@@ -176,17 +180,20 @@ contradicts this file is a plan bug — surface it, don't guess.
   is a backstop against silent erosion, not a quality measure. The Mode 4 review's
   "read the assertion body" step remains the actual quality gate.
 - **Local pre-push gate** (opt-in, per clone): `.githooks/pre-push`, enabled with
-  `git config core.hooksPath .githooks`. Runs the fast subset — a doc-link check, `fmt`, `clippy
-  --workspace`, and a narrowed `nextest --workspace` — and prints the GPU-heavy suites it skipped.
+  `git config core.hooksPath .githooks`. Runs the fast subset — the three Node doc gates, `fmt`,
+  `clippy --workspace`, and a narrowed `nextest --workspace` — and prints the GPU-heavy suites it
+  skipped.
   **Measured 48.6 s warm (2026-08-08, dev box), against the ~28 s recorded when ADR-0033 set it up.**
   The number drifted with the suite it runs, not with the gate's design; it is recorded here rather
   than targeted, and the README's developer section carries the per-step breakdown. If it grows past
   the point where people start reaching for `--no-verify`, that is the signal to narrow it further —
   ADR-0033's own argument is that a gate which hurts gets disabled.
   `cargo deny`, doctests, Miri, and coverage stay in CI. An uninstalled clone silently has no gate;
-  see the README's developer section. The doc-link step (`scripts/check-doc-links.mjs`, ~50 ms) is
-  also a CI job (`links`, `ubuntu-latest`), so it is enforced for everyone rather than only where
-  the hook is installed.
+  see the README's developer section. All three Node doc steps (`check-doc-links.mjs` ~50 ms,
+  `check-index-rows.mjs`, `check-backlog-claims.mjs`) also run as the CI `links` job
+  (`ubuntu-latest`), so they are enforced for everyone rather than only where the hook is installed
+  — and they skip together with a notice when `node` is absent, which is the [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)
+  shape.
 
 ## 8. Distribution (v1)
 
