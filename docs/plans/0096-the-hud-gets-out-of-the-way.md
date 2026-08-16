@@ -1,7 +1,8 @@
 # 0096 — The HUD gets out of the way
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-16
+> **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev
 > **Related ADRs:** none (three shell-local UX fixes; no rejected alternative worth recording)
 
