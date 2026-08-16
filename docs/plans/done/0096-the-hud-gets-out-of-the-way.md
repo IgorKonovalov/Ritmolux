@@ -1,10 +1,50 @@
 # 0096 — The HUD gets out of the way
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-16
 > **Approved:** 2026-08-16 (user)
+> **Closed:** 2026-08-16
 > **Owner skill(s):** dev
 > **Related ADRs:** none (three shell-local UX fixes; no rejected alternative worth recording)
+
+## Close note (2026-08-16)
+
+All three phases landed, one commit each: `5e5ce0d` (Phase 1, the visibility rule),
+`6c9694f` (Phase 2, `Escape`), `ad86ff8` (Phase 3, the settings row). Mode 4 review:
+**no blockers, no majors, two minors and a nit.** Gates green — `fmt`, `clippy --workspace
+--all-targets`, `nextest -p standalone` 136/136, `check-doc-links`, `check-backlog-claims`.
+
+What was verified beyond "the tests pass":
+
+- **Every test the plan named was opened and read.** Phase 1's four-way table is four real
+  assertions, not one; Phase 3's row tests assert **both** rendered states, which most row
+  tests here do not. Two config tests were added past the plan — a missing `[hud]` degrading
+  to `preset_name = true`, and the off choice round-tripping through serialize/parse — which
+  is NFR 10's degrade-never-crash stated as a test rather than as a comment.
+- **The plan's named hazard held.** The `Escape` interception sits after the settings-modal
+  branch and after the repeat gate, guarded on `modal().is_none()`, so browse-open `Escape`
+  still closes the overlay and a held `Escape` cannot thrash fullscreen. The
+  `OverlayAction::None` arm was not widened.
+- **The two-sources-agree question was asked and comes back clean.** `Escape`'s guard reads
+  `self.window.fullscreen().is_some()` and `toggle_fullscreen()` branches on the *same*
+  expression, not on `config.output.fullscreen`. Had the toggle read config, a divergence
+  between window state and persisted state would make `Escape` *enter* fullscreen, and no
+  test at the development configuration could tell which source was used. One source, so the
+  hazard does not exist here.
+- **The comment arithmetic is right**: `ROWS_TOP = LIST_TOP + ROW_H = 94`, 30 px pitch, ninth
+  row spans 334-364 px. Every `SettingsRow::ALL` consumer already used `.len()`, so 8 -> 9
+  needed no other edit.
+
+The minors: `docs/on-device-validation.md` described the F3 overlay without saying the corner
+name now steps aside for it, while the checklist has the tester identify presets in exactly
+that state — swept in this close commit. And Phase 3's done-when *"the name appears or
+disappears immediately"* is not observable as written, because Phase 1 hides the name while the
+menu that edits it is open; what moves is the row's own `on`/`off` value, which the test
+asserts. Not a defect — the two phases interact and Phase 1's rule correctly wins — recorded so
+a later reader does not chase a bug that is not there.
+
+The plan touched no presets and closes no backlog entry, so the curation sweep and the archive
+step do not fire. Version bumped 0.65.0 -> 0.66.0 (feature plan, minor).
 
 ## TL;DR
 
@@ -170,8 +210,8 @@ fn preset_name_visible(modal: Option<Modal>, diagnostics: bool, enabled: bool) -
 
 ## What this plan does NOT do
 
-- **No now-playing metadata.** That is [ADR-0110](../adrs/0110-now-playing-is-a-shell-supplied-string-and-the-core-owns-the-banner.md)
-  and [Plan 0097](0097-the-track-announces-itself.md), which touch the core and the C ABI. This
+- **No now-playing metadata.** That is [ADR-0110](../../adrs/0110-now-playing-is-a-shell-supplied-string-and-the-core-owns-the-banner.md)
+  and [Plan 0097](../0097-the-track-announces-itself.md), which touch the core and the C ABI. This
   plan is deliberately shell-local so it can land in one short session.
 - **No auto-fade or timed reveal** of the preset name (offered in the interview, declined).
 - **No change to the plugin.** The foobar shim has no preset-name HUD and no settings menu; every

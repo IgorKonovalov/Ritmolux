@@ -256,7 +256,10 @@ Play any audio (loopback capture feeds the visuals). Then, in the window:
   below them the analysis block: `BASS` / `MID` / `TREB` / `ONSET` as meters with their numbers,
   plus a `LOCK` / `FREE` row carrying the downbeat estimator's confidence — Plan 0049). Under the
   panel, an `audio` line naming the **capture verdict** — `live WASAPI 48000/2`, or `failed …` with
-  the platform error (Plan 0083).
+  the platform error (Plan 0083). **The corner preset name steps aside while the overlay is up**
+  (Plan 0096) — the panel composites after the text layer and used to paint straight over it — so
+  where a step below asks you to record *which* preset something happened on, read it from the
+  browser (`Tab`) or the window title, not from the corner.
 - **Check the `audio` line before recording anything.** Four flat band meters mean either "capture
   failed" or "nothing is playing", and every reactivity judgement below is worthless if it was the
   first. The line separates them in one glance, and it is the same value the log's `capture` column
