@@ -178,3 +178,32 @@ a stop condition, and if the translation chain proves unviable, **this is the la
   [`milkdrop-shader-converter`](https://github.com/jberg/milkdrop-shader-converter).
   `foo_vis_milk2` is the fidelity reference to compare against on Windows, and it is already the
   only serious visualizer in the foobar2000 component repository.
+
+## Outcome (2026-08-16, from the corpus census taken before Plan 0100 started)
+
+**No decision here changes.** A feature census over 10,347 public `.milk` files — the two projectM
+preset packs, on disk and outside this repository — put numbers on three things this ADR reasoned
+about qualitatively, and two of them cut against the optimistic reading. Recorded here rather than
+edited into the body above, per the append-only rule; the full table is in
+[Plan 0100](../plans/0100-the-engine-speaks-milkdrop.md#the-corpus-measured-2026-08-16).
+
+- **"Fidelity will be partial and we cannot say by how much" is still right, but the corners are
+  not all corners.** This ADR's Negative names `sampler_noisevol_*` volumes in a list of things a
+  preset can look wrong on. **51 % of the corpus reads a procedural noise sampler** — the most
+  common sampler after `main`. That is a scope item, not a corner, and Plan 0100 Phase 6 now names
+  the six textures explicitly. They are generated internally from a seeded RNG, so supplying them
+  costs no disk file and no bundle payload.
+- **The same Negative's `textures/` corner is 19 % of the corpus** (1,937 files), which the plan
+  continues to exclude — at a price now stated rather than assumed (user's call, same day).
+- **The Alternative D landing zone is smaller than "MilkDrop 1.x-class" suggests.** 82 % of the
+  corpus declares `MILKDROP_PRESET_VERSION=201` and carries HLSL, so stopping at Phase 6 lands
+  ~1,847 presets plus the native idiom, not most of the library. The stop condition is still the
+  right shape; what it decides is four fifths of the content, and that is worth knowing before it
+  is reached rather than at it.
+- **The Positive that "[NFR §4](../nfr.md#4-size-and-dependencies) is unaffected by the expensive
+  half" was reasoned against headroom that no longer exists.** It remains true of `milkconv`, which
+  still never ships. But [Plan 0097](../plans/done/0097-the-track-announces-itself.md) closed the
+  same day this ADR was accepted and took the shipped `foo_lmv.dll` from 6,774,784 to
+  **8,879,104 B against the ~10 MB soft cap**, leaving ~1.07 MB. The half that *does* ship — the VM,
+  the loader, the `warp_mesh` scene — spends from that, and Plan 0100's Phase 6 measurement is the
+  first thing that will say by how much.
