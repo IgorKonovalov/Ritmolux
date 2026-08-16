@@ -161,6 +161,9 @@ pub struct MilkElement {
     pub use_dots: bool,
     /// Past `0.5`, a wave's line or a shape's outline is drawn thick.
     pub thick: bool,
+    /// Past `0.5`, a wave adds rather than blends. See [`ElementSpec::additive`]
+    /// for why a shape's flag is not here.
+    pub additive: bool,
 }
 
 /// The most points a custom wave may draw, and the most sides a shape may have.
@@ -175,6 +178,9 @@ pub const MAX_WAVE_POINTS: u32 = 512;
 pub const MAX_SHAPE_SIDES: u32 = 100;
 /// The most copies of one custom shape a preset may draw. MilkDrop's own limit.
 pub const MAX_SHAPE_INSTANCES: u32 = 1024;
+/// How many custom waves, and how many custom shapes, the `.milk` format
+/// declares. Exactly four of each — not a budget, the format's own shape.
+pub const MAX_ELEMENTS: usize = 4;
 
 /// What is wrong with a bundle, as a surfaced load error.
 #[derive(Debug, Clone, PartialEq)]
@@ -192,6 +198,11 @@ pub enum BundleError {
         /// The section whose roster differs from `per_frame`'s.
         section: &'static str,
     },
+    /// More custom waves or shapes than the `.milk` format allows.
+    TooManyElements {
+        /// `"wave"` or `"shape"`.
+        which: &'static str,
+    },
 }
 
 impl std::fmt::Display for BundleError {
@@ -205,6 +216,12 @@ impl std::fmt::Display for BundleError {
                  q1..q32 bridge — so they must declare the same registers in the \
                  same order. `milkconv` emits them that way; a hand-written bundle \
                  has to as well."
+            ),
+            BundleError::TooManyElements { which } => write!(
+                f,
+                "[milk] more than {MAX_ELEMENTS} custom {which}s. The .milk format \
+                 declares exactly four of each, so a fifth is a bundle this \
+                 converter did not write."
             ),
         }
     }
@@ -247,6 +264,78 @@ impl MilkBundle {
             }
         }
         Ok(bundle)
+    }
+
+    /// Attach one custom wave or shape, decoded from its own three assembly
+    /// sections.
+    ///
+    /// **Its own register file, not the bundle's** — an element's programs share
+    /// a scope with each other and with nothing else (see [`ElementRuntime`]), so
+    /// the roster check here is *within* the element and there is deliberately no
+    /// comparison against `per_frame`'s. Only `q1`-`q32` cross, by copy.
+    ///
+    /// Silently over-count is not an option: `count` and `instances` are what the
+    /// draw layer's buffers were sized from, so they are clamped to the format's
+    /// own limits by [`ElementRuntime::spec`] on the way out rather than trusted.
+    #[allow(clippy::too_many_arguments)]
+    pub fn push_element(
+        &mut self,
+        kind: ElementKind,
+        init: Option<&str>,
+        per_frame: Option<&str>,
+        per_point: Option<&str>,
+        count: u32,
+        instances: u32,
+        use_dots: bool,
+        thick: bool,
+        additive: bool,
+    ) -> Result<(), BundleError> {
+        let which = match kind {
+            ElementKind::Wave => "wave",
+            ElementKind::Shape => "shape",
+        };
+        let decode = |section: &'static str, text: Option<&str>| match text {
+            None => Ok(EelProgram::empty()),
+            Some(text) => {
+                EelProgram::from_assembly(text).map_err(|err| BundleError::Program { section, err })
+            }
+        };
+        let element = MilkElement {
+            init: decode("element init", init)?,
+            per_frame: decode("element per_frame", per_frame)?,
+            per_point: decode("element per_point", per_point)?,
+            count,
+            instances,
+            kind,
+            use_dots,
+            thick,
+            additive,
+        };
+        for (section, program) in [
+            ("element init", &element.init),
+            ("element per_point", &element.per_point),
+        ] {
+            if program.register_count() > 0
+                && element.per_frame.register_count() > 0
+                && program.names() != element.per_frame.names()
+            {
+                return Err(BundleError::RosterMismatch { section });
+            }
+        }
+        match kind {
+            ElementKind::Wave => self.waves.push(element),
+            ElementKind::Shape => self.shapes.push(element),
+        }
+        // The format's own ceiling of four each. A fifth would compile fine and
+        // then draw, which is not what the source preset asked for.
+        let full = match kind {
+            ElementKind::Wave => self.waves.len(),
+            ElementKind::Shape => self.shapes.len(),
+        };
+        if full > MAX_ELEMENTS {
+            return Err(BundleError::TooManyElements { which });
+        }
+        Ok(())
     }
 
     /// Whether any program in the bundle draws from the RNG.
@@ -698,6 +787,12 @@ pub struct ElementSpec {
     pub use_dots: bool,
     /// Past `0.5` in the source, the stroke is thick.
     pub thick: bool,
+    /// Past `0.5` in the source, a wave **adds** rather than blends.
+    ///
+    /// A wave's flag is a file key (`wavecode_N_bAdditive`) and so is per element;
+    /// a *shape*'s is a register its own per-frame program may write, so that one
+    /// lives on [`ShapeInstance`] instead.
+    pub additive: bool,
 }
 
 /// One custom wave's or shape's live state (Plan 0100 Phase 4).
@@ -819,6 +914,7 @@ impl ElementRuntime {
             instances: self.program.instances.clamp(1, max_instances),
             use_dots: self.program.use_dots,
             thick: self.program.thick,
+            additive: self.program.additive,
         }
     }
 

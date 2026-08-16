@@ -1017,6 +1017,7 @@ pub(crate) fn build_rings(
                     b: place(b),
                     color: [1.0, 1.0, 1.0],
                     width: 0.01,
+                    alpha: 1.0,
                     joined,
                 });
             }

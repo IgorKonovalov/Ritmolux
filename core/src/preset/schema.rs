@@ -1482,7 +1482,8 @@ fn validate_stops(stops: Vec<RawStop>) -> Result<Vec<(f32, [f32; 3])>, PresetErr
 }
 
 /// The raw `[milk]` table (Plan 0100 Phase 2): a converted MilkDrop preset's
-/// three EEL2 programs, as the assembly text `milkconv` emits.
+/// three EEL2 programs, as the assembly text `milkconv` emits — plus, from Phase
+/// 4, its custom waves and shapes as `[[milk.waves]]` / `[[milk.shapes]]`.
 ///
 /// Every section is optional. An absent one is the empty program, which is what
 /// a `.milk` file with no `per_frame_init` block converts to.
@@ -1494,17 +1495,69 @@ struct RawMilk {
     per_frame: Option<String>,
     #[serde(default)]
     per_vertex: Option<String>,
+    /// Up to four custom waves — **47 % of the corpus enables at least one.**
+    #[serde(default)]
+    waves: Vec<RawMilkElement>,
+    /// Up to four custom shapes — **63 % of the corpus enables at least one.**
+    #[serde(default)]
+    shapes: Vec<RawMilkElement>,
+}
+
+/// One `[[milk.waves]]` or `[[milk.shapes]]` entry: an element's own three
+/// programs and the structural numbers its geometry is sized from.
+///
+/// A shape's `additive` is absent here on purpose — it is a register its own
+/// per-frame program may write, so it varies per instance. See
+/// [`ElementSpec::additive`](crate::milk::ElementSpec::additive).
+#[derive(Debug, Default, Deserialize)]
+struct RawMilkElement {
+    #[serde(default)]
+    init: Option<String>,
+    #[serde(default)]
+    per_frame: Option<String>,
+    #[serde(default)]
+    per_point: Option<String>,
+    /// Points, for a wave; sides, for a shape.
+    count: u32,
+    /// How many copies a shape draws. Ignored for a wave, which draws one.
+    #[serde(default)]
+    instances: Option<u32>,
+    #[serde(default)]
+    use_dots: bool,
+    #[serde(default)]
+    thick: bool,
+    #[serde(default)]
+    additive: bool,
 }
 
 impl RawMilk {
-    /// Decode and validate the three sections at the load boundary — a malformed
+    /// Decode and validate every section at the load boundary — a malformed
     /// program is a surfaced load error, never a panic (ADR-0002 / NFR 10).
     fn into_bundle(self) -> Result<crate::milk::MilkBundle, crate::milk::BundleError> {
-        crate::milk::MilkBundle::from_assembly(
+        let mut bundle = crate::milk::MilkBundle::from_assembly(
             self.per_frame_init.as_deref(),
             self.per_frame.as_deref(),
             self.per_vertex.as_deref(),
-        )
+        )?;
+        for (kind, elements) in [
+            (crate::milk::ElementKind::Wave, self.waves),
+            (crate::milk::ElementKind::Shape, self.shapes),
+        ] {
+            for element in elements {
+                bundle.push_element(
+                    kind,
+                    element.init.as_deref(),
+                    element.per_frame.as_deref(),
+                    element.per_point.as_deref(),
+                    element.count,
+                    element.instances.unwrap_or(1),
+                    element.use_dots,
+                    element.thick,
+                    element.additive,
+                )?;
+            }
+        }
+        Ok(bundle)
     }
 }
 
