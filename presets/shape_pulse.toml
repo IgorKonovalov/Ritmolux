@@ -1,0 +1,84 @@
+# Pulse - nested heart contours that travel outward and breathe with the low end.
+# The first shipped world on `shape_field` (ADR-0105, Plan 0091), authored from
+# the user's reference images at that plan's Phase 6 look gate.
+#
+# THE MECHANISM: this scene hands the palette a DISTANCE rather than a level, so
+# a band of the palette coordinate is a band of constant distance - which is the
+# definition of an offset curve. `palette_steps` turns that into flat graphic
+# bands and `palette_contour` draws the hairline between them. Nothing here is
+# geometry; it is one signed distance evaluated per pixel, so it does not facet
+# and it costs the same at any resolution.
+#
+# WHAT DRIVES WHAT
+#   color_center  a slow outward drift, plus a shove on each onset
+#   scale         a slow breath, plus the low end
+#   saturation    the top end, gently
+#
+# -- THE TWO TUNING FACTS THIS FILE EXISTS TO RECORD ------------------------------
+#
+# 1. THE PALETTE MUST BE CYCLIC, and this one is (first stop and last are both
+#    #000000). The coordinate wraps at 1 and `color_center` slides it, so on a
+#    non-cyclic gradient the wrap is a hard seam sweeping through the figure once
+#    per cycle. Because the ends match, the jump is invisible.
+#
+#    COROLLARY: do NOT put `color_center` in [smoothing]. It is a sawtooth here,
+#    and a one-pole on a sawtooth ramps *backwards* through the whole range at
+#    each wrap - the rings would lurch inward once a cycle. Un-smoothed, the jump
+#    is exactly one period and reads as nothing.
+#
+# 2. `gamma` AND `scale` ARE COUPLED, and picking them independently is how this
+#    look breaks. A gamma above 1 crowds the bands toward the outline - that is
+#    the poster character and it is the reason this file is at 2.0 - but it also
+#    compresses the EXTERIOR, and the exterior is most of a 16:9 frame. The first
+#    draft (scale 0.50, gamma 2.5) reached a palette coordinate of ~37 at the
+#    corner: 37 wraps x 9 steps is ~330 bands across the half-diagonal, about one
+#    pixel each, which is a moire field rather than a figure. It passed as texture
+#    while static and shimmered the moment `color_center` started moving.
+#
+#    The fix is not a lower gamma alone - it is a LARGER FIGURE, so less exterior
+#    is on screen. At scale 0.78 / gamma 2.0 the corner reaches ~5.3, i.e. ~48
+#    bands and ~23 px each at 1080p, and the character is intact. Keep the corner
+#    coordinate under about 6 if you retune: d_corner = 1 + (2.04/scale - 1)/0.637
+#    for this shape, and the coordinate is d_corner^gamma * color_span.
+
+system = "shape_field"
+name   = "Pulse"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#000000" },
+  { at = 0.28, color = "#4a0008" },
+  { at = 0.56, color = "#c8102e" },
+  { at = 0.78, color = "#ff5a4a" },
+  { at = 1.0,  color = "#000000" },
+]
+
+[params]
+shape = "4"
+
+# THE RINGS TRAVEL OUTWARD. `color_center` offsets the palette coordinate, and
+# the coordinate is a distance - so sliding it slides every contour together.
+# Decreasing sends them outward; the `onset` term is a shove on each hit, small
+# on purpose so it reads as the figure being struck rather than as a jump.
+color_center = "mod(0 - time * 0.05 - clamp(onset * 0.05, 0, 0.03), 1.0)"
+
+# THE FIGURE BREATHES. A slow sine so it is alive in silence, plus the low end.
+# Gain from the cap by the house rule (C / 0.85 for bass), so a typical passage
+# sits near half of it and a peak reaches it.
+scale = "0.76 + 0.025 * sin(time * 0.5) + clamp(bass * 0.0941, 0, 0.08)"
+
+# Structure, not luminance: the bands are already at the palette's own levels, so
+# peak energy goes on the coordinate and the size rather than on brightness.
+# There is no brightness param here to blow out, which is why this scene is
+# forgiving - but `saturation` still reads, so the top end gets that.
+saturation = "0.92 + clamp(treb * 0.20, 0, 0.12)"
+
+color_span      = "0.45"
+palette_steps   = "9"
+palette_contour = "0.7"
+gamma           = "2.0"
+
+[smoothing]
+# The breath eases; the travel deliberately does not (see note 1 above).
+scale      = 0.15
+saturation = 0.25
