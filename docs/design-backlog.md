@@ -1701,3 +1701,72 @@ Two constraints any answer has to meet:
 three continuous star params. This is filed so that if someone later wants a figure that travels
 from a heart to a star across a phrase, the precedents and the constraints are in one place instead
 of being re-derived.
+
+## 0102 — a foobar panel attaches its surface at 1x1 and only a stream-format change ever revives it
+
+Found at [Plan 0097](plans/done/0097-the-track-announces-itself.md)'s Phase 6, on the reporter's own
+foobar2000 v2.25.10 — **not** by this plan's changes, and it reproduces on a build from the commit
+before it.
+
+A Default UI panel is created **0x0** and sized by the layout afterwards. `VizSession::claim` runs
+on `WM_CREATE`, so `ensure_handle` attaches the wgpu surface at the `1x1` fallback and sets
+`needs_reattach = (w == 0 || ht == 0)`. The shim expects the first real `WM_SIZE` to call
+`reattach_at_current_size()` — and in practice that does not reliably happen. The panel then
+**renders without presenting**: `lmv_get_metrics` reports a healthy `draw_calls` (30-31 observed)
+against a black panel, and `gpu_bytes` reports the *config* size rather than the surface's, so it
+looks correctly sized while nothing appears.
+
+What actually revives it is unrelated: `claim` starts the handle at a default `48000/2`, so the
+first audio chunk of ordinary 44.1 kHz material triggers `ensure_handle(44100, 2)`, which destroys
+and recreates the handle **at the owner's now-real client size**. That is why the panel can sit
+black and then come alive on a track boundary, with no user action — the reporter's words were
+*"gut feeling that it started working after the next track came by itself"*.
+
+- **Verified 2026-08-16** — the degenerate-attach flag exists and is set from the client rect:
+  `present: needs_reattach = \(w == 0 \|\| ht == 0\) in: plugin-foobar/foo_lmv.cpp`
+
+### Why it is filed rather than fixed
+
+[Plan 0097](plans/done/0097-the-track-announces-itself.md) fixed a *different* pre-existing defect in
+the same file under an explicitly approved scope expansion (the render timer, `1016777`). A second
+patch to the same window/ownership path in the same session would have been a third guess layered on
+two — this one wants a design pass over surface lifetime, not another edge case handled.
+
+### What a fix would have to decide
+
+Whether the panel should **defer the attach** until it has a real client rect (claim without a
+surface, attach on first non-degenerate `WM_SIZE`), or whether `needs_reattach` should be re-checked
+from the same watchdog `1016777` added, which already re-derives visibility from the window every
+500 ms and is the obvious place to also notice a surface that never became real.
+
+### Priority
+
+**Medium.** It is the first thing a new plugin user sees, it looks exactly like a broken component,
+and the recovery is invisible and accidental.
+
+## 0103 — the plugin's context menu shadows foobar's, so the panel cannot be removed from a layout
+
+Found the same session, the same way, and also pre-existing.
+
+`wnd_proc`'s `WM_CONTEXTMENU` case shows the component's own menu (`Next scene` / `Diagnostics
+overlay`) whenever this window owns the session, and **never consults foobar's layout-edit state**.
+In Default UI's layout editing mode the host expects a panel's right-click to surface *its* menu
+(Cut / Copy / Replace / Remove); ours wins instead, so the panel cannot be removed by the documented
+route. The reporter hit exactly this: *"in layout setup I'm not able to remove visualizer — its menu
+overrides setup menu"*. The workaround is Preferences → Display → Default User Interface's layout
+tree, which is not discoverable from the panel.
+
+- **Verified 2026-08-16** — nothing in the shim asks the host whether layout editing is on:
+  `absent: is_edit_mode_enabled in: plugin-foobar/foo_lmv.cpp`
+
+### What a fix would have to decide
+
+`ui_element_instance_callback` exposes the edit-mode query; the panel path can consult it and fall
+through to `DefWindowProc` when editing is on. The **pop-out** host has no such callback and no
+layout to edit, so the two hosts stop sharing one `WM_CONTEXTMENU` branch — which is the design
+question, since sharing `wnd_proc` between both host kinds is deliberate in this file.
+
+### Priority
+
+**Medium-low.** One workaround exists and works, but it is undiscoverable, and "I cannot remove your
+component from my layout" is a bad first impression.

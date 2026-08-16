@@ -1,10 +1,21 @@
 # 0097 — The track announces itself
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-16
 > **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0110](../adrs/0110-now-playing-is-a-shell-supplied-string-and-the-core-owns-the-banner.md)
+> **Related ADRs:** [ADR-0110](../../adrs/0110-now-playing-is-a-shell-supplied-string-and-the-core-owns-the-banner.md)
+> **Closed:** 2026-08-16 — all five `dev` phases (`c9f7a3e`, `3621030`, `cb41dee`, `1c96327`,
+> `51d4489`) plus one approved out-of-plan fix (`1016777`), and the `human` Phase 6 run the same day.
+> Review: **no blockers, no majors, three minors and a nit.** Phase 4's stop condition did not fire —
+> the shipped `foo_lmv.dll` went 6,774,784 -> 8,879,104 B (+31.1 %) against NFR 4's ~10 MB cap, so
+> glyphon stays and ADR-0110's Alternative A is unused. **Both facts ADR-0110 flagged unverified are
+> now settled** and carry a dated `Outcome` there: foobar2000 v2.25.10 publishes SMTC with no extra
+> component, and the WinRT apartment question resolved by the source owning its own MTA thread rather
+> than reusing either of the shell's. Phase 6 also surfaced **two pre-existing plugin defects this
+> plan did not cause and deliberately did not fix** ([backlog 0102](../../design-backlog.md),
+> [backlog 0103](../../design-backlog.md)); a third, a render timer that once killed could never
+> re-arm, was fixed under an explicitly approved scope expansion.
 
 ## TL;DR
 
@@ -21,7 +32,7 @@ sources that have nothing in common — foobar hands its component the exact met
 standalone has to ask the OS — and the core, which is the only thing that can draw, must not
 learn what either source is.
 
-[ADR-0110](../adrs/0110-now-playing-is-a-shell-supplied-string-and-the-core-owns-the-banner.md)
+[ADR-0110](../../adrs/0110-now-playing-is-a-shell-supplied-string-and-the-core-owns-the-banner.md)
 settles the shape: a UTF-8 string pushed in from the shell, a core-owned transient banner, and
 glyphon rather than the core's 31-glyph quad font — which cannot spell `Björk` and fails by
 painting a silent blank. This plan builds it, in the order that puts a visible result first and
@@ -118,7 +129,7 @@ flowchart LR
 - **Files touched:** `standalone/src/config.rs`, `standalone/src/settings.rs`,
   `standalone/src/main.rs`, `README.md`.
 - **How:** Add `now_playing: bool` (default **true**) to the `[hud]` section
-  [Plan 0096](done/0096-the-hud-gets-out-of-the-way.md) introduces, and a `Now playing` row beside
+  [Plan 0096](0096-the-hud-gets-out-of-the-way.md) introduces, and a `Now playing` row beside
   its `Preset name` row, following the same action-and-persist path. **0096 closed 2026-08-16, so
   `[hud]` already exists** (`standalone/src/config.rs`, `#[serde(default)]`, one key) — this phase
   adds a second key to it rather than creating the section, and the conditional this bullet used to
@@ -133,7 +144,7 @@ flowchart LR
 - **What:** `lmv_set_now_playing` on the C ABI, the `text` feature enabled for `core-cabi`, and
   **the DLL size measured against NFR §4**.
 - **Files touched:** `core-cabi/src/lib.rs`, `core-cabi/include/lmv_core.h`,
-  `core-cabi/Cargo.toml`, [`docs/specs/0001-c-abi.md`](../specs/0001-c-abi.md).
+  `core-cabi/Cargo.toml`, [`docs/specs/0001-c-abi.md`](../../specs/0001-c-abi.md).
 - **How:** `int32_t lmv_set_now_playing(LmvHandle *handle, const uint8_t *utf8, size_t len)`,
   following the existing `lmv_load_presets` convention for a byte-slice argument. The core
   **copies on receipt and never retains the pointer**; the caller may free immediately. Invalid
@@ -213,7 +224,7 @@ pub struct NowPlaying {
 
 - **No macOS metadata source.** See the risk above; it would need its own ADR.
 - **No album art, no elapsed-time readout, no scrolling marquee.** One transient two-line banner.
-- **No preset-name changes** — that is [Plan 0096](done/0096-the-hud-gets-out-of-the-way.md).
+- **No preset-name changes** — that is [Plan 0096](0096-the-hud-gets-out-of-the-way.md).
 - **No reactive coupling.** The banner is informational; nothing in the analysis or preset layer
   learns that a track changed. (The director already has its own track-change notion for
   rotation; this plan does not touch it.)

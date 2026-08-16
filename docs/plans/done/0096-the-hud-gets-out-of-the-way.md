@@ -211,7 +211,7 @@ fn preset_name_visible(modal: Option<Modal>, diagnostics: bool, enabled: bool) -
 ## What this plan does NOT do
 
 - **No now-playing metadata.** That is [ADR-0110](../../adrs/0110-now-playing-is-a-shell-supplied-string-and-the-core-owns-the-banner.md)
-  and [Plan 0097](../0097-the-track-announces-itself.md), which touch the core and the C ABI. This
+  and [Plan 0097](0097-the-track-announces-itself.md), which touch the core and the C ABI. This
   plan is deliberately shell-local so it can land in one short session.
 - **No auto-fade or timed reveal** of the preset name (offered in the interview, declined).
 - **No change to the plugin.** The foobar shim has no preset-name HUD and no settings menu; every

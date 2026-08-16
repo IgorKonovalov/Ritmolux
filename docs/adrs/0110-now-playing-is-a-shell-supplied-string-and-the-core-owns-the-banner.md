@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-16, user approval)
 > **Date:** 2026-08-16
-> **Related plan(s):** [0097](../plans/0097-the-track-announces-itself.md)
+> **Related plan(s):** [0097](../plans/done/0097-the-track-announces-itself.md)
 
 ## Context
 
@@ -153,3 +153,41 @@ the plugin's metadata comes from a host the core cannot query.
   an announcement, not a status bar.
 </content>
 </invoke>
+
+## Outcome (2026-08-16, at Plan 0097's close)
+
+Three things this ADR deliberately left open were settled by the implementation. Recorded here
+rather than edited into the body above, per the append-only rule.
+
+**The size gate passed, and the stop condition never fired.** Phase 4 measured the release x64
+build before and after enabling the `text` feature on `core-cabi`:
+
+| Artifact | Before | After | Delta |
+|---|---|---|---|
+| `foo_lmv.dll` — **the shipped component** | 6,774,784 B (6.46 MB) | 8,879,104 B (8.47 MB) | +2,104,320 B, +31.1 % |
+| `lmv_core_c.dll` — the cdylib, built but not shipped | 6,720,512 B (6.41 MB) | 8,824,320 B (8.42 MB) | +2,103,808 B, +31.3 % |
+
+So glyphon fits under NFR §4's ~10 MB soft cap with **~1.07 MB of headroom**, and Alternative A (the
+quad font) stays unused. Two cautions for whoever reads this next: that headroom is the tightest
+this component has had, and **the cdylib is a proxy, not the artifact** — the shim links the
+staticlib, so `foo_lmv.dll` is the number the cap is about. Phase 4 measured the cdylib and Phase 5
+corrected it.
+
+**foobar2000 v2 publishes to SMTC out of the box.** The Neutral section flagged this *unverified*.
+Observed 2026-08-16 on foobar2000 **v2.25.10 x64 [standard]**: with no extra component installed,
+the standalone's banner showed tracks played from foobar. A single-configuration observation, not a
+property — but the question was whether it works at all, and it does.
+
+**The WinRT apartment question resolved by not reusing either apartment.** The Notes called a live
+COM apartment "a Plan 0097 Phase 2 risk". The shell's existing apartments both turned out to be
+unavailable — the capture thread is real-time, and winit's event loop is an STA (it calls
+`OleInitialize` for drag-and-drop) that an MTA init would fight — so the source owns a dedicated
+thread holding its own MTA. `RequestAsync().join()` and `GetCurrentSession()` both succeed there.
+
+**One thing the ADR did not anticipate**, and it is the honest half: the plugin half is correct and
+was still unusable on first contact, because two **pre-existing** defects in the shim's window path
+sit between a working core and a visible banner — a panel that attaches its surface at 1x1
+([backlog 0102](../design-backlog.md)) and a render timer that, once killed, had nothing able to
+re-arm it (fixed under an approved scope expansion, `1016777`). Neither is about metadata. The
+lesson for a future ADR routing work through this shim is that "the core can draw it" and "the user
+can see it" are further apart in the plugin than in the standalone.
