@@ -417,11 +417,57 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    in place, closed to the archive, or split. `dev` is instructed to report a red probe and leave
    the entry alone, so if a phase commit says an entry is falsified, that finding is waiting here.
 
+1d. **Re-run the index-row gate** ([ADR-0116](../../../docs/adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)).
+
+   ```sh
+   node scripts/check-index-rows.mjs   # exit 0 = every roster row is still a pointer
+   ```
+
+   **This gate fires on you, at the close, because this ceremony is what writes the rows it
+   catches** — steps 2, 3 and 3c below each refresh a roster. It holds every row inside a
+   `<!-- roster:begin cap=320 -->` region to **320 bytes** and prints `file:line  N bytes (cap C)`
+   for each one over.
+
+   It exists because the convention alone was tried here and failed. Plan 0061 Phase 7b moved the
+   close write-ups into `README-archive.md` and wrote *"One line per plan."* into the file itself,
+   three lines above the rows; eight days later that section had regrown **7.1x** and
+   `docs/adrs/README.md` had reached **16 %** of the ADR corpus it indexes. If a row will not fit,
+   the answer is **new arithmetic in ADR-0116** — never a raised constant, and never a row nudged
+   outside the markers.
+
 2. **Accept any paired ADRs** (`proposed → accepted`) and refresh `docs/adrs/README.md`. An ADR is
    append-only *once accepted* — but if the plan's implementation falsified something the ADR
    recorded, accept it **with a dated `Outcome` section** (the ADR-0054 and ADR-0074 precedent)
    rather than editing the body or leaving the stale claim standing.
+
+   **The row is a pointer and nothing more — link, title, status, under 320 bytes:**
+
+   ```markdown
+   | [0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) | An index row is a pointer, and a gate holds it to one | accepted 2026-08-16 |
+   ```
+
+   The title is **the ADR body's `H1`**, minus its own `ADR-NNNN —` prefix; the status is the word,
+   the date, the implementing plan, and the bare word `Outcome` if the body carries one. What the
+   ADR *decided*, what it rejected and what it cost belong in the ADR — writing them here is how
+   this index reached 189 KB, and a second copy is the copy that drifts. The one thing the status
+   cell holds that lives nowhere else is the **inbound** forward-reference (`supplemented by 0020`,
+   `extended by 0006, 0008, 0013`), because an accepted ADR is append-only and nobody may reach back
+   into 0003's header to record that 0013 extended it. Never drop one.
+
 3. **Refresh `docs/plans/README.md`**: roster → recently-closed, execution order, next-free-number.
+
+   **The recently-closed bullet is one line — link, close date, review verdict, under 320 bytes:**
+
+   ```markdown
+   - [0105 — The indexes go back to being indexes](done/0105-the-indexes-go-back-to-being-indexes.md) — closed 2026-08-16. Review: **no blockers, no majors.**
+   ```
+
+   The write-up — what landed, what was falsified, what outlived the plan — goes to
+   [`docs/plans/README-archive.md`](../../../docs/plans/README-archive.md) **first**, and the bullet
+   points at it. That is Plan 0061 Phase 7b's rule, and Plan 0105 found that 24 of the 26 fat
+   bullets it had to trim had never been archived at all: the section was emptied once and then
+   regrew entirely fresh. Moving prose between the two files strands reference-link *definitions* —
+   copy them into the archive as well, and re-run step 1b.
 3b. **Curate the preset set — trigger: the plan touched `presets/`.** Since
    [ADR-0081](../../../docs/adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)
    the `preset-author` lane commits presets directly, gated on the behavioral suite; curating the
@@ -470,6 +516,20 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    the ledger row, then **re-point any `#NNNN--…` anchor a still-live entry aimed at the moved body**
    to `design-backlog-archive.md#NNNN--…`. `scripts/check-doc-links.mjs` does **not** validate
    fragments, so those are the one class of break here that no gate will catch for you.
+
+   **The ledger row is a pointer too — number, one line of what it was, where it went, under 320
+   bytes:**
+
+   ```markdown
+   | 0089 | The dragon overruns the frame corner, and `FRAME_FILL = 0.88` promises it cannot | [ADR-0103](adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) + [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md). **Closed 2026-08-15** |
+   ```
+
+   The verdict, the measurements and the falsified halves are in the body you just moved — the row
+   says where, not what. A cross-reference to **another backlog entry** is a bare `see NNNN`, never
+   an anchor link: the anchor is the full text of that entry's heading and can run past eighty
+   bytes, which is what pushed six rows over the cap at Plan 0105. This applies to the **ledger
+   only**; the live entry bodies above it are content, sit outside the marked region, and are not
+   measured by anything.
 
    Two things that are not this step. An entry whose premise turns out **false** is corrected in
    place and stays live — a wrong live entry is more dangerous than a closed one, because it sends

@@ -27,10 +27,11 @@ Ten built-in rendering systems, all driven by editable text presets —
 > CLI under a synthesized audio clip — not a screenshot of the application window. There is no
 > picture anywhere of the preset browser, the settings menu or the `F3` overlay.
 
-> **Status: pre-1.0, in active development.** Both frontends run: the standalone app renders
-> live WASAPI loopback on Windows, and the foobar2000 component links the core's C ABI. The
-> preset format and the C ABI may still change between releases — stability begins at 1.0.0.
-> See [`docs/plans/`](docs/plans/) for what's in flight.
+> **Status: pre-1.0, in active development.** Both frontends run **and both ship**: the standalone
+> app renders live WASAPI loopback on Windows, and the foobar2000 component links the core's C ABI
+> and is attached to every `v*` tag since `v0.70.0`. The preset format and the C ABI may still
+> change between releases — stability begins at 1.0.0. See [`docs/plans/`](docs/plans/) for what's
+> in flight.
 
 ## Architecture
 
@@ -74,8 +75,10 @@ lmv-ring/            # The lock-free SPSC ring, split out zero-dependency so Mir
 standalone/          # Rust binary + lib — winit window, wgpu surface, loopback capture, the shot example.
 plugin-foobar/       # C++ shim: foobar2000 SDK integration, links the core's C ABI. Windows-first.
 presets/             # The curated preset library (*.toml) — embedded at build time, seeded on first run.
-packaging/           # What a `v*` tag ships: macos/bundle.sh (build, lipo, sign, zip, verify) and the
-                     #   READ-ME-FIRST.md testers get in each zip. See ADR-0038.
+packaging/           # What a `v*` tag ships, one recipe per artifact, each doing its own verification
+                     #   so a local run is held to CI's bar: macos/bundle.sh (build, lipo, sign, zip,
+                     #   verify) and foobar/ (fetch the pinned SDK, build, stamp, package, verify).
+                     #   Plus the READ-ME-FIRST.md testers get in each zip. See ADR-0038, ADR-0115.
 docs/
 ├── nfr.md           # Quantified v1 non-functional requirements (the numbers behind "lightweight").
 ├── preset-guide.md  # START HERE for presets: the illustrated entrance — the systems, one
@@ -86,7 +89,8 @@ docs/
 ├── preset-palettes.md  # The colour surface: built-in palettes, custom stops, the A/B crossfade.
 ├── capturing.md     # Headless capture + visual-QA harness: the shot CLI and the core/tests/ checks.
 ├── releasing.md     # The version-bump / release procedure (one bump per plan close).
-├── on-device-validation.md  # The manual checklist for what CI cannot run: real GPUs, live loopback.
+├── on-device-validation.md  # The manual checklist for what CI cannot run: real GPUs, live loopback,
+│                    #   and installing the foobar2000 component (no runner can load foobar2000).
 ├── design-backlog.md  # Captured friction not yet promoted to an ADR or a plan (…-archive.md holds retired entries).
 ├── roadmap-visual-richness.md  # The visual-capability roadmap the recent plans are sequenced against.
 ├── generative-techniques-catalogue.md  # The technique survey behind the scene families.
@@ -102,18 +106,21 @@ preset files they document.
 
 ## Download
 
-Prebuilt standalone binaries are attached to each tag on the
-[Releases page](https://github.com/IgorKonovalov/light-music-visualizer/releases). Two zips per
-release, each carrying the app, a reference copy of the presets, and a `READ-ME-FIRST.txt`:
+Prebuilt binaries are attached to each tag on the
+[Releases page](https://github.com/IgorKonovalov/light-music-visualizer/releases). Three zips per
+release, each carrying a `READ-ME-FIRST.txt`:
 
 | Zip | What's in it |
 |-----|--------------|
 | `…-macos-universal.zip` | `LightMusicVisualizer.app` — universal (Apple Silicon + Intel), **macOS 13+** |
 | `…-windows-x64.zip` | `lmv.exe` — Windows x64 |
+| `…-foobar2000-component.zip` | `foo_lmv.fb2k-component` — foobar2000 v2, **x64 only** |
 
-Both are **unsigned**, so each OS objects once. On Windows, SmartScreen says "Windows protected
-your PC" → More info → Run anyway. On macOS, the app is ad-hoc signed only, so either right-click
-it and choose **Open**, or strip the quarantine attribute first:
+The two standalone zips also carry a reference copy of the presets.
+
+All three are **unsigned**, so each host objects once. On Windows, SmartScreen says "Windows
+protected your PC" → More info → Run anyway. On macOS, the app is ad-hoc signed only, so either
+right-click it and choose **Open**, or strip the quarantine attribute first:
 
 ```sh
 xattr -dr com.apple.quarantine LightMusicVisualizer.app
@@ -122,6 +129,22 @@ xattr -dr com.apple.quarantine LightMusicVisualizer.app
 The macOS build then asks for the **Screen Recording** permission — that is the only first-party
 way to tap system audio — and needs a **relaunch** after you grant it. Releases are marked
 prerelease while the app is `0.x`. The `READ-ME-FIRST.txt` in each zip has the rest.
+
+### The foobar2000 component
+
+Unzip, then in foobar2000: **File → Preferences → Components → Install…**, pick
+`foo_lmv.fb2k-component`, **Apply**, and let it restart. Open it from **View → Light Music
+Visualizer**, or dock it into the layout as a *Playback visualisation* element. `Space` cycles
+scenes.
+
+It needs **64-bit foobar2000 v2 on Windows** — there is no 32-bit build and no macOS component
+([ADR-0001](docs/adrs/0001-rust-core-wgpu-cabi-foobar-shim.md); the SDK is Windows-centric). A
+32-bit install will simply not list it.
+
+Because it reads what foobar2000 is already decoding, there is no audio capture to permit and no
+output device to route — it is the path with the fewest ways to go wrong. If you run both, the
+component and the standalone app **share one preset folder**, so a preset edited in either shows
+up in both.
 
 ## Running the standalone app
 
@@ -234,8 +257,9 @@ This is real-time audio + graphics, so a few rules are non-negotiable:
   types in `core/`; no raw Metal/DX/Vulkan outside the wgpu layer. Swappability is the point.
 - **Determinism where it's testable.** DSP math is a pure function of its input window; visual
   randomness, when wanted, is explicitly seeded.
-- **The C ABI is a versioned contract.** Minimal surface — opaque handle, push-samples,
-  render, resize, free. Changing its shape is an ADR-worthy event.
+- **The C ABI is a versioned contract**, and [`docs/specs/0001-c-abi.md`](docs/specs/0001-c-abi.md)
+  is the authority on its shape — not this list, which paraphrased five functions long enough for
+  the real surface to reach thirteen. Changing that shape is an ADR-worthy event.
 - **Lightweight is a feature.** Small binaries, few dependencies, low idle CPU/GPU.
 
 ## Presets
@@ -244,8 +268,9 @@ Visuals are driven by **presets** — small TOML files that bind a built-in
 rendering system's parameters to short expressions over the live audio analysis
 (no Rust, no rebuild). The whole curated set ships across every built-in system —
 fragment field, particle swarm, parametric curve, L-system, star pattern,
-reaction-diffusion, attractor, spectrum readout, ballistic emitter — seeded into a
-per-user directory that both the standalone app and the foobar plugin share.
+reaction-diffusion, attractor, spectrum readout, ballistic emitter, shape field —
+seeded into a per-user directory that both the standalone app and the foobar
+plugin share.
 
 **Start with [`docs/preset-guide.md`](docs/preset-guide.md)** — the illustrated
 entrance: a complete preset in ten lines, what each built-in system looks
@@ -310,15 +335,22 @@ What it runs, stopping at the first failure and naming the step that failed:
 | Step | Command |
 |------|---------|
 | Doc links | `node scripts/check-doc-links.mjs` |
+| Index rows | `node scripts/check-index-rows.mjs` |
+| Backlog claims | `node scripts/check-backlog-claims.mjs` |
 | Format | `cargo fmt --all --check` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Tests | `cargo nextest run --workspace` (narrowed — see below) |
 
-The doc-link step is first because it is the cheapest (~50 ms) — every relative
-markdown link in the repo must resolve. If `node` is not on your `PATH` it
-**skips with a notice** rather than failing the push; nothing else here needs
-Node. That skip is about the hook only — CI's `links` job runs the same check on
-`ubuntu-latest`, where it cannot skip and is not bypassable.
+The three Node steps come first because they are the cheapest (tens of
+milliseconds between them): every relative markdown link in the repo must
+resolve, every row inside a marked roster region must stay under 320 bytes
+([ADR-0116](docs/adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)),
+and every live `docs/design-backlog.md` entry must carry a probe that still holds
+([ADR-0108](docs/adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)).
+If `node` is not on your `PATH` all three **skip with a notice** rather than
+failing the push; nothing else here needs Node. That skip is about the hook only
+— CI's `links` job runs the same three checks on `ubuntu-latest`, where they
+cannot skip and are not bypassable.
 
 **Measured warm wall time: ~48.6 s** (2026-08-08; dominated by the tests — `fmt`
 and `clippy` are under two seconds between them). The hook excludes the nine

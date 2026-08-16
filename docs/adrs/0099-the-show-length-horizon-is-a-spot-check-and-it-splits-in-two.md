@@ -169,7 +169,17 @@ the mode in wall clock ("3,600·N renders … minutes of wall clock per world") 
 worlds die at 3,601 frames with an invalid capture readback buffer after RSS reaches ~2.9 GB, so
 they were measured at 0.5 simulated minutes rather than 10. It is pre-existing and shared with the
 shipped `capture_preset` (run as the control before it was called a finding), and it is filed as
-[backlog 0093](../design-backlog.md). Until it is fixed, "N simulated minutes" is bounded by world.
+[backlog 0093](../design-backlog.md).
+
+  **Discharged 2026-08-16** at [Plan 0099](../plans/done/0099-the-horizon-reaches-its-own-length.md)'s
+  close, and the paragraph above is wrong in two ways worth naming rather than deleting. It was
+  **not a frame ceiling** — all three RD worlds (there are three, not two) clear 5,401 and fail at
+  7,201, and one unfixed run reached 36,001 at 4.9 GB, so 3,601 was one machine's headroom read as a
+  limit. And it was **not the RD family's mechanism** — the capture path never polled, so retention
+  was per *pass*: 950 KB a frame at 13 passes against ~30 KB for a single-pass world. Every world
+  grew and RD hit the allocator first. `--horizon 10` now renders all 36,001 frames on all three with
+  the resident set flat, so "N simulated minutes" is no longer bounded by world; what remains bounded
+  by world is the wall clock, 16 s to 54 s at 96x96 on this box.
 
 **4. The trigger's first named subject was already repaired.** The Notes below point at Plan 0077's
 standing Phase 5 rider as the first world to use the instrument. Phase 2 ran it: `swarm_shatter`

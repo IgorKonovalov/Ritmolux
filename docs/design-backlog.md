@@ -134,6 +134,11 @@ points at carries the rest. `scripts/check-index-rows.mjs` holds every row below
 ([ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)); the live entry
 bodies further down are content, not an index, and are deliberately outside the region.
 
+A trailing `see NNNN` names another backlog entry rather than a document — look for it under
+`## Open entries` below, or in [design-backlog-archive.md](design-backlog-archive.md) if it has
+already closed. Written once here so that a cross-reference costs a row four bytes instead of
+eighty.
+
 <!-- roster:begin cap=320 -->
 
 | # | Entry | Went to |
@@ -144,19 +149,19 @@ bodies further down are content, not an index, and are deliberately outside the 
 | 0004 | `zoom`/`pan_*` smear RD's edge: a toroidal sim behind a clamped sampler | [ADR-0034](adrs/0034-internal-resolution-follows-the-target.md) + [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 5 |
 | 0005 | No bloom / glow / halo stage | [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) + [Plan 0045](plans/done/0045-linear-light-and-bloom.md) |
 | 0006 | `[smoothing]` is a symmetric one-pole: no attack/release split | [ADR-0035](adrs/0035-asymmetric-attack-release-easing.md) + [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 2 |
-| 0007 | `star_pattern` is a hollow ring, and `variant` cannot be blended | **Closed in full 2026-08-06.** Morph half: [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md) + [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md). Interior half: [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md) + [Plan 0065](plans/done/0065-the-mandala-interior.md) — `[generator] rings`, three ring levers, three mandala presets |
+| 0007 | `star_pattern` is a hollow ring, and `variant` cannot be blended | [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md) + [Plan 0054](plans/done/0054-the-line-scenes-catch-up.md). **Closed 2026-08-06** |
 | 0008 | `shot` harness gaps that cost the content lane real iterations | [Plan 0033](plans/done/0033-internal-resolution-and-preset-surface.md) Phase 1 + [Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md) Phase 4 |
 | 0010 | The fold samples outside its source rectangle and clamps | [ADR-0047](adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) + [Plan 0045](plans/done/0045-linear-light-and-bloom.md) |
 | 0011 | The fold axis is screen-centred, so `pan_*` and `kaleido_*` fight | [ADR-0047](adrs/0047-kaleidoscope-fold-domain-disc-with-falloff.md) + [Plan 0045](plans/done/0045-linear-light-and-bloom.md) Phase 1 |
 | 0012 | `--report`'s `cover` penalises ink presets — **premise was false** | [Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md) Phase 5, as documentation |
 | 0013 | No synthetic signal has transients, so easing is unverifiable | [ADR-0039](adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md) + [Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md) |
 | 0014 | The line scenes' cosine `hue` ramp is not a hue wheel | [Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md) Phase 5 — **and the entry's own colour names were wrong** |
-| 0015 | The band axis is half linear below the crossover | [ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) + [Plan 0048](plans/done/0048-analysis-v2-and-the-retune.md) Phase 1 — a second 8192-sample window feeds every band below the crossover. **Closed 2026-08-04 during a backlog sweep; the entry never got its marker** |
+| 0015 | The band axis is half linear below the crossover | [ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) + [Plan 0048](plans/done/0048-analysis-v2-and-the-retune.md). **Closed 2026-08-04** |
 | 0016 | The `spectrum` readout has no width control | [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) Phase 2 |
 | 0017 | `[spectrum]` has no level curve, and the grammar has no `log` | [ADR-0040](adrs/0040-spectrum-level-curve-applies-before-the-easing.md) + [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) |
 | 0018 | `BASELINE_Y` is a constant, so `mirror_reflect` throws the copy up | [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) Phase 2 |
 | 0019 | `glow` is unreachable from a preset on all four line scenes | [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) Phase 1 |
-| 0020 | The library is gained against stimuli 6-100x hotter than real music | Harness half: [ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md) + [Plan 0041](plans/done/0041-report-two-level-stimuli-and-expression-reachability.md). Content half: [Plan 0048](plans/done/0048-analysis-v2-and-the-retune.md) Phase 7's retune (368 gains, 36 thresholds). **Content half closed 2026-08-04 during a backlog sweep** |
+| 0020 | The library is gained against stimuli 6-100x hotter than real music | [ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md) + [Plan 0041](plans/done/0041-report-two-level-stimuli-and-expression-reachability.md). **Closed 2026-08-04** |
 | 0022 | `--report`'s reactivity columns are blind to a level `curve` | [ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md) + [Plan 0041](plans/done/0041-report-two-level-stimuli-and-expression-reachability.md) |
 | 0023 | `LineRenderer` has no line joins, so every vertex leaves a notch | [ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) + [Plan 0039](plans/done/0039-line-joins.md) |
 | 0024 | The star rosette is a closed chain and half its joints are unjoined | [Plan 0040](plans/done/0040-line-joins-finish-the-job.md) Phase 3 |
@@ -167,13 +172,13 @@ bodies further down are content, not an index, and are deliberately outside the 
 | 0029 | The swarm's wrap seam sits on the frame edge, and feedback burns it in | [ADR-0044](adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) + [Plan 0043](plans/done/0043-swarm-depth-and-domain.md) |
 | 0030 | The library binds audio to luminance far more than to geometry | `.claude/skills/preset-author/references/craft.md` §1, which is where the entry asked it to land. **Closed 2026-08-04 during a backlog sweep** |
 | 0031 | The Rich tier's 3x particle count makes the reseed transient opaque | [Plan 0057](plans/done/0057-the-attractors-compute-path.md) |
-| 0033 | Every mark the engine can draw is a round blob or a stroked curve — **silhouette half only** | [ADR-0084](adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) + [Plan 0070](plans/done/0070-shaped-marks.md). **Closed 2026-08-05.** `shape`/`points` on `swarm` and `emitter`; `swarm_starfield` ships. **The fill-and-outline half is NOT closed** — re-filed as [0069](#0069--there-is-no-way-to-draw-a-two-tone-object-a-fill-with-a-contrasting-outline-because-the-composite-is-additive) at that close, as this entry asked, so the two stop being confused |
+| 0033 | Every mark the engine can draw is a round blob or a stroked curve — **silhouette half only** | [ADR-0084](adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) + [Plan 0070](plans/done/0070-shaped-marks.md). **Closed 2026-08-05**; see 0069 |
 | 0034 | Nothing in the engine spawns, throws, ages or individuates an object | [ADR-0057](adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md) + [Plan 0052](plans/done/0052-the-emitter-objects-that-spawn-fall-and-die.md) |
 | 0035 | `presets/README.md` listed 10 expression variables; the code had 19 | Fixed at [Plan 0048](plans/done/0048-analysis-v2-and-the-retune.md)'s close |
-| 0036 | Does the fold stop folding the backdrop, and does that lose a look? | **Retired unfired 2026-08-04.** [ADR-0055](adrs/0055-backdrop-leaves-the-post-chain.md) shipped 2026-07-31; three full-library content passes have run since and no preset was reported worse. The way back is recorded in the archived body if it ever bites |
+| 0036 | Does the fold stop folding the backdrop, and does that lose a look? | [ADR-0055](adrs/0055-backdrop-leaves-the-post-chain.md) |
 | 0037 | The fold covers a disc, and on a field scene that reads worse | [ADR-0061](adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md) + [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md) |
 | 0039 | Four bind-group layouts are shared by pipelines live in one frame | [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md) + [Plan 0053](plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) |
-| 0040 | Additive light occludes by geometry, so a dim figure over a lit backdrop reads as dark speckle | [ADR-0085](adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) + [Plan 0071](plans/done/0071-light-that-adds-without-covering.md). **Closed 2026-08-09.** `occlude` shipped as a bindable scalar at the backdrop composite and **the default stayed at `1.0`** — decided by the user in the running app over a lit backdrop at 0.35 and 0.60, not by the argument. So the answer to "is coverage the right model" was *yes, keep it, and make the exception reachable*. **The retune it invites is NOT closed** — Plan 0071 Phase 5, still outstanding, grouped with [0038](#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned) |
+| 0040 | Additive light occludes by geometry, so a dim figure over a lit backdrop reads as dark speckle | [ADR-0085](adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) + [Plan 0071](plans/done/0071-light-that-adds-without-covering.md). **Closed 2026-08-09**; see 0038 |
 | 0041 | The line seam's lit-backdrop guard discriminates on ~5 pixels | [Plan 0053](plans/done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) |
 | 0043 | Every reactivity instrument diffs against **silence** | [ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) + [Plan 0056](plans/done/0056-clamp-occupancy-and-the-axis-anchor.md) |
 | 0044 | The axis rebuild silently re-pointed every sub-crossover `bin()` probe | [ADR-0063](adrs/0063-address-the-spectrum-by-frequency.md) + [Plan 0056](plans/done/0056-clamp-occupancy-and-the-axis-anchor.md) |
@@ -181,38 +186,38 @@ bodies further down are content, not an index, and are deliberately outside the 
 | 0046 | The retune's gain rule is direction-blind — **retracted, the claim was false** | Retracted the same day, before any preset was edited. Kept in full because the *reason* it was wrong is a trap |
 | 0047 | `Rich` triples the attractor's light, so the tier is not look-neutral | [ADR-0064](adrs/0064-a-capture-may-pin-the-rich-tier.md) + [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) + [Plan 0057](plans/done/0057-the-attractors-compute-path.md) |
 | 0048 | The `lorenz` family renders as a dust cloud | [ADR-0068](adrs/0068-the-projection-basis-is-a-per-family-property.md) + [Plan 0059](plans/done/0059-lorenz-finds-its-plane.md) |
-| 0049 | The fold's residual rays got a second rejection and a shipped instance | Its three facts were carried into [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md) Phase 2's A/B, which was judged 2026-08-04. **Closed 2026-08-04 during a backlog sweep**; the content rule it asked for is [0058](#0058--thirteen-presets-bind-the-fold-and-eleven-of-them-have-not-chosen-an-edge-treatment-because-until-now-there-was-nothing-to-choose)'s |
+| 0049 | The fold's residual rays got a second rejection and a shipped instance | [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md). **Closed 2026-08-04**; see 0058 |
 | 0050 | The attractor reseed scatters into an axis-aligned box | [ADR-0066](adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) + [Plan 0057](plans/done/0057-the-attractors-compute-path.md) |
 | 0051 | `variant` can morph and neither `star_*` preset does | Closed by content: both presets now drive `variant` with a triangle wave (`star_rosette.toml:59`, `star_lantern.toml:77`). **Closed 2026-08-04 during a backlog sweep** |
 | 0052 | `Spectrum Ridge` has no tonal structure — **premise was false** | Retired 2026-08-03; the preset was never flat and the statistic convicted the right preset for the wrong reason |
 | 0053 | The retune rescaled band gains but not the world-space params | [ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) + [Plan 0058](plans/done/0058-the-gate-can-see-an-empty-frame.md) |
-| 0054 | Pixel coverage cannot see a figure whose *tips* leave the frame | [ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) + [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md). **Closed 2026-08-06.** The successor measures in-frame segment length inside `LineRenderer::draw` and convicts both frozen defects (`0.4975` / `0.7788` separation, against the `0.055` pixel coverage had). **But it has no separating absolute threshold over the shipped library either** — `Rose Zoom` and `Rose Overflow` bracket the over-scaled comb and both are correct content, so it shipped as a **paired** instrument, not the gate this entry asked for. What that leaves open is [0070](#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report) |
-| 0055 | The attractor's shape vocabulary is "breathe and bend", and the reference figures ask for more | [ADR-0093](adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md) + [Plan 0079](plans/done/0079-the-attractor-learns-new-figures.md). **Closed 2026-08-13, both halves.** Variety: a curated per-family tuple roster (13/13/13/12) whose entries carry their own **measured framing**, so the rho ≈ 100 Lorenz cohort 5 called unreachable now renders centred and in frame. Morph: the entry's "may not exist in general" research question **has an answer along a single-coefficient axis** — four measured paths ship out of twenty swept, four refused by measurement (a mid-walk tuple can collapse to a fixed point, which has no scale to render at). Cross-fading two instances stays rejected and unneeded |
-| 0057 | No scene-local level param, so `exposure` gets used for one and two stages disagree | [ADR-0080](adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md) + [Plan 0066](plans/done/0066-the-level-lever.md). **Closed 2026-08-05.** Both halves landed; the retune found a consequence the ADR had not — the background pre-pass is upstream of the tonemap, so moving a number from `exposure` to `brightness` multiplies the sky by `1/old_exposure` (33x on Lorenz). Recorded as the ADR's `Outcome` |
-| 0058 | Thirteen presets bind the fold and eleven had not chosen an edge treatment | Closed by content 2026-08-04, `859ec66` — all thirteen now name a `kaleido_edge`, the verdicts spread across all three treatments. **The entry named `attractor_dejong`, which binds no `kaleido_*` param; the thirteenth is `attractor_clifford`** — inherited from [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md)'s own scope bullet, corrected in both |
+| 0054 | Pixel coverage cannot see a figure whose *tips* leave the frame | [ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) + [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md). **Closed 2026-08-06**; see 0070 |
+| 0055 | The attractor's shape vocabulary is "breathe and bend", and the reference figures ask for more | [ADR-0093](adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md) + [Plan 0079](plans/done/0079-the-attractor-learns-new-figures.md). **Closed 2026-08-13** |
+| 0057 | No scene-local level param, so `exposure` gets used for one and two stages disagree | [ADR-0080](adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md) + [Plan 0066](plans/done/0066-the-level-lever.md). **Closed 2026-08-05** |
+| 0058 | Thirteen presets bind the fold and eleven had not chosen an edge treatment | [Plan 0055](plans/done/0055-the-fold-edge-becomes-a-choice.md) |
 
 ### Added by the 2026-08-13 sweep
 
 | # | Entry | Went to |
 |---|-------|---------|
-| 0009 | The `animation.rs` gate penalizes two legitimate designs | [ADR-0091](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md) + [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 1. **The sparse half is delivered** — the gate scores `metrics::footprint_diff`, and the entry's own casualty is the proof (the rejected fifth-density Squall draft passes at 0.1049 where the whole-frame statistic read 0.0057). **The rotational-symmetry half was never fixable and is now documented rather than open**: a figure invariant under rotation by `2*pi/k` renders an *identical* image under it, so its frame difference is zero at every resolution. `docs/capturing.md`'s gate table carries both limits as of this sweep |
-| 0055 | The attractor's shape vocabulary is "breathe and bend" | [ADR-0093](adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md) + [Plan 0079](plans/done/0079-the-attractor-learns-new-figures.md). **Closed 2026-08-13, both halves** — a curated per-family tuple roster carrying *measured framing*, and four measured morph paths out of twenty swept (four refused by measurement: a mid-walk tuple can collapse to a fixed point, which has no scale to render at) |
-| 0056 | A user-authored preset lived outside the repo for six weeks | [ADR-0081](adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) + [Plan 0067](plans/done/0067-the-curation-route.md). **Both halves closed.** The route exists — the content lane lands presets directly and `architect` curates the set at plan-close cadence — and the file itself came home (`3732fb4`, Phase 3) and was later retired with cohort three (`d92dcb2`), which is the route working rather than failing |
+| 0009 | The `animation.rs` gate penalizes two legitimate designs | [ADR-0091](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md) + [Plan 0077](plans/done/0077-the-quiet-sky.md) |
+| 0055 | The attractor's shape vocabulary is "breathe and bend" | [ADR-0093](adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md) + [Plan 0079](plans/done/0079-the-attractor-learns-new-figures.md). **Closed 2026-08-13** |
+| 0056 | A user-authored preset lived outside the repo for six weeks | [ADR-0081](adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) + [Plan 0067](plans/done/0067-the-curation-route.md) (`3732fb4`) |
 | 0059 | The backdrop does not colour through the shared palette | [ADR-0086](adrs/0086-the-backdrop-colours-through-the-preset-palette.md) + [Plan 0072](plans/done/0072-the-backdrop-joins-the-palette.md) |
 | 0060 | An engine fix leaves its preset-side workarounds standing | [Plan 0067](plans/done/0067-the-curation-route.md) Phase 4 — the close-ceremony workaround grep is installed as step 3b and has run at every close since, reporting its result in the close notes even when it finds nothing |
 | 0061 | `perspective` moves the figure far more than it enlarges it | [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 3, as documentation — the ~0.9x translational law and the ~0.3 practical ceiling. The re-centring option (2) had no demonstrated want and is not carried forward |
-| 0062 | `depth_hue` is a lightness cue on a lightness ramp | [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 3, as documentation (the three regimes, the `2 * min(hue_center, 1 - hue_center)` wrap bound, the duotone deadness). **The wrap-versus-clamp question survives as [0075](#0075--root_tint-earned-no-binding-on-either-shipped-ifs-preset-and-root_hue-earned-both)'s item 2**, which is where the engine half of it belongs |
+| 0062 | `depth_hue` is a lightness cue on a lightness ramp | [Plan 0075](plans/done/0075-the-content-renaissance.md); see 0075 |
 | 0063 | `spin`'s usable ceiling is set by `fade`, not by taste | [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 3, as documentation |
 | 0064 | An IFS preset switch shows a hard-edged rectangle of noise | [ADR-0087](adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md) + [Plan 0073](plans/done/0073-the-fern-unfurls-and-colours-by-what-made-it.md) — the continuous respawn, so the population is never a uniform box at any instant |
 | 0065 | `morph` is a travel knob whose visible rate is steepest near zero | Documentation, `cf977f9`. Struck at the time; archived here |
 | 0066 | The IFS figures are STILL, so the drift-rate conventions are wrong for them | Documentation, `cf977f9`. **Its one undischarged half is now done**: `docs/capturing.md`'s gate table states that a passing `anim` is not evidence of a *watchable* preset on a still family |
 | 0067 | `depth_fade` is a uniform dimmer on every flat family | [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 2 — option 2, the true no-op, asserted by **byte equality** against a live Lorenz control so it cannot pass vacuously |
 | 0070 | The in-frame geometry fraction cannot gate new content | [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 2 — the `geom` column, where the over-scale defect is actually introduced. The `sanity.rs`-shaped distribution report stays a candidate second step, deliberately not taken |
-| 0072 | `sanity.rs`'s coverage floor forces thin-stroke line scenes into washed-out tuning | [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 1 — `metrics::radial_shell_occupancy` rescues a preset under its coverage floor at ≥ 4 occupied shells; the three retired mandalas at their honest tunings read 10/10/9, and the frozen renders-nothing defect reads 0 and still fails |
+| 0072 | `sanity.rs`'s coverage floor forces thin-stroke line scenes into washed-out tuning | [Plan 0075](plans/done/0075-the-content-renaissance.md) |
 | 0074 | The age channel has nothing spatial to colour | [ADR-0088](adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md) + [Plan 0074](plans/done/0074-the-figure-colours-by-how-far-it-has-come.md) — route 2 (the channel that IS spatial) plus route 3 (`age_*` retired), so the roster did not grow |
 | 0076 | The operator docs describe a fern tuning the shipped fern does not carry | Repaired at [Plan 0074](plans/done/0074-the-figure-colours-by-how-far-it-has-come.md)'s close |
 | 0084 | The ink stage has no contrast lever | [ADR-0092](adrs/0092-the-ink-remap-gains-a-contrast-exponent.md) + [Plan 0078](plans/done/0078-the-ink-learns-to-bite.md). **The content half is standing, not open** — the two-header re-judge lives in [`content-brief.md`](content-brief.md) §2 |
-| 0085 | `swarm` has no `reseed` | [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 3 — ADR-0066 disturbance semantics, never a box respawn. The minutes-horizon caveat it insisted on is honoured, and the entry it kept alive — [0086](design-backlog-archive.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument) — **closed 2026-08-15** with `shot --horizon`, which ran on this world first and found the collapse repaired |
+| 0085 | `swarm` has no `reseed` | [Plan 0077](plans/done/0077-the-quiet-sky.md). **Closed 2026-08-15**; see 0086 |
 | 0088 | `shot --report`'s band columns cannot see reactivity spent on bloom | [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 4 — the mean columns keep their meaning and a footprint reading lands beside them. Third member of a family the project has now fixed three times (0022, 0028, this) |
 | 0091 | There is no static, screen-anchored, oriented gradient | [ADR-0094](adrs/0094-the-backdrop-paints-a-directional-ramp.md) + [Plan 0080](plans/done/0080-the-sky-gets-a-horizon.md) |
 
@@ -220,30 +225,30 @@ bodies further down are content, not an index, and are deliberately outside the 
 
 | # | Entry | Went to |
 |---|-------|---------|
-| 0077 | The doc-link gate is blind to reference-style links | [Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md) Phases 1-2. Two new break classes beside the inline one, and **the narrowing that makes them usable was measured rather than assumed** — a shortcut use is reported only when some file in the tree defines that label, without which the repo yields 31 findings of which 24 are prose brackets. It proved itself at its own close, naming all four links the `git mv` into `done/` broke. **One thing left undone:** the fixture tree the phase described was run ad-hoc and never committed, so the script's optional `root` argument has no caller in the repo and the bite check is unrepeatable |
-| 0080 | The reactivity gate renders warm-up frames it throws away | [Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md) Phases 3-4. `capture_audio_after_warmup` advances the analyzer without rasterizing; **136.3 s -> 100.2 s over 36 presets** on this box's DX12 software adapter. **The entry's premise was half wrong and the correction outlives the speedup** — the warm-up renders were also the *scene* warm-up, so 35 of 36 per-band vectors moved. Read any reactivity figure recorded before 2026-08-13 as a different measurement, not as drift. **What has no instrument:** GPU-integrated scene state now meets the measured window colder, documented in three places and asserted in none |
-| 0090 | The Mac build's capture verdict is stderr-only | [Plan 0083](plans/done/0083-the-build-says-why-it-hears-nothing.md). The verdict is a value reaching both artifacts a remote tester can send — a `capture` column on every `diagnostics.log` row and an `audio` line under F3 — with a column rather than a startup line, because the log rotates and a line written once is what rotation deletes. **The capability is what closed; the tester's own answer is that plan's `human` Phase 5**, standing in the plans README, and it is recorded here when it arrives |
+| 0077 | The doc-link gate is blind to reference-style links | [Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md) |
+| 0080 | The reactivity gate renders warm-up frames it throws away | [Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md) |
+| 0090 | The Mac build's capture verdict is stderr-only | [Plan 0083](plans/done/0083-the-build-says-why-it-hears-nothing.md) |
 
 ### Added at Plan 0089's close, 2026-08-15
 
 | # | Entry | Went to |
 |---|-------|---------|
-| 0078 | `kaleido_tile` is a discrete quantity that is not quantized — **premise was false** | [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md) Phase 2, as documentation. The param is deliberately **not** rounded and `fold_tile`'s doc comment said so five phases before the entry was filed; what survived was the doc gap the entry named precisely, and `presets/README.md` now carries both facts — that `kaleido_tile` is the one param on the symmetry stage an author may ease between values, and that a fractional count leaves the border cell **cut off at the frame edge**. Judging whether that clipped edge *reads* badly stays unasked, because nobody has rendered it |
-| 0081 | The house gain rule lives only in preset headers — **first half was false** | [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md) Phase 3, as documentation. The rule itself had been in `presets/README.md` since 2026-08-03; the **exception class** was the survivor and is now named — *a param whose cap is a failure state rather than a maximum*, treated by pulling the range in at **both** ends rather than gaining to reach the cap, worked through Gray-Scott `feed`/`kill`. **The plan's shipped instance was wrong and `dev` corrected it at implementation:** it named `chthonic_coral_oracle.toml`, retired with cohort three on 2026-08-10 (`d92dcb2`), three days before the plan was written — the coral is right as *provenance* and wrong as a file, so the three shipped `reaction_*` presets carry the instance and `reaction_etching`'s `feed` line is quoted as the treatment |
-| 0089 | The dragon overruns the frame corner, and `FRAME_FILL = 0.88` promises it cannot | [ADR-0103](adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) + [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md) Phase 1. **Closed 2026-08-15, and it was never one figure's bug.** The fit measures an axis-aligned box and `project` rotates it at `spin`'s default, so only a figure at or under `sqrt(1/FRAME_FILL² − 1)` stays inside at every angle — measured over the roster, **only the fern complies** (`a = 0.4851`), and sierpinski/tree/dragon/spiral overrun by 34/41/58/79 %. The contract was restated to what it guarantees, pinned as a property test asserted against the shipped `fit_scale`, with **zero pixels moved**. The guarantee itself is **deferred with a trigger, not bought** — the entry's own second candidate (the preset's `zoom` reaching 1.04) did not fire, and all three 2-D IFS presets' bindings peaking above 1.0 is now a content-lane sitting |
+| 0078 | `kaleido_tile` is a discrete quantity that is not quantized — **premise was false** | [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md) |
+| 0081 | The house gain rule lives only in preset headers — **first half was false** | [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md) |
+| 0089 | The dragon overruns the frame corner, and `FRAME_FILL = 0.88` promises it cannot | [ADR-0103](adrs/0103-the-ifs-fit-frames-a-figure-that-does-not-turn.md) + [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md). **Closed 2026-08-15** |
 
 ### Added at Plan 0085's close, 2026-08-15
 
 | # | Entry | Went to |
 |---|-------|---------|
-| 0082 | The quality governor reads `frame_ms_p99`, and a preset switch spikes it to 25 ms — **the premise was false** | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 3-4. **Closed 2026-08-15**, and the qualification landed in all three places a governor design starts from, with the three candidate responses named and deliberately not chosen. **But this entry described a governor that does not exist.** R0 was **not** unbuilt — [Plan 0044](plans/done/0044-quality-tiers.md) / [ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md) shipped it on 2026-07-30, ten days *before* this entry was raised — and the shipped `sustained_miss` **never reads p99**: it needs 75 % of at least 180 raw frame times past `budget * 1.25`, which a switch's handful of slow frames in a 240-sample ring cannot approach. So the built governor already landed this entry's *second* candidate response, independently, as a miss fraction. The hazard is real and lives in the **prose**; a revisit starting from the old description would build it. Same failure mode as 0078 and 0081 — a claim about the repo, rotting the way claims about the repo do |
-| 0086 | No capture path reaches the minutes-long horizon | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 1-2. **Closed 2026-08-15** as the shape the entry specified rather than the gate it refused: `shot --horizon <minutes>`, run by the lane, verdict in the world's header, both determinism properties asserted on rendered pixels and a static control reading `delta 0.0000` as the non-vacuity half. **The named subject came back clean** — `swarm_shatter` wanders 0.197-0.384 across ten minutes with no trend, its collapse repaired by [Plan 0077](plans/done/0077-the-quiet-sky.md)'s `reseed` — and the instrument convicted a world nobody suspected instead: `attractor_ink`, coverage 0.199 -> 0.002 with the **silhouette intact and the density gone**, recorded in that header and deliberately unrepaired. **One bound the entry could not anticipate:** the headless path dies at 3,601 frames on both RD worlds, so those two rows are 0.5 minutes and their `monotone 1.00` is settling, not drift — filed as [0093](#0093--the-headless-capture-path-dies-past-a-few-thousand-frames-so-the-horizon-cannot-reach-its-own-headline-length) |
+| 0082 | The quality governor reads `frame_ms_p99`, and a preset switch spikes it to 25 ms — **the premise was false** | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md). **Closed 2026-08-15** |
+| 0086 | No capture path reaches the minutes-long horizon | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md). **Closed 2026-08-15**; see 0093 |
 
 ### Added at Plan 0090's close, 2026-08-15
 
 | # | Entry | Went to |
 |---|-------|---------|
-| 0068 | A swarm mark has no per-mark variation, and the one scene that could hold a starfield could not reach a slow one | [ADR-0104](adrs/0104-the-emitters-source-is-authorable-geometry.md) + [Plan 0090](plans/done/0090-the-emitters-source-moves.md) Phases 1-4, closing the **second** option; option 1 had landed at [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 2. **Closed 2026-08-15, both halves.** The source is now two authorable scalars plus the two params that answer what moving it costs (`spawn_fade`, `prewarm`), every default an exact arithmetic identity — the golden suite passes against the **committed** baselines, not merely re-blessed. **This entry named one warm-up and there were two**, which the plan found while grounding the gate argument and then measured: the *travel* warm-up is geometry and the *population* one is the spawn rate. Slow draft, `prewarm = 0` against `prewarm = 1` — `sanity` `0.0074` / 0 of 10 radial shells (**convicted blank**) against `0.1470` / 10 of 10; `animation` `0.0629` against `0.1702`; `reactivity` `0.0002` against `0.0195`. **The measurement corrected the plan's own guess**: the animation gate was never the wall (it passes the sparse draft cold), `sanity` was, and no floor moved either way. The world itself is Plan 0090's `human` Phase 5 and stands under Standing — content work on a delivered surface, not an undischarged half. **One lesson banked**: this entry's `present: SOURCE_Y: f32 = -1\.12` probe was written to go red on delivery and did not, because `DEFAULT_SOURCE_Y` still contains the substring — anchor a probe on the line, not on a bare identifier |
+| 0068 | A swarm mark has no per-mark variation, and the one scene that could hold a starfield could not reach a slow one | [ADR-0104](adrs/0104-the-emitters-source-is-authorable-geometry.md) + [Plan 0090](plans/done/0090-the-emitters-source-moves.md). **Closed 2026-08-15** |
 
 ### Added when Plan 0085's Phase 5 was run, later the same day
 
@@ -254,7 +259,17 @@ the other half arriving rather than sitting.
 
 | # | Entry | Went to |
 |---|-------|---------|
-| 0083 | RSS grew 385 to 663 MB over three minutes of switching, with no no-feedback control | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 3 and 5. **Closed 2026-08-15, bounded direction.** Three runs at a fixed 20 s dwell: feedback (62 switches, 1196 s) **382.6 -> 367.2 MB**, no-feedback control (62 switches, 1196 s) **379.9 -> 380.1 MB**, and feedback with no switching (1797 s) **379.7 -> 328.0 MB**. **Nothing grew and the long run fell 52 MB.** The control is what makes it readable — run 1 oscillates across ~30 MB while run 2 sits inside 0.4 MB, so feedback churn is real, **per-switch, and recovered every switch**. Caveats bound it rather than undermine it: no audio, windowed never fullscreen, different presets, 165 Hz — a lighter load than the original, and the fullscreen reconfigure that dominated the original observation never happened. **The runs also falsified a claim in the archived [0082](design-backlog-archive.md#0082--the-quality-governor-reads-frame_ms_p99-and-a-preset-switch-spikes-p99-to-25-ms-while-nothing-is-dropped)**, filed as [0094](#0094--the-frame_ms_p99-tail-is-not-switch-correlated-so-the-steady-state-column-does-not-remove-it) |
+| 0083 | RSS grew 385 to 663 MB over three minutes of switching, with no no-feedback control | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md). **Closed 2026-08-15**; see 0082, 0094 |
+
+### Added at Plan 0093's Phase 2 audit, closed at Plan 0099's
+
+Its own `absent: poll` probe went red on delivery, which is the ADR-0108 grammar working rather
+than failing. The body records two framings this entry got wrong — the ceiling was not a frame
+count and not the RD family's mechanism — and both were found by the fix, not by the diagnosis.
+
+| # | Entry | Went to |
+|---|-------|---------|
+| 0093 | The headless capture path dies past a few thousand frames, so the horizon cannot reach its own length | [Plan 0099](plans/done/0099-the-horizon-reaches-its-own-length.md), no ADR. **Closed 2026-08-16** |
 
 <!-- roster:end -->
 
@@ -1101,103 +1116,6 @@ verdict is the trigger, and it is scheduled.
 
 ---
 
----
-
-## 0093 — the headless capture path dies past a few thousand frames, so the horizon cannot reach its own headline length
-
-> **PROMOTED 2026-08-16** — [Plan 0099](plans/0099-the-horizon-reaches-its-own-length.md), whose
-> Phase 1 is exactly the `reaction_etching` run this entry names as the cheapest discriminator.
-
-**Raised by:** `architect`, at [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md)'s
-close, from that plan's Phase 2 findings. **Owner if taken:** `dev` — but read the mechanism below
-first, because the candidate cause is one line and the entry may be cheaper than it looks.
-
-- **Verified 2026-08-15** — the candidate mechanism is still exactly as stated below, and still
-  unfixed: `present: fn step_offscreen in: core/src/render/capture_api.rs`,
-  `absent: poll in: core/src/render/capture_api.rs`. The second probe is the whole hypothesis in one
-  line — the day anyone polls per frame in that file it goes red, which is the right moment to
-  re-read this entry whether or not the fix worked.
-- **Verified 2026-08-15, AND IT CONVICTED THIS ENTRY — reported by `dev` at Plan 0093 Phase 2,
-  corrected in place by `architect` at that plan's close.** The finding said *"Both shipped
-  reaction-diffusion worlds (`reaction_mitosis`, `reaction_verdigris`)"*. **There are three:**
-  `present: system = "reaction_diffusion" in: presets/reaction_etching.toml`. `reaction_etching`
-  landed in `6ebec33` on **2026-08-10**, five days before this entry was written, so this is a
-  **birth defect** — the class
-  [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) exists for,
-  found by the first pass that read the entry against the tree, by the instrument that pass was
-  building. It is corrected rather than closed because the finding it distorts is untouched: the
-  capture path still dies at 3,601 frames and the candidate mechanism is still one line. What the
-  correction costs the entry is its **scope argument**, and that half is now stated as the open
-  question it always was — see *Why it is worth an entry* below.
-
-### The finding
-
-**Two of the three shipped reaction-diffusion worlds** (`reaction_mitosis`, `reaction_verdigris`)
-fail at **3,601 frames** with `Buffer with 'lmv-capture-readback' label is invalid`, after the
-process's resident set climbs to **~2.9 GB**. The third, `reaction_etching`, **was never run** —
-it was shipped before this entry was written and was simply missed.  Measured on the Windows development box, hardware adapter, debug build,
-at 96x96 — the capture size is not the lever, since 2.9 GB is four orders above what 3,600 frames of
-96x96 RGBA would be.
-
-**It is pre-existing and not a defect in Plan 0085's new sampling primitive.** The shipped
-`Renderer::capture_preset` fails identically at the same frame count on the same preset, which was
-run as the control *before* this was called a finding. It is only visible now because nothing in
-this repo had ever driven a world for thousands of frames: the four synthesized gates capture 30,
-the reactivity gate a few hundred.
-
-### Why it is worth an entry
-
-**It bounds the instrument Plan 0085 just shipped.** `shot --horizon 10` is documented as ten
-simulated minutes — 36,001 renders — and on two shipped worlds it cannot get past 3,601. Those two
-rows in the plan's Phase 2 table are therefore a **0.5-minute** horizon, and their `monotone 1.00`
-is a world still settling into its pattern rather than drifting: a horizon shorter than a world's
-own warm-up reads settling *as* drift, which is precisely the misreading the instrument exists to
-prevent.
-
-**How wide the ceiling is, is open — and the entry originally overstated how well that was known.**
-Every world in the *measured* set other than these two cleared 36,001 renders, which is why this
-reads as a family ceiling rather than a general one. But the measured set was not the roster: it
-omitted `reaction_etching`, the third RD world, so the family evidence is two of three and nobody
-has run the member that would confirm it. Two readings survive that and the entry does not choose
-between them — a mechanism ceiling specific to RD's heavy per-frame ping-pong, or a *cost* ceiling
-that any sufficiently expensive world reaches and RD reaches first. **Running `reaction_etching`
-separates them, and it is the cheapest thing anyone can do here** — it costs one `shot --horizon`
-and it decides which of the two the fix has to answer.
-
-It is also **adjacent to, and not the same as,**
-[0083](design-backlog-archive.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against):
-that is the *live app's* resident set under preset switching, this is a *headless offscreen loop*
-that never rebuilds a surface. If they share a cause it would be worth knowing, and nothing
-currently says they do.
-
-### What a fix would be — with a candidate mechanism, stated as unverified
-
-`core/src/render/capture_api.rs:481` — **`step_offscreen` creates a command encoder, submits it, and
-never polls.** `capture::read_back` holds the only `device.poll` anywhere in the capture path, so
-between two sampled frames wgpu has no opportunity to release the transient resources each
-submission retains. At a 60-second interval that is **3,600 consecutive unpolled submits**. All
-three capture entry points (`capture_preset`, `capture_preset_over`, `capture_preset_at`) funnel
-through `step_offscreen`, which is exactly why the control failed the same way — and it would
-explain why an RD world, whose per-frame ping-pong is the heaviest in the engine, hits it first.
-
-**This is a hypothesis and nobody has run it.** The check is cheap: poll once per frame in
-`step_offscreen` and re-run `shot --horizon 10` on `reaction_mitosis` — and on `reaction_etching`,
-which has never been run at all and is what decides whether the ceiling is the family's or the
-cost's. If the RSS trace flattens,
-the fix is one line and the entry closes with a measurement; if it does not, the diagnosis is wrong
-and the real one starts from a GPU memory report rather than from this paragraph. **Do not close
-this by lowering a documented horizon** — the instrument's stated length is what makes a recorded
-header verdict comparable across worlds.
-
-### Priority
-
-**Medium.** Nothing ships broken — this is a QA path, not a runtime one, and the live app polls
-every frame through its own present. But it silently truncates the only instrument this project has
-for show-length behaviour, on the family that most needs it, and the truncation reads as a *result*
-(`monotone 1.00`) rather than as an error unless someone reads the run's stderr.
-
----
-
 ## 0094 — the `frame_ms_p99` tail is not switch-correlated, so the steady-state column does not remove it
 
 **Raised by:** `architect`, at [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md)
@@ -1748,10 +1666,71 @@ surface, attach on first non-degenerate `WM_SIZE`), or whether `needs_reattach` 
 from the same watchdog `1016777` added, which already re-derives visibility from the window every
 500 ms and is the obvious place to also notice a surface that never became real.
 
+### Reproduced independently 2026-08-16, on a second machine, with a worse symptom
+
+At [Plan 0102](plans/done/0102-the-component-ships.md)'s Phase 5 — the released component installed
+into a foobar2000 v2.25.10 profile on the dev box. **The revival mechanism this entry names was
+confirmed exactly**, and the symptom it describes was not the one observed.
+
+What was not seen: the panel was never black. It came up rendering a correct, well-formed attractor
+at full panel size, which is why nothing about it looked wrong.
+
+What was seen instead, from `plugin-diagnostics.log`: **6.5 fps, `frame_ms_avg` 135 -> 154 ms**,
+`frames_total` advancing exactly 7 per second-sample — **from the first sample of the session**, not
+degrading into it. One thread pegged `Running` at 52 of the process's 69 CPU-seconds over 66 s of
+uptime. `Responding` stayed `True`, so nothing was deadlocked; foobar2000's own status bar simply
+froze at `0:00 / 3:21` under playing audio and the playlist view showed no rows, because the host
+paints on the thread the renderer was consuming. **The user's report was "the plugin and interface
+is completely stale", and the interface half is the part this entry does not predict.**
+
+The recovery was this entry's own path, arrived at accidentally a second time: adding an album to
+the **playing** playlist put 44.1 kHz material through `ensure_handle`, and frame cost went to
+**17.6 ms at 56-58 fps** — `8.7x`, with `draw_calls` (30-31), `gpu_bytes` (2024640, byte-identical)
+and the preset all unchanged across the transition. That invariance is what rules out the obvious
+alternative: a cost that large which vanishes on an unrelated event is not the preset, the quality
+tier, or the GPU being busy.
+
+- **Verified 2026-08-16** — the field an operator would reach for cannot arbitrate this, exactly as
+  this entry already says: `gpu_bytes` was identical in the 6.5 fps and 57 fps stretches:
+  `present: gpu_bytes in: plugin-foobar/foo_lmv.cpp`
+
+**What this adds to the diagnosis.** A surface attached at a size that does not match the window
+does not only fail to present — it can present *expensively*, which looks like nothing being wrong
+at all. A fix that only restores the black case would leave this one standing, so the deferred-attach
+option in the section above is the safer of the two: re-checking `needs_reattach` from the watchdog
+repairs a surface that never became real, but this session's surface **did** become real enough to
+draw a correct picture.
+
+**The window is "panel creation until playback actually starts", and that is what makes the severity
+so variable.** Follow-up on the same box, once the playlist had content: a **brief** slow patch at
+the start of the first track on a fresh foobar2000, then correct for the rest of the session. That
+is the same defect with a short window, and it reconciles the two observations — the two-minute
+episode above was a session where **playback had not started at all** (title bar carried a track
+from the previous run, status bar sat at `0:00`, playlist empty), so no chunk had yet reached
+`ensure_handle` and nothing was scheduled to fix it. Press play early and the window is a moment;
+browse the library first and it lasts until you do.
+
+**That is the wrong way round for a new user.** Someone who has just installed a visualizer
+component opens it and *looks* at it before playing anything — which is precisely the path that
+holds the bad state open. The severity is inversely proportional to how quickly the user does the
+one thing that hides the bug.
+
+**What is not established.** Whether the slow present is the same degenerate attach or a second,
+adjacent defect in the same lifetime; nothing here measured the surface's actual configured size,
+because no instrument in this repo reports it. That gap is the first thing a fix should close.
+Nor was playback state at the start of the long episode captured directly — it is inferred from a
+status bar that the same defect was starving, so treat it as the reading that fits both runs rather
+than as an observation.
+
 ### Priority
 
-**Medium.** It is the first thing a new plugin user sees, it looks exactly like a broken component,
-and the recovery is invisible and accidental.
+**Was Medium, raised to High 2026-08-16.** The original grounds were that it is the first thing a
+new plugin user sees and looks exactly like a broken component. The reproduction above is worse than
+that on two counts: the component now **ships** ([Plan 0102](plans/done/0102-the-component-ships.md),
+`v0.70.0`), so a stranger meets this rather than a developer; and the failure is not confined to our
+panel — it makes **foobar2000 itself** feel dead, with no visible cause and nothing in the console.
+Compounding it, [0103](design-backlog.md) means the user cannot remove the panel by the documented
+route to escape. Whoever picks this up should read the two together.
 
 ## 0103 — the plugin's context menu shadows foobar's, so the panel cannot be removed from a layout
 
@@ -1779,3 +1758,99 @@ question, since sharing `wnd_proc` between both host kinds is deliberate in this
 
 **Medium-low.** One workaround exists and works, but it is undiscoverable, and "I cannot remove your
 component from my layout" is a bad first impression.
+
+## 0104 — `check-index-rows.mjs` has no assertion that it can convict, so a dead detector reads exactly like a clean tree
+
+Found at Plan 0105's close (2026-08-16), reviewing the gate that plan built.
+
+Of the three checkers in `scripts/`, this is the only one whose fixture asserts **exit 0**.
+`scripts/fixtures/README.md` argues the inversion is correct — *"a byte cap is trivially red on any
+tree with a fat row in it, so the interesting assertion is the reverse"* — and that was true of the
+tree it was written against, which still held 136 over-cap rows. **Phases 2-4 of the same plan made
+it false.** Nothing in the repo now contains a row the gate would reject, so nothing anywhere
+exercises its ability to reject one.
+
+The consequence is that the checker's row detection is unasserted. Demonstrated at the close by
+copying the script and replacing `TABLE_ROW` and `BULLET` with regexes that match nothing: the
+fixture reports `3 regions, 0 rows, 0 over cap` and **exits 0**, and so does the repo run. Every one
+of the three call sites — pre-push, the CI `links` job, the architect close ceremony — goes green.
+The per-file region and row counts the script prints are the documented mitigation, and they are
+*printed*, not asserted; nothing compares them to an expected number.
+
+This is the same non-vacuity class the other two gates were repaired for.
+[Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md) found the link checker
+covering one of markdown's two link forms, and
+[Plan 0094](plans/done/0094-the-two-doc-gates-check-what-they-claim-to.md) found a directory-name
+skip swallowing a real tree and a whole half of ADR-0108's rule invisible to a bullet-driven check.
+Both now ship fixtures that expect **exit 1 with an exact break count**, and
+`check-backlog-claims.mjs` additionally carries a `--self-test` whose non-vacuity assertion is
+pinned to the real repository rather than to the fixture.
+
+- **Verified 2026-08-16** — the script has no self-test:
+  `absent: self-test in: scripts/check-index-rows.mjs`
+- **Verified 2026-08-16** — its fixture is documented as the one that passes rather than fails:
+  `present: Expect \*\*exit 0\*\* in: scripts/fixtures/README.md`
+- **Verified 2026-08-16** — the sibling gate has the mechanism this one lacks:
+  `present: --self-test in: scripts/check-backlog-claims.mjs`
+
+### What a fix would be
+
+Two shapes, and they are not exclusive. A **second fixture root** — `scripts/fixtures/index-rows-red/`
+with one over-cap row inside a marked region, run as its own root and expected to exit 1 with
+exactly one break — keeps the existing green fixture's four negative assertions intact rather than
+flipping them. Or a **`--self-test`** on the model `check-backlog-claims.mjs` already carries,
+asserting the green fixture's own counts (3 regions, 4 rows) so a detector that finds nothing fails
+loudly. The `--self-test` is the cheaper of the two and covers the demonstrated mutation; the red
+fixture additionally covers the reporting path, which nothing currently runs either.
+
+[ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) names the *marker*
+hole in its Negative section and pins it as deliberate behavior in the fixture. It does not name
+this one, and its dated `Outcome` now says so.
+
+### Priority
+
+**Medium.** Nothing is broken today — the gate was verified working by hand at Plan 0105's close,
+and the fix is small. What makes it worth an entry is the failure mode: a silent one, in a gate
+whose entire argument ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md))
+is that a rule nothing re-runs is a rule nobody follows. A check that re-runs and cannot fail is the
+same rule wearing a green tick.
+
+## 0105 — the component's READ-ME-FIRST states the SDK it was built against, and on the pre-staged route nothing checks that claim
+
+Found at [Plan 0102](plans/done/0102-the-component-ships.md)'s close (2026-08-16), reviewing the
+recipe that plan built.
+
+`packaging/foobar/build-component.ps1` substitutes `@SDK_VERSION@` into the shipped
+`READ-ME-FIRST.txt` from `packaging/foobar/sdk-pin.ps1`'s `$LmvSdkVersion` — the **pin**, which is
+what the recipe intends to have been built against. What it verifies about the SDK actually on disk
+is one existence test, `plugin-foobar/sdk/foobar2000/SDK/foobar2000.h`. The two are the same fact
+only on the fetch route, where `fetch-sdk.ps1` downloaded the pinned archive and checked its
+SHA-256.
+
+[ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) makes
+the **pre-staged** route first-class — "how the SDK reaches the build host is a parameter of the
+recipe rather than a property of it" — and `plugin-foobar/README.md` documents unpacking it by hand.
+On that route a developer with an older SDK unpacked at `plugin-foobar/sdk/` produces a component
+whose reader-facing document asserts a build against 2025-03-07, with every one of the recipe's
+seven fatal checks green. Nothing downstream can tell, because the SDK version is not in the DLL.
+
+The fix is cheap and the recipe is one grep short of it: the SDK archive ships `sdk-readme.html`
+carrying `<h1>foobar2000 SDK, version 2025-03-07</h1>`, so the staged tree states its own version
+and `build-component.ps1` can fail when it disagrees with the pin instead of asserting over it. That
+also closes the smaller half — the script's own `ok: SDK <version> staged` line prints the pin, not
+what is staged.
+
+- **Verified 2026-08-16** — the recipe never reads the SDK's own version marker:
+  `absent: sdk-readme in: packaging/foobar/build-component.ps1`
+- **Verified 2026-08-16** — but it does stamp a version claim into what ships:
+  `present: @SDK_VERSION@ in: packaging/foobar/build-component.ps1`
+- **Verified 2026-08-16** — the only thing asserted about the staged tree is that a header exists:
+  `present: foobar2000.h in: packaging/foobar/build-component.ps1`
+
+### Priority
+
+**Low.** CI takes the fetch route, so nothing published today can carry the wrong claim, and the
+window is a developer who hand-staged a different SDK and then shipped that build. It is filed
+because the recipe's whole argument is that a local run is held to CI's bar
+([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)'s model, applied by
+ADR-0115) — and this is the one assertion where the local route is held to a looser one.

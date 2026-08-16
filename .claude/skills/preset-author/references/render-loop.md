@@ -129,13 +129,17 @@ own header** — `presets/attractor_ink.toml` carries the first one and is the s
 
 Two live bounds worth knowing before trusting a row:
 
-- The headless capture path **dies past ~3,600 frames on both reaction-diffusion worlds**
-  (design-backlog 0093), so those two cannot reach a ten-minute horizon yet.
 - A horizon **shorter than the world's own warm-up reads settling as drift**. `reaction_verdigris`
   reads `monotone 1.00` over 30 s purely because its pattern is still establishing.
+- **A run that ends short says so**, since Plan 0099: a `--horizon` the `--interval` does not divide
+  is floored to the last whole interval and the header states the length actually **reached**, and a
+  run that dies prints a `TRUNCATED` block where the table goes. *(This bullet used to say the
+  reaction-diffusion worlds die past ~3,600 frames. That was a capture path that never polled,
+  repaired 2026-08-16; all three now reach the full ten minutes.)*
 
-Cost: ~3,600 renders per simulated minute — roughly 10 s of wall clock per simulated minute at
-96x96 on a hardware adapter. Slow by construction, which is exactly why it is a spot-check rather
+Cost: ~3,600 renders per simulated minute — measured at 96x96 on a hardware adapter, a ten-minute
+horizon is **16 s** for a single-pass world and **54 s** for a reaction-diffusion one. Slow by
+construction, which is exactly why it is a spot-check rather
 than a gate (ADR-0099); budget a sitting. Full reference: the "horizon" section of
 `docs/capturing.md`.
 
