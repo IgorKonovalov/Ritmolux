@@ -118,9 +118,11 @@ flowchart LR
 - **Files touched:** `standalone/src/config.rs`, `standalone/src/settings.rs`,
   `standalone/src/main.rs`, `README.md`.
 - **How:** Add `now_playing: bool` (default **true**) to the `[hud]` section
-  [Plan 0096](0096-the-hud-gets-out-of-the-way.md) introduces, and a `Now playing` row beside its
-  `Preset name` row, following the same action-and-persist path. If 0096 has not landed when this
-  phase runs, create `[hud]` here and note it so 0096's phase does not duplicate the section.
+  [Plan 0096](done/0096-the-hud-gets-out-of-the-way.md) introduces, and a `Now playing` row beside
+  its `Preset name` row, following the same action-and-persist path. **0096 closed 2026-08-16, so
+  `[hud]` already exists** (`standalone/src/config.rs`, `#[serde(default)]`, one key) — this phase
+  adds a second key to it rather than creating the section, and the conditional this bullet used to
+  carry is discharged.
 - **Done when:** The menu row toggles the banner live and the choice survives a restart; with it
   off, a track change draws nothing. `README.md` documents the banner, the row, and that metadata
   is Windows-only on the standalone path.
@@ -211,7 +213,7 @@ pub struct NowPlaying {
 
 - **No macOS metadata source.** See the risk above; it would need its own ADR.
 - **No album art, no elapsed-time readout, no scrolling marquee.** One transient two-line banner.
-- **No preset-name changes** — that is [Plan 0096](0096-the-hud-gets-out-of-the-way.md).
+- **No preset-name changes** — that is [Plan 0096](done/0096-the-hud-gets-out-of-the-way.md).
 - **No reactive coupling.** The banner is informational; nothing in the analysis or preset layer
   learns that a track changed. (The director already has its own track-change notion for
   rotation; this plan does not touch it.)
