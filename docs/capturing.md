@@ -1219,6 +1219,7 @@ loads without it and renders something its author never drew:
   files seen                     10347  100.0 %
   parse                          10347  100.0 %
   compile                         8289   80.1 %
+  render non-blank                8063   77.9 %
 
 WHY A FILE DID NOT CONVERT, ranked:
     1217   11.8 %  warp shader disk-texture
@@ -1234,12 +1235,16 @@ WHY A FILE DID NOT CONVERT, ranked:
        2    0.0 %  per_frame_init
 ```
 
-Read together: **8 289 presets (80.1 %) now convert whole, shaders included** —
-which is about 97 % of everything not bound to a disk texture. The `unsupported`
-and `parse` rows (under 2 % combined) are HLSL arrays, computed `#if`
-conditions and similar exotica, each rejected by name. On the 552-preset
-original pack, where disk textures are rarer, the same run reads 476 converted
-(86.2 %) and 471 render non-blank (85.3 %) under the probe.
+Read together: **8 289 presets (80.1 %) now convert whole, shaders included,
+and 8 063 (77.9 %) render non-blank under the probe** — the converted set is
+about 97 % of everything not bound to a disk texture. The `unsupported` and
+`parse` rows (under 2 % combined) are HLSL arrays, computed `#if` conditions
+and similar exotica, each rejected by name. Of the 226 converted-but-blank
+presets, 218 declare MilkDrop 2 — their shaders *ran*, so those are
+shader-fidelity findings — and the 8 shaderless blanks are the same 8 the
+pre-Phase-6 probe found. On the 552-preset original pack, where disk textures
+are rarer, the same run reads 476 converted (86.2 %) and 471 non-blank
+(85.3 %).
 
 **Both predictions held**, which is the result that says the ranking is about the
 corpus. The shaderless share landed at 17.9 % against a predicted 18 % — as close
