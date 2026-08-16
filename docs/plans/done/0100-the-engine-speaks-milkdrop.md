@@ -1,15 +1,20 @@
 # 0100 — The engine speaks MilkDrop
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-16. Six dev phases in commits `2603309`–`0948cf2`; Mode 4
+> review: no blockers, one major (the `warp_mesh` palette surface missing from
+> `docs/preset-palettes.md`, repaired at the close), two index-row minors. Phases 7/8 run at the
+> close: fidelity **mostly there, with defects** (four filed, backlog 0106–0108); HDR **merely
+> different** — the finding the plan predicted would outweigh the feature; provenance **decide
+> later** (nothing ships, user-supplied directory only).
 > **Created:** 2026-08-16
 > **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (MilkDrop presets are translated ahead of time onto a warp-mesh idiom)
+> **Related ADRs:** [0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (MilkDrop presets are translated ahead of time onto a warp-mesh idiom)
 
 ## TL;DR
 
 The engine gains a **warp-mesh render idiom** — a per-vertex mesh that resamples the previous
-frame, generalizing [ADR-0048](../adrs/0048-transformed-feedback.md)'s single shared transform —
+frame, generalizing [ADR-0048](../../adrs/0048-transformed-feedback.md)'s single shared transform —
 and a **dev-only converter** that translates `.milk` presets onto it ahead of time. The first phase
 ships a native, preset-authorable warp-mesh scene that stands alone whether or not the import half
 ever finishes. The last phases add the MilkDrop 2 pixel shaders behind a stop condition, so the
@@ -33,14 +38,14 @@ here**, and Phase 7 is where a human says whether it does.
 The obstacle is that a `.milk` file is not data. It is two imperative EEL2 programs (per-frame and
 per-vertex), up to four custom waves and four custom shapes with their own code, and — since
 MilkDrop 2 — a warp and a composite pixel shader in HLSL. This project's expression layer is
-deliberately **pure and total** ([ADR-0002](../adrs/0002-layered-preset-architecture.md),
-[ADR-0020](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md)) and has no assignment, no
+deliberately **pure and total** ([ADR-0002](../../adrs/0002-layered-preset-architecture.md),
+[ADR-0020](../../adrs/0020-preset-grammar-v2-branching-functions-tempo.md)) and has no assignment, no
 sequencing, no memory and no shader compile — and that purity underwrites both
-[NFR §6](../nfr.md#6-determinism) and the property that a preset cannot crash the app.
+[NFR §6](../../nfr.md#6-determinism) and the property that a preset cannot crash the app.
 
 ## Decision
 
-Per [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md):
+Per [ADR-0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md):
 **translate ahead of time, run natively.** A converter binary outside `default-members` parses
 `.milk`, compiles EEL2 to bytecode and HLSL to WGSL, and emits a bundle; the engine gains a
 `warp_mesh` scene and a small stack VM to execute the bytecode. No `.milk` text, no HLSL and no
@@ -105,7 +110,7 @@ sized by it rather than by estimate. Counted by `grep` over the preset text, so 
 
 **The 82 % is the number to carry into Phase 6.** Its stop condition is not a tail risk — it decides
 whether four fifths of the corpus renders as authored. Phases 1–5 landing alone is still a real
-outcome, but [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
+outcome, but [ADR-0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
 Alternative D should be read as *~1,847 presets plus a native idiom*, not as "most of it works".
 
 **The 4 % on `megabuf` lets Phase 2 size its arena from evidence.** EEL2's reference `megabuf` is
@@ -125,7 +130,7 @@ the corpus actually uses and refuse the rest **by name**, per Phase 3's no-silen
   (new), `core/src/render/scenes/mod.rs`, `presets/README.md`, `docs/presets.md`,
   `core/tests/fixtures/`.
 - **Notes for the implementer:**
-  - The mesh is a **resolution, not a shape** ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+  - The mesh is a **resolution, not a shape** ([ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
     Every screen-destined coordinate — the UV projection, `rad`, `ang` — takes its aspect from the
     **render target**, never from `meshx`/`meshy`. This family has shipped that bug three times
     elsewhere; the grid here is user-visible and quantized, so it is the most likely place for a
@@ -133,15 +138,15 @@ the corpus actually uses and refuse the rest **by name**, per Phase 3's no-silen
   - Per-vertex bindings get `x`, `y`, `rad`, `ang` **only inside a `[per_vertex]` table**, by the
     same mechanism `index` already uses for per-element evaluation. This does not widen the grammar
     for other systems.
-  - A new pass means [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md)
+  - A new pass means [ADR-0058](../../adrs/0058-bind-group-layout-collisions-carry-evidence.md)
     applies: if its bind-group layout shape matches a live pipeline's, it needs an allowlist entry
     carrying the reason.
 - **Done when:** a native `warp_mesh` preset in `core/tests/fixtures/` renders a radial pulse from
   a `[per_vertex]` binding over `rad`, and passes `sanity`, `animation` and `reactivity`. **The mesh
-  grid is a tier capacity** (`TierConfig`, [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md)),
+  grid is a tier capacity** (`TierConfig`, [ADR-0045](../../adrs/0045-quality-tiers-floor-and-rich.md)),
   and its `Floor` value is **the output of a measurement, not a guess**: raise the grid until
   per-frame mesh evaluation costs more than **1 ms — 6 % of the 16.67 ms budget
-  [NFR §1](../nfr.md#1-performance--adaptive-quality) commits to at 1080p** — and cap `Floor` one
+  [NFR §1](../../nfr.md#1-performance--adaptive-quality) commits to at 1080p** — and cap `Floor` one
   step below. Record the number and the machine. `Rich` may go to the format's maximum
   (`meshx` ≤ 128, `meshy` ≤ 96) if it measures clean, and lower if it does not.
 
@@ -152,13 +157,13 @@ the corpus actually uses and refuse the rest **by name**, per Phase 3's no-silen
   that executes it. The VM is the only half that ships.
 - **Files touched:** `core/src/milk/vm.rs` + `core/src/milk/bytecode.rs` (new), `milkconv/` (new
   workspace member, **outside `default-members`** exactly as `lmv-core-cabi` is —
-  [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md)), root `Cargo.toml`.
+  [ADR-0072](../../adrs/0072-the-c-abi-ships-from-its-own-crate.md)), root `Cargo.toml`.
 - **Notes for the implementer:**
   - The VM's registers and `megabuf`/`gmegabuf` scratch are a **fixed arena allocated once at
     preset load**. Zero heap allocation per frame; this runs on the render thread, and
-    [NFR §5](../nfr.md#5-real-time-safety-testable-restatement) governs it.
+    [NFR §5](../../nfr.md#5-real-time-safety-testable-restatement) governs it.
   - No clock reads and no unseeded randomness. EEL2's `rand()` is salted per preset from the same
-    mechanism [ADR-0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md) already
+    mechanism [ADR-0051](../../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md) already
     uses, so a converted preset is reproducible and the capture harness stays a pure function of
     its inputs.
   - Division by zero, `log(0)` and friends are **total** — the VM returns a defined value and never
@@ -184,7 +189,7 @@ the corpus actually uses and refuse the rest **by name**, per Phase 3's no-silen
   plus the read-only inputs `bass`/`mid`/`treb` and their `_att` variants, `time`, `frame`, `fps`,
   `progress`, `meshx`, `meshy`, `aspectx`, `aspecty`. **An unrecognized name is a named warning, not
   a silent zero** — a preset that reads a variable we do not supply must say so, in the shape a
-  typo warning already takes ([ADR-0020](../adrs/0020-preset-grammar-v2-branching-functions-tempo.md)).
+  typo warning already takes ([ADR-0020](../../adrs/0020-preset-grammar-v2-branching-functions-tempo.md)).
 - **Done when:** a real `.milk` file from a public collection converts and renders as **recognizably
   the same preset** as its published description — motion in the right direction, at the right
   rate, reacting to the same bands. This is the plan's moment of truth and the verdict is a
@@ -199,7 +204,7 @@ the corpus actually uses and refuse the rest **by name**, per Phase 3's no-silen
   per-point code, the inner and outer borders (`ib_*`, `ob_*`), and the motion-vector grid (`mv_*`).
 - **Files touched:** `core/src/render/scenes/warp_mesh/`, `milkconv/src/`.
 - **Notes for the implementer:** the waveform and custom shapes are line and point geometry — the
-  shared line renderer is the natural target, and [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md)'s
+  shared line renderer is the natural target, and [ADR-0059](../../adrs/0059-line-scenes-colour-along-their-generator-axis.md)'s
   palette contract applies to anything drawn through it.
 - **Done when:** each `wave_mode` renders distinguishably from the others under one fixture, custom
   shapes honour their per-point program, and a preset using borders and motion vectors shows both.
@@ -217,7 +222,7 @@ the corpus actually uses and refuse the rest **by name**, per Phase 3's no-silen
   sharply with either is evidence about *the converter* rather than about the corpus. That is the
   whole reason the census was taken first, and it costs nothing to state the prediction in
   advance. **This is a measurement and it asserts no threshold** — per
-  [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md), a
+  [ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md), a
   coverage percentage is a property of the corpus and the converter at one moment, so it is
   recorded with both named and is never a gate. The ranked failure reasons are the output that
   matters: they are the work list for whether Phase 6 is worth starting.
@@ -239,7 +244,7 @@ the corpus actually uses and refuse the rest **by name**, per Phase 3's no-silen
     **51 % of the corpus reads one**, which makes them the most common sampler after `main`.
     MilkDrop generates them internally from a seeded RNG at startup, so they are ours to generate
     too: a fixed set built once at device init, deterministic under
-    [ADR-0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)'s rule, no disk file
+    [ADR-0051](../../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)'s rule, no disk file
     and no bundle payload. **A preset sampling a missing one does not fail — it renders wrong**,
     which is the failure class this plan's Risks call the worst for reputation.
   - **Bound every loop in the converter and record the instruction count.** A converted shader can
@@ -250,11 +255,11 @@ the corpus actually uses and refuse the rest **by name**, per Phase 3's no-silen
   reference implementations are a C++ chain (`hlsl2glslfork` + `glsl-optimizer`) with no Rust
   equivalent, and vendoring one into `milkconv` may be more than this plan can carry — **the plan
   stops here.** Phases 1–5 stand as MilkDrop 1.x-class fidelity plus a native warp-mesh idiom, which
-  is [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
+  is [ADR-0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
   Alternative D and an honest landing zone. Record the reason and close.
 - **Done when:** a MilkDrop 2 preset with custom warp and composite shaders renders, and the
   **shipped** binary's size delta against `main` is measured and stated
-  ([NFR §4](../nfr.md#4-size-and-dependencies) expects it to be near zero, since the translator is
+  ([NFR §4](../../nfr.md#4-size-and-dependencies) expects it to be near zero, since the translator is
   in `milkconv` — measuring is how we find out it was not).
 
 ### Phase 7 — does it actually look right
@@ -308,10 +313,10 @@ pub struct MilkBundle {
 - **Phase 6 may be the whole plan's cost.** The HLSL→WGSL chain is the only part with no clear
   route, which is why it is last and why it has a stop condition rather than a hope.
 - **The binary budget is tighter than when this plan was written, and Phase 6 is where we find
-  out.** [Plan 0097](done/0097-the-track-announces-itself.md) closed 2026-08-16 and took the
-  shipped `foo_lmv.dll` to **8,879,104 B against [NFR §4](../nfr.md#4-size-and-dependencies)'s
+  out.** [Plan 0097](0097-the-track-announces-itself.md) closed 2026-08-16 and took the
+  shipped `foo_lmv.dll` to **8,879,104 B against [NFR §4](../../nfr.md#4-size-and-dependencies)'s
   ~10 MB soft cap — about 1.07 MB of headroom**, the tightest that component has had;
-  [`docs/specs/0001-c-abi.md`](../specs/0001-c-abi.md) now carries the rule that came out of it,
+  [`docs/specs/0001-c-abi.md`](../../specs/0001-c-abi.md) now carries the rule that came out of it,
   that the next dependency added there re-measures rather than assumes. What *this* plan ships into
   that same binary is the VM, the bundle loader and the `warp_mesh` scene — small Rust, with `naga`
   already inside wgpu — so the expected delta is tens of KB, not MB. **The reading stays at Phase 6
@@ -334,14 +339,14 @@ pub struct MilkBundle {
   eliminated. This is the residual of the full-fidelity scope call.
 - **Contention:** Phase 1 edits `core/src/preset/schema.rs` and `core/src/render/scenes/mod.rs`,
   which nothing on the current roster touches. It does **not** contend with
-  [0092](0092-the-engine-draws-an-authored-path.md) or [0098](0098-the-figure-nests-properly.md)
-  (both `shape_field.rs`) or [0087](0087-the-line-renderer-draws-a-curve.md) (`lines/`). Phase 4
+  [0092](../0092-the-engine-draws-an-authored-path.md) or [0098](../0098-the-figure-nests-properly.md)
+  (both `shape_field.rs`) or [0087](../0087-the-line-renderer-draws-a-curve.md) (`lines/`). Phase 4
   draws through the shared line renderer and **would** contend with 0087 — sequence them.
 
 ## What this plan does NOT do
 
 - **It does not widen the expression grammar.** EEL2 gets its own machine precisely so
-  [ADR-0002](../adrs/0002-layered-preset-architecture.md)'s purity survives. No assignment, no
+  [ADR-0002](../../adrs/0002-layered-preset-architecture.md)'s purity survives. No assignment, no
   sequencing and no memory enter the native preset language.
 - **It does not ship a runtime `.milk` parser.** Conversion is ahead of time, always.
 - **It does not import MilkDrop's `textures/` directory or its user texture sampling.** Presets
@@ -484,7 +489,7 @@ happened; `--render` adds the third count by loading every converted preset into
 headless renderer. It **asserts no threshold and exits zero however bad the
 numbers are** (ADR-0071) — a non-zero exit would make it a gate the first time
 somebody put it in a script. The full table is in
-[`docs/capturing.md`](../capturing.md).
+[`docs/capturing.md`](../../capturing.md).
 
 **Both census predictions held**, which is the result that says the ranking is
 about the corpus rather than about the converter:
@@ -659,10 +664,54 @@ side by side in `docs/capturing.md`.
   compile EEL2**, and a fixture assembled by hand pins the assembler rather than
   the semantics.
 
+## Phases 7 and 8, run at the close (architect session, 2026-08-16)
+
+**The rig.** Real MilkDrop 2 via `foo_vis_milk2` 0.2.0.0 (DX11) in foobar2000 v2, reading the
+552-file original pack; this engine via the release `lmv.exe` reading 25 converted presets through
+`LMV_PRESET_DIR`. One track playing in foobar fed both — the component directly, this engine over
+loopback. Seven presets judged side by side: *Contortion (Escher's Tunnel Mix)*, *Songflower (Moss
+Posy)*, *chasers 19 Portal*, *Blur Mix 3*, *Cauldron painterly 5*, *Cosmic Dust 2*, *Fog Tunnel*.
+
+**Phase 7 verdict (user, 2026-08-16): mostly there, with defects — and the HDR pipeline makes the
+presets *merely different*, not better.** The second half is the finding the plan said would be
+worth more than the feature, and it is recorded as such — with one qualifier the evidence supports:
+the verdict is dominated by defect (1) below, which inverts or washes the tone of every
+feedback-heavy preset, so "better" cannot be fairly re-judged until it is fixed. *Blur Mix 3*, the
+one pair whose tone survived, looked genuinely good.
+
+Structure, motion and audio reactivity survive conversion in every pair — the bones are right.
+Four defects, each observed in at least two pairs, each mechanistically distinct
+(filed as design-backlog 0106–0108):
+
+1. **The float field never truncates.** MilkDrop's 8-bit target floors `decay`-scaled dim pixels
+   to zero; our `Rgba16Float` field keeps them, and they accumulate. One mechanism, three
+   presentations: pastel wash (*Songflower*, *Cosmic Dust 2*), white-hot glow (*Contortion*),
+   full runaway-to-clamp with channel fringing (*Portal*) — and *Fog Tunnel* renders tonally
+   **inverted** (dark preset on a white plateau). The dominant fidelity defect; likely one
+   warp-epilogue floor emulating the reference's quantization.
+2. **The waveform draw layer misplaces or drops figures.** *Blur Mix 3* draws one steep diagonal
+   stroke where the reference draws horizontal traces; *Cauldron*'s centrepiece spiro scribble is
+   absent; *Cosmic Dust 2*'s dotted trails (`wave_usedots`) never appear.
+3. **A horizontal reflection seam in the warp's sampling** — content mirrors across a horizontal
+   line with a bright ragged boundary (*Contortion*'s split sphere, *Cauldron*'s flipped top band,
+   *Cosmic Dust 2*'s full-width "horizon"). Fingerprint suggests the wrap path's address mode or a
+   v-axis flip, not the `ang` wrap first suspected.
+4. **`chasers 19 Portal`'s mirror symmetry is absent** — the preset converts cleanly, yet the
+   uv-fold that makes the portal never takes effect.
+
+**Phase 8 verdict (user, 2026-08-16): decide later.** No distribution now; nothing third-party
+enters the repository or a release, and the import path remains what it already is — the converter
+plus a user-supplied directory (`LMV_PRESET_DIR`). The licensing question stays open and is
+re-raised when the fidelity work above makes shipping worth deciding. Recorded in
+`docs/presets.md`.
+
 ## Followups (after this lands)
 
+- **The Phase 7 fidelity work list — design-backlog 0106 (truncation floor), 0107 (draw-layer and
+  warp geometry defects), 0108 (conversion tail: HLSL arrays ~71 files, the 218 MD2
+  converted-but-blank).** The HDR verdict is re-judged after 0106.
 - Per-vertex evaluation on a compute shader, if Phase 1's cap lands low enough to hurt.
 - A `warp_mesh` content cohort — the idiom is native and authorable, and
-  [Plan 0104](0104-the-library-stops-being-lopsided.md)'s per-system floor will apply to it once it
+  [Plan 0104](../0104-the-library-stops-being-lopsided.md)'s per-system floor will apply to it once it
   exists.
 - MilkDrop's `textures/` support, if Phase 5's failure ranking says it is a large class.

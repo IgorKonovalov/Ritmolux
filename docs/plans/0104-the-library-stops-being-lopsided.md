@@ -181,12 +181,12 @@ entries are seventeen worlds or a family that converged.
   produces the list.
 - **It does not target 100 presets.** The floor is four per system, arrived at by counting rather
   than by ambition.
-- **It does not cover `warp_mesh`** ([Plan 0100](0100-the-engine-speaks-milkdrop.md)), which does
+- **It does not cover `warp_mesh`** ([Plan 0100](done/0100-the-engine-speaks-milkdrop.md)), which does
   not exist yet. When it does, the per-system floor applies to it too.
 
 ## Followups (after this lands)
 
 - An ADR adding `preset-author` to the `Owner skill:` vocabulary.
-- A `warp_mesh` cohort once [0100](0100-the-engine-speaks-milkdrop.md) Phase 1 lands.
+- A `warp_mesh` cohort once [0100](done/0100-the-engine-speaks-milkdrop.md) Phase 1 lands.
 - Re-run `node scripts/docs-shots.mjs` if any gallery preset is retired — the committed images name
   presets by hand.
