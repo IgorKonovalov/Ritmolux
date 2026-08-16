@@ -1,7 +1,8 @@
 # On-device validation — low-end Windows iGPU smoke
 
-> **Status:** standing / mostly hardware-gated — **does not block plan closes.** (One item, the
-> Plan 0044 `Rich` calibration, is runnable on the dev box today; it has its own section.)
+> **Status:** standing / mostly hardware-gated — **does not block plan closes.** (Two items, the
+> Plan 0044 `Rich` calibration and the Plan 0102 foobar2000 component install, are runnable on the
+> dev box today; each has its own section.)
 > **Owner:** human (the user; only runnable on the target hardware).
 > **Created:** 2026-07-22 (extracted from Plan 0012 Phase 3).
 
@@ -231,6 +232,40 @@ not run at the plan's close, so the rich tier currently ships numbers nobody has
       `[quality] tier`, so remember to set it back (or pass `--tier`, which still wins at launch)
       before running anything that assumes the default. Plan 0050's own Phase 6 item 3 asks for
       exactly this measurement; whichever runs first satisfies both.
+
+## Runnable now — the foobar2000 component's clean-profile install (Plan 0102 Phase 5)
+
+**Also not hardware-gated**, and it is the *only* functional check the component has.
+[NFR §8](nfr.md#8-distribution-v1) names this file as where the answer lives, because no CI runner
+can load foobar2000 — the same gap the macOS path has
+([ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md),
+Negative).
+
+Two things make this a real check rather than a formality. It must run against the **released**
+zip, not `plugin-foobar/build.ps1 -Install` — an artifact that has only ever been installed over its
+own build directory has never exercised the path a user takes, and the release route additionally
+exercises the SDK fetch, the runner's MSVC and the three-zip count. And the dev box already carries
+`%APPDATA%\foobar2000-v2\user-components-x64\foo_lmv\` from that inner loop, so **remove it first**,
+or an older copy shadows the one under test and the version check means nothing.
+
+- [ ] **Install the released component into a clean profile and play something.** Download
+      `light-music-visualizer-v<version>-foobar2000-component.zip` from the Releases page, unzip,
+      and install via File → Preferences → Components. Then, in this order:
+      **(a)** the Components list shows the released version, not the dev build's;
+      **(b)** dock it as a Default UI panel **before playing anything** and record whether it comes
+      up black — this is [backlog 0102](design-backlog.md), which says the panel renders without
+      presenting and revives only at a track boundary, and one reporter's account is all the
+      evidence there is;
+      **(c)** open the pop-out from View → Light Music Visualizer;
+      **(d)** play a track, confirm it reacts, change track, press `Space` a few times;
+      **(e)** in layout-editing mode, right-click the panel and check whether Remove is reachable —
+      this is [backlog 0103](design-backlog.md), expected to fail, and confirming it on a second
+      machine is worth the ten seconds;
+      **(f)** `%APPDATA%\light-music-visualizer\` exists and is the same folder the standalone uses.
+      **Escalation:** a failure is a new backlog entry or a followup plan, never a re-opened plan —
+      on-device checks do not gate closes here. (b) and (e) failing is the *expected* result and
+      confirms two filed defects rather than finding new ones; anything else is new.
+      _(Plan 0102 Phase 5, carried forward at that plan's close 2026-08-16.)_
 
 ## How to run
 

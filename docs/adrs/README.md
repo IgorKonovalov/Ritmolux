@@ -54,7 +54,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0035](0035-asymmetric-attack-release-easing.md) | Asymmetric easing: `[smoothing]` accepts an `{ attack, release }` pair (supplements ADR-0019) | accepted |
 | [0037](0037-internal-grid-is-a-resolution-not-a-shape.md) | An internal grid is a **resolution**, not a **shape**: aspect comes from the render target | accepted (Plan 0035) |
 | [0036](0036-preset-reachable-spectrum.md) | Preset-reachable spectrum: a scalar `bin(x)` function, an N-element spectrum scene, and per-element evaluation as a bounded third step | accepted 2026-07-27 (Outcome) |
-| [0038](0038-tag-driven-release-unsigned-universal-mac-app.md) | Distribution: a tag-driven GitHub Release carrying an unsigned, ad-hoc-signed universal macOS `.app`; standalone binaries only | accepted (Plan 0036; Outcome) |
+| [0038](0038-tag-driven-release-unsigned-universal-mac-app.md) | Distribution: a tag-driven GitHub Release carrying an unsigned, ad-hoc-signed universal macOS `.app`; standalone binaries only | accepted (Plan 0036; Outcome; extended by 0115) |
 | [0039](0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md) | 0039 — Verify easing with a deterministic transient probe, not a committed audio clip | accepted |
 | [0040](0040-spectrum-level-curve-applies-before-the-easing.md) | The spectrum level curve applies *before* the per-element easing, and is a bindable exponent rather than a named mode | accepted (Plan 0038; Outcome) |
 | [0041](0041-line-joins-are-per-endpoint-on-the-segment-instance.md) | Line joins are a per-endpoint flag on the segment instance, not a global cap rule | accepted (Plan 0039; Outcome) |
@@ -131,7 +131,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0112](0112-a-blender-model-enters-as-inline-mesh-data-and-the-gpu-scatters-its-points.md) | A Blender model enters as inline mesh data, and the GPU scatters its points | proposed |
 | [0113](0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) | MilkDrop presets are translated ahead of time onto a warp-mesh idiom | accepted 2026-08-16 (Outcome) |
 | [0114](0114-the-engine-renders-video-offline-and-delegates-encoding.md) | The engine renders video offline and delegates encoding to a pipe | accepted 2026-08-16 (Outcome) |
-| [0115](0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) | The foobar2000 component is a released artifact, and the SDK is a build parameter | accepted 2026-08-16 |
+| [0115](0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) | The foobar2000 component is a released artifact, and the SDK is a build parameter | accepted 2026-08-16 (Plan 0102; Outcome) |
 | [0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) | An index row is a pointer, and a gate holds it to one | accepted 2026-08-16 (Plan 0105; Outcome) |
 
 <!-- roster:end -->

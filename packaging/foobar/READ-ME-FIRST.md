@@ -75,21 +75,34 @@ Deleting the folder resets it; it is recreated on the next launch.
   - Nothing in the Components list after restarting: you are almost certainly
     on 32-bit foobar2000. See section 1.
 
-  - The panel is black and never moves: the engine failed to start. Open
-    View -> Console (foobar2000's own log) and look for lines starting with
-    "foo_lmv:".
+  - A DOCKED PANEL is black and never moves: this one is a known defect in
+    this build, not a broken install. Play a track and let it change to the
+    next one - the panel usually comes to life at a track boundary and stays
+    alive from then on. Nothing appears in the Console when this happens, so
+    an empty log is not a clue. Please tell us if you hit it; how often it
+    happens is the part we cannot measure from here.
+
+  - The POP-OUT window is black and never moves: that one really is the
+    engine failing to start. Open View -> Console (foobar2000's own log) and
+    look for lines starting with "foo_lmv:".
 
   - It draws, but never reacts to the music: playback has to be running -
     the visuals idle when nothing is playing.
+
+  - You cannot remove the panel while editing the layout: right-click gives
+    you our menu instead of foobar2000's, which is a known defect too. Use
+    Preferences -> Display -> Default User Interface and remove it from the
+    layout tree there.
 
 
 6. What to send back
 --------------------
 
-Four things, however roughly:
+Five things, however roughly:
 
   - Did it install, and does the Components list show version @VERSION@?
   - Does it react to playback, in the pop-out window and as a docked panel?
+  - Was the docked panel black at first, and did a track change fix it?
   - Does it survive a track change and pressing Space a few times?
   - What graphics card do you have, and any "foo_lmv:" lines from the Console.
 
