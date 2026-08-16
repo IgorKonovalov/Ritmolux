@@ -5,7 +5,7 @@
 > **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md) (the engine renders video offline and delegates encoding)
-> **Hard dependency:** [0099](0099-the-horizon-reaches-its-own-length.md) — the long-run render path currently dies at ~3,601 frames, and a four-minute video is 14,400.
+> **Hard dependency:** [0099](done/0099-the-horizon-reaches-its-own-length.md) — **DISCHARGED 2026-08-16.** The capture path now polls per frame and 36,001 renders complete with the resident set flat, so the ~3,601-frame wall Phase 4 was blocked on is gone.
 
 ## TL;DR
 
@@ -116,11 +116,14 @@ flowchart LR
 - **Owner skill:** dev
 - **What:** Make a 14,400-frame render complete.
 - **Files touched:** `standalone/src/shot/render.rs`, and whatever
-  [Plan 0099](0099-the-horizon-reaches-its-own-length.md) found.
-- **Notes for the implementer:** **this phase is why 0099 is a hard dependency.** `shot --horizon`
-  dies at ~3,601 frames at ~2.9 GB resident (design-backlog 0093); four minutes at 60 fps is
-  14,400 — four times past a wall that already exists on a sibling path. If 0099 has not landed,
-  stop here and say so rather than working around it in a second place.
+  [Plan 0099](done/0099-the-horizon-reaches-its-own-length.md) found.
+- **Notes for the implementer:** **this phase is why 0099 was a hard dependency, and 0099 has
+  landed** (2026-08-16). What it found is the thing to reuse rather than rediscover: the wall was
+  not a frame count but memory pressure, from a capture path that submitted without ever polling —
+  retention was **per pass**, so an RD world at 13 passes a frame retained 950 KB a frame against a
+  36 KB captured frame. The repair is one `poll(wait_indefinitely)` in `step_offscreen`, at ~1.5x
+  wall clock. If this render mode encodes its own passes and submits them anywhere other than
+  through `step_offscreen`, it inherits the same defect and none of the fix.
 - **Done when:** a four-minute clip renders to completion at 1080p/60 with resident memory **flat
   across the run** — the same no-session-growth requirement [NFR §12](../nfr.md#12-runtime-memory)
   makes of a live session, measured the same way, because a render that leaks is the identical
@@ -136,8 +139,9 @@ flowchart LR
 
 ## Risks & open questions
 
-- **Blocked by [0099](0099-the-horizon-reaches-its-own-length.md).** Phases 1–3 are takeable
-  immediately at short clip lengths; Phase 4 is not takeable at all until that repair lands.
+- ~~**Blocked by [0099](done/0099-the-horizon-reaches-its-own-length.md).**~~ **Discharged
+  2026-08-16** — the repair landed and 36,001 renders complete with the resident set flat, so
+  Phase 4 is takeable with the rest.
 - **Colour is the most likely silent failure.** A file that is subtly darker than the app passes
   every automated check that does not compare against the app. Phase 3's byte-identity assertion is
   the guard, and it is deliberately exact rather than tolerant.

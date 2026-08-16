@@ -130,7 +130,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0111](0111-the-shape-field-gains-a-scaled-copy-coordinate.md) | The shape field gains a scaled-copy coordinate beside its distance one | proposed |
 | [0112](0112-a-blender-model-enters-as-inline-mesh-data-and-the-gpu-scatters-its-points.md) | A Blender model enters as inline mesh data, and the GPU scatters its points | proposed |
 | [0113](0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) | MilkDrop presets are translated ahead of time onto a warp-mesh idiom | accepted 2026-08-16 (Outcome) |
-| [0114](0114-the-engine-renders-video-offline-and-delegates-encoding.md) | The engine renders video offline and delegates encoding to a pipe | accepted 2026-08-16 |
+| [0114](0114-the-engine-renders-video-offline-and-delegates-encoding.md) | The engine renders video offline and delegates encoding to a pipe | accepted 2026-08-16 (Outcome) |
 | [0115](0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) | The foobar2000 component is a released artifact, and the SDK is a build parameter | accepted 2026-08-16 |
 | [0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) | An index row is a pointer, and a gate holds it to one | accepted 2026-08-16 (Plan 0105; Outcome) |
 

@@ -160,8 +160,9 @@ the world's own header, the way the fold-edge verdicts were recorded.
 4. **The verified length is the documented one, and here is what verified
    means** (Plan 0099). `--horizon 10` renders all 36,001 frames on **all three**
    shipped reaction-diffusion worlds — `Etching`, `Mitosis`, `Verdigris` — with
-   the resident set **flat**: 324 → 400 MB across the run, where the 0.8 MB of
-   travel is the 21 sampled images themselves. Measured on the Windows
+   the resident set **flat**: 324 MB reported before the run and 400 MB after,
+   of which the render itself travels **0.8 MB** (398.8 MB at 4 s to 399.6 MB at
+   54 s) — the 21 sampled images themselves. Measured on the Windows
    development box, hardware adapter, debug build, at 96x96 (ADR-0071 — a
    different machine or profile is a different measurement).
 

@@ -1,10 +1,34 @@
 # 0099 — The horizon reaches its own length
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-16
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev
 > **Related ADRs:** none — this is a defect repair, not a design choice
 > **Closes:** design-backlog 0093
+
+> **Close (2026-08-16).** All three `dev` phases landed in two commits: `b0a5ba0` (Phases 1-2),
+> `cb8a434` (Phase 3). Mode 4 review: **no blockers, no majors, four minors and a nit.** Phase 1's
+> discriminator came back with a **third** answer rather than either of the two this plan offered:
+> `reaction_etching` fails like its two siblings, so the family reading holds for all three RD
+> worlds — but the ceiling is **not a frame count**. All three clear 5,401 and fail at 7,201, one
+> unfixed run died at 4.4 GB and another squeaked through to 36,001 at 4.9 GB, so it is memory
+> pressure. Retention was **per pass, not per pixel**: over one unpolled stretch an RD world (13
+> passes a frame) retained **950 KB a frame** against a 36 KB captured frame where single-pass worlds
+> retained ~30 KB — which is why the family looked responsible when the poll cadence was. The
+> prediction that follows was confirmed **before anything was changed**: the same world over the same
+> 36,001 frames cleared at `--interval 5` and died at `--interval 30`. Phase 2 puts a
+> `poll(wait_indefinitely)` in `step_offscreen`, chosen over a non-blocking `Poll` by measurement (a
+> non-blocking poll took the stretch from 3,668 MB to 3,188 MB and no further). On the run that died:
+> 419 MB -> 4,402 MB then dead, against 398.8 MB at 4 s -> 399.6 MB at 54 s after, at ~1.5x wall
+> clock on an RD world. The regression test pins **6,000 frames as one unpolled stretch** and is
+> hardware-gated for a measured reason — written first on WARP it **passed against the unfixed
+> path**, so it would have been a three-minute no-op; Windows CI has only WARP (ADR-0073), so it
+> skips there and says why. Phase 3 found a second way to overstate a run that survives the memory
+> fix entirely: a `--horizon` the `--interval` does not divide is floored, and nothing said so. The
+> header now states the length **reached**, flags the shortfall above the table, and a run that dies
+> prints a `TRUNCATED` block on **stdout** where the table goes. Backlog 0093's `absent: poll` probe
+> went red on delivery exactly as this plan predicted, and the entry is **closed and archived** at
+> this close.
 
 ## TL;DR
 
@@ -16,9 +40,9 @@ than drifting — which is precisely the misreading the instrument exists to pre
 
 ## Context & problem
 
-[Plan 0085](done/0085-the-show-length-horizon-gets-an-instrument.md) shipped the only instrument
+[Plan 0085](0085-the-show-length-horizon-gets-an-instrument.md) shipped the only instrument
 this project has for show-length behaviour. Its own Phase 2 run found the ceiling, and
-[design-backlog 0093](../design-backlog.md) carries the measurement.
+[design-backlog 0093](../../design-backlog-archive.md) carries the measurement.
 
 Three things are already established and this plan does not re-derive them:
 
@@ -96,7 +120,7 @@ flowchart TD
   - **A regression test drives a world past the old ceiling** — deliberately past 3,601 rather than
     to some round number, because that frame count is the thing that must never come back. It is a
     slow test and belongs with the GPU-heavy suites the pre-push hook excludes
-    ([`README.md`](../../README.md) names them), not in the fast subset.
+    ([`README.md`](../../../README.md) names them), not in the fast subset.
   - The backlog entry's `absent: poll` probe is expected to go **red on delivery**. That is the
     entry working as designed — re-read it and correct it in place rather than treating the red as
     a failure.
@@ -134,7 +158,7 @@ flowchart TD
 - **It does not touch the live render path.** The app polls every frame through its own present;
   this is the offscreen capture path only.
 - **It does not revisit the quality governor**, which is
-  [design-backlog 0094](../design-backlog.md)'s subject and a different question about a different
+  [design-backlog 0094](../../design-backlog.md)'s subject and a different question about a different
   statistic.
 - **It does not re-measure the horizon findings** Plan 0085 recorded. Once the ceiling is gone the
   rows that were truncated are worth re-running, but that is an instrument *use* and belongs to

@@ -13,6 +13,67 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0099 — The horizon reaches its own length](done/0099-the-horizon-reaches-its-own-length.md)
+  — closed 2026-08-16, all three `dev` phases in two commits (`b0a5ba0`, `cb8a434`), one session.
+  Review: **no blockers, no majors, four minors and a nit.** **The plan's discriminator was the
+  whole value of it, and it returned a third answer rather than either of the two on offer.**
+  `reaction_etching` — the RD world the original measurement missed — fails like its two siblings,
+  so the family reading held; but the ceiling is **not the 3,601 frames** the backlog entry, this
+  plan and [ADR-0099](../adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md)
+  all recorded. All three worlds clear **5,401** and fail at **7,201**, one unfixed run died at
+  4.4 GB and another squeaked to 36,001 at 4.9 GB: it is memory pressure, so 3,601 was one machine's
+  headroom read as a limit. And it is not the RD family's *mechanism* either — **retention is per
+  pass, not per pixel**. Over one unpolled stretch a 13-pass RD frame retained **950 KB** against a
+  36 KB captured frame where single-pass worlds retained ~30 KB; every world grew, RD reached the
+  allocator first, and that is what made the family look responsible when the poll cadence was. The
+  prediction that follows was confirmed **before anything was changed** — the same world over the
+  same 36,001 frames cleared at `--interval 5` and died at `--interval 30`, because
+  `capture::read_back` held the only device poll on the path and the interval *is* the reclaim
+  period. **Phase 2 is one line and the argument for it is measured, not assumed:** a non-blocking
+  `PollType::Poll` in `step_offscreen` took the same stretch from 3,668 MB to 3,188 MB and no
+  further, because a headless loop submits far faster than the GPU drains, so it is
+  `wait_indefinitely` — the same `poll(Wait)` the sampled path always paid. Result on the run that
+  died: 419 MB -> 4,402 MB then dead, against 398.8 MB at 4 s -> 399.6 MB at 54 s after, at ~1.5x
+  wall clock on an RD world; `capture_api.rs` is off the hot path by construction and nothing behind
+  the C ABI reaches it. **The regression test's honesty is the part worth copying.** It pins 6,000
+  frames as **one** unpolled stretch (`at_frames = [0, LONG_RUN]`), past 3,601 *and* past the 5,401
+  that still cleared — and it is hardware-gated because, written first on this suite's WARP
+  renderer, it **passed against the unfixed path**: 6,000 unpolled frames do not accumulate on the
+  software adapter, so it was a three-minute no-op rather than a regression test. Windows CI has
+  only WARP ([ADR-0073](../adrs/0073-the-windows-ci-critical-path.md)), so it skips there and prints
+  why, which means **this guard has no CI cover at all** and earns its keep on a developer box —
+  stated rather than papered over. **Phase 3 found a second way to overstate a run, and it survives
+  the memory fix entirely:** a `--horizon` the `--interval` does not divide is floored to the last
+  whole interval (rows are exact multiples, which is what makes row *k* comparable across runs), and
+  nothing said so — `--horizon 10 --interval 45` printed a header claiming 10.0 minutes over a table
+  ending at 585 s. The header now states the length **reached**, flags the shortfall directly above
+  the table, and the JSON carries `reached_secs`/`shortfall_secs`/`truncated`. A run that dies now
+  prints a `TRUNCATED` block **on stdout where the table goes** — verified live against a
+  deliberately un-fixed build — with the wall clock, the resident set it died at, and the levers,
+  naming `--interval` as explicitly **not** one: it was the right advice for one afternoon and
+  Phase 2 made it wrong. **Minors, all four documentation or assertion-shape rather than behaviour.**
+  The long-run check asserts `frame_diff > 0.01`, which is exactly the shape
+  [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) removed from
+  `core/src/render/tests.rs`, where a comment records that same threshold as *"half of `NOISE_FLOOR`
+  and so … inside the band this project already calls noise"* — the determinism contract makes the
+  exact form free, and the failure it guards against (the first frame returned twice) is a byte
+  identity. `docs/capturing.md` called the resident set *"flat: 324 -> 400 MB"* in the same sentence
+  that put the travel at 0.8 MB; repaired at the close to separate the before/after report from the
+  0.8 MB the render itself travels. The `preset-author` skill's two copies of the horizon bound
+  still told the content lane that the RD worlds cannot reach ten minutes — swept at the close, and
+  the wall-clock estimate they carried (*"roughly 10 s per simulated minute"*) replaced with the
+  measured 16 s / 54 s. And the plan's Phase 3 file list named `standalone/examples/shot.rs` where
+  the table and JSON actually live in `standalone/src/shot/horizon.rs`; `dev` said so in the commit
+  rather than editing either. Nit: the shortfall tolerance is one frame, which silently absorbs a
+  sub-frame shortfall — correct, and worth knowing before anyone reads `shortfall_secs` as exact.
+  **Two things outlive the plan.** Backlog 0093's `absent: poll` probe went **red on delivery**,
+  precisely as [ADR-0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)
+  designed it to — a probe whose falsification is the finish signal, and the first shipped instance
+  of that working end to end. And two ADRs took dated `Outcome` sections rather than edits: 0099's
+  item 3 (the frame-ceiling claim, wrong twice over) and 0114's *"long renders inherit an unfixed
+  defect"* Negative, which now carries the one conditional Plan 0101 Phase 4 needs — a render mode
+  that submits its own passes outside `step_offscreen` inherits the defect and none of the fix.
+
 - [0105 — The indexes go back to being indexes](done/0105-the-indexes-go-back-to-being-indexes.md)
   — closed 2026-08-16, all six `dev` phases (`5791d25`, `0171fdf`, `f17be77`, `665eb0e`, `34b72ea`,
   `7903351`) in one session. Review: **no blockers, two majors, two minors, one nit.** The three
