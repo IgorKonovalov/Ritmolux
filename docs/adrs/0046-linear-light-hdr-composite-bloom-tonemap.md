@@ -109,3 +109,19 @@ engine-fixed curve can be revisited by a later ADR if it bites.
 Ordering inside the chain: bloom sits **after** the kaleidoscope so halos are computed on the
 folded image (a symmetric input yields symmetric halos either way, but bloom-last keeps the
 bright-pass on the final HDR frame, which is the conventional and cheapest arrangement).
+
+## Outcome (2026-08-16) — recovered from the ADR index at Plan 0105's close
+
+Plan 0045's Phase 6 measurement lived only in this ADR's row in
+[README.md](README.md), which Plan 0105 cut back to a pointer. It is recorded here so the
+measurement survives the trim, on the [ADR-0054](0054-runtime-tier-switching-rebuilds-on-the-live-context.md)
+/ [ADR-0074](0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) precedent
+for adding to an accepted ADR without editing its prose.
+
+**Bloom is not the expensive part at Rich.** `star_lantern` — a preset that runs the full chain
+this ADR decided — measured **p99 8.2 ms**, against two **bloom-less** attractor presets at
+**19.0** and **19.9 ms** on the same tier. The stage this ADR spends its Consequences justifying
+costs less than the scenes it is composited over, so the cost model that made bloom the thing to
+argue about was aimed at the wrong stage.
+
+Plan 0045 shipped in full and closed 2026-07-31.

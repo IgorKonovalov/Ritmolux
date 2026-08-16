@@ -144,3 +144,12 @@ Both are the same shape as the rule this project already writes down for numbers
 up: `aspect` is a real varying input, and every figure in this ADR was derived and asserted at one
 value of it. The deferred routes A and B are unaffected — a rotation-invariant fit is aspect-free by
 construction, and a per-figure measured fill would measure per aspect or not at all.
+
+## Outcome (2026-08-16) — the compliant figure's own ratio, recovered from the ADR index
+
+Plan 0105 cut this ADR's index row back to a pointer. One measured figure lived only in that row:
+
+**The fern's half-extent ratio is `a ~ 0.48`.** It is the one shipped figure that satisfies the
+`a <= 0.5397` bound derived above, and the figure the fit was built on — which is why the defect
+went unseen for as long as it did. The body states `a = 0.54` for *every other* figure in the
+roster and names the fern as the exception without giving its value; this supplies it.

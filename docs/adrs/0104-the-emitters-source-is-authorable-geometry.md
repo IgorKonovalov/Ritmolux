@@ -166,3 +166,17 @@ the point fountain are still the content lane's to author, with these two answer
 And the third question Phase 5 carried was a curation call, not an ADR one: `emitter_perseids`
 **keeps its place** alongside the quiet world rather than being replaced by it, on the reading that a
 fast shower and a slow sky are different looks rather than two tunings of one.
+
+## Outcome (2026-08-16) — Plan 0090 Phase 3's gate measurement, recovered from the ADR index
+
+The Outcome above records Phase 5's two judgements. Phase 3's measurement lived only in this ADR's
+row in [README.md](README.md), which Plan 0105 cut back to a pointer, and it named a different wall
+than the plan had guessed:
+
+- **The animation gate passes the sparse draft cold** — `0.0629` against a `0.01` floor — so the
+  gate the plan expected to convict a slow, sparse emitter does not.
+- **`sanity` is what convicts it**, and it convicts it as *blank*: **0 of 10** radial shells at
+  `prewarm = 0`, and **10 of 10** at `prewarm = 1`.
+
+No floor moved. The pair matters because it locates the instrument that actually sees an empty
+frame, and it is not the one named for motion.
