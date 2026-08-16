@@ -894,6 +894,27 @@ impl AppState {
             return;
         }
 
+        // `Escape` leaves fullscreen (Plan 0096 Phase 2) — checked here, *after*
+        // the modal branches, because a menu on screen owns the key first.
+        //
+        // It has to be intercepted before the overlay dispatch below:
+        // `decode_overlay_key` maps `Escape` unconditionally, so with the browser
+        // **closed** it lands on `OverlayAction::None => return` and never reaches
+        // the shell's own match. Widening that `None` arm to fall through would
+        // route `Enter`, `Backspace` and the arrows out here too — a much broader
+        // change than one binding.
+        //
+        // Windowed it does nothing, and it **never quits**: one stray keypress
+        // ending a running show is the failure mode this binding is worth
+        // avoiding. Fullscreen goes through the existing toggle so the
+        // `[output] fullscreen` write stays on one path with `F`.
+        if code == KeyCode::Escape && self.modal().is_none() {
+            if self.window.fullscreen().is_some() {
+                self.toggle_fullscreen();
+            }
+            return;
+        }
+
         if let Some(key) = overlay_key {
             let name_refs = self.roster_names();
             let refs: Vec<&str> = name_refs.iter().map(String::as_str).collect();
