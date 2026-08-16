@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0106** (ADRs are a separate sequence — next free there is **0117**.)
+**Next free number: 0107** (ADRs are a separate sequence — next free there is **0117**.)
 
 ## Active roster
 
@@ -26,6 +26,7 @@ someone who picked it up is reading.
 | [0102](0102-the-component-ships.md) | The component ships | approved | dev, human | **Contends with nothing and is the cheapest real distribution win on the roster.** Carries [ADR-0115](../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md). Phase 1 is `human` and is one question — **may an automated build fetch and redistribute the foobar2000 SDK?** — and its answer branches Phase 3 between a release-workflow job and a documented manual step; **either answer completes the plan**, which is written so "no" is a branch rather than a failure. Phase 3 corrects [NFR §8](../nfr.md#8-distribution-v1), which will be wrong the moment this lands. Note the `workflow` OAuth scope trap if Phase 3 takes the CI route. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **Ninety-seven plans, 110 ADRs, 66 releases — and 1 star, 0 forks, no repository description.** Almost entirely `human`, no ADR, and its done-whens are **artifacts rather than outcomes** because nobody can plan adoption. Phase 2 soft-wants [0101](0101-the-engine-renders-a-music-video.md) (nothing in this repo can currently record motion — every image is a still); **Phase 4 hard-depends on [0102](0102-the-component-ships.md)**. Two hazards it names rather than hides: announcing produces Mac downloads for a path that **has never run on Apple hardware**, and a visitor judges the library, which is [0104](0104-the-library-stops-being-lopsided.md)'s problem. |
 | [0104](0104-the-library-stops-being-lopsided.md) | The library stops being lopsided | approved | dev, human | **The census is the plan: `attractor` has 17 worlds; `lsystem`, `shape_field`, `spectrum` and `star_pattern` have exactly one each.** Brings every system to a floor of four — 18 presets, 39 → 57 — under [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules. Phase 1 can revise that arithmetic before Phase 2 starts, by asking whether the 17 are seventeen worlds or a family that converged. Phase 2 partly waits on [0098](0098-the-figure-nests-properly.md) (`shape_field`) and **Phase 4 wholly on [0087](0087-the-line-renderer-draws-a-curve.md)** — authoring `star_pattern` before that settles buys a cohort that has to be redone. Every `human` phase is a **`preset-author` session**; that the owner vocabulary has no word for it is a filed followup. |
+| [0106](0106-the-frame-stream-passes-through-a-diffusion-model.md) | The frame stream passes through a diffusion model | draft | dev, human | **Phase 1 is a throwaway spike and Phase 2 is a stop condition** — if a diffused attractor boils, the plan ends there having cost an afternoon and nothing is built. **Phase 1 is takeable today and depends on nothing**; every later phase needs [0101](0101-the-engine-renders-a-music-video.md) Phases 1-2, and transitively [0099](0099-the-horizon-reaches-its-own-length.md) past ~2 minutes. **No ADR yet, deliberately** — it is written between Phases 2 and 3, against the spike's evidence rather than a guess. Ships a script, no weights and no runtime, so `lmv.exe` and the release zip do not change; `core/` is untouched. Contends with nothing (`tools/` + `docs/` only). |
 
 **Added 2026-08-16, from a backlog round after [0091](done/0091-the-figure-fills-the-frame.md)'s
 close: [0098](0098-the-figure-nests-properly.md) and [0099](0099-the-horizon-reaches-its-own-length.md),
@@ -125,6 +126,12 @@ renderer, and they sort into two groups that barely interact:
   [0103](0103-the-project-gets-an-audience.md) goes last on purpose: it is the only one whose cost
   of being early is real, since announcing before [0104] lands means visitors judge a library where
   four of ten systems have a single world.
+
+- **Out of sequence by design: [0106](0106-the-frame-stream-passes-through-a-diffusion-model.md).**
+  Its Phase 1 is a spike that depends on nothing and fits any gap; its Phase 2 is a stop condition
+  that may end the plan for the cost of one afternoon. Everything after that queues behind
+  [0101](0101-the-engine-renders-a-music-video.md) in the lane the 0099 → 0101 pair already
+  occupies, so it never competes for a slot — it either dies cheaply or joins that queue.
 
 - **Taken first and now closed: [0105](done/0105-the-indexes-go-back-to-being-indexes.md)** (user
   call, 2026-08-16; closed the same day). It went first because it was *preventive* — every plan
