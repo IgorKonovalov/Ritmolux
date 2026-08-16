@@ -1,6 +1,6 @@
 # ADR-0113 — MilkDrop presets are translated ahead of time onto a warp-mesh idiom
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-16, user approval)
 > **Date:** 2026-08-16
 > **Related plan(s):** [0100](../plans/0100-the-engine-speaks-milkdrop.md)
 

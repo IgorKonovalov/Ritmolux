@@ -1,6 +1,6 @@
 # ADR-0115 — The foobar2000 component is a released artifact, and the SDK is a build parameter
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-16, user approval)
 > **Date:** 2026-08-16
 > **Related plan(s):** [0102](../plans/0102-the-component-ships.md)
 
