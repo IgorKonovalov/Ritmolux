@@ -80,6 +80,28 @@ flowchart LR
   the other, and the loop advances whichever is due next. `film.rs` already owns the
   hops-per-clip arithmetic; use it rather than writing a second copy, which is the mistake that
   file's own header warns about.
+
+  **The stream format is chosen in this phase, and the choice reaches Phase 3.**
+  [ADR-0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md) leaves it at
+  "self-describing, `ffmpeg` reads it natively", which admits two candidates that differ in a way
+  the ADR did not price. Measured against the installed `ffmpeg` 8.1 (2026-08-16, dev box):
+
+  - **Y4M** (`-f yuv4mpegpipe`) carries a plain-text header — `YUV4MPEG2 W1920 H1080 F60:1 Ip
+    A1:1 C444`, then `FRAME\n` before each frame — which is about thirty lines to parse in any
+    language. It **cannot carry RGB**: the muxer accepts `yuv444p, yuv422p, yuv420p, yuv411p,
+    gray8` and *errors* on `rgb24`. So the writer owns an RGB→YUV conversion, and at 8 bits that
+    conversion is not bijective.
+  - **NUT** (`-f nut -c:v rawvideo`) accepts `rgb24` unconverted, so the bytes on the wire are the
+    bytes the tap produced. It is a binary container: more to write here, and more to parse
+    downstream.
+
+  **Prefer Y4M unless Phase 3 needs the wire bytes to be the tap bytes.** A third shape — raw
+  frames plus an explicit `-s` / `-pix_fmt` geometry argument — is exactly what ADR-0114's
+  "self-describing" clause exists to refuse, so it is not a fallback.
+
+  One downstream consumer beyond `ffmpeg` is already foreseen — a diffusion filter sitting in this
+  pipe as a stdin→stdout stage (architect interview, 2026-08-16) — and it is the only reason
+  Python parseability is weighed above. It does not otherwise constrain this plan.
 - **Done when:** `shot --render` over a fixture clip produces a stream whose **two runs are
   byte-identical**, and whose frame count equals `ceil(clip_seconds × fps)`. Determinism is the
   property this whole plan rests on, so it is asserted here and not left to inference.
@@ -110,6 +132,14 @@ flowchart LR
   **byte-identical** to the frame `shot --frame-at` writes as a PNG. That is an exact property, it
   needs no tolerance, and it is only true if the tap is in the right place and the stream declares
   full-range sRGB correctly.
+
+  **If Phase 1 chose a YUV stream format, assert this at the tap rather than on the wire.** An
+  8-bit RGB→YUV conversion is not bijective, so the wire bytes provably cannot equal the PNG's,
+  and a test written against them would be loosened to a tolerance until it passed — which is how
+  a guard becomes decoration. Assert the RGB frame handed to the stream writer against the PNG,
+  and the colour conversion as its own round-trip property. This phase is about **where the tap
+  sits**; the serialization is a separate question, and conflating them is what makes the
+  assertion unsatisfiable.
 
 ### Phase 4 — it survives a whole track
 
