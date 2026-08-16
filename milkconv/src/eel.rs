@@ -797,9 +797,31 @@ impl<'a> Compiler<'a> {
 
     /// One argument of a call: a full statement sequence, so `if(a, (b; c), d)`
     /// and `loop(4, x = x + 1)` both parse.
+    ///
+    /// **A trailing `;` before the `)` or the `,` is legal**, and the corpus is
+    /// full of it — a multi-line `loop` body is conventionally written with every
+    /// statement terminated:
+    ///
+    /// ```text
+    /// loop (10000,
+    ///   megabuf(index) = .1;
+    ///   index = index + 1;
+    /// );
+    /// ```
+    ///
+    /// Refusing that cost 84 presets in the largest pack before it was allowed,
+    /// which is the second-largest single failure class the converter had.
     fn argument(&mut self) -> Result<(), EelError> {
         self.assignment()?;
         while self.eat_sym(";") {
+            // A doubled `;` is an empty statement, which is legal and which the
+            // corpus contains — `trig = megabuf(bbase+n); ;` inside a `loop`
+            // body. Skipping the run rather than parsing an expression after each
+            // one is what makes both that and the trailing form work.
+            while self.eat_sym(";") {}
+            if matches!(self.peek(), Some(Tok::Sym(")") | Tok::Sym(","))) {
+                break;
+            }
             self.emit(Op::Pop);
             self.assignment()?;
         }

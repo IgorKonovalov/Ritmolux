@@ -22,7 +22,7 @@
 //! render subtly wrong with a green suite.
 
 use lmv_core::milk::bytecode::COMPARE_EPSILON;
-use lmv_core::milk::vm::{VmState, run};
+use lmv_core::milk::vm::{Budget, VmState, run};
 use lmv_core::milk::{MilkRuntime, NOMINAL_FPS};
 use milkconv::eel::{Symbols, compile_bundle, compile_into};
 
@@ -34,7 +34,7 @@ fn eval(src: &str) -> f32 {
     let program = lmv_core::milk::bytecode::EelProgram::new(code, symbols.names().to_vec())
         .unwrap_or_else(|e| panic!("`{src}` compiled to invalid bytecode: {e}"));
     let mut state = VmState::new(program.register_count(), program.stack_depth(), 0);
-    run(&program, &mut state)
+    run(&program, &mut state, Budget::FRAME)
 }
 
 /// Assert a snippet's value, naming the property rather than the number.
@@ -380,7 +380,7 @@ fn the_q_and_t_bridges_are_one_register_file() {
         1.0,
     );
     // `cx` is output index 2 and is a position, so it is not rate-converted.
-    let cx = runtime.run_vertex(0.0, 0.0, 0.0, 0.0)[2];
+    let cx = runtime.run_vertex(0.0, 0.5)[2];
     let expected = (1..=32).sum::<i32>() as f32 + (1..=8).map(|i| i * 100).sum::<i32>() as f32;
     assert!(
         (cx - expected).abs() < 1e-2,
@@ -412,12 +412,12 @@ fn a_preset_shaped_bundle_drives_the_mesh() {
         bass: 0.5,
         ..Default::default()
     };
-    let (outputs, decay) = runtime.run_frame(&frame, 1.0, 1.0 / 60.0, (32, 24), 16.0 / 9.0);
+    let (outputs, extra) = runtime.run_frame(&frame, 1.0, 1.0 / 60.0, (32, 24), 16.0 / 9.0);
 
     // `zoom` = 1.01 + (0.5 * 2) * 0.02 = 1.03 per frame, converted per second.
     let zoom = outputs[0].powf(1.0 / NOMINAL_FPS);
     assert!((zoom - 1.03).abs() < 1e-3, "zoom per frame: {zoom}");
-    let decay = decay.expect("the program names decay");
+    let decay = extra[0].expect("the program names decay");
     assert!(
         (decay.powf(1.0 / NOMINAL_FPS) - 0.97).abs() < 1e-3,
         "decay per frame: {}",
@@ -430,15 +430,15 @@ fn a_preset_shaped_bundle_drives_the_mesh() {
     );
 
     // The per-vertex program actually varies with `rad`.
-    let centre = runtime.run_vertex(0.5, 0.5, 0.0, 0.0)[0];
-    let rim = runtime.run_vertex(1.0, 0.5, 1.0, 0.0)[0];
+    let centre = runtime.run_vertex(0.5, 0.5)[0];
+    let rim = runtime.run_vertex(1.0, 0.5)[0];
     assert!(
         rim > centre,
         "`zoom = zoom + rad * 0.05` must grow with rad: rim {rim} vs centre {centre}"
     );
     // ...and a write inside it does not leak: the same vertex twice agrees.
     assert_eq!(
-        runtime.run_vertex(0.5, 0.5, 0.0, 0.0)[0],
+        runtime.run_vertex(0.5, 0.5)[0],
         centre,
         "the per-frame snapshot is restored before every vertex"
     );

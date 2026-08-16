@@ -14,4 +14,6 @@
 
 #![warn(missing_docs)]
 
+pub mod convert;
 pub mod eel;
+pub mod milk;

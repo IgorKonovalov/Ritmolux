@@ -44,7 +44,7 @@
     clippy::unreachable
 )]
 
-use super::bytecode::{Binary, COMPARE_EPSILON, EelProgram, MAX_LOOP_ITERATIONS, Mem, Op, Unary};
+use super::bytecode::{Binary, COMPARE_EPSILON, EelProgram, Mem, Op, Unary};
 
 /// How many slots a preset's `megabuf` holds.
 ///
@@ -85,6 +85,56 @@ pub const MAX_LOOP_DEPTH: usize = 8;
 ///
 /// The ASCII of `MILKDR`, which is arbitrary and only has to be non-zero.
 const MILK_SEED_MIX: u64 = 0x4D49_4C4B_4452;
+
+/// What one [`run`] may spend: how many iterations any single loop may take, and
+/// how many instructions the whole run may execute.
+///
+/// **Per program rather than one constant, because the three programs of a bundle
+/// cost wildly different amounts.** `per_frame_init` runs once at load;
+/// `per_frame` runs once a frame; `per_vertex` runs once per *vertex*, thousands
+/// of times a frame. A single bound tight enough for the third would break the
+/// first — the corpus's commonest `per_frame_init` idiom is
+/// `loop(10000, megabuf(index) = .1; index = index + 1)`, seeding a scratch
+/// array, and 84 presets in the largest pack do exactly that.
+///
+/// Both numbers are bounds, not budgets: nothing is reserved and an honest
+/// program never approaches either. What they buy is that **untrusted program
+/// text cannot hang a frame**, which is ADR-0113's stated residual risk on the
+/// shader side and is closed on this side.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Budget {
+    /// The most iterations any one `loop()` or `while()` may run.
+    pub loops: u32,
+    /// The most instructions the whole run may execute — the backstop under the
+    /// loop bound, so a program whose bare jumps form a cycle still terminates.
+    pub instructions: u32,
+}
+
+impl Budget {
+    /// `per_frame_init`: runs **once**, at preset load, off the hot path. The
+    /// loop bound is MilkDrop's own (`1 << 20`), and the instruction bound is
+    /// generous enough that seeding a whole `megabuf` fits.
+    pub const INIT: Self = Self {
+        loops: 1_048_576,
+        instructions: 16_000_000,
+    };
+    /// `per_frame`: once a frame. A million instructions is a few milliseconds
+    /// on the CPUs this ships to — far past any real preset, and far under a
+    /// stall.
+    pub const FRAME: Self = Self {
+        loops: 1_048_576,
+        instructions: 1_000_000,
+    };
+    /// `per_vertex`: once per **vertex**, so its bound is multiplied by the mesh.
+    /// At the rich tier's 5 963 vertices this ceiling is still 49 M instructions
+    /// a frame in the worst case, which is why it is three orders under the
+    /// others — real per-vertex programs are a few hundred instructions, and the
+    /// measured tier ladder (`TierConfig::mesh_grid`) is priced against that.
+    pub const VERTEX: Self = Self {
+        loops: 1_024,
+        instructions: 8_192,
+    };
+}
 
 /// One open loop, on the VM's own frame stack.
 #[derive(Clone, Copy)]
@@ -210,7 +260,7 @@ fn splitmix(mut z: u64) -> u64 {
 /// Total on every input: see the module docs. The register file, the arenas and
 /// the RNG are `state`'s and persist across calls, which is what lets a
 /// per-frame program set up values a per-vertex program reads.
-pub fn run(program: &EelProgram, state: &mut VmState) -> f32 {
+pub fn run(program: &EelProgram, state: &mut VmState, budget: Budget) -> f32 {
     let code = program.code();
     // A run starts with an empty stack and no open loops. Both are properties of
     // the *call*, not of the state, so a program that left something behind
@@ -218,17 +268,13 @@ pub fn run(program: &EelProgram, state: &mut VmState) -> f32 {
     let mut sp = 0usize;
     state.depth = 0;
     let mut pc = 0usize;
-    // The instruction budget: a backstop under the per-loop bound, so a program
-    // whose jumps form a cycle the loop machinery does not own still terminates.
-    // Generous enough that no honest program reaches it — the per-vertex budget
-    // measured in Plan 0100 Phase 1 is a few hundred instructions.
-    let mut budget = MAX_INSTRUCTIONS;
+    let mut fuel = budget.instructions;
 
     while let Some(&op) = code.get(pc) {
-        if budget == 0 {
+        if fuel == 0 {
             break;
         }
-        budget -= 1;
+        fuel -= 1;
         pc += 1;
         match op {
             Op::Const(v) => push(state, &mut sp, v),
@@ -313,7 +359,7 @@ pub fn run(program: &EelProgram, state: &mut VmState) -> f32 {
                 // Non-finite or under one means no iterations at all. The clamp is
                 // what makes an untrusted program unable to hang a frame.
                 let iterations = if count.is_finite() && count >= 1.0 {
-                    (count as u32).min(MAX_LOOP_ITERATIONS)
+                    (count as u32).min(budget.loops)
                 } else {
                     0
                 };
@@ -337,7 +383,7 @@ pub fn run(program: &EelProgram, state: &mut VmState) -> f32 {
                 // `while(body)` runs the body first, so the operand its codegen
                 // pushed is only the iteration bound.
                 pop(state, &mut sp);
-                if !open_frame(state, MAX_LOOP_ITERATIONS) {
+                if !open_frame(state, budget.loops) {
                     push(state, &mut sp, 0.0);
                     pc = end as usize;
                 }
@@ -355,15 +401,6 @@ pub fn run(program: &EelProgram, state: &mut VmState) -> f32 {
     }
     if sp == 0 { 0.0 } else { peek(state, sp) }
 }
-
-/// The instruction budget one [`run`] may spend.
-///
-/// The backstop under [`MAX_LOOP_ITERATIONS`], and the reason a program cannot
-/// hang a frame **whatever** its control flow: the per-loop bound assumes the
-/// loops are the only cycles, and a hand-written bundle could form one out of
-/// bare jumps. 1 M is far past any honest program — the per-vertex programs the
-/// converter emits are a few hundred instructions — and far under a stall.
-const MAX_INSTRUCTIONS: u32 = 1_000_000;
 
 /// Coerce a non-finite result to `0`.
 ///

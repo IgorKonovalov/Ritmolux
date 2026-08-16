@@ -1093,6 +1093,32 @@ colour vocabulary applies as it does everywhere else: `hue`, `color_span`,
 `color_center`, `saturation`, `palette_mix`, `palette_steps`, `palette_contour`,
 and `brightness` scaling the whole present.
 
+#### MilkDrop's composite roster
+
+Seven more, and they are here because they are what most of the MilkDrop library
+is made of rather than because the idiom needed them. Each is a flag in the source
+format and stays one here — the four remaps are one `select` apiece in the present
+shader, so a preset that binds none of them pays nothing.
+
+| param | does |
+|---|---|
+| `wrap` | past `0.5`, the past is **toroidal**: content that a zoom pulls off one edge comes back on the other. This is what most of the classic tunnels are made of. Off — the default — an off-field read contributes nothing, which is the transparent-border policy `trails` takes (ADR-0048) |
+| `gamma` | multiplies the light on the way out. Default `1` |
+| `darken_center` | darkens a soft disc at the middle, in frame-heights so it is round on any display. What stops a zooming feedback loop saturating there. A fraction gives a proportional amount, which the source format cannot express |
+| `brighten` | past `0.5`, `sqrt` of the light — lifts the shadows |
+| `darken` | past `0.5`, the light squared |
+| `solarize` | past `0.5`, `c * (1 - c) * 4` — the classic inversion around mid-grey |
+| `invert` | past `0.5`, `1 - c` |
+
+> **The four remaps operate on *linear light* here, where MilkDrop applied them to
+> 8-bit display-referred pixels.** They are the same gesture, not the same
+> arithmetic: `brighten`'s square root lifts the shadows either way, by a
+> different amount. That difference is the whole reason
+> [ADR-0046](../docs/adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)'s
+> pipeline is interesting rather than merely compatible, and it is stated here so
+> a converted preset that looks *different* is not mistaken for one that looks
+> wrong.
+
 > **The deposit is laid down *after* the warp, deliberately.** Its light is
 > "now", so it is crisp on the frame it appears and warped from the next frame
 > onward. Deposit before warping and every stroke would be smeared on arrival.
