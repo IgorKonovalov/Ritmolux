@@ -66,7 +66,7 @@ use crate::render::feedback::PingPongField;
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 
-use super::Scene;
+use super::{Scene, lines};
 
 /// The smallest grid a `[mesh]` table may name, in cells. Below two the mesh is
 /// a single quad and the per-vertex program has no interior to interpolate.
@@ -76,6 +76,15 @@ pub const MIN_MESH: u32 = 2;
 /// ceiling (`meshx <= 128`, `meshy <= 96`), so a converted preset's requested
 /// grid is always representable.
 pub const MAX_MESH: (u32, u32) = (128, 96);
+
+/// The most vertices the filled-shape buffer holds.
+///
+/// Four shapes at MilkDrop's own limits — 1 024 instances of a 100-sided
+/// polygon each — would be 1.2 M triangles, which is not a picture. This is the
+/// bound that keeps the buffer a fixed allocation: past it the extra triangles
+/// are dropped, which degrades a preset that asks for more rather than letting it
+/// grow a buffer on the render thread.
+pub const MAX_SHAPE_VERTICES: usize = 96 * 1024;
 
 /// The grid a `[mesh]` table's absent keys mean. Coarse enough to be free on any
 /// machine and fine enough that a `rad`-driven program reads as a curve rather
@@ -530,6 +539,52 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 "#;
 
+/// The filled-shape pass: a plain triangle list in the line renderer's own world
+/// space, drawn into the field beside the line batch.
+///
+/// A second pipeline rather than a fan of wide line segments, because a custom
+/// shape is a **filled** polygon with a centre-to-edge colour ramp and the line
+/// primitive's across-the-stroke falloff would render it as a star. 63 % of the
+/// corpus enables at least one custom shape, which is what buys the pipeline.
+const SHAPE_SHADER: &str = r#"
+struct ShapeU {
+    // x: aspect, yzw: unused
+    v: vec4<f32>,
+}
+@group(0) @binding(0) var<uniform> su: ShapeU;
+
+struct VsIn {
+    @location(0) pos: vec2<f32>,
+    @location(1) color: vec3<f32>,
+    @location(2) alpha: f32,
+}
+
+struct VsOut {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) color: vec3<f32>,
+    @location(1) alpha: f32,
+}
+
+@vertex
+fn vs_main(in: VsIn) -> VsOut {
+    // World space, with x divided by the aspect — the same convention the shared
+    // line renderer uses, so a shape and its own outline land on each other.
+    let aspect = max(su.v.x, 0.1);
+    var out: VsOut;
+    out.pos = vec4<f32>(in.pos.x / aspect, in.pos.y, 0.0, 1.0);
+    out.color = in.color;
+    out.alpha = in.alpha;
+    return out;
+}
+
+@fragment
+fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    // Premultiplied light and its own coverage (ADR-0056): the colour arrives
+    // already scaled by the alpha, and the alpha is what the fill holds out.
+    return vec4<f32>(in.color, clamp(in.alpha, 0.0, 1.0));
+}
+"#;
+
 /// The present pass: the field, over the backdrop.
 const PRESENT_SHADER: &str = r#"
 struct Present {
@@ -588,6 +643,12 @@ struct DepositUniform {
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct ShapeUniform {
+    v: [f32; 4],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct PresentUniform {
     a: [f32; 4],
     b: [f32; 4],
@@ -629,6 +690,27 @@ struct Resources {
     mesh: (u32, u32),
     lut_texture_a: wgpu::Texture,
     lut_texture_b: wgpu::Texture,
+    /// The draw layer's own line renderer (Plan 0100 Phase 4).
+    ///
+    /// **Its own, not the roster's shared one**, for the reason
+    /// `scenes::create_layer_scene` records: a `LineRenderer` uploads its
+    /// instance and uniform buffers through `Queue::write_buffer`, queued writes
+    /// land before any pass in the submission executes, and two draws through one
+    /// renderer in a frame would both rasterize the second draw's segments. The
+    /// warp mesh draws its layer in the same frame a line preset could be drawing
+    /// its figure — across a dissolve — so sharing is not available here either.
+    ///
+    /// Built lazily with the rest of `Resources`, so a session that never
+    /// activates this scene builds no second line pipeline and cannot meet
+    /// ADR-0058's WARP hazard at all.
+    lines: lines::LineRenderer,
+    /// The filled-shape pipeline and its buffers.
+    shape_pipeline: wgpu::RenderPipeline,
+    shape_vertices: wgpu::Buffer,
+    shape_uniform: wgpu::Buffer,
+    shape_bind_group: wgpu::BindGroup,
+    /// How many shape vertices the buffer holds.
+    shape_capacity: usize,
     /// Whether the field still holds the undefined contents of a fresh
     /// allocation. Cleared by one pass before anything samples it.
     needs_clear: bool,
@@ -788,6 +870,15 @@ pub struct WarpMeshScene {
     /// A converted preset is authoritative about its own transform; a `[params]`
     /// binding alongside one is inert rather than fighting it.
     milk: Option<crate::milk::MilkRuntime>,
+    /// The tier's line-segment cap, which the draw layer's own `LineRenderer` is
+    /// sized to — the same capacity every line scene gets (ADR-0045).
+    max_segments: usize,
+    /// This frame's draw-layer outputs, from the bundle's per-frame program.
+    /// `None` for a hand-authored preset, which draws no MilkDrop layer.
+    draw: Option<crate::milk::outputs::FrameOutputs>,
+    /// The CPU-side geometry the draw layer builds each frame. Its capacity is
+    /// reused, so the per-frame path allocates nothing after the first frames.
+    geometry: draw::DrawGeometry,
     /// This frame's analysis, kept from `update` so `render` can drive the
     /// per-vertex program with the same frame the per-frame program saw.
     frame: crate::dsp::AnalysisFrame,
@@ -801,6 +892,7 @@ impl WarpMeshScene {
         device: &wgpu::Device,
         surface_format: wgpu::TextureFormat,
         tier_mesh: (u32, u32),
+        max_segments: usize,
     ) -> Self {
         let tier = crate::render::TierConfig {
             mesh_grid: tier_mesh,
@@ -849,6 +941,9 @@ impl WarpMeshScene {
             palette: Palette::default_spectrum(),
             palette_dirty: true,
             milk: None,
+            max_segments,
+            draw: None,
+            geometry: draw::DrawGeometry::default(),
             frame: crate::dsp::AnalysisFrame::default(),
         }
     }
@@ -873,6 +968,7 @@ impl Resources {
         surface_format: wgpu::TextureFormat,
         size: (u32, u32),
         mesh: (u32, u32),
+        max_segments: usize,
     ) -> Self {
         let warp_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("warp-mesh-warp-shader"),
@@ -1135,6 +1231,94 @@ impl Resources {
             "warp-mesh-present",
         );
 
+        // --- the draw layer (Plan 0100 Phase 4) ---
+        let lines = lines::LineRenderer::new(device, surface_format, max_segments, "warp-mesh");
+        let shape_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("warp-mesh-shape-shader"),
+            source: wgpu::ShaderSource::Wgsl(SHAPE_SHADER.into()),
+        });
+        let shape_uniform = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("warp-mesh-shape-uniform"),
+            size: std::mem::size_of::<ShapeUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        // A vertex-visible sized uniform, which is a shape nothing else in
+        // `core/src` holds (ADR-0058): `swarm-bind-layout` is the same kind and
+        // visibility with **no** declared size, and that difference is exactly
+        // what Plan 0053 Phase 3 measured as a real separation. Do not tidy it.
+        let shape_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("warp-mesh-shape-layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: std::num::NonZeroU64::new(
+                        std::mem::size_of::<ShapeUniform>() as u64,
+                    ),
+                },
+                count: None,
+            }],
+        });
+        let shape_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("warp-mesh-shape-bg"),
+            layout: &shape_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: shape_uniform.as_entire_binding(),
+            }],
+        });
+        let shape_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("warp-mesh-shape-pipeline-layout"),
+                bind_group_layouts: &[Some(&shape_layout)],
+                immediate_size: 0,
+            });
+        let shape_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("warp-mesh-shape-pipeline"),
+            layout: Some(&shape_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shape_shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[Some(wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<draw::ShapeVertex>() as u64,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &wgpu::vertex_attr_array![
+                        0 => Float32x2,
+                        1 => Float32x3,
+                        2 => Float32,
+                    ],
+                })],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shape_shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: FIELD_FORMAT,
+                    // The shared draw seam (ADR-0056), same as the line batch
+                    // beside it.
+                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        let shape_capacity = MAX_SHAPE_VERTICES;
+        let shape_vertices = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("warp-mesh-shape-vertices"),
+            size: (shape_capacity * std::mem::size_of::<draw::ShapeVertex>()) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         let indices_data = build_indices(mesh);
         let indices = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("warp-mesh-indices"),
@@ -1169,6 +1353,12 @@ impl Resources {
             mesh,
             lut_texture_a,
             lut_texture_b,
+            lines,
+            shape_pipeline,
+            shape_vertices,
+            shape_uniform,
+            shape_bind_group,
+            shape_capacity,
             needs_clear: true,
         }
     }
@@ -1247,6 +1437,10 @@ impl Scene for WarpMeshScene {
             self.milk = milk
                 .as_ref()
                 .map(|bundle| crate::milk::MilkRuntime::new((**bundle).clone(), *salt));
+            // A preset switch must not leave the previous bundle's draw layer
+            // on screen for a frame.
+            self.draw = None;
+            self.geometry.clear();
         }
         None
     }
@@ -1360,23 +1554,31 @@ impl Scene for WarpMeshScene {
         let mesh = self.state.mesh;
         let (time, dt) = (self.time, self.dt);
         if let Some(runtime) = self.milk.as_mut() {
-            let (outputs, extra) = runtime.run_frame(&self.frame, time, dt, mesh, aspect);
-            for (index, value) in outputs.iter().enumerate() {
+            let (transform, out) = runtime.run_frame(&self.frame, time, dt, mesh, aspect);
+            for (index, value) in transform.iter().enumerate() {
                 if let Some(slot) = self.scalars.get_mut(index) {
                     *slot = *value;
                 }
             }
-            // The composite outputs, by name — `EXTRA_OUTPUT_NAMES` is exactly
-            // `COMPOSITE_PARAMS` with `decay` in front, so there is no second
-            // table here to drift from the runtime's.
-            for (index, value) in extra.iter().enumerate() {
-                let Some(value) = *value else { continue };
-                match crate::milk::EXTRA_OUTPUT_NAMES.get(index) {
-                    Some(&"decay") => self.decay = value,
-                    Some(name) => self.set_param(name, value),
-                    None => {}
-                }
-            }
+            // The composite roster, by field rather than by a positional table —
+            // the whole point of `outputs::FrameOutputs` (Plan 0100 Phase 4).
+            self.decay = out.decay;
+            self.gamma = out.gamma;
+            self.wrap = out.wrap;
+            self.darken_center = out.darken_center;
+            self.brighten = out.brighten;
+            self.darken = out.darken;
+            self.solarize = out.solarize;
+            self.invert = out.invert;
+            // **The deposit is NOT forced off here**, and that was a bug for one
+            // commit. A converted preset draws its own light — the waveform, its
+            // custom elements, its borders — and the converter emits no deposit
+            // bindings for exactly that reason, so it already gets none. Forcing
+            // it off in the scene instead would also silence a HAND-WRITTEN
+            // bundle that uses the deposit as its light source, which is a
+            // perfectly good thing for one to do and is what
+            // `core/tests/fixtures/warp_mesh_milk.toml` does.
+            self.draw = Some(out);
             // A bundle's per-vertex program replaces any `[per_vertex]` table's
             // series wholesale, so the flags are cleared here and re-set in
             // `render` once the vertices are evaluated.
@@ -1411,6 +1613,7 @@ impl Scene for WarpMeshScene {
                 self.surface_format,
                 size,
                 self.state.mesh,
+                self.max_segments,
             ));
             self.palette_dirty = true;
         }
@@ -1591,6 +1794,71 @@ impl Scene for WarpMeshScene {
             pass.draw(0..3, 0..1);
         }
 
+        // --- the draw layer: what MilkDrop draws between the warp and the
+        // composite (Plan 0100 Phase 4). Onto the SAME target the deposit went
+        // to, so this frame's strokes are warped from the next frame onward —
+        // which is what makes a waveform leave a trail.
+        if let Some(out) = self.draw {
+            draw::build(
+                &mut self.geometry,
+                self.milk.as_mut(),
+                &out,
+                &self.frame.waveform,
+                self.time,
+                dt,
+                aspect,
+            );
+        } else {
+            self.geometry.clear();
+        }
+        if !self.geometry.triangles.is_empty() {
+            let count = self.geometry.triangles.len().min(res.shape_capacity);
+            if let Some(drawn) = self.geometry.triangles.get(..count) {
+                queue.write_buffer(&res.shape_vertices, 0, bytemuck::cast_slice(drawn));
+                queue.write_buffer(
+                    &res.shape_uniform,
+                    0,
+                    bytemuck::bytes_of(&ShapeUniform {
+                        v: [aspect, 0.0, 0.0, 0.0],
+                    }),
+                );
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("warp-mesh-shape-pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: res.field.write_view(),
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
+                pass.set_pipeline(&res.shape_pipeline);
+                pass.set_bind_group(0, &res.shape_bind_group, &[]);
+                pass.set_vertex_buffer(0, res.shape_vertices.slice(..));
+                pass.draw(0..count as u32, 0..1);
+            }
+        }
+        if !self.geometry.segments.is_empty() {
+            // One batch for the whole layer — the waveform, every custom wave,
+            // every shape outline, both borders and the motion grid — because
+            // colour and width are per segment and only `glow` is per draw.
+            res.lines.draw(
+                queue,
+                encoder,
+                res.field.write_view(),
+                aspect,
+                1.0,
+                lines::ViewTransform::default(),
+                &self.geometry.segments,
+            );
+        }
+
         // The fresh state becomes the next frame's past.
         res.field.swap();
 
@@ -1621,6 +1889,8 @@ impl Scene for WarpMeshScene {
         pass.draw(0..3, 0..1);
     }
 }
+
+pub mod draw;
 
 #[cfg(test)]
 mod tests;

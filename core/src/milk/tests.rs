@@ -653,7 +653,7 @@ fn per_frame_rates_become_per_second_ones() {
     // A **position** is neither, and passes through untouched. Scaling `cx` would
     // put the fixed point outside the frame on the first frame.
     assert_eq!(outputs[2], 0.25, "cx is a position, not a motion");
-    let decay = decay[0].expect("the program names `decay`");
+    let decay = decay.decay;
     assert!(
         (decay - 0.98f32.powf(NOMINAL_FPS)).abs() < 1e-4,
         "decay: {decay}"

@@ -55,9 +55,13 @@
 )]
 
 pub mod bytecode;
+pub mod outputs;
 pub mod vm;
 
 use bytecode::{EelProgram, ProgramError};
+use outputs::{
+    FrameOutputs, FrameSlots, ShapeInstance, ShapeInstanceSlots, WavePoint, WavePointSlots,
+};
 use vm::{Budget, VmState};
 
 /// The frame rate the `fps` variable reports, and the cadence a per-frame rate is
@@ -85,28 +89,14 @@ const OUTPUT_FACTOR: [bool; 9] = [true, false, false, false, false, false, true,
 /// Whether output `i` is a rate — see [`OUTPUT_FACTOR`].
 const OUTPUT_RATE: [bool; 9] = [false, true, false, false, true, true, false, false, true];
 
-/// The composite outputs a per-frame program may set beyond the nine, in the
-/// order [`MilkRuntime::run_frame`] returns them.
+/// How many `q` variables bridge the main program to a custom wave or shape.
 ///
-/// `decay` first because it is the one that is rate-converted; the six after it
-/// are flags and a multiplier that pass through untouched, and they are exactly
-/// [`warp_mesh::COMPOSITE_PARAMS`](crate::render::scenes::warp_mesh::COMPOSITE_PARAMS)
-/// so the scene can apply them by name without a second table.
-pub const EXTRA_OUTPUT_NAMES: [&str; 8] = [
-    "decay",
-    "gamma",
-    "wrap",
-    "darken_center",
-    "brighten",
-    "darken",
-    "solarize",
-    "invert",
-];
-
-/// Each extra output's value before a per-frame program runs, positionally with
-/// [`EXTRA_OUTPUT_NAMES`]. MilkDrop's own defaults: 96 % of the previous frame
-/// survives, unity gamma, and every flag off.
-const EXTRA_DEFAULTS: [f32; 8] = [0.96, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+/// MilkDrop's own count. The bridge is a **copy**, not a shared file: each
+/// element has its own register space (its own `t1`-`t8`, its own working
+/// variables), and what crosses is `q1`-`q32` after the main per-frame program
+/// has run. Copying is what keeps an element from writing back into the main
+/// program's state, which the reference also forbids.
+pub const Q_COUNT: usize = 32;
 
 /// A converted preset's compiled programs: what a bundle carries beyond an
 /// ordinary LMV preset.
@@ -123,7 +113,68 @@ pub struct MilkBundle {
     pub per_frame: EelProgram,
     /// Run once per mesh vertex.
     pub per_vertex: EelProgram,
+    /// Up to four custom waves — extra traces the preset draws with their own
+    /// per-point programs (Plan 0100 Phase 4). **47 % of the corpus enables at
+    /// least one**, which is why they are here rather than warned about.
+    pub waves: Vec<MilkElement>,
+    /// Up to four custom shapes — filled polygons with their own per-instance
+    /// programs. **63 % of the corpus enables at least one.**
+    pub shapes: Vec<MilkElement>,
 }
+
+/// What a custom element draws, which decides which of its programs run and how
+/// its outputs are read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ElementKind {
+    /// A custom **wave**: `count` points, each from one run of `per_point`,
+    /// stroked as a polyline or scattered as dots.
+    Wave,
+    /// A custom **shape**: `instances` filled polygons, each from one run of
+    /// `per_frame` with `instance` bound.
+    Shape,
+}
+
+/// One custom wave or shape: its three programs and the structural numbers that
+/// size its geometry.
+///
+/// The *look* numbers — position, colour, radius, alpha — are **not** here: they
+/// are outputs the element's own per-frame program leaves in named registers,
+/// seeded from the file's initial conditions by a prologue the converter emits.
+/// That is the same shape the main bundle takes, and it is what keeps this struct
+/// from being forty fields of `.milk` key.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MilkElement {
+    /// Run once, at preset load.
+    pub init: EelProgram,
+    /// Run once per frame — and once per *instance* for a shape, with
+    /// `instance` bound.
+    pub per_frame: EelProgram,
+    /// Run once per point. Empty for a shape.
+    pub per_point: EelProgram,
+    /// Points (a wave) or sides (a shape).
+    pub count: u32,
+    /// How many copies a shape draws. Always `1` for a wave.
+    pub instances: u32,
+    /// Which it is.
+    pub kind: ElementKind,
+    /// Past `0.5`, a wave draws dots rather than a line.
+    pub use_dots: bool,
+    /// Past `0.5`, a wave's line or a shape's outline is drawn thick.
+    pub thick: bool,
+}
+
+/// The most points a custom wave may draw, and the most sides a shape may have.
+///
+/// MilkDrop's own limits are 512 points and 100 sides. A wave's points each cost
+/// one run of its per-point program on the render thread, so the bound matters
+/// for the same reason the mesh grid's does — and unlike the mesh it is not a
+/// tier capacity, because it is the *preset* that names it and a converted preset
+/// should draw the figure its author drew.
+pub const MAX_WAVE_POINTS: u32 = 512;
+/// See [`MAX_WAVE_POINTS`].
+pub const MAX_SHAPE_SIDES: u32 = 100;
+/// The most copies of one custom shape a preset may draw. MilkDrop's own limit.
+pub const MAX_SHAPE_INSTANCES: u32 = 1024;
 
 /// What is wrong with a bundle, as a surfaced load error.
 #[derive(Debug, Clone, PartialEq)]
@@ -179,6 +230,8 @@ impl MilkBundle {
             per_frame_init: decode("per_frame_init", per_frame_init)?,
             per_frame: decode("per_frame", per_frame)?,
             per_vertex: decode("per_vertex", per_vertex)?,
+            waves: Vec::new(),
+            shapes: Vec::new(),
         };
         // The shared register file is the bridge, so the rosters have to agree.
         // An empty program declares nothing and is exempt.
@@ -196,11 +249,16 @@ impl MilkBundle {
         Ok(bundle)
     }
 
-    /// Whether any of the three programs draws from the RNG.
+    /// Whether any program in the bundle draws from the RNG.
     pub fn uses_random(&self) -> bool {
+        let element = |e: &MilkElement| {
+            e.init.uses_random() || e.per_frame.uses_random() || e.per_point.uses_random()
+        };
         self.per_frame_init.uses_random()
             || self.per_frame.uses_random()
             || self.per_vertex.uses_random()
+            || self.waves.iter().any(element)
+            || self.shapes.iter().any(element)
     }
 
     /// The roster the three programs share, for resolving indices once at load.
@@ -258,9 +316,15 @@ pub struct MilkRuntime {
     vertex_inputs: VertexInputs,
     /// The nine per-vertex output registers, positionally with [`OUTPUT_NAMES`].
     outputs: [Option<u16>; 9],
-    /// The eight composite outputs, positionally with [`EXTRA_OUTPUT_NAMES`].
-    /// Per-frame only — a vertex has no decay and no gamma.
-    extra: [Option<u16>; 8],
+    /// Every named per-frame output beyond the nine — the composite roster and
+    /// the whole draw layer (`outputs::FrameOutputs`).
+    frame_slots: FrameSlots,
+    /// The registers `q1`-`q32` live in, for the copy into each element.
+    q_slots: [Option<u16>; Q_COUNT],
+    /// One live state per custom wave, then one per custom shape.
+    waves: Vec<ElementRuntime>,
+    /// See [`waves`](Self::waves).
+    shapes: Vec<ElementRuntime>,
     /// The render target's aspect as of the last [`run_frame`](Self::run_frame),
     /// so [`run_vertex`](Self::run_vertex) can compute MilkDrop's `rad`/`ang`
     /// without the caller having to hand it over per vertex.
@@ -332,7 +396,18 @@ impl MilkRuntime {
             ang: index("ang"),
         };
         let outputs = std::array::from_fn(|i| OUTPUT_NAMES.get(i).and_then(|n| index(n)));
-        let extra = std::array::from_fn(|i| EXTRA_OUTPUT_NAMES.get(i).and_then(|n| index(n)));
+        let frame_slots = FrameSlots::resolve(&index);
+        let q_slots = std::array::from_fn(|i| index(&format!("q{}", i + 1)));
+        let waves: Vec<ElementRuntime> = bundle
+            .waves
+            .iter()
+            .map(|e| ElementRuntime::new(e, salt))
+            .collect();
+        let shapes: Vec<ElementRuntime> = bundle
+            .shapes
+            .iter()
+            .map(|e| ElementRuntime::new(e, salt))
+            .collect();
         let stack = bundle
             .per_frame_init
             .stack_depth()
@@ -349,7 +424,10 @@ impl MilkRuntime {
             inputs,
             vertex_inputs,
             outputs,
-            extra,
+            frame_slots,
+            q_slots,
+            waves,
+            shapes,
             aspect: 1.0,
             snapshot,
             frame_index: 0,
@@ -373,6 +451,9 @@ impl MilkRuntime {
         self.frame_index = 0;
         self.att = [0.0; 3];
         vm::run(&self.bundle.per_frame_init, &mut self.state, Budget::INIT);
+        for element in self.waves.iter_mut().chain(self.shapes.iter_mut()) {
+            element.reset();
+        }
     }
 
     /// Whether this bundle has a per-vertex program at all. A bundle without one
@@ -396,7 +477,7 @@ impl MilkRuntime {
         dt: f32,
         mesh: (u32, u32),
         aspect: f32,
-    ) -> ([f32; 9], [Option<f32>; 8]) {
+    ) -> ([f32; 9], FrameOutputs) {
         self.aspect = if aspect.is_finite() && aspect > 0.0 {
             aspect
         } else {
@@ -452,12 +533,7 @@ impl MilkRuntime {
                 self.state.set(index, identity_output(i));
             }
         }
-        for (i, slot) in self.extra.iter().enumerate() {
-            if let Some(index) = *slot {
-                self.state
-                    .set(index, EXTRA_DEFAULTS.get(i).copied().unwrap_or(0.0));
-            }
-        }
+        self.frame_slots.seed(&mut self.state);
 
         vm::run(&self.bundle.per_frame, &mut self.state, Budget::FRAME);
         self.frame_index = self.frame_index.wrapping_add(1);
@@ -477,21 +553,74 @@ impl MilkRuntime {
                 .and_then(|slot| *slot)
                 .map_or_else(|| identity_output(i), |index| self.state.get(index))
         });
-        let extra: [Option<f32>; 8] = std::array::from_fn(|i| {
-            let index = self.extra.get(i).and_then(|slot| *slot)?;
-            let value = self.state.get(index);
-            // `decay` is a per-FRAME survival factor and becomes a per-second
-            // one; the seven after it are a multiplier and six flags, which are
-            // not rates and pass through.
-            Some(if i == 0 {
-                per_second_factor(value)
-            } else if value.is_finite() {
-                value
-            } else {
-                EXTRA_DEFAULTS.get(i).copied().unwrap_or(0.0)
-            })
-        });
-        (convert_outputs(raw), extra)
+        let frame_outputs = self.frame_slots.read(&self.state);
+
+        // **The q-bridge into the elements**, and it is a copy rather than a
+        // shared file (see `Q_COUNT`): each custom wave and shape has its own
+        // register space, and what crosses is `q1`-`q32` as the main per-frame
+        // program left them. Done here, once, rather than per point or per
+        // instance.
+        let mut q = [0.0f32; Q_COUNT];
+        for (slot, index) in q.iter_mut().zip(self.q_slots) {
+            if let Some(index) = index {
+                *slot = self.state.get(index);
+            }
+        }
+        for element in self.waves.iter_mut().chain(self.shapes.iter_mut()) {
+            element.begin_frame(&q, time, frame, self.att);
+        }
+
+        (convert_outputs(raw), frame_outputs)
+    }
+
+    /// How many custom waves this bundle carries.
+    pub fn wave_count(&self) -> usize {
+        self.waves.len()
+    }
+
+    /// The structural numbers of custom wave `index` — how many points it draws
+    /// and how it strokes them.
+    pub fn wave_spec(&self, index: usize) -> Option<ElementSpec> {
+        self.waves.get(index).map(ElementRuntime::spec)
+    }
+
+    /// The structural numbers of custom shape `index`.
+    pub fn shape_spec(&self, index: usize) -> Option<ElementSpec> {
+        self.shapes.get(index).map(ElementRuntime::spec)
+    }
+
+    /// How many custom shapes this bundle carries.
+    pub fn shape_count(&self) -> usize {
+        self.shapes.len()
+    }
+
+    /// Run custom wave `index`'s per-point program for the point at `sample`
+    /// (`0..1` along the wave) with `value1`/`value2` bound to the audio there,
+    /// and return where it put the point.
+    ///
+    /// `value1` and `value2` are MilkDrop's left and right channel samples. This
+    /// engine's analysis is **mono** by construction — the ring carries
+    /// interleaved PCM and the analyzer averages the channels before anything
+    /// else touches them (`dsp::Analyzer::push_interleaved`) — so the two are the
+    /// same number here. A preset that draws `value1` against `value2` as a
+    /// Lissajous figure therefore draws a diagonal line rather than a blob, which
+    /// is a real and stated fidelity loss rather than a bug.
+    pub fn run_wave_point(&mut self, index: usize, sample: f32, value: f32) -> Option<WavePoint> {
+        let element = self.waves.get_mut(index)?;
+        Some(element.run_point(sample, value))
+    }
+
+    /// Run custom wave `index`'s per-frame program, once, before its points.
+    pub fn run_wave_frame(&mut self, index: usize) -> Option<()> {
+        self.waves.get_mut(index)?.run_frame();
+        Some(())
+    }
+
+    /// Run custom shape `index`'s per-frame program for one instance and return
+    /// where it put that copy.
+    pub fn run_shape_instance(&mut self, index: usize, instance: u32) -> Option<ShapeInstance> {
+        let element = self.shapes.get_mut(index)?;
+        Some(element.run_instance(instance))
     }
 
     /// Run `per_vertex` for the vertex at uv `(x, y)` — `y = 0` at the **top**,
@@ -553,6 +682,232 @@ impl MilkRuntime {
                 .map_or_else(|| identity_output(i), |index| self.state.get(index))
         });
         convert_outputs(raw)
+    }
+}
+
+/// The structural numbers a custom element's geometry is sized from — the parts
+/// of a [`MilkElement`] the draw layer needs and the VM does not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ElementSpec {
+    /// Points (a wave) or sides (a shape), already clamped to the format's own
+    /// limit.
+    pub count: u32,
+    /// How many copies a shape draws; `1` for a wave.
+    pub instances: u32,
+    /// Past `0.5` in the source, a wave draws dots.
+    pub use_dots: bool,
+    /// Past `0.5` in the source, the stroke is thick.
+    pub thick: bool,
+}
+
+/// One custom wave's or shape's live state (Plan 0100 Phase 4).
+///
+/// **Its own register file, its own arenas, its own RNG.** MilkDrop gives each
+/// element a separate variable scope — its own `t1`-`t8`, its own working
+/// variables — and only `q1`-`q32` cross from the main program, by copy. Sharing
+/// one file instead would let a shape's `t1` collide with a wave's, which the
+/// reference's own presets rely on not happening.
+struct ElementRuntime {
+    program: MilkElement,
+    state: VmState,
+    inputs: ElementInputs,
+    /// Where a wave's per-point outputs land.
+    point: WavePointSlots,
+    /// Where a shape's per-instance outputs land.
+    instance: ShapeInstanceSlots,
+    /// The registers `q1`-`q32` occupy **in this element's own file**, which the
+    /// bridge copies into.
+    q_slots: [Option<u16>; Q_COUNT],
+    /// The values this element's per-frame or per-point program can write, saved
+    /// before the loop and restored before each iteration — the same mechanism
+    /// and the same reason as the mesh's per-vertex snapshot.
+    snapshot: Vec<f32>,
+    /// The registers that snapshot covers, taken from whichever program loops.
+    snapshot_of: Vec<u16>,
+}
+
+/// The read-only variables an element's programs are handed.
+#[derive(Debug, Default, Clone, Copy)]
+struct ElementInputs {
+    time: Option<u16>,
+    frame: Option<u16>,
+    fps: Option<u16>,
+    bass: Option<u16>,
+    mid: Option<u16>,
+    treb: Option<u16>,
+    bass_att: Option<u16>,
+    mid_att: Option<u16>,
+    treb_att: Option<u16>,
+    /// A wave's position along its own length, `0..1`.
+    sample: Option<u16>,
+    /// The audio at that position — MilkDrop's left and right channels, which
+    /// are the same number here (see `MilkRuntime::run_wave_point`).
+    value1: Option<u16>,
+    /// See [`value1`](Self::value1).
+    value2: Option<u16>,
+    /// Which copy of a shape this run is for, from `0`.
+    instance: Option<u16>,
+}
+
+impl ElementRuntime {
+    fn new(program: &MilkElement, salt: u32) -> Self {
+        let roster: Vec<String> = if program.per_frame.register_count() > 0 {
+            program.per_frame.names().to_vec()
+        } else if program.per_point.register_count() > 0 {
+            program.per_point.names().to_vec()
+        } else {
+            program.init.names().to_vec()
+        };
+        let index = |name: &str| -> Option<u16> {
+            roster
+                .iter()
+                .position(|n| n == name)
+                .and_then(|i| u16::try_from(i).ok())
+        };
+        let stack = program
+            .init
+            .stack_depth()
+            .max(program.per_frame.stack_depth())
+            .max(program.per_point.stack_depth());
+        let mut state = VmState::new(roster.len(), stack, salt);
+        state.accommodate(&program.init);
+        state.accommodate(&program.per_frame);
+        state.accommodate(&program.per_point);
+        // A wave loops its per-POINT program and a shape loops its per-FRAME one,
+        // so the snapshot follows whichever one repeats.
+        let snapshot_of = match program.kind {
+            ElementKind::Wave => program.per_point.written_registers().to_vec(),
+            ElementKind::Shape => program.per_frame.written_registers().to_vec(),
+        };
+        let mut runtime = Self {
+            program: program.clone(),
+            state,
+            inputs: ElementInputs {
+                time: index("time"),
+                frame: index("frame"),
+                fps: index("fps"),
+                bass: index("bass"),
+                mid: index("mid"),
+                treb: index("treb"),
+                bass_att: index("bass_att"),
+                mid_att: index("mid_att"),
+                treb_att: index("treb_att"),
+                sample: index("sample"),
+                value1: index("value1"),
+                value2: index("value2"),
+                instance: index("instance"),
+            },
+            point: WavePointSlots::resolve(&index),
+            instance: ShapeInstanceSlots::resolve(&index),
+            q_slots: std::array::from_fn(|i| index(&format!("q{}", i + 1))),
+            snapshot: vec![0.0; snapshot_of.len()],
+            snapshot_of,
+        };
+        runtime.reset();
+        runtime
+    }
+
+    /// The structural numbers, clamped to the format's own limits so a bundle
+    /// cannot ask for geometry the buffers were not sized for.
+    fn spec(&self) -> ElementSpec {
+        let (max_count, max_instances) = match self.program.kind {
+            ElementKind::Wave => (MAX_WAVE_POINTS, 1),
+            ElementKind::Shape => (MAX_SHAPE_SIDES, MAX_SHAPE_INSTANCES),
+        };
+        ElementSpec {
+            count: self.program.count.clamp(2, max_count),
+            instances: self.program.instances.clamp(1, max_instances),
+            use_dots: self.program.use_dots,
+            thick: self.program.thick,
+        }
+    }
+
+    /// Back to the state a freshly-loaded preset is in.
+    fn reset(&mut self) {
+        self.state.clear_registers();
+        self.state.clear_memory();
+        self.state.reset_rng();
+        vm::run(&self.program.init, &mut self.state, Budget::INIT);
+    }
+
+    /// Copy the bridge in and bind this frame's inputs. Called once per frame,
+    /// after the main per-frame program has run.
+    fn begin_frame(
+        &mut self,
+        q: &[f32; Q_COUNT],
+        time: f32,
+        frame: &crate::dsp::AnalysisFrame,
+        att: [f32; 3],
+    ) {
+        for (value, index) in q.iter().zip(self.q_slots) {
+            if let Some(index) = index {
+                self.state.set(index, *value);
+            }
+        }
+        let mut set = |slot: Option<u16>, value: f32| {
+            if let Some(index) = slot {
+                self.state.set(index, value);
+            }
+        };
+        set(self.inputs.time, time);
+        set(self.inputs.fps, NOMINAL_FPS);
+        set(self.inputs.bass, frame.bass * BAND_SCALE);
+        set(self.inputs.mid, frame.mid * BAND_SCALE);
+        set(self.inputs.treb, frame.treb * BAND_SCALE);
+        set(self.inputs.bass_att, att[0]);
+        set(self.inputs.mid_att, att[1]);
+        set(self.inputs.treb_att, att[2]);
+    }
+
+    /// A wave's per-frame program, run once before its points. Its outputs seed
+    /// the per-point defaults, which is how a wave whose per-point code sets only
+    /// `x`/`y` still gets its colour.
+    fn run_frame(&mut self) {
+        self.point.seed(&mut self.state);
+        vm::run(&self.program.per_frame, &mut self.state, Budget::FRAME);
+        self.take_snapshot();
+    }
+
+    /// One point of a custom wave.
+    fn run_point(&mut self, sample: f32, value: f32) -> WavePoint {
+        self.restore_snapshot();
+        if let Some(index) = self.inputs.sample {
+            self.state.set(index, sample);
+        }
+        if let Some(index) = self.inputs.value1 {
+            self.state.set(index, value);
+        }
+        if let Some(index) = self.inputs.value2 {
+            self.state.set(index, value);
+        }
+        vm::run(&self.program.per_point, &mut self.state, Budget::VERTEX);
+        self.point.read(&self.state)
+    }
+
+    /// One instance of a custom shape.
+    fn run_instance(&mut self, instance: u32) -> ShapeInstance {
+        self.restore_snapshot();
+        self.instance.seed(&mut self.state);
+        if let Some(index) = self.inputs.instance {
+            self.state.set(index, instance as f32);
+        }
+        if let Some(index) = self.inputs.frame {
+            self.state.set(index, instance as f32);
+        }
+        vm::run(&self.program.per_frame, &mut self.state, Budget::FRAME);
+        self.instance.read(&self.state)
+    }
+
+    fn take_snapshot(&mut self) {
+        for (slot, index) in self.snapshot.iter_mut().zip(&self.snapshot_of) {
+            *slot = self.state.get(*index);
+        }
+    }
+
+    fn restore_snapshot(&mut self) {
+        for (value, index) in self.snapshot.iter().zip(&self.snapshot_of) {
+            self.state.set(*index, *value);
+        }
     }
 }
 
