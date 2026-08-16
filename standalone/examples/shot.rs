@@ -42,6 +42,10 @@
 //!                            at capture cadence and print one statistics row
 //!                            per interval. Slow by construction; never a gate
 //!   --interval <secs>        simulated seconds between horizon rows (default 30)
+//!   --render <clip.wav>      offline video: walk the clip at --fps and stream
+//!                            every frame to stdout as Y4M for an encoder to
+//!                            read. Deterministic and decoupled from real time
+//!   --fps <n|num/den>        the render mode's frame rate (default 60)
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
 //! `--presets`, the `LMV_PRESET_DIR` override, the per-user preset directory,
@@ -63,6 +67,7 @@ use standalone::shot::args::{
 use standalone::shot::film::{StripLayout, check_hops, filmstrip_indices, filmstrip_layout};
 use standalone::shot::glyph::{GLYPH_ADVANCE, GLYPH_COLS, glyph_for};
 use standalone::shot::horizon;
+use standalone::shot::render::{self, Fps, parse_fps};
 use standalone::shot::renderer;
 use standalone::shot::report;
 use standalone::shot::wav::parse_wav_16bit;
@@ -85,6 +90,9 @@ enum Mode {
     Report,
     /// `--horizon <minutes>`: the long-run drift check (Plan 0085 Phase 1).
     Horizon,
+    /// `--render <clip.wav>`: the offline video mode (Plan 0101 / ADR-0114) —
+    /// walk the clip at a fixed frame step and stream frames to an encoder.
+    Render,
 }
 
 struct Args {
@@ -137,6 +145,13 @@ struct Args {
     horizon: Option<f32>,
     /// `--interval <secs>`: simulated seconds between horizon rows.
     interval: f32,
+    /// `--render <clip.wav>`: the WAV to render a video from (Plan 0101).
+    /// Distinct from `--audio`, which tiles a filmstrip: this walks the whole
+    /// clip at `--fps` and streams every frame.
+    render: Option<PathBuf>,
+    /// `--fps <n|num/den>`: the render mode's frame rate. Unused elsewhere —
+    /// every other capture path steps at the fixed capture cadence.
+    fps: Fps,
 }
 
 impl Default for Args {
@@ -164,6 +179,8 @@ impl Default for Args {
             // compare, coarse enough that a ten-minute horizon prints twenty of
             // them rather than a page nobody reads.
             interval: 30.0,
+            render: None,
+            fps: render::DEFAULT_FPS,
         }
     }
 }
@@ -222,6 +239,11 @@ fn parse_args() -> Result<Args, String> {
                     .parse::<f32>()
                     .map_err(|_| format!("--interval expects seconds, got `{value}`"))?;
             }
+            "--render" => {
+                args.render = Some(PathBuf::from(next_value(&mut it, "--render")?));
+                args.mode = Mode::Render;
+            }
+            "--fps" => args.fps = parse_fps(&next_value(&mut it, "--fps")?)?,
             "--at" => args.at = Some(parse_hops(&next_value(&mut it, "--at")?)?),
             "--frame-at" => {
                 let value = next_value(&mut it, "--frame-at")?;
@@ -268,6 +290,37 @@ fn parse_args() -> Result<Args, String> {
              by a clip: drop --signal/--audio and set the level with --set"
                 .to_string(),
         );
+    }
+    // `--render` names its own clip and streams every frame; the other audio
+    // flags name a clip to *sample* a filmstrip from, and a horizon holds one
+    // stimulus for its whole run. Any pair of these would mean silently ignoring
+    // one of two clips, which is the failure this CLI's exit codes exist for.
+    if args.render.is_some() {
+        for (flag, given) in [
+            ("--signal", args.signal.is_some()),
+            ("--audio", args.audio.is_some()),
+            ("--horizon", args.horizon.is_some()),
+        ] {
+            if given {
+                return Err(format!(
+                    "--render walks its own clip end to end and cannot also take \
+                     {flag}: pass one"
+                ));
+            }
+        }
+        // stdout carries the frame stream, so there is nowhere for `--out` to
+        // mean what it means everywhere else. Redirect stdout, or use --ffmpeg.
+        if args.out.is_some() {
+            return Err(
+                "--render writes the frame stream to stdout, so --out has nothing to \
+                 name: redirect stdout to a file, or pass --ffmpeg <path> to encode"
+                    .to_string(),
+            );
+        }
+    } else if args.fps != render::DEFAULT_FPS {
+        // Every other capture path steps at the fixed capture cadence, so a
+        // `--fps` outside `--render` would be accepted and ignored.
+        return Err("--fps only applies to --render <clip.wav>".to_string());
     }
     Ok(args)
 }
@@ -321,7 +374,11 @@ fn print_usage() {
                                     capture cadence, one row per interval.\n\
                                     Minutes of wall clock; never a gate\n\
          --interval <secs>          simulated seconds between horizon rows\n\
-                                    (default 30)"
+                                    (default 30)\n\
+         --render <clip.wav>        offline video: walk the clip at --fps and\n\
+                                    stream Y4M frames to stdout for an encoder\n\
+         --fps <n|num/den>          render frame rate (default 60; 30000/1001\n\
+                                    for NTSC - a decimal is rejected)"
     );
 }
 
@@ -393,7 +450,8 @@ fn run() -> Result<(), String> {
     let args = parse_args()?;
     let (presets, source) = load_library(&args)?;
     // An audio source (synth signal or WAV) takes precedence — it drives a
-    // filmstrip regardless of the shot/all/report mode default.
+    // filmstrip regardless of the shot/all/report mode default. `--render` is
+    // rejected alongside either one at parse time, so it never reaches here.
     if args.signal.is_some() || args.audio.is_some() {
         return filmstrip(args, presets, &source);
     }
@@ -419,7 +477,30 @@ fn run() -> Result<(), String> {
                 json: args.json,
             },
         ),
+        Mode::Render => offline_render(args, presets, &source),
     }
+}
+
+/// `--render <clip.wav>`: read the clip and hand it to the offline render mode
+/// (Plan 0101). The file read is the example's, exactly as it is for `--audio`;
+/// the loop and the wire format are the library's.
+fn offline_render(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
+    let path = args.render.clone().ok_or("--render needs a clip path")?;
+    let (pcm, format) = read_wav_16bit(&path)?;
+    render::run(
+        presets,
+        source,
+        &render::RenderRequest {
+            preset: args.preset.clone(),
+            fps: args.fps,
+            width: args.width,
+            height: args.height,
+            tier: args.tier,
+        },
+        &pcm,
+        format,
+        &path.display().to_string(),
+    )
 }
 
 fn shot(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {

@@ -314,6 +314,88 @@ impl Renderer {
             .collect()
     }
 
+    /// Render preset `name` for `frames` frames at an **injected** `dt`, handing
+    /// each frame to `sink` the moment it is read back (Plan 0101 / ADR-0114) —
+    /// the **streaming** primitive, and the one an offline video render needs.
+    ///
+    /// Its three siblings all return a `Vec<CaptureImage>`, which is exactly what
+    /// a video render cannot afford: a 1080p frame is 8.29 MB, so a four-minute
+    /// track at 60 fps is 119 GB of retained images. Nothing is retained here —
+    /// the frame is handed to `sink` and dropped, so the resident set of a
+    /// 14,400-frame render is the same as a 100-frame one.
+    ///
+    /// It is also the only capture entry point whose step is **not** the fixed
+    /// [`FALLBACK_DT`](scenes::FALLBACK_DT). A render at `--fps 30` advances the
+    /// scene by 1/30 s a frame, or the visuals would run at half speed against
+    /// their own soundtrack; that `dt` is the caller's, exactly as it is for the
+    /// live frontend (ADR-0013). At 60 fps `dt` *is* `FALLBACK_DT`, which is what
+    /// makes a rendered frame comparable with every other capture this repo takes.
+    ///
+    /// `analysis` supplies the [`AnalysisFrame`] for each frame index. The audio
+    /// hop clock and the frame clock are different clocks and only the caller
+    /// knows the mapping between them, so this deliberately does not walk PCM —
+    /// unlike [`capture_audio`](Self::capture_audio), which welds one rendered
+    /// frame to one analysis hop.
+    ///
+    /// Deterministic on the same terms as its siblings: scenes rebuilt to their
+    /// seed, the clock reset to `0.0`, the salt pinned. Given a deterministic
+    /// `analysis` the whole run is a pure function of `(name, frames, dt)`.
+    ///
+    /// **Off the hot path** — it blocks on a GPU readback every frame, which is
+    /// also what bounds its memory: `read_back` polls, so each frame's submission
+    /// is retired before the next is encoded (the retention Plan 0099 measured).
+    /// The target and the readback buffer are built **once** and reused, so a
+    /// long run allocates no GPU resources mid-sequence.
+    ///
+    /// A `sink` error stops the run and comes back as
+    /// [`RenderError::Sink`](RenderError::Sink) carrying the consumer's own
+    /// message.
+    pub fn capture_stream(
+        &mut self,
+        name: &str,
+        frames: u32,
+        dt: f32,
+        analysis: &mut dyn FnMut(u32) -> AnalysisFrame,
+        sink: &mut dyn FnMut(u32, &CaptureImage) -> Result<(), String>,
+    ) -> Result<(), RenderError> {
+        self.reset_for_capture(name)?;
+
+        let (width, height) = (self.ctx.config.width, self.ctx.config.height);
+        let format = self.ctx.surface_format();
+        let (texture, view) = capture::create_target(&self.ctx.device, format, width, height);
+        let (buffer, padded_bpr) = capture::create_readback(&self.ctx.device, width, height);
+
+        for index in 0..frames {
+            let frame = analysis(index);
+            self.time += dt;
+            let mut encoder =
+                self.ctx
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("lmv-capture-stream"),
+                    });
+            capture::record_clear(&mut encoder, &view);
+            let _ = self.draw_frame(
+                &frame,
+                &mut encoder,
+                &view,
+                width,
+                height,
+                dt,
+                SaltMode::Pinned,
+            );
+            capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, width, height);
+            self.ctx.queue.submit(std::iter::once(encoder.finish()));
+
+            #[cfg(feature = "text")]
+            self.text_layer.end_frame();
+
+            let img = capture::read_back(&self.ctx.device, &buffer, width, height, padded_bpr)?;
+            sink(index, &img).map_err(RenderError::Sink)?;
+        }
+        Ok(())
+    }
+
     /// Select `name` and reset every stateful system to its deterministic seed —
     /// the shared preamble of [`capture_preset`](Self::capture_preset) and
     /// [`capture_preset_over`](Self::capture_preset_over), so both are pure

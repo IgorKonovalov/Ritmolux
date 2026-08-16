@@ -7,9 +7,10 @@
 //! [`json`] and [`wav`] are pure functions of their arguments: no GPU, no
 //! filesystem, no `Args`, no process state.
 //!
-//! [`report`] and [`horizon`] are the exceptions and both are deliberate
-//! (Plan 0061 Phase 4, Plan 0085 Phase 1). The `--report` and `--horizon`
-//! machinery *does* drive a renderer, so neither is pure — but leaving `report`
+//! [`report`], [`horizon`] and [`render`] are the exceptions and all three are
+//! deliberate (Plan 0061 Phase 4, Plan 0085 Phase 1, Plan 0101 Phase 1). The
+//! `--report`, `--horizon` and `--render`
+//! machinery *does* drive a renderer, so none is pure — but leaving `report`
 //! in the example meant a thousand lines of table generation, gate reachability
 //! and transient analysis whose only coverage was a subprocess asserting that
 //! the JSON's braces balanced. Their pure halves are directly testable here;
@@ -26,6 +27,7 @@ pub mod film;
 pub mod glyph;
 pub mod horizon;
 pub mod json;
+pub mod render;
 pub mod report;
 pub mod wav;
 

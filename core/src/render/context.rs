@@ -41,6 +41,13 @@ pub enum RenderError {
     /// An audio-driven capture was handed a PCM format the analyzer rejected at
     /// the intake boundary (Plan 0013).
     AudioFormat(FormatError),
+    /// The consumer of a **streamed** capture refused a frame — the offline
+    /// render mode's pipe closed, the encoder died, the file could not be
+    /// written (Plan 0101 / ADR-0114). The string is the consumer's own message,
+    /// carried verbatim rather than flattened to "write failed": that consumer
+    /// is a child process, and a mystery broken pipe is the obvious way this
+    /// path goes wrong.
+    Sink(String),
 }
 
 impl std::fmt::Display for RenderError {
@@ -60,6 +67,7 @@ impl std::fmt::Display for RenderError {
                 write!(f, "no preset named '{name}' in the roster")
             }
             RenderError::AudioFormat(e) => write!(f, "invalid audio format for capture: {e}"),
+            RenderError::Sink(msg) => write!(f, "{msg}"),
         }
     }
 }

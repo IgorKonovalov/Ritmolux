@@ -107,6 +107,8 @@ Flags:
 | `--tier floor\|rich` | quality tier to capture at (default `floor` — see above) |
 | `--horizon <minutes>` | [the long-run drift check](#the-horizon-does-a-world-still-look-like-itself-after-minutes) — N **simulated** minutes at capture cadence, one statistics row per interval. Minutes of wall clock; never a gate |
 | `--interval <secs>` | simulated seconds between horizon rows (default 30) |
+| `--render <clip.wav>` | [offline video](#--render-a-music-video-from-a-track) — walk the clip at `--fps` and stream every frame to stdout for an encoder to read. Deterministic and decoupled from real time |
+| `--fps <n\|num/den>` | the render mode's frame rate (default 60). A decimal is rejected: write `30000/1001`, not `29.97` |
 
 Bad arguments and unknown presets exit non-zero with a message.
 
@@ -213,6 +215,79 @@ far the run was asked to go — so a two-minute run and a ten-minute run agree o
 every row they share. The wall clock and resident set in the cost block are the
 exception: those are properties of the box, reported and never asserted
 (ADR-0071).
+
+### `--render`: a music video from a track
+
+Every other mode on this page takes a **picture**. `--render` walks a WAV end to
+end at a fixed frame step and writes a **video stream** to stdout, for a user's
+own `ffmpeg` to encode ([ADR-0114](adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md)).
+
+```bash
+cargo run -p standalone --example shot -- \
+  --preset "Supernova" --render track.wav --fps 30 --size 320x240 \
+  | ffmpeg -f yuv4mpegpipe -i - -i track.wav \
+      -c:v libx264 -pix_fmt yuv420p -c:a aac out.mp4
+```
+
+**No encoder ships, and that is a decision rather than an omission.** A 1080p
+RGBA frame is 8.29 MB and four minutes at 60 fps is 119 GB, so the frames can
+never reach disk before the encoder — a pipe is the only viable shape, not an
+optimization. A static encoder is in turn larger than this application's whole
+[size budget](nfr.md#4-size-and-dependencies). So `ffmpeg` is a documented
+prerequisite for this one feature, and `lmv.exe` does not change size.
+
+**What makes this worth having is that it cannot drop a frame.** Every live
+visualizer's render loop is welded to a real-time audio device, so its "export"
+is a screen capture: bounded by the display's refresh and resolution, degraded
+under load, and different every run. Nothing in this path races a display — `dt`
+is injected (ADR-0013), the DSP is a pure function of its input window
+([NFR §6](nfr.md#6-determinism)), and the grammar's randomness is pinned
+(ADR-0051). Two runs of the same command produce **byte-identical** streams, and
+that is asserted in `standalone/tests/shot_cli.rs` rather than inferred.
+
+**The two clocks are different clocks.** Analysis hops arrive at
+`sample_rate / HOP_SIZE` — 93.75 Hz for 48 kHz audio — and frames at `--fps`.
+The loop advances whichever is due next, so most 60 fps frames take one new hop
+and some take two. Rendering one frame per hop instead would run the picture at
+64% speed against its own soundtrack. Above the hop rate (`--fps 240`) frames
+repeat the last published analysis frame rather than interpolating one: the DSP
+publishes on hop boundaries, and inventing values between them would put
+something on screen the analyzer never derived.
+
+**The wire format is Y4M** (`ffmpeg -f yuv4mpegpipe`), and the stream is
+self-describing — `YUV4MPEG2 W1920 H1080 F60:1 Ip A1:1 C444 XCOLORRANGE=FULL` —
+so a mistyped geometry cannot silently produce garbage and a non-`ffmpeg`
+consumer needs nothing from the command line. Three parts of that header earn
+their place:
+
+- **`C444`** — chroma is not subsampled, so the conversion loses only rounding.
+- **`XCOLORRANGE=FULL`** — the samples use 0–255, not the 16–235 studio swing.
+  Omit it and every player expands the range again and the file is visibly
+  washed out against the app, in a way that reads as an engine bug and is not.
+- **`F60:1`** — an exact rational, which is why `--fps` refuses a decimal.
+  `29.97` is 30000/1001; accepting it as 2997/100 would drift the picture against
+  its own soundtrack by a frame every few minutes, and nothing in this harness
+  would catch it.
+
+Y4M cannot carry RGB — the muxer *errors* on `rgb24` — so `shot` owns the
+RGB→YUV conversion (full-range BT.709). It is not bijective at 8 bits, which is
+why the tap-placement guard is asserted on the RGB frame the writer is handed and
+never on the wire bytes; a guard written against the wire would have to be
+loosened to a tolerance until it passed, which is how a guard becomes decoration.
+
+Practical notes:
+
+- **stdout is the video.** Every human-readable line goes to stderr, so a summary
+  printed the way the other modes print one would be eight bytes of garbage in
+  the middle of the file. `--out` is rejected for the same reason.
+- `--render` takes its own clip and is mutually exclusive with `--signal`,
+  `--audio` and `--horizon` — any pair would mean silently ignoring one of two
+  stimuli.
+- The frame count is `ceil(clip_seconds x fps)`: the trailing partial frame is
+  rendered rather than dropped, so the picture is never shorter than the audio.
+- It renders at the **floor** tier like every other capture path. `--tier rich`
+  is the opt-in, and it is the mode where it is most worth paying for — an
+  offline render has no 60 Hz deadline, so the frame-time governor never fires.
 
 ### The three calibration traps
 
