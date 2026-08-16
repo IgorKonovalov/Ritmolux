@@ -1,7 +1,8 @@
 # 0105 — The indexes go back to being indexes
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-16
+> **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev
 > **Related ADRs:** [0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)
 

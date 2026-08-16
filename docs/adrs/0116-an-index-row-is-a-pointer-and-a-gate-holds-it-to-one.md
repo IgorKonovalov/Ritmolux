@@ -1,6 +1,6 @@
 # ADR-0116 — An index row is a pointer, and a gate holds it to one
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-16, user approval)
 > **Date:** 2026-08-16
 > **Related plan(s):** [0105](../plans/0105-the-indexes-go-back-to-being-indexes.md)
 
