@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0100** (ADRs are a separate sequence — next free there is **0112**.)
+**Next free number: 0100** (ADRs are a separate sequence — next free there is **0113**.)
 
 ## Active roster
 
@@ -49,6 +49,19 @@ result is worth keeping because most of what it found was **not** ripe:
   stars *were* rejected — and **the reason was never captured**, which is the half the plan actually
   asked for. A rejection on silhouette points at [0098]'s coordinate; a rejection on shading points
   at lighting. One short look call settles which, and it is the open question in the content brief.
+
+**Parked behind the whole roster, by the user's own instruction:
+[ADR-0112](../adrs/0112-a-blender-model-enters-as-inline-mesh-data-and-the-gpu-scatters-its-points.md)**
+(2026-08-16) — a Blender-authored model enters as inline mesh data and the GPU scatters the tier's
+particle budget across its surface. It has **no plan and is not to get one until this roster
+clears**, on the [ADR-0102](../adrs/0102-a-palette-coordinates-edge-is-a-per-preset-choice.md)
+precedent: the decision was worth recording while the reasoning was fresh, nobody is blocked, and
+the interview that produced it is the expensive part. Two things a future plan owes before its
+triangle ceiling is fixed, both capable of invalidating the ADR: what triangle count a *recognizable*
+decimated silhouette needs (if a hard-surface model needs thousands, the inline arithmetic collapses
+and the ADR's Alternative E becomes live), and whether uniform area sampling reads at all — which
+should be Phase 1, the author's own model on screen and untuned, because that is the cheapest moment
+to learn that weighted sampling was never optional.
 
 **Sequencing: both new plans run after [0087] and [0092].** [0098] contends with [0092] on
 `shape_field.rs` and [0087]'s stop condition is worth resolving before more line-adjacent work; the
