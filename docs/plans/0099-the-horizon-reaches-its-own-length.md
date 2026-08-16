@@ -1,6 +1,6 @@
 # 0099 — The horizon reaches its own length
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev
 > **Related ADRs:** none — this is a defect repair, not a design choice

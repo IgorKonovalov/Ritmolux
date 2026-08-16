@@ -478,6 +478,20 @@ impl Renderer {
     /// Draw one frame into `view` and submit it — advancing scene state without
     /// reading anything back. The warm-up step [`capture_preset`] uses to reach
     /// frame `N`.
+    ///
+    /// **It polls, and that is what bounds the memory of a long run** (Plan
+    /// 0099). Nothing else here reads anything back, so before this line the
+    /// only `device.poll` in the whole capture path was
+    /// [`capture::read_back`]'s — meaning wgpu got no opportunity to retire a
+    /// completed submission between two *sampled* frames. A horizon at the
+    /// default 30 s interval is 1,800 consecutive unpolled submits, and the
+    /// retention is per **pass**, not per pixel: measured over one such stretch
+    /// on the Windows dev box (hardware adapter, debug, 96x96), a
+    /// reaction-diffusion world — 12 simulation sub-steps plus a present, 13
+    /// passes a frame — retained **950 KB per frame** against a captured frame
+    /// of 36 KB, while single-pass worlds retained ~30 KB. That is what made
+    /// the ceiling look like a property of the RD family: every world grew, RD
+    /// grew ~32x faster and hit the allocator first, at ~4.4 GB.
     fn step_offscreen(
         &mut self,
         frame: &AnalysisFrame,
@@ -503,6 +517,26 @@ impl Renderer {
             SaltMode::Pinned,
         );
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
+
+        // Retire this submission's resources. `wait_indefinitely` rather than a
+        // non-blocking `Poll`, and that was **measured, not assumed**: a
+        // `PollType::Poll` here took the same 3,600-frame stretch from
+        // 3,668 MB to 3,188 MB and no further, because a headless loop submits
+        // far faster than the GPU drains and a non-blocking poll finds almost
+        // nothing complete to retire. Waiting is what makes the retention
+        // per-frame instead of per-run.
+        //
+        // It is the same `poll(Wait)` `capture::read_back` already performs at
+        // every sampled frame, so this path pays what the sampled path always
+        // paid — and this whole file is off the hot path by construction (see
+        // the module docs); nothing in the frame loop or behind the C ABI
+        // reaches it.
+        //
+        // The result is discarded for the same reason `draw_frame`'s is above —
+        // this returns nothing, and a poll that fails means the device is gone,
+        // which the next `read_back` reports as `CaptureReadback` rather than
+        // letting the run pass silently.
+        let _ = self.ctx.device.poll(wgpu::PollType::wait_indefinitely());
 
         #[cfg(feature = "text")]
         self.text_layer.end_frame();
