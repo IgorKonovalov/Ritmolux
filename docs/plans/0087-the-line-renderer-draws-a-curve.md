@@ -7,7 +7,7 @@
 > supplementing [ADR-0007](../adrs/0007-line-geometry-generators.md),
 > [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md),
 > [ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
-> **Closes:** [design-backlog 0073](../design-backlog.md), [design-backlog 0071](../design-backlog.md)
+> **Closes:** [design-backlog 0073](../design-backlog.md), [design-backlog 0071](../design-backlog.md), [design-backlog 0098](../design-backlog.md) (folded in 2026-08-16 as Phase 1b — same subsystem, and no other plan touches these files)
 
 ## TL;DR
 
@@ -135,6 +135,34 @@ flowchart TB
   wrongly); and the new bind-group layout is added to
   [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md)'s enumeration with its
   evidence, or the guard is confirmed to place it in no colliding group.
+
+### Phase 1b — a sub-floor `thickness` stops failing silently
+
+- **Owner skill:** dev
+- **What:** Closes [design-backlog 0098](../design-backlog.md), folded into this plan because this
+  plan owns the line renderer and no other plan touches these files. **It is placed here, before
+  Phase 4's stop gate, deliberately**: Phase 4 can send the whole plan to ADR-0098's Alternative C,
+  and this repair must not be orphaned by that outcome — it is independent of whether arcs ever
+  ship.
+- **Files touched:** `core/src/preset/schema.rs` (the load-path warning),
+  `core/src/render/scenes/lines/` where the floor lives, and their tests.
+- **Done when:**
+  - **The dead zone is what gets reported, not merely a small value.** `thickness` maps to an NDC
+    half-width as `thickness * 0.003` floored at `0.0005`, so **every value below `0.167` produces
+    the identical stroke** — about 0.27 px at 1080p, which rasterizes as a broken dotted line. A
+    warning fires when a line scene's `thickness` binding rests below that threshold, in ADR-0020's
+    shape (the unknown-param warning is the precedent and the same surface).
+  - **The floor itself stays.** It is what stops a zero thickness degenerating the quad; the defect
+    is the silence, not the clamp.
+  - A test asserts that two distinct sub-floor values render **identically** — which is the property
+    that makes the range dead — and that a value above the threshold does not. Without the second
+    half the test would pass on a renderer that ignored `thickness` entirely.
+  - **Why this cost a session, recorded in the phase commit:** re-tuning inside the dead zone
+    changes nothing, so the obvious experiment *disproves the correct hypothesis*.
+    `fragment_vitrail` shipped at `0.016` — two orders below the 1.5-3.2 every other line preset
+    uses — and its Maurer rose read as scattered dots for its whole shipped life; the content lane
+    swept chord count and sample count first because `0.016 -> 0.022 -> 0.038` had visibly no
+    effect. The doc half is already discharged in `presets/README.md`.
 
 ### Phase 2 — the in-frame geometry instrument learns arcs
 
