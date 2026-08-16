@@ -70,6 +70,8 @@ pub struct SettingsView {
     pub diagnostics: bool,
     /// Whether the corner preset name is drawn at all (`[hud] preset_name`).
     pub preset_name: bool,
+    /// Whether a track change announces itself (`[hud] now_playing`).
+    pub now_playing: bool,
     /// The resolved preset directory — shown, never edited.
     pub preset_dir: String,
 }
@@ -136,6 +138,8 @@ pub enum SettingsAction {
     ToggleDiagnostics,
     /// Show or hide the corner preset name, persisted (Plan 0096 Phase 3).
     TogglePresetName,
+    /// Announce track changes or not, persisted (Plan 0097 Phase 3).
+    ToggleNowPlaying,
 }
 
 /// The rows, in display order. Exhaustive and ordered here so the labels, the
@@ -150,12 +154,13 @@ pub enum SettingsRow {
     Display,
     Diagnostics,
     PresetName,
+    NowPlaying,
     Presets,
 }
 
 impl SettingsRow {
     /// Every row, in display order. The one read-only row stays last.
-    pub const ALL: [SettingsRow; 9] = [
+    pub const ALL: [SettingsRow; 10] = [
         SettingsRow::Quality,
         SettingsRow::AutoRotate,
         SettingsRow::MinDwell,
@@ -163,7 +168,11 @@ impl SettingsRow {
         SettingsRow::Fullscreen,
         SettingsRow::Display,
         SettingsRow::Diagnostics,
+        // Beside the preset name: both are `[hud]` keys about what the shell
+        // paints over the show, and an operator clearing the canvas wants them
+        // in one place.
         SettingsRow::PresetName,
+        SettingsRow::NowPlaying,
         SettingsRow::Presets,
     ];
 
@@ -177,6 +186,7 @@ impl SettingsRow {
             SettingsRow::Display => "Display",
             SettingsRow::Diagnostics => "Diagnostics",
             SettingsRow::PresetName => "Preset name",
+            SettingsRow::NowPlaying => "Now playing",
             SettingsRow::Presets => "Presets",
         }
     }
@@ -205,6 +215,7 @@ impl SettingsRow {
             }
             SettingsRow::Diagnostics => on_off(view.diagnostics).to_owned(),
             SettingsRow::PresetName => on_off(view.preset_name).to_owned(),
+            SettingsRow::NowPlaying => on_off(view.now_playing).to_owned(),
             SettingsRow::Presets => view.preset_dir.clone(),
         }
     }
@@ -236,6 +247,7 @@ impl SettingsRow {
             SettingsRow::Display => SettingsAction::CycleDisplay,
             SettingsRow::Diagnostics => SettingsAction::ToggleDiagnostics,
             SettingsRow::PresetName => SettingsAction::TogglePresetName,
+            SettingsRow::NowPlaying => SettingsAction::ToggleNowPlaying,
             // Read-only: it tells you where presets are loaded from, which is a
             // launch-time resolution (`LMV_PRESET_DIR`, then the per-user dir),
             // not a thing a menu can move.

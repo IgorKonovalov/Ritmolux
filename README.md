@@ -153,7 +153,7 @@ one, so you always land where you asked.
 | `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
 | `Tab`     | Open/close the preset browser — opens on the preset you're watching. `↑`/`↓` walk the list and wrap at both ends, `←`/`→` step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
-| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, preset name. `↑`/`↓` pick a row, `←`/`→` change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
+| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, preset name, now playing. `↑`/`↓` pick a row, `←`/`→` change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
 | `[` / `]` | Drop / raise the quality tier live — pins it for the session and persists the choice |
 | `F`       | Toggle fullscreen                                           |
 | `Esc`     | Leave fullscreen (with no menu open). Does nothing in a window, and never quits |
@@ -174,6 +174,26 @@ way on its own: either menu or the `F3` overlay hides it, and it comes straight
 back when they close. For a permanently clean canvas, turn the settings menu's
 **Preset name** row off — that is `[hud] preset_name` in `config.toml`, and it
 survives a restart.
+
+### Now playing
+
+When the track changes, the **artist and title fade in** over the visuals in the
+lower-left corner, hold a few seconds, and fade out — an announcement, not a
+status bar. A long title is truncated to fit rather than running off the screen.
+
+On **Windows** the metadata comes from the system's now-playing feed (SMTC) —
+the same one behind the media flyout — so it works with whatever player is
+publishing to it, foobar2000 included. **Not every player publishes there.** One
+that doesn't simply produces no banner: this is a nicety that stays silent when
+it has nothing to say, never an error. Closing the player clears it.
+
+On **macOS** the standalone gets no metadata: the OS has no supported equivalent
+(`MediaRemote` is private and restricted), which is the same asymmetry loopback
+capture already has. The foobar2000 plugin is the answer on that platform.
+
+To turn it off entirely, use the settings menu's **Now playing** row — that is
+`[hud] now_playing` in `config.toml`, and like the preset name it survives a
+restart. Off means no track ever reaches the visualizer.
 
 ### Flags & environment
 
