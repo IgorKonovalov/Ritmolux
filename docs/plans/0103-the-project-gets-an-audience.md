@@ -1,7 +1,8 @@
 # 0103 — The project gets an audience
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-16
+> **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none — this is distribution work, not a design choice
 > **Soft dependency:** [0101](0101-the-engine-renders-a-music-video.md) (nothing here can currently record motion)

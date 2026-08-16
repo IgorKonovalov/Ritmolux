@@ -1,7 +1,8 @@
 # 0101 — The engine renders a music video
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-16
+> **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md) (the engine renders video offline and delegates encoding)
 > **Hard dependency:** [0099](0099-the-horizon-reaches-its-own-length.md) — the long-run render path currently dies at ~3,601 frames, and a four-minute video is 14,400.

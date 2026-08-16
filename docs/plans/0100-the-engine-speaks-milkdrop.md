@@ -1,7 +1,8 @@
 # 0100 — The engine speaks MilkDrop
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-16
+> **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (MilkDrop presets are translated ahead of time onto a warp-mesh idiom)
 

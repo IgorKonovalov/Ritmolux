@@ -1,7 +1,8 @@
 # 0104 — The library stops being lopsided
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-16
+> **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human (every `human` phase is a `preset-author` session — see Risks)
 > **Related ADRs:** [0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) (the content lane lands presets), [0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md) (renewal by replacement cohorts)
 

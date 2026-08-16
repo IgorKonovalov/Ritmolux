@@ -1,7 +1,8 @@
 # 0102 — The component ships
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-16
+> **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0115](../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) (the foobar2000 component is a released artifact, and the SDK is a build parameter)
 
