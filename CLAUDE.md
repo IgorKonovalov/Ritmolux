@@ -152,8 +152,8 @@ audio + graphics**, where the usual "just allocate and log it" habits cause glit
 - **The C ABI is a contract.** The `extern "C"` surface the plugin links against is versioned
   and minimal, and **[`docs/specs/0001-c-abi.md`](docs/specs/0001-c-abi.md) is the authority on
   its shape** — not this file, which paraphrased a five-function surface for long enough that it
-  drifted to twelve. Changing that shape is an ADR-worthy event, not a casual edit: the C++ side
-  is compiled separately, so a mismatch fails at link time or, worse, at runtime.
+  drifted to twelve, and then to thirteen. Changing that shape is an ADR-worthy event, not a casual
+  edit: the C++ side is compiled separately, so a mismatch fails at link time or, worse, at runtime.
 - **Validate at the boundary, trust inside.** Sample-rate, channel count, and buffer sizes get
   checked once where audio enters the core; the hot path downstream assumes them valid.
 - **Lightweight is a feature.** Small binaries, few dependencies, low idle CPU/GPU. Every new
