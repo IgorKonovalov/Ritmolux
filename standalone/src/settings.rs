@@ -68,6 +68,8 @@ pub struct SettingsView {
     pub display_count: usize,
     pub display_name: String,
     pub diagnostics: bool,
+    /// Whether the corner preset name is drawn at all (`[hud] preset_name`).
+    pub preset_name: bool,
     /// The resolved preset directory — shown, never edited.
     pub preset_dir: String,
 }
@@ -132,6 +134,8 @@ pub enum SettingsAction {
     ToggleFullscreen,
     CycleDisplay,
     ToggleDiagnostics,
+    /// Show or hide the corner preset name, persisted (Plan 0096 Phase 3).
+    TogglePresetName,
 }
 
 /// The rows, in display order. Exhaustive and ordered here so the labels, the
@@ -145,12 +149,13 @@ pub enum SettingsRow {
     Fullscreen,
     Display,
     Diagnostics,
+    PresetName,
     Presets,
 }
 
 impl SettingsRow {
-    /// Every row, in display order.
-    pub const ALL: [SettingsRow; 8] = [
+    /// Every row, in display order. The one read-only row stays last.
+    pub const ALL: [SettingsRow; 9] = [
         SettingsRow::Quality,
         SettingsRow::AutoRotate,
         SettingsRow::MinDwell,
@@ -158,6 +163,7 @@ impl SettingsRow {
         SettingsRow::Fullscreen,
         SettingsRow::Display,
         SettingsRow::Diagnostics,
+        SettingsRow::PresetName,
         SettingsRow::Presets,
     ];
 
@@ -170,6 +176,7 @@ impl SettingsRow {
             SettingsRow::Fullscreen => "Fullscreen",
             SettingsRow::Display => "Display",
             SettingsRow::Diagnostics => "Diagnostics",
+            SettingsRow::PresetName => "Preset name",
             SettingsRow::Presets => "Presets",
         }
     }
@@ -197,6 +204,7 @@ impl SettingsRow {
                 )
             }
             SettingsRow::Diagnostics => on_off(view.diagnostics).to_owned(),
+            SettingsRow::PresetName => on_off(view.preset_name).to_owned(),
             SettingsRow::Presets => view.preset_dir.clone(),
         }
     }
@@ -227,6 +235,7 @@ impl SettingsRow {
             SettingsRow::Fullscreen => SettingsAction::ToggleFullscreen,
             SettingsRow::Display => SettingsAction::CycleDisplay,
             SettingsRow::Diagnostics => SettingsAction::ToggleDiagnostics,
+            SettingsRow::PresetName => SettingsAction::TogglePresetName,
             // Read-only: it tells you where presets are loaded from, which is a
             // launch-time resolution (`LMV_PRESET_DIR`, then the per-user dir),
             // not a thing a menu can move.

@@ -153,9 +153,10 @@ one, so you always land where you asked.
 | `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
 | `Tab`     | Open/close the preset browser — opens on the preset you're watching. `↑`/`↓` walk the list and wrap at both ends, `←`/`→` step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
-| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics. `↑`/`↓` pick a row, `←`/`→` change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
+| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, preset name. `↑`/`↓` pick a row, `←`/`→` change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
 | `[` / `]` | Drop / raise the quality tier live — pins it for the session and persists the choice |
 | `F`       | Toggle fullscreen                                           |
+| `Esc`     | Leave fullscreen (with no menu open). Does nothing in a window, and never quits |
 | `D`       | Cycle to the next display/monitor                           |
 | `F3`      | Toggle the diagnostics overlay                              |
 
@@ -167,6 +168,12 @@ highlighted preset on screen.
 Both menus are modal and only one is open at a time: `S` opens settings when the
 browser is closed (while it's open, `s` is a filter character), and `Tab` from
 settings hands over to the browser.
+
+The active preset's **name** sits in the top-left corner, and it gets out of the
+way on its own: either menu or the `F3` overlay hides it, and it comes straight
+back when they close. For a permanently clean canvas, turn the settings menu's
+**Preset name** row off — that is `[hud] preset_name` in `config.toml`, and it
+survives a restart.
 
 ### Flags & environment
 

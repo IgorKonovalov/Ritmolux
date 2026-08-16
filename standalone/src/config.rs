@@ -24,6 +24,28 @@ pub struct Config {
     pub input: Input,
     pub rotate: Rotate,
     pub quality: Quality,
+    pub hud: Hud,
+}
+
+/// `[hud]` — the on-canvas furniture the shell draws over the show (Plan 0096).
+///
+/// Separate from `[output]` because it is about what is *painted*, not about
+/// which screen the window opens on. One key today; the now-playing banner is
+/// expected to take a second one here (ADR-0110).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Hud {
+    /// Draw the active preset's name in the top-left corner. `true` is the
+    /// pre-Plan-0096 behavior, so an existing config with no `[hud]` section
+    /// keeps what it had. Even when on, the name yields to a modal and to the
+    /// F3 panel — this switch is "never show it", not "show it always".
+    pub preset_name: bool,
+}
+
+impl Default for Hud {
+    fn default() -> Self {
+        Self { preset_name: true }
+    }
 }
 
 /// `[quality]` — the render quality tier (Plan 0044 / ADR-0045).
@@ -202,5 +224,34 @@ impl Config {
             }
             Err(err) => eprintln!("could not serialize config: {err}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Config;
+
+    /// **An existing `config.toml` predates `[hud]`**, so the section missing
+    /// entirely has to mean today's behavior rather than a parse failure — the
+    /// degrade-never-crash rule this whole module is built on (NFR 10).
+    #[test]
+    fn a_config_without_a_hud_section_keeps_the_name_on() {
+        let config: Config = toml::from_str("[output]\nfullscreen = true\n")
+            .expect("a config with no [hud] section must still parse");
+        assert!(config.hud.preset_name);
+    }
+
+    /// The operator's "off" survives the write/read the settings row performs —
+    /// which is what makes the choice outlive a restart.
+    #[test]
+    fn the_preset_name_choice_round_trips() {
+        let mut config = Config::default();
+        config.hud.preset_name = false;
+        let text = toml::to_string_pretty(&config).expect("config serializes");
+        let back: Config = toml::from_str(&text).expect("its own output parses");
+        assert!(
+            !back.hud.preset_name,
+            "the off choice did not survive a save"
+        );
     }
 }
