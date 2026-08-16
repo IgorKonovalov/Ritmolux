@@ -143,6 +143,8 @@ that table is maintained alongside the presets and is the authoritative list.
 | `attractor` | GPU compute particles iterating a strange attractor (ADR-0015). |
 | `spectrum` | The log-spaced band array as N elements — bars, a contour, or a ring (ADR-0036). |
 | `emitter` | Objects that spawn, ride their own parabola, and die — the only system whose population varies (ADR-0057). |
+| `shape_field` | One mark silhouette drawn at frame scale as a signed-distance field, so banding the palette draws concentric offset contours (ADR-0105). |
+| `warp_mesh` | The previous frame, resampled through a grid with **one transform per vertex** — the only system that draws nothing of its own (ADR-0113). |
 
 This table used to carry a per-system count of curated presets. It is gone rather than
 corrected: at the Plan 0054 close six of its eight numbers were wrong (`parametric_curve`
@@ -361,7 +363,8 @@ reproducible given the same audio and the same seed.
 ### Variables
 
 Eighteen read-only variables carry the live audio analysis into your expressions,
-plus one — `index` — that carries position rather than sound:
+plus five that carry **position** rather than sound: `index` for a per-element
+evaluation, and `x`/`y`/`rad`/`ang` for a per-vertex one.
 
 | Variable | Meaning | Notes |
 |----------|---------|-------|
@@ -384,6 +387,9 @@ plus one — `index` — that carries position rather than sound:
 | `bar_index` | Bar counter — monotone except across an alignment change. | `mod(bar_index, 8)` for an 8-bar arc, which a lock can repeat or drop one bar of. |
 | `bar_phase` | Position across the whole bar, `[0, 1)`. | The genuine bar phase, unlike `bar`. |
 | `index` | The element's own position in `[0, 1]` during a **per-element** evaluation. | Not audio. `0` everywhere else — see [below](#index--one-binding-evaluated-once-per-element). |
+| `x` / `y` | The vertex's position in `[0, 1]` during a **per-vertex** evaluation; `y = 0` is the top. | Not audio. `0` outside a `[per_vertex]` table — see [below](#per_vertex--one-binding-evaluated-once-per-mesh-vertex). |
+| `rad` | That vertex's distance from the centre, aspect-corrected against the render target. | `1.0` at the middle of the top and bottom edges on any display; further at the sides of a wide one. |
+| `ang` | That vertex's angle from the centre, `[0, tau)`, counter-clockwise from +x as you look at the screen. | `0` outside a `[per_vertex]` table. |
 
 **The four headline levels are normalized** (ADR-0049): each is divided by its own
 slowly-decaying running peak, with a silence floor so a quiet room reads `0` rather
@@ -650,6 +656,56 @@ Things worth knowing before you reach for it:
   allocation-free — at the default 24 elements it is a low-microsecond fraction of
   a 60 Hz frame. A preset that names `index` nowhere costs exactly what it did
   before this existed.
+
+### `[per_vertex]` — one binding, evaluated once per mesh vertex
+
+`index` gives a binding one axis to vary along. `[per_vertex]` gives it **two**,
+and it belongs to exactly one system: [`warp_mesh`](../presets/README.md#warp_mesh--the-past-resampled-through-a-per-vertex-grid-plan-0100),
+which covers the frame with a grid and resamples the previous frame through it.
+A binding in that table is evaluated once per grid **vertex** per frame, with
+`x`, `y`, `rad` and `ang` bound to that vertex's own position.
+
+```toml
+system = "warp_mesh"
+
+[mesh]
+x = 32
+y = 24
+
+[per_vertex]
+# The past expands harder at the rim than at the centre — a tunnel that opens
+# out. No single `fb_zoom` can say this.
+zoom = "1.9 + rad * 0.9"
+# ...and turns at a rate that depends on which way round the frame you are.
+rot  = "0.35 + sin(ang) * 0.30"
+```
+
+The nine outputs it accepts — `zoom`, `rot`, `cx`, `cy`, `dx`, `dy`, `sx`, `sy`,
+`warp` — are the per-vertex generalization of the `fb_*` affine (ADR-0048), and
+[`presets/README.md`](../presets/README.md#the-per_vertex-table) is the
+authoritative table for what each does.
+
+Things worth knowing before you reach for it:
+
+- **Each of the nine is also an ordinary scalar param, and the table overrides
+  it.** Bind `zoom` in `[params]` and the whole mesh takes that value; bind it in
+  `[per_vertex]` as well and the table wins, vertex by vertex. So a preset starts
+  from one shared transform and opts into a varying one **output at a time**.
+- **Outside a `[per_vertex]` table, `x`/`y`/`rad`/`ang` read `0`** — the same rule
+  `index` takes outside a per-element evaluation. Unlike `index`, naming one in
+  `[params]` is a load **warning**, because a `rad` that silently reads zero is a
+  much more surprising thing to debug than an `index` that does.
+- **`rad` and `ang` are aspect-corrected against the render target**, never
+  against the mesh (ADR-0037), so a `rad`-driven figure is round on a 16:9
+  monitor and round on a 5:4 one.
+- **`[smoothing]` cannot ease a per-vertex binding**, for the reason it cannot
+  ease a per-element one: the smoother holds one scalar and a series has no single
+  value. Listing one is a surfaced load warning.
+- **Cost is the reason `[mesh]` is capped.** It is `(x+1) × (y+1) ×
+  (per-vertex bindings)` evaluations per frame on the render thread — thousands,
+  not dozens — so the grid is a **tier capacity** rather than an open number, and a
+  preset asking for more than the tier carries gets the tier's ceiling without an
+  error. The measured ladder behind those numbers is on `TierConfig::mesh_grid`.
 
 ### Comparisons and branching
 

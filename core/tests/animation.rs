@@ -146,6 +146,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::Spectrum => "spectrum",
         SystemKind::Emitter => "emitter",
         SystemKind::ShapeField => "shape_field",
+        SystemKind::WarpMesh => "warp_mesh",
     }
 }
 
