@@ -266,7 +266,9 @@ or an older copy shadows the one under test and the version check means nothing.
       57 fps** — 8.7x — with preset, `draw_calls` and `gpu_bytes` byte-identical across the
       transition. That is [backlog 0102](design-backlog.md)'s named stream-format revival path,
       reached accidentally, with a symptom that entry does not predict. **Filed there; priority
-      raised Medium -> High.**
+      raised Medium -> High.** A follow-up run with a populated playlist showed only a brief slow
+      patch at the first track, then correct: the bad state runs from panel creation until playback
+      starts, so it is worst for a user who looks before pressing play.
       **(e) Confirmed failing, as expected** — [backlog 0103](design-backlog.md): the panel's
       right-click shadows foobar2000's layout-edit menu, so Remove is unreachable.
       **(f) Pass** — `%APPDATA%\light-music-visualizer\` is present and shared; the component wrote

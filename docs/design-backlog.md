@@ -1701,9 +1701,26 @@ option in the section above is the safer of the two: re-checking `needs_reattach
 repairs a surface that never became real, but this session's surface **did** become real enough to
 draw a correct picture.
 
+**The window is "panel creation until playback actually starts", and that is what makes the severity
+so variable.** Follow-up on the same box, once the playlist had content: a **brief** slow patch at
+the start of the first track on a fresh foobar2000, then correct for the rest of the session. That
+is the same defect with a short window, and it reconciles the two observations — the two-minute
+episode above was a session where **playback had not started at all** (title bar carried a track
+from the previous run, status bar sat at `0:00`, playlist empty), so no chunk had yet reached
+`ensure_handle` and nothing was scheduled to fix it. Press play early and the window is a moment;
+browse the library first and it lasts until you do.
+
+**That is the wrong way round for a new user.** Someone who has just installed a visualizer
+component opens it and *looks* at it before playing anything — which is precisely the path that
+holds the bad state open. The severity is inversely proportional to how quickly the user does the
+one thing that hides the bug.
+
 **What is not established.** Whether the slow present is the same degenerate attach or a second,
 adjacent defect in the same lifetime; nothing here measured the surface's actual configured size,
 because no instrument in this repo reports it. That gap is the first thing a fix should close.
+Nor was playback state at the start of the long episode captured directly — it is inferred from a
+status bar that the same defect was starving, so treat it as the reading that fits both runs rather
+than as an observation.
 
 ### Priority
 
