@@ -669,6 +669,7 @@ impl AppState {
             display_count: monitors.len(),
             display_name,
             diagnostics: self.overlay_on,
+            preset_name: self.config.hud.preset_name,
             preset_dir: self.preset_dir.display().to_string(),
         }
     }
@@ -697,6 +698,12 @@ impl AppState {
             SettingsAction::ToggleFullscreen => self.toggle_fullscreen(),
             SettingsAction::CycleDisplay => self.cycle_display(),
             SettingsAction::ToggleDiagnostics => self.toggle_diagnostics(),
+            // Persisted, unlike diagnostics: a clean canvas is a staging choice,
+            // not a debugging state, so it should survive the restart.
+            SettingsAction::TogglePresetName => {
+                self.config.hud.preset_name = !self.config.hud.preset_name;
+                self.save_config();
+            }
         }
         self.window.request_redraw();
     }
@@ -757,8 +764,7 @@ impl AppState {
         texts.clear();
         meta.clear();
 
-        // `true` until Plan 0096 Phase 3 supplies the config value.
-        if preset_name_visible(self.modal(), self.overlay_on, true) {
+        if preset_name_visible(self.modal(), self.overlay_on, self.config.hud.preset_name) {
             texts.push(self.renderer.preset_name().to_owned());
             meta.push((NAME_INSET, NAME_INSET, NAME_SIZE, NAME_COLOR));
         }
@@ -782,9 +788,10 @@ impl AppState {
             texts.push("settings  -  up/down  left/right  esc".to_owned());
             meta.push((LIST_INSET, LIST_TOP, ROW_SIZE, HEADER_COLOR));
 
-            // One column, always: eight rows fit any window this app opens in,
-            // and a settings menu that reflowed would move a row out from under
-            // the operator's hand mid-edit.
+            // One column, always: nine rows fit any window this app opens in —
+            // they start at `ROWS_TOP` (94 px) with a 30 px pitch, so the last
+            // ends at 364 px — and a settings menu that reflowed would move a row
+            // out from under the operator's hand mid-edit.
             for (row, (label, value)) in self.settings.lines(&view).into_iter().enumerate() {
                 let y = overlay::ROWS_TOP + row as f32 * ROW_H;
                 let (marker, color) = if row == self.settings.row() {
