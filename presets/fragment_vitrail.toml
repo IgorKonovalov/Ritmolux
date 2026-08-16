@@ -121,9 +121,14 @@ samples       = "500"
 # suspected and swept first for the same reason. NOTHING WARNS - the value is in
 # range and the preset loads clean.
 #
-# 1.6 rather than 2.2: at 2.2 the chords fuse into a solid mass at the centre,
-# and the leading is the point of the figure.
-thickness     = "1.6 + clamp(treb * 0.9, 0, 0.6)"
+# 1.0 ON A SECOND LOOK CALL, and the range is narrower than it looks. The repair
+# above first landed at 1.6, which read as too assertive against the vault; the
+# ask was for something between the old stipple and that. The floor is hard,
+# though - below about 1.0 the stroke is sub-pixel again and the figure goes
+# straight back to dots, so there is no continuous dial down to the old look.
+# 1.0 is the thinnest CONTINUOUS line available, and it reads as lace that sits
+# back into the vault rather than as leading laid over it.
+thickness     = "1.0 + clamp(treb * 0.55, 0, 0.35)"
 brightness    = "1.15 + clamp(treb * 0.41, 0, 0.35)"
 glow          = "0.25"
 scale         = "0.80"
