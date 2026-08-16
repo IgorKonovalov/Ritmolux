@@ -1,7 +1,7 @@
 //! Plan 0001 Phase 3 fixtures: known signals in, expected analysis out.
 
 use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS, WINDOW_SIZE};
+use lmv_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS, WAVE_SAMPLES, WINDOW_SIZE};
 
 const SR: u32 = 48_000;
 
@@ -631,6 +631,7 @@ fn analysis_is_deterministic() {
                 // would have gone quietly out of date instead.
                 let AnalysisFrame {
                     spectrum,
+                    waveform,
                     onset,
                     beat,
                     bass,
@@ -652,7 +653,11 @@ fn analysis_is_deterministic() {
                     novelty,
                 } = f;
                 (
-                    spectrum.iter().map(|v| v.to_bits()).collect(),
+                    spectrum
+                        .iter()
+                        .chain(waveform.iter())
+                        .map(|v| v.to_bits())
+                        .collect(),
                     vec![
                         onset.to_bits(),
                         bass.to_bits(),
@@ -715,4 +720,98 @@ fn one_hop_analyzes_well_under_the_hop_interval() {
     // Sanity that the spectrum output stayed meaningful end-to-end.
     assert!(analyzer.take_frame().spectrum.iter().sum::<f32>() > 0.0);
     assert_eq!(SPECTRUM_BINS, 64);
+}
+
+/// **The waveform is the signal, in time order, un-normalized** (Plan 0100
+/// Phase 4) — the four properties the warp mesh's `wave_mode` draw rests on.
+///
+/// It is not a fifth statistic. Everything else on the frame is a *measurement*
+/// of the window; this is the window, and the assertions below are what
+/// distinguishes the two.
+#[test]
+fn the_waveform_is_the_recent_signal_rather_than_a_measurement_of_it() {
+    // A sine at a frequency that fits a whole number of cycles into the tail, so
+    // the trace is checkable sample by sample rather than statistically.
+    let freq = SR as f32 / 64.0; // 750 Hz — 8 whole cycles across 512 samples
+    let amp = 0.4;
+    let mut analyzer = mono_analyzer();
+    let signal = sine(freq, amp, WINDOW_SIZE * 8);
+    for hop in signal.chunks_exact(HOP_SIZE) {
+        analyzer.push_interleaved(hop);
+    }
+    let frame = analyzer.take_frame();
+
+    // 1. It is the TAIL of the window, consecutive — so it round-trips against
+    //    the generator, phase and all.
+    let tail = &signal[signal.len() - WAVE_SAMPLES..];
+    for (i, (got, want)) in frame.waveform.iter().zip(tail).enumerate() {
+        assert!(
+            (got - want).abs() < 1e-6,
+            "sample {i}: waveform {got} != signal {want}"
+        );
+    }
+
+    // 2. It is UN-normalized, unlike every level on this frame. A 0.4-amplitude
+    //    sine reaches 0.4, not 1.0 — which is the whole difference between a
+    //    scope trace and a threshold-able level (ADR-0049).
+    let peak = frame.waveform.iter().fold(0.0f32, |m, v| m.max(v.abs()));
+    assert!(
+        (peak - amp).abs() < 0.01,
+        "the trace must keep the signal's own amplitude, got {peak} for {amp}"
+    );
+    // 750 Hz is a MID-band tone, so that is the level normalization drives.
+    assert!(
+        frame.mid > peak,
+        "...while the normalized level of the same signal is driven toward 1: \
+         mid {} against trace peak {peak}",
+        frame.mid
+    );
+
+    // 3. It is bipolar — a spectrum is not. A trace that had been rectified or
+    //    magnitude-taken would fail here and pass every other check.
+    assert!(
+        frame.waveform.iter().any(|v| *v > 0.1) && frame.waveform.iter().any(|v| *v < -0.1),
+        "the trace must swing both ways"
+    );
+
+    // 4. Silence is a flat line, not a floor. Nothing normalizes it up.
+    let mut quiet = mono_analyzer();
+    for hop in vec![0.0f32; WINDOW_SIZE * 8].chunks_exact(HOP_SIZE) {
+        quiet.push_interleaved(hop);
+    }
+    assert!(
+        quiet.take_frame().waveform.iter().all(|v| *v == 0.0),
+        "silence must be a flat line"
+    );
+}
+
+/// The waveform is **taken consecutively, not decimated**, and this is what that
+/// buys — measured rather than argued.
+///
+/// A 4:1 decimation across the whole 2048-sample window would alias anything
+/// above a quarter of Nyquist: a 12 kHz tone at 48 kHz would read as 12 kHz
+/// sampled at 12 kHz, i.e. DC or a slow beat, and the trace would show a
+/// near-straight line where the signal is a dense oscillation. The consecutive
+/// tail shows the oscillation.
+#[test]
+fn a_high_tone_reads_as_an_oscillation_rather_than_aliasing_flat() {
+    let mut analyzer = mono_analyzer();
+    for hop in sine(12_000.0, 0.5, WINDOW_SIZE * 8).chunks_exact(HOP_SIZE) {
+        analyzer.push_interleaved(hop);
+    }
+    let frame = analyzer.take_frame();
+
+    // Sign changes across the trace: a 12 kHz tone at 48 kHz crosses zero every
+    // other sample, so a 512-sample consecutive window holds hundreds of them.
+    let crossings = frame
+        .waveform
+        .windows(2)
+        .filter(|w| (w[0] < 0.0) != (w[1] < 0.0))
+        .count();
+    println!("[waveform] 12 kHz tone: {crossings} zero crossings in {WAVE_SAMPLES} samples");
+    assert!(
+        crossings > 200,
+        "a 12 kHz tone must read as a dense oscillation, got {crossings} crossings \
+         — a decimated trace would be nearly flat"
+    );
 }

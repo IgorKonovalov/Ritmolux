@@ -33,6 +33,28 @@ use crate::audio::{AudioFormat, FormatError};
 
 /// FFT window length in samples (~43 ms at 48 kHz).
 pub const WINDOW_SIZE: usize = 2048;
+
+/// How many time-domain samples an [`AnalysisFrame`] carries in
+/// [`waveform`](AnalysisFrame::waveform).
+///
+/// **512, which is MilkDrop's own count** (Plan 0100 Phase 4): its waveform draws
+/// 512 consecutive samples, every preset's `wave_mode` geometry is written
+/// against that resolution, and a converted preset should draw the figure its
+/// author drew. At 48 kHz it is 10.7 ms of audio against MilkDrop's 11.6 ms at
+/// 44.1 kHz — the same gesture, a fraction of a beat either way.
+///
+/// The samples are the **most recent** 512 of [`WINDOW_SIZE`], taken
+/// consecutively rather than decimated across the whole window. Decimation would
+/// alias: a 4:1 pick of every fourth sample of a 12 kHz tone at 48 kHz reads as a
+/// 3 kHz one, and a waveform display exists to show exactly that shape.
+pub const WAVE_SAMPLES: usize = 512;
+
+// The tail this is taken from has to exist. A compile-time check rather than a
+// runtime one, because the failure would be a silently shorter waveform.
+const _: () = assert!(
+    WAVE_SAMPLES <= WINDOW_SIZE,
+    "the waveform is the tail of the short analysis window and cannot be longer      than it"
+);
 /// Second, longer FFT window feeding the bands below the crossover (~171 ms at
 /// 48 kHz). Chosen by measurement in Plan 0048 Phase 1 against the plan's rule
 /// — 4096 first, 8192 only if 4096 still leaves sub-bass bands bin-starved. Of
@@ -76,6 +98,30 @@ pub struct AnalysisFrame {
     /// comes through untouched. Not a per-band normalization: that was the draft
     /// ADR-0049 rejected, because it flattens the very shape a spectrum is for.
     pub spectrum: [f32; SPECTRUM_BINS],
+    /// The most recent [`WAVE_SAMPLES`] of the mono signal, in **time** order —
+    /// the oscilloscope trace, not a spectrum (Plan 0100 Phase 4 / ADR-0113).
+    ///
+    /// Nothing in the engine's own vocabulary reads this: the expression grammar
+    /// is scalar and reaches the band array through `bin()` alone (ADR-0036), and
+    /// widening it to an array type is exactly what ADR-0002's purity refuses.
+    /// **It is here for the one consumer that genuinely needs a waveform** — the
+    /// warp mesh's `wave_mode` draw, which is what MilkDrop's presets use as
+    /// their light source, and which no amount of spectrum can reconstruct.
+    ///
+    /// Raw amplitude in roughly `-1..1`, un-normalized. The four headline levels
+    /// are peak-normalized (ADR-0049) because a *threshold* on them has to be
+    /// portable; a waveform is a picture of the signal, and normalizing it would
+    /// make a quiet passage draw the same trace as a loud one — which is the
+    /// opposite of what a scope is for. The consumer scales it (MilkDrop's
+    /// `wave_scale` does exactly that).
+    ///
+    /// **This is the one array on this struct that is not normalized and the one
+    /// that made it big.** `AnalysisFrame` is `Copy` and copied per frame, and 512
+    /// floats take it from ~340 bytes to ~2.4 kB — about 100 ns of memcpy at
+    /// 60 Hz, which is why it was acceptable. It is deliberately **not** in
+    /// [`Variables`](crate::preset::Variables), which carries the band array by
+    /// borrow for precisely this reason.
+    pub waveform: [f32; WAVE_SAMPLES],
     /// Spectral-flux onset envelope, normalized against its recent peak.
     pub onset: f32,
     /// Whether a beat (onset event) fired this hop.
@@ -135,6 +181,7 @@ impl Default for AnalysisFrame {
     fn default() -> Self {
         Self {
             spectrum: [0.0; SPECTRUM_BINS],
+            waveform: [0.0; WAVE_SAMPLES],
             onset: 0.0,
             beat: false,
             bass: 0.0,
@@ -289,8 +336,19 @@ impl Analyzer {
                         self.downbeat
                             .process(beat, clock.beat_index, bass, onset, clock.bar);
 
+                    // The oscilloscope trace: the most recent `WAVE_SAMPLES` of
+                    // the window, consecutive and un-normalized (Plan 0100
+                    // Phase 4). A slice of a buffer the analyzer already holds —
+                    // no extra state, no extra pass, and nothing here reads a
+                    // clock, so the frame stays a pure function of its window.
+                    let mut waveform = [0.0f32; WAVE_SAMPLES];
+                    if let Some(tail) = self.window.get(WINDOW_SIZE - WAVE_SAMPLES..) {
+                        waveform.copy_from_slice(tail);
+                    }
+
                     self.latest = AnalysisFrame {
                         spectrum,
+                        waveform,
                         onset,
                         beat,
                         bass,

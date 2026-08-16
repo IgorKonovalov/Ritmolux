@@ -629,6 +629,7 @@ fn create(
             device,
             surface_format,
             tier.mesh_grid,
+            tier.max_segments,
         )),
     }
 }

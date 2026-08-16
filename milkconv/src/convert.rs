@@ -29,7 +29,7 @@
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
-use lmv_core::milk::MilkBundle;
+use lmv_core::milk::{ElementKind, MilkBundle, MilkElement};
 
 use crate::eel::{EelError, Symbols, compile_bundle, compile_into};
 use crate::milk::MilkFile;
@@ -85,40 +85,44 @@ const OUTPUTS: &[Output] = &[
     o("fvideoechozoom", "echo_zoom", 1.0, false, ECHO),
     o("fvideoechoalpha", "echo_alpha", 0.0, false, ECHO),
     o("nvideoechoorientation", "echo_orient", 0.0, false, ECHO),
-    // --- the draw layer: Phase 4 ---
-    o("nwavemode", "wave_mode", 0.0, false, DRAW),
-    o("fwavescale", "wave_scale", 1.0, false, DRAW),
-    o("fwavesmoothing", "wave_smoothing", 0.75, false, DRAW),
-    o("fwaveparam", "wave_mystery", 0.0, false, DRAW),
-    o("fwavealpha", "wave_a", 1.0, false, DRAW),
-    o("wave_r", "wave_r", 1.0, false, DRAW),
-    o("wave_g", "wave_g", 1.0, false, DRAW),
-    o("wave_b", "wave_b", 1.0, false, DRAW),
-    o("wave_x", "wave_x", 0.5, false, DRAW),
-    o("wave_y", "wave_y", 0.5, false, DRAW),
-    o("bwavedots", "wave_usedots", 0.0, false, DRAW),
-    o("bwavethick", "wave_thick", 0.0, false, DRAW),
-    o("badditivewaves", "wave_additive", 0.0, false, DRAW),
-    o("bmaximizewavecolor", "wave_brighten", 1.0, false, DRAW),
-    o("ob_size", "ob_size", 0.01, false, DRAW),
-    o("ob_r", "ob_r", 0.0, false, DRAW),
-    o("ob_g", "ob_g", 0.0, false, DRAW),
-    o("ob_b", "ob_b", 0.0, false, DRAW),
-    o("ob_a", "ob_a", 0.0, false, DRAW),
-    o("ib_size", "ib_size", 0.01, false, DRAW),
-    o("ib_r", "ib_r", 0.25, false, DRAW),
-    o("ib_g", "ib_g", 0.25, false, DRAW),
-    o("ib_b", "ib_b", 0.25, false, DRAW),
-    o("ib_a", "ib_a", 0.0, false, DRAW),
-    o("nmotionvectorsx", "mv_x", 12.0, false, DRAW),
-    o("nmotionvectorsy", "mv_y", 9.0, false, DRAW),
-    o("mv_dx", "mv_dx", 0.0, false, DRAW),
-    o("mv_dy", "mv_dy", 0.0, false, DRAW),
-    o("mv_l", "mv_l", 0.9, false, DRAW),
-    o("mv_r", "mv_r", 1.0, false, DRAW),
-    o("mv_g", "mv_g", 1.0, false, DRAW),
-    o("mv_b", "mv_b", 1.0, false, DRAW),
-    o("mv_a", "mv_a", 0.0, false, DRAW),
+    // --- the draw layer (Plan 0100 Phase 4) ---
+    o("nwavemode", "wave_mode", 0.0, true, ""),
+    o("fwavescale", "wave_scale", 1.0, true, ""),
+    o("fwavesmoothing", "wave_smoothing", 0.75, true, ""),
+    o("fwaveparam", "wave_mystery", 0.0, true, ""),
+    o("fwavealpha", "wave_a", 1.0, true, ""),
+    o("wave_r", "wave_r", 1.0, true, ""),
+    o("wave_g", "wave_g", 1.0, true, ""),
+    o("wave_b", "wave_b", 1.0, true, ""),
+    o("wave_x", "wave_x", 0.5, true, ""),
+    o("wave_y", "wave_y", 0.5, true, ""),
+    o("bwavedots", "wave_usedots", 0.0, true, ""),
+    o("bwavethick", "wave_thick", 0.0, true, ""),
+    // Read but inert: this engine's draw seam is additive by construction
+    // (ADR-0056), so a preset asking for an alpha-blended waveform gets an
+    // additive one. Consumed rather than warned about because the difference is
+    // a blend mode on light that is already premultiplied, not a missing figure.
+    o("badditivewaves", "wave_additive", 0.0, true, ""),
+    o("bmaximizewavecolor", "wave_brighten", 1.0, true, ""),
+    o("ob_size", "ob_size", 0.01, true, ""),
+    o("ob_r", "ob_r", 0.0, true, ""),
+    o("ob_g", "ob_g", 0.0, true, ""),
+    o("ob_b", "ob_b", 0.0, true, ""),
+    o("ob_a", "ob_a", 0.0, true, ""),
+    o("ib_size", "ib_size", 0.01, true, ""),
+    o("ib_r", "ib_r", 0.25, true, ""),
+    o("ib_g", "ib_g", 0.25, true, ""),
+    o("ib_b", "ib_b", 0.25, true, ""),
+    o("ib_a", "ib_a", 0.0, true, ""),
+    o("nmotionvectorsx", "mv_x", 12.0, true, ""),
+    o("nmotionvectorsy", "mv_y", 9.0, true, ""),
+    o("mv_dx", "mv_dx", 0.0, true, ""),
+    o("mv_dy", "mv_dy", 0.0, true, ""),
+    o("mv_l", "mv_l", 0.9, true, ""),
+    o("mv_r", "mv_r", 1.0, true, ""),
+    o("mv_g", "mv_g", 1.0, true, ""),
+    o("mv_b", "mv_b", 1.0, true, ""),
+    o("mv_a", "mv_a", 0.0, true, ""),
     // --- the debug readout, which has no visual effect anywhere ---
     o("", "monitor", 0.0, false, MONITOR),
 ];
@@ -126,6 +130,10 @@ const OUTPUTS: &[Output] = &[
 const ECHO: &str = "the video echo — a second sampled copy of the frame, which this engine has no \
      stage for. Only 2.4 % of the corpus sets a non-zero echo alpha, which is why \
      it is named here rather than built";
+/// Kept for the roster's shape even though nothing carries it today — the draw
+/// layer landed in Phase 4 and its entries are consumed. A future unconsumed
+/// output names its own phase here.
+#[allow(dead_code)]
 const DRAW: &str = "Plan 0100 Phase 4, the draw layer";
 const MONITOR: &str = "MilkDrop's debug readout, which draws nothing — safe to ignore entirely";
 
@@ -281,11 +289,14 @@ pub fn convert(file: &MilkFile, name: &str) -> Result<Converted, ConvertError> {
     // the preset's own last line and fail to compile.
     let per_vertex_src = format!("{per_vertex_src};\n{ZOOMEXP_EPILOGUE}");
 
-    let (bundle, _) = compile_bundle(
+    let (mut bundle, _) = compile_bundle(
         file.block("per_frame_init"),
         &per_frame_src,
         &per_vertex_src,
     )?;
+    let (waves, shapes) = build_elements(file, &mut warnings)?;
+    bundle.waves = waves;
+    bundle.shapes = shapes;
 
     // --- the roster check: nothing unrecognized goes through silently ---
     //
@@ -396,23 +407,6 @@ pub fn convert(file: &MilkFile, name: &str) -> Result<Converted, ConvertError> {
                 class,
             });
         }
-    }
-    let waves = (0..4).filter(|i| file.number(&format!("wavecode_{i}_enabled"), 0.0) >= 0.5);
-    let shapes = (0..4).filter(|i| file.number(&format!("shapecode_{i}_enabled"), 0.0) >= 0.5);
-    let (waves, shapes) = (waves.count(), shapes.count());
-    if waves > 0 {
-        warnings.push(Warning {
-            section: "",
-            message: format!("has {waves} enabled custom wave(s), which are not drawn — {DRAW}"),
-            class: "unconverted-wave",
-        });
-    }
-    if shapes > 0 {
-        warnings.push(Warning {
-            section: "",
-            message: format!("has {shapes} enabled custom shape(s), which are not drawn — {DRAW}"),
-            class: "unconverted-shape",
-        });
     }
     if file.key("sampler_pc").is_some() || uses_disk_texture(file) {
         warnings.push(Warning {
@@ -525,13 +519,19 @@ fn uses_disk_texture(file: &MilkFile) -> bool {
     })
 }
 
-/// The stand-in deposit a converted preset carries, since Phase 3 does not draw
-/// MilkDrop's waveform.
+/// The palette a converted preset carries.
 ///
-/// **Stated in the bundle rather than hidden**, and it is a placeholder in the
-/// strict sense: Phase 4 replaces it with the preset's own `wave_*` geometry. It
-/// exists at all because without a light source the mesh warps an empty field and
-/// renders black, and the phase's done-when is a human judging the motion.
+/// **The deposit is gone as of Phase 4**: a converted preset draws its own light
+/// now — the waveform, its custom waves and shapes, the borders — so the
+/// stand-in ring Phase 3 emitted would be a second, invented figure on top of the
+/// preset's real one. The scene turns the deposit off for the whole of a bundle's
+/// life (`WarpMeshScene::update`), and this emits none.
+///
+/// What survives is the palette, and it is **not** what colours the draw layer:
+/// every stroke takes its colour from the preset's own `wave_r`/`_g`/`_b` and its
+/// elements' own. The palette is here because the scene's colour vocabulary is
+/// shared with every other system and a preset must carry one; a converted preset
+/// simply never samples it.
 fn deposit_block(file: &MilkFile) -> String {
     // The waveform's colour, which is the closest thing the format has to "what
     // colour is this preset" before its per-frame code runs.
@@ -558,16 +558,8 @@ fn deposit_block(file: &MilkFile) -> String {
          ]\n\
          \n\
          [params]\n\
-         # A STAND-IN light source, not this preset's waveform (Plan 0100 Phase 4\n\
-         # draws that). The warp mesh moves the past; without something depositing\n\
-         # light into it there is nothing on screen to move.\n\
-         deposit        = \"5.0\"\n\
-         deposit_radius = \"0.36\"\n\
-         deposit_width  = \"0.05\"\n\
-         deposit_arms   = \"5\"\n\
-         deposit_twist  = \"1.4\"\n\
-         deposit_spin   = \"0.3\"\n\
-         color_span     = \"1.0\"\n\
+         # A converted preset draws its own light - the waveform, its custom\n\
+         # waves and shapes, the borders - so the scene's own deposit stays off.\n\
          brightness     = \"1.0\"\n",
         hex(0.55),
         hex(1.0),
@@ -654,6 +646,171 @@ fn emit(
     out
 }
 
+// ---------------------------------------------------------------------------
+// The custom waves and shapes (Plan 0100 Phase 4)
+// ---------------------------------------------------------------------------
+
+/// A custom **wave**'s initial-condition keys, as `(suffix, eel name, default)`.
+///
+/// The suffix is what follows `wavecode_N_`. Everything here is seeded into the
+/// element's own register file by a prologue, exactly as the main bundle's
+/// initial conditions are — so an element's per-frame code starts from what the
+/// file says and the engine needs no struct of `.milk` keys.
+const WAVE_KEYS: &[(&str, &str, f32)] = &[
+    ("r", "r", 1.0),
+    ("g", "g", 1.0),
+    ("b", "b", 1.0),
+    ("a", "a", 1.0),
+    ("x", "x", 0.5),
+    ("y", "y", 0.5),
+    ("scaling", "scaling", 1.0),
+    ("smoothing", "smoothing", 0.5),
+    ("sep", "sep", 0.0),
+];
+
+/// A custom **shape**'s initial-condition keys — see [`WAVE_KEYS`].
+const SHAPE_KEYS: &[(&str, &str, f32)] = &[
+    ("x", "x", 0.5),
+    ("y", "y", 0.5),
+    ("rad", "rad", 0.1),
+    ("ang", "ang", 0.0),
+    ("r", "r", 1.0),
+    ("g", "g", 0.0),
+    ("b", "b", 0.0),
+    ("a", "a", 1.0),
+    ("r2", "r2", 0.0),
+    ("g2", "g2", 1.0),
+    ("b2", "b2", 0.0),
+    ("a2", "a2", 0.0),
+    ("border_r", "border_r", 1.0),
+    ("border_g", "border_g", 1.0),
+    ("border_b", "border_b", 1.0),
+    ("border_a", "border_a", 0.1),
+    ("thickoutline", "thickoutline", 0.0),
+    ("sides", "sides", 4.0),
+    ("textured", "textured", 0.0),
+    ("tex_ang", "tex_ang", 0.0),
+    ("tex_zoom", "tex_zoom", 1.0),
+    ("additive", "additive", 0.0),
+];
+
+/// Compile the file's up-to-four custom waves and up-to-four custom shapes.
+///
+/// A disabled element is skipped entirely — it costs no register file, no
+/// programs and no geometry — which is what keeps the common case (a preset with
+/// one enabled wave out of four declared) from paying for the other three.
+fn build_elements(
+    file: &MilkFile,
+    warnings: &mut Vec<Warning>,
+) -> Result<(Vec<MilkElement>, Vec<MilkElement>), ConvertError> {
+    let mut waves = Vec::new();
+    let mut shapes = Vec::new();
+
+    for n in 0..4u32 {
+        if file.number(&format!("wavecode_{n}_enabled"), 0.0) < 0.5 {
+            continue;
+        }
+        let prologue = element_prologue(file, &format!("wavecode_{n}_"), WAVE_KEYS);
+        let element = compile_element(
+            file,
+            &format!("wave_{n}"),
+            &prologue,
+            ElementKind::Wave,
+            file.number(&format!("wavecode_{n}_samples"), 512.0) as u32,
+            1,
+            file.number(&format!("wavecode_{n}_busedots"), 0.0) >= 0.5,
+            file.number(&format!("wavecode_{n}_bdrawthick"), 0.0) >= 0.5,
+        )?;
+        if file.number(&format!("wavecode_{n}_bspectrum"), 0.0) >= 0.5 {
+            warnings.push(Warning {
+                section: "",
+                message: format!(
+                    "custom wave {n} asks for the SPECTRUM as its source rather than the \
+                     waveform; it is drawn from the waveform here, so its figure is the \
+                     right shape over the wrong signal"
+                ),
+                class: "wave-spectrum-source",
+            });
+        }
+        waves.push(element);
+    }
+
+    for n in 0..4u32 {
+        if file.number(&format!("shapecode_{n}_enabled"), 0.0) < 0.5 {
+            continue;
+        }
+        let prologue = element_prologue(file, &format!("shapecode_{n}_"), SHAPE_KEYS);
+        let element = compile_element(
+            file,
+            &format!("shape_{n}"),
+            &prologue,
+            ElementKind::Shape,
+            file.number(&format!("shapecode_{n}_sides"), 4.0) as u32,
+            file.number(&format!("shapecode_{n}_num_inst"), 1.0) as u32,
+            false,
+            file.number(&format!("shapecode_{n}_thickoutline"), 0.0) >= 0.5,
+        )?;
+        if file.number(&format!("shapecode_{n}_textured"), 0.0) >= 0.5 {
+            warnings.push(Warning {
+                section: "",
+                message: format!(
+                    "custom shape {n} is textured with the previous frame, which this \
+                     engine has no stage for; it is drawn as a flat gradient fill"
+                ),
+                class: "shape-textured",
+            });
+        }
+        shapes.push(element);
+    }
+
+    Ok((waves, shapes))
+}
+
+/// The initial-condition assignments for one element, as EEL2 — prepended to its
+/// per-frame program so they are re-applied every frame, which is MilkDrop's own
+/// semantics for the main program and for these alike.
+fn element_prologue(file: &MilkFile, prefix: &str, keys: &[(&str, &str, f32)]) -> String {
+    let mut out = String::new();
+    for (suffix, eel, default) in keys {
+        let value = file.number(&format!("{prefix}{suffix}"), *default);
+        let _ = writeln!(out, "{eel} = {value:?};");
+    }
+    out
+}
+
+/// Compile one element's three programs against **one shared register table of
+/// its own**.
+///
+/// Its own, not the main bundle's: MilkDrop gives each custom wave and shape a
+/// separate variable scope, and only `q1`-`q32` cross (by copy, see
+/// `milk::Q_COUNT`). Sharing would let one element's `t1` collide with another's,
+/// which real presets rely on not happening.
+#[allow(clippy::too_many_arguments)]
+fn compile_element(
+    file: &MilkFile,
+    block: &str,
+    prologue: &str,
+    kind: ElementKind,
+    count: u32,
+    instances: u32,
+    use_dots: bool,
+    thick: bool,
+) -> Result<MilkElement, ConvertError> {
+    let per_frame = format!("{prologue}\n{};", file.block(&format!("{block}_per_frame")));
+    let per_point = file.block(&format!("{block}_per_point")).to_string();
+    let (bundle, _) = compile_bundle(file.block(&format!("{block}_init")), &per_frame, &per_point)?;
+    Ok(MilkElement {
+        init: bundle.per_frame_init,
+        per_frame: bundle.per_frame,
+        per_point: bundle.per_vertex,
+        count,
+        instances,
+        kind,
+        use_dots,
+        thick,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -695,12 +852,21 @@ mod tests {
         }
     }
 
-    /// **Every output the engine consumes is a parameter the warp mesh actually
-    /// has** — the seam between this table and the scene's, checked rather than
-    /// assumed. `zoomexp` is the one exception and is folded into the per-vertex
-    /// program instead ([`ZOOMEXP_EPILOGUE`]).
+    /// **Every output the engine consumes actually reaches it** — the seam
+    /// between this table and the engine's, checked rather than assumed.
+    ///
+    /// There are two ways in, and both are checked: a **scene parameter** the
+    /// warp mesh declares, or a field on `milk::outputs::FrameOutputs`, which the
+    /// scene reads directly for the composite roster and the whole draw layer. A
+    /// roster entry marked consumed with neither is a name this converter seeds
+    /// into a bundle that nothing will ever look at, which is precisely the
+    /// silent loss the no-silent-zero rule is about.
+    ///
+    /// `zoomexp` is the one exception and is folded into the per-vertex program
+    /// instead ([`ZOOMEXP_EPILOGUE`]).
     #[test]
-    fn every_consumed_output_is_a_scene_parameter() {
+    fn every_consumed_output_reaches_the_engine() {
+        use lmv_core::milk::outputs::FRAME_OUTPUT_NAMES;
         use lmv_core::render::scenes::warp_mesh::PARAMS;
         for out in OUTPUTS {
             if !out.consumed {
@@ -714,12 +880,12 @@ mod tests {
                 );
                 continue;
             }
-            let known = PARAMS.contains(&out.eel) || out.eel == "decay";
+            let known = PARAMS.contains(&out.eel) || FRAME_OUTPUT_NAMES.contains(&out.eel);
             assert!(
                 known,
-                "the roster says `{}` is consumed, but the warp mesh has no such \
-                 parameter — either wire it up or mark it unconsumed with the \
-                 phase that owes it",
+                "the roster says `{}` is consumed, but neither the warp mesh's \
+                 params nor `FrameOutputs` has it — either wire it up or mark it \
+                 unconsumed with the phase that owes it",
                 out.eel
             );
         }

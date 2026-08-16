@@ -417,7 +417,7 @@ fn a_preset_shaped_bundle_drives_the_mesh() {
     // `zoom` = 1.01 + (0.5 * 2) * 0.02 = 1.03 per frame, converted per second.
     let zoom = outputs[0].powf(1.0 / NOMINAL_FPS);
     assert!((zoom - 1.03).abs() < 1e-3, "zoom per frame: {zoom}");
-    let decay = extra[0].expect("the program names decay");
+    let decay = extra.decay;
     assert!(
         (decay.powf(1.0 / NOMINAL_FPS) - 0.97).abs() < 1e-3,
         "decay per frame: {}",

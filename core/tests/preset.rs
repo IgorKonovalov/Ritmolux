@@ -570,6 +570,12 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
         downbeat_confidence: 0.77,
         downbeat_locked: true,
         spectrum: std::array::from_fn(|i| i as f32 / 64.0),
+        // Deliberately non-zero and deliberately unreachable: the grammar has no
+        // way to read a waveform, and the assertion below that no variable binds
+        // to it is the point (ADR-0002 / ADR-0036 keep the language scalar). It
+        // is ramped for the same reason `spectrum` is — a slot that leaked into
+        // an expression would read a distinguishable number rather than a zero.
+        waveform: std::array::from_fn(|i| -1.0 + i as f32 / 256.0),
     };
     // Not on the frame: the renderer supplies its own clock here, the probe the
     // hop position it synthesized. That is why it stays an argument.
