@@ -312,14 +312,16 @@ Three things make the reading honest, and the first is the one people drop:
 - **Record the verdict in the world's own header**, the way the fold-edge verdicts were.
   `presets/attractor_ink.toml` carries the first one; copy its shape.
 
-It is slow by construction — ~3,600 renders per simulated minute, roughly 10 s of wall clock per
-simulated minute at 96x96 — so budget a sitting rather than running it casually. That cost is why
-it is a spot-check you remember instead of a gate that runs itself (ADR-0099).
+It is slow by construction — ~3,600 renders per simulated minute, so a ten-minute horizon measures
+**16 s** for a single-pass world and **54 s** for a reaction-diffusion one at 96x96 — so budget a
+sitting rather than running it casually. That cost is why it is a spot-check you remember instead of
+a gate that runs itself (ADR-0099).
 
-Worth knowing before you trust a row: the two reaction-diffusion worlds currently **die past ~3,600
-frames** (design-backlog 0093), so they cannot reach ten minutes yet; and a horizon shorter than a
-world's own warm-up reads **settling as drift** — `reaction_verdigris` reads `monotone 1.00` over
-30 s purely because its pattern is still establishing.
+Worth knowing before you trust a row: a horizon shorter than a world's own warm-up reads **settling
+as drift** — `reaction_verdigris` reads `monotone 1.00` over 30 s purely because its pattern is
+still establishing. Length itself is no longer a bound: since Plan 0099 every world reaches its
+requested horizon, and a run that ends short — floored to a whole interval, or dead — **says so
+where the table is read** rather than printing rows that look complete.
 
 On its first outing it cleared the named suspect (`swarm_shatter`: no trend across ten minutes) and
 convicted one nobody suspected — `attractor_ink` goes coverage **0.199 → 0.002** with the silhouette

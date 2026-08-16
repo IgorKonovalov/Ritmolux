@@ -19,17 +19,16 @@ someone who picked it up is reading.
 | [0095](0095-the-downbeat-fold-gets-a-musical-beat.md) | The downbeat fold gets a musical beat | draft | dev, human | **Succeeds [0086], which measured the defect and shipped the instrument.** The fold is indexed by onset events, not beats (1.7-2.1x, wandering 1x-4x within a track, against a control that reads 1.00). Phase 2 puts **tempo octave stability on the critical path by choice** — if Phase 1's ladder says the octave choice is a coin flip, the plan stops there with a diagnosis rather than gridding on sand. `beat`/`beat_index` are bit-identical by Phase 3's own assertion, so no preset timing moves. |
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 | [0098](0098-the-figure-nests-properly.md) | The figure nests properly | draft | dev, human | **Carries [ADR-0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (proposed) and closes two backlog entries from Plan 0091's content pass.** `shape_field`'s level sets are offsets, and an inward offset *erodes* — which rounds a reflex corner, so a nested heart loses its top notch. That is not tunable: a sharp notch needs `palette_steps * color_span ~ 1`, which leaves ONE band inside the figure, and the user rejected that end of the trade in the running app. Phase 1 is an independent defect fix (a curved or jittered `star` returns a **negative** distance at its own centre — provably, always). **Contends with [0092](0092-the-engine-draws-an-authored-path.md) on `shape_field.rs`**, so run them in sequence or in a lane. |
-| [0099](0099-the-horizon-reaches-its-own-length.md) | The horizon reaches its own length | draft | dev | **A defect repair with no ADR and no design choice.** `shot --horizon 10` claims 36,001 renders and dies at **3,601** on two shipped RD worlds at ~2.9 GB resident, reporting a 0.5-minute run as a ten-minute one. Phase 1 is one command — run `reaction_etching`, the RD world the original measurement missed — and it decides whether the ceiling is the RD family's mechanism or a general cost ceiling, which changes what Phase 2 has to answer. **Contends with nothing**; smallest plan on the roster. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | **Its hard dependency is discharged — [0091](done/0091-the-figure-fills-the-frame.md) closed 2026-08-16 and `shape_field` is the scene this draws into.** Soft-depends on [0087](0087-the-line-renderer-draws-a-curve.md) — the plan states that disagreement openly: a polyline distance field is complete alone, arcs only lower the arity, so **this is takeable even if 0087 ends at ADR-0098's Alternative C**, and Phase 4 may legitimately be empty. Phase 2's arity ceiling is a **measurement**, not [ADR-0107](../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md)'s construction estimate. Expect morph degeneracy — Plan 0079 refused 4 of 20 swept pairs by measurement. |
 | [0100](0100-the-engine-speaks-milkdrop.md) | The engine speaks MilkDrop | approved | dev, human | **The largest plan this project has written, and the only one whose first phase is worth taking even if the rest never happens.** Carries [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md): translate `.milk` **ahead of time** in a converter outside `default-members`, run it on a new native `warp_mesh` scene plus an EEL2 bytecode VM — so no `.milk` text, no HLSL and no translator ever enters `lmv.exe` or `foo_lmv.dll`. Phase 1 alone ships a preset-authorable warp-mesh idiom (a generalization of [ADR-0048](../adrs/0048-transformed-feedback.md)); **Phase 6 carries a stop condition** — if HLSL→WGSL has no viable route, the plan lands at ADR-0113's Alternative D with Phases 1-5 standing. Wants a **worktree lane to itself**. Phase 4 draws through the shared line renderer and **contends with [0087](0087-the-line-renderer-draws-a-curve.md)**; Phase 1 contends with nothing. |
-| [0101](0101-the-engine-renders-a-music-video.md) | The engine renders a music video | approved | dev, human | **Hard-blocked at Phase 4 by [0099](0099-the-horizon-reaches-its-own-length.md)** — a four-minute video is 14,400 frames and the sibling long-run path already dies at ~3,601. Phases 1-3 are takeable now at short clip lengths. Carries [ADR-0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md): render offline at fixed injected `dt`, stream over a pipe to the user's own `ffmpeg`, **ship no encoder** (a 1080p RGBA frame is 8.29 MB, so 119 GB touches disk otherwise, and any static encoder exceeds NFR 4's whole ~10 MB cap). Phase 3's done-when is **exact byte-identity** against `shot --frame-at`, because a washed-out export is the silent failure here. Same lane as 0099 — both are in `standalone/src/shot/`. |
+| [0101](0101-the-engine-renders-a-music-video.md) | The engine renders a music video | approved | dev, human | **Phase 4's wall is gone: [0099](done/0099-the-horizon-reaches-its-own-length.md) closed 2026-08-16** and the capture path now renders 36,001 frames with RSS flat — but a render mode that submits passes outside `step_offscreen` inherits the defect and none of the fix. Carries [ADR-0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md): render offline at fixed injected `dt`, stream over a pipe to the user's own `ffmpeg`, **ship no encoder** (a 1080p RGBA frame is 8.29 MB, so 119 GB touches disk otherwise, and any static encoder exceeds NFR 4's whole ~10 MB cap). Phase 3's done-when is **exact byte-identity** against `shot --frame-at`. |
 | [0102](0102-the-component-ships.md) | The component ships | approved | dev, human | **Contends with nothing and is the cheapest real distribution win on the roster.** Carries [ADR-0115](../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md). Phase 1 is `human` and is one question — **may an automated build fetch and redistribute the foobar2000 SDK?** — and its answer branches Phase 3 between a release-workflow job and a documented manual step; **either answer completes the plan**, which is written so "no" is a branch rather than a failure. Phase 3 corrects [NFR §8](../nfr.md#8-distribution-v1), which will be wrong the moment this lands. Note the `workflow` OAuth scope trap if Phase 3 takes the CI route. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **Ninety-seven plans, 110 ADRs, 66 releases — and 1 star, 0 forks, no repository description.** Almost entirely `human`, no ADR, and its done-whens are **artifacts rather than outcomes** because nobody can plan adoption. Phase 2 soft-wants [0101](0101-the-engine-renders-a-music-video.md) (nothing in this repo can currently record motion — every image is a still); **Phase 4 hard-depends on [0102](0102-the-component-ships.md)**. Two hazards it names rather than hides: announcing produces Mac downloads for a path that **has never run on Apple hardware**, and a visitor judges the library, which is [0104](0104-the-library-stops-being-lopsided.md)'s problem. |
 | [0104](0104-the-library-stops-being-lopsided.md) | The library stops being lopsided | approved | dev, human | **The census is the plan: `attractor` has 17 worlds; `lsystem`, `shape_field`, `spectrum` and `star_pattern` have exactly one each.** Brings every system to a floor of four — 18 presets, 39 → 57 — under [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules. Phase 1 can revise that arithmetic before Phase 2 starts, by asking whether the 17 are seventeen worlds or a family that converged. Phase 2 partly waits on [0098](0098-the-figure-nests-properly.md) (`shape_field`) and **Phase 4 wholly on [0087](0087-the-line-renderer-draws-a-curve.md)** — authoring `star_pattern` before that settles buys a cohort that has to be redone. Every `human` phase is a **`preset-author` session**; that the owner vocabulary has no word for it is a filed followup. |
 
 **Added 2026-08-16, from a backlog round after [0091](done/0091-the-figure-fills-the-frame.md)'s
-close: [0098](0098-the-figure-nests-properly.md) and [0099](0099-the-horizon-reaches-its-own-length.md),
-plus one fold.** The round swept all 17 live backlog entries and promoted four of them; the sweep
+close: [0098](0098-the-figure-nests-properly.md) and [0099](done/0099-the-horizon-reaches-its-own-length.md)
+(**closed 2026-08-16**), plus one fold.** The round swept all 17 live backlog entries and promoted four of them; the sweep
 result is worth keeping because most of what it found was **not** ripe:
 
 - **[0098] takes backlog 0096 + 0097**, which came out of the same content pass and sit on the same
@@ -38,7 +37,9 @@ result is worth keeping because most of what it found was **not** ripe:
 - **[0099] takes backlog 0093**, and is deliberately shaped so its cheapest phase runs first: the
   entry already names the one command that discriminates between the two candidate causes, and
   starting from the one-line hypothesis instead would fix a symptom without establishing which
-  ceiling was removed.
+  ceiling was removed. **That shaping paid: it closed 2026-08-16 with a third answer neither
+  candidate predicted** — the wall was memory pressure, not a frame count, and retention was per
+  *pass*, so every world grew and RD merely reached the allocator first.
 - **backlog 0098 folded into [0087] as Phase 1b** rather than becoming a third plan — same
   subsystem, no other plan touches those files. **Placed before 0087's Phase 4 stop gate on
   purpose**, since that gate can send the whole plan to ADR-0098's Alternative C and this repair is
@@ -69,8 +70,9 @@ to learn that weighted sampling was never optional.
 
 **Sequencing: both new plans run after [0087] and [0092].** [0098] contends with [0092] on
 `shape_field.rs` and [0087]'s stop condition is worth resolving before more line-adjacent work; the
-choice was the user's at the planning interview. [0099] contends with nothing and can be taken by
-any free session at any point — it is the one plan here that does not have to wait.
+choice was the user's at the planning interview. [0099] contended with nothing and did not have to
+wait — **it was taken by a free session and closed 2026-08-16**, which is the note working exactly
+as intended.
 
 **Five plans, written 2026-08-13 from a backlog sweep**, after the roster stood empty for the first
 time in this file's history — **two now: [0083] and [0084] both closed the same day they were
@@ -120,8 +122,9 @@ renderer, and they sort into two groups that barely interact:
   [0103](0103-the-project-gets-an-audience.md) Phase 4.
   [0104](0104-the-library-stops-being-lopsided.md) is content work in `presets/` and collides with
   no engine lane. [0101](0101-the-engine-renders-a-music-video.md) shares
-  `standalone/src/shot/` with [0099](0099-the-horizon-reaches-its-own-length.md), which it is
-  **hard-blocked on at Phase 4**, so those two run in sequence in one lane.
+  `standalone/src/shot/` with [0099](done/0099-the-horizon-reaches-its-own-length.md), which it was
+  hard-blocked on at Phase 4 — **that sequence is discharged; 0099 closed 2026-08-16 and the lane is
+  free.**
   [0103](0103-the-project-gets-an-audience.md) goes last on purpose: it is the only one whose cost
   of being early is real, since announcing before [0104] lands means visitors judge a library where
   four of ten systems have a single world.
@@ -412,6 +415,7 @@ at 60 Hz or at capture `dt` stays correct as written.
 [0089]: done/0089-the-framing-contract-stops-lying.md
 [0090]: done/0090-the-emitters-source-moves.md
 [0091]: done/0091-the-figure-fills-the-frame.md
+[0099]: done/0099-the-horizon-reaches-its-own-length.md
 [0045]: done/0045-linear-light-and-bloom.md
 [0046]: done/0046-transformed-feedback.md
 [0052]: done/0052-the-emitter-objects-that-spawn-fall-and-die.md
@@ -615,6 +619,7 @@ archive first.
 
 <!-- roster:begin cap=320 -->
 
+- [0099 — The horizon reaches its own length](done/0099-the-horizon-reaches-its-own-length.md) — closed 2026-08-16. Review: **no blockers, no majors, four minors and a nit.**
 - [0105 — The indexes go back to being indexes](done/0105-the-indexes-go-back-to-being-indexes.md) — closed 2026-08-16. Review: **no blockers, two majors, two minors, one nit.**
 - [0097 — The track announces itself](done/0097-the-track-announces-itself.md) — closed 2026-08-16. Review: **no blockers, no majors, three minors and a nit.**
 - [0096 — The HUD gets out of the way](done/0096-the-hud-gets-out-of-the-way.md) — closed 2026-08-16. Review: **no blockers, no majors, two minors and a nit.**
