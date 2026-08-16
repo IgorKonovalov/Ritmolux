@@ -205,6 +205,28 @@ Three riders:
 
 ## 6. The figure at frame scale — [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) Phase 6
 
+> **PARTLY RUN, 2026-08-16.** Three of the sitting's questions are answered and one world shipped;
+> the item stays open on the two that are not. What is settled, so nobody re-litigates it:
+>
+> - **The contour construction reads.** `presets/shape_pulse.toml` ships from it — the first
+>   `shape_field` world. Judged in the running app across four rounds of user notes, and the
+>   parameters that survived are recorded in its header with the arithmetic behind them.
+> - **`gamma`'s useful range is bounded by a measured wall, not by its clamp.** Past roughly `1.5`
+>   on a wrapping palette and `3` on a single sweep, the exterior compresses past the pixel grid and
+>   the corners break into moire. The `0.05..20` clamp is far outside anything usable.
+> - **The star silhouettes are NOT good enough for a curated preset** — the user's verdict, so no
+>   star content shipped. **What specifically fell short was not captured**, which is the miss: the
+>   plan asked for a *named* miss and got a rejection. That question is still live below.
+> - **Two engine gaps came out of it** and are filed:
+>   [backlog 0096](design-backlog.md) (the scene draws offset contours where the reference wants
+>   scaled copies — the reason a nested figure's inner notch rounds off) and
+>   [backlog 0097](design-backlog.md) (a curved or jittered star returns a negative distance at its
+>   own centre, which punches a hole through the figure on this scene).
+>
+> **Still open, and both need the user rather than the lane:** whether a beat-latched
+> `palette_steps` reads as a response or a strobe — the probe set for it was built and never run —
+> and which of the three star params is mis-shaped.
+
 **This is the first sitting on a system that ships with no content at all.** Plan 0091 landed the
 `shape_field` scene, the `star` arm's three shape params, and the two-tone `multiply` route, and it
 deliberately shipped **zero presets** (ADR-0081 puts worlds in this lane). So this item is both the

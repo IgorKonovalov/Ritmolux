@@ -917,6 +917,30 @@ much is left for the rings around it. Low values put the whole gradient inside
 the silhouette and leave the surround flat; the default `0.6` is a compromise
 that shows both.
 
+> **`color_span` IS NOT PORTABLE BETWEEN SILHOUETTES, and the factor is large.**
+> The scalar is normalized by each shape's own **inradius** — that is what makes
+> `d` exactly `1` on every outline — and the inradii are nothing like each other:
+> about `0.64` for the `heart` against `0.093` for a sharp `star`
+> (`star_valley = 0.18`, 7 points). So *the same* `color_span` gives roughly
+> **seven times** the contour count on that star, and a value tuned on one shape
+> is meaningless on another. Authoring the Plan 0091 star probes needed a
+> separately computed span per figure just to keep one sweep on frame.
+>
+> **The live consequence: binding `star_valley` or `points` silently changes the
+> ring count while it moves**, because both move the inradius. If you animate
+> either on `shape_field`, expect the banding to breathe with it — and if you
+> wanted only the silhouette to change, that is not currently separable.
+
+**How far the coordinate reaches at the frame corner is worth one line of
+arithmetic before you ship.** The exterior is most of a 16:9 frame, and
+`gamma` above 1 compresses it: past roughly `1.5` on a palette that wraps, or
+`3` on a single sweep, the ring frequency at the corners runs past what the
+pixel grid can carry and the picture breaks into **moire** — which reads as
+texture in a still and shimmers the moment anything moves. `d` at the corner is
+`1 + (|uv|_corner / scale - 1) / R` for inradius `R`, and the coordinate there is
+`d^gamma * color_span`; keep that under about 6 with `palette_steps` near 9.
+`shape_pulse`'s header carries the worked example.
+
 > **`points` on a `star` here is not the same picture as on a mark.** These
 > silhouettes were tuned for sprites a few pixels across, and at frame scale the
 > star's interior is knowingly approximate — measured at Plan 0091 Phase 2, its
@@ -954,6 +978,20 @@ instead of along the whole point.
 
 - `thickness` — stroke weight (roughly 1–5); scaled to a projector-friendly glow.
   Pick it for the weight you want: it no longer trades against a joint artifact.
+
+  > **Below `0.167` is a DEAD ZONE — every value there renders identically.** The
+  > param maps to an NDC half-width as `thickness * 0.003`, floored at `0.0005`
+  > so a zero cannot degenerate the quad; below that threshold the floor wins and
+  > the stroke is ~0.27 px at 1080p, which rasterizes as a **broken dotted line**
+  > rather than a stroke. `fragment_vitrail` shipped at `0.016` — two orders low —
+  > and its Maurer rose read as scattered dots for its whole life.
+  >
+  > **The dead zone is the trap, not the floor.** Re-tuning inside it changes
+  > nothing at all, so the obvious experiment (`0.016` → `0.022` → `0.038`, no
+  > visible difference) *disproves the right hypothesis*. If a line figure looks
+  > stippled, check the magnitude against the 1.5–3.2 the shipped line presets use
+  > before suspecting sample count or geometry density. Nothing warns
+  > ([backlog 0098](../docs/design-backlog.md)).
 - `glow` — the line renderer's **per-segment falloff** multiplier, default `1.0`
   (exactly what these scenes drew before it was bindable), whole-figure on all
   four. It scales the shader's core-to-edge term straight into the stroke colour:
