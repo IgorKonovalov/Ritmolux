@@ -354,6 +354,137 @@ pub struct MilkBundle {
 - **It does not promise a coverage percentage.** Phase 5 measures; nothing asserts.
 - **It does not decide preset licensing** — Phase 8 does, and it is the user's call.
 
+## Implementation log (dev, 2026-08-16)
+
+**Bookkeeping, not design.** Written by `dev` mid-plan so a fresh session can pick
+the work up without re-deriving it. Everything below is *what happened*; the
+phases above are still the contract.
+
+**Lane:** worktree `WORK/lmv-plan-0100`, branch
+`plan-0100-the-engine-speaks-milkdrop`, branched from local `main` at `657d103`
+(**not** `origin/main`, which was behind it — the corpus-census commit this plan
+is sized by is only local).
+
+### Where it stands
+
+| phase | state |
+|---|---|
+| 1 — the warp mesh is a native scene | **done**, committed `2603309` |
+| 2 — the EEL2 machine | **done**, committed `bfb5536` |
+| 3 — the converter reads a real preset | **done**, committed `ebbf395` |
+| 4 — the draw layer | **built and green, one thing left** — committed `9941129` |
+| 5 — what actually converts | not started |
+| 6 — the shaders | not started |
+| 7, 8 — human | not started, and not `dev`'s |
+
+`cargo nextest run --workspace` is **852 passed, 3 skipped**; `cargo clippy
+--workspace --all-targets` and `cargo fmt --all --check` are clean at
+`9941129`.
+
+### The one thing Phase 4 has left, diagnosed
+
+**A converted preset's draw layer saturates the field.** Render
+`Aderrasi - Songflower (Hybrid Plant)` through `milkconv` and `shot --signal
+chord`: the first frames carry real structure — the waveform, the custom shapes,
+a moiré of both — and then the frame goes to flat saturated colour within about
+half a second.
+
+The cause is **not** the frame rate (that was fixed:
+`draw::deposit_exposure` scales each frame's contribution by `dt * NOMINAL_FPS`,
+so a second of wall clock deposits the same light at any refresh). It is the
+blend:
+
+- MilkDrop's waveform is **alpha-blended** when `bAdditiveWaves = 0`, which is
+  the common case: `dst = src*a + dst*(1-a)` *replaces* rather than accumulates,
+  so the field's steady state is the alpha the preset asked for.
+- This engine's draw seam is **additive** by construction (ADR-0056), and the
+  field decays slowly. At `decay = 0.98` per frame the steady state is
+  `deposit / (1 - 0.98)` — **fifty times** the per-frame deposit. MilkDrop clips
+  that to white in 8-bit; the linear-light HDR pipeline (ADR-0046) carries it and
+  the tonemap maps it to a saturated hue.
+
+Two candidate fixes, both one-ish line, and the choice is a real design call:
+
+1. **Scale the deposit by `1 - decay_per_frame`.** The steady state then lands at
+   the alpha the preset asked for. Cheap, needs no new blend state, and is the
+   same normalization ADR-0065 applied to the attractor when a tier capacity
+   turned out to be a brightness. Wrong in one way: a preset that genuinely wants
+   additive build-up (`bAdditiveWaves = 1`, and `wave_additive` is already read
+   and currently inert) gets the same treatment as one that does not.
+2. **A second blend state for the non-additive case**, selected per draw from
+   `wave_additive`. Faithful, and costs a second pipeline plus an ADR-0058 shape
+   for it — and the line batch is currently *one* draw for the whole layer, so
+   splitting it by blend mode splits the batch too.
+
+Either way the phase's done-when then needs checking:
+
+- each `wave_mode` renders distinguishably from the others under one fixture —
+  **not yet written**; `draw::WAVE_MODES` is 8 and `waveform_figure` implements
+  all of them, but there is no test comparing the eight;
+- custom shapes honour their per-point program — **not yet written**;
+- a preset using borders and motion vectors shows both — **not yet written**.
+
+A fixture under `core/tests/fixtures/` plus a test beside
+`core/tests/warp_mesh.rs`'s existing ones is the shape to follow. There is no
+`docs/` write for Phase 4 yet either: `presets/README.md`'s `warp_mesh` section
+and `docs/capturing.md`'s `milkconv` section both still describe the Phase 3
+world (the stand-in deposit, the draw roster as unconverted), and the converter
+no longer emits a stand-in deposit.
+
+### Decisions taken along the way that are not in the phases above
+
+- **`AnalysisFrame` gained `waveform: [f32; WAVE_SAMPLES]`** (512). Phase 4's
+  file list did not include `core/src/dsp/`, and MilkDrop's light source is the
+  waveform, so this was surfaced and the user approved the widening before it was
+  made. It is the scope trace: consecutive tail of the window, un-normalized,
+  and deliberately **not** in `Variables` (the grammar stays scalar, ADR-0036).
+- **The warp transform follows the reference's stage order** (Phase 3): `zoom`
+  about the frame centre, `sx`/`sy` and `rot` about the per-vertex `cx`/`cy`,
+  `dx`/`dy` in uv. Collapsing the two origins renders a different picture for any
+  preset with an off-centre centre.
+- **`zoomexp` needs no engine parameter** — the converter folds it into the
+  per-vertex program as `zoom^(zoomexp^(rad*2-1))`.
+- **Seven composite params were built rather than warned about**, chosen by
+  measuring the corpus: `bTexWrap` 58 %, `bDarken` 36 %, `bBrighten` 14 %,
+  `bDarkenCenter` 7 %, `bInvert` 6 %, `bSolarize` 4 %. The video echo (2.4 %) is
+  named instead, being a second sampled copy rather than a remap.
+- **The VM's loop and instruction bounds are per program** (`Budget::INIT` /
+  `FRAME` / `VERTEX`): the corpus's commonest `per_frame_init` idiom is a
+  10 000-iteration `megabuf` seed, and a bound tight enough for `per_vertex`
+  breaks it.
+- **Two `.milk` parser readings were decided by measurement**, both on
+  `milk::join_code` and `eel::Compiler::argument`: code lines join **directly**
+  (MilkDrop's writer cuts mid-identifier) with `//` comments stripped per line
+  first, and a trailing or doubled `;` inside a call argument is legal. Together
+  they are the difference between 525/552 and 552/552.
+- **The mesh grid's tier values are measured** — `mesh_cost_by_grid` prints the
+  ladder; `Floor` is `64x48` and `Rich` `88x66`, and the format's own maximum is
+  refused at 1.92 ms. See `TierConfig::mesh_grid`.
+
+### Corpus conversion, as of `9941129`
+
+```text
+presets-milkdrop-original      552 / 552     100 %
+presets-cream-of-the-crop    9 784 / 9 795    99.9 %
+```
+
+Parses and compiles — a weaker claim than "renders as authored", and 82 % of the
+corpus carries HLSL that nothing translates yet. Phase 5 is where that becomes a
+measurement; it asserts no threshold (ADR-0071). The corpus is outside the
+repository at `WORK/milkdrop-corpus`.
+
+### Things a fresh session will want to know
+
+- `milkconv` is outside `default-members`, so `cargo build` does not build it;
+  `-p milkconv` or `--workspace` does.
+- Blessing goldens rewrites **every** baseline — check `git status` afterwards
+  and restore any that were not meant to move.
+- The `shot` CLI renders a converted bundle like any other preset:
+  `cargo run -p standalone --example shot -- --preset-file converted.toml`.
+- Two adapter comparisons are recorded and `#[ignore]`d in
+  `core/tests/warp_mesh.rs`; re-run `the_adapters_agree_on_the_warp_mesh` before
+  blessing anything, since the golden suite captures on WARP.
+
 ## Followups (after this lands)
 
 - Per-vertex evaluation on a compute shader, if Phase 1's cap lands low enough to hurt.
