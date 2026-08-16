@@ -107,6 +107,20 @@ impl TextLayer {
         }));
     }
 
+    /// Append one run to this frame's queue, leaving what is already there
+    /// alone. The core's own furniture — the now-playing banner (ADR-0110) —
+    /// goes in through this rather than [`queue`](Self::queue), which replaces:
+    /// a frontend that queues nothing this frame must not erase it.
+    pub fn push(&mut self, run: TextRun<'_>) {
+        self.runs.push(OwnedRun {
+            text: run.text.to_owned(),
+            x: run.x,
+            y: run.y,
+            size: run.size,
+            color: run.color,
+        });
+    }
+
     /// Shape the queued runs and upload their glyphs to the atlas. Returns
     /// whether there is anything to draw; an atlas-full or shaping failure
     /// degrades to "nothing drawn" rather than panicking on the render path.

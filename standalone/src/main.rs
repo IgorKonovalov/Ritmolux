@@ -93,6 +93,9 @@ struct AppState {
     title_tick: u32,
     /// Whether the diagnostics debug overlay is currently painted (toggled by F3).
     overlay_on: bool,
+    /// TEMPORARY (Plan 0097 Phase 1): which of the two stub tracks F8 announces
+    /// next. Removed with the hotkey in Phase 2, once SMTC supplies real ones.
+    stub_track: bool,
     /// The preset browse overlay's modal state (Tab toggles; Plan 0008).
     browse: OverlayState,
     /// The settings modal's state (`S` toggles; Plan 0050 Phase 4). A second,
@@ -257,6 +260,7 @@ impl AppState {
             occluded: false,
             title_tick: 0,
             overlay_on: false,
+            stub_track: false,
             browse: OverlayState::new(),
             settings: SettingsState::new(),
             tier_pinned: tier.is_some(),
@@ -983,6 +987,19 @@ impl AppState {
             }
             KeyCode::KeyF => self.toggle_fullscreen(),
             KeyCode::KeyD => self.cycle_display(),
+            // TEMPORARY (Plan 0097 Phase 1): fake a track change so the banner's
+            // look can be judged before Phase 2's SMTC source exists. Removed in
+            // that phase's commit — nothing shipped should be able to invent a
+            // track. Cycles two strings so a second press proves a *new* string
+            // re-triggers while the same one does not.
+            KeyCode::F8 => {
+                self.stub_track = !self.stub_track;
+                self.renderer.set_now_playing(if self.stub_track {
+                    "Boards of Canada - Roygbiv"
+                } else {
+                    "Sigur Ros - Svefn-g-englar"
+                });
+            }
             // Quality, live (ADR-0054). `[` down a tier, `]` up — the bracket
             // pair reads as a range with the floor on the left.
             KeyCode::BracketLeft => self.swap_tier(Tier::Floor),

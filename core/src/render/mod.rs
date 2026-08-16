@@ -40,6 +40,10 @@ pub(crate) mod kaleidoscope;
 // `PostChain`, whose walk knows the junction; nothing else reaches it.
 pub(crate) mod layer_blend;
 pub mod metrics;
+// The now-playing banner (ADR-0110). Deliberately **not** behind the `text`
+// feature: a build without it keeps the state and never asks for a layout, so
+// the plugin build turns the feature on without touching this module.
+pub mod now_playing;
 pub mod overlay;
 mod overlay_font;
 pub mod palette;
@@ -64,6 +68,7 @@ pub use capture::CaptureImage;
 pub use capture_api::AudioCapture;
 pub use context::{RenderContext, RenderError};
 use ink::Ink;
+use now_playing::NowPlaying;
 use overlay::Overlay;
 use palette::Palette;
 use post::PostChain;
@@ -922,6 +927,10 @@ pub struct Renderer {
     /// `text` feature (ADR-0009); absent from the plugin/default build.
     #[cfg(feature = "text")]
     text_layer: TextLayer,
+    /// The now-playing banner (ADR-0110): a string a shell pushes in, plus the
+    /// `dt`-driven envelope that fades it. Present in every build — a plugin
+    /// build without the `text` feature holds the state and draws nothing.
+    now_playing: NowPlaying,
     /// Segment-cap truncation from the active preset's last `configure`, if any
     /// (ADR-0007: the cap is never a silent cut). Refreshed whenever the active
     /// preset changes; the frontend surfaces it. `None` when geometry fit.
@@ -1014,6 +1023,7 @@ impl Renderer {
             overlay,
             #[cfg(feature = "text")]
             text_layer,
+            now_playing: NowPlaying::default(),
             cap_overflow: None,
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
             param_smoother: ParamSmoother::default(),
@@ -1341,6 +1351,47 @@ impl Renderer {
         self.text_layer.queue(runs);
     }
 
+    /// Announce the currently playing track (ADR-0110). The banner fades in,
+    /// holds, and fades out on its own; the caller only says *what*, never
+    /// *when to stop*.
+    ///
+    /// The string is `artist - title`, split on the first ` - `. Setting the
+    /// string that is already set does nothing, so a metadata source may push on
+    /// every update it receives. An empty string clears the banner.
+    ///
+    /// **Source-agnostic by construction** (ADR-0001): the argument carries no
+    /// evidence of whether it came from Windows SMTC or foobar's `titleformat`.
+    /// Callers must not call this from an audio callback — the copy allocates.
+    pub fn set_now_playing(&mut self, text: &str) {
+        self.now_playing.set(text);
+    }
+
+    /// Append the banner's lines to this frame's text queue, after whatever the
+    /// frontend queued — [`queue_text`](Self::queue_text) *replaces* the queue,
+    /// so the core's own furniture has to go in afterwards or a shell that draws
+    /// nothing would erase it.
+    #[cfg(feature = "text")]
+    fn queue_now_playing(&mut self) {
+        // Split-borrowed: the layout reads `now_playing` and `ctx` while the
+        // queue is mutated, which a `&mut self` method call would forbid.
+        let Self {
+            now_playing,
+            text_layer,
+            ctx,
+            ..
+        } = self;
+        let (width, height) = (ctx.config.width as f32, ctx.config.height as f32);
+        for line in now_playing.layout(width, height).into_iter().flatten() {
+            text_layer.push(TextRun {
+                text: &line.text,
+                x: line.x,
+                y: line.y,
+                size: line.size,
+                color: line.color,
+            });
+        }
+    }
+
     /// Enable or disable rolling frame-time collection — the gated diagnostics
     /// clock read (Plan 0011). The standalone leaves this on so the title always
     /// shows live fps/p99; turning it off keeps the core fully clock-free.
@@ -1531,6 +1582,9 @@ impl Renderer {
     /// validation failure (a bug) bubbles up.
     pub fn render(&mut self, frame: &AnalysisFrame, dt: f32) -> Result<(), RenderError> {
         self.time += dt;
+        // The banner rides the same injected `dt` the scene does, so it lasts the
+        // same number of seconds on any refresh rate (ADR-0110 / Plan 0014).
+        self.now_playing.advance(dt);
 
         // Core-tracked GPU footprint: the swapchain dominates what the core
         // allocates. An approximation (ADR-0008), refreshed each frame so it
@@ -1555,6 +1609,11 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("lmv-frame"),
             });
+
+        // After the acquire, so a dropped frame does not leave a second copy of
+        // the banner queued behind the one the next frame pushes.
+        #[cfg(feature = "text")]
+        self.queue_now_playing();
 
         let (width, height) = (self.ctx.config.width, self.ctx.config.height);
         // The one live call site: a preset that asked for `seed = "random"` gets
@@ -1631,6 +1690,9 @@ impl Renderer {
             overlay,
             #[cfg(feature = "text")]
             text_layer,
+            // Advanced and queued in `render`, before this is called — the banner
+            // is a live-surface concern, so a headless capture never draws one.
+            now_playing: _,
             // Set at preset load, surfaced by the frontend — not a per-frame concern.
             cap_overflow: _,
             series_scratch,
