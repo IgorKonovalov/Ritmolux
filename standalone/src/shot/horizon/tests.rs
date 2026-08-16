@@ -286,3 +286,136 @@ fn the_ground_is_sampled_once_for_the_whole_run() {
     // dividing by an absent frame.
     assert!(measure(&[], &[]).is_empty());
 }
+
+/// A `--horizon` the `--interval` does not divide is rounded **down** to the
+/// last whole interval, and the table has to say so (Plan 0099).
+///
+/// This is the half of "the instrument overstates itself" that survives the
+/// memory fix: nothing in the render path is wrong, the run simply ends 15 s
+/// before the length its own header used to claim. `10 minutes / 45 s` is 13.33
+/// intervals, floored to 13, so the last row sits at 585 s.
+#[test]
+fn a_horizon_the_interval_does_not_divide_reports_the_length_it_reached() {
+    let frames = sample_frames(10.0, 45.0).expect("a 10-minute horizon at 45 s");
+    assert_eq!(frames.last().copied(), Some(35_100), "13 whole intervals");
+
+    let mut short = a_run(vec![
+        sample(0, 0.1, 2.0, None),
+        sample(35_100, 0.2, 2.0, Some(0.05)),
+    ]);
+    short.minutes = 10.0;
+    short.interval_secs = 45.0;
+
+    assert!(
+        (reached_secs(&short) - 585.0166).abs() < 0.01,
+        "{}",
+        reached_secs(&short)
+    );
+    let missed = shortfall_secs(&short).expect("a floored request is short");
+    assert!((missed - 14.98).abs() < 0.05, "short by {missed}");
+
+    let table = text_table("--presets presets", &short);
+    assert!(
+        table.contains("over 9.8 simulated minutes"),
+        "the header states the requested length rather than the reached one:\n{table}"
+    );
+    assert!(
+        table.contains("SHORT of the 10.0 minutes"),
+        "the shortfall is not stated where the table is read:\n{table}"
+    );
+
+    // ...and a request the interval divides carries no note at all, so the
+    // marker means something when it does appear. One minute at 30 s is two
+    // whole intervals, so the last row sits at frame 3600.
+    let whole = a_run(vec![
+        sample(0, 0.1, 2.0, None),
+        sample(1800, 0.15, 2.0, Some(0.05)),
+        sample(3600, 0.2, 2.0, Some(0.05)),
+    ]);
+    assert!(shortfall_secs(&whole).is_none(), "30 s divides 1 minute");
+    assert!(
+        !text_table("--presets presets", &whole).contains("SHORT"),
+        "an exactly-divided horizon should not be flagged"
+    );
+}
+
+/// The JSON carries the reached length beside the requested one, so a consumer
+/// can tell a short run from a whole one without re-deriving it (Plan 0099).
+#[test]
+fn the_json_distinguishes_a_reached_length_from_a_requested_one() {
+    let mut short = a_run(vec![
+        sample(0, 0.1, 2.0, None),
+        sample(35_100, 0.2, 2.0, Some(0.05)),
+    ]);
+    short.minutes = 10.0;
+    short.interval_secs = 45.0;
+    let json = json_report("--presets presets", &short);
+    assert!(json.contains("\"minutes\":10"), "{json}");
+    assert!(json.contains("\"reached_secs\":585"), "{json}");
+    assert!(!json.contains("\"shortfall_secs\":null"), "{json}");
+    assert!(json.contains("\"truncated\":false"), "{json}");
+
+    let whole = a_run(vec![
+        sample(0, 0.1, 2.0, None),
+        sample(1800, 0.15, 2.0, Some(0.05)),
+        sample(3600, 0.2, 2.0, Some(0.05)),
+    ]);
+    assert!(
+        json_report("--presets presets", &whole).contains("\"shortfall_secs\":null"),
+        "a whole run reports no shortfall"
+    );
+}
+
+/// A run that dies before its requested length reports that **on stdout**, where
+/// the table would have been — not only as the stderr line it used to be
+/// (Plan 0099). The original ceiling was legible to nobody who did not count
+/// rows, and a result nobody reads is not a result.
+#[test]
+fn a_truncated_run_reports_itself_where_the_table_would_be() {
+    // The numbers are the ones the defect actually produced, so the report is
+    // exercised at the scale it was written for.
+    const RSS_AT_FAILURE: u64 = 4_402 * 1024 * 1024;
+    let died = TruncatedRun {
+        preset: "Etching".to_string(),
+        minutes: 10.0,
+        interval_secs: 30.0,
+        requested_frames: 36_001,
+        wall_secs: 9.4,
+        rss_bytes: Some(RSS_AT_FAILURE),
+        error: "headless capture readback failed".to_string(),
+    };
+
+    let text = truncation_report("--presets presets", &died, false);
+    assert!(text.contains("TRUNCATED"), "{text}");
+    assert!(
+        text.contains("36001 frames"),
+        "the requested length:\n{text}"
+    );
+    assert!(
+        text.contains("headless capture readback failed"),
+        "the failure itself:\n{text}"
+    );
+    assert!(
+        text.contains("4402 MB"),
+        "the resident set it died at:\n{text}"
+    );
+    // The levers, and specifically NOT --interval: the capture path polls every
+    // frame since Plan 0099, so the interval no longer governs reclaim.
+    assert!(text.contains("--size"), "{text}");
+    assert!(
+        text.contains("--interval is NOT a lever"),
+        "the stale lever has to be named as stale, or the next reader tries it:\n{text}"
+    );
+
+    let json = truncation_report("--presets presets", &died, true);
+    assert!(json.contains("\"truncated\":true"), "{json}");
+    assert!(
+        json.contains("\"samples\":[]"),
+        "an empty table, explicitly:\n{json}"
+    );
+    assert!(json.contains("\"requested_frames\":36001"), "{json}");
+    assert!(
+        json.contains(&format!("\"rss_at_failure_bytes\":{RSS_AT_FAILURE}")),
+        "{json}"
+    );
+}
