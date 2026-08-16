@@ -128,13 +128,24 @@ renderer, and they sort into two groups that barely interact:
   of being early is real, since announcing before [0104] lands means visitors judge a library where
   four of ten systems have a single world.
 
-- **[0105](0105-the-indexes-go-back-to-being-indexes.md) contends with every close, and with nothing
-  else.** It touches no code outside `scripts/` and no preset, so it collides with none of the plans
-  above on content — but it rewrites `docs/plans/README.md` and `docs/design-backlog.md`, which is
-  exactly what a *close ceremony* writes to. Running it concurrently with another lane's close means
-  conflicts in the two files, and worse, a close landing fat rows into a section 0105 has already
-  trimmed. Take it in a gap between closes, or accept that its Phase 5 gate will convict whatever
-  the next close writes — which is the point of the gate, but a poor first impression of it.
+- **First, and cheaply: [0105](0105-the-indexes-go-back-to-being-indexes.md)** (user call,
+  2026-08-16). It is the one plan here with **no user-visible value at all** — it improves the
+  repo's own ergonomics, not the product — and it goes first anyway, because it is *preventive* and
+  its value is proportional to how much work comes after it. Every plan on this roster writes rows
+  into the three roster files at its close; with 0105's Phase 6 landed, those closes produce thin
+  rows on their own, and without it each one adds to a work list already at **135 over-cap rows**.
+  The ADR index grew 41,705 bytes in three days with no plan closing at all. It is also cheap in the
+  ways that usually cost — no core, no shell, no GPU, no golden bless, no ABI, no version-visible
+  behaviour.
+
+  **Its one contention is with closes, not with content.** It touches nothing outside `scripts/` and
+  `docs/`, so it collides with none of the plans below — but it rewrites `docs/plans/README.md` and
+  `docs/design-backlog.md`, which is exactly what a *close ceremony* writes to. Run it concurrently
+  with another lane's close and you get conflicts in those two files, and a close landing fat rows
+  into a section it has already trimmed. Take a worktree per
+  [ADR-0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md) and merge `main` in before the close;
+  the live-entry half of `design-backlog.md` is deliberately out of its scope, so a parallel
+  session filing backlog entries does not contend with Phase 4's ledger rewrite.
 
 **One sequencing disagreement is left open rather than decided**, because it is a product call and
 not an architecture one: [0103] wants [0104] to have landed, and [0104] is four phases of content
