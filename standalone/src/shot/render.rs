@@ -60,6 +60,30 @@
 //! section above gives: the YUV conversion is not bijective, so a wire-level
 //! version of it could only be loosened until it passed.
 //!
+//! ## Surviving a whole track
+//!
+//! A four-minute render is 14,400 frames, and the thing that used to stop a run
+//! that long was not a frame count but memory pressure ([Plan 0099]): a capture
+//! path that submitted without ever polling retained **per pass**, so a
+//! reaction-diffusion world at thirteen passes a frame held 950 KB a frame
+//! against a 36 KB captured frame and hit the allocator at ~4.4 GB.
+//!
+//! This mode does not inherit that, and the reason is structural rather than
+//! lucky: it encodes no passes of its own. Every frame goes through
+//! `Renderer::capture_stream`, which reads back — and `capture::read_back` polls
+//! `wait_indefinitely`, which is the same retirement `step_offscreen` had to be
+//! given. A future edit that submits work here instead of through the core's
+//! capture path would inherit the defect and none of the fix.
+//!
+//! Nothing accumulates on this side either: [`ResidentSet`] is twenty numbers,
+//! the YUV scratch is resized once and reused, and each frame is handed to the
+//! writer and dropped — so the resident set of a 14,400-frame render is the one
+//! a 100-frame render has. That is reported at the end of every run rather than
+//! asserted, because the absolute figure is a property of the box's driver stack
+//! and only the growth travels.
+//!
+//! [Plan 0099]: ../../../docs/plans/done/0099-the-horizon-reaches-its-own-length.md
+//! [NFR §12]: ../../../docs/nfr.md#12-runtime-memory
 //! [ADR-0046]: ../../../docs/adrs/0046-linear-light-hdr-composite-bloom-tonemap.md
 //! [ADR-0096]: ../../../docs/adrs/0096-the-display-write-dithers.md
 //! [NFR §4]: ../../../docs/nfr.md#4-size-and-dependencies
@@ -531,6 +555,91 @@ impl Encoder {
 }
 
 // ---------------------------------------------------------------------------
+// The resident set across a long render
+// ---------------------------------------------------------------------------
+
+/// The resident set sampled across a render (Plan 0101 Phase 4).
+///
+/// **A render that leaks is the same defect as a live session that leaks**, so
+/// [NFR §12]'s no-session-growth requirement applies here and is measured the
+/// same way — the working set the OS reports, read through the same
+/// [`crate::rss`] the diagnostics log and `--horizon`'s cost block read.
+///
+/// Sampled *across* the run rather than before and after it, and that turned out
+/// to be the whole difference between a usable instrument and a misleading one.
+/// A 600-frame reaction-diffusion render on the Windows dev box reads
+/// **357 MB → 434 MB → 434 MB → …**: the entire 76 MB arrives in one step by the
+/// first sampled frame — pipelines compiled and GPU resources built on the first
+/// draw — and the remaining nineteen samples do not move a megabyte. Before and
+/// after alone would have printed "+76 MB" and read exactly like the linear,
+/// per-frame retention Plan 0099 found, which is the failure this is here to
+/// catch.
+///
+/// So the line separates them: a **warm-up** step to the first sampled frame,
+/// and the **growth across the run** after it. The second number is the one that
+/// answers "does this survive a whole track"; the first is a fixed cost of
+/// starting a renderer at all, and it does not scale with the clip. The peak
+/// keeps both honest — a run that grew and was reclaimed reads flat end to end,
+/// and only an intermediate sample can tell it apart from one that never grew.
+///
+/// **Reported, never asserted here** (ADR-0071, the same rule `--horizon`'s cost
+/// block follows): the absolute numbers are a property of the box's GPU driver
+/// stack — a ~327 MB vendor floor on the reference machine ([NFR §12]) — and do
+/// not travel. The growth does, which is why that is what
+/// `standalone/tests/shot_cli.rs` puts a ceiling on.
+#[derive(Debug, Default, Clone)]
+pub struct ResidentSet {
+    /// Every sample, in bytes, in order. Empty where the OS query is
+    /// unsupported or failed — which is reported as such rather than as zero.
+    pub samples: Vec<u64>,
+}
+
+impl ResidentSet {
+    /// Take one reading, if the platform offers one.
+    fn sample(&mut self) {
+        if let Some(bytes) = crate::rss::current_rss_bytes() {
+            self.samples.push(bytes);
+        }
+    }
+
+    /// The reading the run settles at, i.e. the first sample taken with frames
+    /// behind it. Falls back to the baseline for a run too short to have one.
+    fn warm(&self) -> u64 {
+        self.samples
+            .get(1)
+            .or_else(|| self.samples.first())
+            .copied()
+            .unwrap_or(0)
+    }
+
+    /// The line printed at the end of every render.
+    ///
+    /// **`growth` is measured from the warm reading, not from the baseline**, and
+    /// that is the difference between an instrument and a false alarm — see the
+    /// type's own docs for the measured series that forced the split. It leads
+    /// the line because it is the number that answers the question, and it is
+    /// signed because a run that gave memory back is a different observation from
+    /// one that held still.
+    pub fn summary(&self, frames: u32) -> String {
+        const MB: f64 = 1024.0 * 1024.0;
+        let (Some(first), Some(last)) = (self.samples.first(), self.samples.last()) else {
+            return "render: resident set unavailable on this platform".to_string();
+        };
+        let warm = self.warm();
+        let peak = self.samples.iter().copied().max().unwrap_or(*first);
+        format!(
+            "render: resident set {:.0} MB, growth {:+.1} MB across {frames} frames \
+             after a {:+.1} MB warm-up (peak {:.0} MB, {} samples)",
+            *last as f64 / MB,
+            (*last as i64 - warm as i64) as f64 / MB,
+            (warm as i64 - *first as i64) as f64 / MB,
+            peak as f64 / MB,
+            self.samples.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // The mode
 // ---------------------------------------------------------------------------
 
@@ -575,7 +684,17 @@ pub fn run(
         None => Box::new(std::io::BufWriter::new(stdout.lock())),
     };
 
-    let outcome = stream_into(&mut out, &mut r, &name, pcm, format, req, frames);
+    let mut resident = ResidentSet::default();
+    let outcome = stream_into(
+        &mut out,
+        &mut r,
+        &name,
+        pcm,
+        format,
+        req,
+        frames,
+        &mut resident,
+    );
     // Drop the writer before waiting: on the encoder path it owns the pipe, and
     // the encoder cannot finish until the pipe closes.
     drop(out);
@@ -590,10 +709,12 @@ pub fn run(
         (Err(ours), None) => Err(ours),
         (Ok(rendered), Some(encoder)) => {
             encoder.finish()?;
+            eprintln!("{}", resident.summary(rendered));
             eprintln!("render: {rendered} frames encoded");
             Ok(())
         }
         (Ok(rendered), None) => {
+            eprintln!("{}", resident.summary(rendered));
             eprintln!("render: {rendered} frames written");
             Ok(())
         }
@@ -601,6 +722,9 @@ pub fn run(
 }
 
 /// Write the header and every frame into `out`, reporting progress on stderr.
+// Eight arguments: the request the mode was given plus the two sinks it reports
+// through. Bundling them would name a struct after this call site.
+#[allow(clippy::too_many_arguments)]
 fn stream_into(
     out: &mut dyn Write,
     r: &mut Renderer,
@@ -609,6 +733,7 @@ fn stream_into(
     format: AudioFormat,
     req: &RenderRequest,
     frames: u32,
+    resident: &mut ResidentSet,
 ) -> Result<u32, String> {
     out.write_all(y4m_header(req.width, req.height, req.fps).as_bytes())
         .map_err(|e| format!("write stream header: {e}"))?;
@@ -617,9 +742,14 @@ fn stream_into(
     // 14,400 frames and a line each would bury the encoder's own output.
     let every = (frames / 20).max(1);
     let mut planes: Vec<u8> = Vec::new();
+    // Before the first frame, so the baseline includes the renderer and its
+    // driver stack but none of the run — otherwise a fixed startup cost would
+    // read as growth.
+    resident.sample();
     let rendered = render_frames(r, name, pcm, format, req.fps, &mut |index, img| {
         write_y4m_frame(img, &mut planes, out).map_err(|e| format!("write frame {index}: {e}"))?;
         if index > 0 && index % every == 0 {
+            resident.sample();
             eprintln!(
                 "render: {index}/{frames} frames ({:.0}%)",
                 100.0 * index as f32 / frames as f32
@@ -628,6 +758,7 @@ fn stream_into(
         Ok(())
     })?;
     out.flush().map_err(|e| format!("flush stream: {e}"))?;
+    resident.sample();
     Ok(rendered)
 }
 

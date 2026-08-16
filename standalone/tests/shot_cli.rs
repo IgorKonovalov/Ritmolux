@@ -1253,6 +1253,125 @@ fn a_rendered_frame_is_byte_identical_to_the_png_the_app_writes() {
     );
 }
 
+/// A minimal reaction-diffusion preset, written by the test that uses it.
+///
+/// The family Plan 0099 measured as the worst case for per-pass retention —
+/// twelve simulation sub-steps plus a present, thirteen passes a frame, against
+/// single-pass worlds' one. The probe owns its subject rather than naming a
+/// shipped preset: a memory assertion coupled to the content library breaks the
+/// day a cohort retires the file, which is exactly how the tempo probe above
+/// broke.
+const RD_PROBE_SRC: &str = r#"
+system = "reaction_diffusion"
+name = "probe_render_memory"
+[params]
+feed = "0.036"
+kill = "0.0645"
+flow = "2.0"
+inject = "beat"
+"#;
+
+/// **Phase 4's guard.** A render long enough to expose per-frame retention
+/// completes, and reports its resident set.
+///
+/// Plan 0099 found the wall: a capture path that submitted without polling
+/// retained per **pass**, so a thirteen-pass reaction-diffusion world held
+/// 950 KB a frame and hit the allocator at ~4.4 GB. The render mode does not
+/// inherit that — every frame goes through `capture_stream`, which reads back,
+/// and the readback polls — but "does not inherit it" is a claim about a call
+/// graph, and a future edit that submits its own passes here would break it
+/// silently.
+///
+/// Six hundred frames rather than the done-when's 14,400: the defect grew
+/// *linearly with frame count*, so 600 frames of it is ~570 MB and a ceiling
+/// catches it, while a four-minute 1080p run is minutes of GPU time and belongs
+/// in a hand-run measurement rather than in a suite that runs on every push. The
+/// ceiling is deliberately generous — it is a tripwire for a defect of that
+/// scale, not a budget, and the number that is actually judged is the one the
+/// run prints.
+#[test]
+fn a_long_render_completes_and_reports_a_flat_resident_set() {
+    /// Frames rendered — 10 s at 60 fps, and enough that a per-frame leak of the
+    /// scale Plan 0099 measured would be hundreds of megabytes.
+    const FRAMES: u32 = 600;
+    /// Growth past which this is a leak. Charged from the **warm** reading, so
+    /// the ~76 MB of pipeline compilation the first draw pays for is not in it —
+    /// on this box the run after that step is flat to the megabyte across all
+    /// nineteen remaining samples. Sixty-four megabytes is generous against a
+    /// measured zero and still an order of magnitude under what Plan 0099's
+    /// per-pass retention would show at this length.
+    const CEILING_MB: f64 = 64.0;
+
+    let dir = scratch("render-memory");
+    let preset = dir.join("rd_probe.toml");
+    std::fs::write(&preset, RD_PROBE_SRC).expect("write the probe preset");
+    let clip = render_clip("long.wav", 48_000, FRAMES as f32 / 60.0);
+
+    let out = run(&[
+        "--preset-file",
+        &preset.to_string_lossy(),
+        "--render",
+        &clip.to_string_lossy(),
+        "--fps",
+        "60",
+        "--size",
+        "64x48",
+    ]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "the long render failed\nstderr: {}",
+        stderr(&out)
+    );
+    assert_eq!(
+        y4m_frame_count(&out.stdout),
+        FRAMES as usize,
+        "the render did not reach the end of the clip"
+    );
+
+    // The resident-set line is the instrument; losing it would make the
+    // done-when unmeasurable without saying so.
+    let log = stderr(&out);
+    let line = log
+        .lines()
+        .find(|l| l.starts_with("render: resident set"))
+        .unwrap_or_else(|| panic!("no resident-set line in:\n{log}"));
+    assert!(
+        line.contains(&format!("across {FRAMES} frames")),
+        "the line counts a different run: {line}"
+    );
+
+    // Sampled across the run and not merely at its ends: before-and-after alone
+    // cannot tell a run that grew steadily from one that stepped once at
+    // startup, which on this box is a 76 MB difference in what gets reported.
+    let samples: usize = line
+        .split(", ")
+        .last()
+        .and_then(|tail| tail.split(' ').next())
+        .and_then(|n| n.parse().ok())
+        .unwrap_or_else(|| panic!("no sample count in: {line}"));
+    assert!(
+        samples > 10,
+        "the resident set was sampled {samples} times across {FRAMES} frames: {line}"
+    );
+
+    let growth: f64 = line
+        .split("growth ")
+        .nth(1)
+        .and_then(|rest| rest.split(" MB").next())
+        .and_then(|mb| mb.parse().ok())
+        .unwrap_or_else(|| panic!("no growth figure in: {line}"));
+    eprintln!("{line}");
+    assert!(
+        growth < CEILING_MB,
+        "the resident set grew {growth:.1} MB over {FRAMES} frames — a render \
+         that leaks is the same defect as a live session that leaks (NFR 12), \
+         and Plan 0099's per-pass retention is what this looks like: {line}"
+    );
+}
+
 /// `ffmpeg` on `PATH`, or `None` with a printed skip.
 ///
 /// The encoder is a **documented prerequisite**, not a bundled component

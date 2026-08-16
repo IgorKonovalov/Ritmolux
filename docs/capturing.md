@@ -330,6 +330,25 @@ Practical notes:
 - It renders at the **floor** tier like every other capture path. `--tier rich`
   is the opt-in, and it is the mode where it is most worth paying for — an
   offline render has no 60 Hz deadline, so the frame-time governor never fires.
+- **Every run reports its resident set**, sampled across the render and printed
+  on stderr at the end:
+
+  ```
+  render: resident set 434 MB, growth +0.1 MB across 600 frames after a
+  +75.9 MB warm-up (peak 434 MB, 21 samples)
+  ```
+
+  A render that leaks is the same defect as a live session that leaks, so
+  [NFR §12](nfr.md#12-runtime-memory)'s no-session-growth requirement applies
+  here and is measured the same way. Read the **growth**, not the absolute: the
+  latter is a ~327 MB vendor driver floor on the reference box and does not
+  travel. Growth is charged from the *warm* reading rather than the baseline
+  because the whole warm-up step lands at once on the first draw — pipelines
+  compiled, GPU resources built — and charging it against the baseline would
+  print a flat run as "+76 MB", which is exactly what the per-frame retention
+  [Plan 0099](plans/done/0099-the-horizon-reaches-its-own-length.md) found looks
+  like. The peak keeps both honest: a run that grew and was reclaimed reads flat
+  end to end, and only an intermediate sample tells it apart.
 
 ### The three calibration traps
 
