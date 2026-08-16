@@ -7,6 +7,11 @@ mod config;
 mod diaglog;
 mod director;
 mod downbeatlog;
+// Windows-only: the standalone's now-playing source (Plan 0097 / ADR-0110).
+// macOS has no supported equivalent, so the banner exists there and is simply
+// never fed — the same asymmetry loopback capture already has.
+#[cfg(windows)]
+mod nowplaying_win;
 mod overlay;
 mod settings;
 mod soak;
@@ -93,9 +98,11 @@ struct AppState {
     title_tick: u32,
     /// Whether the diagnostics debug overlay is currently painted (toggled by F3).
     overlay_on: bool,
-    /// TEMPORARY (Plan 0097 Phase 1): which of the two stub tracks F8 announces
-    /// next. Removed with the hotkey in Phase 2, once SMTC supplies real ones.
-    stub_track: bool,
+    /// The now-playing metadata source, watching SMTC on its own thread
+    /// (Plan 0097 Phase 2). Windows-only; absent everywhere else, where the
+    /// banner simply never fires.
+    #[cfg(windows)]
+    now_playing: nowplaying_win::NowPlayingSource,
     /// The preset browse overlay's modal state (Tab toggles; Plan 0008).
     browse: OverlayState,
     /// The settings modal's state (`S` toggles; Plan 0050 Phase 4). A second,
@@ -260,7 +267,8 @@ impl AppState {
             occluded: false,
             title_tick: 0,
             overlay_on: false,
-            stub_track: false,
+            #[cfg(windows)]
+            now_playing: nowplaying_win::NowPlayingSource::start(),
             browse: OverlayState::new(),
             settings: SettingsState::new(),
             tier_pinned: tier.is_some(),
@@ -489,6 +497,13 @@ impl AppState {
         if self.director.advance(dt, &frame).is_some() {
             self.on_preset_switched();
         }
+
+        // Hand the core any track change the metadata source picked up since the
+        // last frame (Plan 0097). A slot check, not a query: the WinRT event
+        // threads do the work, so a frame with no change costs one uncontended
+        // lock. The core ignores a string it already has, so this cannot
+        // re-trigger the banner on its own.
+        self.poll_now_playing();
 
         // Queue the on-canvas text for this frame (active name + browse list).
         self.queue_frame_text();
@@ -751,6 +766,23 @@ impl AppState {
         )
     }
 
+    /// Push any track change the metadata source picked up into the core's
+    /// banner (Plan 0097). The source runs on its own thread and leaves the
+    /// newest string in a slot; this takes it. The **only** place a WinRT-sourced
+    /// string reaches the renderer, so nothing calls into the core from a
+    /// callback thread.
+    #[cfg(windows)]
+    fn poll_now_playing(&mut self) {
+        if let Some(track) = self.now_playing.take_change() {
+            self.renderer.set_now_playing(&track);
+        }
+    }
+
+    /// No metadata source outside Windows — `MediaRemote` is private and
+    /// restricted (ADR-0110), so the Mac path's answer is the foobar plugin.
+    #[cfg(not(windows))]
+    fn poll_now_playing(&mut self) {}
+
     /// Build this frame's on-canvas text and hand it to the renderer: the active
     /// preset name in the corner when [`preset_name_visible`] allows it, plus —
     /// while a modal is open — that modal's own rows. Strings are owned locally
@@ -987,19 +1019,6 @@ impl AppState {
             }
             KeyCode::KeyF => self.toggle_fullscreen(),
             KeyCode::KeyD => self.cycle_display(),
-            // TEMPORARY (Plan 0097 Phase 1): fake a track change so the banner's
-            // look can be judged before Phase 2's SMTC source exists. Removed in
-            // that phase's commit — nothing shipped should be able to invent a
-            // track. Cycles two strings so a second press proves a *new* string
-            // re-triggers while the same one does not.
-            KeyCode::F8 => {
-                self.stub_track = !self.stub_track;
-                self.renderer.set_now_playing(if self.stub_track {
-                    "Boards of Canada - Roygbiv"
-                } else {
-                    "Sigur Ros - Svefn-g-englar"
-                });
-            }
             // Quality, live (ADR-0054). `[` down a tier, `]` up — the bracket
             // pair reads as a range with the floor on the left.
             KeyCode::BracketLeft => self.swap_tier(Tier::Floor),

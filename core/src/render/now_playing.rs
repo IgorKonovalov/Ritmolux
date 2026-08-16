@@ -17,6 +17,16 @@
 //! is what lets the plugin build turn the feature on without touching any of
 //! this.
 
+// Hot-path panic-denial pragma (Plan 0002 Phase 2; `render/` scan set). The
+// layout runs every frame a banner is up; a panic here is a visible crash.
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::unreachable
+)]
+
 use std::borrow::Cow;
 
 /// Seconds the banner takes to reach full opacity.
@@ -228,6 +238,8 @@ fn rgba([r, g, b]: [f32; 3], alpha: f32) -> [f32; 4] {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
     use super::*;
 
     /// Step the envelope at `dt` until it returns to zero, and report how many
