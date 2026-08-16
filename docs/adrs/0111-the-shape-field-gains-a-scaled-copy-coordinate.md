@@ -69,6 +69,15 @@ every shipped preset and every golden baseline on the arithmetic it has today.
 - **It is cheap where it matters.** A closed form per arm costs a handful of ALU ops, the same
   order as the SDF it sits beside, which is what makes it a coordinate mode rather than a feature
   with a cost gate on it.
+- **The figure's share of the palette becomes portable across shapes, and roughly doubles on the
+  worst one.** Under the distance the exterior is divided by the shape's inradius, so a sharp star
+  (inradius `0.093`) reaches `d = 26.8` at the frame corner and a preset keeping one sweep on frame
+  is capped near `color_span = 0.037` — which leaves the figure's own `0..1` interior just **9.6 of
+  the LUT's 256 texels**. Under the radius the interior is `0..1` for *every* shape by construction,
+  and the same framing allows `color_span = 0.070`, or **17.9 texels**. That is a 1.9x improvement
+  and it is worth stating honestly: it **mitigates** [design-backlog 0099](../design-backlog.md)
+  rather than removing it, since the exterior range still varies with how elongated the figure is.
+  The actual cure for that trap is `palette_steps`, which quantizes before the LUT read.
 
 ### Negative
 

@@ -214,9 +214,16 @@ Three riders:
 > - **`gamma`'s useful range is bounded by a measured wall, not by its clamp.** Past roughly `1.5`
 >   on a wrapping palette and `3` on a single sweep, the exterior compresses past the pixel grid and
 >   the corners break into moire. The `0.05..20` clamp is far outside anything usable.
-> - **The star silhouettes are NOT good enough for a curated preset** — the user's verdict, so no
->   star content shipped. **What specifically fell short was not captured**, which is the miss: the
->   plan asked for a *named* miss and got a rejection. That question is still live below.
+> - **The star silhouettes were rejected, and then the rejection was diagnosed — it was the PROBE,
+>   not the params.** The user's verdict was that they looked *"dirty and upscaled"*. That is
+>   neither silhouette nor shading: the probes drew their figures through **8 to 32 of the palette's
+>   256 LUT texels**, with silhouette edge transitions of **1.31 texels**, because a sharp star's
+>   tiny inradius forces `color_span` down near `0.037`
+>   ([backlog 0099](design-backlog.md)). Re-rendered with `palette_steps` bound — which snaps the
+>   coordinate to a band centre so no edge is ever interpolated — **the same five silhouettes come
+>   back crisp**, and all five reference shapes read.
+>   **So the three star params are not convicted; they were never fairly judged.** A re-judge on the
+>   corrected probes is worth one sitting, and it is the cheapest open item in this file.
 > - **Two engine gaps came out of it** and are filed:
 >   [backlog 0096](design-backlog.md) (the scene draws offset contours where the reference wants
 >   scaled copies — the reason a nested figure's inner notch rounds off) and
@@ -227,13 +234,12 @@ Three riders:
 > `palette_steps` reads as a response or a strobe — the probe set for it was built and never run —
 > and which of the three star params is mis-shaped.
 >
-> **The second one now decides a plan, so it is worth more than it looks.** If the stars were
-> rejected on **silhouette**, the answer is the star params or
-> [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)'s new coordinate
-> ([Plan 0098](plans/0098-the-figure-nests-properly.md)). If they were rejected because they read
-> **flat and unlit**, the answer is [backlog 0092](design-backlog.md) — whose own trigger says to
-> take it *"if the Phase 6 look gate says the flat sparkle is the disappointing one in the set"*,
-> and which is currently blocked on exactly this. One short look call settles which.
+> **That question is now answered — it was the probe** (see above), which also settles
+> [backlog 0092](design-backlog.md)'s trigger **negatively**: nothing in this gate says the flat
+> sparkle was the disappointing one, so lighting must not be planned off it. What remains is the
+> cheaper job it turned into: **re-judge the five star silhouettes on the corrected probes** and
+> say whether the three params reach the reference shapes. A named miss there is still the useful
+> outcome, and it is now a question about the shapes rather than about the rendering.
 
 **This is the first sitting on a system that ships with no content at all.** Plan 0091 landed the
 `shape_field` scene, the `star` arm's three shape params, and the two-tone `multiply` route, and it

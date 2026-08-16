@@ -1019,15 +1019,20 @@ One cohort's demonstrated want. The ADR-0080 shape is the named route when the s
 
 ## 0092 — every figure this engine draws is unlit, and two reference images ask for a shaded one
 
-> **ITS TRIGGER FIRED, AMBIGUOUSLY — 2026-08-16.** This entry says to take it *"if the Phase 6 look
-> gate says the flat sparkle is the disappointing one in the set"*. That gate ran at
+> **ITS TRIGGER FIRED AND RESOLVED NEGATIVELY — 2026-08-16. Do not take this entry off it.**
+> The entry says to take the lighting work *"if the Phase 6 look gate says the flat sparkle is the
+> disappointing one in the set"*. That gate ran at
 > [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md)'s close and the user rejected the star
-> silhouettes as not good enough to curate — but **the reason was never captured**, and the plan had
-> asked specifically for a *named* miss. So the condition is met on its face and unusable in
-> substance: a rejection on **silhouette** points at the star params or at ADR-0111's coordinate,
-> and a rejection on **shading** points here. **One short look call settles it** and it is recorded
-> as the open question in [`docs/content-brief.md`](content-brief.md) item 6. Do not plan lighting
-> off this trigger until that answer exists.
+> silhouettes — but the stated reason was that they looked **"dirty and upscaled"**, which is
+> neither silhouette nor shading. It was [0099](design-backlog.md): the probes drew their figures
+> through 8 to 32 of the palette's 256 LUT texels, with edge transitions of 1.3 texels, because a
+> sharp star's tiny inradius had forced `color_span` down to `0.037`. Re-rendered with
+> `palette_steps` bound, the same five silhouettes come back **crisp**.
+>
+> **So the trigger is answered and the answer is no.** Nothing in that gate says the flat sparkle
+> was the disappointing one; the sparkles were never fairly judged. This entry stays filed on its
+> original evidence — two reference images — and wants a *fresh* look verdict on a fair probe
+> before anyone plans lighting off it.
 
 - **Raised:** 2026-08-13, from the second of two user reference batches, alongside
   [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md). Filed separately **at the point of raising**
@@ -1488,3 +1493,76 @@ The doc half is already done: `presets/README.md` now states the working range a
 **Low for the engine, and the doc half is discharged.** One preset was affected and is repaired.
 It is filed because the *failure mode* — a parameter range where changing the value does nothing,
 with no warning — is the kind that costs a session every time someone meets it.
+
+---
+
+## 0099 — a narrow `color_span` silently spends the palette's resolution, and the figure comes back looking upscaled
+
+**Raised by:** `architect`, from a user look call on the Plan 0091 Phase 6 star probes (2026-08-16).
+**Owner if taken:** `dev` for a warning; the authoring half is already documented.
+
+- **Verified 2026-08-16** — the LUT is a fixed 256 texels, so a coordinate range is a resolution
+  budget: `present: LUT_SIZE: usize = 256 in: core/src/render/palette.rs`
+- **Verified 2026-08-16** — and it is sampled with linear filtering, which is what turns too few
+  texels into a soft edge rather than a stepped one:
+  `present: fn sample_lut in: core/src/render/palette.rs`
+
+### The finding
+
+The user's verdict on the star probes was that they looked **"dirty and upscaled"**. That was read
+first as a silhouette complaint and second as a shading one. It was neither: **the figures were
+drawn through 8 to 32 of the palette's 256 texels.**
+
+`shape_field` normalizes its distance by each shape's inradius, and a sharp star's inradius is tiny
+(`0.093` against the heart's `0.637`), so the frame corner reaches `d = 26.8`. Keeping one palette
+sweep on frame therefore caps `color_span` near `0.037` — and the figure's whole interior, `d` in
+`0..1`, then occupies **9.6 of 256 texels**, with the silhouette edge transition spanning **1.31**.
+A 1.3-texel transition stretched across half a screen, sampled with linear filtering, is exactly an
+upscaled gradient, and that is what was on the screen.
+
+| probe | figure occupies | edge transition |
+|---|---|---|
+| `p3a sharp7` | 8.6 texels | 1.31 |
+| `p3d sparkle4 deep` | 8.4 | 1.25 |
+| `p3c sparkle4` | 14.8 | 2.23 |
+| `p3b bang9` | 25.0 | 3.76 |
+| `p3e hand6` | 32.3 | 4.86 |
+
+**Re-rendered with `palette_steps` bound, the same five silhouettes come back crisp** — because the
+band quantizer snaps the coordinate to a band *centre* before the LUT read, so every pixel samples
+one exact texel and no edge is ever interpolated. The silhouettes were exact all along; the probe
+was spending its resolution on nothing.
+
+### Why it is worth an entry
+
+**Nothing warns, and the failure presents as a different defect.** A preset author sees a soft,
+crawling figure and reasonably concludes the *shape* is wrong — which is precisely what happened
+here, and it nearly routed a lighting plan
+([0092](design-backlog.md)) off a misread. The trap is silent, the value is in range, and the
+symptom names the wrong subsystem.
+
+It is also **the third member of a family this project keeps meeting**: a parameter range where the
+engine quietly stops honouring the value — `thickness` below `0.167`
+([0098](design-backlog.md)), `color_span` not being portable between shapes (documented in
+`presets/README.md`), and now a `color_span` narrow enough to starve the gradient.
+
+### What a fix would be
+
+Cheapest and probably right: a **load-time warning** when a `shape_field` preset's `color_span`
+puts the figure's own `0..1` interior below some small number of LUT texels — the ADR-0020 warning
+surface again. It cannot be exact, because how much of the coordinate the *figure* occupies depends
+on the shape's inradius and the framing, but the scene knows both.
+
+Two things that are **not** the fix. Enlarging `LUT_SIZE` moves the threshold without removing the
+trap and costs every scene memory. And nearest-filtering the LUT would harden the edge while
+turning every smooth gradient in the library into bands.
+
+**The authoring workaround is real and already documented:** bind `palette_steps`, which removes
+the interpolation entirely.
+
+### Priority
+
+**Low-Medium.** One probe set was affected and no shipped preset is — `shape_pulse` binds
+`palette_steps` and is unaffected by construction. It earns its place because of what it cost: a
+user look verdict was misattributed twice, and the entry that nearly absorbed the blame
+([0092](design-backlog.md)) is a composite-scale piece of work.
