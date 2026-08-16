@@ -1129,22 +1129,87 @@ now the preset's own, and the difference is not subtle:
 | ![Escher's Tunnel, with the draw layer](images/milkconv/eschers-tunnel-drawn.png) | ![Songflower, with the draw layer](images/milkconv/songflower-drawn.png) |
 | *Aderrasi — Contortion (Escher's Tunnel Mix)*, the same preset as the last frame of the block above. The tunnel and its dark core are the mesh, as before; the magenta lattice at the edges is the preset's own custom shapes and waveform, which the stand-in ring had nothing to say about. | *Aderrasi — Songflower (Hybrid Plant)*: four custom shapes and a waveform over a field with `fDecay = 1`, so nothing ever fades. This is the case that reads as a flat white frame under a purely additive draw seam — see the blend note in [`presets/README.md`](../presets/README.md#milk--the-table-you-do-not-write). |
 
-### How much of the corpus converts
+### `--report`: how much of the corpus converts, and what happens to the rest
 
-Measured 2026-08-16, over the two public collections named in the plan:
+Point the converter at a directory instead of a file and it walks it, converts
+everything, and prints what became of each — Plan 0100 Phase 5:
 
-```text
-presets-milkdrop-original      552 / 552     100 %
-presets-cream-of-the-crop    9 784 / 9 795    99.9 %
+```bash
+cargo run -p milkconv --release -- --report path/to/corpus
+cargo run -p milkconv --release -- --report path/to/corpus --render   # slower, adds the third count
+cargo run -p milkconv --release -- --report path/to/corpus --json     # for diffing two runs
 ```
 
-"Converts" means parses and compiles, which is a **weaker** claim than "renders as
-authored" — every one of those files carries the warnings above, and 82 % of the
-corpus has HLSL shaders that Phase 3 does not translate at all. Plan 0100 Phase 5
-is where that gap is measured rather than estimated, and it asserts no threshold:
-per [ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
-a coverage percentage is a property of one corpus and one converter at one moment,
-so it is recorded with both named and is never a gate.
+Three counts, and the third is the interesting one:
+
+| count | is |
+|---|---|
+| **parse** | the `.milk` section layout read without error |
+| **compile** | every EEL2 program in it turned into bytecode |
+| **render non-blank** | the emitted preset loaded into the engine and put light on screen |
+
+Only the third catches a preset that converts *perfectly* and draws *nothing* —
+the failure class the plan's Risks call the worst for reputation, because it looks
+like our bug rather than like a refusal. It needs a device, which is why it is
+behind `--render`; without an adapter the run reports the other two rather than
+failing, which is [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)'s policy for
+captures. Budget about 50 ms a preset.
+
+> **It asserts no threshold and it exits zero however bad the numbers are.** Per
+> [ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> a coverage percentage is a property of one corpus and one converter at one
+> moment, so the report names both and is never a gate. A non-zero exit would
+> make it one the first time somebody put it in a script. **The ranked reasons
+> are the output that matters** — they are the work list.
+
+The report also prints the two predictions the census made *before* any of this
+was built, beside what was measured, so a ranking that disagrees sharply with
+either is read as evidence about the **converter** rather than about the corpus.
+That is the whole reason the census came first, and it costs nothing to state the
+prediction in advance.
+
+#### What it said, 2026-08-16
+
+Over all three collections at `WORK/milkdrop-corpus`, on `windows x86_64`:
+
+```text
+  stage                          count  share
+  ---------------------------- -------  -------
+  files seen                     10347  100.0 %
+  parse                          10347  100.0 %
+  compile                        10325   99.8 %
+
+WHY A FILE DID NOT CONVERT, ranked:
+      15    0.1 %  per_frame
+       5    0.0 %  per_vertex
+       2    0.0 %  per_frame_init
+
+WHAT A CONVERSION COULD NOT CARRY, ranked by presets affected:
+    8482   82.0 %  unconverted-shader
+    4454   43.0 %  unconsumed-other
+    4162   40.2 %  shape-textured
+    2251   21.8 %  disk-texture
+    1353   13.1 %  wave-spectrum-source
+     432    4.2 %  vertex-input-in-frame
+     347    3.4 %  unconsumed-echo
+      23    0.2 %  weak-input
+       6    0.1 %  writes-input
+
+                               predicted   measured
+  reads a disk texture           19.0 %     21.8 %
+  MilkDrop 1.x, no shaders       18.0 %     17.9 %
+```
+
+**Both predictions held**, which is the result that says the ranking is about the
+corpus. The shaderless share landed at 17.9 % against a predicted 18 % — as close
+as a prior gets. The disk-texture class came in 2.8 points *above* its prediction,
+and that direction is expected rather than surprising: the census counted a `grep`
+for a texture name, and the converter also flags `sampler_pc`, so it sees a
+slightly wider class than the census could.
+
+"Converts" is still a **weaker** claim than "renders as authored" — 82 % of the
+corpus carries HLSL that nothing translates yet, which is the number Phase 6 is
+sized by.
 
 The eleven files that do not compile are genuinely malformed — a stray backslash,
 a `sin` with no arguments, a truncated `per_frame_init`. Two decisions in the
