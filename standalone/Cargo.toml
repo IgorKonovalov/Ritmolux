@@ -47,6 +47,10 @@ image = { version = "=0.25.10", default-features = false, features = ["png"] }
 # winit already pulls windows-sys, so the ecosystem dependency is a sunk cost.
 [target.'cfg(windows)'.dependencies]
 windows = { version = "=0.62.2", features = [
+    # Now-playing metadata via SMTC (Plan 0097 / ADR-0110). A feature on the
+    # crate the shell already links, not a new dependency - which is the whole
+    # reason NFR 4's dependency gate is not tripped by the standalone half.
+    "Media_Control",
     # Endpoint enumeration + friendly names for line-in / device selection
     # (Plan 0009 Phase 2): PKEY_Device_FriendlyName lives in FunctionDiscovery,
     # IPropertyStore in Shell PropertiesSystem.
