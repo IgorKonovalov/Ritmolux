@@ -305,7 +305,8 @@ impl Scene for ParametricCurveScene {
             GeneratorConfig::LSystem { .. }
             | GeneratorConfig::Star { .. }
             | GeneratorConfig::Particles { .. }
-            | GeneratorConfig::Spectrum { .. } => {}
+            | GeneratorConfig::Spectrum { .. }
+            | GeneratorConfig::WarpMesh { .. } => {}
         }
         // No load-time truncation: the parametric sampler builds nothing here.
         // Its only cap is a per-frame `samples` clamp in `update` (see there).

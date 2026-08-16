@@ -699,7 +699,8 @@ impl Scene for SpectrumScene {
             GeneratorConfig::Curve { .. }
             | GeneratorConfig::LSystem { .. }
             | GeneratorConfig::Star { .. }
-            | GeneratorConfig::Particles { .. } => {}
+            | GeneratorConfig::Particles { .. }
+            | GeneratorConfig::WarpMesh { .. } => {}
         }
         // Nothing is built here — the element count is validated at load and is
         // orders of magnitude under the segment cap — so nothing truncates.

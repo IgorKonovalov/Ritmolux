@@ -438,6 +438,14 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // **Re-derive it from this test's printed distribution when the first
         // one ships**, at half the family minimum like every floor above.
         SystemKind::ShapeField => 0.50,
+        // **Not derived from a distribution either**: Plan 0100 ships the
+        // `warp_mesh` engine and no preset content, exactly as Plan 0091 shipped
+        // `shape_field`. Inherited from `FragmentField` on the same structural
+        // argument — the warp mesh presents a fullscreen field with `occlude`,
+        // so one that is not broken cannot score low. **Re-derive it from this
+        // test's printed distribution when the first one ships**, at half the
+        // family minimum like every floor above.
+        SystemKind::WarpMesh => 0.50,
     }
 }
 
@@ -453,6 +461,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::Spectrum => "spectrum",
         SystemKind::Emitter => "emitter",
         SystemKind::ShapeField => "shape_field",
+        SystemKind::WarpMesh => "warp_mesh",
     }
 }
 

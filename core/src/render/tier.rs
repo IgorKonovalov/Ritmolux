@@ -243,6 +243,71 @@ pub struct TierConfig {
     /// Ceiling on the segment count a line scene may draw in one frame, after
     /// generation and mirror replication.
     ///
+    /// Ceiling on the warp mesh's grid, in **cells**, width then height
+    /// (Plan 0100 Phase 1).
+    ///
+    /// A capacity in the strictest sense: the grid is a *resolution* for the
+    /// per-vertex program, not a shape (ADR-0037), so raising it refines the
+    /// warp's spatial detail and changes nothing about what the scene draws. The
+    /// vertex count is `(x + 1) * (y + 1)`, and every one of those vertices costs
+    /// one evaluation of each `[per_vertex]` binding **on the render thread**,
+    /// which is what this bounds.
+    ///
+    /// The upper bound either tier may name is the `.milk` format's own —
+    /// `meshx <= 128`, `meshy <= 96` — so a converted preset's requested grid is
+    /// representable at the top of the range and clamped below it.
+    /// [`warp_mesh::clamp_grid`](super::scenes::warp_mesh::clamp_grid) is the one
+    /// place the clamp happens, shared by the loader and the scene.
+    ///
+    /// # Where these numbers come from
+    ///
+    /// **Measured, not chosen** — Plan 0100 Phase 1's done-when. The rule it set
+    /// was: raise the grid until one frame of per-vertex evaluation costs more
+    /// than **1 ms** — 6 % of the 16.67 ms NFR §1 commits to at 1080p — and cap
+    /// the floor one step below.
+    ///
+    /// `mesh_cost_by_grid` in `scenes/warp_mesh/tests.rs` is the measurement and
+    /// prints the ladder on every run. Taken **2026-08-16 on the development box
+    /// (Windows 10, desktop CPU, `--release`)**, evaluating a four-binding
+    /// `[per_vertex]` program of the shape a real preset writes — two runs,
+    /// agreeing to about 1 %:
+    ///
+    /// ```text
+    ///  grid      vertices    per frame     share of 16.67 ms
+    ///  16x12        221       0.036 ms      0.2 %
+    ///  32x24        825       0.129 ms      0.8 %
+    ///  48x36      1 813       0.280 ms      1.7 %
+    ///  64x48      3 185       0.488 ms      2.9 %   <- Floor
+    ///  72x54      4 015       0.616 ms      3.7 %
+    ///  80x60      4 941       0.755 ms      4.5 %
+    ///  88x66      5 963       0.909 ms      5.5 %   <- Rich
+    ///  96x72      7 081       1.081 ms      6.5 %   <- the bar is crossed here
+    /// 112x84      9 605       1.483 ms      8.9 %
+    /// 128x96     12 513       1.918 ms     11.5 %
+    /// ```
+    ///
+    /// **The bar is crossed between `88x66` and `96x72`**, so `88x66` is the
+    /// largest grid the rule admits and it is what `Rich` takes. The format's own
+    /// maximum is therefore **refused**: at 1.92 ms it is 11.5 % of the frame on
+    /// a desktop CPU, which is not a number any tier should spend on one
+    /// parameter surface. That is the plan's "lower if it does not [measure
+    /// clean]", exercised.
+    ///
+    /// **`Floor` sits a step further down than the rule alone would put it, and
+    /// deliberately.** The rig above is a desktop CPU; NFR §1's floor tier
+    /// targets a ~2015 iGPU-class machine whose single-thread performance this
+    /// box does not model, and this is CPU work on the render thread, so a
+    /// slower machine pays proportionally more of a budget it is already
+    /// struggling to hold. `64x48` is 2.9 % here and leaves room for that
+    /// machine to be several times slower before the surface is a problem. Plan
+    /// 0100's own Risks note says as much: if the cap lands low, the honest
+    /// answer is a low cap and a recorded number.
+    ///
+    /// **When the floor tier is next exercised on real target hardware this is
+    /// the constant to re-measure**, and the ladder prints exactly what that
+    /// needs.
+    pub mesh_grid: (u32, u32),
+
     /// The one capacity value here that a preset can *see*: past it geometry is
     /// truncated, and ADR-0007 requires that be surfaced rather than silently cut.
     /// So a preset whose mirror pushes over the floor cap reports an overflow at
@@ -262,6 +327,7 @@ impl TierConfig {
         attractor_trail_cap: (2560, 1440),
         swarm_particles: 10_000,
         emitter_objects: 2_000,
+        mesh_grid: (64, 48),
         max_segments: 20_000,
     };
 
@@ -281,6 +347,7 @@ impl TierConfig {
         attractor_trail_cap: (3840, 2160),
         swarm_particles: 30_000,
         emitter_objects: 6_000,
+        mesh_grid: (88, 66),
         max_segments: 60_000,
     };
 
