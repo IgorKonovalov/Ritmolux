@@ -1143,6 +1143,116 @@ fn a_render_rejects_a_second_clip_a_decimal_rate_and_a_pointless_out() {
     );
 }
 
+/// **Phase 3's done-when.** For the same preset, clip and instant, the frame the
+/// render mode hands its stream writer is **byte-identical** to the PNG
+/// `shot --frame-at` writes.
+///
+/// This is the guard on **where the export tap sits**. The composite is
+/// linear-light `Rgba16Float` until the tonemap (ADR-0046) and the display write
+/// dithers in the *encoded* domain (ADR-0096); a tap upstream of either would
+/// produce a file washed out against the app in a way that reads as an engine
+/// bug and that no check confined to the render path could see. Byte-identity is
+/// exact on purpose — a tolerance here would pass with the tap in the wrong
+/// place.
+///
+/// It is asserted on the **RGB frame**, never on the wire bytes: Y4M cannot
+/// carry RGB, and an 8-bit RGB->YUV conversion is not bijective, so a wire-level
+/// version of this assertion could only ever be loosened until it passed. The
+/// conversion is a separate, measured property (`the_colour_conversion_round_
+/// trips_to_within_a_level`).
+///
+/// **The clip's sample rate is load-bearing.** [`HOP_SIZE`] samples at 30,720 Hz
+/// is exactly 60 analysis hops a second, so at `--fps 60` output frame N and
+/// analysis hop N are the same instant — and `Fps { 60, 1 }.dt()` is bit-for-bit
+/// the fixed step every other capture path takes. At 48 kHz the two clocks are
+/// 93.75 Hz and 60 Hz and no frame index lines up with a hop, which is the whole
+/// reason they are separate clocks; the alignment is arranged here rather than
+/// assumed anywhere in the code.
+#[test]
+fn a_rendered_frame_is_byte_identical_to_the_png_the_app_writes() {
+    use lmv_core::dsp::HOP_SIZE;
+    use lmv_core::preset::Preset;
+    use lmv_core::render::Tier;
+    use standalone::shot::render::{DEFAULT_FPS, render_frames};
+
+    /// One analysis hop per output frame at 60 fps.
+    const RATE: u32 = HOP_SIZE as u32 * 60;
+    /// Well past the analyzer's 16-hop warm-up, so the frame carries real
+    /// analysis rather than the silence both paths start in.
+    const AT: u32 = 45;
+    const W: u32 = 32;
+    const H: u32 = 24;
+
+    let clip = render_clip("tap.wav", RATE, 1.5);
+    let png = scratch("render").join("tap.png");
+    let _ = std::fs::remove_file(&png);
+
+    // The app's own frame, through the CLI a preset author actually runs.
+    let out = run(&[
+        "--preset-file",
+        SHIPPED_PRESET_FILE,
+        "--audio",
+        &clip.to_string_lossy(),
+        "--frame-at",
+        &AT.to_string(),
+        "--out",
+        &png.to_string_lossy(),
+        "--size",
+        &format!("{W}x{H}"),
+    ]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "--frame-at failed\nstderr: {}",
+        stderr(&out)
+    );
+    let expected = load_capture(&png);
+
+    // The render mode's frame, taken where the stream writer takes it.
+    let src = std::fs::read(&clip).unwrap_or_else(|e| panic!("read {}: {e}", clip.display()));
+    let (pcm, format) = standalone::shot::wav::parse_wav_16bit(&src, "tap.wav")
+        .unwrap_or_else(|e| panic!("the render fixture must parse: {e}"));
+    let toml = std::fs::read_to_string(repo_root().join(SHIPPED_PRESET_FILE))
+        .unwrap_or_else(|e| panic!("read {SHIPPED_PRESET_FILE}: {e}"));
+    let preset = Preset::from_toml_str(&toml)
+        .unwrap_or_else(|e| panic!("{SHIPPED_PRESET_FILE} must parse: {e}"));
+    let name = preset.name.clone();
+    let mut r = standalone::shot::renderer(W, H, vec![preset], Tier::Floor)
+        .unwrap_or_else(|e| panic!("headless renderer: {e}"));
+
+    let mut got: Option<CaptureImage> = None;
+    render_frames(
+        &mut r,
+        &name,
+        &pcm,
+        format,
+        DEFAULT_FPS,
+        &mut |index, img| {
+            if index == AT {
+                got = Some(img.clone());
+            }
+            Ok(())
+        },
+    )
+    .unwrap_or_else(|e| panic!("render: {e}"));
+    let got = got.expect("frame 45 of a 90-frame render");
+
+    assert_eq!(
+        (got.width, got.height),
+        (expected.width, expected.height),
+        "the render and the PNG are not even the same size"
+    );
+    assert!(
+        got.rgba == expected.rgba,
+        "the rendered frame differs from the PNG the app writes at the same \
+         instant — the export tap is not where the display write is (mean \
+         difference {:.4}, ADR-0046 tonemap / ADR-0096 dither)",
+        frame_diff(&got, &expected)
+    );
+}
+
 /// `ffmpeg` on `PATH`, or `None` with a printed skip.
 ///
 /// The encoder is a **documented prerequisite**, not a bundled component
