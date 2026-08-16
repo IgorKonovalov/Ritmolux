@@ -1,0 +1,224 @@
+# Facet - a cold four-point sparkle, cut into three flat planes, in a tight halo.
+# The first `shape_field` world on the `star` arm (ADR-0105 / Plan 0091), authored
+# after that plan's Phase 6 judged all five star silhouettes good.
+#
+# THE MECHANISM: this scene hands the palette a DISTANCE, so a band of the
+# coordinate is a band of constant distance. Here the first three bands are the
+# figure - core, edge, rim - and everything past them is one long graded ground.
+#
+# -- FOUR NUMBERS THAT ARE NOT TASTE ---------------------------------------------
+#
+# 1. THE EDGE IS THE OUTLINE. `color_center + color_span` = 0.01125 + 0.04234 =
+#    0.05359 = 3/56, so band 3's boundary lands exactly on d = 1, the figure's
+#    true outline. Put it anywhere else and you draw an OFFSET of the shape: at
+#    1.35x every tip comes back blunt, because an outward offset rounds a convex
+#    corner. That is how the first probe sheet for this arm failed.
+#
+# 2. `palette_steps` IS WHY THIS LOOKS CLEAN. The palette LUT is 256 texels, and
+#    a sharp star's inradius (0.16 here) forces `color_span` down near 0.042 - so
+#    the figure's whole interior would otherwise be drawn through about 11 texels
+#    with a 1-texel edge, which renders as a soft, dirty, upscaled figure
+#    (design-backlog 0099). Banding snaps the coordinate to a band CENTRE before
+#    the LUT read, so nothing anywhere is interpolated.
+#
+# 3. `gamma` IS PINNED AT EXACTLY 1.0, AND IT IS NOT DECORATION. A star with
+#    `star_curve` non-zero returns a NEGATIVE distance at its own centre
+#    (design-backlog 0097). The shader takes `select(pow(d, gamma), d, gamma == 1.0)`
+#    - and `pow` of a negative base is NaN, which lands as a hard artifact in the
+#    middle of the figure. Only the exact identity branch avoids it.
+#    **The `color_center` offset that entry recommends does NOT save you here**,
+#    because it is added AFTER the exponent. Any `gamma` binding on a curved or
+#    jittered star is unsafe until Plan 0098 Phase 1 lands.
+#
+# 4. THE GROUND IS GRADED, AND THE GATE IS THE REASON. A `shape_field` preset
+#    covers every pixel, so a flat dark ground puts ~96 % of the frame in one
+#    luminance band and `sanity` fails it as a shape with no interior - measured,
+#    on the first draft of this file. The 53 ground bands ramp from a near halo
+#    down to black across the 31 bands the frame actually reaches at this scale.
+#    The ramp is fitted to that range on purpose: past band 34 nothing is ever
+#    drawn, so spending gradient there would waste it.
+#
+# 5. THE FIGURE IS LARGE AND ONE CONTOUR RING TRACES IT - BOTH ARE THE `animation`
+#    GATE RATHER THAN TASTE, AND THE RING IS THE PART THAT ACTUALLY WORKED.
+#    What moves pixels here is the STAR's own hard edge, not the ground: the
+#    ground's neighbouring tones are close, so sliding them changes little. At a
+#    small scale this preset measured `anim` 0.002-0.006 against a 0.01 floor
+#    while visibly drifting, and terracing the ground into 8 high-contrast tiers
+#    made it WORSE (fewer moving edges beat more contrast), and doubling the
+#    figure only reached 0.006. What cleared the floor was a single HIGH-CONTRAST
+#    contour ring in the near halo: 0.006 -> 0.021, because `anim` on this scene
+#    is driven by contrast across a moving boundary, not by how far anything
+#    travels. ADR-0091's sparse-figure rescue does not help - `occlude` lights
+#    every pixel, so the lit footprint IS the whole frame and the footprint
+#    statistic equals the whole-frame one.
+#
+#    THE COST IS REAL AND IS RECORDED: this world is less sparse than the
+#    direction it was chosen from. Four rings put it at `anim` 0.029 and turned
+#    it into a ring field; one ring is the least that clears the floor.
+#
+# WHAT DRIVES WHAT
+#   scale       a slow breath plus the low end - the sparkle opens and closes
+#   pan_x/pan_y a slow drift across the frame
+#   saturation  the top end, gently; the only colour lever here
+
+system = "shape_field"
+name   = "Facet"
+
+[palette]
+stops = [
+  { at = 0.00000, color = "#f2fbff" },
+  { at = 0.01785, color = "#f2fbff" },
+  { at = 0.01786, color = "#a8e4ff" },
+  { at = 0.03570, color = "#a8e4ff" },
+  { at = 0.03571, color = "#3d74e0" },
+  { at = 0.05356, color = "#3d74e0" },
+  { at = 0.05357, color = "#141b3a" },
+  { at = 0.07142, color = "#141b3a" },
+  { at = 0.07143, color = "#0d1227" },
+  { at = 0.08928, color = "#0d1227" },
+  { at = 0.08929, color = "#0c1023" },
+  { at = 0.10713, color = "#0c1023" },
+  { at = 0.10714, color = "#8aa8ee" },
+  { at = 0.12499, color = "#8aa8ee" },
+  { at = 0.12500, color = "#0a0d1e" },
+  { at = 0.14285, color = "#0a0d1e" },
+  { at = 0.14286, color = "#090d1c" },
+  { at = 0.16070, color = "#090d1c" },
+  { at = 0.16071, color = "#080c1a" },
+  { at = 0.17856, color = "#080c1a" },
+  { at = 0.17857, color = "#080b19" },
+  { at = 0.19642, color = "#080b19" },
+  { at = 0.19643, color = "#070a17" },
+  { at = 0.21428, color = "#070a17" },
+  { at = 0.21429, color = "#070a16" },
+  { at = 0.23213, color = "#070a16" },
+  { at = 0.23214, color = "#060915" },
+  { at = 0.24999, color = "#060915" },
+  { at = 0.25000, color = "#060914" },
+  { at = 0.26785, color = "#060914" },
+  { at = 0.26786, color = "#060813" },
+  { at = 0.28570, color = "#060813" },
+  { at = 0.28571, color = "#050812" },
+  { at = 0.30356, color = "#050812" },
+  { at = 0.30357, color = "#050711" },
+  { at = 0.32142, color = "#050711" },
+  { at = 0.32143, color = "#050710" },
+  { at = 0.33928, color = "#050710" },
+  { at = 0.33929, color = "#04060f" },
+  { at = 0.35713, color = "#04060f" },
+  { at = 0.35714, color = "#04060f" },
+  { at = 0.37499, color = "#04060f" },
+  { at = 0.37500, color = "#04060e" },
+  { at = 0.39285, color = "#04060e" },
+  { at = 0.39286, color = "#04050d" },
+  { at = 0.41070, color = "#04050d" },
+  { at = 0.41071, color = "#03050c" },
+  { at = 0.42856, color = "#03050c" },
+  { at = 0.42857, color = "#03050c" },
+  { at = 0.44642, color = "#03050c" },
+  { at = 0.44643, color = "#03040b" },
+  { at = 0.46428, color = "#03040b" },
+  { at = 0.46429, color = "#03040a" },
+  { at = 0.48213, color = "#03040a" },
+  { at = 0.48214, color = "#02040a" },
+  { at = 0.49999, color = "#02040a" },
+  { at = 0.50000, color = "#020409" },
+  { at = 0.51785, color = "#020409" },
+  { at = 0.51786, color = "#020309" },
+  { at = 0.53570, color = "#020309" },
+  { at = 0.53571, color = "#020308" },
+  { at = 0.55356, color = "#020308" },
+  { at = 0.55357, color = "#020308" },
+  { at = 0.57142, color = "#020308" },
+  { at = 0.57143, color = "#010207" },
+  { at = 0.58928, color = "#010207" },
+  { at = 0.58929, color = "#010207" },
+  { at = 0.60713, color = "#010207" },
+  { at = 0.60714, color = "#010206" },
+  { at = 0.62499, color = "#010206" },
+  { at = 0.62500, color = "#010206" },
+  { at = 0.64285, color = "#010206" },
+  { at = 0.64286, color = "#010206" },
+  { at = 0.66070, color = "#010206" },
+  { at = 0.66071, color = "#010206" },
+  { at = 0.67856, color = "#010206" },
+  { at = 0.67857, color = "#010206" },
+  { at = 0.69642, color = "#010206" },
+  { at = 0.69643, color = "#010206" },
+  { at = 0.71428, color = "#010206" },
+  { at = 0.71429, color = "#010206" },
+  { at = 0.73213, color = "#010206" },
+  { at = 0.73214, color = "#010206" },
+  { at = 0.74999, color = "#010206" },
+  { at = 0.75000, color = "#010206" },
+  { at = 0.76785, color = "#010206" },
+  { at = 0.76786, color = "#010206" },
+  { at = 0.78570, color = "#010206" },
+  { at = 0.78571, color = "#010206" },
+  { at = 0.80356, color = "#010206" },
+  { at = 0.80357, color = "#010206" },
+  { at = 0.82142, color = "#010206" },
+  { at = 0.82143, color = "#010206" },
+  { at = 0.83928, color = "#010206" },
+  { at = 0.83929, color = "#010206" },
+  { at = 0.85713, color = "#010206" },
+  { at = 0.85714, color = "#010206" },
+  { at = 0.87499, color = "#010206" },
+  { at = 0.87500, color = "#010206" },
+  { at = 0.89285, color = "#010206" },
+  { at = 0.89286, color = "#010206" },
+  { at = 0.91070, color = "#010206" },
+  { at = 0.91071, color = "#010206" },
+  { at = 0.92856, color = "#010206" },
+  { at = 0.92857, color = "#010206" },
+  { at = 0.94642, color = "#010206" },
+  { at = 0.94643, color = "#010206" },
+  { at = 0.96428, color = "#010206" },
+  { at = 0.96429, color = "#010206" },
+  { at = 0.98213, color = "#010206" },
+  { at = 0.98214, color = "#010206" },
+  { at = 0.99999, color = "#010206" },
+  { at = 1.00000, color = "#010206" },
+]
+
+[params]
+shape        = "3"
+points       = "4"
+star_valley  = "0.20"
+star_curve   = "0.55"
+
+# See note 3. Do not bind this.
+gamma        = "1.0"
+
+# See note 3 - this offset keeps the coordinate positive over the centre, where a
+# curved star's distance goes negative.
+color_center = "0.01125"
+color_span   = "0.04234"
+palette_steps = "56"
+
+# Gain from the cap by the house rule (C / 0.85 for bass). The sine is a ~33 s
+# swell so the figure is alive in silence.
+scale        = "0.95 + 0.06 * sin(time * 0.90) + clamp(bass * 0.2353, 0, 0.20)"
+
+# A SLOW DRIFT, AND IT IS THE ONLY MOTION LEVER THAT IS SAFE HERE. Everything else
+# that would move this picture - `color_span`, `color_center`, `gamma` - shifts the
+# palette COORDINATE, which would drag band 3's boundary off d = 1 and quietly
+# start drawing an offset of the star instead of the star (note 1). `scale` and
+# `pan_*` move the figure in space and leave the mapping alone, so the outline
+# stays the outline. `pan` also moves the graded ground with it, which is what
+# earns this preset its animation score: the figure alone is too small a share of
+# the frame to register.
+pan_x        = "0.07 * sin(time * 0.55)"
+pan_y        = "0.05 * cos(time * 0.47)"
+saturation   = "1.0 + clamp(treb * 0.25, 0, 0.15)"
+
+# Held well below the engine default. A bright core on a dark ground is exactly
+# what the bright pass finds, and at the default it spreads a wash across the
+# whole frame that flattens the ground the note above works to keep graded.
+# Measured: holding bloom back alone did NOT fix the wash - the palette was the
+# cause - but the two together are what make the halo tight instead of foggy.
+bloom_amount = "0.12"
+
+[smoothing]
+scale      = 0.45
+saturation = 0.3
