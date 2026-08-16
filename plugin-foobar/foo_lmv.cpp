@@ -70,6 +70,15 @@ constexpr UINT kIdleTimerMs = 150;
 // (owning panel removed, pop-out closed) and to keep its placeholder painted.
 constexpr UINT_PTR kArbitrationTimer = 2;
 constexpr UINT kArbitrationMs = 400;
+// The owner's self-heal tick. sync_render_timer() can legitimately decide to
+// KILL the render timer (hidden host), and once it has, the render timer is no
+// longer there to re-arm itself - a missed or spurious "shown" notification
+// therefore left the panel frozen on its last presented frame FOREVER, with
+// foobar still playing. This timer is the only one that always runs while a
+// host owns the session, so cadence can always recover. Measured cost: one
+// wakeup every half second that usually returns without touching anything.
+constexpr UINT_PTR kWatchdogTimer = 3;
+constexpr UINT kWatchdogMs = 500;
 // Context-menu command ids (window-local; not foobar menu GUIDs).
 constexpr UINT kMenuNextScene = 1001;
 constexpr UINT kMenuToggleOverlay = 1002;
@@ -369,6 +378,21 @@ void VizSession::pump() {
     }
 }
 
+// Whether `host` is really on screen with a drawable client area.
+//
+// GROUND TRUTH, asked of the window rather than accumulated from messages.
+// `visible` used to be a latch driven only by WM_SIZE / WM_SHOWWINDOW edges, and
+// an edge that never arrived (or arrived while another host owned the session)
+// left it stuck - with a killed render timer and no way back. Deriving the
+// answer means a wrong value can only survive until the next watchdog tick.
+bool host_is_showing(HWND host) {
+    if (host == nullptr || IsWindowVisible(host) == FALSE) return false;
+    if (IsIconic(host) != FALSE) return false;
+    RECT rc = {};
+    if (GetClientRect(host, &rc) == FALSE) return false;
+    return (rc.right - rc.left) > 0 && (rc.bottom - rc.top) > 0;
+}
+
 // ---- Now-playing banner (Plan 0097 Phase 5, ADR-0110) ------------------
 //
 // foobar hands a component the exact metadata, so this side does no guessing:
@@ -424,19 +448,31 @@ void announce_current() {
 
 class play_callback_lmv : public play_callback_static {
 public:
-    // Track changes only. A stop needs no notification: the banner is transient
-    // and removes itself, so there is no stale state for one to clear.
-    unsigned get_flags() override { return flag_on_playback_new_track; }
+    // Track changes drive the banner; start/stop/pause drive the render
+    // cadence, which is otherwise only noticed on the render timer's own next
+    // tick - and not at all once that timer has been killed.
+    unsigned get_flags() override {
+        return flag_on_playback_new_track | flag_on_playback_starting |
+               flag_on_playback_stop | flag_on_playback_pause;
+    }
 
     void on_playback_new_track(metadb_handle_ptr p_track) override {
         announce(p_track);
+        g_session.sync_render_timer();
     }
 
+    // Cadence only - `playing_at_full_rate()` re-reads the transport, so these
+    // just tell the session to look again rather than passing a state along.
+    void on_playback_starting(play_control::t_track_command, bool) override {
+        g_session.sync_render_timer();
+    }
+    void on_playback_stop(play_control::t_stop_reason) override {
+        g_session.sync_render_timer();
+    }
+    void on_playback_pause(bool) override { g_session.sync_render_timer(); }
+
     // The rest of the interface, deliberately empty.
-    void on_playback_starting(play_control::t_track_command, bool) override {}
-    void on_playback_stop(play_control::t_stop_reason) override {}
     void on_playback_seek(double) override {}
-    void on_playback_pause(bool) override {}
     void on_playback_edited(metadb_handle_ptr) override {}
     void on_playback_dynamic_info(const file_info &) override {}
     void on_playback_dynamic_info_track(const file_info &) override {}
@@ -464,6 +500,10 @@ bool VizSession::claim(HWND host) {
     visible = true;
     timer_ms = 0;
     sync_render_timer(); // starts the render timer at the right cadence
+    // The self-heal tick, for as long as this host owns the session. Armed even
+    // though the render timer was just started: the whole point is that it
+    // outlives a KillTimer the render timer cannot come back from.
+    SetTimer(host, kWatchdogTimer, kWatchdogMs, nullptr);
     // A host that claims mid-track fires no play_callback of its own, so ask.
     announce_current();
     return true;
@@ -472,6 +512,7 @@ bool VizSession::claim(HWND host) {
 void VizSession::release(HWND host) {
     if (owner != host) return;
     KillTimer(host, kRenderTimer);
+    KillTimer(host, kWatchdogTimer);
     timer_ms = 0;
     visible = true;
     destroy_handle();
@@ -546,6 +587,18 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
                         lmv_render_dt(g_session.handle, g_session.measure_dt());
                     g_session.maybe_log_metrics(); // ~1 Hz, gated internally
                     // Follow play/pause transitions between full and idle rate.
+                    g_session.sync_render_timer();
+                }
+                return 0;
+            }
+            if (wp == kWatchdogTimer) {
+                // Re-derive visibility and re-sync the cadence. This is what
+                // makes a missed show/hide edge survivable: whatever `visible`
+                // latched to, the window itself decides here, so a killed
+                // render timer is re-armed within one tick.
+                if (g_session.owner == wnd) {
+                    const bool showing = host_is_showing(wnd);
+                    if (g_session.visible != showing) g_session.visible = showing;
                     g_session.sync_render_timer();
                 }
                 return 0;
