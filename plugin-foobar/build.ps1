@@ -58,11 +58,12 @@ New-Item -ItemType Directory -Force $build | Out-Null
 # from root Cargo.toml - anchored to the [workspace.package] section so a
 # member-crate or profile version can never match - and emit the header
 # foo_lmv.cpp includes. The header lands in build/ (gitignored); never committed.
-$cargoToml = Get-Content -Raw (Join-Path $repo "Cargo.toml")
-if ($cargoToml -notmatch '\[workspace\.package\][^\[]*?\bversion\s*=\s*"([^"]+)"') {
-    throw "could not parse [workspace.package] version from Cargo.toml"
-}
-$version = $Matches[1]
+#
+# The read itself lives in packaging/foobar/lmv-version.ps1, so this script and
+# the packaging recipe that verifies its output cannot disagree about what the
+# version is (Plan 0102 Phase 2).
+. (Join-Path $repo "packaging\foobar\lmv-version.ps1")
+$version = Get-LmvWorkspaceVersion -RepoRoot $repo
 Set-Content -Path (Join-Path $build "foo_lmv_version.h") -Encoding ascii `
     -Value "#define FOO_LMV_VERSION `"$version`""
 Write-Host "version: $version -> $build\foo_lmv_version.h"
