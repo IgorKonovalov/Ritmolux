@@ -38,4 +38,9 @@ crate-type = ["rlib", "cdylib", "staticlib"]
 workspace = true
 
 [dependencies]
-lmv-core = { path = "../core" }
+# `text` enables the glyphon seam the now-playing banner draws through
+# (ADR-0110). The plugin is the second consumer of that seam - the standalone
+# was the first - and the cost is real: it pulls the cosmic-text tree into this
+# DLL. Plan 0097 Phase 4 measured it against NFR 4's ~10 MB soft cap rather
+# than assuming it fits; see that phase's commit for the two numbers.
+lmv-core = { path = "../core", features = ["text"] }

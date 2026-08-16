@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-#define LMV_ABI_VERSION 4u
+#define LMV_ABI_VERSION 5u
 
 /* Result codes (0 success, negative failure). */
 #define LMV_OK 0
@@ -133,6 +133,28 @@ int32_t lmv_cycle_scene(LmvHandle *handle);
  */
 int32_t lmv_load_presets(LmvHandle *handle, const uint8_t *path_utf8,
                          size_t path_len);
+
+/*
+ * Announce the currently playing track: the core fades a banner in over the
+ * visuals, holds it a few seconds, and fades it out (ADR-0110). The host says
+ * what is playing and never when to stop.
+ *
+ * `utf8` is `len` bytes of UTF-8 text, NOT NUL-terminated, conventionally
+ * "artist - title" - the core splits on the first " - ". THE CORE COPIES THE
+ * BYTES BEFORE RETURNING and never retains the pointer, so the caller may free
+ * or reuse the buffer immediately.
+ *
+ * Returns LMV_OK, or LMV_ERR_INVALID_ARG on a null handle, a null pointer, a
+ * zero length, or non-UTF-8 bytes; LMV_ERR_NO_WINDOW before a window is
+ * attached. Setting the string that is already set does nothing, so a host may
+ * call this on every metadata notification. There is no clear call and none is
+ * needed - the banner removes itself.
+ *
+ * NEVER call this from the visualisation_stream thread: the copy allocates,
+ * which that thread must never do. The host's playback/UI callback is the right
+ * caller. Added in ABI v5.
+ */
+int32_t lmv_set_now_playing(LmvHandle *handle, const uint8_t *utf8, size_t len);
 
 /*
  * Set the debug flag set on the handle (LMV_DEBUG_*). Idempotent and cheap;

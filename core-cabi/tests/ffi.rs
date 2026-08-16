@@ -11,7 +11,7 @@ use std::path::Path;
 use lmv_core_c::{
     LMV_ABI_VERSION, LMV_DEBUG_OVERLAY, LMV_ERR_INVALID_ARG, LMV_ERR_NO_WINDOW, LMV_OK, LmvMetrics,
     lmv_abi_version, lmv_create, lmv_free, lmv_get_metrics, lmv_load_presets, lmv_render,
-    lmv_render_dt, lmv_set_debug,
+    lmv_render_dt, lmv_set_debug, lmv_set_now_playing,
 };
 
 /// Count the `.toml` files in `dir` (0 if it can't be read).
@@ -73,9 +73,9 @@ fn lmv_metrics_is_56_bytes() {
 }
 
 #[test]
-fn abi_version_is_four() {
-    assert_eq!(lmv_abi_version(), 4, "runtime ABI version is v4");
-    assert_eq!(LMV_ABI_VERSION, 4, "compile-time ABI version is v4");
+fn abi_version_is_five() {
+    assert_eq!(lmv_abi_version(), 5, "runtime ABI version is v5");
+    assert_eq!(LMV_ABI_VERSION, 5, "compile-time ABI version is v5");
 }
 
 /// v4 render entry (ADR-0013): `lmv_render_dt` takes a real `dt` and behaves
@@ -135,7 +135,7 @@ fn set_debug_and_get_metrics_over_the_abi() {
     out.struct_size = std::mem::size_of::<LmvMetrics>() as u32;
     let rc = unsafe { lmv_get_metrics(handle, &mut out) };
     assert_eq!(rc, LMV_OK, "lmv_get_metrics -> OK");
-    assert_eq!(out.abi_version, 4, "core stamps the current abi_version");
+    assert_eq!(out.abi_version, 5, "core stamps the current abi_version");
     assert_eq!(
         out.struct_size,
         std::mem::size_of::<LmvMetrics>() as u32,
@@ -158,6 +158,100 @@ fn set_debug_and_get_metrics_over_the_abi() {
         LMV_ERR_INVALID_ARG,
         "null out -> invalid arg"
     );
+
+    unsafe { lmv_free(handle) };
+}
+
+/// v5's text entry point (ADR-0110). Every rejection the boundary promises,
+/// exercised for real: the validate-at-the-boundary rule is only worth stating
+/// if the invalid cases are the ones that got tested.
+///
+/// Headless, so the accepting path lands on `LMV_ERR_NO_WINDOW` rather than
+/// `LMV_OK` — which is itself the documented behaviour before a window is
+/// attached, and distinguishable from every argument rejection below.
+#[test]
+fn set_now_playing_validates_at_the_boundary() {
+    let handle = lmv_create(48_000, 2);
+    assert!(!handle.is_null());
+
+    let track = "Boards of Canada - Roygbiv";
+    let bytes = track.as_bytes();
+
+    // Valid UTF-8, valid handle, no window yet: past every argument check.
+    assert_eq!(
+        unsafe { lmv_set_now_playing(handle, bytes.as_ptr(), bytes.len()) },
+        LMV_ERR_NO_WINDOW,
+        "a well-formed call reaches the renderer check, not an arg rejection"
+    );
+
+    // A null handle.
+    assert_eq!(
+        unsafe { lmv_set_now_playing(std::ptr::null_mut(), bytes.as_ptr(), bytes.len()) },
+        LMV_ERR_INVALID_ARG,
+        "null handle -> invalid arg"
+    );
+
+    // A null pointer, with a length that would otherwise be read.
+    assert_eq!(
+        unsafe { lmv_set_now_playing(handle, std::ptr::null(), bytes.len()) },
+        LMV_ERR_INVALID_ARG,
+        "null text -> invalid arg"
+    );
+
+    // A zero length — rejected before the pointer is dereferenced, so this is
+    // safe even though the pointer is valid.
+    assert_eq!(
+        unsafe { lmv_set_now_playing(handle, bytes.as_ptr(), 0) },
+        LMV_ERR_INVALID_ARG,
+        "zero length -> invalid arg"
+    );
+
+    // Invalid UTF-8: a lone continuation byte and a truncated 3-byte sequence.
+    // Rejected here rather than trusted inward — the core downstream assumes
+    // its string is text.
+    for bad in [&[0x80u8][..], &[0xE2, 0x82][..]] {
+        assert_eq!(
+            unsafe { lmv_set_now_playing(handle, bad.as_ptr(), bad.len()) },
+            LMV_ERR_INVALID_ARG,
+            "invalid UTF-8 -> invalid arg"
+        );
+    }
+
+    // Well-formed non-Latin text is *not* rejected — the whole reason ADR-0110
+    // chose glyphon over the 31-glyph quad font, which would have painted this
+    // blank without reporting anything.
+    let bjork = "Björk - Jóga".as_bytes();
+    assert_eq!(
+        unsafe { lmv_set_now_playing(handle, bjork.as_ptr(), bjork.len()) },
+        LMV_ERR_NO_WINDOW,
+        "multi-byte UTF-8 passes the boundary check"
+    );
+
+    unsafe { lmv_free(handle) };
+}
+
+/// The copy-on-receipt rule the spec states and the C++ side must be able to
+/// rely on: the core must not retain the caller's pointer. Asserted by freeing
+/// the buffer immediately after the call and then driving the handle — a
+/// retained pointer would be a use-after-free here, which Miri and the sanitizer
+/// builds can see even when a plain run cannot.
+#[test]
+fn set_now_playing_does_not_retain_the_callers_buffer() {
+    let handle = lmv_create(48_000, 2);
+    assert!(!handle.is_null());
+
+    {
+        let owned = String::from("Sigur Ros - Svefn-g-englar");
+        let bytes = owned.as_bytes();
+        let _ = unsafe { lmv_set_now_playing(handle, bytes.as_ptr(), bytes.len()) };
+        drop(owned); // the caller may free immediately
+    }
+
+    // Anything the core does with the string from here on would touch freed
+    // memory if it had kept the pointer.
+    for _ in 0..3 {
+        let _ = unsafe { lmv_render(handle) };
+    }
 
     unsafe { lmv_free(handle) };
 }

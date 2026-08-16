@@ -48,8 +48,9 @@ use lmv_core::render::Renderer;
 
 /// Bump on any ABI shape change (with the accompanying ADR). v2 added
 /// `lmv_load_presets` (ADR-0006); v3 added `lmv_set_debug` + `lmv_get_metrics`
-/// and the `LmvMetrics` struct (ADR-0008); v4 added `lmv_render_dt` (ADR-0013).
-pub const LMV_ABI_VERSION: u32 = 4;
+/// and the `LmvMetrics` struct (ADR-0008); v4 added `lmv_render_dt` (ADR-0013);
+/// v5 added `lmv_set_now_playing` (ADR-0110).
+pub const LMV_ABI_VERSION: u32 = 5;
 
 /// Call succeeded.
 pub const LMV_OK: i32 = 0;
@@ -417,6 +418,60 @@ pub unsafe extern "C" fn lmv_load_presets(
             None => state.pending_presets = report.presets,
         }
         count
+    }))
+    .unwrap_or(LMV_ERR_PANIC)
+}
+
+/// Announce the currently playing track: the core fades a banner in over the
+/// visuals, holds it a few seconds, and fades it out (ADR-0110). The host says
+/// *what* is playing and never *when to stop*.
+///
+/// `utf8` is `len` bytes of UTF-8 text, **not** NUL-terminated, conventionally
+/// `artist - title` — the core splits on the first ` - `. **The core copies the
+/// bytes before returning and never retains the pointer**, so the caller may
+/// free or reuse the buffer immediately.
+///
+/// Returns `LMV_OK`, or a negative `LMV_ERR_*`: `LMV_ERR_INVALID_ARG` for a null
+/// handle, a null pointer, a zero length, or bytes that are not valid UTF-8 —
+/// validated here at the boundary rather than trusted inward —
+/// and `LMV_ERR_NO_WINDOW` before a window is attached.
+///
+/// Setting the string that is already set does nothing, so a host may call this
+/// on every metadata notification it receives. There is no "clear" call and none
+/// is needed: the banner is transient and removes itself.
+///
+/// **Never call this from the `visualisation_stream` thread.** The copy
+/// allocates, which that thread must never do; the host's playback/UI callback
+/// is the right caller. Added in ABI v5.
+///
+/// # Safety
+/// `handle` valid per `lmv_create`; `utf8` points at `len` readable bytes.
+/// Render-thread role only.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn lmv_set_now_playing(
+    handle: *mut LmvHandle,
+    utf8: *const u8,
+    len: usize,
+) -> i32 {
+    if handle.is_null() || utf8.is_null() || len == 0 {
+        return LMV_ERR_INVALID_ARG;
+    }
+    let handle = unsafe { &*handle };
+    catch_unwind(AssertUnwindSafe(|| {
+        let bytes = unsafe { std::slice::from_raw_parts(utf8, len) };
+        let Ok(text) = std::str::from_utf8(bytes) else {
+            return LMV_ERR_INVALID_ARG;
+        };
+        let state = unsafe { &mut *handle.render.get() };
+        match state.renderer.as_mut() {
+            Some(renderer) => {
+                // Copies into the core's own String here; `text` — and the
+                // caller's buffer under it — is dead by the time this returns.
+                renderer.set_now_playing(text);
+                LMV_OK
+            }
+            None => LMV_ERR_NO_WINDOW,
+        }
     }))
     .unwrap_or(LMV_ERR_PANIC)
 }
