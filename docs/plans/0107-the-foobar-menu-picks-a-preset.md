@@ -1,7 +1,8 @@
 # 0107 — The foobar menu picks a preset
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-16
+> **Approved:** 2026-08-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0117](../adrs/0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md) (C ABI v6), [0006](../adrs/0006-c-abi-v2-preset-loading.md) (the folder + seed-then-load this builds on)
 
