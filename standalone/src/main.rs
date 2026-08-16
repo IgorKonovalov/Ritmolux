@@ -726,11 +726,6 @@ impl AppState {
         }
     }
 
-    /// Build this frame's on-canvas text and hand it to the renderer: always the
-    /// active preset name in the corner, plus — while the browse overlay is open
-    /// — the scrolled roster with the highlighted row distinct. Strings are
-    /// owned locally so the renderer's `queue_text` (which copies them) needs no
-    /// live borrow of the roster.
     /// The browse list's layout for `visible_len` rows at the window's current
     /// size — the one place the shell turns a window into
     /// [`overlay::ListLayout`], so the drawing and the `Left`/`Right` keys can
@@ -745,6 +740,11 @@ impl AppState {
         )
     }
 
+    /// Build this frame's on-canvas text and hand it to the renderer: the active
+    /// preset name in the corner when [`preset_name_visible`] allows it, plus —
+    /// while a modal is open — that modal's own rows. Strings are owned locally
+    /// so the renderer's `queue_text` (which copies them) needs no live borrow of
+    /// the roster.
     fn queue_frame_text(&mut self) {
         // Taken out and put back rather than borrowed in place: the body below
         // calls `&self` methods (`modal`, `settings_view`, `roster_names`,
@@ -757,8 +757,11 @@ impl AppState {
         texts.clear();
         meta.clear();
 
-        texts.push(self.renderer.preset_name().to_owned());
-        meta.push((NAME_INSET, NAME_INSET, NAME_SIZE, NAME_COLOR));
+        // `true` until Plan 0096 Phase 3 supplies the config value.
+        if preset_name_visible(self.modal(), self.overlay_on, true) {
+            texts.push(self.renderer.preset_name().to_owned());
+            meta.push((NAME_INSET, NAME_INSET, NAME_SIZE, NAME_COLOR));
+        }
 
         // The capture verdict, under the core's diagnostics panel and only while
         // it is up (Plan 0083). Built from the stored token rather than from the
@@ -998,6 +1001,24 @@ impl AppState {
 enum Modal {
     Browse,
     Settings,
+}
+
+/// Whether the corner preset name is drawn this frame (Plan 0096 Phase 1).
+///
+/// **Presence-based, not timed**: the name yields to anything drawn over it and
+/// returns the instant that thing closes. Two things cover it — either modal
+/// (whose header starts at [`LIST_TOP`] and crowds it from below) and the core's
+/// F3 diagnostics panel, which composites *after* the text layer and so paints
+/// straight over it. `enabled` is the operator's own switch (`[hud] preset_name`).
+///
+/// A free function, not a method, so the rule is assertable as a value with no
+/// window and no GPU — the same discipline [`overlay`] and [`settings`] keep.
+///
+/// This governs the **show furniture only**. The F3 capture line is deliberately
+/// not gated on it: that line exists *because* the panel is up (Plan 0083), so
+/// the flag that hides the name must not take it with it.
+fn preset_name_visible(modal: Option<Modal>, diagnostics: bool, enabled: bool) -> bool {
+    enabled && modal.is_none() && !diagnostics
 }
 
 /// Map a physical key to the settings modal's abstract key, or `None` for keys
@@ -1553,5 +1574,36 @@ fn main() {
     if let Err(err) = event_loop.run_app(&mut app) {
         eprintln!("event loop error: {err}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Modal, preset_name_visible};
+
+    #[test]
+    fn name_shows_when_nothing_covers_it() {
+        assert!(preset_name_visible(None, false, true));
+    }
+
+    #[test]
+    fn diagnostics_panel_takes_the_corner() {
+        // The panel composites after the text layer, so a name drawn here would
+        // be painted over rather than shown beside it.
+        assert!(!preset_name_visible(None, true, true));
+    }
+
+    #[test]
+    fn either_modal_suppresses_the_name() {
+        assert!(!preset_name_visible(Some(Modal::Settings), false, true));
+        assert!(!preset_name_visible(Some(Modal::Browse), false, true));
+    }
+
+    #[test]
+    fn the_operator_switch_wins_over_everything() {
+        // Off means off in every state, not just the uncovered one.
+        assert!(!preset_name_visible(None, false, false));
+        assert!(!preset_name_visible(None, true, false));
+        assert!(!preset_name_visible(Some(Modal::Browse), false, false));
     }
 }
