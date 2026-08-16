@@ -235,6 +235,92 @@ fn reaction_diffusion_contract() {
         "pan_x = 0.5 left the outer columns flat ({panned_detail:.3} of the centre's \
          horizontal detail): it is walking off the field rather than scrolling around it"
     );
+
+    // --- Long run: one unpolled stretch past the frame ceiling (Plan 0099). ---
+    //
+    // The WARP renderer above is dropped first, on this file's own rule: two live
+    // headless devices in one process is the configuration that crashes the
+    // software driver, so the check below builds its own only after this one is
+    // gone.
+    drop(renderer);
+    long_run_past_the_old_ceiling();
+}
+
+/// Drive an RD world through one long **unpolled** stretch and require it to
+/// finish — the frame ceiling Plan 0099 removed, pinned so it cannot come back.
+///
+/// `shot --horizon 10` claims 36,001 renders and died on all three shipped RD
+/// worlds, because `step_offscreen` submitted without ever polling: the only
+/// `device.poll` on the capture path was the readback's, so at the default
+/// interval the path ran 1,800 consecutive unpolled submits. Retention is per
+/// **pass**, not per pixel — RD encodes 12 simulation sub-steps plus a present —
+/// and one such stretch retained **950 KB a frame** against a 36 KB captured
+/// frame, so the process reached ~4.4 GB and the readback buffer went invalid.
+///
+/// `at_frames = [0, LONG_RUN]` is the shape that matters as much as the count:
+/// two samples make the whole run ONE unpolled stretch, the worst case any
+/// interval can produce. `LONG_RUN` is deliberately past **3,601** — the frame
+/// count first reported — and past the **5,401** that still cleared when it was
+/// re-measured, because a ceiling pushed up is the same defect with a bigger
+/// number. Unfixed it peaks near 5.7 GB and fails.
+///
+/// **It is hardware-gated, and that is a real limit rather than a preference.**
+/// The check was first written on this suite's WARP renderer and **passed against
+/// the unfixed path** — 6,000 unpolled frames on the software adapter do not
+/// accumulate the way they do on DX12, so on WARP it was a three-minute no-op
+/// rather than a regression test. Windows CI has only WARP (ADR-0073), so this
+/// skips there and earns its keep on a developer box. Skipping loudly is the
+/// point: a silent pass would claim cover it does not have.
+fn long_run_past_the_old_ceiling() {
+    const LONG_RUN: u32 = 6_000;
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: SIZE,
+        height: SIZE,
+        prefer_software: false,
+    }) {
+        Ok(r) if r.adapter_is_software() => {
+            eprintln!(
+                "skipped: the {LONG_RUN}-frame unpolled-stretch check needs a hardware \
+                 adapter — the defect it pins does not reproduce on WARP"
+            );
+            return;
+        }
+        Ok(r) => r,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+
+    let lively = AnalysisFrame {
+        bass: 0.5,
+        mid: 0.3,
+        treb: 0.3,
+        ..Default::default()
+    };
+    let long = renderer
+        .capture_preset_at(PRESET, &lively, &[0, LONG_RUN])
+        .unwrap_or_else(|e| {
+            panic!(
+                "a {LONG_RUN}-frame unpolled stretch failed at `{e}` — the capture \
+                 path is retaining per-frame resources again (Plan 0099)"
+            )
+        });
+
+    // The run has to have gone somewhere: an RD field 100 simulated seconds on is
+    // not the frame it started from. Without this the check would also pass on a
+    // path that returned the first frame twice.
+    let advanced = match long.as_slice() {
+        [first, last] => frame_diff(first, last),
+        rows => panic!("a two-sample horizon returned {} rows", rows.len()),
+    };
+    assert!(
+        advanced > 0.01,
+        "the {LONG_RUN}-frame run completed but did not advance the field \
+         ({advanced:.4})"
+    );
 }
 
 /// Horizontal detail in the outer 10% of columns, relative to the middle 20%.

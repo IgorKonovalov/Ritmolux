@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-16, user approval)
 > **Date:** 2026-08-16
-> **Related plan(s):** [0102](../plans/0102-the-component-ships.md)
+> **Related plan(s):** [0102](../plans/done/0102-the-component-ships.md)
 
 ## Context
 
@@ -122,3 +122,33 @@ instructions longer and each audience read half a document that is not for them.
 - The SDK release currently in use is **2025-03-07** (`plugin-foobar/README.md`). Whichever path
   Phase 1 selects, the version is pinned rather than "latest": a component that silently rebuilt
   against a newer SDK would be an untested change riding a version bump that says nothing about it.
+
+## Outcome (2026-08-16, [Plan 0102](../plans/done/0102-the-component-ships.md))
+
+**The route this ADR left open resolved to the fetch branch, and the Decision above stands
+unchanged.** Recorded here rather than edited into the body, per the append-only rule.
+
+- **The licence question, answered.** Phase 1's `human` reading: the foobar2000 SDK licence is
+  BSD-style. It permits redistribution in binary form and puts a notice obligation only on
+  redistributed **source**. We ship the linked DLL, no SDK source, and nothing implying endorsement,
+  so `.github/workflows/release.yml` gained a `foobar` job that fetches the pinned SDK. Alternative A
+  still stands: the SDK is fetched, never committed.
+- **The pin is stronger than the ADR assumed.** The fetched archive is byte-identical to the copy
+  this project has built against since Plan 0001 (SHA-256 in `packaging/foobar/sdk-pin.ps1`,
+  recomputed independently at the close), and foobar2000.org keeps every SDK release at a stable
+  `/downloads/SDK-<date>.7z` URL back to 2011-03-11. The Negative section's supply-chain risk is a
+  bytes-changed risk, not a URL-rot risk.
+- **What the Negative section did not name, and should have.** The component was already carrying
+  two filed pre-existing defects when it became a public artifact — a Default UI panel that attaches
+  its surface at 1x1 and looks broken until a track change ([backlog 0102](../design-backlog.md)),
+  and a context menu that shadows foobar2000's layout-edit menu so the panel cannot be removed by
+  the documented route ([backlog 0103](../design-backlog.md)). Both are `Medium`, both pre-date this
+  ADR, and both are what a stranger meets first. The shipped `READ-ME-FIRST.txt` now names them;
+  neither is fixed. This is the risk a distribution decision owes its reader and this ADR did not
+  carry it.
+- **One assertion is weaker on the pre-staged route than on the fetch route**, which cuts against
+  this ADR's claim that both paths are equivalent inputs to one recipe:
+  `build-component.ps1` stamps the pinned SDK version into the shipped `READ-ME-FIRST.txt` while
+  asserting nothing about what is actually staged. Filed as
+  [backlog 0105](../design-backlog.md); the fix is one grep against the `sdk-readme.html` the SDK
+  itself ships.

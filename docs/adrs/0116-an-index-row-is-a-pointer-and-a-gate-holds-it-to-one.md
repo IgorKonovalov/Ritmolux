@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-16, user approval)
 > **Date:** 2026-08-16
-> **Related plan(s):** [0105](../plans/0105-the-indexes-go-back-to-being-indexes.md)
+> **Related plan(s):** [0105](../plans/done/0105-the-indexes-go-back-to-being-indexes.md)
 
 ## Context
 
@@ -167,3 +167,36 @@ that touched the file; the 7.1x plans-index figure compares `800f102` (the commi
 The row-width distributions in the Decision are **construction arithmetic from the real filenames
 and `H1` titles**, not measurements of a trimmed file — no trimmed file exists yet. Plan 0105
 Phase 2 is where they either hold or the cap gets revised with better numbers.
+
+## Outcome — 2026-08-16, at Plan 0105's close
+
+The construction arithmetic held and the cap did not move. Measured on the trimmed tree: ADR rows
+median **170** / max **246**, so **74 bytes** of headroom under the 320-byte cap against the 51
+this ADR predicted; `docs/adrs/README.md` landed at **21,085 bytes** from 189,305, an 89 % cut
+against the ~24 KB estimated above. All three rosters together went 477,594 -> 220,626.
+
+**Two figures here are corrected by measurement, and the second is load-bearing.**
+
+**The over-cap count was 136, not 135.** The plans section held 26 over-cap bullets rather than 25;
+the ADR (83) and backlog (27) figures were exact.
+
+**The forward-reference graph is three rows, not "roughly six."** The Negative section estimates
+six rows carrying the inbound edges that exist in no ADR body, and that number is the whole
+argument against Alternative E — regenerating the index from `docs/adrs/*.md`. Phase 2 checked the
+graph edge by edge and found **three** genuine inbound edges (0002 supplemented by 0020, 0003
+extended by 0006/0008/0013, 0031 membership revised by 0032) plus **24 outbound trailers** in the
+title cells, whose 47 targets are **all named in the ADR bodies themselves** and are therefore
+redundant rather than index-only. The qualitative claim stands — a thin index is still not a pure
+projection of the bodies, and a corrupted one is a real loss — but it rests on three rows. Whether
+three edges are worth keeping the index hand-maintained is a smaller question than this ADR framed
+it as, and it is the one Alternative E should be re-read against.
+
+**One thing this ADR did not anticipate.** Its Negative section names the marker hole — a row moved
+outside a region escapes silently — and the fixture pins that as deliberate behavior. It does not
+name the **non-vacuity** hole: the fixture asserts exit 0 only, so a checker that finds *no rows at
+all* is indistinguishable from a clean tree at every one of the three call sites. Demonstrated at
+this close by mutating the row matcher to match nothing — fixture and repo both still exit 0.
+Filed as [backlog 0104](../design-backlog.md); the repair is a `--self-test` or a second fixture
+root expecting exit 1, which is what
+[ADR-0108](0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)'s gate already
+carries and this one does not.

@@ -5324,3 +5324,123 @@ parameter surface, and the scene that most wants it cannot reach it.
   be the only reachable form. What did not ship is the quiet version, which is Plan 0090 Phase 5.
   The demonstrated want is therefore stronger than the entry records, not weaker.
 
+
+---
+
+## 0093 — the headless capture path dies past a few thousand frames, so the horizon cannot reach its own headline length
+
+- **CLOSED 2026-08-16** at [Plan 0099](plans/done/0099-the-horizon-reaches-its-own-length.md)'s
+  close, all three phases. **The candidate mechanism was right and the entry's own framing of the
+  ceiling was wrong twice over**, which is why the body below is kept rather than summarized.
+  `step_offscreen` never polled — that half held exactly, and the repair is the one line this entry
+  named: `poll(wait_indefinitely)` per frame, at ~1.5x wall clock on an RD world, after which all
+  three RD worlds render `--horizon 10`'s full 36,001 frames with the resident set flat
+  (398.8 MB at 4 s to 399.6 MB at 54 s, against 419 MB to 4,402 MB and dead before).
+- **It was never a frame ceiling.** This entry reports **3,601 frames** as the wall and the plan
+  inherited that number. Re-measured, all three worlds clear **5,401** and fail at **7,201**, one
+  unfixed run died at 4.4 GB and another reached 36,001 at 4.9 GB. The wall is memory pressure, so
+  "3,601" was a reading of one machine's headroom on one afternoon.
+- **And it was not the RD family's mechanism either — the discriminator this entry named answered a
+  question neither of its two readings asked.** `reaction_etching` fails like its siblings, so the
+  family reading holds; but retention is per **pass**, not per pixel or per world. Over one unpolled
+  stretch an RD world (12 simulation sub-steps plus a present, 13 passes a frame) retained **950 KB
+  a frame** against a 36 KB captured frame, where single-pass worlds retained ~30 KB. Every world
+  grew. RD reached the allocator first, which is what made the family look responsible.
+- **The `absent: poll` probe went red on delivery, exactly as this entry designed it to.** That is
+  the [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) grammar
+  working: the probe was the hypothesis, and its own falsification is the signal that the entry is
+  finished.
+- **What the closure does not cover**, deliberately: the truncated horizon rows Plan 0085 recorded
+  are still truncated. Re-running them is an instrument *use* and belongs to whoever next asks a
+  show-length question.
+
+> **PROMOTED 2026-08-16** — [Plan 0099](plans/done/0099-the-horizon-reaches-its-own-length.md), whose
+> Phase 1 is exactly the `reaction_etching` run this entry names as the cheapest discriminator.
+
+**Raised by:** `architect`, at [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md)'s
+close, from that plan's Phase 2 findings. **Owner if taken:** `dev` — but read the mechanism below
+first, because the candidate cause is one line and the entry may be cheaper than it looks.
+
+- **Verified 2026-08-15** — the candidate mechanism is still exactly as stated below, and still
+  unfixed: `present: fn step_offscreen in: core/src/render/capture_api.rs`,
+  `absent: poll in: core/src/render/capture_api.rs`. The second probe is the whole hypothesis in one
+  line — the day anyone polls per frame in that file it goes red, which is the right moment to
+  re-read this entry whether or not the fix worked.
+- **Verified 2026-08-15, AND IT CONVICTED THIS ENTRY — reported by `dev` at Plan 0093 Phase 2,
+  corrected in place by `architect` at that plan's close.** The finding said *"Both shipped
+  reaction-diffusion worlds (`reaction_mitosis`, `reaction_verdigris`)"*. **There are three:**
+  `present: system = "reaction_diffusion" in: presets/reaction_etching.toml`. `reaction_etching`
+  landed in `6ebec33` on **2026-08-10**, five days before this entry was written, so this is a
+  **birth defect** — the class
+  [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) exists for,
+  found by the first pass that read the entry against the tree, by the instrument that pass was
+  building. It is corrected rather than closed because the finding it distorts is untouched: the
+  capture path still dies at 3,601 frames and the candidate mechanism is still one line. What the
+  correction costs the entry is its **scope argument**, and that half is now stated as the open
+  question it always was — see *Why it is worth an entry* below.
+
+### The finding
+
+**Two of the three shipped reaction-diffusion worlds** (`reaction_mitosis`, `reaction_verdigris`)
+fail at **3,601 frames** with `Buffer with 'lmv-capture-readback' label is invalid`, after the
+process's resident set climbs to **~2.9 GB**. The third, `reaction_etching`, **was never run** —
+it was shipped before this entry was written and was simply missed.  Measured on the Windows development box, hardware adapter, debug build,
+at 96x96 — the capture size is not the lever, since 2.9 GB is four orders above what 3,600 frames of
+96x96 RGBA would be.
+
+**It is pre-existing and not a defect in Plan 0085's new sampling primitive.** The shipped
+`Renderer::capture_preset` fails identically at the same frame count on the same preset, which was
+run as the control *before* this was called a finding. It is only visible now because nothing in
+this repo had ever driven a world for thousands of frames: the four synthesized gates capture 30,
+the reactivity gate a few hundred.
+
+### Why it is worth an entry
+
+**It bounds the instrument Plan 0085 just shipped.** `shot --horizon 10` is documented as ten
+simulated minutes — 36,001 renders — and on two shipped worlds it cannot get past 3,601. Those two
+rows in the plan's Phase 2 table are therefore a **0.5-minute** horizon, and their `monotone 1.00`
+is a world still settling into its pattern rather than drifting: a horizon shorter than a world's
+own warm-up reads settling *as* drift, which is precisely the misreading the instrument exists to
+prevent.
+
+**How wide the ceiling is, is open — and the entry originally overstated how well that was known.**
+Every world in the *measured* set other than these two cleared 36,001 renders, which is why this
+reads as a family ceiling rather than a general one. But the measured set was not the roster: it
+omitted `reaction_etching`, the third RD world, so the family evidence is two of three and nobody
+has run the member that would confirm it. Two readings survive that and the entry does not choose
+between them — a mechanism ceiling specific to RD's heavy per-frame ping-pong, or a *cost* ceiling
+that any sufficiently expensive world reaches and RD reaches first. **Running `reaction_etching`
+separates them, and it is the cheapest thing anyone can do here** — it costs one `shot --horizon`
+and it decides which of the two the fix has to answer.
+
+It is also **adjacent to, and not the same as,**
+[0083](design-backlog-archive.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against):
+that is the *live app's* resident set under preset switching, this is a *headless offscreen loop*
+that never rebuilds a surface. If they share a cause it would be worth knowing, and nothing
+currently says they do.
+
+### What a fix would be — with a candidate mechanism, stated as unverified
+
+`core/src/render/capture_api.rs:481` — **`step_offscreen` creates a command encoder, submits it, and
+never polls.** `capture::read_back` holds the only `device.poll` anywhere in the capture path, so
+between two sampled frames wgpu has no opportunity to release the transient resources each
+submission retains. At a 60-second interval that is **3,600 consecutive unpolled submits**. All
+three capture entry points (`capture_preset`, `capture_preset_over`, `capture_preset_at`) funnel
+through `step_offscreen`, which is exactly why the control failed the same way — and it would
+explain why an RD world, whose per-frame ping-pong is the heaviest in the engine, hits it first.
+
+**This is a hypothesis and nobody has run it.** The check is cheap: poll once per frame in
+`step_offscreen` and re-run `shot --horizon 10` on `reaction_mitosis` — and on `reaction_etching`,
+which has never been run at all and is what decides whether the ceiling is the family's or the
+cost's. If the RSS trace flattens,
+the fix is one line and the entry closes with a measurement; if it does not, the diagnosis is wrong
+and the real one starts from a GPU memory report rather than from this paragraph. **Do not close
+this by lowering a documented horizon** — the instrument's stated length is what makes a recorded
+header verdict comparable across worlds.
+
+### Priority
+
+**Medium.** Nothing ships broken — this is a QA path, not a runtime one, and the live app polls
+every frame through its own present. But it silently truncates the only instrument this project has
+for show-length behaviour, on the family that most needs it, and the truncation reads as a *result*
+(`monotone 1.00`) rather than as an error unless someone reads the run's stderr.

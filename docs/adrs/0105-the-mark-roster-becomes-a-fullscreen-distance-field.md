@@ -164,3 +164,23 @@ contours the reference images carry, so the band count is not a constraint on th
 `palette_contour` is documented as inert outside the continuous-field scenes and *nothing warns*
 (`palette.rs:59-60`) — the new scene is a continuous field, so it becomes the third place that
 param does something, and `presets/README.md`'s note beside it needs to learn the name.
+
+## Outcome (2026-08-16) — Plan 0091's exterior measurement, recovered from the ADR index
+
+This ADR's Costs section says the roster's exterior "is unverified and two arms are known-wrong out
+there". Plan 0091 measured it, and the result lived only in this ADR's row in
+[README.md](README.md), which Plan 0105 cut back to a pointer. Recorded here on the
+[ADR-0054](0054-runtime-tier-switching-rebuilds-on-the-live-context.md) /
+[ADR-0074](0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) precedent.
+
+**The prediction held exactly.** Against a numerically sampled outline, `polygon` was **0.326** out
+and `star` **1.057** out. Both arms are now exact outside, each keeping its original expression
+verbatim for `d <= 1`, so the particle sprite path is bit-for-bit unchanged — proved against the
+*committed* baselines rather than by re-blessing.
+
+**`star`'s interior stays approximate knowingly.** Its error is recorded as a function of the point
+count — **0.066 at 5 points, 0.248 at 12** — and bounded from both sides, because repairing it would
+move every shipped `shape = "3"` mark. The lower bound fires if it ever becomes exact, which would
+mean the sprite's arithmetic moved.
+
+Plan 0091 closed 2026-08-16, Phases 1-5.

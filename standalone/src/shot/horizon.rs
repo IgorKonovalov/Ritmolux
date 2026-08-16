@@ -19,10 +19,17 @@
 //! honest: a flat row series there is what makes a sloped one here mean
 //! something.
 //!
-//! **What it cannot see.** Nothing about the process — resident set, GPU
-//! resource churn, frame-time spikes on a preset switch. This is a headless
-//! render loop that never rebuilds a surface, so none of that is reproducible
-//! here by construction; `--soak` is the instrument for that half (ADR-0099).
+//! **What it cannot see.** GPU resource churn and the frame-time spike on a
+//! preset switch. This is a headless render loop that never rebuilds a surface,
+//! so neither is reproducible here by construction; `--soak` is the instrument
+//! for that half (ADR-0099).
+//!
+//! **The resident set is the exception**, and Plan 0099 is why this paragraph no
+//! longer lists it among them. A horizon cannot reproduce a *switching* app's
+//! memory behaviour, but the growth of its own render loop is precisely what a
+//! run of tens of thousands of frames is in a position to see — and reading the
+//! cost block's RSS column is what found a capture path retaining 950 KB a
+//! frame.
 //!
 //! Deterministic on the same terms as every other capture: injected `dt`, seeded
 //! randomness, scenes rebuilt to their seed. The same world at the same interval
@@ -265,6 +272,28 @@ fn series(samples: &[HorizonSample]) -> [(&'static str, Vec<f32>); 3] {
 // Presentations
 // ---------------------------------------------------------------------------
 
+/// Simulated seconds the run's **last row** actually sits at.
+///
+/// Not the same as the requested horizon, which is why it exists (Plan 0099).
+/// Rows are exact multiples of the interval — the property that makes row *k*
+/// comparable between a two-minute run and a ten-minute one — so a request the
+/// interval does not divide is silently rounded **down** to the last whole
+/// interval. Nothing else here could tell you that had happened.
+pub fn reached_secs(run: &HorizonRun) -> f32 {
+    run.samples.last().map_or(0.0, |s| s.elapsed_secs)
+}
+
+/// Simulated seconds the run fell short of what `--horizon` asked for, or `None`
+/// when it reached the request.
+///
+/// The tolerance is one frame: `elapsed_secs` counts the clock forward *before*
+/// each frame draws, so an exactly-divided request lands one step past the
+/// nominal length rather than on it, and that is not a shortfall.
+pub fn shortfall_secs(run: &HorizonRun) -> Option<f32> {
+    let short = run.minutes * 60.0 - reached_secs(run);
+    (short > 1.0 / CAPTURE_HZ).then_some(short)
+}
+
 /// The horizon table, as a string. Returns rather than prints so the formatting
 /// is directly testable.
 pub fn text_table(source: &str, run: &HorizonRun) -> String {
@@ -274,12 +303,25 @@ pub fn text_table(source: &str, run: &HorizonRun) -> String {
         "horizon: {} over {:.1} simulated minutes, one row per {:.0}s \
          [{source}] tier {} at {}x{}",
         run.preset,
-        run.minutes,
+        reached_secs(run) / 60.0,
         run.interval_secs,
         run.tier.as_str(),
         run.width,
         run.height
     );
+    // The header states what the run *reached*, so when that is short of what
+    // was asked for the difference is stated too — right above the table rather
+    // than on stderr, because the table is what gets read and copied into a
+    // world's header (Plan 0099).
+    if let Some(short) = shortfall_secs(run) {
+        let _ = writeln!(
+            out,
+            "  SHORT of the {:.1} minutes --horizon asked for, by {short:.1}s: rows are \
+             exact multiples\n  of the {:.0}s interval, so the request was rounded down to \
+             the last whole one.",
+            run.minutes, run.interval_secs
+        );
+    }
     let _ = writeln!(
         out,
         "  {:>10} {:>10} {:>10} {:>10}",
@@ -362,6 +404,16 @@ pub fn json_report(source: &str, run: &HorizonRun) -> String {
     let _ = write!(out, "\"tier\":{},", json_string(run.tier.as_str()));
     let _ = write!(out, "\"width\":{},\"height\":{},", run.width, run.height);
     let _ = write!(out, "\"minutes\":{},", num(run.minutes));
+    // What the run reached, beside what it was asked for — a consumer must be
+    // able to tell a short run from a whole one without re-deriving it from the
+    // last sample (Plan 0099).
+    let _ = write!(out, "\"reached_secs\":{},", num(reached_secs(run)));
+    let _ = write!(
+        out,
+        "\"shortfall_secs\":{},",
+        shortfall_secs(run).map_or("null".to_string(), num)
+    );
+    let _ = write!(out, "\"truncated\":false,");
     let _ = write!(out, "\"interval_secs\":{},", num(run.interval_secs));
 
     out.push_str("\"samples\":[");
@@ -424,6 +476,71 @@ pub fn json_report(source: &str, run: &HorizonRun) -> String {
     out.push('}');
     out.push('\n');
     out
+}
+
+/// What to print, on **stdout**, when the render died before reaching the
+/// requested length (Plan 0099).
+///
+/// The point is the channel. Before this, a horizon that could not finish
+/// returned an error and printed nothing where the table goes — the whole result
+/// existed only as one stderr line, which a reader piping stdout to a file or
+/// scrolling to the trend block never saw. A truncated run is a *result* about
+/// the machine, so it is reported where results are reported, and it still exits
+/// non-zero.
+fn truncation_report(source: &str, run: &TruncatedRun, json: bool) -> String {
+    if json {
+        let mut out = String::from("{");
+        let _ = write!(out, "\"source\":{},", json_string(source));
+        let _ = write!(out, "\"preset\":{},", json_string(&run.preset));
+        let _ = write!(out, "\"minutes\":{},", num(run.minutes));
+        let _ = write!(out, "\"interval_secs\":{},", num(run.interval_secs));
+        let _ = write!(out, "\"requested_frames\":{},", run.requested_frames);
+        let _ = write!(out, "\"truncated\":true,");
+        let _ = write!(out, "\"samples\":[],");
+        let _ = write!(out, "\"error\":{},", json_string(&run.error));
+        let _ = write!(
+            out,
+            "\"cost\":{{\"wall_secs\":{},\"rss_at_failure_bytes\":{}}}",
+            num(run.wall_secs),
+            run.rss_bytes.map_or("null".to_string(), |v| v.to_string())
+        );
+        out.push('}');
+        out.push('\n');
+        return out;
+    }
+
+    const MB: f64 = 1024.0 * 1024.0;
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "horizon: {} TRUNCATED — asked for {:.1} simulated minutes ({} frames) and did \
+         not finish.\n  There is no table: the run failed at `{}` after {:.1}s wall clock.",
+        run.preset, run.minutes, run.requested_frames, run.error, run.wall_secs
+    );
+    if let Some(rss) = run.rss_bytes {
+        let _ = writeln!(out, "  Resident set at failure: {:.0} MB.", rss as f64 / MB);
+    }
+    let _ = writeln!(
+        out,
+        "\n  This is a limit of this machine, not of the world. The capture path retains\n  \
+         nothing per frame (Plan 0099), so --interval is NOT a lever on it: what is left\n  \
+         is the per-frame cost itself, which a smaller --size or a shorter --horizon\n  \
+         lowers. See docs/capturing.md for the verified ceiling and the box it was\n  \
+         verified on."
+    );
+    out
+}
+
+/// The half of a run that exists when it did not finish — what
+/// [`truncation_report`] needs, and nothing that requires rows.
+struct TruncatedRun {
+    preset: String,
+    minutes: f32,
+    interval_secs: f32,
+    requested_frames: u32,
+    wall_secs: f32,
+    rss_bytes: Option<u64>,
+    error: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -494,9 +611,31 @@ pub fn run(presets: Vec<Preset>, source: &str, req: &HorizonRequest) -> Result<(
     let software_adapter = r.adapter_is_software();
     let rss_before = crate::rss::current_rss_bytes();
     let started = Instant::now();
-    let images = r
-        .capture_preset_at(&name, &req.stimulus, &frames)
-        .map_err(|e| format!("horizon `{name}`: {e}"))?;
+    let images = match r.capture_preset_at(&name, &req.stimulus, &frames) {
+        Ok(images) => images,
+        Err(e) => {
+            // Report the truncation where the table would have been, then still
+            // fail — the caller's non-zero exit is what a script reads, and this
+            // block is what a person reads (Plan 0099).
+            print!(
+                "{}",
+                truncation_report(
+                    source,
+                    &TruncatedRun {
+                        preset: name.clone(),
+                        minutes: req.minutes,
+                        interval_secs: req.interval_secs,
+                        requested_frames: total,
+                        wall_secs: started.elapsed().as_secs_f32(),
+                        rss_bytes: crate::rss::current_rss_bytes(),
+                        error: e.to_string(),
+                    },
+                    req.json,
+                )
+            );
+            return Err(format!("horizon `{name}`: {e}"));
+        }
+    };
     let wall_secs = started.elapsed().as_secs_f32();
     let rss_after = crate::rss::current_rss_bytes();
 

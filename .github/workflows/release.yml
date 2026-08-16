@@ -137,7 +137,43 @@ jobs:
           path: target/dist/*.zip
           if-no-files-found: error
 
-  # Publish. Gated on BOTH builds by `needs:`, so a failure on either platform
+  # The foobar2000 component (Plan 0102, ADR-0115). A thin caller, like the
+  # macos job: fetch the SDK, run the recipe, upload - the build, the version
+  # stamp, the packaging AND the seven fatal checks all live in
+  # packaging/foobar/build-component.ps1, so a developer running it locally is
+  # held to this job's bar rather than to a looser one.
+  #
+  # The SDK is third-party, separately licensed and gitignored, so this job
+  # fetches it. That is legal on a reading of the SDK licence, which is
+  # BSD-style: it permits redistribution in binary form and puts a notice
+  # obligation only on redistributed *source*. We ship the linked DLL, no SDK
+  # source, and nothing implying the SDK author endorses this (Plan 0102 Phase
+  # 1, answered by the user 2026-08-16).
+  #
+  # The fetch is pinned to a release and checked against a SHA-256 by
+  # packaging/foobar/sdk-pin.ps1, so a URL that changes its bytes fails the
+  # release rather than shipping an untested component (ADR-0115, Negative).
+  #
+  # Needs MSVC with the C++ workload and 7-Zip; both are preinstalled on the
+  # windows runner image, which is why this is not its own setup step.
+  foobar:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Stage the pinned foobar2000 SDK
+        shell: pwsh
+        run: ./packaging/foobar/fetch-sdk.ps1
+      - name: Build, package and verify the component
+        shell: pwsh
+        run: ./packaging/foobar/build-component.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: foobar2000-component
+          path: target/dist/*.zip
+          if-no-files-found: error
+
+  # Publish. Gated on ALL THREE builds by `needs:`, so a failure on any platform
   # leaves no Release at all rather than a half-published one - the release job
   # is skipped, not merely red. Gated on the ref being a tag, so the
   # workflow_dispatch dry-run path produces run artifacts and publishes nothing.
@@ -146,7 +182,7 @@ jobs:
   # on every runner image, so no pinned third-party release action is needed
   # (NFR section 4 - every dependency is a cost to justify).
   release:
-    needs: [macos, windows]
+    needs: [macos, windows, foobar]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -164,15 +200,20 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Three since Plan 0102: the two standalone zips and the foobar2000
+          # component. The recipe either produces all three or the tag is
+          # incomplete (ADR-0115, Negative), and an exact count is what makes a
+          # silently-skipped job fail here rather than ship a short release.
           count=$(ls -1 assets/*.zip | wc -l)
-          if [ "$count" -ne 2 ]; then
-              echo "expected exactly 2 zips, found $count:" >&2
+          if [ "$count" -ne 3 ]; then
+              echo "expected exactly 3 zips, found $count:" >&2
               ls -1 assets/ >&2
               exit 1
           fi
           ls -1 assets/*.zip
 
-          notes="Standalone builds of the ${TAG} tag.
+          notes="Builds of the ${TAG} tag: the standalone app for macOS and
+          Windows, and the foobar2000 component.
 
           - **macOS** (universal, arm64 + Intel, requires macOS 13+): unsigned and
             ad-hoc signed only, so macOS quarantines it - right-click the app and
@@ -181,10 +222,15 @@ jobs:
             granting it.
           - **Windows** (x64): unsigned, so SmartScreen warns once - More info,
             then Run anyway.
+          - **foobar2000 component** (x64 only, foobar2000 v2): unzip, then
+            install foo_lmv.fb2k-component from File - Preferences - Components.
+            It reads what foobar2000 is already decoding, so unlike the
+            standalone app there is no audio capture to permit.
 
-          Each zip carries a READ-ME-FIRST.txt with the full steps, and a
-          reference copy of the presets. This is a prerelease while the app is
-          0.x."
+          Each zip carries a READ-ME-FIRST.txt with the full steps. The two
+          standalone zips also carry a reference copy of the presets; the
+          component shares the standalone app's preset folder if both are
+          installed. This is a prerelease while the app is 0.x."
 
           # Re-running a workflow on an existing tag must not hard-fail:
           # `gh release create` errors when the release already exists, so

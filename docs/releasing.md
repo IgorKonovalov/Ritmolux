@@ -45,18 +45,25 @@ git push --follow-tags
 ```
 
 That fires [`.github/workflows/release.yml`](../.github/workflows/release.yml)
-([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)), which builds the
-macOS and Windows standalone in parallel and, only if **both** are green, publishes a GitHub
-**prerelease** carrying two zips:
+([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
+[ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)),
+which builds the macOS standalone, the Windows standalone and the foobar2000 component in
+parallel and, only if **all three** are green, publishes a GitHub **prerelease** carrying three
+zips:
 
 ```text
-light-music-visualizer-v<version>-macos-universal.zip    # universal .app, ad-hoc signed
-light-music-visualizer-v<version>-windows-x64.zip        # lmv.exe
+light-music-visualizer-v<version>-macos-universal.zip        # universal .app, ad-hoc signed
+light-music-visualizer-v<version>-windows-x64.zip            # lmv.exe
+light-music-visualizer-v<version>-foobar2000-component.zip   # foo_lmv.fb2k-component, x64
 ```
 
-Each also carries a reference copy of `presets/*.toml` and a `READ-ME-FIRST.txt`. If either
-build fails, the release job is **skipped** and no release exists — there is no half-published
-state. Re-running the same tag's workflow replaces the assets rather than failing.
+Each carries a `READ-ME-FIRST.txt`; the two standalone zips also carry a reference copy of
+`presets/*.toml`. If any build fails, the release job is **skipped** and no release exists —
+there is no half-published state. Re-running the same tag's workflow replaces the assets rather
+than failing.
+
+The publish step asserts the count is exactly three, so a job that silently stopped producing
+its artifact fails the release instead of shortening it.
 
 **A tag push is outward-facing.** Since ADR-0038 this is the last step of every close ceremony
 whose tag gets pushed, so every plan close now publishes a public prerelease whether or not that
@@ -72,8 +79,17 @@ gh auth refresh -s workflow
 ```
 
 To rehearse the builds without publishing anything, run the workflow from the Actions tab
-(`workflow_dispatch`): it produces both zips as **run artifacts** and creates no release. Note
-that a `workflow_dispatch` is only offered once the workflow file exists on the default branch.
+(`workflow_dispatch`): it produces all three zips as **run artifacts** and creates no release.
+Note that a `workflow_dispatch` is only offered once the workflow file exists on the default
+branch.
+
+The component job can also be rehearsed locally, and unlike the macOS bundle it runs on the
+box this project is developed on:
+
+```powershell
+.\packaging\foobar\fetch-sdk.ps1          # once; idempotent
+.\packaging\foobar\build-component.ps1    # same script, same checks, as CI runs
+```
 
 ## What this does NOT touch
 
@@ -87,17 +103,24 @@ that a `workflow_dispatch` is only offered once the workflow file exists on the 
   root `Cargo.toml` and generates `build/foo_lmv_version.h`, which `DECLARE_COMPONENT_VERSION`
   consumes. So a bump here reaches foobar's Components list **on the plugin's next build**,
   with no second string to edit. (This revises ADR-0005's original "independent plugin
-  version" note.)
+  version" note.) Since Plan 0102 that next build is the **tag push**, not a developer running
+  `build.ps1` — and the packaging recipe fails the release if the DLL does not carry the
+  workspace version, so the two cannot drift silently.
+- **The pinned foobar2000 SDK** (`packaging/foobar/sdk-pin.ps1`) is a **separate axis** and
+  never moves on an app bump. Moving it is its own commit, and it owes the on-device check in
+  [`on-device-validation.md`](on-device-validation.md) — nothing in CI can load foobar2000.
 
 ## Where the version surfaces
 
 - The standalone window title (`env!("CARGO_PKG_VERSION")`, resolves to the workspace
   version).
-- The `vX.Y.Z` git tag and both release-zip names (NFR section 8).
+- The `vX.Y.Z` git tag and all three release-zip names (NFR section 8).
 - The macOS bundle's `CFBundleShortVersionString` / `CFBundleVersion`, substituted into
   `packaging/macos/Info.plist.in` at package time. `bundle.sh` asserts the plist and
   `[workspace.package]` agree, so a drift fails the build rather than shipping.
 - The foobar component's `DECLARE_COMPONENT_VERSION`, via the generated
-  `build/foo_lmv_version.h` (ADR-0025).
+  `build/foo_lmv_version.h` (ADR-0025). `build-component.ps1` reads the version back out of the
+  linked DLL and asserts it matches `[workspace.package]`, so — as with the macOS plist — a
+  drift fails the build rather than shipping.
 
 All four read the one string in root `Cargo.toml` — none is edited by hand.

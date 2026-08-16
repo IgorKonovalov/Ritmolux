@@ -5,7 +5,7 @@
 > **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md) (the engine renders video offline and delegates encoding)
-> **Hard dependency:** [0099](0099-the-horizon-reaches-its-own-length.md) — the long-run render path currently dies at ~3,601 frames, and a four-minute video is 14,400.
+> **Hard dependency:** [0099](done/0099-the-horizon-reaches-its-own-length.md) — **DISCHARGED 2026-08-16.** The capture path now polls per frame and 36,001 renders complete with the resident set flat, so the ~3,601-frame wall Phase 4 was blocked on is gone.
 
 ## TL;DR
 
@@ -80,6 +80,28 @@ flowchart LR
   the other, and the loop advances whichever is due next. `film.rs` already owns the
   hops-per-clip arithmetic; use it rather than writing a second copy, which is the mistake that
   file's own header warns about.
+
+  **The stream format is chosen in this phase, and the choice reaches Phase 3.**
+  [ADR-0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md) leaves it at
+  "self-describing, `ffmpeg` reads it natively", which admits two candidates that differ in a way
+  the ADR did not price. Measured against the installed `ffmpeg` 8.1 (2026-08-16, dev box):
+
+  - **Y4M** (`-f yuv4mpegpipe`) carries a plain-text header — `YUV4MPEG2 W1920 H1080 F60:1 Ip
+    A1:1 C444`, then `FRAME\n` before each frame — which is about thirty lines to parse in any
+    language. It **cannot carry RGB**: the muxer accepts `yuv444p, yuv422p, yuv420p, yuv411p,
+    gray8` and *errors* on `rgb24`. So the writer owns an RGB→YUV conversion, and at 8 bits that
+    conversion is not bijective.
+  - **NUT** (`-f nut -c:v rawvideo`) accepts `rgb24` unconverted, so the bytes on the wire are the
+    bytes the tap produced. It is a binary container: more to write here, and more to parse
+    downstream.
+
+  **Prefer Y4M unless Phase 3 needs the wire bytes to be the tap bytes.** A third shape — raw
+  frames plus an explicit `-s` / `-pix_fmt` geometry argument — is exactly what ADR-0114's
+  "self-describing" clause exists to refuse, so it is not a fallback.
+
+  One downstream consumer beyond `ffmpeg` is already foreseen — a diffusion filter sitting in this
+  pipe as a stdin→stdout stage (architect interview, 2026-08-16) — and it is the only reason
+  Python parseability is weighed above. It does not otherwise constrain this plan.
 - **Done when:** `shot --render` over a fixture clip produces a stream whose **two runs are
   byte-identical**, and whose frame count equals `ceil(clip_seconds × fps)`. Determinism is the
   property this whole plan rests on, so it is asserted here and not left to inference.
@@ -111,16 +133,27 @@ flowchart LR
   needs no tolerance, and it is only true if the tap is in the right place and the stream declares
   full-range sRGB correctly.
 
+  **If Phase 1 chose a YUV stream format, assert this at the tap rather than on the wire.** An
+  8-bit RGB→YUV conversion is not bijective, so the wire bytes provably cannot equal the PNG's,
+  and a test written against them would be loosened to a tolerance until it passed — which is how
+  a guard becomes decoration. Assert the RGB frame handed to the stream writer against the PNG,
+  and the colour conversion as its own round-trip property. This phase is about **where the tap
+  sits**; the serialization is a separate question, and conflating them is what makes the
+  assertion unsatisfiable.
+
 ### Phase 4 — it survives a whole track
 
 - **Owner skill:** dev
 - **What:** Make a 14,400-frame render complete.
 - **Files touched:** `standalone/src/shot/render.rs`, and whatever
-  [Plan 0099](0099-the-horizon-reaches-its-own-length.md) found.
-- **Notes for the implementer:** **this phase is why 0099 is a hard dependency.** `shot --horizon`
-  dies at ~3,601 frames at ~2.9 GB resident (design-backlog 0093); four minutes at 60 fps is
-  14,400 — four times past a wall that already exists on a sibling path. If 0099 has not landed,
-  stop here and say so rather than working around it in a second place.
+  [Plan 0099](done/0099-the-horizon-reaches-its-own-length.md) found.
+- **Notes for the implementer:** **this phase is why 0099 was a hard dependency, and 0099 has
+  landed** (2026-08-16). What it found is the thing to reuse rather than rediscover: the wall was
+  not a frame count but memory pressure, from a capture path that submitted without ever polling —
+  retention was **per pass**, so an RD world at 13 passes a frame retained 950 KB a frame against a
+  36 KB captured frame. The repair is one `poll(wait_indefinitely)` in `step_offscreen`, at ~1.5x
+  wall clock. If this render mode encodes its own passes and submits them anywhere other than
+  through `step_offscreen`, it inherits the same defect and none of the fix.
 - **Done when:** a four-minute clip renders to completion at 1080p/60 with resident memory **flat
   across the run** — the same no-session-growth requirement [NFR §12](../nfr.md#12-runtime-memory)
   makes of a live session, measured the same way, because a render that leaks is the identical
@@ -136,8 +169,9 @@ flowchart LR
 
 ## Risks & open questions
 
-- **Blocked by [0099](0099-the-horizon-reaches-its-own-length.md).** Phases 1–3 are takeable
-  immediately at short clip lengths; Phase 4 is not takeable at all until that repair lands.
+- ~~**Blocked by [0099](done/0099-the-horizon-reaches-its-own-length.md).**~~ **Discharged
+  2026-08-16** — the repair landed and 36,001 renders complete with the resident set flat, so
+  Phase 4 is takeable with the rest.
 - **Colour is the most likely silent failure.** A file that is subtly darker than the app passes
   every automated check that does not compare against the app. Phase 3's byte-identity assertion is
   the guard, and it is deliberately exact rather than tolerant.

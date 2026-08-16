@@ -139,7 +139,7 @@ world whose mechanism has an **accumulation axis** — sustained forces, feedbac
 with net gain, a population that can migrate or pile up. Record the verdict in
 the world's own header, the way the fold-edge verdicts were recorded.
 
-**Four things to know before reading a row.**
+**Five things to know before reading a row.**
 
 1. **It is never a gate.** Nothing here runs in CI or fails a build, and the mode
    applies no threshold. It prints a trend; the verdict is yours. Making it a
@@ -153,13 +153,47 @@ the world's own header, the way the fold-edge verdicts were recorded.
    `delta 0.0000, monotone 0.00` on every statistic — that flat series is what
    makes a sloped one mean something.
 3. **It is slow by construction** — 3,600 renders per simulated minute. At
-   96x96 on a hardware adapter that is roughly 10 s of wall clock per simulated
-   minute, so a ten-minute horizon is a couple of minutes of sitting. Nobody will
-   run it casually, which is the honest cost of refusing a gate.
-4. **It cannot see the process.** Resident set, GPU resource churn, frame-time
-   spikes on a preset switch: none of that is reproducible in a headless loop
-   that never rebuilds a surface. [`--soak`](nfr.md) is the instrument for that
-   half, and the two are deliberately separate (ADR-0099).
+   96x96 on a hardware adapter a ten-minute horizon measured **16 s** for a
+   single-pass world (`Halo`) and **54 s** for a reaction-diffusion one
+   (`Etching`, 13 passes a frame). Nobody will run it casually, which is the
+   honest cost of refusing a gate.
+4. **The verified length is the documented one, and here is what verified
+   means** (Plan 0099). `--horizon 10` renders all 36,001 frames on **all three**
+   shipped reaction-diffusion worlds — `Etching`, `Mitosis`, `Verdigris` — with
+   the resident set **flat**: 324 MB reported before the run and 400 MB after,
+   of which the render itself travels **0.8 MB** (398.8 MB at 4 s to 399.6 MB at
+   54 s) — the 21 sampled images themselves. Measured on the Windows
+   development box, hardware adapter, debug build, at 96x96 (ADR-0071 — a
+   different machine or profile is a different measurement).
+
+   It was not always true, and the shape of the old failure is worth keeping.
+   The capture path submitted every non-sampled frame without ever polling the
+   device, so it reclaimed nothing between two *sampled* frames — 1,800
+   consecutive unpolled submits at the default interval. Retention was per
+   **pass**, not per pixel: an RD world retained **950 KB a frame** against a
+   36 KB captured frame, where single-pass worlds retained ~30 KB, so RD reached
+   the allocator first at ~4.4 GB and died with an invalid readback buffer. That
+   made it look like a property of the RD family; it was the poll cadence. The
+   step now polls, which costs about **1.5x** wall clock on an RD world and
+   bounds the memory of any run at any length.
+
+   **A run that cannot reach its requested length says so on stdout**, in the
+   table's place, with the wall clock and resident set it died at — not only as
+   a stderr line. And a `--horizon` the `--interval` does not divide is rounded
+   **down** to the last whole interval (rows are exact multiples, which is what
+   makes them comparable between runs), so the header states the length the run
+   actually reached and flags the shortfall when there is one.
+5. **It cannot see most of the process.** GPU resource churn and the frame-time
+   spike on a preset switch are not reproducible in a headless loop that never
+   rebuilds a surface. [`--soak`](nfr.md) is the instrument for that half, and
+   the two are deliberately separate (ADR-0099).
+
+   **One exception, and it is the one that mattered:** the resident set of the
+   render loop itself. The cost block reports it, and reading that column is
+   what found the ceiling in point 4 — a headless loop cannot reproduce a
+   *switching* app's memory behaviour, but its own growth is exactly what a
+   long run is in a position to see. This point used to name the resident set
+   among the things a horizon cannot see; that was too broad.
 
 The stimulus is `--set`, held for the whole run, which is what makes a row at
 minute nine comparable with a row at minute one — so `--horizon` and

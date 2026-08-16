@@ -86,8 +86,8 @@ capture, and it is the whole reason the feature is cheap here and expensive ever
   against the app, in a way that looks like an engine bug and is not. This is a whole phase, and
   it is the part most likely to ship subtly broken.
 - **Long renders inherit an unfixed defect.** `shot --horizon` currently dies at ~3,601 frames at
-  ~2.9 GB resident ([Plan 0099](../plans/0099-the-horizon-reaches-its-own-length.md), design-backlog
-  0093). A four-minute video is 14,400 frames — **four times past where the existing long-run path
+  ~2.9 GB resident ([Plan 0099](../plans/done/0099-the-horizon-reaches-its-own-length.md),
+  design-backlog 0093 — **discharged, see the Outcome below**). A four-minute video is 14,400 frames — **four times past where the existing long-run path
   already fails**. This feature is blocked on that repair, and saying so is the point of naming it
   here.
 - **Nothing validates the output file.** We test that the frames are right and that the stream is
@@ -130,6 +130,24 @@ capture is coupled to real time, so it drops frames under load, cannot exceed th
 refresh, cannot exceed the display's resolution, and is not reproducible. That is what every
 competitor is stuck with; choosing it deliberately would be choosing to be indistinguishable from
 them.
+
+## Outcome (2026-08-16)
+
+**The "long renders inherit an unfixed defect" Negative is discharged**, by
+[Plan 0099](../plans/done/0099-the-horizon-reaches-its-own-length.md) rather than by this ADR's own
+plan. Two of the three things that bullet asserts turned out to be wrong, and the correction is
+worth carrying into Plan 0101 Phase 4:
+
+- **It is not a frame ceiling.** All three reaction-diffusion worlds clear 5,401 and fail at 7,201,
+  one unfixed run died at 4.4 GB and another reached 36,001 at 4.9 GB — the wall is memory pressure,
+  so "~3,601 frames" was a reading of one machine's headroom, not a limit.
+- **It is not the RD family's mechanism either.** Retention was **per pass**: a 13-pass RD frame
+  retained 950 KB against a 36 KB captured frame where single-pass worlds retained ~30 KB. Every
+  world grew; RD reached the allocator first.
+- **The repair is one `poll(wait_indefinitely)` in `step_offscreen`**, at ~1.5x wall clock on an RD
+  world, and 36,001 renders now complete with the resident set flat. **What this buys the export
+  path is conditional:** a render mode that submits its own passes anywhere other than through
+  `step_offscreen` inherits the defect and none of the fix.
 
 ## Notes
 

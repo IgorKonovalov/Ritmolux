@@ -1,10 +1,28 @@
 # 0105 — The indexes go back to being indexes
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-16
 > **Created:** 2026-08-16
 > **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev
-> **Related ADRs:** [0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)
+> **Related ADRs:** [0116](../../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)
+
+> **Close (2026-08-16).** All six `dev` phases landed: `5791d25`, `0171fdf`, `f17be77`, `665eb0e`,
+> `34b72ea`, `7903351`. Mode 4 review: **no blockers, two majors, two minors, one nit.** The three
+> rosters went 477,594 -> 220,626 bytes and `node scripts/check-index-rows.mjs` is green on the
+> tree, on the fixture, and at all three call sites; every one of the 116 ADR index titles was
+> re-derived and matches its body `H1` exactly (verified mechanically at close). **Three deviations,
+> all surfaced by `dev` rather than tuned to:** the over-cap count was **136, not the 135 this plan
+> names** (26 plan bullets, not 25 — the ADR and backlog figures matched exactly); Phase 2's
+> `awk`-and-`grep` forward-reference invariant **moved 7 -> 3 instead of holding**, because four of
+> the seven matches were the regex catching ordinary words inside the abstracts being deleted and a
+> fifth was `awk` splitting on a pipe inside a title cell — the **three genuine inbound edges are
+> unchanged**, which is what the invariant exists to protect; and Phase 4 found the tree already
+> green one phase earlier than the plan expected. **The majors are both outside the trim:** the gate
+> has no assertion that it can convict (its fixture asserts exit 0 only, so a row matcher that
+> matches nothing reads identical to a clean tree — filed as [backlog
+> 0104](../../design-backlog.md)), and Phase 5 changed what a push runs without sweeping the two
+> operator docs that enumerate it (repaired in the close commit). ADR-0116 carries a dated `Outcome`
+> recording that its "roughly six" forward-reference rows measured **three**.
 
 ## TL;DR
 
@@ -30,7 +48,7 @@ Phase 7b moved the plan close write-ups verbatim into `docs/plans/README-archive
 bytes sitting under a heading that still reads *"One line per plan."* Preservation was never the
 problem; nothing bounded the new rows.
 
-[ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) records the
+[ADR-0116](../../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) records the
 decision and the arithmetic behind the cap.
 
 ## Decision
