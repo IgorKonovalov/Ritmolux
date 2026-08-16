@@ -5,8 +5,9 @@
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none yet — **one is owed and deliberately deferred**, see Phase 2
 > **Hard dependency:** [0101](0101-the-engine-renders-a-music-video.md) Phases 1–2, for every
-> phase except the spike. Transitively [0099](0099-the-horizon-reaches-its-own-length.md) for any
-> render past ~2 minutes.
+> phase except the spike. *(The transitive dependency on
+> [0099](done/0099-the-horizon-reaches-its-own-length.md) for renders past ~2 minutes is
+> **discharged** — it closed 2026-08-16 and the long-run path now completes.)*
 
 ## TL;DR
 
@@ -244,10 +245,13 @@ the core, the C ABI, or `lmv.exe`.
 
 - **Owner skill:** human
 - **What:** Render a full track with the chosen preset and cell, and watch it.
-- **Done when:** the user says whether it is publishable. **A track past roughly two minutes is
-  blocked**: `shot --horizon` dies at ~3,601 frames ([Plan 0099](0099-the-horizon-reaches-its-own-length.md),
-  design-backlog 0093), which at 30 fps is 2:00. Render inside that until 0099 lands, and say so
-  rather than working around it in a third place.
+- **Done when:** the user says whether it is publishable. *(This done-when carried a two-minute
+  ceiling — `shot --horizon` dying at ~3,601 frames — which **is gone**:
+  [Plan 0099](done/0099-the-horizon-reaches-its-own-length.md) closed 2026-08-16, the wall was
+  memory pressure from a capture path that never polled rather than a frame count, and the fix is
+  one `poll` in `step_offscreen`. Track length is no longer a bound. **The one thing to carry
+  forward:** a render mode that submits its own passes outside `step_offscreen` inherits the defect
+  and none of the fix.)*
 
 ## Data shapes
 
@@ -274,8 +278,9 @@ desynchronizes the audio mux downstream, and that failure is silent in the file.
 - **An ADR is owed and does not exist.** Deferred deliberately to after Phase 2 (see that phase).
   If Phases 3+ begin without it, that is a Mode 4 blocker.
 - **Blocked on [0101](0101-the-engine-renders-a-music-video.md) Phases 1–2** for everything except
-  the spike, and transitively on [0099](0099-the-horizon-reaches-its-own-length.md) for anything
-  past ~2 minutes. Phase 1 is takeable **today** and depends on neither.
+  the spike. The transitive block on [0099](done/0099-the-horizon-reaches-its-own-length.md) past
+  ~2 minutes is **discharged** (closed 2026-08-16). Phase 1 is takeable **today** and depends on
+  neither.
 - **The stream format is not settled yet**, and it changes Phase 3's cost. 0101 Phase 1 owns that
   choice and now records the measurement behind it.
 - **Weights are a multi-gigabyte first-run download from a third party.** Hugging Face model IDs
