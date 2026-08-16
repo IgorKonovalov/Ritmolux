@@ -1,6 +1,6 @@
 # ADR-0110 — Now-playing metadata is a shell-supplied string, and the core owns the banner
 
-> **Status:** proposed
+> **Status:** accepted (2026-08-16, user approval)
 > **Date:** 2026-08-16
 > **Related plan(s):** [0097](../plans/0097-the-track-announces-itself.md)
 
