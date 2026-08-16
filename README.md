@@ -102,18 +102,21 @@ preset files they document.
 
 ## Download
 
-Prebuilt standalone binaries are attached to each tag on the
-[Releases page](https://github.com/IgorKonovalov/light-music-visualizer/releases). Two zips per
-release, each carrying the app, a reference copy of the presets, and a `READ-ME-FIRST.txt`:
+Prebuilt binaries are attached to each tag on the
+[Releases page](https://github.com/IgorKonovalov/light-music-visualizer/releases). Three zips per
+release, each carrying a `READ-ME-FIRST.txt`:
 
 | Zip | What's in it |
 |-----|--------------|
 | `…-macos-universal.zip` | `LightMusicVisualizer.app` — universal (Apple Silicon + Intel), **macOS 13+** |
 | `…-windows-x64.zip` | `lmv.exe` — Windows x64 |
+| `…-foobar2000-component.zip` | `foo_lmv.fb2k-component` — foobar2000 v2, **x64 only** |
 
-Both are **unsigned**, so each OS objects once. On Windows, SmartScreen says "Windows protected
-your PC" → More info → Run anyway. On macOS, the app is ad-hoc signed only, so either right-click
-it and choose **Open**, or strip the quarantine attribute first:
+The two standalone zips also carry a reference copy of the presets.
+
+All three are **unsigned**, so each host objects once. On Windows, SmartScreen says "Windows
+protected your PC" → More info → Run anyway. On macOS, the app is ad-hoc signed only, so either
+right-click it and choose **Open**, or strip the quarantine attribute first:
 
 ```sh
 xattr -dr com.apple.quarantine LightMusicVisualizer.app
@@ -122,6 +125,22 @@ xattr -dr com.apple.quarantine LightMusicVisualizer.app
 The macOS build then asks for the **Screen Recording** permission — that is the only first-party
 way to tap system audio — and needs a **relaunch** after you grant it. Releases are marked
 prerelease while the app is `0.x`. The `READ-ME-FIRST.txt` in each zip has the rest.
+
+### The foobar2000 component
+
+Unzip, then in foobar2000: **File → Preferences → Components → Install…**, pick
+`foo_lmv.fb2k-component`, **Apply**, and let it restart. Open it from **View → Light Music
+Visualizer**, or dock it into the layout as a *Playback visualisation* element. `Space` cycles
+scenes.
+
+It needs **64-bit foobar2000 v2 on Windows** — there is no 32-bit build and no macOS component
+([ADR-0001](docs/adrs/0001-rust-core-wgpu-cabi-foobar-shim.md); the SDK is Windows-centric). A
+32-bit install will simply not list it.
+
+Because it reads what foobar2000 is already decoding, there is no audio capture to permit and no
+output device to route — it is the path with the fewest ways to go wrong. If you run both, the
+component and the standalone app **share one preset folder**, so a preset edited in either shows
+up in both.
 
 ## Running the standalone app
 
