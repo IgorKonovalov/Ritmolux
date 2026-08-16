@@ -58,7 +58,7 @@ pub mod bytecode;
 pub mod vm;
 
 use bytecode::{EelProgram, ProgramError};
-use vm::VmState;
+use vm::{Budget, VmState};
 
 /// The frame rate the `fps` variable reports, and the cadence a per-frame rate is
 /// interpreted against.
@@ -84,6 +84,29 @@ const OUTPUT_NAMES: [&str; 9] = ["zoom", "rot", "cx", "cy", "dx", "dy", "sx", "s
 const OUTPUT_FACTOR: [bool; 9] = [true, false, false, false, false, false, true, true, false];
 /// Whether output `i` is a rate — see [`OUTPUT_FACTOR`].
 const OUTPUT_RATE: [bool; 9] = [false, true, false, false, true, true, false, false, true];
+
+/// The composite outputs a per-frame program may set beyond the nine, in the
+/// order [`MilkRuntime::run_frame`] returns them.
+///
+/// `decay` first because it is the one that is rate-converted; the six after it
+/// are flags and a multiplier that pass through untouched, and they are exactly
+/// [`warp_mesh::COMPOSITE_PARAMS`](crate::render::scenes::warp_mesh::COMPOSITE_PARAMS)
+/// so the scene can apply them by name without a second table.
+pub const EXTRA_OUTPUT_NAMES: [&str; 8] = [
+    "decay",
+    "gamma",
+    "wrap",
+    "darken_center",
+    "brighten",
+    "darken",
+    "solarize",
+    "invert",
+];
+
+/// Each extra output's value before a per-frame program runs, positionally with
+/// [`EXTRA_OUTPUT_NAMES`]. MilkDrop's own defaults: 96 % of the previous frame
+/// survives, unity gamma, and every flag off.
+const EXTRA_DEFAULTS: [f32; 8] = [0.96, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
 /// A converted preset's compiled programs: what a bundle carries beyond an
 /// ordinary LMV preset.
@@ -235,8 +258,13 @@ pub struct MilkRuntime {
     vertex_inputs: VertexInputs,
     /// The nine per-vertex output registers, positionally with [`OUTPUT_NAMES`].
     outputs: [Option<u16>; 9],
-    /// `decay`, which is a per-frame output only — a vertex has no decay.
-    decay: Option<u16>,
+    /// The eight composite outputs, positionally with [`EXTRA_OUTPUT_NAMES`].
+    /// Per-frame only — a vertex has no decay and no gamma.
+    extra: [Option<u16>; 8],
+    /// The render target's aspect as of the last [`run_frame`](Self::run_frame),
+    /// so [`run_vertex`](Self::run_vertex) can compute MilkDrop's `rad`/`ang`
+    /// without the caller having to hand it over per vertex.
+    aspect: f32,
     /// The register values `per_frame` left, for the registers `per_vertex` can
     /// write. Restored before each vertex (see the module docs).
     snapshot: Vec<f32>,
@@ -304,6 +332,7 @@ impl MilkRuntime {
             ang: index("ang"),
         };
         let outputs = std::array::from_fn(|i| OUTPUT_NAMES.get(i).and_then(|n| index(n)));
+        let extra = std::array::from_fn(|i| EXTRA_OUTPUT_NAMES.get(i).and_then(|n| index(n)));
         let stack = bundle
             .per_frame_init
             .stack_depth()
@@ -320,7 +349,8 @@ impl MilkRuntime {
             inputs,
             vertex_inputs,
             outputs,
-            decay: index("decay"),
+            extra,
+            aspect: 1.0,
             snapshot,
             frame_index: 0,
             att: [0.0; 3],
@@ -342,7 +372,7 @@ impl MilkRuntime {
         self.state.reset_rng();
         self.frame_index = 0;
         self.att = [0.0; 3];
-        vm::run(&self.bundle.per_frame_init, &mut self.state);
+        vm::run(&self.bundle.per_frame_init, &mut self.state, Budget::INIT);
     }
 
     /// Whether this bundle has a per-vertex program at all. A bundle without one
@@ -366,7 +396,12 @@ impl MilkRuntime {
         dt: f32,
         mesh: (u32, u32),
         aspect: f32,
-    ) -> ([f32; 9], Option<f32>) {
+    ) -> ([f32; 9], [Option<f32>; 8]) {
+        self.aspect = if aspect.is_finite() && aspect > 0.0 {
+            aspect
+        } else {
+            1.0
+        };
         // The `*_att` envelopes, on the injected real `dt`.
         let alpha = if dt > 0.0 && dt.is_finite() {
             1.0 - (-dt / ATT_TAU).exp()
@@ -417,12 +452,14 @@ impl MilkRuntime {
                 self.state.set(index, identity_output(i));
             }
         }
-        if let Some(index) = self.decay {
-            // MilkDrop's own default: 96 % of the previous frame survives.
-            self.state.set(index, 0.96);
+        for (i, slot) in self.extra.iter().enumerate() {
+            if let Some(index) = *slot {
+                self.state
+                    .set(index, EXTRA_DEFAULTS.get(i).copied().unwrap_or(0.0));
+            }
         }
 
-        vm::run(&self.bundle.per_frame, &mut self.state);
+        vm::run(&self.bundle.per_frame, &mut self.state, Budget::FRAME);
         self.frame_index = self.frame_index.wrapping_add(1);
 
         // Snapshot what `per_vertex` can write, so each vertex starts from here.
@@ -440,21 +477,55 @@ impl MilkRuntime {
                 .and_then(|slot| *slot)
                 .map_or_else(|| identity_output(i), |index| self.state.get(index))
         });
-        let decay = self.decay.map(|index| {
-            // A per-frame survival factor becomes a per-second one, and is held
-            // off 1.0 for the reason `warp_mesh::MAX_DECAY` gives.
-            per_second_factor(self.state.get(index))
+        let extra: [Option<f32>; 8] = std::array::from_fn(|i| {
+            let index = self.extra.get(i).and_then(|slot| *slot)?;
+            let value = self.state.get(index);
+            // `decay` is a per-FRAME survival factor and becomes a per-second
+            // one; the seven after it are a multiplier and six flags, which are
+            // not rates and pass through.
+            Some(if i == 0 {
+                per_second_factor(value)
+            } else if value.is_finite() {
+                value
+            } else {
+                EXTRA_DEFAULTS.get(i).copied().unwrap_or(0.0)
+            })
         });
-        (convert_outputs(raw), decay)
+        (convert_outputs(raw), extra)
     }
 
-    /// Run `per_vertex` for the vertex at `(x, y, rad, ang)` and return its nine
-    /// outputs, converted like the per-frame ones.
+    /// Run `per_vertex` for the vertex at uv `(x, y)` — `y = 0` at the **top**,
+    /// which is the reference's own convention — and return its nine outputs,
+    /// converted like the per-frame ones.
+    ///
+    /// `rad` and `ang` are computed here rather than taken, and deliberately:
+    /// **MilkDrop normalizes them differently from this engine's native
+    /// `[per_vertex]` vocabulary**, and a converted preset has to get MilkDrop's.
+    /// The reference takes `rad = |(x_ndc * aspectx, y_ndc * aspecty)|` with the
+    /// *longer* axis scaled to 1, so `rad` reaches `1.0` at the middle of the
+    /// left and right edges of a wide frame; the native `rad`
+    /// ([`warp_mesh::vertex_position`](crate::render::scenes::warp_mesh::vertex_position))
+    /// reaches `1.0` at the top and bottom instead. The two differ by a factor of
+    /// the aspect, which on a 16:9 display is 1.78 — enough that a preset written
+    /// as `zoom = 1 + rad * 0.1` would be most of a stop out. `ang` is the
+    /// reference's `atan2` in `-pi..pi`, not the native `0..tau`.
     ///
     /// Restores the per-frame register state first, so a write inside the program
     /// does not leak into the next vertex — MilkDrop's semantics, and the reason
     /// two adjacent vertices of an identical program give identical answers.
-    pub fn run_vertex(&mut self, x: f32, y: f32, rad: f32, ang: f32) -> [f32; 9] {
+    pub fn run_vertex(&mut self, x: f32, y: f32) -> [f32; 9] {
+        // Clip-space position, +y up, which is what the reference's `rad`/`ang`
+        // are taken from.
+        let nx = x * 2.0 - 1.0;
+        let ny = 1.0 - y * 2.0;
+        let (ax, ay) = if self.aspect >= 1.0 {
+            (1.0, 1.0 / self.aspect)
+        } else {
+            (self.aspect, 1.0)
+        };
+        let (px, py) = (nx * ax, ny * ay);
+        let rad = (px * px + py * py).sqrt();
+        let ang = py.atan2(px);
         for (value, index) in self
             .snapshot
             .iter()
@@ -474,7 +545,7 @@ impl MilkRuntime {
         if let Some(index) = self.vertex_inputs.ang {
             self.state.set(index, ang);
         }
-        vm::run(&self.bundle.per_vertex, &mut self.state);
+        vm::run(&self.bundle.per_vertex, &mut self.state, Budget::VERTEX);
         let raw: [f32; 9] = std::array::from_fn(|i| {
             self.outputs
                 .get(i)

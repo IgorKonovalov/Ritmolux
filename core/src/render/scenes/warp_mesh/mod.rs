@@ -197,6 +197,49 @@ const DEFAULT_DEPOSIT_ARMS: f32 = 0.0;
 const DEFAULT_DEPOSIT_TWIST: f32 = 0.0;
 const DEFAULT_DEPOSIT_SPIN: f32 = 0.0;
 
+/// **MilkDrop's composite roster**, in the order [`COMPOSITE_PARAMS`] declares
+/// it — the six flags and one multiplier its format carries, reachable from a
+/// preset and written by a converted bundle's per-frame program.
+///
+/// They are here rather than warned about because the corpus says so. Counted
+/// over all 10 347 files, 2026-08-16:
+///
+/// ```text
+/// bTexWrap=1       6 014   58 %
+/// bDarken=1        3 686   36 %
+/// bBrighten=1      1 445   14 %
+/// bDarkenCenter=1    711    7 %
+/// bInvert=1          576    6 %
+/// bSolarize=1        445    4 %
+/// ```
+///
+/// Each is one `select` in a shader, and between them they reach most of the
+/// library. `fVideoEchoZoom`/`_Alpha`/`_Orientation` — the one member of the
+/// same family that is *not* here — is a second sampled copy rather than a
+/// remap, and only 252 files (2.4 %) set a non-zero echo alpha, so the converter
+/// names it as unsupported instead.
+pub const COMPOSITE_PARAMS: &[&str] = &[
+    "gamma",
+    "wrap",
+    "darken_center",
+    "brighten",
+    "darken",
+    "solarize",
+    "invert",
+];
+
+/// `gamma` default — MilkDrop's `fGammaAdj` at unity.
+const DEFAULT_GAMMA: f32 = 1.0;
+/// The other six default off, which is the identity for each.
+const DEFAULT_COMPOSITE_FLAG: f32 = 0.0;
+/// How much `darken_center` takes out of the middle at full strength.
+///
+/// MilkDrop draws a fixed alpha there rather than exposing an amount; this is
+/// that gesture as a multiplier, matched by eye to the reference's blob. A
+/// preset binding a fraction gets a proportional one, which the format cannot
+/// express and costs nothing to allow.
+const DARKEN_CENTER_STRENGTH: f32 = 0.22;
+
 /// Colour defaults (ADR-0021), matching the shared vocabulary every other
 /// scene uses.
 const DEFAULT_HUE: f32 = 0.0;
@@ -233,6 +276,14 @@ pub const PARAMS: &[&str] = &[
     "deposit_arms",
     "deposit_twist",
     "deposit_spin",
+    // MilkDrop's composite roster (see `COMPOSITE_PARAMS`).
+    "gamma",
+    "wrap",
+    "darken_center",
+    "brighten",
+    "darken",
+    "solarize",
+    "invert",
     // Colour.
     "hue",
     "color_span",
@@ -260,7 +311,7 @@ const WARP_SHADER: &str = r#"
 struct Warp {
     // x: render-target aspect, y: dt (s), z: scene time (s), w: warp_scale
     misc: vec4<f32>,
-    // x: decay^dt, y: warp_speed, zw: unused
+    // x: decay^dt, y: warp_speed, z: wrap (0/1), w: darken_center amount
     misc2: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> wu: Warp;
@@ -280,6 +331,8 @@ struct VsIn {
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
     @location(0) src: vec2<f32>,
+    // The vertex's own destination uv, for the fragment stage's centre darkening.
+    @location(1) uv: vec2<f32>,
 }
 
 @vertex
@@ -303,23 +356,32 @@ fn vs_main(in: VsIn) -> VsOut {
     let sy   = pow(max(in.t1.w, 1e-4), dt);
     let warp = in.t2.x * dt;
 
-    // Isotropic, about the per-vertex centre. `aspect` is the RENDER TARGET's
-    // (ADR-0037) — the mesh's own proportions never enter this.
-    var p = uv - ctr;
+    // **The stage order is MilkDrop's**, and it matters: `zoom` is about the
+    // FRAME CENTRE while `sx`/`sy` and `rot` are about the per-vertex `cx`/`cy`,
+    // and a preset with an off-centre `cx` renders a different picture if the two
+    // are collapsed into one origin. The whole point of a converted preset is
+    // that it moves the way its author saw, so the reference's order is the one
+    // to keep — see `milk::MilkRuntime` for the rest of the mapping.
+    //
+    // The INVERSE of the motion the outputs name throughout: a destination vertex
+    // asks where its content came from, so a `zoom` above 1 shrinks the source
+    // window and the past appears to grow.
+
+    // 1. zoom, about the frame centre. Aspect-corrected on the way in and out
+    //    (ADR-0037: the RENDER TARGET's aspect, never the mesh's), so a zoom is
+    //    isotropic rather than a squash on a wide display.
+    var p = uv - vec2<f32>(0.5, 0.5);
     p.x = p.x * aspect;
-
-    // The INVERSE of the motion the outputs name: a destination vertex asks where
-    // its content came from, so a `zoom` above 1 shrinks the source window and the
-    // past appears to grow.
     p = p / zoom;
-    p = vec2<f32>(p.x / sx, p.y / sy);
-    let c = cos(rot);
-    let s = sin(rot);
-    p = vec2<f32>(p.x * c - p.y * s, p.x * s + p.y * c);
-    p = p - d;
+    p.x = p.x / aspect;
+    p = p + vec2<f32>(0.5, 0.5);
 
-    // The procedural warp, MilkDrop's four sinusoids: a wobble whose own
-    // frequencies drift, so it never settles into a visible standing pattern.
+    // 2. stretch, about the per-vertex centre.
+    p = (p - ctr) / vec2<f32>(sx, sy) + ctr;
+
+    // 3. the procedural warp, MilkDrop's four sinusoids: a wobble whose own
+    //    frequencies drift, so it never settles into a visible standing pattern.
+    //    Applied in uv, where the reference applies it.
     let wt = time * wspeed;
     let f0 = 11.68 + 4.0 * cos(wt * 1.413 + 10.0);
     let f1 =  8.77 + 3.0 * cos(wt * 1.113 +  7.0);
@@ -333,22 +395,55 @@ fn vs_main(in: VsIn) -> VsOut {
     p.x = p.x + warp * 0.0035 * cos(wt * 0.753 - inv * (wx * f1 - wy * f2));
     p.y = p.y + warp * 0.0035 * sin(wt * 0.825 + inv * (wx * f0 + wy * f3));
 
-    p.x = p.x / aspect;
+    // 4. rotate, about the per-vertex centre, aspect-corrected so it is a
+    //    rotation rather than a shear.
+    var q = p - ctr;
+    q.x = q.x * aspect;
+    let c = cos(rot);
+    let s = sin(rot);
+    q = vec2<f32>(q.x * c - q.y * s, q.x * s + q.y * c);
+    q.x = q.x / aspect;
 
+    // 5. translate, in uv — `dx`/`dy` are uv per second, which is the source
+    //    vocabulary's own unit.
     var out: VsOut;
     out.pos = vec4<f32>(in.clip, 0.0, 1.0);
-    out.src = p + ctr;
+    out.src = q + ctr - d;
+    out.uv = uv;
     return out;
 }
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    // The transparent-border edge policy (ADR-0048): off-field reads contribute
-    // nothing. Clamping would re-deposit the border texel every frame until the
-    // edge became a permanent bar of colour.
-    let inside = f32(all(in.src >= vec2<f32>(0.0)) && all(in.src <= vec2<f32>(1.0)));
-    let past_c = textureSampleLevel(past, past_samp, in.src, 0.0);
-    return past_c * (wu.misc2.x * inside);
+    let wrap = wu.misc2.z;
+    // `wrap` — MilkDrop's `bTexWrap`, and **58 % of the corpus sets it**
+    // (6 014 of 10 347, measured 2026-08-16). With it on the past is toroidal, so
+    // a zoom that pulls content off one edge brings it back on the other; that is
+    // what most of the classic tunnels are made of, and clamping instead smears
+    // the border row outward.
+    //
+    // Off, the transparent-border edge policy applies (ADR-0048): an off-field
+    // read contributes NOTHING. Clamping would re-deposit the border texel every
+    // frame until the edge became a permanent bar of colour.
+    let wrapped = fract(in.src);
+    let src = select(in.src, wrapped, wrap > 0.5);
+    let inside = select(
+        f32(all(in.src >= vec2<f32>(0.0)) && all(in.src <= vec2<f32>(1.0))),
+        1.0,
+        wrap > 0.5
+    );
+    let past_c = textureSampleLevel(past, past_samp, src, 0.0);
+
+    // `darken_center` — MilkDrop draws a small dark blob at the middle of every
+    // frame, which is what stops a zooming feedback loop saturating there. This
+    // is the same gesture as a multiply rather than as a drawn quad: same effect,
+    // one fewer pass. Its radius is in frame-heights, so it is round on any
+    // display.
+    var centred = in.uv - vec2<f32>(0.5, 0.5);
+    centred.x = centred.x * wu.misc.x;
+    let dc = 1.0 - wu.misc2.w * (1.0 - smoothstep(0.0, 0.32, length(centred)));
+
+    return past_c * (wu.misc2.x * inside * dc);
 }
 "#;
 
@@ -438,8 +533,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// The present pass: the field, over the backdrop.
 const PRESENT_SHADER: &str = r#"
 struct Present {
-    // x: brightness, y: occlude, zw: unused
+    // x: brightness, y: occlude, z: gamma, w: unused
     a: vec4<f32>,
+    // The four MilkDrop composite remaps, each 0 or 1:
+    // x: brighten, y: darken, z: solarize, w: invert
+    b: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> pp: Present;
 @group(0) @binding(1) var field: texture_2d<f32>;
@@ -450,9 +548,25 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let c = textureSampleLevel(field, field_samp, in.uv, 0.0);
     // The field already holds premultiplied colour and coverage (the deposit
     // writes them that way and the warp scales both together), so `brightness`
-    // scales the light and `occlude` scales only how much backdrop is held out
-    // (ADR-0085).
-    return vec4<f32>(c.rgb * max(pp.a.x, 0.0), clamp(c.a, 0.0, 1.0) * pp.a.y);
+    // and `gamma` scale the light and `occlude` scales only how much backdrop is
+    // held out (ADR-0085).
+    var col = c.rgb * max(pp.a.x, 0.0) * max(pp.a.z, 0.0);
+
+    // MilkDrop's four composite remaps, in its own order. Each is a flag in the
+    // source format and stays one here, so a preset that binds none of them pays
+    // four `select`s on a uniform branch and nothing else.
+    //
+    // **They operate on LINEAR light here and operated on 8-bit display-referred
+    // pixels in MilkDrop** (ADR-0046 is the whole reason this plan is
+    // interesting), so they are the same gesture rather than the same arithmetic:
+    // `brighten`'s square root lifts the shadows either way, but by a different
+    // amount. Stated rather than discovered.
+    col = select(col, sqrt(max(col, vec3<f32>(0.0))), pp.b.x > 0.5);
+    col = select(col, col * col, pp.b.y > 0.5);
+    col = select(col, col * (vec3<f32>(1.0) - col) * 4.0, pp.b.z > 0.5);
+    col = select(col, max(vec3<f32>(1.0) - col, vec3<f32>(0.0)), pp.b.w > 0.5);
+
+    return vec4<f32>(col, clamp(c.a, 0.0, 1.0) * pp.a.y);
 }
 "#;
 
@@ -476,6 +590,7 @@ struct DepositUniform {
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct PresentUniform {
     a: [f32; 4],
+    b: [f32; 4],
 }
 
 /// One mesh vertex, as the warp pipeline reads it.
@@ -643,6 +758,13 @@ pub struct WarpMeshScene {
     deposit_arms: f32,
     deposit_twist: f32,
     deposit_spin: f32,
+    gamma: f32,
+    wrap: f32,
+    darken_center: f32,
+    brighten: f32,
+    darken: f32,
+    solarize: f32,
+    invert: f32,
     hue: f32,
     color_span: f32,
     color_center: f32,
@@ -708,6 +830,13 @@ impl WarpMeshScene {
             deposit_arms: DEFAULT_DEPOSIT_ARMS,
             deposit_twist: DEFAULT_DEPOSIT_TWIST,
             deposit_spin: DEFAULT_DEPOSIT_SPIN,
+            gamma: DEFAULT_GAMMA,
+            wrap: DEFAULT_COMPOSITE_FLAG,
+            darken_center: DEFAULT_COMPOSITE_FLAG,
+            brighten: DEFAULT_COMPOSITE_FLAG,
+            darken: DEFAULT_COMPOSITE_FLAG,
+            solarize: DEFAULT_COMPOSITE_FLAG,
+            invert: DEFAULT_COMPOSITE_FLAG,
             hue: DEFAULT_HUE,
             color_span: DEFAULT_COLOR_SPAN,
             color_center: DEFAULT_COLOR_CENTER,
@@ -1138,6 +1267,13 @@ impl Scene for WarpMeshScene {
         self.deposit_arms = DEFAULT_DEPOSIT_ARMS;
         self.deposit_twist = DEFAULT_DEPOSIT_TWIST;
         self.deposit_spin = DEFAULT_DEPOSIT_SPIN;
+        self.gamma = DEFAULT_GAMMA;
+        self.wrap = DEFAULT_COMPOSITE_FLAG;
+        self.darken_center = DEFAULT_COMPOSITE_FLAG;
+        self.brighten = DEFAULT_COMPOSITE_FLAG;
+        self.darken = DEFAULT_COMPOSITE_FLAG;
+        self.solarize = DEFAULT_COMPOSITE_FLAG;
+        self.invert = DEFAULT_COMPOSITE_FLAG;
         self.hue = DEFAULT_HUE;
         self.color_span = DEFAULT_COLOR_SPAN;
         self.color_center = DEFAULT_COLOR_CENTER;
@@ -1169,6 +1305,13 @@ impl Scene for WarpMeshScene {
             "deposit_arms" => self.deposit_arms = value,
             "deposit_twist" => self.deposit_twist = value,
             "deposit_spin" => self.deposit_spin = value,
+            "gamma" => self.gamma = value,
+            "wrap" => self.wrap = value,
+            "darken_center" => self.darken_center = value,
+            "brighten" => self.brighten = value,
+            "darken" => self.darken = value,
+            "solarize" => self.solarize = value,
+            "invert" => self.invert = value,
             "hue" => self.hue = value,
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
@@ -1217,14 +1360,22 @@ impl Scene for WarpMeshScene {
         let mesh = self.state.mesh;
         let (time, dt) = (self.time, self.dt);
         if let Some(runtime) = self.milk.as_mut() {
-            let (outputs, decay) = runtime.run_frame(&self.frame, time, dt, mesh, aspect);
+            let (outputs, extra) = runtime.run_frame(&self.frame, time, dt, mesh, aspect);
             for (index, value) in outputs.iter().enumerate() {
                 if let Some(slot) = self.scalars.get_mut(index) {
                     *slot = *value;
                 }
             }
-            if let Some(decay) = decay {
-                self.decay = decay;
+            // The composite outputs, by name — `EXTRA_OUTPUT_NAMES` is exactly
+            // `COMPOSITE_PARAMS` with `decay` in front, so there is no second
+            // table here to drift from the runtime's.
+            for (index, value) in extra.iter().enumerate() {
+                let Some(value) = *value else { continue };
+                match crate::milk::EXTRA_OUTPUT_NAMES.get(index) {
+                    Some(&"decay") => self.decay = value,
+                    Some(name) => self.set_param(name, value),
+                    None => {}
+                }
             }
             // A bundle's per-vertex program replaces any `[per_vertex]` table's
             // series wholesale, so the flags are cleared here and re-set in
@@ -1296,15 +1447,13 @@ impl Scene for WarpMeshScene {
             let mut v = 0usize;
             for row in 0..=my {
                 for col in 0..=mx {
-                    let (x, y, rad, ang) = vertex_position(col, row, (mx, my), aspect);
-                    // MilkDrop's `y` runs bottom-up where this scene's runs
-                    // top-down, and its `rad`/`ang` are already the aspect-
-                    // corrected pair `vertex_position` computes. Flipping `y`
-                    // here rather than in `vertex_position` keeps the native
-                    // `[per_vertex]` vocabulary in texture space, where every
-                    // sampler in this file addresses.
+                    let (x, y, _, _) = vertex_position(col, row, (mx, my), aspect);
+                    // Only the uv goes over: the runtime computes MilkDrop's own
+                    // `rad`/`ang` from it, which are normalized differently from
+                    // the native pair `vertex_position` returns. See
+                    // `MilkRuntime::run_vertex` for the factor and why it matters.
                     let outputs = match self.milk.as_mut() {
-                        Some(runtime) => runtime.run_vertex(x, 1.0 - y, rad, ang),
+                        Some(runtime) => runtime.run_vertex(x, y),
                         None => break,
                     };
                     for (index, value) in outputs.iter().enumerate() {
@@ -1333,7 +1482,12 @@ impl Scene for WarpMeshScene {
             0,
             bytemuck::bytes_of(&WarpUniform {
                 misc: [aspect, dt, self.time, self.warp_scale],
-                misc2: [decay, self.warp_speed, 0.0, 0.0],
+                misc2: [
+                    decay,
+                    self.warp_speed,
+                    f32::from(self.wrap >= 0.5),
+                    self.darken_center.clamp(0.0, 1.0) * DARKEN_CENTER_STRENGTH,
+                ],
             }),
         );
         queue.write_buffer(
@@ -1370,7 +1524,13 @@ impl Scene for WarpMeshScene {
             &res.present_uniform,
             0,
             bytemuck::bytes_of(&PresentUniform {
-                a: [self.brightness, self.occlude, 0.0, 0.0],
+                a: [self.brightness, self.occlude, self.gamma, 0.0],
+                b: [
+                    f32::from(self.brighten >= 0.5),
+                    f32::from(self.darken >= 0.5),
+                    f32::from(self.solarize >= 0.5),
+                    f32::from(self.invert >= 0.5),
+                ],
             }),
         );
 

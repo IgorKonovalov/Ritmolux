@@ -1020,6 +1020,123 @@ Three things to know before running one:
    0.14 % baseline. And do not re-measure by ear: `locked` is the outcome
    instrument and the score columns are the decomposition.
 
+## `milkconv`: looking at a converted MilkDrop preset
+
+`milkconv` turns a `.milk` file into an LMV preset ahead of time
+([ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+It is a **developer tool and never ships** — it sits outside the workspace's
+`default-members`, exactly as `lmv-core-cabi` does, so a bare `cargo build` does
+not compile it:
+
+```bash
+cargo run -p milkconv -- "path/to/Some Preset.milk" --out converted.toml
+```
+
+The output is an ordinary preset, so everything on this page already applies to
+it — `shot --preset-file converted.toml` renders it like any other:
+
+```bash
+cargo run -p standalone --example shot -- \
+  --preset-file converted.toml --frames 300 --size 640x400 \
+  --set bass=0.6,mid=0.5,treb=0.45 --out converted.png
+```
+
+### Read the warnings; they are the interesting output
+
+The converter prints every name it could not carry across, to **stderr**, and
+repeats them in the bundle's header comment. That is the plan's
+no-silent-zero rule (Phase 3): a preset that reads a variable MilkDrop supplies
+and this engine does not, or writes one MilkDrop draws with and this engine does
+not, says so — in the shape ADR-0020's typo warning already takes.
+
+```text
+milkconv: Bow To Gravity: sets `wave_r`, which this engine does not consume — Plan 0100 Phase 4, the draw layer
+milkconv: Bow To Gravity: sets `echo_alpha`, which this engine does not consume — the video echo ...
+```
+
+What is **not** warned about is a bare name the preset uses as its own
+accumulator. In EEL2 an unset variable legitimately reads zero, presets rely on
+that constantly, and warning on every one of them would bury the findings that
+matter. The check is against MilkDrop's own roster, not against "every name we do
+not know".
+
+### What a Phase 3 conversion does and does not carry
+
+| carried | not carried |
+|---|---|
+| the per-frame and per-vertex programs, whole | the waveform and the custom waves and shapes (Phase 4) |
+| `zoom` `rot` `cx` `cy` `dx` `dy` `sx` `sy` `warp` `zoomexp` | the inner/outer borders and the motion-vector grid (Phase 4) |
+| `decay` `gamma` `wrap` `darken_center` `brighten` `darken` `solarize` `invert` | `echo_zoom` / `echo_alpha` / `echo_orient` — a second sampled copy, which this engine has no stage for |
+| the initial conditions, re-applied at the top of every frame | the `warp` and `comp` HLSL blocks (Phase 6) |
+| `q1`–`q32`, `t1`–`t8`, `megabuf`, `gmegabuf` | disk textures — deliberately out of scope, and priced at 19 % of the corpus |
+
+**A converted preset carries a stand-in deposit rather than its own waveform**,
+and the bundle says so in its header. MilkDrop's light source *is* the waveform;
+without something depositing light there is nothing for the mesh to move, and
+nothing on screen to judge. Phase 4 replaces it.
+
+### Rates are converted, and that is why a preset moves at the right speed
+
+MilkDrop's `zoom`, `rot`, `dx`, `dy`, `warp` and `decay` are all **per rendered
+frame**, so a preset drifts at half the speed on a machine running twice the rate.
+This engine's vocabulary is per second throughout (ADR-0019). The runtime converts
+at MilkDrop's nominal **30 fps** — a factor becomes `v^30`, a rate `v * 30` — which
+is what makes a converted preset move at the speed its author saw, on any display.
+
+Two consequences worth knowing before reading a number in a bundle:
+
+- A `zoom` of `1.02` in a `.milk` file is `1.81` per second here. The numbers are
+  not on the same scale as a hand-authored `[params]` binding beside them.
+- `fps` reports `30` to the program rather than the display's real rate. A preset
+  that reads `fps` is compensating for a cadence, and telling it the truth about a
+  144 Hz display would compensate twice.
+
+### The moment of truth, captured
+
+Plan 0100 Phase 3's done-when is a human judgement — does a converted preset move
+the way its name says — so the evidence is frames rather than an assertion. All
+four below are from `presets-milkdrop-original`, converted with no hand editing
+and rendered at `bass=0.6,mid=0.5,treb=0.45` after 300 frames:
+
+| | |
+|---|---|
+| ![LSD Zoomtunnel](images/milkconv/lsd-zoomtunnel.png) | ![A Million Miles from Earth](images/milkconv/a-million-miles.png) |
+| *Goody — LSD Zoomtunnel*: rays converging on a dark centre, which is the preset's whole name. | *Krash & Rovastar — A Million Miles from Earth (Ripple Mix)*: the ripple's radial lobes. |
+| ![Hypnotic Spiral](images/milkconv/hypnotic-spiral.png) | ![Escher's Tunnel](images/milkconv/eschers-tunnel.png) |
+| *Idiot — Marphets Surreal Dream (Hypnotic Spiral Mix)*: a spiral, from `rot` and `zoom` composed per vertex. | *Aderrasi — Contortion (Escher's Tunnel Mix)*. |
+
+And the same spiral over a clip, which is what "motion in the right direction, at
+the right rate" actually looks like — six frames of `--signal click:120`:
+
+![the spiral turning over a clip](images/milkconv/spiral-over-a-clip.png)
+
+> **The radial-arm character these four share is the stand-in deposit, not the
+> presets.** It is the same ring in all of them; what differs is what the mesh
+> does to it. Read the *motion* here and wait for Phase 4 to read the *figure*.
+
+### How much of the corpus converts
+
+Measured 2026-08-16, over the two public collections named in the plan:
+
+```text
+presets-milkdrop-original      552 / 552     100 %
+presets-cream-of-the-crop    9 784 / 9 795    99.9 %
+```
+
+"Converts" means parses and compiles, which is a **weaker** claim than "renders as
+authored" — every one of those files carries the warnings above, and 82 % of the
+corpus has HLSL shaders that Phase 3 does not translate at all. Plan 0100 Phase 5
+is where that gap is measured rather than estimated, and it asserts no threshold:
+per [ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+a coverage percentage is a property of one corpus and one converter at one moment,
+so it is recorded with both named and is never a gate.
+
+The eleven files that do not compile are genuinely malformed — a stray backslash,
+a `sin` with no arguments, a truncated `per_frame_init`. Two decisions in the
+parser are what got the number that high, and both were measured rather than
+assumed; they are on `milk::join_code` and `eel::Compiler::argument`.
+
+
 ## The `core/tests/` harness
 
 Most differential tests render on the **software adapter** (`prefer_software`) so

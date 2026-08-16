@@ -9,8 +9,8 @@
 // Test asserts panic on failure; allowed here over the module's pragma.
 #![allow(clippy::panic, clippy::indexing_slicing, clippy::unwrap_used)]
 
-use super::bytecode::{Binary, EelProgram, MAX_LOOP_ITERATIONS, Mem, Op, ProgramError, Unary};
-use super::vm::{GMEGABUF_SLOTS, MEGABUF_SLOTS, VmState, run};
+use super::bytecode::{Binary, EelProgram, Mem, Op, ProgramError, Unary};
+use super::vm::{Budget, GMEGABUF_SLOTS, MEGABUF_SLOTS, VmState, run};
 use super::*;
 
 /// Assemble a program from ops over registers named `a`, `b`, `c`, …
@@ -23,7 +23,7 @@ fn program(code: Vec<Op>, registers: usize) -> EelProgram {
 
 fn execute(p: &EelProgram) -> f32 {
     let mut state = VmState::new(p.register_count(), p.stack_depth(), 0);
-    run(p, &mut state)
+    run(p, &mut state, Budget::FRAME)
 }
 
 /// **The text encoding round-trips**, which is what makes a bundle both diffable
@@ -312,11 +312,45 @@ fn a_loop_is_bounded_and_is_an_expression() {
         0.0,
         "a non-finite count runs no body"
     );
-    // **The bound, which is what stops untrusted text hanging a frame.**
+    // **The bounds, which are what stop untrusted text hanging a frame.** There
+    // are two and either may bite first, so each is exercised with the other
+    // opened out — a single assertion against the default budget would silently
+    // stop testing the loop cap the moment the instruction backstop got tighter.
+    let billion = counted(1.0e9);
+    let mut state = VmState::new(billion.register_count(), billion.stack_depth(), 0);
     assert_eq!(
-        execute(&counted(1.0e9)),
-        MAX_LOOP_ITERATIONS as f32,
-        "a loop asking for a billion iterations runs exactly the cap"
+        run(
+            &billion,
+            &mut state,
+            Budget {
+                loops: 64,
+                instructions: 1_000_000,
+            }
+        ),
+        64.0,
+        "the loop cap bounds a loop asking for a billion iterations"
+    );
+    let mut state = VmState::new(billion.register_count(), billion.stack_depth(), 0);
+    let ran = run(
+        &billion,
+        &mut state,
+        Budget {
+            loops: 1_000_000,
+            instructions: 700,
+        },
+    );
+    assert!(
+        ran > 0.0 && ran < 200.0,
+        "the instruction backstop bounds it even with the loop cap wide open, \
+         got {ran}"
+    );
+    // And under the shipped per-vertex budget — the one that runs thousands of
+    // times a frame — it terminates well short of either.
+    let mut state = VmState::new(billion.register_count(), billion.stack_depth(), 0);
+    let ran = run(&billion, &mut state, Budget::VERTEX);
+    assert!(
+        ran <= f64::from(Budget::VERTEX.loops) as f32,
+        "a per-vertex loop cannot exceed its own cap, got {ran}"
     );
 }
 
@@ -367,7 +401,26 @@ fn a_while_runs_until_its_body_is_zero_and_is_bounded() {
         ],
         1,
     );
-    assert_eq!(execute(&forever), MAX_LOOP_ITERATIONS as f32);
+    // Bounded by whichever budget bites first; under the default that is the
+    // instruction backstop, and under a wide one it is the loop cap.
+    let mut state = VmState::new(forever.register_count(), forever.stack_depth(), 0);
+    assert_eq!(
+        run(
+            &forever,
+            &mut state,
+            Budget {
+                loops: 50,
+                instructions: 1_000_000,
+            }
+        ),
+        50.0,
+        "a `while` whose body never reads zero stops at the loop cap"
+    );
+    let ran = execute(&forever);
+    assert!(
+        ran > 0.0 && ran.is_finite(),
+        "...and terminates under the shipped budget too, got {ran}"
+    );
 }
 
 /// `megabuf` and `gmegabuf` round-trip within their arenas and are inert outside
@@ -429,7 +482,7 @@ fn randomness_is_seeded_rather_than_drawn() {
 
     let draws = |salt: u32, n: usize| -> Vec<f32> {
         let mut state = VmState::new(0, p.stack_depth(), salt);
-        (0..n).map(|_| run(&p, &mut state)).collect()
+        (0..n).map(|_| run(&p, &mut state, Budget::FRAME)).collect()
     };
     let a = draws(7, 8);
     assert_eq!(a, draws(7, 8), "one salt, two fresh states: identical");
@@ -445,9 +498,9 @@ fn randomness_is_seeded_rather_than_drawn() {
 
     // The reset restores the stream, which is what a re-run of a capture needs.
     let mut state = VmState::new(0, p.stack_depth(), 7);
-    let first: Vec<f32> = (0..4).map(|_| run(&p, &mut state)).collect();
+    let first: Vec<f32> = (0..4).map(|_| run(&p, &mut state, Budget::FRAME)).collect();
     state.reset_rng();
-    let again: Vec<f32> = (0..4).map(|_| run(&p, &mut state)).collect();
+    let again: Vec<f32> = (0..4).map(|_| run(&p, &mut state, Budget::FRAME)).collect();
     assert_eq!(first, again);
 
     assert!(p.uses_random());
@@ -538,8 +591,7 @@ fn the_q_bridge_carries_per_frame_into_every_vertex() {
     runtime.run_frame(&frame, 0.0, 1.0 / 60.0, (4, 4), 1.0);
 
     // `zoom` is output 0, and is a factor, so it comes back as `raw^NOMINAL_FPS`.
-    let zoom_at =
-        |runtime: &mut MilkRuntime, x: f32| -> f32 { runtime.run_vertex(x, 0.0, 0.0, 0.0)[0] };
+    let zoom_at = |runtime: &mut MilkRuntime, x: f32| -> f32 { runtime.run_vertex(x, 0.5)[0] };
     let a = zoom_at(&mut runtime, 0.0);
     let b = zoom_at(&mut runtime, 0.0);
     assert_eq!(
@@ -601,7 +653,7 @@ fn per_frame_rates_become_per_second_ones() {
     // A **position** is neither, and passes through untouched. Scaling `cx` would
     // put the fixed point outside the frame on the first frame.
     assert_eq!(outputs[2], 0.25, "cx is a position, not a motion");
-    let decay = decay.expect("the program names `decay`");
+    let decay = decay[0].expect("the program names `decay`");
     assert!(
         (decay - 0.98f32.powf(NOMINAL_FPS)).abs() < 1e-4,
         "decay: {decay}"

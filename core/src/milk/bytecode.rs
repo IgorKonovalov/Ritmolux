@@ -333,22 +333,6 @@ pub enum Op {
     WhileEnd(u32),
 }
 
-/// The most iterations any `loop()` or `while()` may run.
-///
-/// **A bound, not a tuning knob.** This is untrusted program text executing on
-/// the render thread, and an unbounded loop is a hung frame — the one failure
-/// mode a preset must not be able to cause (ADR-0113's Risks). MilkDrop's own
-/// reference caps `loop` at 1 048 576; this is two orders under that, because the
-/// cost model is different: MilkDrop runs its per-frame program once, and here
-/// the *per-vertex* program runs thousands of times per frame, so the product is
-/// what matters. At the rich tier's 5 963 vertices a per-vertex program looping
-/// to this bound is already 24 M iterations, which is well past a frame.
-///
-/// A program that hits it does not fail — it stops looping and carries on, which
-/// is the total behaviour the VM keeps everywhere. Phase 5's report is where a
-/// corpus preset that needs more than this gets named.
-pub const MAX_LOOP_ITERATIONS: u32 = 4096;
-
 /// EEL2's comparison epsilon: `==` is true within this, and `!=` outside it.
 ///
 /// Not a tolerance we chose — it is part of the language, and a preset written
