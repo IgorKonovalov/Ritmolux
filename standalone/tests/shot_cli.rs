@@ -1143,6 +1143,202 @@ fn a_render_rejects_a_second_clip_a_decimal_rate_and_a_pointless_out() {
     );
 }
 
+/// `ffmpeg` on `PATH`, or `None` with a printed skip.
+///
+/// The encoder is a **documented prerequisite**, not a bundled component
+/// (ADR-0114), so a runner without one is a legitimate skip in exactly the way a
+/// runner without a GPU adapter is. The skip is keyed on the binary being
+/// spawnable, so an `ffmpeg` that exists but fails is still a failure.
+fn ffmpeg_on_path() -> bool {
+    match Command::new("ffmpeg").arg("-version").output() {
+        Ok(out) if out.status.success() => true,
+        _ => {
+            eprintln!("skipped: no `ffmpeg` on PATH (a documented prerequisite, ADR-0114)");
+            false
+        }
+    }
+}
+
+/// **Phase 2's first done-when**: one command over a WAV produces a playable MP4
+/// with audio.
+///
+/// "Playable" is checked with `ffprobe` where it exists — it ships beside
+/// `ffmpeg` — and falls back to the container's own `ftyp` box otherwise.
+/// ADR-0114 accepts that nothing here validates the encode itself; what is
+/// asserted is that the mux happened and that both streams are in the file,
+/// which is the failure a music video without music would be.
+#[test]
+fn one_command_over_a_wav_produces_an_mp4_with_audio() {
+    if !ffmpeg_on_path() {
+        return;
+    }
+    let clip = render_clip("encode.wav", 48_000, 1.0);
+    let mp4 = scratch("render").join("out.mp4");
+    let _ = std::fs::remove_file(&mp4);
+
+    let out = run(&[
+        "--preset-file",
+        SHIPPED_PRESET_FILE,
+        "--render",
+        &clip.to_string_lossy(),
+        "--fps",
+        "30",
+        "--size",
+        "64x48",
+        "--ffmpeg",
+        "ffmpeg",
+        "--out",
+        &mp4.to_string_lossy(),
+    ]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "the one-command render failed\nstderr: {}",
+        stderr(&out)
+    );
+    // stdout stays empty on the encoder path — the frames went down the pipe.
+    assert!(
+        out.stdout.is_empty(),
+        "the frame stream leaked to stdout instead of the encoder"
+    );
+    // The generated command is echoed, so adapting it starts from what ran.
+    assert!(
+        stderr(&out).contains("-f yuv4mpegpipe"),
+        "the canonical invocation was not printed:\n{}",
+        stderr(&out)
+    );
+
+    let bytes = std::fs::read(&mp4).unwrap_or_else(|e| panic!("read {}: {e}", mp4.display()));
+    assert!(bytes.len() > 1024, "the MP4 is {} bytes", bytes.len());
+    assert_eq!(&bytes[4..8], b"ftyp", "not an MP4 container");
+
+    let probe = Command::new("ffprobe")
+        .args([
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_type",
+            "-of",
+            "csv=p=0",
+        ])
+        .arg(&mp4)
+        .output();
+    match probe {
+        Ok(p) if p.status.success() => {
+            let streams = String::from_utf8_lossy(&p.stdout).into_owned();
+            assert!(streams.contains("video"), "no video stream: {streams}");
+            assert!(
+                streams.contains("audio"),
+                "the source WAV was not muxed in — a music video with no music: {streams}"
+            );
+        }
+        _ => eprintln!("note: no `ffprobe`; checked the container header only"),
+    }
+}
+
+/// **Phase 2's second done-when**: an encoder that dies mid-render makes `shot`
+/// exit non-zero **with the encoder's own message**.
+///
+/// The stand-in encoder is `shot` itself handed `ffmpeg`'s arguments: it rejects
+/// the first one and exits 1 with its own text on stderr. That is a faithful
+/// model of the real failure — a child that dies while frames are still being
+/// written — and it needs no `ffmpeg` and no OS-specific way to kill a process.
+///
+/// A frame here is 320x240x3 = 230 KB against a ~64 KB pipe buffer, so the write
+/// genuinely breaks mid-stream rather than fitting into the buffer and only
+/// surfacing at exit. What must *not* happen is `shot` reporting its own broken
+/// pipe: that is the mystery `EPIPE` this path is most likely to produce.
+#[test]
+fn an_encoder_that_dies_reports_the_encoders_own_failure() {
+    let clip = render_clip("broken-pipe.wav", 48_000, 1.0);
+    let fake = shot_bin();
+
+    let out = run(&[
+        "--preset-file",
+        SHIPPED_PRESET_FILE,
+        "--render",
+        &clip.to_string_lossy(),
+        "--fps",
+        "30",
+        "--size",
+        "320x240",
+        "--ffmpeg",
+        &fake.to_string_lossy(),
+        "--out",
+        "unused.mp4",
+    ]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        !out.status.success(),
+        "a dead encoder must exit non-zero\nstderr: {}",
+        stderr(&out)
+    );
+    let err = stderr(&out);
+    assert!(
+        err.contains("the encoder exited with"),
+        "the failure is attributed to the encoder:\n{err}"
+    );
+    // ...and quotes what it actually said, rather than our own write error.
+    assert!(
+        err.contains("unknown argument"),
+        "the encoder's own message is missing from the report:\n{err}"
+    );
+}
+
+/// A missing encoder is a named error naming the flag, and never a silent
+/// fallback to something else (ADR-0114). GPU-free.
+#[test]
+fn a_missing_encoder_names_the_flag_rather_than_falling_back() {
+    let clip = render_clip("no-encoder.wav", 48_000, 0.5);
+    let out = run(&[
+        "--preset-file",
+        SHIPPED_PRESET_FILE,
+        "--render",
+        &clip.to_string_lossy(),
+        "--ffmpeg",
+        "no_such_encoder_binary",
+        "--out",
+        "unused.mp4",
+    ]);
+    assert_failed_naming(&out, "--ffmpeg", "a missing encoder");
+    // The encoder is spawned before the renderer is built, so a missing one
+    // fails immediately rather than after GPU initialization.
+    assert!(
+        !stderr(&out).contains("adapter"),
+        "a missing encoder should not have reached the renderer:\n{}",
+        stderr(&out)
+    );
+    let err = stderr(&out);
+    assert!(
+        err.contains("no encoder ships"),
+        "the message must say there is no fallback:\n{err}"
+    );
+
+    // `--ffmpeg` has nowhere to write without `--out`, and `--out` alone has
+    // nothing to name — both are errors rather than a guessed destination.
+    assert_failed_naming(
+        &run(&[
+            "--preset-file",
+            SHIPPED_PRESET_FILE,
+            "--render",
+            &clip.to_string_lossy(),
+            "--ffmpeg",
+            "ffmpeg",
+        ]),
+        "--out",
+        "--ffmpeg without --out",
+    );
+    assert_failed_naming(
+        &run(&["--preset-file", SHIPPED_PRESET_FILE, "--ffmpeg", "ffmpeg"]),
+        "--ffmpeg only applies",
+        "--ffmpeg without --render",
+    );
+}
+
 /// `--report --json` emits parseable JSON with the documented top-level shape. The
 /// report is hand-rolled (no serde), so nothing but a consumer proves it is
 /// well-formed — and the `preset-author` lane is that consumer.

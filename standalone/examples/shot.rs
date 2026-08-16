@@ -46,6 +46,9 @@
 //!                            every frame to stdout as Y4M for an encoder to
 //!                            read. Deterministic and decoupled from real time
 //!   --fps <n|num/den>        the render mode's frame rate (default 60)
+//!   --ffmpeg <path>          spawn this encoder and wire the pipe, so one
+//!                            command produces a file. Needs --out <file>.
+//!                            No encoder ships and there is no fallback
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
 //! `--presets`, the `LMV_PRESET_DIR` override, the per-user preset directory,
@@ -152,6 +155,10 @@ struct Args {
     /// `--fps <n|num/den>`: the render mode's frame rate. Unused elsewhere —
     /// every other capture path steps at the fixed capture cadence.
     fps: Fps,
+    /// `--ffmpeg <path>`: spawn this encoder and wire the frame stream into it,
+    /// so the common case is one command (Plan 0101 Phase 2). Nothing is bundled
+    /// and there is no fallback — see [`render::EncoderRequest`].
+    ffmpeg: Option<PathBuf>,
 }
 
 impl Default for Args {
@@ -181,6 +188,7 @@ impl Default for Args {
             interval: 30.0,
             render: None,
             fps: render::DEFAULT_FPS,
+            ffmpeg: None,
         }
     }
 }
@@ -244,6 +252,7 @@ fn parse_args() -> Result<Args, String> {
                 args.mode = Mode::Render;
             }
             "--fps" => args.fps = parse_fps(&next_value(&mut it, "--fps")?)?,
+            "--ffmpeg" => args.ffmpeg = Some(PathBuf::from(next_value(&mut it, "--ffmpeg")?)),
             "--at" => args.at = Some(parse_hops(&next_value(&mut it, "--at")?)?),
             "--frame-at" => {
                 let value = next_value(&mut it, "--frame-at")?;
@@ -308,19 +317,36 @@ fn parse_args() -> Result<Args, String> {
                 ));
             }
         }
-        // stdout carries the frame stream, so there is nowhere for `--out` to
-        // mean what it means everywhere else. Redirect stdout, or use --ffmpeg.
-        if args.out.is_some() {
-            return Err(
-                "--render writes the frame stream to stdout, so --out has nothing to \
-                 name: redirect stdout to a file, or pass --ffmpeg <path> to encode"
-                    .to_string(),
-            );
+        // Without an encoder, stdout carries the frame stream and there is
+        // nowhere for `--out` to mean what it means everywhere else. With one,
+        // it is the file the encoder writes — and is then required, since the
+        // encoder has to be told where to put it.
+        match (args.ffmpeg.is_some(), args.out.is_some()) {
+            (false, true) => {
+                return Err(
+                    "--render writes the frame stream to stdout, so --out has nothing to \
+                     name: redirect stdout to a file, or add --ffmpeg <path> and --out \
+                     <file> to encode"
+                        .to_string(),
+                );
+            }
+            (true, false) => {
+                return Err(
+                    "--ffmpeg needs --out <file> to name what the encoder writes".to_string(),
+                );
+            }
+            _ => {}
         }
-    } else if args.fps != render::DEFAULT_FPS {
-        // Every other capture path steps at the fixed capture cadence, so a
-        // `--fps` outside `--render` would be accepted and ignored.
-        return Err("--fps only applies to --render <clip.wav>".to_string());
+    } else {
+        // Every other capture path steps at the fixed capture cadence and writes
+        // its own file, so either flag outside `--render` would be accepted and
+        // silently ignored.
+        if args.fps != render::DEFAULT_FPS {
+            return Err("--fps only applies to --render <clip.wav>".to_string());
+        }
+        if args.ffmpeg.is_some() {
+            return Err("--ffmpeg only applies to --render <clip.wav>".to_string());
+        }
     }
     Ok(args)
 }
@@ -378,7 +404,9 @@ fn print_usage() {
          --render <clip.wav>        offline video: walk the clip at --fps and\n\
                                     stream Y4M frames to stdout for an encoder\n\
          --fps <n|num/den>          render frame rate (default 60; 30000/1001\n\
-                                    for NTSC - a decimal is rejected)"
+                                    for NTSC - a decimal is rejected)\n\
+         --ffmpeg <path>            spawn this encoder and wire the pipe, so\n\
+                                    one command makes a file. Needs --out"
     );
 }
 
@@ -487,6 +515,17 @@ fn run() -> Result<(), String> {
 fn offline_render(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), String> {
     let path = args.render.clone().ok_or("--render needs a clip path")?;
     let (pcm, format) = read_wav_16bit(&path)?;
+    // `--ffmpeg` without `--out` is rejected in the parser, so the pair is
+    // either both present or both absent by the time it reaches here.
+    let encoder = args
+        .ffmpeg
+        .clone()
+        .zip(args.out.clone())
+        .map(|(ffmpeg, out)| render::EncoderRequest {
+            ffmpeg,
+            clip: path.clone(),
+            out,
+        });
     render::run(
         presets,
         source,
@@ -496,6 +535,7 @@ fn offline_render(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), 
             width: args.width,
             height: args.height,
             tier: args.tier,
+            encoder,
         },
         &pcm,
         format,

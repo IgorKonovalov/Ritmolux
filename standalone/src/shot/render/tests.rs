@@ -302,3 +302,60 @@ fn a_written_frame_is_a_marker_and_three_planes() {
         "a long render reallocates nothing"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The one canonical encoder invocation
+// ---------------------------------------------------------------------------
+
+/// The `ffmpeg` command line is a **support surface**: it will be wrong on
+/// somebody's build, and the whole point of generating it is that there is one
+/// of it to fix. This pins the parts that are load-bearing rather than
+/// stylistic, so a well-meant tidy-up cannot quietly drop the colour tags or the
+/// audio mapping.
+#[test]
+fn the_generated_ffmpeg_command_carries_its_inputs_mapping_and_colour() {
+    let args = ffmpeg_args(
+        std::path::Path::new("track.wav"),
+        std::path::Path::new("out.mp4"),
+    );
+    let line = args.join(" ");
+
+    // Two inputs: the frame stream on stdin, then the source WAV untouched.
+    assert!(line.contains("-f yuv4mpegpipe -i pipe:0"), "{line}");
+    assert!(line.contains("-i track.wav"), "{line}");
+    // ...explicitly mapped, so a clip with a video stream of its own (album art)
+    // cannot displace the rendered picture.
+    assert!(line.contains("-map 0:v:0 -map 1:a:0"), "{line}");
+
+    // No geometry is passed: it is on the wire, which is the point of a
+    // self-describing stream. `-s`/`-pix_fmt` *input* flags reappearing here
+    // would reintroduce exactly the mistyping ADR-0114 refuses.
+    assert!(
+        !line.contains("-s "),
+        "geometry must come off the stream: {line}"
+    );
+
+    // The colour declaration, which is the half most likely to ship wrong: an
+    // untagged file gets expanded from studio swing and shows washed out.
+    for tag in [
+        "-color_range pc",
+        "-colorspace bt709",
+        "-color_primaries bt709",
+        "-color_trc bt709",
+    ] {
+        assert!(line.contains(tag), "missing `{tag}` in: {line}");
+    }
+
+    // Audio is encoded rather than dropped — a music video without the music is
+    // the one failure nobody would need a test to notice, and every test needs
+    // to notice it before that.
+    assert!(line.contains("-c:a aac"), "{line}");
+    assert!(line.contains("-shortest"), "{line}");
+
+    // The destination is last and unquoted — the caller passes it as one argv
+    // entry, so a path with spaces needs no escaping here.
+    assert_eq!(args.last().map(String::as_str), Some("out.mp4"));
+    // Overwrite without prompting: an encoder waiting on a y/n at the far end of
+    // a pipe is a render that hangs with no explanation.
+    assert!(args.iter().any(|a| a == "-y"), "{line}");
+}
