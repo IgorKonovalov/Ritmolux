@@ -5,7 +5,7 @@ rendering system and binds that system's parameters to short expressions over th
 analysis. No Rust, no shaders, no rebuild — you edit a line, save, and the running window picks it
 up within about 150 ms.
 
-This is the entrance. It shows you what the nine systems look like, which of the three reference
+This is the entrance. It shows you what the built-in systems look like, which of the three reference
 documents owns which surface, and the loop you actually work in. It deliberately **reproduces no
 table** from those references: where you need a parameter, a function or a palette name, this page
 says which document owns it and links there
@@ -51,7 +51,7 @@ black](images/preset-minimal.png)
 
 Four things are worth naming, because they are the whole model:
 
-- **`system` picks what gets drawn.** One of nine names, listed in section 2. Everything else in the
+- **`system` picks what gets drawn.** One of a closed list of names, in section 2. Everything else in the
   file is interpreted against that choice — `n` means something to a `parametric_curve` and nothing
   at all to a `swarm`.
 - **`[params]` values are expressions, not numbers.** Each one is re-evaluated every frame against
@@ -71,10 +71,12 @@ the params then animate it.
 
 ---
 
-## 2. The nine systems
+## 2. The systems
 
 One image each, captured under the same stimulus at the same moment in the clip, so they are
-comparable. Each is a real shipped preset — the file name is under the picture.
+comparable. Each is a real shipped preset — the file name is under the picture. **One system is
+missing from this section and it is not an omission:** `shape_field` shipped with no world of its
+own, so there is nothing to photograph yet — see the note at the end.
 
 ### `fragment_field`
 
@@ -199,6 +201,19 @@ whose population is not fixed — which is precisely what the swarm's wrap-aroun
 
 **Reach for this when** the look is made of *discrete events*: fireworks, meteors, sparks, anything
 that should be triggered by a beat rather than modulated by a band.
+
+### `shape_field` — no picture yet
+
+The newest system, and the only one with **no shipped preset**, so it has no image here. It draws one
+of five silhouettes — `disc`, `ring`, `polygon`, `star`, `heart` — as a **fullscreen distance
+field**, which makes the palette coordinate a *distance*: turn `palette_steps` up and you get
+concentric **offset contours of that shape**, not concentric circles. `palette_contour` then draws a
+hairline at each band edge.
+
+**Reach for this when** the subject is a **figure and its echoes**: nested outlines, a breathing
+heart, rings travelling outward from a shape. The full parameter roster and three worked reactivity
+recipes are in [`../presets/README.md`](../presets/README.md); this page gains a picture when the
+first `shape_field` world ships.
 
 ---
 

@@ -588,7 +588,7 @@ options delivered — and its body is in the archive.
 > multiply frame. Full derivation and costs in
 > [ADR-0106](adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md).
 >
-> **MEASURED AGAIN 2026-08-15**, at [Plan 0091](plans/0091-the-figure-fills-the-frame.md) Phase 1,
+> **MEASURED AGAIN 2026-08-15**, at [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) Phase 1,
 > which settled the path ADR-0106 left open and falsified one of its own consequences in the
 > process. Both runs are `core/tests/layer.rs`, so the numbers are re-derivable rather than
 > recalled:
@@ -1020,7 +1020,7 @@ One cohort's demonstrated want. The ADR-0080 shape is the named route when the s
 ## 0092 — every figure this engine draws is unlit, and two reference images ask for a shaded one
 
 - **Raised:** 2026-08-13, from the second of two user reference batches, alongside
-  [Plan 0091](plans/0091-the-figure-fills-the-frame.md). Filed separately **at the point of raising**
+  [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md). Filed separately **at the point of raising**
   rather than absorbed into that plan, because it is a lighting decision and the plan is a silhouette
   one, and bundling them would have made a shading register arrive as a side effect of a shape phase.
 - **Verified by measurement:** no, and it does not need one — the claim is an absence. Nothing in
@@ -1037,7 +1037,7 @@ One cohort's demonstrated want. The ADR-0080 shape is the named route when the s
 Two of the six star references are chrome — a four-pointed sparkle with concave edges, rendered as
 polished metal with specular highlights, a horizon reflection and self-shadowing. They read as
 **objects with a surface**, and the engine has no vocabulary for that at all. The rest of the batch
-is flat graphic work that [Plan 0091](plans/0091-the-figure-fills-the-frame.md) Phase 5 reaches with
+is flat graphic work that [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) Phase 5 reaches with
 three parameters; these two are a different question wearing the same silhouette.
 
 ### Why it is worth an entry rather than a comment
@@ -1246,3 +1246,69 @@ named that this run could not reproduce, remains the strongest untested candidat
 **Low.** It blocks nothing, nothing ships broken, and it becomes load-bearing only when someone
 opens the governor. It is filed because that is exactly the moment the correction would otherwise
 be missing.
+
+---
+
+## 0095 — the backdrop ramp makes parallel stripes only, and a converging fan cannot be lit *and* darkened
+
+**Raised by:** `architect`, at [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md)'s close, from
+that plan's **Phase 7, which was designed as a cut point and was cut**. **Owner if taken:**
+`architect` (it owes its own ADR) then `dev`.
+
+- **Verified 2026-08-16** — the ramp's coordinate is linear along `bg_angle` and the swept
+  coordinate is repeat-addressed, so `bg_hue_span > 1` gives repeating **parallel** stripes and
+  nothing gives an angular one: `present: bg_angle in: core/src/render/background.rs`
+- **Verified 2026-08-16** — the backdrop is outside the chain's input, which is why no blend mode
+  and no fold can reach it: `present: backdrop is not in the chain's input in: core/src/render/post.rs`
+
+### The want
+
+The third of the user's Plan 0091 reference images is a collage whose floor is **white with black
+stripes converging to a vanishing point**. Everything else in that collage is now reachable: the
+flat red figure is `shape_field` (ADR-0105), and the dark-on-light treatment is a `multiply` layer
+(ADR-0106). The floor is not.
+
+### What is actually missing, and it is small
+
+**Only the coordinate.** The backdrop's ramp is already swept and already repeat-addressed, so
+repeating stripes ship today at no cost. An **angular** coordinate about a movable point turns the
+same stripes into a fan. Folding the existing ramp is not available — `post.rs` puts the backdrop
+outside the chain the kaleidoscope reads — so this is a backdrop *mode*, not a reuse.
+
+### The constraint Plan 0091 Phase 1 added, and the reason this entry exists rather than a phase
+
+Phase 1 measured what a `multiply` layer does to a **lit backdrop**, and the answer changes what a
+backdrop fan can be *for*:
+
+- at the default `occlude = 1` the backdrop is **absent** — held out by coverage, not darkened, and
+  the frame is byte-identical to the same preset over a black backdrop;
+- at `occlude = 0` the backdrop is added *after* the junction and becomes a **floor**: a multiply
+  layer reaching display luma 18.9 over black reaches only **171.3** over a lit sky.
+
+So **a fan drawn on the backdrop and a dark figure drawn over it are mutually exclusive at the
+tones the reference has.** The collage's black stripes would have to come from the backdrop's own
+palette stops — which the ramp can express — and the figure over them cannot then be darkened into
+that floor.
+
+### What a fix would be, and the alternative that Phase 1 promoted
+
+Two routes, and the second is no longer the weaker one:
+
+1. **A backdrop coordinate mode** (`bg_coord = "linear" | "radial"` plus a centre). Cheapest, and it
+   is the third decision on that pass after ADR-0094 and ADR-0095 — so it owes an ADR, with every
+   default an arithmetic identity and the existing baselines moving zero pixels.
+2. **Draw the floor as a scene in the chain.** Plan 0091 listed this as the rejected alternative
+   because it costs the preset's one `[layer]` slot (ADR-0090). Phase 1's measurement argues *for*
+   it: a floor inside the chain is reachable by every blend mode, and a floor on the backdrop is
+   not. The slot cost is real and it is the honest trade to weigh, not a reason to dismiss it.
+
+The collage's floor is also **bounded by a horizon**, which the ramp expresses only through stop
+placement — so "a fan" may not be the whole of what the image is doing.
+
+### Priority
+
+**Low.** Nothing is blocked and nothing ships broken. The heart is the part of those references the
+user asked for twice and it shipped; the floor was asked for once, as one element of a collage, and
+this engine is not a collage tool. It becomes worth taking when someone authors a world that wants
+a vanishing point — at which point the two routes above should be judged by rendering, not by
+argument, which is what Phase 7's own first done-when said.

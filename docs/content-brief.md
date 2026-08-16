@@ -203,6 +203,51 @@ Three riders:
 
 ---
 
+## 6. The figure at frame scale — [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) Phase 6
+
+**This is the first sitting on a system that ships with no content at all.** Plan 0091 landed the
+`shape_field` scene, the `star` arm's three shape params, and the two-tone `multiply` route, and it
+deliberately shipped **zero presets** (ADR-0081 puts worlds in this lane). So this item is both the
+look gate the plan owed *and* the authoring job that would discharge it — judge the figures by
+authoring them, in the running app, against both reference batches.
+
+The plan's three questions, none of which an instrument in this repo can answer:
+
+- **Do the contours read as the reference does?** The construction is proved — a band of the palette
+  coordinate is a band of constant distance, measured against the heart's own numerically sampled
+  outline. Whether ~20 nested offsets of a heart *look* like the poster is a different question.
+- **Does the ring count on the beat read as a response, or as a strobe?** This is the one the plan
+  flagged hardest. A band count is a global change to every pixel at once, "which is exactly the
+  shape a strobe has", and `fragment_mandala`'s own header raises the same worry and never settled
+  it. **The recorded fallback if it strobes:** move the beat term onto `scale` or `gamma` and let
+  the count sit still.
+- **Does the `star` batch reach its five reference silhouettes** with `star_valley`, `star_curve`
+  and `star_jitter`? **A named miss is the useful outcome here** — it says which of the three is
+  mis-shaped, or that a silhouette needs something none of them expresses. The cartoon star's
+  *eyes* are known to be out of reach and are not a miss.
+
+Four riders, all from the close:
+
+- **`gamma` runs the opposite way to `ink_gamma`, and nothing warns.** Because a band boundary sits
+  at `(k/n)^(1/gamma)`, it is `gamma` **below** 1 that tightens the rings toward the centre — the
+  reference's direction. `presets/README.md` carries the table. The plan also owes a verdict on the
+  param's *useful range*, taken from rendered comparisons rather than from its `0.05..20` clamp.
+- **The rings travel on `color_center`, and the palette must be cyclic.** The coordinate wraps at 1,
+  so unless the gradient's last stop is its first colour again, the wrap is a visible edge crossing
+  the figure once per cycle. Measured seamless on a cyclic gradient across a full 12-step walk.
+- **A heavily jittered `star` is approximate at frame scale** — up to 0.54 out on its *outer* rings
+  at seven points, because the angular fold measures against a point's own spike. `star_curve` costs
+  0.0032 and is invisible. A many-pointed star's *inner* rings are approximate for a different
+  reason (0.248 at 12 points). Both are recorded in `presets/README.md` beside the params.
+- **`docs/preset-guide.md`'s section 2 owes a tenth entry, and only a shipped preset can pay it.**
+  Every entry there is a real shipped preset with a committed render, so the guide currently
+  describes nine systems and the engine has ten. When a `shape_field` world lands, add the section
+  and re-run `node scripts/docs-shots.mjs` — argument-free, and nothing else moves.
+
+**Record the verdict here**, then move the row to `Done` below.
+
+---
+
 ## Done
 
 *(Nothing yet — this file was consolidated 2026-08-13. Move a row here with its date and a
