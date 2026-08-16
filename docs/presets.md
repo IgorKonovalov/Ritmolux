@@ -685,6 +685,12 @@ The nine outputs it accepts — `zoom`, `rot`, `cx`, `cy`, `dx`, `dy`, `sx`, `sy
 [`presets/README.md`](../presets/README.md#the-per_vertex-table) is the
 authoritative table for what each does.
 
+**Converted MilkDrop presets do not ship** (Plan 0100 Phase 8, user's call 2026-08-16: decided
+later, nothing distributed now). The public `.milk` collections have no clear licensing, so no
+converted preset enters this repository or a release; the `milkconv` converter plus a directory
+you point `LMV_PRESET_DIR` at is the whole import path. The question is re-raised when the
+conversion-fidelity backlog (design-backlog 0106–0108) is worked off.
+
 Things worth knowing before you reach for it:
 
 - **Each of the nine is also an ordinary scalar param, and the table overrides

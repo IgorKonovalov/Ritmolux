@@ -13,6 +13,32 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0100 — The engine speaks MilkDrop](done/0100-the-engine-speaks-milkdrop.md)
+  — closed 2026-08-16, six dev phases in commits `2603309`–`0948cf2` across two sessions (one `wip:`
+  checkpoint kept unsquashed by the no-rewrite rule), Phases 7 and 8 (`human`) run live at the close.
+  Review: **no blockers, one major, two minors.** The major was the review's own operator-doc sweep
+  firing: `warp_mesh` is a full palette participant — per-pixel fragment-stage LUT, so both
+  `palette_steps` *and* `palette_contour` are live there — and `docs/preset-palettes.md` had no
+  section and no scoping-table row for it; repaired at the close. The minors were both fat index
+  rows, one already trimmed from `main` by Plan 0105's close. **The stop condition never fired**:
+  Phase 6's census (430,854 shader lines, ~30 intrinsics) predicted a hand-written Rust HLSL
+  frontend would cover the corpus, and it did — 80.1 % converts with shaders, 77.9 % renders
+  non-blank, `emitter-invalid` at zero. The review verified the done-when tests as real: the Phase 6
+  test renders the converted MD2 fixture against a shader-stripped control and asserts inequality;
+  the tier ladder is dated, machine-named and asserts nothing (ADR-0071 at its best); ADR-0037
+  discipline included a three-grids-one-aspect regression test. **Phase 7, judged over seven presets
+  side by side against `foo_vis_milk2` 0.2.0.0: mostly there, with defects — and the HDR pipeline
+  makes them *merely different*, not better**, the finding the plan itself said would outweigh the
+  feature, recorded as a dated Outcome on ADR-0113. Structure, motion and reactivity survive in
+  every pair; four defects filed as backlog 0106 (the float field never truncates where the
+  reference's 8-bit target does — dominates the verdict, re-judge after it lands), 0107 (waveform
+  placement/dots, a horizontal reflection seam in warp sampling, Portal's inert mirror), 0108 (the
+  HLSL-array and converted-but-blank tail). **Phase 8: decide later** — nothing third-party ships,
+  the import path stays converter-plus-user-directory, recorded in `docs/presets.md`. **Curation
+  (step 3b): no preset content landed** — `presets/` gained only its README roster — so no
+  near-duplicate sweep was owed; the workaround grep is unchanged by this plan. Size: whole plan
+  +383 KB / +376 KB against the plan's "near zero" expectation, honestly recorded as optimistic by
+  ~140 KB; cdylib at ~8.8 MiB under NFR §4's ~10 MB soft cap.
 - [0102 — The component ships](done/0102-the-component-ships.md)
   — closed 2026-08-16, Phases 1-4 in three commits (`e5e03de`, `07f1573`, `56c3edf`), one session.
   Review: **no blockers, three majors, four minors.** **Phase 1's `human` question — the one this

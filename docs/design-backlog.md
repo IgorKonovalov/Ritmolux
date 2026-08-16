@@ -1854,3 +1854,107 @@ window is a developer who hand-staged a different SDK and then shipped that buil
 because the recipe's whole argument is that a local run is held to CI's bar
 ([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)'s model, applied by
 ADR-0115) — and this is the one assertion where the local route is held to a looser one.
+
+---
+
+## 0106 — converted MilkDrop presets wash out or invert: the float feedback field never truncates
+
+**Raised by:** `architect`, from Plan 0100 Phase 7's side-by-side judgment (2026-08-16).
+**Owner if taken:** `architect` (the emulation is a design call) then `dev`. **The dominant
+fidelity defect of the MilkDrop import, and the one gating the plan's central claim** — the HDR
+"better or merely different" verdict came back *merely different* and cannot be fairly re-judged
+until this is fixed.
+
+- **Verified 2026-08-16** — the warp pass scales the previous frame by a decay term and writes the
+  product back with no low-end floor: `present: decay in: core/src/render/scenes/warp_mesh/mod.rs`
+- `unprobeable:` the defect itself is a rendered divergence against an external reference
+  (`foo_vis_milk2` 0.2.0.0, DX11) and lives in no greppable line; the evidence is the seven
+  side-by-side pairs recorded in Plan 0100's Phase 7 section.
+
+### The finding
+
+MilkDrop's feedback target is 8-bit: `decay` times a dim pixel **truncates to zero**, and that
+quantization is what keeps a classic preset's background black and its trails finite. This engine's
+field is `Rgba16Float` — nothing truncates, every dim residual survives and accumulates. Judged
+over seven presets side by side (Plan 0100 Phase 7, 2026-08-16), one mechanism with four
+presentations: pastel wash (*Songflower*, *Cosmic Dust 2*), white-hot glow (*Contortion*), runaway
+to the clamp with per-channel fringing (*chasers 19 Portal*), and full tonal **inversion** — *Fog
+Tunnel*, a dark preset rendered on a white plateau. The control ran the other way: *Blur Mix 3*,
+whose blur chain actively darkens, kept its blacks and looked genuinely good — which is what
+scopes the defect to the feedback path rather than the shader translation.
+
+### What a fix would be
+
+An opt-in (per-`[milk]`-bundle, not engine-wide) floor in the warp epilogue emulating the
+reference's quantization — Butterchurn and projectM both carry an equivalent, so the shape is
+known. The design call is what "8-bit truncation" means in linear light: the reference truncates
+in its gamma-encoded target, so a literal `1/255` floor in linear is wrong at both ends. Measure
+against the same seven pairs.
+
+### Priority
+
+**High within the import lane.** Plan 0100's Phase 7 verdict is provisionally negative on the
+plan's own motivating claim; this entry is the re-test trigger.
+
+---
+
+## 0107 — the MilkDrop draw layer misplaces figures, and two warp-path defects mirror or unfold the frame
+
+**Raised by:** `architect`, from Plan 0100 Phase 7's side-by-side judgment (2026-08-16).
+**Owner if taken:** `dev` (mechanism hunts), `architect` if a fix needs a design call.
+
+- **Verified 2026-08-16** — the wave placement code under suspicion is the warp-mesh draw layer:
+  `present: wave_mystery in: core/src/render/scenes/warp_mesh/draw.rs`
+- `unprobeable:` the three defects are rendered divergences against an external reference; the
+  evidence is the pair record in Plan 0100's Phase 7 section.
+
+### The finding
+
+Three distinct defects, each seen in at least one pair against `foo_vis_milk2`:
+
+1. **Waveform placement/orientation.** *Blur Mix 3* draws one steep diagonal stroke where the
+   reference draws horizontal full-width traces — suspect the `wave_mystery` angle mapping or the
+   mode geometry. *Cauldron painterly 5*'s centrepiece spiro scribble is entirely absent.
+   *Cosmic Dust 2*'s beaded `wave_usedots` trails never appear. (The mono engine drawing one trace
+   where stereo draws two is known and accepted — Plan 0100 Phase 4; these are beyond it.)
+2. **A horizontal reflection seam in warp sampling.** Content mirrors across a horizontal line
+   with a bright ragged boundary: *Contortion*'s split sphere, *Cauldron*'s flipped top band,
+   *Cosmic Dust 2*'s full-width false horizon. The fingerprint (reflected copy, not shifted)
+   points at the wrap path's sampler address mode or a v-axis flip — check `s_fw`'s address mode
+   against the reference's toroidal wrap first, not the `ang` discontinuity first suspected.
+3. **`chasers 19 Portal`'s mirror symmetry never takes effect** despite a clean conversion — the
+   uv-fold that makes the portal is inert. One targeted reproduction wanted.
+
+### Priority
+
+**Medium-high within the import lane.** Item 2 is likely one sampler descriptor; item 1 decides
+whether waveform-led presets (the whole *Blur Mix* / *Fog Tunnel* family) read as authored.
+
+---
+
+## 0108 — the conversion tail: HLSL arrays (~71 files) and 218 MD2 presets that convert but render blank
+
+**Raised by:** `dev` (Plan 0100 Phase 6 log, "followup noticed, not acted on"), filed by
+`architect` at the close (2026-08-16). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-16** — arrays are a named rejection class, not a silent drop:
+  `present: array declaration in: milkconv/src/shader/parse.rs`
+- `unprobeable:` the counts (71, 218, 80.1 %) are a measurement of one corpus run (2026-08-16,
+  dev box), reproducible with `milkconv --report`/`--render` over `WORK/milkdrop-corpus`, not a
+  property of this tree; both eras' tables are in `docs/capturing.md`.
+
+### The finding
+
+After Phase 6, the corpus converts at 80.1 % (8 289 of 10 347) and renders non-blank at 77.9 %.
+The residual worth work, in order: **218 MD2 presets convert but render blank** — with their
+shaders now running, these are fidelity findings (most plausibly warp shaders that supply no light
+of their own whose source was a refused disk texture), and backlog 0106/0107's fixes should be
+re-measured against them before any new mechanism is hunted. **~71 files use HLSL arrays**, today
+a named `unsupported` rejection; a bounded-size array lowering in the frontend would recover them.
+The `emitter-invalid` class (naga refusing our own emission) ended Phase 6 at zero and should stay
+there.
+
+### Priority
+
+**Low until 0106/0107 land** — the blank list is contaminated by both, so counting it again first
+is wasted; re-run `--render` after they land and re-rank.
