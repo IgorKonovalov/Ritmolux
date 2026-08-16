@@ -761,6 +761,37 @@ Three things worth knowing before you tune them:
   known, so no unknown-parameter warning fires (ADR-0020). This paragraph is the
   warning.
 
+#### These three MORPH the figure with the music, and that needs no engine work
+
+**All three are clamp-only — no rounding — so a binding drives them continuously and the silhouette
+genuinely deforms.** That is worth stating because the two params beside them, `shape` and `points`,
+are rounded and therefore *step*. Verified by rendering: `star_valley` on bass and `star_curve` on
+treble over a 120 BPM click visibly thickens and thins the arms and changes the spike proportions.
+
+```toml
+[params]
+star_valley = "0.20 + clamp(bass * 0.2941, 0, 0.25)"   # spikes lengthen on the low end
+star_curve  = "0.55 - clamp(treb * 0.5000, 0, 0.30)"   # edges straighten on the top end
+
+[smoothing]
+star_valley = 0.25
+star_curve  = 0.30
+```
+
+Three things to know before binding them:
+
+- **On `shape_field`, an eased `star_valley` silently changes the RING COUNT as well as the shape.**
+  The scene normalizes by the arm's inradius, and the inradius is a function of the valley radius —
+  so morphing the valley changes what `color_span` means, and the contour structure breathes along
+  with the figure. On a particle mark this does not arise; on a banded field it is a continuous
+  wobble in the background structure that you did not ask for.
+- **A binding that sweeps `star_curve` through 0 crosses a small discontinuity.** At exactly zero
+  the arm takes a closed-form straight-edge branch; either side of it takes a sampled one, and the
+  two disagree by about `0.0032` (the polyline's sagitta). Small, but it sits in the middle of the
+  range you are most likely to animate through — bias the range to one side if it shows.
+- **On a curved or jittered star, `gamma` must stay at exactly `1.0`.** See the warning under
+  `shape_field` below; this is a NaN, not a rounding artifact, and it is not optional.
+
 **Not in the roster and not a parameter: a star with *eyes*.** Composing two
 discs onto a silhouette is multi-shape composition, which is neither a knob nor
 a name in the closed roster, and it is the one thing in that reference batch this
@@ -848,7 +879,22 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 | `star_valley` / `star_curve` / `star_jitter` | the same three star shape params — see [The `star` arm](#the-star-arms-three-shape-params-plan-0091-phase-5). `star_jitter` is the one whose *field* precision is worth reading about there |
 | `scale` | the figure's size: its outline sits at `scale` of the frame's short half-axis. Default `0.6`, clamped to `0.01`..`20` |
 | `pan_x` / `pan_y` | move the figure's centre (the shared view transform) |
-| `gamma` | the **response exponent** on the distance, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20` |
+| `gamma` | the **response exponent** on the distance, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20`. **Unusable on a curved or jittered star — see the warning below** |
+
+> **DO NOT BIND `gamma` WHEN `star_curve` OR `star_jitter` IS NON-ZERO. It is a NaN, and the
+> `color_center` workaround does not save you.** Those two params take the star arm's curved branch,
+> which returns a **negative** normalized distance at the figure's centre
+> ([backlog 0097](../docs/design-backlog.md)). The shader evaluates
+> `select(pow(d, gamma), d, gamma == 1.0)` — and `pow` of a negative base is NaN, which lands as a
+> hard artifact through the middle of the figure. The `color_center` offset that entry recommends is
+> applied on the **next line**, after the exponent, so it cannot repair a NaN that has already
+> happened. **Only the exact identity `gamma = "1.0"` avoids it**, because that branch never calls
+> `pow`. `presets/shape_facet.toml` pins it for this reason and says so. Plan 0098 Phase 1 fixes it.
+
+**There is no rotation on this scene**, and `kaleido_*` is not a substitute — it folds the finished
+frame about a screen-centred axis rather than turning the figure about its own, and it fights a
+translating `pan_*`. A turning figure is [Plan 0098](../docs/plans/0098-the-figure-nests-properly.md)
+Phase 4b.
 
 There is no `zoom` here and that is not an omission: `scale` **is** this scene's
 size lever, and a view zoom on top of it would be a second spelling of one idea.

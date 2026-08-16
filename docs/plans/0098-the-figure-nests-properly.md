@@ -84,6 +84,13 @@ flowchart TD
     not equivalent: give the curved branch a reference equal to the figure's **actual** deepest-point
     distance, or clamp the normalized result at `0` and document that the interior is not metric
     there. **The first changes what the interior field looks like; the second does not.**
+  - **`gamma` is usable again on a curved or jittered star, and this is a separate assertion from
+    the sign.** The shader takes `select(pow(d, gamma), d, gamma == 1.0)` and `pow` of a negative
+    base is **NaN**, so today a bound `gamma` puts a hard artifact through the figure's middle — and
+    the `color_center` offset the backlog entry recommends **cannot** repair it, because it is added
+    on the next line, after the exponent. A fix that only makes `d` non-negative happens to cure this
+    too; a fix that clamps *the coordinate* later would not. **Assert it directly**: a curved star
+    with a bound `gamma` renders with no NaN and no hole, at several exponents either side of 1.
   - **The particle path moves zero pixels**, proved bless-to-bless on the branch rather than by
     `git diff` — the Plan 0091 Phase 2 precedent, and the same reason: baselines drift from their
     committed bytes on this box under a clean bless, so a diff would charge that drift here. The
@@ -161,6 +168,31 @@ flowchart TD
     saying so** — the negative ADR-0111 records is that a legal shape plus a legal mode could
     otherwise produce a figure nobody asked for.
   - `presets/README.md` carries it beside the selector, not in a footnote.
+
+### Phase 4b — The figure can turn
+
+- **Owner skill:** dev
+- **What:** `shape_field` has **no rotation lever at all** — its `PARAMS` carries no `rotation` and
+  no `spin`, while every other figure-drawing scene has one (`lines/star.rs` and `lines/lsystem.rs`
+  have `rotation`, `lines/parametric.rs` has `spin`). So a star on this scene can breathe, drift and
+  morph, and cannot turn, which for a star is the most obvious motion there is. Folded in here
+  rather than given its own plan because it is one term in a shader this plan already has open.
+- **Files touched:** `core/src/render/scenes/shape_field.rs`, its tests, `presets/README.md`.
+- **Done when:**
+  - A `rotation` param turns the figure about its own centre, applied in the figure's own frame —
+    the shader builds `p = (uv - pan) / scale`, and the rotation belongs there, **after** the pan so
+    the figure spins in place rather than orbiting the frame centre. Which of those two it is must be
+    a stated choice, because both are defensible and they look completely different.
+  - **The default is an exact arithmetic identity** and every existing golden baseline is
+    byte-identical, proved bless-to-bless as in Phase 1.
+  - **It is not `kaleido_*` and the docs say so.** The screen-space fold is not a substitute: it
+    folds the finished frame about a screen-centred axis, and this project has already recorded that
+    it fights a translating `pan_*`. A reader who wants a turning figure must not be sent there.
+  - **The aspect stays the render target's** ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+    A rotation in a frame whose x has been stretched by the aspect **shears** rather than rotates
+    unless the rotation is applied in square units — this is the exact configuration where a wrong
+    source is invisible at 16:9 and obvious at 2:1, so the test renders at a non-16:9 target and
+    asserts the figure's extent is unchanged by a quarter turn.
 
 ### Phase 5 — What it costs at the floor tier
 

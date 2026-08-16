@@ -1435,6 +1435,24 @@ figure — hexagonal on a six-pointer, nine-sided on a nine-pointer.
 `max(0, 1 - d)` exceed 1 and the falloff saturates brighter, so no golden baseline moves; and no
 shipped preset drives `shape_field` with a star.
 
+### Two consequences the entry did not state, added 2026-08-16 from the content lane
+
+Both surfaced while authoring `presets/shape_facet.toml`, and the first is the one that matters
+most because **it defeats this entry's own recommended workaround**.
+
+- **`gamma` becomes unusable, and `color_center` cannot rescue it.** The shader takes
+  `select(pow(d, gamma), d, gamma == 1.0)` (`shape_field.rs:202`), and `pow` of a negative base is
+  **NaN** — which lands as a hard artifact through the middle of the figure. The offset this entry
+  recommends is applied on the *next* line, `coord = shaped * color_span + color_center`
+  (`shape_field.rs:203`), so it arrives **after** the exponent and cannot repair a NaN that already
+  happened. On any curved or jittered star, `gamma` must therefore be pinned to exactly `1.0` — the
+  identity branch is the only escape. **A repair that only fixes the sign leaves this standing**, so
+  Plan 0098 Phase 1 is scoped against both.
+- **A binding that sweeps through `star_curve = 0` flips branches mid-morph.** The closed-form
+  straight branch and the sampled Bezier branch disagree by the polyline's sagitta — ~0.0032,
+  measured at Plan 0091 Phase 5 — so a param eased through zero crosses a small discontinuity at
+  exactly the point an author is most likely to animate through.
+
 ### What a fix would be
 
 The disagreement is in the **reference** the two branches divide by, not in either distance. The
@@ -1628,3 +1646,58 @@ computes.
 
 **Low.** The look gate passed the silhouette. Take it when someone wants a *deliberately* rough
 figure rather than a slightly irregular one, and read the exterior-accuracy number first.
+
+---
+
+## 0101 — the mark roster cannot morph between silhouettes, and two other rosters in this engine already do
+
+**Raised by:** `preset-author`, from the user's "can we morph the shape with music" at
+`presets/shape_facet.toml`'s authoring (2026-08-16). **Owner if taken:** `architect` — it owes an
+ADR, and it is a real design question rather than a missing knob.
+
+- **Verified 2026-08-16** — the selector is rounded, so a fractional index selects no arm:
+  `present: clamp\(MIN_SHAPE, MAX_SHAPE\)\.round\(\) in: core/src/render/scenes/marks.rs`
+- **Verified 2026-08-16** — the same file states the roster is a list of identities rather than a
+  quantity: `present: values are \*identities\* rather than a quantity in: core/src/render/scenes/marks.rs`
+
+### The finding
+
+**Within an arm, morphing already works and needs nothing** — `star_valley`, `star_curve` and
+`star_jitter` are clamp-only, so a binding drives them continuously and the silhouette genuinely
+deforms with the music. That was demonstrated and it is the answer to the question as asked.
+
+**Between arms it is a cut.** `mark_shape` rounds, deliberately: ADR-0084's roster is five
+identities and a fractional index selects no arm at all. So a preset can switch `star` to `heart`
+on a beat but cannot travel between them, and an eased binding steps rather than morphs.
+
+**What makes this worth an entry rather than a shrug is that this engine has twice decided the
+opposite for other rosters.** [ADR-0060](adrs/0060-star-pattern-variants-interpolate.md) makes the
+star-pattern variants **interpolate**; [ADR-0075](adrs/0075-ifs-family-morphs-in-singular-value-space.md)
+morphs the IFS family in **singular-value space** — a considered answer to exactly the question
+"these are discrete entries, so how do you travel between them". So "roster entries interpolate" is
+an established idea here, and the newest roster is the one without it.
+
+### Why it is a design question and not a knob
+
+A naive lerp between two signed-distance functions is **not** a shape in any principled sense — the
+result is a field whose zero set is some blend that neither arm describes, and whose interior may
+not even be connected. It is nonetheless a well-known technique that often looks good, which is
+precisely the kind of trade an ADR exists to record rather than to have someone discover in a
+preset.
+
+Two constraints any answer has to meet:
+
+- **The particle path shares this chunk.** `swarm` and `emitter` read the same `mark_distance`, so a
+  morph capability arrives there too, and its default must be an exact identity or every shipped
+  `shape`-bearing preset moves (ADR-0105's shared-chunk consequence).
+- **It collides with [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md).** That
+  decision adds a second per-arm scalar (`r_boundary`), so a morph would have to blend *both* the
+  distance and the boundary radius, or be defined only for the distance coordinate. Whoever takes
+  this should read 0111 first — and if both are wanted, they are probably one plan rather than two.
+
+### Priority
+
+**Low, and it is genuinely optional.** The question that prompted it is already answered by the
+three continuous star params. This is filed so that if someone later wants a figure that travels
+from a heart to a star across a phrase, the precedents and the constraints are in one place instead
+of being re-derived.
