@@ -55,11 +55,25 @@ name   = "Pulse"
 
 [palette]
 stops = [
-  { at = 0.0,  color = "#000000" },
-  { at = 0.28, color = "#4a0008" },
-  { at = 0.56, color = "#c8102e" },
-  { at = 0.78, color = "#ff5a4a" },
-  { at = 1.0,  color = "#000000" },
+  { at = 0.00000, color = "#000000" },
+  { at = 0.11101, color = "#000000" },
+  { at = 0.11111, color = "#7a0016" },
+  { at = 0.22212, color = "#7a0016" },
+  { at = 0.22222, color = "#000000" },
+  { at = 0.33323, color = "#000000" },
+  { at = 0.33333, color = "#c8102e" },
+  { at = 0.44434, color = "#c8102e" },
+  { at = 0.44444, color = "#000000" },
+  { at = 0.55546, color = "#000000" },
+  { at = 0.55556, color = "#ff2e3a" },
+  { at = 0.66657, color = "#ff2e3a" },
+  { at = 0.66667, color = "#000000" },
+  { at = 0.77768, color = "#000000" },
+  { at = 0.77778, color = "#ff7a5a" },
+  { at = 0.88879, color = "#ff7a5a" },
+  { at = 0.88889, color = "#000000" },
+  { at = 0.99990, color = "#000000" },
+  { at = 1.00000, color = "#000000" },
 ]
 
 [params]
@@ -78,7 +92,7 @@ color_center = "0"
 # read as fast next to a figure this large. At 0.16 it is a ~39 s swell, and the
 # smoothing constant below is lengthened to match so the bass term arrives as a
 # tide rather than as a pump.
-scale = "0.76 + 0.035 * sin(time * 0.16) + clamp(bass * 0.0941, 0, 0.08)"
+scale = "0.76 + 0.06 * sin(time * 0.16) + clamp(bass * 0.0941, 0, 0.08)"
 
 # Structure, not luminance: the bands are already at the palette's own levels, so
 # peak energy goes on the coordinate and the size rather than on brightness.
@@ -88,8 +102,29 @@ saturation = "0.92 + clamp(treb * 0.20, 0, 0.12)"
 
 color_span      = "0.45"
 palette_steps   = "9"
-palette_contour = "0.7"
-gamma           = "2.0"
+
+# THE LINE WEIGHT WANDERS ON THE BEAT, AND IT IS DELIBERATELY NOT A PATTERN.
+# Two different things read as "line thickness" in this construction and both
+# move, decorrelated so the picture never pulses as one:
+#
+#   `palette_contour` is the dark hairline drawn at each band boundary. Its WIDTH
+#   is fixed - the shader draws it within one pixel of the edge, via `fwidth`, so
+#   it stays even where the field is steep - but the amount sets how hard it
+#   bites, which is what reads as weight.
+#
+#   `gamma` moves where the boundaries themselves sit, so the BANDS change width.
+#   It only ever wanders DOWNWARD from 2.0, and that is the constraint from note 2
+#   rather than taste: upward is toward the moire wall, and 2.0 is the corner
+#   budget this framing was tuned to.
+#
+# `hash` is seeded and pure, so this is reproducible rather than random - the same
+# preset draws the same sequence every run. The two calls are offset by 50 to
+# decorrelate them; without that they would step together and read as one event.
+# `beat_index` counts ONSETS, about 1.7-2.1x per musical beat (ADR-0109), so the
+# wander is already irregular against the pulse, which is the "no pattern" part.
+# Both are eased below, so a step arrives as a settling rather than a switch.
+palette_contour = "0.50 + hash(beat_index) * 0.35"
+gamma           = "1.86 + 0.07 * sin(time * 0.23) + hash(beat_index + 50) * 0.07"
 
 [smoothing]
 # Lengthened with the breath: at 0.15 the bass term punched, which is the pace
@@ -97,3 +132,7 @@ gamma           = "2.0"
 # low end rather than answering each hit.
 scale      = 0.5
 saturation = 0.25
+# Short enough that the beat still lands, long enough that it is a settle rather
+# than a snap. Different constants on the two so they do not resolve together.
+palette_contour = 0.25
+gamma           = 0.38
