@@ -198,21 +198,35 @@ contradicts this file is a plan bug — surface it, don't guess.
 ## 8. Distribution (v1)
 
 Delivered by `.github/workflows/release.yml` on a pushed `v*` tag
-([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)). Two zips, attached
-to a GitHub **prerelease** — a plain download URL, no account needed, because the repository
-is public.
+([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
+[ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)).
+**Three** zips, attached to a GitHub **prerelease** — a plain download URL, no account needed,
+because the repository is public.
 
 - **Windows**: `lmv.exe`, x64, **unsigned** (SmartScreen warning accepted).
 - **macOS**: a **universal** (arm64 + Intel) `LightMusicVisualizer.app`, **ad-hoc signed and
   unnotarized**. Ad-hoc signing buys a stable code identity for the Screen Recording grant to
   bind to; it is *not* Developer ID, so Gatekeeper still quarantines the download and the grant
   does not survive a rebuild. Requires macOS 13+.
-- Both zips also carry a reference copy of `presets/*.toml` and a `READ-ME-FIRST.txt`.
+- **foobar2000 component**: `foo_lmv.fb2k-component`, **x64 only**, for foobar2000 v2. Built
+  by `packaging/foobar/build-component.ps1` against a **pinned, checksummed** SDK release that
+  the workflow fetches (`packaging/foobar/sdk-pin.ps1`). Unsigned, like the rest.
+- All three zips carry a `READ-ME-FIRST.txt`; the two standalone ones also carry a reference
+  copy of `presets/*.toml`.
 
-**Standalone only — CI does not ship a `.fb2k-component`.** The foobar2000 SDK is third-party,
-separately licensed and `.gitignore`'d, so no runner can build the shim; it stays a local
-`plugin-foobar/build.ps1` artifact. (This corrects the original v1 promise of a packaged
-component in the release zip.)
+**The component ships as of Plan 0102** (2026-08-16). This paragraph previously read
+"Standalone only — CI does not ship a `.fb2k-component`", on the grounds that the SDK is
+third-party, separately licensed and `.gitignore`'d, so no runner could build the shim. The
+licence was then read rather than assumed: it is BSD-style, permits binary redistribution, and
+puts a notice obligation only on redistributed *source* — so the workflow fetches the SDK and
+the component is a released artifact. The SDK is still never committed
+([ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)
+Alternative A).
+
+**Nothing in CI can test the component.** No runner loads foobar2000, so its installation and
+`visualisation_stream` behaviour are checked by hand and recorded in
+[`on-device-validation.md`](on-device-validation.md) — the same gap the macOS path has, named
+rather than solved.
 
 No installer, no Developer ID signing, no notarization, no DMG in v1. Signing, if ever, is a
 later plan + human task.
