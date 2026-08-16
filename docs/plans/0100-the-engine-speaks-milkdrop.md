@@ -576,10 +576,16 @@ prologue as `var<private>` shadows — fxc treats every input as a mutable
 global, and shipped presets assign to `rand_preset`), and zero-padded vector
 widening (`lum(float2)`). Two fix rounds later:
 
-| corpus | converts, shaders included |
-|---|---|
-| all 10 347 files | **8 289 (80.1 %)** — ~97 % of everything not disk-texture-bound |
-| the 552-file original pack | **476 (86.2 %)**, 471 non-blank under the probe |
+| corpus | converts, shaders included | renders non-blank |
+|---|---|---|
+| all 10 347 files | **8 289 (80.1 %)** — ~97 % of everything not disk-texture-bound | **8 063 (77.9 %)** |
+| the 552-file original pack | **476 (86.2 %)** | 471 (85.3 %) |
+
+Of the 226 converted-but-blank, 218 declare MilkDrop 2 — with their shaders now
+*running*, those are shader-fidelity findings (most plausibly presets whose
+warp shader supplies no light of its own and whose source was a texture we
+refuse) — and the 8 shaderless blanks are the same 8 the Phase 5 probe found,
+so Phase 6 regressed nothing behind it.
 
 The dominant residual class is the **deliberate** disk-texture exclusion
 (1 826 files, 17.7 % — the census priced 19 %), now a *named conversion
