@@ -372,64 +372,80 @@ is sized by is only local).
 | 1 — the warp mesh is a native scene | **done**, committed `2603309` |
 | 2 — the EEL2 machine | **done**, committed `bfb5536` |
 | 3 — the converter reads a real preset | **done**, committed `ebbf395` |
-| 4 — the draw layer | **built and green, one thing left** — committed `9941129` |
-| 5 — what actually converts | not started |
-| 6 — the shaders | not started |
+| 4 — the draw layer | **done**, committed `aec8f15` (built at `9941129`, finished at `aec8f15`) |
+| 5 — what actually converts | **done**, committed below |
+| 6 — the shaders | not started — its stop condition is the next decision |
 | 7, 8 — human | not started, and not `dev`'s |
 
-`cargo nextest run --workspace` is **852 passed, 3 skipped**; `cargo clippy
---workspace --all-targets` and `cargo fmt --all --check` are clean at
-`9941129`.
+`cargo nextest run --workspace` is **863 passed, 3 skipped**; `cargo clippy
+--workspace --all-targets`, `cargo fmt --all --check` and
+`scripts/check-doc-links.mjs` are clean.
 
-### The one thing Phase 4 has left, diagnosed
+There is one **`wip:` commit** in this branch's history (`dc9612f`). It is the
+checkpoint a bisect control needed — the composite goldens had to be run against
+the pre-change tree — and it is not squashed because this project does not rewrite
+history. Fold it at merge if you want to.
 
-**A converted preset's draw layer saturates the field.** Render
-`Aderrasi - Songflower (Hybrid Plant)` through `milkconv` and `shot --signal
-chord`: the first frames carry real structure — the waveform, the custom shapes,
-a moiré of both — and then the frame goes to flat saturated colour within about
-half a second.
+### What finishing Phase 4 turned out to mean
 
-The cause is **not** the frame rate (that was fixed:
-`draw::deposit_exposure` scales each frame's contribution by `dt * NOMINAL_FPS`,
-so a second of wall clock deposits the same light at any refresh). It is the
-blend:
+The handoff above said "one thing left". It was three.
 
-- MilkDrop's waveform is **alpha-blended** when `bAdditiveWaves = 0`, which is
-  the common case: `dst = src*a + dst*(1-a)` *replaces* rather than accumulates,
-  so the field's steady state is the alpha the preset asked for.
-- This engine's draw seam is **additive** by construction (ADR-0056), and the
-  field decays slowly. At `decay = 0.98` per frame the steady state is
-  `deposit / (1 - 0.98)` — **fifty times** the per-frame deposit. MilkDrop clips
-  that to white in 8-bit; the linear-light HDR pipeline (ADR-0046) carries it and
-  the tonemap maps it to a saturated hue.
+**1. The custom waves and shapes never reached the engine.** `milkconv` compiled
+them into the bundle and `emit()` dropped them: `RawMilk` had no field to receive
+them and `MilkBundle::from_assembly` hard-coded both vectors empty. So **63 % of
+the corpus drew none of its shapes and 47 % none of its waves**, silently, and
+the earlier session's report of "the waveform, the custom shapes, a moiré of both"
+was the waveform alone. Fixed by adding `[[milk.waves]]` / `[[milk.shapes]]` to
+the bundle format, `MilkBundle::push_element` to load them under the same roster
+validation the three main programs get, and the emitter side.
 
-Two candidate fixes, both one-ish line, and the choice is a real design call:
+**2. The blend, and the user chose the faithful one.** The diagnosis above was
+right about the cause and understated the size. The additive seam **sums** where
+alpha-over **replaces**, so N overlapping producers land at N rather than at ≤ 1 —
+which no scalar fixes, because a scalar cannot bound a sum. Measured against the
+corpus: **2 949 of 10 347 presets (28.5 %) set `fDecay >= 1.0`**, where the field
+never fades and nothing brings the sum back down. That number was put to the user
+and **option 2 was chosen** (2026-08-16): `LineRenderer` gains an opt-in second
+pipeline and `draw_split`, the shape pipeline gains its twin, and `DrawGeometry`
+partitions each buffer by blend mode.
 
-1. **Scale the deposit by `1 - decay_per_frame`.** The steady state then lands at
-   the alpha the preset asked for. Cheap, needs no new blend state, and is the
-   same normalization ADR-0065 applied to the attractor when a tier capacity
-   turned out to be a brightness. Wrong in one way: a preset that genuinely wants
-   additive build-up (`bAdditiveWaves = 1`, and `wave_additive` is already read
-   and currently inert) gets the same treatment as one that does not.
-2. **A second blend state for the non-additive case**, selected per draw from
-   `wave_additive`. Faithful, and costs a second pipeline plus an ADR-0058 shape
-   for it — and the line batch is currently *one* draw for the whole layer, so
-   splitting it by blend mode splits the batch too.
+Three things about that landed differently from the sketch:
 
-Either way the phase's done-when then needs checking:
+- **`SegmentInstance` gained an `alpha`**, `1.0` at every existing call site and
+  therefore byte-identical for the nine line scenes that do not split. It is
+  declared **last**, because `vertex_attr_array!` derives offsets from location
+  order — putting it before `joined` reinterprets the join bits as a float, which
+  compiles, renders, and moved five composite golden baselines. Written up on the
+  field.
+- **The second pipeline is opt-in** (`LineRenderer::new_split`). Building it for
+  the nine scenes that never bind it is not free: an extra device allocation
+  changes what WARP resolves later, which is the hazard `core/tests/composite.rs`
+  records.
+- **The over-blend alpha is rate-converted** — `1 - (1-a)^rate` rather than `a` —
+  so a 30 Hz frame travels as far as two 60 Hz ones. ADR-0019 applied to a blend.
 
-- each `wave_mode` renders distinguishably from the others under one fixture —
-  **not yet written**; `draw::WAVE_MODES` is 8 and `waveform_figure` implements
-  all of them, but there is no test comparing the eight;
-- custom shapes honour their per-point program — **not yet written**;
-- a preset using borders and motion vectors shows both — **not yet written**.
+**3. Two `wave_mode` figures were aliases.** `0`/`1` and `6`/`7` built identical
+geometry, so the phase's done-when was not met — the test written for it is what
+found that, which is the argument for writing it as a *pairwise* comparison. The
+reference tells each pair apart using the **second audio channel** and this engine
+is mono, so each now draws the one trace at the separation the reference's own
+parameters name.
 
-A fixture under `core/tests/fixtures/` plus a test beside
-`core/tests/warp_mesh.rs`'s existing ones is the shape to follow. There is no
-`docs/` write for Phase 4 yet either: `presets/README.md`'s `warp_mesh` section
-and `docs/capturing.md`'s `milkconv` section both still describe the Phase 3
-world (the stand-in deposit, the draw roster as unconverted), and the converter
-no longer emits a stand-in deposit.
+Tests, all of Phase 4's done-when plus what ADR-0056 owes a new seam:
+
+| test | where | pins |
+|---|---|---|
+| `every_wave_mode_builds_a_different_figure` | `warp_mesh/tests.rs` | the eight modes, pairwise |
+| `a_custom_shape_honours_its_per_point_program` | `milkconv/tests/draw_layer.rs` | `.milk` text to triangles; only that crate can compile EEL2 |
+| `borders_and_motion_vectors_each_draw_their_own_figure` | `warp_mesh/tests.rs` | each alone, then both |
+| `the_blend_partition_separates_the_two_seams` | `warp_mesh/tests.rs` | the invariant the two-pipeline draw assumes |
+| `the_over_blend_alpha_is_frame_rate_independent` | `warp_mesh/tests.rs` | ADR-0019 on the blend |
+| `a_lit_backdrop_survives_where_the_draw_layer_drew_nothing` | `core/tests/warp_mesh.rs` | ADR-0056's owed capture. Corners move 0 channels; the drawn region moves 103 |
+
+The draw layer is tested **as geometry rather than as pixels** where it can be —
+"each `wave_mode` renders distinguishably" is a statement about figures, and
+comparing eight point sets answers it exactly where eight captures answer a weaker
+version through a rasterizer at a hundred times the cost.
 
 ### Decisions taken along the way that are not in the phases above
 
@@ -461,17 +477,61 @@ no longer emits a stand-in deposit.
   ladder; `Floor` is `64x48` and `Rich` `88x66`, and the format's own maximum is
   refused at 1.92 ms. See `TierConfig::mesh_grid`.
 
-### Corpus conversion, as of `9941129`
+### Phase 5, and what it measured
 
-```text
-presets-milkdrop-original      552 / 552     100 %
-presets-cream-of-the-crop    9 784 / 9 795    99.9 %
-```
+`milkconv --report <dir>` walks a corpus, converts everything and ranks what
+happened; `--render` adds the third count by loading every converted preset into a
+headless renderer. It **asserts no threshold and exits zero however bad the
+numbers are** (ADR-0071) — a non-zero exit would make it a gate the first time
+somebody put it in a script. The full table is in
+[`docs/capturing.md`](../capturing.md).
 
-Parses and compiles — a weaker claim than "renders as authored", and 82 % of the
-corpus carries HLSL that nothing translates yet. Phase 5 is where that becomes a
-measurement; it asserts no threshold (ADR-0071). The corpus is outside the
-repository at `WORK/milkdrop-corpus`.
+**Both census predictions held**, which is the result that says the ranking is
+about the corpus rather than about the converter:
+
+| | predicted | measured |
+|---|---|---|
+| reads a disk texture | 19.0 % | 21.8 % |
+| MilkDrop 1.x, no shaders | 18.0 % | 17.9 % |
+
+The disk-texture class came in 2.8 points high, and in the expected direction: the
+census counted a `grep` for a texture name and the converter also flags
+`sampler_pc`, so it sees a slightly wider class than the census could.
+
+### Phase 6: the stop condition does NOT fire, and why
+
+**The plan asked whether a route to HLSL→WGSL exists and assumed the answer
+depended on porting a C++ chain. It does not.** The reference implementations are
+`hlsl2glslfork` + `glsl-optimizer` (Butterchurn ships them through Emscripten) and
+there is no Rust equivalent — `naga` has an HLSL *backend* and no HLSL frontend.
+That is all true and it is not the question.
+
+MilkDrop shaders are not general HLSL. Censused over all **430 854** shader source
+lines in the corpus (2026-08-16):
+
+| what | count |
+|---|---|
+| distinct intrinsics covering essentially everything | ~30 — `tex2D` `lerp` `saturate` `length` `pow` `frac` `abs` `max` `sin` `cos` `floor` `mul` `atan2` `clamp` `dot` `normalize` `sqrt` `tan` `min` `log` `exp` `cross` `tex3D` |
+| MilkDrop's own prelude helpers | `GetBlur1/2/3` `GetPixel` `lum` `GetDist` `uv_rotate` `uv_polar` `uv_bipolar` — **ours to define once**, not to parse |
+| `if` | 12 822 |
+| presets whose shader contains **any** loop | **928 of 10 347 (9 %)** |
+| user-defined helper functions, whole corpus | 1 888 declarations across 16 380 shader bodies |
+
+A representative shader is twenty lines of expression code over `float2`/`float3`/
+`float2x2`, a few `tex2D`/`tex3D` calls and swizzles. **That is a bounded language
+a hand-written Rust frontend can cover**, and the 9 % with loops plus the 1 888
+helper declarations are exactly the tail Phase 6's "reject that preset by name"
+rule exists for.
+
+So the route is: a lexer, a parser for that subset, HLSL's vector/matrix promotion
+rules, a WGSL emitter, the ~40-name input surface, and the four procedural noise
+textures (**51 % of the corpus samples one**, so they are not a corner). Comparable
+in size to Phase 2's EEL2 machine, which was its own session.
+
+**The user's call (2026-08-16): Phase 6 goes to a fresh session.** It is not
+blocked and it is not deferred by doubt — it is deferred because a whole subsystem
+belongs in its own context, and because this one had already run Phase 4's blend
+rework and Phase 5.
 
 ### Things a fresh session will want to know
 
@@ -484,6 +544,20 @@ repository at `WORK/milkdrop-corpus`.
 - Two adapter comparisons are recorded and `#[ignore]`d in
   `core/tests/warp_mesh.rs`; re-run `the_adapters_agree_on_the_warp_mesh` before
   blessing anything, since the golden suite captures on WARP.
+- **A new vertex attribute goes LAST in its `#[repr(C)]` struct.** `vertex_attr_array!`
+  derives byte offsets from shader-location order, so inserting a field in the
+  middle silently re-points every attribute after it. It compiles and it renders.
+  See `SegmentInstance::alpha`.
+- **A new pipeline is not free on WARP even if nothing binds it.** The extra
+  device allocation changes what a later pass resolves to — the hazard
+  `core/tests/composite.rs`'s header records. `LineRenderer::new_split` exists so
+  the nine scenes that never split do not pay it.
+- `milkconv --report <dir>` takes about a minute over the whole corpus;
+  `--render` takes tens of minutes, because it builds a scene per preset.
+- The two `milkconv` test files split by what they can do: `conformance.rs` and
+  `draw_layer.rs` live there rather than in `core` because **only that crate can
+  compile EEL2**, and a fixture assembled by hand pins the assembler rather than
+  the semantics.
 
 ## Followups (after this lands)
 
