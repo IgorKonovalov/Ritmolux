@@ -1050,8 +1050,8 @@ and this engine does not, or writes one MilkDrop draws with and this engine does
 not, says so — in the shape ADR-0020's typo warning already takes.
 
 ```text
-milkconv: Bow To Gravity: sets `wave_r`, which this engine does not consume — Plan 0100 Phase 4, the draw layer
-milkconv: Bow To Gravity: sets `echo_alpha`, which this engine does not consume — the video echo ...
+milkconv: Songflower: custom shape 1 is textured with the previous frame, which this engine has no stage for; it is drawn as a flat gradient fill
+milkconv: Songflower: sets `echo_zoom`, which this engine does not consume — the video echo ...
 ```
 
 What is **not** warned about is a bare name the preset uses as its own
@@ -1060,20 +1060,24 @@ that constantly, and warning on every one of them would bury the findings that
 matter. The check is against MilkDrop's own roster, not against "every name we do
 not know".
 
-### What a Phase 3 conversion does and does not carry
+### What a conversion does and does not carry
 
 | carried | not carried |
 |---|---|
-| the per-frame and per-vertex programs, whole | the waveform and the custom waves and shapes (Phase 4) |
-| `zoom` `rot` `cx` `cy` `dx` `dy` `sx` `sy` `warp` `zoomexp` | the inner/outer borders and the motion-vector grid (Phase 4) |
-| `decay` `gamma` `wrap` `darken_center` `brighten` `darken` `solarize` `invert` | `echo_zoom` / `echo_alpha` / `echo_orient` — a second sampled copy, which this engine has no stage for |
-| the initial conditions, re-applied at the top of every frame | the `warp` and `comp` HLSL blocks (Phase 6) |
-| `q1`–`q32`, `t1`–`t8`, `megabuf`, `gmegabuf` | disk textures — deliberately out of scope, and priced at 19 % of the corpus |
+| the per-frame and per-vertex programs, whole | the `warp` and `comp` HLSL blocks (Phase 6) |
+| `zoom` `rot` `cx` `cy` `dx` `dy` `sx` `sy` `warp` `zoomexp` | `echo_zoom` / `echo_alpha` / `echo_orient` — a second sampled copy, which this engine has no stage for |
+| `decay` `gamma` `wrap` `darken_center` `brighten` `darken` `solarize` `invert` | disk textures — deliberately out of scope, and priced at 19 % of the corpus |
+| the waveform's eight `wave_mode` figures and their whole `wave_*` roster | a custom shape's `textured` flag — the previous frame as a fill, which needs a stage this engine has not got |
+| up to four custom waves and four custom shapes, each with its own programs | the second audio channel, because this engine's analysis is mono by construction |
+| the inner and outer borders, and the motion-vector grid | |
+| the initial conditions, re-applied at the top of every frame | |
+| `q1`–`q32`, `t1`–`t8`, `megabuf`, `gmegabuf` | |
 
-**A converted preset carries a stand-in deposit rather than its own waveform**,
-and the bundle says so in its header. MilkDrop's light source *is* the waveform;
-without something depositing light there is nothing for the mesh to move, and
-nothing on screen to judge. Phase 4 replaces it.
+**A converted preset draws its own light and the scene's deposit stays off.**
+MilkDrop's light source *is* the waveform, and up to Phase 3 the converter emitted
+a stand-in ring in its place so there was something for the mesh to move. That
+stand-in is gone: the frames further down this section that share a radial-arm
+character are from that era and are labelled as such.
 
 ### Rates are converted, and that is why a preset moves at the right speed
 
@@ -1112,7 +1116,18 @@ the right rate" actually looks like — six frames of `--signal click:120`:
 
 > **The radial-arm character these four share is the stand-in deposit, not the
 > presets.** It is the same ring in all of them; what differs is what the mesh
-> does to it. Read the *motion* here and wait for Phase 4 to read the *figure*.
+> does to it. They are kept because they are what Phase 3's done-when was judged
+> on — read the *motion* in them, not the figure.
+
+### The same thing again with the draw layer (Phase 4)
+
+Phase 4 replaced that stand-in with what MilkDrop actually draws. The figure is
+now the preset's own, and the difference is not subtle:
+
+| | |
+|---|---|
+| ![Escher's Tunnel, with the draw layer](images/milkconv/eschers-tunnel-drawn.png) | ![Songflower, with the draw layer](images/milkconv/songflower-drawn.png) |
+| *Aderrasi — Contortion (Escher's Tunnel Mix)*, the same preset as the last frame of the block above. The tunnel and its dark core are the mesh, as before; the magenta lattice at the edges is the preset's own custom shapes and waveform, which the stand-in ring had nothing to say about. | *Aderrasi — Songflower (Hybrid Plant)*: four custom shapes and a waveform over a field with `fDecay = 1`, so nothing ever fades. This is the case that reads as a flat white frame under a purely additive draw seam — see the blend note in [`presets/README.md`](../presets/README.md#milk--the-table-you-do-not-write). |
 
 ### How much of the corpus converts
 
