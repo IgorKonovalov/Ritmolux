@@ -1,6 +1,6 @@
 # 0105 — The indexes go back to being indexes
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-16
 > **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev

@@ -129,6 +129,13 @@ working rule from a lucky one.
 
 ## Closed entries — the ledger
 
+A ledger row is a pointer: the number, one line of what it was, and where it went. The body it
+points at carries the rest. `scripts/check-index-rows.mjs` holds every row below to 320 bytes
+([ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)); the live entry
+bodies further down are content, not an index, and are deliberately outside the region.
+
+<!-- roster:begin cap=320 -->
+
 | # | Entry | Went to |
 |---|-------|---------|
 | 0001 | `reaction_diffusion` reaches only 2 of the 5 composite levers | [ADR-0026](adrs/0026-full-composite-coverage-fullscreen-scenes.md) + [Plan 0025](plans/done/0025-full-composite-coverage.md) |
@@ -248,6 +255,8 @@ the other half arriving rather than sitting.
 | # | Entry | Went to |
 |---|-------|---------|
 | 0083 | RSS grew 385 to 663 MB over three minutes of switching, with no no-feedback control | [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) + [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phases 3 and 5. **Closed 2026-08-15, bounded direction.** Three runs at a fixed 20 s dwell: feedback (62 switches, 1196 s) **382.6 -> 367.2 MB**, no-feedback control (62 switches, 1196 s) **379.9 -> 380.1 MB**, and feedback with no switching (1797 s) **379.7 -> 328.0 MB**. **Nothing grew and the long run fell 52 MB.** The control is what makes it readable — run 1 oscillates across ~30 MB while run 2 sits inside 0.4 MB, so feedback churn is real, **per-switch, and recovered every switch**. Caveats bound it rather than undermine it: no audio, windowed never fullscreen, different presets, 165 Hz — a lighter load than the original, and the fullscreen reconfigure that dominated the original observation never happened. **The runs also falsified a claim in the archived [0082](design-backlog-archive.md#0082--the-quality-governor-reads-frame_ms_p99-and-a-preset-switch-spikes-p99-to-25-ms-while-nothing-is-dropped)**, filed as [0094](#0094--the-frame_ms_p99-tail-is-not-switch-correlated-so-the-steady-state-column-does-not-remove-it) |
+
+<!-- roster:end -->
 
 ## Open entries
 
