@@ -78,6 +78,41 @@ flowchart TB
     analysis["AnalysisFrame<br/>bass/mid/treb + tempo/beat/bar"] --> vm
 ```
 
+## The corpus, measured (2026-08-16)
+
+Three public collections are on disk before Phase 3 starts, cloned shallow from
+`github.com/projectM-visualizer` — **`presets-cream-of-the-crop`** (9,795 presets, the projectM
+default pack since 2022), **`presets-milkdrop-original`** (552, what shipped with the last official
+MilkDrop) and **`presets-milkdrop-texture-pack`** (the shared disk textures the original set
+declares it needs). **They live outside this repository and stay there until Phase 8 decides
+provenance**, which is also why this section names the upstream repositories rather than a local
+path.
+
+A feature census over all 10,347 files, taken before implementation because three phases below are
+sized by it rather than by estimate. Counted by `grep` over the preset text, so each row is an
+**upper bound on what that phase must handle**, not a parse:
+
+| What | Count | Share | What it prices |
+|------|-------|-------|----------------|
+| `MILKDROP_PRESET_VERSION=201` — MilkDrop 2, carries HLSL | 8,500 | 82 % | Phase 6, behind its stop condition |
+| no version line — MilkDrop 1.x, no shaders | ~1,847 | 18 % | what Phases 1–5 reach alone |
+| an **enabled** custom shape (`shapecode_N_enabled=1`) | 6,498 | 63 % | Phase 4 |
+| an **enabled** custom wave (`wavecode_N_enabled=1`) | 4,852 | 47 % | Phase 4 |
+| reads a procedural noise sampler | 5,323 | 51 % | Phase 6's input surface |
+| reads a **disk** texture | 1,937 | 19 % | out of scope — see the last section |
+| touches `megabuf` / `gmegabuf` | 435 | 4 % | Phase 2's arena |
+| uses `loop()` | 418 | 4 % | Phase 2's bounded loops |
+
+**The 82 % is the number to carry into Phase 6.** Its stop condition is not a tail risk — it decides
+whether four fifths of the corpus renders as authored. Phases 1–5 landing alone is still a real
+outcome, but [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
+Alternative D should be read as *~1,847 presets plus a native idiom*, not as "most of it works".
+
+**The 4 % on `megabuf` lets Phase 2 size its arena from evidence.** EEL2's reference `megabuf` is
+8,388,608 slots, which is tens of MB per preset at any float width — allocated once per load and
+never grown, that is the single largest memory number this plan can introduce. Size it from what
+the corpus actually uses and refuse the rest **by name**, per Phase 3's no-silent-zero rule.
+
 ## Implementation phases
 
 ### Phase 1 — the warp mesh is a native scene
@@ -174,9 +209,14 @@ flowchart TB
 - **Owner skill:** dev
 - **What:** Run `milkconv` over a corpus of public `.milk` files and report what happens.
 - **Files touched:** `milkconv/src/` (a `--report` mode), `docs/capturing.md`.
-- **Done when:** the converter prints, over a corpus of at least several hundred presets, how many
+- **Done when:** the converter prints, over the corpus above, how many
   **parse**, how many **compile**, how many **render non-blank**, and the ranked reasons for each
-  failure class. **This is a measurement and it asserts no threshold** — per
+  failure class. **The ranking is read against the census, not against an empty prior**: a
+  disk-texture failure class near **19 %** and a shaderless-only success class near **18 %** are
+  what the measured distribution predicts before the converter runs, so a ranking that disagrees
+  sharply with either is evidence about *the converter* rather than about the corpus. That is the
+  whole reason the census was taken first, and it costs nothing to state the prediction in
+  advance. **This is a measurement and it asserts no threshold** — per
   [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md), a
   coverage percentage is a property of the corpus and the converter at one moment, so it is
   recorded with both named and is never a gate. The ranked failure reasons are the output that
@@ -194,6 +234,14 @@ flowchart TB
     `time`, `fps`, `frame`, `progress`, the audio scalars, `rand_frame`, `rand_preset`,
     `slow_roam_*`/`roam_*`, `q1`–`q32` and the grouped `_qa`–`_qh`, and the `rot_s/d/f/vf/uf/rand`
     matrix families. Supply all of it or presets fail in ways that read as our bug.
+  - **The procedural noise textures are part of that surface and are not a corner** —
+    `sampler_noise_lq`, `_lq_lite`, `_mq`, `_hq` and the `sampler_noisevol_lq`/`_hq` volumes.
+    **51 % of the corpus reads one**, which makes them the most common sampler after `main`.
+    MilkDrop generates them internally from a seeded RNG at startup, so they are ours to generate
+    too: a fixed set built once at device init, deterministic under
+    [ADR-0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)'s rule, no disk file
+    and no bundle payload. **A preset sampling a missing one does not fail — it renders wrong**,
+    which is the failure class this plan's Risks call the worst for reputation.
   - **Bound every loop in the converter and record the instruction count.** A converted shader can
     still trip a driver TDR (ADR-0113's stated residual risk); a bound is the only lever we hold.
   - A failed `naga` compile **rejects that preset by name** and loads the rest. One bad bundle must
@@ -259,6 +307,18 @@ pub struct MilkBundle {
 
 - **Phase 6 may be the whole plan's cost.** The HLSL→WGSL chain is the only part with no clear
   route, which is why it is last and why it has a stop condition rather than a hope.
+- **The binary budget is tighter than when this plan was written, and Phase 6 is where we find
+  out.** [Plan 0097](done/0097-the-track-announces-itself.md) closed 2026-08-16 and took the
+  shipped `foo_lmv.dll` to **8,879,104 B against [NFR §4](../nfr.md#4-size-and-dependencies)'s
+  ~10 MB soft cap — about 1.07 MB of headroom**, the tightest that component has had;
+  [`docs/specs/0001-c-abi.md`](../specs/0001-c-abi.md) now carries the rule that came out of it,
+  that the next dependency added there re-measures rather than assumes. What *this* plan ships into
+  that same binary is the VM, the bundle loader and the `warp_mesh` scene — small Rust, with `naga`
+  already inside wgpu — so the expected delta is tens of KB, not MB. **The reading stays at Phase 6
+  by the user's call (2026-08-16)**; what changes is the number it is read against. ADR-0113's
+  Positive that NFR §4 "is unaffected by the expensive half" remains true of `milkconv` and was
+  reasoned against 3.2 MB of headroom, not 1.07 — so Phase 6's stated expectation of a near-zero
+  delta is now load-bearing rather than reassuring.
 - **Per-vertex evaluation is CPU work on the render thread.** Phase 1's measurement sets the cap;
   if the cap lands embarrassingly low, the honest answer is a low cap and a recorded number, not a
   hidden `Rich`-only feature. Moving the per-vertex program to a compute shader is a *future* plan,
@@ -285,7 +345,12 @@ pub struct MilkBundle {
   sequencing and no memory enter the native preset language.
 - **It does not ship a runtime `.milk` parser.** Conversion is ahead of time, always.
 - **It does not import MilkDrop's `textures/` directory or its user texture sampling.** Presets
-  that sample a disk texture will fail to convert and be reported as such in Phase 5.
+  that sample a disk texture will fail to convert and be reported as such in Phase 5. **That is a
+  measured 19 % of the corpus — 1,937 of 10,347 files — and the exclusion is deliberate at that
+  price** (user's call, 2026-08-16). The number is stated here so Phase 5's ranking confirms a
+  known cost rather than discovering one; the followup below stands, and its trigger has already
+  fired in the sense that matters. **The procedural noise samplers are the opposite case and are
+  in scope** — see Phase 6.
 - **It does not promise a coverage percentage.** Phase 5 measures; nothing asserts.
 - **It does not decide preset licensing** — Phase 8 does, and it is the user's call.
 
