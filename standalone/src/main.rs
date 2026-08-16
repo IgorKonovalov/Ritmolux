@@ -689,6 +689,7 @@ impl AppState {
             display_name,
             diagnostics: self.overlay_on,
             preset_name: self.config.hud.preset_name,
+            now_playing: self.config.hud.now_playing,
             preset_dir: self.preset_dir.display().to_string(),
         }
     }
@@ -721,6 +722,17 @@ impl AppState {
             // not a debugging state, so it should survive the restart.
             SettingsAction::TogglePresetName => {
                 self.config.hud.preset_name = !self.config.hud.preset_name;
+                self.save_config();
+            }
+            // Persisted for the same reason, but with one extra effect: the
+            // banner is core-owned and may be mid-envelope right now, so turning
+            // it off clears the string rather than waiting out the fade. The
+            // operator's "off" has to take the canvas back immediately.
+            SettingsAction::ToggleNowPlaying => {
+                self.config.hud.now_playing = !self.config.hud.now_playing;
+                if !self.config.hud.now_playing {
+                    self.renderer.set_now_playing("");
+                }
                 self.save_config();
             }
         }
@@ -773,7 +785,14 @@ impl AppState {
     /// callback thread.
     #[cfg(windows)]
     fn poll_now_playing(&mut self) {
-        if let Some(track) = self.now_playing.take_change() {
+        // Drained even when the operator has it off, rather than skipped: a
+        // string left in the slot would announce a track that changed minutes
+        // ago the moment the row is switched back on. Off means the *next*
+        // change is the first one drawn.
+        let Some(track) = self.now_playing.take_change() else {
+            return;
+        };
+        if self.config.hud.now_playing {
             self.renderer.set_now_playing(&track);
         }
     }
@@ -824,9 +843,9 @@ impl AppState {
             texts.push("settings  -  up/down  left/right  esc".to_owned());
             meta.push((LIST_INSET, LIST_TOP, ROW_SIZE, HEADER_COLOR));
 
-            // One column, always: nine rows fit any window this app opens in —
+            // One column, always: ten rows fit any window this app opens in —
             // they start at `ROWS_TOP` (94 px) with a 30 px pitch, so the last
-            // ends at 364 px — and a settings menu that reflowed would move a row
+            // ends at 394 px — and a settings menu that reflowed would move a row
             // out from under the operator's hand mid-edit.
             for (row, (label, value)) in self.settings.lines(&view).into_iter().enumerate() {
                 let y = overlay::ROWS_TOP + row as f32 * ROW_H;

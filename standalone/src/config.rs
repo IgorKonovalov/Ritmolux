@@ -30,8 +30,8 @@ pub struct Config {
 /// `[hud]` — the on-canvas furniture the shell draws over the show (Plan 0096).
 ///
 /// Separate from `[output]` because it is about what is *painted*, not about
-/// which screen the window opens on. One key today; the now-playing banner is
-/// expected to take a second one here (ADR-0110).
+/// which screen the window opens on. Two keys: the corner preset name and the
+/// now-playing banner the second one took, as ADR-0110 expected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Hud {
@@ -40,11 +40,20 @@ pub struct Hud {
     /// keeps what it had. Even when on, the name yields to a modal and to the
     /// F3 panel — this switch is "never show it", not "show it always".
     pub preset_name: bool,
+    /// Announce the current track in the lower-left corner when it changes
+    /// (Plan 0097). `true` because the banner is transient by construction — it
+    /// clears itself after a few seconds — so the default cannot clutter a show
+    /// the way a persistent line would. Off means no track ever reaches the
+    /// core, not a banner drawn transparent.
+    pub now_playing: bool,
 }
 
 impl Default for Hud {
     fn default() -> Self {
-        Self { preset_name: true }
+        Self {
+            preset_name: true,
+            now_playing: true,
+        }
     }
 }
 
@@ -239,6 +248,22 @@ mod tests {
         let config: Config = toml::from_str("[output]\nfullscreen = true\n")
             .expect("a config with no [hud] section must still parse");
         assert!(config.hud.preset_name);
+        assert!(config.hud.now_playing);
+    }
+
+    /// **A `[hud]` section written before Plan 0097** has `preset_name` and
+    /// nothing else. The new key has to default rather than fail the section
+    /// that already exists — the same rule the missing-section case above
+    /// asserts, one level down.
+    #[test]
+    fn a_hud_section_without_the_banner_key_keeps_the_banner_on() {
+        let config: Config = toml::from_str("[hud]\npreset_name = false\n")
+            .expect("a [hud] section predating now_playing must still parse");
+        assert!(!config.hud.preset_name, "the key that was there must hold");
+        assert!(
+            config.hud.now_playing,
+            "the key that was not must default on"
+        );
     }
 
     /// The operator's "off" survives the write/read the settings row performs —
@@ -251,6 +276,20 @@ mod tests {
         let back: Config = toml::from_str(&text).expect("its own output parses");
         assert!(
             !back.hud.preset_name,
+            "the off choice did not survive a save"
+        );
+    }
+
+    /// The same guarantee for the banner: the settings row is only "survives a
+    /// restart" if the write/read round-trips.
+    #[test]
+    fn the_now_playing_choice_round_trips() {
+        let mut config = Config::default();
+        config.hud.now_playing = false;
+        let text = toml::to_string_pretty(&config).expect("config serializes");
+        let back: Config = toml::from_str(&text).expect("its own output parses");
+        assert!(
+            !back.hud.now_playing,
             "the off choice did not survive a save"
         );
     }

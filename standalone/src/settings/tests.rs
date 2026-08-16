@@ -16,6 +16,7 @@ fn view() -> SettingsView {
         display_name: "DELL U2720Q".to_owned(),
         diagnostics: false,
         preset_name: true,
+        now_playing: true,
         preset_dir: r"C:\Users\x\AppData\Roaming\light-music-visualizer\presets".to_owned(),
     }
 }
@@ -82,6 +83,10 @@ fn each_row_emits_the_action_its_table_row_names() {
         assert_eq!(
             edit_at(SettingsRow::PresetName, right, &v),
             SettingsAction::TogglePresetName
+        );
+        assert_eq!(
+            edit_at(SettingsRow::NowPlaying, right, &v),
+            SettingsAction::ToggleNowPlaying
         );
     }
     assert_eq!(
@@ -268,6 +273,12 @@ fn the_lines_show_every_row_with_its_current_value() {
     v.preset_name = false;
     assert_eq!(find("Preset name", &s.lines(&v)), "off");
     v.preset_name = true;
+    // Likewise for the banner row (Plan 0097 Phase 3) — it sits beside the
+    // preset name because both are `[hud]` keys about what covers the show.
+    assert_eq!(find("Now playing", &lines), "on");
+    v.now_playing = false;
+    assert_eq!(find("Now playing", &s.lines(&v)), "off");
+    v.now_playing = true;
     // 1-based for the operator, 0-based in the config.
     assert_eq!(find("Display", &lines), "2 of 3 - DELL U2720Q");
 
